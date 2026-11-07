@@ -38,7 +38,8 @@ const APIKeysCard = ({ ...properties }: APIKeysCardProperties) => {
 
     if (isPending) {
         listBody = <div className="text-muted-foreground py-8 text-center text-sm">{t`Loading API keys…`}</div>;
-    } else if (isError) {
+    } else if (isError && !apiKeys) {
+        // A failed refresh keeps the keys already shown; the error is for a list that never loaded.
         listBody = (
             <div className="text-destructive py-8 text-center text-sm" role="alert">
                 {t`Could not load API keys. Try again later.`}

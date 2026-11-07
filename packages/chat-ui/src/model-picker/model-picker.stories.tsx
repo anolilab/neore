@@ -60,6 +60,8 @@ export const DefaultModelSelected: Story = {
     play: async ({ canvas }) => {
         await expect(await canvas.findByText(KIMI.name ?? "")).toBeVisible();
         await expect(canvas.queryByText(/no models found/i)).toBeNull();
+        // The picker opens scoped to the selected model's creator, so another creator's model is not listed.
+        await expect(canvas.queryByText(CLAUDE.name ?? "")).toBeNull();
     },
 };
 

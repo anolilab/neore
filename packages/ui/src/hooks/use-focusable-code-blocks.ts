@@ -6,9 +6,10 @@ const LANGUAGE_CLASS = /language-([\w+-]+)/;
 /**
  * Streamdown renders each code block's scrolling `<pre>` itself, and its component map does not reach that element, so a
  * long line cannot be scrolled from the keyboard (axe: `scrollable-region-focusable`). This makes every such `<pre>` a
- * focusable, named region inside `root`, and keeps doing so as a streamed reply adds blocks.
+ * focusable, named region inside `root`, and keeps doing so as a streamed reply adds blocks. A block without a language
+ * is named `fallbackLabel`, so no region is left unnamed.
  */
-export const useFocusableCodeBlocks = (root: RefObject<HTMLElement | null>): void => {
+export const useFocusableCodeBlocks = (root: RefObject<HTMLElement | null>, fallbackLabel: string): void => {
     useEffect(() => {
         const element = root.current;
 
@@ -22,10 +23,7 @@ export const useFocusableCodeBlocks = (root: RefObject<HTMLElement | null>): voi
 
                 pre.tabIndex = 0;
                 pre.setAttribute("role", "region");
-
-                if (language) {
-                    pre.setAttribute("aria-label", language);
-                }
+                pre.setAttribute("aria-label", language ?? fallbackLabel);
             }
         };
 
@@ -38,5 +36,5 @@ export const useFocusableCodeBlocks = (root: RefObject<HTMLElement | null>): voi
         return () => {
             observer.disconnect();
         };
-    }, [root]);
+    }, [root, fallbackLabel]);
 };

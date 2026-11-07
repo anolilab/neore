@@ -46,7 +46,8 @@ export const ModelFilters: Story = {
         url: "/dashboard/settings/chat/model-filters",
     },
     play: async ({ canvas }) => {
-        await expect(await canvas.findByText(/region restrictions/i, undefined, PAGE_WAIT)).toBeVisible();
+        // The page's words follow the locale toolbar, so the check is on its controls, not on English text.
+        await expect(await canvas.findAllByRole("switch", undefined, PAGE_WAIT)).not.toHaveLength(0);
     },
 };
 

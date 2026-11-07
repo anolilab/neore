@@ -1,3 +1,4 @@
+import type { useSortable } from "@dnd-kit/sortable";
 import type { MessageDescriptor } from "@lingui/core";
 import { msg } from "@lingui/core/macro";
 import { Plural, useLingui } from "@lingui/react/macro";
@@ -189,8 +190,8 @@ const ThreadNodeChildren: FC<{
 
 interface ThreadNodeProperties {
     currentThreadId: string | undefined;
-    dragAttributes?: any;
-    dragListeners?: any;
+    dragAttributes?: ReturnType<typeof useSortable>["attributes"];
+    dragListeners?: ReturnType<typeof useSortable>["listeners"];
     expandedThreads: Set<string>;
     handleCreateBranch: (threadId: string) => void;
     handleDeleteThread: (threadId: string) => void;
@@ -439,6 +440,11 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                     return;
                 }
 
+                // A press on the reorder handle drags or reorders; it must not also open the thread this row stands for.
+                if ((e.target as Element).closest?.("[data-reorder-handle]")) {
+                    return;
+                }
+
                 e.stopPropagation();
 
                 // The title is a link and navigates by itself.
@@ -499,6 +505,7 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                     aria-label={named(t`Reorder`)}
                     // A 24 × 24 px target (WCAG 2.5.8 at its minimum); the ring is the theme's, so it shows on the light sidebar too.
                     className="focus-visible:ring-ring flex size-6 items-center justify-center rounded-sm opacity-0 transition-opacity group-hover/action-item:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:outline-none"
+                    data-reorder-handle=""
                     {...dragAttributes}
                     {...dragListeners}
                 >

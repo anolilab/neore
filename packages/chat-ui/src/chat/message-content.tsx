@@ -117,13 +117,14 @@ interface MessageContentProps {
  */
 const DefaultText: FC<{ isAnimating: boolean; literalImages?: boolean; text: string }> = memo(({ isAnimating, literalImages, text }) => {
     const plugins = useStreamdownPlugins(text);
+    const { t } = useLingui();
     // The user's code / diagram themes and code-block display (Appearance settings), provided by the app.
     const { codeLineNumbers, mermaid, shikiTheme } = useStreamdownAppearance();
 
     // Streamdown renders each code block's scrolling `<pre>` itself: this makes it reachable from the keyboard.
     const rootRef = useRef<HTMLDivElement>(null);
 
-    useFocusableCodeBlocks(rootRef);
+    useFocusableCodeBlocks(rootRef, t`Code block`);
 
     // `codeBlockMaxHeight="none"`: the 24-line cap is per block (`chatMarkdownComponents`), not Streamdown's global 400px.
     // `contents` keeps the wrapper out of the layout.
