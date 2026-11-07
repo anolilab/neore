@@ -15,8 +15,14 @@ const read = (name: string): string => readFileSync(join(import.meta.dirname, ".
 // through the root `deploy` script.
 const APP_DEPLOY = /alchemy (deploy(?! alchemy-storybook\.run\.ts)|"\$\{args)|pnpm (run )?deploy\b/;
 
+const COMMENT_LINE = /^\s*#/;
+
 const deploy = read("deploy.yml");
-const preview = read("preview.yml");
+// Comment lines dropped: only a step that runs counts, and prose about deploys must not match.
+const preview = read("preview.yml")
+    .split("\n")
+    .filter((line) => !COMMENT_LINE.test(line))
+    .join("\n");
 
 describe("backend codegen before Alchemy", () => {
     const codegen = deploy.indexOf("pnpm --filter @neore/backend run codegen");
