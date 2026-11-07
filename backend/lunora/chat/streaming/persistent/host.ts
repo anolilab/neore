@@ -135,7 +135,8 @@ export const bumpedExpiry = (stream: Pick<Stream, "_creationTime" | "expiresAt">
 /**
  * Hands the thread back from `running` unless another live stream or an edit on it still holds it. `failed` says the turn
  * failed, so a snoozed thread wakes (`patchThread`). A failed turn wakes its thread whatever else holds it or whatever status it
- * has now: a snooze must not outlive a failure with no visible run, the same give-back a failed run makes.
+ * has now: a snooze must not outlive a failure with no visible run, the same give-back a failed run makes. Used by a host turn's end
+ * and by the expiry of a cloud stream (a timeout is a failure).
  */
 export const releaseThread = async (
     ctx: Pick<MutationCtx, "db">,
@@ -143,16 +144,21 @@ export const releaseThread = async (
     now: number,
     { failed = false }: { failed?: boolean } = {},
 ): Promise<void> => {
-    const [thread, live] = await Promise.all([
+    const [thread, live, liveEdit] = await Promise.all([
         ctx.db.threads.findFirst({ where: { _id: threadId } }),
         ctx.db.persistentStreams.findFirst({ where: { status: { in: ["pending", "streaming"] }, threadId } }),
+        // An edit streams through `streamingMessages` instead, and it holds the same running status.
+        ctx.db
+            .query("streamingMessages")
+            .withIndex("threadId_state_order_stepOrder", (q) => q.eq("threadId", threadId).eq("stateKind", "streaming"))
+            .take(1),
     ]);
 
     if (!thread) {
         return;
     }
 
-    if (thread.status === "running" && !live) {
+    if (thread.status === "running" && !live && liveEdit.length === 0) {
         await patchThread(ctx.db, threadId, { status: "active", updatedAt: now }, { failed });
 
         return;

@@ -5,7 +5,7 @@
  * two cases it decides: a write made while the connection is down is refused at once when it is `onlineOnly`, and queued for the
  * reconnect otherwise.
  */
-import { onlineManager, QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { MutationCache, onlineManager, QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -82,7 +82,18 @@ const UNTIL = Date.now() + 3_600_000;
 
 const client = new QueryClient({ defaultOptions: { mutations: { retry: false } } });
 
+// A query client whose refetch fails after every mutation succeeds, as a cache hook or a refetch would.
+const refetchFails = new QueryClient({
+    mutationCache: new MutationCache({
+        onSuccess: () => {
+            throw new Error("The refetch failed.");
+        },
+    }),
+});
+
 const wrapper = ({ children }: { children: ReactNode }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+
+const refetchWrapper = ({ children }: { children: ReactNode }) => <QueryClientProvider client={refetchFails}>{children}</QueryClientProvider>;
 
 const goOffline = (): void => {
     server.online = false;
@@ -121,7 +132,15 @@ describe("snoozing while offline", () => {
     afterEach(() => {
         onlineManager.setOnline(true);
         client.clear();
+        refetchFails.clear();
         vi.restoreAllMocks();
+    });
+
+    it("a custom snooze that is written, followed by a failing refetch, still reports success", async () => {
+        const { result } = renderHook(() => useThreadStateActions(), { wrapper: refetchWrapper });
+
+        await expect(result.current.snoozeAt("t1", UNTIL, undefined)).resolves.toBe(true);
+        expect(server.written).toHaveLength(1);
     });
 
     it("refuses a custom time at once, and no snooze is written once the connection returns", async () => {

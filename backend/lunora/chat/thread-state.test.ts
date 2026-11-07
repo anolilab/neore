@@ -242,7 +242,7 @@ describe("a snoozed thread wakes early", () => {
         expect(row.snoozedUntil).toBeUndefined();
     });
 
-    it("leaves an unsnoozed thread's row untouched when a stream fails while another stream of the thread still runs", async () => {
+    it("a failed stream while another stream of the thread still runs keeps the thread's status and time, and records the wake", async () => {
         const id = await harness.run(
             async (context: any) => await context.db.insert("threads", { status: "running", title: "Parallel", updatedAt: 111, userId: OWNER }),
         );
@@ -257,7 +257,33 @@ describe("a snoozed thread wakes early", () => {
 
         await harness.run(async (context: any) => await context.runMutation(timeoutStream as never, { streamId: failing } as never));
 
-        expect(await readThread(id)).toEqual(before);
+        const after = await readThread(id);
+
+        // The other stream keeps the status, and nothing is snoozed to clear; the wake is recorded as the thread's ordering.
+        expect(after).toMatchObject({ status: before.status, updatedAt: before.updatedAt });
+        expect("snoozedUntil" in after).toBe(false);
+        expect(after.snoozeChosenAt).toBeGreaterThan(0);
+    });
+
+    it("a timed-out stream wakes a snoozed thread, alone or with another stream still running", async () => {
+        const alone = await insertSnoozed();
+        const withAnother = await insertSnoozed();
+        const streaming = (streamThread: string, order: number): Record<string, unknown> => {
+            return { order, state: { kind: "streaming", lastHeartbeat: 1 }, stateKind: "streaming", stepOrder: 0, threadId: streamThread };
+        };
+        const timedOut = await harness.run(async (context: any) => await context.db.insert("streamingMessages", streaming(alone, 1)));
+        const timedOutWithAnother = await harness.run(async (context: any) => await context.db.insert("streamingMessages", streaming(withAnother, 1)));
+
+        await harness.run(async (context: any) => await context.db.insert("streamingMessages", streaming(withAnother, 2)));
+        await harness.run(async (context: any) => await context.runMutation(timeoutStream as never, { streamId: timedOut } as never));
+        await harness.run(async (context: any) => await context.runMutation(timeoutStream as never, { streamId: timedOutWithAnother } as never));
+
+        const aloneRow = await readThread(alone);
+        const withAnotherRow = await readThread(withAnother);
+
+        expect(aloneRow).toMatchObject({ status: "error" });
+        expect(aloneRow.snoozedUntil).toBeUndefined();
+        expect(withAnotherRow.snoozedUntil).toBeUndefined();
     });
 
     it("stays snoozed for an ordinary write", async () => {

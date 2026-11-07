@@ -71,6 +71,17 @@ const SnoozeUntilDialog = ({ onOpenChange, open, previousUntil, returnFocusTo, t
     const [error, setError] = useState<string | null>(null);
     const [saving, setSaving] = useState(false);
     const submitReference = useRef<HTMLButtonElement>(null);
+    const timeReference = useRef<HTMLInputElement>(null);
+    // Whether this opening of the dialog is still open. It is set false when the dialog unmounts, so a save it started cannot act on a later opening.
+    const opened = useRef(true);
+
+    useEffect(() => {
+        opened.current = true;
+
+        return () => {
+            opened.current = false;
+        };
+    }, []);
     const [returnFocus] = useState(() => returnFocusTo);
 
     // A focus return still pending from a dialog that just closed must not take focus from this one.
@@ -103,6 +114,14 @@ const SnoozeUntilDialog = ({ onOpenChange, open, previousUntil, returnFocusTo, t
             return;
         }
 
+        // A submit with no time is refused with its own message, and the field takes focus: nothing is saved and the dialog stays open.
+        if (value.trim() === "") {
+            setError(t`Choose a wake-up time.`);
+            timeReference.current?.focus();
+
+            return;
+        }
+
         const result = customSnoozeCheck(value, new Date());
 
         if ("problem" in result) {
@@ -111,6 +130,7 @@ const SnoozeUntilDialog = ({ onOpenChange, open, previousUntil, returnFocusTo, t
                     ? t`That time does not exist on that day, because the clocks skip it. Choose another time.`
                     : t`Choose a time later than now, and within the next year.`,
             );
+            timeReference.current?.focus();
 
             return;
         }
@@ -118,8 +138,15 @@ const SnoozeUntilDialog = ({ onOpenChange, open, previousUntil, returnFocusTo, t
         setSaving(true);
 
         if (await snoozeAt(threadId, result.until, previousUntil)) {
-            onOpenChange(false);
+            // A save that finishes after this dialog closed (cancelled, or taken over) closes nothing: a new opening may be open now.
+            if (opened.current) {
+                onOpenChange(false);
+            }
 
+            return;
+        }
+
+        if (!opened.current) {
             return;
         }
 
@@ -146,11 +173,13 @@ const SnoozeUntilDialog = ({ onOpenChange, open, previousUntil, returnFocusTo, t
                             aria-describedby={error ? errorId : undefined}
                             aria-invalid={error ? true : undefined}
                             aria-required="true"
+                            disabled={saving}
                             id={inputId}
                             onChange={(event) => {
                                 setValue(event.target.value);
                                 setError(null);
                             }}
+                            ref={timeReference}
                             type="datetime-local"
                             value={value}
                         />

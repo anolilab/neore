@@ -68,6 +68,12 @@ const insertStream = async (thread: Thread, status: string, expiresAt: number): 
             }),
     );
 
+const snoozedUntilOf = async (id: string): Promise<number | undefined> => {
+    const row = (await harness.run(async (context) => await context.db.get("threads", id as never))) as { snoozedUntil?: number } | null;
+
+    return row?.snoozedUntil;
+};
+
 const sweep = async () => await harness.run(async (context) => await context.runMutation(cleanupExpiredStreams, {}));
 
 const statusOf = async (id: string): Promise<unknown> =>
@@ -147,6 +153,24 @@ describe("cleanupExpiredStreams", () => {
 
             await expect(statusOf(expired)).resolves.toBe("timeout");
             await expect(statusOf(thread.threadId)).resolves.toBe("active");
+        });
+
+        it("wakes a snoozed thread when its stream times out, even while a newer stream on it is live", async () => {
+            expect.assertions(3);
+
+            const thread = await seedThread();
+
+            await harness.run(async (context) => await context.db.patch("threads", thread.threadId as never, { snoozedUntil: Date.now() + 24 * HOUR }));
+
+            const expired = await insertStream(thread, "streaming", Date.now() - HOUR);
+
+            await insertStream(thread, "streaming", Date.now() + HOUR);
+
+            await sweep();
+
+            await expect(statusOf(expired)).resolves.toBe("timeout");
+            await expect(statusOf(thread.threadId)).resolves.toBe("running");
+            expect(await snoozedUntilOf(thread.threadId)).toBeUndefined();
         });
 
         it("is left as it is when it is not running", async () => {

@@ -321,9 +321,9 @@ const updateThreadStatusAfterStreamEnd = async (context: MutationContext, thread
     }
 
     if (hasActiveStream) {
-        // Another stream holds the thread's status, but a failed stream still wakes a snoozed thread (`patchesWakeSnooze`).
-        // With no snooze to wake, nothing is written: an empty patch would still touch a row another stream is updating.
-        if (endStatus === "error" && thread.snoozedUntil !== undefined) {
+        // Another stream holds the thread's status, but a failed or timed-out stream still wakes a snoozed thread, and records the wake
+        // even when nothing is snoozed (`patchThread`): a snooze chosen before it must not drain after it.
+        if (endStatus === "error") {
             await patchThread(context.db, threadId, {}, { failed: true });
         }
 

@@ -80,13 +80,30 @@ describe("SnoozeUntilDialog when the send fails", () => {
         const snooze = screen.getByRole("button", { name: "Snooze" }) as HTMLButtonElement;
 
         expect(snooze.disabled).toBe(false);
+        // The Snooze button itself holds focus: the same element, and it is a button.
         // eslint-disable-next-line testing-library/no-node-access -- focus placement is what this asserts
         expect(document.activeElement).toBe(snooze);
+        expect(document.activeElement?.tagName).toBe("BUTTON");
         expect((screen.getByRole("button", { name: "Cancel" }) as HTMLButtonElement).disabled).toBe(false);
 
         fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
 
         expect(onOpenChange).toHaveBeenCalledWith(false);
+    });
+
+    it("a submit with no time shows its own error, keeps the dialog open, saves nothing, and focuses the time field", async () => {
+        const onOpenChange = mountDialog();
+
+        fireEvent.change(wakeInput(), { target: { value: "" } });
+        submit();
+
+        const alert = await screen.findByRole("alert");
+
+        expect(alert.textContent).toBe("Choose a wake-up time.");
+        expect(onOpenChange).not.toHaveBeenCalled();
+        expect(state.snoozeAt).not.toHaveBeenCalled();
+        // eslint-disable-next-line testing-library/no-node-access -- focus placement is what this asserts
+        expect(document.activeElement).toBe(wakeInput());
     });
 
     it("lets Cancel close the dialog while a send that never settles is still pending", async () => {
@@ -100,6 +117,8 @@ describe("SnoozeUntilDialog when the send fails", () => {
         const cancel = screen.getByRole("button", { name: "Cancel" }) as HTMLButtonElement;
 
         expect(cancel.disabled).toBe(false);
+        // The time cannot change under a save in flight.
+        expect(wakeInput().disabled).toBe(true);
 
         fireEvent.click(cancel);
 
@@ -147,6 +166,47 @@ describe("the list's snooze dialog across threads", () => {
     beforeEach(() => {
         state.snoozeAt.mockReset();
         useThreadListUIStore.getState().setSnoozeThreadId(null);
+    });
+
+    it("a save cancelled and then reopened for the same thread does not close the new opening", async () => {
+        let released = false;
+        let saveSettled = false;
+
+        state.snoozeAt.mockImplementationOnce(async () => {
+            await vi.waitFor(() => {
+                if (!released) {
+                    throw new Error("The save is still in flight");
+                }
+            });
+            saveSettled = true;
+
+            return true;
+        });
+        useThreadListUIStore.getState().setSnoozeThreadId("thread-a");
+        render(
+            <>
+                <ListRows />
+                <ListDialogs />
+            </>,
+        );
+
+        fireEvent.click(screen.getByRole("button", { name: "Snooze" }));
+        expect(await screen.findByText("Saving…")).toBeTruthy();
+
+        // The owner cancels, and reopens the same thread's dialog while the save is still in flight.
+        fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+        expect(useThreadListUIStore.getState().snoozeThreadId).toBeNull();
+        act(() => {
+            useThreadListUIStore.getState().setSnoozeThreadId("thread-a");
+        });
+
+        released = true;
+        await vi.waitFor(() => {
+            expect(saveSettled).toBe(true);
+        });
+
+        expect(useThreadListUIStore.getState().snoozeThreadId).toBe("thread-a");
+        expect(screen.getByLabelText("Wake up at")).toBeTruthy();
     });
 
     it("a save for thread A that finishes after thread B's dialog opened leaves B's dialog open", async () => {

@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
 import { renderHook } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const calls: { args: unknown; fn: string }[] = [];
 const seenOptions: { call?: unknown; fn: string; networkMode?: string; retry?: number }[] = [];
+const direct: { args: unknown; call?: unknown }[] = [];
 const toasts: { message: string; options?: { action?: { onClick: () => void } } }[] = [];
 
 vi.mock("@lingui/react/macro", () => {
@@ -19,6 +20,9 @@ vi.mock("@lingui/react/macro", () => {
 
 vi.mock("@tanstack/react-query", () => {
     return {
+        useQueryClient: () => {
+            return {};
+        },
         useMutation: (options: { call?: unknown; fn: string; networkMode?: string; retry?: number }) => {
             seenOptions.push(options);
 
@@ -39,7 +43,15 @@ vi.mock("@/lib/lunora/crpc", () => {
                     thread_state: {
                         snoozeThread: {
                             mutationOptions: (_overrides?: unknown, call?: unknown) => {
-                                return { call, fn: "snooze" };
+                                return {
+                                    call,
+                                    fn: "snooze",
+                                    mutationFn: async (args: unknown) => {
+                                        direct.push({ args, call });
+
+                                        return null;
+                                    },
+                                };
                             },
                         },
                         unsnoozeThread: {
@@ -73,47 +85,59 @@ const flush = () =>
 describe("useThreadStateActions", () => {
     beforeEach(() => {
         calls.length = 0;
+        direct.length = 0;
         seenOptions.length = 0;
         toasts.length = 0;
     });
 
-    it("saves a custom time only while online, without a retry; a preset keeps the client's queued default", () => {
-        renderHook(() => useThreadStateActions());
+    afterEach(() => {
+        vi.restoreAllMocks();
+    });
 
-        const snoozes = seenOptions.filter((options) => options.fn === "snooze");
-        const custom = snoozes.find((options) => options.networkMode === "always");
-        const preset = snoozes.find((options) => options.networkMode === undefined);
+    it("writes a custom time directly and online only; a preset keeps the client's queued default", async () => {
+        const { result } = renderHook(() => useThreadStateActions());
 
-        expect(custom).toMatchObject({ call: { onlineOnly: true }, retry: 0 });
-        expect(preset?.call).toBeUndefined();
+        await expect(result.current.snoozeAt("t1", 1000, undefined)).resolves.toBe(true);
+
+        expect(direct).toMatchObject([{ args: { threadId: "t1", until: 1000 }, call: { onlineOnly: true } }]);
+
+        const presets = seenOptions.filter((options) => options.fn === "snooze");
+
+        expect(presets.every((options) => options.networkMode === undefined)).toBe(true);
     });
 
     it("snoozes, then undoes to a plain unsnooze when nothing was snoozed before", async () => {
+        const clock = vi.spyOn(Date, "now").mockReturnValue(1000);
         const { result } = renderHook(() => useThreadStateActions());
 
         result.current.snooze("t1", "hour", undefined);
         await flush();
 
         expect(calls).toHaveLength(1);
-        expect(calls[0]).toMatchObject({ args: { threadId: "t1" }, fn: "snooze" });
+        expect(calls[0]).toMatchObject({ args: { chosenAt: 1000, threadId: "t1" }, fn: "snooze" });
         expect(toasts).toHaveLength(1);
 
+        // The undo is a choice made later, so it carries the later time.
+        clock.mockReturnValue(5000);
         toasts[0]?.options?.action?.onClick();
         await flush();
 
-        expect(calls[1]).toMatchObject({ args: { threadId: "t1" }, fn: "unsnooze" });
+        expect(calls[1]).toMatchObject({ args: { chosenAt: 5000, threadId: "t1" }, fn: "unsnooze" });
     });
 
-    it("undoes a snooze back to the earlier wake time", async () => {
+    it("undoes a snooze back to the earlier wake time, stamped with the time of the undo", async () => {
+        const clock = vi.spyOn(Date, "now").mockReturnValue(1000);
         const { result } = renderHook(() => useThreadStateActions());
-        const earlier = Date.now() + 86_400_000;
+        const earlier = 1000 + 86_400_000;
 
         result.current.snooze("t1", "hour", earlier);
         await flush();
+
+        clock.mockReturnValue(5000);
         toasts[0]?.options?.action?.onClick();
         await flush();
 
-        expect(calls[1]).toMatchObject({ args: { threadId: "t1", until: earlier }, fn: "snooze" });
+        expect(calls[1]).toMatchObject({ args: { chosenAt: 5000, threadId: "t1", until: earlier }, fn: "snooze" });
     });
 
     it("unsnoozes, and undo snoozes it again until the same time", async () => {

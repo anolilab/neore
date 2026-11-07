@@ -1,6 +1,6 @@
 import { useLingui } from "@lingui/react/macro";
 import type { Id } from "@neore/backend/dataModel";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useCallback } from "react";
 
 import { useCRPC } from "@/lib/lunora/crpc";
@@ -9,7 +9,13 @@ import { showError, showSuccess } from "@/lib/toast";
 import type { SnoozeChoice } from "../lib/thread-state-rules";
 import { isSnoozed, snoozeUntil } from "../lib/thread-state-rules";
 
-type SnoozeMutate = (variables: { chosenAt: number; threadId: Id<"threads">; until: number }) => Promise<unknown>;
+interface SnoozeMutateVariables {
+    chosenAt: number;
+    threadId: Id<"threads">;
+    until: number;
+}
+
+type SnoozeMutate = (variables: SnoozeMutateVariables) => Promise<unknown>;
 
 interface ThreadStateActions {
     /** Hides the thread until the choice's time; the toast offers an undo that restores the previous snooze, if any. */
@@ -27,16 +33,24 @@ interface ThreadStateActions {
 export const useThreadStateActions = (): ThreadStateActions => {
     const { t } = useLingui();
     const crpc = useCRPC();
+    const queryClient = useQueryClient();
     // Presets and undo keep the client's default: a snooze made offline is queued and sent once the connection returns.
     const { mutateAsync: snoozeMutation } = useMutation(crpc.chat.thread_state.snoozeThread.mutationOptions());
-    // A custom time is saved only while online. The client refuses an `onlineOnly` write at once when the connection is down (the
-    // default queues it for the reconnect), so no write is left to land later. `networkMode: "always"` stops the query client from
-    // pausing it first, and `retry: 0` stops a second attempt.
-    const { mutateAsync: snoozeNowMutation } = useMutation({
-        ...crpc.chat.thread_state.snoozeThread.mutationOptions(undefined, { onlineOnly: true }),
-        networkMode: "always",
-        retry: 0,
-    });
+    // A custom time is written straight to the client, online only, and not through the query client. The write's result is then the
+    // write's own: a refetch or a cache hook that fails after it cannot read as a failed snooze. `onlineOnly` makes the client refuse
+    // it at once when the connection is down, so nothing is queued for the reconnect.
+    const writeNow = useCallback(
+        async (variables: SnoozeMutateVariables): Promise<unknown> => {
+            const { mutationFn } = crpc.chat.thread_state.snoozeThread.mutationOptions(undefined, { onlineOnly: true });
+
+            if (mutationFn === undefined) {
+                throw new Error("The snooze write is unavailable.");
+            }
+
+            return await mutationFn(variables, { client: queryClient, meta: undefined });
+        },
+        [crpc, queryClient],
+    );
     const { mutateAsync: unsnoozeMutation } = useMutation(crpc.chat.thread_state.unsnoozeThread.mutationOptions());
 
     const restore = useCallback(
@@ -58,28 +72,31 @@ export const useThreadStateActions = (): ThreadStateActions => {
 
     // The choice is stamped when the user makes it, not when the write is sent: a write queued offline keeps that time, so a choice
     // made later on the thread wins when the queue drains.
+    // The result is the write's own outcome. Only the write sits in the try: an error after a successful write (the toast) is not
+    // reported as a failed snooze.
     const save = useCallback(
-        (mutate: SnoozeMutate, threadId: string, until: number, previousUntil: number | undefined): Promise<boolean> =>
-            mutate({ chosenAt: Date.now(), threadId: threadId as Id<"threads">, until })
-                .then(() => {
-                    const when = new Date(until).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+        async (mutate: SnoozeMutate, threadId: string, until: number, previousUntil: number | undefined): Promise<boolean> => {
+            try {
+                await mutate({ chosenAt: Date.now(), threadId: threadId as Id<"threads">, until });
+            } catch (error) {
+                console.error("Failed to snooze thread:", error);
+                showError(t`Could not snooze the thread. Please try again.`);
 
-                    showSuccess(t`Snoozed until ${when}`, { action: { label: t`Undo`, onClick: () => restore(threadId, previousUntil) } });
+                return false;
+            }
 
-                    return true;
-                })
-                .catch((error) => {
-                    console.error("Failed to snooze thread:", error);
-                    showError(t`Could not snooze the thread. Please try again.`);
+            const when = new Date(until).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
 
-                    return false;
-                }),
+            showSuccess(t`Snoozed until ${when}`, { action: { label: t`Undo`, onClick: () => restore(threadId, previousUntil) } });
+
+            return true;
+        },
         [restore, t],
     );
 
     const snoozeAt = useCallback(
-        (threadId: string, until: number, previousUntil: number | undefined): Promise<boolean> => save(snoozeNowMutation, threadId, until, previousUntil),
-        [save, snoozeNowMutation],
+        (threadId: string, until: number, previousUntil: number | undefined): Promise<boolean> => save(writeNow, threadId, until, previousUntil),
+        [save, writeNow],
     );
 
     const snooze = useCallback(
