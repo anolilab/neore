@@ -1,0 +1,33 @@
+# Changelog
+
+## 0.1.0
+<sub>2026-11-07</sub>
+
+- feat(mobile): hold the mic button to dictate into the composer (#574)
+- chore(tooling): type-check affected projects in the pre-push hook with a fast compiler (#568)
+- docs: split the root AGENTS.md into scoped files next to the code (#541)
+- feat(ai): run the default models on Cloudflare Workers AI (#539)
+- feat(chat): let a thread route each send to a model chosen per request (#497)
+- fix(gateway): compare the prompt-cache stats window in the stored timestamp format (#484)
+- feat(chat): pause a run on a provider rate limit and resume it by itself (#433)
+- feat: combine the open UI and coding-agent PRs, with their review threads fixed (#426)
+- feat(chat): show an MCP tool's progress while it runs (#424)
+- feat(chat): retry a reply on a user-chosen backup model after an infra failure (#347)
+- feat(ai): list every image-input model under the vision filter (#342)
+- fix: work through the #297 audit backlog (#341)
+- feat(desktop): Electron shell, thread windows and offline screen (#296)
+- feat(chat): steer a running reply (#321)
+- fix(gateway): keep usage alerts flowing from a gateway that predates firedAt, and deliver when the cooldown claim fails (#334)
+- fix(gateway): deliver usage and budget notifications to the backend (#323)
+- perf: bundle budget, chat hot-path fixes, msw test coverage (#333)
+- fix(gateway): cancel webhook bodies, cap audio uploads early, drop the ignored tier header, deadline the realtime handshake (#326)
+- fix: audit 2026-10-20 — gateway pricing, workflow media quotas, cancelled-stream billing, backend correctness, gateway hardening, chat perf, Lunora alpha bump (#298)
+- feat(model-picker): sort, exact prices, nicknames, favorite order, open shortcut (#288)
+- feat(ai): mark, label and screen AI-generated output (EU AI Act Art. 50) (#268)
+- feat: knowledge headings/pages/rerank, gateway tool-call fixes, /v1/responses, caps, GenAI spans, canvas a11y, Neore re-import (#285)
+- feat(workflow): video frames, reference uploads, trim, billing and plan gating for workflow media (#283)
+- feat: workflow undo/redo, stored workflow images, and audit fixes (#279)
+- ci(deploy): move the deploy to Alchemy 2 (#244)
+- ci: fix startup failures, gate merges on lint and tests, cover Rust, add a full test run (#237)
+- fix: cost guards for triggers, sweeps, render retries, rate limits and presence (#233)
+- chore(lint): disable jsdoc/text-escaping in the remaining project configs (#232)

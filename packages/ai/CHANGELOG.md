@@ -1,0 +1,31 @@
+# Changelog
+
+## 0.1.0
+<sub>2026-11-07</sub>
+
+- feat(acp): fork a coding agent's session natively when the backend asks (#581)
+- chore(tooling): type-check affected projects in the pre-push hook with a fast compiler (#568)
+- feat(chat): compact a thread's model context on demand and by threshold (#514)
+- fix(chat): strip hidden characters from host-run prompts and narrow the joiner rule (#509)
+- docs: split the root AGENTS.md into scoped files next to the code (#541)
+- feat(ai): run the default models on Cloudflare Workers AI (#539)
+- docs: drop the private plans repository path from comments and docs (#489)
+- chore: move the plans to the private plans repo (#488)
+- feat(chat): take hidden characters out of prompts (#468)
+- feat(chat): cap a message at 100,000 characters with a clear notice (#469)
+- fix(build): restore the packages' dist from the build cache (#450)
+- feat: combine the open UI and coding-agent PRs, with their review threads fixed (#426)
+- docs: add READMEs for the shared packages and the backend (#416)
+- feat(develop): read pull requests from a host adapter, with a Develop workspace (#407)
+- fix(ai): keep the chat system prompt stable within an hour (#374)
+- feat(ai): runner capability types, declarations and gating rules (#362)
+- feat(chat): retry a reply on a user-chosen backup model after an infra failure (#347)
+- feat(ai): list every image-input model under the vision filter (#342)
+- feat(settings): instructions for thread titles (#317)
+- feat(ai): mark, label and screen AI-generated output (EU AI Act Art. 50) (#268)
+- feat(workflow): video frames, reference uploads, trim, billing and plan gating for workflow media (#283)
+- feat: workflow undo/redo, stored workflow images, and audit fixes (#279)
+- ci: fix startup failures, gate merges on lint and tests, cover Rust, add a full test run (#237)
+- fix: cost guards for triggers, sweeps, render retries, rate limits and presence (#233)
+- chore(lint): disable jsdoc/text-escaping in the remaining project configs (#232)
+- ci(lint): make the lint pipeline green (#228)
