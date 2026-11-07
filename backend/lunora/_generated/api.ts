@@ -817,6 +817,9 @@ export interface ApiTypes {
             getUsageBackfillStatus: FunctionReference<"query", {}, "idle" | "running" | "done">;
             startUsageBackfill: FunctionReference<"mutation", {}, "idle" | "running" | "done">;
         };
+        organization: {
+            getOrganizationProjectUsage: FunctionReference<"action", { afterUserId?: string; fromDate: string }, { members: number; nextCursor?: string; projects: Array<{ costMicrodollars: number; replies: number; tokens: number; projectKey: string; title: string }>; truncated: boolean }>;
+        };
     };
     vault: {
         functions: {
@@ -1697,6 +1700,9 @@ export const api: ApiTypes = {
         backfill: {
             getUsageBackfillStatus: { __lunoraRef: "usage_backfill:getUsageBackfillStatus" },
             startUsageBackfill: { __lunoraRef: "usage_backfill:startUsageBackfill" },
+        },
+        organization: {
+            getOrganizationProjectUsage: { __lunoraRef: "usage_organization:getOrganizationProjectUsage" },
         },
     },
     vault: {

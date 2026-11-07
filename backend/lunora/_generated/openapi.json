@@ -56149,6 +56149,116 @@
         "x-lunora-function-kind": "mutation"
       }
     },
+    "/_lunora/rpc#usage_organization:getOrganizationProjectUsage": {
+      "post": {
+        "description": "Invoke the `action` `usage_organization:getOrganizationProjectUsage` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "usage_organization:getOrganizationProjectUsage",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "afterUserId": {
+                        "type": "string"
+                      },
+                      "fromDate": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "fromDate"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "usage_organization:getOrganizationProjectUsage",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "members": {
+                      "type": "number"
+                    },
+                    "nextCursor": {
+                      "type": "string"
+                    },
+                    "projects": {
+                      "items": {
+                        "properties": {
+                          "costMicrodollars": {
+                            "type": "number"
+                          },
+                          "replies": {
+                            "type": "number"
+                          },
+                          "tokens": {
+                            "type": "number"
+                          },
+                          "projectKey": {
+                            "type": "string"
+                          },
+                          "title": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "costMicrodollars",
+                          "replies",
+                          "tokens",
+                          "projectKey",
+                          "title"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "truncated": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "members",
+                    "projects",
+                    "truncated"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "action: usage_organization:getOrganizationProjectUsage",
+        "tags": [
+          "usage"
+        ],
+        "x-lunora-function-kind": "action"
+      }
+    },
     "/_lunora/rpc#vault_functions:deleteAttachments": {
       "post": {
         "description": "Invoke the `mutation` `vault_functions:deleteAttachments` over the Lunora RPC envelope (POST /_lunora/rpc).",

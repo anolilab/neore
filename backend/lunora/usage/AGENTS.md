@@ -22,3 +22,6 @@
   holds; later history stays "No project"); it skips keys the
   live path marked `projectFiled` and marks its own `project:<key>`, which the
   live path checks. Key pruning waits for both walks.
+- **Organization view** (`organization.ts`) fans out to each member's shard
+  with `callOnShard`; it is bounded (`MAX_MEMBERS`, `MAX_PROJECTS`) and checks
+  the admin role on the `member` row, not the session.
