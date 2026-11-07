@@ -7,8 +7,8 @@
 pnpm exec sort-package-json --check packages/*/package.json apps/*/package.json backend/package.json services/*/package.json package.json || exit 1
 
 # Formatting of every file changed since the merge base with main, root files
-# included: oxfmt on code and data, Prettier on CSS and HTML. Markdown is skipped,
-# as in CI.
+# included: oxfmt on code and data, Prettier on CSS and HTML. Markdown is skipped
+# here; a project's `lint:oxfmt` in CI still checks its Markdown.
 base=$(git merge-base HEAD origin/main 2>/dev/null) || {
     git fetch --quiet origin main && base=$(git merge-base HEAD origin/main)
 } || {

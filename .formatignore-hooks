@@ -4,5 +4,6 @@
 # so the hooks leave them alone. Remove a line here when its project gains a format check.
 apps/desktop/
 apps/mobile/
+packages/device-core/
 packages/client-runtime/
 packages/device-core-node/
