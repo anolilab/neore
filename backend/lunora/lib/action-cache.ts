@@ -209,7 +209,7 @@ export const bumpGeneration = internalMutation
         const name = generationRowName(args.name);
         const key = await cacheKeyFor(name, args.scope);
         const expiresAt = ctx.now + GENERATION_TTL_MS;
-        const value = crypto.randomUUID();
+        const value = ctx.newId();
         const existing = await ctx.db.actionCache.findFirst({ where: { key } });
 
         if (existing) {

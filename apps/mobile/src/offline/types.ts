@@ -14,6 +14,8 @@ export interface CachedMessage {
     createdAt: number;
     id: string;
     role: string;
+    /** The text parts only, for the share sheet. `text` also carries labels for attachments. */
+    shareText: string;
     status: string;
     text: string;
     threadId: string;

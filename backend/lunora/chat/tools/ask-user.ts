@@ -22,25 +22,49 @@ import z from "zod/v4";
 
 import type { ToolCtx as ToolContext } from "../../agent/client";
 import { createTool } from "../../agent/client";
-import type { AskUserInput, AskUserOutput } from "./ask-user-constants";
-import { ASK_USER_CHOICE_MAX, ASK_USER_MAX_CHOICES, ASK_USER_QUESTION_MAX } from "./ask-user-constants";
+import type { AskUserFile, AskUserInput, AskUserOutput, AskUserQuestionAnswer } from "./ask-user-constants";
+import { ASK_USER_CHOICE_MAX, ASK_USER_MAX_CHOICES, ASK_USER_MAX_QUESTIONS, ASK_USER_QUESTION_MAX } from "./ask-user-constants";
+
+const choicesSchema = z
+    .array(z.string().min(1).max(ASK_USER_CHOICE_MAX))
+    .max(ASK_USER_MAX_CHOICES)
+    .meta({ description: "Short suggested answers, shown as buttons. The user can always type their own answer instead." });
 
 const inputSchema = z
     .object({
-        choices: z
-            .array(z.string().min(1).max(ASK_USER_CHOICE_MAX))
-            .max(ASK_USER_MAX_CHOICES)
+        choices: choicesSchema.optional(),
+        question: z.string().min(1).max(ASK_USER_QUESTION_MAX).optional().meta({ description: "One clear question for the user" }),
+        questions: z
+            .array(
+                z
+                    .object({
+                        choices: choicesSchema.optional(),
+                        multiSelect: z.boolean().optional().meta({ description: "True when the user may pick several choices" }),
+                        question: z
+                            .string()
+                            .min(1)
+                            .max(ASK_USER_QUESTION_MAX)
+                            .refine((value) => value.trim().length > 0, { error: "A question needs text" }),
+                    })
+                    .strict(),
+            )
+            .min(1)
+            .max(ASK_USER_MAX_QUESTIONS)
             .optional()
-            .meta({ description: "Short suggested answers, shown as buttons. The user can always type their own answer instead." }),
-        question: z.string().min(1).max(ASK_USER_QUESTION_MAX).meta({ description: "One clear question for the user" }),
+            .meta({ description: "Several related questions shown together in one card" }),
     })
-    .strict();
+    .strict()
+    .refine((input) => (input.questions === undefined ? input.question !== undefined : input.question === undefined && input.choices === undefined), {
+        error: "Pass either `question` (with optional `choices`) or `questions`, not both and not neither",
+    });
 
 const DESCRIPTION = `Ask the user a question and wait for their answer before continuing.
 Use it only when you cannot proceed well without information or a decision only the user has — an ambiguous request, a choice between materially different options, a missing detail. Do not use it for small talk or to confirm what the user already said.
+Pass EITHER one question OR several related ones, never both:
 - question: one clear, self-contained question.
 - choices: optional short suggested answers (up to ${String(ASK_USER_MAX_CHOICES)}); the user may still answer in their own words.
-The run pauses until the user answers; the tool result is their answer. If they dismiss the question, carry on with your best judgement.`;
+- questions: up to ${String(ASK_USER_MAX_QUESTIONS)} related questions asked together in one card, each { question, choices?, multiSelect? }. Set multiSelect when several choices can apply. Prefer one question unless the answers are independent.
+The run pauses until the user answers. For one question the tool result is their answer; for several it is an "answers" list with, per question, the question text, the choices selected and an optional note. If they dismiss the card, carry on with your best judgement.`;
 
 /**
  * The registered tool. Its execute runs only if something approves the call
@@ -57,19 +81,40 @@ const askUserTool = createTool<AskUserInput, AskUserOutput, ToolContext>({
     title: "Ask User",
 });
 
-/** The same tool for one resumed run, answering with `answer`. */
-export const createAnsweredAskUserTool = (answer: string) =>
-    createTool<AskUserInput, AskUserOutput, ToolContext>({
+/**
+ * The same tool for one resumed run, answering with `answer`. The stored output is the answer object, with every
+ * attached file named in it, so the card can show it after a reload and no bytes reach the row. The readable files
+ * are handed to the model separately (`answerFilesMessage`, on the continuation's first step). A file the model
+ * cannot read is listed in `unreadFiles`, so the answer says it was not shown. A multi-question call is answered with a
+ * list (one entry per question) and its output carries `answers` instead of `answer`.
+ */
+export const createAnsweredAskUserTool = (
+    answer: string | ReadonlyArray<AskUserQuestionAnswer>,
+    files: ReadonlyArray<AskUserFile> = [],
+    readableFiles: ReadonlyArray<AskUserFile> = files,
+) => {
+    const attachedFiles = files.map(({ filename, mediaType }) => {
+        return { filename, mediaType };
+    });
+    const unreadFiles = files.filter((file) => !readableFiles.includes(file)).map((file) => file.filename);
+
+    return createTool<AskUserInput, AskUserOutput, ToolContext>({
         description: DESCRIPTION,
         execute: async () => {
-            return { answer, answered: true };
+            return {
+                ...(typeof answer === "string" ? { answer } : { answers: [...answer] }),
+                answered: true,
+                ...(attachedFiles.length > 0 && { attachedFiles }),
+                ...(unreadFiles.length > 0 && { unreadFiles }),
+            };
         },
         inputSchema,
         needsApproval: true,
         title: "Ask User",
     });
+};
 
-export type { AskUserInput, AskUserOutput } from "./ask-user-constants";
+export type { AskUserFile, AskUserInput, AskUserOutput, AskUserQuestion, AskUserQuestionAnswer } from "./ask-user-constants";
 export { ASK_USER_ANSWER_MAX, ASK_USER_DISMISSED_REASON, ASK_USER_TOOL_NAME } from "./ask-user-constants";
 
 export default askUserTool;

@@ -1399,7 +1399,7 @@ export const reapRun = internalMutation
     .input({ claimedAt: v.optional(v.number()), runId: v.id("subAgentRuns") })
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
-        await reapSubAgentRun(ctx, args.runId, Date.now(), args.claimedAt);
+        await reapSubAgentRun(ctx, args.runId, ctx.now, args.claimedAt);
 
         return null;
     });
@@ -1581,7 +1581,11 @@ export const cancelRun = authMutation
     .input({ runId: v.id("subAgentRuns") })
     .output(v.object({ cancelled: v.boolean() }))
     .mutation(async ({ args, ctx }) => {
-        return { cancelled: await cancelOwnedSubAgentRun(ctx, args.runId, ctx.user.userId) };
+        const cancelled = await cancelOwnedSubAgentRun(ctx, args.runId, ctx.user.userId);
+
+        ctx.log.event("sub_agents.cancel_run", { cancelled });
+
+        return { cancelled };
     });
 
 // ─── Workers: person-facing procedures ───────────────────────────────────────
@@ -1612,6 +1616,7 @@ const dispatchOrThrow = async (ctx: MutationCtx, args: WorkerRunArgs): Promise<W
  * asked and every run still builds only what the user's own permissions allow a headless run.
  */
 export const createWorker = authMutation
+    .use(rateLimit("chat/update"))
     .input({
         clientId: v.string().max(WORKER_CLIENT_ID_MAX),
         // Run the worker on a coding agent on one of the caller's computers instead of in the cloud.
@@ -1633,8 +1638,7 @@ export const createWorker = authMutation
         );
 
         const lead = await ctx.db.get("threads", args.leadThreadId);
-
-        return await dispatchOrThrow(ctx, {
+        const receipt = await dispatchOrThrow(ctx, {
             clientId: args.clientId,
             dispatchedBy: "user",
             ...(args.host && { runner: { ...args.host, kind: "host" as const } }),
@@ -1647,6 +1651,15 @@ export const createWorker = authMutation
             ...(args.toolAllowlist !== undefined && { toolAllowlist: args.toolAllowlist }),
             userId: ctx.user.userId,
         });
+
+        ctx.log.event("sub_agents.create_worker", {
+            hasSkill: args.skill !== undefined,
+            runner: args.host ? "host" : "cloud",
+            state: receipt.state,
+            toolCount: args.toolAllowlist?.length ?? null,
+        });
+
+        return receipt;
     });
 
 /**
@@ -1655,6 +1668,7 @@ export const createWorker = authMutation
  * id is NOT_FOUND, as an id that does not exist is.
  */
 export const dispatchToWorker = authMutation
+    .use(rateLimit("chat/update"))
     .input({
         clientId: v.string().max(WORKER_CLIENT_ID_MAX),
         message: v.string().max(SUB_AGENT_TASK_MAX),
@@ -1668,7 +1682,7 @@ export const dispatchToWorker = authMutation
             throw new LunoraError("NOT_FOUND", "Worker not found.");
         }
 
-        return await dispatchOrThrow(ctx, {
+        const receipt = await dispatchOrThrow(ctx, {
             childThreadId: args.workerId,
             clientId: args.clientId,
             dispatchedBy: "user",
@@ -1676,6 +1690,10 @@ export const dispatchToWorker = authMutation
             task: args.message,
             userId: ctx.user.userId,
         });
+
+        ctx.log.event("sub_agents.dispatch_to_worker", { runner: origin.runner?.kind ?? "cloud", state: receipt.state });
+
+        return receipt;
     });
 
 /**
@@ -1730,6 +1748,11 @@ export const setWorkerPolicy = authMutation
 
         await patchThread(ctx.db, lead._id, { workerPolicy: policy });
 
+        ctx.log.event("sub_agents.set_worker_policy", {
+            allowedSources: policy.allowedSources.length,
+            capped: policy.maxDispatchesPerHour !== undefined,
+        });
+
         return null;
     });
 
@@ -1768,6 +1791,8 @@ export const stopWorker = authMutation
             args.clientId.length === 0 ||
             !(await claimOnce(ctx, WORKER_STOP_SCOPE, `${args.workerId}:${args.clientId}`, WORKER_DISPATCH_CLAIM_TTL_MS, ctx.user.userId))
         ) {
+            ctx.log.event("sub_agents.stop_worker", { cancelled: 0, repeated: true, scope: args.scope, targets: 0 });
+
             return { cancelled: 0 };
         }
 
@@ -1791,6 +1816,8 @@ export const stopWorker = authMutation
                 }
             }
         }
+
+        ctx.log.event("sub_agents.stop_worker", { cancelled, scope: args.scope, targets: targets.length });
 
         return { cancelled };
     });

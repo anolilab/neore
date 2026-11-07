@@ -131,3 +131,14 @@ describe("backward compatibility (v0 legacy)", () => {
         expect(decrypted).toBe(plaintext);
     });
 });
+
+describe("key normalisation", () => {
+    it("uses the key trimmed, as assertEnv() validates it", async () => {
+        vi.resetModules();
+        vi.stubEnv("ENCRYPTION_KEY", `\u{A0}${btoa(String.fromCodePoint(...testKeyBytes))}\n`);
+
+        const fresh = await import("./encryption");
+
+        await expect(fresh.encryptKey("sk-test").then(async (ciphertext) => await decryptKey(ciphertext))).resolves.toBe("sk-test");
+    });
+});

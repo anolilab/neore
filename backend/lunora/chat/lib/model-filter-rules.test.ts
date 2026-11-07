@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { resolveBackgroundModel } from "./background-model";
 import { createRunLowRiskCheck } from "./low-risk-check";
+import { runInShard } from "../../lib/shard-context";
 import { NoAllowedUtilityModelError } from "../../lib/utility-model";
 import { getUtilityModelForUser, loadModelFilterRules, MODEL_FILTER_RULES_UNAVAILABLE_MESSAGE, ModelFilterRulesUnavailableError } from "./model-filter-rules";
 
@@ -17,6 +18,11 @@ vi.mock("@neore/ai/providers", async () => {
     const { MODEL_REGISTRY } = await import("@neore/ai/models");
 
     return { buildAgents: () => Object.fromEntries(MODEL_REGISTRY.map((model) => [model.id, { chat: { modelId: model.id } }])) };
+});
+const callOnShard = vi.hoisted(() => vi.fn());
+
+vi.mock("../../lib/cross-shard", () => {
+    return { callOnShard };
 });
 vi.mock("../../lib/services", () => {
     return { gatewayFetch: () => async () => new Response("{}") };
@@ -66,6 +72,29 @@ describe("loadModelFilterRules", () => {
 
     it("throws when the preferences query throws", async () => {
         await expect(loadModelFilterRules(ctxOf(failing), "u1")).rejects.toBeInstanceOf(ModelFilterRulesUnavailableError);
+    });
+
+    it("reads a collaborator's rules on their own shard, not the thread owner's it runs on", async () => {
+        callOnShard.mockResolvedValueOnce(prefs({ modelFilterRules: { blockedRegions: ["CN"] } }));
+        const ctx = ctxOf(() => prefs());
+
+        await expect(runInShard("owner", async () => await loadModelFilterRules(ctx, "collaborator"))).resolves.toEqual({ blockedRegions: ["CN"] });
+        expect(callOnShard).toHaveBeenCalledWith(expect.anything(), { userId: "collaborator" }, { shardKey: "collaborator" });
+    });
+
+    it("throws when the read on the user's own shard fails", async () => {
+        callOnShard.mockRejectedValueOnce(new Error("shard unreachable"));
+
+        await expect(
+            runInShard(
+                "owner",
+                async () =>
+                    await loadModelFilterRules(
+                        ctxOf(() => prefs()),
+                        "collaborator",
+                    ),
+            ),
+        ).rejects.toBeInstanceOf(ModelFilterRulesUnavailableError);
     });
 
     it("throws when the query reports its own read failed", async () => {

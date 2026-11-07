@@ -70,7 +70,36 @@ export const backupCapabilities = (definition: ModelDefinition): BackupCapabilit
     };
 };
 
-/** The kinds of attachment in a conversation, for either a model prompt (`file` parts with a media type) or AI SDK messages (`image` and `file` parts). */
+const IMAGE_PART_TYPES: ReadonlySet<unknown> = new Set(["image", "image-data", "image-url"]);
+const FILE_PART_TYPES: ReadonlySet<unknown> = new Set(["file", "file-data", "file-url"]);
+
+/** Records one media part by its type, and by its media type when it is a file: an image file counts as an image. */
+const noteMedia = (found: { files: boolean; images: boolean }, type: unknown, mediaType: unknown): void => {
+    if (IMAGE_PART_TYPES.has(type)) {
+        found.images = true;
+    } else if (FILE_PART_TYPES.has(type)) {
+        if (typeof mediaType === "string" && mediaType.startsWith("image/")) {
+            found.images = true;
+        } else {
+            found.files = true;
+        }
+    }
+};
+
+/** The media a `content` tool result carries (an answer's files, a screenshot): the same kinds as a message's own parts. */
+const noteToolResultMedia = (part: { output?: unknown }, found: { files: boolean; images: boolean }): void => {
+    const output = part.output as { type?: unknown; value?: unknown } | undefined;
+
+    if (output?.type !== "content" || !Array.isArray(output.value)) {
+        return;
+    }
+
+    for (const item of output.value as ({ mediaType?: unknown; type?: unknown } | null)[]) {
+        noteMedia(found, item?.type, item?.mediaType);
+    }
+};
+
+/** The kinds of attachment in a conversation, for either a model prompt (`file` parts with a media type) or AI SDK messages (`image` and `file` parts, and media inside a tool result). */
 export const attachmentsIn = (messages: unknown): { files: boolean; images: boolean } => {
     const found = { files: false, images: false };
 
@@ -83,17 +112,11 @@ export const attachmentsIn = (messages: unknown): { files: boolean; images: bool
             continue;
         }
 
-        for (const part of message.content as ({ mediaType?: unknown; mimeType?: unknown; type?: unknown } | null)[]) {
-            if (part?.type === "image") {
-                found.images = true;
-            } else if (part?.type === "file") {
-                const mediaType = part.mediaType ?? part.mimeType;
-
-                if (typeof mediaType === "string" && mediaType.startsWith("image/")) {
-                    found.images = true;
-                } else {
-                    found.files = true;
-                }
+        for (const part of message.content as ({ mediaType?: unknown; mimeType?: unknown; output?: unknown; type?: unknown } | null)[]) {
+            if (part?.type === "tool-result") {
+                noteToolResultMedia(part, found);
+            } else {
+                noteMedia(found, part?.type, part?.mediaType ?? part?.mimeType);
             }
         }
     }

@@ -130,6 +130,8 @@ export const enableThreadLock = authMutation
 
         const { expiresAt, proof } = await mintUnlockProof({ epoch, threadId, userId }, unlockSecret(), now);
 
+        context.log.event("agent.enable_thread_lock", { locked: true });
+
         return { expiresAt, ok: true, proof };
     });
 
@@ -158,6 +160,8 @@ export const unlockThread = authMutation
 
         const { expiresAt, proof } = await mintUnlockProof({ epoch: row.epoch, threadId, userId }, unlockSecret(), now);
 
+        context.log.event("agent.unlock_thread", { unlocked: true });
+
         return { expiresAt, ok: true, proof };
     });
 
@@ -181,9 +185,13 @@ export const lockThread = authMutation
         await patchRow(context.db, "threadPasscodes", row, { epoch: newPasscodeEpoch(), updatedAt: now });
         await patchRow(context.db, "threads", thread, { lockedAt: now, updatedAt: now });
 
-        if (row.filesIndexedAt === undefined) {
+        const backfillScheduled = row.filesIndexedAt === undefined;
+
+        if (backfillScheduled) {
             await scheduleFileLinkBackfill(context, threadId, userId);
         }
+
+        context.log.event("agent.lock_thread", { backfillScheduled, epochRotated: true });
 
         return { ok: true };
     });
@@ -225,6 +233,8 @@ export const changeThreadPasscode = authMutation
 
         const { expiresAt, proof } = await mintUnlockProof({ epoch, threadId, userId }, unlockSecret(), now);
 
+        context.log.event("agent.change_thread_passcode", { changed: true });
+
         return { expiresAt, ok: true, proof };
     });
 
@@ -254,6 +264,8 @@ export const removeThreadPasscode = authMutation
 
         await context.db.delete("threadPasscodes", row._id);
         await patchRow(context.db, "threads", thread, { lockedAt: undefined, updatedAt: now });
+
+        context.log.event("agent.remove_thread_passcode", { removed: true });
 
         return { ok: true };
     });

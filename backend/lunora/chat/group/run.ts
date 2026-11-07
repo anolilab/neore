@@ -25,6 +25,7 @@
  * the same branch, not a sibling of the first reply (which would read as a
  * regenerate).
  */
+import { DEFAULT_CHAT_MODEL } from "@neore/ai/constants";
 import type { MCPClient } from "@ai-sdk/mcp";
 import { MODEL_LOOKUP, type ModelFilterRules } from "@neore/ai/models";
 import type { ModelMessage } from "ai";
@@ -37,7 +38,7 @@ import type { ActionCtx } from "../../_generated/server";
 import type { ResearchDepth } from "../../agent/client/create-tool";
 import { streamLogger } from "../../lib/logger";
 import { gatewayFetch, type ServiceFetch } from "../../lib/services";
-import { getUtilityModel } from "../../lib/utility-model";
+import { defaultModelUnderRules, getUtilityModel, readsImagesAndCallsTools } from "../../lib/utility-model";
 import { resolveReasoningEffort, resolveSkillModel } from "../../skills/slash-command";
 import type { AwaitingInput, RunContext } from "../lib/agent-run";
 import {
@@ -65,6 +66,7 @@ import { closeMCPClients } from "../lib/mcp-tools";
 import { pipeToPersistentChunks, type PipedStream, stopWhenStopped, toolProgressSink } from "../lib/persist-stream";
 import type { SearchMode } from "../lib/tool-builder";
 import type { ToolRunConfig } from "../lib/tool-run-config";
+import type { AskUserQuestionAnswer } from "../tools/ask-user-constants";
 import type { GroupHistoryRow, GroupParticipantInfo } from "./logic";
 import {
     buildGroupSystemContext,
@@ -252,7 +254,10 @@ const runSpeaker = async (
     let mcpClients: MCPClient[] = [];
 
     try {
-        const model = resolveSkillModel(turn.baseModel, speaker.config?.preferredModel, (id) => MODEL_LOOKUP.get(id), turn.isAnonymous);
+        const modelFilterRules = await loadModelFilterRules(ctx, turn.userId);
+        const skillModel = resolveSkillModel(turn.baseModel, speaker.config?.preferredModel, (id) => MODEL_LOOKUP.get(id), turn.isAnonymous);
+        // The Workers AI default cannot keep to a region rule: a user with one runs on a default their rules allow.
+        const model = skillModel === DEFAULT_CHAT_MODEL ? defaultModelUnderRules(skillModel, modelFilterRules, readsImagesAndCallsTools) : skillModel;
         const searchMode = (speaker.config?.searchMode ?? turn.searchMode) as SearchMode;
         const { allowTools, customProvider } = await resolveRunModel(ctx, model, turn.userId);
 
@@ -277,7 +282,6 @@ const runSpeaker = async (
         setDispatchOrigin(ctx, turn.origin);
         setRunStartedBy(ctx, turn.startedBy);
 
-        const modelFilterRules = await loadModelFilterRules(ctx, turn.userId);
         const backupModelId = await resolveBackupModelId(ctx, turn.userId, turn.prefs.backupModel, model, modelFilterRules);
         const agent = await getAgent(model, {
             backupModelId,
@@ -765,6 +769,9 @@ export const continueGroupAfterToolApproval = async (
     ctx: ActionCtx,
     args: {
         answer?: string;
+        /** The files an `askUser` answer carries (`lib/ask-user-files.ts`). */
+        answerFileIds?: string[];
+        answers?: AskUserQuestionAnswer[];
         approvalId: string;
         approved: boolean;
         config: ToolRunConfig & { group: GroupRunSnapshot };
@@ -774,7 +781,7 @@ export const continueGroupAfterToolApproval = async (
         userId: string;
     },
 ): Promise<void> => {
-    const { answer, approvalId, approved, config, denyReason, streamId, threadId, userId } = args;
+    const { answer, answerFileIds, answers, approvalId, approved, config, denyReason, streamId, threadId, userId } = args;
     const { group } = config;
 
     // Participants are re-checked: one that lost access since the pause does
@@ -792,7 +799,7 @@ export const continueGroupAfterToolApproval = async (
 
     const resumed = await resumeApprovedRun(
         ctx,
-        { answer, approvalId, approved, config, denyReason, streamId, threadId, userId },
+        { answer, answerFileIds, answers, approvalId, approved, config, denyReason, streamId, threadId, userId },
         {
             // Reached only through `continueAfterToolApproval`, after its stream gate.
             admittedRun: true,

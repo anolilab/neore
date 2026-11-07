@@ -13,6 +13,7 @@ import type { FC, ReactNode } from "react";
 import { lazy, memo, startTransition, Suspense, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 
 import DeleteConfirmationDialog from "@/components/delete-confirmation-dialog";
+import { PullRequestCountsProvider } from "@/features/develop/components/pull-request-counts";
 import {
     useDeleteProject,
     useMoveThreadToProject,
@@ -1288,53 +1289,55 @@ const HierarchicalThreadList: FC<
 
     // Regular rendering with groups
     return (
-        <div className="relative flex flex-col gap-2" ref={listReference} tabIndex={-1}>
-            {isSelectionMode && (
-                <SelectionToolbar
-                    isAllSelected={isAllSelected}
-                    onClearSelection={handleClearSelection}
-                    onDeleteSelected={handleBulkDelete}
-                    onDone={onExitSelectionMode}
-                    onSelectAll={handleSelectAll}
-                    onSelectByDate={handleSelectByDate}
-                    selectedCount={selectedThreadIds.size}
-                />
-            )}
-            <DndContext collisionDetection={closestCorners} onDragEnd={handleDragEnd} sensors={sensors}>
-                {renderThreadGroups()}
-            </DndContext>
-            {hasOpenedProjectForm && (
-                <Suspense fallback={null}>
-                    <ProjectFormDialog editingProject={editingProject} onClose={() => setShowProjectFormDialog(false)} open={showProjectFormDialog} />
-                </Suspense>
-            )}
-            <DeleteConfirmationDialog
-                description={t`This will permanently delete the project and all associated threads. This action cannot be undone.`}
-                isDeleting={isDeletingProject}
-                itemName={projectToDelete?.name}
-                onConfirm={handleConfirmDeleteProject}
-                onOpenChange={(open) => {
-                    if (!open) {
-                        setProjectToDelete(null);
-                    }
-                }}
-                open={!!projectToDelete}
-                title={t`Delete Project`}
-            />
-            {snoozeThread && (
-                <SnoozeUntilDialog
+        <PullRequestCountsProvider threadIds={visibleThreadIds}>
+            <div className="relative flex flex-col gap-2" ref={listReference} tabIndex={-1}>
+                {isSelectionMode && (
+                    <SelectionToolbar
+                        isAllSelected={isAllSelected}
+                        onClearSelection={handleClearSelection}
+                        onDeleteSelected={handleBulkDelete}
+                        onDone={onExitSelectionMode}
+                        onSelectAll={handleSelectAll}
+                        onSelectByDate={handleSelectByDate}
+                        selectedCount={selectedThreadIds.size}
+                    />
+                )}
+                <DndContext collisionDetection={closestCorners} onDragEnd={handleDragEnd} sensors={sensors}>
+                    {renderThreadGroups()}
+                </DndContext>
+                {hasOpenedProjectForm && (
+                    <Suspense fallback={null}>
+                        <ProjectFormDialog editingProject={editingProject} onClose={() => setShowProjectFormDialog(false)} open={showProjectFormDialog} />
+                    </Suspense>
+                )}
+                <DeleteConfirmationDialog
+                    description={t`This will permanently delete the project and all associated threads. This action cannot be undone.`}
+                    isDeleting={isDeletingProject}
+                    itemName={projectToDelete?.name}
+                    onConfirm={handleConfirmDeleteProject}
                     onOpenChange={(open) => {
                         if (!open) {
-                            setSnoozeThreadId(null);
+                            setProjectToDelete(null);
                         }
                     }}
-                    open
-                    previousUntil={snoozeThread.snoozedUntil}
-                    returnFocusTo={() => listReference.current}
-                    threadId={snoozeThread.threadId}
+                    open={!!projectToDelete}
+                    title={t`Delete Project`}
                 />
-            )}
-        </div>
+                {snoozeThread && (
+                    <SnoozeUntilDialog
+                        onOpenChange={(open) => {
+                            if (!open) {
+                                setSnoozeThreadId(null);
+                            }
+                        }}
+                        open
+                        previousUntil={snoozeThread.snoozedUntil}
+                        returnFocusTo={() => listReference.current}
+                        threadId={snoozeThread.threadId}
+                    />
+                )}
+            </div>
+        </PullRequestCountsProvider>
     );
 };
 

@@ -47,12 +47,68 @@ export type AutoContinueStreamEvent =
 
 // ─── Token Estimation ───────────────────────────────────────────────────────
 
+/** The `value` of an AI SDK `content` tool output (`type: "content"`), or `undefined` for any other output. */
+const contentParts = (output: unknown): unknown[] | undefined => {
+    if (!output || typeof output !== "object") {
+        return undefined;
+    }
+
+    const { type, value } = output as { type?: unknown; value?: unknown };
+
+    return type === "content" && Array.isArray(value) ? value : undefined;
+};
+
+/** Characters a media part of a tool result counts for, or `undefined` for a part that is not media. */
+const mediaPartChars = (type: unknown): number | undefined => {
+    switch (type) {
+        case "file":
+        case "file-data":
+        case "file-url": {
+            return FILE_TOKEN_ESTIMATE_CHARS;
+        }
+        case "image":
+        case "image-data":
+        case "image-url": {
+            return IMAGE_TOKEN_ESTIMATE_CHARS;
+        }
+        default: {
+            return undefined;
+        }
+    }
+};
+
+/** A content part of a tool result as text: its text, a placeholder for media, or its JSON for anything else. */
+const contentPartText = (item: unknown): string => {
+    const part = item as { text?: unknown; type?: unknown } | undefined;
+
+    if (part?.type === "text" && typeof part.text === "string") {
+        return part.text;
+    }
+
+    if (mediaPartChars(part?.type) !== undefined) {
+        return `[${String(part?.type)}]`;
+    }
+
+    try {
+        return JSON.stringify(item) ?? "";
+    } catch {
+        return "[unserialisable tool output]";
+    }
+};
+
 /**
  * Text of a tool result. AI SDK 5+ stores `output: { type, value }`; `content`
  * and `result` are the pre-v5 names, kept for history rebuilt from old rows.
  */
 export const toolResultText = (part: { content?: unknown; output?: unknown; result?: unknown }): string => {
     const output = part.output ?? part.content ?? part.result;
+    const parts = contentParts(output);
+
+    if (parts) {
+        // Media is named, never serialised: its bytes are not text the model reads as text.
+        return parts.map((item) => contentPartText(item)).join("\n");
+    }
+
     const value = output && typeof output === "object" && "value" in output ? (output as { value: unknown }).value : output;
 
     if (typeof value === "string") {
@@ -64,6 +120,38 @@ export const toolResultText = (part: { content?: unknown; output?: unknown; resu
     } catch {
         return "[unserialisable tool output]"; // Circular refs never reach stored history
     }
+};
+
+/** Characters a tool result counts for in the prompt estimate: media is its fixed estimate, never its bytes. */
+const toolResultChars = (part: { content?: unknown; output?: unknown; result?: unknown }): number => {
+    const parts = contentParts(part.output ?? part.content ?? part.result);
+
+    if (!parts) {
+        return toolResultText(part).length;
+    }
+
+    return parts.reduce<number>((total, item) => total + (mediaPartChars((item as { type?: unknown } | undefined)?.type) ?? contentPartText(item).length), 0);
+};
+
+/** The most an inline file is estimated at: a long PDF costs more than the flat amount, but not without limit. */
+const INLINE_FILE_MAX_CHARS = 200_000;
+
+/**
+ * A file part sent inline as base64 or bytes: its flat estimate, or its size when that is larger, since a long PDF costs
+ * more than the flat amount. Capped, so one attachment never reads as the whole window and pushes the history away. A
+ * reference (a storage key, a URL) has no bytes here and keeps the flat amount.
+ */
+const inlineFileChars = (data: unknown): number => {
+    // Base64 carries three bytes in four characters; a sixteenth of the bytes is a rough token-sized character count.
+    let bytes = 0;
+
+    if (data instanceof Uint8Array) {
+        bytes = data.byteLength;
+    } else if (typeof data === "string") {
+        bytes = (data.length * 3) / 4;
+    }
+
+    return Math.min(INLINE_FILE_MAX_CHARS, Math.max(FILE_TOKEN_ESTIMATE_CHARS, Math.ceil(bytes / 16)));
 };
 
 /** Tokens for a character count, with the safety margin. */
@@ -91,6 +179,7 @@ const estimateChars = (messages: ModelMessage[]): number => {
                     const p = part as {
                         args?: unknown;
                         content?: unknown;
+                        data?: unknown;
                         input?: unknown;
                         output?: unknown;
                         result?: unknown;
@@ -103,7 +192,7 @@ const estimateChars = (messages: ModelMessage[]): number => {
                     } else {
                         switch (p.type) {
                             case "file": {
-                                totalChars += FILE_TOKEN_ESTIMATE_CHARS;
+                                totalChars += inlineFileChars(p.data);
 
                                 break;
                             }
@@ -122,7 +211,7 @@ const estimateChars = (messages: ModelMessage[]): number => {
                                 break;
                             }
                             case "tool-result": {
-                                totalChars += toolResultText(p).length;
+                                totalChars += toolResultChars(p);
 
                                 break;
                             }
@@ -307,7 +396,7 @@ const elideToolOutputs = (messages: ModelMessage[], threshold: number): ModelMes
                 return part;
             }
 
-            const { length } = toolResultText(part);
+            const length = toolResultChars(part);
 
             if (length <= ELIDED_TOOL_OUTPUT.length) {
                 return part;

@@ -9,7 +9,9 @@
  *
  * Purposes: "provider-keys", "tool-keys", "messenger-keys", "custom-providers", "connector-tokens"
  */
-const { ENCRYPTION_KEY } = process.env;
+// Trimmed like `assertEnv()` and the deploy guard check it, so a key that passes
+// them always decodes here (`atob` rejects surrounding whitespace such as U+00A0).
+const ENCRYPTION_KEY = process.env["ENCRYPTION_KEY"]?.trim();
 
 // During codegen (jiti execution), env vars aren't configured.
 // Allow the module to load so codegen can extract cRPC metadata.

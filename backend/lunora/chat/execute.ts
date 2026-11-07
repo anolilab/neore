@@ -14,7 +14,8 @@
  * continuation into `persistentChunks` exactly like the original run. What the
  * two share lives in `lib/agent-run.ts`.
  */
-import { estimateTokensFromCharacters, MODEL_LOOKUP, parseCustomModelId } from "@neore/ai/models";
+import { DEFAULT_CHAT_MODEL } from "@neore/ai/constants";
+import { estimateTokensFromCharacters, hasActiveFilters, MODEL_LOOKUP, parseCustomModelId } from "@neore/ai/models";
 import { v } from "lunorash/server";
 
 import { internal } from "../_generated/internal";
@@ -56,16 +57,19 @@ import { createToolRunMarker } from "./lib/mark-tool-runs";
 import { isRunReplaced } from "./lib/run-epoch";
 import { gatewayFetch } from "../lib/services";
 import getAgent from "./lib/get-agent";
-import { MODEL_FILTER_RULES_UNAVAILABLE_MESSAGE } from "./lib/model-filter-rules";
+import { loadModelFilterRules, MODEL_FILTER_RULES_UNAVAILABLE_MESSAGE } from "./lib/model-filter-rules";
+import { defaultModelUnderRules, readsImagesAndCallsTools } from "../lib/utility-model";
 import { injectsSkillText } from "./lib/low-risk-approval";
 import { closeMCPClientsThenSettle } from "./lib/mcp-tools";
 import { pipeToPersistentChunks, type PipedStream, stopWhenStopped, toolProgressSink } from "./lib/persist-stream";
+import { MAX_LENGTH } from "../lib/validators";
 import { resolveAutoModel, shouldRouteAuto } from "./lib/auto-model";
 import classifyQuery from "./lib/query-classifier";
 import detectTaskComplexity, { type TaskAnalysis } from "./lib/task-detector";
 import { getToolsForModelAndMode, type SearchMode } from "./lib/tool-builder";
 import { getAgentForUser } from "./lib/thread-helpers";
 import { vToolRunConfig } from "./lib/tool-run-config";
+import { vAskUserAnswers } from "./tools/ask-user-validators";
 import { pauseOnRateLimit } from "./lib/pause-run";
 import { scheduleRepliesUsage } from "./lib/pause-usage";
 import { runStreamingAgentFields } from "./lib/streaming-run-args";
@@ -422,6 +426,18 @@ export const runStreamingAgent = internalAction
                 // An invoked skill's search mode is deliberate, so it beats the classifier.
                 if (invokedSkill?.config?.searchMode) {
                     effectiveSearchMode = invokedSkill.config.searchMode as SearchMode;
+                }
+
+                // The Workers AI default cannot keep to a region rule: a user with one runs on a default their rules allow, with
+                // the plan grant (`loadModelFilterRules`) so a paid user may land on a paid model. Recorded like an Auto route,
+                // so a resume continues on the same model even if the rules changed meanwhile.
+                if (resume === undefined && model === DEFAULT_CHAT_MODEL && hasActiveFilters(agentModulePrefs.modelFilterRules ?? undefined)) {
+                    const standIn = defaultModelUnderRules(model, await loadModelFilterRules(ctx, userId), readsImagesAndCallsTools);
+
+                    if (standIn !== model) {
+                        model = standIn;
+                        routedModel = standIn;
+                    }
                 }
 
                 // A custom endpoint gets no tools (built-in or MCP) unless the user
@@ -886,6 +902,10 @@ export const continueAfterToolApproval = internalAction
     .input({
         /** The user's answer to an approved `askUser` call — its tool result (`chat/ask-user.ts`). */
         answer: v.optional(v.string()),
+        /** Files the answer carries; read as the owner by the continuation (`lib/ask-user-files.ts`). */
+        answerFileIds: v.optional(v.array(v.string().max(MAX_LENGTH.id))),
+        /** The answers to a multi-question `askUser` call, one per question: its tool result in place of `answer`. */
+        answers: v.optional(vAskUserAnswers),
         approvalId: v.string(),
         approved: v.boolean(),
         config: vToolRunConfig,
@@ -895,7 +915,7 @@ export const continueAfterToolApproval = internalAction
         threadId: v.string(),
         userId: v.string(),
     })
-    .action(async ({ args: { answer, approvalId, approved, config, denyReason, streamId, threadId, userId }, ctx }) => {
+    .action(async ({ args: { answer, answerFileIds, answers, approvalId, approved, config, denyReason, streamId, threadId, userId }, ctx }) => {
         // Enqueued on the jobs queue (at-least-once): only the claiming delivery resumes the run.
         if (!(await ctx.runMutation(internal.chat.streaming.persistent.library.claimStreamRun, { streamId: streamId as Id<"persistentStreams"> }))) {
             streamLogger.warn(`[ToolApproval] Stream ${streamId} already claimed — ignoring a redelivered continuation`);
@@ -924,6 +944,8 @@ export const continueAfterToolApproval = internalAction
             if (config.group) {
                 await continueGroupAfterToolApproval(ctx, {
                     answer,
+                    answerFileIds,
+                    answers,
                     approvalId,
                     approved,
                     config: { ...config, group: config.group },
@@ -939,7 +961,7 @@ export const continueAfterToolApproval = internalAction
             // The gate above admitted this continuation, so its knowledge search may read the chat's own files.
             const resumed = await resumeApprovedRun(
                 ctx,
-                { answer, approvalId, approved, config, denyReason, streamId, threadId, userId },
+                { answer, answerFileIds, answers, approvalId, approved, config, denyReason, streamId, threadId, userId },
                 { admittedRun: true, steerable: true },
             );
 

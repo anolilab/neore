@@ -10,14 +10,4 @@ if (typeof source !== "object" || source === null || Array.isArray(source)) retu
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 return { "message": source["message"] };
 });
-installCompiledValidatorMap(lunora_email_functions_110.handleEmailEvent.args, (source) => {
-if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
-if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
-if (typeof source["event"] !== "object" || source["event"] === null || Array.isArray(source["event"])) return DEFER;
-if (Object.getPrototypeOf(source["event"]) !== Object.prototype && Object.getPrototypeOf(source["event"]) !== null) return DEFER;
-if (typeof source["event"]["type"] !== "string") return DEFER;
-const __obj1 = { "type": source["event"]["type"] };
-if (typeof source["id"] !== "string") return DEFER;
-return { "event": __obj1, "id": source["id"] };
-});
 export * from "../../email/functions.js";

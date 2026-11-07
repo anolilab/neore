@@ -14,10 +14,15 @@ import { patchThread } from "../../agent/table-writes";
 import { enqueueJob } from "../../lib/job-queue";
 import { persistentTextStreaming } from "../streaming";
 import type { ToolRunConfig } from "./tool-run-config";
+import type { AskUserQuestionAnswer } from "../tools/ask-user-constants";
 
 export interface ResumeClaimedRunArgs {
     /** The user's answer for an approved `askUser` call, or the reference of a saved `requestSecret` — becomes the tool result. Never a secret value. */
     answer?: string;
+    /** The files an answer carries (`lib/ask-user-files.ts`), read by the continuation as the owner. */
+    answerFileIds?: string[];
+    /** The answers to a multi-question `askUser` call, one per question: they become the tool result in place of `answer`. */
+    answers?: AskUserQuestionAnswer[];
     approvalId: string;
     approved: boolean;
     config: ToolRunConfig;
@@ -30,7 +35,7 @@ export interface ResumeClaimedRunArgs {
 
 /** Returns the new stream's id, which the claimed row now records. */
 export const resumeClaimedRun = async (ctx: MutationCtx, args: ResumeClaimedRunArgs): Promise<string> => {
-    const { answer, approvalId, approved, config, denyReason, ownerId, runId, threadId } = args;
+    const { answer, answerFileIds, answers, approvalId, approved, config, denyReason, ownerId, runId, threadId } = args;
     const streamId = await persistentTextStreaming.createStream(ctx, {
         messageId: approvalId,
         streamingConfig: {
@@ -48,6 +53,8 @@ export const resumeClaimedRun = async (ctx: MutationCtx, args: ResumeClaimedRunA
     // On the jobs queue, like the run it resumes (`lib/job-queue.ts`); it claims its stream first.
     await enqueueJob(internal.chat.execute.continueAfterToolApproval, {
         ...(answer !== undefined && { answer }),
+        ...(answers !== undefined && { answers }),
+        ...(answerFileIds !== undefined && answerFileIds.length > 0 && { answerFileIds }),
         approvalId,
         approved,
         config,

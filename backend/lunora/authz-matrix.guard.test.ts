@@ -2,7 +2,7 @@
  * Keeps `docs/security/authz-matrix.md` and the client-reachable surface in step.
  *
  * Each public procedure's own check is the primary access control; row-level
- * security (`lib/rls/`, see `CLAUDE.md` → Auth) only refuses callers with no
+ * security (`lib/rls/`, see `auth/AGENTS.md`) only refuses callers with no
  * connection to a row at all. The matrix is where each one's check was
  * reviewed, so this fails when a procedure reaches `_generated/api.ts` without a
  * row — or a row outlives its procedure.

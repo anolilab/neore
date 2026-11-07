@@ -29,7 +29,7 @@ const thread = (id: string, updatedAt: number, overrides: Partial<CachedThread> 
 };
 
 const message = (id: string, threadId: string, createdAt: number, overrides: Partial<CachedMessage> = {}): CachedMessage => {
-    return { createdAt, id, role: "assistant", status: "success", text: `text ${id}`, threadId, ...overrides };
+    return { createdAt, id, role: "assistant", shareText: `text ${id}`, status: "success", text: `text ${id}`, threadId, ...overrides };
 };
 
 const status = (id: string, updatedAt: number, overrides: Partial<CachedStatus> = {}): CachedStatus => {
@@ -94,6 +94,32 @@ describe("threads", () => {
         const rows = await scoped.loadThreads();
 
         expect(rows.map((row) => row.id)).toEqual(["b", "a"]);
+    });
+});
+
+describe("share text", () => {
+    it("keeps the display text and the share text apart through a save and a read", async () => {
+        const { cache } = makeCache();
+        const scoped = await owned(cache);
+
+        await scoped.saveMessages("t1", [message("m1", "t1", 1, { shareText: "Look at this", text: "Look at this[Attachment]" })]);
+
+        const [row] = await scoped.loadMessages("t1");
+
+        expect(row?.text).toBe("Look at this[Attachment]");
+        expect(row?.shareText).toBe("Look at this");
+    });
+
+    it("a newer save replaces the share text", async () => {
+        const { cache } = makeCache();
+        const scoped = await owned(cache);
+
+        await scoped.saveMessages("t1", [message("m1", "t1", 1, { shareText: "first draft", updatedAt: 1 })]);
+        await scoped.saveMessages("t1", [message("m1", "t1", 1, { shareText: "final", updatedAt: 2 })]);
+
+        const [row] = await scoped.loadMessages("t1");
+
+        expect(row?.shareText).toBe("final");
     });
 });
 
@@ -505,5 +531,70 @@ describe("read-only by construction", () => {
         const rows = await database.getAllAsync<{ name: string }>("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name");
 
         expect(rows.map((row) => row.name)).toEqual(["cache_meta", "cached_messages", "cached_statuses", "cached_threads"]);
+    });
+});
+
+describe("the version-one cache", () => {
+    /** A database with the tables an installed version-one app left behind: no share text column yet. */
+    const openVersionOneDatabase = async () => {
+        const database = createTestDatabase();
+
+        open.push(database);
+        await database.execAsync(`
+            CREATE TABLE cached_threads (id TEXT PRIMARY KEY NOT NULL, title TEXT NOT NULL, status TEXT NOT NULL, runner TEXT, updated_at INTEGER NOT NULL, synced_at INTEGER NOT NULL);
+            CREATE TABLE cached_messages (id TEXT PRIMARY KEY NOT NULL, thread_id TEXT NOT NULL, role TEXT NOT NULL, text TEXT NOT NULL, status TEXT NOT NULL, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, synced_at INTEGER NOT NULL);
+            CREATE INDEX cached_messages_by_thread ON cached_messages (thread_id, created_at);
+            PRAGMA user_version = 1;
+        `);
+
+        return database;
+    };
+
+    it("keeps the saved chats when it is opened, and their messages have no share text until a read replaces them", async () => {
+        const database = await openVersionOneDatabase();
+
+        await database.runAsync("INSERT INTO cached_threads (id, title, status, runner, updated_at, synced_at) VALUES (?, ?, ?, ?, ?, ?)", ["t1", "Saved chat", "finish", null, 10, 10]);
+        await database.runAsync("INSERT INTO cached_messages (id, thread_id, role, text, status, created_at, updated_at, synced_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", ["m1", "t1", "assistant", "Saved reply", "success", 5, 5, 10]);
+
+        const cache = createOfflineCache(database, { now: () => 1000 });
+        const scoped = await owned(cache);
+
+        const threads = await scoped.loadThreads();
+        const messages = await scoped.loadMessages("t1");
+        const [version] = await database.getAllAsync<{ user_version: number }>("PRAGMA user_version");
+
+        expect(threads.map((row) => row.title)).toEqual(["Saved chat"]);
+        expect(messages.map((row) => row.text)).toEqual(["Saved reply"]);
+        expect(messages[0]?.shareText).toBe("");
+        expect(version?.user_version).toBe(2);
+    });
+
+    it("keeps a newer empty share text against an older copy that has text", async () => {
+        const { cache } = makeCache();
+        const scoped = await owned(cache);
+
+        await scoped.saveMessages("t1", [message("m1", "t1", 5, { shareText: "", text: "", updatedAt: 2 })], { syncedAt: 100 });
+        await scoped.saveMessages("t1", [message("m1", "t1", 5, { shareText: "old text", text: "old text", updatedAt: 1 })], { syncedAt: 200 });
+
+        const [saved] = await scoped.loadMessages("t1");
+
+        expect(saved?.shareText).toBe("");
+    });
+
+    it("takes the share text from a live read even when the device clock has moved back past the saved stamp", async () => {
+        const database = await openVersionOneDatabase();
+
+        await database.runAsync("INSERT INTO cached_threads (id, title, status, runner, updated_at, synced_at) VALUES (?, ?, ?, ?, ?, ?)", ["t1", "Saved chat", "finish", null, 10, 10]);
+        // Saved long after the clock was last right, so the stamp is later than any read made now.
+        await database.runAsync("INSERT INTO cached_messages (id, thread_id, role, text, status, created_at, updated_at, synced_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", ["m1", "t1", "assistant", "Saved reply", "success", 5, 5, 900]);
+
+        const cache = createOfflineCache(database, { now: () => 100 });
+        const scoped = await owned(cache);
+
+        await scoped.saveMessages("t1", [message("m1", "t1", 5, { shareText: "Saved reply", text: "Saved reply", updatedAt: 5 })], { syncedAt: 100 });
+
+        const [saved] = await scoped.loadMessages("t1");
+
+        expect(saved?.shareText).toBe("Saved reply");
     });
 });

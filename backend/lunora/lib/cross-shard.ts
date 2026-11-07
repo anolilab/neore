@@ -21,7 +21,7 @@ import { routedShardNamespace } from "./shard-namespace";
 type ShardClient = ReturnType<typeof createShardClient>;
 
 const shardNamespace = (): ShardNamespaceLike => {
-    const namespace = (env as Record<string, unknown>)["SHARD"] as ShardNamespaceLike | undefined;
+    const namespace = (env as unknown as Record<string, unknown>)["SHARD"] as ShardNamespaceLike | undefined;
 
     if (!namespace) {
         throw new Error("The SHARD Durable Object binding is missing — check backend/wrangler.jsonc (dev) or alchemy.run.ts (deploy).");

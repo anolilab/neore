@@ -6133,6 +6133,13 @@
             "userId"
           ],
           "unique": false
+        },
+        "by_userId_and_kind": {
+          "fields": [
+            "userId",
+            "kind"
+          ],
+          "unique": false
         }
       },
       "memory": false,
@@ -6149,57 +6156,6 @@
         }
       },
       "shardMode": "shardBy:userId"
-    },
-    "emails": {
-      "commitOrdered": false,
-      "fields": {
-        "email": {
-          "kind": "string",
-          "nullable": false,
-          "optional": false,
-          "unique": false
-        },
-        "expectation": {
-          "kind": "union",
-          "nullable": false,
-          "optional": false,
-          "unique": false,
-          "members": [
-            {
-              "kind": "literal",
-              "nullable": false,
-              "optional": false,
-              "unique": false,
-              "literal": "\"bounced\""
-            },
-            {
-              "kind": "literal",
-              "nullable": false,
-              "optional": false,
-              "unique": false,
-              "literal": "\"complained\""
-            },
-            {
-              "kind": "literal",
-              "nullable": false,
-              "optional": false,
-              "unique": false,
-              "literal": "\"delivered\""
-            }
-          ]
-        }
-      },
-      "indexes": {
-        "by_email": {
-          "fields": [
-            "email"
-          ],
-          "unique": false
-        }
-      },
-      "memory": false,
-      "relations": {},
-      "shardMode": "global:d1"
     },
     "embeddings_1024": {
       "commitOrdered": false,
@@ -12330,7 +12286,8 @@
       },
       "memory": false,
       "relations": {},
-      "shardMode": "root"
+      "shardMode": "root",
+      "refinementsRecorded": true
     },
     "payment_events": {
       "commitOrdered": false,
@@ -12371,7 +12328,8 @@
       },
       "memory": false,
       "relations": {},
-      "shardMode": "root"
+      "shardMode": "root",
+      "refinementsRecorded": true
     },
     "payment_sessions": {
       "commitOrdered": false,
@@ -12380,13 +12338,15 @@
           "kind": "number",
           "nullable": false,
           "optional": false,
-          "unique": false
+          "unique": false,
+          "refined": true
         },
         "capturedMinor": {
           "kind": "number",
           "nullable": false,
           "optional": false,
-          "unique": false
+          "unique": false,
+          "refined": true
         },
         "createdAt": {
           "kind": "number",
@@ -12422,7 +12382,8 @@
           "kind": "number",
           "nullable": false,
           "optional": false,
-          "unique": false
+          "unique": false,
+          "refined": true
         },
         "revision": {
           "kind": "number",
@@ -12473,7 +12434,8 @@
       },
       "memory": false,
       "relations": {},
-      "shardMode": "root"
+      "shardMode": "root",
+      "refinementsRecorded": true
     },
     "payment_subscriptions": {
       "commitOrdered": false,
@@ -12592,7 +12554,8 @@
       },
       "memory": false,
       "relations": {},
-      "shardMode": "root"
+      "shardMode": "root",
+      "refinementsRecorded": true
     },
     "payment_usageEvents": {
       "commitOrdered": false,
@@ -12672,7 +12635,8 @@
       },
       "memory": false,
       "relations": {},
-      "shardMode": "root"
+      "shardMode": "root",
+      "refinementsRecorded": true
     },
     "persistentChunks": {
       "commitOrdered": false,
@@ -23842,6 +23806,41 @@
           "optional": true,
           "unique": false
         },
+        "lastSkipReason": {
+          "kind": "union",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "members": [
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"awaiting_review\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"blocked\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"still_running\""
+            }
+          ]
+        },
+        "lastSkippedAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "maxRepairRounds": {
           "kind": "number",
           "nullable": false,
@@ -25613,6 +25612,12 @@
         },
         "activeLeafMessageId": {
           "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "autoModel": {
+          "kind": "boolean",
           "nullable": false,
           "optional": true,
           "unique": false

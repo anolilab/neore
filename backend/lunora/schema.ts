@@ -58,7 +58,7 @@ import {
 } from "./source-control/validators";
 import { vSkillConfig } from "./skills/validators";
 import { vDispatchSource, vSubAgentRunMode, vSubAgentRunner, vSubAgentRunStatus, vWorkerPolicy } from "./sub-agents/validators";
-import { vGoalStatus, vTaskRunOrigin, vTaskRunStatus, vTaskStatus, vVerdict } from "./tasks/validators";
+import { vGoalStatus, vTaskRunOrigin, vTaskRunStatus, vTaskSkipReason, vTaskStatus, vVerdict } from "./tasks/validators";
 import { vEventSource, vEventState, vWebhookSignatureScheme } from "./triggers/validators";
 
 /** Hoisted so `streamDeltasFields` is readable as a value, not just a type. */
@@ -745,6 +745,8 @@ export const schema = defineSchema({
         .index("by_messageId", ["messageId"])
         .index("by_userId", ["userId"])
         .index("by_threadId_and_kind", ["threadId", "kind"])
+        // The image library across all of one user's threads (`media/functions.ts`).
+        .index("by_userId_and_kind", ["userId", "kind"])
         .relations((r) => {
             return {
                 thread: r.one("threads", { field: "threadId" }),
@@ -768,13 +770,6 @@ export const schema = defineSchema({
                 document: r.one("documents", { field: "documentId" }),
             };
         }),
-
-    emails: defineTable({
-        email: v.string(),
-        expectation: v.union(v.literal("delivered"), v.literal("bounced"), v.literal("complained")),
-    })
-        .global()
-        .index("by_email", ["email"]),
 
     embeddings_128: defineTable({
         model: v.string(),
@@ -2158,9 +2153,12 @@ export const schema = defineSchema({
         baseBranch: v.optional(v.string()),
         createdAt: v.number(),
         headBranch: v.optional(v.string()),
-        kind: v.union(v.literal("attached"), v.literal("opened")),
+        // `attached`: a thread started on the pull request. `linked`: an existing thread linked by hand. `opened`: a run opened it.
+        kind: v.union(v.literal("attached"), v.literal("linked"), v.literal("opened")),
         number: v.number(),
         repository: v.string(),
+        // Set while the thread is soft-deleted, so the sidebar count reads these rows alone. Kept in step by the thread's delete and restore.
+        threadDeleted: v.optional(v.boolean()),
         threadId: v.id("threads"),
         title: v.string(),
         url: v.string(),
@@ -2677,6 +2675,9 @@ export const schema = defineSchema({
         instructions: v.string(),
         lastError: v.optional(v.string()),
         lastRunThreadId: v.optional(v.string()),
+        // The last recurrence slot the sweep let pass without a run, and why (`tasks/AGENTS.md`).
+        lastSkippedAt: v.optional(v.number()),
+        lastSkipReason: v.optional(vTaskSkipReason),
         maxRepairRounds: v.number(),
         model: v.optional(v.string()),
         nextRunAt: v.optional(v.number()),

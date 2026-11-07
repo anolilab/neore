@@ -1,7 +1,5 @@
 # UI PACKAGE KNOWLEDGE BASE
 
-**Generated:** 2026-01-23 20:32:15
-**Updated:** 2026-10-10 (spreadsheet components)
 **Parent:** ../../AGENTS.md
 
 ## OVERVIEW
@@ -12,8 +10,7 @@ Base UI component library with form elements, data grid, and AI-specific compone
 
 ```text
 packages/ui/src/
-├── components/          # UI components
-│   ├── ui/            # Base UI elements
+├── components/          # UI components (base elements at the top level)
 │   ├── form/          # Form components
 │   ├── data-grid/      # Data presentation
 │   ├── ai-elements/    # AI-specific components
@@ -29,7 +26,7 @@ packages/ui/src/
 
 | Task            | Location                | Notes                                         |
 | --------------- | ----------------------- | --------------------------------------------- |
-| Base components | components/ui/          | Buttons, inputs, layouts                      |
+| Base components | components/             | Buttons, inputs, layouts                      |
 | Forms           | components/form/        | Form validation, handling                     |
 | Data grid       | components/data-grid/   | Table components                              |
 | AI elements     | components/ai-elements/ | AI-specific UI                                |

@@ -34,6 +34,8 @@
         "./chat/tags": "./lunora/chat/tags/logic.ts",
         "./dataModel": "./lunora/_generated/dataModel.ts",
         "./document-limits": "./lunora/lib/document-limits.ts",
+        "./ask-user-limits": "./lunora/chat/tools/ask-user-constants.ts",
+        "./request-secret-limits": "./lunora/chat/tools/request-secret-constants.ts",
         "./knowledge/citations": "./lunora/knowledge/citations.ts",
         "./messenger/reply-tools": "./lunora/messenger/lib/reply-tools.ts",
         "./package.json": "./package.json",
@@ -131,11 +133,13 @@
         ],
         "services": {
             "services": [
+                "ADVISOR_COMPANION",
                 "SERVICE_BROWSER_RENDERER",
                 "SERVICE_DOCUMENT_PARSER",
                 "SERVICE_NSFW_CHECKER"
             ],
             "env.preview.services": [
+                "ADVISOR_COMPANION",
                 "SERVICE_BROWSER_RENDERER",
                 "SERVICE_DOCUMENT_PARSER",
                 "SERVICE_LLM_GATEWAY",

@@ -26,6 +26,9 @@ export const OAUTH_EMAIL_UNVERIFIED = "OAUTH_EMAIL_UNVERIFIED";
 
 export const PASSKEY_REQUIRES_ACCOUNT = "PASSKEY_REQUIRES_ACCOUNT";
 
+/** The refusal of a guest sign-in while registration is invite-only. */
+export const GUEST_SIGN_IN_DISABLED = "GUEST_SIGN_IN_DISABLED";
+
 /** The passkey plugin's registration endpoints. */
 const PASSKEY_REGISTER_PATH = /^\/passkey\/(?:generate-register-options|verify-registration)$/;
 
@@ -45,10 +48,16 @@ export const signInMethods = (methods: SignInMethods, options: { inviteOnly: boo
             getSignInMethods: createAuthEndpoint("/sign-in-methods", { method: "GET" }, async (ctx) => {
                 ctx.setHeader("cache-control", "public, max-age=300");
 
-                return ctx.json(methods);
+                // `inviteOnly` tells the app whether to offer guest chat and sign-up links at all.
+                return ctx.json({ ...methods, inviteOnly: options.inviteOnly });
             }),
         },
         /**
+         * No guests while registration is invite-only: a guest is a free account
+         * that skipped the invitation, with a chat quota of its own. The app
+         * asks a visitor to sign in instead (`inviteOnly` above). A guest
+         * session made before the switch keeps working until it ends.
+         *
          * No passkeys on a guest. A guest session is real enough for the
          * passkey plugin to register one, but converting the guest creates a
          * NEW user and deletes the guest — the passkey would be left pointing at
@@ -56,6 +65,19 @@ export const signInMethods = (methods: SignInMethods, options: { inviteOnly: boo
          */
         hooks: {
             before: [
+                ...(options.inviteOnly
+                    ? [
+                          {
+                              handler: createAuthMiddleware(async () => {
+                                  throw new APIError("FORBIDDEN", {
+                                      code: GUEST_SIGN_IN_DISABLED,
+                                      message: "Guest access is closed. Sign in with an account.",
+                                  });
+                              }),
+                              matcher: (ctx: { path?: string }) => ctx.path === "/sign-in/anonymous",
+                          },
+                      ]
+                    : []),
                 {
                     handler: createAuthMiddleware(async (ctx) => {
                         const session = await getSessionFromCtx(ctx);

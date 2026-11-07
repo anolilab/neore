@@ -61,7 +61,7 @@ const { systemPrompt, userPrompt } = buildUserOptimizerPrompt(style, prompt.trim
   (`provider-capabilities.md`).
 - **Local model hosts live in `models/local-endpoint.ts`.** `LOCAL_ENDPOINT_HOSTS`
   must agree with the web app's CSP and the backend's loopback validator
-  (root `CLAUDE.md`, "Local models").
+  (`apps/web/src/features/local-models/AGENTS.md`).
 - **Prompt optimizer:** user input is wrapped as JSON and the model is told to
   treat it as evidence, not instructions. Do not unwrap it. `render.ts`
   substitutes in a single left-to-right pass so a value containing `{{var}}` is

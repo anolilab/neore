@@ -15,7 +15,8 @@ import { lazy, Suspense, useCallback, useEffect, useEffectEvent, useMemo, useRef
 
 import { ErrorBoundary } from "@/components/error-boundary";
 import { SettingsSearchField, SettingsSearchResults, useSettingsSearch } from "@/components/settings/settings-search";
-import useIsAnonymous from "@/features/auth/hooks/use-is-anonymous";
+import useInviteOnly from "@/features/auth/hooks/use-invite-only";
+import { hasNoAccount } from "@/features/auth/lib/account-state";
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 import { useModalState } from "@/features/layout/hooks/use-ui-state";
 import { jumpToSettingsRow } from "@/features/settings/lib/settings-jump";
@@ -136,6 +137,8 @@ const SettingsTabError: FC<{ error: Error; onRetry: () => void }> = ({ error, on
 
 const AnonymousUpgradeGate: FC<{ label: string }> = ({ label }) => {
     const { t } = useLingui();
+    // Under invite-only an account comes from an invitation, so a visitor without one is sent to sign in instead.
+    const { canSignUp, signUpHref } = useInviteOnly();
 
     return (
         <div className="flex h-64 flex-col items-center justify-center gap-4 p-6 text-center">
@@ -146,12 +149,20 @@ const AnonymousUpgradeGate: FC<{ label: string }> = ({ label }) => {
                 <p className="font-medium">
                     {label} {t`requires an account`}
                 </p>
-                <p className="text-muted-foreground mt-1 text-sm">{t`Sign up and subscribe for $8/mo to unlock all features.`}</p>
+                <p className="text-muted-foreground mt-1 text-sm">
+                    {canSignUp ? t`Sign up and subscribe for $8/mo to unlock all features.` : t`Sign in to your account to use it.`}
+                </p>
             </div>
             {/* A link styled as a button: it navigates, so it keeps link semantics. */}
-            <a className={buttonVariants({ size: "sm" })} href="/auth/sign-up">
-                {t`Create an account`}
-            </a>
+            {canSignUp ? (
+                <a className={buttonVariants({ size: "sm" })} href={signUpHref}>
+                    {t`Create an account`}
+                </a>
+            ) : (
+                <a className={buttonVariants({ size: "sm" })} href="/auth/sign-in">
+                    {t`Sign in`}
+                </a>
+            )}
         </div>
     );
 };
@@ -164,7 +175,9 @@ export const SettingsModal: FC = () => {
     const crpc = useCRPC();
     const { apiKey, hooks, organization } = useAuth();
     const { data: activeOrganization } = hooks.useActiveOrganization();
-    const { isAnonymous } = useIsAnonymous();
+    // A guest, or signed out (the chat is reachable signed out under invite-only), locks the account tabs. A session
+    // read still pending or failed is unknown, not signed out, so it locks nothing.
+    const isAnonymous = hasNoAccount(hooks.useSession());
 
     const { close, isOpen, open } = useModalState("settings");
     // Once opened, stay mounted so the Dialog's Activity component can

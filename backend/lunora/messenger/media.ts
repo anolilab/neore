@@ -21,7 +21,12 @@
 import { internal } from "../_generated/internal";
 import type { Id } from "../_generated/dataModel";
 import type { ActionCtx } from "../_generated/server";
+import { createDocumentParserClient, extractDocument } from "@neore/service-sdk/document-parser";
+
 import { storeFile } from "../agent/client/files";
+import { documentTextOf } from "../agent/extraction";
+import { FETCH_TIMEOUT_LONG_MS } from "../lib/fetch-timeout";
+import { isServiceBound, serviceFetch } from "../lib/services";
 import { readStoredObject, signedReadUrl } from "../lib/storage-read";
 import { toStorageRef } from "../lib/storage-ref";
 import type { InboundAttachment, MediaBytes, OutboundFile } from "./lib/media";
@@ -96,6 +101,36 @@ const skippedLine = (attachment: InboundAttachment, reason: keyof typeof SKIP_RE
     const subject = attachment.kind === "voice" ? "Voice message" : label;
 
     return `[${subject} not read: ${SKIP_REASONS[reason]!}]`;
+};
+
+/** A document's text inlined into the prompt, clipped to {@link INLINE_TEXT_MAX_CHARS}. */
+const documentLine = (name: string, text: string): string =>
+    `[Document: ${name}]\n${text.length > INLINE_TEXT_MAX_CHARS ? `${text.slice(0, INLINE_TEXT_MAX_CHARS)}\n[… truncated]` : text}`;
+
+/**
+ * A PDF's text from the document parser, as chat attaches a document, or `undefined` when the parser is not bound,
+ * fails or finds none.
+ */
+const pdfText = async (context: ActionCtx, bytes: MediaBytes, mediaType: string): Promise<string | undefined> => {
+    if (!isServiceBound(context, "documentParser")) {
+        return undefined;
+    }
+
+    try {
+        const { data, response } = await extractDocument({
+            body: new Blob([bytes], { type: mediaType }),
+            client: createDocumentParserClient({ fetch: serviceFetch(context, "documentParser") }),
+            headers: { "content-type": mediaType },
+            signal: AbortSignal.timeout(FETCH_TIMEOUT_LONG_MS),
+        });
+        const text = response?.ok && data ? documentTextOf(data).trim() : "";
+
+        return text || undefined;
+    } catch (error) {
+        console.warn("[Messenger] PDF text extraction failed:", error instanceof Error ? error.message : error);
+
+        return undefined;
+    }
 };
 
 const isAudio = (attachment: InboundAttachment, mediaType: string): boolean =>
@@ -217,12 +252,17 @@ export const ingestAttachments = async (
         } else if (mediaType.startsWith("image/")) {
             parts.push({ image: reference, mediaType, type: "image" });
         } else if (MODEL_READABLE_TYPES.has(mediaType)) {
-            parts.push({ data: reference, filename: name, mediaType, type: "file" });
-        } else if (TEXT_DOCUMENT_TYPES.has(mediaType)) {
-            const text = decodeInlineText(bytes);
-            const clipped = text.length > INLINE_TEXT_MAX_CHARS ? `${text.slice(0, INLINE_TEXT_MAX_CHARS)}\n[… truncated]` : text;
+            const text = await pdfText(context, bytes, mediaType);
 
-            lines.push(`[Document: ${name}]\n${clipped}`);
+            // A PDF whose text fits goes in as text, which every reply model reads. One that is longer, or whose text
+            // could not be read, stays a file part, so the reply moves to a model that reads PDFs (`chooseReplyModel`).
+            if (text !== undefined && text.length <= INLINE_TEXT_MAX_CHARS) {
+                lines.push(documentLine(name, text));
+            } else {
+                parts.push({ data: reference, filename: name, mediaType, type: "file" });
+            }
+        } else if (TEXT_DOCUMENT_TYPES.has(mediaType)) {
+            lines.push(documentLine(name, decodeInlineText(bytes)));
         } else {
             lines.push(`[Attached file: ${name} (${mediaType}) — its contents cannot be read here]`);
         }

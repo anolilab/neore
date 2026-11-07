@@ -15,7 +15,7 @@ import { LunoraError, v } from "lunorash/server";
 import z from "zod/v4";
 
 import getAgent from "../chat/lib/get-agent";
-import { loadOptimizerModelRules } from "../chat/lib/optimizer-model-rules";
+import { loadOptimizerModel } from "../chat/lib/optimizer-model-rules";
 import { authAction, rateLimit } from "../lib/crpc";
 import { gatewayFetch } from "../lib/services";
 import { buildSkillGeneratorPrompt, MAX_GOAL_LENGTH, normalizeSkillDraft } from "./generate-prompt";
@@ -84,8 +84,8 @@ export const generateSkillDraft = authAction
 
         // `getAgent` wraps the model in the LLM gateway (and refuses to run without
         // one), so this call is metered and attributed like every other.
-        const modelFilterRules = await loadOptimizerModelRules(ctx, ctx.user.userId, DEFAULT_PROMPT_IMPROVEMENT_MODEL);
-        const agent = await getAgent(DEFAULT_PROMPT_IMPROVEMENT_MODEL, { gateway: gatewayFetch(ctx), modelFilterRules, userId: ctx.user.userId });
+        const { model, modelFilterRules } = await loadOptimizerModel(ctx, ctx.user.userId, DEFAULT_PROMPT_IMPROVEMENT_MODEL);
+        const agent = await getAgent(model, { gateway: gatewayFetch(ctx), modelFilterRules, userId: ctx.user.userId });
 
         const tools = getToolRegistry();
         const { prompt, system } = buildSkillGeneratorPrompt(trimmed, tools);
@@ -103,7 +103,7 @@ export const generateSkillDraft = authAction
 
         ctx.log.event("skills.generate_draft", {
             inputTokens: result.usage.inputTokens,
-            model: DEFAULT_PROMPT_IMPROVEMENT_MODEL,
+            model,
             outputTokens: result.usage.outputTokens,
             toolCount: tools.length,
         });

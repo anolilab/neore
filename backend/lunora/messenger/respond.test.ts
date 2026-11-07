@@ -166,8 +166,14 @@ const ctx = () =>
         },
         runQuery: async (path: string, args: unknown) => {
             switch (path) {
+                case "auth_functions:getAgentModulePreferencesQuery": {
+                    return {};
+                }
                 case "auth_functions:getDecryptedMessengerKeysQuery": {
                     return KEYS;
+                }
+                case "auth_functions:getUserRunPlanQuery": {
+                    return null;
                 }
                 case "messenger_functions:aiDisclosureSent": {
                     return state.disclosed;
@@ -180,8 +186,8 @@ const ctx = () =>
                 case "messenger_functions:listReplyMedia": {
                     return state.replyFiles;
                 }
-                case "messenger_functions:threadHasRecentMedia": {
-                    return false;
+                case "messenger_functions:threadRecentMedia": {
+                    return "none";
                 }
                 default: {
                     throw new Error(`unexpected query ${path}`);

@@ -46,6 +46,8 @@
     --popover-foreground: var(--brand-obsidian);
     --primary: var(--brand-lime);
     --primary-foreground: var(--brand-obsidian);
+    /* The accent as TEXT or an icon on the page. The lime is a fill: as text on white it is ~1.2:1. */
+    --primary-text: #3f6212;
     --secondary: var(--brand-frost);
     --secondary-foreground: var(--brand-obsidian);
     --muted: var(--brand-frost);
@@ -79,6 +81,11 @@
     --warning-foreground: var(--color-amber-700);
 }
 
+/* An accent preset's light primary is already dark enough to read as text (`accent-presets.ts`). */
+:root[data-accent] {
+    --primary-text: var(--primary);
+}
+
 .dark {
     --background: var(--brand-charcoal);
     --foreground: var(--brand-frost);
@@ -88,6 +95,7 @@
     --popover-foreground: var(--brand-frost);
     --primary: var(--brand-lime);
     --primary-foreground: var(--brand-obsidian);
+    --primary-text: var(--primary);
     --secondary: var(--brand-iron);
     --secondary-foreground: var(--brand-frost);
     --muted: var(--brand-iron);
@@ -130,6 +138,7 @@
     --color-popover-foreground: var(--popover-foreground);
     --color-primary: var(--primary);
     --color-primary-foreground: var(--primary-foreground);
+    --color-primary-text: var(--primary-text);
     --color-secondary: var(--secondary);
     --color-secondary-foreground: var(--secondary-foreground);
     --color-muted: var(--muted);

@@ -14,7 +14,8 @@
 // via dynamic import() to prevent those heavy modules from being evaluated during
 // the backend bundler's module-analysis phase (which has a 64 MB memory budget).
 
-import { ANONYMOUS_FREE_MODEL } from "../constants";
+import type { LanguageModelV3 } from "@ai-sdk/provider";
+
 import type { AgentConfig, ModelDefinition } from "./types";
 
 // Preset voices of FAL's MiniMax Speech 02 (`voice_setting.voice_id`), listed on
@@ -158,10 +159,10 @@ const REGISTRY_ENTRIES: ModelDefinition[] = [
     {
         contextOptions: { recentMessages: 10 },
         enabled: true,
-        id: ANONYMOUS_FREE_MODEL,
+        id: "openrouter/free",
         maxRetries: 2,
         maxSteps: 5,
-        modelApiId: ANONYMOUS_FREE_MODEL,
+        modelApiId: "openrouter/free",
         name: "Free Models Router",
         provider: "openrouter",
     },
@@ -250,6 +251,180 @@ const REGISTRY_ENTRIES: ModelDefinition[] = [
         name: "Kimi K2 0905",
         provider: "openrouter",
         slug: "kimi-k2-0905",
+        tier: "high-quality",
+    },
+
+    // ── Cloudflare Workers AI ────────────────────────────────────
+    // Run on the gateway's `AI` binding: no provider key, and within the
+    // account's daily free allocation. Ids match the gateway's routing
+    // candidates (`services/llm-gateway/src/models.ts`).
+    {
+        contextOptions: { recentMessages: 10 },
+        desc: "IBM's small, fast model on Workers AI",
+        displayProvider: "IBM",
+        enabled: true,
+        id: "cf-granite-4.0-micro",
+        listed: true,
+        maxRetries: 2,
+        maxSteps: 5,
+        modelApiId: "@cf/ibm-granite/granite-4.0-h-micro",
+        name: "Granite 4.0 Micro (Workers AI)",
+        provider: "cloudflare",
+        slug: "workers-ai-granite-4.0-micro",
+        tier: "budget",
+    },
+    {
+        contextOptions: { recentMessages: 10 },
+        desc: "Qwen's mixture-of-experts model on Workers AI",
+        displayProvider: "Qwen",
+        enabled: true,
+        id: "cf-qwen3-30b-a3b",
+        listed: true,
+        maxRetries: 2,
+        maxSteps: 5,
+        modelApiId: "@cf/qwen/qwen3-30b-a3b-fp8",
+        name: "Qwen3 30B A3B (Workers AI)",
+        provider: "cloudflare",
+        slug: "workers-ai-qwen3-30b-a3b",
+        tier: "fast",
+    },
+    {
+        contextOptions: { recentMessages: 10 },
+        desc: "Z.ai's fast GLM model on Workers AI",
+        displayProvider: "Z.ai",
+        enabled: true,
+        id: "cf-glm-4.7-flash",
+        listed: true,
+        maxRetries: 2,
+        maxSteps: 5,
+        modelApiId: "@cf/zai-org/glm-4.7-flash",
+        name: "GLM 4.7 Flash (Workers AI)",
+        provider: "cloudflare",
+        slug: "workers-ai-glm-4.7-flash",
+        tier: "fast",
+    },
+    {
+        contextOptions: { recentMessages: 10 },
+        desc: "OpenAI's open-weight 20B model on Workers AI",
+        displayProvider: "OpenAI",
+        enabled: true,
+        id: "cf-gpt-oss-20b",
+        listed: true,
+        maxRetries: 2,
+        maxSteps: 5,
+        modelApiId: "@cf/openai/gpt-oss-20b",
+        name: "gpt-oss-20b (Workers AI)",
+        provider: "cloudflare",
+        slug: "workers-ai-gpt-oss-20b",
+        tier: "fast",
+    },
+    {
+        contextOptions: { recentMessages: 10 },
+        desc: "Meta's multimodal Llama 4 on Workers AI",
+        displayProvider: "Meta",
+        enabled: true,
+        id: "cf-llama-4-scout",
+        listed: true,
+        maxRetries: 2,
+        maxSteps: 5,
+        modelApiId: "@cf/meta/llama-4-scout-17b-16e-instruct",
+        name: "Llama 4 Scout (Workers AI)",
+        provider: "cloudflare",
+        slug: "workers-ai-llama-4-scout",
+        supportsImages: true,
+        tier: "medium",
+    },
+    {
+        contextOptions: { recentMessages: 10 },
+        desc: "Meta's Llama 3.3 70B on Workers AI",
+        displayProvider: "Meta",
+        enabled: true,
+        id: "cf-llama-3.3-70b",
+        listed: true,
+        maxRetries: 2,
+        maxSteps: 5,
+        modelApiId: "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+        name: "Llama 3.3 70B (Workers AI)",
+        provider: "cloudflare",
+        slug: "workers-ai-llama-3.3-70b",
+        tier: "medium",
+    },
+    {
+        contextOptions: { recentMessages: 10 },
+        desc: "Google's Gemma 3 on Workers AI, without tools",
+        displayProvider: "Google",
+        enabled: true,
+        id: "cf-gemma-3-12b",
+        listed: true,
+        maxRetries: 2,
+        maxSteps: 5,
+        modelApiId: "@cf/google/gemma-3-12b-it",
+        name: "Gemma 3 12B (Workers AI)",
+        provider: "cloudflare",
+        slug: "workers-ai-gemma-3-12b",
+        supportsToolCalling: false,
+        tier: "budget",
+    },
+    {
+        contextOptions: { recentMessages: 10 },
+        desc: "OpenAI's open-weight 120B model on Workers AI",
+        displayProvider: "OpenAI",
+        enabled: true,
+        id: "cf-gpt-oss-120b",
+        listed: true,
+        maxRetries: 2,
+        maxSteps: 5,
+        modelApiId: "@cf/openai/gpt-oss-120b",
+        name: "gpt-oss-120b (Workers AI)",
+        provider: "cloudflare",
+        slug: "workers-ai-gpt-oss-120b",
+        tier: "high-quality",
+    },
+    {
+        contextOptions: { recentMessages: 10 },
+        desc: "Mistral's multimodal small model on Workers AI",
+        displayProvider: "Mistral",
+        enabled: true,
+        id: "cf-mistral-small-3.1",
+        listed: true,
+        maxRetries: 2,
+        maxSteps: 5,
+        modelApiId: "@cf/mistralai/mistral-small-3.1-24b-instruct",
+        name: "Mistral Small 3.1 (Workers AI)",
+        provider: "cloudflare",
+        slug: "workers-ai-mistral-small-3.1",
+        supportsImages: true,
+        tier: "medium",
+    },
+    {
+        contextOptions: { recentMessages: 10 },
+        desc: "NVIDIA's Nemotron 3 on Workers AI",
+        displayProvider: "NVIDIA",
+        enabled: true,
+        id: "cf-nemotron-3-120b",
+        listed: true,
+        maxRetries: 2,
+        maxSteps: 5,
+        modelApiId: "@cf/nvidia/nemotron-3-120b-a12b",
+        name: "Nemotron 3 120B (Workers AI)",
+        provider: "cloudflare",
+        slug: "workers-ai-nemotron-3-120b",
+        tier: "high-quality",
+    },
+    {
+        contextOptions: { recentMessages: 10 },
+        desc: "Moonshot's multimodal Kimi K2.5 on Workers AI",
+        displayProvider: "Moonshot",
+        enabled: true,
+        id: "cf-kimi-k2.5",
+        listed: true,
+        maxRetries: 2,
+        maxSteps: 5,
+        modelApiId: "@cf/moonshotai/kimi-k2.5",
+        name: "Kimi K2.5 (Workers AI)",
+        provider: "cloudflare",
+        slug: "workers-ai-kimi-k2.5",
+        supportsImages: true,
         tier: "high-quality",
     },
 
@@ -5531,6 +5706,22 @@ export type AgentModel = {
 };
 
 /**
+ * A chat model for a provider that runs only behind the LLM gateway, which holds
+ * its binding (Workers AI's `AI`). The backend swaps every registry model for a
+ * `GatewayLanguageModel` before calling it, so this one only marks the model as
+ * a chat model and fails loudly if it is ever called directly.
+ */
+const gatewayOnlyModel =
+    (provider: string) =>
+    (modelId: string): LanguageModelV3 => {
+        const refuse = (): never => {
+            throw new Error(`${provider} model "${modelId}" runs only through the LLM gateway`);
+        };
+
+        return { doGenerate: refuse, doStream: refuse, modelId, provider, specificationVersion: "v3", supportedUrls: {} };
+    };
+
+/**
  * Build agents object from all provider model definitions.
  * - Text models → `chat`
  * - Image models → `imageModel` (fal, openai, xai, google, luma, replicate, fireworks, bfl)
@@ -5581,6 +5772,7 @@ export const buildAgents = async (): Promise<Record<string, AgentConfig>> => {
 
     // Text model factories (providers that primarily serve chat/language models)
     const textProviderFactories: Record<string, (apiKey?: string) => (id: string) => unknown> = {
+        cloudflare: () => gatewayOnlyModel("cloudflare"),
         groq: (k) => createGroq({ apiKey: k ?? process.env.GROQ_API_KEY }),
         openrouter: (k) => createOpenRouter({ apiKey: k ?? process.env.OPENROUTER_API_KEY, headers }),
         requesty: (k) => createRequesty({ apiKey: k ?? process.env.REQUESTY_API_KEY }),
@@ -5853,6 +6045,7 @@ export const buildDynamicAgent = async (modelId: string, apiKey: string | Record
     headers["X-Title"] = "neore";
 
     const textProviderFactories: Record<string, (apiKey?: string) => (id: string) => unknown> = {
+        cloudflare: () => gatewayOnlyModel("cloudflare"),
         groq: (k) => createGroq({ apiKey: k ?? process.env.GROQ_API_KEY }),
         openrouter: (k) => createOpenRouter({ apiKey: k ?? process.env.OPENROUTER_API_KEY, headers }),
         requesty: (k) => createRequesty({ apiKey: k ?? process.env.REQUESTY_API_KEY }),

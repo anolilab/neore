@@ -94,6 +94,44 @@ describe("estimateTokens", () => {
         expect(estimateTokens([call("c1")])).toBeGreaterThan(0);
     });
 
+    it("counts a media tool result by its fixed estimate, never by the bytes it carries", () => {
+        // A tool result holding a multi-megabyte image as base64: the bytes are not text the model reads.
+        const bytes = "A".repeat(1_000_000);
+        const withImage = {
+            content: [
+                {
+                    output: {
+                        type: "content",
+                        value: [
+                            { text: "Answered", type: "text" },
+                            { data: bytes, mediaType: "image/png", type: "image-data" },
+                        ],
+                    },
+                    toolCallId: "c1",
+                    toolName: "askUser",
+                    type: "tool-result",
+                },
+            ],
+            role: "tool",
+        } as unknown as ModelMessage;
+
+        const withoutImage = {
+            content: [
+                {
+                    output: { type: "content", value: [{ text: "Answered", type: "text" }] },
+                    toolCallId: "c1",
+                    toolName: "askUser",
+                    type: "tool-result",
+                },
+            ],
+            role: "tool",
+        } as unknown as ModelMessage;
+
+        // The image adds a fixed amount (more than zero), and nothing close to its bytes.
+        expect(estimateTokens([withImage]) - estimateTokens([withoutImage])).toBeGreaterThan(0);
+        expect(estimateTokens([withImage])).toBeLessThan(2000);
+    });
+
     it("counts reasoning text", () => {
         const reasoning = { content: [{ text: BIG, type: "reasoning" }], role: "assistant" } as ModelMessage;
 

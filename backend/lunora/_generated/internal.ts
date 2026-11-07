@@ -266,6 +266,7 @@ export interface InternalApiTypes {
         };
         hooks: {
             cascadeDeleteUser: FunctionReference<"mutation", { userId: Id<"user"> }, void>;
+            deleteMergedGuest: FunctionReference<"mutation", { userId: string }, { deleted: boolean }>;
             deleteUserRecord: FunctionReference<"mutation", { userDocId: Id<"user"> }, null>;
             initializeUserDefaults: FunctionReference<"mutation", { userId: Id<"user"> }, void>;
             promoteVerifiedAdmin: FunctionReference<"mutation", { userId: Id<"user"> }, void>;
@@ -352,7 +353,7 @@ export interface InternalApiTypes {
             failAbandonedEditReply: FunctionReference<"mutation", { claimKey?: string; promptMessageId: Id<"messages">; threadId: Id<"threads"> }, { added: boolean; failed: number }>;
         };
         execute: {
-            continueAfterToolApproval: FunctionReference<"action", { answer?: string; approvalId: string; approved: boolean; config: { autoMediaEnrichment: boolean; dispatchOrigin?: "outside_agent"; group?: { baseModel: string; isAnonymous: boolean; organizationId?: string; queue: Array<string>; skillId: string; spokenSkillIds: Array<string>; step?: { role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }; steps?: Array<{ role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }>; turnStartedAt: number }; instructions?: string; mcpServerNames: Array<string>; memory?: { botId?: string }; model: string; promptMessageId?: string; reasoningEffort?: number; replyKey?: string; researchDepth: "speed" | "balanced" | "thorough"; searchMode: string; shouldAutoContinue: boolean; startedBy?: string; toolNames: Array<string>; toolPermissionKeys?: Record<string, string>; untrustedContext?: boolean }; denyReason?: string; streamId: string; threadId: string; userId: string }, void>;
+            continueAfterToolApproval: FunctionReference<"action", { answer?: string; answerFileIds?: Array<string>; answers?: Array<{ note?: string; question: string; selected: Array<string> }>; approvalId: string; approved: boolean; config: { autoMediaEnrichment: boolean; dispatchOrigin?: "outside_agent"; group?: { baseModel: string; isAnonymous: boolean; organizationId?: string; queue: Array<string>; skillId: string; spokenSkillIds: Array<string>; step?: { role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }; steps?: Array<{ role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }>; turnStartedAt: number }; instructions?: string; mcpServerNames: Array<string>; memory?: { botId?: string }; model: string; promptMessageId?: string; reasoningEffort?: number; replyKey?: string; researchDepth: "speed" | "balanced" | "thorough"; searchMode: string; shouldAutoContinue: boolean; startedBy?: string; toolNames: Array<string>; toolPermissionKeys?: Record<string, string>; untrustedContext?: boolean }; denyReason?: string; streamId: string; threadId: string; userId: string }, void>;
             runStreamingAgent: FunctionReference<"action", { isAnonymous?: boolean; messageId: string; organizationId?: string; origin?: "lead" | "outside_agent"; resume?: string; skill?: { rawArgs: string; slug: string }; streamId: string; streamingConfig: { contentType: string; customSystemPrompt?: string; enabledFeatures?: Array<string>; imageSize?: string; mcpServerNames?: Array<string>; model: string; reasoningEffort?: number; researchDepth?: string; searchMode?: string; shouldAutoContinue?: boolean; statelessMode?: boolean }; threadId: string; userId: string; userPrompt?: string }, void>;
         };
         functions: {
@@ -622,8 +623,6 @@ export interface InternalApiTypes {
     email: {
         functions: {
             deliverEmail: FunctionReference<"action", { message?: unknown }, null>;
-            handleEmailEvent: FunctionReference<"mutation", { event: { type: string }; id: string }, null>;
-            insertExpectation: FunctionReference<"mutation", { email: string; expectation: "delivered" | "bounced" | "complained" }, null>;
         };
     };
     evals: {
@@ -903,7 +902,7 @@ export interface InternalApiTypes {
             pairConnection: FunctionReference<"mutation", { codeHash: string; connectionId: Id<"messengerConnections">; displayName?: string; platformChatId: string; platformUserId: string; platformUsername?: string }, boolean>;
             saveMessengerMessage: FunctionReference<"mutation", { fileIds?: Array<Id<"chatFiles">>; parts?: Array<{ image: string; mediaType: string; type: "image" } | { data: string; filename?: string; mediaType: string; type: "file" }>; pending?: boolean; text: string; threadId: Id<"threads">; userId: string }, { messageId: Id<"messages">; order: number }>;
             saveMessengerNotice: FunctionReference<"mutation", { text: string; threadId: Id<"threads">; userId: string }, null>;
-            threadHasRecentMedia: FunctionReference<"query", { threadId: Id<"threads"> }, boolean>;
+            threadRecentMedia: FunctionReference<"query", { threadId: Id<"threads"> }, "files" | "images" | "none">;
             touchConnection: FunctionReference<"mutation", { connectionId: Id<"messengerConnections"> }, void>;
         };
         respond: {
@@ -1071,7 +1070,7 @@ export interface InternalApiTypes {
         };
         gdpr: {
             collectGuidesForExport: FunctionReference<"query", { cursor?: string | null; userId: string }, { cursor: string | null; guides: Array<{ createdAt: number; generatedAt: number; headSha: string; hostOrigin: string; instructions: string; number: number; proposals: Array<{ body: string; id: string; kind: "comment"; line: number; path: string; side: "new" | "old"; startLine: number | null; status: "applied" | "dismissed" | "proposed" } | { id: string; kind: "label"; name: string; reason: string; status: "applied" | "dismissed" | "proposed" }>; repository: string; source: "cloud" | "host"; status: "failed" | "generating" | "ready"; stops: Array<{ explanation: string; files: Array<{ path: string; ranges: Array<{ end: number; side: "new" | "old"; start: number }> }>; id: string; kind: "core" | "dependent" | "mechanical" | "uncovered"; title: string }>; summary: string }> }>;
-            collectPullRequestThreadsForExport: FunctionReference<"query", { cursor?: string | null; userId: string }, { cursor: string | null; links: Array<{ baseBranch?: string; createdAt: number; headBranch?: string; kind: "attached" | "opened"; number: number; repository: string; threadId: string; title: string; url: string }> }>;
+            collectPullRequestThreadsForExport: FunctionReference<"query", { cursor?: string | null; userId: string }, { cursor: string | null; links: Array<{ baseBranch?: string; createdAt: number; headBranch?: string; kind: "attached" | "linked" | "opened"; number: number; repository: string; threadId: string; title: string; url: string }> }>;
             collectReviewDraftsForExport: FunctionReference<"query", { cursor?: string | null; userId: string }, { cursor: string | null; drafts: Array<{ body: string; comments: Array<{ body: string; createdAt: number; id: string; line: number; path: string; side: "new" | "old"; startLine: number | null }>; commitId: string; createdAt: number; hostOrigin: string; number: number; repository: string; updatedAt: number; verdict: "approve" | "comment" | "request_changes" | null }> }>;
             collectWatchedRepositoriesForExport: FunctionReference<"query", { userId: string }, { watched: Array<{ createdAt: number; hostOrigin: string; lastStatus: "ok" | "forbidden" | "host_error" | "needs_reconnect" | "not_connected" | "not_found" | "rate_limited"; repository: string; requested: Array<{ authorLogin: string; number: number; title: string; updatedAt: number; url: string }>; webhookEnabled: boolean }> }>;
             deleteUserGuides: FunctionReference<"mutation", { userId: string }, { hasMore: boolean }>;
@@ -1097,6 +1096,10 @@ export interface InternalApiTypes {
         };
         pr_link_retry: {
             retryOpenedPullRequestLink: FunctionReference<"action", { attempt: number; prUrl: string; threadId: string; userId: string }, null>;
+        };
+        pr_thread_attach: {
+            checkThreadForAttach: FunctionReference<"query", { threadId: string; userId: string }, { ok: true }>;
+            recordAttachedPullRequests: FunctionReference<"mutation", { links: Array<{ baseBranch?: string; headBranch?: string; number: number; repository: string }>; threadId: string; userId: string }, Array<{ number: number; repository: string; status: "attached" | "already_linked" | "forbidden" | "host_error" | "needs_reconnect" | "not_connected" | "not_found" | "rate_limited" | "pull_request_full" | "thread_full" }>>;
         };
         pr_threads: {
             recordOpenedPullRequest: FunctionReference<"mutation", { prUrl: string; threadId: string; userId: string }, { created: boolean; threadId: string }>;
@@ -1201,6 +1204,9 @@ export interface InternalApiTypes {
         };
     };
     workflow: {
+        executor: {
+            generateWorkflowText: FunctionReference<"action", { maxTokens?: number; modelId: string; orgId?: string; prompt: string; system?: string; temperature?: number; userId: string }, { inputTokens: number; outputTokens: number; text: string }>;
+        };
         fork: {
             completeFork: FunctionReference<"mutation", { sourceProjectId: string; userId: string; vaultRows: Array<{ isGenerated?: boolean; key: string; name: string; nsfwScores?: { drawing: number; hentai: number; neutral: number; porn: number; sexy: number }; nsfwStatus?: "pending" | "checking" | "safe" | "blocked" | "failed"; size: number; type: string }> }, { projectId: string }>;
             getAuthorVaultRows: FunctionReference<"query", { authorId: string; sourceProjectId: string }, Array<{ isGenerated?: boolean; key: string; name: string; nsfwScores?: { drawing: number; hentai: number; neutral: number; porn: number; sexy: number }; nsfwStatus?: "pending" | "checking" | "safe" | "blocked" | "failed"; size: number; type: string }>>;
@@ -1479,6 +1485,7 @@ export const internal: InternalApiTypes = {
         },
         hooks: {
             cascadeDeleteUser: { __lunoraRef: "auth_hooks:cascadeDeleteUser" },
+            deleteMergedGuest: { __lunoraRef: "auth_hooks:deleteMergedGuest" },
             deleteUserRecord: { __lunoraRef: "auth_hooks:deleteUserRecord" },
             initializeUserDefaults: { __lunoraRef: "auth_hooks:initializeUserDefaults" },
             promoteVerifiedAdmin: { __lunoraRef: "auth_hooks:promoteVerifiedAdmin" },
@@ -1835,8 +1842,6 @@ export const internal: InternalApiTypes = {
     email: {
         functions: {
             deliverEmail: { __lunoraRef: "email_functions:deliverEmail" },
-            handleEmailEvent: { __lunoraRef: "email_functions:handleEmailEvent" },
-            insertExpectation: { __lunoraRef: "email_functions:insertExpectation" },
         },
     },
     evals: {
@@ -2116,7 +2121,7 @@ export const internal: InternalApiTypes = {
             pairConnection: { __lunoraRef: "messenger_functions:pairConnection" },
             saveMessengerMessage: { __lunoraRef: "messenger_functions:saveMessengerMessage" },
             saveMessengerNotice: { __lunoraRef: "messenger_functions:saveMessengerNotice" },
-            threadHasRecentMedia: { __lunoraRef: "messenger_functions:threadHasRecentMedia" },
+            threadRecentMedia: { __lunoraRef: "messenger_functions:threadRecentMedia" },
             touchConnection: { __lunoraRef: "messenger_functions:touchConnection" },
         },
         respond: {
@@ -2311,6 +2316,10 @@ export const internal: InternalApiTypes = {
         pr_link_retry: {
             retryOpenedPullRequestLink: { __lunoraRef: "source_control_pr_link_retry:retryOpenedPullRequestLink" },
         },
+        pr_thread_attach: {
+            checkThreadForAttach: { __lunoraRef: "source_control_pr_thread_attach:checkThreadForAttach" },
+            recordAttachedPullRequests: { __lunoraRef: "source_control_pr_thread_attach:recordAttachedPullRequests" },
+        },
         pr_threads: {
             recordOpenedPullRequest: { __lunoraRef: "source_control_pr_threads:recordOpenedPullRequest" },
         },
@@ -2414,6 +2423,9 @@ export const internal: InternalApiTypes = {
         },
     },
     workflow: {
+        executor: {
+            generateWorkflowText: { __lunoraRef: "workflow_executor:generateWorkflowText" },
+        },
         fork: {
             completeFork: { __lunoraRef: "workflow_fork:completeFork" },
             getAuthorVaultRows: { __lunoraRef: "workflow_fork:getAuthorVaultRows" },

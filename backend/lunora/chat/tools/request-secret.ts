@@ -7,11 +7,11 @@
  *
  * - The tool ALWAYS needs approval, so calling it stops the step with a
  *   `tool-approval-request` and the run records its `toolApprovalRuns` snapshot.
- *   The call's input is only a label, a purpose and the destination — no value.
+ *   The call's input is only labels, a purpose, the destination(s) and an optional format — no value.
  * - The user answers through `chat_request_secret.answerSecretRequest`, never
  *   through `respondToToolApproval` (which refuses this tool). Saving encrypts
  *   the value into `requestedSecrets`; the run resumes with only the opaque
- *   reference, which {@link createAnsweredRequestSecretTool} returns as the
+ *   reference (a card with `fields`: one per field), which {@link createAnsweredRequestSecretTool} returns as the
  *   tool result. Declining is a denial with a reason the model reads.
  * - The agent spends the reference with a consumer tool (`use-secret.ts`),
  *   once, before the reply ends (the ciphertext is dropped then; at most 24 hours).
@@ -29,47 +29,121 @@ import type { RequestSecretInput, RequestSecretOutput } from "./request-secret-c
 import {
     isForbiddenSecretHeader,
     SECRET_HEADER_NAME_MAX,
+    SECRET_FIELD_NAME_RE,
+    SECRET_FIELDS_MAX,
+    SECRET_FORMAT_PREFIX_MAX,
     SECRET_HEADER_NAME_RE,
+    REFS_ANSWER_PREFIX,
+    SECRET_HEADER_VALUE_MAX,
     SECRET_LABEL_MAX,
+    SECRET_HEADER_VALUE_FORBIDDEN_RE,
+    SECRET_PROVIDER_KEY_MAX,
     SECRET_PROVIDERS,
     SECRET_PURPOSE_MAX,
     SECRET_SERVER_NAME_MAX,
 } from "./request-secret-constants";
 
-const inputSchema = z
+const useSchema = z
+    .discriminatedUnion("kind", [
+        z
+            .object({
+                kind: z.literal("provider_key"),
+                provider: z.enum(SECRET_PROVIDERS).meta({ description: "Whose API key it is" }),
+            })
+            .strict(),
+        z
+            .object({
+                header: z
+                    .string()
+                    .min(1)
+                    .max(SECRET_HEADER_NAME_MAX)
+                    .regex(SECRET_HEADER_NAME_RE)
+                    .refine((name) => !isForbiddenSecretHeader(name), { error: "The transport owns that header" })
+                    .meta({ description: 'The header name, e.g. "Authorization"' }),
+                kind: z.literal("mcp_header"),
+                server: z.string().min(1).max(SECRET_SERVER_NAME_MAX).meta({ description: "The name of one of the user's saved MCP servers" }),
+            })
+            .strict(),
+    ])
+    .meta({ description: "Where the secret will go. The user sees this on the card and the secret can be used nowhere else." });
+
+const formatSchema = z
     .object({
-        label: z.string().min(1).max(SECRET_LABEL_MAX).meta({ description: 'What the secret is, e.g. "OpenAI API key"' }),
-        purpose: z.string().min(1).max(SECRET_PURPOSE_MAX).optional().meta({ description: "One line on why you need it, shown to the user" }),
-        use: z
-            .discriminatedUnion("kind", [
-                z
-                    .object({
-                        kind: z.literal("provider_key"),
-                        provider: z.enum(SECRET_PROVIDERS).meta({ description: "Whose API key it is" }),
-                    })
-                    .strict(),
-                z
-                    .object({
-                        header: z
-                            .string()
-                            .min(1)
-                            .max(SECRET_HEADER_NAME_MAX)
-                            .regex(SECRET_HEADER_NAME_RE)
-                            .refine((name) => !isForbiddenSecretHeader(name), { error: "The transport owns that header" })
-                            .meta({ description: 'The header name, e.g. "Authorization"' }),
-                        kind: z.literal("mcp_header"),
-                        server: z.string().min(1).max(SECRET_SERVER_NAME_MAX).meta({ description: "The name of one of the user's saved MCP servers" }),
-                    })
-                    .strict(),
-            ])
-            .meta({ description: "Where the secret will go. The user sees this on the card and the secret can be used nowhere else." }),
+        minLength: z.int().min(1).max(SECRET_HEADER_VALUE_MAX).optional().meta({ description: "The fewest characters the value may have" }),
+        // The value is trimmed before it is checked, so a prefix that starts with whitespace could never match.
+        prefix: z
+            .string()
+            .min(1)
+            .max(SECRET_FORMAT_PREFIX_MAX)
+            .refine((prefix) => prefix === prefix.trimStart(), { error: "A prefix cannot start with whitespace" })
+            .optional()
+            .meta({ description: 'What the value must start with, e.g. "sk-"' }),
+    })
+    .strict()
+    .meta({ description: "Optional shape the value must have; a value that does not fit is refused and nothing is stored." });
+
+const fieldSchema = z
+    .object({
+        format: formatSchema.optional(),
+        label: z.string().min(1).max(SECRET_LABEL_MAX).meta({ description: 'What this field is, e.g. "Password"' }),
+        name: z.string().regex(SECRET_FIELD_NAME_RE).meta({ description: 'Key of this secret in the result, e.g. "password"; unique in the card' }),
+        use: useSchema,
     })
     .strict();
+
+const inputSchema = z
+    .object({
+        fields: z
+            .array(fieldSchema)
+            .min(1)
+            .max(SECRET_FIELDS_MAX)
+            .optional()
+            .meta({ description: "Several secrets on one card (e.g. username and password); each is stored on its own. Use this instead of `use`." }),
+        format: formatSchema.optional(),
+        label: z.string().min(1).max(SECRET_LABEL_MAX).meta({ description: 'What the secret is, e.g. "OpenAI API key"' }),
+        purpose: z.string().min(1).max(SECRET_PURPOSE_MAX).optional().meta({ description: "One line on why you need it, shown to the user" }),
+        use: useSchema.optional(),
+    })
+    .strict()
+    .refine((input) => (input.use === undefined) !== (input.fields === undefined), { error: "Give either `use` or `fields`" })
+    .refine((input) => input.fields === undefined || input.format === undefined, { error: "With `fields`, put `format` on each field" })
+    .refine((input) => input.fields === undefined || new Set(input.fields.map((field) => field.name)).size === input.fields.length, {
+        error: "Field names must be unique",
+    })
+    // Two fields on one destination would each save a value and the second would replace the first when it is used.
+    .refine(
+        (input) => {
+            const destinations = (input.fields ?? []).map(({ use }) =>
+                use.kind === "provider_key" ? `provider:${use.provider}` : `header:${use.server}:${use.header.toLowerCase()}`,
+            );
+
+            return new Set(destinations).size === destinations.length;
+        },
+        { error: "Two fields cannot save to the same destination" },
+    )
+    // A header prefix with a character no header value may hold could never be matched, so the card would be unanswerable.
+    .refine(
+        (input) =>
+            (input.fields ?? (input.use === undefined ? [] : [{ format: input.format, use: input.use }])).every(
+                ({ format, use }) => use.kind !== "mcp_header" || format?.prefix === undefined || !SECRET_HEADER_VALUE_FORBIDDEN_RE.test(format.prefix),
+            ),
+        { error: "A header prefix cannot hold a control character, a line break or a character above U+00FF" },
+    )
+    // A provider key is stored up to SECRET_PROVIDER_KEY_MAX characters, so a card that requires more could never be answered.
+    .refine(
+        (input) =>
+            (input.fields ?? (input.use === undefined ? [] : [{ format: input.format, use: input.use }])).every(
+                ({ format, use }) => use.kind !== "provider_key" || (format?.minLength ?? 0) <= SECRET_PROVIDER_KEY_MAX,
+            ),
+        { error: `A provider key cannot require more than ${SECRET_PROVIDER_KEY_MAX} characters` },
+    );
 
 const DESCRIPTION = `Ask the user for a secret (an API key or token) you need, on a card that keeps the value out of the chat.
 Use it instead of asking the user to paste a key into the conversation. You never see the value: the tool returns a reference, which you spend with exactly one consumer tool, in the reply that receives it (a reference does not outlive the reply).
 - label: what the secret is.
 - purpose: optional one line on why you need it.
+- format: optional { prefix, minLength } the value must fit (e.g. { prefix: "sk-" }); the card and the server refuse a value that does not, and nothing is stored.
+- fields: instead of use, a list of up to ${SECRET_FIELDS_MAX} { name, label, use, format? } to ask for several secrets (e.g. username and password) on one card. Each is stored on its own and the result is { refs: { <name>: <reference> } }; spend each reference separately.
 - use: where it will go. { kind: "provider_key", provider } saves it as the user's own API key for that provider (then use saveSecretAsProviderKey); { kind: "mcp_header", server, header } sets a header on one of their saved MCP servers (then use setMcpServerSecret). It cannot be used anywhere else.
 The run pauses until the user answers. If they decline, do not ask again; continue without it or point them to Settings.`;
 
@@ -88,13 +162,34 @@ const requestSecretTool = createTool<RequestSecretInput, RequestSecretOutput, To
     title: "Request Secret",
 });
 
+/** The resume carries one reference, or `refs:` and the JSON of `{ name: reference }` for a card with fields (see `secretResumeArgs`). */
+const answeredOutput = (answer: string): RequestSecretOutput => {
+    if (!answer.startsWith(REFS_ANSWER_PREFIX)) {
+        return { ref: answer, status: "saved" };
+    }
+
+    let payload: unknown;
+
+    try {
+        payload = JSON.parse(answer.slice(REFS_ANSWER_PREFIX.length));
+    } catch {
+        payload = undefined;
+    }
+
+    const refs = z.record(z.string(), z.string()).safeParse(payload);
+
+    if (!refs.success) {
+        throw new Error("The saved references of this card could not be read");
+    }
+
+    return { refs: refs.data, status: "saved" };
+};
+
 /** The same tool for one resumed run, answering with the reference of the stored value. */
-export const createAnsweredRequestSecretTool = (ref: string) =>
+export const createAnsweredRequestSecretTool = (answer: string) =>
     createTool<RequestSecretInput, RequestSecretOutput, ToolContext>({
         description: DESCRIPTION,
-        execute: async () => {
-            return { ref, status: "saved" };
-        },
+        execute: async () => answeredOutput(answer),
         inputSchema,
         needsApproval: true,
         title: "Request Secret",

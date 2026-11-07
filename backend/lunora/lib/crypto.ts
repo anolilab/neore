@@ -3,7 +3,7 @@
  * SHA digests in the encodings webhooks and services put on the wire, and the
  * replay-window check.
  *
- * Every verifier — messenger adapters, trigger webhooks, the Resend webhook,
+ * Every verifier — messenger adapters, trigger webhooks,
  * service-to-service signatures, stream tokens, pairing codes, the admin seed
  * route — compares with {@link timingSafeEqual} rather than rolling its own, so
  * there is exactly one comparison loop to get right. `===` on a signature leaks
@@ -94,7 +94,7 @@ export const isWithinWindow = (timestampMs: number, windowMs: number, nowMs: num
 
 /**
  * Five minutes: how far a signed THIRD-PARTY webhook's timestamp may be from
- * now — Slack, Discord, Feishu, WeChat, Resend (Svix) and trigger webhooks all
+ * now — Slack, Discord, Feishu, WeChat and trigger webhooks all
  * use it. Service-to-service requests we sign ourselves use the tighter
  * `SERVICE_REQUEST_WINDOW_MS` (`lib/sign-request.ts`), which must match the
  * services' own verifiers.

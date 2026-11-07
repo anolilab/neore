@@ -44,7 +44,7 @@ import {
 import { isValidCronExpression } from "../triggers/schedule";
 import { requireTaskAccount } from "./account";
 import { loadUserTasks, promoteDependents, queueCycle, startTask, statusMap } from "./internal";
-import { vGoalStatus, vTaskRunOrigin, vTaskRunStatus, vTaskStatus, vVerdict } from "./validators";
+import { vGoalStatus, vTaskRunOrigin, vTaskRunStatus, vTaskSkipReason, vTaskStatus, vVerdict } from "./validators";
 import { isValidBranchName, parseRepoUrl } from "../coding-agents/commands";
 import { vCodingAgentAssignment } from "../coding-agents/validators";
 import { MAX_LENGTH } from "../lib/validators";
@@ -93,6 +93,8 @@ const vTaskBoard = v.object({
             instructions: v.string(),
             lastError: v.union(v.string(), v.null()),
             lastRunThreadId: v.union(v.string(), v.null()),
+            lastSkippedAt: v.union(v.number(), v.null()),
+            lastSkipReason: v.union(vTaskSkipReason, v.null()),
             maxRepairRounds: v.number(),
             model: v.union(v.string(), v.null()),
             nextRunAt: v.union(v.number(), v.null()),
@@ -389,6 +391,8 @@ export const getTaskBoard = authQuery
                     instructions: task.instructions,
                     lastError: task.lastError ?? null,
                     lastRunThreadId: task.lastRunThreadId ?? null,
+                    lastSkippedAt: task.lastSkippedAt ?? null,
+                    lastSkipReason: task.lastSkipReason ?? null,
                     maxRepairRounds: task.maxRepairRounds,
                     model: task.model ?? null,
                     nextRunAt: task.nextRunAt ?? null,
@@ -633,12 +637,17 @@ export const updateTask = authMutation
             nextRunAt = definition.cronExpression === task.cronExpression && task.nextRunAt ? task.nextRunAt : nextRecurrenceAt(definition.cronExpression, now);
         }
 
+        // A skip recorded under a schedule that is gone or changed no longer describes this task.
+        const keepsSkip = definition.cronExpression !== undefined && definition.cronExpression === task.cronExpression;
+
         await patchById(ctx.db, "tasks", args.taskId, {
             codingAgent: definition.codingAgent,
             cronExpression: definition.cronExpression,
             dependsOn: definition.dependsOn,
             goalId: definition.goalId,
             instructions: definition.instructions,
+            lastSkippedAt: keepsSkip ? task.lastSkippedAt : undefined,
+            lastSkipReason: keepsSkip ? task.lastSkipReason : undefined,
             maxRepairRounds: definition.maxRepairRounds,
             model: definition.model,
             nextRunAt,

@@ -64,11 +64,11 @@ describe.each([
     ["createCategoryChat", runCategory],
 ])("%s under the user's model filter rules", (_name, run) => {
     it("uses the default model, and passes the rules on, when the rules allow it", async () => {
-        state.rules = { requireZDR: true };
+        state.rules = { blockedModels: ["openai/o3"] };
 
         await expect(run()).rejects.toThrow(REACHED);
 
-        expect(getAgent).toHaveBeenCalledWith(DEFAULT_TITLE_GENERATION_MODEL, expect.objectContaining({ modelFilterRules: { requireZDR: true } }));
+        expect(getAgent).toHaveBeenCalledWith(DEFAULT_TITLE_GENERATION_MODEL, expect.objectContaining({ modelFilterRules: { blockedModels: ["openai/o3"] } }));
     });
 
     it("uses the next allowed model when the rules exclude the default", async () => {

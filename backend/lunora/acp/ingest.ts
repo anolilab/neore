@@ -28,6 +28,7 @@ import {
     createHostStream,
     isForwardHostState,
     isLiveStream,
+    markHostStreamInterrupted,
     nextHostSeq,
     updateHostStream,
 } from "../chat/streaming/persistent/host";
@@ -320,7 +321,7 @@ const applyTurnPost = async (
         // A restart that comes after the reaper: the turn was cut off, not merely silent. The reply stays as it
         // was saved; only the reason moves on, so Continue (acp-agent-host.md §4.5) is offered all the same.
         if (stream.hostEndReason === "timeout" && events.some((event) => event.kind === "turn_end" && event.reason === "interrupted")) {
-            await ctx.db.patch("persistentStreams", stream._id, { hostEndReason: "interrupted" });
+            await markHostStreamInterrupted(ctx, stream._id);
         }
 
         return { ended: true, next, outcome: "applied" };

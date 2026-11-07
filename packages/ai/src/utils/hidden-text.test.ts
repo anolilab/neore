@@ -21,8 +21,9 @@ describe("hasHiddenText", () => {
 });
 
 describe("strict", () => {
-    it("counts and shows the joiners that the lenient forms let through", () => {
-        expect(hasHiddenText("a\u{200D}b")).toBe(false);
+    it("counts a ZWJ between letters even when lenient, and the strict form counts every joiner", () => {
+        expect(hasHiddenText("a\u{200D}b")).toBe(true);
+        expect(hasHiddenText("\u{1F468}\u{200D}\u{1F469}")).toBe(false);
         expect(hasHiddenText("a\u{200D}b", { strict: true })).toBe(true);
         expect(hasHiddenText("a\u{200C}b", { strict: true })).toBe(true);
         expect(showHidden("a\u{200D}b", { strict: true })).toBe("a?b");
@@ -47,22 +48,29 @@ describe("stripHiddenText", () => {
         expect(hasHiddenText(`a${run}`, { strict: true })).toBe(true);
     });
 
-    it("keeps keycaps, VS16 emoji, ZWJ sequences and a Persian ZWNJ", () => {
-        const kept = "1\u{FE0F}\u{20E3} \u{2764}\u{FE0F} \u{1F468}\u{200D}\u{1F469}\u{200D}\u{1F467} \u{645}\u{6CC}\u{200C}\u{62E}\u{648}\u{627}\u{647}\u{645}";
+    it("keeps keycaps, VS16 emoji and ZWJ sequences", () => {
+        const kept = "1\u{FE0F}\u{20E3} \u{2764}\u{FE0F} \u{1F468}\u{200D}\u{1F469}\u{200D}\u{1F467}";
 
         expect(stripHiddenText(kept)).toEqual({ removed: 0, text: kept });
     });
 
-    it("keeps a trailing joiner only while the text is being typed", () => {
-        const typed = "\u{645}\u{6CC}\u{200C}";
+    it("strips the ZWNJ of a Persian word, since a joiner between letters can carry a bit per gap", () => {
+        expect(stripHiddenText("\u{645}\u{6CC}\u{200C}\u{62E}\u{648}\u{627}\u{647}\u{645}")).toEqual({
+            removed: 1,
+            text: "\u{645}\u{6CC}\u{62E}\u{648}\u{627}\u{647}\u{645}",
+        });
+    });
 
-        expect(stripHiddenText(typed, { keepTrailingJoiner: true })).toEqual({ removed: 0, text: typed });
-        expect(stripHiddenText(typed)).toEqual({ removed: 1, text: "\u{645}\u{6CC}" });
-        expect(stripHiddenText("\u{200C}", { keepTrailingJoiner: true }).removed).toBe(1);
+    it("keeps a trailing ZWJ only while an emoji sequence is being typed", () => {
+        const typing = "\u{1F469}\u{200D}";
+
+        expect(stripHiddenText(typing, { keepTrailingJoiner: true })).toEqual({ removed: 0, text: typing });
+        expect(stripHiddenText(typing)).toEqual({ removed: 1, text: "\u{1F469}" });
+        expect(stripHiddenText("\u{645}\u{200C}", { keepTrailingJoiner: true }).removed).toBe(1);
         expect(stripHiddenText("a\u{200C}\u{200D}", { keepTrailingJoiner: true }).removed).toBe(2);
     });
 
-    it("keeps the ZWNJ of a Persian word typed one character at a time", () => {
+    it("does not keep the ZWNJ of a Persian word typed one character at a time", () => {
         const word = "\u{645}\u{6CC}\u{200C}\u{62E}\u{648}\u{627}\u{647}\u{645}";
         let draft = "";
 
@@ -70,7 +78,7 @@ describe("stripHiddenText", () => {
             draft = stripHiddenText(draft + character, { keepTrailingJoiner: true }).text;
         }
 
-        expect(draft).toBe(word);
+        expect(draft).toBe("\u{645}\u{6CC}\u{62E}\u{648}\u{627}\u{647}\u{645}");
     });
 
     it("removes tag characters, bidi controls, separators and C0 controls, and counts them", () => {
@@ -83,14 +91,13 @@ describe("stripHiddenText", () => {
         expect(stripHiddenText("Über\n\tprüfe 👍")).toEqual({ removed: 0, text: "Über\n\tprüfe 👍" });
     });
 
-    it("keeps joiners: a ZWJ emoji family, a flag-free VS16 emoji and a Persian word with ZWNJ", () => {
+    it("keeps a ZWJ emoji family and a VS16 emoji", () => {
         const family = "👨\u{200D}👩\u{200D}👧";
         const heart = "❤\u{FE0F}";
-        const persian = "می\u{200C}خواهم";
 
-        expect(stripHiddenText(`${family} ${heart} ${persian}`)).toEqual({ removed: 0, text: `${family} ${heart} ${persian}` });
-        expect(hasHiddenText(family + persian)).toBe(false);
-        expect(showHidden(family + persian)).toBe(family + persian);
+        expect(stripHiddenText(`${family} ${heart}`)).toEqual({ removed: 0, text: `${family} ${heart}` });
+        expect(hasHiddenText(family)).toBe(false);
+        expect(showHidden(family)).toBe(family);
     });
 
     it("keeps a joiner after an emoji's own selector, and counts every joiner of a payload", () => {

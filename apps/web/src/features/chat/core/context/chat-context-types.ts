@@ -41,6 +41,8 @@ export interface ThreadData extends ThreadOwnerState {
     customSystemPrompt?: string;
     enabledFeatures?: string[];
     language?: string;
+    /** Set while the chat has a passcode (`thread-lock.ts`); a locked chat takes no file attachments. */
+    lockedAt?: number | null;
     mode?: "text" | "image" | "video";
     model: string;
     multiChat?: boolean;

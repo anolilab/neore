@@ -309,6 +309,7 @@ export const documents = sqliteTable("documents", {
     by_messageId: index("by_messageId").on(t.messageId),
     by_userId: index("by_userId").on(t.userId),
     by_threadId_and_kind: index("by_threadId_and_kind").on(t.threadId, t.kind),
+    by_userId_and_kind: index("by_userId_and_kind").on(t.userId, t.kind),
 }));
 
 export const documentVersions = sqliteTable("documentVersions", {
@@ -1178,9 +1179,10 @@ export const pullRequestThreads = sqliteTable("pullRequestThreads", {
     baseBranch: text("baseBranch"),
     createdAt: real("createdAt").notNull(),
     headBranch: text("headBranch"),
-    kind: text("kind", { mode: "json" }).$type<"attached" | "opened">().notNull(),
+    kind: text("kind", { mode: "json" }).$type<"attached" | "linked" | "opened">().notNull(),
     number: real("number").notNull(),
     repository: text("repository").notNull(),
+    threadDeleted: integer("threadDeleted", { mode: "boolean" }),
     threadId: text("threadId").references((): AnySQLiteColumn => threads._id).notNull(),
     title: text("title").notNull(),
     url: text("url").notNull(),
@@ -1431,6 +1433,8 @@ export const tasks = sqliteTable("tasks", {
     instructions: text("instructions").notNull(),
     lastError: text("lastError"),
     lastRunThreadId: text("lastRunThreadId"),
+    lastSkippedAt: real("lastSkippedAt"),
+    lastSkipReason: text("lastSkipReason", { mode: "json" }).$type<"still_running" | "awaiting_review" | "blocked">(),
     maxRepairRounds: real("maxRepairRounds").notNull(),
     model: text("model"),
     nextRunAt: real("nextRunAt"),
