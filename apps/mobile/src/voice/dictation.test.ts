@@ -1,9 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 
 import type { DictationEngine, DictationPath } from "./dictation";
-import { createDictationRouter, SETTING_UNREADABLE_MESSAGE } from "./dictation";
+import { createDictationRouter, createDictationSetting, SETTING_UNREADABLE_MESSAGE } from "./dictation";
 import type { OnDeviceRecognizer } from "./on-device";
 import { createOnDeviceSession, createRecognizerLock, ON_DEVICE_UNAVAILABLE_MESSAGE, pickSpeechLocale } from "./on-device";
+import { MIC_BUSY_MESSAGE } from "./voice-input";
 
 const NOTHING_SENT = /Nothing was sent/u;
 
@@ -61,11 +62,15 @@ describe(createDictationRouter, () => {
         expect(engines[other].finish).not.toHaveBeenCalled();
     });
 
-    it("records nothing when the setting cannot be read", async () => {
-        const engines = { cloud: fakeEngine(), "on-device": fakeEngine() };
-        const { errors, router } = routed(async () => {
+    it.each([
+        ["cannot be read", async () => {
             throw new Error("keychain locked");
-        }, engines);
+        }],
+        ["holds a value never written", async () => "yes"],
+    ])("records nothing when the setting %s", async (_name, getItem) => {
+        const engines = { cloud: fakeEngine(), "on-device": fakeEngine() };
+        const { readOnDevice } = createDictationSetting({ getItem, setItem: async () => {} });
+        const { errors, router } = routed(readOnDevice, engines);
 
         await router.start();
 
@@ -146,5 +151,43 @@ describe(pickSpeechLocale, () => {
         ["fi-FI", ["de-DE"], "fi-FI"],
     ])("picks a recognizer locale for %s", (wanted, available, expected) => {
         expect(pickSpeechLocale(wanted, available)).toBe(expected);
+    });
+});
+
+describe(createRecognizerLock, () => {
+    it("holds the recognizer after a screen leaves until that recognition ends, so its end never closes the next press", async () => {
+        const recognizer = fakeRecognizer(true);
+        const lock = createRecognizerLock();
+        const session = (errors: (string | undefined)[]) =>
+            createOnDeviceSession({
+                lang: "en-US",
+                lock,
+                now: () => 0,
+                onError: (message) => {
+                    errors.push(message);
+                },
+                onPhase: () => {},
+                onText: () => {},
+                platform: { OS: "ios", Version: "18.0" },
+                recognizer,
+            });
+        const left = session([]);
+        const nextErrors: (string | undefined)[] = [];
+        const next = session(nextErrors);
+
+        await left.start();
+        left.detach();
+        await next.start();
+
+        expect(nextErrors.at(-1)).toBe(MIC_BUSY_MESSAGE);
+
+        // The aborted recognition's end arrives: heard app-wide, it frees the recognizer and reaches no press.
+        next.handle({ type: "end" });
+        lock.ended();
+        await next.finish();
+        await next.start();
+
+        expect(recognizer.start).toHaveBeenCalledTimes(2);
+        expect(lock.isTaken()).toBe(true);
     });
 });

@@ -31,4 +31,5 @@
   press that cannot be served shows a message and records nothing, and a setting that cannot be read records nothing.
   On-device means `requiresOnDeviceRecognition: true`, Android 13+ only (older Android merely prefers offline), and the
   pnpm patch on `expo-speech-recognition` that makes iOS fail such a request instead of using the network. Re-check
-  that patch on every upgrade of the module.
+  that patch on every upgrade of the module. The recognizer is one per app (`createRecognizerLock`): an aborted
+  recognition holds it ("draining") until its `end`, heard by an app-wide listener, so a late end never closes a newer press.

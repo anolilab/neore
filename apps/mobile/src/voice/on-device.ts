@@ -91,9 +91,15 @@ const speechLocales = async (recognizer: OnDeviceRecognizer): Promise<string[]> 
     }
 };
 
+/** How long an aborted recognition holds the recognizer at most while its end is awaited. */
+export const DRAIN_MS = 2000;
+
 /** Who is listening, on any screen: the recognizer is one per app, and its events reach every screen that listens. */
 export const createRecognizerLock = () => {
+    // An aborted recognition whose end has not arrived yet: no screen owns it, and no press may start meanwhile.
+    const draining = Symbol("draining");
     let owner: symbol | undefined;
+    let drainTimer: ReturnType<typeof setTimeout> | undefined;
 
     return {
         claim: (token: symbol): boolean => {
@@ -104,6 +110,29 @@ export const createRecognizerLock = () => {
             owner = token;
 
             return true;
+        },
+        /** `token`'s recognition was aborted: held until its end, so that end never reaches a newer press. */
+        drain: (token: symbol): void => {
+            if (owner !== token) {
+                return;
+            }
+
+            owner = draining;
+            clearTimeout(drainTimer);
+            drainTimer = setTimeout(() => {
+                if (owner === draining) {
+                    owner = undefined;
+                }
+            }, DRAIN_MS);
+        },
+        /** Any recognition's end, heard app-wide: an aborted one is now over. */
+        ended: (): void => {
+            if (owner !== draining) {
+                return;
+            }
+
+            owner = undefined;
+            clearTimeout(drainTimer);
         },
         isHeldBy: (token: symbol): boolean => owner === token,
         isTaken: (): boolean => owner !== undefined,
@@ -152,6 +181,30 @@ export const createOnDeviceSession = ({
 
     const isListening = (): boolean => lock.isHeldBy(token);
 
+    /** A native stop or abort that throws must not skip the cleanup after it. */
+    const didNativeCall = (call: () => void): boolean => {
+        try {
+            call();
+
+            return true;
+        } catch (callError) {
+            console.warn("The speech recognizer refused a call.", callError);
+
+            return false;
+        }
+    };
+
+    /** Cuts the recognition off; the recognizer is held until its end arrives (see `drain`). */
+    const abandon = (): void => {
+        clearTimeout(timer);
+        didNativeCall(() => {
+            recognizer.abort();
+        });
+        lock.drain(token);
+        isBusy = false;
+        isStopping = false;
+    };
+
     /** The recognition is over. The lock is let go only now, so its late events never reach a newer press. */
     const release = (): void => {
         clearTimeout(timer);
@@ -168,13 +221,12 @@ export const createOnDeviceSession = ({
     const giveUpAfterDeadline = (): void => {
         clearTimeout(timer);
         timer = setTimeout(() => {
-            recognizer.abort();
-
             if (isAttached) {
                 onError(failure ?? ON_DEVICE_FAILED_MESSAGE);
+                onPhase("idle");
             }
 
-            release();
+            abandon();
         }, END_DEADLINE_MS);
     };
 
@@ -187,19 +239,38 @@ export const createOnDeviceSession = ({
 
         isStopping = true;
 
-        if (now() - startedAt < MIN_CLIP_MS) {
+        const isTooShort = now() - startedAt < MIN_CLIP_MS;
+
+        if (isTooShort) {
             failure = TOO_SHORT_MESSAGE;
-            recognizer.abort();
         } else {
             onPhase("transcribing");
-            recognizer.stop();
         }
 
-        giveUpAfterDeadline();
+        const isAsked = didNativeCall(() => {
+            if (isTooShort) {
+                recognizer.abort();
+            } else {
+                recognizer.stop();
+            }
+        });
+
+        if (isAsked) {
+            giveUpAfterDeadline();
+        } else {
+            onError(failure ?? ON_DEVICE_FAILED_MESSAGE);
+            onPhase("idle");
+            abandon();
+        }
     };
 
     const start = async (): Promise<void> => {
         if (isBusy) {
+            // A press while the previous one is still starting takes it over, rather than being dropped with it.
+            if (!isListening()) {
+                isHeld = true;
+            }
+
             return;
         }
 
@@ -300,10 +371,8 @@ export const createOnDeviceSession = ({
         detach: (): void => {
             isAttached = false;
 
-            // Let go at once: this screen no longer hears the recognizer's end, and the abort runs before any later start.
             if (isListening()) {
-                recognizer.abort();
-                release();
+                abandon();
             }
         },
         finish,

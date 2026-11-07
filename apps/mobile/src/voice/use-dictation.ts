@@ -11,6 +11,12 @@ import type { VoicePhase } from "./voice-input";
 
 /** One recognizer per app: a second screen's press is refused while this is taken. */
 const recognizerLock = createRecognizerLock();
+const endListener: { subscription?: ReturnType<typeof ExpoSpeechRecognitionModule.addListener> } = {};
+
+/** Hears every recognition's end app-wide, once, so an end whose screen is gone still frees the recognizer. */
+const hearEnds = (): void => {
+    endListener.subscription ??= ExpoSpeechRecognitionModule.addListener("end", recognizerLock.ended);
+};
 
 /** Listens on the phone's own recognizer; the audio never leaves the phone. */
 const useOnDeviceVoiceInput = ({ onText }: { onText: (text: string) => void }) => {
@@ -46,6 +52,7 @@ const useOnDeviceVoiceInput = ({ onText }: { onText: (text: string) => void }) =
     });
 
     useEffect(() => {
+        hearEnds();
         session.attach();
 
         return () => {

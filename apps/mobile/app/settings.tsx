@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ScrollView, Switch, Text, View } from "react-native";
+import { AccessibilityInfo, Platform, ScrollView, Switch, Text, View } from "react-native";
 
 import { readReopenLastChat, writeReopenLastChat } from "@/chat/last-thread-store";
 import { loadConfig } from "@/lib/config";
@@ -137,6 +137,13 @@ const SettingsScreen = () => {
             setIsReopenChanging(false);
         }
     };
+
+    // VoiceOver reads neither the live region nor a new alert, so a failure here is announced on iOS.
+    useEffect(() => {
+        if (onDeviceFailure !== null && Platform.OS === "ios") {
+            AccessibilityInfo.announceForAccessibility(onDeviceFailure);
+        }
+    }, [onDeviceFailure]);
 
     const changeOnDevice = async (isOn: boolean) => {
         setOnDeviceFailure(null);

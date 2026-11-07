@@ -12,7 +12,20 @@ export type DictationPath = "cloud" | "on-device";
 /** Reads and writes "Transcribe on this device". Off by default. */
 export const createDictationSetting = (store: Pick<KeyValueStore, "getItem" | "setItem">) => {
     return {
-        readOnDevice: async (): Promise<boolean> => await store.getItem(ON_DEVICE_KEY) === "on",
+        /** Off when never chosen. A value this app never writes is unreadable, not off: it must not send audio away. */
+        readOnDevice: async (): Promise<boolean> => {
+            const value = await store.getItem(ON_DEVICE_KEY);
+
+            if (value === null || value === "off") {
+                return false;
+            }
+
+            if (value === "on") {
+                return true;
+            }
+
+            throw new Error("Unrecognized on-device transcription setting.");
+        },
         writeOnDevice: async (isOn: boolean): Promise<void> => {
             await store.setItem(ON_DEVICE_KEY, isOn ? "on" : "off");
         },
