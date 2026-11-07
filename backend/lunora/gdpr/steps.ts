@@ -8,6 +8,7 @@ import { gdprLogger } from "../lib/logger";
 import { queueEmail } from "../email/mailer";
 import { SITE_URL } from "../env";
 import { withDependency } from "../lib/dependency";
+import { ORGANIZATION_SKILL_KEY, PROJECT_SKILL_KEY } from "../usage/activity-logic";
 
 const TRAILING_SLASH = /\/$/;
 
@@ -356,6 +357,9 @@ export const collectFiles = internalQuery
 /** Rows of each activity table in the export. Past this the export says so rather than growing without bound. */
 const EXPORT_ACTIVITY_CAP = 5000;
 
+/** The usage rollup's project and organization rows, exported within a bound of their own. */
+const ATTRIBUTION_SKILL_KEYS = [ORGANIZATION_SKILL_KEY, PROJECT_SKILL_KEY] as const;
+
 /** The export JSON is built whole in memory before it is stored; this is the largest one we will write. */
 const MAX_EXPORT_BYTES = 32 * 1024 * 1024;
 
@@ -365,14 +369,28 @@ const MAX_EXPORT_BYTES = 32 * 1024 * 1024;
  */
 export const collectActivityForExport = internalQuery
     .input({ userId: v.string() })
-    .output(v.object({ knowledgeCollections: v.array(v.any()), subAgentRuns: v.array(v.any()), usageDaily: v.array(v.any()) }))
+    .output(
+        v.object({
+            knowledgeCollections: v.array(v.any()),
+            subAgentRuns: v.array(v.any()),
+            usageDaily: v.array(v.any()),
+            usageDailyTruncated: v.boolean(),
+        }),
+    )
     .query(async ({ args: { userId }, ctx: context }) => {
-        const [usageDaily, subAgentRuns, { page: collections }] = await Promise.all([
-            context.db
-                .query("usageDaily")
-                .withIndex("by_user_date", (q) => q.eq("userId", userId))
-                // Day, skill and project rows: the project rows must not push the others out.
-                .take(EXPORT_ACTIVITY_CAP * 2),
+        // Day and skill rows, and project and organization rows, each read within their own bound: neither kind can push
+        // the other out, and the export says when either was cut short.
+        const [dayAndSkillRows, attributionRows, subAgentRuns, { page: collections }] = await Promise.all([
+            context.db.usageDaily.findMany({
+                limit: EXPORT_ACTIVITY_CAP + 1,
+                orderBy: [{ date: "desc" }],
+                where: { skillKey: { notIn: [...ATTRIBUTION_SKILL_KEYS] }, userId },
+            }),
+            context.db.usageDaily.findMany({
+                limit: EXPORT_ACTIVITY_CAP + 1,
+                orderBy: [{ date: "desc" }],
+                where: { skillKey: { in: [...ATTRIBUTION_SKILL_KEYS] }, userId },
+            }),
             context.db
                 .query("subAgentRuns")
                 .withIndex("by_user_and_createdAt", (q) => q.eq("userId", userId))
@@ -405,7 +423,7 @@ export const collectActivityForExport = internalQuery
                     task: run.task,
                 };
             }),
-            usageDaily: usageDaily.map((row) => {
+            usageDaily: [...dayAndSkillRows.page.slice(0, EXPORT_ACTIVITY_CAP), ...attributionRows.page.slice(0, EXPORT_ACTIVITY_CAP)].map((row) => {
                 return {
                     costMicrodollars: row.costMicrodollars,
                     date: row.date,
@@ -416,6 +434,7 @@ export const collectActivityForExport = internalQuery
                     ...(row.organizationId !== undefined && row.organizationId !== null && { organization: row.organizationId }),
                 };
             }),
+            usageDailyTruncated: dayAndSkillRows.page.length > EXPORT_ACTIVITY_CAP || attributionRows.page.length > EXPORT_ACTIVITY_CAP,
         };
     });
 
@@ -524,7 +543,8 @@ export const generateExportFile = internalAction
         watchedRepositories: v.optional(v.any()),
     })
     .action(async ({ args, ctx: context }) => {
-        const activity = args.activity as { knowledgeCollections?: unknown[]; subAgentRuns?: unknown[]; usageDaily?: unknown[] } | undefined;
+        const activity = args.activity as
+            { knowledgeCollections?: unknown[]; subAgentRuns?: unknown[]; usageDaily?: unknown[]; usageDailyTruncated?: boolean } | undefined;
         const exportData = {
             // Read here, a page per query, so no workflow step result or action argument carries the history.
             acpSessions:
@@ -559,6 +579,7 @@ export const generateExportFile = internalAction
             tasks: args.tasks ?? { goals: [], tasks: [] },
             threadTags: args.threadTags ?? [],
             usageDaily: activity?.usageDaily ?? [],
+            usageDailyTruncated: activity?.usageDailyTruncated ?? false,
             watchedRepositories: args.watchedRepositories ?? { watched: [] },
         };
 

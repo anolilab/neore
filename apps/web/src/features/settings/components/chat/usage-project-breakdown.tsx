@@ -16,7 +16,7 @@ import { useAction, useCRPC } from "@/lib/lunora/crpc";
 
 import { BACKFILL_REFETCH_MS, useRefetchAfterBackfill } from "../../hooks/use-usage-backfill";
 import { formatUsd, localDayKey, periodStart } from "../../lib/usage-activity";
-import { readOrganizationUsage } from "../../lib/usage-organization";
+import { readOrganizationUsage, retryOrganizationRead } from "../../lib/usage-organization";
 
 /** The row key of what no project accounts for; never a project id. */
 const NO_PROJECT_KEY = "__no_project__";
@@ -82,7 +82,7 @@ const UsageProjectBreakdown: FC<UsageProjectBreakdownProps> = ({ backfilling, da
         queryFn: async () => await readOrganizationUsage(async (cursor) => await fetchOrganization({ cursor, fromDate })),
         // Keyed by the signed-in user and the organization: switching either never shows the previous one's totals.
         queryKey: ["usage", "organization-projects", userId, organizationId, fromDate],
-        retry: 1,
+        retry: retryOrganizationRead,
         staleTime: 2 * 60_000,
     });
 

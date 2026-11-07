@@ -12,7 +12,7 @@ import { useCRPC } from "@/lib/lunora/crpc";
  */
 export const useUsageBackfill = (): { backfilling: boolean; projectsBackfilling: boolean } => {
     const crpc = useCRPC();
-    const { data: status } = useQuery(crpc.usage.backfill.getUsageBackfillStatus.queryOptions({}));
+    const { data: status } = useQuery(crpc.usage.backfill.getUsageBackfillStatuses.queryOptions({}));
     const { mutate: start } = useMutation(crpc.usage.backfill.startUsageBackfill.mutationOptions());
     const started = useRef(false);
     const backfilling = status !== undefined && status.replies !== "done";

@@ -5,6 +5,8 @@
  * This follows the cursor. Pinned by `usage-organization.test.ts`.
  */
 
+import { getErrorCode, isForbiddenError } from "@lunora/react";
+
 export interface UsageTotalsLike {
     costMicrodollars: number;
     replies: number;
@@ -28,6 +30,13 @@ export interface OrganizationUsageStep {
 export const MAX_ORGANIZATION_PAGES = 40;
 
 export class OrganizationUsageTooLargeError extends Error {}
+
+/**
+ * Whether a failed organization read is worth one more try: each read asks every member's shard, so only a failure
+ * that may not repeat is retried — never an organization too large to read, a refusal, or any answer from the backend.
+ */
+export const retryOrganizationRead = (failureCount: number, error: unknown): boolean =>
+    failureCount < 1 && !(error instanceof OrganizationUsageTooLargeError) && !isForbiddenError(error) && getErrorCode(error) === undefined;
 
 /** Calls `fetchStep` with each cursor it hands back until it returns the organization's totals. */
 export const readOrganizationUsage = async (fetchStep: (cursor: string | undefined) => Promise<OrganizationUsageStep>): Promise<OrganizationUsage> => {

@@ -490,8 +490,17 @@ export const runUsageProjectBackfillStep = internalMutation
         return null;
     });
 
-/** Where each of the caller's two walks stands: `idle` = not started. */
+/**
+ * Where the caller's first walk stands: `idle` = not started. Kept to its old shape for pages loaded before the project
+ * walk existed; current pages read {@link getUsageBackfillStatuses}.
+ */
 export const getUsageBackfillStatus = authQuery
+    .input({})
+    .output(vBackfillStatus)
+    .query(async ({ ctx }): Promise<BackfillStatus> => walkStatuses(await loadState(ctx, ctx.user.userId)).replies);
+
+/** Where each of the caller's two walks stands: `idle` = not started. */
+export const getUsageBackfillStatuses = authQuery
     .input({})
     .output(v.object({ projects: vBackfillStatus, replies: vBackfillStatus }))
     .query(async ({ ctx }) => walkStatuses(await loadState(ctx, ctx.user.userId)));

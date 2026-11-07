@@ -56051,6 +56051,74 @@
             "content": {
               "application/json": {
                 "schema": {
+                  "anyOf": [
+                    {
+                      "const": "idle",
+                      "type": "string"
+                    },
+                    {
+                      "const": "running",
+                      "type": "string"
+                    },
+                    {
+                      "const": "done",
+                      "type": "string"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "query: usage_backfill:getUsageBackfillStatus",
+        "tags": [
+          "usage"
+        ],
+        "x-lunora-function-kind": "query"
+      }
+    },
+    "/_lunora/rpc#usage_backfill:getUsageBackfillStatuses": {
+      "post": {
+        "description": "Invoke the `query` `usage_backfill:getUsageBackfillStatuses` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "usage_backfill:getUsageBackfillStatuses",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {},
+                    "required": [],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "usage_backfill:getUsageBackfillStatuses",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
                   "properties": {
                     "projects": {
                       "anyOf": [
@@ -56099,7 +56167,7 @@
             "$ref": "#/components/responses/LunoraError"
           }
         },
-        "summary": "query: usage_backfill:getUsageBackfillStatus",
+        "summary": "query: usage_backfill:getUsageBackfillStatuses",
         "tags": [
           "usage"
         ],

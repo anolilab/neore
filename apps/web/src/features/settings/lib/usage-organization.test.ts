@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { MAX_ORGANIZATION_PAGES, OrganizationUsageTooLargeError, readOrganizationUsage } from "./usage-organization";
+import { MAX_ORGANIZATION_PAGES, OrganizationUsageTooLargeError, readOrganizationUsage, retryOrganizationRead } from "./usage-organization";
 
 const totals = (costMicrodollars: number) => {
     return { costMicrodollars, replies: 1, tokens: 10 };
@@ -29,5 +29,16 @@ describe("readOrganizationUsage", () => {
 
         await expect(readOrganizationUsage(fetchStep)).rejects.toBeInstanceOf(OrganizationUsageTooLargeError);
         expect(fetchStep).toHaveBeenCalledTimes(MAX_ORGANIZATION_PAGES);
+    });
+});
+
+describe("retryOrganizationRead", () => {
+    it("tries once more only after a failure that may not repeat", () => {
+        expect(retryOrganizationRead(0, new TypeError("Failed to fetch"))).toBe(true);
+        expect(retryOrganizationRead(1, new TypeError("Failed to fetch"))).toBe(false);
+        expect(retryOrganizationRead(0, new OrganizationUsageTooLargeError("too large"))).toBe(false);
+        const refused = Object.assign(new Error("Only organization admins"), { code: "FORBIDDEN", data: { code: "FORBIDDEN" } });
+
+        expect(retryOrganizationRead(0, refused)).toBe(false);
     });
 });

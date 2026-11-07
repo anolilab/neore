@@ -698,7 +698,7 @@ export interface InternalApiTypes {
             pruneRetainedActivity: FunctionReference<"mutation", {}, { subAgentRuns: number; usageDaily: number }>;
         };
         steps: {
-            collectActivityForExport: FunctionReference<"query", { userId: string }, { knowledgeCollections: Array<unknown>; subAgentRuns: Array<unknown>; usageDaily: Array<unknown> }>;
+            collectActivityForExport: FunctionReference<"query", { userId: string }, { knowledgeCollections: Array<unknown>; subAgentRuns: Array<unknown>; usageDaily: Array<unknown>; usageDailyTruncated: boolean }>;
             collectConversations: FunctionReference<"action", { userId: string }, { contextSummaries: { coveredCount: number; coveredUpToMessageId: string; createdAt: number; kind?: "compact"; summary: string; }[]; messages: { _id: string; createdAt: number; model?: string; order?: number; parentMessageId?: string; role?: string; status?: string; stepOrder?: number; text?: string; tool?: boolean; }[]; thread: { _id: string; activeLeafMessageId?: string; category?: string; createdAt: number; model?: string; summary?: string; tags?: string[]; title?: string; updatedAt?: number; userTags: string[]; }; }[]>;
             collectFiles: FunctionReference<"query", { userId: string }, { files: Array<{ _id: Id<"files">; createdAt: number; name: string; size: number; tags?: Array<string>; type: string; updatedAt: number }>; folders: Array<{ _id: Id<"folders">; createdAt: number; name: string; updatedAt: number }> }>;
             collectProfile: FunctionReference<"query", { userId: string }, { createdAt: number; email: string; emailVerified: boolean; id: string; image: string; name: string } | null>;

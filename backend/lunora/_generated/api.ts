@@ -814,7 +814,8 @@ export interface ApiTypes {
             getSkillBreakdown: FunctionReference<"query", { fromDate: unknown }, { skills: Array<{ costMicrodollars: number; replies: number; skillKey: string; skillName?: string; tokens: number }>; truncated: boolean }>;
         };
         backfill: {
-            getUsageBackfillStatus: FunctionReference<"query", {}, { projects: "idle" | "running" | "done"; replies: "idle" | "running" | "done" }>;
+            getUsageBackfillStatus: FunctionReference<"query", {}, "idle" | "running" | "done">;
+            getUsageBackfillStatuses: FunctionReference<"query", {}, { projects: "idle" | "running" | "done"; replies: "idle" | "running" | "done" }>;
             startUsageBackfill: FunctionReference<"mutation", {}, "idle" | "running" | "done">;
         };
         organization: {
@@ -1699,6 +1700,7 @@ export const api: ApiTypes = {
         },
         backfill: {
             getUsageBackfillStatus: { __lunoraRef: "usage_backfill:getUsageBackfillStatus" },
+            getUsageBackfillStatuses: { __lunoraRef: "usage_backfill:getUsageBackfillStatuses" },
             startUsageBackfill: { __lunoraRef: "usage_backfill:startUsageBackfill" },
         },
         organization: {

@@ -17,6 +17,7 @@ import {
     REPLY_KEY_KEEP_MS,
     runUsageBackfillStep,
     runUsageProjectBackfillStep,
+    getUsageBackfillStatuses,
     startUsageBackfill,
     sweepUsageRollup,
 } from "./backfill";
@@ -117,7 +118,10 @@ const reply = (tokens: number, cost: number, extra: Partial<RowSpec> = {}): RowS
 
 const start = async () => await harness.withIdentity({ userId: USER } as never).mutation(startUsageBackfill as never, {} as never);
 
-const status = async () => await harness.withIdentity({ userId: USER } as never).query(getUsageBackfillStatus as never, {} as never);
+const status = async () => await harness.withIdentity({ userId: USER } as never).query(getUsageBackfillStatuses as never, {} as never);
+
+/** The first walk's status in the shape pages loaded before the project walk read. */
+const firstWalkStatus = async () => await harness.withIdentity({ userId: USER } as never).query(getUsageBackfillStatus as never, {} as never);
 
 const state = async () => await harness.run(async (ctx: any) => await ctx.db.usageBackfill.findFirst({ where: { userId: USER } }));
 
@@ -619,6 +623,8 @@ describe("project backfill", () => {
 
         // The totals are complete; only the project walk has still to run, and the usage page waits on nothing else.
         expect(await status()).toStrictEqual({ projects: "idle", replies: "done" });
+        // A page loaded before this change reads the old query, which still answers with the first walk's status alone.
+        expect(await firstWalkStatus()).toBe("done");
         expect(await start()).toBe("running");
         await drain();
 
