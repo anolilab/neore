@@ -9,6 +9,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 
 import { registeredApi, registerModule } from "../../test/registered-api";
 import { jobsQueueMessages } from "../../test/stubs/cloudflare-workers";
+import { _deletePageForThreadId } from "../agent/threads";
 import { respondToToolApproval } from "../chat/tool-permissions";
 import { PENDING_APPROVAL_TTL_MS } from "../chat/lib/tool-approval-cleanup";
 import { hashPasscode, mintUnlockProof, newPasscodeEpoch, THREAD_LOCKED_CODE } from "../lib/thread-lock";
@@ -923,5 +924,28 @@ describe("the reaper of a waiting run", () => {
 
         await run(async (context) => await reapSubAgentRun(context, runId, createdAt + SUB_AGENT_STALE_MS));
         expect(await runStatus()).toBe("failed");
+    });
+});
+
+describe("deleting the child thread of a waiting run", () => {
+    it("ends the run as cancelled and tells the parent it ended, so the slot is not held until the reaper", async () => {
+        await run(async (context) => await markRunAwaiting(context, runId));
+        expect(await runStatus()).toBe("awaiting");
+
+        await run(async (context) => await context.runMutation(_deletePageForThreadId, { threadId: childId as never }));
+
+        expect(await run(async (context) => await context.db.get("threads", childId))).toBeNull();
+        expect(await runStatus()).toBe("cancelled");
+        expect(await runRow()).toMatchObject({ resultPostedAt: expect.any(Number) });
+
+        const parentMessages = await run(
+            async (context) =>
+                await context.db
+                    .query("messages")
+                    .withIndex("by_threadId_order_stepOrder", (q: any) => q.eq("threadId", parentId))
+                    .collect(),
+        );
+
+        expect(parentMessages.filter((row: { agentName?: string }) => row.agentName === SUB_AGENT_NAME)).toHaveLength(1);
     });
 });

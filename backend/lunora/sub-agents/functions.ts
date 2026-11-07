@@ -1977,6 +1977,32 @@ export const cancelQueuedWorkerRuns = async (ctx: MutationCtx, threadId: string)
     }
 };
 
+/**
+ * A thread is being hard-deleted: the runs it is the child of end as cancelled, and so do the runs it delegated, as a
+ * Stop would end them. A waiting run's request goes with the thread, so nothing would answer it: left alone, the run
+ * would hold its fan-out slot until its reaper. The thread's own queued worker runs go first, newest first, so ending
+ * the head does not start the next one on a thread that is going away.
+ */
+export const endSubAgentRunsOfDeletedThread = async (ctx: MutationCtx, threadId: string, userId: string | undefined): Promise<void> => {
+    await cancelQueuedWorkerRuns(ctx, threadId);
+
+    for (const status of ["awaiting", "running"] as const) {
+        const runs = await ctx.db
+            .query("subAgentRuns")
+            .withIndex("by_childThreadId_and_status", (q) => q.eq("childThreadId", threadId).eq("status", status))
+            .take(CANCEL_THREAD_MAX);
+
+        for (const run of runs) {
+            await finishRun(ctx, run._id, { kind: "cancelled" });
+        }
+    }
+
+    // Only an owned thread delegates (`delegateToSubAgent` admits runs for the parent's owner alone).
+    if (userId !== undefined) {
+        await cancelSubAgentRunsForStop(ctx, threadId, userId);
+    }
+};
+
 /** Runs read per stop; the fan-out cap keeps real ones to a handful, the bound is for a runaway. */
 const CANCEL_THREAD_MAX = 20;
 
