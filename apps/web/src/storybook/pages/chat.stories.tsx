@@ -28,12 +28,8 @@ const meta = {
     },
     component: StoryPage,
     parameters: {
-        // Composer controls (model picker, search mode, goal) still set their labels at /30–/50 opacity: the picker
-        // work is the one with its own `todo`. Thread rows, sidebar and code blocks are checked here.
-        // Still failing axe, so the page is `todo` for now: the composer's muted labels (model trigger "Select model...",
-        // the search-mode and goal labels) at about 1.5–1.9:1, and the scroll wrapper Streamdown puts round a code block
-        // (not focusable, no `tabIndex` hook in its API). Thread rows, the sidebar and code tokens pass.
-        a11y: { test: "todo" },
+        // Axe runs on the whole page: thread rows, the composer, the sidebar, code blocks (each `<pre>` is a focusable,
+        // named region, see `useFocusableCodeBlocks`) and the thinking and elapsed-time status all pass in every mode.
         layout: "fullscreen",
         msw: { handlers: { gateway: gatewayModelsHandler(), lunora: lunoraHandlers(...userFixtures(), ...shellFixtures(), ...chatFixtures()) } },
     },

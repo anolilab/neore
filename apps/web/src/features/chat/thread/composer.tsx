@@ -213,6 +213,7 @@ export const ComposerModeSwitcher: FC<{
                                 disabled={disabled}
                                 render={
                                     <button
+                                        aria-label={t`Mode`}
                                         className="flex size-6 items-center justify-center rounded-md transition-colors hover:bg-black/[0.06] dark:hover:bg-white/[0.08]"
                                         type="button"
                                     >

@@ -17,6 +17,7 @@ import AnimatedTiles from "@neore/ui/components/animated-tiles";
 import { chatMarkdownComponents, hostMarkdownComponents } from "@neore/ui/components/chat-markdown-components";
 import type { FileRendererType } from "@neore/ui/components/file-renderers/file-type-utilities";
 import { getFileRendererType } from "@neore/ui/components/file-renderers/file-type-utilities";
+import { useFocusableCodeBlocks } from "@neore/ui/hooks/use-focusable-code-blocks";
 import useStreamdownAppearance from "@neore/ui/hooks/use-streamdown-appearance";
 import useStreamdownPlugins from "@neore/ui/hooks/use-streamdown-plugins";
 import { AlertCircle, ChevronDown, ChevronRight, FileIcon, Globe, Loader2, Play, Presentation, Terminal } from "lucide-react";
@@ -119,20 +120,28 @@ const DefaultText: FC<{ isAnimating: boolean; literalImages?: boolean; text: str
     // The user's code / diagram themes and code-block display (Appearance settings), provided by the app.
     const { codeLineNumbers, mermaid, shikiTheme } = useStreamdownAppearance();
 
+    // Streamdown renders each code block's scrolling `<pre>` itself: this makes it reachable from the keyboard.
+    const rootRef = useRef<HTMLDivElement>(null);
+
+    useFocusableCodeBlocks(rootRef);
+
     // `codeBlockMaxHeight="none"`: the 24-line cap is per block (`chatMarkdownComponents`), not Streamdown's global 400px.
+    // `contents` keeps the wrapper out of the layout.
     return (
-        <Streamdown
-            className="streamdown-animate"
-            codeBlockMaxHeight="none"
-            components={literalImages ? hostMarkdownComponents : chatMarkdownComponents}
-            isAnimating={isAnimating}
-            lineNumbers={codeLineNumbers}
-            mermaid={mermaid}
-            plugins={plugins}
-            shikiTheme={shikiTheme}
-        >
-            {text}
-        </Streamdown>
+        <div className="contents" ref={rootRef}>
+            <Streamdown
+                className="streamdown-animate"
+                codeBlockMaxHeight="none"
+                components={literalImages ? hostMarkdownComponents : chatMarkdownComponents}
+                isAnimating={isAnimating}
+                lineNumbers={codeLineNumbers}
+                mermaid={mermaid}
+                plugins={plugins}
+                shikiTheme={shikiTheme}
+            >
+                {text}
+            </Streamdown>
+        </div>
     );
 });
 
@@ -1128,7 +1137,7 @@ const MessageContent: FC<MessageContentProps> = memo(({ citationLabel, className
     if (renderedParts.length === 0) {
         if (isAnimating) {
             renderedParts.push(
-                <span className="animate-pulse text-gray-400" key="loading">
+                <span className="text-muted-foreground animate-pulse" key="loading">
                     {t`Thinking...`}
                 </span>,
             );
