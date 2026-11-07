@@ -28,26 +28,49 @@ const RECORDING_OPTIONS: RecordingOptions = {
     web: {},
 };
 
-/** The last teardown of any chat screen's recorder: a start waits for it, even one on a newly opened screen. */
-const teardown: { last: Promise<void> } = { last: Promise.resolve() };
+/**
+ * The app's one audio session, shared by every chat screen. `owner` is the press that last switched recording on; a
+ * teardown only switches it off while its own press still owns it, so an old screen can never cut off a newer
+ * recording, whatever order the native calls finish in. `last` is the latest teardown, which a start waits for.
+ */
+const session: { last: Promise<void>; owner: symbol | undefined } = { last: Promise.resolve(), owner: undefined };
+
+/** How long a teardown waits for the recorder to stop before it switches the session off regardless. */
+const STOP_DEADLINE_MS = 5000;
 
 /**
- * Takes the audio session out of recording, after `stopping` (the recorder's stop) has settled. It is registered at
- * once, before that stop settles, and every start waits for it, so a late teardown never lands on the next recording.
- * Failures are dropped here: the caller sees the stop's own failure.
+ * Takes the audio session out of recording for `owner`'s press, after `stopping` (the recorder's stop) has settled.
+ * It is registered at once, before that stop settles. Failures are dropped here: the caller sees the stop's own.
  */
-const leaveRecordingMode = async (stopping?: Promise<unknown>): Promise<void> => {
+const leaveRecordingMode = async (owner: symbol | undefined, stopping?: Promise<unknown>): Promise<void> => {
     // Chained after the one before: a quick teardown must not stand in for a slower one still running.
-    const previous = teardown.last;
+    const previous = session.last;
 
-    teardown.last = (async () => {
+    session.last = (async () => {
         await previous;
 
+        // A stop that never answers must not hold every later press: the session is switched off after a while anyway.
+        let timer: ReturnType<typeof setTimeout> | undefined;
+
         try {
-            await stopping;
+            await Promise.race([
+                stopping,
+                new Promise((resolve) => {
+                    timer = setTimeout(resolve, STOP_DEADLINE_MS);
+                }),
+            ]);
         } catch {
             // The caller handles it.
+        } finally {
+            clearTimeout(timer);
         }
+
+        // A newer press took the session over: leave its recording alone.
+        if (session.owner !== owner) {
+            return;
+        }
+
+        session.owner = undefined;
 
         try {
             await setAudioModeAsync({ allowsRecording: false });
@@ -56,7 +79,7 @@ const leaveRecordingMode = async (stopping?: Promise<unknown>): Promise<void> =>
         }
     })();
 
-    await teardown.last;
+    await session.last;
 };
 
 export type VoicePhase = "idle" | "recording" | "transcribing";
@@ -102,6 +125,8 @@ export const useVoiceInput = ({ onText }: { onText: (text: string) => void }) =>
     const isMounted = useRef(true);
     // Where the clip is written, known once the recorder is prepared, so it can be deleted whatever happens after.
     const clipUri = useRef<string | undefined>(undefined);
+    // The current press's claim on the shared audio session (see `session`).
+    const pressToken = useRef<symbol | undefined>(undefined);
     const stopTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
     const callbacks = useRef({ onText });
 
@@ -120,7 +145,7 @@ export const useVoiceInput = ({ onText }: { onText: (text: string) => void }) =>
         const stopping = (async () => {
             await recorder.stop();
         })();
-        const leaving = leaveRecordingMode(stopping);
+        const leaving = leaveRecordingMode(pressToken.current, stopping);
 
         try {
             await stopping;
@@ -144,7 +169,14 @@ export const useVoiceInput = ({ onText }: { onText: (text: string) => void }) =>
         let uri: string | undefined = clipUri.current;
 
         try {
-            const { durationMillis } = recorder.getStatus();
+            // A status that cannot be read must not skip the stop below: it counts as too short.
+            let durationMillis = 0;
+
+            try {
+                ({ durationMillis } = recorder.getStatus());
+            } catch (statusError) {
+                console.warn("Could not read the voice recording's length.", statusError);
+            }
 
             uri = await stopRecording();
 
@@ -200,6 +232,11 @@ export const useVoiceInput = ({ onText }: { onText: (text: string) => void }) =>
         }
 
         isBusy.current = true;
+
+        // This press's claim on the audio session.
+        const token = Symbol("voice press");
+
+        pressToken.current = token;
         isHeld.current = true;
         setError(undefined);
 
@@ -216,7 +253,16 @@ export const useVoiceInput = ({ onText }: { onText: (text: string) => void }) =>
                 return;
             }
 
-            await teardown.last;
+            await session.last;
+
+            // Another screen's press is recording (a chat opened over it during the hold): this one waits its turn.
+            if (session.owner !== undefined) {
+                isBusy.current = false;
+
+                return;
+            }
+
+            session.owner = token;
             await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
             await recorder.prepareToRecordAsync();
             clipUri.current = recorder.uri ?? undefined;
@@ -227,7 +273,7 @@ export const useVoiceInput = ({ onText }: { onText: (text: string) => void }) =>
                     report(TOO_SHORT_MESSAGE);
                 }
 
-                await leaveRecordingMode();
+                await leaveRecordingMode(token);
                 isDiscarded(clipUri.current);
                 clipUri.current = undefined;
                 isBusy.current = false;
@@ -244,7 +290,7 @@ export const useVoiceInput = ({ onText }: { onText: (text: string) => void }) =>
         } catch (startError) {
             console.warn("Could not start the voice recording.", startError);
             report(RECORDING_FAILED_MESSAGE);
-            await leaveRecordingMode();
+            await leaveRecordingMode(token);
             isDiscarded(clipUri.current);
             clipUri.current = undefined;
             isBusy.current = false;
