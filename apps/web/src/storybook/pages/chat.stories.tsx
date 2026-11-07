@@ -28,10 +28,8 @@ const meta = {
     },
     component: StoryPage,
     parameters: {
-        // Axe passes the chat in light, dark-violet and RTL, and the composer's empty state in mobile. It still fails on
-        // mobile, in a thread message's code text (the Streamdown token colour, about 1.1:1 on the page background).
-        // Until that is fixed, the page is `todo`.
-        a11y: { test: "todo" },
+        // Axe runs on the whole page in every mode. Code blocks take the block's foreground colour (see the
+        // `[data-streamdown="code-block-body"]` rule in `packages/ui/src/global.css`).
         layout: "fullscreen",
         msw: { handlers: { gateway: gatewayModelsHandler(), lunora: lunoraHandlers(...userFixtures(), ...shellFixtures(), ...chatFixtures()) } },
     },
