@@ -112,7 +112,9 @@ catalogs:
     "@cloudflare/workers-types": 5.20261019.1
     "@crxjs/vite-plugin": 3.0.0
     "@prosopo/vite-plugin-watch-workspace": 2.6.33
-    "@rolldown/plugin-babel": 0.2.4
+    # Peer of `@vitejs/plugin-react` and `@lingui/vite-plugin`: 0.3 needs
+    # plugin-react >= 6.2.0 and lingui >= 6.12.0, so move them together.
+    "@rolldown/plugin-babel": 0.3.0
     "@tailwindcss/vite": 4.3.3
     # 1.0.2 and 1.0.3 bundle harfbuzzjs without shipping its `hb.wasm`, and its
     # CommonJS loader cannot run in their ESM node build (`Dynamic require of
@@ -126,7 +128,7 @@ catalogs:
     "@visulima/dev-toolbar": 1.1.18
     "@visulima/vite-overlay": 2.0.41
     "@vite-pwa/assets-generator": ^2.0.0
-    "@vitejs/plugin-react": 6.1.2
+    "@vitejs/plugin-react": 6.2.1
     esbuild: 0.28.2
     sharp: 0.35.5
     svgo: 4.1.0
@@ -143,19 +145,20 @@ catalogs:
   bundler:
     "@swc-node/register": ~1.12.1
     "@swc/cli": 0.8.1
-    "@swc/core": 1.16.18
+    "@swc/core": 1.16.22
     "@swc/helpers": 0.5.23
-    "@visulima/packem": 2.1.0
+    "@visulima/packem": 4.0.5
     # Required (non-optional) peer of packem, pinned exactly by it — move with
     # packem. Declared since `autoInstallPeers: false`; without it every
     # `packem build` dies with "Cannot find package '@visulima/packem-rollup'".
-    "@visulima/packem-rollup": 1.1.0
+    "@visulima/packem-rollup": 1.2.4
     # Optional peer of packem and its rollup plugins, declared by the three
     # packem users. Undeclared, pnpm 12.8.1 resolved it from wherever a rollup
     # happened to sit in the tree and `pnpm dedupe` flipped between "with" and
     # "without" on every run, so `pnpm dedupe --check` (part of `pnpm lint`)
-    # could never pass.
-    rollup: 4.64.12
+    # could never pass. EXACT: packem 4's `@visulima/packem-share` pins rollup
+    # exactly (4.67.4 for packem 4.0.5) — move with packem.
+    rollup: 4.67.4
     tslib: ^2.8.1
   canvas-spreadsheet:
     "@univerjs/preset-sheets-core": 1.1.0
@@ -224,12 +227,12 @@ catalogs:
     fumadocs-mdx: 15.4.8
     fumadocs-ui: 16.17.7
   i18n:
-    "@lingui/babel-plugin-lingui-macro": 6.10.0
-    "@lingui/cli": 6.10.0
-    "@lingui/core": 6.10.0
-    "@lingui/detect-locale": 6.10.0
-    "@lingui/react": 6.10.0
-    "@lingui/vite-plugin": 6.10.0
+    "@lingui/babel-plugin-lingui-macro": 6.12.0
+    "@lingui/cli": 6.12.0
+    "@lingui/core": 6.12.0
+    "@lingui/detect-locale": 6.12.0
+    "@lingui/react": 6.12.0
+    "@lingui/vite-plugin": 6.12.0
     "@visulima/iso-locale": ^1.0.1
   iac:
     # 2.0 is an Effect-based rewrite. The beta ships roughly weekly and each release can
@@ -327,7 +330,7 @@ catalogs:
   security:
     "@hcaptcha/react-hcaptcha": 2.2.0
     "@marsidev/react-turnstile": 1.6.2
-    "@visulima/content-safety": 1.0.1
+    "@visulima/content-safety": 2.0.0
     dompurify: 3.4.17
     tldts: 7.4.18
   server:
@@ -479,8 +482,8 @@ catalogs:
     "@c15t/translations": 2.3.0
     "@toon-format/toon": 4.4.0
     "@ungap/structured-clone": 1.4.0
-    "@visulima/pail": 5.0.0
-    "@visulima/yaml": 1.0.0
+    "@visulima/pail": 6.0.0
+    "@visulima/yaml": 2.0.0
     ansi-to-react: ^6.2.6
     date-fns: 4.4.0
     embla-carousel-react: 8.6.0
