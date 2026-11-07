@@ -17,18 +17,13 @@
   lands through `threadProject` (a sub-agent's or worker's thread: its lead's
   project, via `subAgentRuns`) and `readableAttribution` (only a project the
   user can open: no access files none, a failed read throws). A caller off the
-  thread's shard passes `threadAttribution` (`getThreadAttribution`); a shared
-  thread's record goes through `forwardReplyUsage`. Reading jobs are scheduled
-  with `RECORD_RETRY` (a failed read fails the try); each also gets a fallback
-  record (`RECORD_FALLBACK_MS`, no project) that adds nothing once the record
-  landed, so the total always lands. Replies outside a project
-  write none: "No project" is total − projects.
-- **Project history cutoff** — the project walk (`runUsageProjectBackfillStep`)
-  reconstructs nothing. It runs after the first walk, and files a reply only
-  from the `counted` snapshot (amount and day) the first walk stored on its key.
-  Under "No project" for good: a `usageBackfill` row without `timeZone`
-  (written before projects were filed: no project walk), a key without
-  `counted`, replies in threads the user does not own (teammates' shared
-  threads; their live records file them), sub-agent threads whose
-  `subAgentRuns` link was pruned (90 days). A day's project rows are clamped to
-  that day's total row. Key pruning waits for both walks.
+  thread's shard passes `threadAttribution` (`getThreadAttribution`), checked
+  again when the record lands; a shared thread's record goes through
+  `forwardReplyUsage`. Reading jobs are scheduled with `RECORD_RETRY` (a failed
+  read fails the try); each also gets a fallback record (`RECORD_FALLBACK_MS`,
+  no project) that adds nothing once the record landed, so the total always
+  lands. Replies outside a project write none: "No project" is total − projects.
+- **Project usage starts at deploy** — only replies recorded live are filed
+  under a project. Older usage, and any reply the totals backfill counted,
+  shows under "No project" until the project-history backfill ships (a later
+  part). Do not file a project row for a reply the live record did not count.

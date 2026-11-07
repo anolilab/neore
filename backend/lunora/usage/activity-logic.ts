@@ -78,8 +78,6 @@ export const skillKeyOf = (skill: ReplySkill | undefined): string => {
 
 /** The fields of a saved row a reply's usage is read from (a subset of `MessageDoc`). */
 export interface SavedRowLike {
-    /** When the row was saved: the first reply row's is when the reply started, the day the backfill dates it by. */
-    _creationTime?: number;
     _id?: string;
     message?: { role?: string } | null;
     order?: number;
@@ -151,8 +149,6 @@ export interface ReplyUsageArgs {
     replyKey: string;
     skillKey: string;
     skillName?: string;
-    /** When the reply's first row was saved; dates its project row when the backfill already counted the reply. */
-    startedAt?: number;
     /** The thread's project, read by a caller that can read the thread; the record then reads no thread. */
     threadAttribution?: Attribution;
     /** The thread the reply is in; its project, read when the record lands, gets the reply's usage too. */
@@ -188,7 +184,6 @@ export const replyUsageArgs = (
         userId: options.userId,
         ...(options.skill && { skillName: options.skill.name }),
         ...(first?.threadId !== undefined && { threadId: first.threadId }),
-        ...(first?._creationTime !== undefined && { startedAt: first._creationTime }),
     };
 };
 
@@ -204,9 +199,6 @@ export const RECORD_RETRY = { backoff: "exponential", baseMs: 10_000, maxAttempt
  * when the record landed (`usage/schedule.ts`).
  */
 export const RECORD_FALLBACK_MS = 15 * 60_000;
-
-/** The key `usageReplies` holds once a reply (keyed `replyKey`) has been filed under its project. */
-export const projectFiledKey = (replyKey: string): string => `project:${replyKey}`;
 
 /** Where a reply is filed besides the total: its thread's project. */
 export interface Attribution {

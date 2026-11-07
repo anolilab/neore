@@ -41,7 +41,6 @@ import {
     HEATMAP_DAYS,
     isDayKey,
     PROJECT_SKILL_KEY,
-    projectFiledKey,
     TOTAL_SKILL_KEY,
     withDayTotals,
 } from "./activity-logic";
@@ -63,31 +62,8 @@ type ReadCtx = Pick<MutationCtx | QueryCtx, "db">;
 export const isReplyRecorded = async (ctx: DbCtx, userId: string, replyKey: string): Promise<boolean> =>
     (await ctx.db.usageReplies.findFirst({ where: { replyKey, userId } })) !== null;
 
-/** What the first walk added to the total for a reply. */
-export interface CountedReply {
-    costMicrodollars: number;
-    date: string;
-    tokens: number;
-}
-
-/**
- * `projectFiled`: the reply's project was filed with it, so the project walk leaves it alone. `counted`: what the first
- * walk added to the total, the amount any project row filed for the reply later must carry.
- */
-export const markReplyRecorded = async (
-    ctx: DbCtx,
-    userId: string,
-    replyKey: string,
-    at: number,
-    extra: { counted?: CountedReply; projectFiled?: boolean } = {},
-): Promise<void> => {
-    await ctx.db.insert("usageReplies", {
-        recordedAt: at,
-        replyKey,
-        userId,
-        ...(extra.counted !== undefined && { counted: extra.counted }),
-        ...(extra.projectFiled === true && { projectFiled: true }),
-    });
+export const markReplyRecorded = async (ctx: DbCtx, userId: string, replyKey: string, at: number): Promise<void> => {
+    await ctx.db.insert("usageReplies", { recordedAt: at, replyKey, userId });
 };
 
 /** Where a reply in `thread` is filed besides the total: its project. */
@@ -146,32 +122,6 @@ export const getThreadAttribution = internalQuery
     .input({ threadId: v.string(), userId: v.string() })
     .output(vAttribution)
     .query(async ({ args: { threadId, userId }, ctx }) => await attributionFor(ctx, threadId, userId));
-
-/**
- * Files a recorded reply under its project, once: the project walk may have filed it already (it marks
- * `project:<key>`). A first record needs no marker — the reply's own key (`projectFiled`) stops the walk and any
- * redelivery. A late record (`finalize`) marks it whatever it filed, so a later delivery, after the thread has moved,
- * cannot file the reply again under another project.
- */
-const fileAttribution = async (
-    ctx: DbCtx,
-    reply: { at: number; replyKey: string; userId: string },
-    attribution: Attribution,
-    date: string,
-    amounts: { costMicrodollars: number; tokens: number },
-    finalize: boolean,
-): Promise<void> => {
-    const { at, replyKey, userId } = reply;
-    const projectFiled = await isReplyRecorded(ctx, userId, projectFiledKey(replyKey));
-
-    if (finalize && !projectFiled) {
-        await markReplyRecorded(ctx, userId, projectFiledKey(replyKey), at);
-    }
-
-    if (attribution.projectKey !== undefined && !projectFiled) {
-        await addToAttributionRollup(ctx, userId, [{ ...amounts, date, projectKey: attribution.projectKey, replies: 1 }], at);
-    }
-};
 
 /** Adds `increments` to the user's per-day project rows. */
 export const addToAttributionRollup = async (ctx: DbCtx, userId: string, increments: ReadonlyArray<AttributionIncrement>, at: number): Promise<void> => {
@@ -240,7 +190,6 @@ export const recordReplyUsage = internalMutation
         replyKey: v.string(),
         skillKey: v.string(),
         skillName: v.optional(v.string()),
-        startedAt: v.optional(v.number()),
         // Worked out where the thread is readable when the reply ran in another user's thread (`forwardReplyUsage`).
         threadAttribution: v.optional(vAttribution),
         threadId: v.optional(v.string()),
@@ -260,34 +209,19 @@ export const recordReplyUsage = internalMutation
 
         const costMicrodollars = Math.max(0, Math.round(args.costMicrodollars));
         const tokens = Math.max(0, Math.round(args.tokens));
-        const recorded = await ctx.db.usageReplies.findFirst({ where: { replyKey: args.replyKey, userId: args.userId } });
+        // A redelivered job, or a reply the totals backfill already counted: counted once. A reply the backfill counted
+        // stays under "No project" (project usage starts at deploy, `usage/AGENTS.md`).
+        if (await isReplyRecorded(ctx, args.userId, args.replyKey)) {
+            return null;
+        }
+
         // A project read by the caller is checked again here: access revoked since that read files none. A failed read
-        // throws, and the record is retried (`RECORD_RETRY`); its fallback files the reply without one.
-        const attribution = async (): Promise<Attribution> =>
+        // throws before anything is written, and the record is retried (`RECORD_RETRY`); its fallback files the reply
+        // without a project.
+        const attribution =
             args.threadAttribution === undefined
                 ? await attributionFor(ctx, args.threadId, args.userId)
                 : await readableAttribution(ctx, args.threadAttribution, args.userId);
-
-        // A redelivered job (already filed), or a reply the backfill reached first: the first walk files no project, so
-        // the project is filed here, once — at what the walk counted (`counted`: a run it passed while paused holds less
-        // than this record says), on the day it counted it. A key without that snapshot was written before projects were
-        // filed: nothing says what its total holds, so it stays under "No project" (`usage/AGENTS.md`).
-        if (recorded) {
-            if (!recorded.projectFiled) {
-                const { counted } = recorded;
-
-                await fileAttribution(
-                    ctx,
-                    args,
-                    counted ? await attribution() : {},
-                    counted?.date ?? args.date,
-                    { costMicrodollars: counted?.costMicrodollars ?? 0, tokens: counted?.tokens ?? 0 },
-                    true,
-                );
-            }
-
-            return null;
-        }
 
         if (args.fallback === true) {
             usageLogger.warn("[usage] the reply's record never landed; its fallback records it without a project", {
@@ -297,7 +231,7 @@ export const recordReplyUsage = internalMutation
             });
         }
 
-        await markReplyRecorded(ctx, args.userId, args.replyKey, args.at, { projectFiled: true });
+        await markReplyRecorded(ctx, args.userId, args.replyKey, args.at);
         await addToRollup(
             ctx,
             args.userId,
@@ -315,7 +249,9 @@ export const recordReplyUsage = internalMutation
             true,
         );
 
-        await fileAttribution(ctx, args, await attribution(), args.date, { costMicrodollars, tokens }, false);
+        if (attribution.projectKey !== undefined) {
+            await addToAttributionRollup(ctx, args.userId, [{ costMicrodollars, date: args.date, projectKey: attribution.projectKey, replies: 1, tokens }], args.at);
+        }
 
         return null;
     });
@@ -333,7 +269,6 @@ export const forwardReplyUsage = internalMutation
         replyKey: v.string(),
         skillKey: v.string(),
         skillName: v.optional(v.string()),
-        startedAt: v.optional(v.number()),
         threadId: v.string(),
         tokens: v.number(),
         userId: v.string(),

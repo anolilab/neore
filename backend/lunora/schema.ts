@@ -3303,24 +3303,6 @@ export const schema = defineSchema({
         lastOrder: v.optional(v.number()),
         // Past it the next step picks the job up again (a chain that died).
         leaseUntil: v.number(),
-        // The second walk, which files replies the rollup already counted under their thread's project
-        // (`usage/backfill.ts#runUsageProjectBackfillStep`). Same fields as the walk above; unset = not started.
-        projects: v.optional(
-            v.object({
-                finishedAt: v.optional(v.number()),
-                lastOrder: v.optional(v.number()),
-                leaseUntil: v.number(),
-                replies: v.number(),
-                runId: v.string(),
-                // Replies created from here on are the live path's, which files them itself.
-                startedAt: v.number(),
-                status: v.union(v.literal("running"), v.literal("done")),
-                threadCursor: v.optional(v.string()),
-                threadId: v.optional(v.string()),
-                // The project `threadId` was in when the walk began it, kept so a thread moved mid-walk is not split.
-                threadProjectKey: v.optional(v.string()),
-            }),
-        ),
         // Replies the walk added to the rollup.
         replies: v.number(),
         // Steps check it, so a restarted walk ends the chain it replaced.
@@ -3331,8 +3313,6 @@ export const schema = defineSchema({
         // Pagination cursor for the thread AFTER `threadId`.
         threadCursor: v.optional(v.string()),
         threadId: v.optional(v.string()),
-        // The user's time zone when the first walk started: both walks date replies in it.
-        timeZone: v.optional(v.string()),
         updatedAt: v.number(),
         userId: v.string(),
     })
@@ -3365,12 +3345,6 @@ export const schema = defineSchema({
     // what makes `recordReplyUsage` and the backfill count a reply once.
     // Pruned by `usage/backfill.ts#sweepUsageRollup` once the backfill is done.
     usageReplies: defineTable({
-        // What the first backfill walk added to the total for this reply, and on which day: a project row filed for it
-        // later carries exactly this, so the projects never hold more than the total (a run it passed while paused
-        // was counted only in part).
-        counted: v.optional(v.object({ costMicrodollars: v.number(), date: v.string(), tokens: v.number() })),
-        // Set when the reply's project was filed with it (the live path), so the project walk leaves it alone.
-        projectFiled: v.optional(v.boolean()),
         recordedAt: v.number(),
         replyKey: v.string(),
         userId: v.string(),
