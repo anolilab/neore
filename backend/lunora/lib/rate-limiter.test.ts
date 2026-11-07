@@ -144,6 +144,7 @@ describe("RATE_LIMIT_CONFIGS", () => {
             "changelog/read",
             "chat/message",
             "chat/promptImprovement",
+            "guest/message",
             "messenger/inbound",
             "sandbox/execute",
             "share/view",

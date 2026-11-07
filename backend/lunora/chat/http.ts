@@ -26,11 +26,12 @@ import { parseSkillCommand } from "../skills/slash-command";
 import { clampGoalEffort, GOAL_TEXT_MAX } from "./goals/shared";
 import { vGoalRunConfig } from "./goals/validators";
 import { chargeDailyLimit, type DailyLimitKind } from "./lib/daily-limit";
+import { unsendableGuestText } from "./lib/guest-link-store";
 import { NO_SERVICE_FETCH } from "../lib/services";
 import getAgent from "./lib/get-agent";
 import { capTitlePrompt, fileOnlyPromptPart } from "./lib/first-user-prompt";
 import { mediaThreadTitle, startTitleJobs } from "./lib/start-title-jobs";
-import { documentTextPart } from "./lib/attached-text";
+import { documentTextPart, guestTextPart, messageCarriesGuestText } from "./lib/attached-text";
 import { formatPageContextPart, parsePageContext } from "./lib/page-context";
 import { createStreamToken } from "./streaming/persistent/stream-token";
 
@@ -358,6 +359,8 @@ export interface ChatStartBody {
     fileIds?: string[];
     /** Run until a reviewer confirms this goal is met (`chat/goals/`). Text turns in the caller's own chat only. */
     goal?: { maxRounds?: number; text: string };
+    /** The owner sends a guest's held message on (`chat/guest-links.ts`): the prompt is marked as guest text, so the quick check never reads it as the owner's. */
+    guestMessageId?: string;
     imageSize?: string;
     language?: string;
     mcpServerNames?: string[];
@@ -470,6 +473,17 @@ export const runChatStart = async (
         return Response.json({ error: "Invalid pageContext" }, { status: 400 });
     }
 
+    // The shape is checked here. `runChatStartOnShard` then refuses with 400 any id that is not one of the caller's held notes in
+    // the target chat (`getGuestNoteForSend`), and saves that note's own text.
+    if (body.guestMessageId !== undefined && !isValidDocumentIdFormat(body.guestMessageId)) {
+        return Response.json({ error: "Invalid guestMessageId" }, { status: 400 });
+    }
+
+    // A held note is a send of its own: it never regenerates a reply, which would answer some other prompt.
+    if (body.guestMessageId !== undefined && body.regenerate) {
+        return Response.json({ error: "A guest note cannot be sent as a regeneration." }, { status: 400 });
+    }
+
     // Auth: extract user from the forwarded JWT
     let user: BetterAuthUser | undefined;
 
@@ -566,10 +580,43 @@ const runChatStartOnShard = async (
     // A request refused below never awaits it; it is only a read.
     activeOrganizationPromise.catch(() => undefined);
 
+    const validThreadId = body.threadId && body.threadId !== "default" ? body.threadId : undefined;
+
+    // A held guest note is sent only into the chat it was left in, and its own text is what is saved: the prompt the client
+    // sent is not read for it. (Sent elsewhere, it would be confirmed against its own link.)
+    const guestNote =
+        body.guestMessageId === undefined
+            ? undefined
+            : // A failed lookup propagates to the endpoint's error handling: only a completed lookup that finds no eligible note is a 400.
+              await context.runQuery(internal.chat.guest_links.getGuestNoteForSend, {
+                  messageId: body.guestMessageId as Id<"threadGuestMessages">,
+                  userId,
+              });
+
+    if (body.guestMessageId !== undefined && (!guestNote || guestNote.status !== "held" || guestNote.threadId !== validThreadId)) {
+        return Response.json({ error: "That guest note is not waiting in this chat." }, { status: 400 });
+    }
+
+    // A note a guest posted that cannot be sent (a command, or a mention) is refused here too, for rows posted before the post
+    // path refused them.
+    const unsendable = guestNote ? unsendableGuestText(guestNote.text) : undefined;
+
+    if (unsendable !== undefined) {
+        return Response.json({ error: unsendable }, { status: 400 });
+    }
+
+    // A note is sent as text, into a text reply. A media model would mark it sent without queuing that reply.
+    if (guestNote && contentType !== "text") {
+        return Response.json({ error: "A guest note can only be sent to a text model." }, { status: 400 });
+    }
+
     // Build message content
     const messageContent: any[] = [];
 
-    if (body.prompt) {
+    if (guestNote) {
+        // The stored note is sanitized again here, so a row written before the filter existed reaches the agent clean too.
+        messageContent.push(guestTextPart(stripHiddenText(guestNote.text).text));
+    } else if (body.prompt) {
         messageContent.push({ text: body.prompt.trim(), type: "text" });
     } else if (contentType === "image") {
         messageContent.push({ text: "Generate an image", type: "text" });
@@ -583,8 +630,6 @@ const runChatStartOnShard = async (
     if (pageContext && contentType === "text") {
         messageContent.unshift(formatPageContextPart(pageContext));
     }
-
-    const validThreadId = body.threadId && body.threadId !== "default" ? body.threadId : undefined;
 
     // Continuing a thread needs write access to it. Nothing checked this: the
     // continue branch below saved the prompt into whatever thread id it was
@@ -758,7 +803,8 @@ const runChatStartOnShard = async (
 
     // The config every round of a goal runs with, checked against what `startGoal` accepts BEFORE the turn is charged
     // and saved: an ordinary send tolerates any `researchDepth` and longer lists, a goal does not.
-    const goalSkill = body.goal === undefined || !body.prompt ? null : parseSkillCommand(body.prompt);
+    // A held guest note never selects a skill: its goal rounds run without one, whatever prompt the client sent alongside it.
+    const goalSkill = body.goal === undefined || !body.prompt || guestNote ? null : parseSkillCommand(body.prompt);
     const goalConfig =
         body.goal === undefined
             ? undefined
@@ -807,8 +853,9 @@ const runChatStartOnShard = async (
     // (`chat/lib/start-title-jobs.ts`).
     const titleJobs: (() => Promise<unknown>)[] = [];
     const scheduleTitleJobs = (titleThreadId: string, isNewThread: boolean): void => {
+        // A held note's title is read from the text that was saved (the note's own), not the prompt the client sent.
         // Capped where it is sent: the title is generated from the first characters of the prompt only.
-        const prompt = capTitlePrompt(body.prompt ?? " ");
+        const prompt = capTitlePrompt(guestNote ? stripHiddenText(guestNote.text).text : (body.prompt ?? " "));
 
         for (const job of startTitleJobs(contentType, isNewThread)) {
             if (job === "title") {
@@ -900,6 +947,17 @@ const runChatStartOnShard = async (
         threadId = validThreadId;
         messageId = result.messageId;
 
+        // The held note's text is now in the chat: the guest sees it as sent. The message is already saved, so a failure to mark
+        // the note is logged rather than failing a request whose message is in the chat.
+        if (guestNote) {
+            await context
+                .runMutation(internal.chat.guest_links.markGuestNoteSent, {
+                    messageId: body.guestMessageId as Id<"threadGuestMessages">,
+                    userId,
+                })
+                .catch((error: unknown) => chatLogger.error("[GuestLink] Could not mark a sent note as sent:", error));
+        }
+
         // Title generation for existing threads too — scheduled after the agent run below.
         scheduleTitleJobs(threadId, false);
     } else {
@@ -977,8 +1035,10 @@ const runChatStartOnShard = async (
             ...(activeOrganizationId && { organizationId: activeOrganizationId }),
             ...(origin && { origin }),
             // The typed text, for skill-command detection. Not on regenerate: that
-            // replies to an existing prompt, which the run reads from the message.
-            ...(!body.regenerate && body.prompt && { userPrompt: body.prompt }),
+            // replies to an existing prompt, which the run reads from the message. A guest note's routing reads the note's
+            // own saved text, never the prompt the client sent.
+            ...(!body.regenerate && guestNote && { userPrompt: stripHiddenText(guestNote.text).text }),
+            ...(!body.regenerate && !guestNote && body.prompt && { userPrompt: body.prompt }),
             streamId: streamId!,
             streamingConfig: {
                 ...streamingConfig,
@@ -1091,6 +1151,8 @@ export const editMessageHttpAction = async (context: HttpActionCtx, request: Req
         }
 
         const { threadId } = message;
+        // An edit of a guest's note the owner sent on is still the guest's words: its text keeps the guest mark.
+        const editsGuestText = messageCarriesGuestText(message.message as Parameters<typeof messageCarriesGuestText>[0]);
 
         // Get thread to determine model
         const thread = await context.runQuery(internal.agent.threads.getThreadInternal, { threadId: threadId as Id<"threads"> });
@@ -1231,7 +1293,7 @@ export const editMessageHttpAction = async (context: HttpActionCtx, request: Req
                         break;
                     }
 
-                    messageContent.push({ text, type: "text" });
+                    messageContent.push(editsGuestText ? guestTextPart(text) : { text, type: "text" });
 
                     break;
                 }

@@ -179,3 +179,22 @@ describe("autoArchiveContinue cursor", () => {
         expect(cursor.length).toBeLessThan(MAX_LENGTH.cursor);
     });
 });
+
+describe("archiveIfStillIdle and live guest links", () => {
+    const archiveWithGuestLink = (expiresAt: number) =>
+        harness.run(async (ctx: any) => {
+            const threadId = await ctx.db.insert("threads", { mode: "text", model: "gpt-4o", status: "active", title: "Old", updatedAt: 1, userId: OWNER });
+
+            await ctx.db.insert("threadGuestLinks", { createdAt: 0, expiresAt, linkHash: "hash-live", threadId, userId: OWNER });
+
+            return await ctx.runMutation(archiveIfStillIdle, { cutoff: CUTOFF, threadId });
+        });
+
+    it("keeps an idle thread whose guest link is still live, so its held notes are not deleted", async () => {
+        expect(await archiveWithGuestLink(Date.now() + 60_000)).toBe(false);
+    });
+
+    it("archives an idle thread whose guest link has lapsed", async () => {
+        expect(await archiveWithGuestLink(1)).toBe(true);
+    });
+});

@@ -221,6 +221,8 @@ const OWNER_TABLES = [
     "tasks",
     "temporaryThreads",
     "threadGoals",
+    "threadGuestLinks",
+    "threadGuestMessages",
     "threadPasscodes",
     "threadPins",
     "threadRelationships",
