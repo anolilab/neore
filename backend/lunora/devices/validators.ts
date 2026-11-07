@@ -60,6 +60,8 @@ export const vAcpOffer = v.object({
 export const vDeviceView = v.object({
     _id: v.string(),
     acpOffers: v.optional(v.array(vAcpOffer)),
+    /** The desktop app version last reported with the manifest; unset when never reported. */
+    appVersion: v.optional(v.string()),
     createdAt: v.number(),
     lastSeenAt: v.optional(v.number()),
     name: v.string(),

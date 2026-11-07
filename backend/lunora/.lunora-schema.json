@@ -5905,6 +5905,12 @@
             }
           }
         },
+        "appVersion": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "createdAt": {
           "kind": "number",
           "nullable": false,

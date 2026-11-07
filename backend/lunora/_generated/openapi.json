@@ -29890,6 +29890,9 @@
                         },
                         "type": "array"
                       },
+                      "appVersion": {
+                        "type": "string"
+                      },
                       "createdAt": {
                         "type": "number"
                       },
@@ -30565,6 +30568,9 @@
                 "properties": {
                   "args": {
                     "properties": {
+                      "appVersion": {
+                        "type": "string"
+                      },
                       "deviceId": {
                         "description": "Id<\"devices\">",
                         "type": "string",

@@ -699,6 +699,8 @@ export const schema = defineSchema({
         // The (agent, folder) pairs the user approved for coding agents, from the signed manifest
         // (`updateDeviceManifest`); unset until a shell that knows coding agents has sent one.
         acpOffers: v.optional(v.array(vAcpOffer)),
+        // The desktop app's version, as the page relayed it beside the last manifest. Unsigned and display-only.
+        appVersion: v.optional(v.string()),
         createdAt: v.number(),
         encryptedSecret: v.optional(v.string()),
         // The wire protocol the computer's signed manifest reported (`MIN_DEVICE_PROTOCOL`); unset until a build that reports it has sent one.

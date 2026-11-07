@@ -396,6 +396,7 @@ export interface Doc_devices {
     _id: Id<"devices">;
     _creationTime: number;
     acpOffers?: Array<{ agentKey: string; agentLabel: string; folderId: string; folderLabel: string }>;
+    appVersion?: string;
     createdAt: number;
     encryptedSecret?: string;
     hostProtocol?: number;
@@ -3458,6 +3459,7 @@ export interface Insert_devices {
     _id?: Id<"devices">;
     _creationTime?: number;
     acpOffers?: Array<{ agentKey: string; agentLabel: string; folderId: string; folderLabel: string }>;
+    appVersion?: string;
     createdAt: number;
     encryptedSecret?: string;
     hostProtocol?: number;
