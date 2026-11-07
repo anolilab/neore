@@ -152,7 +152,8 @@ const projectThread = (
         createdAt: thread._creationTime,
         lastViewedAt: thread.lastViewedAt,
         model: thread.model,
-        // When the owner chose the current snooze, by the client's clock (`chat/thread-state.ts`). Unset when nothing was chosen.
+        // When the owner chose the current snooze, by the client's clock (`chat/thread-state.ts`). Unset when nothing was chosen. A wake
+        // records its time here too, even with nothing snoozed (`agent/table-writes.ts#patchThread`).
         snoozeChosenAt: thread.snoozeChosenAt,
         snoozedUntil: thread.snoozedUntil,
         summary: thread.summary,
@@ -214,6 +215,10 @@ export const collectConversations = internalAction.input({ userId: v.string() })
             category?: string;
             createdAt: number;
             model?: string;
+            /** The owner's choice time, or a wake's, for the snooze ordering (see `projectThread`). */
+            snoozeChosenAt?: number;
+            /** The time the thread is snoozed until, if it is. */
+            snoozedUntil?: number;
             summary?: string;
             tags?: string[];
             title?: string;

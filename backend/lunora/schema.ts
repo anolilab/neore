@@ -3046,7 +3046,9 @@ export const schema = defineSchema({
         // device. Unset = the cloud. Set at creation, never changed.
         runner: v.optional(v.literal("host")),
         // When the owner chose the current snooze or unsnooze, by the client's clock. A queued write carries the time it was made with,
-        // so one chosen earlier than this never replaces it (`agent/table-writes.ts#setThreadSnooze`).
+        // so one chosen earlier than this never replaces it (`agent/table-writes.ts#setThreadSnooze`). A wake (a failed run, or one that
+        // waits on the owner) records its time here too, even with nothing snoozed, so a snooze chosen before it cannot hide the thread
+        // again (`agent/table-writes.ts#patchThread`).
         snoozeChosenAt: v.optional(v.number()),
         // Hidden from the owner's active list until then; written only by `chat/thread-state.ts`.
         snoozedUntil: v.optional(v.number()),

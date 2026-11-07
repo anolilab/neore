@@ -65,7 +65,8 @@ export const applySnoozeChoice = async (
 /**
  * Hides the thread from the owner's active list until `until`. The choice time is required: a request without it is refused with a
  * validation error, rather than applied or silently ignored, so an older client cannot erase a newer choice's ordering unnoticed.
- * Returns whether the snooze applied; a choice the thread already has a newer one for is dropped, and says so.
+ * Returns whether the snooze applied; a choice the thread already has a newer one for is dropped, and says so. A wake (a failed run, or one
+ * that waits on the owner) also records its time as the ordering, so a choice made before the wake is dropped too.
  */
 export const snoozeThread = authMutation
     .use(rateLimit("chat/update"))

@@ -711,7 +711,8 @@ export const vThreadDocFields = {
     // Written once by `acp/ingest.ts` when a host session opens, so deliberately not a create field: a client
     // that could set it could mint a host thread, or turn a cloud thread into one.
     runner: v.optional(v.literal("host")),
-    // The owner's choice time of the current snooze, written with it (`agent/table-writes.ts#setThreadSnooze`).
+    // The owner's choice time of the current snooze, written with it (`agent/table-writes.ts#setThreadSnooze`). A wake writes its time
+    // here as well, even with nothing snoozed (`agent/table-writes.ts#patchThread`).
     snoozeChosenAt: v.optional(v.number()),
     // Written only by `chat/thread-state.ts` (snooze / unsnooze), which checks the caller owns the thread.
     snoozedUntil: v.optional(v.number()),
