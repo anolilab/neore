@@ -38,6 +38,20 @@ describe(fingerprintMcpTool, () => {
         expect(await fingerprintMcpTool(mcpTool({ ...two, required: ["limit", "query"] }), SOURCE)).toBe(await fingerprintMcpTool(mcpTool(two), SOURCE));
     });
 
+    it("is the same when a server lists an enum's values in another order", async () => {
+        const sorted: JSONSchema7 = { ...SEARCH_SCHEMA, properties: { scope: { enum: ["docs", "issues", "code"], type: "string" } } };
+        const shuffled: JSONSchema7 = { ...SEARCH_SCHEMA, properties: { scope: { enum: ["code", "docs", "issues"], type: "string" } } };
+
+        expect(await fingerprintMcpTool(mcpTool(shuffled), SOURCE)).toBe(await fingerprintMcpTool(mcpTool(sorted), SOURCE));
+    });
+
+    it("changes when a connector's tool now goes to another address", async () => {
+        const tool = mcpTool(SEARCH_SCHEMA);
+        const connector = { ...SOURCE, connectorSlug: "notion" };
+
+        expect(await fingerprintMcpTool(tool, { ...connector, url: "https://elsewhere.example.com/mcp" })).not.toBe(await fingerprintMcpTool(tool, connector));
+    });
+
     it("is the same when only the annotations' display title changes", async () => {
         const tool = mcpTool(SEARCH_SCHEMA);
         const titled = (title: string) => {

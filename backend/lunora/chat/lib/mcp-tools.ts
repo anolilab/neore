@@ -266,7 +266,7 @@ export const getMCPTools = async (servers: MCPServerConfig[], { progress }: GetM
 
     const tools: ToolSet = {};
     const taken = { has: (name: string) => Object.hasOwn(tools, name) };
-    const listed: { runtimeName: string; source: Omit<MCPToolDescriptor, "fingerprint">; tool: Tool }[] = [];
+    const listed: { fingerprint: () => Promise<string>; runtimeName: string; source: Omit<MCPToolDescriptor, "fingerprint"> }[] = [];
     const clients: MCPClient[] = [];
     const errors: { error: string; serverName: string }[] = [];
 
@@ -282,16 +282,43 @@ export const getMCPTools = async (servers: MCPServerConfig[], { progress }: GetM
 
             clients.push(client);
 
+            const firstPrints = new Map<string, Promise<string>>();
+
+            // What a tool of this server is, hashed from the tool as its server listed it (`mcp-tool-fingerprint.ts`).
+            const identify = async (toolName: string, tool: Tool): Promise<string> => {
+                const annotations = readMcpAnnotations(tool);
+
+                return await fingerprintMcpTool(tool, {
+                    ...(annotations && { annotations }),
+                    ...(server.connectorSlug && { connectorSlug: server.connectorSlug }),
+                    serverName: server.name,
+                    toolName,
+                    url: server.url,
+                });
+            };
+
             // Mid-run 401 → one refresh and one fresh client for the whole
             // server, which joins `clients` so the caller's `closeMCPClients`
-            // closes it too.
-            const session = createAuthRetrySession(server, serverTools, async (config) => {
-                const retry = await connectOnce(config, 10_000);
+            // closes it too. A retry runs only a tool the reconnect lists unchanged.
+            const session = createAuthRetrySession(
+                server,
+                serverTools,
+                async (config) => {
+                    const retry = await connectOnce(config, 10_000);
 
-                clients.push(retry.client);
+                    clients.push(retry.client);
 
-                return retry;
-            });
+                    return retry;
+                },
+                async (toolName, first, relisted) => {
+                    // The first listing is hashed once per tool; every call after a reconnect is checked against it.
+                    const firstPrint = firstPrints.get(toolName) ?? identify(toolName, first);
+
+                    firstPrints.set(toolName, firstPrint);
+
+                    return (await identify(toolName, relisted)) === (await firstPrint);
+                },
+            );
 
             for (const [toolName, tool] of Object.entries(serverTools)) {
                 const runtimeName = mcpRuntimeToolName(server.name, toolName, taken);
@@ -301,6 +328,7 @@ export const getMCPTools = async (servers: MCPServerConfig[], { progress }: GetM
 
                 tools[runtimeName] = progress ? withProgress(wrapped, { serverName: server.name, toolName }, progress) : wrapped;
                 listed.push({
+                    fingerprint: async () => await identify(toolName, tool),
                     runtimeName,
                     source: {
                         ...(annotations && { annotations }),
@@ -309,7 +337,6 @@ export const getMCPTools = async (servers: MCPServerConfig[], { progress }: GetM
                         toolName,
                         ...(!server.connectorSlug && { url: server.url }),
                     },
-                    tool,
                 });
             }
         } else {
@@ -319,11 +346,12 @@ export const getMCPTools = async (servers: MCPServerConfig[], { progress }: GetM
         }
     }
 
-    // Hashed from the tool as its server listed it, before any wrapper. A tool that cannot be hashed keeps working, unpinned.
+    // Hashed from the tool as its server listed it, before any wrapper. A tool that cannot be hashed keeps working, unpinned,
+    // until a reconnect: a retry on it is refused, since nothing can show it is unchanged (`createAuthRetrySession`).
     const fingerprints = await Promise.all(
         listed.map(
-            async ({ source, tool }) =>
-                await fingerprintMcpTool(tool, source).catch((error: unknown) => {
+            async ({ fingerprint, source }) =>
+                await fingerprint().catch((error: unknown) => {
                     toolsLogger.warn(`[MCP] Could not fingerprint "${source.toolName}" of "${source.serverName}":`, error);
 
                     return undefined;

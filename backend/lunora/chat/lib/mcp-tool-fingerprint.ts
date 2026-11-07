@@ -31,6 +31,11 @@ const sortedKeys = (field: string, value: unknown): unknown => {
         return (value as string[]).toSorted(byCodeUnit);
     }
 
+    // The allowed values of an `enum` are a set too.
+    if (field === "enum" && Array.isArray(value)) {
+        return value.toSorted((a: unknown, b: unknown) => byCodeUnit(JSON.stringify(a), JSON.stringify(b)));
+    }
+
     if (!value || typeof value !== "object" || Array.isArray(value)) {
         return value;
     }
@@ -59,8 +64,8 @@ export interface FingerprintedTool {
     connectorSlug?: string;
     serverName: string;
     toolName: string;
-    /** The saved server's address, for a server that is not a connector. */
-    url?: string;
+    /** Where the tool's calls go, a connector's included: the same tool behind another address is another tool. */
+    url: string;
 }
 
 /** The fingerprint of one MCP tool as `getMCPTools` received it from its server. */
@@ -75,7 +80,7 @@ export const fingerprintMcpTool = async (tool: ToolSet[string], source: Fingerpr
             readOnlyHint: hints.readOnlyHint ?? null,
         },
         input: await inputJsonSchema(tool),
-        server: source.connectorSlug === undefined ? { name: source.serverName, url: source.url ?? null } : { connector: source.connectorSlug },
+        server: source.connectorSlug === undefined ? { name: source.serverName, url: source.url } : { connector: source.connectorSlug, url: source.url },
         tool: source.toolName,
     });
     const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(identity));
