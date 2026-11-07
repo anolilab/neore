@@ -259,6 +259,8 @@ export const abortActiveForThread = internalMutation
 
 export const abort = internalMutation
     .input({
+        /** The generation failed (not a stop or a retry): a snoozed thread wakes, as it does for a run that fails in place. */
+        failed: v.optional(v.boolean()),
         finalDelta: v.optional(v.object({ ...streamDeltasFields })),
         reason: v.string(),
         streamId: v.id("streamingMessages"),
@@ -269,6 +271,7 @@ export const abort = internalMutation
 async function abortById(
     context: MutationContext,
     args: {
+        failed?: boolean;
         finalDelta?: Omit<Doc<"streamDeltas">, "_creationTime" | "_id">;
         reason: string;
         streamId: Id<"streamingMessages">;
@@ -294,7 +297,7 @@ async function abortById(
         stateKind: "aborted",
     });
 
-    await updateThreadStatusAfterStreamEnd(context, innerStream.threadId, "abort");
+    await updateThreadStatusAfterStreamEnd(context, innerStream.threadId, args.failed === true ? "error" : "abort");
 
     return true;
 }

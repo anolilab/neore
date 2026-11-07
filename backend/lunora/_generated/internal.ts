@@ -164,7 +164,7 @@ export interface InternalApiTypes {
             updateThreadInvite: FunctionReference<"mutation", { acceptedAt?: number; acceptedBy?: string; inviteId: Id<"threadInvites">; status?: "pending" | "accepted" | "expired" | "revoked" }, null>;
         };
         streams: {
-            abort: FunctionReference<"mutation", { finalDelta?: { end: number; parts: Array<unknown>; start: number; streamId: Id<"streamingMessages"> }; reason: string; streamId: Id<"streamingMessages"> }, boolean>;
+            abort: FunctionReference<"mutation", { failed?: boolean; finalDelta?: { end: number; parts: Array<unknown>; start: number; streamId: Id<"streamingMessages"> }; reason: string; streamId: Id<"streamingMessages"> }, boolean>;
             abortActiveForThread: FunctionReference<"mutation", { threadId: Id<"threads"> }, boolean>;
             abortByOrder: FunctionReference<"mutation", { order: number; reason: string; threadId: Id<"threads"> }, boolean>;
             addDelta: FunctionReference<"mutation", { end: number; parts: Array<unknown>; start: number; streamId: Id<"streamingMessages"> }, boolean>;

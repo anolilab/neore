@@ -303,7 +303,16 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
         const startedAt = Date.now();
         // A fresh context reads no recent rows; with none read, no thread summary is added either (`agent/client/search.ts`).
         const callOptions = options.freshContext ? { contextOptions: { recentMessages: 0 } } : undefined;
-        const result = await thread.generateText(generateArgs as never, callOptions);
+        const result = await thread.generateText(generateArgs as never, callOptions).catch(async (error: unknown) => {
+            // A run that continues a thread and fails wakes it if the owner snoozed it, as a chat run that fails does.
+            if (existingThreadId !== undefined) {
+                await ctx
+                    .runMutation(internal.agent.threads.updateThread, { failed: true, patch: {}, threadId: threadId as Id<"threads"> })
+                    .catch(() => undefined);
+            }
+
+            throw error;
+        });
         const text = result.text ?? "";
 
         const finishedAt = Date.now();
