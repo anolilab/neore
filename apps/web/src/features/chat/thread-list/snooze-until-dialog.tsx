@@ -4,7 +4,7 @@ import { Input } from "@neore/ui/components/input";
 import { Label } from "@neore/ui/components/label";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@neore/ui/components/responsive-dialog";
 import type { FormEvent } from "react";
-import { useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 
 import { useThreadStateActions } from "./hooks/use-thread-state-actions";
@@ -12,6 +12,9 @@ import { customSnoozeCheck } from "./lib/thread-state-rules";
 import { useThreadListUIStore } from "./stores/thread-list-ui-store";
 
 const HOUR_MS = 60 * 60 * 1000;
+
+/** The focus return a closed dialog scheduled, if it has not run yet (see `SnoozeUntilDialog`). */
+const pendingFocusReturn: { timer?: ReturnType<typeof globalThis.setTimeout> } = {};
 
 /**
  * Closes the snooze dialog, but only while it is still open for `threadId`. A save that finishes after the owner opened another
@@ -23,6 +26,17 @@ export const closeSnoozeDialogFor = (threadId: string): void => {
     if (snoozeThreadId === threadId) {
         setSnoozeThreadId(null);
     }
+};
+
+/**
+ * The thread's row inside the list, the focus target once its snooze dialog closes. A snoozed row can have moved out of the
+ * active groups, so the list itself is the fallback.
+ */
+export const threadRowFocusTarget = (list: HTMLElement | null, threadId: string): HTMLElement | null => {
+    const rows = [...(list?.querySelectorAll<HTMLElement>("[data-thread-id]") ?? [])];
+    const row = rows.find((element) => element.dataset.threadId === threadId && element.getAttribute("role") === "button");
+
+    return row ?? list;
 };
 
 /** The local `YYYY-MM-DDTHH:mm` a `datetime-local` input takes, for a time. */
@@ -40,8 +54,8 @@ interface SnoozeUntilDialogProps {
     previousUntil: number | undefined;
 
     /**
-     * Where focus goes when the dialog closes. The list, not the control that opened the dialog: that was a menu item, which is
-     * gone once the menu closes, and the save may move the row out of the list as well.
+     * Where focus goes when the dialog closes: the thread's row (`threadRowFocusTarget`). Not the control that opened the dialog,
+     * which was a menu item and is gone once the menu closes.
      */
     returnFocusTo: () => HTMLElement | null;
     threadId: string;
@@ -57,6 +71,28 @@ const SnoozeUntilDialog = ({ onOpenChange, open, previousUntil, returnFocusTo, t
     const [error, setError] = useState<string | null>(null);
     const [saving, setSaving] = useState(false);
     const submitReference = useRef<HTMLButtonElement>(null);
+    const [returnFocus] = useState(() => returnFocusTo);
+
+    // A focus return still pending from a dialog that just closed must not take focus from this one.
+    useEffect(() => {
+        globalThis.clearTimeout(pendingFocusReturn.timer);
+    }, []);
+
+    // Focus goes back to the thread once the dialog is gone, on desktop and on mobile alike. This is not `finalFocus`: the mobile drawer
+    // drops that prop, which is why focus was lost there. Skipped when another thread's dialog has opened: the store names it, and its
+    // focus is its own (this also covers a StrictMode mount, which unmounts once while the dialog is open).
+    useEffect(
+        () => () => {
+            if (useThreadListUIStore.getState().snoozeThreadId !== null) {
+                return;
+            }
+
+            pendingFocusReturn.timer = globalThis.setTimeout(() => {
+                returnFocus()?.focus();
+            }, 0);
+        },
+        [returnFocus],
+    );
 
     // The dialog closes once the snooze is saved. A failure (offline included) keeps the chosen time here, with the error, and the
     // dialog stays cancellable: Cancel and Escape never wait on the save.
@@ -98,7 +134,7 @@ const SnoozeUntilDialog = ({ onOpenChange, open, previousUntil, returnFocusTo, t
     // The dialog is mounted only while it is open, so each opening starts from a fresh default time.
     return (
         <Dialog onOpenChange={onOpenChange} open={open}>
-            <DialogContent className="sm:max-w-sm" finalFocus={returnFocusTo}>
+            <DialogContent className="sm:max-w-sm">
                 <DialogHeader>
                     <DialogTitle>{t`Snooze until`}</DialogTitle>
                     <DialogDescription>{t`The thread leaves your active list until then. An approval, a question or a failed run brings it back sooner.`}</DialogDescription>

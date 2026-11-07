@@ -338,6 +338,40 @@ describe("snooze and unsnooze", () => {
         await as(OWNER).mutation(unsnoozeThread as never, { threadId } as never);
     });
 
+    it("a queued preset or undo chosen before the latest choice does not replace it", async () => {
+        const now = Date.now();
+        const presetChosenAt = now - 60_000;
+        const customChosenAt = now - 1000;
+        const customUntil = now + 3 * DAY;
+
+        // The owner comes online and picks a custom time; the earlier preset, queued while offline, drains afterwards.
+        await as(OWNER).mutation(snoozeThread as never, { chosenAt: customChosenAt, threadId, until: customUntil } as never);
+        await as(OWNER).mutation(snoozeThread as never, { chosenAt: presetChosenAt, threadId, until: now + DAY } as never);
+        await as(OWNER).mutation(unsnoozeThread as never, { chosenAt: presetChosenAt, threadId } as never);
+
+        expect(await read()).toMatchObject({ snoozeChosenAt: customChosenAt, snoozedUntil: customUntil });
+    });
+
+    it("a stale queued preset whose time has passed is dropped without an error", async () => {
+        const now = Date.now();
+
+        await as(OWNER).mutation(snoozeThread as never, { chosenAt: now - 1000, threadId, until: now + DAY } as never);
+
+        await expect(as(OWNER).mutation(snoozeThread as never, { chosenAt: now - 60_000, threadId, until: now - 1000 } as never)).resolves.toBeNull();
+        expect(await read()).toMatchObject({ snoozedUntil: now + DAY });
+    });
+
+    it("a newer choice replaces the snooze, and a write with no choice time applies as before", async () => {
+        const now = Date.now();
+
+        await as(OWNER).mutation(snoozeThread as never, { chosenAt: now - 5000, threadId, until: now + DAY } as never);
+        await as(OWNER).mutation(snoozeThread as never, { chosenAt: now - 1000, threadId, until: now + 2 * DAY } as never);
+        expect(await read()).toMatchObject({ snoozedUntil: now + 2 * DAY });
+
+        await as(OWNER).mutation(snoozeThread as never, { threadId, until: now + 5 * DAY } as never);
+        expect(await read()).toMatchObject({ snoozedUntil: now + 5 * DAY });
+    });
+
     it("rejects a past time or one beyond 366 days, and any non-owner", async () => {
         await expect(as(OWNER).mutation(snoozeThread as never, { threadId, until: Date.now() - 1000 } as never)).rejects.toThrow();
         await expect(as(OWNER).mutation(snoozeThread as never, { threadId, until: Date.now() + 400 * DAY } as never)).rejects.toThrow();

@@ -9,7 +9,7 @@ import { showError, showSuccess } from "@/lib/toast";
 import type { SnoozeChoice } from "../lib/thread-state-rules";
 import { isSnoozed, snoozeUntil } from "../lib/thread-state-rules";
 
-type SnoozeMutate = (variables: { threadId: Id<"threads">; until: number }) => Promise<unknown>;
+type SnoozeMutate = (variables: { chosenAt: number; threadId: Id<"threads">; until: number }) => Promise<unknown>;
 
 interface ThreadStateActions {
     /** Hides the thread until the choice's time; the toast offers an undo that restores the previous snooze, if any. */
@@ -41,10 +41,12 @@ export const useThreadStateActions = (): ThreadStateActions => {
 
     const restore = useCallback(
         (threadId: string, previousUntil: number | undefined) => {
+            // Undo is a choice made now: it is stamped now, so a snooze queued before it cannot bring back a newer one.
+            const chosenAt = Date.now();
             const request =
-                previousUntil !== undefined && isSnoozed(previousUntil, Date.now())
-                    ? snoozeMutation({ threadId: threadId as Id<"threads">, until: previousUntil })
-                    : unsnoozeMutation({ threadId: threadId as Id<"threads"> });
+                previousUntil !== undefined && isSnoozed(previousUntil, chosenAt)
+                    ? snoozeMutation({ chosenAt, threadId: threadId as Id<"threads">, until: previousUntil })
+                    : unsnoozeMutation({ chosenAt, threadId: threadId as Id<"threads"> });
 
             request.catch((error) => {
                 console.error("Failed to restore the snooze:", error);
@@ -54,9 +56,11 @@ export const useThreadStateActions = (): ThreadStateActions => {
         [snoozeMutation, unsnoozeMutation, t],
     );
 
+    // The choice is stamped when the user makes it, not when the write is sent: a write queued offline keeps that time, so a choice
+    // made later on the thread wins when the queue drains.
     const save = useCallback(
         (mutate: SnoozeMutate, threadId: string, until: number, previousUntil: number | undefined): Promise<boolean> =>
-            mutate({ threadId: threadId as Id<"threads">, until })
+            mutate({ chosenAt: Date.now(), threadId: threadId as Id<"threads">, until })
                 .then(() => {
                     const when = new Date(until).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
 
@@ -87,7 +91,7 @@ export const useThreadStateActions = (): ThreadStateActions => {
 
     const unsnooze = useCallback(
         (threadId: string, previousUntil: number | undefined) => {
-            unsnoozeMutation({ threadId: threadId as Id<"threads"> })
+            unsnoozeMutation({ chosenAt: Date.now(), threadId: threadId as Id<"threads"> })
                 .then(() => {
                     showSuccess(t`Thread unsnoozed`, { action: { label: t`Undo`, onClick: () => restore(threadId, previousUntil) } });
 

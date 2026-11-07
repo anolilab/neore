@@ -139,17 +139,30 @@ export const markThreadViewedAt = async (db: Database, thread: Doc<"threads">, n
     return true;
 };
 
-/** Snoozes the thread until `until`; `undefined` removes the column. Leaves `updatedAt` alone. */
-export const setThreadSnooze = async (db: Database, thread: Doc<"threads">, until: number | undefined): Promise<void> => {
+/**
+ * Sets the thread's snooze: `until`, or `undefined` to bring it back. Leaves `updatedAt` alone.
+ *
+ * `chosenAt` is when the owner made the choice, by the client's clock. A write made offline is queued and sent later, so one
+ * chosen earlier than the thread's latest choice is stale and changes nothing: the newest choice stands. Writes without a
+ * `chosenAt` (from clients that do not send one) are applied as before.
+ */
+export const isStaleSnoozeChoice = (thread: Pick<Doc<"threads">, "snoozeChosenAt">, chosenAt: number | undefined): boolean =>
+    chosenAt !== undefined && thread.snoozeChosenAt !== undefined && chosenAt < thread.snoozeChosenAt;
+
+export const setThreadSnooze = async (db: Database, thread: Doc<"threads">, until: number | undefined, chosenAt?: number): Promise<void> => {
+    if (isStaleSnoozeChoice(thread, chosenAt)) {
+        return;
+    }
+
     if (until === undefined) {
-        if (thread.snoozedUntil !== undefined) {
-            await patchRow(db, "threads", thread, { snoozedUntil: undefined });
+        if (thread.snoozedUntil !== undefined || thread.snoozeChosenAt !== chosenAt) {
+            await patchRow(db, "threads", thread, { snoozeChosenAt: chosenAt, snoozedUntil: undefined });
         }
 
         return;
     }
 
-    await db.patch("threads", thread._id, { snoozedUntil: until });
+    await patchRow(db, "threads", thread, { snoozeChosenAt: chosenAt, snoozedUntil: until });
 };
 
 /**

@@ -18330,6 +18330,9 @@
                       "snoozedUntil": {
                         "type": "number"
                       },
+                      "snoozeChosenAt": {
+                        "type": "number"
+                      },
                       "status": {
                         "anyOf": [
                           {
@@ -25812,6 +25815,9 @@
                 "properties": {
                   "args": {
                     "properties": {
+                      "chosenAt": {
+                        "type": "number"
+                      },
                       "threadId": {
                         "description": "Id<\"threads\">",
                         "type": "string",
@@ -25879,6 +25885,9 @@
                 "properties": {
                   "args": {
                     "properties": {
+                      "chosenAt": {
+                        "type": "number"
+                      },
                       "threadId": {
                         "description": "Id<\"threads\">",
                         "type": "string",

@@ -32,7 +32,7 @@ import useKeyboardNavigation from "./hooks/use-keyboard-navigation";
 import useThreadGroups from "./hooks/use-thread-groups";
 import useThreadHandlers from "./hooks/use-thread-handlers";
 import useThreadListKeyboard from "./hooks/use-thread-list-keyboard";
-import SnoozeUntilDialog, { closeSnoozeDialogFor } from "./snooze-until-dialog";
+import SnoozeUntilDialog, { closeSnoozeDialogFor, threadRowFocusTarget } from "./snooze-until-dialog";
 import SortableThreadItem from "./sortable-thread-item";
 import { useThreadListUIStore } from "./stores/thread-list-ui-store";
 import type { BranchNode, GroupType, HierarchicalThreadListProperties, MinimalThreadRelationship, ThreadGroup } from "./types";
@@ -1334,7 +1334,7 @@ const HierarchicalThreadList: FC<
                         }}
                         open
                         previousUntil={snoozeThread.snoozedUntil}
-                        returnFocusTo={() => listReference.current}
+                        returnFocusTo={() => threadRowFocusTarget(listReference.current, snoozeThread.threadId)}
                         threadId={snoozeThread.threadId}
                     />
                 )}

@@ -121,6 +121,7 @@ describe("snoozing while offline", () => {
     afterEach(() => {
         onlineManager.setOnline(true);
         client.clear();
+        vi.restoreAllMocks();
     });
 
     it("refuses a custom time at once, and no snooze is written once the connection returns", async () => {
@@ -154,5 +155,31 @@ describe("snoozing while offline", () => {
             expect(server.written).toHaveLength(1);
         });
         expect(server.written[0]).toMatchObject({ threadId: "t1" });
+    });
+
+    it("a preset queued offline keeps the time it was chosen at, so a custom time chosen later is not replaced when the queue drains", async () => {
+        const choseEarlier = 1_000_000;
+        const choseLater = 2_000_000;
+        const clock = vi.spyOn(Date, "now");
+
+        goOffline();
+        clock.mockReturnValue(choseEarlier);
+        const { result } = renderHook(() => useThreadStateActions(), { wrapper });
+
+        act(() => {
+            result.current.snooze("t1", "hour", undefined);
+        });
+        await flush();
+
+        // Back online, the custom time is sent first; the preset queued before it drains after.
+        server.online = true;
+        clock.mockReturnValue(choseLater);
+        await expect(result.current.snoozeAt("t1", UNTIL, undefined)).resolves.toBe(true);
+        onlineManager.setOnline(true);
+
+        await waitFor(() => {
+            expect(server.written).toHaveLength(2);
+        });
+        expect(server.written.map((args) => (args as { chosenAt: number }).chosenAt)).toEqual([choseLater, choseEarlier]);
     });
 });

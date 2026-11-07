@@ -52,7 +52,7 @@ export const publicThread = (thread: Doc<"threads">): ThreadDoc => {
  * Unread, snooze and "needs you" belong to the thread's OWNER; the row is shared with grantees, who must not see
  * (or act on) them. Reads that can reach a grantee return the row through here.
  */
-const OWNER_STATE_KEYS = ["awaitingInput", "lastReplyAt", "lastViewedAt", "snoozedUntil"] as const;
+const OWNER_STATE_KEYS = ["awaitingInput", "lastReplyAt", "lastViewedAt", "snoozedUntil", "snoozeChosenAt"] as const;
 
 export const threadForViewer = (thread: Doc<"threads">, viewerId: string | undefined): ThreadDoc => {
     const isOwner = thread.userId !== undefined && thread.userId === viewerId;

@@ -1620,6 +1620,7 @@ export const threads = sqliteTable("threads", {
     reasoningEffort: real("reasoningEffort"),
     runner: text("runner"),
     snoozedUntil: real("snoozedUntil"),
+    snoozeChosenAt: real("snoozeChosenAt"),
     source: text("source"),
     statelessMode: integer("statelessMode", { mode: "boolean" }),
     status: text("status").notNull(),

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useThreadListUIStore } from "./stores/thread-list-ui-store";
@@ -35,7 +35,7 @@ vi.mock("@neore/ui/components/responsive-dialog", () => {
     return { Dialog: Box, DialogContent: Box, DialogDescription: Box, DialogFooter: Box, DialogHeader: Box, DialogTitle: Box };
 });
 
-const { default: SnoozeUntilDialog, closeSnoozeDialogFor } = await import("./snooze-until-dialog");
+const { default: SnoozeUntilDialog, closeSnoozeDialogFor, threadRowFocusTarget } = await import("./snooze-until-dialog");
 
 const mountDialog = (): ReturnType<typeof vi.fn> => {
     const onOpenChange = vi.fn();
@@ -125,11 +125,23 @@ const ListDialogs = () => {
             }}
             open
             previousUntil={undefined}
-            returnFocusTo={() => null}
+            returnFocusTo={() => threadRowFocusTarget(document.body, threadId)}
             threadId={threadId}
         />
     );
 };
+
+/** The list's rows, which the dialog returns focus to. */
+const ListRows = () => (
+    <>
+        <div data-thread-id="thread-a" role="button" tabIndex={0}>
+            Thread A
+        </div>
+        <div data-thread-id="thread-b" role="button" tabIndex={0}>
+            Thread B
+        </div>
+    </>
+);
 
 describe("the list's snooze dialog across threads", () => {
     beforeEach(() => {
@@ -138,24 +150,28 @@ describe("the list's snooze dialog across threads", () => {
     });
 
     it("a save for thread A that finishes after thread B's dialog opened leaves B's dialog open", async () => {
-        // A's save stays in flight until the test releases it, after B's dialog has opened.
+        // A's save stays in flight until the test releases it, after B's dialog has opened. The save waits on a condition the test
+        // sets, not on a delay, so a slow run cannot let it settle early.
         let released = false;
+        let saveSettled = false;
 
-        state.snoozeAt.mockImplementationOnce(
-            async () =>
-                await new Promise<boolean>((resolve) => {
-                    const poll = setInterval(() => {
-                        if (!released) {
-                            return;
-                        }
+        state.snoozeAt.mockImplementationOnce(async () => {
+            await vi.waitFor(() => {
+                if (!released) {
+                    throw new Error("A's save is still in flight");
+                }
+            });
+            saveSettled = true;
 
-                        clearInterval(poll);
-                        resolve(true);
-                    }, 5);
-                }),
-        );
+            return true;
+        });
         useThreadListUIStore.getState().setSnoozeThreadId("thread-a");
-        render(<ListDialogs />);
+        render(
+            <>
+                <ListRows />
+                <ListDialogs />
+            </>,
+        );
 
         fireEvent.click(screen.getByRole("button", { name: "Snooze" }));
         expect(await screen.findByText("Saving…")).toBeTruthy();
@@ -166,11 +182,9 @@ describe("the list's snooze dialog across threads", () => {
         });
 
         released = true;
-
-        await act(async () => {
-            await new Promise<void>((resolve) => {
-                setTimeout(resolve, 50);
-            });
+        // The save has settled, and the dialog's close after it has run, once this poll sees it: it polls after the microtasks.
+        await vi.waitFor(() => {
+            expect(saveSettled).toBe(true);
         });
 
         expect(useThreadListUIStore.getState().snoozeThreadId).toBe("thread-b");
@@ -180,14 +194,73 @@ describe("the list's snooze dialog across threads", () => {
     it("a save that finishes for the thread still open closes its dialog", async () => {
         state.snoozeAt.mockResolvedValueOnce(true);
         useThreadListUIStore.getState().setSnoozeThreadId("thread-a");
-        render(<ListDialogs />);
+        render(
+            <>
+                <ListRows />
+                <ListDialogs />
+            </>,
+        );
 
         fireEvent.click(screen.getByRole("button", { name: "Snooze" }));
 
-        await act(async () => {
-            await Promise.resolve();
+        await waitFor(() => {
+            expect(useThreadListUIStore.getState().snoozeThreadId).toBeNull();
         });
+    });
 
-        expect(useThreadListUIStore.getState().snoozeThreadId).toBeNull();
+    it("returns focus to the thread's row once a save closes the dialog", async () => {
+        state.snoozeAt.mockResolvedValueOnce(true);
+        useThreadListUIStore.getState().setSnoozeThreadId("thread-a");
+        render(
+            <>
+                <ListRows />
+                <ListDialogs />
+            </>,
+        );
+
+        fireEvent.click(screen.getByRole("button", { name: "Snooze" }));
+
+        await waitFor(() => {
+            expect(useThreadListUIStore.getState().snoozeThreadId).toBeNull();
+        });
+        // The focus return is a timer after the dialog unmounts: wait for the condition, not a delay.
+        await waitFor(() => {
+            // eslint-disable-next-line testing-library/no-node-access -- focus placement is what this asserts
+            expect(document.activeElement).toBe(screen.getByRole("button", { name: "Thread A" }));
+        });
+    });
+
+    it("returns focus to the thread's row when the dialog is cancelled", async () => {
+        useThreadListUIStore.getState().setSnoozeThreadId("thread-b");
+        render(
+            <>
+                <ListRows />
+                <ListDialogs />
+            </>,
+        );
+
+        fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+        await waitFor(() => {
+            // eslint-disable-next-line testing-library/no-node-access -- focus placement is what this asserts
+            expect(document.activeElement).toBe(screen.getByRole("button", { name: "Thread B" }));
+        });
+    });
+});
+
+describe("threadRowFocusTarget", () => {
+    it("is the thread's row, or the list when the row has moved out of it", () => {
+        render(
+            <div data-testid="list">
+                <div data-thread-id="thread-a" role="button" tabIndex={0}>
+                    Thread A
+                </div>
+            </div>,
+        );
+        const list = screen.getByTestId("list");
+
+        expect(threadRowFocusTarget(list, "thread-a")).toBe(screen.getByRole("button", { name: "Thread A" }));
+        expect(threadRowFocusTarget(list, "thread-gone")).toBe(list);
+        expect(threadRowFocusTarget(null, "thread-a")).toBeNull();
     });
 });

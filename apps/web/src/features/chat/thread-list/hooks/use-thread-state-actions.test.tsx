@@ -101,7 +101,7 @@ describe("useThreadStateActions", () => {
         toasts[0]?.options?.action?.onClick();
         await flush();
 
-        expect(calls[1]).toEqual({ args: { threadId: "t1" }, fn: "unsnooze" });
+        expect(calls[1]).toMatchObject({ args: { threadId: "t1" }, fn: "unsnooze" });
     });
 
     it("undoes a snooze back to the earlier wake time", async () => {
@@ -113,7 +113,7 @@ describe("useThreadStateActions", () => {
         toasts[0]?.options?.action?.onClick();
         await flush();
 
-        expect(calls[1]).toEqual({ args: { threadId: "t1", until: earlier }, fn: "snooze" });
+        expect(calls[1]).toMatchObject({ args: { threadId: "t1", until: earlier }, fn: "snooze" });
     });
 
     it("unsnoozes, and undo snoozes it again until the same time", async () => {
@@ -123,11 +123,11 @@ describe("useThreadStateActions", () => {
         result.current.unsnooze("t1", until);
         await flush();
 
-        expect(calls[0]).toEqual({ args: { threadId: "t1" }, fn: "unsnooze" });
+        expect(calls[0]).toMatchObject({ args: { threadId: "t1" }, fn: "unsnooze" });
 
         toasts[0]?.options?.action?.onClick();
         await flush();
 
-        expect(calls[1]).toEqual({ args: { threadId: "t1", until }, fn: "snooze" });
+        expect(calls[1]).toMatchObject({ args: { threadId: "t1", until }, fn: "snooze" });
     });
 });
