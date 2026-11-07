@@ -39,6 +39,18 @@ vi.mock("../lib/rate-limiter", async (importOriginal) => {
     };
 });
 
+// `projects` is a `.global()` table the harness cannot write: what the caller may read and file into is set here.
+const { projectAccess } = vi.hoisted(() => {
+    return { projectAccess: new Map<string, "read" | "write">() };
+});
+
+vi.mock("../projects/functions", () => {
+    return {
+        readableProject: async (_ctx: unknown, projectId: string) => (projectAccess.has(projectId) ? { _id: projectId } : null),
+        writableProject: async (_ctx: unknown, projectId: string) => (projectAccess.get(projectId) === "write" ? { _id: projectId } : null),
+    };
+});
+
 vi.mock("../auth/lib/better-auth-queries", async (importOriginal) => {
     return {
         ...(await importOriginal<typeof import("../auth/lib/better-auth-queries")>()),
@@ -69,6 +81,7 @@ beforeEach(() => {
     users.clear();
     users.set(USER, {});
     users.set(GUEST, { isAnonymous: true });
+    projectAccess.clear();
 });
 
 afterEach(() => {
@@ -134,6 +147,66 @@ describe("hidden characters in a task", () => {
         await expect(as(USER).mutation(createTask as never, definition({ instructions: "\u{E0069}\u{E0067}" }) as never)).rejects.toThrow(
             "Instructions is required",
         );
+    });
+});
+
+describe("task projects", () => {
+    it("refuse a project the caller can read but not file into, such as a colleague's", async () => {
+        projectAccess.set("project-colleague", "read");
+        projectAccess.set("project-own", "write");
+
+        await expect(as(USER).mutation(createTask as never, definition({ projectId: "project-colleague" }) as never)).rejects.toThrow(
+            "only be filed in your own projects",
+        );
+        await expect(as(USER).mutation(createTask as never, definition({ projectId: "project-unknown" }) as never)).rejects.toThrow("Project not found");
+        await expect(as(USER).mutation(createTask as never, definition({ projectId: "project-own" }) as never)).resolves.toMatchObject({});
+    });
+
+    it("drop a project the owner can no longer read when the task is edited, but refuse choosing one", async () => {
+        const { taskId } = (await as(USER).mutation(createTask as never, definition() as never)) as { taskId: string };
+
+        // A project that was set while readable and is gone now (deleted, or the owner left its organization).
+        await harness.run(async (ctx: any) => await ctx.db.patch("tasks", taskId, { projectId: "project-gone" }));
+
+        await expect(as(USER).mutation(updateTask as never, definition({ projectId: "project-gone", taskId, title: "Renamed" }) as never)).resolves.toBeNull();
+
+        const row: any = await harness.run(async (ctx: any) => await ctx.db.get("tasks", taskId));
+
+        expect(row).toMatchObject({ title: "Renamed" });
+        expect(row.projectId).toBeUndefined();
+
+        await expect(as(USER).mutation(updateTask as never, definition({ projectId: "project-other", taskId }) as never)).rejects.toThrow("Project not found");
+    });
+});
+
+describe("locked chats", () => {
+    it("refuse choosing to keep a thread whose chat is locked", async () => {
+        const { taskId } = (await as(USER).mutation(createTask as never, definition({ cronExpression: "0 9 * * *" }) as never)) as { taskId: string };
+        const thread = await harness.run(
+            async (ctx: any) => await ctx.db.insert("threads", { lockedAt: 1, status: "active", title: "Task: News", userId: USER }),
+        );
+
+        await harness.run(async (ctx: any) => await ctx.db.patch("tasks", taskId, { lastRunThreadId: thread }));
+
+        await expect(
+            as(USER).mutation(updateTask as never, definition({ cronExpression: "0 9 * * *", runDestination: "continue_thread", taskId }) as never),
+        ).rejects.toThrow("is locked");
+        await expect(
+            as(USER).mutation(updateTask as never, definition({ cronExpression: "0 9 * * *", taskId, title: "Renamed" }) as never),
+        ).resolves.toBeNull();
+    });
+});
+
+describe("coding-agent tasks", () => {
+    it("refuse a project or a run destination, which a coding agent cannot use", async () => {
+        const codingAgent = { agent: "codex", repoUrl: "anolilab/neore" };
+
+        await expect(as(USER).mutation(createTask as never, definition({ codingAgent, projectId: "project-a" }) as never)).rejects.toThrow(
+            "cannot have a project or a run destination",
+        );
+        await expect(
+            as(USER).mutation(createTask as never, definition({ codingAgent, cronExpression: "0 9 * * *", runDestination: "continue_thread" }) as never),
+        ).rejects.toThrow("cannot have a project or a run destination");
     });
 });
 
