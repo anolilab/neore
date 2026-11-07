@@ -31,8 +31,8 @@ const agent = {
     options: {},
 };
 
-/** The continuation's rebuilt tools: `fingerprint` absent means the server no longer offers the tool. */
-const rebuiltWith = (fingerprint: string | undefined) => {
+/** The continuation's rebuilt tools: `fingerprint` absent means the server no longer offers the tool, unless `offered`. */
+const rebuiltWith = (fingerprint: string | undefined, offered = fingerprint !== undefined) => {
     vi.mocked(buildAgentTools).mockResolvedValue({
         autoApprovals: {},
         mcpClients: [],
@@ -41,7 +41,7 @@ const rebuiltWith = (fingerprint: string | undefined) => {
         mcpToolFingerprints: fingerprint === undefined ? {} : { [TOOL]: fingerprint },
         permissionKeys: {},
         repeatable: [],
-        tools: fingerprint === undefined ? {} : { [TOOL]: { execute: vi.fn() } as never },
+        tools: offered ? { [TOOL]: { execute: vi.fn() } as never } : {},
     });
 };
 
@@ -109,6 +109,19 @@ describe("an approved MCP call after a pause", () => {
         expect(agent.denyToolCall).toHaveBeenCalledWith(
             expect.anything(),
             expect.objectContaining({ reason: expect.stringContaining("not available now") }),
+            expect.anything(),
+            expect.anything(),
+        );
+    });
+
+    it("is not run when the tool is still offered but could not be checked, and the model is told it is still available", async () => {
+        rebuiltWith(undefined, true);
+
+        expect(await resume({ [TOOL]: "aaa" })).toBe(STOP);
+        expect(agent.approveToolCall).not.toHaveBeenCalled();
+        expect(agent.denyToolCall).toHaveBeenCalledWith(
+            expect.anything(),
+            expect.objectContaining({ reason: expect.stringContaining("could not be checked") }),
             expect.anything(),
             expect.anything(),
         );

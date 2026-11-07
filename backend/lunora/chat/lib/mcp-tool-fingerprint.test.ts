@@ -100,6 +100,26 @@ describe(fingerprintMcpTool, () => {
         }
     });
 
+    it("is the same when a dependency's property names are listed in another order", async () => {
+        const withDependencies = (names: string[]): JSONSchema7 => {
+            return { ...SEARCH_SCHEMA, dependencies: { query: names } };
+        };
+
+        expect(await fingerprintMcpTool(mcpTool(withDependencies(["b", "a"])), SOURCE)).toBe(
+            await fingerprintMcpTool(mcpTool(withDependencies(["a", "b"])), SOURCE),
+        );
+    });
+
+    it("keeps the order of a constant inside a dependency's subschema", async () => {
+        const withDependency = (values: string[]): JSONSchema7 => {
+            return { ...SEARCH_SCHEMA, dependencies: { query: { properties: { mode: { const: values } } } } };
+        };
+
+        expect(await fingerprintMcpTool(mcpTool(withDependency(["b", "a"])), SOURCE)).not.toBe(
+            await fingerprintMcpTool(mcpTool(withDependency(["a", "b"])), SOURCE),
+        );
+    });
+
     it("changes when an enum gains a value", async () => {
         const listed = (choices: string[]): JSONSchema7 => {
             return { ...SEARCH_SCHEMA, properties: { scope: { enum: choices, type: "string" } } };
@@ -154,19 +174,23 @@ describe(mcpToolDrift, () => {
     const saved = { mcp_Docs__search: "aaa" };
 
     it("is unchanged when the fingerprint matches", () => {
-        expect(mcpToolDrift(saved, { mcp_Docs__search: "aaa" }, "mcp_Docs__search")).toBe("unchanged");
+        expect(mcpToolDrift(saved, { mcp_Docs__search: "aaa" }, "mcp_Docs__search", true)).toBe("unchanged");
     });
 
     it("is changed when the fingerprint differs", () => {
-        expect(mcpToolDrift(saved, { mcp_Docs__search: "bbb" }, "mcp_Docs__search")).toBe("changed");
+        expect(mcpToolDrift(saved, { mcp_Docs__search: "bbb" }, "mcp_Docs__search", true)).toBe("changed");
+    });
+
+    it("is unverified, not removed, when the tool is still offered but has no fingerprint this time", () => {
+        expect(mcpToolDrift(saved, {}, "mcp_Docs__search", true)).toBe("unverified");
     });
 
     it("is removed when the tool is no longer offered", () => {
-        expect(mcpToolDrift(saved, {}, "mcp_Docs__search")).toBe("removed");
+        expect(mcpToolDrift(saved, {}, "mcp_Docs__search", false)).toBe("removed");
     });
 
     it("is unchanged for a tool the snapshot did not fingerprint, or a snapshot that predates fingerprints", () => {
-        expect(mcpToolDrift(saved, {}, "webSearch")).toBe("unchanged");
-        expect(mcpToolDrift(undefined, {}, "mcp_Docs__search")).toBe("unchanged");
+        expect(mcpToolDrift(saved, {}, "webSearch", false)).toBe("unchanged");
+        expect(mcpToolDrift(undefined, {}, "mcp_Docs__search", false)).toBe("unchanged");
     });
 });

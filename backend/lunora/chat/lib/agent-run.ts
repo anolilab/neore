@@ -1123,7 +1123,9 @@ export const resumeApprovedRun = async (
         // The approval was given for the MCP tool as the paused run offered it. One that changed or went away since is not
         // run under it: the call is answered as denied with the reason, so the model can call the tool again, which asks again.
         const drift =
-            approved && pending.toolName !== null ? mcpToolDrift(config.mcpToolFingerprints, toolResult.mcpToolFingerprints, pending.toolName) : "unchanged";
+            approved && pending.toolName !== null
+                ? mcpToolDrift(config.mcpToolFingerprints, toolResult.mcpToolFingerprints, pending.toolName, Object.hasOwn(toolResult.tools, pending.toolName))
+                : "unchanged";
         const runApproved = approved && drift === "unchanged";
         const runDenyReason = drift === "unchanged" ? denyReason : mcpToolDriftReason(drift);
 

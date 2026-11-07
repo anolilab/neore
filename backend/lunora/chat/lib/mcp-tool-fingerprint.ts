@@ -55,7 +55,13 @@ const canonical = (value: unknown, inData: boolean, names = false): unknown => {
             .toSorted(byCodeUnit)
             .map((key) => {
                 if (names) {
-                    return [key, canonical(object[key], inData)];
+                    const entry = canonical(object[key], inData);
+
+                    // A dependency's list of property names (`dependencies`, `dependentRequired`) is a set, like `required`.
+                    return [
+                        key,
+                        Array.isArray(entry) && !inData && entry.every((item) => typeof item === "string") ? (entry as string[]).toSorted(byCodeUnit) : entry,
+                    ];
                 }
 
                 const member = canonical(object[key], inData || DATA_KEYWORDS.has(key), !inData && NAME_MAP_KEYWORDS.has(key));
@@ -130,16 +136,20 @@ export const fingerprintMcpTool = async (tool: ToolSet[string], source: Fingerpr
     return toHex(digest).slice(0, FINGERPRINT_HEX_LENGTH);
 };
 
+export type McpToolDrift = "changed" | "removed" | "unchanged" | "unverified";
+
 /**
  * How the MCP tool `name` stands now against the run that paused. `unchanged` also covers a tool the snapshot did not
  * fingerprint (a built-in or device tool, or a snapshot written before fingerprints were recorded): those keep the
- * checks they had.
+ * checks they had. `offered`: the tool is in the rebuilt run, so one with no current fingerprint (it could not be hashed
+ * this time) is `unverified`, not `removed`.
  */
 export const mcpToolDrift = (
     saved: Readonly<Record<string, string>> | undefined,
     current: Readonly<Record<string, string>>,
     name: string,
-): "changed" | "removed" | "unchanged" => {
+    offered: boolean,
+): McpToolDrift => {
     const before = saved && Object.hasOwn(saved, name) ? saved[name] : undefined;
 
     if (before === undefined) {
@@ -147,14 +157,23 @@ export const mcpToolDrift = (
     }
 
     if (!Object.hasOwn(current, name)) {
-        return "removed";
+        return offered ? "unverified" : "removed";
     }
 
     return current[name] === before ? "unchanged" : "changed";
 };
 
-/** What the model reads in place of the result of an approved call whose tool changed or went away during the pause. */
-export const mcpToolDriftReason = (drift: "changed" | "removed"): string =>
-    drift === "changed"
-        ? "This call was not run: the tool's definition changed on its server after the call was approved. Read the tool's current inputs and call it again if it is still needed."
-        : "This call was not run: the tool is not available now. Its server may be unreachable or no longer offer it, or it was switched off, after the call was approved.";
+/** What the model reads in place of the result of an approved call whose tool changed, went away or could not be checked. */
+export const mcpToolDriftReason = (drift: Exclude<McpToolDrift, "unchanged">): string => {
+    switch (drift) {
+        case "changed": {
+            return "This call was not run: the tool's definition changed on its server after the call was approved. Read the tool's current inputs and call it again if it is still needed.";
+        }
+        case "unverified": {
+            return "This call was not run: the tool could not be checked against the definition it was approved for. It is still available; call it again if it is still needed.";
+        }
+        default: {
+            return "This call was not run: the tool is not available now. Its server may be unreachable or no longer offer it, or it was switched off, after the call was approved.";
+        }
+    }
+};
