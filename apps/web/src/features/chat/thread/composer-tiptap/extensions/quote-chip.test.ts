@@ -54,6 +54,22 @@ describe("insertQuoteChip", () => {
         expect(instance.getText({ blockSeparator: "\n" })).toBe(`${quotedDraft}\n`);
     });
 
+    it("takes the place of a trailing empty line, so no blank line comes before the quote", () => {
+        const instance = createEditor(plainTextToHtml("Before the quote\n"));
+
+        insertQuoteChip(instance, quoted);
+
+        expect(instance.getText({ blockSeparator: "\n" })).toBe(`Before the quote\n${quotedDraft}\n`);
+    });
+
+    it("drops hidden characters from the quote, as the draft store drops them", () => {
+        const instance = createEditor("");
+
+        insertQuoteChip(instance, { messageId: "msg-4", text: "The first\u{200B} line\nthe second line" });
+
+        expect(instance.getText({ blockSeparator: "\n" })).toBe(`${quotedDraft}\n`);
+    });
+
     it("appends the chip after typed text, and the editor's text keeps the quote", () => {
         const instance = createEditor("Before the quote");
 
@@ -108,6 +124,29 @@ describe("the quote chip's clipboard", () => {
 
         try {
             expect(pasted.getJSON().content?.[0]).toMatchObject({ attrs: { messageId: quoted.messageId, text: quoted.text }, type: "quoteChip" });
+        } finally {
+            pasted.destroy();
+        }
+    });
+
+    it.each([
+        [
+            "takes the quote from the visible lines, not a hidden attribute",
+            `<div data-quote-chip data-message-id="m" data-quote-text="${"hidden ".repeat(200)}"><blockquote><p>Seen</p></blockquote></div>`,
+            "quoteChip",
+        ],
+        [
+            "pastes a quote past the long-paste limit as quoted lines, not a chip",
+            `<div data-quote-chip data-message-id="m"><blockquote><p>${"long ".repeat(120)}</p></blockquote></div>`,
+            "paragraph",
+        ],
+    ])("%s", (_label, html, type) => {
+        const pasted = new Editor({ content: html, extensions: [StarterKit.configure({ blockquote: false }), QuoteChip.configure({ labels })] });
+
+        try {
+            expect(pasted.getJSON().content?.[0]?.type).toBe(type);
+            expect(pasted.getText()).not.toContain("hidden");
+            expect(pasted.getText({ blockSeparator: "\n" }).startsWith("> ")).toBe(true);
         } finally {
             pasted.destroy();
         }
