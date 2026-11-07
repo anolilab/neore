@@ -13,8 +13,13 @@ export const applyRateLimit = internalMutation
         count: v.optional(v.number()),
         identifier: v.string(),
         key: v.string(),
+        /**
+         * Charge for work already done: book the units even past what is left, so the next call is refused. Capped at
+         * the window's capacity, which the limiter would otherwise refuse with a throw.
+         */
+        reserve: v.optional(v.boolean()),
     })
-    .mutation(async ({ args: { count, identifier, key }, ctx }) => {
+    .mutation(async ({ args: { count, identifier, key, reserve }, ctx }) => {
         // Widened at the lookup, not in the table — `key` arrives from the wire as
         // an already-tiered `<base>:<tier>` string.
         if (!Object.hasOwn(RATE_LIMIT_CONFIGS, key)) {
@@ -22,7 +27,9 @@ export const applyRateLimit = internalMutation
         }
 
         const limiter = createRatelimit(key, ctx.db);
-        const result = await limiter.limit(identifier, { count: count ?? 1 });
+        const config = (RATE_LIMIT_CONFIGS as Record<string, { capacity?: number; rate: number }>)[key]!;
+        const units = reserve === true ? Math.min(count ?? 1, config.capacity ?? config.rate) : (count ?? 1);
+        const result = await limiter.limit(identifier, { count: units, reserve });
 
         return {
             ok: result.ok,

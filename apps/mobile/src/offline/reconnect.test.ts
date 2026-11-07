@@ -7,7 +7,8 @@ import { createReconnectRefresher, renewTokenThenRefresh } from "./reconnect";
 import { requireOnline } from "./write-gate";
 
 const SOURCE_FILE = /\.tsx?$/;
-const CLIENT_WRITE = /\.(?:mutation|action)\(/;
+// Only mutations are queued: an action is sent at once or fails, and its options take no `onlineOnly`.
+const CLIENT_WRITE = /\.mutation\(/;
 
 describe("renewTokenThenRefresh", () => {
     it("reads again only once the token has been renewed, so no read runs on a lapsed one", async () => {
@@ -17,10 +18,11 @@ describe("renewTokenThenRefresh", () => {
             refresh: () => {
                 calls.push("refresh");
             },
-            renewToken: () => new Promise<void>((resolve) => {
-                calls.push("renew");
-                finishRenewal = resolve;
-            }),
+            renewToken: () =>
+                new Promise<void>((resolve) => {
+                    calls.push("renew");
+                    finishRenewal = resolve;
+                }),
         });
         const done = run();
 

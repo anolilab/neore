@@ -63,6 +63,8 @@ export interface PendingAttachment {
     id: string;
     name: string;
     progress?: number;
+    /** Restored by its file id after a reload: `file` is an empty stand-in, and this is the uploaded file's size in bytes. */
+    restoredSize?: number;
     status: "pending" | "uploading" | "complete" | "error";
     type: "image" | "file" | "document";
 }
