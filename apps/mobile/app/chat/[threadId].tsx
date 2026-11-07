@@ -30,6 +30,8 @@ import { useOffline, useWriteControl } from "@/offline/offline-context";
 import { settleQuietly } from "@/offline/quietly";
 import type { MessageRow } from "@/offline/types";
 import { requireOnline } from "@/offline/write-gate";
+import { useVoiceInput } from "@/voice/use-voice-input";
+import { appendTranscript } from "@/voice/voice-input";
 
 /** A row on this screen; `finished` marks a local row whose send completed, which no server read has confirmed yet. */
 type Row = MessageRow & { finished?: boolean };
@@ -155,6 +157,8 @@ const Chat = () => {
     const [draft, setDraft] = useState("");
     const [sending, setSending] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    // The words land in the draft, after anything typed meanwhile; they are never sent on their own.
+    const voice = useVoiceInput({ onError: setError, onText: (text) => setDraft((current) => appendTranscript(current, text)) });
     const listRef = useRef<LegendListRef>(null);
     // Whether the list shows its last message: the jump button shows whenever it does not, and while a reply streams.
     const [isAtEnd, setIsAtEnd] = useState(true);
@@ -448,7 +452,8 @@ const Chat = () => {
                     fetch,
                     gatewayUrl: config.gatewayUrl,
                     jwt,
-                }));
+                }),
+            );
 
             setThreadId(started.threadId);
             // The prompt is complete once the server has accepted it, whether or not the screen's next read succeeds.
@@ -535,10 +540,8 @@ const Chat = () => {
         updateIsAtEnd();
     };
 
-    const olderHeader
-        = olderCursor === null
-            ? undefined
-            : (
+    const olderHeader =
+        olderCursor === null ? undefined : (
             <Pressable
                 accessibilityRole="button"
                 accessibilityState={{ busy: isLoadingOlder, disabled: isLoadingOlder }}
@@ -548,7 +551,7 @@ const Chat = () => {
             >
                 <Text style={{ textAlign: "center" }}>{isLoadingOlder ? "Loading older messages..." : "Load older messages"}</Text>
             </Pressable>
-            );
+        );
 
     /** Opens the system share sheet. Cancelling resolves normally, so a rejection is a failure to open it. */
     const shareRow = async (text: string): Promise<void> => {
@@ -571,6 +574,13 @@ const Chat = () => {
     // The control and its hint say why sending waits, so it is not announced as available while a reply is held.
     const sendReason = sendControl.reason ?? (isAwaitingReply ? AWAIT_REPLY_MESSAGE : undefined);
     const isSendBlocked = sending || sendControl.disabled || isAwaitingReply;
+    // Recording stays possible while a reply streams; only a clip already being transcribed holds it.
+    const isVoiceBlocked = composer.disabled || voice.phase === "transcribing";
+    const voiceStatus = {
+        idle: undefined,
+        recording: "Recording. Release to add the words to your message.",
+        transcribing: "Turning your recording into text…",
+    }[voice.phase];
 
     return (
         <View onLayout={measureTopOffset} ref={rootRef} style={{ flex: 1 }}>
@@ -623,8 +633,7 @@ const Chat = () => {
                             );
                         }}
                     />
-                    {shouldShowScrollToLatest({ isScrolledToEnd: isAtEnd, isStreaming: sending })
-                        ? (
+                    {shouldShowScrollToLatest({ isScrolledToEnd: isAtEnd, isStreaming: sending }) ? (
                         <Pressable
                             accessibilityLabel={scrollToLatestLabel(sending)}
                             accessibilityRole="button"
@@ -646,16 +655,13 @@ const Chat = () => {
                         >
                             <Text style={{ fontWeight: "600" }}>{scrollToLatestText(sending)}</Text>
                         </Pressable>
-                        )
-                        : null}
+                    ) : null}
                 </View>
-                {error
-                    ? (
+                {error ? (
                     <Text accessibilityRole="alert" style={{ color: "#b00020", padding: 12 }}>
                         {error}
                     </Text>
-                    )
-                    : null}
+                ) : null}
                 <View style={{ flexDirection: "row", gap: 8, padding: 12, paddingBottom: sendReason ? 12 : 12 + safeBottom }}>
                     <TextInput
                         accessibilityHint={composer.reason}
@@ -669,6 +675,24 @@ const Chat = () => {
                         value={draft}
                     />
                     <Pressable
+                        accessibilityHint={composer.reason ?? "Hold to record, release to add the words to your message"}
+                        accessibilityLabel={voice.phase === "recording" ? "Recording" : "Voice input"}
+                        accessibilityRole="button"
+                        accessibilityState={{ busy: voice.phase === "transcribing", disabled: isVoiceBlocked }}
+                        disabled={isVoiceBlocked}
+                        onPressIn={() => {
+                            voice.start();
+                        }}
+                        onPressOut={() => {
+                            voice.finish();
+                        }}
+                        style={{ alignItems: "center", justifyContent: "center", minHeight: 44, minWidth: 44, opacity: isVoiceBlocked ? 0.5 : 1 }}
+                    >
+                        <Text style={{ color: voice.phase === "recording" ? "#b00020" : undefined, fontWeight: "600" }}>
+                            {voice.phase === "recording" ? "● Rec" : "Mic"}
+                        </Text>
+                    </Pressable>
+                    <Pressable
                         accessibilityHint={sendReason}
                         accessibilityRole="button"
                         accessibilityState={{ disabled: isSendBlocked }}
@@ -679,6 +703,11 @@ const Chat = () => {
                         <Text style={{ fontWeight: "600" }}>Send</Text>
                     </Pressable>
                 </View>
+                {voiceStatus ? (
+                    <Text accessibilityLiveRegion="polite" style={{ fontSize: 12, paddingHorizontal: 12 }}>
+                        {voiceStatus}
+                    </Text>
+                ) : null}
                 {sendReason ? <Text style={{ fontSize: 12, paddingBottom: 8 + safeBottom, paddingHorizontal: 12 }}>{sendReason}</Text> : null}
             </KeyboardAvoidingView>
         </View>

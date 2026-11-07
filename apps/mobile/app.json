@@ -13,7 +13,18 @@
         "android": {
             "package": "ai.neore.mobile"
         },
-        "plugins": ["expo-router", "expo-secure-store", "expo-web-browser"],
+        "plugins": [
+            "expo-router",
+            "expo-secure-store",
+            "expo-web-browser",
+            [
+                "expo-audio",
+                {
+                    "enableBackgroundPlayback": false,
+                    "microphonePermission": "Neore records your voice while you hold the microphone button, to turn it into text for your message."
+                }
+            ]
+        ],
         "experiments": {
             "typedRoutes": false
         },

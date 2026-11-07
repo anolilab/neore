@@ -618,6 +618,10 @@ export const RATE_LIMIT_CONFIGS = {
     // under the per-character credit cost.
     "voice/dailySpeechChars:free": Ratelimit.fixedWindow(10_000, DAY),
     "voice/dailySpeechChars:premium": Ratelimit.fixedWindow(200_000, DAY),
+    // Mobile voice input (`voice/transcription.ts`): seconds of audio per day,
+    // charged with `count` = the clip's length.
+    "voice/dailyTranscribeSeconds:free": Ratelimit.fixedWindow(600, DAY),
+    "voice/dailyTranscribeSeconds:premium": Ratelimit.fixedWindow(3600, DAY),
     // Realtime dictation — each token is one billed ElevenLabs Scribe session,
     // minted per mic press. Anonymous is refused outright (`voice/functions.ts`).
     "voice/scribeToken:free": Ratelimit.fixedWindow(30, HOUR),
@@ -626,6 +630,9 @@ export const RATE_LIMIT_CONFIGS = {
     // is a reply's worth. Guests are refused outright (`voice/speech.ts`).
     "voice/speech:free": Ratelimit.tokenBucket(30, MINUTE, 40),
     "voice/speech:premium": Ratelimit.tokenBucket(90, MINUTE, 120),
+    // One clip per mic hold. Guests are refused outright (`voice/transcription.ts`).
+    "voice/transcribe:free": Ratelimit.tokenBucket(10, MINUTE, 15),
+    "voice/transcribe:premium": Ratelimit.tokenBucket(30, MINUTE, 40),
     // Workflow execution — same story as the skills entries above: the name was
     // used but never defined, so every `executeWorkflow` call threw. A run can fan
     // out into many model calls, so this is deliberately tighter than CRUD.
