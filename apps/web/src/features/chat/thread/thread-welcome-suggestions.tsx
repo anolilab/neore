@@ -199,7 +199,8 @@ const ThreadWelcomeSuggestions: FC<{ className?: string }> = ({ className }) => 
                                 value={key}
                             >
                                 <Icon className="size-3.5" />
-                                <span>{category.label}</span>
+                                {/* The label sets its own colour: an inactive tab's faded text fails contrast on the white page. */}
+                                <span className="text-neutral-700 dark:text-neutral-200">{category.label}</span>
                             </TabsTrigger>
                         );
                     })}

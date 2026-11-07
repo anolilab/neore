@@ -80,7 +80,7 @@ const ComposerSearchMode: FC<ComposerSearchModeProps> = ({ disabled, mode, onMod
                                     variant="outline"
                                 >
                                     <CurrentIcon className="size-3 shrink-0" />
-                                    <span className="hidden md:inline">{currentMode.label}</span>
+                                    <span className="hidden text-neutral-700 md:inline dark:text-neutral-200">{currentMode.label}</span>
                                 </Button>
                             }
                         />

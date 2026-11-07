@@ -72,7 +72,7 @@ const ComposerGoal: FC<ComposerGoalProps> = ({ disabled }) => {
                             variant="outline"
                         >
                             <Target aria-hidden="true" className="size-3 shrink-0" />
-                            <span className="hidden sm:inline">{t`Goal`}</span>
+                            <span className="hidden text-neutral-700 sm:inline dark:text-neutral-200">{t`Goal`}</span>
                         </Button>
                     }
                 />

@@ -113,7 +113,9 @@ const ComposerMCPSelector: FC<{ disabled?: boolean }> = ({ disabled }) => {
                                         })}
                                         {overflowCount > 0 && <AvatarGroupCount className="size-4 text-[7px] ring-1">+{overflowCount}</AvatarGroupCount>}
                                     </AvatarGroup>
-                                    <span className="hidden text-xs sm:inline">{isAllSelected ? t`MCP` : `${activeCount}/${enabledServers.length}`}</span>
+                                    <span className="hidden text-xs text-neutral-700 sm:inline dark:text-neutral-200">
+                                        {isAllSelected ? t`MCP` : `${activeCount}/${enabledServers.length}`}
+                                    </span>
                                 </Button>
                             }
                         />
