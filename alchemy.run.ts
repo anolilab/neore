@@ -12,7 +12,15 @@ import { encryptionKeyProblem, OPTIONAL_ENV_KEYS, REQUIRED_ENV_KEYS } from "./ba
 import { JOBS_QUEUE_CONSUMER } from "./backend/lunora/lib/job-queue-config";
 import { jobs, jobsDeadLetters } from "./backend/lunora/queues";
 import { GATEWAY_CRONS } from "./services/llm-gateway/src/crons";
-import { BACKEND_BUILD, RUST_WORKER_OUTPUT, RUST_WORKER_UPLOAD, WEB_UPLOAD_RULES, WORKER_BUILD } from "./scripts/worker-bundle";
+import {
+    BACKEND_BUILD,
+    backendStudioAssets,
+    backendStudioAssetsProblem,
+    RUST_WORKER_OUTPUT,
+    RUST_WORKER_UPLOAD,
+    WEB_UPLOAD_RULES,
+    WORKER_BUILD,
+} from "./scripts/worker-bundle";
 
 // ---------------------------------------------------------------------------
 // Stage resolution
@@ -108,6 +116,15 @@ if (!RUST_WORKER_OUTPUT.every((file) => existsSync(`./services/document-parser/b
 // value, the raised heap, OG images, the service worker) and uploaded as built.
 if (!existsSync("./apps/web/dist/server/index.js") && !destroying) {
     throw new Error("Cannot deploy: apps/web/dist/server/index.js is missing. Run `pnpm build` in apps/web first.");
+}
+
+// Codegen writes Studio's documents to backend/.lunora/studio-assets, and the generated app
+// then reads them through the backend's `ASSETS` binding (Lunora #1499).
+const studioAssets = backendStudioAssets(".");
+const studioAssetsProblem = destroying ? undefined : backendStudioAssetsProblem(".");
+
+if (studioAssetsProblem !== undefined) {
+    throw new Error(`Cannot deploy: ${studioAssetsProblem}`);
 }
 
 const requireEnv = (name: (typeof REQUIRED_DEPLOY_ENV)[number]): string => process.env[name]?.trim() ?? "";
@@ -876,6 +893,9 @@ export default Alchemy.Stack(
         }
 
         const backend = yield* Cloudflare.Worker("neore-backend", {
+            // Studio's documents (OpenAPI, OpenRPC, architecture) behind the `ASSETS` binding, with
+            // every request going to the Worker first. None before Lunora #1499; see `backendStudioAssets`.
+            ...(studioAssets ? { assets: studioAssets } : {}),
             // Minified, React production builds, English-only zod locales — see
             // scripts/worker-bundle.ts. `wrangler.jsonc`'s `minify` does not reach this.
             build: BACKEND_BUILD,
