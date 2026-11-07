@@ -55,6 +55,9 @@ const withoutHidden = <A>(item: QueuedPrompt<A>): QueuedPrompt<A> => {
     return { ...item, text: stripHiddenText(item.text).text };
 };
 
+/** The text a person means by a message: hidden characters gone, then trimmed. Empty means there is nothing to send. */
+export const cleanPromptText = (text: string): string => stripHiddenText(text).text.trim();
+
 export const enqueuePrompt = <A>(state: PromptQueueState<A>, item: QueuedPrompt<A>): PromptQueueState<A> => {
     return { ...state, items: [...state.items, withoutHidden(item)] };
 };
@@ -64,11 +67,66 @@ export const prependPrompt = <A>(state: PromptQueueState<A>, item: QueuedPrompt<
     return { ...state, items: [withoutHidden(item), ...state.items] };
 };
 
+/**
+ * Replaces the text of a queued message in place, so it keeps its place. A changed text takes `newId`, and an unchanged one
+ * keeps its id. A steered message is already in the running reply, so it cannot be edited here. Hidden characters go, as
+ * on enqueue.
+ */
+export const editQueuedPrompt = <A>(state: PromptQueueState<A>, id: string, text: string, newId: string): PromptQueueState<A> => {
+    return {
+        ...state,
+        items: state.items.map((item) => {
+            // Text that is only hidden characters is no message: the item keeps its text rather than becoming empty.
+            if (item.id !== id || item.steer !== undefined || item.text === text || cleanPromptText(text) === "") {
+                return item;
+            }
+
+            // A changed text is a new message: its send id must not be one an earlier, lost-answer send already used.
+            return withoutHidden({ ...item, id: newId, text });
+        }),
+    };
+};
+
 export const removeQueuedPrompt = <A>(state: PromptQueueState<A>, id: string): PromptQueueState<A> => {
     const items = state.items.filter((item) => item.id !== id);
 
     // An emptied queue has nothing left to hold back.
     return { items, paused: items.length === 0 ? false : state.paused };
+};
+
+/**
+ * Moves a queued message to `toIndex` (clamped to the queue), keeping every other message in its order. A steer whose
+ * call is still out holds its place: a move that starts, ends, or passes over one is refused. An unknown id or a move
+ * to the place it already has returns the same state.
+ */
+export const moveQueuedPrompt = <A>(state: PromptQueueState<A>, id: string, toIndex: number): PromptQueueState<A> => {
+    const from = state.items.findIndex((item) => item.id === id);
+    const target = Math.min(Math.max(Math.trunc(toIndex), 0), state.items.length - 1);
+
+    if (from === -1 || from === target) {
+        return state;
+    }
+
+    const [low, high] = from < target ? [from, target] : [target, from];
+
+    // A steer is fixed in the order the running reply reads it, so a move that starts, ends, or passes over one is refused.
+    if (state.items.slice(low, high + 1).some((item) => item.steer)) {
+        return state;
+    }
+
+    const items = [...state.items];
+    const [moved] = items.splice(from, 1);
+
+    items.splice(target, 0, moved as QueuedPrompt<A>);
+
+    return { ...state, items };
+};
+
+/** One place earlier (`-1`) or later (`1`). */
+export const stepQueuedPrompt = <A>(state: PromptQueueState<A>, id: string, direction: -1 | 1): PromptQueueState<A> => {
+    const from = state.items.findIndex((item) => item.id === id);
+
+    return from === -1 ? state : moveQueuedPrompt(state, id, from + direction);
 };
 
 /**

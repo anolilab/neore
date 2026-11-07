@@ -166,19 +166,41 @@ export const startHostSession = authMutation
  */
 export const cancelHostTurn = authMutation
     .use(rateLimit("hosts/answer"))
-    .input({ threadId: v.id("threads") })
-    .output(v.object({ cancelled: v.boolean() }))
+    // `streamId` names the turn the caller saw. When it is given and another turn is live now, nothing is stopped.
+    .input({ streamId: v.optional(v.id("persistentStreams")), threadId: v.id("threads") })
+    // `reason` says why nothing was stopped: no turn was live, or another turn is live (`streamId` named a different one).
+    // `delivered` says whether the computer was told to cancel. False means the stream ended but the stop did not reach the
+    // computer, so the agent may still be running: the caller keeps its next message held instead of sending it.
+    .output(
+        v.object({
+            cancelled: v.boolean(),
+            delivered: v.optional(v.boolean()),
+            reason: v.optional(v.union(v.literal("no_turn"), v.literal("other_turn"))),
+        }),
+    )
     .mutation(async ({ args, ctx }) => {
         if (!(await ownHostThread(ctx, args.threadId, ctx.user.userId))) {
             throw new LunoraError("NOT_FOUND", "Thread not found");
         }
 
-        const stream = await liveHostStream(ctx, args.threadId);
+        // The turn the caller named is the one to stop when it is still a live host turn of this thread, even if a newer host
+        // turn is live too. Otherwise the newest host turn is the candidate, and the check below refuses it when the caller named
+        // another turn.
+        const named = args.streamId === undefined ? null : await ctx.db.get("persistentStreams", args.streamId);
+        const namedLive =
+            named !== null && named.threadId === args.threadId && named.producer === "host" && (named.status === "pending" || named.status === "streaming");
+        const stream = namedLive ? named : await liveHostStream(ctx, args.threadId);
 
         if (!stream) {
-            ctx.log.event("acp.cancel_host_turn", { cancelled: false, withdrewPrompt: false });
+            ctx.log.event("acp.cancel_host_turn", { cancelled: false, reason: "no_turn", withdrewPrompt: false });
 
-            return { cancelled: false };
+            return { cancelled: false, reason: "no_turn" as const };
+        }
+
+        if (args.streamId !== undefined && stream._id !== args.streamId) {
+            ctx.log.event("acp.cancel_host_turn", { cancelled: false, reason: "other_turn", withdrewPrompt: false });
+
+            return { cancelled: false, reason: "other_turn" as const };
         }
 
         if (stream.hostState === "accepted") {
@@ -187,11 +209,11 @@ export const cancelHostTurn = authMutation
 
         const withdrewPrompt = stream.hostState === "accepted";
 
-        await stopHostTurn(ctx, stream, ctx.now);
+        const delivered = await stopHostTurn(ctx, stream, ctx.now);
 
-        ctx.log.event("acp.cancel_host_turn", { cancelled: true, withdrewPrompt });
+        ctx.log.event("acp.cancel_host_turn", { cancelled: true, delivered, withdrewPrompt });
 
-        return { cancelled: true };
+        return { cancelled: true, delivered };
     });
 
 /** The requests the agent in this thread is waiting on, for the web and the phone to show. The owner's thread only. */

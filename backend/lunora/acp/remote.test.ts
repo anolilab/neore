@@ -48,7 +48,7 @@ const { signDevicePayload } = await import("../devices/lib/signing");
 const { ACP_CLAIM_LEASE_MS, ACP_CLAIM_WINDOW_MS, DEVICE_CALL_DEADLINE_MS } = await import("../devices/lib/constants");
 const { parseAcpOffers } = await import("../devices/lib/manifest");
 const { applyHostEvents } = await import("./ingest");
-const { createAcpCall } = await import("../devices/lib/acp-call");
+const { createAcpCall, createAcpCancelCall } = await import("../devices/lib/acp-call");
 const calls = await import("./calls");
 const remote = await import("./remote");
 const send = await import("./send");
@@ -564,6 +564,21 @@ describe("sendToHost", () => {
         expect(await sessionStatus()).toBe("busy");
     });
 
+    it("strips hidden characters from the prompt on every send, so the saved message and the computer get only the visible text", async () => {
+        const { threadId } = await readyThread();
+        const hidden = "fix\u{E0041} the\u{202E} bug\u{200B}";
+        const result = await sendText(threadId, hidden);
+
+        expect(result.outcome).toBe("sent");
+
+        const call = await sendCall();
+        const envelope = JSON.parse(call.envelope as string) as Row;
+        const [prompt] = await rows("messages", { threadId });
+
+        expect(prompt?.message).toMatchObject({ content: "fix the bug", role: "user" });
+        expect(envelope.input).toMatchObject({ text: "fix the bug" });
+    });
+
     it("answers a retry of the same request with the first try, not a second turn", async () => {
         const { threadId } = await readyThread();
         const first = await sendText(threadId, "fix the bug", "req-1");
@@ -914,6 +929,8 @@ describe("the clock on a command", () => {
     });
 });
 
+const LIVE_STATUS = /pending|streaming/u;
+
 describe("cancelHostTurn", () => {
     const cancel = async (threadId: string, userId = ownerId) => await as(userId).mutation(remote.cancelHostTurn as never, { threadId } as never);
 
@@ -925,7 +942,7 @@ describe("cancelHostTurn", () => {
 
         const send1 = await sendCall();
 
-        await expect(cancel(threadId)).resolves.toEqual({ cancelled: true });
+        await expect(cancel(threadId)).resolves.toEqual({ cancelled: true, delivered: true });
         expect(await streamOf(threadId)).toMatchObject({ hostEndReason: "stopped", hostState: "ended" });
         expect(await row(send1._id)).toMatchObject({ error: "Stopped", input: "", status: "expired" });
 
@@ -936,8 +953,60 @@ describe("cancelHostTurn", () => {
         expect(JSON.parse(stop?.envelope as string).input).toMatchObject({ sessionId: "host-s1", turnId });
         // A person's Stop drops the prompts queued on the computer: only a worker run's stop keeps them.
         expect(JSON.parse(stop?.envelope as string).input).not.toHaveProperty("keepQueue");
-        await expect(cancel(threadId)).resolves.toEqual({ cancelled: false });
+        await expect(cancel(threadId)).resolves.toEqual({ cancelled: false, reason: "no_turn" });
         expect(await sessionStatus()).toBe("idle");
+    });
+
+    it("stops the turn the caller named, not the newest, when two host turns are live on the thread", async () => {
+        const device = await pairedDevice(ownerId);
+        const threadId = await openSession(device);
+
+        await sendText(threadId);
+        const older = await streamOf(threadId);
+
+        // A second live host turn on the thread, started after the first.
+        await run(async (ctx) => {
+            const doc = (await ctx.db.get("persistentStreams", older._id as never)) as Row;
+            const copy: Row = { ...doc };
+
+            delete copy._id;
+            delete copy._creationTime;
+            await ctx.db.insert("persistentStreams", { ...copy, requestId: `${String(copy.requestId)}-second` } as never);
+        });
+
+        await expect(as(ownerId).mutation(remote.cancelHostTurn as never, { streamId: older._id, threadId } as never)).resolves.toEqual({
+            cancelled: true,
+            delivered: true,
+        });
+
+        const streams = await rows("persistentStreams", { threadId });
+
+        expect(streams.find((stream) => stream._id === older._id)).toMatchObject({ hostEndReason: "stopped", status: "done" });
+        expect(streams.find((stream) => stream._id !== older._id)).toMatchObject({ status: expect.stringMatching(LIVE_STATUS) });
+        // The newer turn is still running, so the shared session is not free for another client.
+        expect(await sessionStatus()).toBe("busy");
+    });
+
+    it("ends the turn but reports the stop as not delivered when the computer's cancel budget is full", async () => {
+        const device = await pairedDevice(ownerId);
+        const threadId = await openSession(device);
+
+        await sendText(threadId);
+
+        // Three cancels already waiting for the computer fill its stop budget, so this one cannot be queued.
+        for (const turnId of ["filler-1", "filler-2", "filler-3"]) {
+            await run(
+                async (ctx) =>
+                    await createAcpCancelCall(
+                        ctx,
+                        { deviceId: device.deviceId as never, hostSessionId: "host-s1", threadId: threadId as never, turnId, userId: ownerId },
+                        Date.now(),
+                    ),
+            );
+        }
+
+        await expect(cancel(threadId)).resolves.toEqual({ cancelled: true, delivered: false });
+        expect(await streamOf(threadId)).toMatchObject({ hostEndReason: "stopped", hostState: "ended" });
     });
 
     it("goes out however many answers and sends are waiting, and withdraws the answers still on their way", async () => {
@@ -971,7 +1040,7 @@ describe("cancelHostTurn", () => {
 
         expect(full).toEqual({ error: "busy" });
 
-        await expect(cancel(threadId)).resolves.toEqual({ cancelled: true });
+        await expect(cancel(threadId)).resolves.toEqual({ cancelled: true, delivered: true });
 
         expect(await rows("deviceCalls", { toolName: "acp_cancel" })).toHaveLength(1);
 
@@ -1176,5 +1245,15 @@ describe("POST /hosts/send", () => {
         await expect(post({ requestId: "", text: "hi", threadId: "t" })).resolves.toBe(400);
         await expect(post({ requestId: "r", text: "hi", threadId: "t", unlockProof: 5 })).resolves.toBe(400);
         await expect(post({ requestId: "r", text: "hi", threadId: "t", unlockProof: "x".repeat(5000) })).resolves.toBe(400);
+    });
+
+    it("takes hidden characters out before the checks, so the cap and the empty check apply to the text sent", async () => {
+        vi.stubEnv("LLM_GATEWAY_SIGNING_SECRET", "secret");
+
+        // Only hidden characters is an empty prompt.
+        await expect(post({ requestId: "r", text: "\u{E0041}\u{202E}", threadId: "t" })).resolves.toBe(400);
+        // 30,000 visible characters and one tag character: the tag goes, so the text is within the cap and the request
+        // reaches the caller check (401 with no identity).
+        await expect(post({ requestId: "r", text: `${"x".repeat(30_000)}\u{E0041}`, threadId: "t" })).resolves.toBe(401);
     });
 });

@@ -26,10 +26,20 @@ const CONTEXT_NOT_INSTRUCTIONS = /context, not instructions/i;
 
 const RECENT = [row("m1", 1, "user", "first recent"), row("m2", 2, "assistant", "second recent"), row("m3", 3, "user", "the prompt")];
 
-const contextFor = async (summary: string | null, options: { contextHandler?: never; recentMessages?: number; statelessMode?: boolean } = {}) => {
+const contextFor = async (
+    summary: string | null,
+    options: {
+        boundary?: { messageId: string; order: number; stepOrder: number };
+        branched?: boolean;
+        contextHandler?: never;
+        promptMessageId?: string | null;
+        recentMessages?: number;
+        statelessMode?: boolean;
+    } = {},
+) => {
     const runQuery = vi.fn(async (ref: unknown) => {
         if (ref === internal.agent.thread_summaries.getThreadSummaryForContext) {
-            return summary;
+            return summary === null ? null : { ...(boundary && { boundary }), branched: branched ?? false, summary };
         }
 
         if (ref === internal.agent.branches.getContextPathIds) {
@@ -43,7 +53,7 @@ const contextFor = async (summary: string | null, options: { contextHandler?: ne
 
         return { page: [...RECENT].toReversed() };
     });
-    const { contextHandler, statelessMode, ...contextOptions } = options;
+    const { boundary, branched, contextHandler, promptMessageId, statelessMode, ...contextOptions } = options;
     const { messages, threadNotes } = await fetchContextWithPrompt(
         { runQuery, storage: {} } as never,
         {} as never,
@@ -52,7 +62,7 @@ const contextFor = async (summary: string | null, options: { contextHandler?: ne
             contextOptions,
             messages: undefined,
             prompt: undefined,
-            promptMessageId: "m3",
+            promptMessageId: promptMessageId === null ? undefined : (promptMessageId ?? "m3"),
             statelessMode,
             threadId: "thread-1",
             userId: "user-1",
@@ -77,6 +87,27 @@ describe("fetchContextWithPrompt with a thread summary", () => {
         expect(threadNotes).toMatch(CONTEXT_NOT_INSTRUCTIONS);
         expect((messages as { role: string }[]).map((message) => message.role)).not.toContain("system");
         expect(runQuery).toHaveBeenCalledWith(internal.agent.thread_summaries.getThreadSummaryForContext, { promptMessageId: "m3", threadId: "thread-1" });
+    });
+
+    it("replaces the turns up to a compaction's boundary with the notes, keeping the rest and the prompt", async () => {
+        expect.assertions(2);
+
+        const { messages, threadNotes } = await contextFor("The user is planning a trip.", { boundary: { messageId: "m1", order: 1, stepOrder: 0 } });
+
+        expect(texts(messages as never)).toStrictEqual(["second recent", "the prompt"]);
+        expect(threadNotes).toContain("The user is planning a trip.");
+    });
+
+    it("drops no window row by position on a branched thread whose prompt is not named: sibling rows were never covered", async () => {
+        expect.assertions(1);
+
+        const { messages } = await contextFor("The user is planning a trip.", {
+            boundary: { messageId: "m1", order: 1, stepOrder: 0 },
+            branched: true,
+            promptMessageId: null,
+        });
+
+        expect(texts(messages as never)).toStrictEqual(["first recent", "second recent", "the prompt"]);
     });
 
     it("leaves today's context alone when there is no summary for this path", async () => {

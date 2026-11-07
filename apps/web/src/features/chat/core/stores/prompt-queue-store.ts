@@ -20,13 +20,16 @@ import { create } from "zustand";
 import type { PromptQueueState, QueuedPrompt } from "@/features/chat/core/utils/prompt-queue";
 import {
     dequeuePrompt,
+    editQueuedPrompt,
     EMPTY_PROMPT_QUEUE,
     enqueuePrompt,
+    moveQueuedPrompt,
     prependPrompt,
     removeQueuedPrompt,
     restorePromptQueue,
     serializePromptQueue,
     settleQueuedSteer,
+    stepQueuedPrompt,
 } from "@/features/chat/core/utils/prompt-queue";
 
 import type { PendingAttachment } from "./chat-ui-store";
@@ -35,11 +38,16 @@ export type QueuedChatPrompt = QueuedPrompt<PendingAttachment>;
 type ThreadQueue = PromptQueueState<PendingAttachment>;
 
 interface PromptQueueStore {
-    enqueue: (threadId: string, prompt: Omit<QueuedChatPrompt, "id">) => void;
+    /** Replaces a queued message's text in place; a steered message is left as it is. */
+    edit: (threadId: string, id: string, text: string) => void;
+    /** Queues a message. A caller that retries a send it already made passes that send's id, so the backend knows it is the same message. */
+    enqueue: (threadId: string, prompt: Omit<QueuedChatPrompt, "id"> & { id?: string }) => void;
     /** Puts the prompt first and lifts a pause, so it is the next one sent. */
-    enqueueNext: (threadId: string, prompt: Omit<QueuedChatPrompt, "id">) => void;
+    enqueueNext: (threadId: string, prompt: Omit<QueuedChatPrompt, "id"> & { id?: string }) => void;
     /** Loads a thread's queue from sessionStorage once per page load, if memory has none. */
     hydrate: (threadId: string) => void;
+    /** Moves a queued message to `toIndex`, or one place up (`-1`) or down (`1`). */
+    move: (threadId: string, id: string, to: number | { step: -1 | 1 }) => void;
     queues: Record<string, ThreadQueue>;
     remove: (threadId: string, id: string) => void;
     setPaused: (threadId: string, paused: boolean) => void;
@@ -97,10 +105,11 @@ export const usePromptQueueStore = create<PromptQueueStore>()((set, get) => {
     };
 
     return {
-        enqueue: (threadId, prompt) => update(threadId, (queue) => enqueuePrompt(queue, { ...prompt, id: generatePromptId() })),
+        edit: (threadId, id, text) => update(threadId, (queue) => editQueuedPrompt(queue, id, text, generatePromptId())),
+        enqueue: (threadId, prompt) => update(threadId, (queue) => enqueuePrompt(queue, { ...prompt, id: prompt.id ?? generatePromptId() })),
         enqueueNext: (threadId, prompt) =>
             update(threadId, (queue) => {
-                return { ...prependPrompt(queue, { ...prompt, id: generatePromptId() }), paused: false };
+                return { ...prependPrompt(queue, { ...prompt, id: prompt.id ?? generatePromptId() }), paused: false };
             }),
         hydrate: (threadId) => {
             if (hydratedThreadIds.has(threadId)) {
@@ -121,6 +130,8 @@ export const usePromptQueueStore = create<PromptQueueStore>()((set, get) => {
                 });
             }
         },
+        move: (threadId, id, to) =>
+            update(threadId, (queue) => (typeof to === "number" ? moveQueuedPrompt(queue, id, to) : stepQueuedPrompt(queue, id, to.step))),
         queues: {},
         remove: (threadId, id) => update(threadId, (queue) => removeQueuedPrompt(queue, id)),
         setPaused: (threadId, paused) => update(threadId, (queue) => (queue.paused === paused ? queue : { ...queue, paused })),

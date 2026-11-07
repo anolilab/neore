@@ -11,9 +11,9 @@
  *   character that can take emoji presentation (`Extended_Pictographic`, `Emoji_Presentation`; after a keycap base,
  *   0-9 # *, only when U+20E3 follows); U+E0100 to U+E01EF after an ideograph; U+FE00 to U+FE0D after an ideograph or a
  *   math or other symbol (`Sm`, `So`), never after a letter or digit;
- * - the joiners U+200C and U+200D stay only as the ONE joiner between two visible characters (a ZWJ emoji, a Persian
- *   word): a run of them, alternating, is a binary payload, and one at an end of the text or beside a hidden character
- *   renders nothing;
+ * - U+200D (ZWJ) stays only between an emoji, optionally followed by its own emoji selector, and another emoji (a ZWJ emoji sequence):
+ *   a joiner between letters can carry a bit per gap, so it goes. U+200C (ZWNJ) never stays. The cost: the ZWNJ of
+ *   Persian words and the ZWJ of Indic conjuncts no longer render;
  * - the tag letters and CANCEL TAG of the three subdivision flags (England, Scotland, Wales: `gbeng`, `gbsct`, `gbwls`)
  *   stay when they directly follow U+1F3F4 and spell exactly one of those codes, then U+E007F; any other tag sequence is text.
  * The `strict` form treats every joiner and tag as hidden, and every selector but the one U+FE0E or U+FE0F directly after
@@ -44,8 +44,8 @@ const COMBINING_ENCLOSING_KEYCAP = 0x20_e3;
 type Range = { index: number; length: number };
 
 /**
- * `keepTrailingJoiner`: for text still being typed, where a joiner at the very end waits for the letter that follows it
- * (a Persian word is typed one character at a time). Anything sent or stored uses the default, which strips it.
+ * `keepTrailingJoiner`: for text still being typed, where a ZWJ at the very end waits for the emoji that follows it.
+ * Anything sent or stored uses the default, which strips it.
  */
 type ScanOptions = { keepTrailingJoiner?: boolean; layout?: boolean; strict?: boolean };
 
@@ -82,25 +82,26 @@ const selectorBelongs = (value: string, index: number, codePoint: number): boole
 };
 
 /**
- * A joiner stays only as the ONE joiner between two visible characters (a ZWJ emoji, a Persian word). A run of them,
- * or a joiner beside a hidden character or at an end of the text, can carry a bit per character.
+ * A ZWJ stays only inside an emoji sequence: between two emoji, or between an emoji with its own emoji selector and the
+ * next emoji. A joiner at the end of the text waits for the next emoji while the text is typed (`keepTrailingJoiner`).
  */
-const joinsVisibleCharacters = (value: string, index: number, keepTrailingJoiner: boolean): boolean => {
+const joinsEmoji = (value: string, index: number, keepTrailingJoiner: boolean): boolean => {
     const before = characterBefore(value, index);
     const next = value.codePointAt(index + 1);
+    const nextIsEmoji = next === undefined ? keepTrailingJoiner : EMOJI_BASE.test(String.fromCodePoint(next));
 
-    if (before === "" || (next === undefined ? !keepTrailingJoiner : HIDDEN_ONE.test(String.fromCodePoint(next)))) {
+    if (before === "" || !nextIsEmoji) {
         return false;
     }
 
     if (!HIDDEN_ONE.test(before)) {
-        return true;
+        return EMOJI_BASE.test(before);
     }
 
-    // The one hidden character that may stand before a joiner is a selector that belongs to its base (heart, VS16, ZWJ, fire).
+    // The one hidden character that may stand before the joiner is the emoji selector of its base (heart, then fire).
     const beforeCode = before.codePointAt(0) ?? 0;
 
-    return isVariationSelector(beforeCode) && selectorBelongs(value, index - before.length, beforeCode);
+    return isEmojiSelector(beforeCode) && selectorBelongs(value, index - before.length, beforeCode);
 };
 
 /** Whether the hidden-looking character at `index` belongs where it stands (see the top of the file). */
@@ -110,7 +111,7 @@ const belongsInPlace = (value: string, index: number, codePoint: number, inFlag:
     }
 
     if (isJoiner(codePoint)) {
-        return joinsVisibleCharacters(value, index, keepTrailingJoiner);
+        return codePoint === 0x20_0d && joinsEmoji(value, index, keepTrailingJoiner);
     }
 
     return isVariationSelector(codePoint) && selectorBelongs(value, index, codePoint);
@@ -172,9 +173,9 @@ const scan = (value: string, { keepTrailingJoiner = false, layout = false, stric
 };
 
 /**
- * `layout`: a newline and a tab are plain layout, so a multi-line prompt can have them. `strict`: the joiners U+200C
- * and U+200D count as hidden too (prompts allow them for emoji and Persian; a name or glob has no use for them), and so
- * does every variation selector and tag character.
+ * `layout`: a newline and a tab are plain layout, so a multi-line prompt can have them. `strict`: every joiner counts as
+ * hidden, U+200C and U+200D included, and so does every variation selector and tag character. A name or glob has no
+ * use for any of them. A prompt keeps only the joiners described at the top of this file.
  */
 export const hasHiddenText = (value: string, options: { layout?: boolean; strict?: boolean } = {}): boolean => scan(value, options).length > 0;
 
@@ -193,9 +194,9 @@ export const showHidden = (value: string, options: { strict?: boolean } = {}): s
 
 /**
  * The text with every hidden character removed, and how many there were. A newline and a tab stay (a prompt has
- * lines); a carriage return does not, so `\r\n` arrives as `\n`. A joiner (U+200D, U+200C) stays only alone between two visible
- * characters, where emoji sequences and Persian, Arabic and Indic text need it to render. A variation selector stays only as the one directly after a
- * character it can select a variant of (see the top of the file), and a tag only as the tail of a subdivision flag.
+ * lines); a carriage return does not, so `\r\n` arrives as `\n`. A ZWJ stays only inside an emoji sequence, and a ZWNJ never
+ * stays (see the top of the file). A variation selector stays only as the one directly after a character it can select a
+ * variant of, and a tag only as the tail of a subdivision flag.
  */
 export const stripHiddenText = (value: string, options: { keepTrailingJoiner?: boolean } = {}): { removed: number; text: string } => {
     const ranges = scan(value, { ...options, layout: true });

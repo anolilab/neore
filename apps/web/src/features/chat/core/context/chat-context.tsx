@@ -416,6 +416,7 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
         isStreaming: isLocalStreaming,
         send: sendLocalTurn,
         streamingMessage: localStreamingMessage,
+        streamingThreadId: localStreamingThreadId,
         target: localTarget,
     } = useLocalModelTurn(model, savedMessageIds);
 
@@ -644,6 +645,9 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
 
     // A local reply streams on `/chat` too, before its thread exists.
     const isStreaming = (Boolean(threadId) && (streamingMessageId !== null || Boolean(activeStreamId) || isRegenerating)) || isLocalStreaming;
+    const isThreadStreaming =
+        Boolean(threadId) &&
+        (streamingMessageId !== null || Boolean(activeStreamId) || isRegenerating || (isLocalStreaming && localStreamingThreadId === threadId));
 
     const { mutateAsync: abortStreamMutation } = useMutation(crpc.chat.functions.abortStreamByMessageId.mutationOptions());
     const { mutateAsync: abortThreadStreamMutation } = useMutation(crpc.chat.functions.abortThreadStream.mutationOptions());
@@ -946,12 +950,13 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
             isLocalModel: localTarget !== undefined,
             isLocalStreaming,
             isStreaming,
+            isThreadStreaming,
             pause,
             pendingStreamId: gatewayInfo.streamId,
             streamingMessageId,
             streamToken: gatewayInfo.streamToken,
         };
-    }, [isStreaming, isLocalStreaming, localTarget, streamingMessageId, activeStreamId, gatewayInfo, pause]);
+    }, [isStreaming, isThreadStreaming, isLocalStreaming, localTarget, streamingMessageId, activeStreamId, gatewayInfo, pause]);
 
     const actionsContextValue = useMemo((): ChatActionsContextValue => {
         return {

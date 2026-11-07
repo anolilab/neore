@@ -10,6 +10,9 @@ describe("signOutOnDevice", () => {
             clearCache: async () => {
                 calls.push("clear");
             },
+            forgetLastChat: async () => {
+                calls.push("forget");
+            },
             revokeGrant: async () => {
                 calls.push("revoke");
 
@@ -18,7 +21,7 @@ describe("signOutOnDevice", () => {
             warn: () => undefined,
         });
 
-        expect(calls).toEqual(["clear", "revoke"]);
+        expect(calls).toEqual(["clear", "forget", "revoke"]);
     });
 
     it("still asks the server when the cache could not be emptied, and says so", async () => {
@@ -29,6 +32,7 @@ describe("signOutOnDevice", () => {
             clearCache: async () => {
                 throw new Error("disk I/O error");
             },
+            forgetLastChat: async () => undefined,
             revokeGrant,
             warn,
         });
@@ -36,15 +40,84 @@ describe("signOutOnDevice", () => {
         expect(revokeGrant).toHaveBeenCalledTimes(1);
         expect(warn).toHaveBeenCalledWith("Could not empty the offline cache.", expect.any(Error));
     });
+
+    it("still asks the server when the saved chat could not be forgotten, and says so", async () => {
+        const revokeGrant = vi.fn(async () => undefined);
+        const warn = vi.fn();
+
+        await signOutOnDevice({
+            clearCache: async () => undefined,
+            forgetLastChat: async () => {
+                throw new Error("keychain locked");
+            },
+            revokeGrant,
+            warn,
+        });
+
+        expect(revokeGrant).toHaveBeenCalledTimes(1);
+        expect(warn).toHaveBeenCalledWith("Could not forget the last viewed chat.", expect.any(Error));
+    });
 });
 
 describe("emptyCacheWhileSignedOut", () => {
-    it("empties the cache whenever nobody is signed in, so a wipe that failed at sign-out is retried", async () => {
+    it("empties the cache and forgets the saved chat whenever nobody is signed in, so an ended session leaves neither", async () => {
         const clearCache = vi.fn(async () => undefined);
+        const forgetLastChat = vi.fn(async () => undefined);
 
-        await emptyCacheWhileSignedOut({ clearCache, warn: vi.fn() });
+        await emptyCacheWhileSignedOut({ clearCache, forgetLastChat, warn: vi.fn() });
 
         expect(clearCache).toHaveBeenCalledTimes(1);
+        expect(forgetLastChat).toHaveBeenCalledTimes(1);
+    });
+
+    it("still forgets the saved chat when the cache cannot be emptied", async () => {
+        const forgetLastChat = vi.fn(async () => undefined);
+
+        await emptyCacheWhileSignedOut({
+            clearCache: async () => {
+                throw new Error("disk I/O error");
+            },
+            forgetLastChat,
+            warn: vi.fn(),
+        });
+
+        expect(forgetLastChat).toHaveBeenCalledTimes(1);
+    });
+
+    it("asks to forget the saved chat before the cache wipe ends, so a chat saved by a quick sign-in is queued after it", async () => {
+        const calls: string[] = [];
+
+        await emptyCacheWhileSignedOut({
+            clearCache: async () => {
+                calls.push("wipe started");
+                await new Promise((resolve) => {
+                    setTimeout(resolve, 0);
+                });
+                calls.push("wipe ended");
+            },
+            forgetLastChat: async () => {
+                calls.push("forget");
+            },
+            warn: vi.fn(),
+        });
+
+        expect(calls).toEqual(["wipe started", "forget", "wipe ended"]);
+    });
+
+    it("only warns when the saved chat cannot be forgotten", async () => {
+        const error = new Error("keychain locked");
+        const warn = vi.fn();
+
+        await expect(
+            emptyCacheWhileSignedOut({
+                clearCache: async () => undefined,
+                forgetLastChat: async () => {
+                    throw error;
+                },
+                warn,
+            }),
+        ).resolves.toBeUndefined();
+        expect(warn).toHaveBeenCalledWith("Could not forget the last viewed chat.", error);
     });
 
     it("only warns when the cache cannot be emptied", async () => {
@@ -55,6 +128,7 @@ describe("emptyCacheWhileSignedOut", () => {
                 clearCache: async () => {
                     throw new Error("disk I/O error");
                 },
+                forgetLastChat: async () => undefined,
                 warn,
             }),
         ).resolves.toBeUndefined();

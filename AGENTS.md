@@ -81,6 +81,7 @@ the files from the root down to their working directory, so **read the file for 
 | Utility models, claim-once and crypto, storage access                               | `backend/lunora/lib/AGENTS.md`                          |
 | Edge streaming, rate-limit pause, approvals, low-risk check, side questions, secrets | `backend/lunora/chat/AGENTS.md`                         |
 | Branches, agent switch, idle-thread summaries                                       | `backend/lunora/agent/AGENTS.md`                        |
+| Tasks: rounds, the recurrence sweep, skipped slots, where a run goes               | `backend/lunora/tasks/AGENTS.md`                        |
 | Host-run threads, coding agents on a paired computer                                | `backend/lunora/acp/AGENTS.md`                          |
 | Messenger, memory, knowledge, usage, triggers, evals, sub-agents, pages, notifications, connectors, coding agents, chat import, source control, public API, devices | `backend/lunora/<folder>/AGENTS.md`                     |
 | AI model registry, prompt optimizer, multi-reference images                         | `packages/ai/AGENTS.md`                                 |

@@ -6,11 +6,12 @@ import type { Doc, Id } from "@neore/backend/dataModel";
 import { Button } from "@neore/ui/components/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@neore/ui/components/responsive-dropdown-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@neore/ui/components/tooltip";
-import { ClipboardCopyIcon, DownloadIcon, FileJsonIcon, FileTextIcon, FileTypeIcon, GaugeIcon } from "lucide-react";
+import { ClipboardCopyIcon, DownloadIcon, FileJsonIcon, FileTextIcon, FileTypeIcon, GaugeIcon, ShrinkIcon } from "lucide-react";
 import type { FC } from "react";
 import { useCallback, useState } from "react";
 import { toast } from "sonner";
 
+import useCompactThread from "@/features/chat/compaction/use-compact-thread";
 import type { DownloadFormat } from "@/lib/download";
 import { formatAsMarkdown, handleDownload } from "@/lib/download";
 import { useLunora } from "@/lib/lunora/crpc";
@@ -27,6 +28,7 @@ const ThreadDownloadButton: FC<Props> = ({ model, threadId }) => {
     const [loading, setLoading] = useState(false);
     const [isStatsOpen, setIsStatsOpen] = useState(false);
     const lunora = useLunora();
+    const { compact, isCompacting } = useCompactThread(threadId);
 
     const fetchThread = useCallback(async () => {
         if (!threadId || !model) {
@@ -100,7 +102,7 @@ const ThreadDownloadButton: FC<Props> = ({ model, threadId }) => {
                             render={
                                 <Button disabled={isDisabled} size="icon" variant="ghost">
                                     <DownloadIcon className="h-4 w-4" />
-                                    <span className="sr-only">{t`Export chat`}</span>
+                                    <span className="sr-only">{t`Chat actions`}</span>
                                 </Button>
                             }
                         />
@@ -131,13 +133,17 @@ const ThreadDownloadButton: FC<Props> = ({ model, threadId }) => {
                         <FileJsonIcon className="size-4" />
                         {t`Download JSON`}
                     </DropdownMenuItem>
+                    <DropdownMenuItem disabled={isCompacting} onClick={compact}>
+                        <ShrinkIcon aria-hidden="true" className="size-4" />
+                        {t`Compact context`}
+                    </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => setIsStatsOpen(true)}>
                         <GaugeIcon className="size-4" />
                         {t`Thread statistics`}
                     </DropdownMenuItem>
                 </DropdownMenuContent>
             </DropdownMenu>
-            <TooltipContent side="bottom">{t`Export chat`}</TooltipContent>
+            <TooltipContent side="bottom">{t`Chat actions`}</TooltipContent>
             {model && threadId && <ThreadStatsDialog model={model} onOpenChange={setIsStatsOpen} open={isStatsOpen} threadId={threadId} />}
         </Tooltip>
     );

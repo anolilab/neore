@@ -1,3 +1,4 @@
+import { stripHiddenText } from "@neore/ai/utils";
 import { describe, expect, it } from "vitest";
 
 import type { GuideFile } from "./guide-logic";
@@ -38,6 +39,48 @@ const evidenceOf = (prompt: string): Record<string, unknown> => {
 };
 
 describe("buildCloudGuidePrompt", () => {
+    it("keeps a large diff within the budget, however many hidden characters it holds", () => {
+        const { prompt } = buildCloudGuidePrompt(input({ files: [file("src/a.ts", { patch: "\u{200B}".repeat(200_000) })] }));
+
+        expect(prompt.length).toBeLessThan(200_000);
+    });
+
+    it("keeps a hidden-heavy file from using up the budget the other files need", () => {
+        const heavy = "\u{200B}".repeat(6000);
+        const { prompt } = buildCloudGuidePrompt(
+            input({
+                files: [
+                    file("src/a.ts", { patch: heavy }),
+                    file("src/b.ts", { patch: heavy }),
+                    file("src/c.ts", { patch: heavy }),
+                    file("src/d.ts", { patch: "@@ -1 +1 @@\n+kept line" }),
+                ],
+            }),
+        );
+
+        expect(prompt).toContain("+kept line");
+    });
+
+    it("tells the model how a patch spells hidden characters, and keeps its ordinary escapes", () => {
+        const { prompt, system } = buildCloudGuidePrompt(input({ files: [file("src/a.ts", { patch: "+const re = /\\d+/;\\n+x\u{200B}" })] }));
+
+        expect(system).toContain("A patch uses the same escapes for hidden characters");
+        // The patch is quoted as JSON in the prompt: its regex backslash and its escape each show doubled there.
+        expect(prompt).toContain(String.raw`/\\d+/`);
+        expect(prompt).toContain(String.raw`x\\u200B`);
+        expect(prompt).not.toContain("\u{200B}");
+    });
+
+    it("shows a hidden character in a diff as an escape, and keeps the diff's line breaks", () => {
+        const { prompt } = buildCloudGuidePrompt(input({ files: [file("src/a.ts", { patch: "@@ -1,1 +1,2 @@\n a\n+b\u{200B}c\u{E0041}" })] }));
+
+        expect(prompt).not.toContain("\u{200B}");
+        expect(prompt).not.toContain("\u{E0041}");
+        // The patch is quoted as JSON in the prompt, so each escape's backslash is doubled there.
+        expect(prompt).toContain(String.raw`+b\\u200Bc\\u{E0041}`);
+        expect(prompt).toContain(String.raw`@@ -1,1 +1,2 @@\n a\n+b`);
+    });
+
     it("carries every host-supplied string as a JSON string of the evidence, round-tripped exactly", () => {
         const { prompt } = buildCloudGuidePrompt(input());
         const evidence = evidenceOf(prompt) as { pullRequest: { body: string; title: string }; threads: { comments: { body: string }[] }[] };
@@ -86,6 +129,49 @@ describe("buildCloudGuidePrompt", () => {
         expect(files).toHaveLength(200);
         expect(files.filter((entry) => entry.patch !== undefined).length).toBeLessThan(200);
         expect(prompt.length).toBeLessThan(400_000);
+    });
+});
+
+describe("paths with hidden characters", () => {
+    it("shows a changed file's hidden character as an escape, so the cleaner keeps the path the agent must name", () => {
+        const prompt = buildHostGuidePrompt(input({ files: [file("src/a\u{200C}b.ts")] }));
+
+        expect(prompt).toContain(String.raw`"path": "src/a\\u200Cb.ts"`);
+        expect(prompt).not.toContain("\u{200C}");
+    });
+
+    it("writes a branch name with a hidden character as an escape, so the agent compares against the same ref", () => {
+        const prompt = buildHostGuidePrompt(input({ baseBranch: "main\u{200D}" }));
+
+        expect(prompt).toContain(String.raw`"baseBranch": "main\\u200D"`);
+        expect(prompt).toContain(String.raw`the JSON text "main\\u200D" names main`);
+        expect(stripHiddenText(prompt).text).toBe(prompt);
+    });
+
+    it("sends text fields with the hidden characters already removed, so the size checks measure what is sent", () => {
+        const prompt = buildHostGuidePrompt(
+            input({
+                body: "Body\u{200B} text",
+                files: [file("src/a.ts")],
+                instructions: "Look\u{E0041} at errors",
+                threads: [{ comments: [{ authorLogin: "m\u{200D}allory", body: "hi\u{E0042}" }], path: "src/a.ts" }],
+                title: "Fix\u{202E} thing",
+            }),
+        );
+
+        expect(stripHiddenText(prompt).text).toBe(prompt);
+        expect(prompt).toContain("Look at errors");
+    });
+
+    it.each([
+        ["a combining grapheme joiner", "\u{34F}"],
+        ["a supplementary variation selector", "\u{E0100}"],
+    ])("leaves the prompt unchanged by the cleaner when a path has %s after a letter", (_name, char) => {
+        const prompt = buildHostGuidePrompt(input({ files: [file(`src/a${char}b.ts`)] }));
+
+        expect(prompt).not.toContain(char);
+        // The cleaner removes nothing from the prompt, so the path the agent reads is the path the guide matches.
+        expect(stripHiddenText(prompt).text).toBe(prompt);
     });
 });
 

@@ -21,7 +21,7 @@ import { noteShardDue } from "../lib/shard-housekeeping";
 import type { SkillAccessSubject } from "../skills/access";
 import { canReadSkill } from "../skills/access";
 import { MAX_ENABLED_SKILLS } from "../skills/constants";
-import type { TaskStatus } from "./logic";
+import type { TaskRunDestination, TaskStatus } from "./logic";
 import {
     areDependenciesDone,
     canTransition,
@@ -29,6 +29,7 @@ import {
     DEFAULT_MAX_REPAIR_ROUNDS,
     findDependencyCycle,
     isTaskModelAllowed,
+    isValidTaskEffort,
     MAX_DEPENDENCIES,
     MAX_GOALS_PER_USER,
     MAX_RECURRING_TASKS_PER_USER,
@@ -36,6 +37,7 @@ import {
     MAX_TASKS_PER_USER,
     nextRecurrenceAt,
     TASK_CRITERIA_MAX,
+    TASK_EFFORT_MAX,
     TASK_INSTRUCTIONS_MAX,
     TASK_NOTE_MAX,
     TASK_TITLE_MAX,
@@ -44,10 +46,13 @@ import {
 import { isValidCronExpression } from "../triggers/schedule";
 import { requireTaskAccount } from "./account";
 import { loadUserTasks, promoteDependents, queueCycle, startTask, statusMap } from "./internal";
-import { vGoalStatus, vTaskRunOrigin, vTaskRunStatus, vTaskStatus, vVerdict } from "./validators";
+import { vGoalStatus, vTaskRunDestination, vTaskRunNoticeReason, vTaskRunOrigin, vTaskRunStatus, vTaskSkipReason, vTaskStatus, vVerdict } from "./validators";
 import { isValidBranchName, parseRepoUrl } from "../coding-agents/commands";
 import { vCodingAgentAssignment } from "../coding-agents/validators";
 import { MAX_LENGTH } from "../lib/validators";
+import { readableProject, writableProject } from "../projects/functions";
+import { throwForbidden } from "../lib/error-helpers";
+import { isThreadLocked } from "../lib/thread-lock";
 
 /** Runs shown per task in the history panel. */
 const MAX_RUNS_LISTED = 50;
@@ -92,13 +97,19 @@ const vTaskBoard = v.object({
             goalId: v.union(v.id("goals"), v.null()),
             instructions: v.string(),
             lastError: v.union(v.string(), v.null()),
+            lastRunNotice: v.union(v.object({ at: v.number(), reason: vTaskRunNoticeReason }), v.null()),
             lastRunThreadId: v.union(v.string(), v.null()),
+            lastSkippedAt: v.union(v.number(), v.null()),
+            lastSkipReason: v.union(vTaskSkipReason, v.null()),
             maxRepairRounds: v.number(),
             model: v.union(v.string(), v.null()),
             nextRunAt: v.union(v.number(), v.null()),
             parentTaskId: v.union(v.id("tasks"), v.null()),
+            projectId: v.union(v.id("projects"), v.null()),
+            reasoningEffort: v.union(v.number(), v.null()),
             resultSummary: v.union(v.string(), v.null()),
             reviewNote: v.union(v.string(), v.null()),
+            runDestination: v.union(vTaskRunDestination, v.null()),
             skillId: v.union(v.id("skills"), v.null()),
             status: vTaskStatus,
             successCriteria: v.union(v.string(), v.null()),
@@ -203,6 +214,9 @@ interface TaskDefinitionInput {
     maxRepairRounds?: number;
     model?: string;
     parentTaskId?: Id<"tasks">;
+    projectId?: Id<"projects">;
+    reasoningEffort?: number;
+    runDestination?: TaskRunDestination;
     skillId?: Id<"skills">;
     successCriteria?: string;
     title: string;
@@ -331,6 +345,49 @@ const resolveDefinition = async (
 
     const codingAgent = resolveCodingAgent(input);
 
+    // A coding agent works a repository and opens no thread: a project or a run destination would do nothing.
+    if (codingAgent && (input.projectId || (input.runDestination && input.runDestination !== "new_thread"))) {
+        throw new LunoraError("BAD_REQUEST", "A task assigned to a coding agent cannot have a project or a run destination");
+    }
+
+    if (input.reasoningEffort !== undefined && (codingAgent || !isValidTaskEffort(input.reasoningEffort))) {
+        throw new LunoraError(
+            "BAD_REQUEST",
+            codingAgent ? "A task assigned to a coding agent cannot have a reasoning effort" : `Reasoning effort must be from 0 to ${String(TASK_EFFORT_MAX)}`,
+        );
+    }
+
+    const current = taskId ? byId.get(taskId as string) : undefined;
+    let { projectId } = input;
+
+    // Runs file their threads in the project, so it takes write access (`writableProject`: the owner's own, or an
+    // organization project nobody owns), checked again at every run. Choosing one without it is refused; the
+    // task's own project, once it lost it (deleted, or the owner left the organization), is dropped rather than
+    // refusing every later edit.
+    if (projectId && !(await writableProject(ctx, projectId, userId))) {
+        if (projectId !== current?.projectId) {
+            if (await readableProject(ctx, projectId, userId)) {
+                throwForbidden("Task runs can only be filed in your own projects");
+            }
+
+            throw new LunoraError("NOT_FOUND", "Project not found");
+        }
+
+        projectId = undefined;
+    }
+
+    // Choosing to keep one thread whose chat is locked is refused: a scheduled run cannot write into a locked chat
+    // (no unlock proof). A lock that arrives later is caught at the run, which starts a new thread and says so.
+    const keepsThread = input.runDestination !== undefined && input.runDestination !== "new_thread";
+
+    if (keepsThread && current?.lastRunThreadId && input.runDestination !== current.runDestination) {
+        const thread = await ctx.db.get("threads", current.lastRunThreadId as Id<"threads">);
+
+        if (thread && isThreadLocked(thread)) {
+            throw new LunoraError("BAD_REQUEST", "The chat this task would continue is locked. Unlock it, or choose a new thread each run.");
+        }
+    }
+
     return {
         codingAgent,
         cronExpression,
@@ -341,7 +398,11 @@ const resolveDefinition = async (
         model,
         organizationId,
         parentTaskId: input.parentTaskId,
+        projectId,
+        reasoningEffort: input.reasoningEffort,
         recurring: cronExpression !== undefined,
+        // Kept for a one-off task too, so clearing and re-adding a schedule keeps the choice; only a recurring run reads it.
+        runDestination: input.runDestination,
         skillId: input.skillId,
         successCriteria,
         title,
@@ -388,13 +449,19 @@ export const getTaskBoard = authQuery
                     goalId: task.goalId ?? null,
                     instructions: task.instructions,
                     lastError: task.lastError ?? null,
+                    lastRunNotice: task.lastRunNotice ?? null,
                     lastRunThreadId: task.lastRunThreadId ?? null,
+                    lastSkippedAt: task.lastSkippedAt ?? null,
+                    lastSkipReason: task.lastSkipReason ?? null,
                     maxRepairRounds: task.maxRepairRounds,
                     model: task.model ?? null,
                     nextRunAt: task.nextRunAt ?? null,
                     parentTaskId: task.parentTaskId ?? null,
+                    projectId: task.projectId ?? null,
+                    reasoningEffort: task.reasoningEffort ?? null,
                     resultSummary: task.resultSummary ?? null,
                     reviewNote: task.reviewNote ?? null,
+                    runDestination: task.runDestination ?? null,
                     skillId: task.skillId ?? null,
                     status: task.status,
                     successCriteria: task.successCriteria ?? null,
@@ -559,6 +626,9 @@ export const createTask = authMutation
         maxRepairRounds: v.optional(v.number()),
         model: v.optional(v.string().max(MAX_LENGTH.short)),
         parentTaskId: v.optional(v.id("tasks")),
+        projectId: v.optional(v.id("projects")),
+        reasoningEffort: v.optional(v.number()),
+        runDestination: v.optional(vTaskRunDestination),
         skillId: v.optional(v.id("skills")),
         successCriteria: v.optional(v.string().max(MAX_LENGTH.text)),
         title: v.string().max(MAX_LENGTH.long),
@@ -609,6 +679,9 @@ export const updateTask = authMutation
         maxRepairRounds: v.optional(v.number()),
         model: v.optional(v.string().max(MAX_LENGTH.short)),
         parentTaskId: v.optional(v.id("tasks")),
+        projectId: v.optional(v.id("projects")),
+        reasoningEffort: v.optional(v.number()),
+        runDestination: v.optional(vTaskRunDestination),
         skillId: v.optional(v.id("skills")),
         successCriteria: v.optional(v.string().max(MAX_LENGTH.text)),
         taskId: v.id("tasks"),
@@ -633,18 +706,26 @@ export const updateTask = authMutation
             nextRunAt = definition.cronExpression === task.cronExpression && task.nextRunAt ? task.nextRunAt : nextRecurrenceAt(definition.cronExpression, now);
         }
 
+        // A skip recorded under a schedule that is gone or changed no longer describes this task.
+        const keepsSkip = definition.cronExpression !== undefined && definition.cronExpression === task.cronExpression;
+
         await patchById(ctx.db, "tasks", args.taskId, {
             codingAgent: definition.codingAgent,
             cronExpression: definition.cronExpression,
             dependsOn: definition.dependsOn,
             goalId: definition.goalId,
             instructions: definition.instructions,
+            lastSkippedAt: keepsSkip ? task.lastSkippedAt : undefined,
+            lastSkipReason: keepsSkip ? task.lastSkipReason : undefined,
             maxRepairRounds: definition.maxRepairRounds,
             model: definition.model,
             nextRunAt,
             organizationId: definition.organizationId,
             parentTaskId: definition.parentTaskId,
+            projectId: definition.projectId,
+            reasoningEffort: definition.reasoningEffort,
             recurring: definition.recurring,
+            runDestination: definition.runDestination,
             skillId: definition.skillId,
             successCriteria: definition.successCriteria,
             title: definition.title,

@@ -83,7 +83,11 @@ const WorkOnPullRequest = ({
                             <Link className="text-primary font-medium underline" params={{ threadId: row.threadId }} to="/chat/$threadId">
                                 {row.title}
                             </Link>
-                            <span className="text-muted-foreground text-xs">{row.kind === "attached" ? t`Started here` : t`Opened from this thread`}</span>
+                            <span className="text-muted-foreground text-xs">
+                                {row.kind === "attached" && t`Started here`}
+                                {row.kind === "linked" && t`Linked by hand`}
+                                {row.kind === "opened" && t`Opened from this thread`}
+                            </span>
                         </li>
                     ))}
                 </ul>

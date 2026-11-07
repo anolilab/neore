@@ -1,6 +1,16 @@
 import { describe, expect, it } from "vitest";
 
-import { assembleGuide, extractJsonObject, folderMatchesRepo, guideFreshness, isMechanicalFile, parsePatchLines } from "./guide-logic";
+import {
+    assembleGuide,
+    decodePath,
+    encodePath,
+    extractJsonObject,
+    folderMatchesRepo,
+    guideFreshness,
+    isMechanicalFile,
+    parsePatchLines,
+    showHiddenText,
+} from "./guide-logic";
 import type { GuideFile } from "./guide-logic";
 
 const PATCH = ["@@ -1,3 +1,4 @@", " keep", "-old line", "+new line", "+added line", " tail"].join("\n");
@@ -78,6 +88,124 @@ describe("assembleGuide", () => {
         const skipped = (guide.stops.at(-1)?.files ?? []).map((entry) => entry.path);
 
         expect(skipped.toSorted((a, b) => a.localeCompare(b))).toEqual(["src/binary.png", "src/skipped.ts"]);
+    });
+
+    it("names a file whose path has a hidden character by its escaped form, and keeps it apart from a name without the character", () => {
+        const hidden = "src/a\u{200C}b.ts";
+        const plain = "src/ab.ts";
+        const guide = assembleGuide(
+            [file(hidden), file(plain)],
+            {
+                proposals: [],
+                stops: [
+                    { explanation: "", files: [{ path: String.raw`src/a\u200Cb.ts` }], role: "core", title: "Hidden" },
+                    { explanation: "", files: [{ path: plain }], role: "dependent", title: "Plain" },
+                ],
+                summary: "",
+            },
+            0,
+        );
+        const placed = guide.stops.flatMap((stop) => stop.files.map((entry) => entry.path));
+
+        // The stop reports the real path, so the file is found in the pull request, and nothing is left uncovered.
+        expect(placed.toSorted((a, b) => a.localeCompare(b))).toEqual([hidden, plain].toSorted((a, b) => a.localeCompare(b)));
+        expect(guide.stops.some((stop) => stop.kind === "uncovered")).toBe(false);
+    });
+
+    it("matches an answer that names a file with a combining or supplementary selector by its escape", () => {
+        // The escape as the prompt shows it: a backslash, then `u` and the code point's hex digits.
+        const escape = (hex: string): string => String.raw`\u${hex}`;
+        const guide = assembleGuide(
+            [file("src/a\u{34F}b.ts"), file("src/a\u{E0100}b.ts")],
+            {
+                proposals: [],
+                stops: [
+                    { explanation: "", files: [{ path: `src/a${escape("034F")}b.ts` }], role: "core", title: "Combining" },
+                    { explanation: "", files: [{ path: `src/a${escape("{E0100}")}b.ts` }], role: "dependent", title: "Selector" },
+                ],
+                summary: "",
+            },
+            0,
+        );
+        const placed = guide.stops.flatMap((stop) => stop.files.map((entry) => entry.path));
+
+        expect(placed.toSorted((a, b) => a.localeCompare(b))).toEqual(["src/a\u{34F}b.ts", "src/a\u{E0100}b.ts"].toSorted((a, b) => a.localeCompare(b)));
+        expect(guide.stops.some((stop) => stop.kind === "uncovered")).toBe(false);
+    });
+
+    it("keeps a file apart from one whose name spells the same characters as a literal escape", () => {
+        const hidden = "src/a\u{200C}b.ts";
+        const spelled = String.raw`src/a\u200Cb.ts`;
+        const guide = assembleGuide(
+            [file(hidden), file(spelled)],
+            {
+                proposals: [],
+                stops: [
+                    { explanation: "", files: [{ path: String.raw`src/a\u200Cb.ts` }], role: "core", title: "Hidden" },
+                    { explanation: "", files: [{ path: String.raw`src/a\\u200Cb.ts` }], role: "dependent", title: "Spelled" },
+                ],
+                summary: "",
+            },
+            0,
+        );
+        const placed = guide.stops.flatMap((stop) => stop.files.map((entry) => entry.path));
+
+        expect(placed.toSorted((a, b) => a.localeCompare(b))).toEqual([hidden, spelled].toSorted((a, b) => a.localeCompare(b)));
+        expect(guide.stops.some((stop) => stop.kind === "uncovered")).toBe(false);
+    });
+
+    it("leaves letters of any script as they are, and escapes only what cannot be shown", () => {
+        expect(showHiddenText("日本語é中文ö")).toBe("日本語é中文ö");
+        expect(showHiddenText("a\u{200B}b")).toBe(String.raw`a\u200Bb`);
+    });
+
+    it("shows a real hidden character and the same characters written as an escape in source differently", () => {
+        const real = showHiddenText("\u{200B}");
+        const written = showHiddenText(String.raw`\u200B`);
+
+        expect(real).toBe(String.raw`\u200B`);
+        expect(written).toBe(String.raw`\\u200B`);
+        expect(written).not.toBe(real);
+    });
+
+    it("doubles a backslash only where it could read as an escape", () => {
+        expect(showHiddenText(String.raw`\d+\n`)).toBe(String.raw`\d+\n`);
+        expect(showHiddenText(String.raw`\u200B`)).toBe(String.raw`\\u200B`);
+        expect(showHiddenText(`\\\u{200B}`)).toBe(String.raw`\\\u200B`);
+    });
+
+    it("shows a backslash run before a u differently from a backslash before a hidden character", () => {
+        const literal = showHiddenText(String.raw`\\u200B`);
+        const real = showHiddenText("\\\u{200B}");
+
+        expect(literal).not.toBe(real);
+    });
+
+    it("escapes an invisible letter such as a Hangul filler, which is a letter but is not shown", () => {
+        expect(showHiddenText("a\u{3164}b")).toBe(String.raw`a\u3164b`);
+        expect(showHiddenText("a\u{115F}b")).toBe(String.raw`a\u115Fb`);
+    });
+
+    it("reads back every path it writes, so two files never share a spelling", () => {
+        const paths = ["plain.ts", "src/a\u{200C}b.ts", String.raw`src/a\u200Cb.ts`, String.raw`dir\\x`, "x\u{E0100}y", "a\u{34F}b"];
+
+        for (const path of paths) {
+            expect(decodePath(encodePath(path))).toBe(path);
+        }
+    });
+
+    it("matches a path that is short as written but longer than 1,024 characters once its hidden characters are escaped", () => {
+        // 300 zero-width joiners: 303 characters as written, 1,806 as the prompt shows them.
+        const hidden = `src/${"\u{200C}".repeat(300)}.ts`;
+        const escaped = `src/${String.raw`\u200C`.repeat(300)}.ts`;
+        const guide = assembleGuide(
+            [file(hidden)],
+            { proposals: [], stops: [{ explanation: "", files: [{ path: escaped }], role: "core", title: "Long" }], summary: "" },
+            0,
+        );
+
+        expect(guide.stops.flatMap((stop) => stop.files.map((entry) => entry.path))).toEqual([hidden]);
+        expect(guide.stops.some((stop) => stop.kind === "uncovered")).toBe(false);
     });
 
     it("orders core, then dependents, then mechanical changes, then what is not covered", () => {

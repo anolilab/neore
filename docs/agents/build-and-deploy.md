@@ -5,6 +5,8 @@ repo-relative. Project-wide rules stay in the root `AGENTS.md`.
 
 ## Build and deploy
 
+- **Vite is 8.3.x, pinned in the `build` catalog.** Bump it with the Vite plugins that peer-depend on it, and run `pnpm lint` plus a web build.
+- **Perf report:** `ROLLDOWN_REPORT=1 pnpm --filter @neore/web run build` writes Rolldown's report to `apps/web/node_modules/.rolldown/report/dist/{client,server}/` (start at `entry.md`). It stays out of `dist/` and off by default. On Rolldown 1.2 there is no `chunk-graph.json` and no no-op hook list.
 - **Alchemy is 2.0 (beta), pinned EXACTLY** in the `iac` catalog. The beta ships about
   weekly and each release can move APIs; `minimumReleaseAge` also holds back the newest
   ones. Bump it deliberately, run `lint:types:deploy`, the five `deploy-*.test.ts`, then
