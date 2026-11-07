@@ -5,6 +5,7 @@
  * two cases it decides: a write made while the connection is down is refused at once when it is `onlineOnly`, and queued for the
  * reconnect otherwise.
  */
+import { TransportError } from "@lunora/client";
 import { MutationCache, onlineManager, QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
@@ -233,6 +234,15 @@ describe("snoozing while offline", () => {
         await expect(result.current.snoozeAt("t1", UNTIL, undefined)).resolves.toBe("unconfirmed");
         expect(server.written).toHaveLength(1);
         expect(toasts.errors).toEqual([]);
+    });
+
+    it("a custom snooze whose RPC deadline passes with no verdict is unconfirmed, not refused", async () => {
+        const { result } = renderHook(() => useThreadStateActions(), { wrapper });
+
+        // The client's own TransportError: its deadline expired, and the server may have committed the write.
+        server.lostError = new TransportError("The request timed out before the server answered.");
+        await expect(result.current.snoozeAt("t1", UNTIL, undefined)).resolves.toBe("unconfirmed");
+        expect(server.written).toHaveLength(1);
     });
 
     it("a custom snooze that times out after the server committed it is unconfirmed", async () => {

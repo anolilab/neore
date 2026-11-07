@@ -1,4 +1,5 @@
 import { useLingui } from "@lingui/react/macro";
+import { TransportError } from "@lunora/client";
 import type { Id } from "@neore/backend/dataModel";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useCallback } from "react";
@@ -17,9 +18,13 @@ interface SnoozeMutateVariables {
 
 type SnoozeMutate = (variables: SnoozeMutateVariables) => Promise<unknown>;
 
-/** A failure of the request itself: a network failure (a `TypeError` from `fetch`), or an aborted or timed-out request (a `DOMException`). */
+/**
+ * A failure of the request itself: a network failure (a `TypeError` from `fetch`), an aborted or timed-out request (a `DOMException`),
+ * or the client's `TransportError`, which it raises when its RPC deadline passes with no verdict from the server.
+ */
 const isTransportFailure = (error: unknown): boolean =>
     error instanceof TypeError ||
+    error instanceof TransportError ||
     (typeof DOMException !== "undefined" && error instanceof DOMException && (error.name === "AbortError" || error.name === "TimeoutError"));
 
 /**
