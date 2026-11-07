@@ -814,7 +814,7 @@ export interface ApiTypes {
             getSkillBreakdown: FunctionReference<"query", { fromDate: unknown }, { skills: Array<{ costMicrodollars: number; replies: number; skillKey: string; skillName?: string; tokens: number }>; truncated: boolean }>;
         };
         backfill: {
-            getUsageBackfillStatus: FunctionReference<"query", {}, "idle" | "running" | "done">;
+            getUsageBackfillStatus: FunctionReference<"query", {}, { projects: "idle" | "running" | "done"; replies: "idle" | "running" | "done" }>;
             startUsageBackfill: FunctionReference<"mutation", {}, "idle" | "running" | "done">;
         };
         organization: {

@@ -56051,20 +56051,45 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "anyOf": [
-                    {
-                      "const": "idle",
-                      "type": "string"
+                  "properties": {
+                    "projects": {
+                      "anyOf": [
+                        {
+                          "const": "idle",
+                          "type": "string"
+                        },
+                        {
+                          "const": "running",
+                          "type": "string"
+                        },
+                        {
+                          "const": "done",
+                          "type": "string"
+                        }
+                      ]
                     },
-                    {
-                      "const": "running",
-                      "type": "string"
-                    },
-                    {
-                      "const": "done",
-                      "type": "string"
+                    "replies": {
+                      "anyOf": [
+                        {
+                          "const": "idle",
+                          "type": "string"
+                        },
+                        {
+                          "const": "running",
+                          "type": "string"
+                        },
+                        {
+                          "const": "done",
+                          "type": "string"
+                        }
+                      ]
                     }
-                  ]
+                  },
+                  "required": [
+                    "projects",
+                    "replies"
+                  ],
+                  "type": "object"
                 }
               }
             },

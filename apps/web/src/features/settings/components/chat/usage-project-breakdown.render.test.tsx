@@ -17,8 +17,8 @@ vi.mock("@lingui/react/macro", () => {
     };
 });
 
-const { fetchOrganization, permission } = vi.hoisted(() => {
-    return { fetchOrganization: vi.fn(), permission: { success: false } };
+const { fetchOrganization, permission, permissionAsked } = vi.hoisted(() => {
+    return { fetchOrganization: vi.fn(), permission: { success: false }, permissionAsked: [] as unknown[] };
 });
 
 vi.mock("@neore/backend/api", () => {
@@ -33,12 +33,22 @@ vi.mock("@/features/auth/lib/auth-ui-provider", () => {
     };
 });
 
+vi.mock("@/features/auth/hooks/session-user-management", () => {
+    return {
+        useSession: () => {
+            return { data: { user: { id: "user-1" } } };
+        },
+    };
+});
+
 vi.mock("@/features/auth/hooks/organization-management", () => {
     return {
         useActiveOrganization: () => {
             return { data: { id: "org_1" } };
         },
-        useHasPermission: () => {
+        useHasPermission: (_client: unknown, parameters: unknown) => {
+            permissionAsked.push(parameters);
+
             return { data: permission };
         },
     };
@@ -90,6 +100,8 @@ describe("UsageProjectBreakdown", () => {
         await screen.findByText("Alpha");
 
         expect(fetchOrganization).not.toHaveBeenCalled();
+        // The role is asked about the active organization, so a cached answer from another one is never reused.
+        expect(permissionAsked.at(-1)).toMatchObject({ organizationId: "org_1" });
     });
 
     it("leaves an admin on their own view without an organization read until they switch to it", async () => {

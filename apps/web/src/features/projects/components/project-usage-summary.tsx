@@ -23,7 +23,7 @@ const ProjectUsageSummary = ({ projectId }: ProjectUsageSummaryProps) => {
     const [today] = useState(() => localDayKey(new Date()));
     const locale = i18n.locale || "en";
     // Earlier replies are filed under their projects by the usage backfill: start it if it has not run, and read again as it goes.
-    const { backfilling } = useUsageBackfill();
+    const { projectsBackfilling: backfilling } = useUsageBackfill();
     const { data, isError, isPending, refetch } = useQuery({
         ...crpc.usage.activity.getProjectUsage.queryOptions(
             // The dialog receives `_id` as a plain `string`; it is always an id the backend returned for a `projects` row.

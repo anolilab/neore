@@ -10,6 +10,7 @@ import type { FC } from "react";
 import { useState } from "react";
 
 import { useActiveOrganization, useHasPermission } from "@/features/auth/hooks/organization-management";
+import { useSession } from "@/features/auth/hooks/session-user-management";
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 import { useAction, useCRPC } from "@/lib/lunora/crpc";
 
@@ -54,10 +55,16 @@ const UsageProjectBreakdown: FC<UsageProjectBreakdownProps> = ({ backfilling, da
     const fromDate = periodStart(today, days);
 
     // Organization admins and owners can update it; members cannot. The server checks the role again on every call.
-    const { data: permission } = useHasPermission(authClient, { permissions: { organization: ["update"] } });
+    const { data: session } = useSession(authClient);
+    const userId: string | undefined = session?.user.id;
     const { data: activeOrganization } = useActiveOrganization(authClient);
     const organizationId: string | undefined = activeOrganization?.id;
-    const isOrganizationAdmin = permission?.success === true && organizationId !== undefined;
+    // Asked for the active organization by id, so its cached answer is never another organization's.
+    const { data: permission } = useHasPermission(authClient, {
+        permissions: { organization: ["update"] },
+        ...(organizationId !== undefined && { organizationId }),
+    });
+    const isOrganizationAdmin = permission?.success === true && organizationId !== undefined && userId !== undefined;
     const showing: Scope = isOrganizationAdmin ? scope : "mine";
     const organizationEnabled = showing === "organization";
 
@@ -73,8 +80,8 @@ const UsageProjectBreakdown: FC<UsageProjectBreakdownProps> = ({ backfilling, da
     const organization = useQuery({
         enabled: organizationEnabled,
         queryFn: async () => await readOrganizationUsage(async (cursor) => await fetchOrganization({ cursor, fromDate })),
-        // Keyed by the organization too: switching organizations must not show the last one's totals.
-        queryKey: ["usage", "organization-projects", organizationId, fromDate],
+        // Keyed by the signed-in user and the organization: switching either never shows the previous one's totals.
+        queryKey: ["usage", "organization-projects", userId, organizationId, fromDate],
         retry: 1,
         staleTime: 2 * 60_000,
     });

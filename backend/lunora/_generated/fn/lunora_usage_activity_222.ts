@@ -22,13 +22,20 @@ __has1 = true;
 }
 let __has2 = false;
 let __val2;
+if (source["startedAt"] !== undefined) {
+if (typeof source["startedAt"] !== "number" || !Number.isFinite(source["startedAt"])) return DEFER;
+__val2 = source["startedAt"];
+__has2 = true;
+}
+let __has3 = false;
+let __val3;
 if (source["threadId"] !== undefined) {
 if (typeof source["threadId"] !== "string") return DEFER;
-__val2 = source["threadId"];
-__has2 = true;
+__val3 = source["threadId"];
+__has3 = true;
 }
 if (typeof source["tokens"] !== "number" || !Number.isFinite(source["tokens"])) return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
-return { "at": source["at"], "costMicrodollars": source["costMicrodollars"], "date": source["date"], "replyKey": source["replyKey"], "skillKey": source["skillKey"], ...(__has1 ? { "skillName": __val1 } : {}), ...(__has2 ? { "threadId": __val2 } : {}), "tokens": source["tokens"], "userId": source["userId"] };
+return { "at": source["at"], "costMicrodollars": source["costMicrodollars"], "date": source["date"], "replyKey": source["replyKey"], "skillKey": source["skillKey"], ...(__has1 ? { "skillName": __val1 } : {}), ...(__has2 ? { "startedAt": __val2 } : {}), ...(__has3 ? { "threadId": __val3 } : {}), "tokens": source["tokens"], "userId": source["userId"] };
 });
 export * from "../../usage/activity.js";

@@ -256,13 +256,13 @@ describe("usage backfill", () => {
         await insertFixture();
         vi.setSystemTime(STARTED);
 
-        expect(await status()).toBe("idle");
+        expect(await status()).toStrictEqual({ projects: "idle", replies: "idle" });
         expect(await start()).toBe("running");
 
         await drain();
 
         expect(await rollup()).toStrictEqual(EXPECTED);
-        expect(await status()).toBe("done");
+        expect(await status()).toStrictEqual({ projects: "done", replies: "done" });
         const finished = await state();
 
         expect(finished.replies).toBe(5);
@@ -580,7 +580,7 @@ describe("project backfill", () => {
         await start();
         await drain();
 
-        expect(await status()).toBe("done");
+        expect(await status()).toStrictEqual({ projects: "done", replies: "done" });
         const rows = await rollup();
 
         expect(await projectRows()).toStrictEqual(EXPECTED_PROJECTS(alpha, beta));
@@ -617,7 +617,8 @@ describe("project backfill", () => {
 
         await forgetProjectWalk();
 
-        expect(await status()).toBe("idle");
+        // The totals are complete; only the project walk has still to run, and the usage page waits on nothing else.
+        expect(await status()).toStrictEqual({ projects: "idle", replies: "done" });
         expect(await start()).toBe("running");
         await drain();
 
@@ -774,5 +775,48 @@ describe("project backfill", () => {
 
         expect(totalDay).toBe("2026-09-21");
         expect(projectDay).toBe(totalDay);
+    });
+
+    it("files a late live record's project on the day the first walk dated its total, for a reply that ran past midnight", async () => {
+        const alpha = await insertProject("Alpha");
+        // Started at 23:59 UTC on 2026-09-20; its live record lands after midnight, dated 2026-09-21.
+        const started = Date.UTC(2026, 8, 20, 23, 59);
+        const thread = await insertThread(started, [[prompt(), reply(10, 100)]], "active", alpha);
+        const key = thread.rowIds[0]![1]!;
+
+        vi.setSystemTime(STARTED);
+        await start();
+        await drain();
+
+        // The first walk counted it, dated 2026-09-20. Drop the project walk's filing to stand for a walk that passed it running.
+        await harness.run(async (ctx: any) => {
+            const marker = await ctx.db.usageReplies.findFirst({ where: { replyKey: `project:${key}`, userId: USER } });
+            const { page } = await ctx.db.usageDaily.findMany({ where: { skillKey: PROJECT_SKILL_KEY, userId: USER } });
+
+            await ctx.db.delete("usageReplies", marker._id);
+
+            for (const row of page) {
+                await ctx.db.delete("usageDaily", row._id);
+            }
+        });
+        await harness.run(
+            async (ctx: any) =>
+                await ctx.runMutation(recordReplyUsage, {
+                    at: STARTED,
+                    costMicrodollars: 100,
+                    date: "2026-09-21",
+                    replyKey: key,
+                    skillKey: DEFAULT_SKILL_KEY,
+                    startedAt: started,
+                    threadId: thread.threadId,
+                    tokens: 10,
+                    userId: USER,
+                }),
+        );
+
+        const rows = await rollup();
+
+        expect(rows.find((row) => row.skillKey === TOTAL_SKILL_KEY)?.date).toBe("2026-09-20");
+        expect(rows.find((row) => row.skillKey === PROJECT_SKILL_KEY)?.date).toBe("2026-09-20");
     });
 });

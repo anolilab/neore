@@ -45,6 +45,7 @@ import {
     remainderOf,
     sumRows,
     TOTAL_SKILL_KEY,
+    usageDayOf,
     withDayTotals,
 } from "./activity-logic";
 
@@ -165,6 +166,22 @@ export const addToRollup = async (ctx: DbCtx, userId: string, increments: Readon
 };
 
 /**
+ * The day an already-counted reply's total sits on. The first walk dates a reply by its first row, in the zone it
+ * snapshotted when it started; a reply that ran past midnight would otherwise put its project row on the next day.
+ */
+const countedDayOf = async (ctx: DbCtx, args: { date: string; startedAt?: number; userId: string }): Promise<string> => {
+    if (args.startedAt === undefined) {
+        return args.date;
+    }
+
+    const state = await ctx.db.usageBackfill.findFirst({ where: { userId: args.userId } });
+    const settings = state?.timeZone ? null : await ctx.db.userSettings.findFirst({ where: { userId: args.userId } });
+    const timeZone = state?.timeZone ?? settings?.timezone;
+
+    return usageDayOf(args.startedAt, timeZone);
+};
+
+/**
  * One finished reply: adds to the day's total row and to the day's row for the
  * skill that answered, once per `replyKey`. `at` is the caller's clock, so the
  * handler stays deterministic.
@@ -177,6 +194,7 @@ export const recordReplyUsage = internalMutation
         replyKey: v.string(),
         skillKey: v.string(),
         skillName: v.optional(v.string()),
+        startedAt: v.optional(v.number()),
         threadId: v.optional(v.string()),
         tokens: v.number(),
         userId: v.string(),
@@ -202,8 +220,10 @@ export const recordReplyUsage = internalMutation
             const attribution = recorded.projectFiled ? {} : await attributionOfThread(ctx, args.threadId);
 
             if (filesAnywhere(attribution) && !(await isReplyRecorded(ctx, args.userId, projectFiledKey(args.replyKey)))) {
+                const date = await countedDayOf(ctx, args);
+
                 await markReplyRecorded(ctx, args.userId, projectFiledKey(args.replyKey), args.at);
-                await addToAttributionRollup(ctx, args.userId, [{ costMicrodollars, date: args.date, replies: 1, tokens, ...attribution }], args.at);
+                await addToAttributionRollup(ctx, args.userId, [{ costMicrodollars, date, replies: 1, tokens, ...attribution }], args.at);
             }
 
             return null;

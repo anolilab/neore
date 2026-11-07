@@ -88,6 +88,8 @@ export const skillKeyOf = (skill: ReplySkill | undefined): string => {
 
 /** The fields of a saved row a reply's usage is read from (a subset of `MessageDoc`). */
 export interface SavedRowLike {
+    /** When the row was saved: the first reply row's is when the reply started, the day the backfill dates it by. */
+    _creationTime?: number;
     _id?: string;
     message?: { role?: string } | null;
     order?: number;
@@ -157,6 +159,8 @@ export interface ReplyUsageArgs {
     replyKey: string;
     skillKey: string;
     skillName?: string;
+    /** When the reply's first row was saved; dates its project row when the backfill already counted the reply. */
+    startedAt?: number;
     /** The thread the reply is in; its project, read when the record lands, gets the reply's usage too. */
     threadId?: string;
     tokens: number;
@@ -190,6 +194,7 @@ export const replyUsageArgs = (
         userId: options.userId,
         ...(options.skill && { skillName: options.skill.name }),
         ...(first?.threadId !== undefined && { threadId: first.threadId }),
+        ...(first?._creationTime !== undefined && { startedAt: first._creationTime }),
     };
 };
 

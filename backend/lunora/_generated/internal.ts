@@ -1220,7 +1220,7 @@ export interface InternalApiTypes {
     };
     usage: {
         activity: {
-            recordReplyUsage: FunctionReference<"mutation", { at: number; costMicrodollars: number; date: string; replyKey: string; skillKey: string; skillName?: string; threadId?: string; tokens: number; userId: string }, null>;
+            recordReplyUsage: FunctionReference<"mutation", { at: number; costMicrodollars: number; date: string; replyKey: string; skillKey: string; skillName?: string; startedAt?: number; threadId?: string; tokens: number; userId: string }, null>;
         };
         backfill: {
             runUsageBackfillStep: FunctionReference<"mutation", { runId: string; userId: string }, null>;

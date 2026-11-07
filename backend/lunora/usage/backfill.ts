@@ -86,13 +86,12 @@ const loadState = async (ctx: Pick<QueryCtx, "db">, userId: string) => await ctx
 
 type BackfillState = NonNullable<Awaited<ReturnType<typeof loadState>>>;
 
-/** Both walks together: done once both are, idle while either has not started. */
-const combinedStatus = (state: BackfillState | null): BackfillStatus => {
-    if (!state || !state.projects) {
-        return "idle";
-    }
-
-    return state.status === "done" && state.projects.status === "done" ? "done" : "running";
+/**
+ * Each walk on its own: the first walk changes the totals and skills, the project walk only the project rows, so a
+ * page waits only on the walk that feeds it. `idle` = not started.
+ */
+const walkStatuses = (state: BackfillState | null): { projects: BackfillStatus; replies: BackfillStatus } => {
+    return { projects: state?.projects?.status ?? "idle", replies: state?.status ?? "idle" };
 };
 
 /**
@@ -491,11 +490,11 @@ export const runUsageProjectBackfillStep = internalMutation
         return null;
     });
 
-/** Where the caller's backfill stands, both walks together: `idle` = not started. */
+/** Where each of the caller's two walks stands: `idle` = not started. */
 export const getUsageBackfillStatus = authQuery
     .input({})
-    .output(vBackfillStatus)
-    .query(async ({ ctx }): Promise<BackfillStatus> => combinedStatus(await loadState(ctx, ctx.user.userId)));
+    .output(v.object({ projects: vBackfillStatus, replies: vBackfillStatus }))
+    .query(async ({ ctx }) => walkStatuses(await loadState(ctx, ctx.user.userId)));
 
 /** The usage page opened: start the caller's backfill, or resume one that stopped. */
 export const startUsageBackfill = authMutation
