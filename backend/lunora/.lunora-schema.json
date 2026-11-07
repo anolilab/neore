@@ -28265,6 +28265,12 @@
           "optional": true,
           "unique": false
         },
+        "hostFollowUpSteer": {
+          "kind": "boolean",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "isAdvancedUser": {
           "kind": "boolean",
           "nullable": false,

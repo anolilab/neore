@@ -18,8 +18,15 @@ return { "optionId": source["optionId"], "requestId": source["requestId"], "thre
 installCompiledValidatorMap(lunora_acp_remote_4.cancelHostTurn.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
+let __has1 = false;
+let __val1;
+if (source["streamId"] !== undefined) {
+if (typeof source["streamId"] !== "string") return DEFER;
+__val1 = source["streamId"];
+__has1 = true;
+}
 if (typeof source["threadId"] !== "string") return DEFER;
-return { "threadId": source["threadId"] };
+return { ...(__has1 ? { "streamId": __val1 } : {}), "threadId": source["threadId"] };
 });
 installCompiledValidatorMap(lunora_acp_remote_4.getHostPendingPermissions.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;

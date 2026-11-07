@@ -55,6 +55,9 @@ const withoutHidden = <A>(item: QueuedPrompt<A>): QueuedPrompt<A> => {
     return { ...item, text: stripHiddenText(item.text).text };
 };
 
+/** The text a person means by a message: hidden characters gone, then trimmed. Empty means there is nothing to send. */
+export const cleanPromptText = (text: string): string => stripHiddenText(text).text.trim();
+
 export const enqueuePrompt = <A>(state: PromptQueueState<A>, item: QueuedPrompt<A>): PromptQueueState<A> => {
     return { ...state, items: [...state.items, withoutHidden(item)] };
 };
@@ -62,6 +65,26 @@ export const enqueuePrompt = <A>(state: PromptQueueState<A>, item: QueuedPrompt<
 /** Ahead of everything already queued. */
 export const prependPrompt = <A>(state: PromptQueueState<A>, item: QueuedPrompt<A>): PromptQueueState<A> => {
     return { ...state, items: [withoutHidden(item), ...state.items] };
+};
+
+/**
+ * Replaces the text of a queued message in place, so it keeps its place. A changed text takes `newId`, and an unchanged one
+ * keeps its id. A steered message is already in the running reply, so it cannot be edited here. Hidden characters go, as
+ * on enqueue.
+ */
+export const editQueuedPrompt = <A>(state: PromptQueueState<A>, id: string, text: string, newId: string): PromptQueueState<A> => {
+    return {
+        ...state,
+        items: state.items.map((item) => {
+            // Text that is only hidden characters is no message: the item keeps its text rather than becoming empty.
+            if (item.id !== id || item.steer !== undefined || item.text === text || cleanPromptText(text) === "") {
+                return item;
+            }
+
+            // A changed text is a new message: its send id must not be one an earlier, lost-answer send already used.
+            return withoutHidden({ ...item, id: newId, text });
+        }),
+    };
 };
 
 export const removeQueuedPrompt = <A>(state: PromptQueueState<A>, id: string): PromptQueueState<A> => {
