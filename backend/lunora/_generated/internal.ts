@@ -1220,10 +1220,13 @@ export interface InternalApiTypes {
     };
     usage: {
         activity: {
-            recordReplyUsage: FunctionReference<"mutation", { at: number; costMicrodollars: number; date: string; replyKey: string; skillKey: string; skillName?: string; tokens: number; userId: string }, null>;
+            forwardReplyUsage: FunctionReference<"mutation", { at: number; costMicrodollars: number; date: string; replyKey: string; skillKey: string; skillName?: string; startedAt?: number; threadId: string; tokens: number; userId: string }, null>;
+            getThreadAttribution: FunctionReference<"query", { threadId: string; userId: string }, { projectKey?: string }>;
+            recordReplyUsage: FunctionReference<"mutation", { at: number; costMicrodollars: number; date: string; replyKey: string; skillKey: string; skillName?: string; startedAt?: number; threadAttribution?: { projectKey?: string }; threadId?: string; tokens: number; userId: string }, null>;
         };
         backfill: {
             runUsageBackfillStep: FunctionReference<"mutation", { runId: string; userId: string }, null>;
+            runUsageProjectBackfillStep: FunctionReference<"mutation", { runId: string; userId: string }, null>;
             sweepUsageRollup: FunctionReference<"mutation", {}, { pruned: number; status: "idle" | "running" | "done" }>;
         };
     };
@@ -2477,10 +2480,13 @@ export const internal: InternalApiTypes = {
     },
     usage: {
         activity: {
+            forwardReplyUsage: { __lunoraRef: "usage_activity:forwardReplyUsage" },
+            getThreadAttribution: { __lunoraRef: "usage_activity:getThreadAttribution" },
             recordReplyUsage: { __lunoraRef: "usage_activity:recordReplyUsage" },
         },
         backfill: {
             runUsageBackfillStep: { __lunoraRef: "usage_backfill:runUsageBackfillStep" },
+            runUsageProjectBackfillStep: { __lunoraRef: "usage_backfill:runUsageProjectBackfillStep" },
             sweepUsageRollup: { __lunoraRef: "usage_backfill:sweepUsageRollup" },
         },
     },
