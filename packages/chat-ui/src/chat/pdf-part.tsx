@@ -1,6 +1,6 @@
-import { requestPdfPreview } from "@neore/ui/utils/pdf-preview-event";
+import { rememberPdfUrl, requestPdfPreview } from "@neore/ui/utils/pdf-preview-event";
 import type { FC } from "react";
-import { lazy, useState } from "react";
+import { lazy, useEffect, useState } from "react";
 
 const PdfThumbnail = lazy(() => import("@neore/ui/components/file-renderers/pdf-thumbnail"));
 const PdfViewer = lazy(() => import("@neore/ui/components/file-renderers/pdf-viewer"));
@@ -19,12 +19,17 @@ const PdfPart: FC<PdfPartProps> = ({ filename, url }) => {
     const [inlineUrl, setInlineUrl] = useState<string | undefined>(undefined);
     const inline = inlineUrl === url;
 
+    // A re-signed URL replaces an expiring one; a panel already showing this file takes its links from the newest.
+    useEffect(() => {
+        rememberPdfUrl(url);
+    }, [url]);
+
     if (inline) {
         return <PdfViewer filename={filename} url={url} />;
     }
 
-    const open = () => {
-        if (!requestPdfPreview({ filename, url })) {
+    const open = (opener: HTMLElement) => {
+        if (!requestPdfPreview({ filename, opener, url })) {
             setInlineUrl(url);
         }
     };

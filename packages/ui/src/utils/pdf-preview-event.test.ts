@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { OPEN_PDF_PREVIEW_EVENT, requestPdfPreview } from "./pdf-preview-event";
+import { latestPdfUrl, OPEN_PDF_PREVIEW_EVENT, rememberPdfUrl, requestPdfPreview } from "./pdf-preview-event";
 
 const detail = { filename: "report.pdf", url: "https://files.example.com/report.pdf" };
 
@@ -28,5 +28,14 @@ describe(requestPdfPreview, () => {
         target.addEventListener(OPEN_PDF_PREVIEW_EVENT, () => {});
 
         expect(requestPdfPreview(detail, target)).toBe(false);
+    });
+});
+
+describe(latestPdfUrl, () => {
+    it("follows a file to its newest signed URL, and leaves other files alone", () => {
+        rememberPdfUrl("https://files.example.com/a.pdf?sig=new");
+
+        expect(latestPdfUrl("https://files.example.com/a.pdf?sig=old")).toBe("https://files.example.com/a.pdf?sig=new");
+        expect(latestPdfUrl("https://files.example.com/b.pdf?sig=old")).toBe("https://files.example.com/b.pdf?sig=old");
     });
 });

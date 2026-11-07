@@ -46,14 +46,15 @@ vi.mock("react-pdf", async () => {
 
             return firstPage.documentPending ? loading : children;
         },
-        Page: ({ onRenderSuccess }: { onRenderSuccess: () => void }) => {
+        Page: ({ canvasRef, onRenderSuccess }: { canvasRef: { current: unknown }; onRenderSuccess: () => void }) => {
             useEffect(() => {
                 if (firstPage.renders) {
+                    canvasRef.current = { toDataURL: () => "data:image/png;base64,cGFnZQ==" };
                     onRenderSuccess();
                 }
-            }, [onRenderSuccess]);
+            }, [canvasRef, onRenderSuccess]);
 
-            return null;
+            return <span data-pdf-document="" />;
         },
     };
 });
@@ -135,6 +136,15 @@ describe("the thumbnail's load deadline", () => {
         await advance(PDF_LOAD_TIMEOUT_MS + 1);
 
         expect(container.querySelector('[role="status"]')).toBeNull();
+    });
+
+    it("keeps the drawn first page as an image and lets the PDF document go", async () => {
+        firstPage.renders = true;
+
+        await mountThumbnail();
+
+        expect(container.querySelector("img")?.getAttribute("src")).toBe("data:image/png;base64,cGFnZQ==");
+        expect(container.querySelector("[data-pdf-document]")).toBeNull();
     });
 
     // The loading placeholder pulses through a class, and the reduced-motion preference is a CSS media query, so jsdom cannot

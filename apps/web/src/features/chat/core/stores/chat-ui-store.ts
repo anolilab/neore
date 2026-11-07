@@ -56,6 +56,8 @@ const isAtBottomBatcher = createBatcher<boolean>();
 /** A chat PDF the side panel shows. `url` is the attachment's own (signed) URL; the panel shows it only in `threadId`. */
 export interface PreviewFile {
     filename?: string;
+    /** The thumbnail that opened it: focus returns there when the panel closes. */
+    opener?: HTMLElement;
     threadId?: string;
     url: string;
 }

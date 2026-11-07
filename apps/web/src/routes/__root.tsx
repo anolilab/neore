@@ -29,6 +29,7 @@ import { CHAT_TEXT_SIZE_BOOT_SCRIPT } from "@/features/appearance/lib/chat-text-
 import LoginPromptHost from "@/features/auth/components/auth/login-prompt-host";
 import { AuthQueryProvider } from "@/features/auth/lib/auth-query-provider";
 import AuthUIProviderTanstack from "@/features/auth/lib/tanstack/auth-ui-provider-tanstack";
+import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
 import ConnectionProvider from "@/features/connection/components/connection-provider";
 import OfflineScreen from "@/features/connection/components/offline-screen";
 import { useUIStateStore } from "@/features/layout/stores/ui-state-store";
@@ -414,6 +415,9 @@ const RootComponent = () => {
         } catch {
             forgetClientPostHog();
         }
+
+        // The side panel may show the previous account's document or PDF, with its signed link: it does not carry over.
+        useChatUIStore.getState().closeCanvas();
 
         await router.invalidate();
     }, [router]);

@@ -31,6 +31,7 @@ vi.mock("@neore/ui/components/file-renderers/pdf-viewer", () => {
 vi.stubEnv("VITE_LUNORA_URL", "https://api.example");
 
 const { default: PdfPreviewPanel } = await import("./pdf-preview-panel");
+const { rememberPdfUrl } = await import("@neore/ui/utils/pdf-preview-event");
 
 const DOCUMENT_A = { filename: "a.pdf", threadId: "thread-1", url: "https://api.example/files/a.pdf?sig=a" };
 const DOCUMENT_B = { filename: "b.pdf", threadId: "thread-1", url: "https://api.example/files/b.pdf?sig=b" };
@@ -58,7 +59,7 @@ const createObjectUrl = vi.fn(() => "blob:saved");
 
 Object.defineProperty(URL, "createObjectURL", { configurable: true, value: createObjectUrl, writable: true });
 
-const panelFor = (file: typeof DOCUMENT_A) => <PdfPreviewPanel file={file} key={file.url} />;
+const panelFor = (file: typeof DOCUMENT_A) => <PdfPreviewPanel file={file} />;
 
 const flush = async () => {
     await act(async () => {
@@ -100,7 +101,7 @@ describe("the side panel's download after a document switch", () => {
 
         expect(fetchSpy).toHaveBeenCalledWith(DOCUMENT_A.url, expect.objectContaining({ signal: expect.any(AbortSignal) }));
 
-        // The switch: a new document is a new panel, as the assistant keys it by URL.
+        // The switch: the same panel now shows another document.
         rerender(panelFor(DOCUMENT_B));
 
         await act(async () => {
@@ -129,5 +130,45 @@ describe("the side panel's download after a document switch", () => {
         await waitFor(() => {
             expect(savedFilenames()).toEqual(["b.pdf"]);
         });
+    });
+});
+
+describe("the side panel's opener and links", () => {
+    beforeEach(() => {
+        vi.stubGlobal("fetch", fetchSpy);
+    });
+
+    afterEach(() => {
+        pendingFetches.length = 0;
+        fetchSpy.mockClear();
+        vi.unstubAllGlobals();
+        document.body.replaceChildren();
+    });
+
+    it("returns focus to the thumbnail that opened the file on screen when the panel closes", () => {
+        const thumbnailA = document.createElement("button");
+        const thumbnailB = document.createElement("button");
+
+        document.body.append(thumbnailA, thumbnailB);
+
+        const { rerender, unmount } = render(panelFor({ ...DOCUMENT_A, opener: thumbnailA }));
+
+        rerender(panelFor({ ...DOCUMENT_B, opener: thumbnailB }));
+
+        expect(document.activeElement).toBe(screen.getByRole("heading", { name: "b.pdf" }));
+
+        unmount();
+
+        expect(document.activeElement).toBe(thumbnailB);
+    });
+
+    it("downloads from the file's newest signed URL, not the one the panel opened with", () => {
+        const resigned = "https://api.example/files/a.pdf?sig=renewed";
+
+        render(panelFor(DOCUMENT_A));
+        rememberPdfUrl(resigned);
+        clickDownload();
+
+        expect(fetchSpy).toHaveBeenCalledWith(resigned, expect.anything());
     });
 });

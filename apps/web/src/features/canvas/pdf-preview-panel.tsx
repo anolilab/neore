@@ -1,6 +1,7 @@
 import { useLingui } from "@lingui/react/macro";
 import { FetchableOriginsProvider } from "@neore/ui/components/file-renderers/fetchable-origins-provider";
 import { isFetchableUrl, originsOf } from "@neore/ui/hooks/use-fetchable-origins";
+import { latestPdfUrl } from "@neore/ui/utils/pdf-preview-event";
 import cn from "@neore/ui/utils/cn";
 import { Download, ExternalLink, X } from "lucide-react";
 import type { FC } from "react";
@@ -32,24 +33,31 @@ interface PdfPreviewPanelProps {
  * viewer's own page and zoom controls.
  */
 const PdfPreviewPanel: FC<PdfPreviewPanelProps> = ({ className, file }) => {
-    const [downloadFailed, setDownloadFailed] = useState(false);
+    // The file whose download failed: the notice belongs to that file, not to the next one shown.
+    const [failedUrl, setFailedUrl] = useState<string | undefined>(undefined);
+    const downloadFailed = failedUrl === file.url;
     const { t } = useLingui();
     const { closeCanvas } = useCanvasState();
     const headingReference = useRef<HTMLHeadingElement>(null);
+    const openerReference = useRef<HTMLElement | undefined>(undefined);
 
-    // The panel opens from a thumbnail click; focus moves here, so a keyboard user is not left behind in the thread. When the
-    // panel closes, focus goes back to the control that opened it, if that is still on the screen.
+    // Each opened file moves focus here, so a keyboard user is not left behind in the thread.
     useEffect(() => {
-        const opener = document.activeElement;
-
+        openerReference.current = file.opener;
         headingReference.current?.focus();
+    }, [file.opener, file.url]);
 
-        return () => {
-            if (opener instanceof HTMLElement && opener.isConnected) {
+    // When the panel closes, focus goes back to the thumbnail that opened the file on screen, if it is still there.
+    useEffect(
+        () => () => {
+            const opener = openerReference.current;
+
+            if (opener?.isConnected) {
                 opener.focus();
             }
-        };
-    }, []);
+        },
+        [],
+    );
 
     // A download belongs to the document it started for. Showing another document, or closing the panel, abandons it: its fetch is
     // aborted, and a late answer saves nothing, so the reader never gets a PDF they have left.
@@ -66,7 +74,9 @@ const PdfPreviewPanel: FC<PdfPreviewPanelProps> = ({ className, file }) => {
     // The link is cross-origin, and a browser opens a cross-origin PDF inline whatever the `download` attribute says.
     // The file is fetched and saved from a local object URL instead.
     const download = async () => {
-        const { filename, url } = file;
+        const { filename } = file;
+        // The message re-signs its attachment URL before the old one expires; the panel may have been open longer than that.
+        const url = latestPdfUrl(file.url);
 
         if (!isFetchableUrl(url, PANEL_ORIGINS)) {
             showError(t`The PDF could not be downloaded.`);
@@ -106,14 +116,14 @@ const PdfPreviewPanel: FC<PdfPreviewPanelProps> = ({ className, file }) => {
             globalThis.setTimeout(() => {
                 URL.revokeObjectURL(objectUrl);
             }, DOWNLOAD_URL_LIFETIME_MS);
-            setDownloadFailed(false);
+            setFailedUrl(undefined);
         } catch (error) {
             if (attempt.signal.aborted) {
                 return;
             }
 
             console.error("Failed to download the PDF:", error);
-            setDownloadFailed(true);
+            setFailedUrl(file.url);
             showError(t`The PDF could not be downloaded.`);
         } finally {
             if (pendingDownload.current === attempt) {
@@ -134,7 +144,17 @@ const PdfPreviewPanel: FC<PdfPreviewPanelProps> = ({ className, file }) => {
                     </button>
                     {/* Offered only for a URL the page may fetch: the link would send the reader to it. */}
                     {isFetchableUrl(file.url, PANEL_ORIGINS) && (
-                        <a aria-label={t`Open PDF in a new tab to print`} className={ICON_LINK} href={file.url} rel="noopener noreferrer" target="_blank">
+                        <a
+                            aria-label={t`Open PDF in a new tab to print`}
+                            className={ICON_LINK}
+                            href={file.url}
+                            // The newest signed URL, read at the click: the one the panel opened with may have expired.
+                            onClick={(event) => {
+                                event.currentTarget.href = latestPdfUrl(file.url);
+                            }}
+                            rel="noopener noreferrer"
+                            target="_blank"
+                        >
                             <ExternalLink aria-hidden="true" className="size-4" />
                         </a>
                     )}

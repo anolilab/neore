@@ -81,7 +81,7 @@ const AssistantContent: FC<{
                 return;
             }
 
-            openPreviewFile({ filename: detail.filename, threadId, url: detail.url });
+            openPreviewFile({ filename: detail.filename, opener: detail.opener, threadId, url: detail.url });
         };
 
         globalThis.addEventListener(OPEN_PDF_PREVIEW_EVENT, onOpenPdf);
@@ -106,19 +106,19 @@ const AssistantContent: FC<{
             <AppSidebar content={<ThreadList />} header={<ThreadListHeader />} name="assistant" />
             <SidebarInset className="dark:bg-brand-obsidian md:peer-data-[variant=inset]:m-1" data-focus-area="thread">
                 <ChatSiteHeader threadId={threadId} />
-                {isCanvasOpen ? (
-                    <ResizablePanelGroup className="h-[calc(100%-40px)]">
-                        <ResizablePanel defaultSize={50} minSize={30}>
-                            <Thread className="h-full" initialMessage={initialMessage} />
+                {/* The thread keeps its place in the group whether or not the side panel is open: moving it would remount it,
+                    which scrolls it to the bottom and reloads every attachment preview in it. */}
+                <ResizablePanelGroup className="h-[calc(100%-40px)]">
+                    <ResizablePanel defaultSize={isCanvasOpen ? "50%" : "100%"} id="thread" minSize={isCanvasOpen ? "30%" : undefined}>
+                        <Thread className="h-full" initialMessage={initialMessage} />
+                    </ResizablePanel>
+                    {isCanvasOpen && <ResizableHandle withHandle />}
+                    {isCanvasOpen && (
+                        <ResizablePanel aria-label={t`Canvas`} data-focus-area="canvas" defaultSize="50%" id="canvas" minSize="25%" role="region">
+                            {previewFile ? <PdfPreviewPanel file={previewFile} /> : <CanvasPanel />}
                         </ResizablePanel>
-                        <ResizableHandle withHandle />
-                        <ResizablePanel aria-label={t`Canvas`} data-focus-area="canvas" defaultSize={50} minSize={25} role="region">
-                            {previewFile ? <PdfPreviewPanel file={previewFile} key={previewFile.url} /> : <CanvasPanel />}
-                        </ResizablePanel>
-                    </ResizablePanelGroup>
-                ) : (
-                    <Thread initialMessage={initialMessage} />
-                )}
+                    )}
+                </ResizablePanelGroup>
             </SidebarInset>
             <div
                 aria-label={t`Thread details`}
