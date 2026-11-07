@@ -266,4 +266,18 @@ describe("usage by project", () => {
         expect(result.truncated).toBe(true);
         expect(result.costMicrodollars).toBe(53 * 7 * 2);
     });
+
+    it("writes no marker rows beyond the reply's own key when it records a reply first", async () => {
+        const alpha = await insertThread(USER, "Alpha");
+
+        await record({ replyKey: "first-record", threadId: alpha.threadId });
+
+        const keys = await harness.run(async (ctx: any) => {
+            const { page } = await ctx.db.usageReplies.findMany({ where: { userId: USER } });
+
+            return page.map((row: { replyKey: string }) => row.replyKey);
+        });
+
+        expect(keys).toStrictEqual(["first-record"]);
+    });
 });

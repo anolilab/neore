@@ -95,7 +95,9 @@ const attributionOfThread = async (ctx: DbCtx, threadId: string | undefined): Pr
 
 /**
  * Files a recorded reply under its project and organization, each part once: the project walk may have filed the
- * project row already (it marks `project:<key>`), but it never files an organization row, which is marked on its own.
+ * project row already (it marks `project:<key>`), but it never files an organization row. A late record marks each part
+ * it files; a first record does not need to, since the reply's own key (`projectFiled`) already stops the walk and any
+ * redelivery.
  */
 const fileAttribution = async (
     ctx: DbCtx,
@@ -103,6 +105,7 @@ const fileAttribution = async (
     attribution: Attribution,
     date: string,
     amounts: { costMicrodollars: number; tokens: number },
+    markParts: boolean,
 ): Promise<void> => {
     const { at, replyKey, userId } = reply;
     const fileProject = attribution.projectKey !== undefined && !(await isReplyRecorded(ctx, userId, projectFiledKey(replyKey)));
@@ -111,12 +114,18 @@ const fileAttribution = async (
 
     if (fileProject) {
         increments.push({ ...amounts, date, replies: 1, ...attribution, organizationRow: false });
-        await markReplyRecorded(ctx, userId, projectFiledKey(replyKey), at);
+
+        if (markParts) {
+            await markReplyRecorded(ctx, userId, projectFiledKey(replyKey), at);
+        }
     }
 
     if (fileOrganization) {
         increments.push({ ...amounts, date, organizationId: attribution.organizationId, replies: 1 });
-        await markReplyRecorded(ctx, userId, organizationFiledKey(replyKey), at);
+
+        if (markParts) {
+            await markReplyRecorded(ctx, userId, organizationFiledKey(replyKey), at);
+        }
     }
 
     await addToAttributionRollup(ctx, userId, increments, at);
@@ -245,7 +254,14 @@ export const recordReplyUsage = internalMutation
         // project and no walk files an organization, so whatever is still missing is filed here, each part once.
         if (recorded) {
             if (!recorded.projectFiled) {
-                await fileAttribution(ctx, args, await attributionOfThread(ctx, args.threadId), await countedDayOf(ctx, args), { costMicrodollars, tokens });
+                await fileAttribution(
+                    ctx,
+                    args,
+                    await attributionOfThread(ctx, args.threadId),
+                    await countedDayOf(ctx, args),
+                    { costMicrodollars, tokens },
+                    true,
+                );
             }
 
             return null;
@@ -269,7 +285,7 @@ export const recordReplyUsage = internalMutation
             true,
         );
 
-        await fileAttribution(ctx, args, await attributionOfThread(ctx, args.threadId), args.date, { costMicrodollars, tokens });
+        await fileAttribution(ctx, args, await attributionOfThread(ctx, args.threadId), args.date, { costMicrodollars, tokens }, false);
 
         return null;
     });

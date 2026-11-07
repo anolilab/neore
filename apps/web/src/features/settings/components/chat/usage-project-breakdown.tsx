@@ -184,18 +184,19 @@ const UsageProjectBreakdown: FC<UsageProjectBreakdownProps> = ({ backfilling, da
                             {rows.map((row) => {
                                 const share = totalCost > 0 ? row.costMicrodollars / totalCost : 0;
                                 const percent = Math.round(share * 100);
+                                const project = row.label;
 
                                 return (
                                     <TableRow key={row.key}>
-                                        <TableCell className={row.key === NO_PROJECT_KEY ? "text-muted-foreground font-medium" : "font-medium"}>
+                                        <TableHead className={row.key === NO_PROJECT_KEY ? "text-muted-foreground" : undefined} scope="row">
                                             {row.label}
-                                        </TableCell>
+                                        </TableHead>
                                         <TableCell className="text-right tabular-nums">{row.replies.toLocaleString(locale)}</TableCell>
                                         <TableCell className="text-right tabular-nums">{formatTokens(row.tokens, locale)}</TableCell>
                                         <TableCell className="text-right tabular-nums">{formatUsd(row.costMicrodollars, locale)}</TableCell>
                                         <TableCell>
                                             <div
-                                                aria-label={t`${String(percent)}% of spend`}
+                                                aria-label={t`${project}: ${String(percent)}% of spend`}
                                                 aria-valuemax={100}
                                                 aria-valuemin={0}
                                                 aria-valuenow={percent}

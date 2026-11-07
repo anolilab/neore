@@ -96,6 +96,9 @@ describe("UsageProjectBreakdown", () => {
         expect(await screen.findByText("Alpha")).toBeDefined();
         expect(screen.queryByRole("status")).toBeNull();
         expect(screen.getByText("No project")).toBeDefined();
+        // Each row is headed by its project, and its spend meter names the project it measures.
+        expect(screen.getByRole("rowheader", { name: "Alpha" })).toBeDefined();
+        expect(screen.getByRole("meter", { name: "Alpha: 95% of spend" })).toBeDefined();
         expect(screen.queryByRole("group", { name: "Whose usage" })).toBeNull();
 
         // The backfill finishing reads the breakdown again; the organization read is not this member's to make.
