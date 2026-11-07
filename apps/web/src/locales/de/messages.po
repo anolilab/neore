@@ -52,23 +52,23 @@ msgstr "\"{0}\" enthält Variablen, die Werte benötigen."
 msgid "\"{0}\" will start once its dependencies are done"
 msgstr "\"{0}\" startet, sobald seine Abhängigkeiten erledigt sind"
 
-#: src/features/chat/thread/composer-input.tsx:593
+#: src/features/chat/thread/composer-input.tsx:595
 msgid "\"{fileName}\" cannot be attached: this file type is not supported."
 msgstr "„{fileName}“ kann nicht angehängt werden: Dieser Dateityp wird nicht unterstützt."
 
-#: src/features/chat/thread/composer-input.tsx:586
+#: src/features/chat/thread/composer-input.tsx:588
 msgid "\"{fileName}\" could not be attached: its contents do not match its file type."
 msgstr "„{fileName}“ konnte nicht angehängt werden: Der Inhalt passt nicht zum Dateityp."
 
-#: src/features/chat/thread/composer-input.tsx:588
+#: src/features/chat/thread/composer-input.tsx:590
 msgid "\"{fileName}\" could not be uploaded. Check your connection and try again."
 msgstr "„{fileName}“ konnte nicht hochgeladen werden. Prüfe deine Verbindung und versuche es erneut."
 
-#: src/features/chat/thread/composer-input.tsx:591
+#: src/features/chat/thread/composer-input.tsx:593
 msgid "\"{fileName}\" is too large. Documents can be at most {maxMegabytes} MB."
 msgstr "„{fileName}“ ist zu groß. Dokumente dürfen höchstens {maxMegabytes} MB groß sein."
 
-#: src/features/chat/thread/composer-input.tsx:592
+#: src/features/chat/thread/composer-input.tsx:594
 msgid "\"{fileName}\" is too large. Files of this type can be at most {maxMegabytes} MB."
 msgstr "„{fileName}“ ist zu groß. Dateien dieses Typs dürfen höchstens {maxMegabytes} MB groß sein."
 
@@ -3109,7 +3109,7 @@ msgstr ""
 msgid "Allow for today"
 msgstr ""
 
-#: src/features/chat/host/host-composer.tsx:148
+#: src/features/chat/host/host-composer.tsx:160
 msgid "Allow once"
 msgstr ""
 
@@ -5214,7 +5214,7 @@ msgstr "Kanada"
 #: src/features/chat/forward/forward-selection-bar.tsx:78
 #: src/features/chat/group/create-group-chat-button.tsx:240
 #: src/features/chat/host/diff-comment-form.tsx:80
-#: src/features/chat/host/host-composer.tsx:754
+#: src/features/chat/host/host-composer.tsx:835
 #: src/features/chat/lock/thread-lock-dialog.tsx:211
 #: src/features/chat/model-settings/agent-switch-confirm-dialog.tsx:70
 #: src/features/chat/pins/pin-item.tsx:282
@@ -5756,7 +5756,7 @@ msgstr ""
 msgid "Checking image safety..."
 msgstr "Bildsicherheit wird geprüft..."
 
-#: src/features/chat/host/host-composer.tsx:900
+#: src/features/chat/host/host-composer.tsx:994
 msgid "Checking whether a message sent now interrupts the reply or waits behind it."
 msgstr "Es wird geprüft, ob eine jetzt gesendete Nachricht die Antwort unterbricht oder dahinter wartet."
 
@@ -6147,7 +6147,7 @@ msgstr "Klicke auf das Pin-Symbol bei einer Nachricht, um sie hier zu speichern.
 msgid "Click the star on any model in All models to add it here."
 msgstr "Klicke bei einem beliebigen Modell unter Alle Modelle auf den Stern, um es hier hinzuzufügen."
 
-#: src/features/chat/thread/composer-input.tsx:305
+#: src/features/chat/thread/composer-input.tsx:307
 msgid "Click to edit"
 msgstr "Zum Bearbeiten klicken"
 
@@ -7409,7 +7409,7 @@ msgid "Context-aware generation"
 msgstr "Kontextbewusste Generierung"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-paste-dialog.tsx:131
-#: src/features/chat/host/host-composer.tsx:707
+#: src/features/chat/host/host-composer.tsx:788
 #: src/features/skills/components/skill-builder-dialog.tsx:328
 msgid "Continue"
 msgstr "Weiter"
@@ -7422,7 +7422,7 @@ msgstr ""
 msgid "Continue the same thread"
 msgstr "Im selben Thread weitermachen"
 
-#: src/features/chat/host/host-composer.tsx:701
+#: src/features/chat/host/host-composer.tsx:782
 msgid "Continue where you left off."
 msgstr ""
 
@@ -7532,8 +7532,8 @@ msgstr ""
 msgid "Conversations on lines this diff no longer shows"
 msgstr ""
 
-#: src/features/chat/thread/composer-input.tsx:772
-#: src/features/chat/thread/composer-input.tsx:1356
+#: src/features/chat/thread/composer-input.tsx:779
+#: src/features/chat/thread/composer-input.tsx:1363
 msgid "Conversion failed"
 msgstr "Konvertierung fehlgeschlagen"
 
@@ -7839,7 +7839,7 @@ msgstr "{0} konnte nicht angehängt werden. Die übrigen Dateien wurden angehän
 msgid "Could not attach {0}. Try those again."
 msgstr "{0} konnte nicht angehängt werden. Bitte versuche es erneut."
 
-#: src/features/chat/thread/composer-input.tsx:1378
+#: src/features/chat/thread/composer-input.tsx:1385
 msgid "Could not attach the chat"
 msgstr "Der Chat konnte nicht angehängt werden"
 
@@ -8063,11 +8063,11 @@ msgstr ""
 msgid "Could not reach the server. Try again."
 msgstr ""
 
-#: src/features/chat/thread/composer-input.tsx:1381
+#: src/features/chat/thread/composer-input.tsx:1388
 msgid "Could not read that chat"
 msgstr "Dieser Chat konnte nicht gelesen werden"
 
-#: src/features/chat/thread/composer-input.tsx:1382
+#: src/features/chat/thread/composer-input.tsx:1389
 msgid "Could not read that chat. If it is locked, unlock it first."
 msgstr "Dieser Chat konnte nicht gelesen werden. Ist er gesperrt, entsperre ihn zuerst."
 
@@ -8133,7 +8133,7 @@ msgstr ""
 msgid "Could not send the message."
 msgstr ""
 
-#: src/features/chat/host/host-composer.tsx:659
+#: src/features/chat/host/host-composer.tsx:740
 msgid "Could not send your answer."
 msgstr ""
 
@@ -8176,7 +8176,7 @@ msgstr "Die Unterhaltung konnte nicht gestoppt werden"
 msgid "Could not stop the reply. Please try again."
 msgstr ""
 
-#: src/features/chat/host/host-composer.tsx:288
+#: src/features/chat/host/host-composer.tsx:302
 msgid "Could not stop the reply. Your message is queued; send it next when you are ready."
 msgstr "Die Antwort konnte nicht gestoppt werden. Deine Nachricht steht in der Warteschlange; sende sie als Nächstes, wenn du bereit bist."
 
@@ -8981,7 +8981,7 @@ msgstr ""
 msgid "Debug an error or review my code..."
 msgstr "Einen Fehler debuggen oder meinen Code prüfen..."
 
-#: src/features/chat/host/host-composer.tsx:153
+#: src/features/chat/host/host-composer.tsx:165
 #: src/features/chat/thread/request-secret-prompt.tsx:495
 msgid "Decline"
 msgstr ""
@@ -10378,7 +10378,7 @@ msgstr "Datei ablegen oder zum Hochladen klicken"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-file.tsx:686
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-file.tsx:765
-#: src/features/chat/thread/composer-input.tsx:1566
+#: src/features/chat/thread/composer-input.tsx:1573
 msgid "Drop files here"
 msgstr "Dateien hier ablegen"
 
@@ -10621,7 +10621,7 @@ msgstr "Kantengeführte Generierung"
 
 #: src/features/admin/components/admin-cleanup-dashboard.tsx:141
 #: src/features/canvas/canvas-panel.tsx:767
-#: src/features/chat/host/host-composer.tsx:784
+#: src/features/chat/host/host-composer.tsx:878
 #: src/features/chat/thread-list/group-header.tsx:145
 #: src/features/chat/thread/composer-text-attachment-editor.tsx:799
 #: src/features/chat/thread/message-item.tsx:395
@@ -10667,8 +10667,8 @@ msgstr "Sammlung bearbeiten"
 msgid "Edit comment"
 msgstr ""
 
-#: src/features/chat/thread/composer-input.tsx:312
-#: src/features/chat/thread/composer-input.tsx:324
+#: src/features/chat/thread/composer-input.tsx:314
+#: src/features/chat/thread/composer-input.tsx:326
 msgid "Edit content"
 msgstr "Inhalt bearbeiten"
 
@@ -10741,12 +10741,12 @@ msgstr "Prompt bearbeiten"
 msgid "Edit Provider"
 msgstr "Anbieter bearbeiten"
 
-#: src/features/chat/host/host-composer.tsx:722
+#: src/features/chat/host/host-composer.tsx:803
 msgid "Edit queued message"
 msgstr "Wartende Nachricht bearbeiten"
 
 #. placeholder {0}: index + 1
-#: src/features/chat/host/host-composer.tsx:777
+#: src/features/chat/host/host-composer.tsx:871
 msgid "Edit queued message {0}"
 msgstr "Wartende Nachricht {0} bearbeiten"
 
@@ -12321,7 +12321,7 @@ msgid "Failed to attach collection"
 msgstr "Sammlung konnte nicht angehängt werden"
 
 #: src/features/chat/header/kb-attachment-button.tsx:128
-#: src/features/chat/thread/composer-input.tsx:1218
+#: src/features/chat/thread/composer-input.tsx:1225
 msgid "Failed to attach file"
 msgstr "Datei konnte nicht angehängt werden"
 
@@ -12718,7 +12718,7 @@ msgstr "Exportanfrage fehlgeschlagen"
 msgid "Failed to reset to defaults"
 msgstr "Zurücksetzen auf Standard fehlgeschlagen"
 
-#: src/features/chat/thread/composer-input.tsx:1250
+#: src/features/chat/thread/composer-input.tsx:1257
 msgid "Failed to restore attachment"
 msgstr "Anhang konnte nicht wiederhergestellt werden"
 
@@ -15325,7 +15325,7 @@ msgstr "Hilf der KI, dich besser zu verstehen, indem du einige Informationen üb
 msgid "Here they are: planning, budget and next steps."
 msgstr ""
 
-#: src/features/chat/host/host-composer.tsx:864
+#: src/features/chat/host/host-composer.tsx:958
 msgid "Hidden characters were removed from your message."
 msgstr "Verborgene Zeichen wurden aus deiner Nachricht entfernt."
 
@@ -16232,7 +16232,7 @@ msgid "in {0, plural, one {# file} other {# files}}"
 msgstr ""
 
 #. placeholder {0}: request.folder
-#: src/features/chat/host/host-composer.tsx:139
+#: src/features/chat/host/host-composer.tsx:151
 msgid "In {0}"
 msgstr ""
 
@@ -16541,8 +16541,8 @@ msgstr ""
 msgid "Interrupt and restart — stops the current reply and sends this"
 msgstr ""
 
-#: src/features/chat/host/host-composer.tsx:597
-#: src/features/chat/host/host-composer.tsx:886
+#: src/features/chat/host/host-composer.tsx:670
+#: src/features/chat/host/host-composer.tsx:980
 msgid "Interrupt and send"
 msgstr "Unterbrechen und senden"
 
@@ -18300,7 +18300,7 @@ msgstr "Langer Text erkannt"
 msgid "Long text generation in images"
 msgstr "Generierung langer Texte in Bildern"
 
-#: src/features/chat/thread/composer-input.tsx:830
+#: src/features/chat/thread/composer-input.tsx:837
 msgid "Long text was attached as a file."
 msgstr ""
 
@@ -19025,7 +19025,7 @@ msgstr "Nachrichteneingabe"
 msgid "Message selection"
 msgstr "Nachrichtenauswahl"
 
-#: src/features/chat/host/host-composer.tsx:879
+#: src/features/chat/host/host-composer.tsx:973
 msgid "Message the agent on your computer"
 msgstr ""
 
@@ -19037,7 +19037,7 @@ msgstr ""
 msgid "Message the worker..."
 msgstr ""
 
-#: src/features/chat/host/host-composer.tsx:838
+#: src/features/chat/host/host-composer.tsx:932
 msgid "Message to the coding agent"
 msgstr ""
 
@@ -23314,7 +23314,7 @@ msgstr "Dein Konto und alle damit verbundenen Daten dauerhaft löschen"
 msgid "Permission Level"
 msgstr "Berechtigungsstufe"
 
-#: src/features/chat/host/host-composer.tsx:672
+#: src/features/chat/host/host-composer.tsx:753
 msgid "Permission requests from the agent"
 msgstr ""
 
@@ -24719,7 +24719,7 @@ msgstr "Nutzungsanalysen und Kosten abfragen"
 msgid "Question"
 msgstr ""
 
-#: src/features/chat/host/host-composer.tsx:599
+#: src/features/chat/host/host-composer.tsx:672
 msgid "Queue"
 msgstr "Warteschlange"
 
@@ -24741,16 +24741,16 @@ msgstr "Nachricht einreihen – wird gesendet, wenn die aktuelle Antwort fertig 
 msgid "Queued"
 msgstr "In Warteschlange"
 
-#: src/features/chat/host/host-composer.tsx:322
+#: src/features/chat/host/host-composer.tsx:336
 #: src/features/chat/thread/composer-prompt-queue.tsx:597
 msgid "Queued messages"
 msgstr "Nachrichten in der Warteschlange"
 
-#: src/features/chat/host/host-composer.tsx:828
+#: src/features/chat/host/host-composer.tsx:922
 msgid "Queued messages go out in order once the reply ends."
 msgstr "Wartende Nachrichten werden nach Ende der Antwort der Reihe nach gesendet."
 
-#: src/features/chat/host/host-composer.tsx:325
+#: src/features/chat/host/host-composer.tsx:339
 msgid "Queued messages: {queuedTotal}"
 msgstr "Nachrichten in der Warteschlange: {queuedTotal}"
 
@@ -25000,7 +25000,7 @@ msgstr "Schreibgeschützte Vorschau – zum Bearbeiten forken"
 msgid "Read-only shared conversation"
 msgstr "Schreibgeschützte geteilte Unterhaltung"
 
-#: src/features/chat/thread/composer-input.tsx:269
+#: src/features/chat/thread/composer-input.tsx:271
 msgid "Reading \"{attachmentName}\"…"
 msgstr "„{attachmentName}“ wird gelesen …"
 
@@ -25605,13 +25605,13 @@ msgstr "Angemeldet bleiben"
 
 #: ../../packages/ui/src/components/ai-elements/attachments.tsx:195
 #: ../../packages/ui/src/components/combobox.tsx:304
-#: src/features/chat/host/host-composer.tsx:802
+#: src/features/chat/host/host-composer.tsx:896
 #: src/features/chat/sharing/thread-share-button.tsx:267
 #: src/features/chat/sharing/thread-share-button.tsx:339
-#: src/features/chat/thread/composer-input.tsx:331
-#: src/features/chat/thread/composer-input.tsx:343
-#: src/features/chat/thread/composer-input.tsx:397
-#: src/features/chat/thread/composer-input.tsx:406
+#: src/features/chat/thread/composer-input.tsx:333
+#: src/features/chat/thread/composer-input.tsx:345
+#: src/features/chat/thread/composer-input.tsx:399
+#: src/features/chat/thread/composer-input.tsx:408
 #: src/features/devices/components/devices-settings.tsx:206
 #: src/features/devices/components/devices-settings.tsx:212
 #: src/features/projects/components/project-form-dialog.tsx:263
@@ -25792,7 +25792,7 @@ msgid "Remove provider?"
 msgstr "Anbieter entfernen?"
 
 #. placeholder {0}: index + 1
-#: src/features/chat/host/host-composer.tsx:788
+#: src/features/chat/host/host-composer.tsx:882
 msgid "Remove queued message {0}"
 msgstr "Wartende Nachricht {0} entfernen"
 
@@ -26300,7 +26300,7 @@ msgstr "Abruf: Treffer {0} · MRR {1} · Präzision {2} · Recall {3}"
 msgid "retry"
 msgstr ""
 
-#: src/features/chat/host/host-composer.tsx:817
+#: src/features/chat/host/host-composer.tsx:911
 #: src/features/chat/thread/chat-error.tsx:56
 #: src/features/chat/thread/request-secret-prompt.tsx:476
 #: src/features/chat/translation/message-translation.tsx:88
@@ -26327,11 +26327,11 @@ msgstr "Erneut in {retryAfterMinutes} Min."
 msgid "Retry now"
 msgstr ""
 
-#: src/features/chat/thread/composer-input.tsx:420
+#: src/features/chat/thread/composer-input.tsx:422
 msgid "Retry upload"
 msgstr ""
 
-#: src/features/chat/thread/composer-input.tsx:415
+#: src/features/chat/thread/composer-input.tsx:417
 msgid "Retry upload of {attachmentName}"
 msgstr ""
 
@@ -26839,7 +26839,7 @@ msgstr "Saudi-Arabien"
 #: src/features/auth/components/settings/security/change-email-card.tsx:133
 #: src/features/auth/components/settings/security/change-password-card.tsx:244
 #: src/features/auth/components/team/team-settings-dialog.tsx:218
-#: src/features/chat/host/host-composer.tsx:743
+#: src/features/chat/host/host-composer.tsx:824
 #: src/features/chat/pins/pin-item.tsx:283
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:394
 #: src/features/chat/thread-list/rename-thread-dialog.tsx:179
@@ -27064,7 +27064,7 @@ msgstr "Score"
 msgid "Scores each answer 0–100% against the expected answer or rubric. Adds a small model call per case."
 msgstr "Bewertet jede Antwort mit 0–100 % anhand der erwarteten Antwort oder der Bewertungsrubrik. Fügt pro Testfall einen kleinen Modellaufruf hinzu."
 
-#: src/features/chat/thread/composer-input.tsx:1177
+#: src/features/chat/thread/composer-input.tsx:1184
 msgid "Screen capture failed. Please try again."
 msgstr "Die Bildschirmaufnahme ist fehlgeschlagen. Bitte versuche es erneut."
 
@@ -27669,7 +27669,7 @@ msgstr "Halbrealistisches Modell mit guter Prompt-Treue"
 msgid "Semi-realistic visual style"
 msgstr "Halbrealistischer Bildstil"
 
-#: src/features/chat/host/host-composer.tsx:594
+#: src/features/chat/host/host-composer.tsx:667
 #: src/features/sub-agents/components/worker-composer.tsx:106
 msgid "Send"
 msgstr ""
@@ -27742,10 +27742,19 @@ msgstr "Nachrichten-Sendeverhalten"
 msgid "Send messages to the AI bot via Telegram. Conversations appear as threads in your chat list."
 msgstr "Sende über Telegram Nachrichten an den KI-Bot. Unterhaltungen erscheinen als Threads in deiner Chat-Liste."
 
-#: src/features/chat/host/host-composer.tsx:772
+#: src/features/chat/host/host-composer.tsx:853
 #: src/features/chat/thread/composer-prompt-queue.tsx:616
 msgid "Send next"
 msgstr "Als Nächstes senden"
+
+#: src/features/chat/host/host-composer.tsx:866
+msgid "Send now"
+msgstr "Jetzt senden"
+
+#. placeholder {0}: index + 1
+#: src/features/chat/host/host-composer.tsx:859
+msgid "Send queued message {0} now"
+msgstr "Nachricht {0} in der Warteschlange jetzt senden"
 
 #: src/features/develop/components/review-thread.tsx:74
 msgid "Send reply now"
@@ -29417,7 +29426,7 @@ msgstr "Import wird gestartet..."
 msgid "Starting test drive…"
 msgstr "Probelauf wird gestartet…"
 
-#: src/features/chat/host/host-composer.tsx:687
+#: src/features/chat/host/host-composer.tsx:768
 msgid "Starting the agent on your computer. A message you send now goes out once it is up."
 msgstr ""
 
@@ -29537,7 +29546,7 @@ msgstr "Aktien"
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:228
 #: src/features/chat/goal/goal-notes.tsx:85
 #: src/features/chat/group/group-participant-bar.tsx:234
-#: src/features/chat/host/host-composer.tsx:890
+#: src/features/chat/host/host-composer.tsx:984
 #: src/features/chat/thread/rate-limit-pause-notice.tsx:112
 #: src/features/develop/components/watched-repositories.tsx:86
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:354
@@ -30827,7 +30836,7 @@ msgstr "Textrichtung auf LTR gesetzt"
 msgid "Text direction set to RTL"
 msgstr "Textrichtung auf RTL gesetzt"
 
-#: src/features/chat/thread/composer-input.tsx:305
+#: src/features/chat/thread/composer-input.tsx:307
 msgid "Text document"
 msgstr "Textdokument"
 
@@ -30977,7 +30986,7 @@ msgstr ""
 msgid "That passcode is not right."
 msgstr ""
 
-#: src/features/chat/host/host-composer.tsx:662
+#: src/features/chat/host/host-composer.tsx:743
 msgid "That request is no longer waiting."
 msgstr ""
 
@@ -31102,7 +31111,7 @@ msgstr "Die Änderung ist zu groß, um sie vollständig anzuzeigen."
 msgid "The chat agent works the task with its tools, optionally following a skill."
 msgstr "Der Chat-Agent erledigt die Aufgabe mit seinen Tools und folgt optional einem Skill."
 
-#: src/features/chat/host/host-composer.tsx:815
+#: src/features/chat/host/host-composer.tsx:909
 msgid "The chat's state could not be read, so queued messages wait."
 msgstr "Der Chat-Status konnte nicht gelesen werden, daher warten die wartenden Nachrichten."
 
@@ -31322,7 +31331,7 @@ msgstr "Die letzte Löschanfrage ist fehlgeschlagen. Du kannst sie erneut stelle
 msgid "the last time"
 msgstr "das letzte Mal"
 
-#: src/features/chat/host/host-composer.tsx:697
+#: src/features/chat/host/host-composer.tsx:778
 msgid "The last turn stopped before it finished."
 msgstr ""
 
@@ -31429,7 +31438,7 @@ msgstr "Die Seite zeigt jetzt die andere Version. Kopiere alles, was du aus dein
 msgid "The page, every sub-page, its comments and its version history are deleted. This cannot be undone."
 msgstr "Die Seite, alle Unterseiten, ihre Kommentare und ihr Versionsverlauf werden gelöscht. Das kann nicht rückgängig gemacht werden."
 
-#: src/features/chat/thread/composer-input.tsx:908
+#: src/features/chat/thread/composer-input.tsx:915
 msgid "The pasted text could not be attached and was not inserted."
 msgstr ""
 
@@ -31452,7 +31461,7 @@ msgstr "Der Prompt wird zur Eingabe des Testfalls und diese Antwort zur erwartet
 msgid "The provider bills you directly for these requests. Where we know the model's price, the usual platform fee for your own keys is charged in credits."
 msgstr "Der Anbieter stellt dir diese Anfragen direkt in Rechnung. Wenn wir den Preis des Modells kennen, wird die übliche Plattformgebühr für eigene Schlüssel in Credits berechnet."
 
-#: src/features/chat/host/host-composer.tsx:823
+#: src/features/chat/host/host-composer.tsx:917
 msgid "The queue is paused. Send next to go on with the queued messages."
 msgstr "Die Warteschlange ist pausiert. Wähle „Als Nächstes senden“, um mit den wartenden Nachrichten weiterzumachen."
 
@@ -31476,7 +31485,7 @@ msgstr ""
 msgid "The reply is still running. Try again when it finishes."
 msgstr ""
 
-#: src/features/chat/host/host-composer.tsx:287
+#: src/features/chat/host/host-composer.tsx:301
 msgid "The reply stopped, but the stop did not reach the computer, so the agent may still be running. Send next once it has stopped."
 msgstr "Die Antwort wurde gestoppt, der Stopp hat den Computer aber nicht erreicht, daher läuft der Agent womöglich noch. Sende als Nächstes, sobald er gestoppt ist."
 
@@ -31557,7 +31566,7 @@ msgstr ""
 msgid "The unified LLM gateway for modern AI applications."
 msgstr "Das einheitliche LLM-Gateway für moderne KI-Anwendungen."
 
-#: src/features/chat/thread/composer-input.tsx:587
+#: src/features/chat/thread/composer-input.tsx:589
 msgid "The upload of \"{fileName}\" expired. Please attach it again."
 msgstr "Der Upload von „{fileName}“ ist abgelaufen. Bitte hänge die Datei erneut an."
 
@@ -32091,7 +32100,7 @@ msgstr "Dadurch werden die Modelldateien von deinem Computer entfernt. Du kannst
 msgid "This repository was not found."
 msgstr ""
 
-#: src/features/chat/host/host-composer.tsx:142
+#: src/features/chat/host/host-composer.tsx:154
 msgid "This request was too long to show whole. You can decline it here; to allow it, answer on your computer."
 msgstr ""
 
@@ -32123,7 +32132,7 @@ msgstr ""
 msgid "This server's registry entry asks for the values below. They fill in the URL and headers."
 msgstr "Der Registry-Eintrag dieses Servers verlangt die folgenden Werte. Sie werden in die URL und die Header eingesetzt."
 
-#: src/features/chat/host/host-composer.tsx:692
+#: src/features/chat/host/host-composer.tsx:773
 #: src/features/chat/host/host-send-errors.ts:19
 msgid "This session has ended. Start a new one from the desktop app."
 msgstr ""
@@ -32160,7 +32169,7 @@ msgstr "Dieser Sub-Agent-Lauf ist nicht mehr verfügbar."
 msgid "This task has not run yet."
 msgstr "Diese Aufgabe wurde noch nicht ausgeführt."
 
-#: src/features/chat/host/host-composer.tsx:732
+#: src/features/chat/host/host-composer.tsx:813
 msgid "This text is only hidden characters, so there is nothing to save."
 msgstr "Dieser Text besteht nur aus unsichtbaren Zeichen, daher gibt es nichts zu speichern."
 
@@ -33150,7 +33159,7 @@ msgid "Type your answer…"
 msgstr "Gib deine Antwort ein…"
 
 #: src/features/chat/signed-out/signed-out-chat.tsx:249
-#: src/features/chat/thread/composer-input.tsx:1556
+#: src/features/chat/thread/composer-input.tsx:1563
 #: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:182
 msgid "Type your message..."
 msgstr "Nachricht eingeben..."
@@ -33313,7 +33322,7 @@ msgstr "Unter der Haube"
 #: src/features/chat/thread-list/hooks/use-thread-state-actions.ts:48
 #: src/features/chat/thread-list/hooks/use-thread-state-actions.ts:64
 #: src/features/chat/thread/composer-draw-dialog.tsx:349
-#: src/features/chat/thread/composer-input.tsx:832
+#: src/features/chat/thread/composer-input.tsx:839
 #: src/features/workflow/components/canvas/keyboard-shortcuts-dialog.tsx:36
 msgid "Undo"
 msgstr "Rückgängig"
@@ -33541,7 +33550,7 @@ msgstr "Aktuelle Dokumentation für jede Bibliothek und jedes Framework"
 msgid "Update Duration"
 msgstr "Dauer aktualisieren"
 
-#: src/features/chat/thread/composer-input.tsx:1413
+#: src/features/chat/thread/composer-input.tsx:1420
 msgid "Update failed"
 msgstr "Aktualisierung fehlgeschlagen"
 
@@ -33729,14 +33738,14 @@ msgstr "CSVs hochladen, Python-Analysen ausführen und Diagramme exportieren –
 msgid "Upload documents to your knowledge base and group them into collections. The AI searches them for relevant context and cites the passages it used."
 msgstr "Lade Dokumente in deine Wissensdatenbank hoch und gruppiere sie in Sammlungen. Die KI durchsucht sie nach relevantem Kontext und zitiert die verwendeten Abschnitte."
 
-#: src/features/chat/thread/composer-input.tsx:412
-#: src/features/chat/thread/composer-input.tsx:632
-#: src/features/chat/thread/composer-input.tsx:1334
+#: src/features/chat/thread/composer-input.tsx:414
+#: src/features/chat/thread/composer-input.tsx:634
+#: src/features/chat/thread/composer-input.tsx:1341
 msgid "Upload failed"
 msgstr "Hochladen fehlgeschlagen"
 
 #. placeholder {0}: fresh.name
-#: src/features/chat/thread/composer-input.tsx:1327
+#: src/features/chat/thread/composer-input.tsx:1334
 msgid "Upload failed: {0}"
 msgstr ""
 
@@ -33786,7 +33795,7 @@ msgstr "Hochgeladen"
 msgid "Uploaded {fileName}"
 msgstr "{fileName} hochgeladen"
 
-#: src/features/chat/thread/composer-input.tsx:349
+#: src/features/chat/thread/composer-input.tsx:351
 msgid "Uploading {attachmentName}"
 msgstr "{attachmentName} wird hochgeladen"
 
@@ -35974,12 +35983,12 @@ msgid "Your First Chat"
 msgstr "Dein erster Chat"
 
 #. placeholder {0}: formatNumber(contextStats.estimatedTokens, i18n.locale)
-#: src/features/chat/thread/composer-input.tsx:692
+#: src/features/chat/thread/composer-input.tsx:699
 msgid "Your input is large (~{0} tokens) and will consume a significant portion of the model's context window."
 msgstr "Deine Eingabe ist groß (~{0} Token) und wird einen erheblichen Teil des Kontextfensters des Modells beanspruchen."
 
 #. placeholder {0}: formatNumber(contextStats.estimatedTokens, i18n.locale)
-#: src/features/chat/thread/composer-input.tsx:685
+#: src/features/chat/thread/composer-input.tsx:692
 msgid "Your input is too large (~{0} tokens) and exceeds the model's context window. Please reduce the message length or remove attachments to submit."
 msgstr "Deine Eingabe ist zu groß (~{0} Token) und überschreitet das Kontextfenster des Modells. Bitte kürze die Nachricht oder entferne Anhänge, um sie zu senden."
 
