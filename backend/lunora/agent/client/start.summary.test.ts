@@ -26,7 +26,7 @@ const MODEL = { modelId: "test-model", provider: "test", specificationVersion: "
 const start = async (summary: string | null, system: string | undefined) => {
     const runQuery = vi.fn(async (ref: unknown) => {
         if (ref === internal.agent.thread_summaries.getThreadSummaryForContext) {
-            return summary;
+            return summary === null ? null : { summary };
         }
 
         return ref === internal.agent.branches.getContextPathIds ? null : { page: ROWS };

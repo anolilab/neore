@@ -202,6 +202,8 @@ describe("account deletion workflow: order", () => {
         // Thread-dependent rows go before the threads themselves.
         before("delete-user-thread-metadata", "delete-user-thread-cascade");
         before("delete-user-thread-cascade", "delete-all-for-user-id-async");
+        // A compaction that finished after the per-thread erase leaves a summary behind: the owner sweep runs after the threads go.
+        before("delete-all-for-user-id-async", "delete-user-thread-summaries");
         // Projects are found through workflow rows, and the document history is the last data purge.
         before("delete-user-workflow-data", "delete-user-projects");
         before("delete-auth-records", "delete-user-identity");

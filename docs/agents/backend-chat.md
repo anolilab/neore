@@ -126,6 +126,10 @@ The rules are summarized in `backend/lunora/chat/AGENTS.md`, which agents load a
   while a reply runs, because a row landing after the run's pending row would split the reply across
   branches. `parseCustomModelId` returns `null`, not `undefined`, for a non-custom id.
 
+- **Context compaction** (`backend/lunora/agent/thread-compaction*.ts`, `chat/compaction.ts`,
+  `apps/web/src/features/chat/compaction/`) — replaces a thread's older turns in the model's input only; stored
+  messages are never touched. It is a `threadContextSummaries` row with `kind: "compact"`. Auto-compact runs in
+  `runStreamingAgent` before the reply builds its context.
 - **Time-boxed tool allows** ("Allow for 1 hour" / "for today" on the approval card) — a key -> expiry record in
   `aiUserPreferences.toolPermissionGrants`, NOT an `auto` override, and deliberately absent from `auth/fields.ts` so no
   client input can set one. `resolveToolPermission` lifts only an `ask` to `auto`, before the API-key clamp; `off` wins,
