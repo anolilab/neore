@@ -6,6 +6,20 @@ import { useEffect } from "react";
 
 import { reportFirstNativeLaunch } from "@/lib/analytics/first-native-launch";
 
+// The consent state PostHog should follow. `PostHogConsentSync` is a child of `AnalyticsProvider`, so its first
+// effect runs before `posthog.init`; the `loaded` callback applies whatever arrived before then.
+let measurementConsent: boolean | undefined;
+
+const applyMeasurementConsent = (granted: boolean): void => {
+    if (granted) {
+        posthog.opt_in_capturing();
+        // A launch that happened before consent is reported now; its stored flag keeps it from repeating.
+        reportFirstNativeLaunch();
+    } else {
+        posthog.opt_out_capturing();
+    }
+};
+
 /**
  * Apply the effective consent permissions to PostHog.
  *
@@ -17,12 +31,10 @@ export const PostHogConsentSync: FC = () => {
     const { measurement } = useEffectivePermissions();
 
     useEffect(() => {
-        if (measurement) {
-            posthog.opt_in_capturing();
-            // A launch that happened before consent is reported now; its stored flag keeps it from repeating.
-            reportFirstNativeLaunch();
-        } else {
-            posthog.opt_out_capturing();
+        measurementConsent = measurement;
+
+        if (posthog.__loaded) {
+            applyMeasurementConsent(measurement);
         }
     }, [measurement]);
 
@@ -84,6 +96,10 @@ const AnalyticsProvider: FC<PropsWithChildren> = ({ children }) => {
                     // In development, opt in for debugging
                     ph.opt_in_capturing();
                     ph.debug();
+                }
+
+                if (measurementConsent !== undefined) {
+                    applyMeasurementConsent(measurementConsent);
                 }
 
                 // Here, not in an effect: AnalyticsProvider wraps the app, so child effects run before PostHog loads.
