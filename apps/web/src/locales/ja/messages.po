@@ -25,11 +25,11 @@ msgstr " · モデル: {modelFilter}"
 msgid "- {0, plural, one {# row} other {# rows}}, {1, plural, one {# column} other {# columns}}"
 msgstr "- {0, plural, other {# 行}}、{1, plural, other {# 列}}"
 
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:600
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:602
 msgid "-- INSERT --"
 msgstr "-- 挿入 --"
 
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:600
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:602
 msgid "-- NORMAL --"
 msgstr "-- ノーマル --"
 
@@ -226,7 +226,7 @@ msgid "{0, plural, one {# line} other {# lines}}"
 msgstr "{0, plural, other {# 行}}"
 
 #. placeholder {0}: node.relevantMessages.length
-#: src/features/chat/thread-list/thread-node.tsx:1090
+#: src/features/chat/thread-list/thread-node.tsx:1109
 msgid "{0, plural, one {# match} other {# matches}}"
 msgstr "{0, plural, other {# 件一致}}"
 
@@ -346,9 +346,14 @@ msgid "{0, plural, one {# user} other {# users}}"
 msgstr "{0, plural, other {# 人のユーザー}}"
 
 #. placeholder {0}: selectedModelIds!.length
-#: src/components/model-picker/model-picker-button.tsx:168
+#: src/components/model-picker/model-picker-button.tsx:173
 msgid "{0, plural, one {1 model} other {# models}}"
 msgstr "{0, plural, other {# 個のモデル}}"
+
+#. placeholder {0}: selectedModelIds!.length
+#: src/components/model-picker/model-picker-button.tsx:160
+msgid "{0, plural, one {Comparing # model} other {Comparing # models}}"
+msgstr ""
 
 #. placeholder {0}: results.length - MAX_VISIBLE
 #: src/features/chat/thread/widgets/image-search-gallery.tsx:89
@@ -501,7 +506,7 @@ msgstr "{1} 件の評価で {0}"
 
 #. placeholder {0}: formatPricePerMillion(model.pricing.input_per_million)
 #. placeholder {1}: formatPricePerMillion(model.pricing.output_per_million)
-#: src/components/model-picker/model-picker.tsx:321
+#: src/components/model-picker/model-picker.tsx:313
 msgid "{0} input, {1} output per 1M tokens"
 msgstr ""
 
@@ -594,7 +599,7 @@ msgid "{0} of {1} tokens used ({2}%)"
 msgstr "{1} トークン中 {0} トークン使用（{2}%）"
 
 #. placeholder {0}: parallelSelectedIds.size
-#: src/components/model-picker/model-picker.tsx:1228
+#: src/components/model-picker/model-picker.tsx:1224
 msgid "{0} of {MAX_PARALLEL} selected"
 msgstr "{0} / {MAX_PARALLEL} 個を選択中"
 
@@ -707,7 +712,7 @@ msgstr "支出の{0}%"
 msgid "{0}+ text models, {1}+ image models, and {2}+ video models — from Claude and GPT-5 to Flux and Veo — all included in one plan. Switch between any of them mid-conversation."
 msgstr "{0} 以上のテキストモデル、{1} 以上の画像モデル、{2} 以上の動画モデル。Claude や GPT-5 から Flux、Veo まで、すべて 1 つのプランに含まれています。会話の途中でいつでも切り替えられます。"
 
-#: src/features/chat/thread-list/thread-node.tsx:264
+#: src/features/chat/thread-list/thread-node.tsx:267
 msgid "{action}: {displayTitle}"
 msgstr ""
 
@@ -805,11 +810,11 @@ msgstr ""
 msgid "{count, plural, one {# thread deleted.} other {# threads deleted.}}"
 msgstr "{count, plural, other {# 件のスレッドを削除しました。}}"
 
-#: ../../packages/ui/src/components/ai-elements/sources.tsx:24
+#: ../../packages/ui/src/components/ai-elements/sources.tsx:26
 msgid "{count, plural, one {Used # source, toggle to show} other {Used # sources, toggle to show}}"
 msgstr "{count, plural, other {# 件のソースを使用、切り替えて表示}}"
 
-#: ../../packages/ui/src/components/ai-elements/sources.tsx:38
+#: ../../packages/ui/src/components/ai-elements/sources.tsx:40
 msgid "{count, plural, one {Used # source} other {Used # sources}}"
 msgstr "{count, plural, other {# 件のソースを使用}}"
 
@@ -847,7 +852,7 @@ msgstr "{days} 日前"
 msgid "{droppedCount, plural, one {# attachment removed on reload} other {# attachments removed on reload}}"
 msgstr "{droppedCount, plural, other {再読み込み時に # 個の添付ファイルが削除されました}}"
 
-#: ../../packages/ui/src/components/ai-elements/reasoning.tsx:125
+#: ../../packages/ui/src/components/ai-elements/reasoning.tsx:123
 msgid "{duration, plural, one {Thought for # second} other {Thought for # seconds}}"
 msgstr "{duration, plural, other {# 秒間思考しました}}"
 
@@ -981,7 +986,7 @@ msgstr ""
 msgid "{hours} hours"
 msgstr "{hours} 時間"
 
-#: src/features/chat/thread-list/thread-node.tsx:334
+#: src/features/chat/thread-list/thread-node.tsx:337
 msgid "{hours}h {minutes}m"
 msgstr "{hours}時間{minutes}分"
 
@@ -1042,7 +1047,7 @@ msgid "{label} is not connected."
 msgstr ""
 
 #. placeholder {0}: ids.length
-#: src/components/model-picker/model-picker.tsx:911
+#: src/components/model-picker/model-picker.tsx:907
 msgid "{label} moved to position {position} of {0} in starred"
 msgstr "{label} をスター内の {position}/{0} 番目に移動しました"
 
@@ -1054,7 +1059,7 @@ msgstr ""
 msgid "{label} refused this. Your account may lack access."
 msgstr ""
 
-#: src/features/chat/goal/composer-goal.tsx:93
+#: src/features/chat/goal/composer-goal.tsx:95
 msgid "{maxRounds} rounds"
 msgstr ""
 
@@ -1078,7 +1083,7 @@ msgstr "{mins} 分"
 msgid "{mins}m {secs}s"
 msgstr "{mins} 分 {secs} 秒"
 
-#: src/features/chat/thread-list/thread-node.tsx:337
+#: src/features/chat/thread-list/thread-node.tsx:340
 msgid "{minutes}m"
 msgstr "{minutes}分"
 
@@ -1091,7 +1096,7 @@ msgstr "{minutes} 分前"
 msgid "{minutes}m remaining"
 msgstr "残り {minutes} 分"
 
-#: src/features/chat/thread/composer.tsx:226
+#: src/features/chat/thread/composer.tsx:227
 msgid "{modeLabel} mode — click to change"
 msgstr "{modeLabel}モード — クリックして変更"
 
@@ -1155,7 +1160,7 @@ msgstr "{name} の接続を有効化しました"
 msgid "{name} disconnected"
 msgstr "{name} の接続を解除しました"
 
-#: src/components/model-picker/model-picker.tsx:734
+#: src/components/model-picker/model-picker.tsx:730
 msgid "{name} hidden from the model picker"
 msgstr ""
 
@@ -1269,7 +1274,7 @@ msgstr "{selectedCount, plural, other {# 件のプロンプトを選択中}}"
 msgid "{selectedCount, plural, one {# thread selected} other {# threads selected}}"
 msgstr "{selectedCount, plural, other {# 件のスレッドを選択中}}"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:739
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:746
 msgid "{selectedCount} of {MAX_PARALLEL} selected"
 msgstr "{MAX_PARALLEL} 個中 {selectedCount} 個を選択中"
 
@@ -1682,7 +1687,7 @@ msgstr "キーは保存済みです。そのままにするには空欄のまま
 msgid "A model with a system prompt"
 msgstr "システムプロンプト付きのモデル"
 
-#: src/features/settings/components/chat/event-trigger-fields.tsx:314
+#: src/features/settings/components/chat/event-trigger-fields.tsx:316
 msgid "A model's answer to your own message counts as a reply. In a thread you are chatting in, the wait after it fires is what keeps this to one run per wait."
 msgstr ""
 
@@ -1730,7 +1735,7 @@ msgstr ""
 msgid "A placeholder or @mention outside quotes is read as null here, so this error may come from it until a run fills it in"
 msgstr "引用符の外のプレースホルダーまたは @メンションはここでは null として扱われるため、実行時に値が入るまでこのエラーが出ることがあります"
 
-#: src/features/settings/components/chat/event-trigger-fields.tsx:225
+#: src/features/settings/components/chat/event-trigger-fields.tsx:227
 msgid "A public http or https address. The first check only records how the page looks. Only the first 1 MiB of a page is read."
 msgstr ""
 
@@ -1771,7 +1776,7 @@ msgstr "スキルとは、スラッシュコマンドで実行できる再利用
 msgid "A suggestion only. Add the label on {hostLabel} yourself if you agree."
 msgstr ""
 
-#: src/features/settings/components/chat/event-trigger-fields.tsx:236
+#: src/features/settings/components/chat/event-trigger-fields.tsx:238
 msgid "A tag, #id, .class, tag.class or tag#id. Leave it empty to watch the whole page."
 msgstr ""
 
@@ -2321,8 +2326,8 @@ msgstr ""
 msgid "Add to review"
 msgstr ""
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:168
-#: src/components/model-picker/model-picker.tsx:342
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:184
+#: src/components/model-picker/model-picker.tsx:361
 msgid "Add to starred"
 msgstr "スターを付ける"
 
@@ -2793,7 +2798,7 @@ msgstr "AI 動画生成"
 msgid "AI-assisted bug triage with full recording context"
 msgstr "完全な記録コンテキストによる AI 支援のバグトリアージ"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:358
+#: ../../packages/chat-ui/src/chat/message-content.tsx:368
 msgid "AI-generated"
 msgstr "AI生成"
 
@@ -2916,10 +2921,10 @@ msgstr "垂直方向に整列"
 msgid "Align vertically (V)"
 msgstr "垂直方向に整列（V）"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:612
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:674
-#: src/components/model-picker/model-picker.tsx:1076
-#: src/components/model-picker/model-picker.tsx:1154
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:619
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:681
+#: src/components/model-picker/model-picker.tsx:1072
+#: src/components/model-picker/model-picker.tsx:1150
 #: src/features/chat/tags/thread-category-filter.tsx:16
 #: src/features/marketing/components/tutorials-page.tsx:130
 #: src/features/settings/components/chat/models-settings.tsx:422
@@ -3004,8 +3009,8 @@ msgstr "すべてのインストーラー"
 msgid "All MCP servers active"
 msgstr "すべての MCP サーバーが有効"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:558
-#: src/components/model-picker/model-picker.tsx:1024
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:565
+#: src/components/model-picker/model-picker.tsx:1020
 #: src/features/marketing/components/model-detail-page.tsx:165
 msgid "All models"
 msgstr "すべてのモデル"
@@ -3224,7 +3229,7 @@ msgstr "エラーが発生しました"
 msgid "An error occurred during One Tap sign in"
 msgstr "One Tap サインイン中にエラーが発生しました"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1136
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1146
 msgid "An error occurred while generating the response."
 msgstr "応答の生成中にエラーが発生しました。"
 
@@ -3464,7 +3469,7 @@ msgstr "API キー（任意）"
 msgid "API Key Created"
 msgstr "API キーを作成しました"
 
-#: src/features/auth/components/settings/api-key/api-keys-card.tsx:50
+#: src/features/auth/components/settings/api-key/api-keys-card.tsx:74
 #: src/features/layout/lib/dashboard-page-names.ts:15
 #: src/features/settings/components/chat/api-keys-settings.tsx:554
 #: src/features/settings/lib/settings-navigation.ts:96
@@ -3566,7 +3571,7 @@ msgstr "適用しています..."
 msgid "approval"
 msgstr ""
 
-#: src/features/chat/thread-list/thread-node.tsx:548
+#: src/features/chat/thread-list/thread-node.tsx:567
 msgid "Approval"
 msgstr ""
 
@@ -3650,7 +3655,7 @@ msgstr "開いているスレッドをアーカイブします。アーカイブ
 #: ../../packages/chat-ui/src/threads/thread-item.tsx:98
 #: src/components/command-palette.tsx:476
 #: src/components/command-palette.tsx:637
-#: src/features/chat/thread-list/thread-node.tsx:115
+#: src/features/chat/thread-list/thread-node.tsx:116
 msgid "Archive thread"
 msgstr "スレッドをアーカイブ"
 
@@ -3690,7 +3695,7 @@ msgstr ""
 msgid "Are you sure you want to delete this item? This action cannot be undone."
 msgstr "この項目を削除してもよろしいですか？この操作は元に戻せません。"
 
-#: src/features/chat/thread-list/thread-node.tsx:1040
+#: src/features/chat/thread-list/thread-node.tsx:1059
 #: src/features/chat/thread/thread-shortcuts-listener.tsx:66
 msgid "Are you sure you want to delete this thread? This action cannot be undone and will permanently remove all messages in this conversation."
 msgstr "このスレッドを削除してもよろしいですか？この操作は元に戻せず、この会話のすべてのメッセージが完全に削除されます。"
@@ -3833,7 +3838,7 @@ msgstr "何でも質問して新しいチャットを始めましょう…"
 msgid "Ask GPT-4, Claude, and Gemini the same question. Run the same prompt across FLUX, Imagen, and Stable Diffusion. Pick the winner — not the default."
 msgstr "GPT-4、Claude、Gemini に同じ質問をしましょう。同じプロンプトを FLUX、Imagen、Stable Diffusion で実行できます。既定ではなく、勝者を選びましょう。"
 
-#: src/features/chat/thread/composer.tsx:262
+#: src/features/chat/thread/composer.tsx:263
 msgid "Ask me anything..."
 msgstr "何でも聞いてください..."
 
@@ -3881,7 +3886,7 @@ msgstr "アシスタントの返信:"
 msgid "At {0}"
 msgstr ""
 
-#: src/features/settings/components/chat/event-trigger-fields.tsx:312
+#: src/features/settings/components/chat/event-trigger-fields.tsx:314
 msgid "At least {EVENT_MIN_INTERVAL_MINUTES} minutes between checks."
 msgstr ""
 
@@ -3950,8 +3955,8 @@ msgstr "試行回数：{0}"
 msgid "Auckland"
 msgstr "オークランド"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:662
-#: src/components/model-picker/model-picker.tsx:1128
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:669
+#: src/components/model-picker/model-picker.tsx:1124
 #: src/features/chat/sidebar/usage-card.tsx:131
 #: src/features/chat/thread/composer.tsx:124
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:85
@@ -4864,11 +4869,11 @@ msgstr "ワークフローの以前のバージョンを閲覧して復元しま
 msgid "Browse, fork, and remix workflows shared by the community"
 msgstr "コミュニティが共有したワークフローを閲覧、フォーク、リミックス"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:719
+#: ../../packages/chat-ui/src/chat/message-content.tsx:729
 msgid "Browser"
 msgstr "ブラウザー"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:742
+#: ../../packages/chat-ui/src/chat/message-content.tsx:752
 msgid "Browser action failed"
 msgstr "ブラウザー操作に失敗しました"
 
@@ -4876,7 +4881,7 @@ msgstr "ブラウザー操作に失敗しました"
 msgid "Browser Automation"
 msgstr "ブラウザー自動化"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:740
+#: ../../packages/chat-ui/src/chat/message-content.tsx:750
 msgid "Browser error"
 msgstr "ブラウザーエラー"
 
@@ -4885,7 +4890,7 @@ msgid "Browser notes"
 msgstr "ブラウザーに関する注意"
 
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:259
-#: ../../packages/chat-ui/src/chat/message-content.tsx:702
+#: ../../packages/chat-ui/src/chat/message-content.tsx:712
 msgid "Browser screenshot"
 msgstr "ブラウザーのスクリーンショット"
 
@@ -4893,7 +4898,7 @@ msgstr "ブラウザーのスクリーンショット"
 msgid "Browser Session"
 msgstr "ブラウザーセッション"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:652
+#: ../../packages/chat-ui/src/chat/message-content.tsx:662
 msgid "Browser working..."
 msgstr "ブラウザーで作業中..."
 
@@ -5492,7 +5497,7 @@ msgid "Change colors"
 msgstr "色を変更"
 
 #: src/features/chat/lock/thread-lock-dialog.tsx:150
-#: src/features/chat/thread-list/thread-node.tsx:833
+#: src/features/chat/thread-list/thread-node.tsx:852
 msgid "Change passcode"
 msgstr ""
 
@@ -5629,12 +5634,12 @@ msgstr "チャットのインポートに失敗しました"
 msgid "Chat import finished"
 msgstr "チャットのインポートが完了しました"
 
-#: src/features/chat/thread-list/thread-node.tsx:800
-#: src/features/chat/thread-list/thread-node.tsx:814
+#: src/features/chat/thread-list/thread-node.tsx:819
+#: src/features/chat/thread-list/thread-node.tsx:833
 msgid "Chat lock"
 msgstr ""
 
-#: src/features/chat/thread-list/thread-node.tsx:800
+#: src/features/chat/thread-list/thread-node.tsx:819
 msgid "Chat lock: locked"
 msgstr ""
 
@@ -5731,7 +5736,7 @@ msgstr "チェック {0} の種類"
 msgid "Check {0} value"
 msgstr "チェック {0} の値"
 
-#: src/features/settings/components/chat/event-trigger-fields.tsx:291
+#: src/features/settings/components/chat/event-trigger-fields.tsx:293
 msgid "Check every (minutes)"
 msgstr ""
 
@@ -5756,7 +5761,7 @@ msgstr "チェックした連携は、保存後にセットアップの候補と
 msgid "Checked: {0}"
 msgstr ""
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:375
+#: ../../packages/chat-ui/src/chat/message-content.tsx:385
 msgid "Checking image safety..."
 msgstr "画像の安全性を確認しています..."
 
@@ -6076,7 +6081,7 @@ msgstr "マスクをクリア"
 msgid "Clear model"
 msgstr "モデルをクリア"
 
-#: ../../packages/ui/src/components/spreadsheet/csv-table.tsx:173
+#: ../../packages/ui/src/components/spreadsheet/csv-table.tsx:177
 #: src/features/chat/thread-list/search-bar.tsx:82
 #: src/features/prompts/components/prompts-sidebar-tab.tsx:521
 #: src/features/vault/components/empty-states.tsx:21
@@ -6118,7 +6123,7 @@ msgstr "クリック"
 msgid "Click \"{selector}\""
 msgstr "「{selector}」をクリック"
 
-#: src/components/model-picker/model-picker.tsx:1186
+#: src/components/model-picker/model-picker.tsx:1182
 msgid "Click ★ on any model in All models to add it here."
 msgstr "「すべてのモデル」で任意のモデルの ★ をクリックすると、ここに追加されます。"
 
@@ -6147,7 +6152,7 @@ msgstr "下のボタンをクリックして、お使いのデバイスで新し
 msgid "Click the pin icon on any message to save it here."
 msgstr "メッセージのピンアイコンをクリックすると、ここに保存されます。"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:700
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:707
 msgid "Click the star on any model in All models to add it here."
 msgstr "「すべてのモデル」で任意のモデルの星をクリックすると、ここに追加されます。"
 
@@ -6159,7 +6164,7 @@ msgstr "クリックして編集"
 msgid "Click to edit..."
 msgstr "クリックして編集..."
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:644
+#: ../../packages/chat-ui/src/chat/message-content.tsx:654
 msgid "Clicking element..."
 msgstr "要素をクリックしています..."
 
@@ -6292,6 +6297,10 @@ msgstr "Cloudflare Workers AI のモデルは Cloudflare に空きのある場�
 msgid "Code"
 msgstr "コード"
 
+#: ../../packages/chat-ui/src/chat/message-content.tsx:127
+msgid "Code block"
+msgstr ""
+
 #: src/features/marketing/components/landing-page.tsx:338
 msgid "Code execution"
 msgstr "コード実行"
@@ -6300,7 +6309,7 @@ msgstr "コード実行"
 msgid "Code execution and sandbox files"
 msgstr "コード実行とサンドボックスのファイル"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:620
+#: ../../packages/chat-ui/src/chat/message-content.tsx:630
 msgid "Code execution failed"
 msgstr "コードの実行に失敗しました"
 
@@ -6324,7 +6333,7 @@ msgstr ""
 msgid "Code navigation"
 msgstr ""
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:576
+#: ../../packages/chat-ui/src/chat/message-content.tsx:586
 msgid "Code output"
 msgstr "コードの出力"
 
@@ -6429,7 +6438,7 @@ msgstr "Cohere で最も高性能な Command モデル"
 msgid "Collaborate with shared AI workflows."
 msgstr "共有された AI ワークフローで共同作業。"
 
-#: ../../packages/ui/src/components/ai-elements/reasoning.tsx:212
+#: ../../packages/ui/src/components/ai-elements/reasoning.tsx:201
 #: ../../packages/ui/src/components/sidebar.tsx:411
 #: src/features/workflow/components/canvas/workflow-toolbar.tsx:197
 #: src/features/workflow/components/nodes/group-node.tsx:216
@@ -6444,7 +6453,7 @@ msgstr ""
 msgid "Collapse {title}"
 msgstr "{title} を折りたたむ"
 
-#: src/features/chat/thread-list/thread-node.tsx:517
+#: src/features/chat/thread-list/thread-node.tsx:521
 msgid "Collapse branches"
 msgstr ""
 
@@ -6473,8 +6482,8 @@ msgid "Collapse textarea"
 msgstr "テキストエリアを折りたたむ"
 
 #: ../../packages/ui/src/components/ai-elements/reasoning.tsx:137
-msgid "Collapse thinking"
-msgstr "思考を折りたたむ"
+#~ msgid "Collapse thinking"
+#~ msgstr "思考を折りたたむ"
 
 #: src/features/knowledge/components/collection-picker.tsx:76
 msgid "Collection"
@@ -6988,9 +6997,9 @@ msgstr "アプリケーションの設定を構成します"
 msgid "Configured"
 msgstr "設定済み"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:762
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:769
 #: ../../packages/ui/src/components/confirm-dialog.tsx:29
-#: src/components/model-picker/model-picker.tsx:1250
+#: src/components/model-picker/model-picker.tsx:1246
 msgid "Confirm"
 msgstr "確認"
 
@@ -7566,8 +7575,8 @@ msgstr "読みやすくするために添付ファイルに変換しますか？
 msgid "Convert to Full Account"
 msgstr "正式なアカウントに変換"
 
-#: src/features/chat/thread-list/thread-node.tsx:980
-#: src/features/chat/thread-list/thread-node.tsx:1011
+#: src/features/chat/thread-list/thread-node.tsx:999
+#: src/features/chat/thread-list/thread-node.tsx:1030
 msgid "Convert to permanent"
 msgstr "永続化する"
 
@@ -7579,8 +7588,8 @@ msgstr "データを保存するには変換してください"
 msgid "Convert to TypeScript"
 msgstr "TypeScript に変換"
 
-#: src/features/chat/thread-list/thread-node.tsx:980
-#: src/features/chat/thread-list/thread-node.tsx:1011
+#: src/features/chat/thread-list/thread-node.tsx:999
+#: src/features/chat/thread-list/thread-node.tsx:1030
 msgid "Converting..."
 msgstr "変換しています..."
 
@@ -7588,7 +7597,7 @@ msgstr "変換しています..."
 msgid "cookies"
 msgstr ""
 
-#: ../../packages/ui/src/components/ai-elements/reasoning.tsx:215
+#: ../../packages/ui/src/components/ai-elements/reasoning.tsx:204
 #: src/features/auth/components/settings/api-key/mcp-config-snippet.tsx:30
 #: src/features/auth/components/settings/api-key/mcp-config-snippet.tsx:34
 #: src/features/develop/components/files-tab.tsx:101
@@ -7682,7 +7691,7 @@ msgstr "プロンプトをコピー"
 msgid "Copy public link"
 msgstr "公開リンクをコピー"
 
-#: ../../packages/ui/src/components/ai-elements/reasoning.tsx:208
+#: ../../packages/ui/src/components/ai-elements/reasoning.tsx:197
 msgid "Copy reasoning"
 msgstr "推論をコピー"
 
@@ -7976,6 +7985,10 @@ msgstr "ワークフローをインポートできませんでした"
 msgid "Could not link. Try again."
 msgstr ""
 
+#: src/features/auth/components/settings/api-key/api-keys-card.tsx:45
+msgid "Could not load API keys. Try again later."
+msgstr ""
+
 #: src/features/canvas/canvas-panel.tsx:131
 msgid "Could not load image"
 msgstr "画像を読み込めませんでした"
@@ -8115,7 +8128,7 @@ msgstr "Daily Brief の設定を保存できませんでした。"
 msgid "Could not save the email setting."
 msgstr "メール設定を保存できませんでした。"
 
-#: src/components/model-picker/model-picker.tsx:914
+#: src/components/model-picker/model-picker.tsx:910
 msgid "Could not save the new order for {label}"
 msgstr "{label} の新しい順序を保存できませんでした"
 
@@ -8179,7 +8192,7 @@ msgstr "試用を開始できませんでした。"
 msgid "Could not stop the conversation"
 msgstr "会話を停止できませんでした"
 
-#: src/features/chat/thread-list/thread-node.tsx:594
+#: src/features/chat/thread-list/thread-node.tsx:613
 #: src/features/chat/thread/rate-limit-pause-notice.tsx:148
 msgid "Could not stop the reply. Please try again."
 msgstr ""
@@ -8332,11 +8345,11 @@ msgstr "Azure ポータルで Azure Bot リソースを作成し、Microsoft App
 msgid "Create an outline for a blog post about sustainable living"
 msgstr "サステナブルな暮らしに関するブログ記事の構成案を作成する"
 
-#: src/features/auth/components/settings/api-key/api-keys-card.tsx:49
+#: src/features/auth/components/settings/api-key/api-keys-card.tsx:73
 msgid "Create and manage API keys for programmatic access to your account."
 msgstr "アカウントへのプログラムによるアクセス用の API キーを作成・管理します。"
 
-#: src/features/auth/components/settings/api-key/api-keys-card.tsx:46
+#: src/features/auth/components/settings/api-key/api-keys-card.tsx:70
 #: src/features/auth/components/settings/api-key/create-api-key-dialog.tsx:97
 #: src/features/auth/components/settings/api-key/create-api-key-dialog.tsx:180
 msgid "Create API Key"
@@ -8347,8 +8360,8 @@ msgid "Create bot"
 msgstr ""
 
 #: src/components/command-palette.tsx:464
-#: src/features/chat/thread-list/thread-node.tsx:692
-#: src/features/chat/thread-list/thread-node.tsx:715
+#: src/features/chat/thread-list/thread-node.tsx:711
+#: src/features/chat/thread-list/thread-node.tsx:734
 msgid "Create branch"
 msgstr "ブランチを作成"
 
@@ -8500,12 +8513,12 @@ msgstr "作成日：{createdAt}"
 msgid "Creates a single-use link, valid for 7 days. Whoever opens it signed in gets access."
 msgstr "7 日間有効な 1 回限りのリンクを作成します。サインインした状態で開いた人がアクセス権を得ます。"
 
-#: src/features/chat/thread-list/thread-node.tsx:692
-#: src/features/chat/thread-list/thread-node.tsx:715
+#: src/features/chat/thread-list/thread-node.tsx:711
+#: src/features/chat/thread-list/thread-node.tsx:734
 msgid "Creating branch..."
 msgstr "ブランチを作成しています..."
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:299
+#: ../../packages/chat-ui/src/chat/message-content.tsx:309
 msgid "Creating slides..."
 msgstr "スライドを作成しています..."
 
@@ -8985,7 +8998,7 @@ msgstr "ディベートのラウンド数"
 msgid "Debates for {0} rounds."
 msgstr ""
 
-#: src/features/chat/thread/composer.tsx:268
+#: src/features/chat/thread/composer.tsx:269
 msgid "Debug an error or review my code..."
 msgstr "エラーのデバッグやコードレビューなど..."
 
@@ -9189,7 +9202,7 @@ msgstr "既定のモデルを更新しました"
 msgid "Default Models"
 msgstr "既定のモデル"
 
-#: src/components/model-picker/model-picker.tsx:1139
+#: src/components/model-picker/model-picker.tsx:1135
 msgid "Default order"
 msgstr ""
 
@@ -9484,13 +9497,13 @@ msgstr "このケースを削除しますか？"
 #: ../../packages/chat-ui/src/threads/thread-item.tsx:118
 #: src/components/command-palette.tsx:482
 #: src/components/command-palette.tsx:661
-#: src/features/chat/thread-list/thread-node.tsx:1019
-#: src/features/chat/thread-list/thread-node.tsx:1037
+#: src/features/chat/thread-list/thread-node.tsx:1038
+#: src/features/chat/thread-list/thread-node.tsx:1056
 #: src/features/pages/components/page-comments-panel.tsx:188
 msgid "Delete thread"
 msgstr "スレッドを削除"
 
-#: src/features/chat/thread-list/thread-node.tsx:1052
+#: src/features/chat/thread-list/thread-node.tsx:1071
 msgid "Delete Thread"
 msgstr "スレッドを削除"
 
@@ -9522,8 +9535,8 @@ msgstr "{0, plural, other {# 件のプロンプトを削除しました}}"
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-file.tsx:77
 #: src/components/delete-confirmation-dialog.tsx:65
 #: src/features/admin/components/admin-cleanup-dashboard.tsx:285
-#: src/features/chat/thread-list/thread-node.tsx:1019
-#: src/features/chat/thread-list/thread-node.tsx:1037
+#: src/features/chat/thread-list/thread-node.tsx:1038
+#: src/features/chat/thread-list/thread-node.tsx:1056
 msgid "Deleting..."
 msgstr "削除しています..."
 
@@ -10111,7 +10124,7 @@ msgid "Do you want to add more rows?"
 msgstr "行を追加しますか？"
 
 #: ../../packages/chat-ui/src/chat/document-artifact.tsx:44
-#: ../../packages/chat-ui/src/chat/message-content.tsx:274
+#: ../../packages/chat-ui/src/chat/message-content.tsx:284
 #: ../../packages/ui/src/components/file-renderers/docx-preview.tsx:114
 msgid "Document"
 msgstr "ドキュメント"
@@ -10261,7 +10274,7 @@ msgstr "ドキュメントをダウンロード"
 msgid "Download Export"
 msgstr "エクスポートをダウンロード"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:437
+#: ../../packages/chat-ui/src/chat/message-content.tsx:447
 #: ../../packages/ui/src/components/file-renderers/generic-file-card.tsx:87
 msgid "Download file"
 msgstr "ファイルをダウンロード"
@@ -10303,8 +10316,8 @@ msgstr "テキストをダウンロード"
 msgid "Download the Neore desktop app for macOS, Windows and Linux."
 msgstr "macOS、Windows、Linux 向けの Neore デスクトップアプリをダウンロードできます。"
 
-#: src/features/chat/thread-list/thread-node.tsx:907
 #: src/features/chat/thread-list/thread-node.tsx:926
+#: src/features/chat/thread-list/thread-node.tsx:945
 msgid "Download thread"
 msgstr "スレッドをダウンロード"
 
@@ -10312,8 +10325,8 @@ msgstr "スレッドをダウンロード"
 msgid "Download Word document"
 msgstr "Wordドキュメントをダウンロード"
 
-#: src/features/chat/thread-list/thread-node.tsx:907
 #: src/features/chat/thread-list/thread-node.tsx:926
+#: src/features/chat/thread-list/thread-node.tsx:945
 msgid "Downloading..."
 msgstr "ダウンロードしています..."
 
@@ -10332,7 +10345,7 @@ msgstr "下書き"
 msgid "Draft a cover letter for a software engineering position"
 msgstr "ソフトウェアエンジニア職のカバーレターを作成する"
 
-#: src/features/chat/thread/composer.tsx:266
+#: src/features/chat/thread/composer.tsx:267
 msgid "Draft an email, report, or essay..."
 msgstr "メール、レポート、エッセイなどの下書き..."
 
@@ -11619,7 +11632,7 @@ msgstr "エラー率"
 msgid "Error trace:"
 msgstr "エラートレース:"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:235
+#: ../../packages/chat-ui/src/chat/message-content.tsx:245
 msgid "Error:"
 msgstr "エラー:"
 
@@ -11883,7 +11896,7 @@ msgstr "ツールを実行しています..."
 msgid "Execution"
 msgstr "実行"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:610
+#: ../../packages/chat-ui/src/chat/message-content.tsx:620
 msgid "Execution failed"
 msgstr "実行に失敗しました"
 
@@ -11926,7 +11939,7 @@ msgstr "{groupLabel} の操作を展開"
 msgid "Expand {title}"
 msgstr "{title} を展開"
 
-#: src/features/chat/thread-list/thread-node.tsx:517
+#: src/features/chat/thread-list/thread-node.tsx:521
 msgid "Expand branches"
 msgstr ""
 
@@ -11963,8 +11976,8 @@ msgid "Expand textarea"
 msgstr "テキストエリアを展開"
 
 #: ../../packages/ui/src/components/ai-elements/reasoning.tsx:137
-msgid "Expand thinking"
-msgstr "思考を展開"
+#~ msgid "Expand thinking"
+#~ msgstr "思考を展開"
 
 #: src/features/workflow/components/nodes/node-top-toolbar.tsx:556
 msgid "Expand to fullscreen"
@@ -12025,7 +12038,7 @@ msgstr "有効期限を {0} に更新しました"
 msgid "expired"
 msgstr "期限切れ"
 
-#: src/features/chat/thread-list/thread-node.tsx:327
+#: src/features/chat/thread-list/thread-node.tsx:330
 #: src/features/devices/components/devices-settings.tsx:257
 #: src/features/settings/connectors/connector-card.tsx:76
 msgid "Expired"
@@ -12055,7 +12068,7 @@ msgstr "有効期限"
 msgid "Expires {date}"
 msgstr "有効期限 {date}"
 
-#: src/features/chat/thread-list/thread-node.tsx:1078
+#: src/features/chat/thread-list/thread-node.tsx:1097
 msgid "Expires in {remainingTime}"
 msgstr "{remainingTime} 後に期限切れ"
 
@@ -12076,7 +12089,7 @@ msgstr "有効期限：{expiresAt}"
 msgid "Expiring soon"
 msgstr "まもなく期限切れ"
 
-#: src/features/chat/thread/composer.tsx:269
+#: src/features/chat/thread/composer.tsx:270
 msgid "Explain a concept in simple terms..."
 msgstr "概念をわかりやすく説明して..."
 
@@ -12226,11 +12239,11 @@ msgstr "ページを抽出"
 msgid "Extract subject"
 msgstr "被写体を抽出"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:710
+#: ../../packages/chat-ui/src/chat/message-content.tsx:720
 msgid "Extracted"
 msgstr "抽出済み"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:645
+#: ../../packages/chat-ui/src/chat/message-content.tsx:655
 msgid "Extracting content..."
 msgstr "コンテンツを抽出しています..."
 
@@ -12933,8 +12946,8 @@ msgstr "お気に入りを更新できませんでした"
 msgid "Failed to update favorite status"
 msgstr "お気に入りの状態を更新できませんでした"
 
-#: src/components/model-picker/model-picker.tsx:729
-#: src/components/model-picker/model-picker.tsx:738
+#: src/components/model-picker/model-picker.tsx:725
+#: src/components/model-picker/model-picker.tsx:734
 #: src/features/settings/components/chat/model-filter-settings.tsx:57
 #: src/features/settings/components/chat/model-filter-settings.tsx:68
 msgid "Failed to update filter rules"
@@ -13589,11 +13602,11 @@ msgstr "映像による物語とストーリーテリングの質を重視した
 msgid "Filter by action"
 msgstr "操作で絞り込み"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:599
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:606
 msgid "Filter by mode"
 msgstr "モードで絞り込み"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:670
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:677
 msgid "Filter by provider"
 msgstr "プロバイダーで絞り込み"
 
@@ -13717,7 +13730,7 @@ msgstr "フィンランド語（フィンランド）"
 msgid "Firefox works too, and may ask the same question."
 msgstr "Firefox でも動作し、同じ確認が表示される場合があります。"
 
-#: src/features/settings/components/chat/event-trigger-fields.tsx:284
+#: src/features/settings/components/chat/event-trigger-fields.tsx:286
 msgid "Fires when a message lands in it from a sub-agent, a model or another person. Your own messages do not count."
 msgstr ""
 
@@ -14429,7 +14442,7 @@ msgstr "テキストプロンプトから画像を生成し、4 倍にアップ�
 msgid "Generate an image of a cozy reading nook with warm lighting and plants."
 msgstr "暖かい照明と植物に囲まれた居心地のよい読書スペースの画像を生成して。"
 
-#: src/features/chat/thread/composer.tsx:271
+#: src/features/chat/thread/composer.tsx:272
 msgid "Generate an image or video..."
 msgstr "画像または動画を生成..."
 
@@ -14517,7 +14530,7 @@ msgstr "生成された動画"
 msgid "Generated videos will appear here. Start by describing what you want to create in the composer below."
 msgstr "生成した動画はここに表示されます。まずは下の入力欄で作りたいものを説明してください。"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:452
+#: ../../packages/chat-ui/src/chat/message-content.tsx:462
 msgid "Generating audio..."
 msgstr "音声を生成しています..."
 
@@ -14525,12 +14538,12 @@ msgstr "音声を生成しています..."
 msgid "Generating draft…"
 msgstr "下書きを生成しています…"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:453
+#: ../../packages/chat-ui/src/chat/message-content.tsx:463
 #: src/features/chat/thread/media-gallery-view.tsx:395
 msgid "Generating image..."
 msgstr "画像を生成しています..."
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:296
+#: ../../packages/chat-ui/src/chat/message-content.tsx:306
 msgid "Generating presentation..."
 msgstr "プレゼンテーションを生成しています..."
 
@@ -14538,7 +14551,7 @@ msgstr "プレゼンテーションを生成しています..."
 msgid "Generating response"
 msgstr "応答を生成中"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:454
+#: ../../packages/chat-ui/src/chat/message-content.tsx:464
 #: src/features/chat/thread/media-gallery-view.tsx:395
 msgid "Generating video..."
 msgstr "動画を生成しています..."
@@ -14789,7 +14802,7 @@ msgstr "ボールトへ移動"
 msgid "Go to your pages"
 msgstr "ページ一覧へ移動"
 
-#: src/features/chat/goal/composer-goal.tsx:73
+#: src/features/chat/goal/composer-goal.tsx:75
 #: src/features/chat/goal/goal-notes.tsx:70
 #: src/features/chat/goal/goal-notes.tsx:77
 #: src/features/tasks/components/task-form-dialog.tsx:361
@@ -14808,6 +14821,10 @@ msgstr ""
 #: src/features/tasks/components/task-card.tsx:68
 msgid "Goal: {goalTitle}"
 msgstr "目標：{goalTitle}"
+
+#: src/features/chat/goal/composer-goal.tsx:63
+msgid "Goal: run until done"
+msgstr ""
 
 #: src/features/tasks/components/tasks-page.tsx:224
 msgid "Goals"
@@ -15181,11 +15198,11 @@ msgstr "ゲストアカウント"
 msgid "Guest accounts"
 msgstr "ゲストアカウント"
 
-#: src/components/model-picker/model-picker.tsx:982
+#: src/components/model-picker/model-picker.tsx:978
 msgid "Guest accounts use free models only."
 msgstr "ゲストアカウントでは無料モデルのみ利用できます。"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:518
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:525
 msgid "Guest accounts use free models only. Sign up to unlock all models."
 msgstr "ゲストアカウントでは無料モデルのみ使用できます。サインアップするとすべてのモデルが利用できます。"
 
@@ -15346,7 +15363,7 @@ msgstr ""
 msgid "Hide {fieldLabel}"
 msgstr "{fieldLabel}を隠す"
 
-#: src/components/model-picker/model-picker.tsx:1163
+#: src/components/model-picker/model-picker.tsx:1159
 msgid "Hide {name} from model picker"
 msgstr ""
 
@@ -15803,7 +15820,7 @@ msgid "Identity"
 msgstr "アイデンティティ"
 
 #: ../../packages/chat-ui/src/chat/auto-continue-status.tsx:53
-#: src/features/chat/thread-list/thread-node.tsx:559
+#: src/features/chat/thread-list/thread-node.tsx:578
 #: src/features/sub-agents/components/worker-list.tsx:80
 msgid "Idle"
 msgstr "待機中"
@@ -15835,13 +15852,13 @@ msgid "illustration"
 msgstr "イラスト"
 
 #: ../../packages/chat-ui/src/chat/document-artifact.tsx:42
-#: ../../packages/chat-ui/src/chat/message-content.tsx:404
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:636
+#: ../../packages/chat-ui/src/chat/message-content.tsx:414
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:643
 #: ../../packages/ui/src/components/ai-elements/attachments-utilities.tsx:47
 #: ../../packages/ui/src/components/ai-elements/attachments.tsx:107
 #: ../../packages/ui/src/components/ai-elements/attachments.tsx:109
 #: ../../packages/ui/src/components/canvas-editor/canvas-element-palette.tsx:330
-#: src/components/model-picker/model-picker.tsx:1102
+#: src/components/model-picker/model-picker.tsx:1098
 #: src/features/chat/sidebar/usage-card.tsx:129
 #: src/features/chat/thread/composer.tsx:122
 #: src/features/marketing/components/landing-footer.tsx:165
@@ -16270,7 +16287,7 @@ msgstr "設定 > API キーで、「メッセンジャーボットキー」に A
 msgid "In Settings > API Keys add the AppID, AppSecret, Token and EncodingAESKey under \"Messenger Bot Keys\"."
 msgstr "設定 > API キーで、「メッセンジャーボットキー」に AppID、AppSecret、Token、EncodingAESKey を追加してください。"
 
-#: src/features/settings/components/chat/event-trigger-fields.tsx:244
+#: src/features/settings/components/chat/event-trigger-fields.tsx:246
 msgid "In stock"
 msgstr ""
 
@@ -16428,7 +16445,7 @@ msgstr "入力テンプレート"
 msgid "Input tokens"
 msgstr "入力トークン"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:219
+#: ../../packages/chat-ui/src/chat/message-content.tsx:229
 msgid "Input:"
 msgstr "入力:"
 
@@ -16813,7 +16830,7 @@ msgstr ""
 msgid "It was not saved. Paste it again and save."
 msgstr ""
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:381
+#: ../../packages/chat-ui/src/chat/message-content.tsx:391
 msgid "It will be visible once approved by a moderator"
 msgstr "モデレーターの承認後に表示されます"
 
@@ -17780,7 +17797,7 @@ msgstr ""
 msgid "Linked by hand"
 msgstr ""
 
-#: src/features/chat/thread-list/thread-node.tsx:552
+#: src/features/chat/thread-list/thread-node.tsx:571
 msgid "Linked pull requests: {linkedPullRequests}"
 msgstr ""
 
@@ -17928,6 +17945,10 @@ msgstr ""
 msgid "Loading"
 msgstr "読み込み中"
 
+#: src/features/auth/components/settings/api-key/api-keys-card.tsx:40
+msgid "Loading API keys…"
+msgstr ""
+
 #: src/features/canvas/canvas-panel.tsx:318
 msgid "Loading canvas editor..."
 msgstr "キャンバスエディターを読み込んでいます..."
@@ -17981,7 +18002,7 @@ msgstr "エディターを読み込んでいます..."
 msgid "Loading editor…"
 msgstr "エディターを読み込んでいます…"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:318
+#: ../../packages/chat-ui/src/chat/message-content.tsx:328
 #: ../../packages/ui/src/components/file-renderers/fetched-text-preview.tsx:65
 msgid "Loading file…"
 msgstr "ファイルを読み込んでいます…"
@@ -18152,7 +18173,7 @@ msgstr ""
 msgid "Loading..."
 msgstr "読み込んでいます..."
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:321
+#: ../../packages/chat-ui/src/chat/message-content.tsx:331
 #: src/features/chat/thread/memory-usage-action.tsx:46
 #: src/features/chat/thread/request-secret-prompt.tsx:479
 #: src/features/code/components/code-workspace.tsx:90
@@ -18196,7 +18217,7 @@ msgstr "所在地"
 msgid "Location updated"
 msgstr "所在地を更新しました"
 
-#: src/features/chat/thread-list/thread-node.tsx:837
+#: src/features/chat/thread-list/thread-node.tsx:856
 msgid "Lock chat"
 msgstr ""
 
@@ -18209,7 +18230,7 @@ msgstr "グループをロック"
 msgid "Lock node"
 msgstr "ノードをロック"
 
-#: src/features/chat/thread-list/thread-node.tsx:829
+#: src/features/chat/thread-list/thread-node.tsx:848
 msgid "Lock now"
 msgstr ""
 
@@ -18217,16 +18238,16 @@ msgstr ""
 msgid "Lock this chat"
 msgstr ""
 
-#: src/features/chat/thread-list/thread-node.tsx:262
+#: src/features/chat/thread-list/thread-node.tsx:265
 msgid "Locked chat"
 msgstr ""
 
 #. placeholder {0}: getModelModeName(anchorMode)
-#: src/components/model-picker/model-picker.tsx:1233
+#: src/components/model-picker/model-picker.tsx:1229
 msgid "Locked to {0} models"
 msgstr "{0}モデルに固定"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:744
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:751
 msgid "Locked to {anchorModeName} models"
 msgstr "{anchorModeName} モデルに固定"
 
@@ -18512,7 +18533,7 @@ msgstr "マルタ語（マルタ）"
 msgid "Manage Consent Preferences"
 msgstr "同意設定を管理"
 
-#: src/components/model-picker/model-picker.tsx:741
+#: src/components/model-picker/model-picker.tsx:737
 msgid "Manage hidden labs"
 msgstr ""
 
@@ -18731,8 +18752,8 @@ msgstr "最大サイズ: {size}"
 msgid "Max size: {size} • Max {maxFiles} files"
 msgstr "最大サイズ: {size} • 最大 {maxFiles} ファイル"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:739
-#: src/components/model-picker/model-picker.tsx:1227
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:746
+#: src/components/model-picker/model-picker.tsx:1223
 msgid "Maximum {MAX_PARALLEL} models reached"
 msgstr "モデルは最大 {MAX_PARALLEL} 個までです"
 
@@ -19022,6 +19043,11 @@ msgstr ""
 msgid "Merging…"
 msgstr ""
 
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:266
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:409
+msgid "Message"
+msgstr ""
+
 #: src/features/marketing/components/landing-page.tsx:290
 msgid "Message Branching"
 msgstr "メッセージのブランチ"
@@ -19069,8 +19095,8 @@ msgstr "メッセージ"
 msgid "Messages API (/v1/messages) — Anthropic and services that mirror it."
 msgstr "Messages API（/v1/messages）— Anthropic および同じ形式のサービス。"
 
-#: src/features/chat/thread-list/thread-node.tsx:623
-#: src/features/chat/thread-list/thread-node.tsx:635
+#: src/features/chat/thread-list/thread-node.tsx:642
+#: src/features/chat/thread-list/thread-node.tsx:654
 msgid "Messages from {sourceName}"
 msgstr "{sourceName} からのメッセージ"
 
@@ -19355,6 +19381,7 @@ msgid "Mobile app icon"
 msgstr "モバイルアプリアイコン"
 
 #: src/features/chat/host/host-options.tsx:32
+#: src/features/chat/thread/composer.tsx:216
 #: src/features/workflow/components/nodes/image-node.tsx:45
 #: src/features/workflow/components/nodes/node-expand-modal.tsx:132
 #: src/features/workflow/components/nodes/text-node.tsx:123
@@ -19403,7 +19430,7 @@ msgstr "このモデルは既にブロックされています"
 msgid "Model Breakdown"
 msgstr "モデル別内訳"
 
-#: src/features/chat/thread-list/thread-node.tsx:544
+#: src/features/chat/thread-list/thread-node.tsx:548
 msgid "Model comparison"
 msgstr "モデル比較"
 
@@ -19428,7 +19455,7 @@ msgstr "モデルを有効にしました"
 msgid "Model filter"
 msgstr "モデルフィルター"
 
-#: src/components/model-picker/model-picker.tsx:391
+#: src/components/model-picker/model-picker.tsx:398
 msgid "Model info"
 msgstr "モデル情報"
 
@@ -19445,7 +19472,7 @@ msgstr "モデルの制限"
 msgid "Model server"
 msgstr "モデルサーバー"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:527
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:534
 msgid "Model tabs"
 msgstr "モデルタブ"
 
@@ -19455,6 +19482,10 @@ msgstr "モデルタブ"
 #: src/features/prompts/components/prompt-form-dialog.tsx:450
 msgid "Model: {0}"
 msgstr "モデル：{0}"
+
+#: src/components/model-picker/model-picker-button.tsx:180
+msgid "Model: {singleLabel}"
+msgstr ""
 
 #: src/features/workflow/components/nodes/transcription-node.tsx:72
 msgid "Model: OpenAI Whisper"
@@ -19727,11 +19758,11 @@ msgstr "{0} を下へ移動"
 msgid "Move {0} up"
 msgstr "{0} を上へ移動"
 
-#: src/components/model-picker/model-picker.tsx:374
+#: src/components/model-picker/model-picker.tsx:385
 msgid "Move {label} down in starred"
 msgstr "{label} をスター内で下へ移動"
 
-#: src/components/model-picker/model-picker.tsx:359
+#: src/components/model-picker/model-picker.tsx:374
 msgid "Move {label} up in starred"
 msgstr "{label} をスター内で上へ移動"
 
@@ -19795,8 +19826,8 @@ msgstr "次のセルへ移動"
 msgid "Move to previous cell"
 msgstr "前のセルへ移動"
 
-#: src/features/chat/thread-list/thread-node.tsx:722
-#: src/features/chat/thread-list/thread-node.tsx:735
+#: src/features/chat/thread-list/thread-node.tsx:741
+#: src/features/chat/thread-list/thread-node.tsx:754
 msgid "Move to project"
 msgstr "プロジェクトへ移動"
 
@@ -19971,7 +20002,7 @@ msgstr ""
 msgid "Name"
 msgstr "名前"
 
-#: src/components/model-picker/model-picker.tsx:1140
+#: src/components/model-picker/model-picker.tsx:1136
 msgid "Name (A to Z)"
 msgstr ""
 
@@ -20113,11 +20144,11 @@ msgstr "スレッド間を移動"
 msgid "navigate within each column"
 msgstr "各列内を移動"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:711
+#: ../../packages/chat-ui/src/chat/message-content.tsx:721
 msgid "Navigated"
 msgstr "移動しました"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:652
+#: ../../packages/chat-ui/src/chat/message-content.tsx:662
 msgid "Navigating to {target}..."
 msgstr "{target} に移動しています..."
 
@@ -20174,7 +20205,7 @@ msgstr "Neore - AI テキスト・動画・音声・画像・ドキュメント�
 msgid "Neore (timestamped)"
 msgstr ""
 
-#: src/features/chat/thread/composer.tsx:653
+#: src/features/chat/thread/composer.tsx:654
 msgid "Neore can make mistakes. Check important information."
 msgstr "Neore は間違えることがあります。重要な情報は確認してください。"
 
@@ -20302,8 +20333,8 @@ msgstr "無期限"
 msgid "Never used"
 msgstr "未使用"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:146
-#: src/components/model-picker/model-picker.tsx:328
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:143
+#: src/components/model-picker/model-picker.tsx:320
 #: src/features/settings/components/chat/models-settings.tsx:43
 #: src/features/settings/components/chat/models-settings.tsx:568
 msgid "New"
@@ -20376,7 +20407,7 @@ msgstr "新しいデータセット"
 msgid "New Export"
 msgstr "新しいエクスポート"
 
-#: src/components/model-picker/model-picker.tsx:1141
+#: src/components/model-picker/model-picker.tsx:1137
 msgid "New first"
 msgstr ""
 
@@ -20527,7 +20558,7 @@ msgstr "次の一致"
 msgid "Next option"
 msgstr "次のオプション"
 
-#: src/features/chat/thread/composer.tsx:232
+#: src/features/chat/thread/composer.tsx:233
 msgid "Next output mode"
 msgstr "次の出力モード"
 
@@ -20616,7 +20647,7 @@ msgstr "ニックネーム"
 msgid "Nickname for {label}"
 msgstr ""
 
-#: ../../packages/ui/src/components/spreadsheet/csv-table.tsx:153
+#: ../../packages/ui/src/components/spreadsheet/csv-table.tsx:157
 #: src/features/settings/components/privacy/data-access.tsx:42
 msgid "No"
 msgstr "いいえ"
@@ -20641,7 +20672,7 @@ msgstr "このスレッドにアクセスできる他のユーザーはいませ
 msgid "No aperture selected"
 msgstr "絞りが選択されていません"
 
-#: src/features/auth/components/settings/api-key/api-keys-card.tsx:59
+#: src/features/auth/components/settings/api-key/api-keys-card.tsx:57
 msgid "No API keys found. Create one to get started."
 msgstr "API キーがありません。作成して始めましょう。"
 
@@ -20861,7 +20892,7 @@ msgstr "ナレッジベースのファイルはまだありません。設定か
 msgid "No labs are hidden."
 msgstr ""
 
-#: src/features/chat/thread/composer-language-selector.tsx:178
+#: src/features/chat/thread/composer-language-selector.tsx:180
 msgid "No languages found"
 msgstr "言語が見つかりません"
 
@@ -20919,8 +20950,8 @@ msgstr "利用可能なモデルがありません"
 msgid "No models found matching your filters."
 msgstr "フィルターに一致するモデルが見つかりません。"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:706
-#: src/components/model-picker/model-picker.tsx:1192
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:713
+#: src/components/model-picker/model-picker.tsx:1188
 msgid "No models found."
 msgstr "モデルが見つかりません。"
 
@@ -21076,7 +21107,7 @@ msgstr "結果なし"
 msgid "No results found"
 msgstr "結果が見つかりません"
 
-#: ../../packages/ui/src/components/spreadsheet/csv-table.tsx:170
+#: ../../packages/ui/src/components/spreadsheet/csv-table.tsx:174
 msgid "No results found for “{searchTerm}”"
 msgstr "“{searchTerm}” の結果が見つかりません"
 
@@ -21137,8 +21168,8 @@ msgstr "並べ替えは適用されていません"
 msgid "No speech detected. Hands-free mode stopped."
 msgstr "音声が検出されませんでした。ハンズフリーモードを停止しました。"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:698
-#: src/components/model-picker/model-picker.tsx:1184
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:705
+#: src/components/model-picker/model-picker.tsx:1180
 msgid "No starred models"
 msgstr "スター付きのモデルはありません"
 
@@ -21832,7 +21863,7 @@ msgid "Online"
 msgstr "オンライン"
 
 #. placeholder {0}: getModelModeName(anchorMode!)
-#: src/components/model-picker/model-picker.tsx:488
+#: src/components/model-picker/model-picker.tsx:483
 msgid "Only {0} models can be compared. Clear selection to switch types."
 msgstr "比較できるのは{0}モデルのみです。種類を切り替えるには選択を解除してください。"
 
@@ -21864,7 +21895,7 @@ msgstr ""
 msgid "Only run when every filter matches the JSON body. Use dotted paths such as pull_request.user.login or labels.0.name. A delivery that does not match is accepted, shown as Skipped in the history, and does not run or count against your quota."
 msgstr ""
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:250
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:254
 msgid "Only same-type models can be compared. Clear selection to switch types."
 msgstr "比較できるのは同じ種類のモデルだけです。種類を切り替えるには選択をクリアしてください。"
 
@@ -21913,7 +21944,7 @@ msgstr ""
 msgid "Only use providers that guarantee zero data retention — your prompts are never stored."
 msgstr "データを一切保持しないことを保証するプロバイダーのみを使用します。プロンプトが保存されることはありません。"
 
-#: src/features/settings/components/chat/event-trigger-fields.tsx:239
+#: src/features/settings/components/chat/event-trigger-fields.tsx:241
 msgid "Only when it contains (optional)"
 msgstr ""
 
@@ -21946,7 +21977,7 @@ msgstr "問題が発生しました"
 msgid "Opacity"
 msgstr "不透明度"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:697
+#: ../../packages/chat-ui/src/chat/message-content.tsx:707
 #: src/components/command-palette.tsx:700
 #: src/features/chat/link-preview/link-preview-card.tsx:117
 #: src/features/develop/components/pull-request-view.tsx:73
@@ -22029,8 +22060,8 @@ msgstr "オープンな画像生成"
 msgid "Open in full screen"
 msgstr "全画面で開く"
 
-#: src/features/chat/thread-list/thread-node.tsx:743
-#: src/features/chat/thread-list/thread-node.tsx:756
+#: src/features/chat/thread-list/thread-node.tsx:762
+#: src/features/chat/thread-list/thread-node.tsx:775
 msgid "Open in new window"
 msgstr "新しいウィンドウで開く"
 
@@ -22795,7 +22826,7 @@ msgstr ""
 msgid "Outpaint"
 msgstr "アウトペイント"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:552
+#: ../../packages/chat-ui/src/chat/message-content.tsx:562
 #: ../../packages/ui/src/components/ai-elements/context.tsx:276
 #: src/components/model-picker/model-picker.tsx:206
 #: src/features/devices/components/device-tool-call.tsx:174
@@ -22826,7 +22857,7 @@ msgstr "出力ファイル"
 msgid "Output Format"
 msgstr "出力形式"
 
-#: src/features/chat/thread/composer.tsx:243
+#: src/features/chat/thread/composer.tsx:244
 msgid "Output Mode"
 msgstr "出力モード"
 
@@ -22843,7 +22874,7 @@ msgstr "出力タイプ"
 msgid "Output-format focused"
 msgstr "出力形式重視"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:227
+#: ../../packages/chat-ui/src/chat/message-content.tsx:237
 msgid "Output:"
 msgstr "出力:"
 
@@ -22887,7 +22918,7 @@ msgstr ""
 msgid "Pacific Time (US & Canada)"
 msgstr "太平洋標準時（米国およびカナダ）"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:651
+#: ../../packages/chat-ui/src/chat/message-content.tsx:661
 msgid "page"
 msgstr "ページ"
 
@@ -22900,7 +22931,7 @@ msgstr "{currentPage} / {totalPages} ページ"
 msgid "Page added. It is being fetched and indexed."
 msgstr "ページを追加しました。取得とインデックス作成を行っています。"
 
-#: src/features/settings/components/chat/event-trigger-fields.tsx:215
+#: src/features/settings/components/chat/event-trigger-fields.tsx:217
 msgid "Page address"
 msgstr ""
 
@@ -22992,8 +23023,8 @@ msgstr ""
 msgid "Paraguay"
 msgstr "パラグアイ"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:590
-#: src/components/model-picker/model-picker.tsx:1054
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:597
+#: src/components/model-picker/model-picker.tsx:1050
 msgid "Parallel"
 msgstr "並列"
 
@@ -23433,7 +23464,7 @@ msgstr "評価するスキルを選択してください。"
 msgid "Pick a starting point or jump straight into chat."
 msgstr "出発点を選ぶか、すぐにチャットを始めましょう。"
 
-#: src/features/settings/components/chat/event-trigger-fields.tsx:271
+#: src/features/settings/components/chat/event-trigger-fields.tsx:273
 msgid "Pick a thread"
 msgstr ""
 
@@ -23505,7 +23536,7 @@ msgstr "メッセージをピン留め"
 
 #: ../../packages/chat-ui/src/threads/thread-item.tsx:81
 #: src/components/command-palette.tsx:470
-#: src/features/chat/thread-list/thread-node.tsx:107
+#: src/features/chat/thread-list/thread-node.tsx:108
 msgid "Pin thread"
 msgstr "スレッドをピン留め"
 
@@ -23558,7 +23589,7 @@ msgstr ""
 msgid "plan"
 msgstr ""
 
-#: src/features/chat/thread/composer.tsx:265
+#: src/features/chat/thread/composer.tsx:266
 msgid "Plan a project or brainstorm ideas..."
 msgstr "プロジェクトの計画やアイデア出しなど..."
 
@@ -24106,11 +24137,11 @@ msgstr "前のバージョン"
 msgid "Price per 1M tokens"
 msgstr ""
 
-#: src/components/model-picker/model-picker.tsx:1143
+#: src/components/model-picker/model-picker.tsx:1139
 msgid "Price: high to low"
 msgstr ""
 
-#: src/components/model-picker/model-picker.tsx:1142
+#: src/components/model-picker/model-picker.tsx:1138
 msgid "Price: low to high"
 msgstr ""
 
@@ -24189,8 +24220,8 @@ msgstr "非公開"
 msgid "Private by default"
 msgstr "デフォルトでプライベート"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:141
-#: src/components/model-picker/model-picker.tsx:315
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:138
+#: src/components/model-picker/model-picker.tsx:307
 #: src/features/billing/components/personal-plan-card.tsx:25
 #: src/features/marketing/components/gateway-landing-page.tsx:131
 #: src/features/marketing/components/landing-page.tsx:345
@@ -24233,8 +24264,8 @@ msgid "Processing voice input"
 msgstr "音声入力を処理しています"
 
 #: src/features/chat/header/temporary-chat-dropdown.tsx:211
-#: src/features/chat/thread-list/thread-node.tsx:104
-#: src/features/chat/thread-list/thread-node.tsx:112
+#: src/features/chat/thread-list/thread-node.tsx:105
+#: src/features/chat/thread-list/thread-node.tsx:113
 #: src/features/settings/components/privacy/data-export.tsx:101
 msgid "Processing..."
 msgstr "処理しています..."
@@ -24733,7 +24764,7 @@ msgstr "ルーティングエンジンが割り当てたクエリの複雑度テ
 msgid "Query usage analytics and costs"
 msgstr "使用状況の分析とコストを照会"
 
-#: src/features/chat/thread-list/thread-node.tsx:548
+#: src/features/chat/thread-list/thread-node.tsx:567
 msgid "Question"
 msgstr ""
 
@@ -25760,8 +25791,8 @@ msgstr "お気に入りから削除"
 msgid "Remove from project"
 msgstr "プロジェクトから削除"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:168
-#: src/components/model-picker/model-picker.tsx:342
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:184
+#: src/components/model-picker/model-picker.tsx:361
 msgid "Remove from starred"
 msgstr "スターを外す"
 
@@ -25801,7 +25832,7 @@ msgid "Remove or add objects in an image"
 msgstr "画像内のオブジェクトを削除または追加"
 
 #: src/features/chat/lock/thread-lock-dialog.tsx:151
-#: src/features/chat/thread-list/thread-node.tsx:834
+#: src/features/chat/thread-list/thread-node.tsx:853
 msgid "Remove passcode"
 msgstr ""
 
@@ -25899,6 +25930,10 @@ msgstr ""
 #: src/features/pages/components/page-comments-panel.tsx:223
 msgid "Reopen"
 msgstr "未解決に戻す"
+
+#: src/features/chat/thread-list/thread-node.tsx:505
+msgid "Reorder"
+msgstr ""
 
 #. placeholder {0}: getModelLabel(model, nicknames)
 #: src/features/settings/components/chat/favorite-models-settings.tsx:149
@@ -26091,7 +26126,7 @@ msgstr "リサーチ"
 msgid "Research a topic"
 msgstr "トピックをリサーチ"
 
-#: src/features/chat/thread/composer.tsx:267
+#: src/features/chat/thread/composer.tsx:268
 msgid "Research a topic in depth..."
 msgstr "トピックを深くリサーチ..."
 
@@ -26204,9 +26239,14 @@ msgstr "リソース"
 msgid "Response"
 msgstr "応答"
 
-#: src/features/chat/thread-list/thread-node.tsx:566
+#: src/features/chat/thread-list/thread-node.tsx:585
 msgid "Response failed - try again"
 msgstr "応答に失敗しました - もう一度お試しください"
+
+#. placeholder {0}: selectedLanguageItem.label
+#: src/features/chat/thread/composer-language-selector.tsx:142
+msgid "Response language: {0}"
+msgstr ""
 
 #. placeholder {0}: osLabels[key]
 #: src/features/local-models/components/local-setup-guide.tsx:115
@@ -26403,7 +26443,7 @@ msgstr ""
 msgid "Review requests in {0}"
 msgstr ""
 
-#: src/features/chat/goal/composer-goal.tsx:87
+#: src/features/chat/goal/composer-goal.tsx:89
 msgid "Review rounds: {maxRounds}. Change"
 msgstr ""
 
@@ -26689,7 +26729,7 @@ msgstr "PowerShell で次のコマンドを実行してください。"
 msgid "Run this dataset against at least two models to compare them."
 msgstr "比較するには、このデータセットを 2 つ以上のモデルで実行してください。"
 
-#: src/features/chat/goal/composer-goal.tsx:78
+#: src/features/chat/goal/composer-goal.tsx:80
 msgid "Run until done"
 msgstr ""
 
@@ -26715,7 +26755,7 @@ msgstr "ワークフローを実行すると、ここに実行履歴が表示さ
 msgid "Running"
 msgstr "実行中"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:513
+#: ../../packages/chat-ui/src/chat/message-content.tsx:523
 msgid "Running code..."
 msgstr "コードを実行しています..."
 
@@ -26723,7 +26763,7 @@ msgstr "コードを実行しています..."
 msgid "Running on {device}…"
 msgstr "{device} で実行中…"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:196
+#: ../../packages/chat-ui/src/chat/message-content.tsx:206
 #: src/features/admin/components/admin-cleanup-dashboard.tsx:258
 #: src/features/workflow/components/canvas/workflow-controls.tsx:622
 #: src/features/workflow/components/nodes/base-node.tsx:263
@@ -26755,7 +26795,7 @@ msgstr "Cloudflare Workers で動作 — コールドスタート 50ms 未満、
 msgid "Runs on the schedule {0}{1}, on {2}."
 msgstr ""
 
-#: src/features/settings/components/chat/event-trigger-fields.tsx:262
+#: src/features/settings/components/chat/event-trigger-fields.tsx:264
 msgid "Runs once, then switches itself off. For a repeating time, use a schedule."
 msgstr ""
 
@@ -27087,7 +27127,7 @@ msgid "Screen capture failed. Please try again."
 msgstr "画面のキャプチャに失敗しました。もう一度お試しください。"
 
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:118
-#: ../../packages/chat-ui/src/chat/message-content.tsx:693
+#: ../../packages/chat-ui/src/chat/message-content.tsx:703
 msgid "Screenshot"
 msgstr "スクリーンショット"
 
@@ -27184,7 +27224,7 @@ msgstr "宇宙探査に関する最新ニュースを検索する"
 msgid "Search GitHub repositories and code"
 msgstr "GitHub のリポジトリとコードを検索"
 
-#: src/features/chat/thread/composer-language-selector.tsx:172
+#: src/features/chat/thread/composer-language-selector.tsx:174
 msgid "Search languages..."
 msgstr "言語を検索..."
 
@@ -27232,8 +27272,8 @@ msgstr ""
 msgid "Search models by name, ID, or provider..."
 msgstr "名前、ID、プロバイダーでモデルを検索..."
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:523
-#: src/components/model-picker/model-picker.tsx:995
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:530
+#: src/components/model-picker/model-picker.tsx:991
 msgid "Search models..."
 msgstr "モデルを検索..."
 
@@ -27550,7 +27590,7 @@ msgid "Select mode"
 msgstr "選択モード"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker-button.tsx:173
-#: src/components/model-picker/model-picker-button.tsx:196
+#: src/components/model-picker/model-picker-button.tsx:202
 #: src/components/model-picker/model-picker-popup.tsx:42
 msgid "Select Model"
 msgstr "モデルを選択"
@@ -27560,7 +27600,7 @@ msgid "Select model (optional)"
 msgstr "モデルを選択 (任意)"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker-button.tsx:124
-#: src/components/model-picker/model-picker-button.tsx:99
+#: src/components/model-picker/model-picker-button.tsx:100
 #: src/features/workflow/components/nodes/background-removal-node.tsx:66
 #: src/features/workflow/components/nodes/character-ref-node.tsx:147
 #: src/features/workflow/components/nodes/controlnet-node.tsx:133
@@ -27583,7 +27623,7 @@ msgstr "複数のスレッドを選択"
 msgid "Select range"
 msgstr "範囲を選択"
 
-#: src/features/chat/thread/composer-language-selector.tsx:162
+#: src/features/chat/thread/composer-language-selector.tsx:164
 msgid "Select response language"
 msgstr "応答言語を選択"
 
@@ -27603,7 +27643,7 @@ msgstr "コメントするテキストを選択してください"
 msgid "Select text in the page and choose “Comment”."
 msgstr "ページ内のテキストを選択して「コメント」を選んでください。"
 
-#: src/features/chat/thread/composer-language-selector.tsx:158
+#: src/features/chat/thread/composer-language-selector.tsx:160
 msgid "Select the language for AI responses. This determines which language the assistant will use when generating replies."
 msgstr "AI の応答言語を選択します。アシスタントが返信を生成するときに使う言語が決まります。"
 
@@ -27651,7 +27691,7 @@ msgstr ""
 msgid "Selected reference"
 msgstr "選択した参照"
 
-#: src/features/settings/components/chat/event-trigger-fields.tsx:275
+#: src/features/settings/components/chat/event-trigger-fields.tsx:277
 msgid "Selected thread"
 msgstr ""
 
@@ -27667,7 +27707,7 @@ msgstr ""
 msgid "Selection context"
 msgstr "選択範囲のコンテキスト"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:565
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:572
 msgid "Selection mode"
 msgstr "選択モード"
 
@@ -28367,11 +28407,11 @@ msgstr ""
 msgid "Sign in to the Neore desktop app"
 msgstr "Neore デスクトップアプリにサインイン"
 
-#: src/components/model-picker/model-picker.tsx:485
+#: src/components/model-picker/model-picker.tsx:480
 msgid "Sign in to unlock all models"
 msgstr "サインインしてすべてのモデルを利用"
 
-#: src/components/model-picker/model-picker.tsx:989
+#: src/components/model-picker/model-picker.tsx:985
 msgid "Sign in to unlock all models."
 msgstr "サインインしてすべてのモデルを利用できます。"
 
@@ -28437,8 +28477,8 @@ msgstr "サインアップして月額 $8 で登録すると、すべての機�
 #~ msgid "Sign up successful"
 #~ msgstr "サインアップが完了しました"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:247
-#: src/components/model-picker/model-picker.tsx:485
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:251
+#: src/components/model-picker/model-picker.tsx:480
 msgid "Sign up to unlock all models"
 msgstr "サインアップしてすべてのモデルを利用"
 
@@ -28511,8 +28551,8 @@ msgstr "置き換え済み"
 msgid "Singapore"
 msgstr "シンガポール"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:577
-#: src/components/model-picker/model-picker.tsx:1042
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:584
+#: src/components/model-picker/model-picker.tsx:1038
 msgid "Single"
 msgstr "単一"
 
@@ -28703,7 +28743,7 @@ msgstr "スライド {streamingSlideNumber}"
 msgid "Slide title"
 msgstr "スライドのタイトル"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1069
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1079
 msgid "Slide updated"
 msgstr "スライドを更新しました"
 
@@ -28779,20 +28819,20 @@ msgstr "o1 より賢い構成"
 msgid "Smooth transitions"
 msgstr "滑らかなトランジション"
 
-#: src/features/chat/thread-list/thread-node.tsx:877
+#: src/features/chat/thread-list/thread-node.tsx:896
 msgid "Snooze 1 hour"
 msgstr ""
 
-#: src/features/chat/thread-list/thread-node.tsx:856
-#: src/features/chat/thread-list/thread-node.tsx:870
+#: src/features/chat/thread-list/thread-node.tsx:875
+#: src/features/chat/thread-list/thread-node.tsx:889
 msgid "Snooze thread"
 msgstr ""
 
-#: src/features/chat/thread-list/thread-node.tsx:883
+#: src/features/chat/thread-list/thread-node.tsx:902
 msgid "Snooze until next week"
 msgstr ""
 
-#: src/features/chat/thread-list/thread-node.tsx:879
+#: src/features/chat/thread-list/thread-node.tsx:898
 msgid "Snooze until tomorrow 09:00"
 msgstr ""
 
@@ -28849,7 +28889,7 @@ msgstr "堅実な汎用能力"
 msgid "Solid performance across most task types"
 msgstr "ほとんどのタスクで堅実な性能"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:602
+#: ../../packages/chat-ui/src/chat/message-content.tsx:612
 msgid "Some images from this run could not be saved."
 msgstr "この実行の一部の画像を保存できませんでした。"
 
@@ -28901,7 +28941,7 @@ msgstr "データを並べ替え"
 msgid "Sort desc"
 msgstr "降順で並べ替え"
 
-#: src/components/model-picker/model-picker.tsx:1133
+#: src/components/model-picker/model-picker.tsx:1129
 msgid "Sort models"
 msgstr ""
 
@@ -28938,7 +28978,7 @@ msgstr "効果音を有効にしました"
 msgid "Source"
 msgstr "ソース"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1206
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1216
 #: src/features/chat/thread/message-content.tsx:141
 msgid "Source {index}"
 msgstr "出典 {index}"
@@ -29250,8 +29290,8 @@ msgstr ""
 msgid "starred"
 msgstr ""
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:542
-#: src/components/model-picker/model-picker.tsx:1011
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:549
+#: src/components/model-picker/model-picker.tsx:1007
 msgid "Starred"
 msgstr "スター付き"
 
@@ -29502,6 +29542,7 @@ msgid "Stateless"
 msgstr "ステートレス"
 
 #: src/features/chat/sidebar/thread-sidebar.tsx:163
+#: src/features/chat/sidebar/thread-sidebar.tsx:168
 msgid "Stateless Mode"
 msgstr "ステートレスモード"
 
@@ -29595,8 +29636,8 @@ msgstr "現在の話者の後に停止"
 msgid "Stop and clear the queue"
 msgstr ""
 
-#: src/features/chat/thread-list/thread-node.tsx:583
-#: src/features/chat/thread-list/thread-node.tsx:605
+#: src/features/chat/thread-list/thread-node.tsx:602
+#: src/features/chat/thread-list/thread-node.tsx:624
 #: src/features/chat/thread/composer-input-area.tsx:394
 #: src/features/chat/thread/composer-input-area.tsx:407
 msgid "Stop generating"
@@ -29703,7 +29744,7 @@ msgstr "Streamable HTTP（推奨）"
 msgid "Streaming"
 msgstr "ストリーミング"
 
-#: src/features/chat/thread-list/thread-node.tsx:565
+#: src/features/chat/thread-list/thread-node.tsx:584
 msgid "Streaming..."
 msgstr "ストリーミング中..."
 
@@ -30086,7 +30127,7 @@ msgstr ""
 msgid "Submitting…"
 msgstr ""
 
-#: src/components/model-picker/model-picker.tsx:985
+#: src/components/model-picker/model-picker.tsx:981
 msgid "Subscribe for $8/mo to unlock all models."
 msgstr "月額 $8 で登録すると、すべてのモデルを利用できます。"
 
@@ -30134,7 +30175,7 @@ msgstr "おすすめ"
 msgid "Suggested answers"
 msgstr "回答の候補"
 
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:474
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:476
 msgid "Suggestion available, press Right Arrow to accept"
 msgstr "候補があります。右矢印キーで確定します"
 
@@ -30163,7 +30204,7 @@ msgstr ""
 msgid "Summarise my notes in three bullets."
 msgstr ""
 
-#: src/features/chat/thread/composer.tsx:264
+#: src/features/chat/thread/composer.tsx:265
 msgid "Summarize a document or URL..."
 msgstr "ドキュメントや URL を要約..."
 
@@ -30431,7 +30472,7 @@ msgstr "タグはチャットに付ける独自のラベルです。自動カテ
 msgid "Tags for {threadTitle}"
 msgstr "{threadTitle} のタグ"
 
-#: src/features/chat/thread-list/thread-node.tsx:768
+#: src/features/chat/thread-list/thread-node.tsx:787
 msgid "Tags unavailable for temporary chats"
 msgstr "一時チャットではタグを使用できません"
 
@@ -30451,7 +30492,7 @@ msgstr "入力画像の背景を削除し、スタイル転送を適用"
 msgid "Take turns"
 msgstr "順番に回答"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:646
+#: ../../packages/chat-ui/src/chat/message-content.tsx:656
 msgid "Taking screenshot..."
 msgstr "スクリーンショットを撮影しています..."
 
@@ -30715,7 +30756,7 @@ msgstr "テンプレート"
 msgid "Temporary"
 msgstr "一時"
 
-#: src/features/chat/thread-list/thread-node.tsx:1078
+#: src/features/chat/thread-list/thread-node.tsx:1097
 msgid "Temporary chat"
 msgstr "一時チャット"
 
@@ -30741,7 +30782,7 @@ msgstr "一時チャットの保持期間（時間）"
 msgid "Temporary chat settings, {0}"
 msgstr ""
 
-#: src/features/chat/thread-list/thread-node.tsx:780
+#: src/features/chat/thread-list/thread-node.tsx:799
 msgid "Temporary chats expire, so they can't be tagged. Convert it to a permanent chat to add tags."
 msgstr "一時チャットは期限切れになるため、タグを付けられません。タグを追加するには永続的なチャットに変換してください。"
 
@@ -30806,10 +30847,10 @@ msgstr "テスト"
 msgid "text"
 msgstr "テキスト"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:624
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:631
 #: ../../packages/ui/src/components/canvas-editor/canvas-element-palette.tsx:317
 #: ../../packages/ui/src/components/canvas-editor/canvas-property-panel.tsx:351
-#: src/components/model-picker/model-picker.tsx:1089
+#: src/components/model-picker/model-picker.tsx:1085
 #: src/features/chat/sidebar/usage-card.tsx:128
 #: src/features/chat/thread/composer.tsx:121
 #: src/features/marketing/components/landing-footer.tsx:164
@@ -31149,7 +31190,7 @@ msgstr "コーディングエージェントを起動できませんでした。
 msgid "The comparison could not be loaded."
 msgstr "比較を読み込めませんでした。"
 
-#: src/features/settings/components/chat/event-trigger-fields.tsx:209
+#: src/features/settings/components/chat/event-trigger-fields.tsx:211
 msgid "The condition is checked without asking a model; the agent runs only when it comes true. You can keep {MAX_ACTIVE_EVENT_WATCHERS} event triggers switched on at a time."
 msgstr ""
 
@@ -31439,7 +31480,7 @@ msgstr "OpenAI の最高のコーディング能力を必要とする、最も�
 msgid "The most demanding tasks requiring Anthropic's latest frontier reasoning and capabilities"
 msgstr "Anthropic の最新フロンティアの推論と能力を必要とする、最も要求の厳しいタスク"
 
-#: src/features/chat/goal/composer-goal.tsx:98
+#: src/features/chat/goal/composer-goal.tsx:100
 msgid "The most review rounds before it stops"
 msgstr ""
 
@@ -31539,7 +31580,7 @@ msgstr ""
 msgid "The right model, every time."
 msgstr "いつでも、最適なモデルを。"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:722
+#: ../../packages/chat-ui/src/chat/message-content.tsx:732
 msgid "The screenshot could not be saved."
 msgstr "スクリーンショットを保存できませんでした。"
 
@@ -31703,8 +31744,8 @@ msgid "thinking"
 msgstr ""
 
 #: ../../packages/ui/src/components/ai-elements/reasoning.tsx:134
-msgid "Thinking in progress, collapse to hide"
-msgstr "思考中です。折りたたむと非表示になります"
+#~ msgid "Thinking in progress, collapse to hide"
+#~ msgstr "思考中です。折りたたむと非表示になります"
 
 #: src/features/marketing/data/models-data.ts:1130
 msgid "Thinking mode on an efficient 32B model"
@@ -31751,8 +31792,8 @@ msgid "Thinking-enabled vision-language model"
 msgstr "思考機能を備えた視覚言語モデル"
 
 #: ../../packages/chat-ui/src/chat/auto-continue-status.tsx:54
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1132
-#: ../../packages/ui/src/components/ai-elements/reasoning.tsx:116
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1142
+#: ../../packages/ui/src/components/ai-elements/reasoning.tsx:114
 #: src/features/chat/thread/streaming-placeholder.tsx:799
 msgid "Thinking..."
 msgstr "考えています..."
@@ -31988,7 +32029,7 @@ msgstr ""
 msgid "This host does not offer any view of a {requestNoun} yet."
 msgstr ""
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:380
+#: ../../packages/chat-ui/src/chat/message-content.tsx:390
 msgid "This image has been flagged for review"
 msgstr "この画像はレビュー対象としてフラグが付けられています"
 
@@ -32299,7 +32340,7 @@ msgstr "このワークフローは非公開にされたか、削除された可
 msgid "Thorough"
 msgstr "徹底的"
 
-#: ../../packages/ui/src/components/ai-elements/reasoning.tsx:120
+#: ../../packages/ui/src/components/ai-elements/reasoning.tsx:118
 msgid "Thought for a few seconds"
 msgstr "数秒間思考しました"
 
@@ -32308,7 +32349,7 @@ msgid "thread"
 msgstr ""
 
 #: src/features/chat/sidebar/thread-sidebar.tsx:302
-#: src/features/settings/components/chat/event-trigger-fields.tsx:268
+#: src/features/settings/components/chat/event-trigger-fields.tsx:270
 #: src/features/settings/components/chat/trigger-settings.tsx:996
 msgid "Thread"
 msgstr "スレッド"
@@ -32851,7 +32892,7 @@ msgstr "変換後の画像"
 msgid "Translate"
 msgstr "翻訳"
 
-#: src/features/chat/thread/composer.tsx:270
+#: src/features/chat/thread/composer.tsx:271
 msgid "Translate text to another language..."
 msgstr "テキストを別の言語に翻訳..."
 
@@ -33097,16 +33138,16 @@ msgid "Turn off auto-merge?"
 msgstr ""
 
 #: src/features/chat/goal/composer-goal.tsx:62
-msgid "Turn off run until done"
-msgstr ""
+#~ msgid "Turn off run until done"
+#~ msgstr ""
 
 #: src/features/home/components/home-page.tsx:236
 msgid "Turn on Daily Brief"
 msgstr "Daily Brief をオンにする"
 
 #: src/features/chat/goal/composer-goal.tsx:62
-msgid "Turn on run until done"
-msgstr ""
+#~ msgid "Turn on run until done"
+#~ msgstr ""
 
 #: src/features/skills/components/bundle-import-dialog.tsx:122
 msgid "Turns these tools off:"
@@ -33164,8 +33205,8 @@ msgid "Two-factor authentication is currently enabled for your account. This add
 msgstr "お使いのアカウントでは現在、二要素認証が有効になっています。これによりセキュリティが強化されます。"
 
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:125
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:601
-#: src/components/model-picker/model-picker.tsx:1065
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:608
+#: src/components/model-picker/model-picker.tsx:1061
 #: src/features/devices/components/device-tool-call.tsx:119
 msgid "Type"
 msgstr "種類"
@@ -33206,7 +33247,7 @@ msgstr "メッセージを入力..."
 msgid "Typeface for the whole interface. Code blocks always stay monospace."
 msgstr ""
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:647
+#: ../../packages/chat-ui/src/chat/message-content.tsx:657
 msgid "Typing text..."
 msgstr "テキストを入力しています..."
 
@@ -33310,7 +33351,7 @@ msgstr "アーカイブ解除"
 
 #: src/components/command-palette.tsx:476
 #: src/components/command-palette.tsx:637
-#: src/features/chat/thread-list/thread-node.tsx:115
+#: src/features/chat/thread-list/thread-node.tsx:116
 msgid "Unarchive thread"
 msgstr "スレッドのアーカイブを解除"
 
@@ -33351,7 +33392,7 @@ msgid "Under the Hood"
 msgstr "内部の仕組み"
 
 #: ../../packages/ui/src/components/canvas-editor/fabric-canvas-editor.tsx:604
-#: src/components/model-picker/model-picker.tsx:736
+#: src/components/model-picker/model-picker.tsx:732
 #: src/features/canvas/canvas-panel.tsx:244
 #: src/features/canvas/components/canvas-ai-diff-banner.tsx:51
 #: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:126
@@ -33444,7 +33485,7 @@ msgid "Unlink"
 msgstr "リンク解除"
 
 #: src/features/chat/lock/locked-chat-gate.tsx:88
-#: src/features/chat/thread-list/thread-node.tsx:832
+#: src/features/chat/thread-list/thread-node.tsx:851
 msgid "Unlock chat"
 msgstr ""
 
@@ -33499,7 +33540,7 @@ msgstr "メモリのピン留めを解除"
 
 #: ../../packages/chat-ui/src/threads/thread-item.tsx:81
 #: src/components/command-palette.tsx:470
-#: src/features/chat/thread-list/thread-node.tsx:107
+#: src/features/chat/thread-list/thread-node.tsx:108
 msgid "Unpin thread"
 msgstr "スレッドのピン留めを解除"
 
@@ -33507,7 +33548,7 @@ msgstr "スレッドのピン留めを解除"
 msgid "Unpublish"
 msgstr "公開を停止"
 
-#: src/features/chat/thread-list/thread-node.tsx:1085
+#: src/features/chat/thread-list/thread-node.tsx:1104
 msgid "Unread"
 msgstr ""
 
@@ -33515,7 +33556,7 @@ msgstr ""
 msgid "Unsaved changes"
 msgstr "未保存の変更"
 
-#: src/features/chat/thread-list/thread-node.tsx:885
+#: src/features/chat/thread-list/thread-node.tsx:904
 msgid "Unsnooze"
 msgstr ""
 
@@ -33545,7 +33586,7 @@ msgstr ""
 #: src/features/pages/components/pages-sidebar.tsx:219
 #: src/features/pages/components/pages-sidebar.tsx:280
 #: src/features/pages/components/public-page-view.tsx:53
-#: src/features/settings/components/chat/event-trigger-fields.tsx:279
+#: src/features/settings/components/chat/event-trigger-fields.tsx:281
 msgid "Untitled"
 msgstr "無題"
 
@@ -33681,11 +33722,11 @@ msgstr "OpenAI のフロンティア性能を更新"
 msgid "Updated reasoning capabilities over the original R1"
 msgstr "初代 R1 から推論能力を更新"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1067
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1077
 msgid "Updated slide"
 msgstr "スライドを更新しました"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1067
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1077
 msgid "Updated slide {slideNumber}"
 msgstr "スライド {slideNumber} を更新しました"
 
@@ -34469,8 +34510,8 @@ msgstr "生成あたりの非常に低いコスト"
 msgid "video"
 msgstr "動画"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:648
-#: src/components/model-picker/model-picker.tsx:1115
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:655
+#: src/components/model-picker/model-picker.tsx:1111
 #: src/features/chat/sidebar/usage-card.tsx:130
 #: src/features/chat/thread/composer.tsx:123
 #: src/features/marketing/components/landing-footer.tsx:166
@@ -34909,7 +34950,7 @@ msgctxt "width abbreviation"
 msgid "W"
 msgstr "幅"
 
-#: src/features/settings/components/chat/event-trigger-fields.tsx:302
+#: src/features/settings/components/chat/event-trigger-fields.tsx:304
 msgid "Wait after it fires (minutes)"
 msgstr ""
 
@@ -34970,8 +35011,8 @@ msgstr "アップロードの完了を待っています…"
 msgid "Waiting for you"
 msgstr ""
 
-#: src/features/chat/thread-list/thread-node.tsx:568
-#: src/features/chat/thread-list/thread-node.tsx:575
+#: src/features/chat/thread-list/thread-node.tsx:587
+#: src/features/chat/thread-list/thread-node.tsx:594
 #: src/features/chat/thread/ask-user-prompt.tsx:185
 msgid "Waiting for your answer"
 msgstr "あなたの回答を待っています"
@@ -34981,8 +35022,8 @@ msgstr "あなたの回答を待っています"
 msgid "Waiting for your answer in {0}"
 msgstr "{0} であなたの回答を待っています"
 
-#: src/features/chat/thread-list/thread-node.tsx:567
-#: src/features/chat/thread-list/thread-node.tsx:574
+#: src/features/chat/thread-list/thread-node.tsx:586
+#: src/features/chat/thread-list/thread-node.tsx:593
 #: src/features/chat/thread/tool-approval.tsx:74
 msgid "Waiting for your approval"
 msgstr "あなたの承認を待っています"
@@ -35000,7 +35041,7 @@ msgstr "ここから続けますか？"
 msgid "Watch"
 msgstr ""
 
-#: src/features/settings/components/chat/event-trigger-fields.tsx:228
+#: src/features/settings/components/chat/event-trigger-fields.tsx:230
 msgid "Watch only this part (optional)"
 msgstr ""
 
@@ -35324,7 +35365,7 @@ msgstr "WhatsApp Phone Number ID"
 msgid "WhatsApp Verify Token"
 msgstr "WhatsApp Verify Token"
 
-#: src/features/settings/components/chat/event-trigger-fields.tsx:254
+#: src/features/settings/components/chat/event-trigger-fields.tsx:256
 msgid "When"
 msgstr ""
 
@@ -35423,7 +35464,7 @@ msgstr "管理者権限あり"
 msgid "With email/password"
 msgstr "メールアドレス/パスワード"
 
-#: src/features/settings/components/chat/event-trigger-fields.tsx:247
+#: src/features/settings/components/chat/event-trigger-fields.tsx:249
 msgid "With this, it fires when the text starts to contain the phrase, not on every change."
 msgstr ""
 
@@ -35543,7 +35584,7 @@ msgstr "チャットと並行して長文コンテンツを作成"
 msgid "Write long-form content in a side-by-side canvas editor. Go from chat to finished document without switching tools."
 msgstr "横並びのキャンバスエディターで長文コンテンツを作成できます。ツールを切り替えずに、チャットから完成したドキュメントまで。"
 
-#: src/features/chat/thread/composer.tsx:263
+#: src/features/chat/thread/composer.tsx:264
 msgid "Write some code for me..."
 msgstr "コードを書いて..."
 
@@ -35659,7 +35700,7 @@ msgstr "YAML"
 msgid "Yellow"
 msgstr "黄"
 
-#: ../../packages/ui/src/components/spreadsheet/csv-table.tsx:153
+#: ../../packages/ui/src/components/spreadsheet/csv-table.tsx:157
 #: src/features/settings/components/privacy/data-access.tsx:42
 msgid "Yes"
 msgstr "はい"
@@ -36072,7 +36113,7 @@ msgstr "あなたのメッセージ:"
 msgid "Your next chat is temporary. Turn this off in Settings to keep it."
 msgstr ""
 
-#: src/features/chat/goal/composer-goal.tsx:79
+#: src/features/chat/goal/composer-goal.tsx:81
 msgid "Your next message is a goal. The agent keeps working until a review confirms it is met."
 msgstr ""
 
