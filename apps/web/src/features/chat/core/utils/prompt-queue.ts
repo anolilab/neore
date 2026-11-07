@@ -29,6 +29,8 @@ export interface QueuedPrompt<A> {
     /** Sent into the running reply (`chat/steering.ts`): its id on that run's stream. */
     steer?: QueuedSteer;
     text: string;
+    /** A send was made under its id whose answer may have been lost, so the turn running now may be its own. Kept across a reload. */
+    tried?: boolean;
 }
 
 export interface QueuedSteer {
@@ -83,7 +85,11 @@ export const editQueuedPrompt = <A>(state: PromptQueueState<A>, id: string, text
             }
 
             // A changed text is a new message: its send id must not be one an earlier, lost-answer send already used.
-            return withoutHidden({ ...item, id: newId, text });
+            const renamed: QueuedPrompt<A> = { ...item, id: newId, text };
+
+            delete renamed.tried;
+
+            return withoutHidden(renamed);
         }),
     };
 };
@@ -206,7 +212,9 @@ export interface StoredAttachment {
 
 /** What a queue looks like in sessionStorage. */
 interface StoredPromptQueue {
-    items: { attachments?: StoredAttachment[]; droppedAttachments: number; id: string; steer?: QueuedSteer; text: string }[];
+    /** Absent in a queue stored before `tried` was kept: whether its messages were sent is not known. */
+    format?: 2;
+    items: { attachments?: StoredAttachment[]; droppedAttachments: number; id: string; steer?: QueuedSteer; text: string; tried?: true }[];
 }
 
 const ATTACHMENT_KINDS: ReadonlySet<string> = new Set(["document", "file", "image"]);
@@ -251,11 +259,12 @@ export const serializePromptQueue = <A>(
                 id: item.id,
                 ...(item.steer && { steer: { id: item.steer.id, streamId: item.steer.streamId } }),
                 text: item.text,
+                ...(item.tried && { tried: true as const }),
             },
         ];
     });
 
-    return items.length > 0 ? JSON.stringify({ items } satisfies StoredPromptQueue) : undefined;
+    return items.length > 0 ? JSON.stringify({ format: 2, items } satisfies StoredPromptQueue) : undefined;
 };
 
 const readSteer = (value: unknown): QueuedSteer | undefined => {
@@ -376,15 +385,20 @@ export const restorePromptQueue = <A = never>(
         return undefined;
     }
 
+    // A queue stored before `tried` was kept says nothing of its sends: every message counts as tried, so Send now never stops
+    // a turn one of them may have started.
+    const legacy = (parsed as Partial<StoredPromptQueue> | null)?.format !== 2;
+
     const items: QueuedPrompt<A>[] = [];
 
     for (const candidate of rawItems as unknown[]) {
-        const { attachments, droppedAttachments, id, steer, text } = (candidate ?? {}) as {
+        const { attachments, droppedAttachments, id, steer, text, tried } = (candidate ?? {}) as {
             attachments?: unknown;
             droppedAttachments?: unknown;
             id?: unknown;
             steer?: unknown;
             text?: unknown;
+            tried?: unknown;
         };
 
         if (typeof id !== "string" || typeof text !== "string") {
@@ -411,6 +425,7 @@ export const restorePromptQueue = <A = never>(
             id,
             ...(restoredSteer && { steer: restoredSteer }),
             text: clean,
+            ...((tried === true || legacy) && { tried: true }),
         });
     }
 

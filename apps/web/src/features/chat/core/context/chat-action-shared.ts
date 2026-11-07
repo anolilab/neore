@@ -7,6 +7,23 @@ import type { PendingSettings } from "../stores/model-store";
 
 const HTTP_STATUS_RE = /HTTP (\d+)/;
 
+/**
+ * Whether `message` is a `/clear` divider. A scheduled task's run leaves the same part with `reason: "task_run"`, which
+ * marks where that run began and cuts nothing.
+ */
+export const isClearDivider = (message: UIMessage): boolean =>
+    message.parts.some((part) => part.type === "data-contextReset" && (part as { data?: { reason?: unknown } }).data?.reason === "clear");
+
+/**
+ * The messages after the last context reset (`/clear`) divider: a local model is sent only these, for a send, a
+ * regenerate and an edit alike, as the server's reply context is cut at the same reset.
+ */
+export const afterLastContextReset = (messages: ReadonlyArray<UIMessage>): UIMessage[] => {
+    const reset = messages.findLastIndex((message) => isClearDivider(message));
+
+    return messages.slice(reset + 1);
+};
+
 /** Turns whatever a send, reload or edit threw into the `AppError` the chat shows. */
 export const toAppError = (error_: unknown): AppError => {
     let appError: AppError;

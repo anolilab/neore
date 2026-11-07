@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { customSnoozeCheck, customSnoozeUntil, hasUnreadReply, hasUnseenReply, isSnoozed, snoozeUntil } from "./thread-state-rules";
+import { customSnoozeCheck, hasUnreadReply, hasUnseenReply, isSnoozed, snoozeUntil } from "./thread-state-rules";
 
 const idle = { isOpen: false, isStreaming: false };
 
@@ -66,22 +66,20 @@ describe("snoozeUntil", () => {
     });
 });
 
-describe("customSnoozeUntil", () => {
+describe("customSnoozeCheck", () => {
     const now = new Date(2026, 10, 3, 10, 0, 0);
 
     it("reads a local wall-clock time that is in the future", () => {
-        expect(customSnoozeUntil("2026-11-03T15:30", now)).toBe(new Date(2026, 10, 3, 15, 30).getTime());
+        expect(customSnoozeCheck("2026-11-03T15:30", now)).toEqual({ until: new Date(2026, 10, 3, 15, 30).getTime() });
     });
 
-    it("refuses an empty, malformed, past or too distant value", () => {
-        expect(customSnoozeUntil("", now)).toBeUndefined();
-        expect(customSnoozeUntil("tomorrow", now)).toBeUndefined();
-        expect(customSnoozeUntil("2026-11-03T09:00", now)).toBeUndefined();
-        expect(customSnoozeUntil("2027-12-01T09:00", now)).toBeUndefined();
+    it("names a past or too distant value as out of range", () => {
+        expect(customSnoozeCheck("2026-11-03T09:00", now)).toEqual({ problem: "range" });
+        expect(customSnoozeCheck("2027-12-01T09:00", now)).toEqual({ problem: "range" });
     });
 });
 
-describe("customSnoozeUntil across a daylight-saving change", () => {
+describe("customSnoozeCheck across a daylight-saving change", () => {
     const zone = process.env.TZ;
 
     beforeEach(() => {
@@ -99,8 +97,8 @@ describe("customSnoozeUntil across a daylight-saving change", () => {
     it("refuses a time the clock skips, instead of waking at another time", () => {
         const now = new Date(2027, 2, 1, 12, 0, 0);
 
-        expect(customSnoozeUntil("2027-03-14T02:30", now)).toBeUndefined();
-        expect(customSnoozeUntil("2027-03-14T03:30", now)).toBe(new Date(2027, 2, 14, 3, 30).getTime());
+        expect(customSnoozeCheck("2027-03-14T02:30", now)).toEqual({ problem: "gap" });
+        expect(customSnoozeCheck("2027-03-14T03:30", now)).toEqual({ until: new Date(2027, 2, 14, 3, 30).getTime() });
     });
 
     it("names a skipped clock time as a gap, and a time out of range as a range", () => {
@@ -113,12 +111,12 @@ describe("customSnoozeUntil across a daylight-saving change", () => {
     it("takes the first pass of a repeated hour while it is still ahead", () => {
         const now = new Date(2027, 10, 7, 0, 30, 0);
 
-        expect(customSnoozeUntil("2027-11-07T01:30", now)).toBe(Date.UTC(2027, 10, 7, 5, 30));
+        expect(customSnoozeCheck("2027-11-07T01:30", now)).toEqual({ until: Date.UTC(2027, 10, 7, 5, 30) });
     });
 
     it("takes the second pass of a repeated hour once the first has gone by", () => {
         const now = new Date(Date.UTC(2027, 10, 7, 5, 45));
 
-        expect(customSnoozeUntil("2027-11-07T01:30", now)).toBe(Date.UTC(2027, 10, 7, 6, 30));
+        expect(customSnoozeCheck("2027-11-07T01:30", now)).toEqual({ until: Date.UTC(2027, 10, 7, 6, 30) });
     });
 });

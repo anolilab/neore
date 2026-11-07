@@ -30,11 +30,13 @@ import { caretAfterRemoval } from "./host-caret";
 import { exceedsRawInputLimit } from "./host-input";
 import type { HostQueueEffect, HostQueueEvent, HostQueueState } from "./host-queue";
 import {
+    canEditQueued,
     canInterruptAndSend,
     canSendQueueHead,
     holdsDrainLock,
     INITIAL_HOST_QUEUE,
     isTurnLive,
+    sendNowAction,
     shouldQueueMessage,
     stepHostQueue,
     waitDeadline,
@@ -46,11 +48,21 @@ import useHostSendErrorMessages from "./host-send-errors";
 const CONTINUABLE: ReadonlySet<string> = new Set(["interrupted", "timeout"]);
 
 /**
+ * Refusals the backend answers before it looks for an earlier send under the same id (`acp/send.ts`): they say nothing of
+ * whether an earlier try was taken. Every other refusal comes after that check, so the id was never taken.
+ */
+const BEFORE_REPEAT_CHECK: ReadonlySet<string> = new Set(["malformed", "not_authenticated", "not_configured", "not_found", "too_large"]);
+
+/**
  * How long the queue waits for an event that may never come: an accepted send's turn showing on the session, or the end of
  * a turn whose stop was confirmed. Past it the queue pauses for the person (or, for a confirmed stop, goes on), so a missing
  * event cannot hold the queue for good.
  */
 const WAIT_DEADLINE_MS = 5000;
+
+/** Whether a send under the queued message's id may have been taken (`QueuedPrompt.tried`). */
+const isTried = (threadId: string, id: string): boolean =>
+    usePromptQueueStore.getState().queues[threadId]?.items.some((item) => item.id === id && item.tried === true) === true;
 
 /** Whether a queued message is still waiting in its thread's queue, read from the store rather than from the render that sent it. */
 const stillQueued = (threadId: string, id: string): boolean => usePromptQueueStore.getState().queues[threadId]?.items.some((item) => item.id === id) ?? false;
@@ -169,7 +181,14 @@ const HostComposerForThread: FC<{ className?: string; threadId: string }> = ({ c
     const refusals = useRef(0);
     // The box's text as the last change left it, read by a send that finishes after the person has typed.
     const boxText = useRef("");
-    const attempt = useRef<{ id: string; text: string } | undefined>(undefined);
+    // `mayBeTaken`: a send under the id failed in a way that does not say the backend refused it, so it may have started a turn.
+    const attempt = useRef<{ id: string; mayBeTaken?: boolean; text: string } | undefined>(undefined);
+    // Mirrors `attempt.current?.mayBeTaken` for render: a direct send whose answer was lost may be the turn running now.
+    const [directMayBeTaken, setDirectMayBeTaken] = useState(false);
+    const setAttempt = (next: { id: string; mayBeTaken?: boolean; text: string } | undefined) => {
+        attempt.current = next;
+        setDirectMayBeTaken(next?.mayBeTaken === true);
+    };
     const {
         data: session,
         dataUpdatedAt: sessionAt,
@@ -218,6 +237,7 @@ const HostComposerForThread: FC<{ className?: string; threadId: string }> = ({ c
     const setPaused = usePromptQueueStore((state) => state.setPaused);
     const edit = usePromptQueueStore((state) => state.edit);
     const enqueueNext = usePromptQueueStore((state) => state.enqueueNext);
+    const move = usePromptQueueStore((state) => state.move);
     const [editing, setEditing] = useState<{ id: string; text: string } | undefined>(undefined);
     const boxRef = useRef<HTMLTextAreaElement>(null);
     const editorRef = useRef<HTMLTextAreaElement>(null);
@@ -392,11 +412,13 @@ const HostComposerForThread: FC<{ className?: string; threadId: string }> = ({ c
         let requestId = queuedId;
 
         if (requestId === undefined) {
-            if (attempt.current?.text !== prompt) {
-                attempt.current = { id: crypto.randomUUID(), text: prompt };
+            const current = attempt.current?.text === prompt ? attempt.current : { id: crypto.randomUUID(), text: prompt };
+
+            if (current !== attempt.current) {
+                setAttempt(current);
             }
 
-            requestId = attempt.current.id;
+            requestId = current.id;
         }
 
         const before = machineRef.current;
@@ -408,13 +430,20 @@ const HostComposerForThread: FC<{ className?: string; threadId: string }> = ({ c
             return;
         }
 
+        // Until the answer is in, the backend may take this send: the message's own turn could then be the one running.
+        const triedBefore = queuedId === undefined ? attempt.current?.mayBeTaken === true : isTried(threadId, queuedId);
+
+        if (queuedId !== undefined) {
+            usePromptQueueStore.getState().setTried(threadId, queuedId, true);
+        }
+
         const refusalsBefore = refusals.current;
         const result = await sendHostMessage({ requestId, text: prompt, threadId });
 
         if (result.ok) {
             // A direct send's retry id is spent when it lands; a queued message never used it, so the draft's id is kept.
             if (queuedId === undefined) {
-                attempt.current = undefined;
+                setAttempt(undefined);
             } else {
                 remove(threadId, queuedId);
             }
@@ -444,6 +473,16 @@ const HostComposerForThread: FC<{ className?: string; threadId: string }> = ({ c
             const [freshSession, freshLive] = await Promise.all([refetchSession(), refetchLive()]);
 
             liveNow = freshSession.data?.liveStreamId ?? freshLive.data?.streamId ?? undefined;
+        }
+
+        // A send whose answer never came may have been taken. A refusal answered after the repeat check proves the id was never
+        // taken; one answered before it leaves an earlier try as it was.
+        const taken = result.error === "unreachable" || (triedBefore && BEFORE_REPEAT_CHECK.has(result.error));
+
+        if (queuedId !== undefined) {
+            usePromptQueueStore.getState().setTried(threadId, queuedId, taken);
+        } else if (attempt.current?.id === requestId) {
+            setAttempt({ ...attempt.current, mayBeTaken: taken });
         }
 
         dispatch({ error: result.error, itemId: queuedId, live: liveNow, type: "refused" });
@@ -526,13 +565,13 @@ const HostComposerForThread: FC<{ className?: string; threadId: string }> = ({ c
         if (queueing) {
             // A draft whose direct send failed is retried, not new: the first queued retry keeps that send's id, so a send the
             // backend already took is recognised as the same message. The id is handed over once; a later submission is new.
-            const retryId = attempt.current?.text === prompt ? attempt.current.id : undefined;
+            const retry = attempt.current?.text === prompt ? attempt.current : undefined;
 
-            if (retryId !== undefined) {
-                attempt.current = undefined;
+            if (retry !== undefined) {
+                setAttempt(undefined);
             }
 
-            enqueue(threadId, { attachments: [], id: retryId, text: prompt });
+            enqueue(threadId, { attachments: [], id: retry?.id, text: prompt, ...(retry?.mayBeTaken === true && { tried: true }) });
 
             if (draft !== undefined && boxText.current === draft) {
                 boxText.current = "";
@@ -551,6 +590,17 @@ const HostComposerForThread: FC<{ className?: string; threadId: string }> = ({ c
     // Send is off only for that wait, so the person is told what it waits for.
     const waitsForSetting = canWrite && !sending && running && userSettings.isPending;
 
+    /** The message at the head waits, paused, until the stop is answered AND the stopped turn's end is seen. */
+    const stopFor = (itemId: string, wasPaused: boolean) => {
+        const streamId = liveStreamId as Id<"persistentStreams"> | undefined;
+
+        dispatch({ itemId, streamId, type: "interrupt", wasPaused });
+        void cancel
+            .mutateAsync({ streamId, threadId: id })
+            .catch(() => undefined)
+            .then((outcome) => dispatch({ outcome, type: "stop-answered" }));
+    };
+
     /** Interrupt and send: the text goes to the head of the queue, then the running reply is stopped, so it goes next. */
     const interrupt = () => {
         const wasPaused = usePromptQueueStore.getState().queues[threadId]?.paused === true;
@@ -559,7 +609,7 @@ const HostComposerForThread: FC<{ className?: string; threadId: string }> = ({ c
         // its id would come back as a duplicate of the stopped turn, so the text would never run. The text gets a new id, and
         // the lost send's id is spent, so a later send of the same text is not taken for it either.
         if (attempt.current?.text === trimmed) {
-            attempt.current = undefined;
+            setAttempt(undefined);
         }
 
         enqueueNext(threadId, { attachments: [], text: trimmed });
@@ -568,18 +618,50 @@ const HostComposerForThread: FC<{ className?: string; threadId: string }> = ({ c
         boxText.current = "";
         setText("");
 
-        if (interruptId === undefined) {
+        if (interruptId !== undefined) {
+            stopFor(interruptId, wasPaused);
+        }
+    };
+
+    const sendNowFor = (itemId: string, state: HostQueueState) => {
+        // The running turn may be any tried message's lost send, not only this one's: stopping it would lose that message.
+        // A direct send whose answer was lost may be it too: its text sent again later would reuse its id and never run.
+        const tried = directMayBeTaken || usePromptQueueStore.getState().queues[threadId]?.items.some((item) => item.tried === true) === true;
+
+        return cancel.isPending || blocked || starting ? undefined : sendNowAction(state, { itemId, running: isTurnLive(state, liveStreamId), tried });
+    };
+
+    /**
+     * Send now: the queued message moves to the head and goes next, through the same machine as everything else. With a turn
+     * running it is Interrupt and send for that message; with none, it goes past a paused queue, which stays paused behind
+     * it. It keeps its id, so a send of it the backend already took comes back as a duplicate and starts nothing; for the same
+     * reason, a message whose send may have been taken never stops a turn (`sendNowAction`).
+     */
+    const sendNow = (itemId: string) => {
+        const action = sendNowFor(itemId, machineRef.current);
+
+        if (action === undefined) {
             return;
         }
 
-        // The text waits at the head, paused, until the stop is answered AND the stopped turn's end is seen.
-        const streamId = liveStreamId as Id<"persistentStreams"> | undefined;
+        // A move keeps the pause, so this is the queue's state from before Send now.
+        const wasPaused = usePromptQueueStore.getState().queues[threadId]?.paused === true;
 
-        dispatch({ itemId: interruptId, streamId, type: "interrupt", wasPaused });
-        void cancel
-            .mutateAsync({ streamId, threadId: id })
-            .catch(() => undefined)
-            .then((outcome) => dispatch({ outcome, type: "stop-answered" }));
+        move(threadId, itemId, 0);
+
+        if (usePromptQueueStore.getState().queues[threadId]?.items[0]?.id !== itemId) {
+            return;
+        }
+
+        setQueueError(undefined);
+
+        if (action === "release") {
+            dispatch({ itemId, type: "released" });
+
+            return;
+        }
+
+        stopFor(itemId, wasPaused);
     };
 
     /** Stop keeps what is queued behind the reply: the queue pauses first, so nothing starts once the reply is stopped. */
@@ -590,7 +672,9 @@ const HostComposerForThread: FC<{ className?: string; threadId: string }> = ({ c
 
     // With the setting on, a message during a turn interrupts it, unless a stop is already pending: a second stop would
     // put a second message ahead of the first one typed.
-    const steering = running && steerOnSend && !cancel.isPending && !interrupting && canInterruptAndSend();
+    // The running turn may be a queued message's lost send: stopping it would lose that message, so the text queues instead.
+    const anyTried = queue.items.some((item) => item.tried === true);
+    const steering = running && steerOnSend && !cancel.isPending && !interrupting && !anyTried && canInterruptAndSend();
     let sendLabel = t`Send`;
 
     if (steering) {
@@ -622,6 +706,14 @@ const HostComposerForThread: FC<{ className?: string; threadId: string }> = ({ c
     /** Saves an edit of a queued message. An empty or over-long text leaves the message as it was. */
     const saveEdit = () => {
         if (editing === undefined) {
+            return;
+        }
+
+        // The message went out while its editor was open: what was sent stays as it was sent.
+        if (!canEditQueued(machineRef.current, editing.id)) {
+            setEditing(undefined);
+            boxRef.current?.focus();
+
             return;
         }
 
@@ -772,10 +864,23 @@ const HostComposerForThread: FC<{ className?: string; threadId: string }> = ({ c
                                             {t`Send next`}
                                         </Button>
                                     )}
+                                    {/* An unpaused head goes next anyway; a paused one is sent alone, the messages behind it stay paused (Send next resumes them all). */}
+                                    {editing?.id !== item.id && (index > 0 || running || queue.paused) && (
+                                        <Button
+                                            aria-label={t`Send queued message ${index + 1} now`}
+                                            disabled={sendNowFor(item.id, machine) === undefined}
+                                            onClick={() => sendNow(item.id)}
+                                            size="sm"
+                                            type="button"
+                                            variant="outline"
+                                        >
+                                            {t`Send now`}
+                                        </Button>
+                                    )}
                                     {editing?.id !== item.id && (
                                         <Button
                                             aria-label={t`Edit queued message ${index + 1}`}
-                                            disabled={phase.kind === "sending" && phase.itemId === item.id}
+                                            disabled={!canEditQueued(machine, item.id)}
                                             onClick={() => setEditing({ id: item.id, text: item.text })}
                                             size="sm"
                                             type="button"
@@ -881,7 +986,7 @@ const HostComposerForThread: FC<{ className?: string; threadId: string }> = ({ c
                     rows={2}
                     value={text}
                 />
-                {running && !steerOnSend && !interrupting && canInterruptAndSend() && (
+                {running && !steerOnSend && !interrupting && !anyTried && canInterruptAndSend() && (
                     <Button disabled={cancel.isPending || !canSubmit} onClick={interrupt} type="button" variant="outline">
                         {t`Interrupt and send`}
                     </Button>

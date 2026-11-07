@@ -21,11 +21,12 @@ import { createPortal } from "react-dom";
 import { useModelPickerPopupActions } from "@/components/model-picker/model-picker-popup-store";
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 import useCompactThread from "@/features/chat/compaction/use-compact-thread";
+import useClearContext from "@/features/chat/context-reset/use-clear-context";
 import { useModelStore } from "@/features/chat/core/stores/model-store";
 import { useLunoraActionOptions } from "@/lib/lunora/crpc";
 
-import type { SlashCommandMatch } from "./extensions/slash-command";
-import { isBareCompact } from "./extensions/slash-command";
+import type { ComposerSlashState, SlashCommandMatch } from "./extensions/slash-command";
+import { clearedCommandRange, isBareCommand, isPrefixOfCommand } from "./extensions/slash-command";
 
 ("use client");
 
@@ -47,6 +48,8 @@ interface SlashCommandPopupProps {
     onDismiss: () => void;
     /** Called to replace the slash text range in the editor */
     onReplace: (from: number, to: number, replacement: string) => void;
+    /** The editor's whole text now; a `/clear` that finished reads it, so an edit the menu has not seen yet is not cut. */
+    readDraft: () => string;
 }
 
 // `/model` stays first: the list is not filtered for a partial command, so Enter on a bare `/` picks the first entry,
@@ -56,6 +59,7 @@ const COMMANDS = [
     { description: msg`Insert a saved prompt`, id: "prompt", label: "prompt" },
     { description: msg`Invoke a skill`, id: "skill", label: "skill" },
     { description: msg`Condense older messages for the model`, id: "compact", label: "compact" },
+    { description: msg`Start a new context: earlier messages are no longer sent to the model`, id: "clear", label: "clear" },
 ] as const;
 
 const MENU_WIDTH = 300;
@@ -130,12 +134,13 @@ const filterSkills = (skills: Doc<"skills">[], query: string): Doc<"skills">[] =
 // Main Component
 // ============================================================================
 
-const SlashCommandPopup: FC<SlashCommandPopupProps> = ({ currentThreadId, editorRect, favoriteModelIds, match, models, onDismiss, onReplace }) => {
+const SlashCommandPopup: FC<SlashCommandPopupProps> = ({ currentThreadId, editorRect, favoriteModelIds, match, models, onDismiss, onReplace, readDraft }) => {
     const { i18n } = useLingui();
     const selectedModel = useModelStore((state) => state.selectedModel);
     const setSelectedModelStore = useModelStore((state) => state.setSelectedModel);
     const { open: openModelPickerPopup } = useModelPickerPopupActions();
     const { compact } = useCompactThread(currentThreadId);
+    const { clear } = useClearContext(currentThreadId);
 
     const { hooks } = useAuth();
     const { data: sessionData } = hooks.useSession();
@@ -185,6 +190,13 @@ const SlashCommandPopup: FC<SlashCommandPopupProps> = ({ currentThreadId, editor
 
     const [selectedIndex, setSelectedIndex] = useState(0);
     const commandListRef = useRef<HTMLDivElement | null>(null);
+    // The match and thread as the editor holds them now: a `/clear` that finished after the person kept typing, or moved to
+    // another chat, must not cut that text.
+    const latestRef = useRef<ComposerSlashState>({ match, threadId: currentThreadId });
+
+    useEffect(() => {
+        latestRef.current = { match, threadId: currentThreadId };
+    }, [match, currentThreadId]);
 
     // Determine menu type and items
     const { items, type } = useMemo((): { items: ReadonlyArray<unknown>; type: MenuType } => {
@@ -194,10 +206,12 @@ const SlashCommandPopup: FC<SlashCommandPopupProps> = ({ currentThreadId, editor
             return { items: COMMANDS, type: "commands" };
         }
 
-        // `/compact` takes no argument: once typed in full it is the one entry, so Enter runs it instead of sending the text.
-        // With text after it the menu stays closed, and Enter sends that text.
-        if (match.command === "compact") {
-            return isBareCompact(match) ? { items: COMMANDS.filter((command) => command.id === "compact"), type: "commands" } : { items: [], type: undefined };
+        // `/compact` and `/clear` take no argument: once typed in full each is the one entry, so Enter runs it instead of
+        // sending the text. With text after it the menu stays closed, and Enter sends that text.
+        const { command } = match;
+
+        if (command === "compact" || command === "clear") {
+            return isBareCommand(match, command) ? { items: COMMANDS.filter((item) => item.id === command), type: "commands" } : { items: [], type: undefined };
         }
 
         if (match.command === "model") {
@@ -246,9 +260,35 @@ const SlashCommandPopup: FC<SlashCommandPopupProps> = ({ currentThreadId, editor
                 return;
             }
 
-            if (commandId === "compact") {
-                // Never drop typed text: the menu runs a bare `/compact` only.
-                if (match.query !== "") {
+            if (commandId === "compact" || commandId === "clear") {
+                // Never drop typed text: the menu runs `/compact` or `/clear` only from a draft that is nothing but the
+                // slash text, typed as the start of that command (`/c`, `/cle`), never from `/m` or with other text.
+                if (!match.wholeDraft || match.query !== "" || !isPrefixOfCommand(match.text, commandId)) {
+                    return;
+                }
+
+                // The command leaves the draft only once the reset is written; a refused clear keeps it, and the hook says why.
+                // It is removed where the editor holds it then, and only while the draft is still the bare command: text
+                // typed during the request stays.
+                if (commandId === "clear") {
+                    const selected: ComposerSlashState = { match, threadId: currentThreadId };
+                    const finishClear = async () => {
+                        if (!(await clear())) {
+                            return;
+                        }
+
+                        const range = clearedCommandRange(selected, { ...latestRef.current, draft: readDraft() });
+
+                        if (!range) {
+                            return;
+                        }
+
+                        onReplace(range.from, range.to, "");
+                        onDismiss();
+                    };
+
+                    void finishClear();
+
                     return;
                 }
 
@@ -270,7 +310,7 @@ const SlashCommandPopup: FC<SlashCommandPopupProps> = ({ currentThreadId, editor
                 onReplace(match.from, match.to, `/${commandId} `);
             }
         },
-        [compact, match, onReplace, onDismiss, openModelPickerPopup, selectedModel, setSelectedModel],
+        [clear, compact, currentThreadId, match, onReplace, onDismiss, openModelPickerPopup, readDraft, selectedModel, setSelectedModel],
     );
 
     const handleSelectModel = useCallback(

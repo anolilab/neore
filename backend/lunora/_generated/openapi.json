@@ -16109,6 +16109,88 @@
         "x-lunora-function-kind": "query"
       }
     },
+    "/_lunora/rpc#chat_context_reset:clearContext": {
+      "post": {
+        "description": "Invoke the `action` `chat_context_reset:clearContext` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "chat_context_reset:clearContext",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "clientId": {
+                        "type": "string"
+                      },
+                      "threadId": {
+                        "description": "Id<\"threads\">",
+                        "type": "string",
+                        "x-lunora-table": "threads"
+                      },
+                      "unlockProof": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "clientId",
+                      "threadId"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "chat_context_reset:clearContext",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "hostSession": {
+                      "type": "boolean"
+                    },
+                    "messageId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "hostSession",
+                    "messageId"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "action: chat_context_reset:clearContext",
+        "tags": [
+          "chat"
+        ],
+        "x-lunora-function-kind": "action"
+      }
+    },
     "/_lunora/rpc#chat_custom_providers:deleteCustomProvider": {
       "post": {
         "description": "Invoke the `mutation` `chat_custom_providers:deleteCustomProvider` over the Lunora RPC envelope (POST /_lunora/rpc).",
@@ -18242,6 +18324,9 @@
                       "botId": {
                         "type": "string"
                       },
+                      "contextResetMessageId": {
+                        "type": "string"
+                      },
                       "createdAt": {
                         "type": "number"
                       },
@@ -18304,6 +18389,9 @@
                           "participants"
                         ],
                         "type": "object"
+                      },
+                      "hasContextReset": {
+                        "type": "boolean"
                       },
                       "hasHandoff": {
                         "type": "boolean"

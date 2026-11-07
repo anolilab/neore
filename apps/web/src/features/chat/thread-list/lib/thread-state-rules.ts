@@ -101,16 +101,3 @@ export const customSnoozeCheck = (localValue: string, now: Date): { until: numbe
 
     return usable.length > 0 ? { until: Math.min(...usable) } : { problem: "range" };
 };
-
-/**
- * The time a custom snooze ends, from a `datetime-local` value (local wall-clock time, `YYYY-MM-DDTHH:mm`): the earliest
- * occurrence of that time still in the future. In the hour a change repeats, the second pass is taken once the first has
- * gone by. `undefined` when the value is empty or unreadable, falls in a daylight-saving gap, or is not in the future or
- * is further than the server accepts. The server checks the same range; this only keeps the picker from sending a time
- * it refuses.
- */
-export const customSnoozeUntil = (localValue: string, now: Date): number | undefined => {
-    const result = customSnoozeCheck(localValue, now);
-
-    return "until" in result ? result.until : undefined;
-};

@@ -31,7 +31,9 @@ import { type HostAgentRef, type SwitchAgentRef, vSwitchAgentRef } from "../agen
 import { composeHandoff, composeTailHandoff, handoffLimitsFor, HandoffTooLargeError, HANDOFF_REFUSED_TOO_LARGE, jsonBytes } from "../agent/handoff";
 import { collectHandoffSource, findDividerEntering, findDividerLeaving } from "../agent/handoff-source";
 import { getMaxMessage } from "../agent/messages";
-import { insertAgentSwitchRow, insertThread, insertThreadRelationship, patchAgentSwitchRow, patchThread } from "../agent/table-writes";
+import { insertAgentSwitchRow, insertContextResetRow, insertThread, insertThreadRelationship, patchAgentSwitchRow, patchThread } from "../agent/table-writes";
+import { resetForTip } from "../agent/context-reset";
+import { CONTEXT_CLEAR_CONFLICT } from "../agent/context-reset-shape";
 import { inheritPasscodeHandler } from "../agent/thread-lock";
 import { requireThreadPermission } from "../agent/thread-read-access";
 import { HOST_HANDOFF_TAINT, threadPathTaint } from "../agent/thread-summary-taint";
@@ -262,6 +264,14 @@ const nativePlanFor = async (
     const saved = savedSessionFor(earlier, { agentKey: target.offer.agentKey, deviceId: target.device._id, folderId: target.offer.folderId });
 
     if (saved?.nativeSessionId === undefined) {
+        return undefined;
+    }
+
+    // A session from before a context reset (`/clear`) holds the turns that were cleared: loading it would bring them back,
+    // so the switch hands over what follows the reset instead.
+    const reset = await resetForTip(ctx, thread, leaf);
+
+    if (reset && saved._creationTime < reset._creationTime) {
         return undefined;
     }
 
@@ -705,6 +715,132 @@ const write = async (ctx: MutationCtx, args: WriteArgs): Promise<SwitchResult> =
 
     return { agent: to, coldStartCostly: false, forkedThreadId: forkId as string, messageId: null, switched: true };
 };
+
+/**
+ * `/clear` on a coding agent's thread: the agent gets a new session in the same thread, on the same computer, folder and
+ * agent, and the session it ran in ends. Nothing is handed over: `acp/lib/pending-handoff.ts` stops at the reset row.
+ * Not a switch, so it does not go through `commitHostSwitchHandler`, which refuses the same agent on purpose.
+ */
+export const clearHostSessionHandler = async (
+    ctx: MutationCtx,
+    args: { clientId: string; threadId: Id<"threads">; unlockProof?: string; userId: string },
+): Promise<{ messageId: string }> => {
+    const now = Date.now();
+    const { thread } = await requireThreadPermission(ctx, args.threadId, args.userId, "write", args.unlockProof);
+
+    if (thread.userId !== args.userId) {
+        throw new LunoraError("FORBIDDEN", "Only the owner of a chat can clear its context");
+    }
+
+    if (!isHostRunThread(thread)) {
+        throw new LunoraError("BAD_REQUEST", "This chat does not run on a coding agent");
+    }
+
+    if (await isWorkerThread(ctx, thread._id)) {
+        throw new LunoraError("BAD_REQUEST", "A worker's chat takes its messages from its lead");
+    }
+
+    // The new session runs on a computer as the user: the chat must pass the rule a switch to a computer is held to.
+    if (!(await loadEligibleThread(ctx, thread._id, args.userId))) {
+        throw new LunoraError("BAD_REQUEST", "A shared, public or group chat cannot be handed to a computer");
+    }
+
+    const leaf = await leafRowOf(ctx, thread);
+    const current = leaf ? await currentAgent(ctx, thread, leaf) : null;
+
+    if (!leaf || !current || current.agent.kind !== "host") {
+        throw new LunoraError("BAD_REQUEST", "There is no coding agent session to clear");
+    }
+
+    if (await liveHostStream(ctx, thread._id)) {
+        throw new LunoraError("CONFLICT", "Wait for the reply to finish, or stop it, before clearing the context", {
+            data: { code: CONTEXT_CLEAR_CONFLICT.replyRunning },
+        });
+    }
+
+    // A session still opening, or a turn the computer has not reported back, is not a place to leave from.
+    if (current.session?.status === "starting" || current.session?.status === "busy") {
+        throw new LunoraError("CONFLICT", "Wait for the agent to be ready before clearing the context", {
+            data: { code: CONTEXT_CLEAR_CONFLICT.agentStarting },
+        });
+    }
+
+    if (!(await claimOnce(ctx, "switch", claimKeyOf(args), AGENT_SWITCH_CLAIM_TTL_MS, args.userId))) {
+        throw new LunoraError("CONFLICT", "This clear was already made", { data: { code: CONTEXT_CLEAR_CONFLICT.alreadyMade } });
+    }
+
+    const limited = await checkRateLimit(ctx, "hosts/start:free", { key: args.userId });
+
+    if (!limited.ok) {
+        throw new LunoraError("TOO_MANY_REQUESTS", "Too many coding agents were started in a short while. Try again in a minute.");
+    }
+
+    // The same agent, folder and computer as the session being cleared.
+    const target = await resolveTarget(
+        ctx,
+        {
+            clientId: args.clientId,
+            target: { agentKey: current.agent.agentKey, folderId: current.agent.folderId, hostId: current.agent.hostId as Id<"devices">, kind: "host" },
+            threadId: args.threadId,
+            unlockProof: args.unlockProof,
+            userId: args.userId,
+        },
+        thread,
+        now,
+    );
+
+    if (target.kind !== "host") {
+        throw new LunoraError("BAD_REQUEST", "This chat does not run on a coding agent");
+    }
+
+    const taintedBy = await takeoverTaint(ctx, { current, fromHost: true, leaf, thread });
+
+    // The reset row goes in BEFORE the new session: a session created after it is the clear's own, which a later switch
+    // back may reload (`nativePlanFor` reloads only sessions newer than the newest reset).
+    const last = await getMaxMessage(ctx, thread._id);
+    const messageId = await insertContextResetRow(ctx.db, {
+        order: (last?.order ?? -1) + 1,
+        ...(thread.activeLeafMessageId && { parentMessageId: leaf._id }),
+        threadId: thread._id,
+        userId: args.userId,
+    });
+
+    await patchThread(ctx.db, thread._id, {
+        contextResetMessageId: messageId,
+        hasContextReset: true,
+        ...(thread.activeLeafMessageId && { activeLeafMessageId: messageId }),
+        updatedAt: now,
+    });
+
+    await startOn(ctx, {
+        clientId: args.clientId,
+        device: target.device,
+        now,
+        offer: target.offer,
+        sourceThreadId: thread._id,
+        taintedBy,
+        threadId: thread._id,
+        userId: args.userId,
+    });
+
+    if (current.session && current.session.status !== "ended") {
+        await ctx.db.patch("acpSessions", current.session._id, { status: "ended", updatedAt: now });
+    }
+
+    ctx.log.event("acp.clear_context", { threadId: thread._id });
+
+    return { messageId };
+};
+
+export const clearHostSession = internalMutation
+    .input({
+        clientId: v.string().max(MAX_LENGTH.id),
+        threadId: v.id("threads"),
+        unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
+        userId: v.string().max(MAX_LENGTH.id),
+    })
+    .output(v.object({ messageId: v.string() }))
+    .mutation(async ({ args, ctx }) => await clearHostSessionHandler(ctx, args));
 
 /** Whether a switch of this thread is the host switch's: the thread runs on a computer. A fact about the thread, not a permission. */
 export const isHostSwitchSource = internalQuery
