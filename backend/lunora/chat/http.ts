@@ -853,6 +853,10 @@ const runChatStartOnShard = async (
             threadId: validThreadId as Id<"threads">,
         });
 
+        // The leaf now points at the prompt, so a request the child was waiting on is off the displayed path and can no longer be
+        // answered: its wait ends, as a new message's does.
+        await context.runMutation(internal.sub_agents.functions.endApprovalWaitForMessage, { threadId: validThreadId });
+
         threadId = validThreadId;
         messageId = prompt._id;
     } else if (validThreadId) {
