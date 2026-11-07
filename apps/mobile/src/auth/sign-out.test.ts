@@ -41,8 +41,8 @@ describe("signOutOnDevice", () => {
         const seen: (string | undefined)[] = [];
 
         await signOutOnDevice({
-            forgetLastChat: async () => undefined,
             clearCache: async () => undefined,
+            forgetLastChat: async () => undefined,
             releasePush: async () => {
                 seen.push(keychain.grant);
             },
@@ -67,10 +67,10 @@ describe("signOutOnDevice", () => {
         const warn = vi.fn();
 
         await signOutOnDevice({
-            forgetLastChat: async () => undefined,
             clearCache: async () => {
                 throw new Error("disk I/O error");
             },
+            forgetLastChat: async () => undefined,
             revokeSession: vi.fn(),
             takeCredential,
             warn,
@@ -98,13 +98,30 @@ describe("signOutOnDevice", () => {
         expect(warn).toHaveBeenCalledWith("Could not forget the last viewed chat.", expect.any(Error));
     });
 
+    it("still revokes the session when the stored sign-in could not be cleared, so what is left behind stops working", async () => {
+        const revokeSession = vi.fn(async () => undefined);
+        const notCleared = Object.assign(new Error("keychain locked"), { token: "session-1" });
+
+        await signOutOnDevice({
+            clearCache: async () => undefined,
+            forgetLastChat: async () => undefined,
+            revokeSession,
+            takeCredential: async () => {
+                throw notCleared;
+            },
+            warn: vi.fn(),
+        });
+
+        expect(revokeSession).toHaveBeenCalledWith("session-1");
+    });
+
     it("revokes nothing when no session was stored, and warns when the stored one cannot be cleared", async () => {
         const revokeSession = vi.fn(async () => undefined);
         const warn = vi.fn();
 
         await signOutOnDevice({
-            forgetLastChat: async () => undefined,
             clearCache: async () => undefined,
+            forgetLastChat: async () => undefined,
             revokeSession,
             takeCredential: async () => {
                 throw new Error("keychain locked");
@@ -125,8 +142,8 @@ describe("signOutOnDevice releasing push", () => {
             const revokeSession = vi.fn(async () => undefined);
             const warn = vi.fn();
             const signingOut = signOutOnDevice({
-                forgetLastChat: async () => undefined,
                 clearCache: async () => undefined,
+                forgetLastChat: async () => undefined,
                 releasePush: async () => await new Promise<void>(() => {}),
                 revokeSession,
                 takeCredential: async () => "session-1",
@@ -141,6 +158,16 @@ describe("signOutOnDevice releasing push", () => {
         } finally {
             vi.useRealTimers();
         }
+    });
+});
+
+describe("emptyCacheWhileSignedOut removing alerts", () => {
+    it("removes the previous account's alerts when the server ended the session, which never ran the sign-out", async () => {
+        const dismissNotifications = vi.fn(async () => undefined);
+
+        await emptyCacheWhileSignedOut({ clearCache: async () => undefined, dismissNotifications, forgetLastChat: async () => undefined, warn: vi.fn() });
+
+        expect(dismissNotifications).toHaveBeenCalledTimes(1);
     });
 });
 

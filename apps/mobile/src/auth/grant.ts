@@ -7,6 +7,7 @@
  */
 
 import { trimTrailing } from "../lib/trim-trailing";
+import { StoredGrantNotClearedError } from "./stored-grant-error";
 
 export type Fetch = (input: string, init?: RequestInit) => Promise<Response>;
 
@@ -262,7 +263,13 @@ export const fetchAccessToken = async (input: { fetch: Fetch; lunoraUrl: string;
     }
 
     if (response.status === 401 || response.status === 403) {
-        await input.store.clear();
+        // Only the grant the server refused is forgotten: a caller that runs beside the app (the push background task)
+        // must not delete a newer one, stored by a sign-in that finished while this request was out.
+        const current = await input.store.get();
+
+        if (current?.token === grant.token) {
+            await input.store.clear();
+        }
 
         // eslint-disable-next-line unicorn/no-null -- a signed-out result is null by contract; auth-context compares with null
         return null;
@@ -297,7 +304,11 @@ export const takeStoredGrant = async (store: GrantStore): Promise<string | undef
         // Unreadable: nothing to revoke, and the item is still cleared below.
     }
 
-    await store.clear();
+    try {
+        await store.clear();
+    } catch (error) {
+        throw new StoredGrantNotClearedError(token, error);
+    }
 
     return token;
 };
@@ -311,16 +322,31 @@ export const revokeSessionToken = async (input: { fetch: Fetch; lunoraUrl: strin
 
 /** Forget the session on the phone, then revoke it server-side; a failed revoke still leaves it forgotten. */
 export const signOutGrant = async (input: { fetch: Fetch; lunoraUrl: string; store: GrantStore }): Promise<void> => {
-    const token = await takeStoredGrant(input.store);
-
-    if (token === undefined) {
-        return;
-    }
+    let token: string | undefined;
+    let notCleared: StoredGrantNotClearedError | undefined;
 
     try {
-        await revokeSessionToken({ fetch: input.fetch, lunoraUrl: input.lunoraUrl, token });
-    } catch {
-        // Offline: the session expires on its own, and the local copy is already gone.
+        token = await takeStoredGrant(input.store);
+    } catch (error) {
+        if (!(error instanceof StoredGrantNotClearedError)) {
+            throw error;
+        }
+
+        notCleared = error;
+        ({ token } = error);
+    }
+
+    if (token !== undefined) {
+        try {
+            await revokeSessionToken({ fetch: input.fetch, lunoraUrl: input.lunoraUrl, token });
+        } catch {
+            // Offline: the session expires on its own.
+        }
+    }
+
+    // A grant still in the keychain is the caller's to report; the session it held is revoked above.
+    if (notCleared) {
+        throw notCleared;
     }
 };
 
@@ -339,3 +365,5 @@ export const readStoredUser = async (store: GrantStore): Promise<GrantUser | nul
         return null;
     }
 };
+
+export { StoredGrantNotClearedError } from "./stored-grant-error";

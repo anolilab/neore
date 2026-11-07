@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import type { PushPermission, PushPlatform, PushServer } from "./push-registration";
-import { createPendingWork, createRegistrationRetry, isAccountSwitch, onceItWorks, pushIdsFromNotification, pushIdsIn, registerPhoneForPush, releasePhonePush, routeForPush } from "./push-registration";
+import { createPendingWork, createRegistrationRetry, isAccountSwitch, LAST_ACCOUNT_KEY, noteAccountOnPhone, onceItWorks, pushIdsFromNotification, pushIdsIn, registerPhoneForPush, releasePhonePush, routeForPush } from "./push-registration";
 
 const TOKEN = "a".repeat(64);
 
@@ -235,6 +235,39 @@ describe("isAccountSwitch", () => {
         expect(isAccountSwitch("u1", "u1")).toBe(false);
         expect(isAccountSwitch(undefined, "u2")).toBe(false);
         expect(isAccountSwitch("u1", undefined)).toBe(false);
+    });
+});
+
+describe("noteAccountOnPhone", () => {
+    const device = (stored?: string) => {
+        const items: Record<string, string> = stored === undefined ? {} : { [LAST_ACCOUNT_KEY]: stored };
+
+        return {
+            items,
+            store: {
+                read: async (key: string) => items[key] ?? null,
+                writeInPlace: vi.fn(async (key: string, value: string) => {
+                    items[key] = value;
+                }),
+            },
+        };
+    };
+
+    it("sees another person signing in even after a relaunch, because the last account is kept on the phone", async () => {
+        const { items, store } = device("u1");
+
+        expect(await noteAccountOnPhone("u2", store)).toBe(true);
+        expect(items[LAST_ACCOUNT_KEY]).toBe("u2");
+    });
+
+    it("is no switch for the same person, or the first sign-in on the phone, and writes only on a change", async () => {
+        const same = device("u1");
+        const first = device();
+
+        expect(await noteAccountOnPhone("u1", same.store)).toBe(false);
+        expect(same.store.writeInPlace).not.toHaveBeenCalled();
+        expect(await noteAccountOnPhone("u1", first.store)).toBe(false);
+        expect(first.items[LAST_ACCOUNT_KEY]).toBe("u1");
     });
 });
 

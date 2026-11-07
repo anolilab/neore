@@ -6,7 +6,7 @@
  * Loaded first, from the app entry (`index.ts`): a background task must be defined at
  * module scope before the app starts, or a push that launches the app finds no task.
  */
-import { AndroidImportance, registerTaskAsync, scheduleNotificationAsync, setNotificationChannelAsync } from "expo-notifications";
+import { AndroidImportance, dismissNotificationAsync, registerTaskAsync, scheduleNotificationAsync, setNotificationChannelAsync } from "expo-notifications";
 import { defineTask } from "expo-task-manager";
 import { Platform } from "react-native";
 
@@ -40,14 +40,19 @@ if (Platform.OS === "android") {
             await showDataOnlyPush(data, {
                 fetchContent: async (notificationId) => await fetchPushContent({ fetch, lunoraUrl, notificationId, store: secureGrantStore }),
                 locale: deviceLocale(),
+                // The task can run with no screen up: the channel may not exist yet in this process.
+                prepare: async () => {
+                    await setNotificationChannelAsync(ANDROID_CHANNEL_ID, { importance: AndroidImportance.HIGH, name: channelName(deviceLocale()) });
+                },
+                retract: async (ids) => {
+                    await dismissNotificationAsync(ids.notificationId);
+                },
                 sessionUserId: async () => {
                     const grant = await secureGrantStore.get();
 
                     return grant?.user.id;
                 },
                 show: async (text, ids) => {
-                    // The task can run with no screen up: the channel may not exist yet in this process.
-                    await setNotificationChannelAsync(ANDROID_CHANNEL_ID, { importance: AndroidImportance.HIGH, name: channelName(deviceLocale()) });
                     // Keyed by the notification: a send that runs twice replaces the first alert instead of adding a second.
                     await scheduleNotificationAsync({
                         content: { ...text, data: { ...ids } },

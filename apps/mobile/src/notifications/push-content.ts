@@ -120,6 +120,10 @@ export const pushPlaceholder = (locale: string | undefined): PushText => {
 export interface PushTaskSteps {
     fetchContent: (notificationId: string) => Promise<PushText | typeof NOT_THIS_ACCOUNT | undefined>;
     locale: string | undefined;
+    /** Work before showing (the Android channel), done before the last session check so nothing waits between them. */
+    prepare?: () => Promise<void>;
+    /** Takes back an alert just shown (a sign-out landed between the last check and the post). */
+    retract?: (ids: PushIds) => Promise<void>;
     /** The account signed in on this phone right now, or `undefined`. A push for nobody shows nothing. */
     sessionUserId: () => Promise<string | undefined>;
     show: (text: PushText, ids: PushIds) => Promise<void>;
@@ -153,10 +157,18 @@ export const showDataOnlyPush = async (payload: unknown, steps: PushTaskSteps): 
         return false;
     }
 
+    await steps.prepare?.();
+
     const isSameSession = await steps.sessionUserId() === fetchedFor;
-    const text = (isSameSession ? fetched : undefined) ?? pushPlaceholder(steps.locale);
+    const isRealText = isSameSession && fetched !== undefined;
+    const text = (isRealText ? fetched : undefined) ?? pushPlaceholder(steps.locale);
 
     await steps.show(text, ids);
+
+    // A sign-out can still land between that check and the post: look once more, and take the real text back if so.
+    if (isRealText && await steps.sessionUserId() !== fetchedFor) {
+        await steps.retract?.(ids);
+    }
 
     return true;
 };
