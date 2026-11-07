@@ -50,6 +50,18 @@ CI deploys; run this only when told to.
 DEPLOY_ENV=preview pnpm run deploy
 ```
 
+## Linters
+
+ESLint is the authority; oxlint is a fast first pass that enforces only what ESLint enforces, and gates CI like it.
+`.oxlintrc.json` is generated, never edited: `pnpm lint:oxlint:sync` (`scripts/sync-oxlint-rules.mjs`) asks ESLint, from
+inside each project, which files it lints and how each rule is set, then enables a rule only when ESLint sets it the
+same way on every file it lints (or every file that loads its plugin), and ignores every file ESLint does not lint.
+Every oxlint category is off. Run it after a change to an ESLint config or to `@anolilab/eslint-config`. When the
+oxlint job reports code ESLint accepts, add the rule to `OXLINT_DIFFERS` in the script, with its reason, and sync.
+No enabled rule is type-aware today, so oxlint needs no build; the sync turns type-aware mode on when one is, and from
+then on oxlint needs built packages and the backend codegen first, like `lint:types`. The JS-plugin versions in the
+`lint` catalog match the ones `@anolilab/eslint-config` loads, so both run the same rule code.
+
 ## Git hooks
 
 `vis hook install` (run by `postinstall`) points `core.hooksPath` at `.vis/hooks/_`, which runs the scripts in

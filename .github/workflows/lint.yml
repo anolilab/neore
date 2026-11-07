@@ -116,12 +116,10 @@ jobs:
               shell: "bash"
               run: "pnpm run lint:types:deploy && pnpm run lint:eslint:deploy"
 
-    # Advisory: oxlint reports tens of thousands of findings today (its preset does
-    # not fit this repo yet), so the step cannot gate. It is left out of
-    # `lint-required-check.needs`; drop `continue-on-error` and add the job there
-    # once the report is clean.
+    # oxlint enforces only what ESLint enforces (`.oxlintrc.json` is generated from
+    # ESLint's config by `pnpm lint:oxlint:sync`), so it gates like ESLint does.
     oxlint:
-        name: "oxlint (advisory)"
+        name: "oxlint"
         needs: "files-changed"
         if: "github.event_name == 'merge_group' || needs.files-changed.outputs.code == 'true'"
         runs-on: "ubuntu-latest"
@@ -151,7 +149,6 @@ jobs:
             - name: "oxlint"
               shell: "bash"
               run: "pnpm run lint:oxlint"
-              continue-on-error: true
 
     types:
         name: "Types"
@@ -265,7 +262,7 @@ jobs:
     # `if:` reports success, so the gate must run when a need fails.
     lint-required-check:
         name: "Check Lint"
-        needs: ["lint", "files-changed", "format-and-secrets", "types", "eslint", "actionlint"]
+        needs: ["lint", "files-changed", "format-and-secrets", "oxlint", "types", "eslint", "actionlint"]
         if: "always()"
         runs-on: "ubuntu-latest"
         timeout-minutes: 5

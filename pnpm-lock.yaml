@@ -607,9 +607,6 @@ catalogs:
     '@anolilab/oxfmt-config':
       specifier: 1.0.8
       version: 1.0.8
-    '@anolilab/oxlint-config':
-      specifier: 2.0.1
-      version: 2.0.1
     '@anolilab/prettier-config':
       specifier: 10.0.4
       version: 10.0.4
@@ -665,8 +662,8 @@ catalogs:
       specifier: 1.0.2
       version: 1.0.2
     eslint-plugin-regexp:
-      specifier: 3.3.1
-      version: 3.3.1
+      specifier: 3.1.1
+      version: 3.1.1
     eslint-plugin-sonarjs:
       specifier: 4.2.2
       version: 4.2.2
@@ -688,9 +685,6 @@ catalogs:
     oxlint:
       specifier: 1.89.0
       version: 1.89.0
-    oxlint-plugin-react-doctor:
-      specifier: 0.9.18
-      version: 0.9.18
     oxlint-tsgolint:
       specifier: 7.0.2004
       version: 7.0.2004
@@ -1459,9 +1453,6 @@ importers:
       '@anolilab/oxfmt-config':
         specifier: catalog:lint
         version: 1.0.8(oxfmt@0.74.0)
-      '@anolilab/oxlint-config':
-        specifier: catalog:lint
-        version: 2.0.1(@visulima/yaml@2.0.0)(eslint@10.13.0(jiti@2.7.0)(supports-color@10.2.2))(json5@2.2.3)(oxlint-tsgolint@7.0.2004)(oxlint@1.89.0(oxlint-tsgolint@7.0.2004))(smol-toml@1.9.0)
       '@anolilab/prettier-config':
         specifier: catalog:lint
         version: 10.0.4(prettier@3.9.10)
@@ -1533,7 +1524,7 @@ importers:
         version: 2.3.3(eslint@10.13.0(jiti@2.7.0)(supports-color@10.2.2))
       eslint-plugin-regexp:
         specifier: catalog:lint
-        version: 3.3.1(eslint@10.13.0(jiti@2.7.0)(supports-color@10.2.2))
+        version: 3.1.1(eslint@10.13.0(jiti@2.7.0)(supports-color@10.2.2))
       eslint-plugin-sonarjs:
         specifier: catalog:lint
         version: 4.2.2(eslint@10.13.0(jiti@2.7.0)(supports-color@10.2.2))
@@ -1555,9 +1546,6 @@ importers:
       oxlint:
         specifier: catalog:lint
         version: 1.89.0(oxlint-tsgolint@7.0.2004)
-      oxlint-plugin-react-doctor:
-        specifier: catalog:lint
-        version: 0.9.18
       oxlint-tsgolint:
         specifier: catalog:lint
         version: 7.0.2004
@@ -3877,14 +3865,6 @@ packages:
     hasBin: true
     peerDependencies:
       oxfmt: 0.74.0
-
-  '@anolilab/oxlint-config@2.0.1':
-    resolution: {integrity: sha512-8IiMmcXrrwdn8ywvxb3GD/Knso222j6J3Vd1XjHEz6UTcwwYCP3lurZFUkgff+3omd/ZqfUDR29vySNgFTrsLQ==}
-    engines: {node: '>=22.12.0 <=25.*'}
-    hasBin: true
-    peerDependencies:
-      oxlint: 1.89.0
-      oxlint-tsgolint: 7.0.2004
 
   '@anolilab/prettier-config@10.0.4':
     resolution: {integrity: sha512-N4NI74CNxoJcl+9TyPMuOFF27JO88vgKqF0AiBdQP3wJKmLNVbgAwv+GE6aWzAR2zPNqDbUQ9mVCBaCfKC1AWw==}
@@ -18414,12 +18394,6 @@ packages:
     peerDependencies:
       eslint: '>=9.38.0'
 
-  eslint-plugin-regexp@3.3.1:
-    resolution: {integrity: sha512-58bGUci/AaWAo1ETj6Lsnmy6QXwnSyVONRA805828nnqp7vrTwdaQMc02vtowmYB3A5OB3SLr3r5HgmfxX4dLg==}
-    engines: {node: ^20.19.0 || ^22.13.0 || >=24}
-    peerDependencies:
-      eslint: '>=9.38.0'
-
   eslint-plugin-security@4.0.1:
     resolution: {integrity: sha512-/lZCkOxPOWaf1jXAqgICrS8St3BMBccIPvhOSUYuV6VCr1o5nFVG998FnTLt6w2Nxb8Uo0nM8fzmnhp+GY/aEg==}
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
@@ -20445,10 +20419,6 @@ packages:
     resolution: {integrity: sha512-uQu/fXVqVaMg6gM8/E5G5+eygVcZ1NV0Z51CvqhNa2bDWxvHMl484ETr6vph4oPyC+KUcbP/w2W2pewfCiR9aQ==}
     engines: {node: '>=20.0.0'}
 
-  jsdoc-type-pratt-parser@9.5.0:
-    resolution: {integrity: sha512-Qu/AuBJocEUhxq187P4Ud7xGBHB+NhtrclSrS7Utkr6uNeeh8BrZ5+Ax/AGe8VXQLGY+4oYgbUp04hY8iGsIWA==}
-    engines: {node: ^22.22.2 || >=24.15.0}
-
   jsdom@26.1.0:
     resolution: {integrity: sha512-Cvc9WUhxSMEo4McES3P7oK3QaXldCfNWp7pl2NNeiIFlCoLr3kfq9kb1fxftiwk1FLV7CvpvDfonxtzUDeSOPg==}
     engines: {node: '>=18'}
@@ -21860,10 +21830,6 @@ packages:
         optional: true
       vite-plus:
         optional: true
-
-  oxlint-plugin-react-doctor@0.9.18:
-    resolution: {integrity: sha512-1mfeb/jzXnduWOZJxrvdJjvKT0pFNKrNFYcPO4ncpFAnfW41M0mLz/23lAFzHb0knNLYayEgIQ5DjI4ZfFe+DQ==}
-    engines: {node: ^20.19.0 || >=22.13.0}
 
   oxlint-plugin-react-doctor@0.9.22:
     resolution: {integrity: sha512-kf9MwCpK3YlAWYUyX5Zx7XYrdIbA/4lQD2QREIqC8DvmNb2I+wP8zyjL4NeGl2FO2EC1sLuYvW8ir4Ooq1Xd2A==}
@@ -25911,23 +25877,6 @@ snapshots:
   '@anolilab/oxfmt-config@1.0.8(oxfmt@0.74.0)':
     dependencies:
       oxfmt: 0.74.0
-
-  '@anolilab/oxlint-config@2.0.1(@visulima/yaml@2.0.0)(eslint@10.13.0(jiti@2.7.0)(supports-color@10.2.2))(json5@2.2.3)(oxlint-tsgolint@7.0.2004)(oxlint@1.89.0(oxlint-tsgolint@7.0.2004))(smol-toml@1.9.0)':
-    dependencies:
-      '@eslint-community/eslint-plugin-eslint-comments': 4.8.1(eslint@10.13.0(jiti@2.7.0)(supports-color@10.2.2))
-      '@visulima/tsconfig': 3.2.38(@visulima/yaml@2.0.0)(json5@2.2.3)(smol-toml@1.9.0)
-      eslint-plugin-no-secrets: 2.3.3(eslint@10.13.0(jiti@2.7.0)(supports-color@10.2.2))
-      eslint-plugin-regexp: 3.3.1(eslint@10.13.0(jiti@2.7.0)(supports-color@10.2.2))
-      eslint-plugin-sonarjs: 4.2.2(eslint@10.13.0(jiti@2.7.0)(supports-color@10.2.2))
-      oxlint: 1.89.0(oxlint-tsgolint@7.0.2004)
-      oxlint-plugin-react-doctor: 0.9.18
-      oxlint-tsgolint: 7.0.2004
-    transitivePeerDependencies:
-      - '@visulima/yaml'
-      - eslint
-      - ini
-      - json5
-      - smol-toml
 
   '@anolilab/prettier-config@10.0.4(prettier@3.9.10)':
     dependencies:
@@ -42881,17 +42830,6 @@ snapshots:
       regexp-ast-analysis: 0.7.1
       scslre: 0.3.0
 
-  eslint-plugin-regexp@3.3.1(eslint@10.13.0(jiti@2.7.0)(supports-color@10.2.2)):
-    dependencies:
-      '@eslint-community/eslint-utils': 4.10.1(eslint@10.13.0(jiti@2.7.0)(supports-color@10.2.2))
-      '@eslint-community/regexpp': 4.12.2
-      comment-parser: 1.4.9
-      eslint: 10.13.0(jiti@2.7.0)(supports-color@10.2.2)
-      jsdoc-type-pratt-parser: 9.5.0
-      refa: 0.12.1
-      regexp-ast-analysis: 0.7.1
-      scslre: 0.3.0
-
   eslint-plugin-security@4.0.1:
     dependencies:
       safe-regex: 2.1.1
@@ -45147,10 +45085,6 @@ snapshots:
 
   jsdoc-type-pratt-parser@8.0.0: {}
 
-  jsdoc-type-pratt-parser@9.5.0:
-    dependencies:
-      '@types/estree': 1.0.10
-
   jsdom@26.1.0(canvas@3.2.3)(supports-color@10.2.2):
     dependencies:
       cssstyle: 4.6.0
@@ -47324,15 +47258,6 @@ snapshots:
       '@oxfmt/binding-win32-arm64-msvc': 0.74.0
       '@oxfmt/binding-win32-ia32-msvc': 0.74.0
       '@oxfmt/binding-win32-x64-msvc': 0.74.0
-
-  oxlint-plugin-react-doctor@0.9.18:
-    dependencies:
-      '@shaderfrog/glsl-parser': 7.0.1
-      '@typescript-eslint/types': 8.72.0
-      eslint-scope: 9.1.2
-      eslint-visitor-keys: 5.0.1
-      lightningcss: 1.33.0
-      oxc-parser: 0.148.0
 
   oxlint-plugin-react-doctor@0.9.22:
     dependencies:

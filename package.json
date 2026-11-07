@@ -65,6 +65,7 @@
         "lint:oxfmt:fix": "oxfmt && prettier --config=.prettierrc.cjs --write \"**/*.{md,mdx}\"",
         "lint:oxlint": "oxlint",
         "lint:oxlint:fix": "oxlint --fix",
+        "lint:oxlint:sync": "node scripts/sync-oxlint-rules.mjs",
         "lint:secrets": "vis secrets",
         "lint:staged": "vis staged --verbose --concurrent false --debug",
         "lint:types": "vis run lint:types && pnpm run lint:types:deploy",
@@ -78,7 +79,6 @@
     "devDependencies": {
         "@anolilab/commitlint-config": "catalog:lint",
         "@anolilab/oxfmt-config": "catalog:lint",
-        "@anolilab/oxlint-config": "catalog:lint",
         "@anolilab/prettier-config": "catalog:lint",
         "@commitlint/cli": "catalog:lint",
         "@commitlint/config-conventional": "catalog:lint",
@@ -110,7 +110,6 @@
         "jspdf": "catalog:utils",
         "oxfmt": "catalog:lint",
         "oxlint": "catalog:lint",
-        "oxlint-plugin-react-doctor": "catalog:lint",
         "oxlint-tsgolint": "catalog:lint",
         "plop": "catalog:cli",
         "prettier": "catalog:lint",
