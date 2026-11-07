@@ -32,9 +32,11 @@ describe(transcribeClip, () => {
 describe(voiceErrorMessage, () => {
     it("shows the server's own words for a guest or a spent allowance, and a plain message for anything else", () => {
         const refusal = Object.assign(new Error("Create an account to use voice input."), { code: "FORBIDDEN" });
+        const allowanceSpent = Object.assign(new Error("You've used today's voice input allowance."), { data: { code: "TOO_MANY_REQUESTS" } });
         const failure = Object.assign(new Error("Transcription gateway error: 502 upstream"), { code: "INTERNAL_SERVER_ERROR" });
 
         expect(voiceErrorMessage(refusal)).toBe("Create an account to use voice input.");
+        expect(voiceErrorMessage(allowanceSpent)).toBe("You've used today's voice input allowance.");
         expect(voiceErrorMessage(failure)).toBe("The recording could not be turned into text. Try again, or type your message.");
         expect(voiceErrorMessage(new TypeError("Network request failed"))).toMatch(NEEDS_CONNECTION);
     });

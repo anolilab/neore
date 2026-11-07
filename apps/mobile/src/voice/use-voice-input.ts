@@ -1,5 +1,5 @@
 import type { RecordingOptions } from "expo-audio";
-import { AudioQuality, IOSOutputFormat, requestRecordingPermissionsAsync, setAudioModeAsync, useAudioRecorder } from "expo-audio";
+import { AudioQuality, getRecordingPermissionsAsync, IOSOutputFormat, requestRecordingPermissionsAsync, setAudioModeAsync, useAudioRecorder } from "expo-audio";
 import { File } from "expo-file-system";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -32,15 +32,27 @@ const RECORDING_OPTIONS: RecordingOptions = {
 const teardown: { last: Promise<void> } = { last: Promise.resolve() };
 
 /**
- * Takes the audio session out of recording. Every start waits for it, so a late teardown never lands on the next
- * recording. A failure is dropped: there is nothing to do about it.
+ * Takes the audio session out of recording, after `stopping` (the recorder's stop) has settled. It is registered at
+ * once, before that stop settles, and every start waits for it, so a late teardown never lands on the next recording.
+ * Failures are dropped here: the caller sees the stop's own failure.
  */
-const leaveRecordingMode = async (): Promise<void> => {
+const leaveRecordingMode = async (stopping?: Promise<unknown>): Promise<void> => {
+    // Chained after the one before: a quick teardown must not stand in for a slower one still running.
+    const previous = teardown.last;
+
     teardown.last = (async () => {
+        await previous;
+
+        try {
+            await stopping;
+        } catch {
+            // The caller handles it.
+        }
+
         try {
             await setAudioModeAsync({ allowsRecording: false });
         } catch {
-            // See above.
+            // Nothing to do about it.
         }
     })();
 
@@ -105,10 +117,15 @@ export const useVoiceInput = ({ onText }: { onText: (text: string) => void }) =>
     const stopRecording = useCallback(async (): Promise<string | undefined> => {
         isRecording.current = false;
 
-        try {
+        const stopping = (async () => {
             await recorder.stop();
+        })();
+        const leaving = leaveRecordingMode(stopping);
+
+        try {
+            await stopping;
         } finally {
-            await leaveRecordingMode();
+            await leaving;
         }
 
         return clipUri.current ?? recorder.uri ?? undefined;
@@ -187,7 +204,10 @@ export const useVoiceInput = ({ onText }: { onText: (text: string) => void }) =>
         setError(undefined);
 
         try {
-            const permission = await requestRecordingPermissionsAsync();
+            // Asked only when not yet granted: a first prompt takes the finger off the button, which is no "too short".
+            const current = await getRecordingPermissionsAsync();
+            const hadPermission = current.granted;
+            const permission = hadPermission ? { granted: true } : await requestRecordingPermissionsAsync();
 
             if (!permission.granted) {
                 report(MIC_DENIED_MESSAGE);
@@ -203,6 +223,10 @@ export const useVoiceInput = ({ onText }: { onText: (text: string) => void }) =>
 
             // Released while the recorder was starting (or while the first permission prompt was up): nothing to record.
             if (!isHeld.current || !isMounted.current) {
+                if (hadPermission) {
+                    report(TOO_SHORT_MESSAGE);
+                }
+
                 await leaveRecordingMode();
                 isDiscarded(clipUri.current);
                 clipUri.current = undefined;

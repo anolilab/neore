@@ -45,7 +45,17 @@ export const voiceErrorMessage = (error: unknown): string => {
         return OFFLINE_MESSAGE;
     }
 
-    const { code, message } = (typeof error === "object" && error !== null ? error : {}) as { code?: unknown; message?: unknown };
+    const {
+        code: topCode,
+        data,
+        message,
+    } = (typeof error === "object" && error !== null ? error : {}) as {
+        code?: unknown;
+        data?: { code?: unknown } | null;
+        message?: unknown;
+    };
+    // A Lunora error carries its code on `.code` or on `.data.code`.
+    const code = typeof topCode === "string" ? topCode : data?.code;
 
     // The server's refusals for guests and spent allowances are written to be shown.
     if (typeof message === "string" && message !== "" && (code === "FORBIDDEN" || code === "TOO_MANY_REQUESTS")) {
