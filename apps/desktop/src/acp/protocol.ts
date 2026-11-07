@@ -118,8 +118,12 @@ export const initialize = async (connection: JsonRpcConnection, appVersion: stri
     };
 };
 
-/** Opens a session in `cwd` and returns the agent's session id. */
-export const newSession = async (connection: JsonRpcConnection, cwd: string, timeoutMs = STARTUP_TIMEOUT_MS): Promise<string> => {
+/** Opens a session in `cwd`: the agent's session id, and its whole answer (which carries the options it offers). */
+export const newSession = async (
+    connection: JsonRpcConnection,
+    cwd: string,
+    timeoutMs = STARTUP_TIMEOUT_MS,
+): Promise<{ answer: Record<string, unknown>; sessionId: string }> => {
     const params: NewSessionRequest = { cwd, mcpServers: [] };
 
     try {
@@ -129,7 +133,7 @@ export const newSession = async (connection: JsonRpcConnection, cwd: string, tim
             throw new Error("the agent did not return a session id");
         }
 
-        return response.sessionId;
+        return { answer: response, sessionId: response.sessionId };
     } catch (error) {
         if (error instanceof RpcError && error.code === AUTH_REQUIRED) {
             // eslint-disable-next-line preserve-caught-error -- the cause is the agent's own error, which can quote its environment
@@ -144,7 +148,12 @@ export const newSession = async (connection: JsonRpcConnection, cwd: string, tim
  * `session/fork` (unstable in ACP v1): a new session that starts with the history of `sessionId`, which stays as it was.
  * Returns the new session's id. Call only when the agent advertised `sessionCapabilities.fork`.
  */
-export const forkSession = async (connection: JsonRpcConnection, sessionId: string, cwd: string, timeoutMs = LOAD_TIMEOUT_MS): Promise<string> => {
+export const forkSession = async (
+    connection: JsonRpcConnection,
+    sessionId: string,
+    cwd: string,
+    timeoutMs = LOAD_TIMEOUT_MS,
+): Promise<{ answer: Record<string, unknown>; sessionId: string }> => {
     const params: ForkSessionRequest = { cwd, mcpServers: [], sessionId };
     const response = await withTimeout(connection.request(METHOD.forkSession, params), timeoutMs, "the agent did not fork the session");
 
@@ -152,7 +161,7 @@ export const forkSession = async (connection: JsonRpcConnection, sessionId: stri
         throw new Error("the agent did not return a session id");
     }
 
-    return response.sessionId;
+    return { answer: response, sessionId: response.sessionId };
 };
 
 export const promptParams = (sessionId: string, text: string): PromptRequest => {
@@ -217,11 +226,17 @@ export const listSessions = async (connection: JsonRpcConnection, cwd: string, t
  * collects the notifications. Call only when the agent advertised `loadSession`. A replay is as long as the session, so
  * the deadline is generous.
  */
-export const loadSession = async (connection: JsonRpcConnection, sessionId: string, cwd: string, timeoutMs = LOAD_TIMEOUT_MS): Promise<void> => {
+export const loadSession = async (
+    connection: JsonRpcConnection,
+    sessionId: string,
+    cwd: string,
+    timeoutMs = LOAD_TIMEOUT_MS,
+    answered?: () => void,
+): Promise<unknown> => {
     const params: LoadSessionRequest = { cwd, mcpServers: [], sessionId };
 
     try {
-        await withTimeout(connection.request(METHOD.loadSession, params), timeoutMs, "the agent did not finish loading the session");
+        return await withTimeout(connection.request(METHOD.loadSession, params, answered), timeoutMs, "the agent did not finish loading the session");
     } catch (error) {
         if (error instanceof RpcError && error.code === AUTH_REQUIRED) {
             // eslint-disable-next-line preserve-caught-error -- the cause is the agent's own error, which can quote its environment

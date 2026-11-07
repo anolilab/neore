@@ -12,6 +12,7 @@ import { LunoraError } from "lunorash/server";
 import type { Doc, Id } from "../../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../../_generated/server";
 import { loadActivePathTail } from "../../agent/branch-rows";
+import { clearAwaitingInput } from "../../agent/table-writes";
 import { isToolApprovalRunExpired } from "./tool-approval-cleanup";
 import type { ToolRunConfig } from "./tool-run-config";
 import { admitOwnedThread, resolveThreadReadAccess } from "../../agent/thread-read-access";
@@ -194,6 +195,17 @@ export const claimToolApproval = async (
         resolvedBy: callerId,
         status: decision === "deny" ? "denied" : "approved",
     });
+
+    // Once no approval on the thread is still open, the thread stops waiting for the owner, so it leaves Needs You now rather than
+    // when the resumed run writes. Another open approval keeps it waiting.
+    const stillOpen = await ctx.db
+        .query("toolApprovalRuns")
+        .withIndex("by_threadId_status_createdAt", (q) => q.eq("threadId", threadId).eq("status", "pending"))
+        .first();
+
+    if (!stillOpen) {
+        await clearAwaitingInput(ctx.db, threadId);
+    }
 
     return { config: run.config, kind: "claimed", ownerId: run.userId, runId: run._id, toolName: pending.toolName };
 };

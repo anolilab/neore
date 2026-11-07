@@ -1,6 +1,7 @@
 /** What an agent session reports about its turns, and what the backend is told of them (`ingest.ts`). */
 import type { CapabilityReport } from "@neore/ai/capabilities";
 
+import type { AgentOptions } from "./agent-options";
 import type { ChildEvent } from "./children";
 import type { StopReason } from "./types";
 
@@ -77,6 +78,8 @@ export interface HostSessionInfo {
     fork?: { forked: boolean; reason?: "fork_failed" | "fork_unsupported" };
     /** The agent's own id for the session, so an import finds it and a later reattach can use it. */
     nativeSessionId?: string;
+    /** The options the agent offers for the session (`agent-options.ts`), already bounded. */
+    options?: AgentOptions;
     /** For a session the backend started with a saved session id (harness switch S4): whether the agent loaded it, and why not. */
     reattach?: { loaded: boolean; reason?: "load_failed" | "load_unsupported" };
 }
@@ -90,6 +93,8 @@ export interface SessionObserver {
     sessionEnded: (sessionId: string) => void;
     /** `threadId` is known when the backend started the session (`acp_start`); otherwise opening it makes the thread. */
     sessionOpened: (sessionId: string, info: HostSessionInfo, threadId?: string) => void;
+    /** What the session reports changed after it opened (its options, and the report that follows them): the whole info again. */
+    sessionUpdated?: (sessionId: string, info: HostSessionInfo) => void;
     text: (sessionId: string, turnId: string, delta: string) => void;
     thought: (sessionId: string, turnId: string, delta: string) => void;
     tool: (sessionId: string, turnId: string, tool: { id: string; kind: string; status: string; title: string }) => void;
@@ -117,6 +122,7 @@ export const capSessionInfo = (info: HostSessionInfo): HostSessionInfo => {
         folderId: info.folderId.slice(0, 128),
         folderLabel: info.folderLabel.slice(0, 200),
         ...(info.capabilities !== undefined && { capabilities: info.capabilities }),
+        ...(info.options !== undefined && { options: info.options }),
         ...(info.nativeSessionId !== undefined &&
             info.nativeSessionId !== "" &&
             Buffer.byteLength(info.nativeSessionId) <= MAX_NATIVE_ID_BYTES && { nativeSessionId: info.nativeSessionId }),

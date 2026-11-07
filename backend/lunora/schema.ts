@@ -13,7 +13,7 @@ import { paymentExtension } from "@lunora/payment";
 import { MAX_THREAD_TITLE_INSTRUCTIONS_LENGTH } from "@neore/ai/constants";
 import { defineSchema, defineTable, v } from "lunorash/server";
 
-import { vAcpSessionStatus, vHostEndReason, vHostEvent, vHostState } from "./acp/validators";
+import { vAcpSessionStatus, vAgentOptions, vHostEndReason, vHostEvent, vHostState } from "./acp/validators";
 import { vAgentRef } from "./agent/agent-switch-validators";
 import { vGoalRunConfig, vGoalStatus as vThreadGoalStatus, vGoalStopReason, vGoalVerdict } from "./chat/goals/validators";
 import { vGroupChat } from "./chat/group/validators";
@@ -165,6 +165,11 @@ export const schema = defineSchema({
     acpSessions: defineTable({
         agentKey: v.string(),
         agentLabel: v.string(),
+        // The options the agent offers for the session (model, reasoning effort, mode ...), as its newest report said.
+        agentOptions: v.optional(vAgentOptions),
+        // The time the desktop gave the report the stored options came with, as it sent it (not capped to this clock): it rises
+        // strictly within one session, so it orders that session's reports whatever the two clocks say.
+        agentOptionsAt: v.optional(v.number()),
         capabilities: v.optional(vCapabilityReport),
         createdAt: v.number(),
         deviceId: v.id("devices"),

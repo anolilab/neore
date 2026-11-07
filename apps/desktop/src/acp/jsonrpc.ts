@@ -17,6 +17,8 @@ export interface RpcHandlers {
 }
 
 interface Pending {
+    /** Called as the answer is read, before anything read after it: a promise's callbacks run only after the whole read is handled. */
+    answered?: () => void;
     reject: (error: Error) => void;
     resolve: (value: unknown) => void;
 }
@@ -57,7 +59,7 @@ export class JsonRpcConnection {
         output.on("error", (error) => this.close(exitedBeforeInput(error)));
     }
 
-    public request<Result = unknown>(method: string, params: unknown): Promise<Result> {
+    public request<Result = unknown>(method: string, params: unknown, answered?: () => void): Promise<Result> {
         if (this.closed !== undefined) {
             return Promise.reject(this.closed);
         }
@@ -67,7 +69,7 @@ export class JsonRpcConnection {
         this.nextId += 1;
 
         return new Promise<Result>((resolve, reject) => {
-            this.pending.set(id, { reject, resolve: (value) => resolve(value as Result) });
+            this.pending.set(id, { answered, reject, resolve: (value) => resolve(value as Result) });
             this.write({ id, jsonrpc: "2.0", method, params });
         });
     }
@@ -157,6 +159,7 @@ export class JsonRpcConnection {
         }
 
         this.pending.delete(id);
+        waiter.answered?.();
 
         if (isRecord(message.error)) {
             const { code, message: text } = message.error;
