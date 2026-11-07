@@ -119,7 +119,10 @@ export const FailedReply: Story = {
     },
 };
 
-/** A thread shared with the viewer read-only: no composer. */
+/**
+ * A thread whose permission is read-only, shown on the chat route, which still renders its composer for it. The read-only
+ * view a share link opens is the public page, asserted in `shared-thread.stories`.
+ */
 export const ReadOnlyShare: Story = {
     parameters: {
         msw: { handlers: { lunora: lunoraHandlers(...userFixtures(), ...shellFixtures(), ...chatFixtures({ permission: "read" })) } },
