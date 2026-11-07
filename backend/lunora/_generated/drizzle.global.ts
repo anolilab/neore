@@ -655,6 +655,24 @@ export const twoFactor = sqliteTable("twoFactor", {
     userId: index("userId").on(t.userId),
 }));
 
+export const usageOrganizationReplies = sqliteTable("usageOrganizationReplies", {
+    _id: text("_id").primaryKey(),
+    _creationTime: integer("_creationTime").notNull(),
+    costMicrodollars: real("costMicrodollars").notNull(),
+    date: text("date").notNull(),
+    organizationId: text("organizationId").notNull(),
+    projectKey: text("projectKey"),
+    recordedAt: real("recordedAt").notNull(),
+    replyKey: text("replyKey").notNull(),
+    tokens: real("tokens").notNull(),
+    userId: text("userId").notNull(),
+}, (t) => ({
+    by_org_date: index("by_org_date").on(t.organizationId, t.date),
+    by_org_recorded: index("by_org_recorded").on(t.organizationId, t.recordedAt),
+    by_user_reply: index("by_user_reply").on(t.userId, t.replyKey),
+    by_date: index("by_date").on(t.date),
+}));
+
 export const user = sqliteTable("user", {
     _id: text("_id").primaryKey(),
     _creationTime: integer("_creationTime").notNull(),

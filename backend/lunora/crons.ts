@@ -255,6 +255,8 @@ export const PERIODIC_JOBS: ReadonlyArray<CronJob & PeriodicJob> = [
         ref: internal.crons.deleteExpiredTemporaryChats,
         schedule: { everyMinutes: 60, kind: "interval" },
     },
+    // Organization usage rows past the usage rollup's retention (`usage/organization.ts`); global, so pruned here once.
+    { name: "pruneOrganizationUsage", ref: internal.usage.organization.pruneOrganizationUsage, schedule: { everyMinutes: 360, kind: "interval" } },
     // Claim-once rows past their TTL (`lib/claim-once.ts`).
     { name: "purgeIdempotencyClaims", ref: internal.lib.claim_once.purgeExpiredClaims, schedule: { everyMinutes: 60, kind: "interval" } },
     // 0 */6 * * *
@@ -274,6 +276,12 @@ export const PERIODIC_JOBS: ReadonlyArray<CronJob & PeriodicJob> = [
         name: "sweepOrphanedOrganizationPolicies",
         ref: internal.auth.organization_policy_erase.sweepOrphanedOrganizationPolicies,
         schedule: { hourUTC: 4, kind: "daily", minuteUTC: 15 },
+    },
+    // Usage of organizations that are gone, for an erasure the queue never delivered (`usage/organization-erase.ts`).
+    {
+        name: "sweepOrphanedOrganizationUsage",
+        ref: internal.usage.organization_erase.sweepOrphanedOrganizationUsage,
+        schedule: { hourUTC: 4, kind: "daily", minuteUTC: 45 },
     },
     // 0 0 * * *
     {

@@ -24,9 +24,17 @@ export const scheduleReplyUsage = (scheduler: SchedulerLike, usageArgs: ReplyUsa
     }
 
     const target = internal.usage.activity.recordReplyUsage;
-    const scheduled: Promise<unknown> = servesUser(usageArgs.userId)
-        ? scheduler.runAfter(0, target as never, usageArgs as never)
-        : runAfterOnShard(scheduler, 0, target, { ...usageArgs }, usageArgs.userId);
+    let scheduled: Promise<unknown>;
+
+    if (servesUser(usageArgs.userId)) {
+        scheduled = scheduler.runAfter(0, target as never, usageArgs as never);
+    } else if (usageArgs.threadId === undefined || usageArgs.threadAttribution !== undefined) {
+        // No thread to read, or the caller already read it: straight to the user's shard.
+        scheduled = runAfterOnShard(scheduler, 0, target, { ...usageArgs }, usageArgs.userId);
+    } else {
+        // Another user's thread: its project and organization are read here, on its shard, then forwarded.
+        scheduled = scheduler.runAfter(0, internal.usage.activity.forwardReplyUsage as never, { ...usageArgs, threadId: usageArgs.threadId } as never);
+    }
 
     void scheduled.catch((error: unknown) => {
         streamLogger.warn("[usage] rollup record not scheduled", error);

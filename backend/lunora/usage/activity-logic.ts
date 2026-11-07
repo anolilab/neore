@@ -7,15 +7,25 @@
  * One reply writes TWO rows on the user's shard: the day's total
  * (`skillKey = TOTAL_SKILL_KEY`, what the heatmap reads — at most one row per
  * day, so a year is ≤ 371 rows) and the day's row for the skill that answered
- * (what the breakdown reads). Rows are summed on read rather than assumed
- * unique, so a guest→account merge that lands two rows for one key still adds up.
+ * (what the breakdown reads). A reply in a thread that belongs to a project
+ * writes a third: the day's row for that project (`skillKey = PROJECT_SKILL_KEY`,
+ * `projectKey` = the project id). Replies outside any project write none, so
+ * "No project" is the total less the projects, and the two always add up.
+ * Rows are summed on read rather than assumed unique, so a guest→account merge
+ * that lands two rows for one key still adds up.
  */
 import { sumMessageCosts, sumStepUsage } from "../agent/message-cost";
 import type { StepUsage } from "../agent/message-cost";
-import { localDayOf } from "../memory/reflection-logic";
+import { localDayOf, resolveTimeZone, zonedTimeToUtc } from "../memory/reflection-logic";
 
 /** `skillKey` of the per-day total row the heatmap reads. */
 export const TOTAL_SKILL_KEY = "__total__";
+
+/** `skillKey` of the per-day rows of one project (`projectKey`), what the project breakdown reads. */
+export const PROJECT_SKILL_KEY = "__project__";
+
+/** The `skillKey`s of the rollup's own rows, which no skill breakdown lists. */
+const ROLLUP_SKILL_KEYS: ReadonlySet<string> = new Set([PROJECT_SKILL_KEY, TOTAL_SKILL_KEY]);
 
 /** `skillKey` of replies no skill produced — the plain assistant. */
 export const DEFAULT_SKILL_KEY = "__assistant__";
@@ -28,6 +38,9 @@ export const HEATMAP_DAYS = 53 * 7;
 
 /** Rows one breakdown read takes (total rows included) — about ten skills a day over a full year. */
 export const BREAKDOWN_ROW_LIMIT = 4000;
+
+/** Project rows one project breakdown read takes — about ten projects a day over a full year. */
+export const PROJECT_ROW_LIMIT = 4000;
 
 const DAY_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -68,10 +81,14 @@ export const skillKeyOf = (skill: ReplySkill | undefined): string => {
 
 /** The fields of a saved row a reply's usage is read from (a subset of `MessageDoc`). */
 export interface SavedRowLike {
+    /** When the row was saved: the first reply row's is when the reply started, the day the backfill dates it by. */
+    _creationTime?: number;
     _id?: string;
     message?: { role?: string } | null;
     order?: number;
     providerMetadata?: unknown;
+    /** The thread the row is in: what the reply's project is read from. */
+    threadId?: string;
     usage?: StepUsage;
 }
 
@@ -126,6 +143,13 @@ export const summariseReply = (savedMessages: ReadonlyArray<SavedRowLike>): Repl
 /** The user's calendar day at `instant`, in their zone (UTC when unset or unusable). */
 export const usageDayOf = (instant: number, timeZone: string | null | undefined): string => localDayOf(instant, timeZone);
 
+/** The instant `day` (`YYYY-MM-DD`) begins in `timeZone` (UTC when unset or unusable), across a DST change too. */
+export const startOfUsageDay = (day: string, timeZone: string | null | undefined): number => {
+    const [year, month, date] = day.split("-").map(Number) as [number, number, number];
+
+    return zonedTimeToUtc(year, month, date, 0, 0, resolveTimeZone(timeZone));
+};
+
 /** The arguments of `usage_activity.recordReplyUsage`. */
 export interface ReplyUsageArgs {
     at: number;
@@ -135,6 +159,12 @@ export interface ReplyUsageArgs {
     replyKey: string;
     skillKey: string;
     skillName?: string;
+    /** When the reply's first row was saved; dates its project row when the backfill already counted the reply. */
+    startedAt?: number;
+    /** The thread the reply is in; its project, read when the record lands, gets the reply's usage too. */
+    /** The thread's project and organization, read by a caller that can read the thread; the record then reads no thread. */
+    threadAttribution?: Attribution;
+    threadId?: string;
     tokens: number;
     userId: string;
 }
@@ -149,7 +179,8 @@ export const replyUsageArgs = (
     options: { at: number; skill?: ReplySkill; timeZone?: string; userId: string },
 ): ReplyUsageArgs | undefined => {
     const usage = summariseReply(savedMessages);
-    const replyKey = savedMessages.find((row) => row.message?.role !== "user")?._id;
+    const first = savedMessages.find((row) => row.message?.role !== "user");
+    const replyKey = first?._id;
 
     if (!usage || replyKey === undefined) {
         return undefined;
@@ -164,7 +195,90 @@ export const replyUsageArgs = (
         tokens: usage.tokens,
         userId: options.userId,
         ...(options.skill && { skillName: options.skill.name }),
+        ...(first?.threadId !== undefined && { threadId: first.threadId }),
+        ...(first?._creationTime !== undefined && { startedAt: first._creationTime }),
     };
+};
+
+/** The key `usageReplies` holds for a reply the first walk passed while it was still running, and left to its live record. */
+export const pendingKey = (replyKey: string): string => `pending:${replyKey}`;
+
+/** The key `usageReplies` holds once a reply (keyed `replyKey`) has been filed under its project and organization. */
+export const projectFiledKey = (replyKey: string): string => `project:${replyKey}`;
+
+/** Where a reply is filed besides the total: its thread's project, and the organization the reply belongs to. */
+export interface Attribution {
+    /** The organization of the thread's project, else of the thread itself. */
+    organizationId?: string;
+    /** Set when the organization owns the project: only then is the project one of the organization's. */
+    projectInOrganization?: boolean;
+    projectKey?: string;
+}
+
+/** The key `usageReplies` holds once a reply's organization row has been filed apart from its project row. */
+export const organizationFiledKey = (replyKey: string): string => `organization:${replyKey}`;
+
+/** What some replies of one day add to their project's row. */
+export interface AttributionIncrement {
+    costMicrodollars: number;
+    date: string;
+    projectKey: string;
+    replies: number;
+    tokens: number;
+}
+
+/** One project row a write touches. */
+export interface AttributionRow {
+    costMicrodollars: number;
+    date: string;
+    projectKey: string;
+    replies: number;
+    skillKey: typeof PROJECT_SKILL_KEY;
+    tokens: number;
+}
+
+/** The project rows some increments touch, each once: one per (day, project). */
+export const attributionRows = (increments: ReadonlyArray<AttributionIncrement>): AttributionRow[] => {
+    const rows = new Map<string, AttributionRow>();
+
+    for (const { costMicrodollars, date, projectKey, replies, tokens } of increments) {
+        const key = `${date}\u{0}${projectKey}`;
+        const current = rows.get(key);
+
+        if (current) {
+            current.costMicrodollars += costMicrodollars;
+            current.replies += replies;
+            current.tokens += tokens;
+        } else {
+            rows.set(key, { costMicrodollars, date, projectKey, replies, skillKey: PROJECT_SKILL_KEY, tokens });
+        }
+    }
+
+    return [...rows.values()];
+};
+
+/** One reply of an organization's usage (`usageOrganizationReplies`): its day, spend, and the organization's project. */
+export interface OrganizationReply {
+    costMicrodollars: number;
+    date: string;
+    /** Set only when the organization owns the project the reply ran in. */
+    projectKey?: string;
+    tokens: number;
+}
+
+/**
+ * What one reply files under its organization: its spend, and its project only when the organization owns it. A
+ * member's own project in an organization's thread is left off, so the organization's view never names it.
+ */
+export const organizationReply = (
+    attribution: Attribution,
+    amounts: { costMicrodollars: number; date: string; tokens: number },
+): OrganizationReply | undefined => {
+    if (attribution.organizationId === undefined) {
+        return undefined;
+    }
+
+    return { ...amounts, ...(attribution.projectKey !== undefined && attribution.projectInOrganization === true && { projectKey: attribution.projectKey }) };
 };
 
 /** What some replies of one day and skill add to the rollup. */
@@ -228,6 +342,7 @@ export interface DayTotal {
 interface RollupRowLike {
     costMicrodollars: number;
     date: string;
+    projectKey?: string;
     replies: number;
     skillKey: string;
     skillName?: string;
@@ -260,12 +375,12 @@ export interface SkillTotal {
     tokens: number;
 }
 
-/** Fold per-skill rows (total rows are skipped) into one entry per skill, costliest first. */
+/** Fold per-skill rows (total and project rows are skipped) into one entry per skill, costliest first. */
 export const foldSkillTotals = (rows: ReadonlyArray<RollupRowLike>): SkillTotal[] => {
     const bySkill = new Map<string, SkillTotal & { nameAt: number }>();
 
     for (const row of rows) {
-        if (row.skillKey === TOTAL_SKILL_KEY) {
+        if (ROLLUP_SKILL_KEYS.has(row.skillKey)) {
             continue;
         }
 
@@ -287,4 +402,67 @@ export const foldSkillTotals = (rows: ReadonlyArray<RollupRowLike>): SkillTotal[
     return [...bySkill.values()]
         .map(({ nameAt: _nameAt, ...total }) => total)
         .toSorted((a, b) => b.costMicrodollars - a.costMicrodollars || b.replies - a.replies || a.skillKey.localeCompare(b.skillKey));
+};
+
+export interface UsageTotals {
+    costMicrodollars: number;
+    replies: number;
+    tokens: number;
+}
+
+export interface ProjectTotal extends UsageTotals {
+    projectKey: string;
+}
+
+const emptyTotals = (): UsageTotals => {
+    return { costMicrodollars: 0, replies: 0, tokens: 0 };
+};
+
+/** The sum of some rows, whatever their kind. */
+export const sumRows = (rows: ReadonlyArray<UsageTotals>): UsageTotals => {
+    const sum = emptyTotals();
+
+    for (const row of rows) {
+        sum.costMicrodollars += row.costMicrodollars;
+        sum.replies += row.replies;
+        sum.tokens += row.tokens;
+    }
+
+    return sum;
+};
+
+/** Fold project rows (others are skipped) into one entry per project, costliest first. */
+export const foldProjectTotals = (rows: ReadonlyArray<RollupRowLike>): ProjectTotal[] => {
+    const byProject = new Map<string, ProjectTotal>();
+
+    for (const row of rows) {
+        if (row.skillKey !== PROJECT_SKILL_KEY || row.projectKey === undefined) {
+            continue;
+        }
+
+        const current = byProject.get(row.projectKey) ?? { ...emptyTotals(), projectKey: row.projectKey };
+
+        current.costMicrodollars += row.costMicrodollars;
+        current.replies += row.replies;
+        current.tokens += row.tokens;
+        byProject.set(row.projectKey, current);
+    }
+
+    return [...byProject.values()].toSorted(
+        (a, b) => b.costMicrodollars - a.costMicrodollars || b.replies - a.replies || a.projectKey.localeCompare(b.projectKey),
+    );
+};
+
+/**
+ * What no project accounts for: the total less every project, never below zero.
+ * Replies outside a project write no project row, so this is their sum.
+ */
+export const remainderOf = (total: UsageTotals, projects: ReadonlyArray<UsageTotals>): UsageTotals => {
+    const filed = sumRows(projects);
+
+    return {
+        costMicrodollars: Math.max(0, total.costMicrodollars - filed.costMicrodollars),
+        replies: Math.max(0, total.replies - filed.replies),
+        tokens: Math.max(0, total.tokens - filed.tokens),
+    };
 };

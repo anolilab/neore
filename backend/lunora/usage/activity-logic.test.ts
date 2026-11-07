@@ -5,12 +5,18 @@ import {
     addDays,
     DEFAULT_SKILL_KEY,
     foldDayTotals,
+    attributionRows,
+    foldProjectTotals,
     foldSkillTotals,
     HEATMAP_DAYS,
     isDayKey,
+    organizationReply,
+    PROJECT_SKILL_KEY,
+    remainderOf,
     repliesByOrder,
     replyUsageArgs,
     skillKeyOf,
+    startOfUsageDay,
     summariseReply,
     TOTAL_SKILL_KEY,
     usageDayOf,
@@ -20,6 +26,17 @@ import {
 const row = (overrides: Partial<Parameters<typeof foldSkillTotals>[0][number]>) => {
     return { costMicrodollars: 0, date: "2026-09-01", replies: 1, skillKey: TOTAL_SKILL_KEY, tokens: 0, updatedAt: 0, ...overrides };
 };
+
+describe("startOfUsageDay", () => {
+    it("is the instant a day begins in a zone, across a DST change, and in UTC without one", () => {
+        expect(startOfUsageDay("2026-09-01", "Asia/Tokyo")).toBe(Date.UTC(2026, 7, 31, 15));
+        // New York moves its clocks on 2026-03-08 at 02:00: that day still begins at 05:00Z, the next at 04:00Z.
+        expect(startOfUsageDay("2026-03-08", "America/New_York")).toBe(Date.UTC(2026, 2, 8, 5));
+        expect(startOfUsageDay("2026-03-09", "America/New_York")).toBe(Date.UTC(2026, 2, 9, 4));
+        expect(startOfUsageDay("2026-09-01", undefined)).toBe(Date.UTC(2026, 8, 1));
+        expect(startOfUsageDay("2026-09-01", "Not/AZone")).toBe(Date.UTC(2026, 8, 1));
+    });
+});
 
 describe("isDayKey", () => {
     it("accepts real calendar days only", () => {
@@ -147,6 +164,12 @@ describe("replyUsageArgs", () => {
         });
     });
 
+    it("carries the thread of the first reply row, whose project the record files it under", () => {
+        const args = replyUsageArgs([{ _id: "m_reply", message: { role: "assistant" }, threadId: "th_1", usage: { totalTokens: 1 } }], { at, userId: "u1" });
+
+        expect(args?.threadId).toBe("th_1");
+    });
+
     it("records nothing for a run that saved no reply row", () => {
         expect(replyUsageArgs([{ _id: "m_prompt", message: { role: "user" } }], { at, userId: "u1" })).toBeUndefined();
         expect(replyUsageArgs([{ message: { role: "assistant" } }], { at, userId: "u1" })).toBeUndefined();
@@ -189,5 +212,58 @@ describe("withDayTotals", () => {
             { costMicrodollars: 5, date: "2026-09-02", replies: 2, skillKey: "sk_1", tokens: 4 },
             { costMicrodollars: 5, date: "2026-09-02", replies: 2, skillKey: TOTAL_SKILL_KEY, tokens: 4 },
         ]);
+    });
+});
+
+describe("project rows", () => {
+    const projectRow = (projectKey: string, costMicrodollars: number, replies = 1) => {
+        return { costMicrodollars, date: "2026-09-20", projectKey, replies, skillKey: PROJECT_SKILL_KEY, tokens: replies * 10, updatedAt: 1 };
+    };
+
+    it("folds per project, costliest first, and the skill breakdown leaves them out", () => {
+        const rows = [projectRow("p_a", 100), projectRow("p_b", 300), projectRow("p_a", 50), row({ skillKey: "sk_1" })];
+
+        expect(foldProjectTotals(rows)).toStrictEqual([
+            { costMicrodollars: 300, projectKey: "p_b", replies: 1, tokens: 10 },
+            { costMicrodollars: 150, projectKey: "p_a", replies: 2, tokens: 20 },
+        ]);
+        expect(foldSkillTotals(rows).map((skill) => skill.skillKey)).toStrictEqual(["sk_1"]);
+    });
+
+    it("leaves no project the rest of the total, never below zero", () => {
+        const projects = [
+            { costMicrodollars: 100, replies: 1, tokens: 10 },
+            { costMicrodollars: 40, replies: 1, tokens: 4 },
+        ];
+
+        expect(remainderOf({ costMicrodollars: 147, replies: 3, tokens: 15 }, projects)).toStrictEqual({ costMicrodollars: 7, replies: 1, tokens: 1 });
+        expect(remainderOf({ costMicrodollars: 100, replies: 1, tokens: 10 }, projects)).toStrictEqual({ costMicrodollars: 0, replies: 0, tokens: 0 });
+    });
+
+    it("folds project increments into one row per day and project", () => {
+        const one = { costMicrodollars: 1, date: "2026-09-20", replies: 1, tokens: 1 };
+
+        expect(
+            attributionRows([
+                { ...one, projectKey: "p_a" },
+                { ...one, projectKey: "p_a" },
+                { ...one, projectKey: "p_b" },
+            ]),
+        ).toStrictEqual([
+            { ...one, costMicrodollars: 2, projectKey: "p_a", replies: 2, skillKey: PROJECT_SKILL_KEY, tokens: 2 },
+            { ...one, projectKey: "p_b", skillKey: PROJECT_SKILL_KEY },
+        ]);
+    });
+
+    it("files a reply under its organization's total, and under the project only when the organization owns it", () => {
+        const amounts = { costMicrodollars: 5, date: "2026-09-20", tokens: 1 };
+
+        expect(organizationReply({ organizationId: "org", projectInOrganization: true, projectKey: "p_org" }, amounts)).toStrictEqual({
+            ...amounts,
+            projectKey: "p_org",
+        });
+        // A member's own project in an organization thread: the total only, never the project.
+        expect(organizationReply({ organizationId: "org", projectKey: "p_own" }, amounts)).toStrictEqual(amounts);
+        expect(organizationReply({ projectKey: "p_own" }, amounts)).toBeUndefined();
     });
 });

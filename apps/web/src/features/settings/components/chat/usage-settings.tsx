@@ -25,6 +25,7 @@ import { useAction } from "@/lib/lunora/crpc";
 
 import { useUsageBackfill } from "../../hooks/use-usage-backfill";
 import UsageActivityHeatmap from "./usage-activity-heatmap";
+import UsageProjectBreakdown from "./usage-project-breakdown";
 import UsageSkillBreakdown from "./usage-skill-breakdown";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -145,7 +146,7 @@ const OverviewCard: FC<OverviewCardProps> = ({ icon, label, value }) => (
 const UsageSettings: FC = () => {
     const { i18n, t } = useLingui();
     const [days, setDays] = useState<7 | 30 | 90>(30);
-    const { backfilling } = useUsageBackfill();
+    const { backfilling, projectsBackfilling } = useUsageBackfill();
     const [showCreateForm, setShowCreateForm] = useState(false);
     const [formData, setFormData] = useState(EMPTY_FORM);
     const [showDailyBreakdown, setShowDailyBreakdown] = useState(false);
@@ -336,6 +337,9 @@ const UsageSettings: FC = () => {
 
                 {/* Skill / agent breakdown */}
                 <UsageSkillBreakdown backfilling={backfilling} days={days} />
+
+                {/* Project breakdown (the caller's own, or the organization's for its admins) */}
+                <UsageProjectBreakdown backfilling={projectsBackfilling} days={days} />
 
                 {/* Daily cost trend */}
                 <Card>

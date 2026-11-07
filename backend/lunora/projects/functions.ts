@@ -48,6 +48,13 @@ export const writableProject = async (context: QueryCtx | MutationCtx, projectId
     return project && (!project.userId || project.userId === userId) ? project : null;
 };
 
+/** The organization a project belongs to, read past row-level security: a usage record files the reply under it. */
+export const projectOrganizationOf = async (context: Pick<QueryCtx | MutationCtx, "db">, projectId: string): Promise<string | undefined> => {
+    const found = await systemDb(context).projects.findFirst({ where: { _id: projectId as Id<"projects"> } });
+
+    return found?.organizationId ?? undefined;
+};
+
 /** A project's `context` text for a run on behalf of `userId`, under the same access rule as `createThread` (owner or organization member). */
 export const getProjectContextForRun = internalQuery
     .input({ projectId: v.id("projects"), userId: v.string().max(MAX_LENGTH.id) })

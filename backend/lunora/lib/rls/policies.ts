@@ -457,6 +457,8 @@ export const UNPOLICED_TABLES: Record<string, string> = {
     teamSettings: "org-scoped settings, checked by org role",
     threadKnowledge: "link rows with no owner column; every access follows a thread access check",
     triggerExecutions: "no owner column; every access follows the parent trigger's owner check",
+    usageOrganizationReplies:
+        "an organization's per-day usage per member; written only by that member's usage record, read only summed into organization totals by `usage_organization.getOrganizationProjectUsage` after the org admin check, and by the member's own export and erasure",
     verification: "better-auth verification tokens",
 };
 

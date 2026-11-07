@@ -4,26 +4,30 @@ import { useEffect, useRef } from "react";
 import { useCRPC } from "@/lib/lunora/crpc";
 
 /**
- * The usage rollup's one-shot backfill (`usage/backfill.ts`), started — or
- * resumed — once when the usage page opens. The status is live, so it flips to
- * done without polling; `backfilling` is true until then.
+ * The usage rollup's two one-shot walks (`usage/backfill.ts`), started — or
+ * resumed — once when a usage view opens. The status is live, so it flips to
+ * done without polling. `backfilling`: the first walk, which fills the totals
+ * and skills, is still running. `projectsBackfilling`: either walk is, so the
+ * project breakdowns are still being filled.
  */
-export const useUsageBackfill = (): { backfilling: boolean } => {
+export const useUsageBackfill = (): { backfilling: boolean; projectsBackfilling: boolean } => {
     const crpc = useCRPC();
-    const { data: status } = useQuery(crpc.usage.backfill.getUsageBackfillStatus.queryOptions({}));
+    const { data: status } = useQuery(crpc.usage.backfill.getUsageBackfillStatuses.queryOptions({}));
     const { mutate: start } = useMutation(crpc.usage.backfill.startUsageBackfill.mutationOptions());
     const started = useRef(false);
+    const backfilling = status !== undefined && status.replies !== "done";
+    const projectsBackfilling = backfilling || (status !== undefined && status.projects !== "done");
 
     useEffect(() => {
-        if (status === undefined || status === "done" || started.current) {
+        if (!projectsBackfilling || started.current) {
             return;
         }
 
         started.current = true;
         start({});
-    }, [start, status]);
+    }, [projectsBackfilling, start]);
 
-    return { backfilling: status !== undefined && status !== "done" };
+    return { backfilling, projectsBackfilling };
 };
 
 /** While the backfill runs, how often a one-shot usage query re-reads the rollup. */

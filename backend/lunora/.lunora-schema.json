@@ -27637,6 +27637,90 @@
           "optional": false,
           "unique": false
         },
+        "projects": {
+          "kind": "object",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "fields": {
+            "finishedAt": {
+              "kind": "number",
+              "nullable": false,
+              "optional": true,
+              "unique": false
+            },
+            "lastOrder": {
+              "kind": "number",
+              "nullable": false,
+              "optional": true,
+              "unique": false
+            },
+            "leaseUntil": {
+              "kind": "number",
+              "nullable": false,
+              "optional": false,
+              "unique": false
+            },
+            "replies": {
+              "kind": "number",
+              "nullable": false,
+              "optional": false,
+              "unique": false
+            },
+            "runId": {
+              "kind": "string",
+              "nullable": false,
+              "optional": false,
+              "unique": false
+            },
+            "startedAt": {
+              "kind": "number",
+              "nullable": false,
+              "optional": false,
+              "unique": false
+            },
+            "status": {
+              "kind": "union",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "members": [
+                {
+                  "kind": "literal",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
+                  "literal": "\"done\""
+                },
+                {
+                  "kind": "literal",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
+                  "literal": "\"running\""
+                }
+              ]
+            },
+            "threadCursor": {
+              "kind": "string",
+              "nullable": false,
+              "optional": true,
+              "unique": false
+            },
+            "threadId": {
+              "kind": "string",
+              "nullable": false,
+              "optional": true,
+              "unique": false
+            },
+            "threadProjectKey": {
+              "kind": "string",
+              "nullable": false,
+              "optional": true,
+              "unique": false
+            }
+          }
+        },
         "replies": {
           "kind": "number",
           "nullable": false,
@@ -27689,6 +27773,12 @@
           "optional": true,
           "unique": false
         },
+        "timeZone": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "updatedAt": {
           "kind": "number",
           "nullable": false,
@@ -27727,6 +27817,12 @@
           "kind": "string",
           "nullable": false,
           "optional": false,
+          "unique": false
+        },
+        "projectKey": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
           "unique": false
         },
         "replies": {
@@ -27780,6 +27876,14 @@
           ],
           "unique": false
         },
+        "by_user_project_date": {
+          "fields": [
+            "userId",
+            "projectKey",
+            "date"
+          ],
+          "unique": false
+        },
         "by_user_skill_date": {
           "fields": [
             "userId",
@@ -27793,9 +27897,100 @@
       "relations": {},
       "shardMode": "shardBy:userId"
     },
+    "usageOrganizationReplies": {
+      "commitOrdered": false,
+      "fields": {
+        "costMicrodollars": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "date": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "organizationId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "projectKey": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "recordedAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "replyKey": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "tokens": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "userId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        }
+      },
+      "indexes": {
+        "by_date": {
+          "fields": [
+            "date"
+          ],
+          "unique": false
+        },
+        "by_org_date": {
+          "fields": [
+            "organizationId",
+            "date"
+          ],
+          "unique": false
+        },
+        "by_org_recorded": {
+          "fields": [
+            "organizationId",
+            "recordedAt"
+          ],
+          "unique": false
+        },
+        "by_user_reply": {
+          "fields": [
+            "userId",
+            "replyKey"
+          ],
+          "unique": false
+        }
+      },
+      "memory": false,
+      "relations": {},
+      "shardMode": "global:d1"
+    },
     "usageReplies": {
       "commitOrdered": false,
       "fields": {
+        "projectFiled": {
+          "kind": "boolean",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "recordedAt": {
           "kind": "number",
           "nullable": false,

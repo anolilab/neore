@@ -698,7 +698,7 @@ export interface InternalApiTypes {
             pruneRetainedActivity: FunctionReference<"mutation", {}, { subAgentRuns: number; usageDaily: number }>;
         };
         steps: {
-            collectActivityForExport: FunctionReference<"query", { userId: string }, { knowledgeCollections: Array<unknown>; subAgentRuns: Array<unknown>; usageDaily: Array<unknown> }>;
+            collectActivityForExport: FunctionReference<"query", { userId: string }, { knowledgeCollections: Array<unknown>; subAgentRuns: Array<unknown> }>;
             collectConversations: FunctionReference<"action", { userId: string }, { contextSummaries: { coveredCount: number; coveredUpToMessageId: string; createdAt: number; kind?: "compact"; summary: string; }[]; messages: { _id: string; createdAt: number; model?: string; order?: number; parentMessageId?: string; role?: string; status?: string; stepOrder?: number; text?: string; tool?: boolean; }[]; thread: { _id: string; activeLeafMessageId?: string; category?: string; createdAt: number; model?: string; summary?: string; tags?: string[]; title?: string; updatedAt?: number; userTags: string[]; }; }[]>;
             collectFiles: FunctionReference<"query", { userId: string }, { files: Array<{ _id: Id<"files">; createdAt: number; name: string; size: number; tags?: Array<string>; type: string; updatedAt: number }>; folders: Array<{ _id: Id<"folders">; createdAt: number; name: string; updatedAt: number }> }>;
             collectProfile: FunctionReference<"query", { userId: string }, { createdAt: number; email: string; emailVerified: boolean; id: string; image: string; name: string } | null>;
@@ -1220,11 +1220,29 @@ export interface InternalApiTypes {
     };
     usage: {
         activity: {
-            recordReplyUsage: FunctionReference<"mutation", { at: number; costMicrodollars: number; date: string; replyKey: string; skillKey: string; skillName?: string; tokens: number; userId: string }, null>;
+            forwardReplyUsage: FunctionReference<"mutation", { at: number; costMicrodollars: number; date: string; replyKey: string; skillKey: string; skillName?: string; startedAt?: number; threadId: string; tokens: number; userId: string }, null>;
+            getThreadAttribution: FunctionReference<"query", { threadId: string; userId: string }, { organizationId?: string; projectInOrganization?: boolean; projectKey?: string }>;
+            recordReplyUsage: FunctionReference<"mutation", { at: number; costMicrodollars: number; date: string; replyKey: string; skillKey: string; skillName?: string; startedAt?: number; threadAttribution?: { organizationId?: string; projectInOrganization?: boolean; projectKey?: string }; threadId?: string; tokens: number; userId: string }, null>;
         };
         backfill: {
             runUsageBackfillStep: FunctionReference<"mutation", { runId: string; userId: string }, null>;
+            runUsageProjectBackfillStep: FunctionReference<"mutation", { runId: string; userId: string }, null>;
             sweepUsageRollup: FunctionReference<"mutation", {}, { pruned: number; status: "idle" | "running" | "done" }>;
+        };
+        gdpr: {
+            collectOrganizationUsageForExport: FunctionReference<"query", { cursor: string | null; userId: string }, { cursor: string | null; rows: Array<{ costMicrodollars: number; date: string; organization: string; project?: string; tokens: number }> }>;
+            collectUsageDailyForExport: FunctionReference<"query", { cursor: string | null; userId: string }, { cursor: string | null; rows: Array<{ costMicrodollars: number; date: string; project?: string; replies: number; skill: string; tokens: number }> }>;
+        };
+        organization: {
+            isOrganizationAdmin: FunctionReference<"query", { organizationId: string; userId: string }, boolean>;
+            organizationProjectTitles: FunctionReference<"query", { organizationId: string; projectIds: Array<string>; withUnused: boolean }, { moreUnused: boolean; owned: Array<{ projectId: string; title: string }>; unused: Array<{ projectId: string; title: string }> }>;
+            organizationUsageSums: FunctionReference<"query", { from: number; organizationId: string }, Array<{ costMicrodollars: number; projectKey?: string; replies: number; tokens: number }>>;
+            pruneOrganizationUsage: FunctionReference<"mutation", {}, number>;
+            usageTimeZoneOf: FunctionReference<"query", { userId: string }, string | null>;
+        };
+        organization_erase: {
+            eraseOrganizationUsage: FunctionReference<"mutation", { organizationId: string }, number>;
+            sweepOrphanedOrganizationUsage: FunctionReference<"mutation", { after?: string }, number>;
         };
     };
     vault: {
@@ -2477,11 +2495,29 @@ export const internal: InternalApiTypes = {
     },
     usage: {
         activity: {
+            forwardReplyUsage: { __lunoraRef: "usage_activity:forwardReplyUsage" },
+            getThreadAttribution: { __lunoraRef: "usage_activity:getThreadAttribution" },
             recordReplyUsage: { __lunoraRef: "usage_activity:recordReplyUsage" },
         },
         backfill: {
             runUsageBackfillStep: { __lunoraRef: "usage_backfill:runUsageBackfillStep" },
+            runUsageProjectBackfillStep: { __lunoraRef: "usage_backfill:runUsageProjectBackfillStep" },
             sweepUsageRollup: { __lunoraRef: "usage_backfill:sweepUsageRollup" },
+        },
+        gdpr: {
+            collectOrganizationUsageForExport: { __lunoraRef: "usage_gdpr:collectOrganizationUsageForExport" },
+            collectUsageDailyForExport: { __lunoraRef: "usage_gdpr:collectUsageDailyForExport" },
+        },
+        organization: {
+            isOrganizationAdmin: { __lunoraRef: "usage_organization:isOrganizationAdmin" },
+            organizationProjectTitles: { __lunoraRef: "usage_organization:organizationProjectTitles" },
+            organizationUsageSums: { __lunoraRef: "usage_organization:organizationUsageSums" },
+            pruneOrganizationUsage: { __lunoraRef: "usage_organization:pruneOrganizationUsage" },
+            usageTimeZoneOf: { __lunoraRef: "usage_organization:usageTimeZoneOf" },
+        },
+        organization_erase: {
+            eraseOrganizationUsage: { __lunoraRef: "usage_organization_erase:eraseOrganizationUsage" },
+            sweepOrphanedOrganizationUsage: { __lunoraRef: "usage_organization_erase:sweepOrphanedOrganizationUsage" },
         },
     },
     vault: {

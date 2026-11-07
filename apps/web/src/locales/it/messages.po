@@ -14,7 +14,7 @@ msgstr ""
 "Plural-Forms: \n"
 "X-Generator: @lingui/cli\n"
 
-#: src/features/settings/components/chat/usage-settings.tsx:630
+#: src/features/settings/components/chat/usage-settings.tsx:634
 msgid " · model: {modelFilter}"
 msgstr " · modello: {modelFilter}"
 
@@ -122,7 +122,7 @@ msgstr "(filtrate da {unfilteredRows})"
 msgid "(maximum reached)"
 msgstr "(massimo raggiunto)"
 
-#: src/features/settings/components/chat/usage-settings.tsx:498
+#: src/features/settings/components/chat/usage-settings.tsx:502
 msgid "(microdollars; 1,000,000 = $1)"
 msgstr "(microdollari; 1.000.000 = 1 $)"
 
@@ -146,7 +146,7 @@ msgid "(opens in new tab)"
 msgstr "(si apre in una nuova scheda)"
 
 #: src/features/settings/components/chat/mcp/server-form.tsx:34
-#: src/features/settings/components/chat/usage-settings.tsx:542
+#: src/features/settings/components/chat/usage-settings.tsx:546
 msgid "(optional)"
 msgstr "(facoltativo)"
 
@@ -1058,15 +1058,15 @@ msgstr ""
 msgid "{maxRounds} rounds"
 msgstr ""
 
-#: src/features/settings/components/chat/usage-settings.tsx:606
+#: src/features/settings/components/chat/usage-settings.tsx:610
 msgid "{metricLabel} > {threshold} per day"
 msgstr "{metricLabel} > {threshold} al giorno"
 
-#: src/features/settings/components/chat/usage-settings.tsx:610
+#: src/features/settings/components/chat/usage-settings.tsx:614
 msgid "{metricLabel} > {threshold} per hour"
 msgstr "{metricLabel} > {threshold} all'ora"
 
-#: src/features/settings/components/chat/usage-settings.tsx:614
+#: src/features/settings/components/chat/usage-settings.tsx:618
 msgid "{metricLabel} > {threshold} per month"
 msgstr "{metricLabel} > {threshold} al mese"
 
@@ -1196,6 +1196,11 @@ msgstr "{openCount} commenti aperti"
 msgid "{overflowCount, plural, one {# more user} other {# more users}}"
 msgstr "{overflowCount, plural, one {# altro utente} other {altri # utenti}}"
 
+#. placeholder {0}: String(percent)
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:205
+msgid "{project}: {0}% of spend"
+msgstr "{project}: {0}% della spesa"
+
 #: src/features/settings/components/chat/api-keys-settings.tsx:495
 msgid "{providerId} API key removed"
 msgstr "Chiave API {providerId} rimossa"
@@ -1220,7 +1225,7 @@ msgstr "{providerName} · il tuo account Bedrock ({region})"
 msgid "{refusedLabel} does not have the format this request asks for, so nothing was saved. Enter it again."
 msgstr "{refusedLabel} non ha il formato richiesto da questa richiesta, quindi non è stato salvato nulla. Inseriscilo di nuovo."
 
-#: src/features/settings/components/chat/usage-settings.tsx:391
+#: src/features/settings/components/chat/usage-settings.tsx:395
 #: src/routes/admin/gateway/index.tsx:67
 msgid "{requestCount} req"
 msgstr "{requestCount} rich."
@@ -1945,7 +1950,7 @@ msgstr "Eliminazione dell'account avviata. Verrai disconnesso."
 msgid "Accounts"
 msgstr "Account"
 
-#: src/features/settings/components/chat/usage-settings.tsx:515
+#: src/features/settings/components/chat/usage-settings.tsx:519
 msgid "Action"
 msgstr "Azione"
 
@@ -2081,11 +2086,11 @@ msgstr "Aggiungi un tag..."
 msgid "Add Account"
 msgstr "Aggiungi account"
 
-#: src/features/settings/components/chat/usage-settings.tsx:415
+#: src/features/settings/components/chat/usage-settings.tsx:419
 msgid "Add Alert"
 msgstr "Aggiungi avviso"
 
-#: src/features/settings/components/chat/usage-settings.tsx:667
+#: src/features/settings/components/chat/usage-settings.tsx:671
 msgid "Add an alert above to be notified when your usage crosses a threshold."
 msgstr "Aggiungi un avviso qui sopra per ricevere una notifica quando il tuo utilizzo supera una soglia."
 
@@ -2117,7 +2122,7 @@ msgstr "Aggiungi allegato"
 msgid "Add background"
 msgstr "Aggiungi sfondo"
 
-#: src/features/settings/components/chat/usage-settings.tsx:413
+#: src/features/settings/components/chat/usage-settings.tsx:417
 msgid "Add budget alert"
 msgstr "Aggiungi avviso di budget"
 
@@ -3500,7 +3505,7 @@ msgid "App Secret from your Meta app's App settings > Basic, used to verify X-Hu
 msgstr "App Secret da App settings > Basic della tua app Meta, usato per verificare X-Hub-Signature-256"
 
 #: ../../packages/ui/src/components/canvas-editor/canvas-property-panel.tsx:316
-#: src/features/projects/components/project-form-dialog.tsx:232
+#: src/features/projects/components/project-form-dialog.tsx:233
 #: src/features/settings/components/account/account-settings.tsx:178
 #: src/features/settings/lib/settings-keywords.ts:27
 msgid "Appearance"
@@ -4614,7 +4619,7 @@ msgstr "Blocca"
 msgid "Block providers that may use your data for training or collect usage data."
 msgstr "Blocca i provider che potrebbero usare i tuoi dati per l'addestramento o raccogliere dati di utilizzo."
 
-#: src/features/settings/components/chat/usage-settings.tsx:103
+#: src/features/settings/components/chat/usage-settings.tsx:104
 msgid "Block requests"
 msgstr "Blocca le richieste"
 
@@ -4808,7 +4813,7 @@ msgstr "Brasile"
 msgid "Break down complex tasks into numbered steps with progress tracking. Ideal for multi-step projects and development tasks."
 msgstr "Suddividi le attività complesse in passaggi numerati con monitoraggio dei progressi. Ideale per progetti in più fasi e attività di sviluppo."
 
-#: src/features/projects/components/project-form-dialog.tsx:220
+#: src/features/projects/components/project-form-dialog.tsx:221
 msgid "Brief description of this project"
 msgstr "Breve descrizione di questo progetto"
 
@@ -4920,15 +4925,15 @@ msgstr "economico"
 msgid "Budget"
 msgstr "Economico"
 
-#: src/features/settings/components/chat/usage-settings.tsx:209
+#: src/features/settings/components/chat/usage-settings.tsx:210
 msgid "Budget alert created"
 msgstr "Avviso di budget creato"
 
-#: src/features/settings/components/chat/usage-settings.tsx:225
+#: src/features/settings/components/chat/usage-settings.tsx:226
 msgid "Budget alert deleted"
 msgstr "Avviso di budget eliminato"
 
-#: src/features/settings/components/chat/usage-settings.tsx:410
+#: src/features/settings/components/chat/usage-settings.tsx:414
 msgid "Budget Alerts"
 msgstr "Avvisi di budget"
 
@@ -5238,7 +5243,7 @@ msgstr "Canada"
 #: src/features/pages/components/page-agent-dialog.tsx:148
 #: src/features/pages/components/page-comments-panel.tsx:87
 #: src/features/projects/components/move-to-project-dialog.tsx:95
-#: src/features/projects/components/project-form-dialog.tsx:390
+#: src/features/projects/components/project-form-dialog.tsx:392
 #: src/features/prompts/components/prompt-form-dialog.tsx:501
 #: src/features/prompts/components/prompt-optimize-dialog.tsx:194
 #: src/features/prompts/components/variable-fill-dialog.tsx:185
@@ -5249,8 +5254,8 @@ msgstr "Canada"
 #: src/features/settings/components/chat/rotate-webhook-secret-dialog.tsx:57
 #: src/features/settings/components/chat/system-prompt-preset-settings.tsx:239
 #: src/features/settings/components/chat/trigger-settings.tsx:375
-#: src/features/settings/components/chat/usage-settings.tsx:569
-#: src/features/settings/components/chat/usage-settings.tsx:577
+#: src/features/settings/components/chat/usage-settings.tsx:573
+#: src/features/settings/components/chat/usage-settings.tsx:581
 #: src/features/settings/components/knowledge/knowledge-base-settings.tsx:417
 #: src/features/settings/components/personalization/memory-item.tsx:141
 #: src/features/settings/components/personalization/memory-settings.tsx:246
@@ -6452,7 +6457,7 @@ msgstr "Comprimi pannello del browser"
 msgid "Collapse chain of thought"
 msgstr "Comprimi catena di ragionamento"
 
-#: src/features/settings/components/chat/usage-settings.tsx:353
+#: src/features/settings/components/chat/usage-settings.tsx:357
 msgid "Collapse daily trend"
 msgstr "Comprimi andamento giornaliero"
 
@@ -6493,7 +6498,7 @@ msgid "Colombia"
 msgstr "Colombia"
 
 #: src/features/canvas/canvas-panel.tsx:123
-#: src/features/projects/components/project-form-dialog.tsx:239
+#: src/features/projects/components/project-form-dialog.tsx:240
 msgid "Color"
 msgstr "Colore"
 
@@ -6800,7 +6805,7 @@ msgstr "Completato"
 msgid "Completing the connection..."
 msgstr "Completamento della connessione..."
 
-#: src/features/settings/components/chat/usage-settings.tsx:284
+#: src/features/settings/components/chat/usage-settings.tsx:285
 msgid "Completion Tokens"
 msgstr "Token di completamento"
 
@@ -6930,7 +6935,7 @@ msgstr "Configura moduli avanzati dell'agente IA per un'esecuzione migliore dell
 msgid "Configure chat behavior and preferences."
 msgstr "Configura il comportamento e le preferenze della chat."
 
-#: src/features/projects/components/project-form-dialog.tsx:343
+#: src/features/projects/components/project-form-dialog.tsx:344
 msgid "Configure default model, reasoning effort, and features for new chats created in this project."
 msgstr "Configura il modello predefinito, l'impegno di ragionamento e le funzioni per le nuove chat create in questo progetto."
 
@@ -7366,7 +7371,7 @@ msgstr "Slide di contenuto"
 msgid "Context"
 msgstr "Contesto"
 
-#: src/features/projects/components/project-form-dialog.tsx:317
+#: src/features/projects/components/project-form-dialog.tsx:318
 msgid "Context / Instructions"
 msgstr "Contesto / istruzioni"
 
@@ -7756,7 +7761,7 @@ msgstr "Raggio degli angoli"
 #: src/features/evals/components/model-comparison.tsx:115
 #: src/features/evals/components/run-comparison.tsx:131
 #: src/features/evals/components/run-detail.tsx:226
-#: src/features/settings/components/chat/usage-settings.tsx:319
+#: src/features/settings/components/chat/usage-settings.tsx:320
 #: src/routes/admin/gateway/index.tsx:92
 msgid "Cost"
 msgstr "Costo"
@@ -7765,7 +7770,7 @@ msgstr "Costo"
 msgid "Cost {display}"
 msgstr "Costo {display}"
 
-#: src/features/settings/components/chat/usage-settings.tsx:297
+#: src/features/settings/components/chat/usage-settings.tsx:298
 msgid "Cost by Model"
 msgstr "Costo per modello"
 
@@ -7996,6 +8001,10 @@ msgstr "Impossibile caricare il marketplace. Riprova più tardi."
 msgid "Could not load the memories."
 msgstr "Impossibile caricare i ricordi."
 
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:172
+msgid "Could not load the project breakdown."
+msgstr "Impossibile caricare la ripartizione per progetto."
+
 #: src/features/settings/components/chat/usage-skill-breakdown.tsx:76
 msgid "Could not load the skill breakdown."
 msgstr "Impossibile caricare la ripartizione per skill."
@@ -8007,6 +8016,10 @@ msgstr ""
 #: src/features/develop/components/failure-notice.tsx:17
 msgid "Could not load this"
 msgstr ""
+
+#: src/features/projects/components/project-usage-summary.tsx:58
+msgid "Could not load this project's usage."
+msgstr "Impossibile caricare l'utilizzo di questo progetto."
 
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:139
 msgid "Could not load tools: {error}"
@@ -8221,6 +8234,10 @@ msgstr "Impossibile aggiornare i partecipanti"
 msgid "country"
 msgstr ""
 
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:227
+msgid "Counts usage recorded since organization reporting started. Members' own projects count under No project."
+msgstr "Conta l'utilizzo registrato dall'avvio dei report dell'organizzazione. I progetti personali dei membri rientrano in Nessun progetto."
+
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:254
 msgid "Covers only tools from MCP servers and connectors you trust for auto-approval (a switch on each server in your MCP settings and on each connector), left at their default Ask, in chats only you can write to. A trusted server's tool descriptions reach the model and can influence what is approved, so trust only servers you would let act for you. Changing a server's address ends its trust."
 msgstr ""
@@ -8280,7 +8297,7 @@ msgstr "Crea un nuovo ramo da questo messaggio. Dagli un nome per riconoscerlo p
 msgid "Create a new organization to collaborate with your team"
 msgstr "Crea una nuova organizzazione per collaborare con il tuo team"
 
-#: src/features/projects/components/project-form-dialog.tsx:185
+#: src/features/projects/components/project-form-dialog.tsx:186
 msgid "Create a new project to group related chats with shared context."
 msgstr "Crea un nuovo progetto per raggruppare chat correlate con un contesto condiviso."
 
@@ -8416,8 +8433,8 @@ msgstr "Crea PR"
 msgid "Create project"
 msgstr "Crea progetto"
 
-#: src/features/projects/components/project-form-dialog.tsx:183
-#: src/features/projects/components/project-form-dialog.tsx:403
+#: src/features/projects/components/project-form-dialog.tsx:184
+#: src/features/projects/components/project-form-dialog.tsx:405
 msgid "Create Project"
 msgstr "Crea progetto"
 
@@ -8785,7 +8802,7 @@ msgstr "Personalizza le scorciatoie da tastiera per le azioni comuni. Clicca \"R
 msgid "Customize the appearance of the application."
 msgstr "Personalizza l'aspetto dell'applicazione."
 
-#: src/features/projects/components/project-form-dialog.tsx:233
+#: src/features/projects/components/project-form-dialog.tsx:234
 msgid "Customize the visual appearance of this project."
 msgstr "Personalizza l'aspetto visivo di questo progetto."
 
@@ -8843,11 +8860,11 @@ msgstr "Daily Brief disattivato"
 msgid "Daily Brief turned on"
 msgstr "Daily Brief attivato"
 
-#: src/features/settings/components/chat/usage-settings.tsx:90
+#: src/features/settings/components/chat/usage-settings.tsx:91
 msgid "Daily cost (microdollars)"
 msgstr "Costo giornaliero (microdollari)"
 
-#: src/features/settings/components/chat/usage-settings.tsx:347
+#: src/features/settings/components/chat/usage-settings.tsx:351
 msgid "Daily Cost Trend"
 msgstr "Andamento dei costi giornalieri"
 
@@ -8859,7 +8876,7 @@ msgstr "Riepilogo giornaliero della posta in arrivo"
 msgid "Daily LLM spend and request volume"
 msgstr "Spesa LLM giornaliera e volume di richieste"
 
-#: src/features/settings/components/chat/usage-settings.tsx:349
+#: src/features/settings/components/chat/usage-settings.tsx:353
 msgid "Daily spend and request volume"
 msgstr "Spesa giornaliera e volume di richieste"
 
@@ -8960,7 +8977,7 @@ msgstr "Data"
 msgid "Date and time"
 msgstr "Data e ora"
 
-#: src/features/settings/components/chat/usage-settings.tsx:97
+#: src/features/settings/components/chat/usage-settings.tsx:98
 msgid "Day"
 msgstr "Giorno"
 
@@ -9100,7 +9117,7 @@ msgstr "Agente predefinito"
 msgid "Default AI Response Language"
 msgstr "Lingua predefinita delle risposte dell'IA"
 
-#: src/features/projects/components/project-form-dialog.tsx:341
+#: src/features/projects/components/project-form-dialog.tsx:342
 msgid "Default AI Settings"
 msgstr "Impostazioni IA predefinite"
 
@@ -9129,7 +9146,7 @@ msgstr "Lingua predefinita aggiornata"
 msgid "default model"
 msgstr ""
 
-#: src/features/projects/components/project-form-dialog.tsx:351
+#: src/features/projects/components/project-form-dialog.tsx:352
 msgid "Default Model"
 msgstr "Modello predefinito"
 
@@ -9303,7 +9320,7 @@ msgstr "Elimina {title}"
 msgid "Delete Account"
 msgstr "Elimina account"
 
-#: src/features/settings/components/chat/usage-settings.tsx:641
+#: src/features/settings/components/chat/usage-settings.tsx:645
 msgid "Delete alert \"{ruleName}\""
 msgstr "Elimina avviso \"{ruleName}\""
 
@@ -9713,7 +9730,7 @@ msgstr "Descrivi il tuo workflow... ad es. \"Genera un'immagine da un testo, aum
 #: src/features/develop/components/pull-request-view.tsx:72
 #: src/features/evals/components/dataset-form-dialog.tsx:102
 #: src/features/knowledge/components/collection-dialog.tsx:69
-#: src/features/projects/components/project-form-dialog.tsx:213
+#: src/features/projects/components/project-form-dialog.tsx:214
 #: src/features/prompts/components/prompt-form-dialog.tsx:266
 #: src/features/prompts/components/prompt-list-view.tsx:117
 #: src/features/prompts/components/prompt-list-view.tsx:120
@@ -10466,7 +10483,7 @@ msgstr "movimento dinamico"
 msgid "Dyslexia-friendly"
 msgstr ""
 
-#: src/features/settings/components/chat/usage-settings.tsx:551
+#: src/features/settings/components/chat/usage-settings.tsx:555
 msgid "e.g. claude-opus-4 (leave blank for all models)"
 msgstr "ad es. claude-opus-4 (lascia vuoto per tutti i modelli)"
 
@@ -10486,7 +10503,7 @@ msgstr "ad es. Elenca almeno cinque fonti, ognuna con un link"
 msgid "e.g. Make the output a table and drop web search"
 msgstr "ad es. Rendi l'output una tabella e rimuovi la ricerca web"
 
-#: src/features/settings/components/chat/usage-settings.tsx:438
+#: src/features/settings/components/chat/usage-settings.tsx:442
 msgid "e.g. Monthly $10 limit"
 msgstr "ad es. Limite mensile di 10 $"
 
@@ -10514,7 +10531,7 @@ msgstr "ad es. Lavoro"
 msgid "e.g., Emphasize concise outputs, target a beginner audience..."
 msgstr "ad es. Privilegia risposte concise, rivolgiti a un pubblico principiante..."
 
-#: src/features/projects/components/project-form-dialog.tsx:201
+#: src/features/projects/components/project-form-dialog.tsx:202
 msgid "e.g., Financial Planning"
 msgstr "ad es. Pianificazione finanziaria"
 
@@ -10731,7 +10748,7 @@ msgstr "Modalità di modifica"
 msgid "Edit preset"
 msgstr "Modifica preset"
 
-#: src/features/projects/components/project-form-dialog.tsx:183
+#: src/features/projects/components/project-form-dialog.tsx:184
 msgid "Edit Project"
 msgstr "Modifica progetto"
 
@@ -11938,7 +11955,7 @@ msgstr "Espandi canvas"
 msgid "Expand chain of thought"
 msgstr "Espandi catena di ragionamento"
 
-#: src/features/settings/components/chat/usage-settings.tsx:353
+#: src/features/settings/components/chat/usage-settings.tsx:357
 msgid "Expand daily trend"
 msgstr "Espandi andamento giornaliero"
 
@@ -12394,7 +12411,7 @@ msgstr "Impossibile creare la chiave API"
 msgid "Failed to create branch"
 msgstr "Impossibile creare il ramo"
 
-#: src/features/settings/components/chat/usage-settings.tsx:214
+#: src/features/settings/components/chat/usage-settings.tsx:215
 msgid "Failed to create budget alert"
 msgstr "Impossibile creare l'avviso di budget"
 
@@ -12426,7 +12443,7 @@ msgstr "Impossibile eliminare"
 msgid "Failed to delete {fileName}"
 msgstr "Impossibile eliminare {fileName}"
 
-#: src/features/settings/components/chat/usage-settings.tsx:228
+#: src/features/settings/components/chat/usage-settings.tsx:229
 msgid "Failed to delete budget alert"
 msgstr "Impossibile eliminare l'avviso di budget"
 
@@ -12622,7 +12639,7 @@ msgstr "Impossibile caricare le skill"
 msgid "Failed to load spreadsheet"
 msgstr "Impossibile caricare il foglio di calcolo"
 
-#: src/features/settings/components/chat/usage-settings.tsx:264
+#: src/features/settings/components/chat/usage-settings.tsx:265
 msgid "Failed to load usage data. Ensure the LLM Gateway is running and reachable."
 msgstr "Impossibile caricare i dati di utilizzo. Assicurati che l'LLM Gateway sia in esecuzione e raggiungibile."
 
@@ -14625,7 +14642,7 @@ msgstr "Ottieni una chiave API"
 msgid "Get cited, multi-step analysis in minutes. Deep Research reads sources so you don't have to."
 msgstr "Ottieni in pochi minuti analisi in più passaggi con citazioni. La Ricerca approfondita legge le fonti al posto tuo."
 
-#: src/features/settings/components/chat/usage-settings.tsx:411
+#: src/features/settings/components/chat/usage-settings.tsx:415
 msgid "Get notified or block requests when usage thresholds are reached"
 msgstr "Ricevi una notifica o blocca le richieste al raggiungimento delle soglie di utilizzo"
 
@@ -15638,7 +15655,7 @@ msgstr ""
 msgid "hotkey"
 msgstr ""
 
-#: src/features/settings/components/chat/usage-settings.tsx:98
+#: src/features/settings/components/chat/usage-settings.tsx:99
 msgid "Hour"
 msgstr "Ora"
 
@@ -15773,7 +15790,7 @@ msgstr "Islandese"
 msgid "Icelandic (Iceland)"
 msgstr "Islandese (Islanda)"
 
-#: src/features/projects/components/project-form-dialog.tsx:274
+#: src/features/projects/components/project-form-dialog.tsx:275
 msgid "Icon"
 msgstr "Icona"
 
@@ -17243,17 +17260,17 @@ msgstr "Poster grande"
 msgid "Last 24h"
 msgstr "Ultime 24h"
 
-#: src/features/settings/components/chat/usage-settings.tsx:254
+#: src/features/settings/components/chat/usage-settings.tsx:255
 msgid "Last 30 days"
 msgstr "Ultimi 30 giorni"
 
 #: src/features/chat/thread-list/hooks/use-thread-groups.ts:583
-#: src/features/settings/components/chat/usage-settings.tsx:253
+#: src/features/settings/components/chat/usage-settings.tsx:254
 #: src/routes/admin/gateway/index.tsx:234
 msgid "Last 7 days"
 msgstr "Ultimi 7 giorni"
 
-#: src/features/settings/components/chat/usage-settings.tsx:255
+#: src/features/settings/components/chat/usage-settings.tsx:256
 msgid "Last 90 days"
 msgstr "Ultimi 90 giorni"
 
@@ -17317,7 +17334,7 @@ msgstr "Ultima esecuzione saltata"
 msgid "Last slide"
 msgstr "Ultima slide"
 
-#: src/features/settings/components/chat/usage-settings.tsx:635
+#: src/features/settings/components/chat/usage-settings.tsx:639
 msgid "Last triggered: {lastTriggeredAt}"
 msgstr "Ultima attivazione: {lastTriggeredAt}"
 
@@ -18110,6 +18127,11 @@ msgstr ""
 #: src/features/settings/components/chat/trigger-settings.tsx:707
 msgid "Loading triggers..."
 msgstr "Caricamento dei trigger..."
+
+#: src/features/projects/components/project-usage-summary.tsx:55
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:166
+msgid "Loading usage…"
+msgstr "Caricamento dell'utilizzo…"
 
 #: src/routes/(chat)/workflow/$workflowId.tsx:47
 #: src/routes/(chat)/workflow/shared/$token.tsx:32
@@ -19131,7 +19153,7 @@ msgid "Meta's well-established and widely-deployed model"
 msgstr "Il modello consolidato e ampiamente diffuso di Meta"
 
 #: src/features/evals/components/run-comparison.tsx:102
-#: src/features/settings/components/chat/usage-settings.tsx:445
+#: src/features/settings/components/chat/usage-settings.tsx:449
 msgid "Metric"
 msgstr "Metrica"
 
@@ -19163,6 +19185,7 @@ msgid "Min"
 msgstr "Min"
 
 #: src/features/develop/components/inbox-list.tsx:51
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:157
 msgid "Mine"
 msgstr ""
 
@@ -19370,7 +19393,7 @@ msgstr "Modalità:"
 #: src/features/evals/components/run-dialog.tsx:212
 #: src/features/prompts/components/prompt-form-dialog.tsx:387
 #: src/features/settings/components/chat/bots-settings.tsx:135
-#: src/features/settings/components/chat/usage-settings.tsx:316
+#: src/features/settings/components/chat/usage-settings.tsx:317
 #: src/features/tasks/components/task-form-dialog.tsx:388
 #: src/features/workflow/components/nodes/ai-node.tsx:34
 #: src/features/workflow/components/nodes/background-removal-node.tsx:63
@@ -19418,7 +19441,7 @@ msgstr "Modello disattivato"
 msgid "Model enabled"
 msgstr "Modello attivato"
 
-#: src/features/settings/components/chat/usage-settings.tsx:541
+#: src/features/settings/components/chat/usage-settings.tsx:545
 msgid "Model filter"
 msgstr "Filtro modelli"
 
@@ -19562,7 +19585,7 @@ msgid "Monospace"
 msgstr ""
 
 #: src/features/settings/components/chat/usage-activity-heatmap.tsx:244
-#: src/features/settings/components/chat/usage-settings.tsx:99
+#: src/features/settings/components/chat/usage-settings.tsx:100
 msgid "Month"
 msgstr "Mese"
 
@@ -19570,7 +19593,7 @@ msgstr "Mese"
 msgid "Monthly"
 msgstr "Mensile"
 
-#: src/features/settings/components/chat/usage-settings.tsx:91
+#: src/features/settings/components/chat/usage-settings.tsx:92
 msgid "Monthly cost (microdollars)"
 msgstr "Costo mensile (microdollari)"
 
@@ -19957,7 +19980,7 @@ msgstr ""
 #: src/features/settings/components/chat/native-providers-settings.tsx:507
 #: src/features/settings/components/chat/system-prompt-preset-settings.tsx:154
 #: src/features/settings/components/chat/trigger-settings.tsx:214
-#: src/features/settings/components/chat/usage-settings.tsx:429
+#: src/features/settings/components/chat/usage-settings.tsx:433
 #: src/features/skills/components/skill-builder-diff.tsx:32
 #: src/features/skills/components/skill-builder-review.tsx:136
 #: src/features/skills/components/skill-form-dialog.tsx:201
@@ -20315,7 +20338,7 @@ msgstr ""
 msgid "New Branch"
 msgstr "Nuovo branch"
 
-#: src/features/settings/components/chat/usage-settings.tsx:424
+#: src/features/settings/components/chat/usage-settings.tsx:428
 msgid "New Budget Alert"
 msgstr "Nuovo avviso di budget"
 
@@ -20659,7 +20682,7 @@ msgstr ""
 msgid "No bots yet."
 msgstr ""
 
-#: src/features/settings/components/chat/usage-settings.tsx:666
+#: src/features/settings/components/chat/usage-settings.tsx:670
 msgid "No budget alerts configured."
 msgstr "Nessun avviso di budget configurato."
 
@@ -20739,7 +20762,7 @@ msgstr "Nessun dato sui costi per questo periodo."
 msgid "No custom endpoints yet."
 msgstr "Ancora nessun endpoint personalizzato."
 
-#: src/features/settings/components/chat/usage-settings.tsx:398
+#: src/features/settings/components/chat/usage-settings.tsx:402
 msgid "No daily data for this period."
 msgstr "Nessun dato giornaliero per questo periodo."
 
@@ -20993,6 +21016,8 @@ msgstr ""
 msgid "No progress: {0}"
 msgstr ""
 
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:109
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:119
 #: src/features/tasks/components/task-form-dialog.tsx:411
 #: src/features/tasks/components/task-form-dialog.tsx:423
 msgid "No project"
@@ -21048,6 +21073,7 @@ msgstr "Nessun riferimento selezionato"
 msgid "No remote MCP servers match your search."
 msgstr "Nessun server MCP remoto corrisponde alla tua ricerca."
 
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:174
 #: src/features/settings/components/chat/usage-skill-breakdown.tsx:78
 msgid "No replies recorded for this period."
 msgstr "Nessuna risposta registrata per questo periodo."
@@ -21214,7 +21240,7 @@ msgstr "Nessuna notifica non letta."
 msgid "No updates yet."
 msgstr "Ancora nessun aggiornamento."
 
-#: src/features/settings/components/chat/usage-settings.tsx:310
+#: src/features/settings/components/chat/usage-settings.tsx:311
 #: src/routes/admin/gateway/index.tsx:125
 msgid "No usage data for this period."
 msgstr "Nessun dato di utilizzo per questo periodo."
@@ -21510,11 +21536,11 @@ msgstr "Le notifiche sono bloccate per questo sito nel tuo browser. Consentile n
 msgid "Notifications, {badge} unread"
 msgstr "Notifiche, {badge} non lette"
 
-#: src/features/settings/components/chat/usage-settings.tsx:105
+#: src/features/settings/components/chat/usage-settings.tsx:106
 msgid "Notify + block"
 msgstr "Notifica + blocca"
 
-#: src/features/settings/components/chat/usage-settings.tsx:104
+#: src/features/settings/components/chat/usage-settings.tsx:105
 msgid "Notify only"
 msgstr "Solo notifica"
 
@@ -21841,6 +21867,11 @@ msgstr "Solo in un'esecuzione"
 #: src/features/auth/components/organization/billing-settings-card.tsx:136
 msgid "Only organization owners can manage billing settings"
 msgstr "Solo i proprietari dell'organizzazione possono gestire le impostazioni di fatturazione"
+
+#: src/features/projects/components/project-usage-summary.tsx:69
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:221
+msgid "Only part of this period is included."
+msgstr "È inclusa solo una parte di questo periodo."
 
 #: src/features/chat/group/group-mode.ts:66
 msgid "Only participants you @mention answer."
@@ -22649,6 +22680,7 @@ msgstr ""
 #: src/features/auth/components/organization/organization-logo.tsx:62
 #: src/features/auth/components/organization/organization-view.tsx:64
 #: src/features/layout/lib/dashboard-page-names.ts:32
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:158
 #: src/features/settings/lib/settings-navigation.ts:108
 #: src/features/skills/components/skill-form-dialog.tsx:476
 #: src/features/skills/components/skill-item.tsx:129
@@ -23302,7 +23334,7 @@ msgstr "Incarnato perfetto, TV di prestigio"
 msgid "Performance comparable to Mistral Small 24B"
 msgstr "Prestazioni paragonabili a Mistral Small 24B"
 
-#: src/features/settings/components/chat/usage-settings.tsx:469
+#: src/features/settings/components/chat/usage-settings.tsx:473
 msgid "Period"
 msgstr "Periodo"
 
@@ -24364,6 +24396,7 @@ msgstr "Avanzamento"
 msgid "Progress of {toolName}"
 msgstr ""
 
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:180
 #: src/features/tasks/components/task-form-dialog.tsx:408
 msgid "Project"
 msgstr "Progetto"
@@ -24372,9 +24405,13 @@ msgstr "Progetto"
 msgid "Project actions"
 msgstr "Azioni del progetto"
 
-#: src/features/projects/components/project-form-dialog.tsx:322
+#: src/features/projects/components/project-form-dialog.tsx:323
 msgid "Project Context"
 msgstr "Contesto del progetto"
+
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:105
+msgid "Project no longer available"
+msgstr "Progetto non più disponibile"
 
 #: src/features/chat/thread-list/hooks/use-thread-groups.ts:548
 msgid "Projects"
@@ -24483,7 +24520,7 @@ msgstr "Prompt ottimizzato"
 msgid "Prompt to run on all models..."
 msgstr "Prompt da eseguire su tutti i modelli..."
 
-#: src/features/settings/components/chat/usage-settings.tsx:279
+#: src/features/settings/components/chat/usage-settings.tsx:280
 msgid "Prompt Tokens"
 msgstr "Token del prompt"
 
@@ -25626,8 +25663,8 @@ msgstr "Ricordami"
 #: src/features/chat/thread/composer-input.tsx:410
 #: src/features/devices/components/devices-settings.tsx:206
 #: src/features/devices/components/devices-settings.tsx:212
-#: src/features/projects/components/project-form-dialog.tsx:263
-#: src/features/projects/components/project-form-dialog.tsx:304
+#: src/features/projects/components/project-form-dialog.tsx:264
+#: src/features/projects/components/project-form-dialog.tsx:305
 #: src/features/settings/components/chat/custom-providers-settings.tsx:652
 #: src/features/settings/components/chat/favorite-models-settings.tsx:186
 #: src/features/settings/components/chat/native-providers-settings.tsx:723
@@ -25942,8 +25979,10 @@ msgid "Replay the welcome tour to review the core features of Neore."
 msgstr "Ripeti il tour di benvenuto per rivedere le funzioni principali di Neore."
 
 #: src/features/chat/header/thread-stats-dialog.tsx:71
+#: src/features/projects/components/project-usage-summary.tsx:39
 #: src/features/settings/components/chat/usage-activity-heatmap.tsx:144
 #: src/features/settings/components/chat/usage-activity-heatmap.tsx:246
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:181
 #: src/features/settings/components/chat/usage-skill-breakdown.tsx:85
 msgid "Replies"
 msgstr "Risposte"
@@ -25971,6 +26010,10 @@ msgstr "Le risposte verranno lette ad alta voce"
 #: src/features/settings/components/account/account-settings.tsx:437
 msgid "Replies will no longer be read aloud"
 msgstr "Le risposte non verranno più lette ad alta voce"
+
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:138
+msgid "Replies, tokens and spend per project for the selected period"
+msgstr "Risposte, token e spesa per progetto nel periodo selezionato"
 
 #: src/features/settings/components/chat/usage-skill-breakdown.tsx:66
 msgid "Replies, tokens and spend per skill or agent for the selected period"
@@ -26008,7 +26051,7 @@ msgstr ""
 msgid "Request changes"
 msgstr ""
 
-#: src/features/settings/components/chat/usage-settings.tsx:92
+#: src/features/settings/components/chat/usage-settings.tsx:93
 msgid "Request count"
 msgstr "Numero di richieste"
 
@@ -26037,8 +26080,8 @@ msgstr "Permessi richiesti"
 msgid "Requesting..."
 msgstr "Richiesta in corso..."
 
-#: src/features/settings/components/chat/usage-settings.tsx:271
-#: src/features/settings/components/chat/usage-settings.tsx:317
+#: src/features/settings/components/chat/usage-settings.tsx:272
+#: src/features/settings/components/chat/usage-settings.tsx:318
 #: src/routes/admin/gateway/index.tsx:89
 #: src/routes/admin/gateway/index.tsx:256
 msgid "Requests"
@@ -26605,7 +26648,7 @@ msgstr ""
 msgid "Rubric"
 msgstr "Rubrica"
 
-#: src/features/settings/components/chat/usage-settings.tsx:191
+#: src/features/settings/components/chat/usage-settings.tsx:192
 msgid "Rule name is required"
 msgstr "Il nome della regola è obbligatorio"
 
@@ -26876,7 +26919,7 @@ msgstr "Salva e chiudi"
 msgid "Save 25%"
 msgstr "Risparmia il 25%"
 
-#: src/features/settings/components/chat/usage-settings.tsx:566
+#: src/features/settings/components/chat/usage-settings.tsx:570
 msgid "Save Alert"
 msgstr "Salva avviso"
 
@@ -26897,7 +26940,7 @@ msgstr "Salva come preset"
 msgid "Save blocked websites"
 msgstr ""
 
-#: src/features/settings/components/chat/usage-settings.tsx:558
+#: src/features/settings/components/chat/usage-settings.tsx:562
 msgid "Save budget alert"
 msgstr "Salva avviso di budget"
 
@@ -26986,7 +27029,7 @@ msgstr "Salvato in \"{0}\""
 
 #: src/features/auth/components/team/team-settings-dialog.tsx:215
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:394
-#: src/features/projects/components/project-form-dialog.tsx:407
+#: src/features/projects/components/project-form-dialog.tsx:409
 #: src/features/prompts/components/prompt-form-dialog.tsx:521
 #: src/features/prompts/components/thread-variables-config.tsx:258
 #: src/features/settings/components/chat/api-keys-settings.tsx:436
@@ -27482,8 +27525,8 @@ msgid "Select all cells"
 msgstr "Seleziona tutte le celle"
 
 #: ../../packages/ui/src/components/icon-picker.tsx:431
-#: src/features/projects/components/project-form-dialog.tsx:286
-#: src/features/projects/components/project-form-dialog.tsx:299
+#: src/features/projects/components/project-form-dialog.tsx:287
+#: src/features/projects/components/project-form-dialog.tsx:300
 msgid "Select an icon"
 msgstr "Seleziona un'icona"
 
@@ -28010,6 +28053,7 @@ msgstr "Forme"
 msgid "Share"
 msgstr "Condividi"
 
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:185
 #: src/features/settings/components/chat/usage-skill-breakdown.tsx:89
 msgid "Share of spend"
 msgstr "Quota della spesa"
@@ -28847,6 +28891,10 @@ msgstr "Prestazioni solide nella maggior parte dei tipi di attività"
 msgid "Some images from this run could not be saved."
 msgstr "Alcune immagini di questa esecuzione non sono state salvate."
 
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:223
+msgid "Some of the organization's projects with no usage are not listed."
+msgstr "Alcuni progetti dell'organizzazione senza utilizzo non sono elencati."
+
 #: src/features/chat/thread/message-cost-badge.tsx:80
 msgid "Some steps had no pricing data; the total is a minimum."
 msgstr "Per alcuni passaggi mancano i dati sui prezzi; il totale è un minimo."
@@ -29119,8 +29167,10 @@ msgstr "Velocità"
 msgid "Speed tier of Nano Banana 2 for fast text-to-image generation"
 msgstr "Livello veloce di Nano Banana 2 per una generazione rapida da testo a immagine"
 
+#: src/features/projects/components/project-usage-summary.tsx:44
 #: src/features/settings/components/chat/usage-activity-heatmap.tsx:145
 #: src/features/settings/components/chat/usage-activity-heatmap.tsx:247
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:183
 #: src/features/settings/components/chat/usage-skill-breakdown.tsx:87
 msgid "Spend"
 msgstr "Spesa"
@@ -31890,11 +31940,11 @@ msgstr ""
 msgid "This connection needs to be renewed."
 msgstr "Questa connessione deve essere rinnovata."
 
-#: src/features/projects/components/project-form-dialog.tsx:326
+#: src/features/projects/components/project-form-dialog.tsx:327
 msgid "This context will be automatically added to each chat in your project. You can include instructions, background information, or any shared knowledge."
 msgstr "Questo contesto verrà aggiunto automaticamente a ogni chat del progetto. Puoi includere istruzioni, informazioni di contesto o qualsiasi conoscenza condivisa."
 
-#: src/features/projects/components/project-form-dialog.tsx:331
+#: src/features/projects/components/project-form-dialog.tsx:332
 msgid "This context will be prepended to the system prompt for all chats in this project."
 msgstr "Questo contesto verrà anteposto al prompt di sistema di tutte le chat di questo progetto."
 
@@ -32418,7 +32468,7 @@ msgid "Threads working on this {requestNoun}"
 msgstr ""
 
 #: src/features/canvas/canvas-panel.tsx:215
-#: src/features/settings/components/chat/usage-settings.tsx:496
+#: src/features/settings/components/chat/usage-settings.tsx:500
 msgid "Threshold"
 msgstr "Soglia"
 
@@ -32465,7 +32515,7 @@ msgid "Timezone updated"
 msgstr "Fuso orario aggiornato"
 
 #: src/features/chat/thread-list/rename-thread-dialog.tsx:148
-#: src/features/projects/components/project-form-dialog.tsx:194
+#: src/features/projects/components/project-form-dialog.tsx:195
 #: src/features/slides/components/slide-editor-dialog.tsx:90
 #: src/features/tasks/components/goal-form-dialog.tsx:88
 #: src/features/tasks/components/task-form-dialog.tsx:219
@@ -32597,15 +32647,17 @@ msgstr "Budget di token"
 msgid "Token Cost Impact"
 msgstr "Impatto sul costo in token"
 
-#: src/features/settings/components/chat/usage-settings.tsx:93
+#: src/features/settings/components/chat/usage-settings.tsx:94
 msgid "Token count"
 msgstr "Numero di token"
 
-#: src/features/settings/components/chat/usage-settings.tsx:299
+#: src/features/settings/components/chat/usage-settings.tsx:300
 msgid "Token usage and cost breakdown per model for the selected period"
 msgstr "Utilizzo dei token e ripartizione dei costi per modello nel periodo selezionato"
 
-#: src/features/settings/components/chat/usage-settings.tsx:318
+#: src/features/projects/components/project-usage-summary.tsx:41
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:182
+#: src/features/settings/components/chat/usage-settings.tsx:319
 #: src/features/settings/components/chat/usage-skill-breakdown.tsx:86
 msgid "Tokens"
 msgstr "Token"
@@ -32753,7 +32805,7 @@ msgstr "Toronto"
 msgid "Total cost"
 msgstr "Costo totale"
 
-#: src/features/settings/components/chat/usage-settings.tsx:274
+#: src/features/settings/components/chat/usage-settings.tsx:275
 #: src/routes/admin/gateway/index.tsx:262
 msgid "Total Cost"
 msgstr "Costo totale"
@@ -32778,7 +32830,7 @@ msgstr "Tieni traccia di tutte le azioni degli admin per la responsabilità"
 msgid "Track every token and dollar."
 msgstr "Tieni traccia di ogni token e di ogni dollaro."
 
-#: src/features/settings/components/chat/usage-settings.tsx:245
+#: src/features/settings/components/chat/usage-settings.tsx:246
 msgid "Track your LLM token usage, cost, and set budget alerts"
 msgstr "Monitora l’utilizzo dei token LLM e i costi, e imposta avvisi di budget"
 
@@ -32906,7 +32958,7 @@ msgstr "Pensiero trasparente per compiti legali, finanziari e tecnici"
 msgid "Triangle"
 msgstr "Triangolo"
 
-#: src/features/settings/components/chat/usage-settings.tsx:425
+#: src/features/settings/components/chat/usage-settings.tsx:429
 msgid "Trigger a notification or block when a usage metric exceeds a threshold"
 msgstr "Invia una notifica o blocca quando una metrica di utilizzo supera una soglia"
 
@@ -33586,7 +33638,7 @@ msgstr "Aggiorna durata"
 msgid "Update failed"
 msgstr "Aggiornamento non riuscito"
 
-#: src/features/projects/components/project-form-dialog.tsx:403
+#: src/features/projects/components/project-form-dialog.tsx:405
 msgid "Update Project"
 msgstr "Aggiorna progetto"
 
@@ -33620,7 +33672,7 @@ msgstr "Aggiorna il ruolo di questo membro"
 msgid "Update your account email address"
 msgstr "Aggiorna l'indirizzo email del tuo account"
 
-#: src/features/projects/components/project-form-dialog.tsx:185
+#: src/features/projects/components/project-form-dialog.tsx:186
 msgid "Update your project details below."
 msgstr "Aggiorna qui sotto i dettagli del progetto."
 
@@ -33892,10 +33944,11 @@ msgstr "USA"
 
 #: src/features/chat/sidebar/usage-card.tsx:117
 #: src/features/layout/lib/dashboard-page-names.ts:41
+#: src/features/projects/components/project-usage-summary.tsx:50
 msgid "Usage"
 msgstr "Utilizzo"
 
-#: src/features/settings/components/chat/usage-settings.tsx:244
+#: src/features/settings/components/chat/usage-settings.tsx:245
 msgid "Usage & Cost"
 msgstr "Utilizzo e costi"
 
@@ -33906,6 +33959,10 @@ msgstr "Analisi dell’utilizzo"
 #: src/features/marketing/components/gateway-landing-page.tsx:57
 msgid "Usage Analytics"
 msgstr "Analisi dell’utilizzo"
+
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:134
+msgid "Usage by project"
+msgstr "Utilizzo per progetto"
 
 #: src/features/settings/components/chat/usage-skill-breakdown.tsx:64
 msgid "Usage by skill"
@@ -35371,6 +35428,10 @@ msgstr "Con quale identità vengono eseguiti i commit di una pull request"
 msgid "Who answers"
 msgstr "Chi risponde"
 
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:144
+msgid "Whose usage"
+msgstr "Utilizzo di chi"
+
 #. placeholder {0}: model.name
 #: src/features/marketing/components/model-detail-page.tsx:175
 msgid "Why {0}"
@@ -36074,6 +36135,10 @@ msgstr ""
 msgid "Your next message will start a self-destructing chat."
 msgstr "Il tuo prossimo messaggio avvierà una chat che si autodistrugge."
 
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:139
+msgid "Your organization's projects, summed over every member, for the selected period"
+msgstr "I progetti della tua organizzazione, sommati su tutti i membri, nel periodo selezionato"
+
 #: src/features/home/components/home-page.tsx:134
 msgid "Your overview could not be loaded."
 msgstr "Impossibile caricare la tua panoramica."
@@ -36101,6 +36166,10 @@ msgstr "Il tuo piano e i tuoi crediti dipendono dal tuo abbonamento."
 #: src/features/skills/components/marketplace-skill-detail-dialog.tsx:162
 msgid "Your rating"
 msgstr "La tua valutazione"
+
+#: src/features/projects/components/project-usage-summary.tsx:51
+msgid "Your replies, tokens and spend in this project over the last 30 days."
+msgstr "Le tue risposte, token e spesa in questo progetto negli ultimi 30 giorni."
 
 #: src/features/develop/components/review-panel.tsx:196
 #: src/features/tasks/components/task-detail-dialog.tsx:90

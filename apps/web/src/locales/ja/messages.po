@@ -14,7 +14,7 @@ msgstr ""
 "Plural-Forms: \n"
 "X-Generator: @lingui/cli\n"
 
-#: src/features/settings/components/chat/usage-settings.tsx:630
+#: src/features/settings/components/chat/usage-settings.tsx:634
 msgid " · model: {modelFilter}"
 msgstr " · モデル: {modelFilter}"
 
@@ -122,7 +122,7 @@ msgstr "（{unfilteredRows} 件から絞り込み）"
 msgid "(maximum reached)"
 msgstr "（上限に達しました）"
 
-#: src/features/settings/components/chat/usage-settings.tsx:498
+#: src/features/settings/components/chat/usage-settings.tsx:502
 msgid "(microdollars; 1,000,000 = $1)"
 msgstr "（マイクロドル単位、1,000,000 = $1）"
 
@@ -146,7 +146,7 @@ msgid "(opens in new tab)"
 msgstr "（新しいタブで開きます）"
 
 #: src/features/settings/components/chat/mcp/server-form.tsx:34
-#: src/features/settings/components/chat/usage-settings.tsx:542
+#: src/features/settings/components/chat/usage-settings.tsx:546
 msgid "(optional)"
 msgstr "（任意）"
 
@@ -1058,15 +1058,15 @@ msgstr ""
 msgid "{maxRounds} rounds"
 msgstr ""
 
-#: src/features/settings/components/chat/usage-settings.tsx:606
+#: src/features/settings/components/chat/usage-settings.tsx:610
 msgid "{metricLabel} > {threshold} per day"
 msgstr "{metricLabel} > 1 日あたり {threshold}"
 
-#: src/features/settings/components/chat/usage-settings.tsx:610
+#: src/features/settings/components/chat/usage-settings.tsx:614
 msgid "{metricLabel} > {threshold} per hour"
 msgstr "{metricLabel} > 1 時間あたり {threshold}"
 
-#: src/features/settings/components/chat/usage-settings.tsx:614
+#: src/features/settings/components/chat/usage-settings.tsx:618
 msgid "{metricLabel} > {threshold} per month"
 msgstr "{metricLabel} > 1 か月あたり {threshold}"
 
@@ -1196,6 +1196,11 @@ msgstr "未解決のコメント {openCount} 件"
 msgid "{overflowCount, plural, one {# more user} other {# more users}}"
 msgstr "{overflowCount, plural, other {ほか # 人のユーザー}}"
 
+#. placeholder {0}: String(percent)
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:205
+msgid "{project}: {0}% of spend"
+msgstr "{project}: 支出の {0}%"
+
 #: src/features/settings/components/chat/api-keys-settings.tsx:495
 msgid "{providerId} API key removed"
 msgstr "{providerId} の API キーを削除しました"
@@ -1220,7 +1225,7 @@ msgstr "{providerName} · ご自身の Bedrock アカウント（{region}）"
 msgid "{refusedLabel} does not have the format this request asks for, so nothing was saved. Enter it again."
 msgstr "{refusedLabel} はこのリクエストの形式に合っていないため、何も保存されませんでした。もう一度入力してください。"
 
-#: src/features/settings/components/chat/usage-settings.tsx:391
+#: src/features/settings/components/chat/usage-settings.tsx:395
 #: src/routes/admin/gateway/index.tsx:67
 msgid "{requestCount} req"
 msgstr "{requestCount} 件"
@@ -1945,7 +1950,7 @@ msgstr "アカウントの削除を開始しました。サインアウトされ
 msgid "Accounts"
 msgstr "アカウント"
 
-#: src/features/settings/components/chat/usage-settings.tsx:515
+#: src/features/settings/components/chat/usage-settings.tsx:519
 msgid "Action"
 msgstr "アクション"
 
@@ -2081,11 +2086,11 @@ msgstr "タグを追加..."
 msgid "Add Account"
 msgstr "アカウントを追加"
 
-#: src/features/settings/components/chat/usage-settings.tsx:415
+#: src/features/settings/components/chat/usage-settings.tsx:419
 msgid "Add Alert"
 msgstr "アラートを追加"
 
-#: src/features/settings/components/chat/usage-settings.tsx:667
+#: src/features/settings/components/chat/usage-settings.tsx:671
 msgid "Add an alert above to be notified when your usage crosses a threshold."
 msgstr "使用量がしきい値を超えたときに通知を受け取るには、上でアラートを追加してください。"
 
@@ -2117,7 +2122,7 @@ msgstr "添付ファイルを追加"
 msgid "Add background"
 msgstr "背景を追加"
 
-#: src/features/settings/components/chat/usage-settings.tsx:413
+#: src/features/settings/components/chat/usage-settings.tsx:417
 msgid "Add budget alert"
 msgstr "予算アラートを追加"
 
@@ -3500,7 +3505,7 @@ msgid "App Secret from your Meta app's App settings > Basic, used to verify X-Hu
 msgstr "Meta アプリの「App settings > Basic」にある App Secret（X-Hub-Signature-256 の検証に使用）"
 
 #: ../../packages/ui/src/components/canvas-editor/canvas-property-panel.tsx:316
-#: src/features/projects/components/project-form-dialog.tsx:232
+#: src/features/projects/components/project-form-dialog.tsx:233
 #: src/features/settings/components/account/account-settings.tsx:178
 #: src/features/settings/lib/settings-keywords.ts:27
 msgid "Appearance"
@@ -4614,7 +4619,7 @@ msgstr "ブロック"
 msgid "Block providers that may use your data for training or collect usage data."
 msgstr "データをトレーニングに利用したり、利用データを収集したりする可能性のあるプロバイダーをブロックします。"
 
-#: src/features/settings/components/chat/usage-settings.tsx:103
+#: src/features/settings/components/chat/usage-settings.tsx:104
 msgid "Block requests"
 msgstr "リクエストをブロック"
 
@@ -4808,7 +4813,7 @@ msgstr "ブラジル"
 msgid "Break down complex tasks into numbered steps with progress tracking. Ideal for multi-step projects and development tasks."
 msgstr "複雑なタスクを番号付きのステップに分解し、進捗を追跡します。多段階のプロジェクトや開発タスクに最適です。"
 
-#: src/features/projects/components/project-form-dialog.tsx:220
+#: src/features/projects/components/project-form-dialog.tsx:221
 msgid "Brief description of this project"
 msgstr "このプロジェクトの簡単な説明"
 
@@ -4920,15 +4925,15 @@ msgstr "低予算"
 msgid "Budget"
 msgstr "低予算"
 
-#: src/features/settings/components/chat/usage-settings.tsx:209
+#: src/features/settings/components/chat/usage-settings.tsx:210
 msgid "Budget alert created"
 msgstr "予算アラートを作成しました"
 
-#: src/features/settings/components/chat/usage-settings.tsx:225
+#: src/features/settings/components/chat/usage-settings.tsx:226
 msgid "Budget alert deleted"
 msgstr "予算アラートを削除しました"
 
-#: src/features/settings/components/chat/usage-settings.tsx:410
+#: src/features/settings/components/chat/usage-settings.tsx:414
 msgid "Budget Alerts"
 msgstr "予算アラート"
 
@@ -5238,7 +5243,7 @@ msgstr "カナダ"
 #: src/features/pages/components/page-agent-dialog.tsx:148
 #: src/features/pages/components/page-comments-panel.tsx:87
 #: src/features/projects/components/move-to-project-dialog.tsx:95
-#: src/features/projects/components/project-form-dialog.tsx:390
+#: src/features/projects/components/project-form-dialog.tsx:392
 #: src/features/prompts/components/prompt-form-dialog.tsx:501
 #: src/features/prompts/components/prompt-optimize-dialog.tsx:194
 #: src/features/prompts/components/variable-fill-dialog.tsx:185
@@ -5249,8 +5254,8 @@ msgstr "カナダ"
 #: src/features/settings/components/chat/rotate-webhook-secret-dialog.tsx:57
 #: src/features/settings/components/chat/system-prompt-preset-settings.tsx:239
 #: src/features/settings/components/chat/trigger-settings.tsx:375
-#: src/features/settings/components/chat/usage-settings.tsx:569
-#: src/features/settings/components/chat/usage-settings.tsx:577
+#: src/features/settings/components/chat/usage-settings.tsx:573
+#: src/features/settings/components/chat/usage-settings.tsx:581
 #: src/features/settings/components/knowledge/knowledge-base-settings.tsx:417
 #: src/features/settings/components/personalization/memory-item.tsx:141
 #: src/features/settings/components/personalization/memory-settings.tsx:246
@@ -6452,7 +6457,7 @@ msgstr "ブラウザーパネルを折りたたむ"
 msgid "Collapse chain of thought"
 msgstr "思考の連鎖を折りたたむ"
 
-#: src/features/settings/components/chat/usage-settings.tsx:353
+#: src/features/settings/components/chat/usage-settings.tsx:357
 msgid "Collapse daily trend"
 msgstr "日別の推移を折りたたむ"
 
@@ -6493,7 +6498,7 @@ msgid "Colombia"
 msgstr "コロンビア"
 
 #: src/features/canvas/canvas-panel.tsx:123
-#: src/features/projects/components/project-form-dialog.tsx:239
+#: src/features/projects/components/project-form-dialog.tsx:240
 msgid "Color"
 msgstr "色"
 
@@ -6800,7 +6805,7 @@ msgstr "完了"
 msgid "Completing the connection..."
 msgstr "接続を完了しています..."
 
-#: src/features/settings/components/chat/usage-settings.tsx:284
+#: src/features/settings/components/chat/usage-settings.tsx:285
 msgid "Completion Tokens"
 msgstr "出力トークン"
 
@@ -6930,7 +6935,7 @@ msgstr "タスク実行を強化する高度な AI エージェントモジュ�
 msgid "Configure chat behavior and preferences."
 msgstr "チャットの動作と設定を構成します。"
 
-#: src/features/projects/components/project-form-dialog.tsx:343
+#: src/features/projects/components/project-form-dialog.tsx:344
 msgid "Configure default model, reasoning effort, and features for new chats created in this project."
 msgstr "このプロジェクトで作成する新しいチャットの既定のモデル、推論レベル、機能を設定します。"
 
@@ -7366,7 +7371,7 @@ msgstr "コンテンツスライド"
 msgid "Context"
 msgstr "コンテキスト"
 
-#: src/features/projects/components/project-form-dialog.tsx:317
+#: src/features/projects/components/project-form-dialog.tsx:318
 msgid "Context / Instructions"
 msgstr "コンテキスト / 指示"
 
@@ -7756,7 +7761,7 @@ msgstr "角の半径"
 #: src/features/evals/components/model-comparison.tsx:115
 #: src/features/evals/components/run-comparison.tsx:131
 #: src/features/evals/components/run-detail.tsx:226
-#: src/features/settings/components/chat/usage-settings.tsx:319
+#: src/features/settings/components/chat/usage-settings.tsx:320
 #: src/routes/admin/gateway/index.tsx:92
 msgid "Cost"
 msgstr "コスト"
@@ -7765,7 +7770,7 @@ msgstr "コスト"
 msgid "Cost {display}"
 msgstr "コスト {display}"
 
-#: src/features/settings/components/chat/usage-settings.tsx:297
+#: src/features/settings/components/chat/usage-settings.tsx:298
 msgid "Cost by Model"
 msgstr "モデル別のコスト"
 
@@ -7996,6 +8001,10 @@ msgstr "マーケットプレイスを読み込めませんでした。しばら
 msgid "Could not load the memories."
 msgstr "メモリを読み込めませんでした。"
 
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:172
+msgid "Could not load the project breakdown."
+msgstr "プロジェクト別の内訳を読み込めませんでした。"
+
 #: src/features/settings/components/chat/usage-skill-breakdown.tsx:76
 msgid "Could not load the skill breakdown."
 msgstr "スキル別の内訳を読み込めませんでした。"
@@ -8007,6 +8016,10 @@ msgstr ""
 #: src/features/develop/components/failure-notice.tsx:17
 msgid "Could not load this"
 msgstr ""
+
+#: src/features/projects/components/project-usage-summary.tsx:58
+msgid "Could not load this project's usage."
+msgstr "このプロジェクトの使用状況を読み込めませんでした。"
 
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:139
 msgid "Could not load tools: {error}"
@@ -8221,6 +8234,10 @@ msgstr "参加者を更新できませんでした"
 msgid "country"
 msgstr ""
 
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:227
+msgid "Counts usage recorded since organization reporting started. Members' own projects count under No project."
+msgstr "組織レポートの開始以降に記録された使用状況を集計します。メンバー自身のプロジェクトは「プロジェクトなし」に含まれます。"
+
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:254
 msgid "Covers only tools from MCP servers and connectors you trust for auto-approval (a switch on each server in your MCP settings and on each connector), left at their default Ask, in chats only you can write to. A trusted server's tool descriptions reach the model and can influence what is approved, so trust only servers you would let act for you. Changing a server's address ends its trust."
 msgstr ""
@@ -8280,7 +8297,7 @@ msgstr "このメッセージから新しいブランチを作成します。後
 msgid "Create a new organization to collaborate with your team"
 msgstr "チームで共同作業するための新しい組織を作成します"
 
-#: src/features/projects/components/project-form-dialog.tsx:185
+#: src/features/projects/components/project-form-dialog.tsx:186
 msgid "Create a new project to group related chats with shared context."
 msgstr "関連するチャットを共有コンテキストでまとめる新しいプロジェクトを作成します。"
 
@@ -8416,8 +8433,8 @@ msgstr "PR を作成"
 msgid "Create project"
 msgstr "プロジェクトを作成"
 
-#: src/features/projects/components/project-form-dialog.tsx:183
-#: src/features/projects/components/project-form-dialog.tsx:403
+#: src/features/projects/components/project-form-dialog.tsx:184
+#: src/features/projects/components/project-form-dialog.tsx:405
 msgid "Create Project"
 msgstr "プロジェクトを作成"
 
@@ -8785,7 +8802,7 @@ msgstr "よく使う操作のキーボードショートカットをカスタマ
 msgid "Customize the appearance of the application."
 msgstr "アプリケーションの外観をカスタマイズします。"
 
-#: src/features/projects/components/project-form-dialog.tsx:233
+#: src/features/projects/components/project-form-dialog.tsx:234
 msgid "Customize the visual appearance of this project."
 msgstr "このプロジェクトの見た目をカスタマイズします。"
 
@@ -8843,11 +8860,11 @@ msgstr "Daily Brief をオフにしました"
 msgid "Daily Brief turned on"
 msgstr "Daily Brief をオンにしました"
 
-#: src/features/settings/components/chat/usage-settings.tsx:90
+#: src/features/settings/components/chat/usage-settings.tsx:91
 msgid "Daily cost (microdollars)"
 msgstr "1 日あたりのコスト（マイクロドル）"
 
-#: src/features/settings/components/chat/usage-settings.tsx:347
+#: src/features/settings/components/chat/usage-settings.tsx:351
 msgid "Daily Cost Trend"
 msgstr "日別コストの推移"
 
@@ -8859,7 +8876,7 @@ msgstr "毎日の受信トレイの要約"
 msgid "Daily LLM spend and request volume"
 msgstr "1 日あたりの LLM 支出とリクエスト数"
 
-#: src/features/settings/components/chat/usage-settings.tsx:349
+#: src/features/settings/components/chat/usage-settings.tsx:353
 msgid "Daily spend and request volume"
 msgstr "1 日あたりの支出とリクエスト数"
 
@@ -8960,7 +8977,7 @@ msgstr "日付"
 msgid "Date and time"
 msgstr "日付と時刻"
 
-#: src/features/settings/components/chat/usage-settings.tsx:97
+#: src/features/settings/components/chat/usage-settings.tsx:98
 msgid "Day"
 msgstr "日"
 
@@ -9100,7 +9117,7 @@ msgstr "既定のエージェント"
 msgid "Default AI Response Language"
 msgstr "AI の既定の応答言語"
 
-#: src/features/projects/components/project-form-dialog.tsx:341
+#: src/features/projects/components/project-form-dialog.tsx:342
 msgid "Default AI Settings"
 msgstr "既定の AI 設定"
 
@@ -9129,7 +9146,7 @@ msgstr "既定の言語を更新しました"
 msgid "default model"
 msgstr ""
 
-#: src/features/projects/components/project-form-dialog.tsx:351
+#: src/features/projects/components/project-form-dialog.tsx:352
 msgid "Default Model"
 msgstr "既定のモデル"
 
@@ -9303,7 +9320,7 @@ msgstr "{title} を削除"
 msgid "Delete Account"
 msgstr "アカウントを削除"
 
-#: src/features/settings/components/chat/usage-settings.tsx:641
+#: src/features/settings/components/chat/usage-settings.tsx:645
 msgid "Delete alert \"{ruleName}\""
 msgstr "アラート「{ruleName}」を削除"
 
@@ -9713,7 +9730,7 @@ msgstr "ワークフローを説明してください...例：「テキストか
 #: src/features/develop/components/pull-request-view.tsx:72
 #: src/features/evals/components/dataset-form-dialog.tsx:102
 #: src/features/knowledge/components/collection-dialog.tsx:69
-#: src/features/projects/components/project-form-dialog.tsx:213
+#: src/features/projects/components/project-form-dialog.tsx:214
 #: src/features/prompts/components/prompt-form-dialog.tsx:266
 #: src/features/prompts/components/prompt-list-view.tsx:117
 #: src/features/prompts/components/prompt-list-view.tsx:120
@@ -10466,7 +10483,7 @@ msgstr "ダイナミックな動き"
 msgid "Dyslexia-friendly"
 msgstr ""
 
-#: src/features/settings/components/chat/usage-settings.tsx:551
+#: src/features/settings/components/chat/usage-settings.tsx:555
 msgid "e.g. claude-opus-4 (leave blank for all models)"
 msgstr "例: claude-opus-4（すべてのモデルが対象の場合は空欄）"
 
@@ -10486,7 +10503,7 @@ msgstr "例：少なくとも 5 つの情報源を、それぞれリンク付き
 msgid "e.g. Make the output a table and drop web search"
 msgstr "例：出力を表形式にして、Web 検索をやめる"
 
-#: src/features/settings/components/chat/usage-settings.tsx:438
+#: src/features/settings/components/chat/usage-settings.tsx:442
 msgid "e.g. Monthly $10 limit"
 msgstr "例: 月額 $10 の上限"
 
@@ -10514,7 +10531,7 @@ msgstr "例：仕事"
 msgid "e.g., Emphasize concise outputs, target a beginner audience..."
 msgstr "例：簡潔な出力を重視する、初心者向けにする..."
 
-#: src/features/projects/components/project-form-dialog.tsx:201
+#: src/features/projects/components/project-form-dialog.tsx:202
 msgid "e.g., Financial Planning"
 msgstr "例：資産計画"
 
@@ -10731,7 +10748,7 @@ msgstr "編集モード"
 msgid "Edit preset"
 msgstr "プリセットを編集"
 
-#: src/features/projects/components/project-form-dialog.tsx:183
+#: src/features/projects/components/project-form-dialog.tsx:184
 msgid "Edit Project"
 msgstr "プロジェクトを編集"
 
@@ -11938,7 +11955,7 @@ msgstr "キャンバスを拡張"
 msgid "Expand chain of thought"
 msgstr "思考の連鎖を展開"
 
-#: src/features/settings/components/chat/usage-settings.tsx:353
+#: src/features/settings/components/chat/usage-settings.tsx:357
 msgid "Expand daily trend"
 msgstr "日別の推移を展開"
 
@@ -12394,7 +12411,7 @@ msgstr "API キーを作成できませんでした"
 msgid "Failed to create branch"
 msgstr "ブランチを作成できませんでした"
 
-#: src/features/settings/components/chat/usage-settings.tsx:214
+#: src/features/settings/components/chat/usage-settings.tsx:215
 msgid "Failed to create budget alert"
 msgstr "予算アラートを作成できませんでした"
 
@@ -12426,7 +12443,7 @@ msgstr "削除できませんでした"
 msgid "Failed to delete {fileName}"
 msgstr "{fileName} を削除できませんでした"
 
-#: src/features/settings/components/chat/usage-settings.tsx:228
+#: src/features/settings/components/chat/usage-settings.tsx:229
 msgid "Failed to delete budget alert"
 msgstr "予算アラートを削除できませんでした"
 
@@ -12622,7 +12639,7 @@ msgstr "スキルを読み込めませんでした"
 msgid "Failed to load spreadsheet"
 msgstr "スプレッドシートを読み込めませんでした"
 
-#: src/features/settings/components/chat/usage-settings.tsx:264
+#: src/features/settings/components/chat/usage-settings.tsx:265
 msgid "Failed to load usage data. Ensure the LLM Gateway is running and reachable."
 msgstr "使用量データを読み込めませんでした。LLM Gateway が起動していて到達可能であることを確認してください。"
 
@@ -14625,7 +14642,7 @@ msgstr "API キーを取得"
 msgid "Get cited, multi-step analysis in minutes. Deep Research reads sources so you don't have to."
 msgstr "出典付きの多段階分析が数分で手に入ります。ディープリサーチがあなたの代わりにソースを読み込みます。"
 
-#: src/features/settings/components/chat/usage-settings.tsx:411
+#: src/features/settings/components/chat/usage-settings.tsx:415
 msgid "Get notified or block requests when usage thresholds are reached"
 msgstr "使用量がしきい値に達したときに通知を受け取るか、リクエストをブロックします"
 
@@ -15638,7 +15655,7 @@ msgstr ""
 msgid "hotkey"
 msgstr ""
 
-#: src/features/settings/components/chat/usage-settings.tsx:98
+#: src/features/settings/components/chat/usage-settings.tsx:99
 msgid "Hour"
 msgstr "時間"
 
@@ -15773,7 +15790,7 @@ msgstr "アイスランド語"
 msgid "Icelandic (Iceland)"
 msgstr "アイスランド語（アイスランド）"
 
-#: src/features/projects/components/project-form-dialog.tsx:274
+#: src/features/projects/components/project-form-dialog.tsx:275
 msgid "Icon"
 msgstr "アイコン"
 
@@ -17243,17 +17260,17 @@ msgstr "大判ポスター"
 msgid "Last 24h"
 msgstr "過去 24 時間"
 
-#: src/features/settings/components/chat/usage-settings.tsx:254
+#: src/features/settings/components/chat/usage-settings.tsx:255
 msgid "Last 30 days"
 msgstr "過去 30 日間"
 
 #: src/features/chat/thread-list/hooks/use-thread-groups.ts:583
-#: src/features/settings/components/chat/usage-settings.tsx:253
+#: src/features/settings/components/chat/usage-settings.tsx:254
 #: src/routes/admin/gateway/index.tsx:234
 msgid "Last 7 days"
 msgstr "過去 7 日間"
 
-#: src/features/settings/components/chat/usage-settings.tsx:255
+#: src/features/settings/components/chat/usage-settings.tsx:256
 msgid "Last 90 days"
 msgstr "過去 90 日間"
 
@@ -17317,7 +17334,7 @@ msgstr "最後にスキップされた実行"
 msgid "Last slide"
 msgstr "最後のスライド"
 
-#: src/features/settings/components/chat/usage-settings.tsx:635
+#: src/features/settings/components/chat/usage-settings.tsx:639
 msgid "Last triggered: {lastTriggeredAt}"
 msgstr "最終トリガー: {lastTriggeredAt}"
 
@@ -18110,6 +18127,11 @@ msgstr ""
 #: src/features/settings/components/chat/trigger-settings.tsx:707
 msgid "Loading triggers..."
 msgstr "トリガーを読み込んでいます..."
+
+#: src/features/projects/components/project-usage-summary.tsx:55
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:166
+msgid "Loading usage…"
+msgstr "使用状況を読み込み中…"
 
 #: src/routes/(chat)/workflow/$workflowId.tsx:47
 #: src/routes/(chat)/workflow/shared/$token.tsx:32
@@ -19131,7 +19153,7 @@ msgid "Meta's well-established and widely-deployed model"
 msgstr "実績があり広く導入されている Meta のモデル"
 
 #: src/features/evals/components/run-comparison.tsx:102
-#: src/features/settings/components/chat/usage-settings.tsx:445
+#: src/features/settings/components/chat/usage-settings.tsx:449
 msgid "Metric"
 msgstr "指標"
 
@@ -19163,6 +19185,7 @@ msgid "Min"
 msgstr "Min"
 
 #: src/features/develop/components/inbox-list.tsx:51
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:157
 msgid "Mine"
 msgstr ""
 
@@ -19370,7 +19393,7 @@ msgstr "モード:"
 #: src/features/evals/components/run-dialog.tsx:212
 #: src/features/prompts/components/prompt-form-dialog.tsx:387
 #: src/features/settings/components/chat/bots-settings.tsx:135
-#: src/features/settings/components/chat/usage-settings.tsx:316
+#: src/features/settings/components/chat/usage-settings.tsx:317
 #: src/features/tasks/components/task-form-dialog.tsx:388
 #: src/features/workflow/components/nodes/ai-node.tsx:34
 #: src/features/workflow/components/nodes/background-removal-node.tsx:63
@@ -19418,7 +19441,7 @@ msgstr "モデルを無効にしました"
 msgid "Model enabled"
 msgstr "モデルを有効にしました"
 
-#: src/features/settings/components/chat/usage-settings.tsx:541
+#: src/features/settings/components/chat/usage-settings.tsx:545
 msgid "Model filter"
 msgstr "モデルフィルター"
 
@@ -19562,7 +19585,7 @@ msgid "Monospace"
 msgstr ""
 
 #: src/features/settings/components/chat/usage-activity-heatmap.tsx:244
-#: src/features/settings/components/chat/usage-settings.tsx:99
+#: src/features/settings/components/chat/usage-settings.tsx:100
 msgid "Month"
 msgstr "月"
 
@@ -19570,7 +19593,7 @@ msgstr "月"
 msgid "Monthly"
 msgstr "月間"
 
-#: src/features/settings/components/chat/usage-settings.tsx:91
+#: src/features/settings/components/chat/usage-settings.tsx:92
 msgid "Monthly cost (microdollars)"
 msgstr "月間コスト (マイクロドル)"
 
@@ -19957,7 +19980,7 @@ msgstr ""
 #: src/features/settings/components/chat/native-providers-settings.tsx:507
 #: src/features/settings/components/chat/system-prompt-preset-settings.tsx:154
 #: src/features/settings/components/chat/trigger-settings.tsx:214
-#: src/features/settings/components/chat/usage-settings.tsx:429
+#: src/features/settings/components/chat/usage-settings.tsx:433
 #: src/features/skills/components/skill-builder-diff.tsx:32
 #: src/features/skills/components/skill-builder-review.tsx:136
 #: src/features/skills/components/skill-form-dialog.tsx:201
@@ -20315,7 +20338,7 @@ msgstr ""
 msgid "New Branch"
 msgstr "新しいブランチ"
 
-#: src/features/settings/components/chat/usage-settings.tsx:424
+#: src/features/settings/components/chat/usage-settings.tsx:428
 msgid "New Budget Alert"
 msgstr "新しい予算アラート"
 
@@ -20659,7 +20682,7 @@ msgstr ""
 msgid "No bots yet."
 msgstr ""
 
-#: src/features/settings/components/chat/usage-settings.tsx:666
+#: src/features/settings/components/chat/usage-settings.tsx:670
 msgid "No budget alerts configured."
 msgstr "予算アラートが設定されていません。"
 
@@ -20739,7 +20762,7 @@ msgstr "この期間のコストデータはありません。"
 msgid "No custom endpoints yet."
 msgstr "カスタムエンドポイントはまだありません。"
 
-#: src/features/settings/components/chat/usage-settings.tsx:398
+#: src/features/settings/components/chat/usage-settings.tsx:402
 msgid "No daily data for this period."
 msgstr "この期間の日別データはありません。"
 
@@ -20993,6 +21016,8 @@ msgstr ""
 msgid "No progress: {0}"
 msgstr ""
 
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:109
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:119
 #: src/features/tasks/components/task-form-dialog.tsx:411
 #: src/features/tasks/components/task-form-dialog.tsx:423
 msgid "No project"
@@ -21048,6 +21073,7 @@ msgstr "参照が選択されていません"
 msgid "No remote MCP servers match your search."
 msgstr "検索に一致するリモート MCP サーバーはありません。"
 
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:174
 #: src/features/settings/components/chat/usage-skill-breakdown.tsx:78
 msgid "No replies recorded for this period."
 msgstr "この期間に記録された返信はありません。"
@@ -21214,7 +21240,7 @@ msgstr "未読の通知はありません。"
 msgid "No updates yet."
 msgstr "更新はまだありません。"
 
-#: src/features/settings/components/chat/usage-settings.tsx:310
+#: src/features/settings/components/chat/usage-settings.tsx:311
 #: src/routes/admin/gateway/index.tsx:125
 msgid "No usage data for this period."
 msgstr "この期間の使用量データはありません。"
@@ -21510,11 +21536,11 @@ msgstr "このサイトの通知はブラウザーでブロックされていま
 msgid "Notifications, {badge} unread"
 msgstr "通知、未読 {badge} 件"
 
-#: src/features/settings/components/chat/usage-settings.tsx:105
+#: src/features/settings/components/chat/usage-settings.tsx:106
 msgid "Notify + block"
 msgstr "通知 + ブロック"
 
-#: src/features/settings/components/chat/usage-settings.tsx:104
+#: src/features/settings/components/chat/usage-settings.tsx:105
 msgid "Notify only"
 msgstr "通知のみ"
 
@@ -21841,6 +21867,11 @@ msgstr "一方の実行のみ"
 #: src/features/auth/components/organization/billing-settings-card.tsx:136
 msgid "Only organization owners can manage billing settings"
 msgstr "請求設定を管理できるのは組織のオーナーのみです"
+
+#: src/features/projects/components/project-usage-summary.tsx:69
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:221
+msgid "Only part of this period is included."
+msgstr "この期間の一部のみが含まれています。"
 
 #: src/features/chat/group/group-mode.ts:66
 msgid "Only participants you @mention answer."
@@ -22649,6 +22680,7 @@ msgstr ""
 #: src/features/auth/components/organization/organization-logo.tsx:62
 #: src/features/auth/components/organization/organization-view.tsx:64
 #: src/features/layout/lib/dashboard-page-names.ts:32
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:158
 #: src/features/settings/lib/settings-navigation.ts:108
 #: src/features/skills/components/skill-form-dialog.tsx:476
 #: src/features/skills/components/skill-item.tsx:129
@@ -23302,7 +23334,7 @@ msgstr "完璧な肌のトーン、高級ドラマ"
 msgid "Performance comparable to Mistral Small 24B"
 msgstr "Mistral Small 24B に匹敵する性能"
 
-#: src/features/settings/components/chat/usage-settings.tsx:469
+#: src/features/settings/components/chat/usage-settings.tsx:473
 msgid "Period"
 msgstr "期間"
 
@@ -24364,6 +24396,7 @@ msgstr "進捗"
 msgid "Progress of {toolName}"
 msgstr ""
 
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:180
 #: src/features/tasks/components/task-form-dialog.tsx:408
 msgid "Project"
 msgstr "プロジェクト"
@@ -24372,9 +24405,13 @@ msgstr "プロジェクト"
 msgid "Project actions"
 msgstr "プロジェクトの操作"
 
-#: src/features/projects/components/project-form-dialog.tsx:322
+#: src/features/projects/components/project-form-dialog.tsx:323
 msgid "Project Context"
 msgstr "プロジェクトのコンテキスト"
+
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:105
+msgid "Project no longer available"
+msgstr "プロジェクトは利用できなくなりました"
 
 #: src/features/chat/thread-list/hooks/use-thread-groups.ts:548
 msgid "Projects"
@@ -24483,7 +24520,7 @@ msgstr "プロンプトを最適化しました"
 msgid "Prompt to run on all models..."
 msgstr "すべてのモデルで実行するプロンプト..."
 
-#: src/features/settings/components/chat/usage-settings.tsx:279
+#: src/features/settings/components/chat/usage-settings.tsx:280
 msgid "Prompt Tokens"
 msgstr "プロンプトトークン"
 
@@ -25626,8 +25663,8 @@ msgstr "サインイン状態を保持"
 #: src/features/chat/thread/composer-input.tsx:410
 #: src/features/devices/components/devices-settings.tsx:206
 #: src/features/devices/components/devices-settings.tsx:212
-#: src/features/projects/components/project-form-dialog.tsx:263
-#: src/features/projects/components/project-form-dialog.tsx:304
+#: src/features/projects/components/project-form-dialog.tsx:264
+#: src/features/projects/components/project-form-dialog.tsx:305
 #: src/features/settings/components/chat/custom-providers-settings.tsx:652
 #: src/features/settings/components/chat/favorite-models-settings.tsx:186
 #: src/features/settings/components/chat/native-providers-settings.tsx:723
@@ -25942,8 +25979,10 @@ msgid "Replay the welcome tour to review the core features of Neore."
 msgstr "ウェルカムツアーを再生して、Neore の主な機能を確認します。"
 
 #: src/features/chat/header/thread-stats-dialog.tsx:71
+#: src/features/projects/components/project-usage-summary.tsx:39
 #: src/features/settings/components/chat/usage-activity-heatmap.tsx:144
 #: src/features/settings/components/chat/usage-activity-heatmap.tsx:246
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:181
 #: src/features/settings/components/chat/usage-skill-breakdown.tsx:85
 msgid "Replies"
 msgstr "返信"
@@ -25971,6 +26010,10 @@ msgstr "返信が読み上げられます"
 #: src/features/settings/components/account/account-settings.tsx:437
 msgid "Replies will no longer be read aloud"
 msgstr "返信は読み上げられなくなります"
+
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:138
+msgid "Replies, tokens and spend per project for the selected period"
+msgstr "選択した期間のプロジェクトごとの返信、トークン、支出"
 
 #: src/features/settings/components/chat/usage-skill-breakdown.tsx:66
 msgid "Replies, tokens and spend per skill or agent for the selected period"
@@ -26008,7 +26051,7 @@ msgstr ""
 msgid "Request changes"
 msgstr ""
 
-#: src/features/settings/components/chat/usage-settings.tsx:92
+#: src/features/settings/components/chat/usage-settings.tsx:93
 msgid "Request count"
 msgstr "リクエスト数"
 
@@ -26037,8 +26080,8 @@ msgstr "要求された権限"
 msgid "Requesting..."
 msgstr "リクエストしています..."
 
-#: src/features/settings/components/chat/usage-settings.tsx:271
-#: src/features/settings/components/chat/usage-settings.tsx:317
+#: src/features/settings/components/chat/usage-settings.tsx:272
+#: src/features/settings/components/chat/usage-settings.tsx:318
 #: src/routes/admin/gateway/index.tsx:89
 #: src/routes/admin/gateway/index.tsx:256
 msgid "Requests"
@@ -26605,7 +26648,7 @@ msgstr ""
 msgid "Rubric"
 msgstr "ルーブリック"
 
-#: src/features/settings/components/chat/usage-settings.tsx:191
+#: src/features/settings/components/chat/usage-settings.tsx:192
 msgid "Rule name is required"
 msgstr "ルール名は必須です"
 
@@ -26876,7 +26919,7 @@ msgstr "保存して閉じる"
 msgid "Save 25%"
 msgstr "25% お得"
 
-#: src/features/settings/components/chat/usage-settings.tsx:566
+#: src/features/settings/components/chat/usage-settings.tsx:570
 msgid "Save Alert"
 msgstr "アラートを保存"
 
@@ -26897,7 +26940,7 @@ msgstr "プリセットとして保存"
 msgid "Save blocked websites"
 msgstr ""
 
-#: src/features/settings/components/chat/usage-settings.tsx:558
+#: src/features/settings/components/chat/usage-settings.tsx:562
 msgid "Save budget alert"
 msgstr "予算アラートを保存"
 
@@ -26986,7 +27029,7 @@ msgstr "「{0}」に保存しました"
 
 #: src/features/auth/components/team/team-settings-dialog.tsx:215
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:394
-#: src/features/projects/components/project-form-dialog.tsx:407
+#: src/features/projects/components/project-form-dialog.tsx:409
 #: src/features/prompts/components/prompt-form-dialog.tsx:521
 #: src/features/prompts/components/thread-variables-config.tsx:258
 #: src/features/settings/components/chat/api-keys-settings.tsx:436
@@ -27482,8 +27525,8 @@ msgid "Select all cells"
 msgstr "すべてのセルを選択"
 
 #: ../../packages/ui/src/components/icon-picker.tsx:431
-#: src/features/projects/components/project-form-dialog.tsx:286
-#: src/features/projects/components/project-form-dialog.tsx:299
+#: src/features/projects/components/project-form-dialog.tsx:287
+#: src/features/projects/components/project-form-dialog.tsx:300
 msgid "Select an icon"
 msgstr "アイコンを選択"
 
@@ -28010,6 +28053,7 @@ msgstr "図形"
 msgid "Share"
 msgstr "共有"
 
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:185
 #: src/features/settings/components/chat/usage-skill-breakdown.tsx:89
 msgid "Share of spend"
 msgstr "支出の割合"
@@ -28847,6 +28891,10 @@ msgstr "ほとんどのタスクで堅実な性能"
 msgid "Some images from this run could not be saved."
 msgstr "この実行の一部の画像を保存できませんでした。"
 
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:223
+msgid "Some of the organization's projects with no usage are not listed."
+msgstr "使用状況のない組織のプロジェクトの一部は表示されていません。"
+
 #: src/features/chat/thread/message-cost-badge.tsx:80
 msgid "Some steps had no pricing data; the total is a minimum."
 msgstr "一部のステップに料金データがありませんでした。合計は最小値です。"
@@ -29119,8 +29167,10 @@ msgstr "速度"
 msgid "Speed tier of Nano Banana 2 for fast text-to-image generation"
 msgstr "高速なテキストから画像への生成に向けた Nano Banana 2 の高速ティア"
 
+#: src/features/projects/components/project-usage-summary.tsx:44
 #: src/features/settings/components/chat/usage-activity-heatmap.tsx:145
 #: src/features/settings/components/chat/usage-activity-heatmap.tsx:247
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:183
 #: src/features/settings/components/chat/usage-skill-breakdown.tsx:87
 msgid "Spend"
 msgstr "支出"
@@ -31890,11 +31940,11 @@ msgstr ""
 msgid "This connection needs to be renewed."
 msgstr "この接続は更新が必要です。"
 
-#: src/features/projects/components/project-form-dialog.tsx:326
+#: src/features/projects/components/project-form-dialog.tsx:327
 msgid "This context will be automatically added to each chat in your project. You can include instructions, background information, or any shared knowledge."
 msgstr "このコンテキストは、プロジェクト内の各チャットに自動的に追加されます。指示、背景情報、共有の知識などを含めることができます。"
 
-#: src/features/projects/components/project-form-dialog.tsx:331
+#: src/features/projects/components/project-form-dialog.tsx:332
 msgid "This context will be prepended to the system prompt for all chats in this project."
 msgstr "このコンテキストは、このプロジェクトのすべてのチャットでシステムプロンプトの先頭に追加されます。"
 
@@ -32418,7 +32468,7 @@ msgid "Threads working on this {requestNoun}"
 msgstr ""
 
 #: src/features/canvas/canvas-panel.tsx:215
-#: src/features/settings/components/chat/usage-settings.tsx:496
+#: src/features/settings/components/chat/usage-settings.tsx:500
 msgid "Threshold"
 msgstr "しきい値"
 
@@ -32465,7 +32515,7 @@ msgid "Timezone updated"
 msgstr "タイムゾーンを更新しました"
 
 #: src/features/chat/thread-list/rename-thread-dialog.tsx:148
-#: src/features/projects/components/project-form-dialog.tsx:194
+#: src/features/projects/components/project-form-dialog.tsx:195
 #: src/features/slides/components/slide-editor-dialog.tsx:90
 #: src/features/tasks/components/goal-form-dialog.tsx:88
 #: src/features/tasks/components/task-form-dialog.tsx:219
@@ -32597,15 +32647,17 @@ msgstr "トークン予算"
 msgid "Token Cost Impact"
 msgstr "トークンコストへの影響"
 
-#: src/features/settings/components/chat/usage-settings.tsx:93
+#: src/features/settings/components/chat/usage-settings.tsx:94
 msgid "Token count"
 msgstr "トークン数"
 
-#: src/features/settings/components/chat/usage-settings.tsx:299
+#: src/features/settings/components/chat/usage-settings.tsx:300
 msgid "Token usage and cost breakdown per model for the selected period"
 msgstr "選択した期間のモデル別トークン使用量とコストの内訳"
 
-#: src/features/settings/components/chat/usage-settings.tsx:318
+#: src/features/projects/components/project-usage-summary.tsx:41
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:182
+#: src/features/settings/components/chat/usage-settings.tsx:319
 #: src/features/settings/components/chat/usage-skill-breakdown.tsx:86
 msgid "Tokens"
 msgstr "トークン"
@@ -32753,7 +32805,7 @@ msgstr "トロント"
 msgid "Total cost"
 msgstr "合計コスト"
 
-#: src/features/settings/components/chat/usage-settings.tsx:274
+#: src/features/settings/components/chat/usage-settings.tsx:275
 #: src/routes/admin/gateway/index.tsx:262
 msgid "Total Cost"
 msgstr "合計コスト"
@@ -32778,7 +32830,7 @@ msgstr "説明責任のため、すべての管理者の操作を記録します
 msgid "Track every token and dollar."
 msgstr "すべてのトークンと費用を追跡。"
 
-#: src/features/settings/components/chat/usage-settings.tsx:245
+#: src/features/settings/components/chat/usage-settings.tsx:246
 msgid "Track your LLM token usage, cost, and set budget alerts"
 msgstr "LLM のトークン使用量とコストを追跡し、予算アラートを設定します"
 
@@ -32906,7 +32958,7 @@ msgstr "法務、財務、技術タスクのための透明な思考"
 msgid "Triangle"
 msgstr "三角形"
 
-#: src/features/settings/components/chat/usage-settings.tsx:425
+#: src/features/settings/components/chat/usage-settings.tsx:429
 msgid "Trigger a notification or block when a usage metric exceeds a threshold"
 msgstr "使用量の指標がしきい値を超えたときに通知またはブロックします"
 
@@ -33586,7 +33638,7 @@ msgstr "期間を更新"
 msgid "Update failed"
 msgstr "更新に失敗しました"
 
-#: src/features/projects/components/project-form-dialog.tsx:403
+#: src/features/projects/components/project-form-dialog.tsx:405
 msgid "Update Project"
 msgstr "プロジェクトを更新"
 
@@ -33620,7 +33672,7 @@ msgstr "このメンバーのロールを更新します"
 msgid "Update your account email address"
 msgstr "アカウントのメールアドレスを更新します"
 
-#: src/features/projects/components/project-form-dialog.tsx:185
+#: src/features/projects/components/project-form-dialog.tsx:186
 msgid "Update your project details below."
 msgstr "以下でプロジェクトの詳細を更新してください。"
 
@@ -33892,10 +33944,11 @@ msgstr "米国"
 
 #: src/features/chat/sidebar/usage-card.tsx:117
 #: src/features/layout/lib/dashboard-page-names.ts:41
+#: src/features/projects/components/project-usage-summary.tsx:50
 msgid "Usage"
 msgstr "使用量"
 
-#: src/features/settings/components/chat/usage-settings.tsx:244
+#: src/features/settings/components/chat/usage-settings.tsx:245
 msgid "Usage & Cost"
 msgstr "使用量とコスト"
 
@@ -33906,6 +33959,10 @@ msgstr "使用状況の分析"
 #: src/features/marketing/components/gateway-landing-page.tsx:57
 msgid "Usage Analytics"
 msgstr "使用状況の分析"
+
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:134
+msgid "Usage by project"
+msgstr "プロジェクト別の使用状況"
 
 #: src/features/settings/components/chat/usage-skill-breakdown.tsx:64
 msgid "Usage by skill"
@@ -35371,6 +35428,10 @@ msgstr "プルリクエストのコミットの作成者"
 msgid "Who answers"
 msgstr "回答者"
 
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:144
+msgid "Whose usage"
+msgstr "誰の使用状況か"
+
 #. placeholder {0}: model.name
 #: src/features/marketing/components/model-detail-page.tsx:175
 msgid "Why {0}"
@@ -36074,6 +36135,10 @@ msgstr ""
 msgid "Your next message will start a self-destructing chat."
 msgstr "次のメッセージから自動で消えるチャットが始まります。"
 
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:139
+msgid "Your organization's projects, summed over every member, for the selected period"
+msgstr "選択した期間の、全メンバーを合計した組織のプロジェクト"
+
 #: src/features/home/components/home-page.tsx:134
 msgid "Your overview could not be loaded."
 msgstr "概要を読み込めませんでした。"
@@ -36101,6 +36166,10 @@ msgstr "プランとクレジット枠はサブスクリプションに応じて
 #: src/features/skills/components/marketplace-skill-detail-dialog.tsx:162
 msgid "Your rating"
 msgstr "あなたの評価"
+
+#: src/features/projects/components/project-usage-summary.tsx:51
+msgid "Your replies, tokens and spend in this project over the last 30 days."
+msgstr "過去30日間のこのプロジェクトでのあなたの返信、トークン、支出。"
 
 #: src/features/develop/components/review-panel.tsx:196
 #: src/features/tasks/components/task-detail-dialog.tsx:90

@@ -49,7 +49,7 @@ export type OrganizationLookup = "exists" | "missing" | "unreadable";
 /** A policy row goes only when its organization was read and is not there. */
 export const shouldDeleteOrphanedPolicy = (lookup: OrganizationLookup): boolean => lookup === "missing";
 
-const lookUpOrganization = async (db: MutationCtx["db"], organizationId: string): Promise<OrganizationLookup> => {
+export const lookUpOrganization = async (db: MutationCtx["db"], organizationId: string): Promise<OrganizationLookup> => {
     try {
         const organization = await db.organization.findFirst({ where: { _id: db.asId("organization", organizationId) } });
 

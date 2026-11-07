@@ -70,6 +70,8 @@ export const GLOBAL_USER_COLUMNS: Readonly<Record<string, ReadonlyArray<string>>
     skills: ["userId"],
     threadAccess: ["userId", "ownerId", "grantedBy"],
     threadInvites: ["ownerId", "invitedBy", "acceptedBy"],
+    // A guest's spend in an organization stays theirs once they sign up; rows are summed, never assumed unique.
+    usageOrganizationReplies: ["userId"],
     userVariableDefaults: ["userId"],
 };
 

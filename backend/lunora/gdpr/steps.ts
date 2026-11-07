@@ -1,6 +1,7 @@
 import { LunoraError, v } from "lunorash/server";
 
 import { collectAcpSessionPages } from "../acp/gdpr";
+import { collectOrganizationUsagePages, collectUsageDailyPages } from "../usage/gdpr";
 import { internal } from "../_generated/internal";
 import type { Doc, Id } from "../_generated/dataModel";
 import { internalAction, internalQuery } from "../_generated/server";
@@ -360,18 +361,16 @@ const EXPORT_ACTIVITY_CAP = 5000;
 const MAX_EXPORT_BYTES = 32 * 1024 * 1024;
 
 /**
- * Usage history, sub-agent delegations (their task text and results) and
- * knowledge collections — user data the export used to leave out.
+ * Sub-agent delegations (their task text and results) and knowledge
+ * collections — user data the export used to leave out. Usage history is read
+ * by `generateExportFile`, a page at a time (`usage/gdpr.ts`).
  */
 export const collectActivityForExport = internalQuery
     .input({ userId: v.string() })
-    .output(v.object({ knowledgeCollections: v.array(v.any()), subAgentRuns: v.array(v.any()), usageDaily: v.array(v.any()) }))
+    .output(v.object({ knowledgeCollections: v.array(v.any()), subAgentRuns: v.array(v.any()) }))
     .query(async ({ args: { userId }, ctx: context }) => {
-        const [usageDaily, subAgentRuns, { page: collections }] = await Promise.all([
-            context.db
-                .query("usageDaily")
-                .withIndex("by_user_date", (q) => q.eq("userId", userId))
-                .take(EXPORT_ACTIVITY_CAP),
+        // Usage history is not read here: `generateExportFile` reads all of it, a page at a time.
+        const [subAgentRuns, { page: collections }] = await Promise.all([
             context.db
                 .query("subAgentRuns")
                 .withIndex("by_user_and_createdAt", (q) => q.eq("userId", userId))
@@ -402,15 +401,6 @@ export const collectActivityForExport = internalQuery
                     skillSlug: run.skillSlug,
                     status: run.status,
                     task: run.task,
-                };
-            }),
-            usageDaily: usageDaily.map((row) => {
-                return {
-                    costMicrodollars: row.costMicrodollars,
-                    date: row.date,
-                    replies: row.replies,
-                    skill: row.skillName ?? row.skillKey,
-                    tokens: row.tokens,
                 };
             }),
         };
@@ -467,9 +457,9 @@ export const generateExportFile = internalAction
         // Coding-agent sessions on paired devices (`acp/gdpr.ts`). Read here, a page at a
         // time, unless a workflow already in flight passes them.
         acpSessions: v.optional(v.any()),
-        // Usage history, sub-agent runs and knowledge collections
-        // (`collectActivityForExport`). Optional for the same in-flight-replay
-        // reason as `threadTags`.
+        // Sub-agent runs and knowledge collections (`collectActivityForExport`); usage history is read
+        // here, a page at a time, unless a workflow in flight recorded it with these. Optional for the same
+        // in-flight-replay reason as `threadTags`.
         activity: v.optional(v.any()),
         // Bots, their persona and computer settings (`bots/gdpr.ts`). Optional for
         // the same in-flight-replay reason as `threadTags`.
@@ -555,7 +545,14 @@ export const generateExportFile = internalAction
             subAgentRuns: activity?.subAgentRuns ?? [],
             tasks: args.tasks ?? { goals: [], tasks: [] },
             threadTags: args.threadTags ?? [],
-            usageDaily: activity?.usageDaily ?? [],
+            // All of it, a page at a time, also for a workflow that was in flight with an older, capped copy in `activity`.
+            usageDaily: await collectUsageDailyPages(
+                async (cursor) => await context.runQuery(internal.usage.gdpr.collectUsageDailyForExport, { cursor, userId: args.userId }),
+            ),
+            // The user's share of organizations' usage: what they spent in each organization, per day and project.
+            usageOrganizations: await collectOrganizationUsagePages(
+                async (cursor) => await context.runQuery(internal.usage.gdpr.collectOrganizationUsageForExport, { cursor, userId: args.userId }),
+            ),
             watchedRepositories: args.watchedRepositories ?? { watched: [] },
         };
 
