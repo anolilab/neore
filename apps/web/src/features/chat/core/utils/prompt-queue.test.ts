@@ -5,6 +5,7 @@ import {
     decideAutoSend,
     deliveredSteerItems,
     dequeuePrompt,
+    editQueuedPrompt,
     EMPTY_PROMPT_QUEUE,
     enqueuePrompt,
     prependPrompt,
@@ -381,5 +382,42 @@ describe("hidden characters in queued prompts", () => {
         const restored = restorePromptQueue(JSON.stringify({ items: [{ id: "1", text: tagged }] }));
 
         expect(restored?.items[0]?.text).toBe("abc");
+    });
+});
+
+describe("editing a queued prompt", () => {
+    it("replaces the text in place, keeping the place, and gives the changed message a new id", () => {
+        const state = { items: [item("a"), item("b")], paused: false };
+
+        const edited = editQueuedPrompt(state, "b", "rewritten", "fresh");
+
+        expect(edited.items.map((entry) => [entry.id, entry.text])).toEqual([
+            ["a", "text a"],
+            ["fresh", "rewritten"],
+        ]);
+    });
+
+    it("keeps the id when the text is unchanged, so a retry of the same message stays one message", () => {
+        const edited = editQueuedPrompt({ items: [item("a")], paused: false }, "a", "text a", "fresh");
+
+        expect(edited.items[0]?.id).toBe("a");
+    });
+
+    it("strips hidden characters from the new text, as enqueueing does", () => {
+        const edited = editQueuedPrompt({ items: [item("a")], paused: false }, "a", "abc\u{200B}", "fresh");
+
+        expect(edited.items[0]?.text).toBe("abc");
+    });
+
+    it("keeps the text when the new text is only hidden characters, rather than emptying the message", () => {
+        const edited = editQueuedPrompt({ items: [item("a")], paused: false }, "a", "\u{200B}\u{200B}", "fresh");
+
+        expect(edited.items[0]).toEqual(item("a"));
+    });
+
+    it("leaves a steered message as it is, since it is already in the reply", () => {
+        const steered = { ...item("s"), steer: { id: "steer-1", streamId: "stream-1" } };
+
+        expect(editQueuedPrompt({ items: [steered], paused: false }, "s", "changed", "fresh").items[0]?.text).toBe("text s");
     });
 });

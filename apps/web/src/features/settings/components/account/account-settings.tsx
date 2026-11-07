@@ -85,6 +85,8 @@ const AccountSettings: FC = () => {
     const isResumeLastChat = userSettings?.resumeLastChat === true;
     // Absent means on: a reply interrupted by a deploy or crash continues by itself.
     const isResumeInterruptedRuns = userSettings?.resumeInterruptedRuns !== false;
+    // Opt-in: absent means a message sent during a coding agent's turn waits in the queue behind it.
+    const isHostFollowUpSteer = userSettings?.hostFollowUpSteer === true;
     // Opt-in: absent means off.
     const isComposerVimMode = userSettings?.composerVimMode === true;
 
@@ -543,6 +545,28 @@ const AccountSettings: FC = () => {
                                     "resumeInterruptedRuns",
                                     checked,
                                     checked ? t`Interrupted replies will continue` : t`Interrupted replies will stop`,
+                                );
+                            }}
+                        />
+                    </div>
+                    <div className="flex items-center justify-between">
+                        <div className="space-y-0.5">
+                            <Label className="text-base font-medium" htmlFor="host-follow-up-steer">
+                                {t`Send during a coding agent's turn`}
+                            </Label>
+                            <p className="text-muted-foreground text-sm" id="host-follow-up-steer-description">
+                                {t`Off: a message you send while a coding agent is working waits in the queue and goes after the turn. On: it interrupts the turn and goes next.`}
+                            </p>
+                        </div>
+                        <Switch
+                            aria-describedby="host-follow-up-steer-description"
+                            checked={isHostFollowUpSteer}
+                            id="host-follow-up-steer"
+                            onCheckedChange={(checked) => {
+                                handleUpdateSetting(
+                                    "hostFollowUpSteer",
+                                    checked,
+                                    checked ? t`Messages will interrupt the agent's turn` : t`Messages will wait for the agent's turn to end`,
                                 );
                             }}
                         />
