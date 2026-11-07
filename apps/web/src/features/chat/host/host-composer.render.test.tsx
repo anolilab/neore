@@ -515,6 +515,25 @@ describe("the coding-agent composer", () => {
         expect(second).toBe(first);
     });
 
+    it("sends a paused queue's first message alone on Send now, and keeps the rest paused", async () => {
+        usePromptQueueStore.getState().enqueue("thread-1", { attachments: [], text: "first" });
+        usePromptQueueStore.getState().enqueue("thread-1", { attachments: [], text: "second" });
+        usePromptQueueStore.getState().setPaused("thread-1", true);
+        mount(session());
+
+        const sendNow = await screen.findByRole("button", { name: "Send queued message 1 now" });
+
+        await waitFor(() => expect((sendNow as HTMLButtonElement).disabled).toBe(false));
+        fireEvent.click(sendNow);
+
+        await waitFor(() => expect(sendCalls()).toHaveLength(1));
+        expect(sendCalls()[0]).toEqual(["send", { requestId: expect.any(String), text: "first", threadId: "thread-1" }]);
+        await endTurn();
+
+        expect(await screen.findByRole("button", { name: "Send next" })).toBeTruthy();
+        expect(sendCalls()).toHaveLength(1);
+    });
+
     it("offers no Send now that would stop a turn a queued message's lost send may have started", async () => {
         harness.sendResults = [{ error: "unreachable", ok: false }];
         mount({ ...session(), "chat.streaming.getActiveStreamForThread": { streamId: "stream-1" } });

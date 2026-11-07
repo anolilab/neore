@@ -839,7 +839,8 @@ const HostComposerForThread: FC<{ className?: string; threadId: string }> = ({ c
                                             {t`Send next`}
                                         </Button>
                                     )}
-                                    {editing?.id !== item.id && (index > 0 || running) && (
+                                    {/* An unpaused head goes next anyway; a paused one is sent alone, the messages behind it stay paused (Send next resumes them all). */}
+                                    {editing?.id !== item.id && (index > 0 || running || queue.paused) && (
                                         <Button
                                             aria-label={t`Send queued message ${index + 1} now`}
                                             disabled={sendNowFor(item.id, machine) === undefined}
