@@ -95,18 +95,20 @@ export const organizationUsagePage = internalQuery
 /** Titles of the projects among `projectIds` the organization owns now, and its projects to list at zero. */
 export const organizationProjectTitles = internalQuery
     .input({ organizationId: v.string().max(MAX_LENGTH.id), projectIds: v.array(v.string().max(MAX_LENGTH.id)) })
-    .output(v.object({ owned: v.array(vTitled), unused: v.array(vTitled) }))
+    .output(v.object({ moreUnused: v.boolean(), owned: v.array(vTitled), unused: v.array(vTitled) }))
     .query(async ({ args: { organizationId, projectIds }, ctx }) => {
         const found = await Promise.all(
             projectIds.slice(0, TITLE_BATCH).map(async (projectId) => await systemDb(ctx).projects.findFirst({ where: { _id: projectId as never } })),
         );
-        const listed = await systemDb(ctx).projects.findMany({ limit: MAX_PROJECTS, where: { organizationId } });
+        const listed = await systemDb(ctx).projects.findMany({ limit: MAX_PROJECTS + 1, where: { organizationId } });
 
         return {
             owned: found.flatMap((project) =>
                 project && project.organizationId === organizationId ? [{ projectId: project._id as string, title: project.title }] : [],
             ),
-            unused: listed.page.map((project) => {
+            // Past the bound, the projects with no usage are not listed: the result says it was cut.
+            moreUnused: listed.page.length > MAX_PROJECTS,
+            unused: listed.page.slice(0, MAX_PROJECTS).map((project) => {
                 return { projectId: project._id as string, title: project.title };
             }),
         };
@@ -179,10 +181,12 @@ export const getOrganizationProjectUsage = authAction
         // Listed: projects the organization owns now, looked up by id, and its projects with no usage yet, at zero.
         // Anything else — a project that has left the organization — stays in "No project", without its name or id.
         for (let index = 0; index < Math.max(keys.length, 1); index += TITLE_BATCH) {
-            const { owned, unused } = await ctx.runQuery(internal.usage.organization.organizationProjectTitles, {
+            const { moreUnused, owned, unused } = await ctx.runQuery(internal.usage.organization.organizationProjectTitles, {
                 organizationId,
                 projectIds: keys.slice(index, index + TITLE_BATCH),
             });
+
+            truncated ||= index === 0 && moreUnused;
 
             for (const project of [...owned, ...(index === 0 ? unused : [])]) {
                 titles.set(project.projectId, project.title);

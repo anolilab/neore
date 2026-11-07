@@ -15,7 +15,8 @@ import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 import { useAction, useCRPC } from "@/lib/lunora/crpc";
 
 import { BACKFILL_REFETCH_MS, useRefetchAfterBackfill } from "../../hooks/use-usage-backfill";
-import { formatUsd, localDayKey, periodStart } from "../../lib/usage-activity";
+import { useUsageToday } from "../../hooks/use-usage-today";
+import { formatUsd, periodStart } from "../../lib/usage-activity";
 import { readOrganizationUsage, retryOrganizationRead } from "../../lib/usage-organization";
 
 /** The row key of what no project accounts for; never a project id. */
@@ -49,7 +50,7 @@ const UsageProjectBreakdown: FC<UsageProjectBreakdownProps> = ({ backfilling, da
     const { i18n, t } = useLingui();
     const crpc = useCRPC();
     const { authClient } = useAuth();
-    const [today] = useState(() => localDayKey(new Date()));
+    const today = useUsageToday();
     const [scope, setScope] = useState<Scope>("mine");
     const locale = i18n.locale || "en";
     const fromDate = periodStart(today, days);

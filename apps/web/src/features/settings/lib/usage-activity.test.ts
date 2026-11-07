@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+    dayKeyInZone,
     addDays,
     buildHeatmap,
     daysBetween,
@@ -127,5 +128,15 @@ describe("formatUsd", () => {
         expect(formatUsd(1234, "en")).toBe("$0.0012");
         expect(formatUsd(0, "en")).toBe("$0.00");
         expect(formatUsd(12_345_678, "en")).toBe("$12.35");
+    });
+});
+
+describe("dayKeyInZone", () => {
+    it("names the day in the zone usage is dated in, not the browser's", () => {
+        const instant = new Date(Date.UTC(2026, 8, 20, 23, 30));
+
+        expect(dayKeyInZone(instant, "Pacific/Kiritimati")).toBe("2026-09-21");
+        expect(dayKeyInZone(instant, "America/Los_Angeles")).toBe("2026-09-20");
+        expect(dayKeyInZone(instant, undefined)).toBe("2026-09-20");
     });
 });

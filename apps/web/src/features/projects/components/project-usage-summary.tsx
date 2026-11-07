@@ -3,10 +3,10 @@ import type { Id } from "@neore/backend/dataModel";
 import { Label } from "@neore/ui/components/label";
 import { Skeleton } from "@neore/ui/components/skeleton";
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
 
 import { BACKFILL_REFETCH_MS, useRefetchAfterBackfill, useUsageBackfill } from "@/features/settings/hooks/use-usage-backfill";
-import { formatUsd, localDayKey, periodStart } from "@/features/settings/lib/usage-activity";
+import { useUsageToday } from "@/features/settings/hooks/use-usage-today";
+import { formatUsd, periodStart } from "@/features/settings/lib/usage-activity";
 import { useCRPC } from "@/lib/lunora/crpc";
 
 /** The window the project's totals cover, in days. */
@@ -20,7 +20,7 @@ interface ProjectUsageSummaryProps {
 const ProjectUsageSummary = ({ projectId }: ProjectUsageSummaryProps) => {
     const { i18n, t } = useLingui();
     const crpc = useCRPC();
-    const [today] = useState(() => localDayKey(new Date()));
+    const today = useUsageToday();
     const locale = i18n.locale || "en";
     // Earlier replies are filed under their projects by the usage backfill: start it if it has not run, and read again as it goes.
     const { projectsBackfilling: backfilling } = useUsageBackfill();

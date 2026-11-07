@@ -33,6 +33,14 @@ vi.mock("@/features/auth/lib/auth-ui-provider", () => {
     };
 });
 
+vi.mock("@/features/auth/hooks/use-user-settings", () => {
+    return {
+        useUserSettings: () => {
+            return { data: { timezone: "UTC" } };
+        },
+    };
+});
+
 vi.mock("@/features/auth/hooks/session-user-management", () => {
     return {
         useSession: () => {
