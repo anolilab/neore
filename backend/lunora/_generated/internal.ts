@@ -192,6 +192,8 @@ export interface InternalApiTypes {
         };
         thread_title: {
             admitTitleRun: FunctionReference<"mutation", { chargeKey: string; expectedTitleDigest: string; promptId?: string; requestedBy?: string; threadId: Id<"threads">; userId?: string }, { outcome: "refused"; reason: string } | { claimedAt: number; outcome: "admitted" } | { claimedAt: number; outcome: "answered"; promptId?: string; title: string } | { outcome: "in-flight" }>;
+            beginTitleDispatch: FunctionReference<"mutation", { requestId: string; threadId: Id<"threads"> }, null | number>;
+            endTitleDispatch: FunctionReference<"mutation", { claimedAt: number; requestId: string; threadId: Id<"threads"> }, null>;
             readTitlePrompt: FunctionReference<"query", { requestedBy: string; threadId: Id<"threads"> }, { outcome: "refused" } | { outcome: "none" } | { id?: string; outcome: "prompt"; text: string }>;
             recordTitleAnswer: FunctionReference<"mutation", { chargeKey: string; claimedAt: number; promptId?: string; title: string }, boolean>;
             setGeneratedTitle: FunctionReference<"mutation", { expectedTitleDigest: string; promptId?: string; requestedBy?: string; threadId: Id<"threads">; title: string }, boolean>;
@@ -1430,6 +1432,8 @@ export const internal: InternalApiTypes = {
         },
         thread_title: {
             admitTitleRun: { __lunoraRef: "agent_thread_title:admitTitleRun" },
+            beginTitleDispatch: { __lunoraRef: "agent_thread_title:beginTitleDispatch" },
+            endTitleDispatch: { __lunoraRef: "agent_thread_title:endTitleDispatch" },
             readTitlePrompt: { __lunoraRef: "agent_thread_title:readTitlePrompt" },
             recordTitleAnswer: { __lunoraRef: "agent_thread_title:recordTitleAnswer" },
             setGeneratedTitle: { __lunoraRef: "agent_thread_title:setGeneratedTitle" },
