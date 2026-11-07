@@ -14,7 +14,7 @@ export interface BranchNode {
     isPinned?: boolean;
     lastReplyAt?: number; // When the thread last got a reply (owned threads only)
     lastViewedAt?: number; // When its owner last opened it after a reply (owned threads only)
-    lockedAt?: number; // Present while the chat has a passcode
+    lockedAt?: number | null; // Present while the chat has a passcode (`isThreadLocked`)
     model?: string;
     order?: number;
     projectId?: string; // Project ID if thread belongs to a project
@@ -24,6 +24,8 @@ export interface BranchNode {
     source?: string; // "telegram" | "slack" | "discord" | undefined (web)
     statelessMode?: boolean; // Present if thread is in stateless mode
     status: string;
+    /** The title as stored: empty for an untitled chat, where `title` shows the fallback. */
+    storedTitle?: string;
     tagIds?: string[]; // User-defined tag ids
     tags?: ThreadTag[]; // `tagIds` resolved against the user's tags, in display order
     threadId: string;

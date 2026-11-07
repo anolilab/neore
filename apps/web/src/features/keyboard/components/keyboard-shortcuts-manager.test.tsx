@@ -305,3 +305,86 @@ describe("KeyboardShortcutsManager", () => {
         });
     });
 });
+
+describe("F6 between screen areas", () => {
+    const mounted: HTMLElement[] = [];
+
+    // jsdom has no layout: an area counts as shown only once it has a box.
+    const shownArea = (role?: string): HTMLElement => {
+        const element = document.createElement("section");
+
+        element.dataset.focusArea = "";
+        element.tabIndex = 0;
+
+        if (role) {
+            element.setAttribute("role", role);
+            element.setAttribute("aria-modal", "true");
+        }
+
+        Object.assign(element, {
+            getBoundingClientRect: () => {
+                return { bottom: 10, height: 10, left: 0, right: 10, top: 0, width: 10 };
+            },
+            getClientRects: () => [{}],
+        });
+        document.body.appendChild(element);
+        mounted.push(element);
+
+        return element;
+    };
+
+    afterEach(() => {
+        for (const element of mounted) {
+            element.remove();
+        }
+
+        mounted.length = 0;
+    });
+
+    it("moves focus and cancels the key when another area can take it", () => {
+        const first = shownArea();
+        const second = shownArea();
+
+        render(
+            <KeyboardShortcutsManager>
+                <span />
+            </KeyboardShortcutsManager>,
+        );
+        first.focus();
+
+        // fireEvent returns false when the handler cancelled the key.
+        expect(fireEvent.keyDown(first, { code: "F6", key: "F6" })).toBe(false);
+        // eslint-disable-next-line testing-library/no-node-access -- focus placement is what this asserts
+        expect(document.activeElement).toBe(second);
+    });
+
+    it("leaves F6 to the browser when the only area already holds the focus", () => {
+        const only = shownArea();
+
+        render(
+            <KeyboardShortcutsManager>
+                <span />
+            </KeyboardShortcutsManager>,
+        );
+        only.focus();
+
+        expect(fireEvent.keyDown(only, { code: "F6", key: "F6" })).toBe(true);
+        // eslint-disable-next-line testing-library/no-node-access -- focus placement is what this asserts
+        expect(document.activeElement).toBe(only);
+    });
+
+    it("leaves F6 to the browser when the mobile sidebar sheet is the only area and holds the focus", () => {
+        const sheet = shownArea("dialog");
+
+        render(
+            <KeyboardShortcutsManager>
+                <span />
+            </KeyboardShortcutsManager>,
+        );
+        sheet.focus();
+
+        expect(fireEvent.keyDown(sheet, { code: "F6", key: "F6" })).toBe(true);
+        // eslint-disable-next-line testing-library/no-node-access -- focus placement is what this asserts
+        expect(document.activeElement).toBe(sheet);
+    });
+});

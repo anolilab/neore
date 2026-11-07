@@ -1,5 +1,6 @@
 "use client";
 
+import { withoutFocusAreaKeys } from "@neore/backend/auth/shortcut";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
@@ -112,7 +113,8 @@ export const defaultKeyboardShortcuts: KeyboardShortcuts = {
  * a custom Focus Search is theirs and stays.
  */
 export const mergeKeyboardShortcuts = (saved: Partial<KeyboardShortcuts> | undefined): KeyboardShortcuts => {
-    const merged = { ...defaultKeyboardShortcuts, ...saved };
+    // A binding on F6 or Shift+F6 is cleared: those keys move focus, and a saved action on them would run as well.
+    const merged = withoutFocusAreaKeys({ ...defaultKeyboardShortcuts, ...saved });
 
     if (saved?.findInThread === undefined && saved?.focusSearch === `${platformModifier}+f`) {
         merged.focusSearch = defaultKeyboardShortcuts.focusSearch;
@@ -295,7 +297,7 @@ export const useUIStateStore = create<UIStateStore>()(
                 setKeyboardShortcuts: (shortcuts: Partial<KeyboardShortcuts>) => {
                     set((state) => {
                         return {
-                            keyboardShortcuts: { ...state.keyboardShortcuts, ...shortcuts },
+                            keyboardShortcuts: withoutFocusAreaKeys({ ...state.keyboardShortcuts, ...shortcuts }),
                         };
                     });
                 },

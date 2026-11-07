@@ -143,14 +143,24 @@ vi.mock("./message-search-matches", () => {
 });
 
 vi.mock("./sortable-thread-item", () => {
-    return { default: () => null };
+    return { default: vi.fn(() => null) };
+});
+
+/** The thread whose options menu the list has open, as the context-menu key sets it. */
+const uiState = vi.hoisted(() => {
+    return { optionsMenuThreadId: null as string | null };
 });
 
 vi.mock("./stores/thread-list-ui-store", () => {
-    return { selectSetShowManageTagsDialog: () => {}, useThreadListUIStore: () => () => {} };
+    return {
+        selectSetShowManageTagsDialog: () => {},
+        useThreadListUIStore: (selector: (state: Record<string, unknown>) => unknown) =>
+            selector({ optionsMenuThreadId: uiState.optionsMenuThreadId, setOptionsMenuThreadId: () => {}, setRenameThreadId: () => {} }),
+    };
 });
 
 const { default: ThreadNode } = await import("./thread-node");
+const { default: SortableThreadItem } = await import("./sortable-thread-item");
 
 const SNOOZE_BUTTON = /^Snooze thread/u;
 const TOUCH_CLASSES = /pointer-coarse|hover:none/u;
@@ -234,6 +244,21 @@ describe("ThreadNode", () => {
         expect(screen.queryByRole("button", { name: SNOOZE_BUTTON })).toBeNull();
     });
 
+    it("marks the keyboard-selected child inside an expanded group, and no other row", () => {
+        // The child rows are stubbed here: the test checks the selection each one is given.
+        vi.mocked(SortableThreadItem).mockImplementation((props) => (
+            <div data-selected={String(props.isKeyboardSelected)} data-testid={`row-${props.node.threadId}`} />
+        ));
+
+        try {
+            render(<ThreadNode {...baseProps} expandedThreads={new Set(["t1"])} keyboardThreadId="c1" />);
+
+            expect(screen.getByTestId("row-c1").dataset.selected).toBe("true");
+        } finally {
+            vi.mocked(SortableThreadItem).mockImplementation(() => null);
+        }
+    });
+
     it("flips the expand label and state when the branches are open", () => {
         render(<ThreadNode {...baseProps} expandedThreads={new Set(["t1"])} />);
 
@@ -280,4 +305,34 @@ describe("ThreadNode", () => {
         expect(strip?.className).not.toMatch(TOUCH_CLASSES);
     });
     /* eslint-enable testing-library/no-node-access */
+
+    it.each([
+        ["a screen with hover", true],
+        ["a touch screen", false],
+    ])("opens one options menu, never both copies, on %s", (_screen, hover) => {
+        const matchMedia = vi.fn((query: string) => {
+            return { addEventListener: () => {}, matches: query === "(hover: hover)" && hover, removeEventListener: () => {} };
+        });
+
+        vi.stubGlobal("matchMedia", matchMedia);
+        // An open menu positions itself with a ResizeObserver, which it constructs.
+        vi.stubGlobal(
+            "ResizeObserver",
+            // A constructor mock must be a `function`, not an arrow.
+            // eslint-disable-next-line prefer-arrow-callback
+            vi.fn(function ResizeObserverStub() {
+                return { disconnect: vi.fn(), observe: vi.fn(), unobserve: vi.fn() };
+            }),
+        );
+        uiState.optionsMenuThreadId = "t1";
+
+        try {
+            render(<ThreadNode {...baseProps} />);
+
+            expect(screen.getAllByRole("menuitem", { name: "Rename" })).toHaveLength(1);
+        } finally {
+            uiState.optionsMenuThreadId = null;
+            vi.unstubAllGlobals();
+        }
+    });
 });

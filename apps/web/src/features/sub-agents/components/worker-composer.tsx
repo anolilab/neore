@@ -91,6 +91,8 @@ const WorkerComposer: FC<WorkerComposerProps> = ({ archived, busy, className, fo
                 <Textarea
                     aria-label={t`Message the worker`}
                     className="min-h-[44px] flex-1"
+                    // The box is the composer's focus area for F6, as the cloud composer's editor is (`composer-tiptap/editor-attributes.ts`).
+                    data-focus-area="composer"
                     disabled={archived}
                     onChange={(event) => {
                         // A changed draft is a new message: it must not reuse the last one's id.

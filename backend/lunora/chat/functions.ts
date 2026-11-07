@@ -1459,21 +1459,29 @@ export const updateThread = authAction
             // Use provided model or fall back to thread's existing model
             const effectiveModel = (threadData?.activeAgent ? undefined : model) ?? threadData?.model;
 
-            if (!effectiveModel) {
+            // Only a change that reads or writes the model needs one: a thread whose model was never set can still be renamed,
+            // archived or restored.
+            const modelChange = [autoModel, customSystemPrompt, enabledFeatures, model, order, reasoningEffort, statelessMode].some(
+                (value) => value !== undefined,
+            );
+
+            if (!effectiveModel && modelChange) {
                 throw new LunoraError("BAD_REQUEST", "Model is required when thread has no existing model");
             }
 
-            // A custom endpoint or a bot's chat never routes (`shouldRouteAuto`), so Auto cannot be saved on one.
-            if (autoModel === true && (threadData?.botId || parseCustomModelId(effectiveModel) !== null)) {
-                throw new LunoraError("BAD_REQUEST", "Auto is not available for this chat");
+            if (effectiveModel) {
+                // A custom endpoint or a bot's chat never routes (`shouldRouteAuto`), so Auto cannot be saved on one.
+                if (autoModel === true && (threadData?.botId || parseCustomModelId(effectiveModel) !== null)) {
+                    throw new LunoraError("BAD_REQUEST", "Auto is not available for this chat");
+                }
+
+                const agent = await getAgentForUser(context, userId, effectiveModel, threadLanguage);
+
+                await agent.continueThread(context, {
+                    threadId,
+                    userId,
+                });
             }
-
-            const agent = await getAgentForUser(context, userId, effectiveModel, threadLanguage);
-
-            const { thread } = await agent.continueThread(context, {
-                threadId,
-                userId,
-            });
 
             // Update status using archive/unarchive functions if status is being changed
             if (status === "archived") {
@@ -1482,16 +1490,6 @@ export const updateThread = authAction
                 });
             } else if (status === "active") {
                 await context.runMutation(internal.agent.threads.unarchiveThread, {
-                    threadId: threadId as Id<"threads">,
-                });
-            }
-
-            if (title !== undefined || summary !== undefined) {
-                await context.runMutation(internal.agent.threads.updateThread, {
-                    patch: {
-                        ...(title !== undefined && { title }),
-                        ...(summary !== undefined && { summary }),
-                    },
                     threadId: threadId as Id<"threads">,
                 });
             }
@@ -1505,32 +1503,51 @@ export const updateThread = authAction
             const stays = !(threadData?.activeAgent || threadData?.runner === "host");
             const autoModelForWrite = stays ? (autoModel ?? pickFallback) : undefined;
 
-            await context.runMutation(internal.chat.functions.updateThreadModel, {
-                autoModel: autoModelForWrite,
-                customSystemPrompt,
-                enabledFeatures,
-                model: effectiveModel,
-                order,
-                reasoningEffort,
-                statelessMode,
-                threadId,
-                userId,
-            });
-
-            // Record audit history for thread update (component tables need manual tracking)
-            const updatedThread = await context.runQuery(internal.agent.threads.getThreadInternal, { threadId: threadId as Id<"threads"> });
-
-            if (updatedThread) {
-                await context.runMutation(internal.lib.document_history.recordHistory, {
-                    attribution: { action: "update", source: "manual" },
-                    doc: updatedThread,
-                    documentId: threadId,
-                    isDeleted: false,
-                    oldDoc: threadData,
-                    organizationId: updatedThread.organizationId ?? undefined,
-                    tableName: "threads",
+            if (effectiveModel) {
+                await context.runMutation(internal.chat.functions.updateThreadModel, {
+                    autoModel: autoModelForWrite,
+                    customSystemPrompt,
+                    enabledFeatures,
+                    model: effectiveModel,
+                    order,
+                    reasoningEffort,
+                    statelessMode,
+                    threadId,
                     userId,
                 });
+            }
+
+            // The title is the last write that can fail this action: once it is stored, a failure afterwards would tell the caller
+            // the rename failed while the title stays. Everything before it can still fail with nothing written.
+            if (title !== undefined || summary !== undefined) {
+                await context.runMutation(internal.agent.threads.updateThread, {
+                    patch: {
+                        ...(title !== undefined && { title }),
+                        ...(summary !== undefined && { summary }),
+                    },
+                    threadId: threadId as Id<"threads">,
+                });
+            }
+
+            // Record audit history for thread update (component tables need manual tracking). The title is stored by now, so a
+            // failure here is logged and does not fail the rename.
+            try {
+                const updatedThread = await context.runQuery(internal.agent.threads.getThreadInternal, { threadId: threadId as Id<"threads"> });
+
+                if (updatedThread) {
+                    await context.runMutation(internal.lib.document_history.recordHistory, {
+                        attribution: { action: "update", source: "manual" },
+                        doc: updatedThread,
+                        documentId: threadId,
+                        isDeleted: false,
+                        oldDoc: threadData,
+                        organizationId: updatedThread.organizationId ?? undefined,
+                        tableName: "threads",
+                        userId,
+                    });
+                }
+            } catch (error) {
+                console.error("Failed to record the thread's history:", error);
             }
 
             context.log.event("chat.update_thread", {
@@ -1540,7 +1557,7 @@ export const updateThread = authAction
                 titleChanged: title !== undefined,
             });
 
-            return thread.threadId;
+            return threadId;
         },
     );
 
