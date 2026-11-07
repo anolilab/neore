@@ -172,7 +172,9 @@ describe("dispatching to a worker", () => {
         expect(second).toMatchObject({ run: { organizationId: "org-x" } });
     });
 
-    it("caps a follow-up by the run's organization when neither the worker nor the lead thread stores one", async () => {
+    // The follow-up's stored organization is what `runSubAgent` hands to `runHeadlessAgent`, whose tool assembly caps by
+    // it (`headless-run.test.ts`, `run-permission-cap.test.ts`). This checks the first link: the organization is stored.
+    it("stores the run's organization on a follow-up when neither the worker nor the lead thread has one", async () => {
         // Neither thread is stamped: the first run named no organization, and the lead has none.
         const first = await create({ toolCallId: "call-unstamped-1" });
 

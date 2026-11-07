@@ -533,6 +533,12 @@ describe("runHeadlessAgent tool allowlist", () => {
             ...extra,
         });
 
+    it("builds its tools under the run's organization, whose cap the tool assembly reads", async () => {
+        await run({ organizationId: "org-a" });
+
+        expect(seen.buildOptions).toMatchObject([{ headless: true, organizationId: "org-a" }]);
+    });
+
     it("narrows to the allowlist and drops MCP tools unless told to keep them", async () => {
         await run({ toolAllowlist: ["webSearch", "imageGeneration"] });
         await run({ toolAllowlist: ["webSearch", "imageGeneration"], toolAllowlistKeepsMcp: true });
