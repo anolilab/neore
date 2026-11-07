@@ -412,8 +412,10 @@ export const runUsageBackfillStep = internalMutation
             },
         );
 
-        for (const key of step.keys) {
-            await markReplyRecorded(ctx, userId, key, now);
+        for (const [index, key] of step.keys.entries()) {
+            const { costMicrodollars, date, tokens } = step.increments[index]!;
+
+            await markReplyRecorded(ctx, userId, key, now, { counted: { costMicrodollars, date, tokens } });
         }
 
         await addToRollup(ctx, userId, step.increments, now, false);
@@ -495,12 +497,17 @@ export const runUsageProjectBackfillStep = internalMutation
                         return undefined;
                     }
 
+                    // What the first walk counted for the reply, when it did: a run it passed while paused holds only the
+                    // steps saved by then, and the project must not hold more than the total.
+                    const keyRow = await ctx.db.usageReplies.findFirst({ where: { replyKey: key, userId } });
+                    const counted = keyRow?.counted ?? increment;
+
                     return {
-                        costMicrodollars: increment.costMicrodollars,
-                        date: increment.date,
+                        costMicrodollars: counted.costMicrodollars,
+                        date: counted.date,
                         projectKey: thread.projectKey,
                         replies: increment.replies,
-                        tokens: increment.tokens,
+                        tokens: counted.tokens,
                     };
                 },
                 skipThread: (thread) => thread.projectKey === undefined,
