@@ -493,6 +493,15 @@ describe("capability reports", () => {
         await openWithOptions(ahead, mode("build"));
         await expect(optionsOf(threadId)).resolves.toEqual(mode("plan"));
 
+        // Nor is the report a late older open carries: it would no longer match the options stored.
+        await ingest(device, {
+            events: [
+                { ...SESSION_OPEN, capabilities: { ...CHANGED, reportedAt: ahead } },
+                { kind: "session_options", options: mode("build") },
+            ],
+        });
+        await expect(reportOf(threadId)).resolves.toMatchObject({ groups: REPORT.groups });
+
         // Options are a session-level event: never one of a turn, and never anything but the open's follower.
         await expect(ingest(device, { events: [{ kind: "session_options", options: mode("build") }] })).resolves.toMatchObject({ status: 403 });
 

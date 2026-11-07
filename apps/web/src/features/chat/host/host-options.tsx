@@ -38,7 +38,7 @@ const HostOptions: FC<{ options: HostAgentOptions | undefined }> = ({ options })
     return (
         <ul aria-label={t`Agent options`} className="text-muted-foreground flex flex-wrap gap-1 text-xs">
             {rows.map((row) => (
-                <li className="bg-muted rounded-md px-2 py-1" key={row.id}>
+                <li className="bg-muted max-w-full rounded-md px-2 py-1 break-all" key={row.id}>
                     {row.name}: <span className="text-foreground">{row.value}</span>
                 </li>
             ))}

@@ -172,6 +172,12 @@ export class AgentSession {
     /** The options the agent offers for this session (`agent-options.ts`); empty until it has said. */
     private agentOptions: AgentOptions = {};
 
+    /**
+     * Option updates that came before the agent's answer naming its session was handled: the update can follow the answer in
+     * the same read from the agent, before the session id is known here. At most a few are kept.
+     */
+    private earlyOptionUpdates: { sessionId: unknown; update: Record<string, unknown> }[] = [];
+
     /** What the backend was told when the session opened, kept so a change of the options can send it again. */
     private opened: HostSessionInfo | undefined;
 
@@ -409,17 +415,15 @@ export class AgentSession {
         }
 
         if (resumeSessionId === undefined) {
-            const opened = await newSession(this.connection, folder, startupTimeoutMs);
-
-            this.agentOptions = optionsOf(opened.answer, scrub);
-
-            return opened.sessionId;
+            return this.withEarlyUpdates(await newSession(this.connection, folder, startupTimeoutMs));
         }
 
         // No `session/load` frame goes to an agent that did not say it loads them.
         if (isAvailable(capabilityOf(this.report, "sessions.load"))) {
             try {
                 this.agentOptions = optionsOf(await loadSession(this.connection, resumeSessionId, folder), scrub);
+                // What came before the answer is the replayed history: the answer holds the options as they are now.
+                this.earlyOptionUpdates = [];
                 this.reattach = { loaded: true };
 
                 return resumeSessionId;
@@ -431,9 +435,25 @@ export class AgentSession {
             this.reattach = { loaded: false, reason: "load_unsupported" };
         }
 
-        const opened = await newSession(this.connection, folder, startupTimeoutMs);
+        // A failed load's replay must not fill the room the new session's own early updates need.
+        this.earlyOptionUpdates = [];
 
-        this.agentOptions = optionsOf(opened.answer, scrub);
+        return this.withEarlyUpdates(await newSession(this.connection, folder, startupTimeoutMs));
+    }
+
+    /** A new or forked session's options: its answer's, then any update for it that came before the answer was handled. */
+    private withEarlyUpdates(opened: { answer: unknown; sessionId: string }): string {
+        const { scrub } = this.options.process;
+        let options = optionsOf(opened.answer, scrub);
+
+        for (const early of this.earlyOptionUpdates) {
+            if (early.sessionId === opened.sessionId) {
+                options = applyOptionsUpdate(options, early.update, scrub) ?? options;
+            }
+        }
+
+        this.agentOptions = options;
+        this.earlyOptionUpdates = [];
 
         return opened.sessionId;
     }
@@ -453,9 +473,8 @@ export class AgentSession {
                 }
 
                 this.fork = { forked: true };
-                this.agentOptions = optionsOf(forked.answer, this.options.process.scrub);
 
-                return forked.sessionId;
+                return this.withEarlyUpdates(forked);
             } catch {
                 // The agent's own error can quote its environment: the backend is told that it failed (a code), not its text.
                 this.fork = { forked: false, reason: "fork_failed" };
@@ -464,11 +483,7 @@ export class AgentSession {
             this.fork = { forked: false, reason: "fork_unsupported" };
         }
 
-        const opened = await newSession(this.connection, folder, startupTimeoutMs);
-
-        this.agentOptions = optionsOf(opened.answer, this.options.process.scrub);
-
-        return opened.sessionId;
+        return this.withEarlyUpdates(await newSession(this.connection, folder, startupTimeoutMs));
     }
 
     /** Drops the prompts still waiting. The ones the backend queued are told their turn was cancelled, so no stream waits on them. */
@@ -844,6 +859,16 @@ export class AgentSession {
     // ─── From the agent ────────────────────────────────────────────────────
 
     private onNotification(method: string, params: unknown): void {
+        if (method === METHOD.sessionUpdate && this.agentSessionId === "" && isRecord(params) && isRecord(params.update)) {
+            const kind = params.update.sessionUpdate;
+
+            if ((kind === "config_option_update" || kind === "current_mode_update") && this.earlyOptionUpdates.length < 8) {
+                this.earlyOptionUpdates.push({ sessionId: params.sessionId, update: params.update });
+            }
+
+            return;
+        }
+
         if (method !== METHOD.sessionUpdate || !isRecord(params) || params.sessionId !== this.agentSessionId || !isRecord(params.update)) {
             return;
         }

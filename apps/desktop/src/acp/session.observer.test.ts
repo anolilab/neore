@@ -3,6 +3,8 @@
  * its text, tool calls and permission requests, and how it ended. The observer is told in the order things
  * happen, never an "always" option, never a folder path, and never a value the user asked to mask.
  */
+import type { PassThrough } from "node:stream";
+
 import { describe, expect, it } from "vitest";
 
 import type { HostSessionInfo, SessionObserver } from "./ingest";
@@ -259,6 +261,39 @@ describe("the agent's options", () => {
         expect(updated.options?.configOptions?.[0]?.currentValue).toBe("plan");
         expect(updated.capabilities?.reportedAt).toBeGreaterThan(opened.capabilities?.reportedAt ?? Infinity);
         expect({ ...updated, capabilities: undefined, options: undefined }).toEqual({ ...opened, capabilities: undefined, options: undefined });
+    });
+
+    it("keep an update that follows the answer before the session's id is known here", async () => {
+        const { calls, observer } = recorder();
+        const agent = memoryAgent();
+        const session = new AgentSession({
+            agentKey: "example",
+            agentLabel: "Example",
+            appVersion: "9.9.9",
+            folder: "/work",
+            gate: refuse,
+            hostInfo: HOST_INFO,
+            observer,
+            onChange: () => {},
+            process: agent.process,
+        });
+        const steps = readTranscript("handshake-and-prompt").slice(0, 3);
+        const mode = { category: "mode", currentValue: "build", id: "mode", name: "Mode", options: [{ name: "Plan", value: "plan" }, { name: "Build", value: "build" }], type: "select" };
+
+        const started = session.start();
+
+        await transcriptPlayer(agent).play(steps);
+        // The answer and the update in one read: the update is handled before the code that awaited the answer runs.
+        (agent.process.stdout as PassThrough).write(
+            `${JSON.stringify({ id: agent.written.at(-1)?.id, jsonrpc: "2.0", result: { configOptions: [mode], sessionId: "sess_1" } })}\n${JSON.stringify({
+                jsonrpc: "2.0",
+                method: "session/update",
+                params: { sessionId: "sess_1", update: { currentModeId: "plan", sessionUpdate: "current_mode_update" } },
+            })}\n`,
+        );
+        await started;
+
+        expect((calls[0]?.[1] as HostSessionInfo).options?.configOptions?.[0]?.currentValue).toBe("plan");
     });
 });
 

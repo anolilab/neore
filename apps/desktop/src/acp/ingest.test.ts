@@ -447,6 +447,17 @@ describe("opening a session", () => {
         });
     });
 
+    it("sends nothing more once the poster has stopped, not even an open deferred while one was in flight", async () => {
+        const host = poster();
+
+        host.sessionOpened("s1", INFO);
+        host.sessionUpdated("s1", { ...INFO, options: { configOptions: [] } });
+        host.stop();
+        await settle(60_000);
+
+        expect(backend.posts).toHaveLength(1);
+    });
+
     it("sends no open for a change of a session that has ended", async () => {
         const host = poster();
 
@@ -501,22 +512,29 @@ describe("pairing after a session opened", () => {
 });
 
 describe("a session that never gets a thread", () => {
-    it.each([
-        ["it opened itself", undefined],
-        // The backend named the thread before the first open: a refusal of that open still leaves the session local.
-        ["the backend started it", "thread-1"],
-    ])("ends a turn that started during session_open when the backend refuses the open, when %s", async (_name, threadId) => {
+    it("ends a turn that started during session_open when the backend refuses the open", async () => {
         backend.respond = (post) => (post.threadId === undefined ? Response.json({ error: "no" }, { status: 403 }) : undefined);
 
         const host = poster();
 
-        host.sessionOpened("s1", INFO, threadId);
-        await settle();
+        host.sessionOpened("s1", INFO);
         host.turnStarted("s1", "t1", "hello");
         await settle(1000);
 
         expect(host.busy).toBe(false);
-        // The session went local: nothing of the turn is posted into a thread the backend refused to open.
+    });
+
+    it("leaves a session the backend started local when the backend refuses its first open", async () => {
+        backend.respond = (post) => (post.threadId === undefined ? Response.json({ error: "no" }, { status: 403 }) : undefined);
+
+        const host = poster();
+
+        // The backend named the thread before the first open: a refusal of that open is still the end of the link.
+        host.sessionOpened("s1", INFO, "thread-1");
+        await settle();
+        host.turnStarted("s1", "t1", "hello");
+        await settle(1000);
+
         expect(backend.posts.some(({ post }) => post.turnId === "t1")).toBe(false);
     });
 

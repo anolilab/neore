@@ -110,10 +110,15 @@ const openSession = async (ctx: MutationCtx, device: Doc<"devices">, hostSession
         // future-dated report cannot shut out every later one. The agent's options are sent with a newer report whenever they
         // change, and are ordered by that report's time as the desktop sent it: capped, two reports from a desktop clock ahead
         // of this one would tie, or a late older one could pass a newer one.
-        const reportedAt = open.capabilities ? Math.min(open.capabilities.reportedAt, now) : 0;
-        const newerReport = open.capabilities !== undefined && reportedAt > (existing.capabilities?.reportedAt ?? 0);
-        const opened = existing.status === "starting";
+        // A report the desktop dated before the stored options' is older than them, whatever the capped times say: it would put
+        // back the models and reasoning effort of options already replaced.
         const optionsAt = open.capabilities?.reportedAt;
+        const reportedAt = open.capabilities ? Math.min(open.capabilities.reportedAt, now) : 0;
+        const newerReport =
+            open.capabilities !== undefined &&
+            reportedAt > (existing.capabilities?.reportedAt ?? 0) &&
+            !(optionsAt !== undefined && existing.agentOptionsAt !== undefined && optionsAt < existing.agentOptionsAt);
+        const opened = existing.status === "starting";
         const newerOptions =
             options !== undefined && optionsAt !== undefined && optionsAt > (existing.agentOptionsAt ?? -1)
                 ? { agentOptions: options, agentOptionsAt: optionsAt }

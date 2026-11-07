@@ -51,7 +51,9 @@ export const withOptionCapabilities = (report: CapabilityReport, options: AgentO
     // Every model option's choices, each model once: an agent may file more than one option under `model`.
     const models = new Map<string, string>();
 
-    for (const choice of optionsIn(options, "model").flatMap((option) => option.choices)) {
+    const choices = optionsIn(options, "model").flatMap((option) => option.choices);
+
+    for (const choice of choices) {
         if (!models.has(choice.value) && models.size < MAX_MODELS) {
             models.set(choice.value, choice.name);
         }
