@@ -474,6 +474,7 @@ describe("runHeadlessAgent fresh context and reasoning effort", () => {
         await runHeadlessAgent(paidCtx() as never, {
             memory: false,
             model: "test-model",
+            organizationId: null,
             origin: "lead",
             personalization: "none",
             prompt: "Run the report",
