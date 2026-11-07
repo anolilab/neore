@@ -8,7 +8,8 @@
  * - a stream that ends in an error pauses it too, so one failure does not
  *   cascade into firing every queued prompt at a broken backend;
  * - a queue restored after a reload is always paused: nothing a user can no
- *   longer remember typing is sent without them asking for it.
+ *   longer remember typing is sent without them asking for it. Its attachments
+ *   come back by their uploaded file ids, never their bytes.
  * - a STEERED prompt (`steer`) was handed to the running reply. It is
  *   withdrawn before it is sent (`chat_steering.withdrawSteer`): the reply may
  *   already have taken it, and then it is dropped instead.
@@ -20,7 +21,7 @@ import type { ReferenceSelection } from "@/features/chat/components/reference-pi
 
 export interface QueuedPrompt<A> {
     attachments: A[];
-    /** Attachments that did not survive a reload (they are `File`s, which sessionStorage cannot hold). */
+    /** Attachments that did not survive a reload: ones that had no uploaded file id to keep. */
     droppedAttachments?: number;
     id: string;
     /** Reference images selected when the prompt was queued, so a later draft's picks do not replace them. */
@@ -193,27 +194,58 @@ export const decideAutoSend = ({
     return hasError ? "pause" : "send";
 };
 
-/** What a queue looks like in sessionStorage: text only. */
-interface StoredPromptQueue {
-    items: { droppedAttachments: number; id: string; steer?: QueuedSteer; text: string }[];
+/** An attachment as storage keeps it: the uploaded file's id and what the chip shows, never the file's bytes. */
+export interface StoredAttachment {
+    fileId: string;
+    kind: "document" | "file" | "image";
+    mediaType: string;
+    name: string;
 }
 
+/** What a queue looks like in sessionStorage. */
+interface StoredPromptQueue {
+    items: { attachments?: StoredAttachment[]; droppedAttachments: number; id: string; steer?: QueuedSteer; text: string }[];
+}
+
+const ATTACHMENT_KINDS: ReadonlySet<string> = new Set(["document", "file", "image"]);
+
+/** Storage is read back as untrusted: an entry missing a field, or with a blank file id, is not an attachment. */
+const readStoredAttachment = (value: unknown): StoredAttachment | undefined => {
+    const { fileId, kind, mediaType, name } = (value ?? {}) as Partial<Record<keyof StoredAttachment, unknown>>;
+
+    if (typeof fileId !== "string" || fileId === "" || typeof kind !== "string" || !ATTACHMENT_KINDS.has(kind) || typeof name !== "string") {
+        return undefined;
+    }
+
+    return { fileId, kind: kind as StoredAttachment["kind"], mediaType: typeof mediaType === "string" ? mediaType : "", name };
+};
+
 /**
- * Serialises a queue for sessionStorage, or `undefined` when there is nothing
- * worth keeping. Attachments are counted, not stored; a prompt that was ONLY
- * attachments has no text to restore and is left out.
+ * Serialises a queue for sessionStorage, or `undefined` when there is nothing worth keeping. An attachment is kept by its
+ * uploaded file id (`toStored`); one without an id is counted as dropped. A prompt with neither text nor a kept attachment
+ * has nothing to restore and is left out.
  */
-export const serializePromptQueue = <A>(state: PromptQueueState<A>): string | undefined => {
-    const items = state.items
-        .filter((item) => item.text.trim().length > 0)
-        .map((item) => {
-            return {
-                droppedAttachments: item.attachments.length + (item.droppedAttachments ?? 0),
+export const serializePromptQueue = <A>(
+    state: PromptQueueState<A>,
+    toStored: (attachment: A) => StoredAttachment | undefined = () => undefined,
+): string | undefined => {
+    const items = state.items.flatMap((item) => {
+        const attachments = item.attachments.flatMap((attachment) => toStored(attachment) ?? []);
+
+        if (item.text.trim().length === 0 && attachments.length === 0) {
+            return [];
+        }
+
+        return [
+            {
+                ...(attachments.length > 0 && { attachments }),
+                droppedAttachments: item.attachments.length - attachments.length + (item.droppedAttachments ?? 0),
                 id: item.id,
                 ...(item.steer && { steer: { id: item.steer.id, streamId: item.steer.streamId } }),
                 text: item.text,
-            };
-        });
+            },
+        ];
+    });
 
     return items.length > 0 ? JSON.stringify({ items } satisfies StoredPromptQueue) : undefined;
 };
@@ -310,8 +342,14 @@ export const takeNextToSend = async <A>({
     return undefined;
 };
 
-/** Parses a stored queue. Always paused; anything malformed reads as "no queue". */
-export const restorePromptQueue = (raw: string | null | undefined): PromptQueueState<never> | undefined => {
+/**
+ * Parses a stored queue. Always paused; anything malformed reads as "no queue". `fromStored` turns a kept attachment back
+ * into the composer's own shape; without it, kept attachments are counted as dropped.
+ */
+export const restorePromptQueue = <A = never>(
+    raw: string | null | undefined,
+    fromStored?: (attachment: StoredAttachment) => A,
+): PromptQueueState<A> | undefined => {
     if (!raw) {
         return undefined;
     }
@@ -330,27 +368,36 @@ export const restorePromptQueue = (raw: string | null | undefined): PromptQueueS
         return undefined;
     }
 
-    const items: QueuedPrompt<never>[] = [];
+    const items: QueuedPrompt<A>[] = [];
 
     for (const candidate of rawItems as unknown[]) {
-        const { droppedAttachments, id, steer, text } = (candidate ?? {}) as { droppedAttachments?: unknown; id?: unknown; steer?: unknown; text?: unknown };
+        const { attachments, droppedAttachments, id, steer, text } = (candidate ?? {}) as {
+            attachments?: unknown;
+            droppedAttachments?: unknown;
+            id?: unknown;
+            steer?: unknown;
+            text?: unknown;
+        };
 
         if (typeof id !== "string" || typeof text !== "string") {
             continue;
         }
 
         const clean = stripHiddenText(text).text;
+        const stored = Array.isArray(attachments) ? attachments.flatMap((entry: unknown) => readStoredAttachment(entry) ?? []) : [];
+        const kept = fromStored ? stored.map((entry) => fromStored(entry)) : [];
 
-        // A text of nothing but hidden characters is empty once stripped: sending it would be a blank prompt.
-        if (!clean.trim()) {
+        // A text of nothing but hidden characters is empty once stripped: with no attachment either, sending it would be a blank prompt.
+        if (!clean.trim() && kept.length === 0) {
             continue;
         }
 
-        const dropped = typeof droppedAttachments === "number" && droppedAttachments > 0 ? Math.floor(droppedAttachments) : 0;
+        const stated = typeof droppedAttachments === "number" && droppedAttachments > 0 ? Math.floor(droppedAttachments) : 0;
+        const dropped = stated + stored.length - kept.length;
         const restoredSteer = readSteer(steer);
 
         items.push({
-            attachments: [],
+            attachments: kept,
             ...(dropped > 0 && { droppedAttachments: dropped }),
             id,
             ...(restoredSteer && { steer: restoredSteer }),
