@@ -11,6 +11,14 @@
  */
 export const PROMPT_CACHE_COLD_START_TOKENS = 20_000;
 
+/**
+ * How long a provider keeps a conversation prefix cached after its last use: the shortest default among the
+ * providers the gateway routes to. A thread idle for longer than this re-reads its whole context as fresh input
+ * on the next reply, which is when compacting it first pays off. Providers that cache longer only make the
+ * suggestion early, never wrong.
+ */
+export const PROMPT_CACHE_LIFETIME_MS = 5 * 60 * 1000;
+
 /** The size approximation every caller of {@link PROMPT_CACHE_COLD_START_TOKENS} uses. */
 export const CHARACTERS_PER_TOKEN = 4;
 

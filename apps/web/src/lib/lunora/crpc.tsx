@@ -46,7 +46,11 @@ interface CrpcLeaf<F> {
      * but got 1" — an error that points at the CALLER for following the
      * documented convention.
      */
-    mutationOptions: (overrides?: Omit<UseMutationOptions<ReturnOf<F>, Error, ArgsOf<F>>, "mutationFn">) => UseMutationOptions<ReturnOf<F>, Error, ArgsOf<F>>;
+    mutationOptions: (
+        overrides?: Omit<UseMutationOptions<ReturnOf<F>, Error, ArgsOf<F>>, "mutationFn">,
+        /** `onlineOnly` refuses the write while offline, instead of queuing it for the reconnect. */
+        call?: { onlineOnly?: true },
+    ) => UseMutationOptions<ReturnOf<F>, Error, ArgsOf<F>>;
 
     /**
      * The query key alone, for cache reads and invalidation.
@@ -126,6 +130,7 @@ const NEVER_LIVE: ReadonlySet<string> = new Set<ApiPath>([
     "auth_admin:isCurrentUserAdmin",
     "auth_admin:isImpersonating",
     "auth_organization:checkSlug",
+    "chat_compaction:getCompactionStatus",
     "chat_functions:searchMessages",
     "chat_functions:searchThreads",
     "connectors_user_connectors:listConnectorCatalog",
@@ -178,10 +183,11 @@ const resolve = (path: string[]): FunctionReference => {
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const leaf = (client: LunoraClient, path: string[]): any => {
     return {
-        mutationOptions: (overrides?: object) => {
+        // `call.onlineOnly` refuses the write while offline instead of queuing it for the reconnect.
+        mutationOptions: (overrides?: object, call?: { onlineOnly?: true }) => {
             return {
                 mutationFn: async (args: Record<string, unknown>) =>
-                    await client.mutation(resolve(path) as never, withUnlockProof(args) as never, shardOptionsFor(args) as never),
+                    await client.mutation(resolve(path) as never, withUnlockProof(args) as never, { ...shardOptionsFor(args), ...call } as never),
                 ...overrides,
             };
         },

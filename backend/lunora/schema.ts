@@ -2807,6 +2807,12 @@ export const schema = defineSchema({
         coveredCount: v.number(),
         coveredUpToMessageId: v.id("messages"),
         createdAt: v.number(),
+        /**
+         * `"compact"` marks a compaction (`agent/thread-compaction.ts`): the user asked for it (or the auto-compact
+         * threshold did), so the context builder also drops the rows it covers from what the model is sent, and it
+         * does not depend on the idle-summary opt-in. Absent = an idle summary. The stored messages are never touched.
+         */
+        kind: v.optional(v.literal("compact")),
         summary: v.string(),
         /**
          * The untrusted sources (`devices/lib/taint.ts`) of the rows folded into the summary and of the one it
@@ -3413,6 +3419,8 @@ export const schema = defineSchema({
         accentColor: v.optional(v.string()),
         // Auto-archive threads idle this many days (`agent/auto-archive.ts`). Absent or 0 = off; 7-365 otherwise.
         autoArchiveAfterDays: v.optional(v.number()),
+        // Compact a thread's model context before a reply once it fills this percentage of the model's window (`agent/thread-compaction.ts`). Absent or 0 = off; 50-95 otherwise.
+        autoCompactThreshold: v.optional(v.number()),
         // Opt-in: speak every finished reply aloud (`features/chat/voice-mode`). Absent = off.
         autoReadReplies: v.optional(v.boolean()),
         // Model a reply is retried on once when the chosen model fails with an infrastructure error (`chat/lib/backup-model.ts`). Blank or absent = none.

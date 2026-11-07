@@ -10,6 +10,8 @@ import type { Id } from "../_generated/dataModel";
 import { internalQuery, type QueryCtx } from "../_generated/server";
 import type { Doc } from "../_generated/dataModel";
 import { getThreadRow } from "../agent/branch-rows";
+import { estimateContext } from "../agent/thread-compaction";
+import { ownedBy, summariesOf } from "../agent/thread-summaries";
 import { replyWindowRows, rowCharacters } from "../agent/handoff-source";
 import { attachmentsIn } from "./lib/backup-model";
 
@@ -79,8 +81,20 @@ export const autoRouteContextOf = async (
     // A stateless run sends the prompt alone; a stateful one sends the successful window, as model assembly reads it.
     const window = args.stateless ? [prompt] : await replyWindowRows(ctx, args.threadId, prompt, PATH_ROWS);
     const docs = keptRows(window);
-    const found = attachmentsIn(docs.map((row) => row.message));
-    const fileIds = [...new Set(docs.flatMap((row) => row.fileIds ?? []))];
+
+    // A compaction stands on this path: the request is its notes plus the rows after it. Sizing and attachments read only
+    // the rows the request sends, so a file reference in a row it covers cannot fail the routing.
+    const thread = ownedBy(await ctx.db.get("threads", args.threadId));
+    const summaries = thread ? await summariesOf(ctx, thread._id) : [];
+    const hasCompaction = summaries.some((row) => row.kind === "compact");
+    // The estimate walks the path, so it runs only when a compaction row stands: most threads have none. A stateless reply
+    // sends the prompt alone, so the retained history and its summary do not size it.
+    const compacted = thread && hasCompaction && !args.stateless ? await estimateContext(ctx, thread, prompt) : undefined;
+    const covered = compacted?.compactedAt === undefined ? undefined : compacted.covered;
+    const sent =
+        covered === undefined ? docs : docs.filter((row) => row.order > covered.order || (row.order === covered.order && row.stepOrder > covered.stepOrder));
+    const found = attachmentsIn(sent.map((row) => row.message));
+    const fileIds = [...new Set(sent.flatMap((row) => row.fileIds ?? []))];
 
     for (let start = 0; start < fileIds.length; start += FILE_BATCH) {
         const batch = fileIds.slice(start, start + FILE_BATCH) as Id<"chatFiles">[];
@@ -99,14 +113,14 @@ export const autoRouteContextOf = async (
         }
     }
 
-    // A tool result's output is not in `text`, so its JSON is counted here: an understated history would let a smaller
-    // model be routed to a conversation it cannot hold.
-    const characters = docs.reduce(
-        (sum, row) => sum + rowCharacters(row) + (field(row.message, "role") === "tool" ? JSON.stringify(row.message).length : 0),
-        0,
-    );
+    if (covered === undefined || compacted === undefined) {
+        // `rowCharacters` counts what a tool result returned, so an understated history cannot route a reply to a smaller model.
+        const characters = docs.reduce((sum, row) => sum + rowCharacters(row), 0);
 
-    return { contextTokens: Math.ceil(estimateTokensFromCharacters(characters)), ...found };
+        return { contextTokens: Math.ceil(estimateTokensFromCharacters(characters)), ...found };
+    }
+
+    return { contextTokens: compacted.tokens, ...found };
 };
 
 export const getAutoRouteContext = internalQuery

@@ -182,7 +182,7 @@ export const collectConversations = internalAction.input({ userId: v.string() })
     // wire shape.
     const conversations: {
         /** The condensed copies of the thread's older turns made while it sat idle (`agent/thread-summaries.ts`). */
-        contextSummaries: { coveredCount: number; coveredUpToMessageId: string; createdAt: number; summary: string }[];
+        contextSummaries: { coveredCount: number; coveredUpToMessageId: string; createdAt: number; kind?: "compact"; summary: string }[];
         /** The notes strangers left through the thread's guest link, held and sent (`chat/guest-links.ts`). */
         guestNotes: { createdAt: number; status: string; text: string }[];
         messages: {

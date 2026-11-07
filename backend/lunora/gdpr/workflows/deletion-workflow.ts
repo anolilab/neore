@@ -288,6 +288,17 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
 
         // --- Phase 3: Delete remaining user-owned data ---
 
+        // After the threads are gone: a compaction that finished after the per-thread erase is swept here.
+        await drain(
+            "delete-user-thread-summaries",
+            async (round) =>
+                await context.run(
+                    steps.deleteUserThreadSummaries,
+                    { userId: args.userId },
+                    { dedupId: stepDedupId(scope, "delete-user-thread-summaries", round) },
+                ),
+        );
+
         await context.run(internal.gdpr.functions.updateRequestProgress, {
             currentStep: "deleting_memories",
             progress: 40,
