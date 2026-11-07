@@ -66,6 +66,9 @@ export interface InternalApiTypes {
             saveEditedSibling: FunctionReference<"mutation", { fileIds?: Array<Id<"chatFiles">>; message: { content: string | Array<{ providerMetadata?: Record<string, Record<string, unknown>>; providerOptions?: Record<string, Record<string, unknown>>; text: string; type: "text" } | { image: string | ArrayBuffer; mediaType?: string; providerOptions?: Record<string, Record<string, unknown>>; type: "image" } | { data: string | ArrayBuffer; filename?: string; mediaType?: string; providerMetadata?: Record<string, Record<string, unknown>>; providerOptions?: Record<string, Record<string, unknown>>; type: "file" }>; providerOptions?: Record<string, Record<string, unknown>>; role: "user" } | { content: string | Array<{ providerMetadata?: Record<string, Record<string, unknown>>; providerOptions?: Record<string, Record<string, unknown>>; text: string; type: "text" } | { data: string | ArrayBuffer; filename?: string; mediaType?: string; providerMetadata?: Record<string, Record<string, unknown>>; providerOptions?: Record<string, Record<string, unknown>>; type: "file" } | { providerMetadata?: Record<string, Record<string, unknown>>; providerOptions?: Record<string, Record<string, unknown>>; signature?: string; text: string; type: "reasoning" } | { data: string; providerMetadata?: Record<string, Record<string, unknown>>; providerOptions?: Record<string, Record<string, unknown>>; type: "redacted-reasoning" } | { input?: unknown; providerExecuted?: boolean; providerMetadata?: Record<string, Record<string, unknown>>; providerOptions?: Record<string, Record<string, unknown>>; toolCallId: string; toolName: string; type: "tool-call" } | { dynamic?: boolean; input?: unknown; output?: { providerOptions?: Record<string, Record<string, unknown>>; type: "text"; value: string } | { providerOptions?: Record<string, Record<string, unknown>>; type: "json"; value?: unknown } | { providerOptions?: Record<string, Record<string, unknown>>; type: "error-text"; value: string } | { providerOptions?: Record<string, Record<string, unknown>>; type: "error-json"; value?: unknown } | { providerOptions?: Record<string, Record<string, unknown>>; reason?: string; type: "execution-denied" } | { type: "content"; value: Array<{ providerOptions?: Record<string, Record<string, unknown>>; text: string; type: "text" } | { data: string; filename?: string; mediaType: string; providerOptions?: Record<string, Record<string, unknown>>; type: "file-data" } | { providerOptions?: Record<string, Record<string, unknown>>; type: "file-url"; url: string } | { fileId: string | Record<string, string>; providerOptions?: Record<string, Record<string, unknown>>; type: "file-id" } | { data: string; mediaType: string; providerOptions?: Record<string, Record<string, unknown>>; type: "image-data" } | { providerOptions?: Record<string, Record<string, unknown>>; type: "image-url"; url: string } | { fileId: string | Record<string, string>; providerOptions?: Record<string, Record<string, unknown>>; type: "image-file-id" } | { providerOptions?: Record<string, Record<string, unknown>>; type: "custom" }> }; preliminary?: boolean; providerExecuted?: boolean; providerMetadata?: Record<string, Record<string, unknown>>; providerOptions?: Record<string, Record<string, unknown>>; toolCallId: string; toolName: string; type: "tool-result" } | { id: string; providerMetadata?: Record<string, Record<string, unknown>>; providerOptions?: Record<string, Record<string, unknown>>; sourceType: "url"; title?: string; type: "source"; url: string } | { filename?: string; id: string; mediaType: string; providerMetadata?: Record<string, Record<string, unknown>>; providerOptions?: Record<string, Record<string, unknown>>; sourceType: "document"; title: string; type: "source" } | { approvalId: string; providerMetadata?: Record<string, Record<string, unknown>>; providerOptions?: Record<string, Record<string, unknown>>; toolCallId: string; type: "tool-approval-request" }>; providerOptions?: Record<string, Record<string, unknown>>; role: "assistant" } | { content: Array<{ dynamic?: boolean; input?: unknown; output?: { providerOptions?: Record<string, Record<string, unknown>>; type: "text"; value: string } | { providerOptions?: Record<string, Record<string, unknown>>; type: "json"; value?: unknown } | { providerOptions?: Record<string, Record<string, unknown>>; type: "error-text"; value: string } | { providerOptions?: Record<string, Record<string, unknown>>; type: "error-json"; value?: unknown } | { providerOptions?: Record<string, Record<string, unknown>>; reason?: string; type: "execution-denied" } | { type: "content"; value: Array<{ providerOptions?: Record<string, Record<string, unknown>>; text: string; type: "text" } | { data: string; filename?: string; mediaType: string; providerOptions?: Record<string, Record<string, unknown>>; type: "file-data" } | { providerOptions?: Record<string, Record<string, unknown>>; type: "file-url"; url: string } | { fileId: string | Record<string, string>; providerOptions?: Record<string, Record<string, unknown>>; type: "file-id" } | { data: string; mediaType: string; providerOptions?: Record<string, Record<string, unknown>>; type: "image-data" } | { providerOptions?: Record<string, Record<string, unknown>>; type: "image-url"; url: string } | { fileId: string | Record<string, string>; providerOptions?: Record<string, Record<string, unknown>>; type: "image-file-id" } | { providerOptions?: Record<string, Record<string, unknown>>; type: "custom" }> }; preliminary?: boolean; providerExecuted?: boolean; providerMetadata?: Record<string, Record<string, unknown>>; providerOptions?: Record<string, Record<string, unknown>>; toolCallId: string; toolName: string; type: "tool-result" } | { approvalId: string; approved: boolean; providerExecuted?: boolean; providerMetadata?: Record<string, Record<string, unknown>>; providerOptions?: Record<string, Record<string, unknown>>; reason?: string; type: "tool-approval-response" }>; providerOptions?: Record<string, Record<string, unknown>>; role: "tool" } | { content: string; providerOptions?: Record<string, Record<string, unknown>>; role: "system" }; originalMessageId: Id<"messages">; userId: string }, Id<"messages">>;
             setActiveLeaf: FunctionReference<"mutation", { messageId: Id<"messages">; runModel?: string; threadId: Id<"threads"> }, null>;
         };
+        context_reset: {
+            appendContextReset: FunctionReference<"mutation", { threadId: Id<"threads">; userId: string }, boolean>;
+        };
         documents: {
             createDocument: FunctionReference<"mutation", { content?: string; contentJson?: unknown; kind: "text" | "code" | "sheet" | "image" | "design"; language?: string; messageId?: string; threadId: Id<"threads">; title: string; userId: string }, { content?: string | undefined; contentJson?: unknown; language?: string | undefined; messageId?: string | undefined; status?: "streaming" | "idle" | undefined; } & { _creationTime: number; _id: string; kind: "text" | "image" | "code" | "sheet" | "design"; threadId: string; title: string; userId: string; version: number; }>;
             deleteDocument: FunctionReference<"mutation", { documentId: Id<"documents"> }, null>;
@@ -186,6 +189,15 @@ export interface InternalApiTypes {
             listThreadSummariesForExport: FunctionReference<"query", { threadId: Id<"threads"> }, Array<{ coveredCount: number; coveredUpToMessageId: string; createdAt: number; kind?: "compact"; summary: string }>>;
             prepareThreadSummary: FunctionReference<"mutation", { afterMessageId: Id<"messages">; threadId: Id<"threads"> }, { coveredCount: number; coveredUpToMessageId: Id<"messages">; cutClaimedAt: number; epoch: number; foldClaimedAt: number; previousSummary?: string; previousSummaryId?: Id<"threadContextSummaries">; taintedBy: Array<"web" | "knowledge" | "mcp" | "device" | "files">; transcript: string; userId: string } | null>;
             runThreadSummary: FunctionReference<"action", { afterMessageId: Id<"messages">; threadId: Id<"threads"> }, null>;
+        };
+        thread_title: {
+            admitTitleRun: FunctionReference<"mutation", { chargeKey: string; expectedTitleDigest: string; promptId?: string; requestedBy?: string; threadId: Id<"threads">; userId?: string }, { outcome: "refused"; reason: string } | { claimedAt: number; outcome: "admitted" } | { claimedAt: number; outcome: "answered"; promptId?: string; title: string } | { outcome: "in-flight" }>;
+            beginTitleDispatch: FunctionReference<"mutation", { requestId: string; threadId: Id<"threads"> }, null | number>;
+            endTitleDispatch: FunctionReference<"mutation", { claimedAt: number; requestId: string; threadId: Id<"threads"> }, null>;
+            readTitlePrompt: FunctionReference<"query", { requestedBy: string; threadId: Id<"threads"> }, { outcome: "refused" } | { outcome: "none" } | { id?: string; outcome: "prompt"; text: string }>;
+            recordTitleAnswer: FunctionReference<"mutation", { chargeKey: string; claimedAt: number; promptId?: string; title: string }, boolean>;
+            setGeneratedTitle: FunctionReference<"mutation", { chargeKey?: string; expectedTitleDigest: string; promptId?: string; requestedBy?: string; threadId: Id<"threads">; title: string }, boolean>;
+            writeRecordedTitle: FunctionReference<"mutation", { chargeKey: string; expectedTitleDigest: string; requestedBy?: string; threadId: Id<"threads"> }, "written" | "refused" | "none">;
         };
         threads: {
             _deletePageForThreadId: FunctionReference<"mutation", { cursor?: string; deltaCursor?: string; limit?: number; messagesDone?: boolean; streamOrder?: number; streamsDone?: boolean; threadId: Id<"threads"> }, {} & { cursor: string | null; isDone: boolean; }>;
@@ -364,7 +376,7 @@ export interface InternalApiTypes {
             createSummarizeChat: FunctionReference<"action", { threadId: string; userId: string }, void>;
             createThreadRelationship: FunctionReference<"mutation", { branchPoint?: number; branchType?: "branch" | "continuation" | "comparison"; parentThreadId: string; threadId: string }, void>;
             createThreadWithInitialMessage: FunctionReference<"mutation", { autoModel?: boolean; customSystemPrompt?: string; enabledFeatures?: Array<string>; fileIds?: Array<string>; language?: string; messageContent: Array<Record<string, unknown>>; mode?: "text" | "image" | "video"; model: string; reasoningEffort?: number; retentionHours?: number; statelessMode?: boolean; temporary?: boolean; title?: string; userId: string }, { messageId: string; threadId: string; }>;
-            createTitleChat: FunctionReference<"action", { prompt: string; threadId: string }, void>;
+            createTitleChat: FunctionReference<"action", { jobId?: string; prompt: string; promptId?: string; threadId: string }, void>;
             deleteThreadRelationship: FunctionReference<"mutation", { threadId: string }, null>;
             editImage: FunctionReference<"action", { imageUrl: string; mask?: string; operation: string; prompt?: string }, { resultUrl: string; }>;
             gateThreadAction: FunctionReference<"query", { level: "read" | "write" | "admin"; threadId: Id<"threads">; unlockProof?: string; userId: string }, { activeAgent?: { kind: "model"; model: string }; botId?: Id<"bots">; hostRun?: boolean; isWorker?: boolean; outcome: "denied" | "locked" | "ok" }>;
@@ -392,6 +404,8 @@ export interface InternalApiTypes {
             improvePrompt: FunctionReference<"action", { improvementInstructions?: string; prompt: string; style?: string; threadId?: string; userId: string; userPlan?: "free" | "premium" }, { improvedPrompt: string; }>;
             iteratePrompt: FunctionReference<"action", { iterateInput: string; lastOptimizedPrompt: string; mode?: "user" | "system"; threadId?: string; userId: string; userPlan?: "free" | "premium" }, { improvedPrompt: string; }>;
             optimizeSystemPrompt: FunctionReference<"action", { improvementInstructions?: string; modelId?: string; prompt: string; style?: string; threadId?: string; userId: string; userPlan?: "free" | "premium" }, { improvedPrompt: string; }>;
+            regenerateTitleChat: FunctionReference<"action", { claimedAt: number; expectedTitleDigest?: string; threadId: string; userId: string }, void>;
+            retryTitleWrite: FunctionReference<"action", { chargeKey: string; expectedTitleDigest: string; regenerateClaimedAt?: number; requestedBy?: string; threadId: string }, void>;
             streamAsync: FunctionReference<"action", { customSystemPrompt?: string; enabledFeatures?: Array<string>; jobId?: string; messageId: string; model: string; parentId?: string; prompt?: string; reasoningEffort?: number; statelessMode?: boolean; threadId: string }, null>;
             updateThreadModel: FunctionReference<"mutation", { autoModel?: boolean; customSystemPrompt?: string; dictationLanguage?: string; enabledFeatures?: Array<string>; model: string; order?: number; reasoningEffort?: number; statelessMode?: boolean; threadId: string; userId: string }, null>;
         };
@@ -818,9 +832,11 @@ export interface InternalApiTypes {
             removeIfAttempt: FunctionReference<"mutation", { attempt: string; key: string }, null>;
         };
         claim_once: {
+            claimHeld: FunctionReference<"query", { key: string; scope: string }, boolean>;
             claimKey: FunctionReference<"mutation", { key: string; leaseMs?: number; onLapse?: { args?: string; target: string }; scope: string; ttlMs: number; userId?: string }, boolean>;
             claimKeyFenced: FunctionReference<"mutation", { key: string; leaseMs?: number; onLapse?: { args?: string; target: string }; scope: string; ttlMs: number; unlessHeld?: { key: string; scope: string }; userId?: string }, null | number>;
             completeKey: FunctionReference<"mutation", { key: string; scope: string }, null>;
+            holdKey: FunctionReference<"mutation", { claimedAt: number; key: string; scope: string; ttlMs: number; userId?: string }, boolean>;
             purgeClaimsWithPrefix: FunctionReference<"mutation", { prefix: string; scope: string }, null>;
             purgeExpiredClaims: FunctionReference<"mutation", {}, number>;
             reapLapsedClaims: FunctionReference<"mutation", {}, number>;
@@ -1153,11 +1169,14 @@ export interface InternalApiTypes {
         internal: {
             canRunForUser: FunctionReference<"query", { userId: string }, boolean>;
             checkDueTasks: FunctionReference<"mutation", {}, null>;
-            claimRound: FunctionReference<"mutation", { cycle: string; origin: "manual" | "dependency" | "schedule" | "retry" | "repair"; round: number; taskId: Id<"tasks"> }, null | { codingAgent?: { agent: "claude_code" | "codex"; branch?: string; openPr?: boolean; repoUrl: string }; goal?: { description?: string; successCriteria?: string; title: string }; instructions: string; model?: string; organizationId?: string; repair?: { reasons: Array<string>; repairInstructions?: string }; reviewNote?: string; runId: Id<"taskRuns">; skillId?: Id<"skills">; successCriteria?: string; title: string; userId: string }>;
-            completeRound: FunctionReference<"mutation", { outcome: { error: string; kind: "error" } | { finalAnswer: string; kind: "verified"; verdict: { pass: boolean; reasons: Array<string>; repairInstructions?: string } } | { finalAnswer: string; kind: "unverified" }; runId: Id<"taskRuns">; threadId?: string }, null | "done" | "repair" | "needs_review" | "failed" | "cancelled">;
+            claimRound: FunctionReference<"mutation", { cycle: string; origin: "manual" | "dependency" | "schedule" | "retry" | "repair"; round: number; taskId: Id<"tasks"> }, null | { codingAgent?: { agent: "claude_code" | "codex"; branch?: string; openPr?: boolean; repoUrl: string }; contextDivider?: boolean; continueThreadId?: string; freshContext?: boolean; goal?: { description?: string; successCriteria?: string; title: string }; instructions: string; keepLastThread?: boolean; model?: string; organizationId?: string; projectId?: Id<"projects">; reasoningEffort?: number; repair?: { previousAnswer?: string; reasons: Array<string>; repairInstructions?: string }; reviewNote?: string; runId: Id<"taskRuns">; skillId?: Id<"skills">; successCriteria?: string; title: string; userId: string }>;
+            completeRound: FunctionReference<"mutation", { keepLastThread?: boolean; outcome: { error: string; kind: "error" } | { finalAnswer: string; kind: "verified"; verdict: { pass: boolean; reasons: Array<string>; repairInstructions?: string } } | { finalAnswer: string; kind: "unverified" }; runId: Id<"taskRuns">; threadId?: string }, null | "done" | "repair" | "needs_review" | "failed" | "cancelled">;
             getTaskForVerification: FunctionReference<"query", { taskId: Id<"tasks"> }, { instructions: string; successCriteria?: string; title: string; userId: string } | null>;
             isRoundRunning: FunctionReference<"query", { runId: Id<"taskRuns"> }, boolean>;
+            recordRunNotice: FunctionReference<"mutation", { cycle: string; reason: "project_unwritable" | "thread_locked" | "thread_busy" | "thread_shared" | "thread_unavailable"; taskId: Id<"tasks"> }, null>;
             resolveTaskSkill: FunctionReference<"query", { organizationId?: string; skillId: Id<"skills">; userId: string }, { error: string } | { config?: { additionalTools?: string[] | undefined; disabledTools?: string[] | undefined; preferredModel?: string | undefined; reasoningEffort?: number | undefined; searchMode?: string | undefined; voice?: string | undefined; } & {}; instructions: string; slug: string }>;
+            runProjectFor: FunctionReference<"query", { taskId: Id<"tasks"> }, null | { context?: string; projectId: Id<"projects"> }>;
+            runThreadProblem: FunctionReference<"query", { cycle: string; round: number; taskId: Id<"tasks">; threadId: string }, "project_unwritable" | "thread_locked" | "thread_busy" | "thread_shared" | "thread_unavailable" | null>;
         };
     };
     triggers: {
@@ -1299,6 +1318,9 @@ export const internal: InternalApiTypes = {
             saveEditedSibling: { __lunoraRef: "agent_branches:saveEditedSibling" },
             setActiveLeaf: { __lunoraRef: "agent_branches:setActiveLeaf" },
         },
+        context_reset: {
+            appendContextReset: { __lunoraRef: "agent_context_reset:appendContextReset" },
+        },
         documents: {
             createDocument: { __lunoraRef: "agent_documents:createDocument" },
             deleteDocument: { __lunoraRef: "agent_documents:deleteDocument" },
@@ -1419,6 +1441,15 @@ export const internal: InternalApiTypes = {
             listThreadSummariesForExport: { __lunoraRef: "agent_thread_summaries:listThreadSummariesForExport" },
             prepareThreadSummary: { __lunoraRef: "agent_thread_summaries:prepareThreadSummary" },
             runThreadSummary: { __lunoraRef: "agent_thread_summaries:runThreadSummary" },
+        },
+        thread_title: {
+            admitTitleRun: { __lunoraRef: "agent_thread_title:admitTitleRun" },
+            beginTitleDispatch: { __lunoraRef: "agent_thread_title:beginTitleDispatch" },
+            endTitleDispatch: { __lunoraRef: "agent_thread_title:endTitleDispatch" },
+            readTitlePrompt: { __lunoraRef: "agent_thread_title:readTitlePrompt" },
+            recordTitleAnswer: { __lunoraRef: "agent_thread_title:recordTitleAnswer" },
+            setGeneratedTitle: { __lunoraRef: "agent_thread_title:setGeneratedTitle" },
+            writeRecordedTitle: { __lunoraRef: "agent_thread_title:writeRecordedTitle" },
         },
         threads: {
             _deletePageForThreadId: { __lunoraRef: "agent_threads:_deletePageForThreadId" },
@@ -1625,6 +1656,8 @@ export const internal: InternalApiTypes = {
             improvePrompt: { __lunoraRef: "chat_functions:improvePrompt" },
             iteratePrompt: { __lunoraRef: "chat_functions:iteratePrompt" },
             optimizeSystemPrompt: { __lunoraRef: "chat_functions:optimizeSystemPrompt" },
+            regenerateTitleChat: { __lunoraRef: "chat_functions:regenerateTitleChat" },
+            retryTitleWrite: { __lunoraRef: "chat_functions:retryTitleWrite" },
             streamAsync: { __lunoraRef: "chat_functions:streamAsync" },
             updateThreadModel: { __lunoraRef: "chat_functions:updateThreadModel" },
         },
@@ -2051,9 +2084,11 @@ export const internal: InternalApiTypes = {
             removeIfAttempt: { __lunoraRef: "lib_action_cache:removeIfAttempt" },
         },
         claim_once: {
+            claimHeld: { __lunoraRef: "lib_claim_once:claimHeld" },
             claimKey: { __lunoraRef: "lib_claim_once:claimKey" },
             claimKeyFenced: { __lunoraRef: "lib_claim_once:claimKeyFenced" },
             completeKey: { __lunoraRef: "lib_claim_once:completeKey" },
+            holdKey: { __lunoraRef: "lib_claim_once:holdKey" },
             purgeClaimsWithPrefix: { __lunoraRef: "lib_claim_once:purgeClaimsWithPrefix" },
             purgeExpiredClaims: { __lunoraRef: "lib_claim_once:purgeExpiredClaims" },
             reapLapsedClaims: { __lunoraRef: "lib_claim_once:reapLapsedClaims" },
@@ -2390,7 +2425,10 @@ export const internal: InternalApiTypes = {
             completeRound: { __lunoraRef: "tasks_internal:completeRound" },
             getTaskForVerification: { __lunoraRef: "tasks_internal:getTaskForVerification" },
             isRoundRunning: { __lunoraRef: "tasks_internal:isRoundRunning" },
+            recordRunNotice: { __lunoraRef: "tasks_internal:recordRunNotice" },
             resolveTaskSkill: { __lunoraRef: "tasks_internal:resolveTaskSkill" },
+            runProjectFor: { __lunoraRef: "tasks_internal:runProjectFor" },
+            runThreadProblem: { __lunoraRef: "tasks_internal:runThreadProblem" },
         },
     },
     triggers: {

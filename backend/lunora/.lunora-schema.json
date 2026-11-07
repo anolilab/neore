@@ -8806,6 +8806,12 @@
             }
           }
         },
+        "result": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "scope": {
           "kind": "string",
           "nullable": false,
@@ -21078,6 +21084,13 @@
               "nullable": false,
               "optional": false,
               "unique": false,
+              "literal": "\"linked\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
               "literal": "\"opened\""
             }
           ]
@@ -21092,6 +21105,12 @@
           "kind": "string",
           "nullable": false,
           "optional": false,
+          "unique": false
+        },
+        "threadDeleted": {
+          "kind": "boolean",
+          "nullable": false,
+          "optional": true,
           "unique": false
         },
         "threadId": {
@@ -23800,6 +23819,63 @@
           "optional": true,
           "unique": false
         },
+        "lastRunNotice": {
+          "kind": "object",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "fields": {
+            "at": {
+              "kind": "number",
+              "nullable": false,
+              "optional": false,
+              "unique": false
+            },
+            "reason": {
+              "kind": "union",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "members": [
+                {
+                  "kind": "literal",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
+                  "literal": "\"project_unwritable\""
+                },
+                {
+                  "kind": "literal",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
+                  "literal": "\"thread_busy\""
+                },
+                {
+                  "kind": "literal",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
+                  "literal": "\"thread_locked\""
+                },
+                {
+                  "kind": "literal",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
+                  "literal": "\"thread_shared\""
+                },
+                {
+                  "kind": "literal",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
+                  "literal": "\"thread_unavailable\""
+                }
+              ]
+            }
+          }
+        },
         "lastRunThreadId": {
           "kind": "string",
           "nullable": false,
@@ -23872,6 +23948,19 @@
           "unique": false,
           "ref": "tasks"
         },
+        "projectId": {
+          "kind": "id",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "ref": "projects"
+        },
+        "reasoningEffort": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "recurring": {
           "kind": "boolean",
           "nullable": false,
@@ -23889,6 +23978,35 @@
           "nullable": false,
           "optional": true,
           "unique": false
+        },
+        "runDestination": {
+          "kind": "union",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "members": [
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"continue_thread\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"fresh_context\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"new_thread\""
+            }
+          ]
         },
         "skillId": {
           "kind": "id",

@@ -15,13 +15,28 @@ import { patchById } from "../lib/patch";
 import schema from "../schema";
 import { jobsQueueMessages } from "../../test/stubs/cloudflare-workers";
 import { DAILY_LIMIT_MESSAGE, ANONYMOUS_TASKS_MESSAGE } from "./account";
-import { checkDueTasks, claimRound, completeRound } from "./internal";
+import { checkDueTasks, claimRound, completeRound, recordRunNotice, runProjectFor, runThreadProblem } from "./internal";
 import { MAX_RECURRENCES_PER_USER_PER_SWEEP } from "./logic";
 
 // `user` is a `.global()` (D1) table the in-memory harness cannot write, so the
 // account behind each claim is looked up here instead.
 const { users } = vi.hoisted(() => {
     return { users: new Map<string, { isAnonymous?: boolean; role?: string }>() };
+});
+
+// `projects` is a `.global()` table too: which projects the owner may file into, and their context, is set here.
+const { readableProjects } = vi.hoisted(() => {
+    return { readableProjects: new Map<string, { context?: string }>() };
+});
+
+vi.mock("../projects/functions", () => {
+    const found = async (_ctx: unknown, projectId: string) => {
+        const project = readableProjects.get(projectId);
+
+        return project ? { _id: projectId, ...project } : null;
+    };
+
+    return { readableProject: found, writableProject: found };
 });
 
 vi.mock("../auth/lib/better-auth-queries", async (importOriginal) => {
@@ -104,6 +119,7 @@ beforeEach(() => {
     harness = lunoraTest(schema as never);
     users.clear();
     users.set(USER, {});
+    readableProjects.clear();
 });
 
 afterEach(() => {
@@ -141,7 +157,8 @@ describe("repair loop", () => {
             const claimed = await claim(taskId, round);
 
             if (round > 0) {
-                expect(claimed.repair).toStrictEqual({ reasons: FAIL.reasons, repairInstructions: FAIL.repairInstructions });
+                // A new thread per round has no history: the round is given the attempt it repairs.
+                expect(claimed.repair).toStrictEqual({ previousAnswer: "draft", reasons: FAIL.reasons, repairInstructions: FAIL.repairInstructions });
             }
 
             expect(await verified(claimed.runId, "draft", FAIL, `t${String(round)}`)).toBe("repair");
@@ -466,6 +483,264 @@ describe("a failed run", () => {
 
         expect(task.status).toBe("failed");
         expect(task.resultSummary).toBeUndefined();
+    });
+});
+
+describe("claimRound destination and effort", () => {
+    const insertThread = async (fields: Record<string, unknown> = {}): Promise<string> =>
+        await harness.run(async (ctx: any) => await ctx.db.insert("threads", { status: "active", title: "Task: Summary", userId: USER, ...fields }));
+
+    it("continues run 1's thread on run 2 of a recurring task set to continue, with the task's effort", async () => {
+        const thread = await insertThread();
+        const taskId = await insertTask({
+            activeCycle: "c1",
+            cronExpression: "0 9 * * *",
+            lastRunThreadId: thread,
+            reasoningEffort: 75,
+            recurring: true,
+            runDestination: "continue_thread",
+            status: "queued",
+        });
+
+        const claimed = await claim(taskId, 0);
+
+        expect(claimed).toMatchObject({ continueThreadId: thread, reasoningEffort: 75 });
+        expect(claimed.freshContext).toBeUndefined();
+    });
+
+    it("asks for a fresh context on a task set to one thread with a fresh context per run", async () => {
+        const thread = await insertThread();
+        const taskId = await insertTask({
+            activeCycle: "c1",
+            cronExpression: "0 9 * * *",
+            lastRunThreadId: thread,
+            recurring: true,
+            runDestination: "fresh_context",
+            status: "queued",
+        });
+
+        expect(await claim(taskId, 0)).toMatchObject({ contextDivider: true, continueThreadId: thread, freshContext: true });
+    });
+
+    it("starts a new thread after the task moved to another project", async () => {
+        readableProjects.set("project-new", {});
+
+        const thread = await insertThread({ projectId: "project-old" });
+        const taskId = await insertTask({
+            activeCycle: "c1",
+            cronExpression: "0 9 * * *",
+            lastRunThreadId: thread,
+            projectId: "project-new",
+            recurring: true,
+            runDestination: "continue_thread",
+            status: "queued",
+        });
+
+        const claimed = await claim(taskId, 0);
+
+        expect(claimed.continueThreadId).toBeUndefined();
+        expect(claimed.projectId).toBe("project-new");
+    });
+
+    it("gives the run the project's own instructions, re-read right before the run, and nothing once access is gone", async () => {
+        readableProjects.set("project-a", { context: "Write for the finance team." });
+
+        const taskId = await insertTask({ activeCycle: "c1", projectId: "project-a", status: "queued" });
+        const runProject = async (): Promise<unknown> => await harness.run(async (ctx: any) => await ctx.runQuery(runProjectFor, { taskId }));
+
+        expect(await claim(taskId, 0)).toMatchObject({ projectId: "project-a" });
+        expect(await runProject()).toStrictEqual({ context: "Write for the finance team.", projectId: "project-a" });
+
+        // The owner left the project's organization between the claim and the run.
+        readableProjects.delete("project-a");
+        expect(await runProject()).toBeNull();
+    });
+
+    it("continues a repair round in the thread its cycle's previous round ran in", async () => {
+        const kept = await insertThread();
+        const fallback = await insertThread();
+        const taskId = await insertTask({
+            activeCycle: "c1",
+            cronExpression: "0 9 * * *",
+            lastRunThreadId: kept,
+            recurring: true,
+            runDestination: "continue_thread",
+            status: "running",
+        });
+
+        // Round 0 fell back to a new chat (the kept one was busy) and did not pass the verifier.
+        await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("taskRuns", {
+                    cycle: "c1",
+                    origin: "schedule",
+                    round: 0,
+                    startedAt: 1,
+                    status: "failed",
+                    taskId,
+                    threadId: fallback,
+                    userId: USER,
+                }),
+        );
+
+        const claimed = await claim(taskId, 1);
+
+        expect(claimed.continueThreadId).toBe(fallback);
+
+        // Completing the repair in the fallback thread leaves the task on its kept thread.
+        await complete({
+            keepLastThread: claimed.keepLastThread,
+            outcome: { finalAnswer: "Fixed", kind: "verified", verdict: PASS },
+            runId: claimed.runId,
+            threadId: fallback,
+        });
+        expect(await getTask(taskId)).toMatchObject({ lastRunThreadId: kept, status: "done" });
+    });
+
+    it("gives a fresh-context repair round the attempt it repairs, which its context does not hold", async () => {
+        const thread = await insertThread();
+        const taskId = await insertTask({
+            activeCycle: "c1",
+            cronExpression: "0 9 * * *",
+            lastRunThreadId: thread,
+            recurring: true,
+            runDestination: "fresh_context",
+            status: "running",
+        });
+
+        await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("taskRuns", {
+                    cycle: "c1",
+                    finalAnswer: "Draft one",
+                    origin: "schedule",
+                    round: 0,
+                    startedAt: 1,
+                    status: "failed",
+                    taskId,
+                    threadId: thread,
+                    userId: USER,
+                    verdict: FAIL,
+                }),
+        );
+
+        const claimed = await claim(taskId, 1);
+
+        expect(claimed).toMatchObject({ freshContext: true, repair: { previousAnswer: "Draft one", reasons: FAIL.reasons } });
+    });
+
+    it("starts a new thread instead of writing into a locked chat, and records why", async () => {
+        const thread = await insertThread({ lockedAt: 1 });
+        const taskId = await insertTask({
+            activeCycle: "c1",
+            cronExpression: "0 9 * * *",
+            lastRunThreadId: thread,
+            recurring: true,
+            runDestination: "continue_thread",
+            status: "queued",
+        });
+
+        const claimed = await claim(taskId, 0);
+        const task = await getTask(taskId);
+
+        expect(claimed.continueThreadId).toBeUndefined();
+        expect(claimed.keepLastThread).toBe(true);
+        expect(task.lastRunNotice).toMatchObject({ reason: "thread_locked" });
+    });
+
+    it("keeps the task's thread when a run fell back for a passing reason, and hands over otherwise", async () => {
+        const keep = await insertTask({ activeCycle: "c1", lastRunThreadId: "thread-kept", status: "queued" });
+        const kept = await claim(keep, 0);
+
+        await complete({
+            keepLastThread: true,
+            outcome: { finalAnswer: "Done", kind: "verified", verdict: PASS },
+            runId: kept.runId,
+            threadId: "thread-fallback",
+        });
+        expect(await getTask(keep)).toMatchObject({ lastRunThreadId: "thread-kept", status: "done" });
+
+        const hand = await insertTask({ activeCycle: "c2", lastRunThreadId: "thread-gone", status: "queued" });
+        const handed = await claim(hand, 0, "c2");
+
+        await complete({ outcome: { finalAnswer: "Done", kind: "verified", verdict: PASS }, runId: handed.runId, threadId: "thread-new" });
+        expect(await getTask(hand)).toMatchObject({ lastRunThreadId: "thread-new" });
+    });
+
+    it("keeps a cancelled round's late action out of the kept thread, which may be the newer cycle's", async () => {
+        const thread = await insertThread();
+        const taskId = await insertTask({
+            activeCycle: "c-new",
+            cronExpression: "0 9 * * *",
+            lastRunThreadId: thread,
+            recurring: true,
+            runDestination: "continue_thread",
+            status: "running",
+        });
+        const problem = async (cycle: string): Promise<unknown> =>
+            await harness.run(async (ctx: any) => await ctx.runQuery(runThreadProblem, { cycle, round: 0, taskId, threadId: thread }));
+
+        expect(await problem("c-old")).toBe("thread_unavailable");
+        expect(await problem("c-new")).toBeNull();
+    });
+
+    it("never lets a cancelled round's late action overwrite a newer run's notice", async () => {
+        const taskId = await insertTask({ activeCycle: "c-new", lastRunNotice: { at: 1, reason: "project_unwritable" }, status: "running" });
+
+        await runInternal(recordRunNotice, { cycle: "c-old", reason: "thread_busy", taskId });
+        expect(await getTask(taskId)).toMatchObject({ lastRunNotice: { reason: "project_unwritable" } });
+
+        await runInternal(recordRunNotice, { cycle: "c-new", reason: "thread_busy", taskId });
+        expect(await getTask(taskId)).toMatchObject({ lastRunNotice: { reason: "thread_busy" } });
+    });
+
+    it("keeps the notice of the run's first round through a repair round", async () => {
+        const taskId = await insertTask({
+            activeCycle: "c1",
+            lastRunNotice: { at: 1, reason: "thread_locked" },
+            status: "running",
+        });
+
+        await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("taskRuns", { cycle: "c1", origin: "schedule", round: 0, startedAt: 1, status: "failed", taskId, userId: USER }),
+        );
+        const claimed = await claim(taskId, 1);
+        const task = await getTask(taskId);
+
+        expect(claimed).not.toBeNull();
+        expect(task.lastRunNotice).toMatchObject({ reason: "thread_locked" });
+    });
+
+    it("files nothing in a project the owner can no longer read, and leaves its thread", async () => {
+        const thread = await insertThread({ projectId: "project-left" });
+        const taskId = await insertTask({
+            activeCycle: "c1",
+            cronExpression: "0 9 * * *",
+            lastRunThreadId: thread,
+            projectId: "project-left",
+            recurring: true,
+            runDestination: "continue_thread",
+            status: "queued",
+        });
+
+        const claimed = await claim(taskId, 0);
+
+        expect(claimed.projectId).toBeUndefined();
+        expect(claimed.continueThreadId).toBeUndefined();
+
+        const task = await getTask(taskId);
+
+        expect(task.lastRunNotice).toMatchObject({ reason: "project_unwritable" });
+    });
+
+    it("starts a new thread each run by default", async () => {
+        const thread = await insertThread();
+        const taskId = await insertTask({ activeCycle: "c1", cronExpression: "0 9 * * *", lastRunThreadId: thread, recurring: true, status: "queued" });
+
+        const claimed = await claim(taskId, 0);
+
+        expect(claimed.continueThreadId).toBeUndefined();
     });
 });
 

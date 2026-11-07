@@ -19,6 +19,7 @@ export interface BranchNode {
     order?: number;
     projectId?: string; // Project ID if thread belongs to a project
     relevantMessages?: any[]; // Messages that matched the search query
+    runner?: "host"; // Present on a chat that runs on a paired computer (its title is not generated in the cloud)
     snoozedUntil?: number; // Hidden from the main sections until then (owned threads only)
     source?: string; // "telegram" | "slack" | "discord" | undefined (web)
     statelessMode?: boolean; // Present if thread is in stateless mode

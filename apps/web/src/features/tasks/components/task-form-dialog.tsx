@@ -13,16 +13,21 @@ import { useQuery } from "@tanstack/react-query";
 import { useId, useMemo, useState } from "react";
 import { toast } from "sonner";
 
+import { ReasoningEffortSelector } from "@/features/chat/model-settings/reasoning-effort-selector";
 import PromptModelSelector from "@/features/prompts/components/prompt-model-selector";
+import useFeatureFlaggedModels from "@/hooks/use-feature-flagged-models";
 import { useCRPC } from "@/lib/lunora/crpc";
 
-import type { BoardGoal, BoardTask, SchedulePresetKey, TaskAssignee, TaskFormErrorKey, TaskFormValues } from "../lib/task-board";
+import useTaskProjects from "../hooks/use-task-projects";
+import type { BoardGoal, BoardTask, SchedulePresetKey, TaskAssignee, TaskFormErrorKey, TaskFormValues, TaskRunDestination } from "../lib/task-board";
 import {
     CRITERIA_MAX,
+    effortAppliesTo,
     getTaskFormDefaults,
     INSTRUCTIONS_MAX,
     MAX_REPAIR_ROUNDS,
     presetForCron,
+    RUN_DESTINATIONS,
     SCHEDULE_PRESETS,
     selectableRelatives,
     TITLE_MAX,
@@ -55,6 +60,16 @@ const TaskFormDialogBody = ({ defaultGoalId, editingTask, goals, onClose, onSubm
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     const { data: skills = [] } = useQuery(crpc.tasks.functions.listTaskSkillOptions.queryOptions({}));
+    const {
+        failed: projectsFailed,
+        hasMore: hasMoreProjects,
+        isLoadingMore: isLoadingMoreProjects,
+        loadMore: loadMoreProjects,
+        projects,
+        retry: retryProjects,
+    } = useTaskProjects(values.projectId);
+    const models = useFeatureFlaggedModels();
+    const selectedModel = values.model ? models.find((model) => model.id === values.model) : undefined;
 
     const errors = validateTaskForm(values);
     const hasErrors = Object.keys(errors).length > 0;
@@ -97,6 +112,13 @@ const TaskFormDialogBody = ({ defaultGoalId, editingTask, goals, onClose, onSubm
             return { ...previous, [key]: value };
         });
 
+    // An effort belongs to the model it was set for: a new or cleared model drops it, so no effort the form no
+    // longer shows keeps overriding the skill's.
+    const setModel = (model: string | undefined) =>
+        setValues((previous) => {
+            return { ...previous, model, reasoningEffort: model === previous.model ? previous.reasoningEffort : undefined };
+        });
+
     const presetLabels: Record<SchedulePresetKey, string> = {
         custom: t`Custom (cron)`,
         daily: t`Every day at 09:00 UTC`,
@@ -111,6 +133,16 @@ const TaskFormDialogBody = ({ defaultGoalId, editingTask, goals, onClose, onSubm
         claude_code: t`Claude Code (coding agent)`,
         codex: t`OpenAI Codex (coding agent)`,
     };
+    const destinationLabels: Record<TaskRunDestination, string> = {
+        continue_thread: t`Continue the same thread`,
+        fresh_context: t`Same thread, fresh context each run`,
+        new_thread: t`A new thread each run`,
+    };
+    const destinationHints: Record<TaskRunDestination, string> = {
+        continue_thread: t`Each run is added to the last run's thread, and the agent sees the earlier runs.`,
+        fresh_context: t`Each run is added to the last run's thread after a divider. The history stays, but the agent is not sent earlier runs.`,
+        new_thread: t`Each run starts its own thread.`,
+    };
     const isCodingAgent = values.assignee !== "chat";
     const keyProvider = values.assignee === "codex" ? "OpenAI" : "Anthropic";
 
@@ -123,11 +155,15 @@ const TaskFormDialogBody = ({ defaultGoalId, editingTask, goals, onClose, onSubm
         cron: `${baseId}-cron`,
         cronError: `${baseId}-cron-error`,
         dependencies: `${baseId}-dependencies`,
+        destination: `${baseId}-destination`,
+        destinationHint: `${baseId}-destination-hint`,
         goal: `${baseId}-goal`,
         instructions: `${baseId}-instructions`,
         instructionsError: `${baseId}-instructions-error`,
         model: `${baseId}-model`,
         parent: `${baseId}-parent`,
+        project: `${baseId}-project`,
+        projectHint: `${baseId}-project-hint`,
         repairs: `${baseId}-repairs`,
         repairsHint: `${baseId}-repairs-hint`,
         repo: `${baseId}-repo`,
@@ -148,7 +184,7 @@ const TaskFormDialogBody = ({ defaultGoalId, editingTask, goals, onClose, onSubm
         setIsSubmitting(true);
 
         try {
-            await onSubmit(toTaskPayload(values));
+            await onSubmit(toTaskPayload(values, { effortApplies: effortAppliesTo(values.model, selectedModel) }));
             onClose();
         } catch (error) {
             toast.error(error instanceof Error && error.message ? error.message : t`Failed to save task`);
@@ -350,15 +386,69 @@ const TaskFormDialogBody = ({ defaultGoalId, editingTask, goals, onClose, onSubm
 
                         <div aria-labelledby={ids.model} className="space-y-2" hidden={isCodingAgent} role="group">
                             <Label id={ids.model}>{t`Model`}</Label>
-                            <PromptModelSelector onChange={(model) => set("model", model)} value={values.model} />
+                            <PromptModelSelector onChange={(model) => setModel(model)} value={values.model} />
                             <div className="flex items-center justify-between gap-2">
                                 <p className="text-muted-foreground text-xs">{t`Optional. Defaults to the skill's preferred model, then the default model.`}</p>
                                 {values.model && (
-                                    <Button onClick={() => set("model", undefined)} size="sm" type="button" variant="ghost">
+                                    <Button onClick={() => setModel(undefined)} size="sm" type="button" variant="ghost">
                                         {t`Clear model`}
                                     </Button>
                                 )}
                             </div>
+                            {selectedModel && (
+                                <ReasoningEffortSelector
+                                    model={selectedModel}
+                                    onChange={(effort) => set("reasoningEffort", effort)}
+                                    value={values.reasoningEffort}
+                                />
+                            )}
+                        </div>
+
+                        <div className="space-y-2" hidden={isCodingAgent}>
+                            <Label id={ids.project}>{t`Project`}</Label>
+                            <Select
+                                items={[
+                                    { label: t`No project`, value: NONE },
+                                    ...projects.map((project) => {
+                                        return { label: project.title, value: project._id as string };
+                                    }),
+                                ]}
+                                onValueChange={(value) => set("projectId", !value || value === NONE ? "" : (String(value) as Id<"projects">))}
+                                value={values.projectId || NONE}
+                            >
+                                <SelectTrigger aria-describedby={ids.projectHint} aria-labelledby={ids.project}>
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value={NONE}>{t`No project`}</SelectItem>
+                                    {projects.map((project) => (
+                                        <SelectItem key={project._id} value={project._id}>
+                                            {project.title}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                            {isLoadingMoreProjects && (
+                                <p className="text-muted-foreground text-xs" role="status">
+                                    {t`Loading more projects…`}
+                                </p>
+                            )}
+                            {projectsFailed && (
+                                <p className="text-destructive flex items-center gap-2 text-xs" role="alert">
+                                    {t`Could not load more projects.`}
+                                    <Button onClick={retryProjects} size="sm" type="button" variant="ghost">
+                                        {t`Try again`}
+                                    </Button>
+                                </p>
+                            )}
+                            {hasMoreProjects && !isLoadingMoreProjects && (
+                                <Button onClick={loadMoreProjects} size="sm" type="button" variant="ghost">
+                                    {t`Show more projects`}
+                                </Button>
+                            )}
+                            <p className="text-muted-foreground text-xs" id={ids.projectHint}>
+                                {t`A run's thread is filed in this project. Moving the task to another project starts a new thread.`}
+                            </p>
                         </div>
 
                         <div className="space-y-2">
@@ -470,6 +560,32 @@ const TaskFormDialogBody = ({ defaultGoalId, editingTask, goals, onClose, onSubm
                                                 {cronError}
                                             </p>
                                         )}
+                                    </div>
+                                )}
+                                {preset !== "none" && !isCodingAgent && (
+                                    <div className="space-y-1">
+                                        <Label id={ids.destination}>{t`Where each run goes`}</Label>
+                                        <Select
+                                            items={RUN_DESTINATIONS.map((destination) => {
+                                                return { label: destinationLabels[destination], value: destination };
+                                            })}
+                                            onValueChange={(value) => set("runDestination", (value ?? "new_thread") as TaskRunDestination)}
+                                            value={values.runDestination}
+                                        >
+                                            <SelectTrigger aria-describedby={ids.destinationHint} aria-labelledby={ids.destination}>
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {RUN_DESTINATIONS.map((destination) => (
+                                                    <SelectItem key={destination} value={destination}>
+                                                        {destinationLabels[destination]}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                        <p className="text-muted-foreground text-xs" id={ids.destinationHint}>
+                                            {destinationHints[values.runDestination]}
+                                        </p>
                                     </div>
                                 )}
                             </div>

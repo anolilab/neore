@@ -19,13 +19,15 @@ export const documentTextPart = (filename: string | undefined, extractedText: st
     return { text: `${label}\n\n${extractedText}`, type: "text" };
 };
 
-/** A label at the start of any line: an attachment can follow typed text in the same string (messenger). */
-export const isAttachedContentText = (text: string): boolean =>
-    text.split("\n").some((line) => {
-        const trimmed = line.trimStart();
+/** Whether one line opens with an attachment's label. */
+export const isAttachedLine = (line: string): boolean => {
+    const trimmed = line.trimStart();
 
-        return trimmed.startsWith(DOCUMENT_LABEL_PREFIX) || trimmed.startsWith(ATTACHED_DOCUMENT_LABEL) || trimmed.startsWith(PAGE_CONTEXT_LABEL);
-    });
+    return trimmed.startsWith(DOCUMENT_LABEL_PREFIX) || trimmed.startsWith(ATTACHED_DOCUMENT_LABEL) || trimmed.startsWith(PAGE_CONTEXT_LABEL);
+};
+
+/** A label at the start of any line: an attachment can follow typed text in the same string (messenger). */
+export const isAttachedContentText = (text: string): boolean => text.split("\n").some((line) => isAttachedLine(line));
 
 interface MessageLike {
     content?: unknown;

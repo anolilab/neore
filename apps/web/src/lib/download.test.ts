@@ -175,6 +175,16 @@ describe("chat export", () => {
             expect(xml).toContain("Switched from GPT-4.1 Mini to custom/unlisted");
         });
 
+        it("exports a fresh-context task run's divider as the line it stands for, not an empty system entry", async () => {
+            const reset = { ...divider, providerMetadata: { neoreContextReset: { reason: "task_run" } } } as unknown as Doc<"messages">;
+            const rows = [switched[0], reset, switched[2]] as Doc<"messages">[];
+            const textBlob = await exported("txt", rows);
+            const text = await textBlob.text();
+
+            expect(text).toContain("System: New task run · earlier messages were not sent to the model");
+            expect(formatAsMarkdown(thread, rows)).toContain("_New task run · earlier messages were not sent to the model_");
+        });
+
         it.each(["portable", "delta"] as const)("annotates a %s handoff divider too", (mode) => {
             const handoff = {
                 ...divider,
