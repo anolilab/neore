@@ -35,8 +35,26 @@ const RECORDING_OPTIONS: RecordingOptions = {
  */
 const session: { last: Promise<void>; owner: symbol | undefined } = { last: Promise.resolve(), owner: undefined };
 
-/** How long a teardown waits for the recorder to stop before it switches the session off regardless. */
+/** How long anything waits for the recorder to stop: a native stop that never answers must not hold the mic forever. */
 const STOP_DEADLINE_MS = 5000;
+
+/** `work`, or a rejection once `ms` have passed without it settling. */
+const withDeadline = async <T>(work: Promise<T>, ms: number): Promise<T> => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+
+    try {
+        return await Promise.race([
+            work,
+            new Promise<never>((_resolve, reject) => {
+                timer = setTimeout(() => {
+                    reject(new Error("The recorder did not stop in time."));
+                }, ms);
+            }),
+        ]);
+    } finally {
+        clearTimeout(timer);
+    }
+};
 
 /**
  * Takes the audio session out of recording for `owner`'s press, after `stopping` (the recorder's stop) has settled.
@@ -50,19 +68,10 @@ const leaveRecordingMode = async (owner: symbol | undefined, stopping?: Promise<
         await previous;
 
         // A stop that never answers must not hold every later press: the session is switched off after a while anyway.
-        let timer: ReturnType<typeof setTimeout> | undefined;
-
         try {
-            await Promise.race([
-                stopping,
-                new Promise((resolve) => {
-                    timer = setTimeout(resolve, STOP_DEADLINE_MS);
-                }),
-            ]);
+            await withDeadline(Promise.resolve(stopping), STOP_DEADLINE_MS);
         } catch {
             // The caller handles it.
-        } finally {
-            clearTimeout(timer);
         }
 
         // A newer press took the session over: leave its recording alone.
@@ -148,7 +157,8 @@ export const useVoiceInput = ({ onText }: { onText: (text: string) => void }) =>
         const leaving = leaveRecordingMode(pressToken.current, stopping);
 
         try {
-            await stopping;
+            // A stop that never answers ends as a failure here, so the press is cleaned up and the mic freed.
+            await withDeadline(stopping, STOP_DEADLINE_MS);
         } finally {
             await leaving;
         }
