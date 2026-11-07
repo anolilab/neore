@@ -306,9 +306,19 @@ const chipKey = (state: EditorState, vim: VimState, key: string): VimResult => {
 
     if (INSERT_BEFORE.has(key) || INSERT_AFTER.has(key)) {
         const before = INSERT_BEFORE.has(key);
-        const target = Selection.near(state.doc.resolve(before ? from : to), before ? -1 : 1);
+        // A text position on that side of the chip; when the chip is the first or last block there is none, so an empty line
+        // is opened there, and typing never lands on the chip itself.
+        const target = Selection.findFrom(state.doc.resolve(before ? from : to), before ? -1 : 1, true);
 
-        return handledAt(vim, state.tr.setSelection(target), { mode: "insert" });
+        if (target) {
+            return handledAt(vim, state.tr.setSelection(target), { mode: "insert" });
+        }
+
+        const { paragraph } = state.schema.nodes;
+        const at = before ? from : to;
+        const tr = state.tr.insert(at, paragraph!.create());
+
+        return handledAt(vim, tr.setSelection(TextSelection.create(tr.doc, at + 1)), { mode: "insert" });
     }
 
     return { handled: key.length === 1, state: { ...vim, pending: "" } };

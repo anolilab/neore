@@ -126,19 +126,21 @@ describe("the quote chip's clipboard", () => {
             "takes the quote from the visible lines, not a hidden attribute",
             `<div data-quote-chip data-message-id="m" data-quote-text="${"hidden ".repeat(200)}"><blockquote><p>Seen</p></blockquote></div>`,
             "quoteChip",
+            formatQuote("Seen"),
         ],
         [
             "pastes a quote past the long-paste limit as quoted lines, not a chip",
             `<div data-quote-chip data-message-id="m"><blockquote><p>${"long ".repeat(120)}</p></blockquote></div>`,
             "paragraph",
+            `> ${"long ".repeat(120).trim()}`,
         ],
-    ])("%s", (_label, html, type) => {
+    ])("%s", (_label, html, type, text) => {
         const pasted = new Editor({ content: html, extensions: [StarterKit.configure({ blockquote: false }), QuoteChip.configure({ labels })] });
 
         try {
             expect(pasted.getJSON().content?.[0]?.type).toBe(type);
-            expect(pasted.getText()).not.toContain("hidden");
-            expect(pasted.getText({ blockSeparator: "\n" }).startsWith("> ")).toBe(true);
+            // All of the quote, and only the visible quote, with its markers.
+            expect(pasted.getText({ blockSeparator: "\n" })).toBe(text);
         } finally {
             pasted.destroy();
         }

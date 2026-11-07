@@ -192,6 +192,17 @@ describe("motions", () => {
         expect(after.vim.mode).toBe("insert");
         expect(after.state.selection.$head.parent.textContent).toBe("last");
     });
+
+    it("opens a line before a quote chip that starts the draft, so i does not type over it", () => {
+        const doc = chipSchema.node("doc", null, [chipSchema.node("quoteChip"), chipSchema.node("paragraph", null, [chipSchema.text("comment")])]);
+        const start = EditorState.create({ doc, schema: chipSchema });
+        const chipSelected = start.apply(start.tr.setSelection(NodeSelection.create(start.doc, 0)));
+        const { state, vim } = press(chipSelected, ["i"]);
+
+        expect(vim.mode).toBe("insert");
+        expect(state.selection.$head.parent.isTextblock).toBe(true);
+        expect(state.doc.child(1).type.name).toBe("quoteChip");
+    });
 });
 
 describe("editing", () => {

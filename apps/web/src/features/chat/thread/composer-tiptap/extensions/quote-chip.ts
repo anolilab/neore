@@ -92,6 +92,7 @@ const QuoteChip = Node.create<QuoteChipOptions>({
         return ({ node }) => {
             const dom = document.createElement("div");
             const excerpt = document.createElement("span");
+            const fullText = document.createElement("span");
             const source = document.createElement("button");
             const paint = (): void => {
                 const label = labels().goToReply;
@@ -106,6 +107,10 @@ const QuoteChip = Node.create<QuoteChipOptions>({
             dom.className = "bg-muted text-muted-foreground my-1 flex items-center gap-2 rounded-md border px-2 py-1 text-xs";
             excerpt.className = "min-w-0 truncate";
             excerpt.textContent = excerptOf(String(node.attrs.text ?? ""));
+            // The excerpt is for the eye; a screen reader reads the whole quote instead.
+            excerpt.setAttribute("aria-hidden", "true");
+            fullText.className = "sr-only";
+            fullText.textContent = String(node.attrs.text ?? "");
             source.type = "button";
             source.className = "text-primary shrink-0 underline-offset-2 hover:underline";
             paint();
@@ -114,6 +119,7 @@ const QuoteChip = Node.create<QuoteChipOptions>({
                     showWarning(labels().notOnScreen);
                 }
             });
+            dom.appendChild(fullText);
             dom.appendChild(excerpt);
             dom.appendChild(source);
             repaints.set(dom, paint);
