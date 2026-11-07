@@ -29,21 +29,28 @@ rm -f "$list"
 
 # Type check of the projects affected since the same base, with `tsrs` (TS 7.1
 # semantics, beta). CI still runs `tsc` 6; if the two disagree, CI decides.
-# It reads the working tree, so it stands only for a push of the checked-out
-# commit: Git lists "<local ref> <local sha> <remote ref> <remote sha>" on stdin
-# for each pushed ref, and any other commit (all-zero sha = a deletion) skips it.
+# It reads the working tree, so it describes the push only when every pushed ref
+# is the checked-out commit and the tree is clean; otherwise it is skipped and CI
+# checks. Git lists "<local ref> <local sha> <remote ref> <remote sha>" on stdin
+# for each pushed ref; an all-zero sha is a deletion.
+skip() {
+    echo "pre-push: type check skipped: $1; CI checks the pushed commit." >&2
+    exit 0
+}
 head=$(git rev-parse HEAD)
-other=
+pushed=
 while read -r _ sha _ _; do
     case "$sha" in
         # Peeled: an annotated tag lists the tag object, not its commit.
-        *[!0]*) [ "$(git rev-parse --verify --quiet "$sha^{commit}")" = "$head" ] || other=1 ;;
+        *[!0]*)
+            pushed=1
+            [ "$(git rev-parse --verify --quiet "$sha^{commit}")" = "$head" ] || skip "a pushed ref is not the checked-out commit"
+            ;;
     esac
 done
-if [ -n "$other" ]; then
-    echo "pre-push: type check skipped: a pushed ref is not the checked-out commit; CI checks it." >&2
-    exit 0
-fi
+[ -n "$pushed" ] || skip "nothing but deletions is pushed"
+git diff --quiet HEAD -- || skip "the working tree has uncommitted changes"
+[ -z "$(git ls-files --others --exclude-standard -- '*.ts' '*.tsx' '*.mts' '*.cts')" ] || skip "there are untracked TypeScript files"
 # Quiet: a failing task still prints its errors; cached ones (the backend codegen
 # replays its whole advisor report) do not.
 pnpm exec vis affected lint:types:fast --base="$base" --output-style=quiet || exit 1

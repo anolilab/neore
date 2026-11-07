@@ -60,6 +60,8 @@ then `vis affected lint:types:fast` from that same base. The fast type check run
 with TS 7.1 semantics (beta): about 13 s for every project, against 4.5 min for `lint:types`, plus up to a minute when a
 backend change reruns its `codegen`. CI and
 `pnpm lint:types` stay on `tsc` 6, so the hook can report a difference that only TS 7 sees; the CI result decides.
+It reads the working tree, so it is skipped (with a note) when a pushed ref is not the checked-out commit, when only
+deletions are pushed, or when there are uncommitted changes or untracked TypeScript files.
 `lint:types:fast` depends on the `build` of `@neore/ai` and `@neore/service-sdk` (they export only `dist`) and on the
 backend `codegen`, not on `^build`, which would also build the Worker. Lint, tests and the full `tsc` check stay manual:
 on a change to a root config every project is affected and they take many minutes. A new worktree needs `pnpm install`
