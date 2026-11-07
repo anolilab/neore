@@ -442,27 +442,6 @@ export const getSkillBreakdown = authQuery
 
 const vTotals = { costMicrodollars: v.number(), replies: v.number(), tokens: v.number() };
 
-/** Days whose usage no project was filed for: from the first backfill walk's start until the project walk began. */
-const vUnfiled = v.optional(v.object({ from: v.string(), to: v.string() }));
-
-/**
- * The days, from `fromDate` on, whose replies were recorded before replies were filed under projects: between the
- * first backfill walk's start and the project walk's. They count under "No project"; a view says so rather than show
- * them as project-less spend.
- */
-const unfiledDays = async (ctx: Pick<QueryCtx, "db">, userId: string, fromDate: string): Promise<{ from: string; to: string } | undefined> => {
-    const state = await ctx.db.usageBackfill.findFirst({ where: { userId } });
-
-    if (!state?.projects || state.projects.startedAt <= state.startedAt) {
-        return undefined;
-    }
-
-    const from = usageDayOf(state.startedAt, state.timeZone);
-    const to = usageDayOf(state.projects.startedAt, state.timeZone);
-
-    return to < fromDate || from === to ? undefined : { from: from < fromDate ? fromDate : from, to };
-};
-
 /** Project title lookups one breakdown runs at once. */
 const TITLE_LOOKUPS_AT_ONCE = 16;
 
@@ -494,12 +473,10 @@ export const getProjectBreakdown = authQuery
             projects: v.array(v.object({ ...vTotals, projectKey: v.string(), title: v.optional(v.string()) })),
             total: v.object({ ...vTotals }),
             truncated: v.boolean(),
-            unfiled: vUnfiled,
         }),
     )
     .query(async ({ args, ctx }) => {
         const { userId } = ctx.user;
-        const unfiled = await unfiledDays(ctx, userId, args.fromDate);
         const [totals, rows] = await Promise.all([
             totalSince(ctx, userId, args.fromDate),
             ctx.db.usageDaily.findMany({
@@ -538,7 +515,6 @@ export const getProjectBreakdown = authQuery
             projects: titled,
             total,
             truncated: totals.truncated || rows.page.length >= PROJECT_ROW_LIMIT,
-            ...(unfiled && { unfiled }),
         };
     });
 
@@ -551,14 +527,13 @@ const PROJECT_USAGE_ROW_LIMIT = HEATMAP_DAYS * 2;
  */
 export const getProjectUsage = authQuery
     .input({ fromDate: vDayKey(), projectId: v.id("projects") })
-    .output(v.object({ ...vTotals, truncated: v.boolean(), unfiled: vUnfiled }))
+    .output(v.object({ ...vTotals, truncated: v.boolean() }))
     .query(async ({ args, ctx }) => {
-        const unfiled = await unfiledDays(ctx, ctx.user.userId, args.fromDate);
         const { page } = await ctx.db.usageDaily.findMany({
             limit: PROJECT_USAGE_ROW_LIMIT + 1,
             orderBy: [{ date: "desc" }],
             where: { date: { gte: args.fromDate }, projectKey: args.projectId as string, userId: ctx.user.userId },
         });
 
-        return { ...sumRows(page.slice(0, PROJECT_USAGE_ROW_LIMIT)), truncated: page.length > PROJECT_USAGE_ROW_LIMIT, ...(unfiled && { unfiled }) };
+        return { ...sumRows(page.slice(0, PROJECT_USAGE_ROW_LIMIT)), truncated: page.length > PROJECT_USAGE_ROW_LIMIT };
     });

@@ -162,7 +162,6 @@ describe("usage by project", () => {
         projects: (Totals & { projectKey: string; title?: string })[];
         total: Totals;
         truncated: boolean;
-        unfiled?: { from: string; to: string };
     }
 
     const projectBreakdown = async (userId: string, fromDate: string): Promise<ProjectBreakdown> =>
@@ -341,30 +340,5 @@ describe("usage by project", () => {
         expect(result.truncated).toBe(true);
         expect(result.noProject).toStrictEqual({ costMicrodollars: 0, replies: 0, tokens: 0 });
         expect(result.total.costMicrodollars).toBe((days - 1) * projectKeys.length);
-    });
-
-    it("says which days were recorded before usage was filed by project", async () => {
-        const day = 24 * 60 * 60 * 1000;
-        const first = Date.UTC(2026, 8, 1, 12);
-
-        await harness.run(async (ctx: any) => {
-            await ctx.db.insert("usageBackfill", {
-                leaseUntil: 0,
-                projects: { leaseUntil: 0, replies: 0, runId: "p", startedAt: first + 10 * day, status: "done" },
-                replies: 0,
-                runId: "r",
-                startedAt: first,
-                status: "done",
-                timeZone: "UTC",
-                updatedAt: 0,
-                userId: USER,
-            });
-        });
-
-        const spanning = await projectBreakdown(USER, "2026-09-05");
-        const after = await projectBreakdown(USER, "2026-09-12");
-
-        expect(spanning.unfiled).toStrictEqual({ from: "2026-09-05", to: "2026-09-11" });
-        expect(after.unfiled).toBeUndefined();
     });
 });

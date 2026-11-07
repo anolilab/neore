@@ -6,7 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import { BACKFILL_REFETCH_MS, useRefetchAfterBackfill, useUsageBackfill } from "@/features/settings/hooks/use-usage-backfill";
 import { useUsageToday } from "@/features/settings/hooks/use-usage-today";
-import { formatDayKey, formatUsd, periodStart } from "@/features/settings/lib/usage-activity";
+import { formatUsd, periodStart } from "@/features/settings/lib/usage-activity";
 import { useCRPC } from "@/lib/lunora/crpc";
 
 /** The window the project's totals cover, in days. */
@@ -35,8 +35,6 @@ const ProjectUsageSummary = ({ projectId }: ProjectUsageSummaryProps) => {
 
     useRefetchAfterBackfill(backfilling, refetch);
 
-    const unfiledFrom = data?.unfiled ? formatDayKey(data.unfiled.from, locale) : undefined;
-    const unfiledTo = data?.unfiled ? formatDayKey(data.unfiled.to, locale) : undefined;
     const stats = [
         { label: t`Replies`, value: data ? data.replies.toLocaleString(locale) : undefined },
         {
@@ -69,11 +67,6 @@ const ProjectUsageSummary = ({ projectId }: ProjectUsageSummaryProps) => {
                 </dl>
             )}
             {data?.truncated && <p className="text-muted-foreground text-xs">{t`Only part of this period is included.`}</p>}
-            {unfiledFrom !== undefined && unfiledTo !== undefined && (
-                <p className="text-muted-foreground text-xs">
-                    {t`Replies from ${unfiledFrom} to ${unfiledTo} were recorded before usage was filed by project, and are not counted here.`}
-                </p>
-            )}
         </section>
     );
 };

@@ -55813,21 +55813,6 @@
                     },
                     "truncated": {
                       "type": "boolean"
-                    },
-                    "unfiled": {
-                      "properties": {
-                        "from": {
-                          "type": "string"
-                        },
-                        "to": {
-                          "type": "string"
-                        }
-                      },
-                      "required": [
-                        "from",
-                        "to"
-                      ],
-                      "type": "object"
                     }
                   },
                   "required": [
@@ -55912,21 +55897,6 @@
                     },
                     "truncated": {
                       "type": "boolean"
-                    },
-                    "unfiled": {
-                      "properties": {
-                        "from": {
-                          "type": "string"
-                        },
-                        "to": {
-                          "type": "string"
-                        }
-                      },
-                      "required": [
-                        "from",
-                        "to"
-                      ],
-                      "type": "object"
                     }
                   },
                   "required": [

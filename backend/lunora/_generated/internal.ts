@@ -1235,7 +1235,7 @@ export interface InternalApiTypes {
         };
         organization: {
             isOrganizationAdmin: FunctionReference<"query", { organizationId: string; userId: string }, boolean>;
-            organizationProjectTitles: FunctionReference<"query", { organizationId: string; projectIds: Array<string> }, { moreUnused: boolean; owned: Array<{ projectId: string; title: string }>; unused: Array<{ projectId: string; title: string }> }>;
+            organizationProjectTitles: FunctionReference<"query", { organizationId: string; projectIds: Array<string>; withUnused: boolean }, { moreUnused: boolean; owned: Array<{ projectId: string; title: string }>; unused: Array<{ projectId: string; title: string }> }>;
             organizationUsageSums: FunctionReference<"query", { from: number; organizationId: string }, Array<{ costMicrodollars: number; projectKey?: string; replies: number; tokens: number }>>;
             pruneOrganizationUsage: FunctionReference<"mutation", {}, number>;
             usageTimeZoneOf: FunctionReference<"query", { userId: string }, string | null>;

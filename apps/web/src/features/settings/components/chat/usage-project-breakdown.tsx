@@ -16,7 +16,7 @@ import { useAction, useCRPC } from "@/lib/lunora/crpc";
 
 import { BACKFILL_REFETCH_MS, useRefetchAfterBackfill } from "../../hooks/use-usage-backfill";
 import { useUsageToday } from "../../hooks/use-usage-today";
-import { formatDayKey, formatUsd, periodStart } from "../../lib/usage-activity";
+import { formatUsd, periodStart } from "../../lib/usage-activity";
 import { retryOrganizationRead } from "../../lib/usage-organization";
 
 /** The row key of what no project accounts for; never a project id. */
@@ -120,8 +120,6 @@ const UsageProjectBreakdown: FC<UsageProjectBreakdownProps> = ({ backfilling, da
         }
     }
 
-    const unfiledFrom = mine.data?.unfiled ? formatDayKey(mine.data.unfiled.from, locale) : undefined;
-    const unfiledTo = mine.data?.unfiled ? formatDayKey(mine.data.unfiled.to, locale) : undefined;
     const totalCost = rows.reduce((sum, row) => sum + row.costMicrodollars, 0);
     // The organization's read is summed by the database and never cut short.
     const truncated = showing === "mine" && mine.data?.truncated === true;
@@ -221,11 +219,6 @@ const UsageProjectBreakdown: FC<UsageProjectBreakdownProps> = ({ backfilling, da
                     </Table>
                 )}
                 {truncated && <p className="text-muted-foreground mt-2 text-xs">{t`Only part of this period is included.`}</p>}
-                {showing === "mine" && unfiledFrom !== undefined && unfiledTo !== undefined && (
-                    <p className="text-muted-foreground mt-2 text-xs">
-                        {t`Replies from ${unfiledFrom} to ${unfiledTo} were recorded before usage was filed by project, and count under No project.`}
-                    </p>
-                )}
                 {showing === "organization" && organization.data?.projectsCut && (
                     <p className="text-muted-foreground mt-2 text-xs">{t`Some of the organization's projects with no usage are not listed.`}</p>
                 )}

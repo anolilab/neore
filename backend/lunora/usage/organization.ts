@@ -17,6 +17,7 @@
 import { LunoraError, v } from "lunorash/server";
 
 import { internal } from "../_generated/internal";
+import type { QueryCtx } from "../_generated/server";
 import { internalMutation, internalQuery } from "../_generated/server";
 import { getMemberByOrganizationAndUser } from "../auth/lib/better-auth-queries";
 import { usageDailyCutoffDate } from "../gdpr/retention";
@@ -97,23 +98,31 @@ export const organizationUsageSums = internalQuery
         });
     });
 
+/** The organization's projects to list at zero, one past {@link MAX_PROJECTS} to tell whether more are left out. */
+const organizationProjects = async (ctx: QueryCtx, organizationId: string) => {
+    const { page } = await systemDb(ctx).projects.findMany({ limit: MAX_PROJECTS + 1, where: { organizationId } });
+
+    return page;
+};
+
 /** Titles of the projects among `projectIds` the organization owns now, and its projects to list at zero. */
 export const organizationProjectTitles = internalQuery
-    .input({ organizationId: v.string().max(MAX_LENGTH.id), projectIds: v.array(v.string().max(MAX_LENGTH.id)) })
+    .input({ organizationId: v.string().max(MAX_LENGTH.id), projectIds: v.array(v.string().max(MAX_LENGTH.id)), withUnused: v.boolean() })
     .output(v.object({ moreUnused: v.boolean(), owned: v.array(vTitled), unused: v.array(vTitled) }))
-    .query(async ({ args: { organizationId, projectIds }, ctx }) => {
+    .query(async ({ args: { organizationId, projectIds, withUnused }, ctx }) => {
         const found = await Promise.all(
             projectIds.slice(0, TITLE_BATCH).map(async (projectId) => await systemDb(ctx).projects.findFirst({ where: { _id: projectId as never } })),
         );
-        const listed = await systemDb(ctx).projects.findMany({ limit: MAX_PROJECTS + 1, where: { organizationId } });
+        // The organization's project list is read once, by the first batch; later batches only look titles up.
+        const listed = withUnused ? await organizationProjects(ctx, organizationId) : [];
 
         return {
             // Past the bound, the projects with no usage are not listed: the result says it was cut.
-            moreUnused: listed.page.length > MAX_PROJECTS,
+            moreUnused: listed.length > MAX_PROJECTS,
             owned: found.flatMap((project) =>
                 project && project.organizationId === organizationId ? [{ projectId: project._id as string, title: project.title }] : [],
             ),
-            unused: listed.page.slice(0, MAX_PROJECTS).map((project) => {
+            unused: listed.slice(0, MAX_PROJECTS).map((project) => {
                 return { projectId: project._id as string, title: project.title };
             }),
         };
@@ -174,11 +183,12 @@ export const getOrganizationProjectUsage = authAction
             const { moreUnused, owned, unused } = await ctx.runQuery(internal.usage.organization.organizationProjectTitles, {
                 organizationId,
                 projectIds: keys.slice(index, index + TITLE_BATCH),
+                withUnused: index === 0,
             });
 
             projectsCut ||= moreUnused;
 
-            for (const project of [...owned, ...(index === 0 ? unused : [])]) {
+            for (const project of [...owned, ...unused]) {
                 titles.set(project.projectId, project.title);
             }
         }

@@ -502,6 +502,36 @@ describe("organization usage rows", () => {
         expect(result.total).toMatchObject({ costMicrodollars: 20, replies: 1 });
     });
 
+    it("titles projects with usage across several lookups and lists those with none once", async () => {
+        const withUsage = 52;
+        const ids: string[] = [];
+
+        await harness.run(async (ctx: any) => {
+            for (let index = 0; index < withUsage + 3; index += 1) {
+                ids.push(await ctx.db.insert("projects", { createdAt: 0, organizationId: ORG, title: `P${String(index)}`, userId: ADMIN }));
+            }
+
+            for (const [index, projectKey] of ids.slice(0, withUsage).entries()) {
+                await ctx.db.insert("usageOrganizationReplies", {
+                    costMicrodollars: index + 1,
+                    date: "2026-09-20",
+                    organizationId: ORG,
+                    projectKey,
+                    recordedAt: AT,
+                    replyKey: `titled-${String(index)}`,
+                    tokens: 1,
+                    userId: ADMIN,
+                });
+            }
+        });
+
+        const { result } = await read();
+
+        expect(result.projects).toHaveLength(withUsage + 3);
+        expect(new Set(result.projects.map((project) => project.projectKey)).size).toBe(withUsage + 3);
+        expect(result.projects.filter((project) => project.costMicrodollars === 0)).toHaveLength(3);
+    });
+
     it("says when projects with no usage are left out, without calling the period incomplete", async () => {
         await harness.run(async (ctx: any) => {
             for (let index = 0; index <= MAX_PROJECTS; index += 1) {

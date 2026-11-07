@@ -88,10 +88,6 @@ export const weekdayOf = (dayKey: string): number => (new Date(`${dayKey}T00:00:
 /** The first day of a window of `days` days ending (inclusive) at `today`. */
 export const periodStart = (today: string, days: number): string => addDays(today, -(Math.max(1, days) - 1));
 
-/** `dayKey` as the locale writes a date, never shifted to another day by the browser's zone. */
-export const formatDayKey = (dayKey: string, locale: string): string =>
-    new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeZone: "UTC" }).format(new Date(`${dayKey}T12:00:00Z`));
-
 /** A UTC `Date` at noon of `dayKey`, for `Intl` formatting that must not shift the day. */
 export const dayKeyToDate = (dayKey: string): Date => new Date(`${dayKey}T12:00:00Z`);
 

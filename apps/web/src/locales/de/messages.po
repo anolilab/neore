@@ -1197,7 +1197,7 @@ msgid "{overflowCount, plural, one {# more user} other {# more users}}"
 msgstr "{overflowCount, plural, one {# weiterer Benutzer} other {# weitere Benutzer}}"
 
 #. placeholder {0}: String(percent)
-#: src/features/settings/components/chat/usage-project-breakdown.tsx:207
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:205
 msgid "{project}: {0}% of spend"
 msgstr "{project}: {0} % der Ausgaben"
 
@@ -8001,7 +8001,7 @@ msgstr "Der Marktplatz konnte nicht geladen werden. Versuche es später erneut."
 msgid "Could not load the memories."
 msgstr "Die Erinnerungen konnten nicht geladen werden."
 
-#: src/features/settings/components/chat/usage-project-breakdown.tsx:174
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:172
 msgid "Could not load the project breakdown."
 msgstr "Die Aufschlüsselung nach Projekt konnte nicht geladen werden."
 
@@ -8017,7 +8017,7 @@ msgstr ""
 msgid "Could not load this"
 msgstr ""
 
-#: src/features/projects/components/project-usage-summary.tsx:60
+#: src/features/projects/components/project-usage-summary.tsx:58
 msgid "Could not load this project's usage."
 msgstr "Die Nutzung dieses Projekts konnte nicht geladen werden."
 
@@ -8234,7 +8234,7 @@ msgstr "Die Teilnehmer konnten nicht aktualisiert werden"
 msgid "country"
 msgstr ""
 
-#: src/features/settings/components/chat/usage-project-breakdown.tsx:234
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:227
 msgid "Counts usage recorded since organization reporting started. Members' own projects count under No project."
 msgstr "Zählt die Nutzung seit Beginn der Organisationsberichte. Eigene Projekte von Mitgliedern zählen unter Kein Projekt."
 
@@ -18128,8 +18128,8 @@ msgstr ""
 msgid "Loading triggers..."
 msgstr "Trigger werden geladen..."
 
-#: src/features/projects/components/project-usage-summary.tsx:57
-#: src/features/settings/components/chat/usage-project-breakdown.tsx:168
+#: src/features/projects/components/project-usage-summary.tsx:55
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:166
 msgid "Loading usage…"
 msgstr "Nutzung wird geladen…"
 
@@ -19185,7 +19185,7 @@ msgid "Min"
 msgstr "Min"
 
 #: src/features/develop/components/inbox-list.tsx:51
-#: src/features/settings/components/chat/usage-project-breakdown.tsx:159
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:157
 msgid "Mine"
 msgstr ""
 
@@ -21073,7 +21073,7 @@ msgstr "Keine Referenzen ausgewählt"
 msgid "No remote MCP servers match your search."
 msgstr "Keine Remote-MCP-Server entsprechen deiner Suche."
 
-#: src/features/settings/components/chat/usage-project-breakdown.tsx:176
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:174
 #: src/features/settings/components/chat/usage-skill-breakdown.tsx:78
 msgid "No replies recorded for this period."
 msgstr "Für diesen Zeitraum wurden keine Antworten erfasst."
@@ -21868,8 +21868,8 @@ msgstr "Nur in einem Durchlauf"
 msgid "Only organization owners can manage billing settings"
 msgstr "Nur Organisationsinhaber können Abrechnungseinstellungen verwalten"
 
-#: src/features/projects/components/project-usage-summary.tsx:71
-#: src/features/settings/components/chat/usage-project-breakdown.tsx:223
+#: src/features/projects/components/project-usage-summary.tsx:69
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:221
 msgid "Only part of this period is included."
 msgstr "Nur ein Teil dieses Zeitraums ist enthalten."
 
@@ -22680,7 +22680,7 @@ msgstr ""
 #: src/features/auth/components/organization/organization-logo.tsx:62
 #: src/features/auth/components/organization/organization-view.tsx:64
 #: src/features/layout/lib/dashboard-page-names.ts:32
-#: src/features/settings/components/chat/usage-project-breakdown.tsx:160
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:158
 #: src/features/settings/lib/settings-navigation.ts:108
 #: src/features/skills/components/skill-form-dialog.tsx:476
 #: src/features/skills/components/skill-item.tsx:129
@@ -24396,7 +24396,7 @@ msgstr "Fortschritt"
 msgid "Progress of {toolName}"
 msgstr ""
 
-#: src/features/settings/components/chat/usage-project-breakdown.tsx:182
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:180
 #: src/features/tasks/components/task-form-dialog.tsx:408
 msgid "Project"
 msgstr "Projekt"
@@ -25979,10 +25979,10 @@ msgid "Replay the welcome tour to review the core features of Neore."
 msgstr "Spiele die Willkommenstour erneut ab, um dir die wichtigsten Funktionen von Neore anzusehen."
 
 #: src/features/chat/header/thread-stats-dialog.tsx:71
-#: src/features/projects/components/project-usage-summary.tsx:41
+#: src/features/projects/components/project-usage-summary.tsx:39
 #: src/features/settings/components/chat/usage-activity-heatmap.tsx:144
 #: src/features/settings/components/chat/usage-activity-heatmap.tsx:246
-#: src/features/settings/components/chat/usage-project-breakdown.tsx:183
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:181
 #: src/features/settings/components/chat/usage-skill-breakdown.tsx:85
 msgid "Replies"
 msgstr "Antworten"
@@ -25994,14 +25994,6 @@ msgstr "Antworten und Ausgaben pro Tag in den letzten 53 Wochen"
 #: src/features/settings/connectors/messenger/messenger-reply-tools.tsx:67
 msgid "Replies can search, generate images and more, charged to your account. Tools set to \"Ask\" are skipped — nobody can approve them in a messenger."
 msgstr "Antworten können suchen, Bilder erzeugen und mehr – abgerechnet über dein Konto. Tools auf „Fragen“ werden übersprungen, denn im Messenger kann sie niemand genehmigen."
-
-#: src/features/projects/components/project-usage-summary.tsx:74
-msgid "Replies from {unfiledFrom} to {unfiledTo} were recorded before usage was filed by project, and are not counted here."
-msgstr "Antworten vom {unfiledFrom} bis {unfiledTo} wurden erfasst, bevor die Nutzung nach Projekt zugeordnet wurde, und sind hier nicht enthalten."
-
-#: src/features/settings/components/chat/usage-project-breakdown.tsx:226
-msgid "Replies from {unfiledFrom} to {unfiledTo} were recorded before usage was filed by project, and count under No project."
-msgstr "Antworten vom {unfiledFrom} bis {unfiledTo} wurden erfasst, bevor die Nutzung nach Projekt zugeordnet wurde, und zählen unter Kein Projekt."
 
 #: src/features/settings/components/chat/event-trigger-fields.tsx:155
 msgid "Replies in a thread"
@@ -26019,7 +26011,7 @@ msgstr "Antworten werden vorgelesen"
 msgid "Replies will no longer be read aloud"
 msgstr "Antworten werden nicht mehr vorgelesen"
 
-#: src/features/settings/components/chat/usage-project-breakdown.tsx:140
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:138
 msgid "Replies, tokens and spend per project for the selected period"
 msgstr "Antworten, Tokens und Ausgaben pro Projekt im gewählten Zeitraum"
 
@@ -28061,7 +28053,7 @@ msgstr "Formen"
 msgid "Share"
 msgstr "Teilen"
 
-#: src/features/settings/components/chat/usage-project-breakdown.tsx:187
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:185
 #: src/features/settings/components/chat/usage-skill-breakdown.tsx:89
 msgid "Share of spend"
 msgstr "Anteil an den Ausgaben"
@@ -28899,7 +28891,7 @@ msgstr "Solide Leistung bei den meisten Aufgabentypen"
 msgid "Some images from this run could not be saved."
 msgstr "Einige Bilder aus diesem Lauf konnten nicht gespeichert werden."
 
-#: src/features/settings/components/chat/usage-project-breakdown.tsx:230
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:223
 msgid "Some of the organization's projects with no usage are not listed."
 msgstr "Einige Projekte der Organisation ohne Nutzung werden nicht aufgeführt."
 
@@ -29175,10 +29167,10 @@ msgstr "Geschwindigkeit"
 msgid "Speed tier of Nano Banana 2 for fast text-to-image generation"
 msgstr "Schnelle Stufe von Nano Banana 2 für rasche Text-zu-Bild-Generierung"
 
-#: src/features/projects/components/project-usage-summary.tsx:46
+#: src/features/projects/components/project-usage-summary.tsx:44
 #: src/features/settings/components/chat/usage-activity-heatmap.tsx:145
 #: src/features/settings/components/chat/usage-activity-heatmap.tsx:247
-#: src/features/settings/components/chat/usage-project-breakdown.tsx:185
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:183
 #: src/features/settings/components/chat/usage-skill-breakdown.tsx:87
 msgid "Spend"
 msgstr "Ausgaben"
@@ -32663,8 +32655,8 @@ msgstr "Token-Anzahl"
 msgid "Token usage and cost breakdown per model for the selected period"
 msgstr "Token-Nutzung und Kostenaufschlüsselung pro Modell für den gewählten Zeitraum"
 
-#: src/features/projects/components/project-usage-summary.tsx:43
-#: src/features/settings/components/chat/usage-project-breakdown.tsx:184
+#: src/features/projects/components/project-usage-summary.tsx:41
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:182
 #: src/features/settings/components/chat/usage-settings.tsx:319
 #: src/features/settings/components/chat/usage-skill-breakdown.tsx:86
 msgid "Tokens"
@@ -33952,7 +33944,7 @@ msgstr "USA"
 
 #: src/features/chat/sidebar/usage-card.tsx:117
 #: src/features/layout/lib/dashboard-page-names.ts:41
-#: src/features/projects/components/project-usage-summary.tsx:52
+#: src/features/projects/components/project-usage-summary.tsx:50
 msgid "Usage"
 msgstr "Nutzung"
 
@@ -33968,7 +33960,7 @@ msgstr "Nutzungsanalysen"
 msgid "Usage Analytics"
 msgstr "Nutzungsanalysen"
 
-#: src/features/settings/components/chat/usage-project-breakdown.tsx:136
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:134
 msgid "Usage by project"
 msgstr "Nutzung nach Projekt"
 
@@ -35436,7 +35428,7 @@ msgstr "Als wer die Commits eines Pull Requests erstellt werden"
 msgid "Who answers"
 msgstr "Wer antwortet"
 
-#: src/features/settings/components/chat/usage-project-breakdown.tsx:146
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:144
 msgid "Whose usage"
 msgstr "Wessen Nutzung"
 
@@ -36143,7 +36135,7 @@ msgstr ""
 msgid "Your next message will start a self-destructing chat."
 msgstr "Deine nächste Nachricht startet einen selbstzerstörenden Chat."
 
-#: src/features/settings/components/chat/usage-project-breakdown.tsx:141
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:139
 msgid "Your organization's projects, summed over every member, for the selected period"
 msgstr "Die Projekte deiner Organisation, summiert über alle Mitglieder, im gewählten Zeitraum"
 
@@ -36175,7 +36167,7 @@ msgstr "Dein Plan und dein Guthaben richten sich nach deinem Abonnement."
 msgid "Your rating"
 msgstr "Deine Bewertung"
 
-#: src/features/projects/components/project-usage-summary.tsx:53
+#: src/features/projects/components/project-usage-summary.tsx:51
 msgid "Your replies, tokens and spend in this project over the last 30 days."
 msgstr "Deine Antworten, Tokens und Ausgaben in diesem Projekt in den letzten 30 Tagen."
 
