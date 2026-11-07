@@ -2,12 +2,19 @@
  * An option request the agent answers after its timeout is refused on time, but its answer is still handed over, so the
  * options the session offers match what the agent did.
  */
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { setConfigOption, setMode } from "./protocol";
 
+afterEach(() => {
+    vi.useRealTimers();
+});
+
 describe("an option request the agent answers late", () => {
     it("is refused on time, and its answer is still handed over when it comes", async () => {
+        // The request is answered 60 ms after it is made; the request's own timeout is 10 ms. The clock is driven past each point.
+        vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+
         const answer = { configOptions: [] };
         const connection = {
             request: () =>
@@ -19,17 +26,18 @@ describe("an option request the agent answers late", () => {
         };
         const late: unknown[] = [];
 
-        await expect(
+        const refused = expect(
             setConfigOption(connection as never, "s1", "model", "fast", 10, (value) => {
                 late.push(value);
             }),
         ).rejects.toThrow("the agent did not answer");
 
-        await new Promise((resolve) => {
-            setTimeout(() => {
-                resolve(undefined);
-            }, 120);
-        });
+        await vi.advanceTimersByTimeAsync(10);
+        await refused;
+        expect(late).toEqual([]);
+
+        // The answer arrives after the timeout: it is handed over, not dropped.
+        await vi.advanceTimersByTimeAsync(60);
 
         expect(late).toEqual([answer]);
     });
