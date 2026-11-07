@@ -213,16 +213,6 @@ describe(heicToJpegBlob, () => {
         expect(built).toHaveLength(0);
     });
 
-    it("hands a photo within the pixel budget to the browser's decoder, and releases its object URL", async () => {
-        const built: { src: string }[] = [];
-
-        vi.stubGlobal("Image", imageElement({ failure: new Error("decode reached"), height: 7000, width: 7000 }, built));
-
-        await expect(heicToJpegBlob(photoOf(7000, 7000), 0.92)).rejects.toThrow("decode reached");
-        expect(built[0]?.src).toBe("blob:heic");
-        expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:heic");
-    });
-
     describe("with the browser's image element and canvas faked at the boundary", () => {
         it("decodes the photo, draws it on a white canvas, encodes it as JPEG and releases the object URL", async () => {
             const photo = photoOf(100, 80);

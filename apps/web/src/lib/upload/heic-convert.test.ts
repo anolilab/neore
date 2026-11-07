@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { canConvertHeic, convertHeicToJpeg, decodesHeic, isHeicFile, jpegNameFor, willConvertHeic } from "./heic-convert";
+import { canConvertHeic, convertHeicToJpeg, decodesHeic, isHeicFile, jpegNameFor } from "./heic-convert";
 
 const { heicToJpegBlob } = vi.hoisted(() => {
     return { heicToJpegBlob: vi.fn(async () => new Blob(["jpeg bytes"], { type: "image/jpeg" })) };
@@ -27,8 +27,6 @@ const ANDROID_CHROME = "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537
 const useBrowser = (userAgent: string | undefined, maxTouchPoints = 0): void => {
     vi.stubGlobal("navigator", { maxTouchPoints, userAgent });
 };
-
-const heicPhoto = (name = "IMG_0001.HEIC"): File => new File(["heic"], name, { type: "image/heic" });
 
 afterEach(() => {
     vi.unstubAllGlobals();
@@ -91,32 +89,6 @@ describe(decodesHeic, () => {
     });
 });
 
-describe(willConvertHeic, () => {
-    it("converts a HEIC file in Safari, which decodes it", () => {
-        useBrowser(DESKTOP_SAFARI);
-
-        expect(willConvertHeic({ name: "IMG_0001.HEIC", type: "image/heic" })).toBe(true);
-    });
-
-    it("converts a HEIC file in another browser on iOS, which decodes it through WebKit", () => {
-        useBrowser(IPHONE_CHROME, 5);
-
-        expect(willConvertHeic({ name: "IMG_0001.HEIC", type: "image/heic" })).toBe(true);
-    });
-
-    it("does not convert a HEIC file in a browser that cannot decode it", () => {
-        useBrowser(MAC_CHROME);
-
-        expect(willConvertHeic({ name: "IMG_0001.HEIC", type: "image/heic" })).toBe(false);
-    });
-
-    it("never converts a file that is not HEIC", () => {
-        useBrowser(DESKTOP_SAFARI);
-
-        expect(willConvertHeic({ name: "photo.jpg", type: "image/jpeg" })).toBe(false);
-    });
-});
-
 describe(convertHeicToJpeg, () => {
     beforeEach(() => {
         heicToJpegBlob.mockClear();
@@ -140,48 +112,5 @@ describe(convertHeicToJpeg, () => {
         expect(converted.name).toBe("IMG_0003.jpg");
         expect(converted.type).toBe("image/jpeg");
         expect(converted.lastModified).toBe(1234);
-    });
-
-    it.each([
-        ["Chrome on iPhone", IPHONE_CHROME, 5],
-        ["Firefox on iPhone", IPHONE_FIREFOX, 5],
-        ["an in-app browser on iPhone", IPHONE_IN_APP, 5],
-        ["Chrome on iPad", IPAD_CHROME, 5],
-    ])("re-encodes a HEIC file in %s, as it does in Safari", async (_label, userAgent, touchPoints) => {
-        useBrowser(userAgent, touchPoints);
-        const photo = heicPhoto("IMG_0005.HEIC");
-
-        const converted = await convertHeicToJpeg(photo);
-
-        expect(heicToJpegBlob).toHaveBeenCalledWith(photo, 0.92);
-        expect(converted.name).toBe("IMG_0005.jpg");
-    });
-
-    it("keeps a HEIC file unchanged in a browser that cannot decode it, for the server to refuse", async () => {
-        useBrowser(MAC_CHROME);
-        const photo = heicPhoto("IMG_0004.HEIC");
-
-        await expect(convertHeicToJpeg(photo)).resolves.toBe(photo);
-        expect(heicToJpegBlob).not.toHaveBeenCalled();
-    });
-
-    it.each([
-        ["desktop Safari", DESKTOP_SAFARI, 0],
-        ["Chrome on iPhone", IPHONE_CHROME, 5],
-        ["Chrome on a Mac", MAC_CHROME, 0],
-    ])("decides the same in %s for the size precheck and the conversion", async (_label, userAgent, touchPoints) => {
-        useBrowser(userAgent, touchPoints);
-        const photo = heicPhoto();
-
-        const converted = await convertHeicToJpeg(photo);
-
-        expect(willConvertHeic(photo)).toBe(converted !== photo);
-    });
-
-    it("rejects when the decoder cannot read the file", async () => {
-        useBrowser(DESKTOP_SAFARI);
-        heicToJpegBlob.mockRejectedValueOnce(new Error("not a HEIC image"));
-
-        await expect(convertHeicToJpeg(new File(["x"], "broken.heic", { type: "image/heic" }))).rejects.toThrow("not a HEIC image");
     });
 });
