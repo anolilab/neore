@@ -234,6 +234,15 @@ const setSearch = (raw: Record<string, string>): void => {
 
 const selectedModel = (): string => useModelStore.getState().selectedModel;
 
+/** Lets the saved prompt's query answer and its effects run, so a draft is read once loading has finished, not at first render. */
+const settle = async (): Promise<void> => {
+    await act(async () => {
+        await new Promise((resolve) => {
+            setTimeout(resolve, 50);
+        });
+    });
+};
+
 describe("chat index route", () => {
     beforeEach(() => {
         harness.assistantProps = undefined;
@@ -507,12 +516,7 @@ describe("chat index route", () => {
 
             mountPage();
 
-            // The saved prompt's query answers after mount: let it resolve and its effects run before the draft is read.
-            await act(async () => {
-                await new Promise((resolve) => {
-                    setTimeout(resolve, 50);
-                });
-            });
+            await settle();
 
             expect(harness.navigate).not.toHaveBeenCalled();
             expect(useChatUIStore.getState().composerText).toBe("my draft");
@@ -630,20 +634,24 @@ describe("chat index route", () => {
             expect(harness.navigate).toHaveBeenCalledTimes(1);
         });
 
-        it("a blank prompt does not change the chat's model, even with a model in the link", () => {
+        it("a blank prompt does not change the chat's model, even with a model in the link", async () => {
             openUrl(`https://app.example.com/chat?model=${encodeURIComponent(textModel?.id ?? "")}&prompt=%20%20%20`);
 
             mountPage();
+
+            await settle();
 
             expect(useChatUIStore.getState().composerText).toBe("");
             expect(selectedModel()).toBe(DEFAULT_CHAT_MODEL);
             expect(harness.showWarning).not.toHaveBeenCalled();
         });
 
-        it("treats a blank prompt parameter as no link: nothing is drafted and no navigation strips it", () => {
+        it("treats a blank prompt parameter as no link: nothing is drafted and no navigation strips it", async () => {
             openUrl("https://app.example.com/chat?prompt=%20%20%20");
 
             mountPage();
+
+            await settle();
 
             expect(useChatUIStore.getState().composerText).toBe("");
             expect(harness.navigate).not.toHaveBeenCalled();

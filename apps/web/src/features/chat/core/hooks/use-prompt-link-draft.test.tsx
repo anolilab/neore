@@ -303,6 +303,28 @@ describe("usePromptLinkDraft", () => {
         expect(useModelStore.getState().comparisonMode).toBe(true);
     });
 
+    it("a link naming only a prompt keeps the chat's comparison, Auto, mode and model, and sets none of them", () => {
+        expect(textModel).toBeDefined();
+        expect(otherTextModel).toBeDefined();
+        useModelStore.setState({
+            comparisonMode: true,
+            newThreadMode: "text",
+            pendingSettings: { autoModel: true },
+            selectedModel: (otherTextModel?.id ?? "") as ModelId,
+            selectedModelsForComparison: [textModel?.id ?? "", otherTextModel?.id ?? ""] as ModelId[],
+        });
+
+        renderLink({ prompt: "hi" });
+
+        expect(useChatUIStore.getState().composerText).toBe("hi");
+        expect(useModelStore.getState().comparisonMode).toBe(true);
+        expect(useModelStore.getState().selectedModelsForComparison).toEqual([textModel?.id, otherTextModel?.id]);
+        expect(useModelStore.getState().pendingSettings?.autoModel).toBe(true);
+        expect(useModelStore.getState().newThreadMode).toBe("text");
+        expect(selectedModel()).toBe(otherTextModel?.id);
+        expect(harness.showWarning).not.toHaveBeenCalled();
+    });
+
     it("ends Auto as a pick does, so the link's model is the one a send runs on", () => {
         useModelStore.setState({ pendingSettings: { autoModel: true } });
 
@@ -413,12 +435,12 @@ describe("usePromptLinkDraft", () => {
         expect(harness.showWarning).not.toHaveBeenCalled();
     });
 
-    it("a link naming a non-text model opens a text chat, says the model is unavailable, and keeps a text model", () => {
+    it("a link naming a non-text model says the model is unavailable, keeps the chat's model, and leaves the chat's mode as it is", () => {
         useModelStore.setState({ newThreadMode: "image" });
 
         renderLink({ model: imageModel?.id, prompt: "hi" });
 
-        expect(useModelStore.getState().newThreadMode).toBe("text");
+        expect(useModelStore.getState().newThreadMode).toBe("image");
         expect(selectedModel()).toBe(DEFAULT_CHAT_MODEL);
         expect(useChatUIStore.getState().composerText).toBe("hi");
         expect(harness.showWarning).toHaveBeenCalledWith(MODEL_NOTICE);

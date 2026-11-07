@@ -39,8 +39,9 @@ const withoutLinkParameters = (search: Record<string, unknown>): Record<string, 
 
 /**
  * Applies a prompt link once: its prompt becomes the draft, and its model is chosen only when the composer would send with
- * that model (a text new chat, and not an anonymous visitor's, who sends the free model). Naming it ends Auto and any
- * comparison, as a pick in the model picker does. A draft or a saved prompt already in place is kept with a notice, and so is the model the person
+ * that model (a text new chat, and not an anonymous visitor's, who sends the free model). A link writes its draft and the model it writes,
+ * and nothing else: with a model written, it also ends Auto and any comparison, as a pick in the model picker does, and a link that
+ * writes no model leaves the chat's mode, comparison and Auto as they are. A draft or a saved prompt already in place is kept with a notice, and so is the model the person
  * chose. A model the composer would not send is left alone, with a notice. The link's parameters are then removed from the
  * address. It never sends. Nothing is decided until `ready`: the anonymity it reads comes from the session.
  */
@@ -121,14 +122,12 @@ export const usePromptLinkDraft = ({
             }
         }
 
-        // A link opens a text chat with its draft. The draft is the link's, so a comparison left on would fan it out, and the new chat is set
-        // to text whatever mode the composer was last in (an image chat's). Then the model: the link's, when the composer offers it as a
-        // text model; otherwise the chat keeps a text model it already has, or takes the default text model.
+        // The link owns its draft and, when it writes one, the model. A link that names no model leaves the chat's mode, comparison and Auto
+        // as the composer has them. When it writes a model, the chat is a text chat on that model: a comparison left on would send to its
+        // own models, Auto would route past the model, and a text draft cannot go to an image mode. The model is the link's, when the
+        // composer offers it as a text model; otherwise a text model the chat already has, or the default text model.
         if (applyLink && prompt !== undefined) {
             const state = useModelStore.getState();
-
-            state.setComparisonMode(false);
-            state.setComposerMode("text", undefined, false);
 
             // Until the list has loaded, it offers nothing: a link's model is refused (a blocked model must never be selected), and the
             // chat is not told it has no text model, because that is not yet known.
@@ -136,16 +135,10 @@ export const usePromptLinkDraft = ({
 
             // A link's model travels only with its prompt (`readPromptLinkSearch` drops it otherwise).
             const sendsLinkModel = model !== undefined && linkModelAppliesOnOpen({ isAnonymous, linkable: offered, model });
+            let writtenModel: string | undefined;
 
             if (model !== undefined && sendsLinkModel) {
-                state.setSelectedModel(model as ModelId, undefined);
-
-                // Naming a model is choosing it, so Auto ends with the pick, as it does in the model picker for a new chat.
-                if (state.pendingSettings?.autoModel === true) {
-                    state.setPendingSettings((previous) => {
-                        return { ...previous, autoModel: false };
-                    });
-                }
+                writtenModel = model;
             } else {
                 if (model !== undefined) {
                     showWarning(t`This link's model is not available in this chat. The chat keeps its model.`);
@@ -167,8 +160,21 @@ export const usePromptLinkDraft = ({
                     if (fallback === undefined) {
                         showWarning(t`This chat has no text model available, so the link's draft has no model. Choose one in the model picker.`);
                     } else {
-                        state.setSelectedModel(fallback as ModelId, undefined);
+                        writtenModel = fallback;
                     }
+                }
+            }
+
+            if (writtenModel !== undefined) {
+                state.setComparisonMode(false);
+                state.setComposerMode("text", undefined, false);
+                state.setSelectedModel(writtenModel as ModelId, undefined);
+
+                // The model the link writes is the one a send runs on: Auto ends, as it does when the person picks a model.
+                if (state.pendingSettings?.autoModel === true) {
+                    state.setPendingSettings((previous) => {
+                        return { ...previous, autoModel: false };
+                    });
                 }
             }
         }
