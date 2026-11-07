@@ -1,4 +1,5 @@
 import type { KeyValueStore } from "../chat/last-thread-storage";
+import { createSerialQueue } from "../lib/serial-queue";
 import { TOO_SHORT_MESSAGE } from "./voice-input";
 
 export const ON_DEVICE_KEY = "neore.mobile.on-device-dictation";
@@ -9,12 +10,17 @@ export const SETTING_UNREADABLE_MESSAGE
 /** Cloud transcription unless "Transcribe on this device" was switched on; there is no fallback between the two. */
 export type DictationPath = "cloud" | "on-device";
 
-/** Reads and writes "Transcribe on this device". Off by default. */
+/**
+ * Reads and writes "Transcribe on this device". Off by default. A read waits for a save still in progress, so a press
+ * right after switching it on never reads the earlier off.
+ */
 export const createDictationSetting = (store: Pick<KeyValueStore, "getItem" | "setItem">) => {
+    const inOrder = createSerialQueue();
+
     return {
         /** Off when never chosen. A value this app never writes is unreadable, not off: it must not send audio away. */
         readOnDevice: async (): Promise<boolean> => {
-            const value = await store.getItem(ON_DEVICE_KEY);
+            const value = await inOrder(async () => await store.getItem(ON_DEVICE_KEY));
 
             if (value === null || value === "off") {
                 return false;
@@ -27,7 +33,9 @@ export const createDictationSetting = (store: Pick<KeyValueStore, "getItem" | "s
             throw new Error("Unrecognized on-device transcription setting.");
         },
         writeOnDevice: async (isOn: boolean): Promise<void> => {
-            await store.setItem(ON_DEVICE_KEY, isOn ? "on" : "off");
+            await inOrder(async () => {
+                await store.setItem(ON_DEVICE_KEY, isOn ? "on" : "off");
+            });
         },
     };
 };

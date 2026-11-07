@@ -80,6 +80,34 @@ describe(createDictationRouter, () => {
         expect(engines["on-device"].start).not.toHaveBeenCalled();
     });
 
+    it("a press while switching on is still being saved goes on the device, not to the cloud", async () => {
+        const values = new Map<string, string>();
+
+        vi.useFakeTimers();
+
+        const { readOnDevice, writeOnDevice } = createDictationSetting({
+            getItem: async (key) => values.get(key) ?? null,
+            setItem: async (key, value) => {
+                await new Promise((resolve) => {
+                    setTimeout(resolve, 100);
+                });
+                values.set(key, value);
+            },
+        });
+        const engines = { cloud: fakeEngine(), "on-device": fakeEngine() };
+        const { router } = routed(readOnDevice, engines);
+
+        const saving = writeOnDevice(true);
+        const pressing = router.start();
+
+        await vi.advanceTimersByTimeAsync(100);
+        await Promise.all([saving, pressing]);
+        vi.useRealTimers();
+
+        expect(engines["on-device"].start).toHaveBeenCalledOnce();
+        expect(engines.cloud.start).not.toHaveBeenCalled();
+    });
+
     it.each([
         ["an iPhone without on-device recognition", { OS: "ios", Version: "18.0" }, false],
         ["Android 12, where on-device only prefers offline", { OS: "android", Version: 32 }, true],
