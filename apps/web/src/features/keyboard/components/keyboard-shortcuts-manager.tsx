@@ -358,7 +358,10 @@ const KeyboardShortcutsHandler: React.FC<{
         {
             description: "Archive the open thread",
             enabled: !!shortcuts.archiveThread && typeof shortcuts.archiveThread === "string",
-            // Outside text fields only: a modifier chord in the composer is left to the field.
+            // Never from a text field, modifier chord or not: these two options are what keep it out of the composer (the
+            // keystroke check in the handler lets every modifier chord through).
+            enableOnContentEditable: false,
+            enableOnFormTags: false,
             preventDefault: (event: KeyboardEvent) => !isTextEntryKeystroke(event),
         },
         [convertedShortcuts.archiveThread, handleArchiveThread],
@@ -370,6 +373,9 @@ const KeyboardShortcutsHandler: React.FC<{
         {
             description: "Delete the open thread (asks first)",
             enabled: !!shortcuts.deleteThread && typeof shortcuts.deleteThread === "string",
+            // Never from a text field, as archive: these two options keep it out of the composer.
+            enableOnContentEditable: false,
+            enableOnFormTags: false,
             preventDefault: (event: KeyboardEvent) => !isTextEntryKeystroke(event),
         },
         [convertedShortcuts.deleteThread, handleDeleteThread],
