@@ -29,7 +29,16 @@ import DiffCommentsDraft from "./diff-comments-draft";
 import { caretAfterRemoval } from "./host-caret";
 import { exceedsRawInputLimit } from "./host-input";
 import type { HostQueueEffect, HostQueueEvent, HostQueueState } from "./host-queue";
-import { canInterruptAndSend, canSendQueueHead, holdsDrainLock, INITIAL_HOST_QUEUE, shouldQueueMessage, stepHostQueue, waitDeadline } from "./host-queue";
+import {
+    canInterruptAndSend,
+    canSendQueueHead,
+    holdsDrainLock,
+    INITIAL_HOST_QUEUE,
+    isTurnLive,
+    shouldQueueMessage,
+    stepHostQueue,
+    waitDeadline,
+} from "./host-queue";
 import { MAX_HOST_PROMPT_CHARS, sendHostMessage } from "./host-send";
 import useHostSendErrorMessages from "./host-send-errors";
 
@@ -442,7 +451,7 @@ const HostComposerForThread: FC<{ className?: string; threadId: string }> = ({ c
 
     // Whether the queue's head, if it is still `id`, may be sent now: read from the machine and the store, which are current
     // even when this render is not, and from the reads of the last render. The drain lock asks again once it is granted.
-    const gates = { blocked, editing: editing?.id, running, starting };
+    const gates = { blocked, editing: editing?.id, liveStreamId, starting };
     const gatesRef = useRef(gates);
 
     useEffect(() => {
@@ -460,7 +469,8 @@ const HostComposerForThread: FC<{ className?: string; threadId: string }> = ({ c
                 editing: now.editing === candidate,
                 headId: candidate,
                 paused: current.paused,
-                running: now.running,
+                // A stream read that still shows a turn whose end the session has reported holds nothing back.
+                running: isTurnLive(machineRef.current, now.liveStreamId),
                 starting: now.starting,
             })
         );
@@ -509,7 +519,7 @@ const HostComposerForThread: FC<{ className?: string; threadId: string }> = ({ c
         );
         // `send` and `mayDrain` read the machine and the store when they run; the head and the gates decide when to look.
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [head, queue.paused, machine, blocked, running, starting, editing]);
+    }, [head, queue.paused, machine, blocked, running, liveStreamId, starting, editing]);
 
     /** A message typed now goes behind the queue while a turn runs, and is sent at once otherwise. */
     const submit = (prompt: string, draft?: string) => {

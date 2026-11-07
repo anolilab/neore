@@ -438,6 +438,9 @@ export const stepHostQueue = (state: HostQueueState, event: HostQueueEvent): Hos
     }
 };
 
+/** Whether `streamId`, as a read shows it, is a turn still running: not one whose end the machine has already seen. */
+export const isTurnLive = (state: HostQueueState, streamId: string | undefined): boolean => liveNow(state, streamId) !== undefined;
+
 /** Whether the phase waits on an event that may never come, so the composer arms a deadline (`timed-out`). */
 export const waitDeadline = (phase: HostQueuePhase): boolean =>
     (phase.kind === "awaiting-turn-end" && phase.streamId === undefined) || (phase.kind === "awaiting-stop" && phase.stopConfirmed && phase.ended === null);

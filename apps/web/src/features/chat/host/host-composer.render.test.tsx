@@ -518,7 +518,9 @@ describe("the coding-agent composer", () => {
         fireEvent.click(screen.getByRole("button", { name: "Interrupt and send" }));
 
         await waitFor(() => expect(harness.calls).toContainEqual(["acp.remote.cancelHostTurn", { streamId: "stream-1", threadId: "thread-1" }]));
-        expect(await screen.findByText("after the ending")).toBeTruthy();
+        // The stop found no turn live, so the text goes at once, even while the stream read still names the ended turn.
+        await waitFor(() => expect(sendCalls()).toHaveLength(1));
+        expect(sendCalls()[0]).toEqual(["send", { requestId: expect.any(String), text: "after the ending", threadId: "thread-1" }]);
         expect(screen.queryByRole("button", { name: "Send next" })).toBeNull();
     });
 
@@ -1670,6 +1672,23 @@ describe("the coding-agent composer", () => {
         expect(await screen.findByText("Checking whether a message sent now interrupts the reply or waits behind it.")).toBeTruthy();
         release();
         await waitFor(() => expect(screen.queryByText("Checking whether a message sent now interrupts the reply or waits behind it.")).toBeNull());
+    });
+
+    it("sends the next queued message once the session reports the turn's end, while the stream read still shows that turn", async () => {
+        mount({ ...session(), "chat.streaming.getActiveStreamForThread": { streamId: "stream-1" } });
+
+        await screen.findByLabelText("Message to the coding agent");
+        usePromptQueueStore.getState().enqueue("thread-1", { attachments: [], text: "after the turn" });
+
+        // The session reports stream-1's end; the stream read lags and still names it.
+        harness.data = {
+            ...harness.data,
+            "acp.functions.getHostSession": { lastEndedReason: "finished", lastEndReason: "finished", lastEndStreamId: "stream-1", status: "idle" },
+        };
+        await harness.client?.invalidateQueries({ queryKey: ["acp.functions.getHostSession"] });
+
+        await waitFor(() => expect(sendCalls()).toHaveLength(1));
+        expect(sendCalls()[0]).toEqual(["send", { requestId: expect.any(String), text: "after the turn", threadId: "thread-1" }]);
     });
 
     it("hides Continue while messages are queued, since they go first", async () => {
