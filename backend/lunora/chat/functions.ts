@@ -1831,6 +1831,7 @@ const writeGeneratedTitle = async (
     // from the recorded answer.
     const written = await firstResultOf(TITLE_WRITE_ATTEMPTS, () =>
         context.runMutation(internal.agent.thread_title.setGeneratedTitle, {
+            chargeKey: arguments_.chargeKey,
             expectedTitleDigest,
             promptId,
             requestedBy: arguments_.requestedBy,

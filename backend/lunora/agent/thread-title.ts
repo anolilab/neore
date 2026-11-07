@@ -20,7 +20,16 @@ import type { Doc, Id } from "../_generated/dataModel";
 import { internalMutation, internalQuery, type MutationCtx as MutationContext, type QueryCtx as QueryContext } from "../_generated/server";
 import { type ContextRow, firstUserPrompt } from "../chat/lib/first-user-prompt";
 import { threadGateOutcome } from "../chat/lib/thread-gate";
-import { claimFence, claimRow, dropExpiredClaimsWithPrefix, hasClaimWithPrefix, recordClaimResult, releaseClaim } from "../lib/claim-once";
+import {
+    claimFence,
+    claimRow,
+    clearClaimResult,
+    clearClaimResultsWithPrefix,
+    dropExpiredClaimsWithPrefix,
+    hasClaimWithPrefix,
+    recordClaimResult,
+    releaseClaim,
+} from "../lib/claim-once";
 import { sha256Hex } from "../lib/crypto";
 import { isThreadLocked } from "../lib/thread-lock";
 import { MAX_LENGTH } from "../lib/validators";
@@ -230,6 +239,11 @@ export const admitTitleRun = internalMutation
         const reason = await titleBlockedIn(ctx, { ...args, promptId: answer ? answer.promptId : args.promptId });
 
         if (reason !== undefined) {
+            // A recorded answer that can no longer be written is not kept: a chat locked or deleted since keeps no copy of it.
+            if (answer) {
+                await clearClaimResult(ctx, TITLE_CHARGE_SCOPE, args.chargeKey);
+            }
+
             return { outcome: "refused" as const, reason };
         }
 
@@ -284,8 +298,13 @@ export const writeTitleIfUnchanged = async (ctx: Pick<MutationContext, "db">, ar
     return true;
 };
 
+/**
+ * Writes a generated title ({@link writeTitleIfUnchanged}). The run is settled either way, so the answer recorded on its charge
+ * (`chargeKey`) is dropped in the same transaction: it lives only between the model's answer and the write.
+ */
 export const setGeneratedTitle = internalMutation
     .input({
+        chargeKey: v.optional(v.string().max(MAX_LENGTH.short)),
         expectedTitleDigest: v.string().max(MAX_LENGTH.short),
         promptId: v.optional(v.string().max(MAX_LENGTH.id)),
         requestedBy: v.optional(v.string().max(MAX_LENGTH.id)),
@@ -293,7 +312,16 @@ export const setGeneratedTitle = internalMutation
         title: v.string().max(MAX_LENGTH.long),
     })
     .output(v.boolean())
-    .mutation(async ({ args, ctx }) => await writeTitleIfUnchanged(ctx, args));
+    .mutation(async ({ args, ctx }) => {
+        const { chargeKey, ...check } = args;
+        const written = await writeTitleIfUnchanged(ctx, check);
+
+        if (chargeKey !== undefined) {
+            await clearClaimResult(ctx, TITLE_CHARGE_SCOPE, chargeKey);
+        }
+
+        return written;
+    });
 
 /** Whether a title model request for this thread is being sent: locking the chat waits until none is. */
 export const titleDispatchInFlight = async (context: Reader, threadId: Id<"threads">): Promise<boolean> =>
@@ -326,3 +354,8 @@ export const endTitleDispatch = internalMutation
 
         return null;
     });
+
+/** Drops every title answer recorded for this thread's runs: a chat being locked keeps no copy of a title made from its content. */
+export const clearRecordedTitleAnswers = async (ctx: Pick<MutationContext, "db">, threadId: Id<"threads">): Promise<void> => {
+    await clearClaimResultsWithPrefix(ctx, TITLE_CHARGE_SCOPE, `${threadId}:`);
+};

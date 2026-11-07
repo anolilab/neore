@@ -14,8 +14,10 @@ import { BRANCH_ROOT } from "./branch-tree";
 import {
     admitTitleRun,
     beginTitleDispatch,
+    clearRecordedTitleAnswers,
     readTitlePrompt,
     recordTitleAnswer,
+    setGeneratedTitle,
     dispatchStillHeld,
     TITLE_CHARGE_SCOPE,
     TITLE_DISPATCH_MARGIN_MS,
@@ -439,4 +441,73 @@ describe("a title request's dispatch claim", () => {
         expect(keys.filter((claim) => claim.key.startsWith(`${threadId}:a-`))).toHaveLength(70);
         expect(keys.map((claim) => claim.key)).toEqual(expect.arrayContaining([`${threadId}:z-live`, `${threadId}:next`]));
     }, 60_000);
+});
+
+describe("a recorded title answer", () => {
+    const resultOf = async (key: string): Promise<string | undefined> => {
+        const claims = (await harness.run(async (context: any) => await context.db.query("idempotencyClaims").collect())) as { key: string; result?: string }[];
+
+        return claims.find((claim) => claim.key === key)?.result;
+    };
+
+    const recorded = async (threadId: string, key: string, expectedTitle = "Old") => {
+        const prompt = await rowIn(threadId)(1, { message: { content: "Plan a trip", role: "user" } });
+        const { claimedAt } = await admit(threadId, key, { expectedTitle, promptId: prompt });
+
+        await harness.run(
+            async (context: any) =>
+                await context.runMutation(recordTitleAnswer as never, { chargeKey: key, claimedAt, promptId: prompt, title: "Lisbon trip" }),
+        );
+
+        return prompt;
+    };
+
+    it("is dropped once the run's write settles, whether it landed or was refused", async () => {
+        const landed = await threadWith();
+        const refused = await threadWith();
+        const write = async (threadId: string, key: string, prompt: string) =>
+            await harness.run(
+                async (context: any) =>
+                    await context.runMutation(setGeneratedTitle as never, {
+                        chargeKey: key,
+                        expectedTitleDigest: await sha256Hex("Old"),
+                        promptId: prompt,
+                        threadId,
+                        title: "Lisbon trip",
+                    }),
+            );
+
+        const landedPrompt = await recorded(landed, `${landed}:run`);
+        const refusedPrompt = await recorded(refused, `${refused}:run`);
+
+        // The owner renames the chat while the model works: its write is refused.
+        await harness.run(async (context: any) => await context.db.patch("threads", refused, { title: "Renamed meanwhile" }));
+
+        expect(await resultOf(`${landed}:run`)).toBeDefined();
+        await expect(write(landed, `${landed}:run`, landedPrompt)).resolves.toBe(true);
+        await expect(write(refused, `${refused}:run`, refusedPrompt)).resolves.toBe(false);
+        expect(await resultOf(`${landed}:run`)).toBeUndefined();
+        expect(await resultOf(`${refused}:run`)).toBeUndefined();
+        // The charge itself stays, so a retry still does not call the model again.
+        await expect(admit(landed, `${landed}:run`)).resolves.toMatchObject({ outcome: expect.not.stringMatching("admitted") });
+    });
+
+    it("is dropped when a retry finds the chat locked since, and when the chat is locked", async () => {
+        const retried = await threadWith();
+        const locked = await threadWith();
+        const other = await threadWith();
+
+        await recorded(retried, `${retried}:run`);
+        await recorded(locked, `${locked}:auto-title:job`);
+        await recorded(other, `${other}:run`);
+
+        await harness.run(async (context: any) => await context.db.patch("threads", retried, { lockedAt: 1000 }));
+        await expect(admit(retried, `${retried}:run`)).resolves.toMatchObject({ outcome: "refused" });
+        expect(await resultOf(`${retried}:run`)).toBeUndefined();
+
+        await harness.run(async (context: any) => await clearRecordedTitleAnswers(context, locked as Id<"threads">));
+        expect(await resultOf(`${locked}:auto-title:job`)).toBeUndefined();
+        // Another chat's answer is not touched.
+        expect(await resultOf(`${other}:run`)).toBeDefined();
+    });
 });

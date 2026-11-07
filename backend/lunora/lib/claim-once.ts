@@ -249,6 +249,15 @@ export const recordClaimResult = async (ctx: ClaimCtx, scope: string, key: strin
     return true;
 };
 
+/** Drops what {@link recordClaimResult} stored on the claim for `(scope, key)`, keeping the claim itself. */
+export const clearClaimResult = async (ctx: ClaimCtx, scope: string, key: string): Promise<void> => {
+    const existing = await findClaim(ctx, scope, key);
+
+    if (existing?.result !== undefined) {
+        await patchRow(ctx.db, "idempotencyClaims", existing, { result: undefined });
+    }
+};
+
 /** `true` for the first claim of `(scope, key)` within `ttlMs`, `false` for every later one. */
 export const claimOnce = async (ctx: ClaimCtx, scope: string, key: string, ttlMs: number, userId?: string): Promise<boolean> =>
     await claim(ctx, scope, key, { ttlMs, userId });
@@ -340,6 +349,37 @@ export const dropExpiredClaimsWithPrefix = async (ctx: ClaimCtx, scope: string, 
         if (row.expiresAt <= now) {
             await ctx.db.delete("idempotencyClaims", row._id);
         }
+    }
+};
+
+/**
+ * Drops the stored `result` of every claim of `scope` whose key starts with `prefix`, keeping the claims. Pages through the range, so a
+ * result is never left behind expired rows.
+ */
+export const clearClaimResultsWithPrefix = async (ctx: ClaimCtx, scope: string, prefix: string): Promise<void> => {
+    const end = prefixEnd(prefix);
+    let after: string | undefined;
+
+    for (;;) {
+        const from = after;
+        const rows = await ctx.db
+            .query("idempotencyClaims")
+            .withIndex("by_scope_key", (q) =>
+                (from === undefined ? q.eq("scope", scope).gte("key", prefix) : q.eq("scope", scope).gt("key", from)).lt("key", end),
+            )
+            .take(PREFIX_PROBE_BATCH);
+
+        for (const row of rows) {
+            if (row.result !== undefined) {
+                await patchRow(ctx.db, "idempotencyClaims", row, { result: undefined });
+            }
+        }
+
+        if (rows.length < PREFIX_PROBE_BATCH) {
+            return;
+        }
+
+        after = rows.at(-1)!.key;
     }
 };
 

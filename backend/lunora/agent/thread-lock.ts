@@ -21,7 +21,7 @@ import { scheduleGranteeRedaction } from "../notifications/locked-redact";
 
 import { scheduleFileLinkBackfill } from "./file-link-backfill";
 import { deleteThreadSummaries } from "./thread-summaries";
-import { titleDispatchInFlight } from "./thread-title";
+import { clearRecordedTitleAnswers, titleDispatchInFlight } from "./thread-title";
 import { passcodeHashOf, readPasscodeRow, type PasscodeRow, unlockSecret } from "./thread-passcode";
 import { requireOwnedThreadIgnoringLock } from "./thread-read-access";
 
@@ -130,6 +130,8 @@ export const enableThreadLock = authMutation
         await patchRow(context.db, "threads", thread, { lockedAt: now, updatedAt: now });
         // Condensed copies of its content made before the lock are not kept (`thread-summaries.ts`).
         await deleteThreadSummaries(context, threadId);
+        // Nor are title answers recorded for a run whose write has not settled (`agent/thread-title.ts`).
+        await clearRecordedTitleAnswers(context, threadId);
         // Index the chat's attachments; until the walk stamps the row, the file gate scans its messages.
         await scheduleFileLinkBackfill(context, threadId, userId);
         // Former collaborators' notifications for this chat stop showing its title (`notifications/locked-redact.ts`).
