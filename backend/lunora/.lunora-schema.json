@@ -26611,6 +26611,24 @@
                 "unique": false
               }
             },
+            "mcpToolFingerprints": {
+              "kind": "record",
+              "nullable": false,
+              "optional": true,
+              "unique": false,
+              "key": {
+                "kind": "string",
+                "nullable": false,
+                "optional": false,
+                "unique": false
+              },
+              "of": {
+                "kind": "string",
+                "nullable": false,
+                "optional": false,
+                "unique": false
+              }
+            },
             "memory": {
               "kind": "object",
               "nullable": false,

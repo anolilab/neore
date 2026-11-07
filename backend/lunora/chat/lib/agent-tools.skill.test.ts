@@ -43,7 +43,14 @@ vi.mock("./tool-builder", () => {
 let mcpTools: {
     descriptors: Map<
         string,
-        { annotations?: { destructiveHint?: boolean; readOnlyHint?: boolean }; connectorSlug?: string; serverName: string; toolName: string; url?: string }
+        {
+            annotations?: { destructiveHint?: boolean; readOnlyHint?: boolean };
+            connectorSlug?: string;
+            fingerprint?: string;
+            serverName: string;
+            toolName: string;
+            url?: string;
+        }
     >;
     tools: ToolSet;
 };
@@ -185,6 +192,28 @@ describe("buildAgentTools MCP permission keys", () => {
 
         expect((tools["mcp_my_server__delete"] as { needsApproval?: unknown }).needsApproval).toBe(true);
         expect((tools["mcp_my_server__delete_2"] as { needsApproval?: unknown }).needsApproval).toBeUndefined();
+    });
+});
+
+describe("buildAgentTools MCP fingerprints", () => {
+    beforeEach(() => {
+        mcpTools = {
+            descriptors: new Map([
+                ["mcp_docs__delete", { fingerprint: "bbb", serverName: "docs", toolName: "delete" }],
+                // Could not be hashed: offered, but not pinned.
+                ["mcp_docs__list", { serverName: "docs", toolName: "list" }],
+                ["mcp_docs__search", { fingerprint: "aaa", serverName: "docs", toolName: "search" }],
+            ]),
+            tools: { mcp_docs__delete: fakeTool("delete"), mcp_docs__list: fakeTool("list"), mcp_docs__search: fakeTool("search") },
+        };
+    });
+
+    it("records the fingerprint of each MCP tool the run is offered, and only those, for its approval snapshot", async () => {
+        overrides = { "mcp:docs:delete": "off" };
+
+        const { mcpToolFingerprints } = await buildAgentTools(fakeCtx(), { model: "test-model", searchMode: "web", userId: "user" });
+
+        expect(mcpToolFingerprints).toStrictEqual({ mcp_docs__search: "aaa" });
     });
 });
 
