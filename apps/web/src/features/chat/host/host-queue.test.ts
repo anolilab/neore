@@ -626,6 +626,15 @@ describe("Send now", () => {
         expect(run([observed(undefined, ["stream-other", "stopped"])], behind).state.released).toBeUndefined();
     });
 
+    it("holds a released message when the session drops the turn it waited behind without saying how it ended", () => {
+        const sessionLive: HostQueueEvent = { end: undefined, live: "stream-other", sessionLive: "stream-other", starting: false, type: "observed" };
+        const behind = run([{ itemId: "b", type: "released" }, sessionLive], IDLE).state;
+        const dropped = run([{ end: undefined, live: undefined, starting: false, type: "observed" }], behind).state;
+
+        expect(dropped.phase.kind).toBe("idle");
+        expect(dropped.released).toBeUndefined();
+    });
+
     it("sends the message past a paused queue once, and keeps the rest paused", () => {
         const released = run([{ itemId: "b", type: "released" }], IDLE).state;
         const paused = { ...gates, headId: "b", paused: true };

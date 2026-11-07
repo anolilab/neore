@@ -180,7 +180,13 @@ const leftSession = (state: HostQueueState, sessionLive: string | undefined): Ho
         return state;
     }
 
-    return { ...retire(state, phase.streamId), live: state.live === phase.streamId ? undefined : state.live, phase: { kind: "idle" } };
+    // How that turn ended is not known, so a message released to go after it waits for the person.
+    return {
+        ...retire(state, phase.streamId),
+        live: state.live === phase.streamId ? undefined : state.live,
+        phase: { kind: "idle" },
+        released: undefined,
+    };
 };
 
 /** The stopped turn is over and the stop reached the computer: the interrupting message goes next. */
