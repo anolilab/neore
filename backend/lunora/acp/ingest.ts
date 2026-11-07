@@ -21,7 +21,7 @@ import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
 import { internalMutation, internalQuery } from "../_generated/server";
 import { addMessagesHandler } from "../agent/messages";
-import { insertThread } from "../agent/table-writes";
+import { insertThread, patchThread } from "../agent/table-writes";
 import {
     appendHostChunk,
     bumpedExpiry,
@@ -379,8 +379,18 @@ const applyTurnPost = async (
     }
 
     const expiresAt = bumpedExpiry(stream, now);
-    const pendingChanged = pending.join("\n") !== (stream.hostPendingPermissions ?? []).join("\n");
+    const previousPending = stream.hostPendingPermissions ?? [];
+    const pendingChanged = pending.join("\n") !== previousPending.join("\n");
     const stateChanged = hostState !== stream.hostState;
+
+    // A permission the agent asks for pauses the thread for the owner, as a cloud approval does, so a snoozed thread wakes
+    // (`patchThread`). Once every request is answered the run is running again, which clears that pause.
+    if (pending.some((id) => !previousPending.includes(id))) {
+        await patchThread(ctx.db, threadId, { awaitingInput: "approval" });
+    } else if (previousPending.length > 0 && pending.length === 0) {
+        await patchThread(ctx.db, threadId, { status: "running", updatedAt: now });
+    }
+
     const startsStreaming = sawContent && stream.status === "pending";
 
     // The stream row is read by a live query, so a plain text post (none of these) writes nothing to it.

@@ -1142,6 +1142,28 @@ describe("a host turn", () => {
         await turn(device, threadId, "t1", 2, [{ kind: "permission_resolved", outcome: "allowed", requestId: "r1" }]);
         expect(await streamField("t1", "hostPendingPermissions")).toBeUndefined();
     });
+
+    it("a snoozed host thread wakes when the agent asks for a permission, and is running again once it is answered", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+        const askForTool = { kind: "permission_request", options: [{ kind: "allow_once", name: "Allow", optionId: "o1" }], requestId: "r1", tool: "Bash" };
+
+        await harness.run(async (ctx: any) => {
+            await ctx.db.patch("threads", ctx.db.normalizeId("threads", threadId), {
+                snoozeChosenAt: Date.now(),
+                snoozedUntil: Date.now() + 3_600_000,
+            });
+        });
+
+        await turn(device, threadId, "t1", 0, [START(), askForTool]);
+
+        // The owner has to see the approval, so the thread leaves the snoozed list the way a cloud approval wakes it.
+        expect(await rowField(threadId, "awaitingInput")).toBe("approval");
+        expect(await rowField(threadId, "snoozedUntil")).toBeUndefined();
+
+        await turn(device, threadId, "t1", 2, [{ kind: "permission_resolved", outcome: "allowed", requestId: "r1" }]);
+        expect(await rowField(threadId, "awaitingInput")).toBeUndefined();
+    });
 });
 
 describe("ingest refusals", () => {
