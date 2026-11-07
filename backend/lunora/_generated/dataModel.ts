@@ -743,6 +743,7 @@ export interface Doc_idempotencyClaims {
     key: string;
     leaseExpiresAt?: number;
     onLapse?: { args?: string; target: string };
+    result?: string;
     scope: string;
     userId?: string;
 }
@@ -3746,6 +3747,7 @@ export interface Insert_idempotencyClaims {
     key: string;
     leaseExpiresAt?: number;
     onLapse?: { args?: string; target: string };
+    result?: string;
     scope: string;
     userId?: string;
 }

@@ -27,7 +27,7 @@ vi.mock("@lingui/react/macro", () => {
 });
 
 vi.mock("@neore/backend/api", () => {
-    return { api: {} };
+    return { api: { chat: { functions: { regenerateThreadTitle: {}, updateThread: {} } } } };
 });
 
 vi.mock("@/features/develop/components/pull-request-counts", () => {
@@ -70,11 +70,14 @@ vi.mock("@/lib/lunora/crpc", () => {
         createLunoraQueryOptions: () => {
             return {};
         },
+        useLunoraActionOptions: () => {
+            return {};
+        },
         useCRPC: () => {
             return {
                 agent: { thread_lock: { lockThread: entry } },
                 chat: {
-                    functions: { abortThreadStream: entry, convertTemporaryToPermanent: entry, getThread: entry },
+                    functions: { abortThreadStream: entry, convertTemporaryToPermanent: entry, getThread: entry, regenerateThreadTitle: entry },
                     thread_state: { snoozeThread: entry, unsnoozeThread: entry },
                 },
             };
@@ -150,6 +153,7 @@ vi.mock("./stores/thread-list-ui-store", () => {
 const { default: ThreadNode } = await import("./thread-node");
 
 const SNOOZE_BUTTON = /^Snooze thread/u;
+const TOUCH_CLASSES = /pointer-coarse|hover:none/u;
 
 const child = { branchPoint: 0, branchType: "branch", children: [], createdAt: 0, depth: 1, status: "idle", threadId: "c1", title: "Child" };
 
@@ -251,4 +255,29 @@ describe("ThreadNode", () => {
 
         expect(region.textContent).toBe("Waiting for your answer");
     });
+
+    /* eslint-disable testing-library/no-node-access -- where a control sits relative to the hover-only strip, and its classes, are what these assert */
+    it("shows the options menu outside the hover-only action strip on a touch screen, and keeps the strip itself hidden", () => {
+        render(<ThreadNode {...baseProps} />);
+
+        const [touch, strip] = screen.getAllByRole("button", { name: "Thread options: Quarterly plan" });
+        const touchWrapper = touch?.closest("span[role=presentation]");
+        const stripWrapper = strip?.closest("span[role=presentation]");
+
+        // The touch copy is not inside the strip, whose opacity would hide it; each copy shows only where the other does not.
+        expect(touchWrapper?.className).toContain("[@media(hover:none)]:contents");
+        expect(touchWrapper?.closest(".opacity-0")).toBeNull();
+        expect(stripWrapper?.className).toContain("[@media(hover:none)]:hidden");
+        expect(stripWrapper?.closest(".opacity-0")).not.toBeNull();
+    });
+
+    it("keeps the touch-screen classes off the action strip, so it never covers the title", () => {
+        render(<ThreadNode {...baseProps} />);
+
+        const strip = screen.getByRole("button", { name: "Archive thread: Quarterly plan" }).closest(".absolute");
+
+        expect(strip?.className).toContain("opacity-0");
+        expect(strip?.className).not.toMatch(TOUCH_CLASSES);
+    });
+    /* eslint-enable testing-library/no-node-access */
 });

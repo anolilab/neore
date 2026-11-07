@@ -327,6 +327,7 @@ for a schema table that is neither policed nor listed:
 | `chat_functions.unpinThread` | mutation | authMutation + RL | threads | row.userId == caller | ok |
 | `chat_functions.updateBrowserSettings` | mutation | authMutation + RL | aiUserPreferences | caller-scoped (ctx.user) | ok |
 | `chat_functions.updateThread` | action | authAction + RL | threads | thread access (owner/grant) | accepted — admin grantees may edit by design |
+| `chat_functions.regenerateThreadTitle` | action | authAction + RL | threads | admin access (owner), as the rename | overwrites the title and bills the requester, as the summary does; refuses a locked, a host-run and a deleted thread |
 | `chat_functions.updateThreadDictationLanguage` | mutation | authMutation + RL | threads | row.userId == caller | ok |
 | `chat_functions.updateThreadLanguage` | mutation | authMutation + RL | threads | row.userId == caller | ok |
 | `chat_functions.updateThreadMode` | mutation | authMutation + RL | threads | row.userId == caller | ok |
