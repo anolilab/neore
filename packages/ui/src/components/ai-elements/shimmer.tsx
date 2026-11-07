@@ -44,7 +44,7 @@ const ShimmerComponent = ({ as = "p", children, className, duration = 2, spread 
                 className,
             )}
             initial={{ backgroundPosition: "100% center" }}
-            role="status"
+            role={as.startsWith("h") ? undefined : "status"}
             style={
                 {
                     "--spread": `${dynamicSpread}px`,

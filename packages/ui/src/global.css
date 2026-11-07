@@ -298,6 +298,21 @@
     }
 }
 
+/*
+ * reactjs-tiptap-editor wraps its content in `.reactjs-tiptap-editor` and colours it with
+ * `hsl(var(--background))` / `hsl(var(--foreground))`. Our tokens are complete colours, so those
+ * declarations are invalid, and the editor text stays dark on a dark page (table cells fail contrast).
+ */
+.reactjs-tiptap-editor.reactjs-tiptap-editor {
+    background-color: var(--background);
+    color: var(--foreground);
+}
+
+/* The library gives inline code white text for its own dark chip; `.prose` swaps in our muted chip, so the text must follow. */
+.reactjs-tiptap-editor .ProseMirror code:not(pre code) {
+    color: var(--foreground);
+}
+
 .prose {
     @apply text-foreground max-w-[65ch];
 

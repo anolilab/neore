@@ -42,6 +42,9 @@ interface ZoomState {
 
 const INITIAL_STATE: ZoomState = { eased: false, view: INITIAL_ZOOM_VIEW };
 
+// Frames to wait for the image to get a size before a step is dropped (about a second at 60 Hz).
+const FRAME_RETRIES = 60;
+
 const cursorClass = (isDragging: boolean, isZoomed: boolean): string => {
     if (isDragging) {
         return "cursor-grabbing";
@@ -97,12 +100,22 @@ const ZoomableImage = ({ alt, className, onError, src }: ZoomableImageProps) => 
     // A functional update, so several wheel events in one frame each build on the last.
     // Eased only for the discrete steps; continuous input (wheel, pinch, drag) must
     // track the pointer without lag.
-    const apply = useCallback((step: (current: ZoomView, frame: Frame) => ZoomView, isEased = false) => {
+    const apply = useCallback(function applyStep(step: (current: ZoomView, frame: Frame) => ZoomView, isEased = false, retriesLeft = FRAME_RETRIES) {
         const surface = surfaceRef.current;
         const image = imageRef.current;
 
         // Before the image has layout its size is zero, and a cursor-anchored zoom would clamp its pan to nothing.
-        if (!surface || !image || image.offsetWidth === 0 || image.offsetHeight === 0) {
+        // Retry for a bounded number of frames, so a click that lands before the first layout still counts
+        // and a picture that never gets a size cannot loop forever.
+        if (!surface || !image) {
+            return;
+        }
+
+        if (image.offsetWidth === 0 || image.offsetHeight === 0) {
+            if (retriesLeft > 0) {
+                requestAnimationFrame(() => applyStep(step, isEased, retriesLeft - 1));
+            }
+
             return;
         }
 

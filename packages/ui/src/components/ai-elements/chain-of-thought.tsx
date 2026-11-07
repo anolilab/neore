@@ -58,11 +58,13 @@ export type ChainOfThoughtHeaderProps = ComponentProps<typeof CollapsibleTrigger
 export const ChainOfThoughtHeader = memo(({ children, className, ...props }: ChainOfThoughtHeaderProps) => {
     const { t } = useLingui();
     const { isOpen, setIsOpen } = useChainOfThought();
+    const toggleLabel = isOpen ? t`Collapse chain of thought` : t`Expand chain of thought`;
 
     return (
         <Collapsible onOpenChange={setIsOpen} open={isOpen}>
             <CollapsibleTrigger
-                aria-label={isOpen ? t`Collapse chain of thought` : t`Expand chain of thought`}
+                aria-controls={undefined}
+                aria-label={children ? undefined : toggleLabel}
                 className={cn("text-muted-foreground hover:text-foreground flex w-full items-center gap-2 text-sm transition-colors", className)}
                 {...props}
             >
@@ -86,7 +88,7 @@ export const ChainOfThoughtStep = memo(
         const statusStyles = {
             active: "text-foreground",
             complete: "text-muted-foreground",
-            pending: "text-muted-foreground/50",
+            pending: "text-muted-foreground italic",
         };
 
         return (

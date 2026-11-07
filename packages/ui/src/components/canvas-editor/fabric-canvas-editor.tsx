@@ -567,7 +567,7 @@ const FabricCanvasEditor: FC<FabricCanvasEditorProps> = memo(
                 {!readOnly && (
                     <div
                         className={`flex items-center gap-1 border-b px-3 py-1.5 ${
-                            darkMode ? "border-white/10 bg-neutral-900" : "border-neutral-200 bg-white"
+                            darkMode ? "border-white/10 bg-neutral-900 text-white" : "border-neutral-200 bg-white text-neutral-900"
                         }`}
                     >
                         {/* Panel toggles */}
@@ -631,7 +631,7 @@ const FabricCanvasEditor: FC<FabricCanvasEditorProps> = memo(
                             <ToolButton label={t`Zoom Out`} onClick={() => handleZoom(-0.1)}>
                                 <MinusIcon className="size-4" />
                             </ToolButton>
-                            <span className="text-muted-foreground min-w-[3rem] text-center text-xs">{Math.round(zoom * 100)}%</span>
+                            <span className="min-w-[3rem] text-center text-xs opacity-70">{Math.round(zoom * 100)}%</span>
                             <ToolButton label={t`Zoom In`} onClick={() => handleZoom(0.1)}>
                                 <PlusIcon className="size-4" />
                             </ToolButton>

@@ -31,7 +31,8 @@ const DropdownMenuPortal = ({ ...props }: MenuPrimitive.Portal.Props) => <MenuPr
 
 const DropdownMenuTrigger = ({ children, render, ...props }: MenuPrimitive.Trigger.Props & { render?: React.ReactElement }) => {
     if (render) {
-        return <MenuPrimitive.Trigger data-slot="dropdown-menu-trigger" render={render} {...props} />;
+        // Children go to the rendered element too; passing `children: undefined` would wipe the element's own children.
+        return <MenuPrimitive.Trigger data-slot="dropdown-menu-trigger" render={render} {...props} {...(children === undefined ? {} : { children })} />;
     }
 
     return (

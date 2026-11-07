@@ -189,6 +189,8 @@ const ImageGalleryItem = ({ className, item }: ImageGalleryItemProps) => {
                 onClick={handleClick}
                 type="button"
             >
+                {/* The button is named by its own text, so it has a name before the image is in view and loaded. */}
+                <span className="sr-only">{item.alt || t`Gallery item`}</span>
                 {/* Image/Video thumbnail with lazy loading */}
                 {item.nsfwStatus === "blocked" || item.nsfwStatus === "checking" ? (
                     <div className="bg-muted flex aspect-square items-center justify-center">
@@ -199,7 +201,7 @@ const ImageGalleryItem = ({ className, item }: ImageGalleryItemProps) => {
                     </div>
                 ) : (
                     <LazyImage
-                        alt={item.alt || t`Gallery item`}
+                        alt=""
                         aspectRatioClassName="border-0 bg-muted"
                         className="transition-transform duration-300 group-hover:scale-105"
                         fallback={undefined}

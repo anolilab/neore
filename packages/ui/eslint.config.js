@@ -414,6 +414,17 @@ export default createConfig(
     },
     {
         /**
+         * The shortcut list is a scrollable region with no focusable content, so axe
+         * (`scrollable-region-focusable`) needs it to be a tab stop. jsx-a11y classifies
+         * `region` as non-interactive and has no exception for a focusable region.
+         */
+        files: ["**/data-grid/data-grid-keyboard-shortcuts.tsx"],
+        rules: {
+            "jsx-a11y/no-noninteractive-tabindex": "off",
+        },
+    },
+    {
+        /**
          * The column resizer is the ARIA WINDOW SPLITTER pattern —
          * `role="separator"` with `aria-valuenow`/`min`/`max`, a tab stop and
          * drag handlers. That is the spec-correct markup for a resizable

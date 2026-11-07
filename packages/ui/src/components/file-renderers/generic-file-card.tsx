@@ -4,7 +4,7 @@ import { useLingui } from "@lingui/react/macro";
 import cn from "@ui/utils/cn";
 import { Download, File, FileArchive, FileAudio, FileCode, FileImage, FileSpreadsheet, FileText, FileVideo } from "lucide-react";
 import type { FC } from "react";
-import { memo, useId, useMemo } from "react";
+import { memo, useMemo } from "react";
 
 import { formatFileSize } from "./file-type-utilities";
 
@@ -85,12 +85,9 @@ const GenericFileCard: FC<GenericFileCardProps> = memo(({ className, description
     const { t } = useLingui();
     const Icon = useMemo(() => getIconForFile(mediaType, filename), [mediaType, filename]);
     const displayName = filename || t`Download file`;
-    const descriptionId = useId();
 
     return (
         <a
-            aria-describedby={description ? descriptionId : undefined}
-            aria-label={t`Download ${displayName}`}
             className={cn(
                 "group my-2 flex w-full max-w-sm items-center gap-3 rounded-lg border p-3 transition-colors",
                 "hover:bg-accent hover:border-accent-foreground/20",
@@ -105,8 +102,12 @@ const GenericFileCard: FC<GenericFileCardProps> = memo(({ className, description
                 <Icon aria-hidden="true" className="text-muted-foreground size-5" />
             </div>
             <div className="min-w-0 flex-1">
-                <div className="truncate text-sm font-medium">{displayName}</div>
-                <div className="text-muted-foreground text-xs" id={descriptionId}>
+                {/* The name comes from the content, so the visible text is part of it; the hidden word says what the link does. */}
+                <div className="truncate text-sm font-medium">
+                    {filename && <span className="sr-only">{t`Download`} </span>}
+                    {displayName}
+                </div>
+                <div className="text-muted-foreground text-xs">
                     {description ?? (
                         <>
                             {mediaType && <span>{mediaType}</span>}

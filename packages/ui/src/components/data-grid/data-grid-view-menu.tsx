@@ -40,11 +40,11 @@ const DataGridViewMenu = <TData extends RowData>({ className, disabled, table, .
                 <Settings2 aria-hidden="true" className="text-muted-foreground" />
                 {t`View`}
             </PopoverTrigger>
-            <PopoverContent className={cn("w-44 p-0", className)} dir={direction} {...props}>
+            <PopoverContent aria-label={t`Columns`} className={cn("w-44 p-0", className)} dir={direction} {...props}>
                 <Command>
                     <CommandInput placeholder={t`Search columns...`} />
+                    <CommandEmpty>{t`No columns found.`}</CommandEmpty>
                     <CommandList>
-                        <CommandEmpty>{t`No columns found.`}</CommandEmpty>
                         <CommandGroup>
                             {columns.map((column) => (
                                 <CommandItem key={column.id} onSelect={() => column.toggleVisibility(!column.getIsVisible())}>

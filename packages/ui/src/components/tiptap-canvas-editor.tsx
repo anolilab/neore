@@ -20,7 +20,7 @@ import { useEffect, useImperativeHandle, useMemo, useRef } from "react";
 import { RichTextProvider } from "reactjs-tiptap-editor";
 import { Blockquote, RichTextBlockquote } from "reactjs-tiptap-editor/blockquote";
 import { Bold, RichTextBold } from "reactjs-tiptap-editor/bold";
-import { RichTextBubbleImage, RichTextBubbleLink, RichTextBubbleTable } from "reactjs-tiptap-editor/bubble";
+import { RichTextBubbleImage, RichTextBubbleLink } from "reactjs-tiptap-editor/bubble";
 import { BulletList, RichTextBulletList } from "reactjs-tiptap-editor/bulletlist";
 import { Code, RichTextCode } from "reactjs-tiptap-editor/code";
 import { CodeBlock, RichTextCodeBlock } from "reactjs-tiptap-editor/codeblock";
@@ -43,6 +43,8 @@ import { RichTextUnderline, TextUnderline } from "reactjs-tiptap-editor/textunde
 
 import { BASE_EXTENSIONS, EDITOR_PLACEHOLDER_CLASSES } from "../lib/tiptap-base-extensions";
 import { htmlToMarkdown, markdownToHTML, markdownToTiptapJSON } from "../lib/tiptap-markdown";
+import TiptapTableBubble from "../lib/tiptap-table-bubble";
+import ToolbarItem from "../lib/tiptap-toolbar-item";
 import ToolbarSeparator from "../lib/tiptap-toolbar-separator";
 import cn from "../utils/cn";
 
@@ -177,6 +179,7 @@ export const TiptapCanvasEditor = ({
         editable,
         editorProps: {
             attributes: {
+                "aria-label": t`Document`,
                 class: cn("prose prose-sm dark:prose-invert max-w-none focus:outline-none min-h-[200px] p-4", EDITOR_PLACEHOLDER_CLASSES),
             },
         },
@@ -282,32 +285,72 @@ export const TiptapCanvasEditor = ({
             <div className={cn("flex h-full flex-col overflow-hidden", className)}>
                 {toolbar && editable && (
                     <div className="flex flex-wrap items-center gap-0.5 border-b px-3 py-1.5">
-                        <RichTextUndo />
-                        <RichTextRedo />
+                        <ToolbarItem label={t`Undo`}>
+                            <RichTextUndo />
+                        </ToolbarItem>
+                        <ToolbarItem label={t`Redo`}>
+                            <RichTextRedo />
+                        </ToolbarItem>
                         <ToolbarSeparator />
-                        <RichTextBold />
-                        <RichTextItalic />
-                        <RichTextUnderline />
-                        <RichTextStrike />
-                        <RichTextCode />
+                        <ToolbarItem label={t`Bold`}>
+                            <RichTextBold />
+                        </ToolbarItem>
+                        <ToolbarItem label={t`Italic`}>
+                            <RichTextItalic />
+                        </ToolbarItem>
+                        <ToolbarItem label={t`Underline`}>
+                            <RichTextUnderline />
+                        </ToolbarItem>
+                        <ToolbarItem label={t`Strikethrough`}>
+                            <RichTextStrike />
+                        </ToolbarItem>
+                        <ToolbarItem label={t`Code`}>
+                            <RichTextCode />
+                        </ToolbarItem>
                         <ToolbarSeparator />
-                        <RichTextHeading />
-                        <RichTextAlign />
+                        <ToolbarItem label={t`Heading`}>
+                            <RichTextHeading />
+                        </ToolbarItem>
+                        <ToolbarItem label={t`Text alignment`}>
+                            <RichTextAlign />
+                        </ToolbarItem>
                         <ToolbarSeparator />
-                        <RichTextBulletList />
-                        <RichTextOrderedList />
-                        <RichTextTaskList />
+                        <ToolbarItem label={t`Bulleted list`}>
+                            <RichTextBulletList />
+                        </ToolbarItem>
+                        <ToolbarItem label={t`Numbered list`}>
+                            <RichTextOrderedList />
+                        </ToolbarItem>
+                        <ToolbarItem label={t`Task list`}>
+                            <RichTextTaskList />
+                        </ToolbarItem>
                         <ToolbarSeparator />
-                        <RichTextBlockquote />
-                        <RichTextCodeBlock />
-                        <RichTextHorizontalRule />
+                        <ToolbarItem label={t`Quote`}>
+                            <RichTextBlockquote />
+                        </ToolbarItem>
+                        <ToolbarItem label={t`Code block`}>
+                            <RichTextCodeBlock />
+                        </ToolbarItem>
+                        <ToolbarItem label={t`Horizontal rule`}>
+                            <RichTextHorizontalRule />
+                        </ToolbarItem>
                         <ToolbarSeparator />
-                        <RichTextLink />
-                        <RichTextImage />
-                        <RichTextTable />
+                        <ToolbarItem label={t`Link`}>
+                            <RichTextLink />
+                        </ToolbarItem>
+                        <ToolbarItem label={t`Image`}>
+                            <RichTextImage />
+                        </ToolbarItem>
+                        <ToolbarItem label={t`Table`}>
+                            <RichTextTable />
+                        </ToolbarItem>
                         <ToolbarSeparator />
-                        <RichTextColor />
-                        <RichTextHighlight />
+                        <ToolbarItem label={t`Text color`}>
+                            <RichTextColor />
+                        </ToolbarItem>
+                        <ToolbarItem label={t`Highlight`}>
+                            <RichTextHighlight />
+                        </ToolbarItem>
                     </div>
                 )}
 
@@ -321,7 +364,7 @@ export const TiptapCanvasEditor = ({
             {/* Contextual bubble menus */}
             <RichTextBubbleLink />
             <RichTextBubbleImage />
-            <RichTextBubbleTable />
+            <TiptapTableBubble editor={editor} />
         </RichTextProvider>
     );
 };

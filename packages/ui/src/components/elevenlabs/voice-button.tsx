@@ -149,7 +149,6 @@ const VoiceButton = ({
 
     return (
         <Button
-            aria-label={stateLabels[state]}
             className={cn("gap-2 transition-all duration-200", size === "icon" && "relative", className)}
             disabled={isDisabled}
             onClick={handleClick}
@@ -159,6 +158,8 @@ const VoiceButton = ({
             variant={buttonVariant}
             {...props}
         >
+            {/* The name comes from the content, so a visible label is part of it; this says the state. */}
+            <span className="sr-only">{stateLabels[state]} </span>
             {size !== "icon" && displayLabel && <span className="inline-flex shrink-0 items-center justify-start">{displayLabel}</span>}
 
             <div
