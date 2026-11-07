@@ -58,6 +58,18 @@ const verify = async (input: {
     return parseVerifierOutput(result.text);
 };
 
+/**
+ * The repair a round's prompt states. The attempt being repaired (`previousAnswer`) is left out only when the round
+ * continues a thread with its history, which holds it already; a new thread or a fresh context gets it.
+ */
+const repairFor = <T extends { previousAnswer?: string }>(repair: T | undefined, continuesWithHistory: boolean): T | undefined => {
+    if (!repair || !continuesWithHistory) {
+        return repair;
+    }
+
+    return { ...repair, previousAnswer: undefined };
+};
+
 const runAgent = async (
     ctx: ActionCtx,
     claim: {
@@ -165,7 +177,7 @@ const runAgent = async (
         },
         origin: "trigger",
         personalization: "full",
-        prompt: buildTaskPrompt(claim),
+        prompt: buildTaskPrompt({ ...claim, repair: repairFor(claim.repair, "threadId" in thread && !claim.freshContext) }),
         ...(claim.reasoningEffort !== undefined && { reasoningEffort: claim.reasoningEffort }),
         skill,
         // The project's own instructions, framed as a chat in the project gets them (`chat/lib/agent-run.ts`).

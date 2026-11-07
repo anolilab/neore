@@ -303,9 +303,9 @@ export const claimRound = internalMutation
         const goal = task.goalId ? await ctx.db.get("goals", task.goalId) : null;
         const { destination, notice, project } = await resolveRunPlace(ctx, task, round);
 
-        // A repair round that starts without the thread's history (a new thread, or a fresh context) is given the
-        // attempt it repairs; one that continues the thread with history has it in view already.
-        if (repair && previous?.finalAnswer && (!destination.threadId || destination.freshContext)) {
+        // The attempt being repaired travels with the claim; the runner drops it only when the round really continues
+        // a thread whose history holds it (it may still fall back to a new thread right before it writes).
+        if (repair && previous?.finalAnswer) {
             repair.previousAnswer = previous.finalAnswer;
         }
 

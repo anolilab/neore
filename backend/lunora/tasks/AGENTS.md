@@ -56,9 +56,9 @@ recurring tasks. State machine and idempotency are explained at the top of `inte
   not deleted, temporary, locked or host-run, not busy with a reply, and in the task's `projectId`. Anything else starts a new thread, so
   moving the task to another project (or the thread out of it) starts a new thread. Never clear
   `lastRunThreadId` to force this; the run history links to it.
-- `fresh_context` sends no earlier turns on every round of the cycle, and only round 0 writes the divider. A repair
-  round without the thread's history (new thread, fresh context) gets the attempt it repairs as `repair.previousAnswer`
-  in its prompt, apart from the verifier's words. A goal's later rounds inside one run read that run's own turns.
+- `fresh_context` sends no earlier turns on every round of the cycle, and only round 0 writes the divider. The claim
+  carries the attempt being repaired (`repair.previousAnswer`); the runner drops it from the prompt only when the round
+  really continues a thread with its history (`repairFor`), after its last re-check. A goal's later rounds inside one run read that run's own turns.
 - The project takes WRITE access (`writableProject`: the owner's own, or an organization project nobody owns;
   the rule of moving a thread into a project), checked when the task is saved and again by `resolveRunPlace` at
   every claim. Saving a project without it is refused; the task's own project that lost it is dropped on edit.

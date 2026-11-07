@@ -194,6 +194,20 @@ describe("runTaskRound destination", () => {
         expect(state.mutations.find((mutation) => mutation.name === "completeRound")?.args).toMatchObject({ keepLastThread: true });
     });
 
+    it("states the attempt a repair round fixes unless it continues a thread that holds it", async () => {
+        const repair = { previousAnswer: "Draft one", reasons: ["Missing totals"] };
+
+        state.claim = claimWith({ continueThreadId: "thread-run-1", repair });
+        await runRound(1);
+        expect(state.runs[0]!.prompt).not.toContain("Draft one");
+
+        // The kept thread was locked right before the write: the round runs in a new chat, which needs the attempt.
+        state.runs = [];
+        state.threadProblem = "thread_locked";
+        await runRound(1);
+        expect(state.runs[0]!.prompt).toContain("Draft one");
+    });
+
     it("gives the run the project's own instructions, as a chat in the project gets them", async () => {
         state.claim = claimWith({ projectId: "project-a" });
         state.runProject = { context: "Write for the finance team.", projectId: "project-a" };
