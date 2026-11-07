@@ -27963,6 +27963,13 @@
           ],
           "unique": false
         },
+        "by_org_recorded": {
+          "fields": [
+            "organizationId",
+            "recordedAt"
+          ],
+          "unique": false
+        },
         "by_user_reply": {
           "fields": [
             "userId",

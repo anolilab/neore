@@ -16,7 +16,7 @@
  */
 import { sumMessageCosts, sumStepUsage } from "../agent/message-cost";
 import type { StepUsage } from "../agent/message-cost";
-import { localDayOf } from "../memory/reflection-logic";
+import { localDayOf, resolveTimeZone, zonedTimeToUtc } from "../memory/reflection-logic";
 
 /** `skillKey` of the per-day total row the heatmap reads. */
 export const TOTAL_SKILL_KEY = "__total__";
@@ -142,6 +142,13 @@ export const summariseReply = (savedMessages: ReadonlyArray<SavedRowLike>): Repl
 
 /** The user's calendar day at `instant`, in their zone (UTC when unset or unusable). */
 export const usageDayOf = (instant: number, timeZone: string | null | undefined): string => localDayOf(instant, timeZone);
+
+/** The instant `day` (`YYYY-MM-DD`) begins in `timeZone` (UTC when unset or unusable), across a DST change too. */
+export const startOfUsageDay = (day: string, timeZone: string | null | undefined): number => {
+    const [year, month, date] = day.split("-").map(Number) as [number, number, number];
+
+    return zonedTimeToUtc(year, month, date, 0, 0, resolveTimeZone(timeZone));
+};
 
 /** The arguments of `usage_activity.recordReplyUsage`. */
 export interface ReplyUsageArgs {

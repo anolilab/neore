@@ -24,7 +24,7 @@ import { authAction, rateLimit } from "../lib/crpc";
 import { throwForbidden } from "../lib/error-helpers";
 import { systemDb } from "../lib/rls/scope";
 import { MAX_LENGTH } from "../lib/validators";
-import { isDayKey, remainderOf, sumRows } from "./activity-logic";
+import { isDayKey, remainderOf, startOfUsageDay, sumRows } from "./activity-logic";
 
 /** Project titles one lookup reads. */
 const TITLE_BATCH = 50;
@@ -56,16 +56,27 @@ export const isOrganizationAdmin = internalQuery
         return member !== null && isOrganizationAdminRole(member.role);
     });
 
+/** The zone the caller's usage page counts days in (`userSettings.timezone`), or null for UTC. */
+export const usageTimeZoneOf = internalQuery
+    .input({ userId: v.string().max(MAX_LENGTH.id) })
+    .output(v.union(v.string(), v.null()))
+    .query(async ({ args: { userId }, ctx }) => {
+        const settings = await ctx.db.userSettings.findFirst({ where: { userId } });
+
+        return settings?.timezone ?? null;
+    });
+
 /**
- * The organization's usage from `fromDate` on, summed by the database per project (`null`: no project the organization
- * owns). Three grouped reads over the ledger's `by_org_date` index; each answers with a row per project, however many
- * replies the period holds, so no read is ever cut short.
+ * The organization's usage recorded from `from` (an instant) on, summed by the database per project (`null`: no project
+ * the organization owns). Each row's `date` is its member's local day, so the period is taken by instant: it starts at
+ * the viewer's midnight for every member alike. Three grouped reads over `by_org_recorded`; each answers with a row per
+ * project, however many replies the period holds, so no read is ever cut short.
  */
 export const organizationUsageSums = internalQuery
-    .input({ fromDate: v.string().max(10), organizationId: v.string().max(MAX_LENGTH.id) })
+    .input({ from: v.number(), organizationId: v.string().max(MAX_LENGTH.id) })
     .output(v.array(v.object({ costMicrodollars: v.number(), projectKey: v.optional(v.string()), replies: v.number(), tokens: v.number() })))
-    .query(async ({ args: { fromDate, organizationId }, ctx }) => {
-        const where = { date: { gte: fromDate }, organizationId };
+    .query(async ({ args: { from, organizationId }, ctx }) => {
+        const where = { organizationId, recordedAt: { gte: from } };
         const [costs, tokens, replies] = await Promise.all([
             ctx.db.usageOrganizationReplies.groupBy({ agg: { field: "costMicrodollars", op: "sum" }, by: ["projectKey"], where }),
             ctx.db.usageOrganizationReplies.groupBy({ agg: { field: "tokens", op: "sum" }, by: ["projectKey"], where }),
@@ -109,7 +120,7 @@ export const organizationProjectTitles = internalQuery
     });
 
 /**
- * The caller's active organization's usage from `fromDate` on: its total, per
+ * The caller's active organization's usage from the start of `fromDate` in the caller's time zone: its total, per
  * project it owns, and what no project accounts for. Admins and owners only.
  * `organizationId` is the organization the caller's page expects: a request
  * whose active organization has changed since (in another tab) is refused
@@ -145,7 +156,11 @@ export const getOrganizationProjectUsage = authAction
             return throwForbidden(FORBIDDEN);
         }
 
-        const sums = await ctx.runQuery(internal.usage.organization.organizationUsageSums, { fromDate, organizationId });
+        const timeZone = await ctx.runQuery(internal.usage.organization.usageTimeZoneOf, { userId: ctx.user.userId });
+        const sums = await ctx.runQuery(internal.usage.organization.organizationUsageSums, {
+            from: startOfUsageDay(fromDate, timeZone),
+            organizationId,
+        });
         const projects = sums.flatMap(({ projectKey, ...totals }) => (projectKey === undefined ? [] : [{ ...totals, projectKey }]));
         const total = sumRows(sums);
         const usage = new Map(projects.map((project) => [project.projectKey, project]));

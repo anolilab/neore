@@ -70,6 +70,8 @@ const ADMIN = "user-admin";
 const MEMBER = "user-member";
 const ORG = "org_1";
 const FROM = "2026-09-01";
+/** When the tests' replies are recorded: inside the period from `FROM` on. */
+const AT = Date.UTC(2026, 8, 20, 12);
 
 let harness: ReturnType<typeof lunoraTest>;
 let replies = 0;
@@ -82,7 +84,7 @@ const record = async (userId: string, threadId: string, costMicrodollars: number
     await harness.run(
         async (ctx: any) =>
             await ctx.runMutation(recordReplyUsage, {
-                at: 1,
+                at: AT,
                 costMicrodollars,
                 date: "2026-09-20",
                 replyKey: `reply-${String(replies)}`,
@@ -208,7 +210,7 @@ describe("organization usage", () => {
                     costMicrodollars: 1,
                     date: "2026-09-20",
                     organizationId: ORG,
-                    recordedAt: 0,
+                    recordedAt: AT,
                     replyKey: `reply-${String(index)}`,
                     tokens: 1,
                     userId: `user-${String(index)}`,
@@ -281,7 +283,7 @@ describe("organization usage rows", () => {
     it("files a re-delivered reply once", async () => {
         const thread = await insert("threads", { organizationId: ORG, status: "active", title: "T", userId: ADMIN });
         const args = {
-            at: 1,
+            at: AT,
             costMicrodollars: 30,
             date: "2026-09-20",
             replyKey: "redelivered-reply",
@@ -305,7 +307,7 @@ describe("organization usage rows", () => {
             await harness.run(
                 async (ctx: any) =>
                     await ctx.runMutation(recordReplyUsage, {
-                        at: 1,
+                        at: AT,
                         costMicrodollars: 30,
                         date: "2026-09-20",
                         replyKey: "retried-reply",
@@ -475,6 +477,31 @@ describe("organization usage rows", () => {
         expect(result.total.costMicrodollars).toBe(0);
     });
 
+    it("starts the period at the viewer's midnight, whichever zone dated each member's reply", async () => {
+        // The admin counts days in Tokyo: the period from FROM starts at 2026-08-31T15:00Z.
+        const start = Date.UTC(2026, 7, 31, 15);
+
+        await insert("userSettings", { timezone: "Asia/Tokyo", userId: ADMIN });
+        await harness.run(async (ctx: any) => {
+            // Both dated FROM by a member in Los Angeles; only the second is inside the admin's period.
+            for (const [index, recordedAt] of [start - 60_000, start + 60_000].entries()) {
+                await ctx.db.insert("usageOrganizationReplies", {
+                    costMicrodollars: 10 * (index + 1),
+                    date: FROM,
+                    organizationId: ORG,
+                    recordedAt,
+                    replyKey: `zone-${String(index)}`,
+                    tokens: 1,
+                    userId: MEMBER,
+                });
+            }
+        });
+
+        const { result } = await read();
+
+        expect(result.total).toMatchObject({ costMicrodollars: 20, replies: 1 });
+    });
+
     it("says when projects with no usage are left out, without calling the period incomplete", async () => {
         await harness.run(async (ctx: any) => {
             for (let index = 0; index <= MAX_PROJECTS; index += 1) {
@@ -498,7 +525,7 @@ describe("organization usage of shared threads and former members", () => {
         await harness.run(
             async (ctx: any) =>
                 await ctx.runMutation(forwardReplyUsage, {
-                    at: 1,
+                    at: AT,
                     costMicrodollars: 40,
                     date: "2026-09-20",
                     replyKey: "shared-reply",

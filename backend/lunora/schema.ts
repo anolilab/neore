@@ -3370,6 +3370,8 @@ export const schema = defineSchema({
     })
         .global()
         .index("by_org_date", ["organizationId", "date"])
+        // The organization view: a period starts at the viewer's local midnight, whatever zone dated each row.
+        .index("by_org_recorded", ["organizationId", "recordedAt"])
         .index("by_user_reply", ["userId", "replyKey"])
         // The retention sweep.
         .index("by_date", ["date"]),

@@ -60,7 +60,7 @@ export const sweepOrphanedOrganizationUsage = internalMutation
     .input({ after: v.optional(v.string().max(MAX_LENGTH.id)) })
     .output(v.number())
     .mutation(async ({ args, ctx }) => {
-        let after = args.after;
+        let { after } = args;
         let deleted = 0;
 
         for (let looked = 0; looked < SWEEP_ORGANIZATIONS; looked += 1) {

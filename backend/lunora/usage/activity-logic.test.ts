@@ -16,6 +16,7 @@ import {
     repliesByOrder,
     replyUsageArgs,
     skillKeyOf,
+    startOfUsageDay,
     summariseReply,
     TOTAL_SKILL_KEY,
     usageDayOf,
@@ -25,6 +26,17 @@ import {
 const row = (overrides: Partial<Parameters<typeof foldSkillTotals>[0][number]>) => {
     return { costMicrodollars: 0, date: "2026-09-01", replies: 1, skillKey: TOTAL_SKILL_KEY, tokens: 0, updatedAt: 0, ...overrides };
 };
+
+describe("startOfUsageDay", () => {
+    it("is the instant a day begins in a zone, across a DST change, and in UTC without one", () => {
+        expect(startOfUsageDay("2026-09-01", "Asia/Tokyo")).toBe(Date.UTC(2026, 7, 31, 15));
+        // New York moves its clocks on 2026-03-08 at 02:00: that day still begins at 05:00Z, the next at 04:00Z.
+        expect(startOfUsageDay("2026-03-08", "America/New_York")).toBe(Date.UTC(2026, 2, 8, 5));
+        expect(startOfUsageDay("2026-03-09", "America/New_York")).toBe(Date.UTC(2026, 2, 9, 4));
+        expect(startOfUsageDay("2026-09-01", undefined)).toBe(Date.UTC(2026, 8, 1));
+        expect(startOfUsageDay("2026-09-01", "Not/AZone")).toBe(Date.UTC(2026, 8, 1));
+    });
+});
 
 describe("isDayKey", () => {
     it("accepts real calendar days only", () => {
