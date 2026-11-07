@@ -249,6 +249,35 @@ describe("collectConversations", () => {
             harness.close();
         }
     });
+
+    it("exports each thread's snooze, with the time the owner chose it", async () => {
+        registry.set("agent_messages:listMessagesByThreadIdAdmitted", listMessagesByThreadIdAdmitted);
+        registry.set("agent_threads:listThreadsByUserIdInternal", listThreadsByUserIdInternal);
+        registry.set("gdpr_steps:collectThreadTags", collectThreadTags);
+        registry.set("agent_thread_summaries:listThreadSummariesForExport", listThreadSummariesForExport);
+
+        const harness = lunoraTest(schema as never);
+
+        try {
+            await harness.run(async (context: any) => {
+                await context.db.insert("threads", {
+                    snoozeChosenAt: 1_700_000_000_000,
+                    snoozedUntil: 1_800_000_000_000,
+                    status: "active",
+                    title: "Snoozed",
+                    userId: "user-s",
+                });
+            });
+
+            const conversations = await harness.action(async (context: any) => await context.runAction(collectConversations, { userId: "user-s" }));
+            const exported = conversations as { thread: { snoozeChosenAt?: number; snoozedUntil?: number; title?: string } }[];
+            const snoozed = exported.find((conversation) => conversation.thread.title === "Snoozed");
+
+            expect(snoozed?.thread).toMatchObject({ snoozeChosenAt: 1_700_000_000_000, snoozedUntil: 1_800_000_000_000 });
+        } finally {
+            harness.close();
+        }
+    });
 });
 
 /**

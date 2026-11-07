@@ -10,6 +10,10 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+const toasts = vi.hoisted(() => {
+    return { errors: [] as string[] };
+});
+
 const { server, write } = vi.hoisted(() => {
     const fake = { loseResponse: false, online: true, queued: [] as (() => void)[], refuse: false, written: [] as unknown[] };
 
@@ -59,7 +63,9 @@ vi.mock("@lingui/react/macro", () => {
 
 vi.mock("@/lib/toast", () => {
     return {
-        showError: () => {},
+        showError: (message: string) => {
+            toasts.errors.push(message);
+        },
         showSuccess: () => {},
     };
 });
@@ -137,6 +143,7 @@ describe("snoozing while offline", () => {
         server.online = true;
         server.loseResponse = false;
         server.refuse = false;
+        toasts.errors.length = 0;
         server.queued.length = 0;
         server.written.length = 0;
         onlineManager.setOnline(true);
@@ -155,6 +162,8 @@ describe("snoozing while offline", () => {
         server.refuse = true;
         await expect(result.current.snoozeAt("t1", UNTIL, undefined)).resolves.toBe("refused");
         expect(server.written).toHaveLength(0);
+        // The dialog shows the failure inline; a toast would be a second copy of it.
+        expect(toasts.errors).toEqual([]);
     });
 
     it("a custom snooze whose answer is lost after the server committed it is unconfirmed, not refused", async () => {

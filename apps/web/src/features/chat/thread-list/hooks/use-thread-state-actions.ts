@@ -89,8 +89,10 @@ export const useThreadStateActions = (): ThreadStateActions => {
     // made later on the thread wins when the queue drains.
     // The result is the write's own outcome. Only the write sits in the try: an error after a successful write (the toast) is not
     // reported as a failed snooze.
+    // `reportFailure` says whether this call reports a failure itself. A dialog shows its own failure inline, so a custom snooze does not
+    // also toast it; a snooze with no dialog (a preset) reports it here.
     const save = useCallback(
-        async (mutate: SnoozeMutate, threadId: string, until: number, previousUntil: number | undefined): Promise<SnoozeOutcome> => {
+        async (mutate: SnoozeMutate, threadId: string, until: number, previousUntil: number | undefined, reportFailure: boolean): Promise<SnoozeOutcome> => {
             try {
                 await mutate({ chosenAt: Date.now(), threadId: threadId as Id<"threads">, until });
             } catch (error) {
@@ -98,15 +100,17 @@ export const useThreadStateActions = (): ThreadStateActions => {
 
                 // Only a lost answer is "may have saved": the request went out and no answer came back, so the server may have committed
                 // it. Anything the server answered, including the client's own refusal before sending, did not save.
-                if (answerWasLost(error)) {
-                    showError(t`Could not confirm the snooze. It may have saved; check the thread before saving again.`);
+                const lost = answerWasLost(error);
 
-                    return "unconfirmed";
+                if (reportFailure) {
+                    showError(
+                        lost
+                            ? t`Could not confirm the snooze. It may have saved; check the thread before saving again.`
+                            : t`Could not snooze the thread. Please try again.`,
+                    );
                 }
 
-                showError(t`Could not snooze the thread. Please try again.`);
-
-                return "refused";
+                return lost ? "unconfirmed" : "refused";
             }
 
             const when = new Date(until).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
@@ -119,13 +123,13 @@ export const useThreadStateActions = (): ThreadStateActions => {
     );
 
     const snoozeAt = useCallback(
-        (threadId: string, until: number, previousUntil: number | undefined): Promise<SnoozeOutcome> => save(writeNow, threadId, until, previousUntil),
+        (threadId: string, until: number, previousUntil: number | undefined): Promise<SnoozeOutcome> => save(writeNow, threadId, until, previousUntil, false),
         [save, writeNow],
     );
 
     const snooze = useCallback(
         (threadId: string, choice: SnoozeChoice, previousUntil: number | undefined) => {
-            void save(snoozeMutation, threadId, snoozeUntil(choice, new Date()), previousUntil);
+            void save(snoozeMutation, threadId, snoozeUntil(choice, new Date()), previousUntil, true);
         },
         [save, snoozeMutation],
     );

@@ -126,7 +126,18 @@ const projectMessage = (
 const projectThread = (
     thread: Pick<
         Doc<"threads">,
-        "_creationTime" | "activeLeafMessageId" | "category" | "lastViewedAt" | "model" | "snoozedUntil" | "summary" | "tagIds" | "tags" | "title" | "updatedAt"
+        | "_creationTime"
+        | "activeLeafMessageId"
+        | "category"
+        | "lastViewedAt"
+        | "model"
+        | "snoozeChosenAt"
+        | "snoozedUntil"
+        | "summary"
+        | "tagIds"
+        | "tags"
+        | "title"
+        | "updatedAt"
     > & {
         _id: string;
     },
@@ -141,6 +152,8 @@ const projectThread = (
         createdAt: thread._creationTime,
         lastViewedAt: thread.lastViewedAt,
         model: thread.model,
+        // When the owner chose the current snooze, by the client's clock (`chat/thread-state.ts`). Unset when nothing was chosen.
+        snoozeChosenAt: thread.snoozeChosenAt,
         snoozedUntil: thread.snoozedUntil,
         summary: thread.summary,
         tags: thread.tags,

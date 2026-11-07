@@ -153,11 +153,11 @@ export const isStaleSnoozeChoice = (thread: Pick<Doc<"threads">, "snoozeChosenAt
 
 /**
  * Sets the thread's snooze: `until`, or `undefined` to bring it back, and records `chosenAt` as the ordering. Leaves `updatedAt` alone.
- * A stale write (`isStaleSnoozeChoice`) changes nothing.
+ * Returns whether the write applied: a stale write (`isStaleSnoozeChoice`) changes nothing and returns false.
  */
-export const setThreadSnooze = async (db: Database, thread: Doc<"threads">, until: number | undefined, chosenAt: number): Promise<void> => {
+export const setThreadSnooze = async (db: Database, thread: Doc<"threads">, until: number | undefined, chosenAt: number): Promise<boolean> => {
     if (isStaleSnoozeChoice(thread, chosenAt)) {
-        return;
+        return false;
     }
 
     if (until === undefined) {
@@ -165,10 +165,12 @@ export const setThreadSnooze = async (db: Database, thread: Doc<"threads">, unti
             await patchRow(db, "threads", thread, { snoozeChosenAt: chosenAt, snoozedUntil: undefined });
         }
 
-        return;
+        return true;
     }
 
     await patchRow(db, "threads", thread, { snoozeChosenAt: chosenAt, snoozedUntil: until });
+
+    return true;
 };
 
 /**

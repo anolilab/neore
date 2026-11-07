@@ -361,6 +361,8 @@ describe("the list's snooze dialog across threads", () => {
 
         const alert = await screen.findByRole("alert");
 
+        // One error element, in the dialog's own error place, and not a second copy of it.
+        expect(screen.getAllByRole("alert")).toHaveLength(1);
         expect(alert.textContent).toBe("Could not snooze the thread. Please try again.");
         expect(alert.textContent).not.toContain("may have");
         expect(onOpenChange).not.toHaveBeenCalled();

@@ -3993,8 +3993,8 @@ export interface Caller {
         };
         thread_state: {
             markThreadViewed: (args: { threadId: Id<"threads"> }) => Promise<{ updated: boolean }>;
-            snoozeThread: (args: { chosenAt: number; threadId: Id<"threads">; until: number }) => Promise<null>;
-            unsnoozeThread: (args: { chosenAt: number; threadId: Id<"threads"> }) => Promise<null>;
+            snoozeThread: (args: { chosenAt: number; threadId: Id<"threads">; until: number }) => Promise<{ applied: boolean }>;
+            unsnoozeThread: (args: { chosenAt: number; threadId: Id<"threads"> }) => Promise<{ applied: boolean }>;
         };
         tool_permissions: {
             consumeLowRiskCheck: (args: { threadId: Id<"threads">; userId: string }) => Promise<boolean>;

@@ -10,7 +10,7 @@ import { getThread, updateThread } from "../agent/threads";
 import schema from "../schema";
 import { isSnoozeInRange, SNOOZE_MAX_MS } from "./lib/thread-state-logic";
 import { releaseThread } from "./streaming/persistent/host";
-import { markThreadViewed, snoozeThread, unsnoozeThread } from "./thread-state";
+import { applySnoozeChoice, markThreadViewed, snoozeThread, unsnoozeThread } from "./thread-state";
 
 const OWNER = "user-owner";
 const GRANTEE = "user-grantee";
@@ -383,7 +383,9 @@ describe("snooze and unsnooze", () => {
 
         await as(OWNER).mutation(snoozeThread as never, { chosenAt: now - 1000, threadId, until: now + DAY } as never);
 
-        await expect(as(OWNER).mutation(snoozeThread as never, { chosenAt: now - 60_000, threadId, until: now - 1000 } as never)).resolves.toBeNull();
+        await expect(as(OWNER).mutation(snoozeThread as never, { chosenAt: now - 60_000, threadId, until: now - 1000 } as never)).resolves.toEqual({
+            applied: false,
+        });
         expect(await read()).toMatchObject({ snoozedUntil: now + DAY });
     });
 
@@ -397,6 +399,63 @@ describe("snooze and unsnooze", () => {
         // A client that predates the ordering field sends no choice time: it is refused, and the stored choice stands.
         await expect(as(OWNER).mutation(snoozeThread as never, { threadId, until: now + 5 * DAY } as never)).rejects.toThrow();
         expect(await read()).toMatchObject({ snoozedUntil: now + 2 * DAY });
+    });
+
+    it("a stale unsnooze is reported as not applied, and logged as dropped with its reason", async () => {
+        const now = Date.now();
+
+        await as(OWNER).mutation(snoozeThread as never, { chosenAt: now - 1000, threadId, until: now + 2 * DAY } as never);
+
+        const events: { fields: Record<string, unknown>; name: string }[] = [];
+        const log = {
+            event: (name: string, fields: Record<string, unknown>) => {
+                events.push({ fields, name });
+            },
+        };
+        const stale = await harness.run(
+            async (context: any) =>
+                await applySnoozeChoice(context.db, log, await context.db.get("threads", threadId as never), {
+                    applied: {},
+                    chosenAt: now - 5000,
+                    kind: "unsnooze",
+                    until: undefined,
+                }),
+        );
+
+        expect(stale).toEqual({ applied: false });
+        expect(events).toEqual([{ fields: { reason: "stale_ordering" }, name: "chat.unsnooze_dropped" }]);
+        expect(await read()).toMatchObject({ snoozedUntil: now + 2 * DAY });
+    });
+
+    it("an applied choice is reported as applied, and logged as applied", async () => {
+        const now = Date.now();
+        const events: { fields: Record<string, unknown>; name: string }[] = [];
+        const log = {
+            event: (name: string, fields: Record<string, unknown>) => {
+                events.push({ fields, name });
+            },
+        };
+        const applied = await harness.run(
+            async (context: any) =>
+                await applySnoozeChoice(context.db, log, await context.db.get("threads", threadId as never), {
+                    applied: { snoozedForMs: DAY },
+                    chosenAt: now - 1000,
+                    kind: "snooze",
+                    until: now + DAY,
+                }),
+        );
+
+        expect(applied).toEqual({ applied: true });
+        expect(events).toEqual([{ fields: { snoozedForMs: DAY }, name: "chat.snooze_thread" }]);
+    });
+
+    it("the unsnooze procedure reports a dropped unsnooze to its caller", async () => {
+        const now = Date.now();
+
+        await as(OWNER).mutation(snoozeThread as never, { chosenAt: now - 1000, threadId, until: now + 2 * DAY } as never);
+
+        await expect(as(OWNER).mutation(unsnoozeThread as never, { chosenAt: now - 5000, threadId } as never)).resolves.toEqual({ applied: false });
+        await expect(as(OWNER).mutation(unsnoozeThread as never, { chosenAt: now, threadId } as never)).resolves.toEqual({ applied: true });
     });
 
     it("a queued snooze that drains after the thread woke does not hide it again", async () => {

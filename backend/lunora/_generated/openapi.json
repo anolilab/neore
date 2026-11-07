@@ -25857,7 +25857,15 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "null"
+                  "properties": {
+                    "applied": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "applied"
+                  ],
+                  "type": "object"
                 }
               }
             },
@@ -25924,7 +25932,15 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "null"
+                  "properties": {
+                    "applied": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "applied"
+                  ],
+                  "type": "object"
                 }
               }
             },

@@ -358,8 +358,8 @@ export interface ApiTypes {
         };
         thread_state: {
             markThreadViewed: FunctionReference<"mutation", { threadId: Id<"threads"> }, { updated: boolean }>;
-            snoozeThread: FunctionReference<"mutation", { chosenAt: number; threadId: Id<"threads">; until: number }, null>;
-            unsnoozeThread: FunctionReference<"mutation", { chosenAt: number; threadId: Id<"threads"> }, null>;
+            snoozeThread: FunctionReference<"mutation", { chosenAt: number; threadId: Id<"threads">; until: number }, { applied: boolean }>;
+            unsnoozeThread: FunctionReference<"mutation", { chosenAt: number; threadId: Id<"threads"> }, { applied: boolean }>;
         };
         tool_permissions: {
             getToolPermissionSettings: FunctionReference<"query", {}, { autoApproveLowRisk: boolean; builtIn: Array<{ available: boolean; category: string; defaultMode: "auto" | "ask" | "off"; key: string; name: string }>; grants: Record<string, number>; lowRiskTrustedServers: Array<string>; overrides: Record<string, "auto" | "ask" | "off"> }>;
