@@ -82,6 +82,10 @@ export const Streaming: Story = {
 
 /** The provider answered 429: the reply waits and resumes on its own, with a countdown. */
 export const RateLimitPaused: Story = {
+    play: async ({ canvas }) => {
+        // The visible line is aria-hidden; the sr-only announcement says "Rate limited by Anthropic. Retrying in about", with a period.
+        await expect(await canvas.findByText(/^Rate limited by Anthropic, retrying in /, undefined, STATE_WAIT)).toBeInTheDocument();
+    },
     parameters: {
         msw: {
             handlers: {
@@ -127,9 +131,23 @@ export const ReadOnlyShare: Story = {
 };
 
 /** The connection to the backend dropped: the banner above the composer. */
-export const Reconnecting: Story = { parameters: { connection: "connecting" } };
+export const Reconnecting: Story = {
+    play: async ({ canvas }) => {
+        await expect(await canvas.findByText("Reconnecting to the server…", undefined, STATE_WAIT)).toBeInTheDocument();
+    },
+    // "connecting" reads as online until a socket has opened, and a story's socket never does, so the live status is "offline".
+    parameters: { connection: "offline" },
+};
 
-export const Offline: Story = { parameters: { connection: "offline" } };
+export const Offline: Story = {
+    play: async ({ canvas }) => {
+        // The "offline" view comes from the browser's offline event, not the live status: fire it once the page has mounted.
+        await canvas.findByRole("textbox", { name: "Message" }, PAGE_WAIT);
+        globalThis.dispatchEvent(new Event("offline"));
+        await expect(await canvas.findByText("You are offline.", undefined, STATE_WAIT)).toBeInTheDocument();
+    },
+    parameters: { connection: "offline" },
+};
 
 /** A fresh chat, before the first message. */
 export const NewChat: Story = {

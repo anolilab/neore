@@ -43,7 +43,7 @@ const meta = {
             </div>
         ),
     ],
-    // The same unfinished picker as the web one (nested chips, label names, `text-muted-foreground/60` rows); see its stories.
+    // Same open axe findings as the web picker: each row's star sits directly in the listbox (aria-required-children).
     parameters: { a11y: { test: "todo" } },
     title: "Extension/Model picker",
 } satisfies Meta<typeof ModelPicker>;

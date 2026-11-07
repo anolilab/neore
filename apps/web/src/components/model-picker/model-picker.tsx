@@ -251,7 +251,6 @@ const ProviderSidebarButton = memo<{
     showBorder?: boolean;
 }>(({ icon, isSelected, label, onClick, showBorder = false }) => (
     <button
-        aria-label={label}
         className={cn(
             "relative flex w-full items-center gap-2 px-2.5 py-1.5 text-left transition-colors duration-150",
             showBorder && "mb-0.5 border-b pb-2",
@@ -262,7 +261,9 @@ const ProviderSidebarButton = memo<{
         onClick={onClick}
         type="button"
     >
-        <span className="flex size-4 shrink-0 items-center justify-center">{icon}</span>
+        <span aria-hidden="true" className="flex size-4 shrink-0 items-center justify-center">
+            {icon}
+        </span>
         <span className={cn("truncate text-[12px]", isSelected ? "font-medium" : "font-normal")}>{label}</span>
     </button>
 ));
@@ -287,20 +288,11 @@ const ProviderSidebarItem = memo<{
 // ─── Model Row ────────────────────────────────────────────────────────────────
 
 const ModelItemContent = memo<{
-    /** Only set while the starred order can be changed; the buttons are hidden otherwise. */
-    canMoveDown?: boolean;
-    canMoveUp?: boolean;
-    isFavorite: boolean;
-    isInfoActive: boolean;
     isSelected: boolean;
     label: string;
     model: GatewayModel;
-    onInfo: (modelId: string) => void;
-    onInfoLeave: () => void;
-    onMove?: (delta: -1 | 1) => void;
-    onToggleFavorite: (modelId: string, setFavorite: boolean) => void;
     selectionMode: ModelPickerSelectionMode;
-}>(({ canMoveDown, canMoveUp, isFavorite, isInfoActive, isSelected, label, model, onInfo, onInfoLeave, onMove, onToggleFavorite, selectionMode }) => {
+}>(({ isSelected, label, model, selectionMode }) => {
     const { i18n, t } = useLingui();
     const costMultiplier = getCostMultiplier(model.pricing?.input_per_million);
 
@@ -311,7 +303,7 @@ const ModelItemContent = memo<{
                 <div className="flex min-w-0 items-baseline gap-1.5">
                     <span className="truncate text-[13px] leading-none font-medium">{label}</span>
                     {model.isPremium ? (
-                        <span className="shrink-0 rounded-[3px] bg-amber-500/15 px-1 py-0 text-[9px] font-semibold tracking-wide text-amber-600 uppercase dark:bg-amber-400/15 dark:text-amber-400">
+                        <span className="shrink-0 rounded-[3px] bg-amber-500/15 px-1 py-0 text-[9px] font-semibold tracking-wide text-amber-800 uppercase dark:bg-amber-400/15 dark:text-amber-400">
                             <Trans>Pro</Trans>
                         </span>
                     ) : null}
@@ -324,7 +316,7 @@ const ModelItemContent = memo<{
                         </span>
                     ) : null}
                     {model.isNew ? (
-                        <span className="shrink-0 rounded-[3px] bg-emerald-500/12 px-1 py-0 text-[9px] font-semibold tracking-wide text-emerald-600 uppercase dark:bg-emerald-400/15 dark:text-emerald-400">
+                        <span className="shrink-0 rounded-[3px] bg-emerald-500/12 px-1 py-0 text-[9px] font-semibold tracking-wide text-emerald-800 uppercase dark:bg-emerald-400/15 dark:text-emerald-400">
                             <Trans>New</Trans>
                         </span>
                     ) : null}
@@ -336,80 +328,85 @@ const ModelItemContent = memo<{
                 ) : null}
             </div>
 
-            {/* Actions — reveal on hover */}
-            <div className="flex shrink-0 items-center gap-0.5">
-                <button
-                    aria-label={isFavorite ? t`Remove from starred` : t`Add to starred`}
-                    className={cn(
-                        "rounded p-1 transition-all duration-100",
-                        isFavorite ? "text-amber-400 opacity-100" : "text-muted-foreground opacity-0 group-hover/row:opacity-100 hover:text-amber-400",
-                    )}
-                    onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        onToggleFavorite(model.id, !isFavorite);
-                    }}
-                    type="button"
-                >
-                    <Star className={cn("size-3.5", isFavorite && "fill-current")} />
-                </button>
-                {onMove ? (
-                    <>
-                        <button
-                            aria-label={t`Move ${label} up in starred`}
-                            className="text-muted-foreground hover:text-foreground rounded p-1 disabled:opacity-30"
-                            data-move-delta={-1}
-                            data-move-id={model.id}
-                            disabled={!canMoveUp}
-                            onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                onMove(-1);
-                            }}
-                            type="button"
-                        >
-                            <ArrowUp aria-hidden="true" className="size-3.5" />
-                        </button>
-                        <button
-                            aria-label={t`Move ${label} down in starred`}
-                            className="text-muted-foreground hover:text-foreground rounded p-1 disabled:opacity-30"
-                            data-move-delta={1}
-                            data-move-id={model.id}
-                            disabled={!canMoveDown}
-                            onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                onMove(1);
-                            }}
-                            type="button"
-                        >
-                            <ArrowDown aria-hidden="true" className="size-3.5" />
-                        </button>
-                    </>
-                ) : null}
-                <button
-                    aria-label={t`Model info`}
-                    className={cn(
-                        "rounded p-1 transition-all duration-100",
-                        isInfoActive ? "text-foreground opacity-100" : "text-muted-foreground hover:text-foreground hover:!opacity-100",
-                    )}
-                    onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        onInfo(model.id);
-                    }}
-                    onMouseEnter={() => onInfo(model.id)}
-                    onMouseLeave={onInfoLeave}
-                    type="button"
-                >
-                    <Info className="size-3.5" />
-                </button>
-                {selectionMode === "single" ? (
-                    <span className="ml-0.5 flex size-3.5 shrink-0 items-center justify-center">
-                        {isSelected ? <CheckIcon className="text-primary-text size-3.5" /> : null}
-                    </span>
-                ) : null}
-            </div>
+            {selectionMode === "single" ? (
+                <span className="ml-0.5 flex size-3.5 shrink-0 items-center justify-center">
+                    {isSelected ? <CheckIcon className="text-primary-text size-3.5" /> : null}
+                </span>
+            ) : null}
+        </div>
+    );
+});
+
+// ─── Model Item Actions ───────────────────────────────────────────────────────
+// Rendered beside the option, not inside it: an option may not hold focusable controls (axe nested-interactive).
+
+const ModelItemActions = memo<{
+    /** Only set while the starred order can be changed; the buttons are hidden otherwise. */
+    canMoveDown?: boolean;
+    canMoveUp?: boolean;
+    isFavorite: boolean;
+    isInfoActive: boolean;
+    label: string;
+    modelId: string;
+    onInfo: (modelId: string) => void;
+    onInfoLeave: () => void;
+    onMove?: (delta: -1 | 1) => void;
+    onToggleFavorite: (modelId: string, setFavorite: boolean) => void;
+}>(({ canMoveDown, canMoveUp, isFavorite, isInfoActive, label, modelId, onInfo, onInfoLeave, onMove, onToggleFavorite }) => {
+    const { t } = useLingui();
+
+    return (
+        <div className="absolute top-1/2 right-2 flex -translate-y-1/2 items-center gap-0.5">
+            <button
+                aria-label={isFavorite ? t`Remove from starred` : t`Add to starred`}
+                className={cn(
+                    "rounded p-1 transition-all duration-100",
+                    isFavorite ? "text-amber-400 opacity-100" : "text-muted-foreground opacity-0 group-hover/row:opacity-100 hover:text-amber-400",
+                )}
+                onClick={() => onToggleFavorite(modelId, !isFavorite)}
+                type="button"
+            >
+                <Star className={cn("size-3.5", isFavorite && "fill-current")} />
+            </button>
+            {onMove ? (
+                <>
+                    <button
+                        aria-label={t`Move ${label} up in starred`}
+                        className="text-muted-foreground hover:text-foreground rounded p-1 disabled:opacity-30"
+                        data-move-delta={-1}
+                        data-move-id={modelId}
+                        disabled={!canMoveUp}
+                        onClick={() => onMove(-1)}
+                        type="button"
+                    >
+                        <ArrowUp aria-hidden="true" className="size-3.5" />
+                    </button>
+                    <button
+                        aria-label={t`Move ${label} down in starred`}
+                        className="text-muted-foreground hover:text-foreground rounded p-1 disabled:opacity-30"
+                        data-move-delta={1}
+                        data-move-id={modelId}
+                        disabled={!canMoveDown}
+                        onClick={() => onMove(1)}
+                        type="button"
+                    >
+                        <ArrowDown aria-hidden="true" className="size-3.5" />
+                    </button>
+                </>
+            ) : null}
+            <button
+                aria-label={t`Model info`}
+                className={cn(
+                    "rounded p-1 transition-all duration-100",
+                    isInfoActive ? "text-foreground opacity-100" : "text-muted-foreground hover:text-foreground hover:!opacity-100",
+                )}
+                onClick={() => onInfo(modelId)}
+                onMouseEnter={() => onInfo(modelId)}
+                onMouseLeave={onInfoLeave}
+                type="button"
+            >
+                <Info className="size-3.5" />
+            </button>
         </div>
     );
 });
@@ -499,64 +496,65 @@ const ModelGroupRenderer = memo<{
                         }
 
                         return (
-                            <CommandItem
-                                className={cn(
-                                    "group/row mx-1.5 flex-row !items-center rounded-md px-2 py-2 transition-colors duration-100",
-                                    isSelected && selectionMode === "single" ? "bg-accent/60" : "",
-                                    isParallelSelected && selectionMode === "parallel" ? "bg-accent/40" : "",
-                                    stateClassName,
-                                )}
-                                key={item.value}
-                                onClick={(e: React.MouseEvent & { preventBaseUIHandler?: () => void }) => {
-                                    e.preventBaseUIHandler?.();
+                            <div className={cn("group/row relative mx-1.5", stateClassName)} key={item.value}>
+                                <CommandItem
+                                    aria-disabled={isDisabled || undefined}
+                                    className={cn(
+                                        "flex-row !items-center rounded-md py-2 pl-2 transition-colors duration-100",
+                                        reorder && position !== -1 ? "pr-26" : "pr-14",
+                                        isSelected && selectionMode === "single" ? "bg-accent/60" : "",
+                                        isParallelSelected && selectionMode === "parallel" ? "bg-accent/40" : "",
+                                    )}
+                                    onClick={(e: React.MouseEvent & { preventBaseUIHandler?: () => void }) => {
+                                        e.preventBaseUIHandler?.();
 
-                                    if (isLockedForAnonymous) {
-                                        trackEvent("signup_wall_shown", { trigger: "model_picker" });
-                                    }
+                                        if (isLockedForAnonymous) {
+                                            trackEvent("signup_wall_shown", { trigger: "model_picker" });
+                                        }
 
-                                    if (!isDisabled) {
-                                        item.onSelect();
-                                    }
-                                }}
-                                title={lockedTitle}
-                                value={item.value}
-                            >
-                                {/* Anonymous lock icon */}
-                                {isLockedForAnonymous ? (
-                                    <span className="mr-2 flex shrink-0 items-center justify-center">
-                                        <Lock className="text-muted-foreground size-4" />
-                                    </span>
-                                ) : null}
+                                        if (!isDisabled) {
+                                            item.onSelect();
+                                        }
+                                    }}
+                                    title={lockedTitle}
+                                    value={item.value}
+                                >
+                                    {/* Anonymous lock icon */}
+                                    {isLockedForAnonymous ? (
+                                        <span className="mr-2 flex shrink-0 items-center justify-center">
+                                            <Lock className="text-muted-foreground size-4" />
+                                        </span>
+                                    ) : null}
 
-                                {/* Parallel checkbox / lock */}
-                                {!isLockedForAnonymous && selectionMode === "parallel" ? (
-                                    <span className="mr-2 flex shrink-0 items-center justify-center">{parallelIndicator}</span>
-                                ) : null}
+                                    {/* Parallel checkbox / lock */}
+                                    {!isLockedForAnonymous && selectionMode === "parallel" ? (
+                                        <span className="mr-2 flex shrink-0 items-center justify-center">{parallelIndicator}</span>
+                                    ) : null}
 
-                                {/* Provider icon — only shown on starred tab */}
-                                {showProviderIcon ? (
-                                    <ProviderIcon
-                                        className="mr-2 size-5 shrink-0"
-                                        provider={item.model.provider || item.model.displayProvider || ""}
-                                        providerIcon={item.model.id.split("/", 1)[0] || item.model.displayProvider || ""}
-                                    />
-                                ) : null}
+                                    {/* Provider icon — only shown on starred tab */}
+                                    {showProviderIcon ? (
+                                        <ProviderIcon
+                                            className="mr-2 size-5 shrink-0"
+                                            provider={item.model.provider || item.model.displayProvider || ""}
+                                            providerIcon={item.model.id.split("/", 1)[0] || item.model.displayProvider || ""}
+                                        />
+                                    ) : null}
 
-                                <ModelItemContent
+                                    <ModelItemContent isSelected={isSelected} label={item.label} model={item.model} selectionMode={selectionMode} />
+                                </CommandItem>
+                                <ModelItemActions
                                     canMoveDown={position !== -1 && position < (reorder?.ids.length ?? 0) - 1}
                                     canMoveUp={position > 0}
                                     isFavorite={isFavorite(item.model.id)}
                                     isInfoActive={infoModelId === item.model.id}
-                                    isSelected={isSelected}
                                     label={item.label}
-                                    model={item.model}
+                                    modelId={item.model.id}
                                     onInfo={onInfo}
                                     onInfoLeave={onInfoLeave}
                                     onMove={reorder && position !== -1 ? (delta) => reorder.move(item.model.id, delta) : undefined}
                                     onToggleFavorite={toggleFavorite}
-                                    selectionMode={selectionMode}
                                 />
-                            </CommandItem>
+                            </div>
                         );
                     }}
                 </CommandCollection>
@@ -1000,7 +998,7 @@ const ModelPicker: FC<ModelPickerProps> = ({
                                     "flex items-center gap-1.5 border-b-2 px-3 py-2.5 text-[12.5px] font-medium transition-colors duration-150",
                                     activeTab === "starred"
                                         ? "text-foreground border-foreground -mb-px"
-                                        : "text-muted-foreground/60 hover:text-foreground border-transparent",
+                                        : "text-muted-foreground hover:text-foreground border-transparent",
                                 )}
                                 onClick={() => handleTabChange("starred")}
                                 type="button"
@@ -1013,7 +1011,7 @@ const ModelPicker: FC<ModelPickerProps> = ({
                                     "flex items-center gap-1.5 border-b-2 px-3 py-2.5 text-[12.5px] font-medium transition-colors duration-150",
                                     activeTab === "all"
                                         ? "text-foreground border-foreground -mb-px"
-                                        : "text-muted-foreground/60 hover:text-foreground border-transparent",
+                                        : "text-muted-foreground hover:text-foreground border-transparent",
                                 )}
                                 onClick={() => handleTabChange("all")}
                                 type="button"
@@ -1066,7 +1064,7 @@ const ModelPicker: FC<ModelPickerProps> = ({
                                         "rounded-md px-2 py-1 text-[11px] font-medium transition-all duration-150",
                                         modeFilter === null
                                             ? "bg-primary/10 text-primary-text"
-                                            : "text-muted-foreground/60 hover:text-foreground hover:bg-muted/50",
+                                            : "text-muted-foreground hover:text-foreground hover:bg-muted/50",
                                     )}
                                     onClick={() => setModeFilter(null)}
                                     type="button"
@@ -1078,7 +1076,7 @@ const ModelPicker: FC<ModelPickerProps> = ({
                                         "flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium transition-all duration-150",
                                         modeFilter === "text"
                                             ? "bg-primary/10 text-primary-text"
-                                            : "text-muted-foreground/60 hover:text-foreground hover:bg-muted/50",
+                                            : "text-muted-foreground hover:text-foreground hover:bg-muted/50",
                                     )}
                                     onClick={() => setModeFilter("text")}
                                     type="button"
@@ -1091,7 +1089,7 @@ const ModelPicker: FC<ModelPickerProps> = ({
                                         "flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium transition-all duration-150",
                                         modeFilter === "image"
                                             ? "bg-primary/10 text-primary-text"
-                                            : "text-muted-foreground/60 hover:text-foreground hover:bg-muted/50",
+                                            : "text-muted-foreground hover:text-foreground hover:bg-muted/50",
                                     )}
                                     onClick={() => setModeFilter("image")}
                                     type="button"
@@ -1104,7 +1102,7 @@ const ModelPicker: FC<ModelPickerProps> = ({
                                         "flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium transition-all duration-150",
                                         modeFilter === "video"
                                             ? "bg-primary/10 text-primary-text"
-                                            : "text-muted-foreground/60 hover:text-foreground hover:bg-muted/50",
+                                            : "text-muted-foreground hover:text-foreground hover:bg-muted/50",
                                     )}
                                     onClick={() => setModeFilter("video")}
                                     type="button"
@@ -1117,7 +1115,7 @@ const ModelPicker: FC<ModelPickerProps> = ({
                                         "flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium transition-all duration-150",
                                         modeFilter === "speech-to-text"
                                             ? "bg-primary/10 text-primary-text"
-                                            : "text-muted-foreground/60 hover:text-foreground hover:bg-muted/50",
+                                            : "text-muted-foreground hover:text-foreground hover:bg-muted/50",
                                     )}
                                     onClick={() => setModeFilter("speech-to-text")}
                                     type="button"
@@ -1220,7 +1218,7 @@ const ModelPicker: FC<ModelPickerProps> = ({
                     {selectionMode === "parallel" ? (
                         <div className="border-border/40 flex items-center justify-between border-t px-3 py-2">
                             <div className="flex flex-col gap-0.5">
-                                <span className={cn("text-[11.5px]", isParallelMaxReached ? "text-amber-500 dark:text-amber-400" : "text-muted-foreground")}>
+                                <span className={cn("text-[11.5px]", isParallelMaxReached ? "text-amber-700 dark:text-amber-400" : "text-muted-foreground")}>
                                     {isParallelMaxReached
                                         ? t`Maximum ${MAX_PARALLEL} models reached`
                                         : t`${parallelSelectedIds.size} of ${MAX_PARALLEL} selected`}

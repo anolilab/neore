@@ -29,9 +29,9 @@ const meta = {
         ),
     ],
     parameters: {
-        // Axe still fails the picker: the creator filter chips nest a button in a button and their `aria-label` is the
-        // creator alone (not the visible text), and the secondary text in the chat-ui copy and the creator rows still sets
-        // `text-muted-foreground/60`. `todo` reports them in the a11y panel without failing CI until the picker is fixed.
+        // Axe still reports the picker: each model row's star, move and info buttons sit directly in the listbox
+        // (aria-required-children), and the search combobox has no aria-controls while the list is empty (packages/ui).
+        // `todo` reports them in the a11y panel without failing CI until the picker is fixed.
         a11y: { test: "todo" },
         msw: { handlers: { gateway: gatewayModelsHandler(), lunora: lunoraHandlers(...userFixtures()) } },
     },
