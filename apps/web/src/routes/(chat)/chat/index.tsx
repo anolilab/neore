@@ -9,7 +9,9 @@ import RouteErrorBoundary from "@/components/error-boundaries/route-error-bounda
 import { useUserSettings } from "@/features/auth/hooks/use-user-settings";
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 import Assistant from "@/features/chat/assistant";
+import { usePromptLinkDraft } from "@/features/chat/core/hooks/use-prompt-link-draft";
 import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
+import { readPromptLinkSearch } from "@/features/chat/core/utils/prompt-link";
 import { BOOTED_ON_CHAT_INDEX } from "@/features/chat/core/utils/resume-boot";
 import { LANDING_MESSAGE_KEY } from "@/features/marketing/stores/landing-store";
 import { useCRPC } from "@/lib/lunora/crpc";
@@ -26,6 +28,8 @@ const ChatPage = () => {
     const promptId = Route.useSearch({ select: ({ promptId: selected }) => selected });
     const redirectReason = Route.useSearch({ select: ({ redirectReason: selected }) => selected });
     const hasInitialMessage = Route.useSearch({ select: ({ initialMessage }) => initialMessage });
+    const linkPrompt = Route.useSearch({ select: ({ prompt }) => prompt });
+    const linkModel = Route.useSearch({ select: ({ model }) => model });
     const location = useLocation();
     // TanStack keys each history entry; a new navigation gets a new key.
     const navigationKey = location.state.__TSR_key;
@@ -40,8 +44,20 @@ const ChatPage = () => {
     const { data: sessionData, isPending: isSessionPending } = hooks.useSession();
     const activeTeamId = (sessionData?.session as { activeTeamId?: string | null } | undefined)?.activeTeamId ?? undefined;
     const resumeScopeReady = !isOrgPending && !isSessionPending;
+    // A prompt link's draft belongs to this page: resuming the last chat would navigate it away. Read at mount, since the link's
+    // parameters leave the address once applied, before the resume query answers.
+    const [openedWithLink] = useState(() => linkPrompt !== undefined);
     const resumeLastChat =
-        BOOTED_ON_CHAT_INDEX && userSettings?.resumeLastChat === true && !promptId && !redirectReason && !hasInitialMessage && resumeScopeReady;
+        BOOTED_ON_CHAT_INDEX &&
+        userSettings?.resumeLastChat === true &&
+        !promptId &&
+        !redirectReason &&
+        !hasInitialMessage &&
+        !openedWithLink &&
+        resumeScopeReady;
+
+    usePromptLinkDraft({ model: linkModel, otherDraftSource: Boolean(promptId) || Boolean(hasInitialMessage), prompt: linkPrompt });
+
     const { data: latestThreadId, isSuccess: latestResolved } = useQuery(
         // Not live, and skipped once decided: later visits to /chat must not re-run the scan.
         crpc.chat.resume.latestResumableThread.queryOptions(
@@ -138,7 +154,7 @@ const ChatPage = () => {
     useEffect(() => {
         // Include initialMessage as allowed (though unused) to prevent warnings during navigation
         // TanStack Router may briefly carry over search params when navigating between routes
-        const supportedParams = new Set(["initialMessage", "promptId", "redirectReason", "settings", "settingsTab"]);
+        const supportedParams = new Set(["initialMessage", "model", "prompt", "promptId", "redirectReason", "settings", "settingsTab"]);
         const searchParams = new URLSearchParams(location.search);
         const unsupportedParams: string[] = [];
 
@@ -164,7 +180,12 @@ const ChatPage = () => {
 
 export const Route = createFileRoute("/(chat)/chat/")({
     validateSearch: (search: Record<string, unknown>) => {
+        // A prompt link (`core/utils/prompt-link.ts`): applied as a draft once, never sent (`core/hooks/use-prompt-link-draft.ts`).
+        const link = readPromptLinkSearch(search);
+
         return {
+            model: link.model,
+            prompt: link.prompt,
             promptId: search.promptId as string | undefined,
             redirectReason: search.redirectReason as string | undefined,
             // `|| undefined`, not `false`: a default written into the search is put into the URL, and the

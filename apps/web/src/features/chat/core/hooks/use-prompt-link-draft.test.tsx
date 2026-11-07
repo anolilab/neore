@@ -1,0 +1,74 @@
+import { MODEL_REGISTRY } from "@neore/ai/models";
+import { renderHook } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+import { useChatUIStore } from "../stores/chat-ui-store";
+import { useModelStore } from "../stores/model-store";
+import { usePromptLinkDraft } from "./use-prompt-link-draft";
+
+const navigate = vi.fn();
+const showWarning = vi.fn();
+
+vi.mock("@lingui/react/macro", () => {
+    return {
+        useLingui: () => {
+            return { t: (strings: TemplateStringsArray) => strings.join("") };
+        },
+    };
+});
+
+vi.mock("@tanstack/react-router", () => {
+    return { useNavigate: () => navigate };
+});
+
+vi.mock("@/lib/toast", () => {
+    return { showWarning: (message: string) => showWarning(message) };
+});
+
+const textModel = MODEL_REGISTRY.find((model) => (model.mode ?? "text") === "text" && model.enabled !== false && model.provider !== "external");
+const externalModel = MODEL_REGISTRY.find((model) => model.provider === "external");
+const startModel = useModelStore.getState().selectedModel;
+
+/** The search the hook writes back to the address. */
+const strippedSearch = (): unknown => {
+    const call = navigate.mock.calls.at(-1)?.[0] as { search: (previous: Record<string, unknown>) => unknown };
+
+    return call.search({ model: "m", prompt: "p", promptId: "kept" });
+};
+
+beforeEach(() => {
+    navigate.mockClear();
+    showWarning.mockClear();
+    useChatUIStore.getState().clearComposer();
+    useModelStore.getState().setSelectedModel(startModel, undefined);
+});
+
+describe(usePromptLinkDraft, () => {
+    it("puts the prompt in the composer, selects the model, and removes the link from the address", () => {
+        renderHook(() => usePromptLinkDraft({ model: textModel?.id, otherDraftSource: false, prompt: "Draft me" }));
+
+        expect(useChatUIStore.getState().composerText).toBe("Draft me");
+        expect(useModelStore.getState().selectedModel).toBe(textModel?.id);
+        expect(showWarning).not.toHaveBeenCalled();
+        expect(strippedSearch()).toStrictEqual({ model: undefined, prompt: undefined, promptId: "kept" });
+    });
+
+    it("keeps a draft already in the composer, and the chat's model, with a notice", () => {
+        useChatUIStore.getState().setComposerText("Mine");
+
+        renderHook(() => usePromptLinkDraft({ model: textModel?.id, otherDraftSource: false, prompt: "Draft me" }));
+
+        expect(useChatUIStore.getState().composerText).toBe("Mine");
+        expect(useModelStore.getState().selectedModel).toBe(startModel);
+        expect(showWarning).toHaveBeenCalledOnce();
+        expect(navigate).toHaveBeenCalledOnce();
+    });
+
+    it("applies the prompt but not an external model", () => {
+        renderHook(() => usePromptLinkDraft({ model: externalModel?.id, otherDraftSource: false, prompt: "Draft me" }));
+
+        expect(useChatUIStore.getState().composerText).toBe("Draft me");
+        expect(useModelStore.getState().selectedModel).toBe(startModel);
+        expect(showWarning).toHaveBeenCalledOnce();
+    });
+});

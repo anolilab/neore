@@ -6,6 +6,7 @@ import type { FC, PropsWithChildren } from "react";
 import { useEffect } from "react";
 
 import { reportFirstNativeLaunch } from "@/lib/analytics/first-native-launch";
+import { redactPromptFromEvent } from "@/lib/analytics/redact-prompt";
 
 // The consent state PostHog should follow. `PostHogConsentSync` is a child of `AnalyticsProvider`, so its first
 // effect runs before `posthog.init`; the `loaded` callback applies whatever arrived before then.
@@ -99,6 +100,8 @@ const AnalyticsProvider: FC<PropsWithChildren> = ({ children }) => {
                           isIdentifiedID: false,
                       }
                     : undefined,
+            // A prompt link's text never leaves the browser in an event's URLs (`lib/analytics/redact-prompt.ts`).
+            before_send: redactPromptFromEvent,
             capture_pageview: true,
             // PostHog will not set any cookies until the user has given consent
             cookieless_mode: "on_reject",
