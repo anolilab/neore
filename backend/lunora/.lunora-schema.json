@@ -27813,12 +27813,6 @@
           "optional": false,
           "unique": false
         },
-        "organizationId": {
-          "kind": "string",
-          "nullable": false,
-          "optional": true,
-          "unique": false
-        },
         "projectKey": {
           "kind": "string",
           "nullable": false,
@@ -27876,14 +27870,6 @@
           ],
           "unique": false
         },
-        "by_user_organization_date": {
-          "fields": [
-            "userId",
-            "organizationId",
-            "date"
-          ],
-          "unique": false
-        },
         "by_user_project_date": {
           "fields": [
             "userId",
@@ -27904,6 +27890,92 @@
       "memory": false,
       "relations": {},
       "shardMode": "shardBy:userId"
+    },
+    "usageOrganizationDaily": {
+      "commitOrdered": false,
+      "fields": {
+        "costMicrodollars": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "date": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "organizationId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "projectKey": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "replies": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "tokens": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "updatedAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "userId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        }
+      },
+      "indexes": {
+        "by_date": {
+          "fields": [
+            "date"
+          ],
+          "unique": false
+        },
+        "by_org_date": {
+          "fields": [
+            "organizationId",
+            "date"
+          ],
+          "unique": false
+        },
+        "by_org_project_user_date": {
+          "fields": [
+            "organizationId",
+            "projectKey",
+            "userId",
+            "date"
+          ],
+          "unique": false
+        },
+        "by_userId": {
+          "fields": [
+            "userId"
+          ],
+          "unique": false
+        }
+      },
+      "memory": false,
+      "relations": {},
+      "shardMode": "global:d1"
     },
     "usageReplies": {
       "commitOrdered": false,
