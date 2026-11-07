@@ -514,7 +514,27 @@ export const rerunFailedForAgent = async (
         return { status: "head_moved" };
     }
 
-    for (const check of chosen.slice(0, AGENT_MAX_RERUNS)) {
+    const batch = chosen.slice(0, AGENT_MAX_RERUNS);
+    // Unnamed, every failed check is chosen, so a group's failed jobs (a workflow run's) re-run in ONE call: the host
+    // refuses a second job of a run once the first runs again. Named checks re-run one by one, exactly as named.
+    const groups = checkIds === undefined ? await rerunGroups(dependencies, token, picked.ref, batch) : new Map<string, typeof batch>();
+    const grouped = new Set([...groups.values()].flat().map((check) => check.id));
+
+    for (const [groupId, members] of groups) {
+        const outcome = await writeToHost(driver, token, async (request) => {
+            await driver.rerunFailedOfGroup!(request, picked.ref, groupId);
+
+            return {};
+        });
+
+        for (const check of members) {
+            rerun.push({ id: check.id, name: check.name, status: outcome.status, ...(outcome.status === "rejected" && { reason: outcome.reason }) });
+        }
+    }
+
+    const alone = batch.filter((entry) => !grouped.has(entry.id));
+
+    for (const check of alone) {
         const outcome = await writeToHost(driver, token, async (request) => {
             await driver.rerunCheck(request, picked.ref, check.id);
 
@@ -526,6 +546,55 @@ export const rerunFailedForAgent = async (
 
     // The host has more checks than the pages read: an unnamed re-run may have missed failed ones among them.
     return { notRerun, rerun, skipped, status: "ok", unlisted, unlistedChecks: { ...truncatedMarker(listed.total - listed.checks.length) } };
+};
+
+/**
+ * The checks that re-run together, by group (a workflow run): two or more of them share it, AND the jobs the group's
+ * call would re-run are exactly those checks. The host's call re-runs every failed or cancelled job of the run, so a
+ * run with a job not chosen (past the cap, cancelled, on a page not read) re-runs its jobs one by one instead. A host
+ * without groups, or a read that fails, groups nothing: each check then re-runs on its own.
+ */
+const rerunGroups = async <T extends { id: string }>(
+    dependencies: PullRequestAgentDependencies,
+    token: GithubTokenOutcome,
+    ref: PullRequestRef,
+    checks: T[],
+): Promise<Map<string, T[]>> => {
+    const { driver } = dependencies;
+
+    if (driver.rerunGroupOf === undefined || driver.rerunFailedOfGroup === undefined || driver.rerunnableOfGroup === undefined || checks.length < 2) {
+        return new Map();
+    }
+
+    const groupOf = driver.rerunGroupOf;
+    const rerunnableOf = driver.rerunnableOfGroup;
+    const read = await readFromHost(driver, token, async (request) => {
+        const byGroup = new Map<string, T[]>();
+
+        for (const check of checks) {
+            const group = await groupOf(request, ref, check.id);
+
+            if (group !== null) {
+                byGroup.set(group, [...(byGroup.get(group) ?? []), check]);
+            }
+        }
+
+        // Only a group whose call would re-run exactly the checks chosen, no more.
+        const exact = new Map<string, T[]>();
+
+        for (const [group, members] of byGroup) {
+            const rerunnable = members.length > 1 ? await rerunnableOf(request, ref, group) : null;
+            const chosen = new Set(members.map((member) => member.id));
+
+            if (rerunnable !== null && rerunnable.length === chosen.size && rerunnable.every((id) => chosen.has(id))) {
+                exact.set(group, members);
+            }
+        }
+
+        return { exact };
+    });
+
+    return read.status === "ok" ? read.exact : new Map();
 };
 
 /** The method a merge uses: the one asked for when the repository allows it, else squash, else the first it allows. */

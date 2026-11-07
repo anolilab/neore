@@ -626,6 +626,62 @@ describe("re-running checks of a linked pull request", () => {
         await expect(rerunFailedForAgent(dependencies(), {}, undefined)).resolves.toMatchObject({ unlistedChecks: { truncated: "truncated, 1 more" } });
     });
 
+    it("re-runs the failed jobs of one workflow run in one call, and a lone job on its own", async () => {
+        const runOf: Record<string, number> = { "1": 500, "2": 500, "3": 600 };
+        const seen = stubHost({
+            ...routes([run(1, "failure"), run(2, "failure"), run(3, "failure")]),
+            ...Object.fromEntries(Object.entries(runOf).map(([id, runId]) => [`GET ${API}/actions/jobs/${id}`, () => Response.json({ run_id: runId })])),
+            [`GET ${API}/actions/runs/500/jobs`]: () =>
+                Response.json({
+                    jobs: [
+                        { conclusion: "failure", id: 1 },
+                        { conclusion: "failure", id: 2 },
+                        { conclusion: "success", id: 9 },
+                    ],
+                    total_count: 3,
+                }),
+            [`POST ${API}/actions/runs/500/rerun-failed-jobs`]: () => new Response(null, { status: 201 }),
+        });
+
+        const outcome = await rerunFailedForAgent(dependencies(), {}, undefined);
+
+        expect(outcome).toMatchObject({ status: "ok" });
+        expect(
+            "rerun" in outcome && outcome.rerun.map((entry) => `${entry.id}:${entry.status}`).toSorted((left, right) => left.localeCompare(right)),
+        ).toStrictEqual(["1:ok", "2:ok", "3:ok"]);
+
+        const posts = seen.filter((call) => call.method === "POST").map((call) => new URL(call.url).pathname);
+
+        expect(posts.toSorted((left, right) => left.localeCompare(right))).toStrictEqual([
+            "/repos/octo/hello/actions/jobs/3/rerun",
+            "/repos/octo/hello/actions/runs/500/rerun-failed-jobs",
+        ]);
+    });
+
+    it("re-runs job by job when the run's grouped call would re-run a job not chosen (a cancelled one)", async () => {
+        const seen = stubHost({
+            ...routes([run(1, "failure"), run(2, "failure")]),
+            [`GET ${API}/actions/jobs/1`]: () => Response.json({ run_id: 500 }),
+            [`GET ${API}/actions/jobs/2`]: () => Response.json({ run_id: 500 }),
+            [`GET ${API}/actions/runs/500/jobs`]: () =>
+                Response.json({
+                    jobs: [
+                        { conclusion: "failure", id: 1 },
+                        { conclusion: "failure", id: 2 },
+                        { conclusion: "cancelled", id: 3 },
+                    ],
+                    total_count: 3,
+                }),
+        });
+
+        await rerunFailedForAgent(dependencies(), {}, undefined);
+
+        const posts = seen.filter((call) => call.method === "POST").map((call) => new URL(call.url).pathname);
+
+        expect(posts.some((path) => path.endsWith("/rerun-failed-jobs"))).toBe(false);
+        expect(posts).toHaveLength(2);
+    });
+
     it("names back the failed checks past the cap instead of dropping them", async () => {
         stubHost(routes(Array.from({ length: 12 }, (_, index) => run(index + 1, "failure"))));
 

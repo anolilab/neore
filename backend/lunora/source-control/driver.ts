@@ -96,6 +96,18 @@ export interface HostDriver {
     replyToThread: (request: HostRequest, ref: PullRequestRef, commentId: string, body: string) => Promise<{ id: string }>;
     /** Re-runs the narrowest scope the host offers for one check: a single job, not its whole workflow. */
     rerunCheck: (request: HostRequest, ref: PullRequestRef, checkId: string) => Promise<void>;
+    /** Re-runs every failed job of one group in ONE host call: a group's jobs cannot be re-run one by one once one runs. */
+    rerunFailedOfGroup?: (request: HostRequest, ref: PullRequestRef, groupId: string) => Promise<void>;
+    /**
+     * The group a check re-runs with (a workflow run whose jobs the host re-runs together), or `null` for a check that
+     * re-runs alone. Optional: a host without such groups leaves it out, and each check re-runs on its own.
+     */
+    rerunGroupOf?: (request: HostRequest, ref: PullRequestRef, checkId: string) => Promise<string | null>;
+    /**
+     * The ids of the jobs {@link HostDriver.rerunFailedOfGroup} would re-run (failed and cancelled), or `null` when they
+     * cannot all be listed: the grouped call is used only when these are exactly the checks chosen.
+     */
+    rerunnableOfGroup?: (request: HostRequest, ref: PullRequestRef, groupId: string) => Promise<string[] | null>;
     /** Turns auto-merge on (merging `headSha` with `method` once the host's rules are met) or off. */
     setAutoMerge: (request: HostRequest, ref: PullRequestRef, enabled: boolean, method: MergeMethod, headSha: string) => Promise<void>;
     setThreadResolved: (request: HostRequest, threadId: string, resolved: boolean) => Promise<void>;

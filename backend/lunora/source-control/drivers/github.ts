@@ -1255,6 +1255,67 @@ const rerunCheck = async (request: HostRequest, ref: PullRequestRef, checkId: st
     }
 };
 
+const jobRunSchema = z.object({ run_id: z.number() });
+
+/** The workflow run an Actions job belongs to: its jobs re-run together. Any other app's check re-runs alone. */
+const rerunGroupOf = async (request: HostRequest, ref: PullRequestRef, checkId: string): Promise<string | null> => {
+    if (!COMMENT_ID.test(checkId)) {
+        throw new HostApiError("Not a check id", 404);
+    }
+
+    const repo = repoPath(ref);
+    const run = parse(runAppSchema, await readJson(await request(`${repo}/check-runs/${checkId}`)));
+
+    if (run.app?.slug !== ACTIONS_APP) {
+        return null;
+    }
+
+    const job = parse(jobRunSchema, await readJson(await request(`${repo}/actions/jobs/${checkId}`)));
+
+    return Number.isSafeInteger(job.run_id) ? String(job.run_id) : null;
+};
+
+const runJobsSchema = z.object({ jobs: z.array(z.object({ conclusion: z.string().nullable(), id: z.number() })), total_count: z.number() });
+
+/** Conclusions the host's "re-run failed jobs" call re-runs. */
+const RERUN_FAILED_CONCLUSIONS: ReadonlySet<string> = new Set(["action_required", "cancelled", "failure", "startup_failure", "timed_out"]);
+
+/** The latest jobs of a workflow run that its "re-run failed jobs" call would re-run; `null` past one page of jobs. */
+const rerunnableOfGroup = async (request: HostRequest, ref: PullRequestRef, groupId: string): Promise<string[] | null> => {
+    if (!COMMENT_ID.test(groupId)) {
+        throw new HostApiError("Not a workflow run id", 404);
+    }
+
+    const page = parse(
+        runJobsSchema,
+        await readJson(await request(`${repoPath(ref)}/actions/runs/${groupId}/jobs`, { query: { filter: "latest", per_page: GITHUB_PAGE_SIZE } })),
+    );
+
+    if (page.total_count > page.jobs.length) {
+        return null;
+    }
+
+    return page.jobs.flatMap((job) => (job.conclusion !== null && RERUN_FAILED_CONCLUSIONS.has(job.conclusion) ? [String(job.id)] : []));
+};
+
+/** One call that re-runs every failed job of a workflow run: re-running them one by one is refused after the first. */
+const rerunFailedOfGroup = async (request: HostRequest, ref: PullRequestRef, groupId: string): Promise<void> => {
+    if (!COMMENT_ID.test(groupId)) {
+        throw new HostApiError("Not a workflow run id", 404);
+    }
+
+    try {
+        await discard(await request(`${repoPath(ref)}/actions/runs/${groupId}/rerun-failed-jobs`, { json: {}, method: "POST" }));
+    } catch (error) {
+        // As for one job: a 403 that says why is a refusal of this call, and its reason is what the person needs.
+        if (error instanceof HostApiError && error.status === 403 && !error.rateLimited && error.detail !== undefined) {
+            throw new HostApiError(error.message, 422, false, { detail: error.detail });
+        }
+
+        throw error;
+    }
+};
+
 const checkOutputSchema = z.object({
     app: z.object({ slug: z.string() }).nullable().optional(),
     output: z
@@ -1545,6 +1606,9 @@ export const githubDriver: HostDriver = {
     readCheckLog,
     replyToThread,
     rerunCheck,
+    rerunFailedOfGroup,
+    rerunGroupOf,
+    rerunnableOfGroup,
     setAutoMerge,
     setThreadResolved,
     setViewed,
