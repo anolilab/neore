@@ -49,6 +49,7 @@ export const usePromptLinkDraft = ({
     linkableModels,
     isAnonymous = false,
     model,
+    onApplied,
     onDecided,
     otherDraftSource = false,
     prompt,
@@ -64,6 +65,8 @@ export const usePromptLinkDraft = ({
      */
     linkableModels: ReadonlyMap<string, LinkableModel> | undefined;
     model?: string;
+    /** Called once the link's prompt has become the draft, with the link's own prompt and model (what a sign-in return re-applies). */
+    onApplied?: (applied: { model?: string; prompt: string }) => void;
     /** Called once the link can be decided (the caller's own ownership of the draft ends here, after this pass has read it). */
     onDecided?: () => void;
     /** A saved prompt or a message in the same URL already supplies this chat's draft: the link does not replace it. */
@@ -110,15 +113,19 @@ export const usePromptLinkDraft = ({
             const { attachedReferences, composerAttachments, composerText, setComposerText } = useChatUIStore.getState();
             // Attachments and references are part of the draft too: a link's text would be sent with them.
             const hasDraft = composerText.trim() !== "" || composerAttachments.length > 0 || attachedReferences.length > 0;
+            // The draft already in place is this link's own text, as after a sign-in that kept the composer: it is the link's, not a
+            // draft to keep, so no notice is shown for it.
+            const isOwnDraft = composerText === promptFromLink(prompt) && composerAttachments.length === 0 && attachedReferences.length === 0;
 
             if (otherDraftSource) {
                 applyLink = false;
                 showWarning(t`This chat already has a prompt. The prompt from the link was not added.`);
-            } else if (hasDraft) {
+            } else if (hasDraft && !isOwnDraft) {
                 applyLink = false;
                 showWarning(t`Your draft is kept. The prompt from the link was not added.`);
             } else {
                 setComposerText(promptFromLink(prompt));
+                onApplied?.({ prompt, ...(model !== undefined && { model }) });
             }
         }
 
@@ -181,5 +188,5 @@ export const usePromptLinkDraft = ({
 
         // `hash: true` keeps the address's fragment: removing the link's parameters must not remove a `#section` the address also has.
         void navigate({ hash: true, replace: true, search: (previous: Record<string, unknown>) => withoutLinkParameters(previous), to: "/chat" });
-    }, [isAnonymous, linkableModels, model, navigate, onDecided, otherDraftSource, prompt, ready, t]);
+    }, [isAnonymous, linkableModels, model, navigate, onApplied, onDecided, otherDraftSource, prompt, ready, t]);
 };

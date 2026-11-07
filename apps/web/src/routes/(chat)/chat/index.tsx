@@ -12,6 +12,8 @@ import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 import Assistant from "@/features/chat/assistant";
 import { usePromptLinkDraft } from "@/features/chat/core/hooks/use-prompt-link-draft";
 import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
+import type { PendingLinkDraft } from "@/features/chat/core/utils/pending-link-draft";
+import { savePendingLinkDraft, takePendingLinkDraft } from "@/features/chat/core/utils/pending-link-draft";
 import { readPromptLinkSearch } from "@/features/chat/core/utils/prompt-link";
 import { BOOTED_ON_CHAT_INDEX } from "@/features/chat/core/utils/resume-boot";
 import { LANDING_MESSAGE_KEY } from "@/features/marketing/stores/landing-store";
@@ -69,8 +71,13 @@ const ChatPage = () => {
     // The address's own text (`searchStr`, not the parsed `search` object) is what a link carries, so it is read once here, and the
     // parsed value only when there is no text.
     const linkRead = readPromptLinkSearch({ model: parsedLinkModel, prompt: rawPromptText(location.searchStr) ?? parsedLinkPrompt });
-    const linkPrompt = linkRead.prompt;
-    const linkModel = linkRead.model;
+    const addressHasLink = linkRead.prompt !== undefined || linkRead.model !== undefined;
+    // A draft kept for a sign-in (`pending-link-draft.ts`), taken once by the first page that sees the signed-in account. It applies only
+    // when the address names no link of its own.
+    const [restoredLink, setRestoredLink] = useState<PendingLinkDraft | undefined>(undefined);
+    const restoreChecked = useRef(false);
+    const linkPrompt = linkRead.prompt ?? restoredLink?.prompt;
+    const linkModel = linkRead.model ?? restoredLink?.model;
     // TanStack keys each history entry; a new navigation gets a new key.
     const navigationKey = location.state.__TSR_key;
     const { t } = useLingui();
@@ -102,6 +109,38 @@ const ChatPage = () => {
     const endHandoffOwnership = useCallback(() => {
         setHandoffWaiting(false);
     }, []);
+    const sessionUserId = sessionData?.user?.id ?? null;
+    const signedInAccount = sessionData?.user !== undefined && sessionData.user.isAnonymous !== true;
+
+    // Checked once per mount, when the session is known. A link in the address is this page's own, so nothing is restored over it, and the
+    // address changing afterwards (the link is removed once it applies) does not start a check.
+    useEffect(() => {
+        if (isSessionPending || restoreChecked.current) {
+            return;
+        }
+
+        restoreChecked.current = true;
+
+        if (addressHasLink) {
+            return;
+        }
+
+        const taken = takePendingLinkDraft(sessionUserId);
+
+        if (taken !== undefined) {
+            setRestoredLink(taken);
+        }
+    }, [addressHasLink, isSessionPending, sessionUserId]);
+
+    // A link applied while no signed-in account is on the page is kept for the sign-in return.
+    const keepForSignIn = useCallback(
+        (applied: PendingLinkDraft) => {
+            if (!signedInAccount) {
+                savePendingLinkDraft(applied, sessionUserId);
+            }
+        },
+        [sessionUserId, signedInAccount],
+    );
 
     // A link may select only a model the composer's picker offers this user. The link waits until the catalog and the user's rules
     // have answered, so the list is final; if the rules fail to load the list is empty, the link's model is refused and its prompt applies.
@@ -136,6 +175,7 @@ const ChatPage = () => {
         // written after this page mounted, as a new handoff is) or was waiting at mount and not yet decided. Read now, so the link sees it.
         otherDraftSource: savedPromptApplies || (Boolean(hasInitialMessage) && (handoffWaiting || landingMessageWaiting())),
         prompt: linkPrompt,
+        onApplied: keepForSignIn,
         onDecided: endHandoffOwnership,
         ready: (!isSessionPending || linkWaitOver) && (linkableModels !== undefined || linkWaitOver) && !savedPromptPending,
     });

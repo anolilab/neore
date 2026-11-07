@@ -24,6 +24,7 @@ const harness = vi.hoisted(() => {
         composerListLoaded: true,
         composerModels: [] as { id: string }[],
         linkWaitOver: false,
+        sessionUser: undefined as { id: string; isAnonymous: boolean } | undefined,
         savedPrompt: null as unknown,
         sessionPending: false,
         validation: (() => {
@@ -136,7 +137,7 @@ vi.mock("@/features/auth/lib/auth-ui-provider", () => {
                         return { data: undefined, isPending: false };
                     },
                     useSession: () => {
-                        return { data: undefined, isPending: harness.sessionPending };
+                        return { data: harness.sessionUser === undefined ? undefined : { user: harness.sessionUser }, isPending: harness.sessionPending };
                     },
                 },
             };
@@ -214,11 +215,16 @@ const linkWith = (extra: Record<string, string>): string => {
 };
 
 /** Renders the page; the returned function re-renders it on the search last set, as the router does after a navigation. */
+/** Unmounts the page last mounted, as a navigation away from it does. */
+const lastPage: { unmount?: () => void } = {};
+
 const mountPage = (): (() => void) => {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const Wrapper = ({ children }: { children: ReactNode }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>;
     const ChatPage = Route.options.component as ComponentType;
-    const { rerender } = render(<ChatPage />, { wrapper: Wrapper });
+    const { rerender, unmount } = render(<ChatPage />, { wrapper: Wrapper });
+
+    lastPage.unmount = unmount;
 
     return () => {
         rerender(<ChatPage />);
@@ -251,6 +257,8 @@ describe("chat index route", () => {
         harness.savedPrompt = null;
         harness.composerListLoaded = true;
         harness.linkWaitOver = false;
+        harness.sessionUser = undefined;
+        sessionStorage.clear();
         harness.validation = () => {
             return { errors: {}, isValid: true };
         };
@@ -340,6 +348,33 @@ describe("chat index route", () => {
             mountPage();
 
             await waitFor(() => expect(useChatUIStore.getState().composerText).toBe(prompt));
+        });
+    });
+
+    describe("a linked draft across a sign-in", () => {
+        it("a link opened signed out keeps its text through a sign-in that empties the composer, and is applied once", async () => {
+            openUrl(buildPromptLink("https://app.example.com", { prompt: "from the link" }));
+            mountPage();
+
+            await waitFor(() => expect(useChatUIStore.getState().composerText).toBe("from the link"));
+
+            // The sign-in leaves the page: the composer in memory is empty again, and the session storage is not.
+            lastPage.unmount?.();
+            useChatUIStore.getState().setComposerText("");
+            harness.sessionUser = { id: "account-1", isAnonymous: false };
+            openUrl("https://app.example.com/chat");
+            mountPage();
+
+            await waitFor(() => expect(useChatUIStore.getState().composerText).toBe("from the link"));
+            expect(harness.showWarning).not.toHaveBeenCalled();
+
+            // Applied once: a later visit with an empty composer does not draft the link again.
+            lastPage.unmount?.();
+            useChatUIStore.getState().setComposerText("");
+            mountPage();
+            await settle();
+
+            expect(useChatUIStore.getState().composerText).toBe("");
         });
     });
 
