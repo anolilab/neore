@@ -353,42 +353,22 @@ describe("the list's snooze dialog across threads", () => {
         list.remove();
     });
 
-    it("a server-refused snooze shows the refused message and does not claim it may have saved", async () => {
+    // Which outcome a save came back with is decided and tested in the hook (`use-thread-state-actions.offline.test.tsx`). The dialog's
+    // own part is the message for each outcome, one error element, and staying open.
+    it.each([
+        ["refused", "Could not snooze the thread. Please try again."],
+        ["superseded", "A newer change to this thread is already in place, so this did not apply."],
+        ["unconfirmed", "Could not confirm the snooze. It may have saved; check the thread before saving again."],
+    ] as const)("a save that comes back %s shows its message in one alert, and keeps the dialog open", async (outcome, message) => {
         const onOpenChange = mountDialog();
 
-        state.snoozeAt.mockResolvedValueOnce("refused");
+        state.snoozeAt.mockResolvedValueOnce(outcome);
         submit();
 
         const alert = await screen.findByRole("alert");
 
-        // One error element, in the dialog's own error place, and not a second copy of it.
         expect(screen.getAllByRole("alert")).toHaveLength(1);
-        expect(alert.textContent).toBe("Could not snooze the thread. Please try again.");
-        expect(alert.textContent).not.toContain("may have");
-        expect(onOpenChange).not.toHaveBeenCalled();
-    });
-
-    it("a snooze the server drops shows that a newer change applies instead, and keeps the dialog open", async () => {
-        const onOpenChange = mountDialog();
-
-        state.snoozeAt.mockResolvedValueOnce("superseded");
-        submit();
-
-        const alert = await screen.findByRole("alert");
-
-        expect(alert.textContent).toBe("A newer change to this thread is already in place, so this did not apply.");
-        expect(onOpenChange).not.toHaveBeenCalled();
-    });
-
-    it("shows that a save may have gone through when its answer was lost, and keeps the dialog open", async () => {
-        const onOpenChange = mountDialog();
-
-        state.snoozeAt.mockResolvedValueOnce("unconfirmed");
-        submit();
-
-        const alert = await screen.findByRole("alert");
-
-        expect(alert.textContent).toBe("Could not confirm the snooze. It may have saved; check the thread before saving again.");
+        expect(alert.textContent).toBe(message);
         expect(onOpenChange).not.toHaveBeenCalled();
     });
 });

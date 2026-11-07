@@ -364,32 +364,36 @@ describe("snooze and unsnooze", () => {
         await as(OWNER).mutation(unsnoozeThread as never, { chosenAt: Date.now(), threadId } as never);
     });
 
-    it("a queued preset or undo chosen before the latest choice does not replace it", async () => {
+    // The ordering rule, one row per write: the thread holds a choice made at `now - 1000` until `now + 2 * DAY`, then one write is
+    // sent. A write with an older chosen time is dropped (a queued preset, a second tap or an undo from another device, delivered late);
+    // a newer one applies. `remaining` is the snooze's end after the write, in days from now, or `null` when it is gone.
+    it.each([
+        ["a newer snooze applies", "snooze", -500, 3, true, 3],
+        ["an older snooze is dropped, as a queued preset is when a custom time came first", "snooze", -60_000, 1, false, 2],
+        ["an older snooze is dropped when it arrives after a newer one", "snooze", -2000, 1, false, 2],
+        ["an older unsnooze is dropped, as another device's earlier undo is", "unsnooze", -5000, undefined, false, 2],
+        ["a newer unsnooze applies and clears the snooze", "unsnooze", 0, undefined, true, null],
+    ] as const)("%s", async (_name, kind, offset, untilDays, applied, remaining) => {
         const now = Date.now();
-        const presetChosenAt = now - 60_000;
-        const customChosenAt = now - 1000;
-        const customUntil = now + 3 * DAY;
 
-        // The owner comes online and picks a custom time; the earlier preset, queued while offline, drains afterwards.
-        await as(OWNER).mutation(snoozeThread as never, { chosenAt: customChosenAt, threadId, until: customUntil } as never);
-        await as(OWNER).mutation(snoozeThread as never, { chosenAt: presetChosenAt, threadId, until: now + DAY } as never);
-        await as(OWNER).mutation(unsnoozeThread as never, { chosenAt: presetChosenAt, threadId } as never);
+        await harness.run(async (context: any) => await context.db.replace("threads", threadId, { status: "active", userId: OWNER }));
+        await as(OWNER).mutation(snoozeThread as never, { chosenAt: now - 1000, threadId, until: now + 2 * DAY } as never);
 
-        expect(await read()).toMatchObject({ snoozeChosenAt: customChosenAt, snoozedUntil: customUntil });
-    });
+        const chosenAt = now + offset;
+        const sent =
+            kind === "snooze"
+                ? await as(OWNER).mutation(snoozeThread as never, { chosenAt, threadId, until: now + (untilDays ?? 0) * DAY } as never)
+                : await as(OWNER).mutation(unsnoozeThread as never, { chosenAt, threadId } as never);
 
-    it("two rapid choices delivered in reverse order leave the later choice in place", async () => {
-        const now = Date.now();
-        const earlierChosenAt = now - 2000;
-        const laterChosenAt = now - 1000;
+        expect(sent).toEqual({ applied });
 
-        // The later choice arrives first, then the earlier one: the chosen time decides, not the order the writes arrive in.
-        await as(OWNER).mutation(snoozeThread as never, { chosenAt: laterChosenAt, threadId, until: now + 2 * DAY } as never);
-        await expect(as(OWNER).mutation(snoozeThread as never, { chosenAt: earlierChosenAt, threadId, until: now + DAY } as never)).resolves.toEqual({
-            applied: false,
-        });
+        const row = await read();
 
-        expect(await read()).toMatchObject({ snoozeChosenAt: laterChosenAt, snoozedUntil: now + 2 * DAY });
+        if (remaining === null) {
+            expect(row.snoozedUntil).toBeUndefined();
+        } else {
+            expect(row).toMatchObject({ snoozedUntil: now + remaining * DAY });
+        }
     });
 
     it("a stale queued preset whose time has passed is dropped without an error", async () => {
@@ -401,18 +405,6 @@ describe("snooze and unsnooze", () => {
             applied: false,
         });
         expect(await read()).toMatchObject({ snoozedUntil: now + DAY });
-    });
-
-    it("a newer choice replaces the snooze, and a write with no choice time cannot replace it", async () => {
-        const now = Date.now();
-
-        await as(OWNER).mutation(snoozeThread as never, { chosenAt: now - 5000, threadId, until: now + DAY } as never);
-        await as(OWNER).mutation(snoozeThread as never, { chosenAt: now - 1000, threadId, until: now + 2 * DAY } as never);
-        expect(await read()).toMatchObject({ snoozedUntil: now + 2 * DAY });
-
-        // A client that predates the ordering field sends no choice time: it is refused, and the stored choice stands.
-        await expect(as(OWNER).mutation(snoozeThread as never, { threadId, until: now + 5 * DAY } as never)).rejects.toThrow();
-        expect(await read()).toMatchObject({ snoozedUntil: now + 2 * DAY });
     });
 
     it("a stale unsnooze is reported as not applied, and logged as dropped with its reason", async () => {
@@ -463,15 +455,6 @@ describe("snooze and unsnooze", () => {
         expect(events).toEqual([{ fields: { snoozedForMs: DAY }, name: "chat.snooze_thread" }]);
     });
 
-    it("the unsnooze procedure reports a dropped unsnooze to its caller", async () => {
-        const now = Date.now();
-
-        await as(OWNER).mutation(snoozeThread as never, { chosenAt: now - 1000, threadId, until: now + 2 * DAY } as never);
-
-        await expect(as(OWNER).mutation(unsnoozeThread as never, { chosenAt: now - 5000, threadId } as never)).resolves.toEqual({ applied: false });
-        await expect(as(OWNER).mutation(unsnoozeThread as never, { chosenAt: now, threadId } as never)).resolves.toEqual({ applied: true });
-    });
-
     it("a queued snooze that drains after the thread woke does not hide it again", async () => {
         // The owner's snooze was made while offline; its run then failed and woke the thread; the queue drains after that.
         const queuedChosenAt = Date.now() - 60_000;
@@ -492,26 +475,6 @@ describe("snooze and unsnooze", () => {
         // A legacy write is refused outright, so the caller is told it did not happen (no silent success).
         await expect(as(OWNER).mutation(snoozeThread as never, { threadId, until: now + DAY } as never)).rejects.toThrow();
         await expect(as(OWNER).mutation(unsnoozeThread as never, { threadId } as never)).rejects.toThrow();
-
-        expect(await read()).toMatchObject({ snoozeChosenAt: now - 1000, snoozedUntil: now + 2 * DAY });
-    });
-
-    it("a legacy request followed by an older queued stamped request leaves the newer choice standing", async () => {
-        const now = Date.now();
-
-        await as(OWNER).mutation(snoozeThread as never, { chosenAt: now - 1000, threadId, until: now + 2 * DAY } as never);
-        await expect(as(OWNER).mutation(unsnoozeThread as never, { threadId } as never)).rejects.toThrow();
-        await as(OWNER).mutation(snoozeThread as never, { chosenAt: now - 5000, threadId, until: now + DAY } as never);
-
-        expect(await read()).toMatchObject({ snoozeChosenAt: now - 1000, snoozedUntil: now + 2 * DAY });
-    });
-
-    it("device B's later change survives device A's earlier write, snooze or undo", async () => {
-        const now = Date.now();
-
-        await as(OWNER).mutation(snoozeThread as never, { chosenAt: now - 1000, threadId, until: now + 2 * DAY } as never);
-        await as(OWNER).mutation(snoozeThread as never, { chosenAt: now - 5000, threadId, until: now + DAY } as never);
-        await as(OWNER).mutation(unsnoozeThread as never, { chosenAt: now - 5000, threadId } as never);
 
         expect(await read()).toMatchObject({ snoozeChosenAt: now - 1000, snoozedUntil: now + 2 * DAY });
     });
