@@ -30,10 +30,13 @@ const RECORDING_OPTIONS: RecordingOptions = {
 
 export type VoicePhase = "idle" | "recording" | "transcribing";
 
-/** The clip is a temporary file: it is deleted once it has been read, whatever happened. The audio is never kept. */
-const discard = (uri: string | undefined): void => {
+/**
+ * The clip is a temporary file: it is deleted once it has been read, whatever happened. The audio is never kept.
+ * Returns whether the file is gone, so a failed delete can be tried again.
+ */
+const isDiscarded = (uri: string | undefined): boolean => {
     if (!uri) {
-        return;
+        return true;
     }
 
     try {
@@ -42,18 +45,24 @@ const discard = (uri: string | undefined): void => {
         if (file.exists) {
             file.delete();
         }
+
+        return true;
     } catch (error) {
         console.warn("Could not delete the voice clip.", error);
+
+        return false;
     }
 };
 
 /**
- * Hold to record, release to transcribe. `onText` gets the words to put into the draft; `onError` gets a message to
- * show in the composer (null clears it). Nothing is ever sent as a message from here.
+ * Hold to record, release to transcribe. `onText` gets the words to put into the draft; nothing is ever sent as a
+ * message from here. `error` is voice input's own message for the composer, apart from the screen's send errors, so a
+ * press never clears a send failure.
  */
-export const useVoiceInput = ({ onError, onText }: { onError: (message: string | null) => void; onText: (text: string) => void }) => {
+export const useVoiceInput = ({ onText }: { onText: (text: string) => void }) => {
     const recorder = useAudioRecorder(RECORDING_OPTIONS);
     const [phase, setPhase] = useState<VoicePhase>("idle");
+    const [error, setError] = useState<string | undefined>(undefined);
     // Whether the finger is still on the button: a release during the permission prompt or the recorder's start records nothing.
     const isHeld = useRef(false);
     // From a press until its clip is done with: a second press meanwhile is ignored, so two starts never share the recorder.
@@ -63,9 +72,15 @@ export const useVoiceInput = ({ onError, onText }: { onError: (message: string |
     // Where the clip is written, known once the recorder is prepared, so it can be deleted whatever happens after.
     const clipUri = useRef<string | undefined>(undefined);
     const stopTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-    const callbacks = useRef({ onError, onText });
+    const callbacks = useRef({ onText });
 
-    callbacks.current = { onError, onText };
+    callbacks.current = { onText };
+
+    const report = useCallback((message: string) => {
+        if (isMounted.current) {
+            setError(message);
+        }
+    }, []);
 
     /** Stops the recorder and returns the clip's path; the caller deletes it. A failed stop still hands the path back. */
     const stopRecording = useCallback(async (): Promise<string | undefined> => {
@@ -98,21 +113,23 @@ export const useVoiceInput = ({ onError, onText }: { onError: (message: string |
             uri = await stopRecording();
 
             if (!uri) {
-                callbacks.current.onError(RECORDING_FAILED_MESSAGE);
+                report(RECORDING_FAILED_MESSAGE);
 
                 return;
             }
 
             if (durationMillis < MIN_CLIP_MS) {
-                callbacks.current.onError(TOO_SHORT_MESSAGE);
+                report(TOO_SHORT_MESSAGE);
 
                 return;
             }
 
             const audio = await new File(uri).base64();
 
-            discard(uri);
-            uri = undefined;
+            // A delete that failed here is tried once more below.
+            if (isDiscarded(uri)) {
+                uri = undefined;
+            }
 
             // Left the screen meanwhile: nobody would see the text, so the paid call is not made.
             if (!isMounted.current) {
@@ -123,17 +140,15 @@ export const useVoiceInput = ({ onError, onText }: { onError: (message: string |
 
             if (isMounted.current) {
                 if (text.trim() === "") {
-                    callbacks.current.onError(NOTHING_HEARD_MESSAGE);
+                    report(NOTHING_HEARD_MESSAGE);
                 } else {
                     callbacks.current.onText(text);
                 }
             }
-        } catch (error) {
-            if (isMounted.current) {
-                callbacks.current.onError(voiceErrorMessage(error));
-            }
+        } catch (transcribeError) {
+            report(voiceErrorMessage(transcribeError));
         } finally {
-            discard(uri);
+            isDiscarded(uri);
             clipUri.current = undefined;
             isBusy.current = false;
 
@@ -141,7 +156,7 @@ export const useVoiceInput = ({ onError, onText }: { onError: (message: string |
                 setPhase("idle");
             }
         }
-    }, [recorder, stopRecording]);
+    }, [recorder, report, stopRecording]);
 
     const start = useCallback(async () => {
         if (isBusy.current) {
@@ -150,14 +165,13 @@ export const useVoiceInput = ({ onError, onText }: { onError: (message: string |
 
         isBusy.current = true;
         isHeld.current = true;
-        // eslint-disable-next-line unicorn/no-null -- the screen's error slot is `string | null`; null clears it
-        callbacks.current.onError(null);
+        setError(undefined);
 
         try {
             const permission = await requestRecordingPermissionsAsync();
 
             if (!permission.granted) {
-                callbacks.current.onError(MIC_DENIED_MESSAGE);
+                report(MIC_DENIED_MESSAGE);
                 isBusy.current = false;
 
                 return;
@@ -170,7 +184,7 @@ export const useVoiceInput = ({ onError, onText }: { onError: (message: string |
             // Released while the recorder was starting (or while the first permission prompt was up): nothing to record.
             if (!isHeld.current || !isMounted.current) {
                 settleQuietly(setAudioModeAsync({ allowsRecording: false }));
-                discard(clipUri.current);
+                isDiscarded(clipUri.current);
                 clipUri.current = undefined;
                 isBusy.current = false;
 
@@ -183,14 +197,15 @@ export const useVoiceInput = ({ onError, onText }: { onError: (message: string |
             stopTimer.current = setTimeout(() => {
                 settleQuietly(finish());
             }, MAX_CLIP_MS);
-        } catch (error) {
-            console.warn("Could not start the voice recording.", error);
-            callbacks.current.onError(RECORDING_FAILED_MESSAGE);
-            discard(clipUri.current);
+        } catch (startError) {
+            console.warn("Could not start the voice recording.", startError);
+            settleQuietly(setAudioModeAsync({ allowsRecording: false }));
+            report(RECORDING_FAILED_MESSAGE);
+            isDiscarded(clipUri.current);
             clipUri.current = undefined;
             isBusy.current = false;
         }
-    }, [finish, recorder]);
+    }, [finish, recorder, report]);
 
     // Leaving the screen mid-recording: stop, and delete what was recorded even when the released recorder cannot stop.
     useEffect(() => {
@@ -207,12 +222,12 @@ export const useVoiceInput = ({ onError, onText }: { onError: (message: string |
                     try {
                         await stopRecording();
                     } finally {
-                        discard(uri);
+                        isDiscarded(uri);
                     }
                 });
             }
         };
     }, [stopRecording]);
 
-    return { finish, phase, start };
+    return { error, finish, phase, start };
 };

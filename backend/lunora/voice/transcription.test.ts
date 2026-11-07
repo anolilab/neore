@@ -16,15 +16,18 @@ import { createRatelimit } from "../lib/rate-limiter";
 import schema from "../schema";
 import { MAX_CLIP_SECONDS, TRANSCRIPTION_DAILY_LIMIT_MESSAGE, TRANSCRIPTION_GUEST_MESSAGE, transcribeClip } from "./transcription";
 
-const { binding, providerKeys, registry, sessionFrom, users } = vi.hoisted(() => {
+const { activeOrganization, binding, providerKeys, registry, sessionFrom, users } = vi.hoisted(() => {
+    const organization = { current: null as { id: string } | null };
+
     return {
+        activeOrganization: organization,
         /** The fake `SERVICE_LLM_GATEWAY` binding: what `ctx.services.llmGateway.fetch` would reach. */
         binding: { contexts: [] as unknown[], fetch: undefined as unknown as (input: Request | string | URL, init?: RequestInit) => Promise<Response> },
         providerKeys: { current: {} as Record<string, string> },
         registry: new Map<string, unknown>(),
         sessionFrom: async (context: { auth: { userId?: string | null } }) =>
             context.auth.userId
-                ? { activeOrganization: null, id: context.auth.userId, isAdmin: false, plan: null, role: null, userId: context.auth.userId }
+                ? { activeOrganization: organization.current, id: context.auth.userId, isAdmin: false, plan: null, role: null, userId: context.auth.userId }
                 : null,
         users: new Map<string, { isAnonymous?: boolean; role?: string }>(),
     };
@@ -111,6 +114,7 @@ beforeEach(() => {
     users.set(MEMBER, {});
     users.set(GUEST, { isAnonymous: true });
     providerKeys.current = {};
+    activeOrganization.current = null;
     binding.contexts.length = 0;
     binding.fetch = async (input, init) => {
         gatewayCalls.push({ body: JSON.parse(String(init?.body)) as Record<string, unknown>, url: String(input) });
@@ -140,6 +144,7 @@ describe("transcribeClip", () => {
 
     it("returns the trimmed text, charges the clip's seconds, sends the user's own key, and saves nothing", async () => {
         providerKeys.current = { fal: "other", openai: "user-openai-key" };
+        activeOrganization.current = { id: "org-1" };
         const before = await remainingSeconds(MEMBER);
 
         await expect(transcribe(MEMBER, 2500)).resolves.toEqual({ text: "hello there" });
@@ -147,7 +152,7 @@ describe("transcribeClip", () => {
         expect(await remainingSeconds(MEMBER)).toBe(before - 3);
         expect(gatewayCalls).toEqual([
             {
-                body: expect.objectContaining({ audio: AUDIO, durationSeconds: 3, providerApiKey: "user-openai-key", userId: MEMBER }),
+                body: expect.objectContaining({ audio: AUDIO, durationSeconds: 3, orgId: "org-1", providerApiKey: "user-openai-key", userId: MEMBER }),
                 url: `${GATEWAY}/internal/transcription`,
             },
         ]);

@@ -159,7 +159,7 @@ const Chat = () => {
     const [sending, setSending] = useState(false);
     const [error, setError] = useState<string | null>(null);
     // The words land in the draft, after anything typed meanwhile; they are never sent on their own.
-    const voice = useVoiceInput({ onError: setError, onText: (text) => setDraft((current) => appendTranscript(current, text)) });
+    const voice = useVoiceInput({ onText: (text) => setDraft((current) => appendTranscript(current, text)) });
     const listRef = useRef<LegendListRef>(null);
     // Whether the list shows its last message: the jump button shows whenever it does not, and while a reply streams.
     const [isAtEnd, setIsAtEnd] = useState(true);
@@ -685,7 +685,7 @@ const Chat = () => {
                         <Text style={{ fontWeight: "600" }}>Send</Text>
                     </Pressable>
                 </View>
-                <VoiceStatus phase={voice.phase} />
+                <VoiceStatus error={voice.error} phase={voice.phase} />
                 {sendReason ? <Text style={{ fontSize: 12, paddingBottom: 8 + safeBottom, paddingHorizontal: 12 }}>{sendReason}</Text> : null}
             </KeyboardAvoidingView>
         </View>

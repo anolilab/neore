@@ -1,4 +1,5 @@
-import { Pressable, Text } from "react-native";
+import { useEffect } from "react";
+import { AccessibilityInfo, Platform, Pressable, Text } from "react-native";
 
 import type { VoicePhase } from "./use-voice-input";
 
@@ -41,9 +42,28 @@ export const VoiceButton = ({
     );
 };
 
-/** The line under the composer while a clip records or is transcribed; read out when it changes. */
-export const VoiceStatus = ({ phase }: { phase: VoicePhase }) => {
+/**
+ * The line under the composer while a clip records or is transcribed, or voice input's failure. On iOS each change is
+ * announced, since VoiceOver reads neither the live region nor a new alert; Android's TalkBack reads the live region.
+ */
+export const VoiceStatus = ({ error, phase }: { error: string | undefined; phase: VoicePhase }) => {
     const status = STATUS[phase];
+
+    const spoken = error ?? status;
+
+    useEffect(() => {
+        if (spoken !== undefined && Platform.OS === "ios") {
+            AccessibilityInfo.announceForAccessibility(spoken);
+        }
+    }, [spoken]);
+
+    if (error !== undefined) {
+        return (
+            <Text accessibilityLiveRegion="polite" accessibilityRole="alert" style={{ color: "#b00020", fontSize: 12, paddingHorizontal: 12 }}>
+                {error}
+            </Text>
+        );
+    }
 
     if (status === undefined) {
         return undefined;

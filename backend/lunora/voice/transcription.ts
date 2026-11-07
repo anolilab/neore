@@ -85,6 +85,8 @@ export const transcribeClip = authAction
             body: JSON.stringify({
                 audio: args.audio,
                 durationSeconds: seconds,
+                // The credits are the member's in the active organization, from the session, never from the client.
+                orgId: ctx.user.activeOrganization?.id,
                 providerApiKey: providerKeys.openai || undefined,
                 requestId: crypto.randomUUID(),
                 userId,
