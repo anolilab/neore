@@ -563,6 +563,39 @@ describe("the coding-agent composer", () => {
         expect(screen.queryByRole("button", { name: "Interrupt and send" })).toBeNull();
     });
 
+    it("spends a lost direct send's id when Send now stops a turn, so the text sent again runs under a new one", async () => {
+        harness.sendResults = [{ error: "unreachable", ok: false }];
+        mount(session());
+
+        const box = (await screen.findByLabelText("Message to the coding agent")) as HTMLTextAreaElement;
+
+        fireEvent.change(box, { target: { value: "lost direct" } });
+        fireEvent.click(screen.getByRole("button", { name: "Send" }));
+        await waitFor(() => expect(sendCalls()).toHaveLength(1));
+        const lostId = (sendCalls()[0]?.[1] as { requestId: string }).requestId;
+
+        // Its turn may be the one that shows up now; a message queued behind it is sent now, stopping that turn.
+        harness.data = { ...harness.data, "chat.streaming.getActiveStreamForThread": { streamId: "stream-9" } };
+        await harness.client?.invalidateQueries();
+        fireEvent.change(box, { target: { value: "another" } });
+        fireEvent.click(await screen.findByRole("button", { name: "Queue" }));
+
+        const sendNow = await screen.findByRole("button", { name: "Send queued message 1 now" });
+
+        await waitFor(() => expect((sendNow as HTMLButtonElement).disabled).toBe(false));
+        fireEvent.click(sendNow);
+        await waitFor(() => expect(harness.calls.some(([name]: [string, unknown]) => name === "acp.remote.cancelHostTurn")).toBe(true));
+
+        fireEvent.change(box, { target: { value: "lost direct" } });
+        fireEvent.click(screen.getByRole("button", { name: "Queue" }));
+        await screen.findByText("lost direct");
+
+        const resent = usePromptQueueStore.getState().queues["thread-1"]?.items.find((item) => item.text === "lost direct");
+
+        expect(resent?.id).toBeDefined();
+        expect(resent?.id).not.toBe(lostId);
+    });
+
     it("keeps a lost send's mark through a refusal answered before the backend looks for repeats", async () => {
         harness.sendResults = [
             { error: "unreachable", ok: false },

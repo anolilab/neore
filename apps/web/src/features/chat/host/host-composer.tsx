@@ -652,6 +652,9 @@ const HostComposerForThread: FC<{ className?: string; threadId: string }> = ({ c
             return;
         }
 
+        // The turn stopped may be a direct send whose answer was lost: a later send of that text must not reuse its id, or it would
+        // come back as a duplicate of the stopped turn and never run. Its id is spent, as Interrupt and send spends it.
+        attempt.current = undefined;
         stopFor(itemId, wasPaused);
     };
 
