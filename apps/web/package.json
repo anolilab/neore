@@ -25,8 +25,6 @@
         "postinstall": "pnpm run cf:typegen && fumadocs-mdx",
         "lint:eslint": "eslint . --cache --cache-location .eslint.cache.json",
         "lint:eslint:fix": "eslint . --fix --cache --cache-location .eslint.cache.json",
-        "lint:oxfmt": "oxfmt --check . --ignore-path ../../.prettierignore --ignore-path .prettierignore && prettier --check \"**/*.{md,mdx,css,html}\" --ignore-path ../../.prettierignore --ignore-path .prettierignore --no-error-on-unmatched-pattern",
-        "lint:oxfmt:fix": "oxfmt --write . --ignore-path ../../.prettierignore --ignore-path .prettierignore && prettier --write \"**/*.{md,mdx,css,html}\" --ignore-path ../../.prettierignore --ignore-path .prettierignore --no-error-on-unmatched-pattern",
         "lint:types": "tsc --noEmit",
         "lint:types:fast": "tsrs --noEmit",
         "preview": "npm run build && vite preview",

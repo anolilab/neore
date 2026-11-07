@@ -9,8 +9,6 @@
         "dev": "vite",
         "lint:eslint": "eslint . --cache --cache-location .eslint.cache.json",
         "lint:eslint:fix": "eslint . --fix --cache --cache-location .eslint.cache.json",
-        "lint:oxfmt": "oxfmt --check . --ignore-path ../../.prettierignore --ignore-path .prettierignore && prettier --check \"**/*.{md,mdx,css,html}\" --ignore-path ../../.prettierignore --ignore-path .prettierignore --no-error-on-unmatched-pattern",
-        "lint:oxfmt:fix": "oxfmt --write . --ignore-path ../../.prettierignore --ignore-path .prettierignore && prettier --write \"**/*.{md,mdx,css,html}\" --ignore-path ../../.prettierignore --ignore-path .prettierignore --no-error-on-unmatched-pattern",
         "lint:types": "tsc -b",
         "lint:types:fast": "tsrs -b",
         "preview": "vite preview",

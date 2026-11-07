@@ -6,8 +6,8 @@ import config from "@anolilab/oxfmt-config";
  * so oxfmt formats code and data files exactly as Prettier did. The shared preset covers the
  * common subset; the rest is set here.
  *
- * Markdown, CSS and HTML stay on Prettier (each project's `lint:oxfmt` runs it on those files):
- * oxfmt's Markdown output reflows lists and blockquotes.
+ * Markdown stays on Prettier (`pnpm lint:oxfmt` runs it on md and mdx): oxfmt's Markdown output
+ * reflows lists and blockquotes.
  *
  * Ignore rules come from `.gitignore` and `.prettierignore`, which oxfmt reads by default.
  *
@@ -35,8 +35,8 @@ export default {
     sortPackageJson: false,
     // Prettier ran prettier-plugin-tailwindcss with no config, so this is the same default algorithm.
     sortTailwindcss: true,
-    // Prettier never formatted TOML. Markdown, CSS and HTML are Prettier's, so oxfmt skips them.
-    ignorePatterns: ["**/*.toml", "**/*.md", "**/*.mdx", "**/*.css", "**/*.html"],
+    // Prettier never formatted TOML. Markdown is Prettier's, so oxfmt skips it.
+    ignorePatterns: ["**/*.toml", "**/*.md", "**/*.mdx"],
     overrides: [
         // oxfmt caps printWidth at 320 (Prettier allowed 1000); package.json lines never reach it.
         { files: ["package*.json"], options: { printWidth: 320 } },

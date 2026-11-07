@@ -64,7 +64,7 @@ input validation work, and `/classify` fails at the model call. Alchemy binds
 ```bash
 pnpm --filter nsfw-checker lint:types
 pnpm --filter nsfw-checker lint:eslint
-pnpm --filter nsfw-checker lint:oxfmt
+pnpm lint:oxfmt   # from the repository root: formatting is checked repo-wide
 pnpm --filter nsfw-checker build      # wrangler deploy --dry-run
 ```
 

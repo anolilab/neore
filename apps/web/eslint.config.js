@@ -16,7 +16,7 @@ export default createConfig(
             "./e2e/.results/**",
             // The shared test user's saved session (`e2e/auth.setup.ts`), also gitignored.
             "./e2e/.auth/**",
-            // Lingui-generated message catalogs. Already in `.prettierignore`;
+            // Lingui-generated message catalogs. Already in the root `.prettierignore`;
             // every finding in them is `unicorn/no-abusive-eslint-disable` on a
             // blanket disable the generator writes.
             "./src/locales/**",
