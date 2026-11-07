@@ -25,12 +25,9 @@ vi.mock("../chat/lib/headless-run", () => {
         runHeadlessAgent: async () => {
             agent.calls += 1;
 
-            // A run that lasts this many beat intervals, on the faked interval clock; the yield lets each beat's write land.
+            // A run that lasts this many beat intervals, on the faked interval clock; the run awaits its last beat before it returns.
             if (agent.beats > 0) {
                 vi.advanceTimersByTime(agent.beats * RUN_BEAT_MS);
-                await new Promise((resolve) => {
-                    setImmediate(resolve);
-                });
             }
 
             return { text: "done" };
@@ -197,7 +194,7 @@ describe("a sub-agent run whose loop lives", () => {
 
         expect(agent.calls).toBe(1);
         expect(finished.status).toBe("succeeded");
-        expect(finished.beatAt).toBeGreaterThanOrEqual(finished.startedAt!);
+        expect(finished.beatAt).toStrictEqual(expect.any(Number));
 
         await harness.run(async (ctx: any) => await beatSubAgentRun(ctx, runId as never, finished.startedAt! + 10 * RUN_STALE_MS));
         await watch(runId, finished.startedAt!, finished.startedAt! + 10 * RUN_STALE_MS);

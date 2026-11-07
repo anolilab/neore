@@ -51,8 +51,10 @@ export const runSubAgent = internalAction.input({ runId: v.id("subAgentRuns") })
 
     const { userId } = claim;
     // A beat that does not land is not fatal (the next one may), but a loop that stops beating is read as dead.
+    // The last one is awaited before the run returns, so no write outlives it.
+    let lastBeat: Promise<unknown> = Promise.resolve();
     const beat = setInterval(() => {
-        ctx.runMutation(internal.sub_agents.functions.beatRun, { runId }).catch((error: unknown) => {
+        lastBeat = ctx.runMutation(internal.sub_agents.functions.beatRun, { runId }).catch((error: unknown) => {
             console.warn(`[SubAgent] Run ${runId}: a heartbeat failed:`, error);
         });
     }, RUN_BEAT_MS);
@@ -153,5 +155,6 @@ export const runSubAgent = internalAction.input({ runId: v.id("subAgentRuns") })
         await ctx.runMutation(internal.sub_agents.functions.completeRun, { outcome: { error: message, kind: "failed" }, runId });
     } finally {
         clearInterval(beat);
+        await lastBeat;
     }
 });
