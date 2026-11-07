@@ -1850,6 +1850,7 @@ export const userSettings = sqliteTable("userSettings", {
     enableFollowupSuggestions: integer("enableFollowupSuggestions", { mode: "boolean" }),
     favoriteModels: text("favoriteModels", { mode: "json" }).$type<Array<string>>(),
     hidePersonalInfo: integer("hidePersonalInfo", { mode: "boolean" }),
+    hostFollowUpSteer: integer("hostFollowUpSteer", { mode: "boolean" }),
     isAdvancedUser: integer("isAdvancedUser", { mode: "boolean" }),
     keyboardShortcuts: text("keyboardShortcuts"),
     language: text("language"),

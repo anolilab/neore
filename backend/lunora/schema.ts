@@ -3409,6 +3409,8 @@ export const schema = defineSchema({
         enableFollowupSuggestions: v.optional(v.boolean()),
         favoriteModels: v.optional(v.array(v.string())),
         hidePersonalInfo: v.optional(v.boolean()),
+        // A message sent during a coding agent's turn interrupts that turn and goes next, instead of queueing behind it. Absent = queue.
+        hostFollowUpSteer: v.optional(v.boolean()),
         isAdvancedUser: v.optional(v.boolean()),
         keyboardShortcuts: v.optional(v.any()),
         language: v.optional(v.string()),
