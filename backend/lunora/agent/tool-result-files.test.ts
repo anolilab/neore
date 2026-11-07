@@ -197,7 +197,11 @@ describe("inline media in a tool result", () => {
     const readBack = async (row: any) => {
         const { resolveDocsStoredMedia } = await import("./stored-media");
         const { ownedStorageKeys } = await import("../lib/storage-ownership");
-        const [doc] = await resolveDocsStoredMedia([{ fileIds: row.fileIds, message: row.message, userId: OWNER }], {
+
+        // The owner saved on the row, not one the test supplies: a row saved without one must fail here.
+        expect(row.userId).toBe(OWNER);
+
+        const [doc] = await resolveDocsStoredMedia([{ fileIds: row.fileIds, message: row.message, userId: row.userId }], {
             lookupKeys: async () => new Map(),
             lookupOwnedKeys: async (userId, keys) => await harness.run(async (ctx: any) => await ownedStorageKeys(ctx.db, userId, keys)),
             origins: [],

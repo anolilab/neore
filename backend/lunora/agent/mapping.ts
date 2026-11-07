@@ -321,17 +321,22 @@ export const serializeStepContent = async (
     owner?: ToolMediaOwner,
 ): Promise<{ messageFileIds?: string[]; partContent: SerializedContent }> => {
     const fileIds: string[] = [];
-    // One store per distinct blob in the step: parts serialize at once, and two stores of the same new object would
-    // each count it (`addFile` raises the refcount of a row the other just inserted), so it would never be released.
+    // Tool media is stored once per distinct blob in the step, and one blob at a time: the parts serialize at once,
+    // and each store holds a decoded copy (up to `STORE_MAX_BYTES`), so several at once could exhaust the Worker.
     const storedMedia = new Map<string, ReturnType<StoreToolMedia>>();
+    let storing: Promise<unknown> = Promise.resolve();
     const inlineBudget = stepInlineBudget();
     const storeToolMedia: StoreToolMedia = async (base64, mediaType) => {
         let pending = storedMedia.get(base64);
 
         if (!pending) {
-            pending = storeFile(context, new Blob([convertBase64ToUint8Array(base64)], { type: mediaType }), owner).then(({ file }) => {
+            pending = storing.then(async () => {
+                const { file } = await storeFile(context, new Blob([convertBase64ToUint8Array(base64)], { type: mediaType }), owner);
+
                 return { fileId: file.fileId, storageId: file.storageId };
             });
+            // The next store waits for this one, whatever its outcome.
+            storing = pending.catch(() => undefined);
             storedMedia.set(base64, pending);
         }
 
