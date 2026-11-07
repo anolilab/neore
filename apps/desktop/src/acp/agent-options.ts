@@ -153,8 +153,13 @@ export const applyOptionsUpdate = (options: AgentOptions, update: Record<string,
     if (update.sessionUpdate === "config_option_update") {
         const configOptions = configOptionsOf(update.configOptions, scrub);
 
-        // The options replace everything offered before, legacy modes included.
-        return configOptions === undefined ? undefined : { configOptions };
+        // The options replace everything offered before, legacy modes included. The same list again changes nothing: `optionOf`
+        // builds every option with the same key order, so equal lists serialise alike.
+        if (configOptions === undefined || (options.modes === undefined && JSON.stringify(configOptions) === JSON.stringify(options.configOptions))) {
+            return undefined;
+        }
+
+        return { configOptions };
     }
 
     if (update.sessionUpdate !== "current_mode_update") {

@@ -168,6 +168,8 @@ describe("applyOptionsUpdate", () => {
         expect(applyOptionsUpdate(legacy, { currentModeId: "ask", sessionUpdate: "current_mode_update" }, keep)).toBeUndefined();
         expect(applyOptionsUpdate(start, { currentModeId: "build", sessionUpdate: "current_mode_update" }, keep)).toBeUndefined();
         expect(applyOptionsUpdate({}, update, keep)).toBeUndefined();
+        // Nor does the same list again.
+        expect(applyOptionsUpdate(start, { configOptions: [MODE, MODEL], sessionUpdate: "config_option_update" }, keep)).toBeUndefined();
     });
 
     it("ignores every other update", () => {
