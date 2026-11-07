@@ -60,9 +60,31 @@ type ReadCtx = Pick<MutationCtx | QueryCtx, "db">;
 export const isReplyRecorded = async (ctx: DbCtx, userId: string, replyKey: string): Promise<boolean> =>
     (await ctx.db.usageReplies.findFirst({ where: { replyKey, userId } })) !== null;
 
-/** `projectFiled`: the reply's project was filed with it, so the project walk leaves it alone. */
-export const markReplyRecorded = async (ctx: DbCtx, userId: string, replyKey: string, at: number, projectFiled = false): Promise<void> => {
-    await ctx.db.insert("usageReplies", { recordedAt: at, replyKey, userId, ...(projectFiled && { projectFiled: true }) });
+/** What the first walk added to the total for a reply. */
+export interface CountedReply {
+    costMicrodollars: number;
+    date: string;
+    tokens: number;
+}
+
+/**
+ * `projectFiled`: the reply's project was filed with it, so the project walk leaves it alone. `counted`: what the first
+ * walk added to the total, the amount any project row filed for the reply later must carry.
+ */
+export const markReplyRecorded = async (
+    ctx: DbCtx,
+    userId: string,
+    replyKey: string,
+    at: number,
+    extra: { counted?: CountedReply; projectFiled?: boolean } = {},
+): Promise<void> => {
+    await ctx.db.insert("usageReplies", {
+        recordedAt: at,
+        replyKey,
+        userId,
+        ...(extra.counted !== undefined && { counted: extra.counted }),
+        ...(extra.projectFiled === true && { projectFiled: true }),
+    });
 };
 
 /** Where a reply in `thread` is filed besides the total: its project. */
@@ -235,12 +257,16 @@ export const recordReplyUsage = internalMutation
         // the project is filed here, once.
         if (recorded) {
             if (!recorded.projectFiled) {
+                // The project gets what the total holds for the reply: the first walk's count when it made one (a run it
+                // passed while paused holds less than this record says), else this record dated as the walk would.
+                const { counted } = recorded;
+
                 await fileAttribution(
                     ctx,
                     args,
                     args.threadAttribution ?? (await attributionOfThread(ctx, args.threadId)),
-                    await countedDayOf(ctx, args),
-                    { costMicrodollars, tokens },
+                    counted?.date ?? (await countedDayOf(ctx, args)),
+                    counted ? { costMicrodollars: counted.costMicrodollars, tokens: counted.tokens } : { costMicrodollars, tokens },
                     true,
                 );
             }
@@ -248,7 +274,7 @@ export const recordReplyUsage = internalMutation
             return null;
         }
 
-        await markReplyRecorded(ctx, args.userId, args.replyKey, args.at, true);
+        await markReplyRecorded(ctx, args.userId, args.replyKey, args.at, { projectFiled: true });
         await addToRollup(
             ctx,
             args.userId,

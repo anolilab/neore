@@ -28571,6 +28571,32 @@
     "usageReplies": {
       "commitOrdered": false,
       "fields": {
+        "counted": {
+          "kind": "object",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "fields": {
+            "costMicrodollars": {
+              "kind": "number",
+              "nullable": false,
+              "optional": false,
+              "unique": false
+            },
+            "date": {
+              "kind": "string",
+              "nullable": false,
+              "optional": false,
+              "unique": false
+            },
+            "tokens": {
+              "kind": "number",
+              "nullable": false,
+              "optional": false,
+              "unique": false
+            }
+          }
+        },
         "projectFiled": {
           "kind": "boolean",
           "nullable": false,

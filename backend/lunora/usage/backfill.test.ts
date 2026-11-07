@@ -648,6 +648,66 @@ describe("project backfill", () => {
         ]);
     });
 
+    /**
+     * A run paused on a rate limit has no pending row: the first walk counts the steps saved so far (10), and the run
+     * then resumes and saves the rest (30) under the same reply. Returns the reply's key and thread.
+     */
+    const pausedRun = async () => {
+        const alpha = await insertProject("Alpha");
+        const thread = await insertThread(DAY_1, [[prompt(), reply(1, 10)]], "active", alpha);
+
+        vi.setSystemTime(STARTED);
+        await start();
+
+        for (let current = await state(); current.status !== "done"; current = await state()) {
+            await step(current.runId);
+        }
+
+        vi.setSystemTime(STARTED + 60_000);
+        await harness.run(async (ctx: any) => {
+            await ctx.db.insert("messages", {
+                message: { content: "resumed", role: "assistant" },
+                order: 0,
+                providerMetadata: { [GATEWAY_COST_METADATA_KEY]: { costMicrodollars: 30 } },
+                status: "success",
+                stepOrder: 2,
+                threadId: thread.threadId,
+                tool: false,
+                usage: { totalTokens: 3 },
+                userId: USER,
+            });
+        });
+
+        return { alpha, key: thread.rowIds[0]![1]!, threadId: thread.threadId };
+    };
+
+    const totalAndProjects = async () => {
+        const rows = await rollup();
+
+        return {
+            projects: rows.filter((row) => row.skillKey === PROJECT_SKILL_KEY).reduce((sum, row) => sum + row.costMicrodollars, 0),
+            total: rows.filter((row) => row.skillKey === TOTAL_SKILL_KEY).reduce((sum, row) => sum + row.costMicrodollars, 0),
+        };
+    };
+
+    it("files a run the first walk counted while paused at what the total holds, when its live record lands first", async () => {
+        const { key, threadId } = await pausedRun();
+
+        await live(key, threadId, 40, 4);
+        await drain();
+
+        expect(await totalAndProjects()).toStrictEqual({ projects: 10, total: 10 });
+    });
+
+    it("files a run the first walk counted while paused at what the total holds, when the project walk gets there first", async () => {
+        const { key, threadId } = await pausedRun();
+
+        await drain();
+        await live(key, threadId, 40, 4);
+
+        expect(await totalAndProjects()).toStrictEqual({ projects: 10, total: 10 });
+    });
+
     it("starts the project walk only once the first walk is done, from the first walk's cutoff", async () => {
         const { alpha, beta } = await insertProjectFixture();
 

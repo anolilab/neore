@@ -3365,6 +3365,10 @@ export const schema = defineSchema({
     // what makes `recordReplyUsage` and the backfill count a reply once.
     // Pruned by `usage/backfill.ts#sweepUsageRollup` once the backfill is done.
     usageReplies: defineTable({
+        // What the first backfill walk added to the total for this reply, and on which day: a project row filed for it
+        // later carries exactly this, so the projects never hold more than the total (a run it passed while paused
+        // was counted only in part).
+        counted: v.optional(v.object({ costMicrodollars: v.number(), date: v.string(), tokens: v.number() })),
         // Set when the reply's project was filed with it (the live path), so the project walk leaves it alone.
         projectFiled: v.optional(v.boolean()),
         recordedAt: v.number(),
