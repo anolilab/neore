@@ -298,6 +298,8 @@ export const getMCPTools = async (servers: MCPServerConfig[], { progress }: GetM
 
             // The hash of each tool as FIRST listed, made once: the listing records it and a reconnect compares against it.
             const firstPrints = new Map<string, Promise<string>>();
+            // Keyed by the relisted tool object, so a later reconnect's new objects are judged afresh.
+            const verdicts = new WeakMap<Tool, Promise<boolean>>();
             const firstPrint = async (toolName: string, tool: Tool): Promise<string> => {
                 const known = firstPrints.get(toolName) ?? identify(toolName, tool);
 
@@ -319,7 +321,14 @@ export const getMCPTools = async (servers: MCPServerConfig[], { progress }: GetM
 
                     return retry;
                 },
-                async (toolName, first, relisted) => (await identify(toolName, relisted)) === (await firstPrint(toolName, first)),
+                async (toolName, first, relisted) => {
+                    // A reconnect's tool set stays the same for the rest of the run: each relisted tool is judged once.
+                    const verdict = verdicts.get(relisted) ?? (async () => (await identify(toolName, relisted)) === (await firstPrint(toolName, first)))();
+
+                    verdicts.set(relisted, verdict);
+
+                    return await verdict;
+                },
             );
 
             for (const [toolName, tool] of Object.entries(serverTools)) {
