@@ -778,14 +778,16 @@ overrides:
   lodash@>=4.0.0 <=4.17.22: ">=4.17.23"
   mermaid@>=10.9.0-rc.1 <10.9.4: ">=10.9.4"
   mermaid@>=11.0.0-alpha.1 <11.16.1: ">=11.16.1"
-  # Keep the bump inside 3.x. An open-ended ">=3.1.4" resolves to the newest
-  # minimatch (10.x), which drops the CJS default export — so every consumer
-  # declaring `minimatch: ^3.x` (eslint-plugin-jsx-a11y among them) blows up
-  # with `(0, _minimatch.default) is not a function` at rule-run time.
+  # Keep each bump inside its major. An open-ended ">=3.1.4" resolves to the newest
+  # minimatch, which drops the CJS default export — so every consumer declaring
+  # `minimatch: ^3.x` (eslint-plugin-jsx-a11y among them) blows up with
+  # `(0, _minimatch.default) is not a function` at rule-run time; an open-ended
+  # ">=10.2.3" let `pnpm dedupe` hand typescript-estree minimatch 11, which removed
+  # `makeRe`, and every ESLint run failed to load its config.
   minimatch@<3.1.4: "^3.1.4"
-  minimatch@>=10.0.0 <10.2.3: ">=10.2.3"
-  minimatch@>=5.0.0 <5.1.8: ">=5.1.8"
-  minimatch@>=9.0.0 <9.0.7: ">=9.0.7"
+  minimatch@>=10.0.0 <10.2.3: ^10.2.3
+  minimatch@>=5.0.0 <5.1.8: ^5.1.8
+  minimatch@>=9.0.0 <9.0.7: ^9.0.7
   moment@>=2.29.2 <2.31.0: ">=2.31.0"
   mysql2@<=3.23.0: ">=3.23.1"
   nanoid@<3.3.17: ">=3.3.17"

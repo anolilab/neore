@@ -68,13 +68,15 @@ describe("code highlighter plugin", () => {
         expect(run("x", language)).not.toBeNull();
     });
 
-    it.each(["r", "scala", "haskell", "elixir", "powershell", "graphql", "latex", "hcl", "zig", "julia", "objective-c", ""])(
-        "leaves %s to Streamdown's plain rendering",
-        (language) => {
-            expect(code.supportsLanguage(language)).toBe(false);
-            expect(run("x", language)).toBeNull();
-        },
-    );
+    it.each(["hcl", "zig", ""])("leaves %s to Streamdown's plain rendering", (language) => {
+        expect(code.supportsLanguage(language)).toBe(false);
+        expect(run("x", language)).toBeNull();
+    });
+
+    it.each(["r", "scala", "haskell", "elixir", "powershell", "graphql", "latex", "julia", "objective-c"])("highlights %s with its own grammar", (language) => {
+        expect(code.supportsLanguage(language)).toBe(true);
+        expect(run("x", language)).not.toBeNull();
+    });
 
     it("highlights C with the C++ grammar", () => {
         const keyword = run("int main(void) { return 0; }", "c")?.tokens[0]?.find((token) => token.content === "return");

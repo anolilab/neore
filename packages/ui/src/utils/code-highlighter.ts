@@ -12,7 +12,7 @@ type HighlightToken = HighlightResult["tokens"][number][number];
  * Streamdown's code-block highlighter, on TanStack Highlight instead of Shiki.
  *
  * Shiki's bundle is every grammar and theme it ships (~230 languages, 8 MiB of source in
- * the server build alone) behind one `import()` each; this is ~40 languages in ~11 KB. The
+ * the server build alone) behind one `import()` each; this is 79 grammars in ~28 KB gzipped. The
  * trade is coverage and precision: it is "a deliberately small docs highlighter", not a
  * TextMate engine, so a language it does not know renders as plain text, which Streamdown
  * does for any `supportsLanguage` that answers `false`.
