@@ -5,7 +5,8 @@
  * - `{{payload}}`: the whole body, inside a frame tag drawn at random for each delivery, so a body that contains a
  *   closing tag cannot end the frame early.
  * - `{{body.a.b.0}}`: a value of the JSON body (numeric segments index arrays).
- * - `{{header.name}}` and `{{query.name}}`: a request header or a query parameter (the first value).
+ * - `{{header.name}}` and `{{query.name}}`: a request header (a repeated one as its values joined by `, `, as Fetch
+ *   reads it) or a query parameter (the first value).
  *
  * A value is inserted as a JSON literal, so the model reads it as quoted data. A template that places neither the
  * whole body nor any body value gets the body framed after it, so an existing trigger keeps receiving its body.
@@ -276,7 +277,7 @@ export const webhookTemplateProblem = (template: string): string | undefined => 
 };
 
 /**
- * The first value of a header or query name, unless the name is a credential. The name is judged as the template wrote
+ * The value read for a header or query name, unless the name is a credential. The name is judged as the template wrote
  * it, so `ClientKey` splits at its capital before a header lookup lowercases it.
  */
 const readNamed = (values: Readonly<Record<string, string>>, name: string, key = name): string => {
