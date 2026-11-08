@@ -218,6 +218,25 @@ describe("stopping a server", () => {
         expect(system.table.map((entry) => entry.pid)).toContain(10);
     });
 
+    it("says the process list could not be read, and signals nothing, when finding the target fails", async () => {
+        const system = new FakeSystem();
+
+        system.processes = async () => {
+            throw new Error("ps timed out");
+        };
+
+        expect(await stopper(system).stop(10, SERVER_30)).toEqual({ ended: false, reason: STOP_REASON.unlocated });
+
+        const sockets = new FakeSystem();
+
+        sockets.listeners = async () => {
+            throw new Error("lsof timed out");
+        };
+
+        expect(await stopper(sockets).stop(10, SERVER_30)).toEqual({ ended: false, reason: STOP_REASON.unlocated });
+        expect([...system.signals, ...sockets.signals]).toEqual([]);
+    });
+
     it("signals nothing for a process that is not listening below the agent, or whose identity changed", async () => {
         const system = new FakeSystem();
         const service = stopper(system);

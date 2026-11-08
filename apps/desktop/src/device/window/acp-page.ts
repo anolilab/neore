@@ -822,7 +822,10 @@ const stopPort = async (selected: string | undefined, port: Awaited<ReturnType<t
         portsRead.quiet = 0;
         await refreshPorts();
 
-        if (!result.ended && state.selected === selected) {
+        // An ended session's servers are already cleared: a late reason must not come back over that.
+        const sessionEnded = state.sessions.find((session) => session.id === selected)?.status === "ended";
+
+        if (!sessionEnded && !result.ended && state.selected === selected) {
             setPortsStatus(`${port.name} on port ${String(port.port)} did not end: ${result.reason}.`);
             // The next read redraws the list, which brings the count back instead of leaving this reason up.
             portsRead.shown = undefined;

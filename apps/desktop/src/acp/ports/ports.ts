@@ -42,6 +42,7 @@ export const STOP_REASON = {
     refused: "a process could not be signalled (not permitted)",
     survived: "a process was still running after it was force-killed",
     unconfirmed: "it was force-killed, but the process list could not be read to confirm it ended",
+    unlocated: "the process list or its listening sockets could not be read to find it, so nothing was signalled",
     unreadable: "the process list could not be read to confirm it, so nothing was force-killed",
 } as const;
 
@@ -119,7 +120,13 @@ export class PortsService {
      * grace period. Refused unless `target` is, in a fresh read, below the agent and still listening.
      */
     public async stop(agentPid: number | undefined, target: StopTarget): Promise<StopResult> {
-        const root = await this.locate(agentPid, target);
+        let root: Awaited<ReturnType<PortsService["locate"]>>;
+
+        try {
+            root = await this.locate(agentPid, target);
+        } catch {
+            return { ended: false, reason: STOP_REASON.unlocated };
+        }
 
         if (root === undefined || agentPid === undefined) {
             return { ended: false, reason: STOP_REASON.gone };
