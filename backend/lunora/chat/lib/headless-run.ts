@@ -48,6 +48,7 @@ import {
     setResearchDepth,
     stampSavedToolCalls,
     toPersonalization,
+    withoutAskToolsOnLastStep,
 } from "./agent-run";
 import { buildAgentTools } from "./agent-tools";
 import { collectApprovalRequestIds } from "./tool-approval-claim";
@@ -249,7 +250,15 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
                   skillTools: headlessSkillTools(skill?.config, options.additionalTools, options.withheldTools),
                   userId,
               })
-            : { mcpClients: [], mcpLabels: {}, mcpServerNames: [], mcpToolFingerprints: NO_PERMISSION_KEYS, permissionKeys: NO_PERMISSION_KEYS, tools: {} };
+            : {
+                  mcpClients: [],
+                  mcpLabels: {},
+                  mcpServerNames: [],
+                  mcpToolFingerprints: NO_PERMISSION_KEYS,
+                  permissionKeys: NO_PERMISSION_KEYS,
+                  requiresApproval: [],
+                  tools: {},
+              };
     const toolAllowlist =
         options.toolAllowlist && options.toolAllowlistKeepsMcp ? [...options.toolAllowlist, ...Object.keys(toolResult.mcpLabels)] : options.toolAllowlist;
 
@@ -298,6 +307,11 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
             ...(options.shouldStop && { stopWhen: [stepCountIs(options.maxSteps ?? getMaxSteps(true)), stopWhenRequested(options.shouldStop)] }),
             ...(system !== undefined && { system }),
         };
+
+        // A run that may pause keeps its `ask` tools, but not on its last step: no step would be left to answer the request.
+        if (options.pauseForApproval) {
+            withoutAskToolsOnLastStep(generateArgs, Object.keys(runTools), toolResult.requiresApproval, options.maxSteps ?? getMaxSteps(true));
+        }
 
         let threadId: string;
         let thread;
@@ -380,7 +394,10 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
         const { savedMessages } = result as { savedMessages?: { _id: string; message?: { content?: unknown; role?: string } }[] };
         // Only a run that may pause keeps `ask` tools, so only such a run can have stopped on a request.
         const approvalIds = options.pauseForApproval ? collectApprovalRequestIds(savedMessages) : [];
-        const paused = approvalIds.length > 0;
+        // What is left of the run's budget. The last step offers no `ask` tool (`withoutAskToolsOnLastStep`); should a request
+        // still come from it, it is not recorded: no step would be left to answer it, so the run ends unpaused.
+        const stepsLeft = Math.max(0, (options.maxSteps ?? getMaxSteps(true)) - (result.steps?.length ?? 0));
+        const paused = approvalIds.length > 0 && stepsLeft > 0;
 
         if (paused && options.pauseForApproval) {
             // What the continuation rebuilds the run from (`resumeApprovedRun`): the same model, servers, tools after the
@@ -402,6 +419,10 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
                 researchDepth: "balanced",
                 searchMode: (skill?.config?.searchMode as SearchMode | undefined) ?? DEFAULT_HEADLESS_SEARCH_MODE,
                 shouldAutoContinue,
+                // What is left of the run's budget, and where a fresh-context run's own turns start: an answer neither buys
+                // a new budget nor shows the model the turns the run never read.
+                stepsLeft,
+                ...(options.freshContext && result.order !== undefined && { contextFromOrder: result.order }),
                 ...(options.approvedTools && { headlessApproved: [...options.approvedTools] }),
                 startedBy: userId,
                 subAgentRunId: options.pauseForApproval.subAgentRunId,

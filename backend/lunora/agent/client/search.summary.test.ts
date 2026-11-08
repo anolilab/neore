@@ -32,6 +32,7 @@ const contextFor = async (
         boundary?: { messageId: string; order: number; stepOrder: number };
         branched?: boolean;
         contextHandler?: never;
+        fromOrder?: number;
         promptMessageId?: string | null;
         recentMessages?: number;
         statelessMode?: boolean;
@@ -121,6 +122,16 @@ describe("fetchContextWithPrompt with a thread summary", () => {
 
         expect(texts(messages as never)).toStrictEqual(["first recent", "second recent", "the prompt"]);
         expect(threadNotes).toBeUndefined();
+    });
+
+    it("adds none for a run read from its own first turn, which never read the turns a summary covers", async () => {
+        expect.assertions(3);
+
+        const { messages, runQuery, threadNotes } = await contextFor("A summary of the earlier turns", { fromOrder: 3 });
+
+        expect(texts(messages as never)).toStrictEqual(["the prompt"]);
+        expect(threadNotes).toBeUndefined();
+        expect(runQuery).not.toHaveBeenCalledWith(internal.agent.thread_summaries.getThreadSummaryForContext, expect.anything());
     });
 
     it("does not look for one when the recent window is smaller than the one the summary was made for", async () => {

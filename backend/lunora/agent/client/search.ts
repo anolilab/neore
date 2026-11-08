@@ -635,7 +635,12 @@ export const fetchContextWithPrompt = async (
     // A compaction REPLACES the turns up to its boundary: the notes stand in for them, so neither the window nor the
     // search hits show them again. The thread's stored rows are untouched; this is only what the model is sent.
     // A context reset (`/clear`) cuts the same way: the rows before it are not sent, whatever the window holds.
-    const afterReset = rowsAfterContextReset(windowMessages, contextReset);
+    const fromOrder = args.contextOptions?.fromOrder;
+    const inRun = (m: MessageDocument): boolean => fromOrder === undefined || m.threadId !== threadId || m.order >= fromOrder;
+    const afterReset = rowsAfterContextReset(
+        windowMessages.filter((m) => inRun(m)),
+        contextReset,
+    );
     const boundary = olderSummary?.boundary;
     // The window and the thread's own hits are on the prompt's path whenever that path is known (`fetchRecentAndSearchMessages`
     // keeps only those): an unbranched thread always has its path, and a branched one has it when the prompt is named. Then
@@ -647,8 +652,8 @@ export const fetchContextWithPrompt = async (
     // a named prompt): a sibling branch (a regenerate of an earlier turn, made after the reset) holds orders below it that
     // it never crossed. A hit in another thread is not the reset's to cut.
     const hitsOnResetPath = contextReset !== null && (!contextReset.branched || args.promptMessageId !== undefined);
-    const hitsAfterReset =
-        contextReset && hitsOnResetPath ? foundMessages.filter((m) => m.threadId !== threadId || m.order > contextReset.order) : foundMessages;
+    const hitsInRun = foundMessages.filter((m) => inRun(m));
+    const hitsAfterReset = contextReset && hitsOnResetPath ? hitsInRun.filter((m) => m.threadId !== threadId || m.order > contextReset.order) : hitsInRun;
     const searchMessages =
         boundary && pathKnown
             ? hitsAfterReset.filter(
@@ -695,7 +700,12 @@ export const fetchContextWithPrompt = async (
     // The notes carry a compaction's summary, not a switch's handoff text, so the lookups run after a compaction too.
     const earlierHandoffs =
         threadId && oldest && oldest.order > 0 && needsEarlierHandoff(prePromptDocs)
-            ? await context.runQuery(internal.agent.agent_switch.getHandoffAbove, { belowMessageId: oldest._id, threadId: threadId as Id<"threads"> })
+            ? await context.runQuery(internal.agent.agent_switch.getHandoffAbove, {
+                  belowMessageId: oldest._id,
+                  // A run read from its own first turn gets no handoff of the turns before it.
+                  ...(fromOrder !== undefined && { fromOrder }),
+                  threadId: threadId as Id<"threads">,
+              })
             : [];
     const deltaBases = new Map(
         await Promise.all(
@@ -705,6 +715,7 @@ export const fetchContextWithPrompt = async (
                         model,
                         await context.runQuery(internal.agent.agent_switch.getHandoffBeforeDelta, {
                             dividerMessageId: id as Id<"messages">,
+                            ...(fromOrder !== undefined && { fromOrder }),
                             threadId: threadId as Id<"threads">,
                         }),
                     ] as const,
@@ -804,7 +815,13 @@ const readOlderSummary = async (
     args: { contextOptions?: ContextOptions; promptMessageId: string | undefined; statelessMode?: boolean; threadId: string | undefined },
 ): Promise<{ boundary?: CompactionBoundary; branched: boolean; summary: string } | null> => {
     // A smaller window would leave rows uncovered between the summary and itself.
-    if (!args.threadId || args.statelessMode || (args.contextOptions?.recentMessages ?? DEFAULT_RECENT_MESSAGES) < SUMMARY_RECENT_ROWS) {
+    // A run read from its own first turn (`fromOrder`) never read the turns a summary covers.
+    if (
+        !args.threadId ||
+        args.statelessMode ||
+        args.contextOptions?.fromOrder !== undefined ||
+        (args.contextOptions?.recentMessages ?? DEFAULT_RECENT_MESSAGES) < SUMMARY_RECENT_ROWS
+    ) {
         return null;
     }
 

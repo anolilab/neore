@@ -190,6 +190,12 @@ export type ContextOptions = {
     excludeToolMessages?: boolean;
 
     /**
+     * The lowest `order` of this thread's rows the model reads: a fresh-context run that paused resumes from its own
+     * prompt, never the turns above it (`ToolRunConfig.contextFromOrder`). Rows of other threads are not cut.
+     */
+    fromOrder?: number;
+
+    /**
      * How many recent messages to include. These are added after the search
      * messages, and do not count against the search limit.
      * Default: 100

@@ -16,6 +16,11 @@ import { vGroupRunSnapshot } from "../group/validators";
 export const vToolRunConfig = v.object({
     autoMediaEnrichment: v.boolean(),
     /**
+     * A fresh-context headless run's own prompt order (`headless-run.ts`): its continuation reads the thread from there,
+     * never the turns before it. Absent = the usual window.
+     */
+    contextFromOrder: v.optional(v.number()),
+    /**
      * What started the run that paused, when it was not the user's own chat (an outside agent, or a trigger's or a messenger
      * reply's sub-agent, `headless-run.ts`): the continuation dispatches to workers as that origin did, not as the lead.
      * Absent means the lead.
@@ -67,6 +72,11 @@ export const vToolRunConfig = v.object({
      * the owner's secret. Absent on a snapshot written before it existed, which reads as nobody.
      */
     startedBy: v.optional(v.string().max(MAX_LENGTH.id)),
+    /**
+     * A headless run's steps left of its budget when it paused (`headless-run.ts`): the continuation runs at most these, and
+     * none at all when it is spent, so an answer never buys a fresh budget. Absent (interactive, or older) = a full budget.
+     */
+    stepsLeft: v.optional(v.number()),
     /**
      * Set when a sub-agent's child run paused (`sub-agents/execute.ts`): the continuation hands the run back to it
      * (`sub_agents.functions.resumeRunForAnswer`, then the run's end), so the result still reaches the parent once.

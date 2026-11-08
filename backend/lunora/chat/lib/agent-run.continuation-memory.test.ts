@@ -35,7 +35,7 @@ const pausedAgain = {
 };
 
 /** Runs a steerable continuation that takes one steer (unless `steered` is off), and returns the scheduled jobs and recorded snapshots. */
-const resume = async (config: ToolRunConfig, savedMessages: unknown[], memoryEnabled = true, steered = true) => {
+const resume = async (config: ToolRunConfig, savedMessages: unknown[], memoryEnabled = true, steered = true, steps: unknown[] = []) => {
     const runAfter = vi.fn(async () => "job");
     const runMutation = vi.fn(async (ref: unknown) =>
         ref === internal.chat.steering.deliverSteers && steered ? { messageId: "steer-1", text: "actually, vegetarian" } : null,
@@ -56,7 +56,14 @@ const resume = async (config: ToolRunConfig, savedMessages: unknown[], memoryEna
             async (_ctx: unknown, _ids: unknown, _approval: unknown, _args: unknown, runOptions: { takeSteer: (a: unknown) => Promise<unknown> }) => {
                 await runOptions.takeSteer({ pendingMessageId: "p1" });
 
-                return { consumeStream: async () => {}, fullStream: (async function* none() {})(), order: 2, promptMessageId: "tool-result-1", savedMessages };
+                return {
+                    consumeStream: async () => {},
+                    fullStream: (async function* none() {})(),
+                    order: 2,
+                    promptMessageId: "tool-result-1",
+                    savedMessages,
+                    steps: Promise.resolve(steps),
+                };
             },
         ),
         options: {},
@@ -65,15 +72,17 @@ const resume = async (config: ToolRunConfig, savedMessages: unknown[], memoryEna
     vi.mocked(getAgent).mockResolvedValue(agent as never);
     vi.mocked(buildAgentTools).mockClear();
 
+    const ctx: Record<string, unknown> = { runMutation, runQuery, scheduler: { runAfter } };
+
     await resumeApprovedRun(
-        { runMutation, runQuery, scheduler: { runAfter } } as never,
+        ctx as never,
         { approvalId: "approval-1", approved: true, config, streamId: "stream-1", threadId: "thread-1", userId: "owner-1" },
         { steerable: true },
     );
 
     const jobs = (ref: unknown) => runAfter.mock.calls.filter((call) => (call as unknown[])[1] === ref).map((call) => (call as unknown[])[2]);
 
-    return { jobs, runMutation };
+    return { ctx, jobs, runMutation };
 };
 
 /** What `runStreamingAgent` records when a run ends at a pause: `afterRun` over the prompt and the steers so far. */
@@ -157,11 +166,38 @@ describe("a tool-approval continuation", () => {
         expect((recorded as unknown[] | undefined)?.[1]).toMatchObject({ config: { memory: CARRIED } });
     });
 
+    it("runs a sub-agent child headless and hands its next approval what is left of its budget; an interactive one neither", async () => {
+        const recordedConfig = (runMutation: ReturnType<typeof vi.fn>) =>
+            (runMutation.mock.calls.find((call) => (call as unknown[])[0] === internal.chat.tool_permissions.recordPendingToolApprovals) as unknown[])[1];
+        const child = await resume({ ...BASE_CONFIG, stepsLeft: 3, subAgentRunId: "run-1" } as ToolRunConfig, [pausedAgain], true, true, [{}]);
+
+        expect(child.ctx.headless).toBe(true);
+        expect(recordedConfig(child.runMutation)).toMatchObject({ config: { stepsLeft: 2 } });
+
+        const chat = await resume(BASE_CONFIG, [pausedAgain], true, true, [{}]);
+
+        expect(chat.ctx.headless).toBeUndefined();
+        expect((recordedConfig(chat.runMutation) as { config: object }).config).not.toHaveProperty("stepsLeft");
+    });
+
+    it("records no pause for a request a sub-agent child's continuation saved on its last step, which no step is left to answer", async () => {
+        const recorded = (runMutation: ReturnType<typeof vi.fn>) =>
+            runMutation.mock.calls.some((call) => (call as unknown[])[0] === internal.chat.tool_permissions.recordPendingToolApprovals);
+        const lastStep = await resume({ ...BASE_CONFIG, stepsLeft: 1, subAgentRunId: "run-1" } as ToolRunConfig, [pausedAgain], true, true, [{}]);
+
+        expect(recorded(lastStep.runMutation)).toBe(false);
+
+        // With a step to spare it pauses as before.
+        const spare = await resume({ ...BASE_CONFIG, stepsLeft: 2, subAgentRunId: "run-1" } as ToolRunConfig, [pausedAgain], true, true, [{}]);
+
+        expect(recorded(spare.runMutation)).toBe(true);
+    });
+
     it("hands the next approval the permission keys and fingerprints of the tools IT offered, not the first run's", async () => {
         const rebuilt = { mcpToolFingerprints: { mcp_docs__search: "new" }, permissionKeys: { mcp_docs__search: "mcp:docs (work):search" } };
 
         vi.mocked(buildAgentTools).mockImplementationOnce(async () => {
-            return { autoApprovals: {}, mcpClients: [], mcpLabels: {}, mcpServerNames: [], repeatable: [], tools: {}, ...rebuilt };
+            return { autoApprovals: {}, mcpClients: [], mcpLabels: {}, mcpServerNames: [], repeatable: [], requiresApproval: [], tools: {}, ...rebuilt };
         });
 
         const { runMutation } = await resume(

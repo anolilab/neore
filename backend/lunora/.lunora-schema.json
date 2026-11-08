@@ -1,7 +1,8 @@
 {
   "jurisdiction": "eu",
   "migrationIds": [
-    "add-headless-approved"
+    "add-headless-approved",
+    "add-headless-resume-bounds"
   ],
   "tables": {
     "account": {
@@ -27307,6 +27308,12 @@
               "optional": false,
               "unique": false
             },
+            "contextFromOrder": {
+              "kind": "number",
+              "nullable": false,
+              "optional": true,
+              "unique": false
+            },
             "dispatchOrigin": {
               "kind": "union",
               "nullable": false,
@@ -27662,6 +27669,12 @@
               "optional": true,
               "unique": false,
               "refined": true
+            },
+            "stepsLeft": {
+              "kind": "number",
+              "nullable": false,
+              "optional": true,
+              "unique": false
             },
             "subAgentRunId": {
               "kind": "id",

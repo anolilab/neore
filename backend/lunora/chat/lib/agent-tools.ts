@@ -116,6 +116,8 @@ export interface BuildAgentToolsResult {
     permissionKeys: Record<string, string>;
     /** The runtime names of the tools a resume may call again after a worker died inside one (`repeatable-tools.ts`). */
     repeatable: string[];
+    /** The runtime names of the tools whose permission is `ask`: each call needs an approval (`applyToolPermissions`). */
+    requiresApproval: string[];
     tools: ToolSet;
 }
 
@@ -329,6 +331,7 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
         mcpToolFingerprints,
         permissionKeys,
         repeatable: Object.keys(tools).filter((name) => isSafeToRepeat(name, describe(name))),
+        requiresApproval,
         tools,
     };
 };

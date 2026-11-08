@@ -201,6 +201,92 @@ describe("fetchContextWithPrompt after a switch back whose earlier divider has l
     });
 });
 
+describe("fetchContextWithPrompt from a run's own first turn (fromOrder)", () => {
+    it("sends a fresh-context run's continuation no turn from before the run's prompt", async () => {
+        const row = (id: string, order: number, stepOrder: number, role: "assistant" | "user", content: string) => {
+            return { _id: id, message: { content, role }, order, status: "success", stepOrder, threadId: "thread-1" };
+        };
+        const rows = [
+            row("u0", 0, 0, "user", "earlier turn"),
+            row("a0", 0, 1, "assistant", "earlier answer"),
+            row("u1", 1, 0, "user", "the run's task"),
+            row("u2", 2, 0, "user", "go on"),
+        ];
+        const runQuery = vi.fn(async (ref: unknown) => {
+            if (ref === internal.agent.branches.getContextPathIds || ref === internal.agent.thread_summaries.getThreadSummaryForContext) {
+                return null;
+            }
+
+            if (ref === internal.agent.context_reset_read.getContextReset) {
+                return null;
+            }
+
+            if (ref === internal.agent.files.getStorageKeys || ref === internal.agent.files.getOwnedStorageKeys) {
+                return {};
+            }
+
+            if (ref === internal.agent.agent_switch.getHandoffAbove) {
+                return [];
+            }
+
+            return { page: rows.toReversed() };
+        });
+        const { messages } = await fetchContextWithPrompt(
+            { runQuery } as never,
+            {} as never,
+            {
+                contextOptions: { fromOrder: 1 },
+                messages: undefined,
+                prompt: undefined,
+                promptMessageId: "u2",
+                threadId: "thread-1",
+                userId: "user-1",
+            } as never,
+        );
+
+        expect(messages.map((m) => (m as { content: unknown }).content)).toStrictEqual(["the run's task", "go on"]);
+        // A switch's handoff from before the run's prompt is not looked up either.
+        expect(runQuery).toHaveBeenCalledWith(internal.agent.agent_switch.getHandoffAbove, expect.objectContaining({ fromOrder: 1 }));
+    });
+
+    it("drops this thread's search hits from before the run's prompt, and keeps another thread's", async () => {
+        const hit = (id: string, threadId: string, content: string) => {
+            return { _id: id, message: { content, role: "assistant" }, order: 0, status: "success", stepOrder: 1, threadId };
+        };
+        const runQuery = vi.fn(async (ref: unknown) => {
+            if (ref === internal.agent.files.getStorageKeys || ref === internal.agent.files.getOwnedStorageKeys) {
+                return {};
+            }
+
+            if (ref === internal.agent.thread_summaries.getThreadSummaryForContext || ref === internal.agent.context_reset_read.getContextReset) {
+                return null;
+            }
+
+            if (ref === internal.agent.agent_switch.getHandoffAbove) {
+                return [];
+            }
+
+            // No window rows: only the search hits reach the model.
+            return { page: [] };
+        });
+        const runAction = vi.fn(async () => [hit("own", "thread-1", "an earlier turn of this thread"), hit("other", "thread-2", "another chat")]);
+        const { messages } = await fetchContextWithPrompt(
+            { runAction, runQuery } as never,
+            {} as never,
+            {
+                contextOptions: { fromOrder: 1, searchOptions: { limit: 5, textSearch: true } },
+                messages: undefined,
+                prompt: "find it",
+                promptMessageId: undefined,
+                threadId: "thread-1",
+                userId: "user-1",
+            } as never,
+        );
+
+        expect((messages as { content: unknown }[]).map((m) => m.content)).toStrictEqual(["another chat", "find it"]);
+    });
+});
+
 describe("fetchContextWithPrompt after a context reset (/clear)", () => {
     const row = (id: string, order: number, stepOrder: number, role: "assistant" | "user", content: string) => {
         return { _id: id, message: { content, role }, order, status: "success", stepOrder, threadId: "thread-1" };
