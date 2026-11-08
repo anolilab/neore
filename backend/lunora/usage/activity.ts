@@ -24,7 +24,7 @@ import { v } from "lunorash/server";
 import type { Id } from "../_generated/dataModel";
 import { internal } from "../_generated/internal";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
-import { internalMutation, internalQuery } from "../_generated/server";
+import { internalMutation } from "../_generated/server";
 import { isAccountDeletionUnderway } from "../gdpr/deletion-guard";
 import { authQuery } from "../lib/crpc";
 import { logger } from "../lib/logger";
@@ -100,8 +100,8 @@ const threadProject = async (ctx: ReadCtx, threadId: string): Promise<Attributio
 
 /**
  * `attribution` as `userId` may file it: without a project they cannot open (a confirmed lack of access — a teammate's
- * personal project, or an organization they have left). A read that fails throws: the record is retried (`RECORD_RETRY`)
- * or the side question refused before it is charged, never filed as if the user had no access.
+ * personal project, or an organization they have left). A read that fails throws: the caller counts the total without the
+ * project and retries the project (`RECORD_RETRY`), never filing it as if the user had no access.
  */
 const readableAttribution = async (ctx: MutationCtx | QueryCtx, attribution: Attribution, userId: string): Promise<Attribution> => {
     if (attribution.projectKey === undefined) {
@@ -116,15 +116,6 @@ const attributionFor = async (ctx: MutationCtx | QueryCtx, threadId: string | un
     threadId === undefined || threadId.length === 0 ? {} : await readableAttribution(ctx, await threadProject(ctx, threadId), userId);
 
 const vAttribution = v.object({ projectKey: v.optional(v.string()) });
-
-/**
- * The project a reply in `threadId` is filed under, read where the caller can read the thread: an
- * action off the thread's shard (a side question) reads it here and hands it on with the record.
- */
-export const getThreadAttribution = internalQuery
-    .input({ threadId: v.string(), userId: v.string() })
-    .output(vAttribution)
-    .query(async ({ args: { threadId, userId }, ctx }) => await attributionFor(ctx, threadId, userId));
 
 /** Adds `increments` to the user's per-day project rows. */
 const addToAttributionRollup = async (ctx: DbCtx, userId: string, increments: ReadonlyArray<AttributionIncrement>, at: number): Promise<void> => {

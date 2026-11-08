@@ -147,8 +147,6 @@ export interface ReplyUsageArgs {
     replyKey: string;
     skillKey: string;
     skillName?: string;
-    /** The thread's project, read by a caller that can read the thread; the record then reads no thread. */
-    threadAttribution?: Attribution;
     /** The thread the reply is in; its project, read when the record lands, gets the reply's usage too. */
     threadId?: string;
     tokens: number;

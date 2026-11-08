@@ -30,19 +30,13 @@ describe("scheduleReplyUsage", () => {
         runAfterOnShard.mockClear();
     });
 
-    it("sends a record whose caller read the thread to the user's shard, even from an action with no shard of its own", () => {
-        const threadAttribution = { projectKey: "p1" };
+    it("sends a record with no thread to the user's shard, even from an action with no shard of its own", () => {
+        const noThread = { ...ARGS, threadId: undefined };
 
-        scheduleReplyUsage({ runAfter } as never, { ...ARGS, threadAttribution });
+        scheduleReplyUsage({ runAfter } as never, noThread);
 
         expect(runAfter).not.toHaveBeenCalled();
-        expect(runAfterOnShard).toHaveBeenCalledExactlyOnceWith(
-            expect.anything(),
-            0,
-            internal.usage.activity.recordReplyUsage,
-            { ...ARGS, threadAttribution },
-            "u1",
-        );
+        expect(runAfterOnShard).toHaveBeenCalledExactlyOnceWith(expect.anything(), 0, internal.usage.activity.recordReplyUsage, noThread, "u1");
     });
 
     it("forwards a record with only a thread id through this shard, which holds the thread", () => {
