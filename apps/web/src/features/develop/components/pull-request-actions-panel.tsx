@@ -4,7 +4,7 @@ import { useLingui } from "@lingui/react/macro";
 import type { HostCapabilityReportInput } from "@neore/backend/source-control/capabilities";
 import { isHostCapabilityAvailable } from "@neore/backend/source-control/capabilities";
 import { Alert, AlertDescription, AlertTitle } from "@neore/ui/components/alert";
-import { useId, useState } from "react";
+import { useId, useRef, useState } from "react";
 
 import type { Feedback } from "../lib/pull-request-action-feedback";
 import type { PullRequestAddress } from "../lib/use-develop";
@@ -36,16 +36,18 @@ const PullRequestActionsPanel = ({
     const titleId = useId();
     const actions = usePullRequestActions(pull.address);
     const [feedback, setFeedback] = useState<Feedback | null>(null);
+    const statusRef = useRef<HTMLDivElement>(null);
 
     const canEdit = isHostCapabilityAvailable(host.capabilities, "pullRequest.edit");
     const canReview = isHostCapabilityAvailable(host.capabilities, "reviewers.request") && pull.state === "open";
     const canRevert = isHostCapabilityAvailable(host.capabilities, "pullRequest.revert") && pull.state === "merged";
 
-    if (!canEdit && !canReview && !canRevert) {
+    const busy = actions.edit.isPending || actions.requestReviewers.isPending || actions.revert.isPending;
+
+    // A refetch may change the state or the capabilities under a write: the panel stays while one runs or its answer shows.
+    if (!canEdit && !canReview && !canRevert && !busy && feedback === null) {
         return null;
     }
-
-    const busy = actions.edit.isPending || actions.requestReviewers.isPending || actions.revert.isPending;
 
     return (
         <section aria-labelledby={titleId} className="space-y-3 rounded-md border p-3">
@@ -75,9 +77,18 @@ const PullRequestActionsPanel = ({
                         requestNoun={host.noun}
                     />
                 )}
-                {canRevert && <RevertPullRequestAction actions={actions} busy={busy} hostLabel={host.label} onFeedback={setFeedback} requestNoun={host.noun} />}
+                {canRevert && (
+                    <RevertPullRequestAction
+                        actions={actions}
+                        busy={busy}
+                        hostLabel={host.label}
+                        onFeedback={setFeedback}
+                        onSubmitted={() => statusRef.current?.focus()}
+                        requestNoun={host.noun}
+                    />
+                )}
             </div>
-            <div aria-live="polite" role="status">
+            <div aria-live="polite" className="outline-none" ref={statusRef} role="status" tabIndex={-1}>
                 {busy && <p className="text-muted-foreground text-sm">{t`Working on ${host.label}…`}</p>}
                 {!busy && feedback?.kind === "success" && (
                     <p className="text-sm">

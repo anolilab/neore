@@ -1,5 +1,6 @@
 "use client";
 
+import { plural } from "@lingui/core/macro";
 import { useLingui } from "@lingui/react/macro";
 import { Alert, AlertDescription, AlertTitle } from "@neore/ui/components/alert";
 import { Button } from "@neore/ui/components/button";
@@ -12,19 +13,36 @@ import type { Feedback } from "../lib/pull-request-action-feedback";
 import { attempt, useActionFeedback, useSingleFlight } from "../lib/pull-request-action-feedback";
 import type { PullRequestActions } from "../lib/use-pull-request-actions";
 
-/** The login format the backend checks:a letter or digit first, then letters, digits and single hyphens or underscores. */
+/**
+ * The login format the backend checks: a letter or digit first, then letters, digits and single hyphens or underscores.
+ * The host data carries no login rule, so this is a copy; the server stays the authority and its reason is shown when it refuses.
+ */
 const LOGIN = /^[A-Za-z0-9](?:[A-Za-z0-9]|[-_](?=[A-Za-z0-9])){0,38}$/u;
 /** The most characters a login holds, the bound LOGIN allows. */
 const MAX_LOGIN = 39;
 const SEPARATORS = /[\s,]+/u;
 const LEADING_AT = /^@/u;
 
-/** Splits what the person typed into logins: commas or spaces, an optional leading @. */
-const parseLogins = (input: string): string[] =>
-    input
+/** Splits what the person typed into logins: commas or spaces, an optional leading @. A login named twice counts once. */
+const parseLogins = (input: string): string[] => {
+    const logins = input
         .split(SEPARATORS)
         .map((login) => login.replace(LEADING_AT, ""))
         .filter((login) => login !== "");
+
+    return [...new Map(logins.map((login) => [login.toLowerCase(), login])).values()];
+};
+
+/** The reason the server gave when it refused the request itself (a login it does not accept), if it named one. */
+const serverReason = (thrown: unknown): string | undefined => {
+    const { code, data, message } = (typeof thrown === "object" && thrown !== null ? thrown : {}) as {
+        code?: unknown;
+        data?: { code?: unknown };
+        message?: unknown;
+    };
+
+    return (code === "BAD_REQUEST" || data?.code === "BAD_REQUEST") && typeof message === "string" && message !== "" ? message : undefined;
+};
 
 /**
  * Requesting reviewers by login: its button, and the dialog that holds the typed logins until the host answers. A refusal keeps
@@ -53,20 +71,22 @@ const ReviewersPullRequestAction = ({
     const [typed, setTyped] = useState<string | null>(null);
     // A refused request keeps the dialog open with its reason, so the typed logins are still there to correct.
     const [refusal, setRefusal] = useState<string | null>(null);
+    const [touched, setTouched] = useState(false);
 
     const logins = parseLogins(typed ?? "");
     const badLogin = logins.find((login) => !LOGIN.test(login));
     const tooMany = logins.length > maxReviewers;
+    // The count is said as it changes; a login's format is said once the person leaves the field, so typing is not interrupted.
     let problem: string | null = null;
 
     if (tooMany) {
-        problem = t`Request at most ${i18n.number(maxReviewers)} reviewers at a time.`;
-    } else if (badLogin !== undefined) {
+        problem = plural(maxReviewers, { one: "Request at most # reviewer at a time.", other: "Request at most # reviewers at a time." });
+    } else if (badLogin !== undefined && touched) {
         problem = t`"${badLogin}" is not a valid login. A login starts with a letter or digit, has at most ${i18n.number(MAX_LOGIN)} characters, and uses only letters, digits, and single hyphens or underscores.`;
     }
 
     const submit = async () => {
-        if (problem !== null || logins.length === 0) {
+        if (logins.length === 0 || tooMany || badLogin !== undefined) {
             return;
         }
 
@@ -74,7 +94,11 @@ const ReviewersPullRequestAction = ({
         setRefusal(null);
 
         const result = await attempt(actions.requestReviewers.mutateAsync(logins));
-        const next = settled(result, { kind: "success", text: t`Review requested on ${hostLabel}.` });
+        const reason = "thrown" in result ? serverReason(result.thrown) : undefined;
+        const next: Feedback =
+            reason === undefined
+                ? settled(result, { kind: "success", text: t`Review requested on ${hostLabel}.` })
+                : { kind: "error", text: reason, unconfirmed: false };
 
         // A refusal changed nothing: the dialog stays open with its reason and the typed logins. Anything else closes it.
         if (next.kind === "error" && !next.unconfirmed) {
@@ -99,6 +123,7 @@ const ReviewersPullRequestAction = ({
                 onClick={() => {
                     setTyped("");
                     setRefusal(null);
+                    setTouched(false);
                 }}
                 variant="outline"
             >
@@ -116,6 +141,7 @@ const ReviewersPullRequestAction = ({
                             aria-describedby={problem === null ? undefined : `${titleId}-logins-note`}
                             aria-invalid={problem !== null || undefined}
                             id={`${titleId}-logins`}
+                            onBlur={() => setTouched(true)}
                             onChange={(event) => setTyped(event.target.value)}
                             readOnly={actions.requestReviewers.isPending}
                             required
@@ -135,7 +161,7 @@ const ReviewersPullRequestAction = ({
                     )}
                     <DialogFooter>
                         <DialogClose render={<Button variant="outline" />}>{t`Cancel`}</DialogClose>
-                        <Button disabled={logins.length === 0 || problem !== null || actions.requestReviewers.isPending} onClick={send}>
+                        <Button disabled={logins.length === 0 || tooMany || badLogin !== undefined || actions.requestReviewers.isPending} onClick={send}>
                             {actions.requestReviewers.isPending ? t`Requesting…` : t`Request`}
                         </Button>
                     </DialogFooter>

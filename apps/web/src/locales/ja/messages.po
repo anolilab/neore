@@ -53,7 +53,7 @@ msgid "\"{0}\" will start once its dependencies are done"
 msgstr "「{0}」は依存タスクの完了後に開始されます"
 
 #. placeholder {0}: i18n.number(MAX_LOGIN)
-#: src/features/develop/components/pull-request-reviewers-action.tsx:65
+#: src/features/develop/components/pull-request-reviewers-action.tsx:85
 msgid "\"{badLogin}\" is not a valid login. A login starts with a letter or digit, has at most {0} characters, and uses only letters, digits, and single hyphens or underscores."
 msgstr ""
 
@@ -969,7 +969,7 @@ msgstr ""
 msgid "{hostLabel} lists only part of this change; {0} files are not in the guide."
 msgstr ""
 
-#: src/features/develop/components/pull-request-revert-action.tsx:53
+#: src/features/develop/components/pull-request-revert-action.tsx:58
 msgid "{hostLabel} opens a new {requestNoun} that undoes the merged change. It is a separate change for you to review and merge."
 msgstr ""
 
@@ -1090,6 +1090,10 @@ msgstr ""
 
 #: src/components/model-picker/model-picker.tsx:977
 msgid "{label} removed from starred"
+msgstr ""
+
+#: src/features/develop/components/pull-request-reviewers-action.tsx:83
+msgid "{maxReviewers, plural, one {Request at most # reviewer at a time.} other {Request at most # reviewers at a time.}}"
 msgstr ""
 
 #: src/features/chat/goal/composer-goal.tsx:95
@@ -5329,7 +5333,7 @@ msgstr "カナダ"
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:227
 #: src/features/develop/components/comment-composer.tsx:62
 #: src/features/develop/components/pull-request-edit-action.tsx:172
-#: src/features/develop/components/pull-request-reviewers-action.tsx:137
+#: src/features/develop/components/pull-request-reviewers-action.tsx:163
 #: src/features/evals/components/case-form-dialog.tsx:68
 #: src/features/evals/components/dataset-form-dialog.tsx:168
 #: src/features/evals/components/import-cases-dialog.tsx:113
@@ -11590,7 +11594,7 @@ msgstr "API キーを入力してください"
 msgid "Enter the endpoint URL first"
 msgstr "先にエンドポイント URL を入力してください"
 
-#: src/features/develop/components/pull-request-reviewers-action.tsx:111
+#: src/features/develop/components/pull-request-reviewers-action.tsx:136
 msgid "Enter the logins of the people {hostLabel} should ask to review this {requestNoun}. Reviewers already requested stay requested."
 msgstr ""
 
@@ -18515,7 +18519,7 @@ msgstr "サインイン"
 msgid "login refused"
 msgstr ""
 
-#: src/features/develop/components/pull-request-reviewers-action.tsx:114
+#: src/features/develop/components/pull-request-reviewers-action.tsx:139
 msgid "Logins"
 msgstr ""
 
@@ -21655,9 +21659,9 @@ msgstr "承認されませんでした"
 msgid "Not attached:"
 msgstr "添付されなかったファイル："
 
-#: src/features/develop/components/pull-request-actions-panel.tsx:104
+#: src/features/develop/components/pull-request-actions-panel.tsx:115
 #: src/features/develop/components/pull-request-edit-action.tsx:167
-#: src/features/develop/components/pull-request-reviewers-action.tsx:132
+#: src/features/develop/components/pull-request-reviewers-action.tsx:158
 msgid "Not changed"
 msgstr ""
 
@@ -21675,7 +21679,7 @@ msgstr "未設定"
 msgid "Not configured by the operator"
 msgstr "運営者によって設定されていません"
 
-#: src/features/develop/components/pull-request-actions-panel.tsx:104
+#: src/features/develop/components/pull-request-actions-panel.tsx:115
 #: src/features/develop/components/review-panel.tsx:307
 msgid "Not confirmed"
 msgstr ""
@@ -22269,7 +22273,7 @@ msgstr "不透明度"
 #: ../../packages/chat-ui/src/chat/message-content.tsx:708
 #: src/components/command-palette.tsx:700
 #: src/features/chat/link-preview/link-preview-card.tsx:117
-#: src/features/develop/components/pull-request-actions-panel.tsx:95
+#: src/features/develop/components/pull-request-actions-panel.tsx:106
 #: src/features/develop/components/pull-request-view.tsx:75
 #: src/features/tasks/hooks/use-task-notifications.ts:30
 msgid "Open"
@@ -22297,7 +22301,7 @@ msgstr "{modelName} をスレッド全体で開く"
 msgid "Open a pull request with the change (GitHub, needs the GitHub connector)"
 msgstr "変更を含むプルリクエストを作成（GitHub、GitHub コネクタが必要）"
 
-#: src/features/develop/components/pull-request-revert-action.tsx:58
+#: src/features/develop/components/pull-request-revert-action.tsx:63
 msgid "Open a revert of this {requestNoun}?"
 msgstr ""
 
@@ -22425,7 +22429,7 @@ msgstr "新しいタブでプレビューを開く"
 msgid "Open Prompts"
 msgstr "プロンプトを開く"
 
-#: src/features/develop/components/pull-request-revert-action.tsx:52
+#: src/features/develop/components/pull-request-revert-action.tsx:57
 msgid "Open revert"
 msgstr ""
 
@@ -22521,7 +22525,7 @@ msgstr ""
 
 #. placeholder {0}: host.noun
 #. placeholder {1}: host.label
-#: src/features/develop/components/pull-request-actions-panel.tsx:89
+#: src/features/develop/components/pull-request-actions-panel.tsx:100
 msgid "Open the revert {0} on {1}"
 msgstr ""
 
@@ -22810,7 +22814,7 @@ msgstr ""
 msgid "Opened {tabLabel}: {label}"
 msgstr ""
 
-#: src/features/develop/components/pull-request-revert-action.tsx:40
+#: src/features/develop/components/pull-request-revert-action.tsx:45
 msgid "Opened a revert {requestNoun} on {hostLabel}."
 msgstr ""
 
@@ -26418,13 +26422,8 @@ msgstr "リポジトリ"
 msgid "Repository to watch"
 msgstr ""
 
-#: src/features/develop/components/pull-request-reviewers-action.tsx:139
+#: src/features/develop/components/pull-request-reviewers-action.tsx:165
 msgid "Request"
-msgstr ""
-
-#. placeholder {0}: i18n.number(maxReviewers)
-#: src/features/develop/components/pull-request-reviewers-action.tsx:63
-msgid "Request at most {0} reviewers at a time."
 msgstr ""
 
 #: src/features/develop/components/review-panel.tsx:64
@@ -26439,8 +26438,8 @@ msgstr "リクエスト数"
 msgid "Request Data Export"
 msgstr "データのエクスポートをリクエスト"
 
-#: src/features/develop/components/pull-request-reviewers-action.tsx:105
-#: src/features/develop/components/pull-request-reviewers-action.tsx:110
+#: src/features/develop/components/pull-request-reviewers-action.tsx:130
+#: src/features/develop/components/pull-request-reviewers-action.tsx:135
 msgid "Request reviewers"
 msgstr ""
 
@@ -26465,7 +26464,7 @@ msgstr "要求された権限"
 msgid "Requesting..."
 msgstr "リクエストしています..."
 
-#: src/features/develop/components/pull-request-reviewers-action.tsx:139
+#: src/features/develop/components/pull-request-reviewers-action.tsx:165
 msgid "Requesting…"
 msgstr ""
 
@@ -26809,11 +26808,11 @@ msgstr "ホームに戻る"
 msgid "Return to home"
 msgstr "ホームに戻る"
 
-#: src/features/develop/components/pull-request-revert-action.tsx:49
+#: src/features/develop/components/pull-request-revert-action.tsx:54
 msgid "Revert"
 msgstr ""
 
-#: src/features/develop/components/pull-request-revert-action.tsx:49
+#: src/features/develop/components/pull-request-revert-action.tsx:54
 msgid "Reverting…"
 msgstr ""
 
@@ -26833,7 +26832,7 @@ msgstr "チャットとボールト全体で、フラグが付いたコンテン
 msgid "Review our privacy policy and data processing practices"
 msgstr "プライバシーポリシーとデータ処理の方針を確認します"
 
-#: src/features/develop/components/pull-request-reviewers-action.tsx:77
+#: src/features/develop/components/pull-request-reviewers-action.tsx:100
 msgid "Review requested on {hostLabel}."
 msgstr ""
 
@@ -36123,7 +36122,7 @@ msgid "Working"
 msgstr "作業中"
 
 #. placeholder {0}: host.label
-#: src/features/develop/components/pull-request-actions-panel.tsx:81
+#: src/features/develop/components/pull-request-actions-panel.tsx:92
 msgid "Working on {0}…"
 msgstr ""
 

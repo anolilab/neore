@@ -16,12 +16,15 @@ const RevertPullRequestAction = ({
     busy,
     hostLabel,
     onFeedback,
+    onSubmitted,
     requestNoun,
 }: {
     actions: PullRequestActions;
     busy: boolean;
     hostLabel: string;
     onFeedback: (feedback: Feedback | null) => void;
+    /** Called once the confirmation has closed and the request runs: the panel moves focus to its status. */
+    onSubmitted: () => void;
     requestNoun: string;
 }) => {
     const { t } = useLingui();
@@ -32,6 +35,8 @@ const RevertPullRequestAction = ({
     const submit = async () => {
         setConfirming(false);
         onFeedback(null);
+        // The button that opened the confirmation is disabled while this runs, so the dialog has nowhere to return focus to.
+        requestAnimationFrame(onSubmitted);
 
         const result = await attempt(actions.revert.mutateAsync());
         // The server keeps only a link on the host's web origin; it is checked here again before it is shown as an address to open.
