@@ -24,6 +24,8 @@ const STEP_TARGET: Record<SetupStepId, string> = {
 
 type SkippedRow = { setupStepsSkipped?: string[] } | null | undefined;
 
+const SAVE_SCOPE = "setup-steps-skip";
+
 /** A click carries the account that made it, so a save queued behind others never runs as someone who signed in since. */
 interface SkipVariables {
     owner: string | undefined;
@@ -61,7 +63,8 @@ const SetupChecklist: FC<{ serverFormShown: boolean }> = ({ serverFormShown }) =
     const setSkipped = useMutation({
         ...saveStep,
         // Saves run in click order, so a Skip still on its way can never land after the Resume that followed it.
-        scope: { id: "setup-steps-skip" },
+        mutationKey: [SAVE_SCOPE],
+        scope: { id: SAVE_SCOPE },
         mutationFn: async (args: SkipVariables, context) => {
             const { owner, ...step } = args;
 
@@ -80,13 +83,15 @@ const SetupChecklist: FC<{ serverFormShown: boolean }> = ({ serverFormShown }) =
             // A read still in flight would land after the patch with the value from before the click.
             await queryClient.cancelQueries({ queryKey: settingsKey });
 
-            const previous = queryClient.getQueryData<SkippedRow>(settingsKey)?.setupStepsSkipped;
+            // An account with no settings row reads `null`: the click still shows, and an error puts the null back.
+            const row = queryClient.getQueryData<SkippedRow>(settingsKey);
+            const wasSkipped = row?.setupStepsSkipped?.includes(args.stepId) === true;
 
-            queryClient.setQueryData<SkippedRow>(settingsKey, (row) =>
-                row ? { ...row, setupStepsSkipped: toggleSkipped(row.setupStepsSkipped, args.stepId, args.skipped) } : row,
-            );
+            const patched: SkippedRow = { ...row, setupStepsSkipped: toggleSkipped(row?.setupStepsSkipped, args.stepId, args.skipped) };
 
-            return { previous };
+            queryClient.setQueryData<SkippedRow>(settingsKey, () => patched);
+
+            return { hadRow: Boolean(row), wasSkipped };
         },
         onError: (_error, args, context) => {
             // Another account is signed in now: the cache is theirs, so nothing is restored or announced.
@@ -94,13 +99,18 @@ const SetupChecklist: FC<{ serverFormShown: boolean }> = ({ serverFormShown }) =
                 return;
             }
 
-            queryClient.setQueryData<SkippedRow>(settingsKey, (row) => (row ? { ...row, setupStepsSkipped: context.previous } : row));
+            // Only this step goes back to its own previous value; a choice made on another step since stays.
+            queryClient.setQueryData<SkippedRow>(settingsKey, (row) => {
+                const list = toggleSkipped(row?.setupStepsSkipped, args.stepId, context.wasSkipped);
+
+                return context.hadRow || list.length > 0 ? { ...row, setupStepsSkipped: list } : null;
+            });
             setFailedStep(args.stepId);
             toast.error(t`Could not save that choice. Try again.`);
         },
-        // Settled either way, the cache ends on what the server stores.
+        // Settled, the cache ends on what the server stores, once no later save is still waiting its turn.
         onSettled: async (_data, _error, args) => {
-            if (args.owner === signedInRef.current) {
+            if (args.owner === signedInRef.current && queryClient.isMutating({ mutationKey: [SAVE_SCOPE] }) <= 1) {
                 await queryClient.invalidateQueries({ queryKey: settingsKey });
             }
         },
@@ -128,6 +138,24 @@ const SetupChecklist: FC<{ serverFormShown: boolean }> = ({ serverFormShown }) =
         },
     };
     const statusLabel = { done: t`Done`, skipped: t`Skipped`, todo: t`To do` };
+    const [seen, setSeen] = useState<{ key: string; steps: NonNullable<typeof steps> } | undefined>(undefined);
+    const [announcement, setAnnouncement] = useState("");
+    const statusKey = steps?.map((step) => step.status).join(",");
+
+    // Said once when a status changes after the first read: a device completing a step, Skip, Resume. The first read is silent.
+    if (steps !== undefined && statusKey !== undefined && seen?.key !== statusKey) {
+        setSeen({ key: statusKey, steps });
+
+        if (seen) {
+            setAnnouncement(
+                steps
+                    .filter((step, index) => step.status !== seen.steps[index]?.status)
+                    .map((step) => `${copy[step.id].title}: ${statusLabel[step.status]}`)
+                    .join(". "),
+            );
+        }
+    }
+
     const pendingLabel = devicesQuery.isError || settingsQuery.isError ? t`Could not check` : t`Checking`;
 
     return (
@@ -176,6 +204,9 @@ const SetupChecklist: FC<{ serverFormShown: boolean }> = ({ serverFormShown }) =
                         </li>
                     ))}
                 </ol>
+                <p className="sr-only" role="status">
+                    {announcement}
+                </p>
                 {devicesQuery.isError && (
                     <div className="mt-3 flex flex-wrap items-center gap-3" role="alert">
                         <p className="text-destructive text-xs">{t`Could not read your devices, so the steps cannot be checked yet. The links still work.`}</p>

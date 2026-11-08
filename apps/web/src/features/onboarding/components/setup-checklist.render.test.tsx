@@ -16,6 +16,9 @@ const { account, devices, save, server, toastError } = vi.hoisted(() => {
         save: vi.fn(),
         server: {
             failSave: false,
+            failStep: undefined as string | undefined,
+            noRow: false,
+            reads: 0,
             hold: undefined as Promise<undefined> | undefined,
             settingsHold: undefined as Promise<undefined> | undefined,
             skipped: [] as string[],
@@ -66,7 +69,12 @@ vi.mock("@/lib/lunora/crpc", () => {
                             queryOptions: () => {
                                 return {
                                     queryFn: async () => {
+                                        server.reads += 1;
                                         await server.settingsHold;
+
+                                        if (server.noRow) {
+                                            return null;
+                                        }
 
                                         return { setupStepsSkipped: [...server.skipped] };
                                     },
@@ -84,7 +92,7 @@ vi.mock("@/lib/lunora/crpc", () => {
 
                                         await server.hold;
 
-                                        if (server.failSave) {
+                                        if (server.failSave || server.failStep === args.stepId) {
                                             throw new Error("down");
                                         }
 
@@ -169,6 +177,9 @@ describe("<SetupChecklist>", () => {
         devices.reads = 0;
         account.id = "user-a";
         server.failSave = false;
+        server.failStep = undefined;
+        server.noRow = false;
+        server.reads = 0;
         server.hold = undefined;
         server.settingsHold = undefined;
         server.skipped = [];
@@ -305,5 +316,68 @@ describe("<SetupChecklist>", () => {
         });
         expect(save).toHaveBeenCalledWith({ skipped: true, stepId: "ssh" });
         expect(toastError).not.toHaveBeenCalled();
+    });
+
+    it("keeps the second step's choice when the first of two quick saves fails, and re-reads once", async () => {
+        const user = userEvent.setup();
+        const gate = createGate();
+
+        server.hold = gate.promise;
+        server.failStep = "pair";
+        renderChecklist();
+        await user.click(await screen.findByRole("button", { name: RESkipPairAComputer }));
+        await user.click(screen.getByRole("button", { name: RESkipAddAnSshServer }));
+        gate.open();
+
+        await waitFor(() => {
+            expect(save).toHaveBeenCalledTimes(2);
+        });
+        await waitFor(() => {
+            expect(server.skipped).toEqual(["ssh"]);
+        });
+
+        expect(await screen.findByText("(Skipped)")).toBeTruthy();
+        expect(screen.getAllByText("(To do)")).toHaveLength(2);
+        // The first read plus one after the last save settled, none while the second save was still waiting.
+        await waitFor(() => {
+            expect(server.reads).toBe(2);
+        });
+    });
+
+    it("shows a first skip for an account with no settings row, and puts the null back when it fails", async () => {
+        const user = userEvent.setup();
+        const gate = createGate();
+
+        server.noRow = true;
+        server.hold = gate.promise;
+        renderChecklist();
+        await user.click(await screen.findByRole("button", { name: RESkipAddAnSshServer }));
+
+        expect(await screen.findByText("(Skipped)")).toBeTruthy();
+
+        server.failSave = true;
+        gate.open();
+
+        await waitFor(() => {
+            expect(screen.queryByText("(Skipped)")).toBeNull();
+        });
+        expect(screen.getAllByText("(To do)")).toHaveLength(3);
+    });
+
+    it("says a status change in a polite region, and nothing on the first read", async () => {
+        const user = userEvent.setup();
+
+        renderChecklist();
+        await screen.findAllByText("(To do)");
+
+        const region = screen.getByRole("status");
+
+        expect(region.textContent).toBe("");
+
+        await user.click(screen.getByRole("button", { name: RESkipAddAnSshServer }));
+
+        await waitFor(() => {
+            expect(region.textContent).toBe("Add an SSH server: Skipped");
+        });
     });
 });
