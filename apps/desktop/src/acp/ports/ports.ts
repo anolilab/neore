@@ -60,6 +60,7 @@ export class PortsService {
             }
         }
 
-        return views.toSorted((a, b) => a.port - b.port || a.pid - b.pid);
+        // A total order, so the same sockets always come out the same way and an unchanged list is not redrawn.
+        return views.toSorted((a, b) => a.port - b.port || a.pid - b.pid || a.address.localeCompare(b.address));
     }
 }

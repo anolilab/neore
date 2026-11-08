@@ -10,8 +10,8 @@ import type { Listener } from "./process-table";
 import { parseLsof, parsePs, parseSs } from "./process-table";
 
 const PS = ["/bin/ps", "/usr/bin/ps"];
-const LSOF = ["/usr/sbin/lsof", "/usr/bin/lsof"];
-const SS = ["/usr/bin/ss", "/usr/sbin/ss", "/bin/ss"];
+const LSOF = ["/usr/sbin/lsof", "/usr/bin/lsof", "/sbin/lsof", "/bin/lsof"];
+const SS = ["/usr/bin/ss", "/usr/sbin/ss", "/bin/ss", "/sbin/ss"];
 const TIMEOUT_MS = 5000;
 const MAX_BUFFER = 16 * 1024 * 1024;
 
