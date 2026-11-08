@@ -69,7 +69,7 @@ const GuestLinkPage: FC<{ linkToken: string }> = ({ linkToken }) => {
                 return t`This link is already in use in another browser.`;
             }
             case "NOT_FOUND": {
-                return t`This link has ended.`;
+                return t`This link is not taking messages right now. Try again later.`;
             }
             case "TOO_MANY_REQUESTS": {
                 return t`Too many messages. Please try again later.`;
@@ -110,11 +110,10 @@ const GuestLinkPage: FC<{ linkToken: string }> = ({ linkToken }) => {
             return guestToken;
         },
         // Awaited before the post counts as failed, so a retry cannot run before the stale copy is dropped.
+        // A refused post never ends the link here: the backend also answers NOT_FOUND while the owner's chat is archived,
+        // locked or run by a computer, which can be undone, and the link stays bound to this browser's token. Only a view
+        // read after this browser's own accepted post, which ignores the chat's state, says the link itself is gone.
         onError: async (error) => {
-            if (errorCode(error) === "NOT_FOUND") {
-                endLink();
-            }
-
             // Another tab of this browser may hold the token the link is bound to: read storage again before the next try.
             if (errorCode(error) === "FORBIDDEN") {
                 await rereadGuestToken(linkToken);

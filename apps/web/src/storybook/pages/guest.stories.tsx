@@ -2,7 +2,7 @@ import { api } from "@neore/backend/api";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, userEvent } from "storybook/test";
 
-import { clearGuestTokenMemory, forgetGuestToken, keepGuestToken, keepPendingPost } from "@/features/chat/guest-links/guest-token";
+import { clearGuestTokenMemory, forgetGuestToken, guestTokenFor, keepGuestToken, keepPendingPost } from "@/features/chat/guest-links/guest-token";
 import { Route as GuestRoute } from "@/routes/(public)/guest";
 import { HOUR, STORY_NOW as NOW } from "@/storybook/clock";
 import { GUEST_LINK_TOKEN, guestAttempts, guestPageFixtures, guestPosts, resetGuestPosts, RETURNING_GUEST_TOKEN } from "@/storybook/fixtures/guest-page";
@@ -178,6 +178,21 @@ export const AnotherBrowser: Story = {
 
         await expect(await canvas.findByRole("alert")).toHaveTextContent("already in use in another browser");
         await expect(canvas.queryByText("The server's own words")).not.toBeInTheDocument();
+    },
+};
+
+/** The owner's chat is closed for now (archived, locked): the post is refused, and this browser keeps its token for later. */
+export const ChatClosedForNow: Story = {
+    beforeEach: atFragment(`#${GUEST_LINK_TOKEN}`, { returning: true }),
+    parameters: { msw: { handlers: { lunora: lunoraHandlers(...guestPageFixtures({ postRefusal: "NOT_FOUND" })) } } },
+    play: async ({ canvas }) => {
+        await userEvent.type(await canvas.findByRole("textbox", { name: "Your message" }), "Hello?");
+        await userEvent.click(canvas.getByRole("button", { name: "Send to the owner" }));
+
+        await expect(await canvas.findByRole("alert")).toHaveTextContent("not taking messages right now");
+        await expect(canvas.getByRole("textbox", { name: "Your message" })).toBeEnabled();
+        clearGuestTokenMemory();
+        await expect(await guestTokenFor(GUEST_LINK_TOKEN)).toBe(RETURNING_GUEST_TOKEN);
     },
 };
 
