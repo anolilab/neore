@@ -187,6 +187,8 @@ export const recordReplyUsage = internalMutation
         at: v.number(),
         costMicrodollars: v.number(),
         date: v.string(),
+        /** A retry for the project alone: it never counts the total, even when the reply's key has since been pruned. */
+        projectOnly: v.optional(v.boolean()),
         /** The project could not be read where the record was sent from: count the total now, and file no project. */
         projectUnread: v.optional(v.boolean()),
         replyKey: v.string(),
@@ -241,6 +243,12 @@ export const recordReplyUsage = internalMutation
             return null;
         }
 
+        // A retry for the project alone whose reply is no longer known (its key was pruned): the total was counted when
+        // the reply was first recorded, so this adds nothing rather than count it again.
+        if (args.projectOnly === true) {
+            return null;
+        }
+
         // The total and skill rows land now, whatever the project read does: a read that fails counts the reply without
         // its project and tries the project again on its own (`RECORD_RETRY`).
         let attribution: Attribution = {};
@@ -257,7 +265,13 @@ export const recordReplyUsage = internalMutation
                     userId: args.userId,
                 });
                 projectUnread = true;
-                await runAfterWithRetry(ctx.scheduler, RECORD_RETRY.baseMs, internal.usage.activity.recordReplyUsage, { ...args }, RECORD_RETRY);
+                await runAfterWithRetry(
+                    ctx.scheduler,
+                    RECORD_RETRY.baseMs,
+                    internal.usage.activity.recordReplyUsage,
+                    { ...args, projectOnly: true },
+                    RECORD_RETRY,
+                );
             }
         }
 
@@ -335,7 +349,12 @@ export const forwardReplyUsage = internalMutation
             return null;
         }
 
-        const record: ReplyUsageArgs & { threadAttribution: Attribution } = { ...usage, threadAttribution };
+        // A retry's record only files the project: the first try sent the total already.
+        const record: ReplyUsageArgs & { projectOnly?: boolean; threadAttribution: Attribution } = {
+            ...usage,
+            threadAttribution,
+            ...(projectRetry === true && { projectOnly: true }),
+        };
 
         await runAfterOnShard(ctx.scheduler as never, 0, internal.usage.activity.recordReplyUsage, { ...record }, usage.userId);
 
