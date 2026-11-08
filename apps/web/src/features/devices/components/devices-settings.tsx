@@ -207,6 +207,8 @@ export const DeviceRow: FC<{
         latestAction.current += 1;
 
         const mine = latestAction.current;
+        // The core's reason as the action starts: a newer one the core reports meanwhile replaces this action's failure.
+        const coreReasonAtStart = reconnectReason.current;
 
         setActionFailure(undefined);
 
@@ -217,7 +219,7 @@ export const DeviceRow: FC<{
                 const message = cutFailure(error instanceof Error ? error.message : t`Could not connect to the server.`);
 
                 if (mine === latestAction.current) {
-                    setActionFailure({ coreReason: reconnectReason.current, message });
+                    setActionFailure({ coreReason: coreReasonAtStart, message });
                 }
 
                 toast.error(failureText(message));
