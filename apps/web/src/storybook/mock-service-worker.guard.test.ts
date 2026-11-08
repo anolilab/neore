@@ -15,9 +15,9 @@ const require = createRequire(import.meta.url);
  */
 describe("Storybook's mockServiceWorker.js", () => {
     it("is the worker of the installed msw", () => {
-        const served = readFileSync(resolve(import.meta.dirname, "../../.storybook/public/mockServiceWorker.js"), "utf8");
-        const shipped = readFileSync(require.resolve("msw/mockServiceWorker.js"), "utf8");
+        // A checkout with CRLF conversion rewrites the served copy's line endings, not its content.
+        const read = (file: string): string => readFileSync(file, "utf8").replaceAll("\r\n", "\n");
 
-        expect(served).toBe(shipped);
+        expect(read(resolve(import.meta.dirname, "../../.storybook/public/mockServiceWorker.js"))).toBe(read(require.resolve("msw/mockServiceWorker.js")));
     });
 });
