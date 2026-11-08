@@ -146,6 +146,12 @@ jobs:
                   npm-version: "11"
                   skip-playwright: "true"
 
+            # A rule ESLint turned off for some files but the committed config still
+            # enforces would fail here on code ESLint accepts.
+            - name: "Check that .oxlintrc.json matches ESLint's config"
+              shell: "bash"
+              run: "pnpm run lint:oxlint:sync && git diff --exit-code .oxlintrc.json"
+
             - name: "oxlint"
               shell: "bash"
               run: "pnpm run lint:oxlint"

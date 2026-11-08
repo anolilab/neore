@@ -68,7 +68,7 @@ packages: &packages
     - ".github/file-filters.yml"
 
 # What the Types, ESLint and oxlint jobs check: code, its configuration and the lint
-# workflow itself. A change to docs or markdown alone skips both jobs.
+# workflow itself. A change to docs or markdown alone skips all three.
 code:
     - "**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs}"
     - "**/*.jsonc"

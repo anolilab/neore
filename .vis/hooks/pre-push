@@ -21,7 +21,7 @@ code=$(mktemp) || exit 1
 docs=$(mktemp) || { rm -f "$code"; exit 1; }
 trap 'rm -f "$code" "$docs"' EXIT
 trap 'exit 130' INT TERM HUP
-git diff -z --name-only --diff-filter=ACMR "$base" HEAD -- '*.js' '*.jsx' '*.mjs' '*.cjs' '*.ts' '*.tsx' '*.mts' '*.cts' '*.json' '*.jsonc' '*.yml' '*.yaml' '*.css' '*.html' >"$code" || exit 1
+git diff -z --name-only --diff-filter=ACMR "$base" HEAD -- '*.js' '*.jsx' '*.mjs' '*.cjs' '*.ts' '*.tsx' '*.mts' '*.cts' '*.json' '*.jsonc' '*.json5' '*.yml' '*.yaml' '*.css' '*.html' >"$code" || exit 1
 git diff -z --name-only --diff-filter=ACMR "$base" HEAD -- '*.md' '*.mdx' >"$docs" || exit 1
 if [ -s "$code" ]; then
     xargs -0 pnpm exec oxfmt --check --no-error-on-unmatched-pattern -- <"$code" || exit 1

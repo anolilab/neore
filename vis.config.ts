@@ -141,7 +141,7 @@ export default defineConfig({
         // The same formatters as `pnpm lint:oxfmt`: oxfmt for code, data, CSS and HTML, Prettier
         // for Markdown. Both read the root .gitignore and .prettierignore, so an ignored file
         // that is staged is left alone.
-        "*.{js,jsx,mjs,cjs,ts,tsx,mts,cts,json,jsonc,yml,yaml,css,html}": "pnpm exec oxfmt --no-error-on-unmatched-pattern",
+        "*.{js,jsx,mjs,cjs,ts,tsx,mts,cts,json,jsonc,json5,yml,yaml,css,html}": "pnpm exec oxfmt --no-error-on-unmatched-pattern",
         "*.{md,mdx}": "pnpm exec prettier --config=.prettierrc.cjs --write",
         // CI checks the key order of every package.json (`lint.yml`, "Types").
         "**/package.json": "sort-package-json",

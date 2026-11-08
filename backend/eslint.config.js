@@ -423,7 +423,7 @@ export default createConfig(
             /**
              * Conflicts with the formatter of record here, oxfmt
              * (`lint:oxfmt` is a separate gate and runs after `--fix`). The rule's
-             * fix and Prettier's disagree, so `--fix` and `prettier --write` undo each
+             * fix and the formatter's disagree, so `--fix` and `lint:oxfmt:fix` undo each
              * other indefinitely. The formatter wins.
              */
             "antfu/if-newline": "off",
