@@ -16,7 +16,9 @@ import { internal } from "../_generated/internal";
 import { internalAction, internalQuery } from "../_generated/server";
 import { isAccountDeletionUnderway } from "../gdpr/deletion-guard";
 import { authMutation, authQuery, rateLimit } from "../lib/crpc";
-import { linksToLockedThread, redactForLockedThread } from "./locked-link";
+import { linksToLockedThread, redactForLockedThread, threadIdOfLink } from "./locked-link";
+import { deliverToPhones } from "./phone-delivery";
+import { isPhonePushConfigured } from "./native-push-config";
 import { webPushConfig } from "./push-config";
 import { isAllowedPushEndpoint } from "./push-endpoint";
 import { pushTitle, pushUrgency } from "./push-text";
@@ -142,6 +144,7 @@ export const loadPushNotification = internalQuery
             v.null(),
             v.object({
                 body: v.optional(v.string()),
+                language: v.optional(v.string()),
                 link: v.optional(v.string()),
                 outcome: v.optional(v.union(v.literal("success"), v.literal("failure"))),
                 title: v.string(),
@@ -158,8 +161,10 @@ export const loadPushNotification = internalQuery
 
         // Queued before its chat was locked, the push still carries the title: redact it as the inbox does.
         const shown = (await linksToLockedThread(ctx.db, notification.link)) ? redactForLockedThread(notification) : notification;
+        const settings = await ctx.db.userSettings.findFirst({ where: { userId: args.userId } });
 
         return {
+            ...(settings?.language !== undefined && { language: settings.language }),
             title: shown.title,
             type: shown.type,
             ...(shown.body !== undefined && { body: shown.body }),
@@ -171,11 +176,17 @@ export const loadPushNotification = internalQuery
 /** Push body cap, well inside the 4 KiB a push service accepts after encryption. */
 const PUSH_BODY_MAX = 300;
 
+/**
+ * Delivers one notification to every browser (Web Push) and phone (Expo push) of
+ * its user. Each channel is skipped while its keys are unset.
+ */
 export const sendPushForNotification = internalAction
     .input({ notificationId: v.id("notifications"), userId: v.string() })
     .output(v.null())
     .action(async ({ args, ctx }) => {
-        if (!webPushConfig(process.env)) {
+        const isWebPushOn = webPushConfig(process.env) !== undefined;
+
+        if (!isWebPushOn && !isPhonePushConfigured(process.env)) {
             return null;
         }
 
@@ -185,18 +196,39 @@ export const sendPushForNotification = internalAction
             return null;
         }
 
-        // `public/push-sw.js` reads `title`/`body` and `data.{link,tag}`.
-        const result = await ctx.push.broadcast(
-            {
-                body: notification.body ? `${notification.title}\n${notification.body}`.slice(0, PUSH_BODY_MAX) : notification.title.slice(0, PUSH_BODY_MAX),
-                data: { link: notification.link ?? "/dashboard", tag: args.notificationId },
-                title: pushTitle(notification.type, notification.outcome),
-                urgency: pushUrgency(notification.type),
-            },
-            { userId: args.userId },
-        );
+        const urgency = pushUrgency(notification.type);
 
-        ctx.log.event("notifications.push", { delivered: result.sent, failed: result.failed, gone: result.pruned, type: notification.type });
+        if (isWebPushOn) {
+            // A browser-side failure must not keep the phones from getting it.
+            try {
+                // `public/push-sw.js` reads `title`/`body` and `data.{link,tag}`.
+                const result = await ctx.push.broadcast(
+                    {
+                        body: notification.body
+                            ? `${notification.title}\n${notification.body}`.slice(0, PUSH_BODY_MAX)
+                            : notification.title.slice(0, PUSH_BODY_MAX),
+                        data: { link: notification.link ?? "/dashboard", tag: args.notificationId },
+                        title: pushTitle(notification.type, notification.outcome),
+                        urgency,
+                    },
+                    { userId: args.userId },
+                );
+
+                ctx.log.event("notifications.push", { delivered: result.sent, failed: result.failed, gone: result.pruned, type: notification.type });
+            } catch (error) {
+                console.warn("[notifications] Web Push broadcast failed:", error);
+            }
+        }
+
+        // Phones get no text from here: only the ids, and the account's language for the placeholder.
+        const threadId = threadIdOfLink(notification.link);
+
+        await deliverToPhones(ctx, args.userId, {
+            notificationId: args.notificationId,
+            urgency,
+            ...(notification.language !== undefined && { language: notification.language }),
+            ...(threadId !== undefined && { threadId }),
+        });
 
         return null;
     });

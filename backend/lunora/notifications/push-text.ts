@@ -38,3 +38,27 @@ export const pushTitle = (type: string, outcome: "failure" | "success" | undefin
 const WAITING_ON_A_PERSON: ReadonlySet<string> = new Set(["ask_user", "secret_request", "tool_approval"]);
 
 export const pushUrgency = (type: string): "high" | "normal" => (WAITING_ON_A_PERSON.has(type) ? "high" : "normal");
+
+/**
+ * The only text a phone push carries through Expo, Apple and Google: a generic
+ * alert, the same for every notification. Worded in the account's language,
+ * with the same locales as the web app.
+ */
+const PHONE_PLACEHOLDER_BODIES: Readonly<Record<string, string>> = {
+    de: "Du hast eine neue Benachrichtigung",
+    en: "You have a new notification",
+    es: "Tienes una notificación nueva",
+    fr: "Vous avez une nouvelle notification",
+    it: "Hai una nuova notifica",
+    ja: "新しい通知があります",
+    pl: "Masz nowe powiadomienie",
+    pt: "Você tem uma nova notificação",
+    zh: "你有一条新通知",
+};
+
+export const PHONE_PLACEHOLDER_TITLE = "Neore";
+
+const LANGUAGE_SEPARATOR = /[-_]/u;
+
+export const phonePlaceholderBody = (language: string | undefined): string =>
+    PHONE_PLACEHOLDER_BODIES[language?.toLowerCase().split(LANGUAGE_SEPARATOR, 1)[0] ?? "en"] ?? (PHONE_PLACEHOLDER_BODIES.en as string);

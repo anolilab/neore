@@ -43,3 +43,13 @@
     - At most 10 per user (`trimPushDevices`). An account merge drops the guest's
       rows (`dropPushDevicesOf`) instead of moving them: they belong to a session
       that ends with the guest.
+- **Phone push delivery** (`phone-delivery.ts`, `expo-push.ts`) — **no title
+  ever leaves us**: every phone gets the same localised placeholder
+  (`push-text.ts`) with only `notificationId`/`threadId` as data.
+    - A phone is sent to only while the session that registered it exists and has
+      not expired; an ended one is dropped at the next send.
+    - Otherwise a row is deleted only on `DeviceNotRegistered` in the send's
+      ticket, and only while it has the owner the send was for and has not
+      registered again since (`lastSeenAt <= sentAt`); any other error keeps it.
+    - `notify()` schedules a send when the recipient has a browser subscription
+      or a phone; a failed browser lookup still checks the phones.
