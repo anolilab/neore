@@ -129,13 +129,16 @@ export const collectTriggerRunsForExport = internalQuery
             .withIndex("by_triggerId_startedAt", (q) => q.eq("triggerId", triggerId))
             .order("desc")
             .paginate({ cursor: cursor ?? null, numItems: EXPORT_RUN_PAGE });
+        const watchesThread = trigger.eventSource?.kind === "thread";
 
         return {
             cursor: page.isDone ? null : page.continueCursor,
             // What this page read, whole rows included: the export action's queries share one read budget.
             readBytes: page.page.reduce((sum, run) => sum + new TextEncoder().encode(JSON.stringify(run)).byteLength, 0),
             runs: page.page.map((run) => {
-                const payload = run.payload ?? null;
+                // A thread watcher's run quotes the watched thread in its payload and prompt, and the owner may no longer
+                // have access to that thread: neither is exported, as with a pending run (`withoutPendingPayload`).
+                const payload = watchesThread ? null : (run.payload ?? null);
 
                 return {
                     completedAt: run.completedAt ?? null,
@@ -143,7 +146,7 @@ export const collectTriggerRunsForExport = internalQuery
                     // Cut on a code point, so an emoji at the boundary is kept whole or left out, never halved.
                     payload: payload === null ? null : sliceUnits(payload, MAX_PAYLOAD_LENGTH),
                     payloadTruncated: payload !== null && payload.length > MAX_PAYLOAD_LENGTH,
-                    prompt: run.prompt ?? null,
+                    prompt: watchesThread ? null : (run.prompt ?? null),
                     startedAt: run.startedAt,
                     status: run.status,
                     threadId: run.threadId ?? null,

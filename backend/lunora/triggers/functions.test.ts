@@ -1283,6 +1283,7 @@ describe("run prompts", () => {
         });
 
         expect(watched).toEqual({ firing: 7, payload: undefined });
+
         expect(trigger).toHaveProperty("updatedAt");
         // The whole row is counted, so the read is larger than what the export keeps of it.
         expect(exported.readBytes).toBeGreaterThan(JSON.stringify(exported.runs[0]).length);
@@ -1302,6 +1303,16 @@ describe("run prompts", () => {
         });
 
         expect(emoji).toMatchObject({ payload: "x".repeat(MAX_PAYLOAD_LENGTH - 1), payloadTruncated: true });
+
+        // The same holds for its runs: a thread watcher's run keeps its status, but not the quoted text.
+        const watcherRun = await harness.run(async (ctx: any) => {
+            await ctx.db.patch("triggers", triggerId, { eventSource: { kind: "thread", threadId: "t-watched" } });
+            const { runs } = await ctx.runQuery(collectTriggerRunsForExport, { triggerId, userId: "user-a" });
+
+            return (runs as { payload: string | null; prompt: string | null; status: string }[])[0];
+        });
+
+        expect(watcherRun).toMatchObject({ payload: null, prompt: null, status: "completed" });
         expect(exported.runs[0]).toMatchObject({ payload: '{"ref":"main"}', payloadTruncated: false, prompt: "Summarise the issue" });
         expect(exported.foreign.runs).toEqual([]);
         expect(trigger).not.toHaveProperty("webhookSecret");
