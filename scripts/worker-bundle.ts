@@ -173,6 +173,9 @@ export const backendStudioAssets = (root: string): { directory: string; runWorke
  */
 const STUDIO_DOCUMENT_CALL = /loadStudioDocument\([^;\n]*?,\s*(["'`])([^"'`]+)\1\s*\)/gu;
 
+/** The start of a `loadStudioDocument` call (the import names it without a parenthesis). */
+const STUDIO_DOCUMENT_CALL_START = /loadStudioDocument\(/gu;
+
 /**
  * The names of the documents the generated app reads from `ASSETS`, or `undefined` when it reads none (bundled
  * documents) or there is no generated app (a destroy after `clean`).
@@ -190,7 +193,10 @@ const studioDocumentsRead = (root: string): ReadonlyArray<string> | undefined =>
         return undefined;
     }
 
-    return [...new Set(Array.from(generatedApp.matchAll(STUDIO_DOCUMENT_CALL), (match) => match[2] ?? ""))].filter(Boolean);
+    const names = Array.from(generatedApp.matchAll(STUDIO_DOCUMENT_CALL), (match) => match[2] ?? "").filter(Boolean);
+
+    // A call the pattern cannot read would leave its document unchecked, so it counts as no inventory at all.
+    return names.length === generatedApp.match(STUDIO_DOCUMENT_CALL_START)?.length ? [...new Set(names)] : [];
 };
 
 /**
@@ -205,7 +211,7 @@ export const backendStudioAssetsProblem = (root: string): string | undefined => 
     }
 
     if (names.length === 0) {
-        return "backend/lunora/_generated/app.ts calls loadStudioDocument, but no document name could be read from it, so the deploy cannot check that Studio's documents are on disk. Update STUDIO_DOCUMENT_CALL in scripts/worker-bundle.ts to the generated call.";
+        return "backend/lunora/_generated/app.ts calls loadStudioDocument in a form whose document name cannot be read, so the deploy cannot check that Studio's documents are on disk. Update STUDIO_DOCUMENT_CALL in scripts/worker-bundle.ts to the generated call.";
     }
 
     const directory = path.join(root, BACKEND_STUDIO_ASSETS);

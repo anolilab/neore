@@ -222,8 +222,13 @@ describe("backend Studio documents (Workers Static Assets)", () => {
         expect(backendStudioAssetsProblem(root)).toContain("backend/.lunora/studio-assets is missing the directory");
         expect(backendStudioAssetsProblem(repoRoot(ASSET_MODE_APP, ["openapi"]))).toContain("is missing _lunora/studio/openrpc.json.");
         expect(backendStudioAssetsProblem(repoRoot("openApiSpec: () => loadStudioDocument(env.ASSETS, name),", ["openapi"]))).toContain(
-            "no document name could be read",
+            "whose document name cannot be read",
         );
+        expect(
+            backendStudioAssetsProblem(
+                repoRoot(`${ASSET_MODE_APP}\narchitecture: () => loadStudioDocument(env.ASSETS, names.architecture),`, ["openapi", "openrpc"]),
+            ),
+        ).toContain("whose document name cannot be read");
     });
 
     it("binds nothing and reports nothing without a generated app, so a destroy after `clean` runs", () => {
