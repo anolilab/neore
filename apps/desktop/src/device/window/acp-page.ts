@@ -786,7 +786,7 @@ const showPorts = (selected: string | undefined, ports: Awaited<ReturnType<typeo
                     : item(
                         label,
                         button("Stop", `Stop ${port.name} on port ${String(port.port)}`, () => {
-                            guarded(() => stopPort(selected, port));
+                            guarded(() => stopPort(selected, port, $("acp-ports-list").contains(document.activeElement)));
                         }),
                     );
             }),
@@ -797,7 +797,11 @@ const showPorts = (selected: string | undefined, ports: Awaited<ReturnType<typeo
 const stopping = new Set<string>();
 
 /** Ends one listed server, then reads the list again; a stop that did not end says why in the ports status line. */
-const stopPort = async (selected: string | undefined, port: Awaited<ReturnType<typeof globalThis.neoreDevice.acpPorts>>[number]): Promise<void> => {
+const stopPort = async (
+    selected: string | undefined,
+    port: Awaited<ReturnType<typeof globalThis.neoreDevice.acpPorts>>[number],
+    hadFocus: boolean,
+): Promise<void> => {
     // The row was drawn for another session: its pid may mean nothing here, so nothing is stopped.
     if (selected === undefined || state.selected !== selected) {
         return;
@@ -810,9 +814,21 @@ const stopPort = async (selected: string | undefined, port: Awaited<ReturnType<t
     }
 
     stopping.add(key);
+    // A stop can take the whole grace period: say it started. Reads of an unchanged list leave this up until it answers.
+    setPortsStatus(`Stopping ${port.name} on port ${String(port.port)}…`);
 
     try {
-        const result = await globalThis.neoreDevice.acpPortStop(selected, { name: port.name, pid: port.pid, startedAt: port.startedAt });
+        let result: Awaited<ReturnType<typeof globalThis.neoreDevice.acpPortStop>>;
+
+        try {
+            result = await globalThis.neoreDevice.acpPortStop(selected, { name: port.name, pid: port.pid, startedAt: port.startedAt });
+        } catch (error) {
+            // The error is shown on its own; the count comes back in place of "Stopping…".
+            portsRead.shown = undefined;
+            refreshPorts();
+
+            throw error;
+        }
 
         // Another session was opened during the stop: its own list is on screen now.
         if (state.selected !== selected) {
@@ -820,7 +836,18 @@ const stopPort = async (selected: string | undefined, port: Awaited<ReturnType<t
         }
 
         portsRead.quiet = 0;
+
+        // An ended stop brings the count back; one that did not end writes its reason below, over "Stopping…" alone.
+        if (result.ended) {
+            portsRead.shown = undefined;
+        }
+
         await refreshPorts();
+
+        // The redrawn list no longer has the button that was pressed: focus that fell to the page goes to the list.
+        if (hadFocus && (document.activeElement === null || document.activeElement === document.body)) {
+            $("acp-ports-list").focus();
+        }
 
         // An ended session's servers are already cleared: a late reason must not come back over that.
         const sessionEnded = state.sessions.find((session) => session.id === selected)?.status === "ended";
