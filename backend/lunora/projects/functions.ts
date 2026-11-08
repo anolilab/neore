@@ -14,24 +14,8 @@ import { throwForbidden } from "../lib/error-helpers";
 import { admitOrganization, systemDb } from "../lib/rls/scope";
 import { MAX_LENGTH } from "../lib/validators";
 
-/** Whether `userId` is a current member of an organization; {@link membershipCheck} reads each organization once. */
-export type MembershipCheck = (organizationId: string) => Promise<boolean>;
-
-/** A membership check for `userId` that reads each organization's membership once, however many projects ask. */
-export const membershipCheck = (context: QueryCtx | MutationCtx, userId: string): MembershipCheck => {
-    const read = new Map<string, Promise<boolean>>();
-
-    return async (organizationId) => {
-        let member = read.get(organizationId);
-
-        if (member === undefined) {
-            member = getMemberByOrganizationAndUser(context, organizationId, userId).then((row) => row !== null);
-            read.set(organizationId, member);
-        }
-
-        return await member;
-    };
-};
+/** Whether `userId` is a current member of an organization. */
+type MembershipCheck = (organizationId: string) => Promise<boolean>;
 
 /**
  * The one rule for who may read a project: its owner, or a CURRENT member of its organization. A project without an owner
@@ -46,7 +30,9 @@ export const readableProject = async (context: QueryCtx | MutationCtx, projectId
     // NON-active organization is invisible to the guarded `ctx.db` until the org is admitted.
     const found = await systemDb(context).projects.findFirst({ where: { _id: projectId } });
 
-    if (!found || !(await mayReadProject(found, userId, membershipCheck(context, userId)))) {
+    const isMember: MembershipCheck = async (organizationId) => (await getMemberByOrganizationAndUser(context, organizationId, userId)) !== null;
+
+    if (!found || !(await mayReadProject(found, userId, isMember))) {
         return null;
     }
 
@@ -58,21 +44,64 @@ export const readableProject = async (context: QueryCtx | MutationCtx, projectId
     return await context.db.projects.findFirst({ where: { _id: projectId } });
 };
 
-/**
- * The title of a project `userId` can read, else `undefined` (also for a missing one): the rule of {@link readableProject}
- * in one read of the row rather than two, for a view that only names projects. Pass one {@link membershipCheck} to name
- * many projects, so an organization's membership is read once.
- */
-export const readableProjectTitle = async (
-    context: QueryCtx | MutationCtx,
-    projectId: Id<"projects">,
-    userId: string,
-    isMember: MembershipCheck = membershipCheck(context, userId),
-): Promise<string | undefined> => {
-    // One read of the row: the access decision needs no second, row-level-security read, as only the title leaves here.
-    const found = await systemDb(context).projects.findFirst({ where: { _id: projectId } });
+/** Ids one `in` read binds: D1 takes at most 100 parameters a statement, and the read binds others beside them. */
+const IDS_PER_READ = 90;
 
-    return found && (await mayReadProject(found, userId, isMember)) ? found.title : undefined;
+/** `ids` in runs of {@link IDS_PER_READ}. */
+const inBatches = <T>(ids: ReadonlyArray<T>): T[][] => {
+    const batches: T[][] = [];
+
+    for (let index = 0; index < ids.length; index += IDS_PER_READ) {
+        batches.push(ids.slice(index, index + IDS_PER_READ));
+    }
+
+    return batches;
+};
+
+/**
+ * The titles of the projects in `projectIds` that `userId` can read, by id: the rule of {@link readableProject} for many
+ * projects in a few reads, the rows and then the caller's memberships in their organizations, each in batches of
+ * {@link IDS_PER_READ} ids. A project the caller cannot
+ * read, or that no longer exists, is left out. For a view that only names projects: no row-level-security re-read, as
+ * only titles leave here.
+ */
+export const readableProjectTitles = async (
+    context: QueryCtx | MutationCtx,
+    projectIds: ReadonlyArray<Id<"projects">>,
+    userId: string,
+): Promise<Map<string, string>> => {
+    if (projectIds.length === 0) {
+        return new Map();
+    }
+
+    const rows = [];
+
+    for (const ids of inBatches(projectIds)) {
+        const { page } = await systemDb(context).projects.findMany({ where: { _id: { in: ids } } });
+
+        rows.push(...page);
+    }
+
+    const organizations = [...new Set(rows.filter((row) => row.userId !== userId && row.organizationId).map((row) => row.organizationId!))];
+    const memberOf = new Set<string>();
+
+    for (const ids of inBatches(organizations)) {
+        const { page } = await context.db.member.findMany({ where: { organizationId: { in: ids }, userId } });
+
+        for (const membership of page) {
+            memberOf.add(membership.organizationId);
+        }
+    }
+
+    const titles = new Map<string, string>();
+
+    for (const row of rows) {
+        if (await mayReadProject(row, userId, async (organizationId) => memberOf.has(organizationId))) {
+            titles.set(row._id, row.title);
+        }
+    }
+
+    return titles;
 };
 
 /**

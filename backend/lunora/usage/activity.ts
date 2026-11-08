@@ -30,9 +30,9 @@ import { isAccountDeletionUnderway } from "../gdpr/deletion-guard";
 import { authQuery } from "../lib/crpc";
 import { logger } from "../lib/logger";
 import { runAfterOnShard, runAfterWithRetry } from "../lib/shard-scheduler";
-import { membershipCheck, readableProject, readableProjectTitle } from "../projects/functions";
+import { readableProject, readableProjectTitles } from "../projects/functions";
 import { leadThreadOf } from "../sub-agents/worker-thread";
-import type { Attribution, AttributionIncrement, ProjectTotal, ReplyUsageArgs, RollupIncrement } from "./activity-logic";
+import type { Attribution, AttributionIncrement, ReplyUsageArgs, RollupIncrement } from "./activity-logic";
 import {
     addDays,
     attributionRows,
@@ -507,9 +507,6 @@ export const getSkillBreakdown = authQuery
 
 const vTotals = { costMicrodollars: v.number(), replies: v.number(), tokens: v.number() };
 
-/** Project title lookups one breakdown runs at once. */
-const TITLE_LOOKUPS_AT_ONCE = 16;
-
 /** Projects one breakdown names, costliest first; the rest are summed as `otherProjects`, with no title read. */
 const PROJECTS_LISTED = 100;
 
@@ -570,27 +567,20 @@ export const getProjectBreakdown = authQuery
             .at(-1);
         const projects = foldProjectTotals(coveredFrom === undefined ? rows.page : rows.page.filter((row) => row.date > coveredFrom));
         const total = coveredFrom === undefined ? totals.total : sumRows(totals.rows.filter((row) => row.date > coveredFrom));
-        const titled: (ProjectTotal & { title?: string })[] = [];
 
-        // A few lookups at a time: each is up to three reads, and a long history holds many projects.
         const listed = projects.slice(0, PROJECTS_LISTED);
-        // One membership read per organization, however many of its projects are listed.
-        const isMember = membershipCheck(ctx, userId);
         const others = projects.slice(PROJECTS_LISTED);
+        // A few reads for all the listed projects, whatever their number: their rows, then the caller's memberships.
+        const titles = await readableProjectTitles(
+            ctx,
+            listed.map((project) => project.projectKey as Id<"projects">),
+            userId,
+        );
+        const titled = listed.map((project) => {
+            const title = titles.get(project.projectKey);
 
-        for (let index = 0; index < listed.length; index += TITLE_LOOKUPS_AT_ONCE) {
-            const batch = await Promise.all(
-                listed.slice(index, index + TITLE_LOOKUPS_AT_ONCE).map(async (project) => {
-                    // One read of the row, as many rows as one page of the project list. A failed read fails the query, so
-                    // the card shows an error rather than "no longer available".
-                    const title = await readableProjectTitle(ctx, project.projectKey as Id<"projects">, userId, isMember);
-
-                    return { ...project, ...(title !== undefined && { title }) };
-                }),
-            );
-
-            titled.push(...batch);
-        }
+            return { ...project, ...(title !== undefined && { title }) };
+        });
 
         return {
             noProject: remainderOf(total, projects),
