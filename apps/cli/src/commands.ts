@@ -327,10 +327,6 @@ const repl = async (context: Context, client: NeoreClient, flags: Flags): Promis
 };
 
 export const chat = async (context: Context, { args, flags }: ParsedCommand): Promise<void> => {
-    if (flags.wait) {
-        throw new UsageError("`chat` has no --wait: use --no-stream to wait for the whole reply, or `thread start --wait`.");
-    }
-
     const client = await clientFor(context, flags);
     let prompt = args.join(" ").trim();
 

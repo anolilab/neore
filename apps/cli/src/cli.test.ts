@@ -404,7 +404,9 @@ describe("chat end to end against a fake API", () => {
             expect(await run(["thread", "start", "hi", "-t", "th5"], context)).toBe(2);
             expect(await run(["thread", "start", "hi", "--no-stream"], context)).toBe(2);
             expect(await run(["chat", "hi", "--wait"], context)).toBe(2);
-            expect(context.io.stderr.text()).toContain("--no-stream");
+            expect(context.io.stderr.text()).toContain("`chat` has no --wait: use --no-stream");
+            expect(await run(["tasks", "run", "t1", "--wait"], context)).toBe(2);
+            expect(context.io.stderr.text()).toContain("`neore tasks status <id>`");
         });
 
         it("keeps the sign-in exit code", async () => {
