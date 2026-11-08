@@ -4,18 +4,16 @@ import { CardContent } from "@neore/ui/components/card";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check } from "lucide-react";
 import type { FC } from "react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import SettingsCard from "@/components/settings/settings-card";
 import { useUserSettings } from "@/features/auth/hooks/use-user-settings";
+import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 import { useCRPC } from "@/lib/lunora/crpc";
 
 import type { SetupStepId } from "../lib/setup-steps";
-import { deriveSetupSteps, detectSetupDone, SETUP_STEP_IDS, toggleSkipped } from "../lib/setup-steps";
-
-/** How often the device list is read again while no computer is paired. */
-const PAIRING_POLL_MS = 5000;
+import { deriveSetupSteps, SETUP_STEP_IDS, toggleSkipped } from "../lib/setup-steps";
 
 /** Where each step's action goes: the control on this page, or the guide for the part that happens in the desktop app. */
 const STEP_TARGET: Record<SetupStepId, string> = {
@@ -26,11 +24,20 @@ const STEP_TARGET: Record<SetupStepId, string> = {
 
 type SkippedRow = { setupStepsSkipped?: string[] } | null | undefined;
 
+/** A click carries the account that made it, so a save queued behind others never runs as someone who signed in since. */
+interface SkipVariables {
+    owner: string | undefined;
+    skipped: boolean;
+    stepId: SetupStepId;
+}
+
+class StaleAccountError extends Error {}
+
 /**
  * First-run setup. The web only explains and links: pairing and agent installs happen in the desktop app's own
- * window, so nothing here makes the desktop do anything.
+ * window, so nothing here makes the desktop do anything. `serverFormShown` says whether the servers card is on this page.
  */
-const SetupChecklist: FC = () => {
+const SetupChecklist: FC<{ serverFormShown: boolean }> = ({ serverFormShown }) => {
     const { t } = useLingui();
     const crpc = useCRPC();
     const queryClient = useQueryClient();
@@ -38,35 +45,64 @@ const SetupChecklist: FC = () => {
     const settingsKey = crpc.auth.functions.getUserSettings.queryOptions({}).queryKey;
     // The step whose last save was refused: the message stays beside it after the toast has gone.
     const [failedStep, setFailedStep] = useState<SetupStepId | undefined>(undefined);
-    // Pairing happens in the desktop app, outside this page: while the step is open the list is read again on focus and
-    // every few seconds, then left alone.
-    const pairingOpen = (devices: Parameters<typeof detectSetupDone>[0]) =>
-        !detectSetupDone(devices).pair && settingsQuery.data?.setupStepsSkipped?.includes("pair") !== true;
-    const devicesQuery = useQuery({
-        ...crpc.devices.functions.listDevices.queryOptions({}),
-        refetchInterval: (query) => (pairingOpen(query.state.data) ? PAIRING_POLL_MS : false),
-        refetchOnWindowFocus: (query) => (pairingOpen(query.state.data) ? "always" : false),
-    });
+    const { authClient } = useAuth();
+    const { data: session } = authClient.useSession();
+    // Who is signed in right now, read when a queued save runs.
+    const signedInRef = useRef(session?.user?.id);
+
+    useEffect(() => {
+        signedInRef.current = session?.user?.id;
+    }, [session?.user?.id]);
+
+    // The list is live: a computer paired in the desktop app arrives as a push.
+    const devicesQuery = useQuery(crpc.devices.functions.listDevices.queryOptions({}));
+    const saveStep = crpc.auth.setup_steps.setSetupStepSkipped.mutationOptions();
     // One step per call: the server applies it to the list it holds, so another tab's skip is never overwritten.
     const setSkipped = useMutation({
-        ...crpc.auth.setup_steps.setSetupStepSkipped.mutationOptions(),
+        ...saveStep,
         // Saves run in click order, so a Skip still on its way can never land after the Resume that followed it.
         scope: { id: "setup-steps-skip" },
+        mutationFn: async (args: SkipVariables, context) => {
+            const { owner, ...step } = args;
+
+            if (owner !== signedInRef.current) {
+                throw new StaleAccountError();
+            }
+
+            return (await saveStep.mutationFn?.(step as never, context)) ?? null;
+        },
         onMutate: async (args) => {
+            if (args.owner !== signedInRef.current) {
+                return undefined;
+            }
+
             setFailedStep(undefined);
             // A read still in flight would land after the patch with the value from before the click.
             await queryClient.cancelQueries({ queryKey: settingsKey });
+
+            const previous = queryClient.getQueryData<SkippedRow>(settingsKey)?.setupStepsSkipped;
+
             queryClient.setQueryData<SkippedRow>(settingsKey, (row) =>
                 row ? { ...row, setupStepsSkipped: toggleSkipped(row.setupStepsSkipped, args.stepId, args.skipped) } : row,
             );
+
+            return { previous };
         },
-        onError: (_error, args) => {
-            // Undo only this step; the server's push carries whatever is stored.
-            queryClient.setQueryData<SkippedRow>(settingsKey, (row) =>
-                row ? { ...row, setupStepsSkipped: toggleSkipped(row.setupStepsSkipped, args.stepId, !args.skipped) } : row,
-            );
+        onError: (_error, args, context) => {
+            // Another account is signed in now: the cache is theirs, so nothing is restored or announced.
+            if (context === undefined || args.owner !== signedInRef.current) {
+                return;
+            }
+
+            queryClient.setQueryData<SkippedRow>(settingsKey, (row) => (row ? { ...row, setupStepsSkipped: context.previous } : row));
             setFailedStep(args.stepId);
             toast.error(t`Could not save that choice. Try again.`);
+        },
+        // Settled either way, the cache ends on what the server stores.
+        onSettled: async (_data, _error, args) => {
+            if (args.owner === signedInRef.current) {
+                await queryClient.invalidateQueries({ queryKey: settingsKey });
+            }
         },
     });
     // An account with no settings row answers `null`; only `undefined` means the read has not finished. Until both reads
@@ -87,7 +123,7 @@ const SetupChecklist: FC = () => {
         },
         ssh: {
             action: t`Go to servers`,
-            description: t`Let the agent work on a server you reach over SSH. Needs a paired computer.`,
+            description: t`Let the agent work on a server you reach over SSH. Needs a paired computer, and the form to add one is in the desktop app.`,
             title: t`Add an SSH server`,
         },
     };
@@ -97,7 +133,7 @@ const SetupChecklist: FC = () => {
     return (
         <SettingsCard description={t`Three steps to use coding agents on your own machines. Skip any of them and come back later.`} title={t`Coding setup`}>
             <CardContent>
-                <ol aria-label={t`Coding setup steps`} aria-live="polite" className="space-y-3">
+                <ol aria-label={t`Coding setup steps`} className="space-y-3">
                     {(
                         steps ??
                         SETUP_STEP_IDS.map((id) => {
@@ -111,24 +147,22 @@ const SetupChecklist: FC = () => {
                                     {copy[id].title} <span className="text-muted-foreground font-normal">({status ? statusLabel[status] : pendingLabel})</span>
                                 </p>
                                 <p className="text-muted-foreground text-xs">{copy[id].description}</p>
-                                {failedStep === id && (
-                                    <p className="text-destructive mt-1 text-xs" role="alert">
-                                        {t`Could not save that choice. Try again.`}
-                                    </p>
-                                )}
+                                {failedStep === id && <p className="text-destructive mt-1 text-xs">{t`Could not save that choice. Try again.`}</p>}
                             </div>
                             {/* The links stay while the device check is pending or failed; only Skip and Resume need a known status. */}
                             {status !== "done" && (
                                 <>
-                                    <a className={buttonVariants({ size: "sm", variant: "outline" })} href={STEP_TARGET[id]}>
-                                        {copy[id].action}
-                                        <span className="sr-only">: {copy[id].title}</span>
-                                    </a>
+                                    {(id !== "ssh" || serverFormShown) && (
+                                        <a className={buttonVariants({ size: "sm", variant: "outline" })} href={STEP_TARGET[id]}>
+                                            {copy[id].action}
+                                            <span className="sr-only">: {copy[id].title}</span>
+                                        </a>
+                                    )}
                                     {status !== undefined && (
                                         <Button
                                             disabled={settingsQuery.isError}
                                             onClick={() => {
-                                                setSkipped.mutate({ skipped: status === "todo", stepId: id });
+                                                setSkipped.mutate({ owner: signedInRef.current, skipped: status === "todo", stepId: id });
                                             }}
                                             size="sm"
                                             variant="ghost"

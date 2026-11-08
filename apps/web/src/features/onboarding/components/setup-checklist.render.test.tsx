@@ -9,12 +9,32 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import SetupChecklist from "./setup-checklist";
 
-const { devices, save, server, toastError } = vi.hoisted(() => {
+const { account, devices, save, server, toastError } = vi.hoisted(() => {
     return {
-        devices: { current: [] as unknown[], fail: false },
+        account: { id: "user-a" },
+        devices: { current: [] as unknown[], fail: false, reads: 0 },
         save: vi.fn(),
-        server: { failSave: false, skipped: [] as string[] },
+        server: {
+            failSave: false,
+            hold: undefined as Promise<undefined> | undefined,
+            settingsHold: undefined as Promise<undefined> | undefined,
+            skipped: [] as string[],
+        },
         toastError: vi.fn(),
+    };
+});
+
+vi.mock("@/features/auth/lib/auth-ui-provider", () => {
+    return {
+        useAuth: () => {
+            return {
+                authClient: {
+                    useSession: () => {
+                        return { data: { user: { id: account.id } } };
+                    },
+                },
+            };
+        },
     };
 });
 
@@ -46,7 +66,9 @@ vi.mock("@/lib/lunora/crpc", () => {
                             queryOptions: () => {
                                 return {
                                     queryFn: async () => {
-                                        return { setupStepsSkipped: server.skipped };
+                                        await server.settingsHold;
+
+                                        return { setupStepsSkipped: [...server.skipped] };
                                     },
                                     queryKey: ["getUserSettings"],
                                 };
@@ -59,6 +81,8 @@ vi.mock("@/lib/lunora/crpc", () => {
                                 return {
                                     mutationFn: async (args: { skipped: boolean; stepId: string }) => {
                                         save(args);
+
+                                        await server.hold;
 
                                         if (server.failSave) {
                                             throw new Error("down");
@@ -79,6 +103,8 @@ vi.mock("@/lib/lunora/crpc", () => {
                             queryOptions: () => {
                                 return {
                                     queryFn: async () => {
+                                        devices.reads += 1;
+
                                         if (devices.fail) {
                                             throw new Error("offline");
                                         }
@@ -106,36 +132,84 @@ const RESkipPairAComputer = /Skip: Pair a computer/;
 const RESkipResume = /Skip|Resume/;
 const RECouldNotReadYourDevices = /Could not read your devices/;
 
-const renderChecklist = () => {
-    const client = new QueryClient({ defaultOptions: { mutations: { retry: false }, queries: { retry: false } } });
+/** A promise a test holds shut until it calls `open`. */
+const createGate = () => {
+    let open: () => void = () => {};
+    // The tsconfig lib predates `Promise.withResolvers`.
 
-    render(
+    const promise = new Promise<undefined>((resolve) => {
+        open = () => {
+            resolve(undefined);
+        };
+    });
+
+    return { open, promise };
+};
+
+const renderChecklist = (serverFormShown = true) => {
+    const client = new QueryClient({ defaultOptions: { mutations: { retry: false }, queries: { retry: false } } });
+    const tree = (
         <QueryClientProvider client={client}>
-            <SetupChecklist />
-        </QueryClientProvider>,
+            <SetupChecklist serverFormShown={serverFormShown} />
+        </QueryClientProvider>
     );
+    const view = render(tree);
+
+    return {
+        reload: () => {
+            view.rerender(tree);
+        },
+    };
 };
 
 describe("<SetupChecklist>", () => {
     beforeEach(() => {
         devices.current = [];
         devices.fail = false;
+        devices.reads = 0;
+        account.id = "user-a";
         server.failSave = false;
+        server.hold = undefined;
+        server.settingsHold = undefined;
         server.skipped = [];
         save.mockClear();
         toastError.mockClear();
     });
 
-    it("shows no status until both reads answer, then every step to do with a link to its control or guide", async () => {
+    it("shows no status while the settings read is pending, so a stored skip never reads as To do", async () => {
+        const gate = createGate();
+
+        server.settingsHold = gate.promise;
+        server.skipped = ["ssh"];
         renderChecklist();
+        await waitFor(() => {
+            expect(devices.reads).toBeGreaterThan(0);
+        });
 
         expect(screen.getAllByText("(Checking)")).toHaveLength(3);
         expect(screen.queryByRole("button", { name: RESkip })).toBeNull();
 
+        gate.open();
+
+        expect(await screen.findByText("(Skipped)")).toBeTruthy();
+        expect(screen.getAllByText("(To do)")).toHaveLength(2);
+    });
+
+    it("links the pairing step and the guide, and the servers step only when its card is on the page", async () => {
+        renderChecklist(false);
+
         expect(await screen.findAllByText("(To do)")).toHaveLength(3);
         expect(screen.getByRole("link", { name: REGoToPairing }).getAttribute("href")).toBe("#devices-pairing");
-        expect(screen.getByRole("link", { name: REGoToServers }).getAttribute("href")).toBe("#devices-ssh");
         expect(screen.getByRole("link", { name: REReadTheGuide }).getAttribute("href")).toBe("/docs/devices#coding-agents-on-a-computer");
+        expect(screen.queryByRole("link", { name: REGoToServers })).toBeNull();
+    });
+
+    it("links the servers step to its card when the card is on the page", async () => {
+        renderChecklist(true);
+
+        const link = await screen.findByRole("link", { name: REGoToServers });
+
+        expect(link.getAttribute("href")).toBe("#devices-ssh");
     });
 
     it("skips and resumes a step through the server", async () => {
@@ -162,10 +236,8 @@ describe("<SetupChecklist>", () => {
         renderChecklist();
         await user.click(await screen.findByRole("button", { name: RESkipPairAComputer }));
 
-        const alert = await screen.findByRole("alert");
-
-        expect(alert.textContent).toBe("Could not save that choice. Try again.");
-        expect(toastError).toHaveBeenCalled();
+        expect(await screen.findByText("Could not save that choice. Try again.")).toBeTruthy();
+        expect(toastError).toHaveBeenCalledTimes(1);
         expect(screen.queryByText("(Skipped)")).toBeNull();
     });
 
@@ -193,5 +265,45 @@ describe("<SetupChecklist>", () => {
         await user.click(screen.getByRole("button", { name: "Retry the device check" }));
 
         expect(await screen.findAllByText("(To do)")).toHaveLength(3);
+    });
+
+    it("ends on the stored state when the same step fails to save twice", async () => {
+        const user = userEvent.setup();
+
+        server.skipped = ["ssh"];
+        server.failSave = true;
+        renderChecklist();
+        await user.click(await screen.findByRole("button", { name: REResumeAddAnSshServer }));
+        await waitFor(() => {
+            expect(save).toHaveBeenCalledTimes(1);
+        });
+        await user.click(await screen.findByRole("button", { name: REResumeAddAnSshServer }));
+        await waitFor(() => {
+            expect(save).toHaveBeenCalledTimes(2);
+        });
+
+        expect(await screen.findByText("(Skipped)")).toBeTruthy();
+        expect(screen.getAllByText("(To do)")).toHaveLength(2);
+    });
+
+    it("refuses a queued save once another account is signed in, and announces nothing", async () => {
+        const user = userEvent.setup();
+        const gate = createGate();
+
+        server.hold = gate.promise;
+
+        const { reload } = renderChecklist();
+
+        await user.click(await screen.findByRole("button", { name: RESkipAddAnSshServer }));
+        await user.click(screen.getByRole("button", { name: RESkipPairAComputer }));
+        account.id = "user-b";
+        reload();
+        gate.open();
+
+        await waitFor(() => {
+            expect(save).toHaveBeenCalledTimes(1);
+        });
+        expect(save).toHaveBeenCalledWith({ skipped: true, stepId: "ssh" });
+        expect(toastError).not.toHaveBeenCalled();
     });
 });

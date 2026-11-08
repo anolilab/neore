@@ -571,7 +571,7 @@ const DevicesSettings: FC = () => {
 
     return (
         <div className="space-y-6">
-            <SetupChecklist />
+            <SetupChecklist serverFormShown={pairedHere !== undefined && Boolean(native?.deviceId)} />
             <SettingsCard
                 description={t`Let the agent use files, a terminal and local MCP servers on your own computer through the Neore desktop app. Every action asks you on that computer first, and nothing runs from shared chats or background tasks.`}
                 id="devices-pairing"
