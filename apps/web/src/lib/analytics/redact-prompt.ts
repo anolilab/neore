@@ -24,17 +24,18 @@ const keyPattern = (escapes: ReadonlyArray<string>): string =>
 
 /**
  * A `prompt` parameter in an address: its value runs to the next `&` or `#` (an `&` inside the text is encoded as `%26`), or to
- * a double quote, where an autocaptured `href="…"` in `$elements_chain` ends. Not at an apostrophe or a space: a link written in
- * a message can hold either raw, and stopping there would send the rest of the prompt.
+ * a double quote, where an autocaptured `href="…"` in `$elements_chain` ends. PostHog writes a quote inside that value as `\"`, so
+ * an escaped character is part of the value. Not at an apostrophe or a space: a link written in a message can hold either raw,
+ * and stopping there would send the rest of the prompt.
  */
-const PLAIN_PROMPT = new RegExp(`([?&]${keyPattern(["%"])}=)[^&#"]*`, "giu");
+const PLAIN_PROMPT = new RegExp(String.raw`([?&]${keyPattern(["%"])}=)(?:[^&#"\\]|\\[\s\S])*`, "giu");
 
 /** The same parameter in a link encoded once as another parameter's value: its value runs to the next encoded `&` or `#`. */
 // Any number of layers deep (a link in a sign-in `redirectTo`, itself in another one): `%3F`, `%253F`, `%25253F`, … The layer is
 // taken at the separator, and the value ends only at a `&` or `#` of that same layer, never at the prompt's own (one deeper).
 // The `=` may be encoded at any layer or not at all: a hand-built return address can encode the `?` and leave the `=` raw.
 const ENCODED_PROMPT = new RegExp(
-    String.raw`(%(?<layer>(?:25)*)(?:3F|26)${keyPattern(["%(?:25)*"])}(?:=|%(?:25)*3D))(?:[^%&#"]|%(?!\k<layer>(?:26|23)))*`,
+    String.raw`(%(?<layer>(?:25)*)(?:3F|26)${keyPattern(["%(?:25)*"])}(?:=|%(?:25)*3D))(?:[^%&#"\\]|\\[\s\S]|%(?!\k<layer>(?:26|23)))*`,
     "giu",
 );
 

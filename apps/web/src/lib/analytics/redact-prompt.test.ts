@@ -40,6 +40,19 @@ describe(redactPromptFromEvent, () => {
         expect(event?.properties.$heatmap_data).toStrictEqual({ "https://app.test/chat?prompt=redacted": [{ x: 1 }, { x: 2 }] });
     });
 
+    it("redacts past a quote PostHog escaped inside an autocaptured link", () => {
+        // \" is how the element chain writes a quote inside an attribute value.
+        const event = redactPromptFromEvent(pageView({ $elements_chain: String.raw`a:attr__href="/chat?prompt=private\"LEAK"nth-child="1"` }));
+
+        expect(event?.properties.$elements_chain).toBe('a:attr__href="/chat?prompt=redacted"nth-child="1"');
+    });
+
+    it("redacts past a backslash before a line break", () => {
+        const event = redactPromptFromEvent(pageView({ $current_url: "https://app.test/chat?prompt=abc\\\nSECRET&model=gpt" }));
+
+        expect(event?.properties.$current_url).toBe("https://app.test/chat?prompt=redacted&model=gpt");
+    });
+
     it("ends the redaction at the quote around an autocaptured link, keeping the rest of the element chain", () => {
         const event = redactPromptFromEvent(pageView({ $elements_chain: 'a:attr__href="/chat?prompt=hi"nth-child="1";div.card:nth-child="2"' }));
 
