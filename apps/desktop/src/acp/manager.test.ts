@@ -10,8 +10,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AcpManager } from "./manager";
 import { spawnAgent } from "./process";
+import { newSession } from "./protocol";
+import { AgentSignedOutError } from "./signed-out";
 import { alive, expectGone, Scratch } from "./testing/harness";
-import type { SessionSnapshot, SpawnPlan } from "./types";
+import type { AcpUpdate, SessionSnapshot, SpawnPlan } from "./types";
 
 const SENTINEL = "sentinel-secret-7f3a";
 const PID_PREFIX = /^pid:\d+/u;
@@ -313,15 +315,21 @@ describe("a version probe", () => {
 
     it("tells the user to sign in with the agent's own tool when the agent asks for a login", async () => {
         const target = make({ FAKE_AGENT_AUTH: "1" });
+        const failure = start(target);
 
-        await expect(start(target)).rejects.toThrow("sign in");
+        await expect(failure).rejects.toThrow("Sign in with the agent's own login command");
+        // Callers tell "not signed in" from other failures by the type, after a session start and after `withAgent`.
+        await expect(failure).rejects.toBeInstanceOf(AgentSignedOutError);
+        await expect(target.withAgent("fake", scratch.work, {}, async ({ connection }) => await newSession(connection, scratch.work))).rejects.toBeInstanceOf(
+            AgentSignedOutError,
+        );
         target.killAll();
     });
 
     it("keeps the capability report of an agent whose start failed after the handshake", async () => {
         const target = make({ FAKE_AGENT_AUTH: "1" });
 
-        await expect(start(target)).rejects.toThrow("sign in");
+        await expect(start(target)).rejects.toThrow("Sign in with the agent's own login command");
         expect(Object.keys(target.allReports())).toEqual(["fake"]);
         target.killAll();
     });
@@ -470,5 +478,70 @@ describe("unsupported platforms and missing commands", () => {
         );
 
         await expect(target.probe("missing")).rejects.toThrow(MISSING_COMMAND);
+    });
+});
+
+/** A promise that stays pending until `open` is called. */
+const gate = (): { open: () => void; opened: Promise<void> } => {
+    let open: () => void = () => {};
+    const opened = new Promise<void>((resolve) => {
+        open = () => {
+            resolve();
+        };
+    });
+
+    return { open, opened };
+};
+
+describe("a sign-out of an agent", () => {
+    it("waits for an import of that agent that is running, and refuses a new one meanwhile", async () => {
+        const target = make({});
+        const finish = gate();
+        const running = target.usingAgent("fake", async () => await finish.opened);
+        let signedOut = false;
+        const hold = target.holdingAgent("fake", async () => {
+            signedOut = true;
+        });
+
+        // The sign-out has begun: it must not run while the import still holds the agent's connection.
+        await Promise.resolve();
+        expect(await messageOf(target.usingAgent("fake", async () => {}))).toContain("being signed out");
+        expect(signedOut).toBe(false);
+
+        finish.open();
+        await running;
+        await hold;
+
+        expect(signedOut).toBe(true);
+        target.killAll();
+    });
+
+    it("refuses only the updates that would change the account being signed out", async () => {
+        const target = make({});
+        const finish = gate();
+        const hold = target.holdingAgent("fake", async () => await finish.opened);
+        const refused = (update: AcpUpdate): string => {
+            try {
+                target.refuseUpdateWhileSigningOut(update);
+
+                return "";
+            } catch (error) {
+                return (error as Error).message;
+            }
+        };
+
+        expect(refused({ agentKey: "fake", folder: "/work", op: "grant" })).toBe("");
+        expect(refused({ agentKey: "fake", folderId: "f1", op: "revoke" })).toBe("");
+        expect(refused({ agentKey: "other", name: "TOKEN", op: "setEnv", value: "v" })).toBe("");
+        expect(refused({ key: "other", op: "removeAgent" })).toBe("");
+        expect(refused({ args: [], command: "x", key: "fake", label: "Fake", op: "saveAgent" })).toContain("being signed out");
+        expect(refused({ agentKey: "fake", name: "TOKEN", op: "removeEnv" })).toContain("being signed out");
+        expect(refused({ name: "TOKEN", op: "setEnv", value: "v" })).toContain("being signed out");
+        // The core reads a `null` key as "all agents".
+        expect(refused({ agentKey: null, name: "TOKEN", op: "setEnv", value: "v" } as unknown as AcpUpdate)).toContain("being signed out");
+
+        finish.open();
+        await hold;
+        target.killAll();
     });
 });

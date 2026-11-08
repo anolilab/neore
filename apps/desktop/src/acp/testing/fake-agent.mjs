@@ -2,7 +2,7 @@
 // every frame the host sends against the SDK's published JSON schema and against the protocol's ordering rules, and writes what it saw (and any violation) to
 // $FAKE_AGENT_LOG as JSON lines. What it does is chosen by the first word of each prompt (see `behaviours`).
 import { spawn } from "node:child_process";
-import { appendFileSync } from "node:fs";
+import { appendFileSync, existsSync, rmSync } from "node:fs";
 import { createInterface } from "node:readline";
 import { createRequire } from "node:module";
 
@@ -26,7 +26,13 @@ const REQUEST_SCHEMAS = {
     "session/list": check("ListSessionsRequest"),
     "session/load": check("LoadSessionRequest"),
     "session/fork": checkUnstable("ForkSessionRequest"),
+    logout: check("LogoutRequest"),
 };
+
+// FAKE_AGENT_LOGOUT=1 advertises `auth.logout`. FAKE_AGENT_AUTH_FILE names a file that stands for the agent's own
+// stored sign-in: signed in while it exists, and `logout` deletes it, so the next start of the agent is signed out.
+const authFile = process.env.FAKE_AGENT_AUTH_FILE;
+const signedOut = () => process.env.FAKE_AGENT_AUTH === "1" || (authFile !== undefined && !existsSync(authFile));
 
 // FAKE_AGENT_SESSIONS = any of "list", "load" and "fork", comma-separated: which saved-session methods the agent advertises (and answers).
 const advertised = new Set((process.env.FAKE_AGENT_SESSIONS ?? "").split(",").filter(Boolean));
@@ -257,6 +263,7 @@ const handle = async (message) => {
                     loadSession: advertised.has("load"),
                     promptCapabilities: { image: false, audio: false, embeddedContext: false },
                     sessionCapabilities: { ...(advertised.has("list") && { list: {} }), ...(advertised.has("fork") && { fork: {} }) },
+                    ...(process.env.FAKE_AGENT_LOGOUT === "1" && { auth: { logout: {} } }),
                 },
                 agentInfo: { name: "fake-agent", title: "Fake Agent", version: "1.2.3" },
                 authMethods: [],
@@ -266,7 +273,7 @@ const handle = async (message) => {
 
     if (message.method === "session/new") {
         record({ sessionNew: message.params });
-        if (process.env.FAKE_AGENT_AUTH === "1") {
+        if (signedOut()) {
             return send({ id: message.id, error: { code: -32000, message: "Authentication required" } });
         }
         if (process.env.FAKE_AGENT_SESSION_ERROR === "1") {
@@ -275,6 +282,17 @@ const handle = async (message) => {
         }
         state.sessionId = "fake-session-1";
         return send({ id: message.id, result: { sessionId: state.sessionId } });
+    }
+
+    if (message.method === "logout") {
+        if (process.env.FAKE_AGENT_LOGOUT !== "1") {
+            return violation("logout without advertising it", message);
+        }
+        record({ logout: true });
+        if (authFile !== undefined) {
+            rmSync(authFile, { force: true });
+        }
+        return send({ id: message.id, result: {} });
     }
 
     if (message.method === "session/fork") {

@@ -7,6 +7,7 @@ import type { CapabilityReport } from "@neore/ai/capabilities";
 
 import type { HooksView } from "../../acp/hooks/types";
 import type { RegistryListing } from "../../acp/registry";
+import type { SignInStatus } from "../../acp/sign-in";
 import type { AcpView, ImportSummary, NativeSessionView, PermissionView, SessionSnapshot, SessionSummary, ToolStatus } from "../../acp/types";
 import { HooksPanelModel } from "./hooks-panel";
 import { canImportSessions } from "./import-control";
@@ -52,8 +53,16 @@ const state: {
     selected?: string;
     sessions: SessionSummary[];
     signature: string;
+
+    /**
+     * Each agent's last sign-in answer, by key, with the agent's configuration when it was asked (`agentConfig`). An answer
+     * for a configuration that changed since (another command, a removed and re-added key) is not shown.
+     */
+    signIn: Record<string, { config: string; status: SignInStatus }>;
+    /** The sign-in request running for an agent, by key: one at a time (`askSignIn`). */
+    signInPending: Map<string, SignInRequest>;
     view: AcpView;
-} = { listings: [], reports: {}, requests: [], searchSerial: 0, sessions: [], signature: "", view: { agents: [], consents: [], envNames: [] } };
+} = { listings: [], reports: {}, requests: [], searchSerial: 0, sessions: [], signature: "", signIn: {}, signInPending: new Map(), view: { agents: [], consents: [], envNames: [] } };
 
 const showError = (error: unknown): void => {
     $("acp-error").textContent = String(error instanceof Error ? error.message : error).replace(IPC_PREFIX, "");
@@ -150,7 +159,7 @@ const approveFolder = (key: string) =>
         );
 
         if (confirmed) {
-            state.view = await globalThis.neoreDevice.acpUpdate({ agentKey: key, folder, op: "grant" });
+            state.view = await savedView({ agentKey: key, folder, op: "grant" });
             renderAgents();
         }
     });
@@ -161,6 +170,173 @@ const probe = (key: string) =>
 
         await refreshReports();
         $("acp-notice").textContent = `${agentLabel(key)}: ${result.agentName || "agent"} ${result.agentVersion}, protocol ${String(result.protocolVersion)}. No session was opened.${canImportSessions(state.reports[key]) ? " Its saved sessions can be imported." : ""}`;
+    });
+
+// ─── Signing in to the agent's own account ──────────────────────────────────
+
+type SignInRequest = "check" | "signOut";
+
+const SIGN_IN_TEXT: Record<SignInStatus["state"], string> = {
+    signed_in: "signed in",
+    signed_out: "not signed in. Sign in with the agent's own login command on this computer",
+    unknown: "could not tell",
+};
+
+const signInText = (status: SignInStatus | undefined): string => {
+    if (status === undefined) {
+        return "not checked";
+    }
+
+    return status.detail === "" ? SIGN_IN_TEXT[status.state] : `${SIGN_IN_TEXT[status.state]}: ${status.detail}`;
+};
+
+const canSignOut = (status: SignInStatus | undefined): boolean => status?.state === "signed_in" && status.canSignOut;
+
+/**
+ * Bumped by every saved change: an agent's variable can change its value without changing its names, so a sign-in
+ * answer given before a save is not trusted after it.
+ */
+const saves: { count: number; queue: Promise<unknown> } = { count: 0, queue: Promise.resolve() };
+
+/** What the window asks the core to save: the same request the bridge takes. */
+type SavedUpdate = Parameters<typeof globalThis.neoreDevice.acpUpdate>[0];
+
+/** A view the window saved: the answers given before it are no longer about the configuration it left. */
+const savedView = async (update: SavedUpdate): Promise<AcpView> => {
+    // Saves go one at a time, in the order they were made: an older answer cannot land after a newer one.
+    const previous = saves.queue;
+    let finish: () => void = () => {};
+
+    saves.queue = new Promise<void>((resolve) => {
+        finish = () => {
+            resolve();
+        };
+    });
+
+    await previous;
+
+    try {
+        const view = await globalThis.neoreDevice.acpUpdate(update);
+
+        saves.count += 1;
+
+        return view;
+    } finally {
+        finish();
+    }
+};
+
+/** The account line of an agent's row: a polite live region, so a sign-in answer or request is announced to screen readers. */
+const accountItem = (key: string, ...actions: HTMLElement[]): HTMLLIElement => {
+    const row = item(`↳ Account: ${accountText(key)}`, ...actions);
+
+    row.firstElementChild?.setAttribute("role", "status");
+
+    return row;
+};
+
+/** What decides which account an agent reaches: its program, its variables, and every change saved since. */
+const agentConfig = (key: string): string => {
+    const agent = state.view.agents.find((candidate) => candidate.key === key);
+
+    return JSON.stringify([saves.count, agent?.command, agent?.args, agent?.install, agent?.envNames, state.view.envNames]);
+};
+
+const accountText = (key: string): string => {
+    const pending = state.signInPending.get(key);
+
+    return pending === undefined ? signInText(signInOf(key)) : SIGN_IN_PENDING[pending];
+};
+
+/** The agent's last sign-in answer, if it was given for the agent as it is configured now. */
+const signInOf = (key: string): SignInStatus | undefined => {
+    const known = state.signIn[key];
+
+    return known?.config === agentConfig(key) ? known.status : undefined;
+};
+
+/** How the row names a request that is running. */
+const SIGN_IN_PENDING: Record<SignInRequest, string> = {
+    check: "checking…",
+    signOut: "signing out…",
+};
+
+/**
+ * Asks the main process about an agent's account, one request per agent at a time: a second would start another agent
+ * process, and a check answered from before a sign-out could replace its result. The row says what runs meanwhile.
+ */
+const askSignIn = async (key: string, request: SignInRequest, ask: () => Promise<SignInStatus>): Promise<void> => {
+    const config = agentConfig(key);
+    // The rows are rebuilt while the request runs; the control the person used gets its focus back after each rebuild.
+    const focused = focusedAgentControl();
+
+    state.signInPending.set(key, request);
+    renderAgents();
+    restoreAgentFocus(focused, key);
+
+    try {
+        state.signIn[key] = { config, status: await ask() };
+    } finally {
+        // Read again: the person can have moved on to another field while the request ran.
+        const stillFocused = focusedAgentControl();
+
+        state.signInPending.delete(key);
+        renderAgents();
+        restoreAgentFocus(stillFocused, key);
+    }
+};
+
+/** The label of the agent-list control that has focus, if one does: rebuilding the rows would drop it. */
+const focusedAgentControl = (): string | undefined => {
+    const active = document.activeElement;
+
+    return active instanceof HTMLButtonElement && $("acp-agents").contains(active) ? (active.getAttribute("aria-label") ?? undefined) : undefined;
+};
+
+/**
+ * Puts focus back on the control with `label` after the rows are rebuilt. A control that is hidden meanwhile (Sign out,
+ * during a request) falls back to the agent's own check, so keyboard focus never drops to the page.
+ */
+const restoreAgentFocus = (label: string | undefined, key: string): void => {
+    if (label === undefined) {
+        return;
+    }
+
+    const controls = [...$("acp-agents").querySelectorAll("button")];
+    const target = controls.find((control) => control.getAttribute("aria-label") === label)
+        ?? controls.find((control) => control.getAttribute("aria-label") === `Check whether ${agentLabel(key)} is signed in`);
+
+    target?.focus();
+};
+
+/** A sign-in request for `key` is running; its row says which, so a click meanwhile does nothing. */
+const signInBusy = (key: string): boolean => state.signInPending.has(key);
+
+const checkSignIn = (key: string) =>
+    guarded(async () => {
+        if (!signInBusy(key)) {
+            await askSignIn(key, "check", () => globalThis.neoreDevice.acpSignInStatus(key));
+        }
+    });
+
+const signOut = (key: string) =>
+    guarded(async () => {
+        if (signInBusy(key)) {
+            return;
+        }
+
+        const open = state.sessions.filter((session) => session.agentKey === key && session.status !== "ended").length;
+        const sessions = open === 1 ? "session" : "sessions";
+        const ending = open === 0 ? "" : ` Its ${String(open)} open ${sessions} on this computer end first.`;
+
+        if (!await globalThis.neoreDevice.confirm(`Sign ${agentLabel(key)} out of its account?${ending}`)) {
+            return;
+        }
+
+        // Checked again: a request could have started while this one's dialog was open.
+        if (!signInBusy(key)) {
+            await askSignIn(key, "signOut", () => globalThis.neoreDevice.acpSignOut(key));
+        }
     });
 
 // ─── Importing saved sessions ───────────────────────────────────────────────
@@ -242,6 +418,7 @@ const renderAgents = (): void => {
                         ? `${agent.label}: ${[agent.command, ...agent.args].join(" ")}`
                         : `${agent.label} ${agent.install.version} from the registry, by ${agent.install.publisher} (pinned, checksum ${agent.install.sha256.slice(0, 12)}…)`,
                     button("Check version", `Check the version of ${agent.label}`, () => probe(agent.key)),
+                    button("Check sign-in", `Check whether ${agent.label} is signed in`, () => checkSignIn(agent.key)),
                     button("Approve a folder…", `Approve a folder for ${agent.label}`, () => approveFolder(agent.key)),
                     button("Remove", `Remove ${agent.label}`, () => {
                         guarded(async () => {
@@ -249,10 +426,14 @@ const renderAgents = (): void => {
                                 return;
                             }
 
-                            state.view = await globalThis.neoreDevice.acpUpdate({ key: agent.key, op: "removeAgent" });
+                            state.view = await savedView({ key: agent.key, op: "removeAgent" });
                             renderAgents();
                         });
                     }),
+                ),
+                accountItem(
+                    agent.key,
+                    ...!state.signInPending.has(agent.key) && canSignOut(signInOf(agent.key)) ? [button("Sign out", `Sign ${agent.label} out of its account`, () => signOut(agent.key))] : [],
                 ),
                 ...view.consents
                     .filter((consent) => consent.agentKey === agent.key)
@@ -266,7 +447,7 @@ const renderAgents = (): void => {
                                 : [],
                             button("Stop approving", `Stop approving ${agent.label} in ${consent.folderPath}`, () => {
                                 guarded(async () => {
-                                    state.view = await globalThis.neoreDevice.acpUpdate({ agentKey: agent.key, folderId: consent.folderId, op: "revoke" });
+                                    state.view = await savedView({ agentKey: agent.key, folderId: consent.folderId, op: "revoke" });
                                     renderAgents();
                                 });
                             }),
@@ -299,7 +480,7 @@ const renderAgents = (): void => {
                     `${owner}: ${name} = ••••••••`,
                     button("Remove", `Remove ${name} for ${owner}`, () => {
                         guarded(async () => {
-                            state.view = await globalThis.neoreDevice.acpUpdate({ agentKey, name, op: "removeEnv" });
+                            state.view = await savedView({ agentKey, name, op: "removeEnv" });
                             renderAgents();
                         });
                     }),
@@ -1019,7 +1200,7 @@ export const initAcp = async (): Promise<void> => {
                 return;
             }
 
-            state.view = await globalThis.neoreDevice.acpUpdate({ args, command, key: slug(label), label, op: "saveAgent" });
+            state.view = await savedView({ args, command, key: slug(label), label, op: "saveAgent" });
             ($("acp-agent-form") as HTMLFormElement).reset();
             renderAgents();
         });
@@ -1049,7 +1230,7 @@ export const initAcp = async (): Promise<void> => {
         guarded(async () => {
             const agentKey = $<HTMLSelectElement>("acp-env-scope").value || undefined;
 
-            state.view = await globalThis.neoreDevice.acpUpdate({ agentKey, name: field("acp-env-name").trim(), op: "setEnv", value: field("acp-env-value") });
+            state.view = await savedView({ agentKey, name: field("acp-env-name").trim(), op: "setEnv", value: field("acp-env-value") });
             // The value is not kept anywhere in the page once it is saved.
             ($("acp-env-form") as HTMLFormElement).reset();
             renderAgents();
