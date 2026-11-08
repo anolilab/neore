@@ -8,7 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cascadeDeleteUser } from "../auth/hooks";
 import { reassignGlobalRows } from "../lib/account-merge";
 import schema from "../schema";
-import { getNativePushConfig, registerPushDevice, unregisterPushDevice } from "./native-push";
+import { getNativePushConfig, isUniqueViolation, registerPushDevice, unregisterPushDevice } from "./native-push";
 import { collectNotificationsForExport, deleteUserNotifications } from "./gdpr";
 import { deleteIfUnchanged, dropPushDevicesOf, MAX_PUSH_DEVICES_PER_USER, trimPushDevices } from "./push-device-writes";
 
@@ -287,6 +287,89 @@ describe("phone push tokens", () => {
         );
 
         expect(await devicesOf(USER)).toMatchObject([{ sessionId: sessions[USER], token: PHONE }]);
+    });
+
+    it("gives a phone back to its previous account when the registration that took it is refused after the write", async () => {
+        await call(registerPushDevice, OTHER, { platform: "ios", token: PHONE });
+
+        // USER's session ends while its registration is on its way: the first check passes, the second does not.
+        const live = sessions[USER]!;
+        let checks = 0;
+
+        await harness.run(async (ctx: any) => {
+            const findFirst = ctx.db.session.findFirst.bind(ctx.db.session);
+
+            vi.spyOn(ctx.db.session, "findFirst").mockImplementation(async (options: any) => {
+                if (options.where._id !== live) {
+                    return await findFirst(options);
+                }
+
+                checks += 1;
+
+                return checks === 1 ? await findFirst(options) : null;
+            });
+
+            await (registerPushDevice as unknown as Handler<unknown>).handler(
+                {
+                    ...ctx,
+                    auth: {
+                        getIdentity: async () => {
+                            return { sessionId: live };
+                        },
+                        userId: USER,
+                    },
+                },
+                { platform: "ios", token: PHONE },
+            );
+        });
+
+        expect(await devicesOf(USER)).toHaveLength(0);
+        expect(await devicesOf(OTHER)).toMatchObject([{ sessionId: sessions[OTHER], token: PHONE }]);
+    });
+
+    it("does not bring a phone back to an account that signed out while the registration that took it was refused", async () => {
+        await call(registerPushDevice, OTHER, { platform: "ios", token: PHONE });
+
+        // Both sessions end while USER's registration is on its way: OTHER signed out, USER's session lapsed.
+        const live = sessions[USER]!;
+        let checks = 0;
+
+        await harness.run(async (ctx: any) => {
+            const findFirst = ctx.db.session.findFirst.bind(ctx.db.session);
+
+            vi.spyOn(ctx.db.session, "findFirst").mockImplementation(async (options: any) => {
+                if (options.where._id === live && checks === 0) {
+                    checks += 1;
+
+                    return await findFirst(options);
+                }
+
+                return null;
+            });
+
+            await (registerPushDevice as unknown as Handler<unknown>).handler(
+                {
+                    ...ctx,
+                    auth: {
+                        getIdentity: async () => {
+                            return { sessionId: live };
+                        },
+                        userId: USER,
+                    },
+                },
+                { platform: "ios", token: PHONE },
+            );
+        });
+
+        expect(await devicesOf(USER)).toHaveLength(0);
+        expect(await devicesOf(OTHER)).toHaveLength(0);
+    });
+
+    it("treats only a unique-index refusal as two registrations of one phone racing", () => {
+        expect(isUniqueViolation(Object.assign(new Error('unique constraint violation on "pushDevices"'), { kind: "unique" }))).toBe(true);
+        expect(isUniqueViolation(new Error("D1_ERROR: UNIQUE constraint failed: pushDevices.token"))).toBe(true);
+        expect(isUniqueViolation(new Error("D1_ERROR: network connection lost"))).toBe(false);
+        expect(isUniqueViolation(Object.assign(new Error("optimistic concurrency conflict"), { kind: "occ" }))).toBe(false);
     });
 
     it("registers nothing for a call that carries no session", async () => {

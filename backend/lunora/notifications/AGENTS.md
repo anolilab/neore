@@ -34,7 +34,10 @@
       that started before the row's last write is refused as superseded). A
       token is not a secret, so a leaked one can take a phone's pushes until it
       registers again (accepted: only the generic alert reaches a phone).
-      A registration takes its row back if an account deletion started meanwhile.
+      A registration refused after its write (its session ended, or an account
+      deletion started meanwhile) takes its row back: the registration it
+      replaced is put back only while that sign-in is live and its account is
+      not being erased. Only Lunora's `kind: "unique"` conflict is a race.
     - At most 10 per user (`trimPushDevices`). An account merge drops the guest's
       rows (`dropPushDevicesOf`) instead of moving them: they belong to a session
       that ends with the guest.

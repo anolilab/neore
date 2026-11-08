@@ -22,13 +22,21 @@ const vExpoPushToken = v.string().check((value) => value.length <= 200 && EXPO_P
 
 const vPlatform = v.union(v.literal("android"), v.literal("ios"));
 
-/** SQLite's own wording for a unique index refusing a row, as Lunora's D1 layer reports it; nothing else is a race. */
-const UNIQUE_CONSTRAINT_FAILED = /unique constraint failed/iu;
+/** SQLite's wording, raw ("failed") or as Lunora rewords it ("violation"). */
+const UNIQUE_CONSTRAINT = /unique constraint (?:failed|violation)/iu;
 
-const isUniqueViolation = (error: unknown): boolean => {
+/**
+ * A unique index refusing the row: Lunora's `ConflictError` with `kind: "unique"`, or SQLite's own error where a layer
+ * passes it through. Nothing else is two registrations racing.
+ */
+export const isUniqueViolation = (error: unknown): boolean => {
+    if ((error as { kind?: unknown } | null)?.kind === "unique") {
+        return true;
+    }
+
     const cause = error instanceof Error ? error.cause : undefined;
 
-    return UNIQUE_CONSTRAINT_FAILED.test(String(error)) || (cause !== undefined && UNIQUE_CONSTRAINT_FAILED.test(String(cause)));
+    return UNIQUE_CONSTRAINT.test(String(error)) || (cause !== undefined && UNIQUE_CONSTRAINT.test(String(cause)));
 };
 
 /**
@@ -88,15 +96,15 @@ export const registerPushDevice = authMutation
 
         const now = Date.now();
         const database = systemDb(ctx);
-        const isLive = async () => {
-            // An expired session counts as gone: a phone tied to it would never be sent to. Checked before the write too,
-            // so a request whose JWT outlived its session never takes a phone from a live registration.
-            const session = await database.session.findFirst({ consistency: "primary", where: { _id: sessionId as Id<"session"> } });
+        // An expired session counts as gone: a phone tied to it would never be sent to. Checked before the write too, so
+        // a request whose JWT outlived its session never takes a phone from a live registration.
+        const isLive = async (row: { sessionId: string; userId: string }) => {
+            const session = await database.session.findFirst({ consistency: "primary", where: { _id: row.sessionId as Id<"session"> } });
 
-            return session?.userId === userId && session.expiresAt > Date.now();
+            return session?.userId === row.userId && session.expiresAt > Date.now();
         };
 
-        if (!(await isLive())) {
+        if (!(await isLive({ sessionId, userId }))) {
             return refuse("session_ended");
         }
 
@@ -111,8 +119,9 @@ export const registerPushDevice = authMutation
             return refuse("superseded");
         }
 
-        // The account the row was taken from, when it was another one: logged, so a takeover can be seen.
-        let previousOwner = existing?.userId;
+        // The row as it was before this call took it over, if it existed: put back if the call is refused below, so a
+        // refused registration never erases the one it replaced.
+        let replaced = existing ?? undefined;
 
         if (existing) {
             await database.patch("pushDevices", existing._id, { lastSeenAt: now, platform: args.platform, sessionId, userId });
@@ -136,7 +145,7 @@ export const registerPushDevice = authMutation
                     return refuse("superseded");
                 }
 
-                previousOwner = raced.userId;
+                replaced = raced;
                 await database.patch("pushDevices", raced._id, { lastSeenAt: now, platform: args.platform, sessionId, userId });
             }
         }
@@ -145,14 +154,27 @@ export const registerPushDevice = authMutation
         // ask again, and take back this row, so a phone never outlives the account's erasure. A guest is deleted
         // without a deletion request (inactive-guest cleanup, the end of a merge), its sessions first: a session gone
         // by now means the same.
-        const isSessionLive = await isLive();
+        const isSessionLive = await isLive({ sessionId, userId });
         const isDeleting = isSessionLive && (await isAccountDeletionUnderway(ctx, userId));
 
         if (!isSessionLive || isDeleting) {
             const written = await database.pushDevices.findFirst({ consistency: "primary", where: { token: args.token, userId } });
 
-            if (written) {
-                await deleteIfUnchanged(database, written);
+            // Only the row exactly as this call wrote it: a newer registration since (another sign-in) stays.
+            if (written?.sessionId === sessionId && written.lastSeenAt === now) {
+                // The registration this call replaced goes back only while it is still a live sign-in of an account that
+                // is not being erased: one that signed out or was deleted meanwhile must not come back.
+                const canRestore = replaced !== undefined && (await isLive(replaced)) && !(await isAccountDeletionUnderway(ctx, replaced.userId));
+
+                if (canRestore) {
+                    const { lastSeenAt, platform, sessionId: replacedSession, userId: replacedOwner } = replaced!;
+
+                    await database.patch("pushDevices", written._id, { lastSeenAt, platform, sessionId: replacedSession, userId: replacedOwner });
+                    // That account may have registered other phones meanwhile: keep it under the cap.
+                    await trimPushDevices(database, replacedOwner);
+                } else {
+                    await deleteIfUnchanged(database, written);
+                }
             }
 
             return refuse(isSessionLive ? "deleting" : "session_ended");
@@ -162,7 +184,7 @@ export const registerPushDevice = authMutation
         const pruned = await trimPushDevices(ctx.db, userId);
 
         ctx.log.event("notifications.register_push_device", {
-            moved: previousOwner !== undefined && previousOwner !== userId,
+            moved: replaced !== undefined && replaced.userId !== userId,
             platform: args.platform,
             pruned,
         });
