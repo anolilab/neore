@@ -25,6 +25,13 @@ __has1 = true;
 if (typeof source["threadId"] !== "string") return DEFER;
 return { ...(__has1 ? { "discardWaiting": __val1 } : {}), "threadId": source["threadId"] };
 });
+installCompiledValidatorMap(lunora_chat_guest_links_76.releaseGuestNoteSend.args, (source) => {
+if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
+if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
+if (typeof source["claimedAt"] !== "number" || !Number.isFinite(source["claimedAt"])) return DEFER;
+if (typeof source["messageId"] !== "string") return DEFER;
+return { "claimedAt": source["claimedAt"], "messageId": source["messageId"] };
+});
 installCompiledValidatorMap(lunora_chat_guest_links_76.revokeGuestLink.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;

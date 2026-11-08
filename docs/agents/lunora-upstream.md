@@ -19,6 +19,10 @@ shared facade, since `lunora/notify.ts` makes a fresh memory store per ctx),
 The ORM-facade reads and
 `agent/admitted-thread-db.ts` stay, as ordinary code, not as a workaround).
 
+**Not filed yet (owner to decide):** in `lunoraTest` (`@lunora/server@alpha.273`), `rls()` ignores a range on the second
+index field of `messages` (read policy: `OR` of `{ userId }` and `{ threadId: { in } }`); the owner-policy `threadGuestLinks`
+honours it. `findSentNote` reads through `admittedThreadDb`; `agent/messages.ts#pinFollowingRowParent` is exposed.
+
 Moving queue, mail, push and uploads onto Lunora (2026-10) filed and saw fixed,
 workarounds retired with `@lunora/cli@alpha.365`:
 [#1036](https://github.com/anolilab/lunora/issues/1036) (a `-preview` queue routed

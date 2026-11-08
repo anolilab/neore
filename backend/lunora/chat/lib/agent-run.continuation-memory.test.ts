@@ -7,7 +7,8 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { internal } from "../../_generated/internal";
-import { afterRun, memoryToCarry, resumeApprovedRun } from "./agent-run";
+import { afterRun, mayExtractMemory, memoryToCarry, resumeApprovedRun } from "./agent-run";
+import { guestTextPart } from "./attached-text";
 import { buildAgentTools } from "./agent-tools";
 import getAgent from "./get-agent";
 import type { ToolRunConfig } from "./tool-run-config";
@@ -266,5 +267,14 @@ describe("who started the turn a continuation resumes", () => {
 
     it("is nobody for a snapshot that does not say", async () => {
         expect(await resumeWith(BASE_CONFIG)).toBeUndefined();
+    });
+});
+
+describe(mayExtractMemory, () => {
+    const thread = { lockedAt: undefined };
+
+    it("mines the owner's own prompt, and never a guest's note the owner sent on", () => {
+        expect(mayExtractMemory(true, thread, { message: { content: [{ text: "I live in Berlin", type: "text" }], role: "user" } })).toBe(true);
+        expect(mayExtractMemory(true, thread, { message: { content: [guestTextPart("I live in Berlin", "note-1")], role: "user" } })).toBe(false);
     });
 });

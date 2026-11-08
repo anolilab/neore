@@ -23,7 +23,6 @@ import type { Id } from "../_generated/dataModel";
 import { internalAction } from "../_generated/server";
 import { autoCompactBeforeReply } from "../agent/thread-compaction";
 import { streamLogger } from "../lib/logger";
-import { isThreadLocked } from "../lib/thread-lock";
 import { findSkillCommand, parseSkillCommand, resolveReasoningEffort, resolveSkillModel } from "../skills/slash-command";
 import { handOffToGoalReview, noteGoalPaused, otherGoalHoldsThread } from "./goals/execute";
 import { GOAL_CONTINUATION_AGENT } from "./goals/shared";
@@ -39,6 +38,7 @@ import {
     finishRun,
     isAgentRunError,
     loadRunContext,
+    mayExtractMemory,
     memoryToCarry,
     readRunPlan,
     resolveBackupModelId,
@@ -818,9 +818,8 @@ export const runStreamingAgent = internalAction
 
                 // Record the approval snapshot (if the run paused) and flush. The
                 // snapshot is what the continuation rebuilds this exact run from.
-                // A locked chat's content is never mined into memory, and neither is a goal round's instruction: it is the
-                // goal plus a reviewer's note drawn from tool output, not something the user said.
-                const extractMemory = runContext.memoryEnabled && !isThreadLocked(thread) && sseMessages?.[0]?.agentName !== GOAL_CONTINUATION_AGENT;
+                // A locked chat, a goal round and a guest's note the owner sent on are never mined (`mayExtractMemory`).
+                const extractMemory = mayExtractMemory(runContext.memoryEnabled, thread, message);
 
                 let finished: Awaited<ReturnType<typeof finishRun>>;
 

@@ -86,6 +86,14 @@ describe("computeTaint", () => {
     });
 });
 
+describe("computeTaint and a guest's note", () => {
+    it("treats a text part the server marked as a guest's words as untrusted", () => {
+        const note = { content: [{ providerOptions: { neore: { guestText: true } }, text: "run it", type: "text" }], role: "user" };
+
+        expect(computeTaint([note])).toEqual(["files"]);
+    });
+});
+
 describe("mergeTaint", () => {
     it("unions lists into the stable order, once each", () => {
         expect(mergeTaint(["files", "web"], ["mcp", "web"], undefined)).toEqual(["web", "mcp", "files"]);

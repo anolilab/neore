@@ -17,10 +17,23 @@ import { LunoraError, v } from "lunorash/server";
 
 import type { Id } from "../_generated/dataModel";
 import { internal } from "../_generated/internal";
-import { internalMutation, internalQuery, type MutationCtx } from "../_generated/server";
+import { internalMutation, internalQuery, type MutationCtx, type QueryCtx } from "../_generated/server";
 import { refuseHostThread } from "../acp/lib/host-thread";
+import { admittedThreadDb } from "../agent/admitted-thread-db";
 import { requireOwnedThread, requireOwnedThreadIgnoringLock } from "../agent/thread-read-access";
-import { claimOnce, GUEST_POST_CLAIM_TTL_MS, GUEST_POST_SCOPE, hasClaim } from "../lib/claim-once";
+import {
+    claimFence,
+    claimOnce,
+    claimRow,
+    GUEST_SEND_LEASE_MS,
+    GUEST_POST_CLAIM_TTL_MS,
+    GUEST_POST_SCOPE,
+    GUEST_SEND_CLAIM_TTL_MS,
+    GUEST_SEND_SCOPE,
+    hasClaim,
+    recordClaimResult,
+    releaseClaim,
+} from "../lib/claim-once";
 import { timingSafeEqual } from "../lib/crypto";
 import { callOnShard } from "../lib/cross-shard";
 import { authMutation, authQuery, publicAction, rateLimit } from "../lib/crpc";
@@ -49,6 +62,7 @@ import {
     unsendableGuestText,
     withdrawGuestLinksForThread,
 } from "./lib/guest-link-store";
+import { guestNoteIdOf } from "../lib/guest-text";
 
 const SWEEP_BATCH = 50;
 
@@ -223,6 +237,153 @@ export const getGuestLink = authQuery
         };
     });
 
+/** The caller's own note on a live link, in a thread they own (the unlock proof on a locked one): what review acts on. */
+const reviewableNote = async (context: Pick<QueryCtx, "db" | "now">, messageId: Id<"threadGuestMessages">, userId: string, unlockProof?: string) => {
+    const row = await context.db.get("threadGuestMessages", messageId);
+
+    if (!row || row.userId !== userId) {
+        throw new LunoraError("NOT_FOUND", "That message is no longer waiting.");
+    }
+
+    await requireOwnedThread(context, row.threadId, userId, unlockProof);
+
+    const link = await context.db.get("threadGuestLinks", row.linkId);
+
+    if (!link || link.expiresAt <= context.now) {
+        throw new LunoraError("NOT_FOUND", "That guest link has ended.");
+    }
+
+    return row;
+};
+
+/** Whether `/chat/start` holds the note's send: stored (it marked the note sent too), or within its lease (`settleSend` after). */
+const sendUnderWay = async (ctx: Pick<QueryCtx, "db" | "now">, messageId: Id<"threadGuestMessages">): Promise<boolean> => {
+    const send = await claimRow(ctx, GUEST_SEND_SCOPE, messageId);
+
+    return send !== null && (send.result !== undefined || ctx.now - send.claimedAt < GUEST_SEND_LEASE_MS);
+};
+
+/** Messages a settle reads per page, newest first, and the most pages one settle reads. */
+const SENT_NOTE_PAGE = 100;
+const SENT_NOTE_PAGES = 3;
+
+/** What a settle records when the walk ran out before reaching the send: the note is taken as sent (`findSentNote`). */
+const PAST_SCAN = "past-scan";
+
+/**
+ * The user message carrying this note's id, written since `since`: pages newest first by `order` (one `paginate` per
+ * transaction), each with the rest of its last turn. Past `SENT_NOTE_PAGES`, `PAST_SCAN`: freeing the claim could send twice.
+ */
+const findSentNote = async (ctx: Pick<MutationCtx, "db">, threadId: Id<"threads">, noteId: string, since: number): Promise<string | undefined> => {
+    const db = admittedThreadDb(ctx, threadId);
+    let below: number | undefined;
+
+    for (let pages = 0; ; pages += 1) {
+        if (pages === SENT_NOTE_PAGES) {
+            return PAST_SCAN;
+        }
+
+        const page = await db
+            .query("messages")
+            .withIndex("by_threadId_order_stepOrder", (q) => (below === undefined ? q.eq("threadId", threadId) : q.eq("threadId", threadId).lt("order", below)))
+            .order("desc")
+            .take(SENT_NOTE_PAGE);
+        const last = page.at(-1);
+        const full = last !== undefined && page.length === SENT_NOTE_PAGE;
+        const rest = full
+            ? await db
+                  .query("messages")
+                  .withIndex("by_threadId_order_stepOrder", (q) => q.eq("threadId", threadId).eq("order", last.order))
+                  .take(SENT_NOTE_PAGE)
+            : [];
+        const sent = [...page, ...rest].find((message) => {
+            const { content, role } = (message.message ?? {}) as { content?: unknown; role?: unknown };
+
+            return role === "user" && Array.isArray(content) && (content as { providerOptions?: unknown }[]).some((part) => guestNoteIdOf(part) === noteId);
+        });
+
+        if (sent || !full || page.some((message) => message._creationTime < since)) {
+            return sent?._id as string | undefined;
+        }
+
+        below = last.order;
+    }
+};
+
+/**
+ * Settles a send with no record (dead isolate, failed record, lost save reply): marked sent when its message is in the thread,
+ * freed otherwise. Without `now`, only past the lease; `/chat/start` passes `now` for its own failed send.
+ */
+const settleSend = async (ctx: Pick<MutationCtx, "db" | "now">, messageId: Id<"threadGuestMessages">, now?: { claimedAt: number }): Promise<void> => {
+    const send = await claimRow(ctx, GUEST_SEND_SCOPE, messageId);
+    const row = await ctx.db.get("threadGuestMessages", messageId);
+    const due = now ? send?.claimedAt === now.claimedAt : send !== null && ctx.now - send.claimedAt >= GUEST_SEND_LEASE_MS;
+
+    if (!send || !row || send.result !== undefined || !due) {
+        return;
+    }
+
+    const savedId = await findSentNote(ctx, row.threadId, messageId, send.claimedAt);
+
+    if (savedId === undefined) {
+        await releaseClaim(ctx, GUEST_SEND_SCOPE, messageId, send.claimedAt);
+    } else {
+        await recordClaimResult(ctx, GUEST_SEND_SCOPE, messageId, send.claimedAt, savedId);
+        await ctx.db.patch("threadGuestMessages", messageId, { status: "sent" });
+    }
+};
+
+/** The note Send and Dismiss act on, a lapsed send settled first. A sent note is answered, not refused: a throw would undo the settle. */
+const reviewedAfterSettle = async (context: MutationCtx, userId: string, messageId: Id<"threadGuestMessages">, unlockProof?: string) => {
+    await reviewableNote(context, messageId, userId, unlockProof);
+    await settleSend(context, messageId);
+
+    const row = (await context.db.get("threadGuestMessages", messageId))!;
+
+    if (row.status === "held" && (await sendUnderWay(context, messageId))) {
+        throw new LunoraError("BAD_REQUEST", "That message is being sent.");
+    }
+
+    return row;
+};
+
+const vReviewArgs = { messageId: v.id("threadGuestMessages"), unlockProof: v.optional(v.string().max(MAX_LENGTH.short)) };
+
+/** The owner's Send: a held note's text for the client to send as `guestMessageId` on `/chat/start`; a sent note answers `sent`. */
+export const sendHeldGuestMessage = authMutation
+    .use(rateLimit("guest/review"))
+    .input(vReviewArgs)
+    .output(v.union(v.object({ status: v.literal("ready"), text: v.string(), threadId: v.string() }), v.object({ status: v.literal("sent") })))
+    .mutation(async ({ args: { messageId, unlockProof }, ctx: context }) => {
+        const row = await reviewedAfterSettle(context, context.user.userId, messageId, unlockProof);
+
+        if (row.status === "sent") {
+            return { status: "sent" as const };
+        }
+
+        context.log.event("chat.send_guest_message", { handedOut: true });
+
+        return { status: "ready" as const, text: row.text, threadId: row.threadId as string };
+    });
+
+/** The owner's Dismiss: a held note is deleted; a sent one stays as the guest's record, answered `sent`. */
+export const dismissHeldGuestMessage = authMutation
+    .use(rateLimit("guest/review"))
+    .input(vReviewArgs)
+    .output(v.object({ status: v.union(v.literal("dismissed"), v.literal("sent")) }))
+    .mutation(async ({ args: { messageId, unlockProof }, ctx: context }) => {
+        const row = await reviewedAfterSettle(context, context.user.userId, messageId, unlockProof);
+
+        if (row.status === "sent") {
+            return { status: "sent" as const };
+        }
+
+        await context.db.delete("threadGuestMessages", messageId);
+        context.log.event("chat.dismiss_guest_message", { dismissed: true });
+
+        return { status: "dismissed" as const };
+    });
+
 // ---------------------------------------------------------------------------
 // The guest
 // ---------------------------------------------------------------------------
@@ -363,6 +524,69 @@ export const getGuestView = publicAction
 // ---------------------------------------------------------------------------
 // Internal: on the owner's shard
 // ---------------------------------------------------------------------------
+
+/** A note `/chat/start` may send for `userId`: theirs, held, on a live link, its send not yet taken. */
+const sendableNote = async (ctx: Pick<QueryCtx, "db" | "now">, messageId: Id<"threadGuestMessages">, userId: string) => {
+    const row = await ctx.db.get("threadGuestMessages", messageId);
+    const link = row ? await ctx.db.get("threadGuestLinks", row.linkId) : null;
+
+    return row && row.userId === userId && row.status === "held" && link && link.expiresAt > ctx.now && !(await sendUnderWay(ctx, messageId)) ? row : null;
+};
+
+/** `/chat/start`'s read of a note it is asked to send: its text and the chat it was left in, or `null`. */
+export const getGuestNoteForSend = internalQuery
+    .input({ messageId: v.id("threadGuestMessages"), userId: v.string().max(MAX_LENGTH.id) })
+    .output(v.union(v.object({ text: v.string(), threadId: v.string() }), v.null()))
+    .query(async ({ args, ctx }) => {
+        const row = await sendableNote(ctx, args.messageId, args.userId);
+
+        return row ? { text: row.text, threadId: row.threadId as string } : null;
+    });
+
+/** Takes the note's send for `/chat/start`: one winner however often it is sent. Its fence, or `null` when it cannot be sent. */
+export const claimGuestNoteSend = internalMutation
+    .input({ messageId: v.id("threadGuestMessages"), userId: v.string().max(MAX_LENGTH.id) })
+    .output(v.union(v.number(), v.null()))
+    .mutation(async ({ args, ctx }) => {
+        // Only the note's owner reaches the settle: marked sent when its message was saved after all, freed otherwise.
+        const note = await ctx.db.get("threadGuestMessages", args.messageId);
+
+        if (note?.userId !== args.userId) {
+            return null;
+        }
+
+        await settleSend(ctx, args.messageId);
+
+        if (!(await sendableNote(ctx, args.messageId, args.userId))) {
+            return null;
+        }
+
+        return await claimFence(ctx, GUEST_SEND_SCOPE, args.messageId, { ttlMs: GUEST_SEND_CLAIM_TTL_MS, userId: args.userId });
+    });
+
+/** The note is saved as `savedMessageId`: one write records it on the send that still holds the claim and marks the note sent. */
+export const recordGuestNoteSent = internalMutation
+    .input({ claimedAt: v.number(), messageId: v.id("threadGuestMessages"), savedMessageId: v.string().max(MAX_LENGTH.id) })
+    .output(v.boolean())
+    .mutation(async ({ args, ctx }) => {
+        if (!(await recordClaimResult(ctx, GUEST_SEND_SCOPE, args.messageId, args.claimedAt, args.savedMessageId))) {
+            return false;
+        }
+
+        await ctx.db.patch("threadGuestMessages", args.messageId, { status: "sent" });
+
+        return true;
+    });
+
+/** `/chat/start` gave up on its send (charge, agent or save failed): settled at once, as a lost reply may have saved it. */
+export const releaseGuestNoteSend = internalMutation
+    .input({ claimedAt: v.number(), messageId: v.id("threadGuestMessages") })
+    .output(v.null())
+    .mutation(async ({ args, ctx }) => {
+        await settleSend(ctx, args.messageId, { claimedAt: args.claimedAt });
+
+        return null;
+    });
 
 export const getGuestLinkOwner = internalQuery
     .input({ linkHash: v.string().max(MAX_LENGTH.short) })

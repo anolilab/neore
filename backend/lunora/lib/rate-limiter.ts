@@ -282,6 +282,9 @@ export const RATE_LIMIT_CONFIGS = {
     "guest/message:free": Ratelimit.fixedWindow(30, HOUR),
     "guest/message:premium": Ratelimit.fixedWindow(30, HOUR),
     "guest/message:public": Ratelimit.fixedWindow(30, HOUR),
+    // An owner working through a full queue of guest notes: each takes a send and a confirm, and a dismiss for the rest.
+    "guest/review:free": Ratelimit.fixedWindow(40, MINUTE),
+    "guest/review:premium": Ratelimit.fixedWindow(80, MINUTE),
     // Remote control of a coding agent (`acp/remote.ts`, `acp/send.ts`): each one queues a signed command for a
     // computer that holds three open ones, so a person gets a burst, not a stream.
     "hosts/answer:free": Ratelimit.fixedWindow(60, MINUTE),

@@ -60,12 +60,17 @@ vi.mock("../lib/rate-limiter", async (importOriginal) => {
 
 const { default: schema } = await import("../schema");
 const guestLinks = await import("./guest-links");
+const { claimRow, GUEST_SEND_LEASE_MS, GUEST_SEND_SCOPE } = await import("../lib/claim-once");
+const { guestTextPart } = await import("./lib/attached-text");
 const { GUEST_MAX_HELD_PER_LINK, GUEST_MESSAGE_MAX_CHARS, hashGuestToken } = await import("./lib/guest-link-store");
 
 const OWNER = "user-owner";
 const BROWSER = "fresh-browser-token";
 const OTHER_BROWSER = /another browser/u;
 const NOT_ACTIVE = /not active/u;
+const NO_LONGER_WAITING = /no longer waiting/u;
+const LOCKED = /chat is locked/u;
+const BEING_SENT = /being sent/u;
 const REUSED_REQUEST = /already used for a different message/u;
 const LIMITED = /Too many messages on this link/u;
 const MINTED_TOKEN = /^[0-9a-f]{64}$/u;
@@ -335,6 +340,116 @@ describe("the guest actions", () => {
 
         await settle();
         await expect(post({ guestToken: NAMED, linkToken, text: "one too many" })).rejects.toThrow(LIMITED);
+    });
+});
+
+describe("reviewing a held note", () => {
+    const review =
+        (name: "dismissHeldGuestMessage" | "sendHeldGuestMessage", userId = OWNER) =>
+        async (messageId: string) =>
+            await harness.withIdentity({ userId } as never).mutation(guestLinks[name] as never, { messageId } as never);
+    const PROCEDURES = ["sendHeldGuestMessage", "dismissHeldGuestMessage"] as const;
+    const takeSend = async (messageId: string) =>
+        (await harness.run(async (ctx: any) => await ctx.runMutation(guestLinks.claimGuestNoteSend, { messageId, userId: OWNER }))) as number | null;
+
+    const heldNote = async () => {
+        const { linkToken } = await createLink();
+
+        return (await hold(linkToken, "please call me back")).messageId!;
+    };
+
+    it.each(PROCEDURES)("%s is refused to a stranger, an admin grantee, and on a locked chat without its proof", async (name) => {
+        const messageId = await heldNote();
+
+        await harness.run(
+            async (ctx: any) => await ctx.db.insert("threadAccess", { grantedAt: 0, grantedBy: OWNER, permission: "admin", threadId, userId: "user-admin" }),
+        );
+        await expect(review(name, "user-stranger")(messageId)).rejects.toThrow(NO_LONGER_WAITING);
+        await expect(review(name, "user-admin")(messageId)).rejects.toThrow(NO_LONGER_WAITING);
+        await harness.run(async (ctx: any) => await ctx.db.patch("threads", threadId, { lockedAt: NOW }));
+        await expect(review(name)(messageId)).rejects.toThrow(LOCKED);
+        expect(await rows("threadGuestMessages")).toMatchObject([{ status: "held" }]);
+    });
+
+    it("sends a note once: the stored send marks it sent, after which it is neither sent again nor dismissed", async () => {
+        const messageId = await heldNote();
+
+        expect(await review("sendHeldGuestMessage")(messageId)).toEqual({ status: "ready", text: "please call me back", threadId });
+
+        // What `/chat/start` does around its save: take the send, then record the stored message.
+        const claimedAt = await takeSend(messageId);
+
+        expect(await takeSend(messageId)).toBeNull();
+        await harness.run(async (ctx: any) => await ctx.runMutation(guestLinks.recordGuestNoteSent, { claimedAt, messageId, savedMessageId: "saved-1" }));
+
+        expect(await rows("threadGuestMessages")).toMatchObject([{ status: "sent" }]);
+        expect(await review("sendHeldGuestMessage")(messageId)).toEqual({ status: "sent" });
+        expect(await review("dismissHeldGuestMessage")(messageId)).toEqual({ status: "sent" });
+    });
+
+    it("frees a note whose send died before storing anything, once the send's lease lapses", async () => {
+        const messageId = await heldNote();
+
+        await takeSend(messageId);
+        await expect(review("sendHeldGuestMessage")(messageId)).rejects.toThrow(BEING_SENT);
+
+        vi.setSystemTime(NOW + GUEST_SEND_LEASE_MS + 1);
+
+        expect(await review("sendHeldGuestMessage")(messageId)).toMatchObject({ text: "please call me back" });
+        expect(await takeSend(messageId)).toEqual(expect.any(Number));
+    });
+
+    /** `[order, stepOrder]` rows written after the send; the first carries the note when `tagged`. */
+    const span = (orders: number, steps = 1) => Array.from({ length: orders * steps }, (_unused, index) => [1 + Math.floor(index / steps), index % steps]);
+
+    it.each([
+        ["behind more than a page of newer turns", span(130), true],
+        ["in its own turn of more than a page of rows", span(1, 130), true],
+        ["nowhere within the walk's cap: taken as sent, never freed to be sent twice", span(320), false],
+    ] as const)("settles a lapsed send whose message is %s by marking the note sent", async (_label, rowsAfter, tagged) => {
+        const messageId = await heldNote();
+
+        await takeSend(messageId);
+
+        const noteRowId = await harness.run(async (ctx: any) => {
+            let first: string | undefined;
+
+            for (const [index, [order, stepOrder]] of rowsAfter.entries()) {
+                const note = tagged && index === 0;
+                const id = await ctx.db.insert("messages", {
+                    message: {
+                        content: [note ? guestTextPart("please call me back", messageId) : { text: "step", type: "text" }],
+                        role: note ? "user" : "assistant",
+                    },
+                    order,
+                    status: "success",
+                    stepOrder,
+                    text: "",
+                    threadId,
+                    tool: false,
+                    userId: OWNER,
+                });
+
+                first ??= id;
+            }
+
+            return first;
+        });
+
+        vi.setSystemTime(NOW + GUEST_SEND_LEASE_MS + 1);
+
+        expect(await review("sendHeldGuestMessage")(messageId)).toEqual({ status: "sent" });
+        expect(await rows("threadGuestMessages")).toMatchObject([{ status: "sent" }]);
+        // Found, or taken as sent past the walk: the claim records which.
+        expect((await harness.run(async (ctx: any) => await claimRow(ctx, GUEST_SEND_SCOPE, messageId)))?.result).toBe(tagged ? noteRowId : "past-scan");
+    });
+
+    it("dismisses a held note by deleting it", async () => {
+        const messageId = await heldNote();
+
+        await review("dismissHeldGuestMessage")(messageId);
+
+        expect(await rows("threadGuestMessages")).toHaveLength(0);
     });
 });
 

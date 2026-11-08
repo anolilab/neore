@@ -12,6 +12,9 @@
  * and flushes the stream, the post-run bookkeeping (`afterRun`), resuming an
  * approved run (`resumeApprovedRun`) and the error cleanup.
  */
+import { isThreadLocked } from "../../lib/thread-lock";
+import { GOAL_CONTINUATION_AGENT } from "../goals/shared";
+import { messageCarriesGuestText } from "./attached-text";
 import { MODEL_LOOKUP, type ModelDefinition, type ModelFilterRules, parseCustomModelId } from "@neore/ai/models";
 import type { UserPersonalization } from "@neore/ai/prompts";
 import { buildMemoryContext } from "@neore/ai/prompts";
@@ -779,6 +782,18 @@ export const buildRunStreamArgs = (options: {
 
     return streamTextArgs;
 };
+
+/** Whether a finished run mines its prompt for memory: never a locked chat, a goal round or a guest's note (not the owner's words). */
+export const mayExtractMemory = (
+    memoryEnabled: boolean,
+    thread: Parameters<typeof isThreadLocked>[0] | null,
+    prompt: { agentName?: string; message?: unknown } | null | undefined,
+): boolean =>
+    memoryEnabled &&
+    thread !== null &&
+    !isThreadLocked(thread) &&
+    !messageCarriesGuestText(prompt?.message as Parameters<typeof messageCarriesGuestText>[0]) &&
+    prompt?.agentName !== GOAL_CONTINUATION_AGENT;
 
 /**
  * What a run that may pause carries in its approval snapshot: that it was mined for memory, and for
