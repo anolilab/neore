@@ -23,10 +23,13 @@ const LINE_BREAK = /\r?\n/u;
 const PATH_SEPARATOR = /[/\\]/u;
 /** A line that is one URL or file URI: what a file manager or a browser's "Copy Image" puts next to the files it copies. */
 const LINK_LINE = /^(?:file|https?):\/\/\S+$/iu;
-/** HTML that holds one image and nothing else (an optional `<meta charset>` first), as a browser's "Copy Image" writes it. */
-const IMAGE_ONLY_HTML = /^\s*(?:<meta\b[^>]*>\s*)?<img\b[^>]*>\s*$/iu;
-/** The wrapper Windows puts around clipboard HTML (`<html><body><!--StartFragment-->…`), and any other comment. */
-const HTML_WRAPPER = /<!--[\s\S]*?-->|<\/?(?:html|body)\b[^>]*>/giu;
+/** Whitespace, the `<html>`/`<body>`/`<meta>` wrapper Windows and macOS put around clipboard HTML, and comments (`<!--StartFragment-->`). */
+// A comment never runs past its own `-->`, so each piece has one parse and the match stays linear on any clipboard.
+const HTML_WRAPPER = String.raw`(?:\s|<\/?(?:html|body|meta)\b[^>]*>|<!--(?:[^-]|-(?!->))*-->)*`;
+/** HTML that holds one image and nothing else, as a browser's "Copy Image" writes it. Only read to classify a paste, never inserted. */
+const IMAGE_ONLY_HTML = new RegExp(String.raw`^${HTML_WRAPPER}<img\b[^>]*>${HTML_WRAPPER}$`, "iu");
+/** HTML with nothing in it but its wrapper. */
+const EMPTY_HTML = new RegExp(`^${HTML_WRAPPER}$`, "iu");
 
 /**
  * Whether a paste carries text of its own as well as its files: that text is the editor's to insert, or a file when it is
@@ -36,10 +39,9 @@ const HTML_WRAPPER = /<!--[\s\S]*?-->|<\/?(?:html|body)\b[^>]*>/giu;
 export const pasteHasText = (data: Pick<DataTransfer, "getData">, files: ReadonlyArray<Pick<File, "name">>): boolean => {
     const names = new Set(files.map((file) => file.name));
     const html = data.getData("text/html");
-    const fragment = html.replaceAll(HTML_WRAPPER, "");
     // With nothing else in the HTML, the text can only describe the files (a file manager, "Copy Image"): their names, paths or
     // links. HTML with text in it says the lines were copied as text, whatever they look like.
-    const describesFiles = fragment.trim() === "" || IMAGE_ONLY_HTML.test(fragment);
+    const describesFiles = EMPTY_HTML.test(html) || IMAGE_ONLY_HTML.test(html);
     const lines = data
         .getData("text/plain")
         .split(LINE_BREAK)

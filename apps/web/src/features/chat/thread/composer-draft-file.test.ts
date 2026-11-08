@@ -251,6 +251,8 @@ describe(pasteHasText, () => {
             '<html>\r\n<body>\r\n<!--StartFragment--><img src="https://cdn.example.com/p/photo.jpg"><!--EndFragment-->\r\n</body>\r\n</html>',
         ],
         ["a picture copied out of Word, with an HTML document and no text", "\r\n", picture, false, '<html><head><style>p{}</style></head><body><p class=MsoNormal><img src="clip.png"></p></body></html>'],
+        // Many comments in a row, then text: a pattern that could read the comments more than one way would hang here.
+        ["copied page text after many empty markup comments", "words", picture, true, `${"<!-- -->".repeat(40)}<p>words</p>`],
         ["copied text that happens to match the picture's name", "notes.txt", [{ name: "notes.txt" }], true, "<p>notes.txt</p>"],
         ["a spreadsheet's copied links, next to a picture of the cells", "https://a.example\nhttps://b.example", picture, true, "<table><tr><td>https://a.example</td></tr></table>"],
     ])("%s: %s", (_label, plain, files, expected, html = "") => {
