@@ -17864,7 +17864,7 @@ msgstr "Dowiedz się więcej o MCP"
 msgid "Learning"
 msgstr "Nauka"
 
-#: src/features/chat/guest-links/guest-page.tsx:164
+#: src/features/chat/guest-links/guest-page.tsx:174
 #: src/routes/(public)/guest.tsx:12
 msgid "Leave a message"
 msgstr "Zostaw wiadomość"
@@ -18484,6 +18484,10 @@ msgstr "Wczytywanie przepływu pracy..."
 #: src/features/skills/components/bundle-export-dialog.tsx:167
 msgid "Loading your items…"
 msgstr "Wczytywanie Twoich elementów…"
+
+#: src/features/chat/guest-links/guest-page.tsx:225
+msgid "Loading your messages…"
+msgstr "Wczytywanie Twoich wiadomości…"
 
 #: src/features/home/components/home-page.tsx:128
 msgid "Loading your overview…"
@@ -28390,7 +28394,7 @@ msgstr "Wyślij to do bota ze swojego konta:"
 msgid "Send to agent"
 msgstr "Wyślij do agenta"
 
-#: src/features/chat/guest-links/guest-page.tsx:198
+#: src/features/chat/guest-links/guest-page.tsx:214
 msgid "Send to the owner"
 msgstr "Wyślij do właściciela"
 
@@ -28406,7 +28410,7 @@ msgstr "Wyślij kod weryfikacyjny"
 msgid "Sending your message and waiting for the reply"
 msgstr "Wysyłanie wiadomości i oczekiwanie na odpowiedź"
 
-#: src/features/chat/guest-links/guest-page.tsx:198
+#: src/features/chat/guest-links/guest-page.tsx:214
 #: src/features/chat/thread/streaming-placeholder.tsx:617
 msgid "Sending…"
 msgstr "Wysyłanie…"
@@ -28431,7 +28435,7 @@ msgstr "Wysłane przez uruchomienie bez nadzoru"
 msgid "Sent by the lead agent"
 msgstr "Wysłane przez agenta prowadzącego"
 
-#: src/features/chat/guest-links/guest-page.tsx:212
+#: src/features/chat/guest-links/guest-page.tsx:231
 msgid "Sent by the owner"
 msgstr "Wysłane przez właściciela"
 
@@ -32128,7 +32132,7 @@ msgstr "Nie udało się połączyć z rejestrem MCP, więc może brakować suges
 msgid "The MCP Registry is unavailable right now. Showing popular servers instead."
 msgstr "Rejestr MCP jest teraz niedostępny. Zamiast tego wyświetlane są popularne serwery."
 
-#: src/features/chat/guest-links/guest-page.tsx:77
+#: src/features/chat/guest-links/guest-page.tsx:69
 msgid "The message could not be sent. Check your connection and try again."
 msgstr "Nie udało się wysłać wiadomości. Sprawdź połączenie i spróbuj ponownie."
 
@@ -32780,12 +32784,12 @@ msgstr "Za krótkie: co najmniej {minLength} znaków."
 msgid "This is your organization's URL namespace"
 msgstr "To przestrzeń nazw URL twojej organizacji"
 
-#: src/features/chat/guest-links/guest-page.tsx:71
-#: src/features/chat/guest-links/guest-page.tsx:183
+#: src/features/chat/guest-links/guest-page.tsx:63
+#: src/features/chat/guest-links/guest-page.tsx:193
 msgid "This link has ended."
 msgstr "Ten link wygasł."
 
-#: src/features/chat/guest-links/guest-page.tsx:68
+#: src/features/chat/guest-links/guest-page.tsx:60
 msgid "This link is already in use in another browser."
 msgstr "Ten link jest już używany w innej przeglądarce."
 
@@ -32793,7 +32797,7 @@ msgstr "Ten link jest już używany w innej przeglądarce."
 msgid "This link is incomplete."
 msgstr "Ten link jest niekompletny."
 
-#: src/features/chat/guest-links/guest-page.tsx:169
+#: src/features/chat/guest-links/guest-page.tsx:218
 msgid "This link is not complete. Ask for the full link."
 msgstr "Ten link jest niekompletny. Poproś o pełny link."
 
@@ -32807,7 +32811,7 @@ msgstr "To wspomnienie zostało od tego czasu usunięte."
 msgid "This merges the commit {0} into the base branch with “{1}” on {hostLabel}. If the branch has changed since you opened this page, {hostLabel} refuses."
 msgstr "To scala commit {0} z gałęzią bazową metodą „{1}” w {hostLabel}. Jeśli gałąź zmieniła się od otwarcia tej strony, {hostLabel} odmówi."
 
-#: src/features/chat/guest-links/guest-page.tsx:65
+#: src/features/chat/guest-links/guest-page.tsx:57
 msgid "This message cannot be left. Keep it short, don't start it with / or mention anyone, or try again later."
 msgstr "Nie można zostawić tej wiadomości. Napisz krótko, nie zaczynaj od / i nikogo nie wspominaj albo spróbuj ponownie później."
 
@@ -33447,7 +33451,7 @@ msgstr "Za długi, aby sprawdzić jako JSON"
 msgid "too many files"
 msgstr "zbyt wiele plików"
 
-#: src/features/chat/guest-links/guest-page.tsx:74
+#: src/features/chat/guest-links/guest-page.tsx:66
 msgid "Too many messages. Please try again later."
 msgstr "Zbyt wiele wiadomości. Spróbuj ponownie później."
 
@@ -33817,7 +33821,7 @@ msgid "Try adjusting your search terms."
 msgstr "Spróbuj zmienić wyszukiwane hasła."
 
 #: src/components/error-component.tsx:40
-#: src/features/chat/guest-links/guest-page.tsx:193
+#: src/features/chat/guest-links/guest-page.tsx:209
 #: src/features/connection/components/offline-screen.tsx:59
 #: src/features/develop/components/files-tab.tsx:275
 #: src/features/develop/components/thread-pull-requests.tsx:169
@@ -35770,7 +35774,7 @@ msgstr "Oczekiwanie na wynik…"
 msgid "Waiting for the agent…"
 msgstr "Oczekiwanie na agenta…"
 
-#: src/features/chat/guest-links/guest-page.tsx:212
+#: src/features/chat/guest-links/guest-page.tsx:231
 #: src/features/chat/thread/request-secret-prompt.tsx:343
 msgid "Waiting for the owner"
 msgstr "Oczekiwanie na właściciela"
@@ -36899,7 +36903,7 @@ msgstr "Twój serwer lokalny odpowiedział, ale odrzucił tę witrynę (CORS). Z
 msgid "Your location (e.g., \"New York, USA\", \"Berlin, Germany\")."
 msgstr "Twoja lokalizacja (np. „Warszawa, Polska”, „Berlin, Niemcy”)."
 
-#: src/features/chat/guest-links/guest-page.tsx:172
+#: src/features/chat/guest-links/guest-page.tsx:180
 msgid "Your message"
 msgstr "Twoja wiadomość"
 
@@ -36907,7 +36911,7 @@ msgstr "Twoja wiadomość"
 msgid "Your message contains inappropriate content that cannot be sent."
 msgstr "Twoja wiadomość zawiera nieodpowiednie treści i nie może zostać wysłana."
 
-#: src/features/chat/guest-links/guest-page.tsx:165
+#: src/features/chat/guest-links/guest-page.tsx:175
 msgid "Your message waits for the owner of this conversation. Nothing happens until they send it."
 msgstr "Twoja wiadomość czeka na właściciela tej rozmowy. Nic się nie stanie, dopóki jej nie wyśle."
 
@@ -36915,7 +36919,7 @@ msgstr "Twoja wiadomość czeka na właściciela tej rozmowy. Nic się nie stani
 msgid "Your message:"
 msgstr "Twoja wiadomość:"
 
-#: src/features/chat/guest-links/guest-page.tsx:206
+#: src/features/chat/guest-links/guest-page.tsx:224
 msgid "Your messages"
 msgstr "Twoje wiadomości"
 
@@ -36931,7 +36935,7 @@ msgstr "Twoja następna wiadomość jest celem. Agent pracuje, dopóki recenzja 
 msgid "Your next message will start a self-destructing chat."
 msgstr "Twoja następna wiadomość rozpocznie samousuwający się czat."
 
-#: src/features/chat/guest-links/guest-page.tsx:191
+#: src/features/chat/guest-links/guest-page.tsx:201
 msgid "Your notes could not be loaded. They are still there; try again in a moment."
 msgstr "Nie udało się wczytać Twoich wiadomości. Nadal tam są; spróbuj ponownie za chwilę."
 

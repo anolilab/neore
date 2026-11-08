@@ -8,7 +8,7 @@ import { Label } from "@neore/ui/components/label";
 import { Textarea } from "@neore/ui/components/textarea";
 import { skipToken, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { FC, FormEvent } from "react";
-import { useId, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
 
 import { useAction } from "@/lib/lunora/crpc";
 
@@ -24,6 +24,8 @@ const subscribeToHash = (onChange: () => void): (() => void) => {
 
     return () => globalThis.removeEventListener("hashchange", onChange);
 };
+/** A link token's shape (`newGuestToken` in the backend): 64 lowercase hex characters. */
+const LINK_TOKEN_SHAPE = /^[0-9a-f]{64}$/u;
 const readHash = (): string => globalThis.location.hash.slice(1);
 const noHashOnServer = (): undefined => undefined;
 
@@ -96,29 +98,35 @@ const GuestLinkPage: FC<{ linkToken: string }> = ({ linkToken }) => {
 
             return guestToken;
         },
-        onError: (error) => {
+        // Awaited before the post counts as failed, so a retry cannot run before the stale copy is dropped.
+        onError: async (error) => {
             if (errorCode(error) === "NOT_FOUND") {
                 endLink();
             }
 
             // Another tab of this browser may hold the token the link is bound to: read storage again before the next try.
             if (errorCode(error) === "FORBIDDEN") {
-                void rereadGuestToken(linkToken);
+                await rereadGuestToken(linkToken);
             }
         },
-        onSuccess: (guestToken) => {
-            // The token this post was accepted with is the one to keep, whatever another tab wrote meanwhile.
-            void keepGuestToken(linkToken, guestToken);
+        onSuccess: (guestToken, note) => {
             pendingRef.current = undefined;
             setPostedAt(Date.now());
-            setText("");
+            // A draft typed while the post was on its way stays.
+            setText((current) => (current.trim() === note.text ? "" : current));
 
             // Not awaited, so "Sending…" ends with the post. Only a fetch that worked and found nothing ends the link: a failed one
             // keeps the view from before the post, `null` for a new guest, and must not drop the token the post just bound.
             // A view still in flight began before the post (and, for a new guest, before this browser had a token): `refetch`
             // would reuse it while there is no data yet, so it is cancelled first and the view read anew.
             const settleLink = async (): Promise<void> => {
-                await queryClient.cancelQueries({ queryKey: ["guest-view", linkToken] });
+                // Cancelled at once, before any await: a view that began before the post must not land and read as "ended".
+                const cancelled = queryClient.cancelQueries({ queryKey: ["guest-view", linkToken] });
+
+                // The token this post was accepted with is kept before the view is read, whatever another tab wrote meanwhile:
+                // a link found ended by that read then cannot have it written back after it was forgotten.
+                await keepGuestToken(linkToken, guestToken);
+                await cancelled;
 
                 const result = await view.refetch();
 
@@ -132,6 +140,14 @@ const GuestLinkPage: FC<{ linkToken: string }> = ({ linkToken }) => {
     });
 
     const linkEnded = ended || (postedAt !== undefined && view.isSuccess && view.data === null && view.dataUpdatedAt > postedAt);
+    const endedByView = !ended && linkEnded;
+
+    // A link found ended by a view (a poll after the post) forgets this browser's token, as one found ended by a post does.
+    useEffect(() => {
+        if (endedByView) {
+            void forgetGuestToken(linkToken);
+        }
+    }, [endedByView, linkToken]);
 
     const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
@@ -159,14 +175,14 @@ const GuestLinkPage: FC<{ linkToken: string }> = ({ linkToken }) => {
                         <CardDescription>{t`Your message waits for the owner of this conversation. Nothing happens until they send it.`}</CardDescription>
                     </CardHeader>
                     <CardContent>
-                        {linkToken === "" ? (
-                            <p role="alert">{t`This link is not complete. Ask for the full link.`}</p>
-                        ) : (
+                        {LINK_TOKEN_SHAPE.test(linkToken) ? (
                             <form className="flex flex-col gap-2" onSubmit={handleSubmit}>
                                 <Label htmlFor={fieldId}>{t`Your message`}</Label>
                                 <Textarea
                                     aria-describedby={post.isError && !linkEnded ? errorId : undefined}
                                     aria-invalid={post.isError && !linkEnded && errorCode(post.error) === "BAD_REQUEST" ? true : undefined}
+                                    // `ph-no-capture`: a guest's words stay out of PostHog's autocapture and recordings.
+                                    className="ph-no-capture"
                                     disabled={linkEnded}
                                     id={fieldId}
                                     maxLength={MAX_CHARS}
@@ -176,7 +192,7 @@ const GuestLinkPage: FC<{ linkToken: string }> = ({ linkToken }) => {
                                 />
                                 {linkEnded && <p role="alert">{t`This link has ended.`}</p>}
                                 {!linkEnded && post.isError && (
-                                    <p id={errorId} role="alert">
+                                    <p className="ph-no-capture" id={errorId} role="alert">
                                         {errorMessage(post.error)}
                                     </p>
                                 )}
@@ -198,12 +214,15 @@ const GuestLinkPage: FC<{ linkToken: string }> = ({ linkToken }) => {
                                     {post.isPending ? t`Sending…` : t`Send to the owner`}
                                 </Button>
                             </form>
+                        ) : (
+                            <p role="alert">{t`This link is not complete. Ask for the full link.`}</p>
                         )}
                     </CardContent>
                 </Card>
             </HeadingLevelProvider>
             {/* Announced as it changes: a note that arrives, and one the owner sends on. */}
-            <section aria-label={t`Your messages`} aria-live="polite" className="flex flex-col gap-2">
+            <section aria-label={t`Your messages`} aria-live="polite" className="ph-no-capture flex flex-col gap-2">
+                {view.isPending && view.fetchStatus === "fetching" && <p className="text-muted-foreground text-sm">{t`Loading your messages…`}</p>}
                 {view.data?.messages.map((note) => (
                     <Card key={`${note.createdAt}:${note.text}`}>
                         <CardContent className="flex flex-col gap-2 pt-4">
@@ -225,7 +244,22 @@ const GuestLinkPage: FC<{ linkToken: string }> = ({ linkToken }) => {
  * thread is shown. Another link opened in the same tab starts afresh (keyed by its token).
  */
 const GuestPage: FC = () => {
-    const linkToken = useSyncExternalStore(subscribeToHash, readHash, noHashOnServer);
+    const hash = useSyncExternalStore(subscribeToHash, readHash, noHashOnServer);
+    // The last link token this page read: an in-page anchor (the "Skip to content" link's `#main-content`) is no link.
+    const [lastLinkToken, setLastLinkToken] = useState<string>();
+
+    if (hash !== undefined && LINK_TOKEN_SHAPE.test(hash) && hash !== lastLinkToken) {
+        setLastLinkToken(hash);
+    }
+
+    const linkToken = hash === undefined ? undefined : (lastLinkToken ?? hash);
+
+    // An in-page anchor took the link out of the address: put it back, so a reload or a copied address still opens the link.
+    useEffect(() => {
+        if (hash !== undefined && lastLinkToken !== undefined && hash !== lastLinkToken) {
+            globalThis.history.replaceState(globalThis.history.state, "", `#${lastLinkToken}`);
+        }
+    }, [hash, lastLinkToken]);
 
     return linkToken === undefined ? null : <GuestLinkPage key={linkToken} linkToken={linkToken} />;
 };

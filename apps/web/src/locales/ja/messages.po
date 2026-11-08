@@ -17864,7 +17864,7 @@ msgstr "MCP について詳しく見る"
 msgid "Learning"
 msgstr "学習"
 
-#: src/features/chat/guest-links/guest-page.tsx:164
+#: src/features/chat/guest-links/guest-page.tsx:174
 #: src/routes/(public)/guest.tsx:12
 msgid "Leave a message"
 msgstr "メッセージを残す"
@@ -18484,6 +18484,10 @@ msgstr "ワークフローを読み込んでいます..."
 #: src/features/skills/components/bundle-export-dialog.tsx:167
 msgid "Loading your items…"
 msgstr "自分のアイテムを読み込み中…"
+
+#: src/features/chat/guest-links/guest-page.tsx:225
+msgid "Loading your messages…"
+msgstr "メッセージを読み込んでいます…"
 
 #: src/features/home/components/home-page.tsx:128
 msgid "Loading your overview…"
@@ -28390,7 +28394,7 @@ msgstr "自分のアカウントからボットにこれを送信してくださ
 msgid "Send to agent"
 msgstr "エージェントに送信"
 
-#: src/features/chat/guest-links/guest-page.tsx:198
+#: src/features/chat/guest-links/guest-page.tsx:214
 msgid "Send to the owner"
 msgstr "オーナーに送信"
 
@@ -28406,7 +28410,7 @@ msgstr "確認コードを送信"
 msgid "Sending your message and waiting for the reply"
 msgstr "メッセージを送信して返信を待っています"
 
-#: src/features/chat/guest-links/guest-page.tsx:198
+#: src/features/chat/guest-links/guest-page.tsx:214
 #: src/features/chat/thread/streaming-placeholder.tsx:617
 msgid "Sending…"
 msgstr "送信中…"
@@ -28431,7 +28435,7 @@ msgstr "無人実行から送信"
 msgid "Sent by the lead agent"
 msgstr "リードエージェントから送信"
 
-#: src/features/chat/guest-links/guest-page.tsx:212
+#: src/features/chat/guest-links/guest-page.tsx:231
 msgid "Sent by the owner"
 msgstr "オーナーが送信済み"
 
@@ -32128,7 +32132,7 @@ msgstr "MCP レジストリに接続できなかったため、サーバーの�
 msgid "The MCP Registry is unavailable right now. Showing popular servers instead."
 msgstr "MCP レジストリは現在利用できません。代わりに人気のサーバーを表示しています。"
 
-#: src/features/chat/guest-links/guest-page.tsx:77
+#: src/features/chat/guest-links/guest-page.tsx:69
 msgid "The message could not be sent. Check your connection and try again."
 msgstr "メッセージを送信できませんでした。接続を確認して、もう一度お試しください。"
 
@@ -32780,12 +32784,12 @@ msgstr "短すぎます。{minLength}文字以上にしてください。"
 msgid "This is your organization's URL namespace"
 msgstr "組織の URL 名前空間です"
 
-#: src/features/chat/guest-links/guest-page.tsx:71
-#: src/features/chat/guest-links/guest-page.tsx:183
+#: src/features/chat/guest-links/guest-page.tsx:63
+#: src/features/chat/guest-links/guest-page.tsx:193
 msgid "This link has ended."
 msgstr "このリンクは終了しました。"
 
-#: src/features/chat/guest-links/guest-page.tsx:68
+#: src/features/chat/guest-links/guest-page.tsx:60
 msgid "This link is already in use in another browser."
 msgstr "このリンクはすでに別のブラウザーで使用されています。"
 
@@ -32793,7 +32797,7 @@ msgstr "このリンクはすでに別のブラウザーで使用されていま
 msgid "This link is incomplete."
 msgstr "このリンクは不完全です。"
 
-#: src/features/chat/guest-links/guest-page.tsx:169
+#: src/features/chat/guest-links/guest-page.tsx:218
 msgid "This link is not complete. Ask for the full link."
 msgstr "このリンクは不完全です。完全なリンクを依頼してください。"
 
@@ -32807,7 +32811,7 @@ msgstr "このメモリはその後削除されました。"
 msgid "This merges the commit {0} into the base branch with “{1}” on {hostLabel}. If the branch has changed since you opened this page, {hostLabel} refuses."
 msgstr "{hostLabel} で、コミット {0} を「{1}」でベースブランチにマージします。このページを開いた後にブランチが変更された場合、{hostLabel} は拒否します。"
 
-#: src/features/chat/guest-links/guest-page.tsx:65
+#: src/features/chat/guest-links/guest-page.tsx:57
 msgid "This message cannot be left. Keep it short, don't start it with / or mention anyone, or try again later."
 msgstr "このメッセージは残せません。短くし、/ で始めたり誰かをメンションしたりしないでください。または後でもう一度お試しください。"
 
@@ -33447,7 +33451,7 @@ msgstr "JSON として確認するには長すぎます"
 msgid "too many files"
 msgstr "ファイルが多すぎます"
 
-#: src/features/chat/guest-links/guest-page.tsx:74
+#: src/features/chat/guest-links/guest-page.tsx:66
 msgid "Too many messages. Please try again later."
 msgstr "メッセージが多すぎます。後でもう一度お試しください。"
 
@@ -33817,7 +33821,7 @@ msgid "Try adjusting your search terms."
 msgstr "検索キーワードを変えてみてください。"
 
 #: src/components/error-component.tsx:40
-#: src/features/chat/guest-links/guest-page.tsx:193
+#: src/features/chat/guest-links/guest-page.tsx:209
 #: src/features/connection/components/offline-screen.tsx:59
 #: src/features/develop/components/files-tab.tsx:275
 #: src/features/develop/components/thread-pull-requests.tsx:169
@@ -35770,7 +35774,7 @@ msgstr "出力を待っています…"
 msgid "Waiting for the agent…"
 msgstr "エージェントを待っています…"
 
-#: src/features/chat/guest-links/guest-page.tsx:212
+#: src/features/chat/guest-links/guest-page.tsx:231
 #: src/features/chat/thread/request-secret-prompt.tsx:343
 msgid "Waiting for the owner"
 msgstr "オーナーを待っています"
@@ -36899,7 +36903,7 @@ msgstr "ローカルサーバーは応答しましたが、このサイトを拒
 msgid "Your location (e.g., \"New York, USA\", \"Berlin, Germany\")."
 msgstr "所在地（例：「アメリカ、ニューヨーク」「ドイツ、ベルリン」）。"
 
-#: src/features/chat/guest-links/guest-page.tsx:172
+#: src/features/chat/guest-links/guest-page.tsx:180
 msgid "Your message"
 msgstr "あなたのメッセージ"
 
@@ -36907,7 +36911,7 @@ msgstr "あなたのメッセージ"
 msgid "Your message contains inappropriate content that cannot be sent."
 msgstr "メッセージに不適切なコンテンツが含まれているため、送信できません。"
 
-#: src/features/chat/guest-links/guest-page.tsx:165
+#: src/features/chat/guest-links/guest-page.tsx:175
 msgid "Your message waits for the owner of this conversation. Nothing happens until they send it."
 msgstr "あなたのメッセージは、この会話のオーナーを待っています。オーナーが送信するまで何も起こりません。"
 
@@ -36915,7 +36919,7 @@ msgstr "あなたのメッセージは、この会話のオーナーを待って
 msgid "Your message:"
 msgstr "あなたのメッセージ:"
 
-#: src/features/chat/guest-links/guest-page.tsx:206
+#: src/features/chat/guest-links/guest-page.tsx:224
 msgid "Your messages"
 msgstr "あなたのメッセージ"
 
@@ -36931,7 +36935,7 @@ msgstr "次のメッセージは目標になります。レビューで達成が
 msgid "Your next message will start a self-destructing chat."
 msgstr "次のメッセージから自動で消えるチャットが始まります。"
 
-#: src/features/chat/guest-links/guest-page.tsx:191
+#: src/features/chat/guest-links/guest-page.tsx:201
 msgid "Your notes could not be loaded. They are still there; try again in a moment."
 msgstr "メッセージを読み込めませんでした。メッセージは残っています。少ししてからもう一度お試しください。"
 

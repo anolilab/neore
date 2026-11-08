@@ -38,6 +38,17 @@ describe(redactPromptFromEvent, () => {
         expect(event?.properties.$elements_chain).toBe('a:href="/guest"nth-child="1"');
     });
 
+    it("drops the fragment of a guest link encoded in another address, at any depth", () => {
+        const once = `https://app.test/sign-in?redirectTo=%2Fguest%23${"cd".repeat(32)}&x=1`;
+        const twice = `https://app.test/a?next=%252Fguest%2523${"cd".repeat(32)}`;
+        const event = redactPromptFromEvent(pageView({ $current_url: once, $referrer: twice }));
+
+        expect(JSON.stringify(event)).not.toContain("cdcd");
+        expect(event?.properties.$current_url).toBe("https://app.test/sign-in?redirectTo=%2Fguest&x=1");
+        // A value that only looks alike is left alone.
+        expect(redactPromptFromEvent(pageView({ q: "guest%231 issue" }))?.properties.q).toBe("guest%231 issue");
+    });
+
     it("ends a dropped fragment at an escaped quote in an autocaptured link, keeping the rest of the chain", () => {
         const event = redactPromptFromEvent(pageView({ $elements_chain: String.raw`a:attr__href="https://app.test/guest#token\"x"nth-child="1"` }));
 

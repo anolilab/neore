@@ -43,6 +43,23 @@ export const LeaveANote: Story = {
     },
 };
 
+/** The "Skip to content" link moves the fragment to `#main-content`: the page keeps the link it was opened with. */
+export const SkipLinkKeepsTheLink: Story = {
+    play: async ({ canvas }) => {
+        const field = await canvas.findByRole("textbox", { name: "Your message" });
+
+        globalThis.location.hash = "main-content";
+        globalThis.dispatchEvent(new HashChangeEvent("hashchange"));
+        await userEvent.type(field, "Can we talk tomorrow?");
+        await userEvent.click(canvas.getByRole("button", { name: "Send to the owner" }));
+
+        await expect(await canvas.findByText("Waiting for the owner")).toBeVisible();
+        await expect(guestPosts[0]?.linkToken).toBe(GUEST_LINK_TOKEN);
+        // The address carries the link again, for a reload or a copy.
+        await expect(globalThis.location.hash).toBe(`#${GUEST_LINK_TOKEN}`);
+    },
+};
+
 /** The first post is stored but its reply is lost: sending again carries the same request id, so the note is stored once. */
 export const RetryAfterLostReply: Story = {
     parameters: { msw: { handlers: { lunora: lunoraHandlers(...guestPageFixtures({ failFirstPost: true })) } } },
