@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect, fn, userEvent, within } from "storybook/test";
+import { expect, fn, userEvent, waitFor, within } from "storybook/test";
 
 import {
     MicSelector,
@@ -95,7 +95,10 @@ export const Open: Story = {
     play: async ({ canvasElement }) => {
         const { body } = canvasElement.ownerDocument;
 
-        await expect(await within(body).findByText("USB Headset")).toBeVisible();
+        // The popover fades in from opacity 0, so visibility is checked until the fade ends.
+        await waitFor(() => {
+            expect(within(body).getByText("USB Headset")).toBeVisible();
+        });
     },
     render: () => <Picker defaultOpen />,
 };
