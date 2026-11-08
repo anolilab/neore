@@ -282,7 +282,10 @@ const sync = (scratch) => {
             return undefined;
         }
 
-        const [level, options] = keys[0].split("|");
+        // Only the first `|` separates: the options are JSON and may contain one (a regex, say).
+        const separator = keys[0].indexOf("|");
+        const level = keys[0].slice(0, separator);
+        const options = keys[0].slice(separator + 1);
 
         return level === "off" ? undefined : [level, ...JSON.parse(options)];
     };
