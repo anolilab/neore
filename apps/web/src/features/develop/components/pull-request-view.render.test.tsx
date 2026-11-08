@@ -93,7 +93,7 @@ const detail = {
 const renderView = () =>
     render(
         <PullRequestView
-            host={{ capabilities: {}, label: "GitHub", requestNoun: "pull request" } as never}
+            host={{ capabilities: {}, label: "GitHub", limits: { commits: 250, files: 3000, reviewers: 15 }, requestNoun: "pull request" } as never}
             number={7}
             onTabChange={() => {}}
             repository="octo/hello"

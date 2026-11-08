@@ -14,7 +14,7 @@ export async function attempt<T>(promise: Promise<T>): Promise<{ outcome: T } | 
     }
 }
 
-export type Feedback = { kind: "error"; text: string; unconfirmed: boolean } | { kind: "success"; text: string };
+export type Feedback = { kind: "error"; text: string; unconfirmed: boolean } | { href?: string; kind: "success"; text: string };
 
 /**
  * Each handler it wraps runs once at a time: a run is refused while the previous one of the same name is in flight. The flag is
