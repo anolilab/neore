@@ -11,13 +11,23 @@
  * pinned against the installed zod: a zod release that moves the English
  * default or the `locales` namespace must fail here, not in production.
  */
-import { readFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
-import { BACKEND_BUILD, RUST_WORKER_UPLOAD, WEB_CLIENT_ONLY_CHUNKS, WEB_UPLOAD_RULES, WORKER_BUILD, zodEnglishOnlyLocales } from "../scripts/worker-bundle";
+import {
+    BACKEND_BUILD,
+    backendStudioAssets,
+    backendStudioAssetsProblem,
+    RUST_WORKER_UPLOAD,
+    WEB_CLIENT_ONLY_CHUNKS,
+    WEB_UPLOAD_RULES,
+    WORKER_BUILD,
+    zodEnglishOnlyLocales,
+} from "../scripts/worker-bundle";
 
 const REPO_ROOT = join(import.meta.dirname, "..");
 const alchemyScript = readFileSync(join(REPO_ROOT, "alchemy.run.ts"), "utf8");
@@ -152,5 +162,89 @@ describe("web Worker upload", () => {
         }
 
         expect(globs).toStrictEqual(expect.arrayContaining(["**/*.js", "**/*.mjs", "**/*.wasm"]));
+    });
+});
+
+describe("backend Studio documents (Workers Static Assets)", () => {
+    const roots: string[] = [];
+
+    const ASSET_MODE_APP = [
+        'openApiSpec: () => loadStudioDocument((env as Record<string, unknown>)["ASSETS"], "openapi"),',
+        "openRpcSpec: () => loadStudioDocument(env.ASSETS, 'openrpc'),",
+    ].join("\n");
+
+    /** A repository root with the generated app, and the codegen'd assets directory holding `documents` when given. */
+    const repoRoot = (generatedApp: string, documents?: ReadonlyArray<string>): string => {
+        const root = mkdtempSync(join(tmpdir(), "neore-studio-assets-"));
+
+        roots.push(root);
+        mkdirSync(join(root, "backend/lunora/_generated"), { recursive: true });
+        writeFileSync(join(root, "backend/lunora/_generated/app.ts"), generatedApp);
+
+        if (documents) {
+            mkdirSync(join(root, "backend/.lunora/studio-assets/_lunora/studio"), { recursive: true });
+
+            for (const name of documents) {
+                writeFileSync(join(root, `backend/.lunora/studio-assets/_lunora/studio/${name}.json`), "{}");
+            }
+        }
+
+        return root;
+    };
+
+    afterEach(() => {
+        for (const root of roots) {
+            rmSync(root, { force: true, recursive: true });
+        }
+
+        roots.length = 0;
+    });
+
+    it("binds the directory codegen wrote, with every request going to the Worker first", () => {
+        const root = repoRoot(ASSET_MODE_APP, ["openapi", "openrpc"]);
+
+        // `true`, not a path list: a list would serve /_lunora/studio/* from the asset layer, to anyone.
+        expect(backendStudioAssets(root)).toStrictEqual({ directory: join(root, "backend/.lunora/studio-assets"), runWorkerFirst: true });
+        expect(backendStudioAssetsProblem(root)).toBeUndefined();
+    });
+
+    it("binds nothing when the generated app bundles the documents, even with a directory left from an earlier codegen", () => {
+        const root = repoRoot('openApiSpec: async () => (await import("./openapi.js")).openApiSpec,', ["openapi"]);
+
+        expect(backendStudioAssets(root)).toBeUndefined();
+        expect(backendStudioAssetsProblem(root)).toBeUndefined();
+    });
+
+    it("refuses a generated app that reads ASSETS when the directory or one of its documents is missing", () => {
+        const root = repoRoot(ASSET_MODE_APP);
+
+        expect(backendStudioAssets(root)).toBeUndefined();
+        expect(backendStudioAssetsProblem(root)).toContain("backend/.lunora/studio-assets is missing the directory");
+        expect(backendStudioAssetsProblem(repoRoot(ASSET_MODE_APP, ["openapi"]))).toContain("is missing _lunora/studio/openrpc.json.");
+        expect(backendStudioAssetsProblem(repoRoot("openApiSpec: () => loadStudioDocument(env.ASSETS, name),", ["openapi"]))).toContain(
+            "whose document name cannot be read",
+        );
+        expect(
+            backendStudioAssetsProblem(
+                repoRoot(`${ASSET_MODE_APP}\narchitecture: () => loadStudioDocument(env.ASSETS, names.architecture),`, ["openapi", "openrpc"]),
+            ),
+        ).toContain("whose document name cannot be read");
+    });
+
+    it("binds nothing and reports nothing without a generated app, so a destroy after `clean` runs", () => {
+        const root = mkdtempSync(join(tmpdir(), "neore-studio-assets-"));
+
+        roots.push(root);
+
+        expect(backendStudioAssets(root)).toBeUndefined();
+        expect(backendStudioAssetsProblem(root)).toBeUndefined();
+    });
+
+    it("is passed to the backend Worker, and checked before the deploy", () => {
+        const backend = workerCalls.find(({ name }) => name === "neore-backend");
+
+        expect(backend?.options).toContain("...(studioAssets ? { assets: studioAssets } : {}),");
+        expect(alchemyScript).toContain('const studioAssets = backendStudioAssets(".");');
+        expect(alchemyScript).toContain('const studioAssetsProblem = destroying ? undefined : backendStudioAssetsProblem(".");');
     });
 });
