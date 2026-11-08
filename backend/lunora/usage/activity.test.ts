@@ -334,10 +334,12 @@ describe("recording usage by project", () => {
             projectReadFails.value = false;
         }
 
-        // A retry whose read works forwards the reply with its project, for the project alone.
+        // A retry whose read works forwards the reply with its project: a full record, which the reply's key keeps from
+        // counting the total twice whichever of the two lands first.
         forwarded.length = 0;
         await forward(true);
-        expect(forwarded).toMatchObject([{ projectOnly: true, threadAttribution: { projectKey: alpha.projectId } }]);
+        expect(forwarded).toMatchObject([{ threadAttribution: { projectKey: alpha.projectId } }]);
+        expect(forwarded[0]).not.toHaveProperty("projectOnly");
     });
 
     it("counts a reply at once when its project read fails, and files the project once a retry reads it", async () => {

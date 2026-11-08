@@ -69,18 +69,18 @@ export const markReplyRecorded = async (ctx: DbCtx, userId: string, replyKey: st
 };
 
 /** Where a reply in `thread` is filed besides the total: its project. */
-export const attributionOf = (thread: { projectId?: string | null } | null): Attribution => (thread?.projectId ? { projectKey: thread.projectId } : {});
+const attributionOf = (thread: { projectId?: string | null } | null): Attribution => (thread?.projectId ? { projectKey: thread.projectId } : {});
 
 /** Sub-agent threads started from sub-agent threads followed up to a lead with a project, at most. */
 const LEAD_HOPS = 4;
 
 /**
  * What replies in `threadId` are filed under: its project, or — for a sub-agent's or worker's thread, which is in no
- * project — its lead thread's, followed through nested runs. The live record and the project walk both read it here.
- * A run whose link has been pruned (`subAgentRuns` retention) has no lead to follow, and counts under no project.
+ * project — its lead thread's, followed through nested runs. A run whose link has been pruned (`subAgentRuns`
+ * retention) has no lead to follow, and counts under no project.
  */
-export const threadProject = async (ctx: ReadCtx, threadId: string, known?: { projectId?: string | null }): Promise<Attribution> => {
-    let current: { projectId?: string | null } | null = known ?? (await ctx.db.threads.findFirst({ where: { _id: threadId as Id<"threads"> } }));
+const threadProject = async (ctx: ReadCtx, threadId: string): Promise<Attribution> => {
+    let current: { projectId?: string | null } | null = await ctx.db.threads.findFirst({ where: { _id: threadId as Id<"threads"> } });
     let currentId = threadId;
 
     for (let hop = 0; hop < LEAD_HOPS && current && !current.projectId; hop += 1) {
@@ -102,7 +102,7 @@ export const threadProject = async (ctx: ReadCtx, threadId: string, known?: { pr
  * personal project, or an organization they have left). A read that fails throws: the record is retried (`RECORD_RETRY`)
  * or the side question refused before it is charged, never filed as if the user had no access.
  */
-export const readableAttribution = async (ctx: MutationCtx | QueryCtx, attribution: Attribution, userId: string): Promise<Attribution> => {
+const readableAttribution = async (ctx: MutationCtx | QueryCtx, attribution: Attribution, userId: string): Promise<Attribution> => {
     if (attribution.projectKey === undefined) {
         return attribution;
     }
@@ -126,7 +126,7 @@ export const getThreadAttribution = internalQuery
     .query(async ({ args: { threadId, userId }, ctx }) => await attributionFor(ctx, threadId, userId));
 
 /** Adds `increments` to the user's per-day project rows. */
-export const addToAttributionRollup = async (ctx: DbCtx, userId: string, increments: ReadonlyArray<AttributionIncrement>, at: number): Promise<void> => {
+const addToAttributionRollup = async (ctx: DbCtx, userId: string, increments: ReadonlyArray<AttributionIncrement>, at: number): Promise<void> => {
     for (const { costMicrodollars, date, projectKey, replies, skillKey, tokens } of attributionRows(increments)) {
         const existing = await ctx.db.usageDaily.findFirst({ where: { date, projectKey, skillKey, userId } });
 
@@ -349,12 +349,9 @@ export const forwardReplyUsage = internalMutation
             return null;
         }
 
-        // A retry's record only files the project: the first try sent the total already.
-        const record: ReplyUsageArgs & { projectOnly?: boolean; threadAttribution: Attribution } = {
-            ...usage,
-            threadAttribution,
-            ...(projectRetry === true && { projectOnly: true }),
-        };
+        // A retry's record is a full one: nothing orders it after the total record the first try sent, and the reply's
+        // key keeps whichever lands second from counting the total again.
+        const record: ReplyUsageArgs & { threadAttribution: Attribution } = { ...usage, threadAttribution };
 
         await runAfterOnShard(ctx.scheduler as never, 0, internal.usage.activity.recordReplyUsage, { ...record }, usage.userId);
 
