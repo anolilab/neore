@@ -60061,7 +60061,7 @@
       "name": "triggers"
     },
     {
-      "description": "The usage page's daily rollup (usageDaily), recorded once per reply, plus its one-shot backfill.",
+      "description": "The usage page's daily rollup (usageDaily), recorded once per reply with its skill and project, plus its one-shot backfill.",
       "name": "usage"
     },
     {
