@@ -44,8 +44,9 @@ export const usePromptLinkDraft = ({
     const pickerSettled = useFeatureFlaggedModelsSettled();
     const appliedRef = useRef<string | undefined>(undefined);
     // The model of a link whose prompt was applied, waiting for the picker's list: judged earlier, it could pick a model the
-    // list then leaves out. The prompt itself does not wait for it.
-    const pendingModelRef = useRef<string | undefined>(undefined);
+    // list then leaves out. The prompt itself does not wait for it. `chosen` is the chat's model then: a model the person
+    // picks in the meantime is theirs, and the link's is dropped.
+    const pendingModelRef = useRef<{ chosen: string; model: string } | undefined>(undefined);
 
     useEffect(() => {
         // No link in the address: the next one, even the same link again, is a new visit.
@@ -66,6 +67,8 @@ export const usePromptLinkDraft = ({
         }
 
         appliedRef.current = key;
+        // A new link replaces what an earlier one set aside, whether this one applies or not.
+        pendingModelRef.current = undefined;
 
         const clearLink = () => {
             void navigate({
@@ -92,28 +95,32 @@ export const usePromptLinkDraft = ({
             showWarning(t`Your draft is kept. The prompt from the link was not added.`);
         } else {
             setComposerText(prompt);
-            pendingModelRef.current = model;
+            pendingModelRef.current = model === undefined ? undefined : { chosen: useModelStore.getState().selectedModel, model };
         }
 
         clearLink();
     }, [model, navigate, otherDraftSource, prompt, ready, t]);
 
     useEffect(() => {
-        const pendingModel = pendingModelRef.current;
+        const pending = pendingModelRef.current;
 
-        if (pendingModel === undefined || !pickerSettled) {
+        if (pending === undefined || !pickerSettled) {
             return;
         }
 
         pendingModelRef.current = undefined;
 
-        if (isLinkableModel(pendingModel, pickerModelIds)) {
-            const state = useModelStore.getState();
+        const state = useModelStore.getState();
 
+        if (state.selectedModel !== pending.chosen) {
+            return;
+        }
+
+        if (isLinkableModel(pending.model, pickerModelIds)) {
             // A text draft on a text model: a comparison or another mode would send it elsewhere.
             state.setComparisonMode(false);
             state.setComposerMode("text", undefined, false);
-            state.setSelectedModel(pendingModel as ModelId, undefined);
+            state.setSelectedModel(pending.model as ModelId, undefined);
         } else {
             showWarning(t`The model in the link is not available. The chat keeps its model.`);
         }

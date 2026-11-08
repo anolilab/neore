@@ -135,6 +135,20 @@ describe(usePromptLinkDraft, () => {
         expect(showWarning).toHaveBeenCalledOnce();
     });
 
+    it("drops a link's model still waiting for the picker's list once the person picks a model themselves", () => {
+        const other = MODEL_REGISTRY.find((entry) => (entry.mode ?? "text") === "text" && entry.enabled !== false && entry.id !== textModel?.id);
+
+        picker.settled = false;
+        const { rerender } = renderHook(() => usePromptLinkDraft({ model: textModel?.id, otherDraftSource: false, prompt: "Draft me" }));
+
+        useModelStore.getState().setSelectedModel(other!.id as never, undefined);
+        picker.settled = true;
+        rerender();
+
+        expect(useModelStore.getState().selectedModel).toBe(other?.id);
+        expect(showWarning).not.toHaveBeenCalled();
+    });
+
     it("applies the prompt but not an external model", () => {
         renderHook(() => usePromptLinkDraft({ model: externalModel?.id, otherDraftSource: false, prompt: "Draft me" }));
 

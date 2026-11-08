@@ -15,6 +15,7 @@ import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
 import { readPromptLinkSearch } from "@/features/chat/core/utils/prompt-link";
 import { BOOTED_ON_CHAT_INDEX } from "@/features/chat/core/utils/resume-boot";
 import { LANDING_MESSAGE_KEY } from "@/features/marketing/stores/landing-store";
+import { useFeatureFlaggedModelsSettled } from "@/hooks/use-feature-flagged-models";
 import { useCRPC } from "@/lib/lunora/crpc";
 
 /** Whether a landing page left a message for this chat; storage can be unavailable (private mode, the server). */
@@ -72,7 +73,10 @@ const ChatPage = () => {
     // runs in a child, so its effect comes before this one), and the link then finds a draft; one that is missing or refused does
     // not, and the link applies. The same query as the loader's, so it is read once.
     const savedPrompt = useQuery(crpc.prompts.functions.getPrompt.queryOptions(promptId ? { promptId: promptId as Id<"prompts"> } : skipToken));
-    const savedPromptSettled = !promptId || savedPrompt.isSuccess || savedPrompt.isError;
+    // The loader checks the prompt's model against the picker's list before it fills the composer, so it decides only once that
+    // list has settled too.
+    const modelsSettled = useFeatureFlaggedModelsSettled();
+    const savedPromptSettled = !promptId || ((savedPrompt.isSuccess || savedPrompt.isError) && modelsSettled);
 
     const { data: latestThreadId, isSuccess: latestResolved } = useQuery(
         // Not live, and skipped once decided: later visits to /chat must not re-run the scan.
