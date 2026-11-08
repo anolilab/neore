@@ -279,8 +279,10 @@ export const postGuestMessage = publicAction
         // The per-link limit is charged on the owner's shard, after the browser check (`holdGuestMessage`):
         // charged here, posts refused as another browser's would use up the bound guest's allowance.
         // A browser may name the token it keeps before its first post, so a retry after a lost reply carries the token the
-        // link was bound to. Only a token of the minted shape is taken; anything else gets a minted one.
-        const fresh = guestToken !== undefined && GUEST_TOKEN_SHAPE.test(guestToken) ? guestToken : newGuestToken();
+        // link was bound to. Only a token of the minted shape is taken; anything else gets a minted one. Never the link
+        // token itself: everyone holding the link would then hold the guest's token too, and read the guest's notes.
+        const named = guestToken !== undefined && guestToken !== linkToken && GUEST_TOKEN_SHAPE.test(guestToken);
+        const fresh = named ? guestToken : newGuestToken();
         const outcome = await callOnShard(
             internal.chat.guest_links.holdGuestMessage,
             {

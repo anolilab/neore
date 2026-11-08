@@ -286,6 +286,15 @@ describe("the guest actions", () => {
         expect((await view({ guestToken: NAMED, linkToken }))?.messages).toHaveLength(1);
     });
 
+    it("never binds the link token itself as the guest's, so holding the link is not reading the guest's notes", async () => {
+        const { linkToken } = await createLink();
+        const { guestToken } = await post({ guestToken: linkToken, linkToken, text: "hello" });
+
+        expect(guestToken).toMatch(MINTED_TOKEN);
+        expect(guestToken).not.toBe(linkToken);
+        expect(await view({ guestToken: linkToken, linkToken })).toBeNull();
+    });
+
     it("store a later post once when its request id comes twice, and refuse the id for other text", async () => {
         const { linkToken } = await createLink();
 
