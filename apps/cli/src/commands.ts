@@ -231,7 +231,14 @@ const postThread = async (context: Context, flags: Flags, threadId: string | und
         threadId,
         client
             .request<ChatCompleted>("POST", "/chat", { body: { ...body, stream: false }, retryAmbiguous: false, timeoutMs: BLOCKING_TIMEOUT_MS })
-            .then((answer) => requireThreadId(answer, 200)),
+            .then((answer) => {
+                // An empty reply is a run that finished without writing; a missing one is an answer that cannot be read.
+                if (typeof (answer as { text?: unknown } | null)?.text !== "string") {
+                    throw new ApiError({ code: "invalid_response", message: "The API answered without the reply text.", status: 200 });
+                }
+
+                return requireThreadId(answer, 200);
+            }),
     );
 
     const colors = paint(shouldUseColor(context.io.stderr, context.io.env));

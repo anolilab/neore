@@ -451,6 +451,11 @@ describe("chat end to end against a fake API", () => {
             expect(await run(["thread", "start", "hi"], empty.context)).toBe(2);
             expect(empty.context.io.stderr.text()).toContain("neore threads ls");
 
+            const textless = await setup(() => Response.json({ messageId: "m1", status: "done", threadId: "th1" }));
+
+            expect(await run(["thread", "send", "th1", "hi", "--wait"], textless.context)).toBe(2);
+            expect(textless.context.io.stderr.text()).toContain("neore threads show th1");
+
             const cut = await setup(() => new Response('{"messageId":"m1","thr', { headers: { "Content-Type": "application/json" }, status: 200 }));
 
             expect(await run(["thread", "send", "th1", "hi", "--wait"], cut.context)).toBe(2);
