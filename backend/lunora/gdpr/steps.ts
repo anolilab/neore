@@ -215,9 +215,9 @@ export const collectConversations = internalAction.input({ userId: v.string() })
     const conversations: {
         /** The condensed copies of the thread's older turns made while it sat idle (`agent/thread-summaries.ts`). */
         contextSummaries: { coveredCount: number; coveredUpToMessageId: string; createdAt: number; kind?: "compact"; summary: string }[];
-        /** The notes strangers left through the thread's guest link, held and sent (`chat/guest-links.ts`). */
         /** The thread's guest links, with or without notes: when each was made and when it lapses. */
         guestLinks: { createdAt: number; expiresAt: number }[];
+        /** The notes strangers left through the thread's guest link, held and sent (`chat/guest-links.ts`). */
         guestNotes: { createdAt: number; status: string; text: string }[];
         messages: {
             _id: string;

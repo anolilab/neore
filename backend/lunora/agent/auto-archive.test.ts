@@ -196,7 +196,8 @@ describe("archiveIfStillIdle and live guest links", () => {
         });
 
     it("keeps an idle thread whose guest link is still live, so its held notes are not deleted", async () => {
-        expect(await archiveWithGuestLink(Date.now() + 60_000)).toBe(false);
+        // Live whatever the clock reads: no wall-clock margin to run out.
+        expect(await archiveWithGuestLink(Number.MAX_SAFE_INTEGER)).toBe(false);
     });
 
     it("archives an idle thread whose guest link has lapsed", async () => {
