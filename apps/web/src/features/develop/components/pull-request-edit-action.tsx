@@ -67,9 +67,9 @@ const EditPullRequestAction = ({
             return;
         }
 
-        // The title is compared as typed: an untouched title with surrounding spaces must not be sent trimmed in a description-only save.
+        // Compared trimmed, as the host keeps it: a stray space is no change, and must not overwrite a newer title.
         const change = {
-            ...(editing.title !== editing.original.title && { title: editing.title.trim() }),
+            ...(editing.title.trim() !== editing.original.title.trim() && { title: editing.title.trim() }),
             ...(!editing.truncated && normalizeLineEndings(editing.body) !== normalizeLineEndings(editing.original.body) && { body: editing.body }),
         };
 
@@ -132,7 +132,7 @@ const EditPullRequestAction = ({
                                 value={editing?.title ?? ""}
                             />
                             {titleProblem && (
-                                <p className="text-muted-foreground text-xs" id={`${titleId}-title-note`}>
+                                <p className="text-destructive text-xs" id={`${titleId}-title-note`} role="alert">
                                     {titleTooLong
                                         ? t`A ${requestNoun} title is at most ${i18n.number(MAX_TITLE)} characters.`
                                         : t`A ${requestNoun} needs a title. Enter one to save.`}
@@ -156,7 +156,7 @@ const EditPullRequestAction = ({
                                 </p>
                             )}
                             {bodyTooLong && (
-                                <p className="text-muted-foreground text-xs" id={`${titleId}-body-note`}>
+                                <p className="text-destructive text-xs" id={`${titleId}-body-note`} role="alert">
                                     {t`A description is at most ${i18n.number(MAX_BODY)} characters.`}
                                 </p>
                             )}

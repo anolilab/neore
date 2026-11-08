@@ -68,10 +68,10 @@ const typeInto = (element: HTMLElement, value: string): void => {
 
 const ADDRESS = { number: 7, repository: "octo/hello" } as const;
 
-const renderPanel = (bodyTruncated = false, body = "The description") =>
+const renderPanel = (bodyTruncated = false, body = "The description", noun = "pull request") =>
     render(
         <PullRequestActionsPanel
-            host={{ capabilities: {} as never, label: "GitHub", noun: "pull request" }}
+            host={{ capabilities: {} as never, label: "GitHub", noun }}
             pull={{ address: ADDRESS as never, body, bodyTruncated, title: "Old title" }}
         />,
     );
@@ -204,5 +204,61 @@ describe("PullRequestActionsPanel while saving", () => {
         expect((screen.getByLabelText("Title") as HTMLInputElement).readOnly).toBe(true);
         expect((screen.getByLabelText("Description") as HTMLTextAreaElement).readOnly).toBe(true);
         expect(screen.getByRole("button", { name: "Saving…" })).toBeTruthy();
+    });
+});
+
+describe("PullRequestActionsPanel naming", () => {
+    it("names the region after the host's request noun", () => {
+        renderPanel(false, "The description", "merge request");
+
+        expect(screen.getByRole("region", { name: "Merge request" })).toBeTruthy();
+    });
+});
+
+describe("PullRequestActionsPanel title comparison", () => {
+    it("sends only the description when the title differs by a space", async () => {
+        edit.mockResolvedValueOnce({ status: "ok" });
+        renderPanel();
+
+        pressButton(screen.getByRole("button", { name: "Edit title and description" }));
+        typeInto(await screen.findByLabelText("Title"), "Old title ");
+        typeInto(screen.getByLabelText("Description"), "New description");
+        pressButton(screen.getByRole("button", { name: "Save" }));
+
+        await waitFor(() => {
+            expect(edit).toHaveBeenCalledTimes(1);
+        });
+        expect(edit).toHaveBeenCalledWith({ body: "New description" });
+    });
+
+    it("sends nothing when only a space was added to the title", async () => {
+        renderPanel();
+
+        pressButton(screen.getByRole("button", { name: "Edit title and description" }));
+        typeInto(await screen.findByLabelText("Title"), "Old title ");
+        pressButton(screen.getByRole("button", { name: "Save" }));
+
+        await waitFor(() => {
+            expect(screen.queryByLabelText("Title")).toBeNull();
+        });
+        expect(edit).not.toHaveBeenCalled();
+    });
+});
+
+describe("PullRequestActionsPanel validation notes", () => {
+    it("announces an empty title and links it to the field", async () => {
+        renderPanel();
+
+        pressButton(screen.getByRole("button", { name: "Edit title and description" }));
+
+        const title = await screen.findByLabelText("Title");
+
+        typeInto(title, "  ");
+
+        const note = screen.getByRole("alert");
+
+        expect(note.textContent).toContain("needs a title");
+        expect(title.getAttribute("aria-invalid")).toBe("true");
+        expect(title.getAttribute("aria-describedby")).toBe(note.id);
     });
 });

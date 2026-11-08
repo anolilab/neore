@@ -25069,8 +25069,8 @@ msgid "pull request"
 msgstr "pull request"
 
 #: src/features/develop/components/pull-request-actions-panel.tsx:45
-msgid "Pull request"
-msgstr "Pull request"
+#~ msgid "Pull request"
+#~ msgstr "Pull request"
 
 #: src/features/settings/components/chat/webhook-trigger-fields.tsx:86
 msgid "Pull request merged"

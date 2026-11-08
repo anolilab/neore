@@ -42,7 +42,7 @@ const PullRequestActionsPanel = ({
     return (
         <section aria-labelledby={titleId} className="space-y-3 rounded-md border p-3">
             <h3 className="text-sm font-semibold" id={titleId}>
-                {t`Pull request`}
+                {`${host.noun.charAt(0).toUpperCase()}${host.noun.slice(1)}`}
             </h3>
             <div className="flex flex-wrap items-center gap-2">
                 <EditPullRequestAction
