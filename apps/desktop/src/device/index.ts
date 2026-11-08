@@ -790,8 +790,9 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
         const key = readAgentKey(id);
         const { installer } = state;
         const install = async (): Promise<AcpView | null> => await installer.install(key, readAgentVersion(version));
-        // An install changes the program a sign-out checks the account of: refused during one, and one waits for it.
-        const view = state.acp === undefined ? await install() : await state.acp.usingAgent(key, install);
+        // An install changes the program a sign-out checks the account of: refused during one, and one waits for it. Always
+        // through the manager, even before anything else made it, or a sign-out started meanwhile would not see the install.
+        const view = await requireAcp().usingAgent(key, install);
 
         if (view !== null) {
             state.acp?.forgetReport(key);

@@ -537,6 +537,8 @@ describe("a sign-out of an agent", () => {
         expect(refused({ args: [], command: "x", key: "fake", label: "Fake", op: "saveAgent" })).toContain("being signed out");
         expect(refused({ agentKey: "fake", name: "TOKEN", op: "removeEnv" })).toContain("being signed out");
         expect(refused({ name: "TOKEN", op: "setEnv", value: "v" })).toContain("being signed out");
+        // The core reads a `null` key as "all agents".
+        expect(refused({ agentKey: null, name: "TOKEN", op: "setEnv", value: "v" } as unknown as AcpUpdate)).toContain("being signed out");
 
         finish.open();
         await hold;

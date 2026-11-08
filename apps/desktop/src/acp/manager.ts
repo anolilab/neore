@@ -389,7 +389,8 @@ export class AcpManager {
             return;
         }
 
-        if (update.agentKey !== undefined) {
+        // The window's update is checked only for shape: a `null` key is "all agents" to the core, so anything not a key is too.
+        if (typeof update.agentKey === "string") {
             this.refuseHeld(update.agentKey);
         } else if (this.held.size > 0) {
             throw new Error("an agent is being signed out; change the variables for all agents once that ends");
