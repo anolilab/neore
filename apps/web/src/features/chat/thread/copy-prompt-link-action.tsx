@@ -16,20 +16,22 @@ import { useChatThread } from "@/features/chat/core/context/chat-context";
 import type { ChatThreadContextValue } from "@/features/chat/core/context/chat-context-types";
 import { MIN_COMPARISON_MODELS, useModelStore } from "@/features/chat/core/stores/model-store";
 import { buildPromptLink, isPromptLinkTooLong, promptFromLink } from "@/features/chat/core/utils/prompt-link";
+import { useGroupChat } from "@/features/chat/group/use-group-chat";
 import type { UIMessage } from "@/lib/agent";
 import { showError, showSuccess, showWarning } from "@/lib/toast";
 
 /**
- * The one text model the composer sends to now, read at the click. A comparison, a media mode, Auto and a bot (whose model the
- * row does not read) each send elsewhere, so the link then names no model and opens on the reader's own.
+ * The one text model the composer sends to now, read at the click. A comparison, a media mode, Auto, a bot (whose model the
+ * row does not read) and a group chat (each participant can answer on its own model) each send elsewhere, so the link then
+ * names no model and opens on the reader's own.
  */
-const composerLinkModel = ({ model, thread, threadId }: ChatThreadContextValue): string | undefined => {
+const composerLinkModel = ({ model, thread, threadId }: ChatThreadContextValue, isGroupChat: boolean): string | undefined => {
     const store = useModelStore.getState();
     const mode = threadId ? (store.threadModes.get(threadId) ?? "text") : store.newThreadMode;
     const auto = threadId ? thread?.autoModel === true && !thread.activeAgent : store.pendingSettings?.autoModel === true;
     const comparison = store.comparisonMode && store.selectedModelsForComparison.length >= MIN_COMPARISON_MODELS;
 
-    if (comparison || auto || mode !== "text" || Boolean(thread?.botId) || enabledModelOf(model, { mode: "text" }) === undefined) {
+    if (comparison || auto || isGroupChat || mode !== "text" || Boolean(thread?.botId) || enabledModelOf(model, { mode: "text" }) === undefined) {
         return undefined;
     }
 
@@ -39,6 +41,7 @@ const composerLinkModel = ({ model, thread, threadId }: ChatThreadContextValue):
 const CopyPromptLinkAction: FC<{ message: UIMessage }> = ({ message }) => {
     const { t } = useLingui();
     const chatThread = useChatThread();
+    const isGroupChat = useGroupChat(chatThread.threadId) !== null;
 
     const copy = async (): Promise<void> => {
         const prompt = getVisibleUserText({ parts: [...message.parts], text: message.text });
@@ -50,7 +53,7 @@ const CopyPromptLinkAction: FC<{ message: UIMessage }> = ({ message }) => {
             return;
         }
 
-        const model = composerLinkModel(chatThread);
+        const model = composerLinkModel(chatThread, isGroupChat);
 
         // A longer message would reach the reader cut, or as an address that does not open.
         if (isPromptLinkTooLong(prompt, model)) {
