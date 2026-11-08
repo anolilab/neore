@@ -88,7 +88,10 @@ export const pushContentHttpAction = async (context: HttpActionCtx, request: Req
     const limited = await checkRateLimit(context, "notifications/pushContent", { failMode: "open", key: userId, throws: false });
 
     if (!limited.ok) {
-        return Response.json({ error: "RATE_LIMITED" }, { headers: NO_STORE, status: 429 });
+        // `retryAfter` is in milliseconds; the header is in whole seconds, at least one.
+        const retryAfter = String(Math.max(1, Math.ceil((limited.retryAfter ?? 0) / 1000)));
+
+        return Response.json({ error: "RATE_LIMITED" }, { headers: { ...NO_STORE, "Retry-After": retryAfter }, status: 429 });
     }
 
     const raw = await readCappedBody(request);

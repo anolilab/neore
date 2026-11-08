@@ -247,11 +247,12 @@ describe("phone push content", () => {
     it("answers 429 past the caller's rate limit, before any read", async () => {
         const runQuery = vi.fn();
 
-        vi.mocked(checkRateLimit).mockResolvedValueOnce({ ok: false });
+        vi.mocked(checkRateLimit).mockResolvedValueOnce({ ok: false, retryAfter: 2500 });
 
         const response = await pushContentHttpAction({ auth: { userId: USER }, runQuery } as never, request({ notificationId: "n1" }));
 
         expect(response.status).toBe(429);
+        expect(response.headers.get("Retry-After")).toBe("3");
         expect(runQuery).not.toHaveBeenCalled();
     });
 });
