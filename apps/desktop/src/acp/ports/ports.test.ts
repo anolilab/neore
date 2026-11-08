@@ -41,6 +41,9 @@ class FakeSystem implements PortsSystem {
 
     public denied = new Set<number>();
 
+    /** Pids still running after SIGKILL (an uninterruptible wait, say). */
+    public ignoreKill = new Set<number>();
+
     public signals: [number, string][] = [];
 
     public time = 0;
@@ -54,7 +57,7 @@ class FakeSystem implements PortsSystem {
             throw new Error("EPERM");
         }
 
-        if (signal === "SIGKILL" || !this.ignoreTerm.has(pid)) {
+        if (signal === "SIGKILL" ? !this.ignoreKill.has(pid) : !this.ignoreTerm.has(pid)) {
             this.table = this.table.filter((entry) => entry.pid !== pid);
         }
     }
@@ -311,6 +314,16 @@ describe("stopping a server", () => {
 
         expect(await stopper(system).stop(10, SERVER_30)).toEqual({ ended: false, reason: STOP_REASON.unreadable });
         expect(system.signals.every(([, signal]) => signal === "SIGTERM")).toBe(true);
+    });
+
+    it("says a process survived when it still runs after it was force-killed", async () => {
+        const system = new FakeSystem();
+
+        system.ignoreTerm.add(30);
+        system.ignoreKill.add(30);
+
+        expect(await stopper(system).stop(10, SERVER_30)).toEqual({ ended: false, reason: STOP_REASON.survived });
+        expect(system.signals).toContainEqual([30, "SIGKILL"]);
     });
 
     it("does not force-kill a survivor that has left the agent's tree", async () => {

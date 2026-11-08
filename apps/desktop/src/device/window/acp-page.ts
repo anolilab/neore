@@ -785,7 +785,7 @@ const showPorts = (selected: string | undefined, ports: Awaited<ReturnType<typeo
                     ? item(`${label}, the agent itself`)
                     : item(
                         label,
-                        button("Stop", `Stop ${port.name} on port ${String(port.port)}`, () => {
+                        button("Stop", `Stop ${port.name} (process ${String(port.pid)}) on port ${String(port.port)}, address ${port.address}`, () => {
                             guarded(() => stopPort(selected, port, $("acp-ports-list").contains(document.activeElement)));
                         }),
                     );
