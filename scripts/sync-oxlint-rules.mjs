@@ -220,8 +220,7 @@ const ignorePatterns = (scopes, linted) => {
     return [...outside, ...[...inside].toSorted()];
 };
 
-const main = () => {
-    const scratch = mkdtempSync(join(tmpdir(), "oxlint-sync-"));
+const sync = (scratch) => {
     const projects = eslintProjects();
     const views = projects.map(({ dir, only }, index) => {
         const out = join(scratch, `${index}.json`);
@@ -323,8 +322,17 @@ const main = () => {
     writeFileSync(join(ROOT, ".oxlintrc.json"), header + JSON.stringify(config, undefined, 4) + "\n");
     // In the repository's own format, so a sync leaves nothing for the format check.
     execFileSync(join(ROOT, "node_modules/.bin/oxfmt"), [".oxlintrc.json"], { cwd: ROOT, stdio: "ignore" });
-    rmSync(scratch, { force: true, recursive: true });
     process.stderr.write(`${Object.keys(sortedRules).length} rules enabled, ${linted.size} files linted by ESLint\n`);
+};
+
+const main = () => {
+    const scratch = mkdtempSync(join(tmpdir(), "oxlint-sync-"));
+
+    try {
+        sync(scratch);
+    } finally {
+        rmSync(scratch, { force: true, recursive: true });
+    }
 };
 
 if (process.argv[2] === "--collect") {
