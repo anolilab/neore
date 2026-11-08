@@ -160,8 +160,8 @@ scripts/profile-worker-startup.ts <dir> <main>`. Local profiles swing ~100 ms (m
   runWorkerFirst: true }` (Alchemy names the binding `ASSETS` itself). `runWorkerFirst` must
   stay `true`, never a path list: otherwise the asset layer answers `/_lunora/studio/*` before
   the Worker, and the documents, which describe the whole app, are public. The binding exists
-  only when the directory does, so an older Lunora deploys without it; a generated `app.ts`
-  that calls `loadStudioDocument` with no directory fails the deploy, because Studio would
+  only when the generated `app.ts` calls `loadStudioDocument` (a directory left from an earlier codegen is
+  not bound), and the deploy fails when one of the documents it reads is not on disk, because Studio would
   otherwise show empty documents with no error. `deploy.yml`'s codegen step writes the
   directory; `backend/deploy-bundle.test.ts` pins all three cases.
 - **Cloudflare enforces the UNCOMPRESSED Worker size: 64 MiB.** There is

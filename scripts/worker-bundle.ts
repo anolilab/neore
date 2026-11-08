@@ -151,30 +151,57 @@ const BACKEND_STUDIO_ASSETS = "./backend/.lunora/studio-assets";
  * would leave `/_lunora/studio/*` assets-first and make the documents, which describe the whole
  * app, public. Alchemy names the binding `ASSETS` itself.
  *
- * The binding follows the directory, which Alchemy reads at plan time: codegen creates it
- * exactly when it chose asset mode, so a Lunora release without #1499 deploys with neither.
- * Mirroring codegen's decision with a version check would duplicate rules that also depend
- * on the project's shape. {@link backendStudioAssetsProblem} catches the one state that
- * cannot be right.
+ * The binding follows the generated app, not the directory: it exists exactly when
+ * `_generated/app.ts` reads a document through `loadStudioDocument`. The directory is
+ * git-ignored and codegen does not remove it when it goes back to bundling the documents,
+ * so a directory left from an earlier codegen is not bound. A Lunora release without #1499
+ * deploys with no binding. {@link backendStudioAssetsProblem} refuses a generated app whose
+ * documents are not all on disk.
  *
  * `root` is the repository root; `alchemy.run.ts` passes `"."`, as Alchemy resolves the
  * relative `directory` against the working directory too.
  */
-export const backendStudioAssets = (root: string): { directory: string; runWorkerFirst: true } | undefined =>
-    existsSync(path.join(root, BACKEND_STUDIO_ASSETS)) ? { directory: path.join(root, BACKEND_STUDIO_ASSETS), runWorkerFirst: true } : undefined;
+export const backendStudioAssets = (root: string): { directory: string; runWorkerFirst: true } | undefined => {
+    const directory = path.join(root, BACKEND_STUDIO_ASSETS);
 
-/**
- * A generated app that reads Studio's documents from `ASSETS` with no directory to bind:
- * Studio would show empty documents without an error anywhere, so the deploy refuses it.
- */
-export const backendStudioAssetsProblem = (root: string): string | undefined => {
-    if (backendStudioAssets(root) !== undefined) {
+    return studioDocumentsRead(root) !== undefined && existsSync(directory) ? { directory, runWorkerFirst: true } : undefined;
+};
+
+/** A `loadStudioDocument(<binding>, "<name>")` call in the generated app. */
+const STUDIO_DOCUMENT_CALL = /loadStudioDocument\([^,()]+,\s*(["'`])([^"'`]+)\1\s*\)/gu;
+
+/** The names of the documents the generated app reads from `ASSETS`, or `undefined` when it reads none (bundled documents). */
+const studioDocumentsRead = (root: string): ReadonlyArray<string> | undefined => {
+    const generatedApp = readFileSync(path.join(root, "backend/lunora/_generated/app.ts"), "utf8");
+
+    if (!generatedApp.includes("loadStudioDocument")) {
         return undefined;
     }
 
-    const generatedApp = readFileSync(path.join(root, "backend/lunora/_generated/app.ts"), "utf8");
+    return [...new Set(Array.from(generatedApp.matchAll(STUDIO_DOCUMENT_CALL), (match) => match[2] ?? ""))].filter(Boolean);
+};
 
-    return generatedApp.includes("loadStudioDocument")
-        ? "backend/lunora/_generated/app.ts reads Studio's documents from the ASSETS binding, but backend/.lunora/studio-assets is missing. Run `pnpm --filter @neore/backend run codegen` first."
-        : undefined;
+/**
+ * A generated app that reads Studio's documents from `ASSETS` when one of them is not on disk:
+ * Studio would show empty documents without an error anywhere, so the deploy refuses it.
+ */
+export const backendStudioAssetsProblem = (root: string): string | undefined => {
+    const names = studioDocumentsRead(root);
+
+    if (names === undefined) {
+        return undefined;
+    }
+
+    if (names.length === 0) {
+        return "backend/lunora/_generated/app.ts calls loadStudioDocument, but no document name could be read from it, so the deploy cannot check that Studio's documents are on disk. Update STUDIO_DOCUMENT_CALL in scripts/worker-bundle.ts to the generated call.";
+    }
+
+    const directory = path.join(root, BACKEND_STUDIO_ASSETS);
+    const missing = existsSync(directory)
+        ? names.map((name) => `_lunora/studio/${name}.json`).filter((file) => !existsSync(path.join(directory, file)))
+        : ["the directory"];
+
+    return missing.length === 0
+        ? undefined
+        : `backend/lunora/_generated/app.ts reads Studio's documents from the ASSETS binding, but backend/.lunora/studio-assets is missing ${missing.join(", ")}. Run \`pnpm --filter @neore/backend run codegen\` first.`;
 };

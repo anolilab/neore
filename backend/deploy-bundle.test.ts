@@ -168,16 +168,22 @@ describe("web Worker upload", () => {
 describe("backend Studio documents (Workers Static Assets)", () => {
     const roots: string[] = [];
 
-    /** A repository root with the generated app (and the codegen'd assets directory when asked for). */
-    const repoRoot = (generatedApp: string, withAssets: boolean): string => {
+    const ASSET_MODE_APP = 'openApiSpec: () => loadStudioDocument(env["ASSETS"], "openapi"), openRpcSpec: () => loadStudioDocument(env.ASSETS, \'openrpc\'),';
+
+    /** A repository root with the generated app, and the codegen'd assets directory holding `documents` when given. */
+    const repoRoot = (generatedApp: string, documents?: ReadonlyArray<string>): string => {
         const root = mkdtempSync(join(tmpdir(), "neore-studio-assets-"));
 
         roots.push(root);
         mkdirSync(join(root, "backend/lunora/_generated"), { recursive: true });
         writeFileSync(join(root, "backend/lunora/_generated/app.ts"), generatedApp);
 
-        if (withAssets) {
+        if (documents) {
             mkdirSync(join(root, "backend/.lunora/studio-assets/_lunora/studio"), { recursive: true });
+
+            for (const name of documents) {
+                writeFileSync(join(root, `backend/.lunora/studio-assets/_lunora/studio/${name}.json`), "{}");
+            }
         }
 
         return root;
@@ -192,25 +198,29 @@ describe("backend Studio documents (Workers Static Assets)", () => {
     });
 
     it("binds the directory codegen wrote, with every request going to the Worker first", () => {
-        const root = repoRoot('openApiSpec: () => loadStudioDocument(env["ASSETS"], "openapi"),', true);
+        const root = repoRoot(ASSET_MODE_APP, ["openapi", "openrpc"]);
 
         // `true`, not a path list: a list would serve /_lunora/studio/* from the asset layer, to anyone.
         expect(backendStudioAssets(root)).toStrictEqual({ directory: join(root, "backend/.lunora/studio-assets"), runWorkerFirst: true });
         expect(backendStudioAssetsProblem(root)).toBeUndefined();
     });
 
-    it("binds nothing before Lunora writes the documents as assets", () => {
-        const root = repoRoot('openApiSpec: async () => (await import("./openapi.js")).openApiSpec,', false);
+    it("binds nothing when the generated app bundles the documents, even with a directory left from an earlier codegen", () => {
+        const root = repoRoot('openApiSpec: async () => (await import("./openapi.js")).openApiSpec,', ["openapi"]);
 
         expect(backendStudioAssets(root)).toBeUndefined();
         expect(backendStudioAssetsProblem(root)).toBeUndefined();
     });
 
-    it("refuses a generated app that reads ASSETS when the directory is missing", () => {
-        const root = repoRoot('openApiSpec: () => loadStudioDocument(env["ASSETS"], "openapi"),', false);
+    it("refuses a generated app that reads ASSETS when the directory or one of its documents is missing", () => {
+        const root = repoRoot(ASSET_MODE_APP);
 
         expect(backendStudioAssets(root)).toBeUndefined();
-        expect(backendStudioAssetsProblem(root)).toContain("backend/.lunora/studio-assets is missing");
+        expect(backendStudioAssetsProblem(root)).toContain("backend/.lunora/studio-assets is missing the directory");
+        expect(backendStudioAssetsProblem(repoRoot(ASSET_MODE_APP, ["openapi"]))).toContain("is missing _lunora/studio/openrpc.json.");
+        expect(backendStudioAssetsProblem(repoRoot("openApiSpec: () => loadStudioDocument(env.ASSETS, name),", ["openapi"]))).toContain(
+            "no document name could be read",
+        );
     });
 
     it("is passed to the backend Worker, and checked before the deploy", () => {
