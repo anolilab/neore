@@ -126,7 +126,8 @@ export class PortsService {
         }
 
         const signalled: ProcessInfo[] = [root.current, ...this.newcomers(root.table, [root.current], [root.current], agentPid)];
-        const refused = signalled.map((victim) => !this.send(victim, "SIGTERM")).includes(true);
+        // Children before parents (the list is breadth-first): a child is signalled while its parent still holds it in the tree.
+        const refused = signalled.toReversed().map((victim) => !this.send(victim, "SIGTERM")).includes(true);
 
         return await this.awaitGone(signalled, refused, agentPid);
     }
@@ -146,7 +147,7 @@ export class PortsService {
                 // victim still below the agent, so a victim the system re-parented takes no new signals to its tree.
                 const roots = aliveOf(this.below(table, agentPid), signalled);
 
-                for (const newcomer of this.newcomers(table, roots, signalled, agentPid)) {
+                for (const newcomer of this.newcomers(table, roots, signalled, agentPid).toReversed()) {
                     refused = !this.send(newcomer, "SIGTERM") || refused;
                     signalled.push(newcomer);
                 }
@@ -202,7 +203,13 @@ export class PortsService {
         const survivors = aliveOf(stillBelow, signalled);
         const newcomers = this.newcomers(last, survivors, signalled, agentPid);
 
-        for (const target of [...survivors, ...newcomers]) {
+        const targets = [...survivors, ...newcomers];
+
+        // Deepest first, by the breadth-first order of the agent's tree: a SIGKILL ends a parent at once, and a child it
+        // leaves behind would be re-parented out of the tree before its own signal.
+        const deepestFirst = stillBelow.filter((row) => targets.some((target) => sameProcess(row, target))).toReversed();
+
+        for (const target of deepestFirst) {
             refused = !this.send(target, "SIGKILL") || refused;
         }
 
