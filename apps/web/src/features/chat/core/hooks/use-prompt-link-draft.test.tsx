@@ -25,6 +25,20 @@ vi.mock("@/lib/toast", () => {
     return { showWarning: (message: string) => showWarning(message) };
 });
 
+/** The models the picker offers this person; empty is the picker's list still loading. */
+const picker = vi.hoisted(() => {
+    return { ids: [] as string[] };
+});
+
+vi.mock("@/hooks/use-feature-flagged-models", () => {
+    return {
+        default: () =>
+            picker.ids.map((id) => {
+                return { id };
+            }),
+    };
+});
+
 const textModel = MODEL_REGISTRY.find((model) => (model.mode ?? "text") === "text" && model.enabled !== false && model.provider !== "external");
 const externalModel = MODEL_REGISTRY.find((model) => model.provider === "external");
 const startModel = useModelStore.getState().selectedModel;
@@ -37,6 +51,7 @@ const strippedSearch = (): unknown => {
 };
 
 beforeEach(() => {
+    picker.ids = [];
     navigate.mockClear();
     showWarning.mockClear();
     useChatUIStore.getState().clearComposer();
@@ -103,6 +118,15 @@ describe(usePromptLinkDraft, () => {
 
     it("applies the prompt but not an external model", () => {
         renderHook(() => usePromptLinkDraft({ model: externalModel?.id, otherDraftSource: false, prompt: "Draft me" }));
+
+        expect(useChatUIStore.getState().composerText).toBe("Draft me");
+        expect(useModelStore.getState().selectedModel).toBe(startModel);
+        expect(showWarning).toHaveBeenCalledOnce();
+    });
+
+    it("applies the prompt but not a model the picker does not offer this person", () => {
+        picker.ids = ["some-other-model"];
+        renderHook(() => usePromptLinkDraft({ model: textModel?.id, otherDraftSource: false, prompt: "Draft me" }));
 
         expect(useChatUIStore.getState().composerText).toBe("Draft me");
         expect(useModelStore.getState().selectedModel).toBe(startModel);

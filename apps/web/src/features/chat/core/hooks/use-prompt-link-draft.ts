@@ -1,16 +1,22 @@
 import { useLingui } from "@lingui/react/macro";
 import { enabledModelOf } from "@neore/ai/models";
 import { useNavigate } from "@tanstack/react-router";
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 
+import useFeatureFlaggedModels from "@/hooks/use-feature-flagged-models";
 import { showWarning } from "@/lib/toast";
 
 import { useChatUIStore } from "../stores/chat-ui-store";
 import type { ModelId } from "../stores/model-store";
 import { useModelStore } from "../stores/model-store";
 
-/** A model a link may select: an enabled text model the app can call (`MODEL_LOOKUP` leaves out external, marketing-only rows). */
-const isLinkableModel = (model: string): boolean => enabledModelOf(model, { mode: "text" }) !== undefined;
+/**
+ * A model a link may select: an enabled text model the app can call (`MODEL_LOOKUP` leaves out external, marketing-only rows)
+ * that the picker offers this person (`pickerModelIds`: flags, their own switched-off models and filter rules). While the
+ * picker's list is still loading it is empty, and the registry alone decides; the server checks the model again on send.
+ */
+const isLinkableModel = (model: string, pickerModelIds: ReadonlySet<string>): boolean =>
+    enabledModelOf(model, { mode: "text" }) !== undefined && (pickerModelIds.size === 0 || pickerModelIds.has(model));
 
 /**
  * Applies a prompt link once (`core/utils/prompt-link.ts`): its prompt becomes the new chat's draft, and its model is selected when
@@ -33,6 +39,8 @@ export const usePromptLinkDraft = ({
 }): void => {
     const { t } = useLingui();
     const navigate = useNavigate();
+    const pickerModels = useFeatureFlaggedModels({ applyUserOverrides: true });
+    const pickerModelIds = useMemo(() => new Set(pickerModels.map((entry) => entry.id)), [pickerModels]);
     const appliedRef = useRef<string | undefined>(undefined);
 
     useEffect(() => {
@@ -81,7 +89,7 @@ export const usePromptLinkDraft = ({
         } else {
             setComposerText(prompt);
 
-            if (model !== undefined && isLinkableModel(model)) {
+            if (model !== undefined && isLinkableModel(model, pickerModelIds)) {
                 const state = useModelStore.getState();
 
                 // A text draft on a text model: a comparison or another mode would send it elsewhere.
@@ -94,5 +102,5 @@ export const usePromptLinkDraft = ({
         }
 
         clearLink();
-    }, [model, navigate, otherDraftSource, prompt, ready, t]);
+    }, [model, navigate, otherDraftSource, pickerModelIds, prompt, ready, t]);
 };
