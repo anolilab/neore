@@ -68,7 +68,7 @@ const { default: schema } = await import("../schema");
 const guestLinks = await import("./guest-links");
 const { _deletePageForThreadId, createTemporaryThread, markThreadArchived, softDeleteThread } = await import("../agent/threads");
 const { enableThreadLock } = await import("../agent/thread-lock");
-const { withdrawGuestLinksForThread } = await import("./lib/guest-link-store");
+const { GUEST_ROUTE_BATCH, scheduleGuestLinkRouteDrop, withdrawGuestLinksForThread } = await import("./lib/guest-link-store");
 
 const OWNER = "user-owner";
 
@@ -188,6 +188,16 @@ describe("a link's route", () => {
 
         expect(routeFailures.left).toBe(0);
         expect(await rows("shardRoutes")).toHaveLength(0);
+    });
+
+    it("is removed in jobs of at most one batch each when more hashes are handed over", async () => {
+        const hashes = Array.from({ length: GUEST_ROUTE_BATCH * 2 + 20 }, (_unused, index) => `hash-${index}`);
+
+        await harness.run(async (ctx: any) => await scheduleGuestLinkRouteDrop(ctx, hashes));
+
+        expect(harness.scheduler.list().map((job) => (job.args["linkHashes"] as string[]).length)).toEqual([GUEST_ROUTE_BATCH, GUEST_ROUTE_BATCH, 20]);
+        // Each job's input passes the job's own validator.
+        await runRouteDrops();
     });
 
     it("is kept while a link row with its hash still exists", async () => {

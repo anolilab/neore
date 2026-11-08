@@ -287,6 +287,13 @@ export interface ApiTypes {
                 updateGroupChat: FunctionReference<"mutation", { debateRounds?: number; mode: "supervisor" | "round-robin" | "mention-only" | "parallel" | "debate"; skillIds: Array<string>; synthesizerSkillId?: string; threadId: Id<"threads"> }, null>;
             };
         };
+        guest_links: {
+            createGuestLink: FunctionReference<"mutation", { discardWaiting?: boolean; threadId: Id<"threads"> }, { expiresAt: number; linkToken: string }>;
+            getGuestLink: FunctionReference<"query", { threadId: Id<"threads">; unlockProof?: string }, { link: { bound: boolean; expiresAt: number } | null; messages: Array<{ createdAt: number; id: string; status: "held" | "sent"; text: string }> }>;
+            getGuestView: FunctionReference<"action", { guestToken: string; linkToken: string }, { expiresAt: number; messages: Array<{ createdAt: number; status: "held" | "sent"; text: string }> } | null>;
+            postGuestMessage: FunctionReference<"action", { guestToken?: string; linkToken: string; text: string }, { guestToken?: string }>;
+            revokeGuestLink: FunctionReference<"mutation", { threadId: Id<"threads"> }, null>;
+        };
         link_preview: {
             getLinkPreview: FunctionReference<"action", { url: string }, { description?: string; favicon?: string; github?: { language?: string; number?: number; owner: string; repo: string; stars?: number; state?: string }; image?: string; kind: "generic" | "github-issue" | "github-pull" | "github-repo" | "linear-issue"; linear?: { identifier: string }; ok: boolean; siteName?: string; title?: string; url: string }>;
         };
@@ -1165,6 +1172,13 @@ export const api: ApiTypes = {
                 stopGroupTurn: { __lunoraRef: "chat_group_functions:stopGroupTurn" },
                 updateGroupChat: { __lunoraRef: "chat_group_functions:updateGroupChat" },
             },
+        },
+        guest_links: {
+            createGuestLink: { __lunoraRef: "chat_guest_links:createGuestLink" },
+            getGuestLink: { __lunoraRef: "chat_guest_links:getGuestLink" },
+            getGuestView: { __lunoraRef: "chat_guest_links:getGuestView" },
+            postGuestMessage: { __lunoraRef: "chat_guest_links:postGuestMessage" },
+            revokeGuestLink: { __lunoraRef: "chat_guest_links:revokeGuestLink" },
         },
         link_preview: {
             getLinkPreview: { __lunoraRef: "chat_link_preview:getLinkPreview" },

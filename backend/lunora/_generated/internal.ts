@@ -448,8 +448,12 @@ export interface InternalApiTypes {
         guest_links: {
             continueGuestLinkRemoval: FunctionReference<"mutation", { before: number; threadId: Id<"threads"> }, null>;
             dropGuestLinkRoutesJob: FunctionReference<"mutation", { attempt: number; linkHashes: Array<string> }, null>;
+            getGuestLinkOwner: FunctionReference<"query", { linkHash: string }, string | null>;
+            holdGuestMessage: FunctionReference<"mutation", { freshGuestHash: string; linkHash: string; presentedGuestHash?: string; text: string }, { messageId: string; minted: boolean; ok: true } | { ok: false; reason: "closed" | "full" | "invalid" | "limited" | "other_browser" | "unsendable" }>;
+            isBoundGuest: FunctionReference<"query", { guestHash: string; linkHash: string }, boolean>;
             listGuestLinksForExport: FunctionReference<"query", { cursor: string | null; threadId: Id<"threads"> }, { continueCursor: string | null; isDone: boolean; page: Array<{ createdAt: number; expiresAt: number }> }>;
             listGuestNotesForExport: FunctionReference<"query", { cursor: string | null; threadId: Id<"threads"> }, { continueCursor: string | null; isDone: boolean; page: Array<{ createdAt: number; status: "held" | "sent"; text: string }> }>;
+            readGuestView: FunctionReference<"query", { guestHash: string; linkHash: string }, { expiresAt: number; messages: Array<{ createdAt: number; status: "held" | "sent"; text: string }> } | null>;
             sweepGuestLinks: FunctionReference<"mutation", {}, null>;
         };
         mcp_registry: {
@@ -1713,8 +1717,12 @@ export const internal: InternalApiTypes = {
         guest_links: {
             continueGuestLinkRemoval: { __lunoraRef: "chat_guest_links:continueGuestLinkRemoval" },
             dropGuestLinkRoutesJob: { __lunoraRef: "chat_guest_links:dropGuestLinkRoutesJob" },
+            getGuestLinkOwner: { __lunoraRef: "chat_guest_links:getGuestLinkOwner" },
+            holdGuestMessage: { __lunoraRef: "chat_guest_links:holdGuestMessage" },
+            isBoundGuest: { __lunoraRef: "chat_guest_links:isBoundGuest" },
             listGuestLinksForExport: { __lunoraRef: "chat_guest_links:listGuestLinksForExport" },
             listGuestNotesForExport: { __lunoraRef: "chat_guest_links:listGuestNotesForExport" },
+            readGuestView: { __lunoraRef: "chat_guest_links:readGuestView" },
             sweepGuestLinks: { __lunoraRef: "chat_guest_links:sweepGuestLinks" },
         },
         mcp_registry: {
