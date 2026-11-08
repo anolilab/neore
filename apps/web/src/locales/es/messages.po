@@ -375,7 +375,7 @@ msgstr "{0, plural, one {Mostrar # video más} other {Mostrar # videos más}}"
 #. placeholder {0}: unsupportedParams.length
 #. placeholder {1}: unsupportedParams.join(", ")
 #: src/routes/(chat)/chat/$threadId.tsx:86
-#: src/routes/(chat)/chat/index.tsx:153
+#: src/routes/(chat)/chat/index.tsx:202
 msgid "{0, plural, one {Unsupported query parameter} other {Unsupported query parameters}}: {1}"
 msgstr "{0, plural, one {Parámetro de consulta no compatible} other {Parámetros de consulta no compatibles}}: {1}"
 
@@ -1181,11 +1181,11 @@ msgstr "{name} en pausa"
 msgid "{name} resumed"
 msgstr "{name} reanudado"
 
-#: ../../packages/ui/src/components/file-renderers/pdf-thumbnail.tsx:68
+#: ../../packages/ui/src/components/file-renderers/pdf-thumbnail.tsx:69
 msgid "{name}, {pages, plural, one {# page} other {# pages}}"
 msgstr ""
 
-#: ../../packages/ui/src/components/file-renderers/pdf-thumbnail.tsx:69
+#: ../../packages/ui/src/components/file-renderers/pdf-thumbnail.tsx:70
 msgid "{name}, preview unavailable"
 msgstr ""
 
@@ -1209,7 +1209,7 @@ msgstr "{openCount} comentarios abiertos"
 msgid "{overflowCount, plural, one {# more user} other {# more users}}"
 msgstr "{overflowCount, plural, one {# usuario más} other {# usuarios más}}"
 
-#: ../../packages/ui/src/components/file-renderers/pdf-thumbnail.tsx:113
+#: ../../packages/ui/src/components/file-renderers/pdf-thumbnail.tsx:116
 msgid "{pages, plural, one {# page} other {# pages}}"
 msgstr ""
 
@@ -5360,7 +5360,7 @@ msgid "Cannot be exported: {0}"
 msgstr ""
 
 #: src/features/prompts/components/prompts-sidebar-tab.tsx:168
-#: src/features/prompts/hooks/use-prompt-loader.tsx:52
+#: src/features/prompts/hooks/use-prompt-loader.tsx:63
 msgid "Cannot use prompt: {errorMessages}"
 msgstr "No se puede usar el prompt: {errorMessages}"
 
@@ -5368,7 +5368,7 @@ msgstr "No se puede usar el prompt: {errorMessages}"
 msgid "Canny Edge"
 msgstr "Bordes Canny"
 
-#: src/features/chat/assistant.tsx:120
+#: src/features/chat/assistant.tsx:124
 #: src/features/marketing/components/landing-page.tsx:217
 msgid "Canvas"
 msgstr "Lienzo"
@@ -5762,7 +5762,7 @@ msgstr "Valor de la comprobación {0}"
 msgid "Check every (minutes)"
 msgstr ""
 
-#: src/components/error-boundaries/route-error-boundary.tsx:127
+#: src/components/error-boundaries/route-error-boundary.tsx:124
 msgid "Check your internet connection and try again."
 msgstr "Revisa tu conexión a internet e inténtalo de nuevo."
 
@@ -6226,7 +6226,7 @@ msgstr ""
 #: src/components/command-palette.tsx:708
 #: src/features/admin/components/user-sessions-dialog.tsx:159
 #: src/features/canvas/canvas-panel.tsx:818
-#: src/features/canvas/pdf-preview-panel.tsx:98
+#: src/features/canvas/pdf-preview-panel.tsx:105
 #: src/features/chat/thread/composer-text-attachment-editor.tsx:868
 #: src/features/develop/components/thread-pull-requests.tsx:256
 #: src/features/evals/components/save-eval-case-action.tsx:95
@@ -6285,7 +6285,7 @@ msgstr "Cerrar mejora del prompt"
 msgid "Close search"
 msgstr "Cerrar búsqueda"
 
-#: src/features/chat/assistant.tsx:82
+#: src/features/chat/assistant.tsx:83
 msgid "Close the open document to view this PDF in the panel."
 msgstr ""
 
@@ -7310,7 +7310,7 @@ msgstr "Conectores"
 msgid "Connectors talk to each provider's own MCP server over OAuth 2.0. Your tokens are stored encrypted, the AI asks before using a tool that can change data, and disconnecting revokes access."
 msgstr "Los conectores se comunican con el propio servidor MCP de cada proveedor mediante OAuth 2.0. Tus tokens se guardan cifrados, la IA pregunta antes de usar una herramienta que pueda cambiar datos y desconectar revoca el acceso."
 
-#: src/features/settings/components/privacy/consent-preferences.tsx:18
+#: src/features/settings/components/privacy/consent-preferences.tsx:17
 #: src/features/settings/lib/settings-keywords.ts:108
 msgid "Consent Preferences"
 msgstr "Preferencias de consentimiento"
@@ -9452,7 +9452,7 @@ msgstr "Eliminar preajuste"
 msgid "Delete preset?"
 msgstr "¿Eliminar preajuste?"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1335
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1336
 msgid "Delete Project"
 msgstr "Eliminar proyecto"
 
@@ -10331,7 +10331,7 @@ msgstr "Descargar Markdown"
 msgid "Download Neore for desktop"
 msgstr "Descargar Neore para escritorio"
 
-#: src/features/canvas/pdf-preview-panel.tsx:76
+#: src/features/canvas/pdf-preview-panel.tsx:83
 #: src/features/chat/header/thread-download-button.tsx:122
 msgid "Download PDF"
 msgstr "Descargar PDF"
@@ -11644,7 +11644,7 @@ msgstr "Detalles del error:"
 msgid "Error ID: <0>{displayErrorId}</0>"
 msgstr "ID del error: <0>{displayErrorId}</0>"
 
-#: src/components/error-boundaries/route-error-boundary.tsx:143
+#: src/components/error-boundaries/route-error-boundary.tsx:128
 msgid "Error ID: <0>{errorId}</0>"
 msgstr "ID del error: <0>{errorId}</0>"
 
@@ -15870,7 +15870,7 @@ msgid "If it kept the review as pending, submit or delete it there first."
 msgstr ""
 
 #: src/components/error-boundaries/global-error-boundary-provider.tsx:271
-#: src/components/error-boundaries/route-error-boundary.tsx:139
+#: src/components/error-boundaries/route-error-boundary.tsx:126
 msgid "If this problem persists, please contact support."
 msgstr "Si el problema persiste, contacta con soporte."
 
@@ -16664,7 +16664,7 @@ msgstr "Contraseña no válida"
 msgid "Invalid password. Please try again."
 msgstr "Contraseña no válida. Inténtalo de nuevo."
 
-#: src/routes/(chat)/chat/index.tsx:116
+#: src/routes/(chat)/chat/index.tsx:165
 msgid "Invalid thread ID"
 msgstr "ID de conversación no válido"
 
@@ -18113,7 +18113,7 @@ msgid "Loading preview..."
 msgstr "Cargando vista previa..."
 
 #: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:170
-#: src/features/canvas/pdf-preview-panel.tsx:120
+#: src/features/canvas/pdf-preview-panel.tsx:127
 #: src/features/chat/thread/sandbox-files.tsx:104
 msgid "Loading preview…"
 msgstr "Cargando vista previa…"
@@ -18166,7 +18166,7 @@ msgstr ""
 msgid "Loading threads"
 msgstr "Cargando conversaciones"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1111
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1112
 msgid "Loading threads..."
 msgstr "Cargando conversaciones..."
 
@@ -18233,11 +18233,11 @@ msgid "Local models are text only. Remove the attachments to send."
 msgstr "Los modelos locales solo admiten texto. Quita los adjuntos para enviar."
 
 #. placeholder {0}: info.detail
-#: src/features/local-models/lib/local-errors.ts:195
+#: src/features/local-models/lib/local-errors.ts:204
 msgid "Local request failed: {0}"
 msgstr "La solicitud local falló: {0}"
 
-#: src/features/local-models/lib/local-errors.ts:195
+#: src/features/local-models/lib/local-errors.ts:204
 msgid "Local request failed."
 msgstr "La solicitud local falló."
 
@@ -18570,7 +18570,7 @@ msgstr "Maltés"
 msgid "Maltese (Malta)"
 msgstr "Maltés (Malta)"
 
-#: src/features/settings/components/privacy/consent-preferences.tsx:24
+#: src/features/settings/components/privacy/consent-preferences.tsx:23
 msgid "Manage Consent Preferences"
 msgstr "Gestionar preferencias de consentimiento"
 
@@ -18646,7 +18646,7 @@ msgstr "Gestiona tus cuentas conectadas"
 msgid "Manage your connected social accounts and third-party providers"
 msgstr "Gestiona tus cuentas sociales conectadas y proveedores de terceros"
 
-#: src/features/settings/components/privacy/consent-preferences.tsx:18
+#: src/features/settings/components/privacy/consent-preferences.tsx:17
 msgid "Manage your consent preferences for cookies and data processing"
 msgstr "Gestiona tus preferencias de consentimiento para cookies y tratamiento de datos"
 
@@ -20258,7 +20258,7 @@ msgstr "Neore no puede conectarse con el servidor. Seguirá intentando reconecta
 msgid "Neore Chat"
 msgstr "Neore Chat"
 
-#: src/routes/__root.tsx:565
+#: src/routes/__root.tsx:558
 msgid "Neore Chat is a modern AI chat application. Chat with the latest AI models, organise your conversations, and stay productive."
 msgstr "Neore Chat es una aplicación moderna de chat con IA. Chatea con los modelos de IA más recientes, organiza tus conversaciones y mantén tu productividad."
 
@@ -20969,7 +20969,7 @@ msgstr "No hay recuerdos de este tipo."
 msgid "No memories yet. The AI will start learning from your conversations automatically."
 msgstr "Aún no hay recuerdos. La IA empezará a aprender de tus conversaciones automáticamente."
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1130
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1131
 msgid "No messages found for"
 msgstr "No se encontraron mensajes para"
 
@@ -21251,7 +21251,7 @@ msgstr "No hay texto que mostrar."
 msgid "No thread has worked on this {requestNoun} yet."
 msgstr ""
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1130
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1131
 msgid "No threads found for"
 msgstr "No se encontraron conversaciones para"
 
@@ -21264,7 +21264,7 @@ msgid "No threads were active in that date range."
 msgstr ""
 
 #: src/features/chat/signed-out/signed-out-chat.tsx:273
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1121
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1122
 msgid "No threads yet"
 msgstr "Aún no hay conversaciones"
 
@@ -21541,7 +21541,7 @@ msgstr "Todavía no se ha ejecutado nada en un dispositivo."
 msgid "Nothing here."
 msgstr ""
 
-#: src/features/local-models/lib/local-errors.ts:192
+#: src/features/local-models/lib/local-errors.ts:201
 msgid "Nothing is listening at that address. Start Ollama or LM Studio's server, check the port, and make sure the URL ends in /v1."
 msgstr "No hay nada escuchando en esa dirección. Inicia el servidor de Ollama o LM Studio, comprueba el puerto y asegúrate de que la URL termine en /v1."
 
@@ -22036,7 +22036,7 @@ msgctxt "stock opening price"
 msgid "Open"
 msgstr "Apertura"
 
-#: ../../packages/ui/src/components/file-renderers/pdf-thumbnail.tsx:67
+#: ../../packages/ui/src/components/file-renderers/pdf-thumbnail.tsx:68
 msgid "Open {filename}"
 msgstr ""
 
@@ -22156,11 +22156,11 @@ msgstr ""
 msgid "Open Pages"
 msgstr "Abrir páginas"
 
-#: ../../packages/ui/src/components/file-renderers/pdf-thumbnail.tsx:67
+#: ../../packages/ui/src/components/file-renderers/pdf-thumbnail.tsx:68
 msgid "Open PDF"
 msgstr ""
 
-#: src/features/canvas/pdf-preview-panel.tsx:82
+#: src/features/canvas/pdf-preview-panel.tsx:89
 msgid "Open PDF in a new tab to print"
 msgstr ""
 
@@ -23332,7 +23332,7 @@ msgid "Payments, subscriptions, and financial data"
 msgstr "Pagos, suscripciones y datos financieros"
 
 #: src/components/model-picker/model-picker.tsx:82
-#: src/features/canvas/pdf-preview-panel.tsx:73
+#: src/features/canvas/pdf-preview-panel.tsx:80
 #: src/features/settings/components/chat/models-settings.tsx:35
 msgid "PDF"
 msgstr "PDF"
@@ -23341,7 +23341,7 @@ msgstr "PDF"
 msgid "PDF document"
 msgstr "Documento PDF"
 
-#: src/features/chat/assistant.tsx:120
+#: src/features/chat/assistant.tsx:124
 msgid "PDF preview"
 msgstr ""
 
@@ -24031,8 +24031,8 @@ msgstr "Preajuste actualizado"
 msgid "Presets"
 msgstr "Preajustes"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1123
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1147
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1124
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1148
 msgid "Press ? for keyboard shortcuts"
 msgstr "Pulsa ? para ver los atajos de teclado"
 
@@ -24566,7 +24566,7 @@ msgstr "El prompt es obligatorio para generar imágenes"
 msgid "Prompt is required for inpainting"
 msgstr "El prompt es obligatorio para el inpainting"
 
-#: src/features/prompts/hooks/use-prompt-loader.tsx:94
+#: src/features/prompts/hooks/use-prompt-loader.tsx:105
 msgid "Prompt loaded"
 msgstr "Prompt cargado"
 
@@ -26899,7 +26899,7 @@ msgstr "Ruso (Rusia)"
 msgid "S&P Global financial metrics, company data, and market info"
 msgstr "Métricas financieras, datos de empresas e información de mercado de S&P Global"
 
-#: src/features/local-models/lib/local-errors.ts:177
+#: src/features/local-models/lib/local-errors.ts:186
 msgid "Safari blocks this secure page from calling http://localhost. Use Chrome, Edge or Firefox for local models."
 msgstr "Safari impide que esta página segura llame a http://localhost. Usa Chrome, Edge o Firefox para los modelos locales."
 
@@ -27478,7 +27478,7 @@ msgstr "Buscar..."
 msgid "Searched the latest messages only"
 msgstr ""
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1137
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1138
 msgid "Searching..."
 msgstr "Buscando..."
 
@@ -28720,7 +28720,7 @@ msgstr "Omitir capas CLIP (0 = ninguna, 1-2 = más estilizado)"
 msgid "Skip questions"
 msgstr "Omitir preguntas"
 
-#: src/routes/__root.tsx:435
+#: src/routes/__root.tsx:440
 msgid "Skip to content"
 msgstr "Saltar al contenido"
 
@@ -29417,7 +29417,7 @@ msgstr "Inicia un nuevo chat para empezar"
 msgid "Start a new context: earlier messages are no longer sent to the model"
 msgstr "Empezar un contexto nuevo: los mensajes anteriores ya no se envían al modelo"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1122
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1123
 msgid "Start a new conversation to create your first thread"
 msgstr "Empieza una nueva conversación para crear la primera"
 
@@ -29788,7 +29788,7 @@ msgstr ""
 msgid "Stopped: you sent a new message"
 msgstr ""
 
-#: src/features/local-models/lib/local-errors.ts:166
+#: src/features/local-models/lib/local-errors.ts:175
 msgid "Stopped."
 msgstr "Detenido."
 
@@ -31111,7 +31111,7 @@ msgstr ""
 msgid "That link could not be read."
 msgstr ""
 
-#: src/features/chat/thread/message-list.tsx:303
+#: src/features/chat/thread/message-list.tsx:312
 msgid "That message could not be found in this conversation."
 msgstr "No se encontró ese mensaje en esta conversación."
 
@@ -31485,30 +31485,30 @@ msgid "The link may be wrong, or its owner has unpublished or deleted the page."
 msgstr "Puede que el enlace sea incorrecto o que su propietario haya despublicado o eliminado la página."
 
 #. placeholder {0}: info.detail
-#: src/features/local-models/lib/local-errors.ts:186
+#: src/features/local-models/lib/local-errors.ts:195
 msgid "The local model reported an error: {0}"
 msgstr "El modelo local informó de un error: {0}"
 
-#: src/features/local-models/lib/local-errors.ts:186
+#: src/features/local-models/lib/local-errors.ts:195
 msgid "The local model reported an error."
 msgstr "El modelo local informó de un error."
 
 #. placeholder {0}: info.status ?? 0
 #. placeholder {1}: info.detail
-#: src/features/local-models/lib/local-errors.ts:173
+#: src/features/local-models/lib/local-errors.ts:182
 msgid "The local server answered HTTP {0}: {1}"
 msgstr "El servidor local respondió HTTP {0}: {1}"
 
 #. placeholder {0}: info.status ?? 0
-#: src/features/local-models/lib/local-errors.ts:174
+#: src/features/local-models/lib/local-errors.ts:183
 msgid "The local server answered HTTP {0}."
 msgstr "El servidor local respondió HTTP {0}."
 
-#: src/features/local-models/lib/local-errors.ts:189
+#: src/features/local-models/lib/local-errors.ts:198
 msgid "The local server did not answer in time. Is it still loading the model?"
 msgstr "El servidor local no respondió a tiempo. ¿Todavía está cargando el modelo?"
 
-#: src/features/local-models/lib/local-errors.ts:180
+#: src/features/local-models/lib/local-errors.ts:189
 msgid "The local server does not have this model. Pull it first (Ollama: ollama pull <model>) or pick another one."
 msgstr "El servidor local no tiene este modelo. Descárgalo primero (Ollama: ollama pull <model>) o elige otro."
 
@@ -31519,6 +31519,10 @@ msgstr "No se pudo acceder al registro MCP, así que pueden faltar sugerencias d
 #: src/features/settings/components/chat/mcp/server-catalog.tsx:187
 msgid "The MCP Registry is unavailable right now. Showing popular servers instead."
 msgstr "El registro MCP no está disponible ahora mismo. Se muestran servidores populares en su lugar."
+
+#: src/features/chat/core/hooks/use-prompt-link-draft.ts:153
+msgid "The model in the link is not available. The chat keeps its model."
+msgstr ""
 
 #. placeholder {0}: modelIds.length
 #. placeholder {1}: provider.name
@@ -31583,7 +31587,7 @@ msgstr "Se eliminan la página, todas sus subpáginas, sus comentarios y su hist
 msgid "The pasted text could not be attached and was not inserted."
 msgstr ""
 
-#: src/features/canvas/pdf-preview-panel.tsx:105
+#: src/features/canvas/pdf-preview-panel.tsx:112
 #: src/features/canvas/use-pdf-download.ts:82
 #: src/features/canvas/use-pdf-download.ts:158
 msgid "The PDF could not be downloaded."
@@ -32229,10 +32233,10 @@ msgstr "Esta presentación todavía no tiene diapositivas."
 msgid "This preset will be permanently removed."
 msgstr "Este preajuste se eliminará de forma permanente."
 
-#: ../../packages/ui/src/components/file-renderers/pdf-thumbnail.tsx:82
-#: ../../packages/ui/src/components/file-renderers/pdf-thumbnail.tsx:87
+#: ../../packages/ui/src/components/file-renderers/pdf-thumbnail.tsx:85
+#: ../../packages/ui/src/components/file-renderers/pdf-thumbnail.tsx:90
 #: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:162
-#: src/features/canvas/pdf-preview-panel.tsx:114
+#: src/features/canvas/pdf-preview-panel.tsx:121
 #: src/features/chat/thread/sandbox-files.tsx:159
 #: src/features/chat/thread/sandbox-files.tsx:199
 msgid "This preview could not be loaded."
@@ -32347,7 +32351,7 @@ msgstr ""
 msgid "This thread changed since, so this was not applied."
 msgstr ""
 
-#: src/routes/(chat)/chat/index.tsx:121
+#: src/routes/(chat)/chat/index.tsx:170
 msgid "This thread has been deleted"
 msgstr "Esta conversación se ha eliminado"
 
@@ -32394,7 +32398,7 @@ msgstr "Se eliminarán de forma permanente {0} cuentas de usuario anónimas y to
 msgid "This will permanently delete all {0} memories and their daily digests. The AI will start learning fresh from your next conversation."
 msgstr "Se eliminarán de forma permanente los {0} recuerdos y sus resúmenes diarios. La IA empezará a aprender de cero a partir de tu próxima conversación."
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1325
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1326
 msgid "This will permanently delete the project and all associated threads. This action cannot be undone."
 msgstr "Se eliminarán de forma permanente el proyecto y todas sus conversaciones. Esta acción no se puede deshacer."
 
@@ -32457,7 +32461,7 @@ msgstr "Conversación archivada"
 msgid "Thread deleted."
 msgstr "Conversación eliminada."
 
-#: src/features/chat/assistant.tsx:127
+#: src/features/chat/assistant.tsx:137
 msgid "Thread details"
 msgstr ""
 
@@ -32486,7 +32490,7 @@ msgstr "Conversación hecha pública"
 msgid "Thread management"
 msgstr "Gestión de conversaciones"
 
-#: src/routes/(chat)/chat/index.tsx:126
+#: src/routes/(chat)/chat/index.tsx:175
 msgid "Thread not found or you don't have access to it"
 msgstr "No se encontró la conversación o no tienes acceso a ella"
 
@@ -33184,11 +33188,11 @@ msgstr "Pruébalo ahora"
 msgid "Try searching for a different term."
 msgstr "Prueba a buscar otro término."
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1143
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1144
 msgid "Try searching in message content"
 msgstr "Prueba a buscar en el contenido de los mensajes"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1143
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1144
 msgid "Try searching in thread titles or summaries"
 msgstr "Prueba a buscar en los títulos o resúmenes de las conversaciones"
 
@@ -35892,7 +35896,7 @@ msgstr "Puedes contactar con nuestro delegado de protección de datos para cualq
 msgid "You can edit the optimized prompt before applying it."
 msgstr "Puedes editar el prompt optimizado antes de aplicarlo."
 
-#: src/features/settings/components/privacy/consent-preferences.tsx:21
+#: src/features/settings/components/privacy/consent-preferences.tsx:20
 msgid "You can manage your consent preferences for different types of data processing, including analytics, marketing, and AI features."
 msgstr "Puedes gestionar tus preferencias de consentimiento para distintos tipos de tratamiento de datos, como analítica, marketing y funciones de IA."
 
@@ -35986,7 +35990,7 @@ msgstr "Un responsable del equipo tendrá que volver a añadirte."
 msgid "You will need to click \"Stop Impersonating\" to return to your account"
 msgstr "Tendrás que hacer clic en \"Dejar de suplantar\" para volver a tu cuenta"
 
-#: src/components/error-boundaries/route-error-boundary.tsx:133
+#: src/components/error-boundaries/route-error-boundary.tsx:125
 msgid "You'll be redirected back here after signing in."
 msgstr "Volverás aquí después de iniciar sesión."
 
@@ -36092,7 +36096,7 @@ msgstr "Tu formación, preferencias o ubicación, para que la IA te entienda mej
 msgid "Your bots"
 msgstr ""
 
-#: src/features/local-models/lib/local-errors.ts:183
+#: src/features/local-models/lib/local-errors.ts:192
 msgid "Your browser blocked access to local network devices for this site. Allow \"Local network access\" in the site settings (the icon left of the address bar), then try again."
 msgstr "Tu navegador bloqueó el acceso a los dispositivos de la red local para este sitio. Permite \"Acceso a la red local\" en los ajustes del sitio (el icono a la izquierda de la barra de direcciones) e inténtalo de nuevo."
 
@@ -36153,6 +36157,10 @@ msgstr "Tu exportación de datos está lista"
 msgid "Your display name for your account"
 msgstr "El nombre visible de tu cuenta"
 
+#: src/features/chat/core/hooks/use-prompt-link-draft.ts:123
+msgid "Your draft is kept. The prompt from the link was not added."
+msgstr ""
+
 #: src/features/settings/components/privacy/data-export.tsx:164
 msgid "Your export will include: profile, settings, conversations, files metadata, prompts, and usage history. The download link expires in 7 days."
 msgstr "Tu exportación incluirá: perfil, ajustes, conversaciones, metadatos de archivos, prompts e historial de uso. El enlace de descarga caduca en 7 días."
@@ -36188,7 +36196,7 @@ msgstr "Tu última importación se detuvo antes de terminar. Reanúdala para imp
 msgid "Your latest changes are not saved yet."
 msgstr "Tus últimos cambios aún no se han guardado."
 
-#: src/features/local-models/lib/local-errors.ts:169
+#: src/features/local-models/lib/local-errors.ts:178
 msgid "Your local server answered, but refused this site (CORS). Allow this site's origin — for Ollama set OLLAMA_ORIGINS, for LM Studio turn on \"Enable CORS\" — then restart the server."
 msgstr "Tu servidor local respondió, pero rechazó este sitio (CORS). Permite el origen de este sitio (en Ollama configura OLLAMA_ORIGINS, en LM Studio activa \"Enable CORS\") y reinicia el servidor."
 

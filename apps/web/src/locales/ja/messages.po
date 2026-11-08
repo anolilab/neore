@@ -375,7 +375,7 @@ msgstr "{0, plural, other {さらに # 件の動画を表示}}"
 #. placeholder {0}: unsupportedParams.length
 #. placeholder {1}: unsupportedParams.join(", ")
 #: src/routes/(chat)/chat/$threadId.tsx:86
-#: src/routes/(chat)/chat/index.tsx:153
+#: src/routes/(chat)/chat/index.tsx:202
 msgid "{0, plural, one {Unsupported query parameter} other {Unsupported query parameters}}: {1}"
 msgstr "{0, plural, other {未対応のクエリパラメーター}}：{1}"
 
@@ -1181,11 +1181,11 @@ msgstr "{name} を一時停止しました"
 msgid "{name} resumed"
 msgstr "{name} を再開しました"
 
-#: ../../packages/ui/src/components/file-renderers/pdf-thumbnail.tsx:68
+#: ../../packages/ui/src/components/file-renderers/pdf-thumbnail.tsx:69
 msgid "{name}, {pages, plural, one {# page} other {# pages}}"
 msgstr ""
 
-#: ../../packages/ui/src/components/file-renderers/pdf-thumbnail.tsx:69
+#: ../../packages/ui/src/components/file-renderers/pdf-thumbnail.tsx:70
 msgid "{name}, preview unavailable"
 msgstr ""
 
@@ -1209,7 +1209,7 @@ msgstr "未解決のコメント {openCount} 件"
 msgid "{overflowCount, plural, one {# more user} other {# more users}}"
 msgstr "{overflowCount, plural, other {ほか # 人のユーザー}}"
 
-#: ../../packages/ui/src/components/file-renderers/pdf-thumbnail.tsx:113
+#: ../../packages/ui/src/components/file-renderers/pdf-thumbnail.tsx:116
 msgid "{pages, plural, one {# page} other {# pages}}"
 msgstr ""
 
@@ -5360,7 +5360,7 @@ msgid "Cannot be exported: {0}"
 msgstr ""
 
 #: src/features/prompts/components/prompts-sidebar-tab.tsx:168
-#: src/features/prompts/hooks/use-prompt-loader.tsx:52
+#: src/features/prompts/hooks/use-prompt-loader.tsx:63
 msgid "Cannot use prompt: {errorMessages}"
 msgstr "プロンプトを使用できません：{errorMessages}"
 
@@ -5368,7 +5368,7 @@ msgstr "プロンプトを使用できません：{errorMessages}"
 msgid "Canny Edge"
 msgstr "Canny エッジ"
 
-#: src/features/chat/assistant.tsx:120
+#: src/features/chat/assistant.tsx:124
 #: src/features/marketing/components/landing-page.tsx:217
 msgid "Canvas"
 msgstr "キャンバス"
@@ -5762,7 +5762,7 @@ msgstr "チェック {0} の値"
 msgid "Check every (minutes)"
 msgstr ""
 
-#: src/components/error-boundaries/route-error-boundary.tsx:127
+#: src/components/error-boundaries/route-error-boundary.tsx:124
 msgid "Check your internet connection and try again."
 msgstr "インターネット接続を確認して、もう一度お試しください。"
 
@@ -6226,7 +6226,7 @@ msgstr ""
 #: src/components/command-palette.tsx:708
 #: src/features/admin/components/user-sessions-dialog.tsx:159
 #: src/features/canvas/canvas-panel.tsx:818
-#: src/features/canvas/pdf-preview-panel.tsx:98
+#: src/features/canvas/pdf-preview-panel.tsx:105
 #: src/features/chat/thread/composer-text-attachment-editor.tsx:868
 #: src/features/develop/components/thread-pull-requests.tsx:256
 #: src/features/evals/components/save-eval-case-action.tsx:95
@@ -6285,7 +6285,7 @@ msgstr "プロンプト改善を閉じる"
 msgid "Close search"
 msgstr "検索を閉じる"
 
-#: src/features/chat/assistant.tsx:82
+#: src/features/chat/assistant.tsx:83
 msgid "Close the open document to view this PDF in the panel."
 msgstr ""
 
@@ -7310,7 +7310,7 @@ msgstr "コネクタ"
 msgid "Connectors talk to each provider's own MCP server over OAuth 2.0. Your tokens are stored encrypted, the AI asks before using a tool that can change data, and disconnecting revokes access."
 msgstr "コネクタは、各プロバイダー独自の MCP サーバーと OAuth 2.0 で通信します。トークンは暗号化して保存され、データを変更できるツールを使う前には AI が確認し、切断するとアクセス権が取り消されます。"
 
-#: src/features/settings/components/privacy/consent-preferences.tsx:18
+#: src/features/settings/components/privacy/consent-preferences.tsx:17
 #: src/features/settings/lib/settings-keywords.ts:108
 msgid "Consent Preferences"
 msgstr "同意設定"
@@ -9452,7 +9452,7 @@ msgstr "プリセットを削除"
 msgid "Delete preset?"
 msgstr "プリセットを削除しますか？"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1335
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1336
 msgid "Delete Project"
 msgstr "プロジェクトを削除"
 
@@ -10331,7 +10331,7 @@ msgstr "Markdown をダウンロード"
 msgid "Download Neore for desktop"
 msgstr "デスクトップ版 Neore をダウンロード"
 
-#: src/features/canvas/pdf-preview-panel.tsx:76
+#: src/features/canvas/pdf-preview-panel.tsx:83
 #: src/features/chat/header/thread-download-button.tsx:122
 msgid "Download PDF"
 msgstr "PDF をダウンロード"
@@ -11644,7 +11644,7 @@ msgstr "エラーの詳細:"
 msgid "Error ID: <0>{displayErrorId}</0>"
 msgstr "エラー ID: <0>{displayErrorId}</0>"
 
-#: src/components/error-boundaries/route-error-boundary.tsx:143
+#: src/components/error-boundaries/route-error-boundary.tsx:128
 msgid "Error ID: <0>{errorId}</0>"
 msgstr "エラー ID: <0>{errorId}</0>"
 
@@ -15870,7 +15870,7 @@ msgid "If it kept the review as pending, submit or delete it there first."
 msgstr ""
 
 #: src/components/error-boundaries/global-error-boundary-provider.tsx:271
-#: src/components/error-boundaries/route-error-boundary.tsx:139
+#: src/components/error-boundaries/route-error-boundary.tsx:126
 msgid "If this problem persists, please contact support."
 msgstr "問題が解決しない場合は、サポートにお問い合わせください。"
 
@@ -16664,7 +16664,7 @@ msgstr "パスワードが無効です"
 msgid "Invalid password. Please try again."
 msgstr "パスワードが無効です。もう一度お試しください。"
 
-#: src/routes/(chat)/chat/index.tsx:116
+#: src/routes/(chat)/chat/index.tsx:165
 msgid "Invalid thread ID"
 msgstr "無効なスレッド ID です"
 
@@ -18113,7 +18113,7 @@ msgid "Loading preview..."
 msgstr "プレビューを読み込んでいます..."
 
 #: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:170
-#: src/features/canvas/pdf-preview-panel.tsx:120
+#: src/features/canvas/pdf-preview-panel.tsx:127
 #: src/features/chat/thread/sandbox-files.tsx:104
 msgid "Loading preview…"
 msgstr "プレビューを読み込んでいます…"
@@ -18166,7 +18166,7 @@ msgstr ""
 msgid "Loading threads"
 msgstr "スレッドを読み込んでいます"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1111
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1112
 msgid "Loading threads..."
 msgstr "スレッドを読み込んでいます..."
 
@@ -18233,11 +18233,11 @@ msgid "Local models are text only. Remove the attachments to send."
 msgstr "ローカルモデルはテキストのみに対応しています。送信するには添付ファイルを削除してください。"
 
 #. placeholder {0}: info.detail
-#: src/features/local-models/lib/local-errors.ts:195
+#: src/features/local-models/lib/local-errors.ts:204
 msgid "Local request failed: {0}"
 msgstr "ローカルリクエストに失敗しました：{0}"
 
-#: src/features/local-models/lib/local-errors.ts:195
+#: src/features/local-models/lib/local-errors.ts:204
 msgid "Local request failed."
 msgstr "ローカルリクエストに失敗しました。"
 
@@ -18570,7 +18570,7 @@ msgstr "マルタ語"
 msgid "Maltese (Malta)"
 msgstr "マルタ語（マルタ）"
 
-#: src/features/settings/components/privacy/consent-preferences.tsx:24
+#: src/features/settings/components/privacy/consent-preferences.tsx:23
 msgid "Manage Consent Preferences"
 msgstr "同意設定を管理"
 
@@ -18646,7 +18646,7 @@ msgstr "接続済みのアカウントを管理します"
 msgid "Manage your connected social accounts and third-party providers"
 msgstr "接続済みのソーシャルアカウントとサードパーティプロバイダーを管理します"
 
-#: src/features/settings/components/privacy/consent-preferences.tsx:18
+#: src/features/settings/components/privacy/consent-preferences.tsx:17
 msgid "Manage your consent preferences for cookies and data processing"
 msgstr "Cookie とデータ処理に関する同意設定を管理します"
 
@@ -20258,7 +20258,7 @@ msgstr "Neore はサーバーに接続できません。再接続を試み続け
 msgid "Neore Chat"
 msgstr "Neore Chat"
 
-#: src/routes/__root.tsx:565
+#: src/routes/__root.tsx:558
 msgid "Neore Chat is a modern AI chat application. Chat with the latest AI models, organise your conversations, and stay productive."
 msgstr "Neore Chat はモダンな AI チャットアプリケーションです。最新の AI モデルとチャットし、会話を整理して、生産性を高めましょう。"
 
@@ -20969,7 +20969,7 @@ msgstr "この種類のメモリはありません。"
 msgid "No memories yet. The AI will start learning from your conversations automatically."
 msgstr "メモリはまだありません。AI は会話から自動的に学習を始めます。"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1130
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1131
 msgid "No messages found for"
 msgstr "次に一致するメッセージは見つかりませんでした："
 
@@ -21251,7 +21251,7 @@ msgstr "表示するテキストがありません。"
 msgid "No thread has worked on this {requestNoun} yet."
 msgstr ""
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1130
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1131
 msgid "No threads found for"
 msgstr "次に一致するスレッドは見つかりませんでした："
 
@@ -21264,7 +21264,7 @@ msgid "No threads were active in that date range."
 msgstr ""
 
 #: src/features/chat/signed-out/signed-out-chat.tsx:273
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1121
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1122
 msgid "No threads yet"
 msgstr "スレッドはまだありません"
 
@@ -21541,7 +21541,7 @@ msgstr "デバイスではまだ何も実行されていません。"
 msgid "Nothing here."
 msgstr ""
 
-#: src/features/local-models/lib/local-errors.ts:192
+#: src/features/local-models/lib/local-errors.ts:201
 msgid "Nothing is listening at that address. Start Ollama or LM Studio's server, check the port, and make sure the URL ends in /v1."
 msgstr "そのアドレスで待ち受けているサーバーがありません。Ollama または LM Studio のサーバーを起動し、ポートを確認して、URL が /v1 で終わっていることを確認してください。"
 
@@ -22036,7 +22036,7 @@ msgctxt "stock opening price"
 msgid "Open"
 msgstr "始値"
 
-#: ../../packages/ui/src/components/file-renderers/pdf-thumbnail.tsx:67
+#: ../../packages/ui/src/components/file-renderers/pdf-thumbnail.tsx:68
 msgid "Open {filename}"
 msgstr ""
 
@@ -22156,11 +22156,11 @@ msgstr ""
 msgid "Open Pages"
 msgstr "ページを開く"
 
-#: ../../packages/ui/src/components/file-renderers/pdf-thumbnail.tsx:67
+#: ../../packages/ui/src/components/file-renderers/pdf-thumbnail.tsx:68
 msgid "Open PDF"
 msgstr ""
 
-#: src/features/canvas/pdf-preview-panel.tsx:82
+#: src/features/canvas/pdf-preview-panel.tsx:89
 msgid "Open PDF in a new tab to print"
 msgstr ""
 
@@ -23332,7 +23332,7 @@ msgid "Payments, subscriptions, and financial data"
 msgstr "支払い、サブスクリプション、財務データ"
 
 #: src/components/model-picker/model-picker.tsx:82
-#: src/features/canvas/pdf-preview-panel.tsx:73
+#: src/features/canvas/pdf-preview-panel.tsx:80
 #: src/features/settings/components/chat/models-settings.tsx:35
 msgid "PDF"
 msgstr "PDF"
@@ -23341,7 +23341,7 @@ msgstr "PDF"
 msgid "PDF document"
 msgstr "PDF ドキュメント"
 
-#: src/features/chat/assistant.tsx:120
+#: src/features/chat/assistant.tsx:124
 msgid "PDF preview"
 msgstr ""
 
@@ -24031,8 +24031,8 @@ msgstr "プリセットを更新しました"
 msgid "Presets"
 msgstr "プリセット"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1123
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1147
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1124
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1148
 msgid "Press ? for keyboard shortcuts"
 msgstr "? キーでキーボードショートカットを表示"
 
@@ -24566,7 +24566,7 @@ msgstr "画像生成にはプロンプトが必要です"
 msgid "Prompt is required for inpainting"
 msgstr "インペイントにはプロンプトが必要です"
 
-#: src/features/prompts/hooks/use-prompt-loader.tsx:94
+#: src/features/prompts/hooks/use-prompt-loader.tsx:105
 msgid "Prompt loaded"
 msgstr "プロンプトを読み込みました"
 
@@ -26899,7 +26899,7 @@ msgstr "ロシア語（ロシア）"
 msgid "S&P Global financial metrics, company data, and market info"
 msgstr "S&P Global の財務指標、企業データ、市場情報"
 
-#: src/features/local-models/lib/local-errors.ts:177
+#: src/features/local-models/lib/local-errors.ts:186
 msgid "Safari blocks this secure page from calling http://localhost. Use Chrome, Edge or Firefox for local models."
 msgstr "Safari はこの安全なページから http://localhost への通信をブロックします。ローカルモデルには Chrome、Edge、または Firefox をご利用ください。"
 
@@ -27478,7 +27478,7 @@ msgstr "検索..."
 msgid "Searched the latest messages only"
 msgstr ""
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1137
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1138
 msgid "Searching..."
 msgstr "検索しています..."
 
@@ -28720,7 +28720,7 @@ msgstr "CLIP レイヤーをスキップ (0 = なし、1〜2 = よりスタイ�
 msgid "Skip questions"
 msgstr "質問をスキップ"
 
-#: src/routes/__root.tsx:435
+#: src/routes/__root.tsx:440
 msgid "Skip to content"
 msgstr "コンテンツへスキップ"
 
@@ -29417,7 +29417,7 @@ msgstr "新しいチャットを始めましょう"
 msgid "Start a new context: earlier messages are no longer sent to the model"
 msgstr "新しいコンテキストを開始: 以前のメッセージはモデルに送信されなくなります"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1122
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1123
 msgid "Start a new conversation to create your first thread"
 msgstr "新しい会話を始めて、最初のスレッドを作成しましょう"
 
@@ -29788,7 +29788,7 @@ msgstr ""
 msgid "Stopped: you sent a new message"
 msgstr ""
 
-#: src/features/local-models/lib/local-errors.ts:166
+#: src/features/local-models/lib/local-errors.ts:175
 msgid "Stopped."
 msgstr "停止しました。"
 
@@ -31111,7 +31111,7 @@ msgstr ""
 msgid "That link could not be read."
 msgstr ""
 
-#: src/features/chat/thread/message-list.tsx:303
+#: src/features/chat/thread/message-list.tsx:312
 msgid "That message could not be found in this conversation."
 msgstr "そのメッセージはこの会話内に見つかりませんでした。"
 
@@ -31485,30 +31485,30 @@ msgid "The link may be wrong, or its owner has unpublished or deleted the page."
 msgstr "リンクが間違っているか、所有者がページの公開を停止したか削除した可能性があります。"
 
 #. placeholder {0}: info.detail
-#: src/features/local-models/lib/local-errors.ts:186
+#: src/features/local-models/lib/local-errors.ts:195
 msgid "The local model reported an error: {0}"
 msgstr "ローカルモデルがエラーを報告しました：{0}"
 
-#: src/features/local-models/lib/local-errors.ts:186
+#: src/features/local-models/lib/local-errors.ts:195
 msgid "The local model reported an error."
 msgstr "ローカルモデルがエラーを報告しました。"
 
 #. placeholder {0}: info.status ?? 0
 #. placeholder {1}: info.detail
-#: src/features/local-models/lib/local-errors.ts:173
+#: src/features/local-models/lib/local-errors.ts:182
 msgid "The local server answered HTTP {0}: {1}"
 msgstr "ローカルサーバーが HTTP {0} を返しました：{1}"
 
 #. placeholder {0}: info.status ?? 0
-#: src/features/local-models/lib/local-errors.ts:174
+#: src/features/local-models/lib/local-errors.ts:183
 msgid "The local server answered HTTP {0}."
 msgstr "ローカルサーバーが HTTP {0} を返しました。"
 
-#: src/features/local-models/lib/local-errors.ts:189
+#: src/features/local-models/lib/local-errors.ts:198
 msgid "The local server did not answer in time. Is it still loading the model?"
 msgstr "ローカルサーバーが時間内に応答しませんでした。まだモデルを読み込み中ですか？"
 
-#: src/features/local-models/lib/local-errors.ts:180
+#: src/features/local-models/lib/local-errors.ts:189
 msgid "The local server does not have this model. Pull it first (Ollama: ollama pull <model>) or pick another one."
 msgstr "ローカルサーバーにこのモデルがありません。先に取得するか（Ollama：ollama pull <model>）、別のモデルを選択してください。"
 
@@ -31519,6 +31519,10 @@ msgstr "MCP レジストリに接続できなかったため、サーバーの�
 #: src/features/settings/components/chat/mcp/server-catalog.tsx:187
 msgid "The MCP Registry is unavailable right now. Showing popular servers instead."
 msgstr "MCP レジストリは現在利用できません。代わりに人気のサーバーを表示しています。"
+
+#: src/features/chat/core/hooks/use-prompt-link-draft.ts:153
+msgid "The model in the link is not available. The chat keeps its model."
+msgstr ""
 
 #. placeholder {0}: modelIds.length
 #. placeholder {1}: provider.name
@@ -31583,7 +31587,7 @@ msgstr "ページ、すべてのサブページ、コメント、バージョン
 msgid "The pasted text could not be attached and was not inserted."
 msgstr ""
 
-#: src/features/canvas/pdf-preview-panel.tsx:105
+#: src/features/canvas/pdf-preview-panel.tsx:112
 #: src/features/canvas/use-pdf-download.ts:82
 #: src/features/canvas/use-pdf-download.ts:158
 msgid "The PDF could not be downloaded."
@@ -32229,10 +32233,10 @@ msgstr "このプレゼンテーションにはまだスライドがありませ
 msgid "This preset will be permanently removed."
 msgstr "このプリセットは完全に削除されます。"
 
-#: ../../packages/ui/src/components/file-renderers/pdf-thumbnail.tsx:82
-#: ../../packages/ui/src/components/file-renderers/pdf-thumbnail.tsx:87
+#: ../../packages/ui/src/components/file-renderers/pdf-thumbnail.tsx:85
+#: ../../packages/ui/src/components/file-renderers/pdf-thumbnail.tsx:90
 #: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:162
-#: src/features/canvas/pdf-preview-panel.tsx:114
+#: src/features/canvas/pdf-preview-panel.tsx:121
 #: src/features/chat/thread/sandbox-files.tsx:159
 #: src/features/chat/thread/sandbox-files.tsx:199
 msgid "This preview could not be loaded."
@@ -32347,7 +32351,7 @@ msgstr ""
 msgid "This thread changed since, so this was not applied."
 msgstr ""
 
-#: src/routes/(chat)/chat/index.tsx:121
+#: src/routes/(chat)/chat/index.tsx:170
 msgid "This thread has been deleted"
 msgstr "このスレッドは削除されました"
 
@@ -32394,7 +32398,7 @@ msgstr "{0} 件の匿名ユーザーアカウントとそのすべてのデー�
 msgid "This will permanently delete all {0} memories and their daily digests. The AI will start learning fresh from your next conversation."
 msgstr "{0} 件のメモリとその日次ダイジェストがすべて完全に削除されます。AI は次の会話から改めて学習を始めます。"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1325
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1326
 msgid "This will permanently delete the project and all associated threads. This action cannot be undone."
 msgstr "プロジェクトと関連するすべてのスレッドが完全に削除されます。この操作は元に戻せません。"
 
@@ -32457,7 +32461,7 @@ msgstr "スレッドをアーカイブしました"
 msgid "Thread deleted."
 msgstr "スレッドを削除しました。"
 
-#: src/features/chat/assistant.tsx:127
+#: src/features/chat/assistant.tsx:137
 msgid "Thread details"
 msgstr ""
 
@@ -32486,7 +32490,7 @@ msgstr "スレッドを公開しました"
 msgid "Thread management"
 msgstr "スレッド管理"
 
-#: src/routes/(chat)/chat/index.tsx:126
+#: src/routes/(chat)/chat/index.tsx:175
 msgid "Thread not found or you don't have access to it"
 msgstr "スレッドが見つからないか、アクセス権がありません"
 
@@ -33184,11 +33188,11 @@ msgstr "今すぐ試す"
 msgid "Try searching for a different term."
 msgstr "別のキーワードで検索してみてください。"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1143
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1144
 msgid "Try searching in message content"
 msgstr "メッセージの内容で検索してみてください"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1143
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1144
 msgid "Try searching in thread titles or summaries"
 msgstr "スレッドのタイトルや要約で検索してみてください"
 
@@ -35892,7 +35896,7 @@ msgstr "個人データ、GDPR に基づく権利、プライバシーに関す�
 msgid "You can edit the optimized prompt before applying it."
 msgstr "最適化されたプロンプトは、適用する前に編集できます。"
 
-#: src/features/settings/components/privacy/consent-preferences.tsx:21
+#: src/features/settings/components/privacy/consent-preferences.tsx:20
 msgid "You can manage your consent preferences for different types of data processing, including analytics, marketing, and AI features."
 msgstr "分析、マーケティング、AI 機能など、さまざまな種類のデータ処理に対する同意設定を管理できます。"
 
@@ -35986,7 +35990,7 @@ msgstr "再参加するには、チームマネージャーに追加してもら
 msgid "You will need to click \"Stop Impersonating\" to return to your account"
 msgstr "アカウントに戻るには「なりすましを終了」をクリックする必要があります"
 
-#: src/components/error-boundaries/route-error-boundary.tsx:133
+#: src/components/error-boundaries/route-error-boundary.tsx:125
 msgid "You'll be redirected back here after signing in."
 msgstr "サインイン後、このページに戻ります。"
 
@@ -36092,7 +36096,7 @@ msgstr "AI があなたをより理解できるよう、経歴、好み、所在
 msgid "Your bots"
 msgstr ""
 
-#: src/features/local-models/lib/local-errors.ts:183
+#: src/features/local-models/lib/local-errors.ts:192
 msgid "Your browser blocked access to local network devices for this site. Allow \"Local network access\" in the site settings (the icon left of the address bar), then try again."
 msgstr "ブラウザーがこのサイトからローカルネットワーク上のデバイスへのアクセスをブロックしました。サイト設定（アドレスバー左のアイコン）で「ローカルネットワークへのアクセス」を許可してから、もう一度お試しください。"
 
@@ -36153,6 +36157,10 @@ msgstr "データのエクスポートの準備ができました"
 msgid "Your display name for your account"
 msgstr "アカウントの表示名"
 
+#: src/features/chat/core/hooks/use-prompt-link-draft.ts:123
+msgid "Your draft is kept. The prompt from the link was not added."
+msgstr ""
+
 #: src/features/settings/components/privacy/data-export.tsx:164
 msgid "Your export will include: profile, settings, conversations, files metadata, prompts, and usage history. The download link expires in 7 days."
 msgstr "エクスポートには、プロフィール、設定、会話、ファイルのメタデータ、プロンプト、利用履歴が含まれます。ダウンロードリンクの有効期限は 7 日間です。"
@@ -36188,7 +36196,7 @@ msgstr "前回のインポートは完了する前に停止しました。再開
 msgid "Your latest changes are not saved yet."
 msgstr "最新の変更はまだ保存されていません。"
 
-#: src/features/local-models/lib/local-errors.ts:169
+#: src/features/local-models/lib/local-errors.ts:178
 msgid "Your local server answered, but refused this site (CORS). Allow this site's origin — for Ollama set OLLAMA_ORIGINS, for LM Studio turn on \"Enable CORS\" — then restart the server."
 msgstr "ローカルサーバーは応答しましたが、このサイトを拒否しました（CORS）。このサイトのオリジンを許可してください。Ollama の場合は OLLAMA_ORIGINS を設定し、LM Studio の場合は「Enable CORS」をオンにしてから、サーバーを再起動してください。"
 
