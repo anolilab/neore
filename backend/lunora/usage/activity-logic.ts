@@ -192,6 +192,14 @@ export const replyUsageArgs = (
  */
 export const RECORD_RETRY = { backoff: "exponential", baseMs: 10_000, maxAttempts: 4, maxMs: 60_000 } as const;
 
+/**
+ * How old a reply may be for a retry's record to still count it when its key is missing. A retry runs minutes after
+ * the reply, and a key is pruned only two days after it was written (`backfill.ts#REPLY_KEY_KEEP_MS`): a missing key
+ * within this window means the retry's record simply arrived first; past it, the key was pruned after the total was
+ * counted, and counting again would double it.
+ */
+export const RETRY_COUNTS_WITHIN_MS = 24 * 60 * 60 * 1000;
+
 /** Where a reply is filed besides the total: its thread's project. */
 export interface Attribution {
     projectKey?: string;

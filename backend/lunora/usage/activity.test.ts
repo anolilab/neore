@@ -334,12 +334,24 @@ describe("recording usage by project", () => {
             projectReadFails.value = false;
         }
 
-        // A retry whose read works forwards the reply with its project: a full record, which the reply's key keeps from
-        // counting the total twice whichever of the two lands first.
+        // A retry whose read works forwards the reply with its project: a full record, marked as a retry's.
         forwarded.length = 0;
         await forward(true);
-        expect(forwarded).toMatchObject([{ threadAttribution: { projectKey: alpha.projectId } }]);
-        expect(forwarded[0]).not.toHaveProperty("projectOnly");
+        expect(forwarded).toMatchObject([{ retry: true, threadAttribution: { projectKey: alpha.projectId } }]);
+    });
+
+    it("counts a shared reply once when the forward retry's record lands before the total record", async () => {
+        const alpha = await insertThread(USER, "Alpha");
+        const now = Date.now();
+
+        // The retry's record, with the project, lands first; the first try's total record, without it, lands after.
+        await record({ at: now, replyKey: "out-of-order", retry: true, threadAttribution: { projectKey: alpha.projectId }, threadId: alpha.threadId });
+        await record({ at: now, projectUnread: true, replyKey: "out-of-order", threadId: alpha.threadId });
+
+        const totals = await heatmap(USER, "2026-09-25");
+
+        expect(totals.days).toMatchObject([{ costMicrodollars: 100, replies: 1 }]);
+        expect(await projectTotals(USER)).toStrictEqual({ [alpha.projectId!]: { costMicrodollars: 100, replies: 1, tokens: 10 } });
     });
 
     it("counts a reply at once when its project read fails, and files the project once a retry reads it", async () => {
@@ -350,7 +362,7 @@ describe("recording usage by project", () => {
         try {
             await record({ replyKey: "unread", threadId: alpha.threadId });
             // A retry that fails again throws, so the scheduler runs it again.
-            await expect(record({ projectOnly: true, replyKey: "unread", threadId: alpha.threadId })).rejects.toThrow("project read failed");
+            await expect(record({ replyKey: "unread", retry: true, threadId: alpha.threadId })).rejects.toThrow("project read failed");
         } finally {
             projectReadFails.value = false;
         }
@@ -361,8 +373,8 @@ describe("recording usage by project", () => {
         expect(await projectTotals(USER)).toStrictEqual({});
 
         // The retry whose read works files the project, once; a later delivery adds nothing.
-        await record({ projectOnly: true, replyKey: "unread", threadId: alpha.threadId });
-        await record({ projectOnly: true, replyKey: "unread", threadId: alpha.threadId });
+        await record({ replyKey: "unread", retry: true, threadId: alpha.threadId });
+        await record({ replyKey: "unread", retry: true, threadId: alpha.threadId });
 
         const after = await heatmap(USER, "2026-09-25");
 
@@ -370,7 +382,7 @@ describe("recording usage by project", () => {
         expect(await projectTotals(USER)).toStrictEqual({ [alpha.projectId!]: { costMicrodollars: 100, replies: 1, tokens: 10 } });
     });
 
-    it("never counts a reply twice when a retry for its project runs after the reply's key was pruned", async () => {
+    it("never counts a reply twice when a retry's record, local or forwarded, runs after the reply's key was pruned", async () => {
         const alpha = await insertThread(USER, "Alpha");
 
         projectReadFails.value = true;
@@ -387,7 +399,7 @@ describe("recording usage by project", () => {
 
             await ctx.db.delete("usageReplies", key._id);
         });
-        await record({ projectOnly: true, replyKey: "pruned", threadId: alpha.threadId });
+        await record({ replyKey: "pruned", retry: true, threadId: alpha.threadId });
 
         const totals = await heatmap(USER, "2026-09-25");
 

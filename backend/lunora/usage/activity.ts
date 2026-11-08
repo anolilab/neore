@@ -42,6 +42,7 @@ import {
     isDayKey,
     PROJECT_SKILL_KEY,
     RECORD_RETRY,
+    RETRY_COUNTS_WITHIN_MS,
     TOTAL_SKILL_KEY,
     withDayTotals,
 } from "./activity-logic";
@@ -187,11 +188,11 @@ export const recordReplyUsage = internalMutation
         at: v.number(),
         costMicrodollars: v.number(),
         date: v.string(),
-        /** A retry for the project alone: it never counts the total, even when the reply's key has since been pruned. */
-        projectOnly: v.optional(v.boolean()),
         /** The project could not be read where the record was sent from: count the total now, and file no project. */
         projectUnread: v.optional(v.boolean()),
         replyKey: v.string(),
+        /** A record sent by a retry: with the reply's key missing it counts the reply only while the reply is recent. */
+        retry: v.optional(v.boolean()),
         skillKey: v.string(),
         skillName: v.optional(v.string()),
         // Worked out where the thread is readable when the reply ran in another user's thread (`forwardReplyUsage`).
@@ -243,9 +244,9 @@ export const recordReplyUsage = internalMutation
             return null;
         }
 
-        // A retry for the project alone whose reply is no longer known (its key was pruned): the total was counted when
-        // the reply was first recorded, so this adds nothing rather than count it again.
-        if (args.projectOnly === true) {
+        // A retry's record whose reply is no longer known: a recent reply's record simply has not landed yet, so this one
+        // counts it; an old one's key was pruned after its total was counted, so this adds nothing (`RETRY_COUNTS_WITHIN_MS`).
+        if (args.retry === true && ctx.now - args.at > RETRY_COUNTS_WITHIN_MS) {
             return null;
         }
 
@@ -265,13 +266,7 @@ export const recordReplyUsage = internalMutation
                     userId: args.userId,
                 });
                 projectUnread = true;
-                await runAfterWithRetry(
-                    ctx.scheduler,
-                    RECORD_RETRY.baseMs,
-                    internal.usage.activity.recordReplyUsage,
-                    { ...args, projectOnly: true },
-                    RECORD_RETRY,
-                );
+                await runAfterWithRetry(ctx.scheduler, RECORD_RETRY.baseMs, internal.usage.activity.recordReplyUsage, { ...args, retry: true }, RECORD_RETRY);
             }
         }
 
@@ -350,8 +345,13 @@ export const forwardReplyUsage = internalMutation
         }
 
         // A retry's record is a full one: nothing orders it after the total record the first try sent, and the reply's
-        // key keeps whichever lands second from counting the total again.
-        const record: ReplyUsageArgs & { threadAttribution: Attribution } = { ...usage, threadAttribution };
+        // key keeps whichever lands second from counting the total again. Marked as a retry, it counts nothing for a reply
+        // old enough that its key may have been pruned.
+        const record: ReplyUsageArgs & { retry?: boolean; threadAttribution: Attribution } = {
+            ...usage,
+            threadAttribution,
+            ...(projectRetry === true && { retry: true }),
+        };
 
         await runAfterOnShard(ctx.scheduler as never, 0, internal.usage.activity.recordReplyUsage, { ...record }, usage.userId);
 
