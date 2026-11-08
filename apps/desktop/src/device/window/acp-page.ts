@@ -824,10 +824,25 @@ const refreshPorts = async (): Promise<void> => {
     }
 };
 
-const refreshSessions = async (): Promise<void> => {
-    state.sessions = await globalThis.neoreDevice.acpSessions();
+/** Counts session-list reads, so an older answer never replaces a newer one. */
+const sessionsRead = { latest: 0 };
 
-    if (state.selected !== undefined && state.sessions.every((session) => session.id !== state.selected)) {
+const refreshSessions = async (): Promise<void> => {
+    sessionsRead.latest += 1;
+
+    const read = sessionsRead.latest;
+    const selectedAtStart = state.selected;
+    const sessions = await globalThis.neoreDevice.acpSessions();
+
+    // A newer read started meanwhile: its answer is the one to show.
+    if (read !== sessionsRead.latest) {
+        return;
+    }
+
+    state.sessions = sessions;
+
+    // Only the session that was open when this list was read can be missing from it; one opened since is newer.
+    if (state.selected !== undefined && state.selected === selectedAtStart && state.sessions.every((session) => session.id !== state.selected)) {
         selectSession(undefined);
     }
 
