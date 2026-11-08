@@ -43,9 +43,9 @@ streams).
 
 Exit codes: 0 ok, 1 error, 2 usage, 3 auth or missing scope, 4 not found,
 5 rate or daily limit, 6 network. `thread start` and `thread send` keep 1 for a
-run that failed: their other errors exit 2, as does a `--wait` that ended
-without a finished reply (read it later with `neore threads show <id>`). Both
-read the prompt from stdin when it is piped.
+run that failed: a generic error exits 2 instead (3-6 are unchanged), as does
+a `--wait` that ended without a finished reply (read it later with
+`neore threads show <id>`). Both read the prompt from stdin when it is piped.
 
 `kb upload` goes over the TUS upload route (`/api/v1/uploads`, which needs a key
 with `knowledge:write`), like every other upload in the stack.

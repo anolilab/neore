@@ -384,6 +384,10 @@ describe("chat end to end against a fake API", () => {
             expect(await run(["thread"], context)).toBe(2);
             expect(await run(["thread", "start", "hi", "--wiat"], context)).toBe(2);
             expect(await run(["thread", "--help"], context)).toBe(0);
+            expect(await run(["thread", "start", "hi", "-t", "th5"], context)).toBe(2);
+            expect(await run(["thread", "start", "hi", "--no-stream"], context)).toBe(2);
+            expect(await run(["chat", "hi", "--wait"], context)).toBe(2);
+            expect(context.io.stderr.text()).toContain("--no-stream");
         });
 
         it("keeps the sign-in exit code", async () => {

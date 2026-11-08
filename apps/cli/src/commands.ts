@@ -150,7 +150,7 @@ const readLaterHint = (threadId: string | undefined): string =>
  * Whether the server may have run the send despite the error: a 5xx, one of {@link MAYBE_RUNNING_CODES}, or a success
  * status whose body could not be read.
  */
-const mayHaveRun = (error: ApiError): boolean =>
+const isPossiblyRun = (error: ApiError): boolean =>
     error.status >= 500 || MAYBE_RUNNING_CODES.has(error.code) || (error.code === "invalid_response" && error.status >= 200 && error.status < 300);
 
 /** A success answer from `POST /chat` that names no thread: the run started, but the CLI cannot say where. */
@@ -167,7 +167,7 @@ const withReadLaterHint = async <T>(threadId: string | undefined, request: Promi
     try {
         return await request;
     } catch (error) {
-        if (error instanceof ApiError && mayHaveRun(error)) {
+        if (error instanceof ApiError && isPossiblyRun(error)) {
             // A new invocation sends a new idempotency key, so sending again could start and bill a second run.
             throw new ApiError({
                 code: error.code,
@@ -183,6 +183,15 @@ const withReadLaterHint = async <T>(threadId: string | undefined, request: Promi
 };
 
 const postThread = async (context: Context, flags: Flags, threadId: string | undefined, prompt: string): Promise<number> => {
+    // These are `chat` flags; dropping them would start a new thread or skip the wait the caller asked for.
+    if (flags.thread !== undefined) {
+        throw new UsageError("`thread` has no -t/--thread: the thread id is the first argument of `thread send`.");
+    }
+
+    if (flags["no-stream"] || flags.reasoning) {
+        throw new UsageError("`thread` has no --no-stream or --reasoning: use --wait to wait for the reply.");
+    }
+
     const client = await clientFor(context, flags);
     const body = { model: flags.model, prompt, ...(threadId && { threadId }) };
 
@@ -302,6 +311,10 @@ const repl = async (context: Context, client: NeoreClient, flags: Flags): Promis
 };
 
 export const chat = async (context: Context, { args, flags }: ParsedCommand): Promise<void> => {
+    if (flags.wait) {
+        throw new UsageError("`chat` has no --wait: use --no-stream to wait for the whole reply, or `thread start --wait`.");
+    }
+
     const client = await clientFor(context, flags);
     let prompt = args.join(" ").trim();
 
