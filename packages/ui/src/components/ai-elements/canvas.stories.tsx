@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import type { Edge as FlowEdge, Node as FlowNode } from "@xyflow/react";
-import { expect } from "storybook/test";
+import { expect, waitFor } from "storybook/test";
 
 import Canvas from "./canvas";
 import Connection from "./connection";
@@ -53,7 +53,10 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {
     play: async ({ canvas }) => {
-        await expect(await canvas.findByText("Generate")).toBeVisible();
+        // React Flow keeps a node hidden until it has measured it, so it is in the page before it is visible.
+        const node = await canvas.findByText("Generate");
+
+        await waitFor(async () => await expect(node).toBeVisible(), { timeout: 5000 });
     },
     render: () => <Canvas edges={edges} edgeTypes={edgeTypes} nodes={nodes} nodeTypes={nodeTypes} />,
 };
