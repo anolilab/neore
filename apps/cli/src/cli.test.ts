@@ -315,7 +315,8 @@ describe("chat end to end against a fake API", () => {
             await writeConfig({ apiKey: "nk_1", apiUrl: "https://api.test" }, join(directory, "config.json"));
 
             const bodies: unknown[] = [];
-            const context = contextWith((async (_url: string, init: RequestInit) => {
+            const context = contextWith((async (url: string, init: RequestInit) => {
+                expect(`${init.method} ${new URL(url).pathname}`).toBe("POST /api/v1/chat");
                 bodies.push(JSON.parse(String(init.body)));
 
                 return await reply();
@@ -374,7 +375,7 @@ describe("chat end to end against a fake API", () => {
             const { context } = await setup(() =>
                 Response.json({
                     messageId: "m1",
-                    pendingRequest: { question: "Which branch?" },
+                    pendingRequest: { question: "Which branch?\n\u{1B}[31merror: forged" },
                     reasoning: "",
                     status: "waiting_on_person",
                     text: "",
@@ -383,7 +384,7 @@ describe("chat end to end against a fake API", () => {
             );
 
             expect(await run(["thread", "send", "th1", "hi", "--wait"], context)).toBe(2);
-            expect(context.io.stderr.text()).toContain("waiting on a person (Which branch?). Answer it in the app");
+            expect(context.io.stderr.text()).toContain("waiting on a person (Which branch? [31merror: forged). Answer it in the app");
         });
 
         it("reads the prompt from piped stdin", async () => {

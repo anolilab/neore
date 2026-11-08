@@ -184,6 +184,11 @@ const withReadLaterHint = async <T>(threadId: string | undefined, request: Promi
     }
 };
 
+/** Control characters (newlines, escape sequences) in model text become spaces, so it cannot forge a line or restyle the terminal. */
+const CONTROL_CHARACTERS = /\p{Cc}+/gu;
+
+const oneLine = (text: string): string => text.replaceAll(CONTROL_CHARACTERS, " ").trim();
+
 /** The flags `thread start|send` use. Every flag is shared, so any other one would be dropped while a billed run starts. */
 const THREAD_FLAGS: ReadonlySet<string> = new Set(["api-key", "api-url", "help", "json", "model", "wait"]);
 
@@ -246,7 +251,8 @@ const postThread = async (context: Context, flags: Flags, threadId: string | und
     }
 
     if (result.status === "waiting_on_person") {
-        const asked = result.pendingRequest?.question ?? (result.pendingRequest?.toolName ? `approve ${result.pendingRequest.toolName}` : "an answer");
+        const { question, toolName } = result.pendingRequest ?? {};
+        const asked = oneLine(question ?? (toolName ? `approve ${toolName}` : "an answer"));
 
         context.io.stderr.write(
             `${colors.red("error:")} the run is waiting on a person (${asked}). Answer it in the app, then read the reply with \`neore threads show ${result.threadId}\`.\n`,
