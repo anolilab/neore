@@ -168,7 +168,10 @@ describe("web Worker upload", () => {
 describe("backend Studio documents (Workers Static Assets)", () => {
     const roots: string[] = [];
 
-    const ASSET_MODE_APP = 'openApiSpec: () => loadStudioDocument(env["ASSETS"], "openapi"), openRpcSpec: () => loadStudioDocument(env.ASSETS, \'openrpc\'),';
+    const ASSET_MODE_APP = [
+        'openApiSpec: () => loadStudioDocument((env as Record<string, unknown>)["ASSETS"], "openapi"),',
+        "openRpcSpec: () => loadStudioDocument(env.ASSETS, 'openrpc'),",
+    ].join("\n");
 
     /** A repository root with the generated app, and the codegen'd assets directory holding `documents` when given. */
     const repoRoot = (generatedApp: string, documents?: ReadonlyArray<string>): string => {
@@ -221,6 +224,15 @@ describe("backend Studio documents (Workers Static Assets)", () => {
         expect(backendStudioAssetsProblem(repoRoot("openApiSpec: () => loadStudioDocument(env.ASSETS, name),", ["openapi"]))).toContain(
             "no document name could be read",
         );
+    });
+
+    it("binds nothing and reports nothing without a generated app, so a destroy after `clean` runs", () => {
+        const root = mkdtempSync(join(tmpdir(), "neore-studio-assets-"));
+
+        roots.push(root);
+
+        expect(backendStudioAssets(root)).toBeUndefined();
+        expect(backendStudioAssetsProblem(root)).toBeUndefined();
     });
 
     it("is passed to the backend Worker, and checked before the deploy", () => {

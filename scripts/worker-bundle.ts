@@ -167,12 +167,24 @@ export const backendStudioAssets = (root: string): { directory: string; runWorke
     return studioDocumentsRead(root) !== undefined && existsSync(directory) ? { directory, runWorkerFirst: true } : undefined;
 };
 
-/** A `loadStudioDocument(<binding>, "<name>")` call in the generated app. */
-const STUDIO_DOCUMENT_CALL = /loadStudioDocument\([^,()]+,\s*(["'`])([^"'`]+)\1\s*\)/gu;
+/**
+ * A `loadStudioDocument(<binding>, "<name>")` call in the generated app. The binding argument is an expression
+ * (Lunora writes `(env as Record<string, unknown>)["ASSETS"]`), so the name is the quoted string that closes the call.
+ */
+const STUDIO_DOCUMENT_CALL = /loadStudioDocument\([^;\n]*?,\s*(["'`])([^"'`]+)\1\s*\)/gu;
 
-/** The names of the documents the generated app reads from `ASSETS`, or `undefined` when it reads none (bundled documents). */
+/**
+ * The names of the documents the generated app reads from `ASSETS`, or `undefined` when it reads none (bundled
+ * documents) or there is no generated app (a destroy after `clean`).
+ */
 const studioDocumentsRead = (root: string): ReadonlyArray<string> | undefined => {
-    const generatedApp = readFileSync(path.join(root, "backend/lunora/_generated/app.ts"), "utf8");
+    const appFile = path.join(root, "backend/lunora/_generated/app.ts");
+
+    if (!existsSync(appFile)) {
+        return undefined;
+    }
+
+    const generatedApp = readFileSync(appFile, "utf8");
 
     if (!generatedApp.includes("loadStudioDocument")) {
         return undefined;
