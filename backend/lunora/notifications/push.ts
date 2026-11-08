@@ -19,7 +19,7 @@ import { authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { linksToLockedThread, redactForLockedThread } from "./locked-link";
 import { webPushConfig } from "./push-config";
 import { isAllowedPushEndpoint } from "./push-endpoint";
-import { pushTitle, pushUrgency } from "./push-text";
+import { pushHeadline, pushUrgency } from "./push-text";
 
 /** Browsers one user may register; the one not seen for longest is dropped past this. */
 export const MAX_PUSH_SUBSCRIPTIONS_PER_USER = 10;
@@ -168,9 +168,6 @@ export const loadPushNotification = internalQuery
         };
     });
 
-/** Push body cap, well inside the 4 KiB a push service accepts after encryption. */
-const PUSH_BODY_MAX = 300;
-
 export const sendPushForNotification = internalAction
     .input({ notificationId: v.id("notifications"), userId: v.string() })
     .output(v.null())
@@ -188,9 +185,8 @@ export const sendPushForNotification = internalAction
         // `public/push-sw.js` reads `title`/`body` and `data.{link,tag}`.
         const result = await ctx.push.broadcast(
             {
-                body: notification.body ? `${notification.title}\n${notification.body}`.slice(0, PUSH_BODY_MAX) : notification.title.slice(0, PUSH_BODY_MAX),
+                ...pushHeadline(notification),
                 data: { link: notification.link ?? "/dashboard", tag: args.notificationId },
-                title: pushTitle(notification.type, notification.outcome),
                 urgency: pushUrgency(notification.type),
             },
             { userId: args.userId },

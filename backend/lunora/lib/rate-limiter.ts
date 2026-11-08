@@ -362,6 +362,8 @@ export const RATE_LIMIT_CONFIGS = {
     // and push subscribe/unsubscribe (each a browser permission prompt at most).
     "notifications/push:free": Ratelimit.fixedWindow(10, MINUTE),
     "notifications/push:premium": Ratelimit.fixedWindow(30, MINUTE),
+    // A phone fetching one notification's text before it shows the push: per account, a few per notification at most.
+    "notifications/pushContent": Ratelimit.fixedWindow(120, MINUTE),
     // Registering a phone (sign-in, token rotation, each return to the front): its own bucket, so a phone opened often
     // never uses up the browser push one.
     "notifications/pushRegister:free": Ratelimit.fixedWindow(30, MINUTE),
