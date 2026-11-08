@@ -117,7 +117,14 @@ const AssistantContent: FC<{
                     </ResizablePanel>
                     {isPanelOpen && <ResizableHandle withHandle />}
                     {isPanelOpen && (
-                        <ResizablePanel aria-label={previewFile ? t`PDF preview` : t`Canvas`} data-focus-area="canvas" defaultSize="50%" id="canvas" minSize="25%" role="region">
+                        <ResizablePanel
+                            aria-label={previewFile ? t`PDF preview` : t`Canvas`}
+                            data-focus-area="canvas"
+                            defaultSize="50%"
+                            id="canvas"
+                            minSize="25%"
+                            role="region"
+                        >
                             {previewFile ? <PdfPreviewPanel file={previewFile} /> : <CanvasPanel />}
                         </ResizablePanel>
                     )}
