@@ -114,6 +114,8 @@ const UsageProjectBreakdown: FC<UsageProjectBreakdownProps> = ({ backfilling, da
                             {rows.map((row) => {
                                 const share = totalCost > 0 ? row.costMicrodollars / totalCost : 0;
                                 const percent = Math.round(share * 100);
+                                // The spoken share follows the locale's own percent format (its sign, spacing and digits).
+                                const spendShare = new Intl.NumberFormat(locale, { maximumFractionDigits: 0, style: "percent" }).format(share);
                                 const project = row.label;
 
                                 return (
@@ -129,7 +131,7 @@ const UsageProjectBreakdown: FC<UsageProjectBreakdownProps> = ({ backfilling, da
                                         <TableCell className="text-right tabular-nums">{formatUsd(row.costMicrodollars, locale)}</TableCell>
                                         <TableCell>
                                             <div
-                                                aria-label={t`${project}: ${String(percent)}% of spend`}
+                                                aria-label={t`${project}: ${spendShare} of spend`}
                                                 aria-valuemax={100}
                                                 aria-valuemin={0}
                                                 aria-valuenow={percent}

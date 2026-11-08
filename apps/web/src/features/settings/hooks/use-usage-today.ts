@@ -23,14 +23,26 @@ export const useUsageToday = (): { failed: boolean; today: string | undefined; z
         // A zone that changes while a view is open is applied to the time now, not to when the day last turned.
         setNow(new Date());
 
-        const timer = setInterval(() => {
+        const check = (): void => {
             const next = new Date();
 
             // A new Date only on a new day, so the views keep their query until the period actually moves.
             setNow((current) => (dayKeyInZone(current, zone) === dayKeyInZone(next, zone) ? current : next));
-        }, DAY_CHECK_MS);
+        };
+        // A tab left in the background past midnight catches up as soon as it is shown again, not at the next tick.
+        const onVisible = (): void => {
+            if (document.visibilityState === "visible") {
+                check();
+            }
+        };
+        const timer = setInterval(check, DAY_CHECK_MS);
 
-        return () => clearInterval(timer);
+        document.addEventListener("visibilitychange", onVisible);
+
+        return () => {
+            clearInterval(timer);
+            document.removeEventListener("visibilitychange", onVisible);
+        };
     }, [zone]);
 
     // Only a first load that failed is a failure: a failed refetch keeps the settings it had, and their zone.

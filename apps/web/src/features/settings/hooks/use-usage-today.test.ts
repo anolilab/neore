@@ -38,6 +38,22 @@ describe("useUsageToday", () => {
         expect(result.current.today).toBe("2026-10-01");
     });
 
+    it("catches up on the day as soon as a tab left in the background past midnight is shown again", () => {
+        vi.setSystemTime(new Date("2026-09-30T21:58:00Z"));
+
+        const { result } = renderHook(() => useUsageToday());
+
+        expect(result.current.today).toBe("2026-09-30");
+
+        // The clock passes midnight in Berlin without an interval tick, as it can in a throttled background tab.
+        vi.setSystemTime(new Date("2026-09-30T22:01:00Z"));
+        act(() => {
+            document.dispatchEvent(new Event("visibilitychange"));
+        });
+
+        expect(result.current.today).toBe("2026-10-01");
+    });
+
     it("gives no day while the settings load, and fails rather than dating in UTC when they cannot be read", () => {
         settings.data = undefined;
 
