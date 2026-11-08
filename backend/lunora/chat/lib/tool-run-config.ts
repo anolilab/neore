@@ -16,15 +16,22 @@ import { vGroupRunSnapshot } from "../group/validators";
 export const vToolRunConfig = v.object({
     autoMediaEnrichment: v.boolean(),
     /**
-     * What started the run that paused, when it was not the user's own chat: the continuation
-     * dispatches to workers as that origin did, not as the lead. Absent means the lead.
+     * What started the run that paused, when it was not the user's own chat (an outside agent, or a trigger's or a messenger
+     * reply's sub-agent, `headless-run.ts`): the continuation dispatches to workers as that origin did, not as the lead.
+     * Absent means the lead.
      */
-    dispatchOrigin: v.optional(v.literal("outside_agent")),
+    dispatchOrigin: v.optional(v.union(v.literal("outside_agent"), v.literal("trigger"), v.literal("messenger"))),
     /**
      * Set when a group-chat participant paused: the continuation resumes that
      * participant, then the rest of the turn (`chat/group/run.ts`).
      */
     group: v.optional(vGroupRunSnapshot),
+    /**
+     * The built-ins whose `ask` a sub-agent child inherited an approval for (`sub-agents/execute.ts`): the parent's approved
+     * delegation carries into its nested dispatch. The continuation of a paused child keeps them, so an answer does not ask
+     * again for a nested dispatch. Absent on a snapshot that predates it, which reads as no inherited approval.
+     */
+    headlessApproved: v.optional(v.array(v.string())),
     instructions: v.optional(v.string()),
     mcpServerNames: v.array(v.string()),
     /**
@@ -60,6 +67,11 @@ export const vToolRunConfig = v.object({
      * the owner's secret. Absent on a snapshot written before it existed, which reads as nobody.
      */
     startedBy: v.optional(v.string().max(MAX_LENGTH.id)),
+    /**
+     * Set when a sub-agent's child run paused (`sub-agents/execute.ts`): the continuation hands the run back to it
+     * (`sub_agents.functions.resumeRunForAnswer`, then the run's end), so the result still reaches the parent once.
+     */
+    subAgentRunId: v.optional(v.id("subAgentRuns")),
     toolNames: v.array(v.string()),
     /**
      * Runtime tool name -> stable permission key, taken from the tools as they

@@ -1,6 +1,8 @@
 {
   "jurisdiction": "eu",
-  "migrationIds": [],
+  "migrationIds": [
+    "add-headless-approved"
+  ],
   "tables": {
     "account": {
       "commitOrdered": false,
@@ -27232,11 +27234,33 @@
               "unique": false
             },
             "dispatchOrigin": {
-              "kind": "literal",
+              "kind": "union",
               "nullable": false,
               "optional": true,
               "unique": false,
-              "literal": "\"outside_agent\""
+              "members": [
+                {
+                  "kind": "literal",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
+                  "literal": "\"messenger\""
+                },
+                {
+                  "kind": "literal",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
+                  "literal": "\"outside_agent\""
+                },
+                {
+                  "kind": "literal",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
+                  "literal": "\"trigger\""
+                }
+              ]
             },
             "group": {
               "kind": "object",
@@ -27430,6 +27454,18 @@
                 }
               }
             },
+            "headlessApproved": {
+              "kind": "array",
+              "nullable": false,
+              "optional": true,
+              "unique": false,
+              "of": {
+                "kind": "string",
+                "nullable": false,
+                "optional": false,
+                "unique": false
+              }
+            },
             "instructions": {
               "kind": "string",
               "nullable": false,
@@ -27552,6 +27588,13 @@
               "optional": true,
               "unique": false,
               "refined": true
+            },
+            "subAgentRunId": {
+              "kind": "id",
+              "nullable": false,
+              "optional": true,
+              "unique": false,
+              "ref": "subAgentRuns"
             },
             "toolNames": {
               "kind": "array",
