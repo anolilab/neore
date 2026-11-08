@@ -162,10 +162,11 @@ export const registerPushDevice = authMutation
 
             // Only the row exactly as this call wrote it: a newer registration since (another sign-in) stays.
             if (written?.sessionId === sessionId && written.lastSeenAt === now) {
-                // The registration this call replaced goes back only while it is still a live sign-in of an account that
-                // is not being erased: one that signed out or was deleted meanwhile must not come back.
-                const restorable =
-                    replaced !== undefined && (await isLive(replaced)) && !(await isAccountDeletionUnderway(ctx, replaced.userId)) ? replaced : undefined;
+                // The registration this call replaced goes back only while its sign-in is still live: one that signed out
+                // meanwhile must not come back, and erasure revokes an account's sessions as its first step, so an
+                // account being deleted fails this too (its deletion request lives on its own shard, unreadable here).
+                // The caller's own row is never put back while the caller's account is the one going.
+                const restorable = replaced !== undefined && (await isLive(replaced)) && !(replaced.userId === userId && isDeleting) ? replaced : undefined;
 
                 if (restorable) {
                     const { lastSeenAt, platform, sessionId: replacedSession, userId: replacedOwner } = restorable;

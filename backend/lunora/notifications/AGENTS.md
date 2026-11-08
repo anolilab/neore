@@ -38,8 +38,8 @@
       registers again (accepted: only the generic alert reaches a phone).
       A registration refused after its write (its session ended, or an account
       deletion started meanwhile) takes its row back: the registration it
-      replaced is put back only while that sign-in is live and its account is
-      not being erased. Only Lunora's `kind: "unique"` conflict is a race.
+      replaced is put back only while that sign-in is live (erasure revokes an
+      account's sessions first, so a deleted account fails it). Only Lunora's `kind: "unique"` conflict is a race.
     - At most 10 per user (`trimPushDevices`). An account merge drops the guest's
       rows (`dropPushDevicesOf`) instead of moving them: they belong to a session
       that ends with the guest.
