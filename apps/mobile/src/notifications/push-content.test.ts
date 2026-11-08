@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import type { GrantStore } from "../auth/grant";
-import { channelName, fetchPushContent, NOT_THIS_ACCOUNT, pushPlaceholder, showDataOnlyPush } from "./push-content";
+import { channelName, fetchPushContent, NOT_THIS_ACCOUNT, PUSH_CONTENT_TIMEOUT_MS, pushPlaceholder, showDataOnlyPush } from "./push-content";
 
 const LUNORA = "https://api.test";
 
@@ -65,6 +65,30 @@ describe("fetchPushContent", () => {
 
         expect(await fetchPushContent({ fetch: backend({}) as never, lunoraUrl: LUNORA, notificationId: "n1", store: store(null) })).toBeUndefined();
         expect(await fetchPushContent({ fetch: offline as never, lunoraUrl: LUNORA, notificationId: "n1", store: store("session") })).toBeUndefined();
+    });
+
+    it("gives up at its own budget when the token exchange hangs, not the exchange's longer timeout", async () => {
+        vi.useFakeTimers();
+
+        try {
+            // Answers only when aborted, like a request that never comes back.
+            const hanging = vi.fn(
+                async (_url: string, init?: RequestInit) =>
+                    await new Promise<Response>((_resolve, reject) => {
+                        init?.signal?.addEventListener("abort", () => {
+                            reject(new DOMException("Aborted", "AbortError"));
+                        });
+                    }),
+            );
+            const fetched = fetchPushContent({ fetch: hanging as never, lunoraUrl: LUNORA, notificationId: "n1", store: store("session") });
+
+            await vi.advanceTimersByTimeAsync(PUSH_CONTENT_TIMEOUT_MS);
+
+            expect(await fetched).toBeUndefined();
+            expect(hanging).toHaveBeenCalledTimes(1);
+        } finally {
+            vi.useRealTimers();
+        }
     });
 });
 

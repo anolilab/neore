@@ -39,7 +39,12 @@ export const fetchPushContent = async (input: {
     const timer = setTimeout(() => controller.abort(), PUSH_CONTENT_TIMEOUT_MS);
 
     try {
-        const jwt = await fetchAccessToken({ fetch: input.fetch, lunoraUrl: input.lunoraUrl, store: input.store });
+        // The token exchange counts against the same budget: its own, longer timeout would outlast it.
+        const jwt = await fetchAccessToken({
+            fetch: async (url, init) => await input.fetch(url, { ...init, signal: controller.signal }),
+            lunoraUrl: input.lunoraUrl,
+            store: input.store,
+        });
 
         if (jwt === null) {
             return undefined;

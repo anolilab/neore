@@ -31,6 +31,9 @@ const registerPushTask = async (): Promise<void> => {
 if (Platform.OS === "android") {
     defineTask(PHONE_PUSH_TASK, async ({ data, error }) => {
         if (error) {
+            // eslint-disable-next-line no-console -- no logger in a background task; a lost push must not be silent
+            console.warn("The push notification task could not run.", error);
+
             return;
         }
 
