@@ -339,11 +339,12 @@ describe("chat end to end against a fake API", () => {
             expect(bodies).toEqual([{ prompt: "more", stream: true, threadId: "th9" }]);
         });
 
-        it("--wait prints the reply and exits 0", async () => {
+        it("--wait prints the reply, names the thread on stderr and exits 0", async () => {
             const { bodies, context } = await setup(() => completed("done"));
 
             expect(await run(["thread", "start", "hi", "--wait"], context)).toBe(0);
             expect(context.io.stdout.text()).toBe("Hello\n");
+            expect(context.io.stderr.text()).toBe("thread th1\n");
             expect(bodies).toEqual([{ prompt: "hi", stream: false }]);
         });
 
@@ -366,6 +367,22 @@ describe("chat end to end against a fake API", () => {
 
             expect(await run(["thread", "send", "th1", "hi", "--wait"], context)).toBe(2);
             expect(context.io.stderr.text()).toContain("neore threads show th1");
+        });
+
+        it("--wait on a run paused for a person names what it waits on and exits 2", async () => {
+            const { context } = await setup(() =>
+                Response.json({
+                    messageId: "m1",
+                    pendingRequest: { question: "Which branch?" },
+                    reasoning: "",
+                    status: "waiting_on_person",
+                    text: "",
+                    threadId: "th1",
+                }),
+            );
+
+            expect(await run(["thread", "send", "th1", "hi", "--wait"], context)).toBe(2);
+            expect(context.io.stderr.text()).toContain("waiting on a person (Which branch?). Answer it in the app");
         });
 
         it("reads the prompt from piped stdin", async () => {
@@ -408,6 +425,11 @@ describe("chat end to end against a fake API", () => {
             expect(await run(["thread", "start", "hi"], context)).toBe(2);
             expect(context.io.stdout.text()).toBe("");
             expect(context.io.stderr.text()).toContain("neore threads ls");
+
+            const empty = await setup(() => Response.json(null, { status: 202 }));
+
+            expect(await run(["thread", "start", "hi"], empty.context)).toBe(2);
+            expect(empty.context.io.stderr.text()).toContain("neore threads ls");
 
             const cut = await setup(() => new Response('{"messageId":"m1","thr', { headers: { "Content-Type": "application/json" }, status: 200 }));
 

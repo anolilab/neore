@@ -52,6 +52,8 @@ interface ChatStarted {
 }
 
 interface ChatCompleted {
+    /** With `status: "waiting_on_person"`: the approval or question only a person can answer, in the app. */
+    pendingRequest?: { question?: string; toolName?: string };
     status: string;
     text: string;
     threadId: string;
@@ -132,11 +134,11 @@ const THREAD_EXIT = { failed: 1, ok: 0, other: 2 } as const;
 
 /**
  * `ChatCompleted.status` values that mean the reply cannot be read from this
- * answer (the five-minute wait or the read budget ran out, the run is paused on
- * a person, or the read was cut): not a failed run, so the caller is told where
- * to read it later.
+ * answer (the five-minute wait or the read budget ran out, or the read was cut):
+ * not a failed run, so the caller is told where to read it later. A run paused
+ * on a person (`waiting_on_person`) also exits 2, with what it is waiting on.
  */
-const UNFINISHED_STATUSES: ReadonlySet<string> = new Set(["interrupted", "relay_budget", "relay_timeout", "unknown", "waiting_on_person"]);
+const UNFINISHED_STATUSES: ReadonlySet<string> = new Set(["interrupted", "relay_budget", "relay_timeout", "unknown"]);
 
 /** Error codes after which the run may have started, besides any 5xx: the send was lost, or a retry found it in progress or could not tell. */
 const MAYBE_RUNNING_CODES: ReadonlySet<string> = new Set(["idempotency_in_progress", "idempotency_outcome_unknown", "network_error"]);
@@ -154,8 +156,8 @@ const isPossiblyRun = (error: ApiError): boolean =>
     error.status >= 500 || MAYBE_RUNNING_CODES.has(error.code) || (error.code === "invalid_response" && error.status >= 200 && error.status < 300);
 
 /** A success answer from `POST /chat` that names no thread: the run started, but the CLI cannot say where. */
-const requireThreadId = <T extends { threadId?: unknown }>(answer: T, status: number): T & { threadId: string } => {
-    if (typeof answer.threadId !== "string" || answer.threadId === "") {
+const requireThreadId = <T extends { threadId?: unknown }>(answer: T | null, status: number): T & { threadId: string } => {
+    if (answer === null || typeof answer !== "object" || typeof answer.threadId !== "string" || answer.threadId === "") {
         throw new ApiError({ code: "invalid_response", message: "The API answered without a thread id.", status });
     }
 
@@ -219,17 +221,31 @@ const postThread = async (context: Context, flags: Flags, threadId: string | und
             .then((answer) => requireThreadId(answer, 200)),
     );
 
+    const colors = paint(shouldUseColor(context.io.stderr, context.io.env));
+
     if (flags.json) {
         printJson(context.io, result);
-    } else if (result.text) {
-        context.io.stdout.write(result.text.endsWith("\n") ? result.text : `${result.text}\n`);
+    } else {
+        if (result.text) {
+            context.io.stdout.write(result.text.endsWith("\n") ? result.text : `${result.text}\n`);
+        }
+
+        context.io.stderr.write(colors.dim(`thread ${result.threadId}\n`));
     }
 
     if (result.status === "done") {
         return THREAD_EXIT.ok;
     }
 
-    const colors = paint(shouldUseColor(context.io.stderr, context.io.env));
+    if (result.status === "waiting_on_person") {
+        const asked = result.pendingRequest?.question ?? (result.pendingRequest?.toolName ? `approve ${result.pendingRequest.toolName}` : "an answer");
+
+        context.io.stderr.write(
+            `${colors.red("error:")} the run is waiting on a person (${asked}). Answer it in the app, then read the reply with \`neore threads show ${result.threadId}\`.\n`,
+        );
+
+        return THREAD_EXIT.other;
+    }
 
     if (UNFINISHED_STATUSES.has(result.status)) {
         context.io.stderr.write(
