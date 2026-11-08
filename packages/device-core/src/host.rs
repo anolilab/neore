@@ -35,8 +35,9 @@ use crate::launch;
 use crate::outbox::Outbox;
 use crate::sandbox::{self, Support};
 
-/// 4: the `browse` and `mkdir` requests. 2: the `reap` request. 3: the `list`, `tar` and `cancel` requests and chunk frames. The `agent` request (S7) is
-/// announced by [`Outgoing::Hello::agents`] instead of a new number, so a host without it still connects.
+/// 2: the `reap` request. 3: the `list`, `tar` and `cancel` requests and chunk frames. 4: the `browse` and `mkdir`
+/// requests. The `agent` request (S7) is announced by [`Outgoing::Hello::agents`] instead of a new number, so a host
+/// without it still connects.
 pub const PROTOCOL_VERSION: u32 = 4;
 /// Requests being served at once; a further one is refused, not queued behind a ten-minute command.
 const MAX_IN_FLIGHT: usize = 8;
