@@ -1181,6 +1181,14 @@ msgstr "{name} 已暂停"
 msgid "{name} resumed"
 msgstr "{name} 已恢复"
 
+#: ../../packages/ui/src/components/file-renderers/pdf-thumbnail.tsx:68
+msgid "{name}, {pages, plural, one {# page} other {# pages}}"
+msgstr ""
+
+#: ../../packages/ui/src/components/file-renderers/pdf-thumbnail.tsx:69
+msgid "{name}, preview unavailable"
+msgstr ""
+
 #: ../../packages/chat-ui/src/chat/tool-group.tsx:29
 msgid "{namesText}, +{more} more"
 msgstr ""
@@ -1200,6 +1208,10 @@ msgstr "{openCount} 条未解决的评论"
 #: src/features/workflow/components/collab/collaborator-facepile.tsx:92
 msgid "{overflowCount, plural, one {# more user} other {# more users}}"
 msgstr "{overflowCount, plural, other {另外 # 位用户}}"
+
+#: ../../packages/ui/src/components/file-renderers/pdf-thumbnail.tsx:113
+msgid "{pages, plural, one {# page} other {# pages}}"
+msgstr ""
 
 #: src/features/settings/components/chat/api-keys-settings.tsx:495
 msgid "{providerId} API key removed"
@@ -2052,7 +2064,7 @@ msgstr "添加评论"
 msgid "Add a member from your organization to <0>{0}</0>"
 msgstr "从你的组织中添加成员到 <0>{0}</0>"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:283
+#: src/features/auth/components/organization/billing-settings-card.tsx:246
 #: src/features/auth/components/team/team-settings-dialog.tsx:191
 msgid "Add a model..."
 msgstr "添加模型..."
@@ -2798,7 +2810,7 @@ msgstr "AI 视频生成"
 msgid "AI-assisted bug triage with full recording context"
 msgstr "借助完整录制上下文进行 AI 辅助的缺陷分诊"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:368
+#: ../../packages/chat-ui/src/chat/message-content.tsx:369
 msgid "AI-generated"
 msgstr "AI生成"
 
@@ -3127,7 +3139,7 @@ msgstr ""
 msgid "Allow this site ({0})"
 msgstr "允许此网站（{0}）"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:253
+#: src/features/auth/components/organization/billing-settings-card.tsx:216
 #: src/features/auth/components/team/team-settings-dialog.tsx:170
 msgid "Allowed AI Models"
 msgstr "允许的 AI 模型"
@@ -3229,7 +3241,7 @@ msgstr "发生错误"
 msgid "An error occurred during One Tap sign in"
 msgstr "One Tap 登录时出错"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1146
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1147
 msgid "An error occurred while generating the response."
 msgstr "生成回复时发生错误。"
 
@@ -4589,17 +4601,22 @@ msgstr "费用计入你自己的 API 密钥，而非你的积分。"
 msgid "Billing"
 msgstr "账单"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:234
+#: src/features/auth/components/organization/billing-settings-card.tsx:313
+msgid "Billing details for this organization"
+msgstr ""
+
+#: src/features/auth/components/organization/billing-settings-card.tsx:194
 msgid "Billing Email"
 msgstr "账单邮箱"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:137
-#: src/features/auth/components/organization/billing-settings-card.tsx:168
-#: src/features/auth/components/organization/billing-settings-card.tsx:313
+#: src/features/auth/components/organization/billing-settings-card.tsx:136
+#: src/features/auth/components/organization/billing-settings-card.tsx:274
+#: src/features/auth/components/organization/billing-settings-card.tsx:314
+#: src/features/auth/components/organization/billing-settings-card.tsx:337
 msgid "Billing Settings"
 msgstr "账单设置"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:91
+#: src/features/auth/components/organization/billing-settings-card.tsx:83
 msgid "Billing settings updated successfully"
 msgstr "账单设置已更新"
 
@@ -4869,11 +4886,11 @@ msgstr "浏览并恢复工作流的历史版本。"
 msgid "Browse, fork, and remix workflows shared by the community"
 msgstr "浏览、复刻并改编社区分享的工作流"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:729
+#: ../../packages/chat-ui/src/chat/message-content.tsx:730
 msgid "Browser"
 msgstr "浏览器"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:752
+#: ../../packages/chat-ui/src/chat/message-content.tsx:753
 msgid "Browser action failed"
 msgstr "浏览器操作失败"
 
@@ -4881,7 +4898,7 @@ msgstr "浏览器操作失败"
 msgid "Browser Automation"
 msgstr "浏览器自动化"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:750
+#: ../../packages/chat-ui/src/chat/message-content.tsx:751
 msgid "Browser error"
 msgstr "浏览器错误"
 
@@ -4890,7 +4907,7 @@ msgid "Browser notes"
 msgstr "浏览器说明"
 
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:259
-#: ../../packages/chat-ui/src/chat/message-content.tsx:712
+#: ../../packages/chat-ui/src/chat/message-content.tsx:713
 msgid "Browser screenshot"
 msgstr "浏览器截图"
 
@@ -4898,7 +4915,7 @@ msgstr "浏览器截图"
 msgid "Browser Session"
 msgstr "浏览器会话"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:662
+#: ../../packages/chat-ui/src/chat/message-content.tsx:663
 msgid "Browser working..."
 msgstr "浏览器运行中..."
 
@@ -5204,7 +5221,7 @@ msgstr "加拿大"
 #: src/features/admin/components/ban-user-dialog.tsx:146
 #: src/features/admin/components/impersonate-user-dialog.tsx:79
 #: src/features/admin/components/update-user-role-dialog.tsx:60
-#: src/features/auth/components/organization/create-organization-dialog.tsx:336
+#: src/features/auth/components/organization/create-organization-dialog.tsx:339
 #: src/features/auth/components/organization/delete-organization-dialog.tsx:144
 #: src/features/auth/components/organization/leave-organization-dialog.tsx:91
 #: src/features/auth/components/organization/remove-member-dialog.tsx:83
@@ -5346,7 +5363,7 @@ msgstr "无法使用提示词：{errorMessages}"
 msgid "Canny Edge"
 msgstr "Canny 边缘"
 
-#: src/features/chat/assistant.tsx:71
+#: src/features/chat/assistant.tsx:120
 #: src/features/marketing/components/landing-page.tsx:217
 msgid "Canvas"
 msgstr "画布"
@@ -5761,7 +5778,7 @@ msgstr "勾选的集成会在保存后提供设置。在你确认之前不会建
 msgid "Checked: {0}"
 msgstr ""
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:385
+#: ../../packages/chat-ui/src/chat/message-content.tsx:386
 msgid "Checking image safety..."
 msgstr "正在检查图片安全性..."
 
@@ -6164,7 +6181,7 @@ msgstr "点击编辑"
 msgid "Click to edit..."
 msgstr "点击编辑..."
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:654
+#: ../../packages/chat-ui/src/chat/message-content.tsx:655
 msgid "Clicking element..."
 msgstr "正在点击元素..."
 
@@ -6200,6 +6217,7 @@ msgstr ""
 #: src/components/command-palette.tsx:708
 #: src/features/admin/components/user-sessions-dialog.tsx:159
 #: src/features/canvas/canvas-panel.tsx:818
+#: src/features/canvas/pdf-preview-panel.tsx:98
 #: src/features/chat/thread/composer-text-attachment-editor.tsx:868
 #: src/features/develop/components/thread-pull-requests.tsx:256
 #: src/features/evals/components/save-eval-case-action.tsx:95
@@ -6258,6 +6276,10 @@ msgstr "关闭提示词优化"
 msgid "Close search"
 msgstr "关闭搜索"
 
+#: src/features/chat/assistant.tsx:82
+msgid "Close the open document to view this PDF in the panel."
+msgstr ""
+
 #: src/features/chat/translation/message-translation.tsx:133
 msgid "Close translation"
 msgstr "关闭翻译"
@@ -6297,7 +6319,7 @@ msgstr "Cloudflare Workers AI 模型在 Cloudflare 有可用容量的任何地�
 msgid "Code"
 msgstr "代码"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:127
+#: ../../packages/chat-ui/src/chat/message-content.tsx:128
 msgid "Code block"
 msgstr ""
 
@@ -6309,7 +6331,7 @@ msgstr "代码执行"
 msgid "Code execution and sandbox files"
 msgstr "代码执行和沙盒文件"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:630
+#: ../../packages/chat-ui/src/chat/message-content.tsx:631
 msgid "Code execution failed"
 msgstr "代码执行失败"
 
@@ -6333,7 +6355,7 @@ msgstr ""
 msgid "Code navigation"
 msgstr ""
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:586
+#: ../../packages/chat-ui/src/chat/message-content.tsx:587
 msgid "Code output"
 msgstr "代码输出"
 
@@ -6967,8 +6989,8 @@ msgstr "配置团队“{teamName}”的设置"
 msgid "Configure team settings"
 msgstr "配置团队设置"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:165
-#: src/features/auth/components/organization/billing-settings-card.tsx:311
+#: src/features/auth/components/organization/billing-settings-card.tsx:135
+#: src/features/auth/components/organization/billing-settings-card.tsx:272
 msgid "Configure the billing contact and available AI models"
 msgstr "配置账单联系人和可用的 AI 模型"
 
@@ -8033,6 +8055,10 @@ msgstr "无法加载工具：{error}"
 msgid "Could not load your activity."
 msgstr "无法加载你的活动。"
 
+#: src/features/auth/components/organization/billing-settings-card.tsx:319
+msgid "Could not load your organization's billing details. Try again later."
+msgstr ""
+
 #: src/features/pages/components/pages-sidebar.tsx:108
 msgid "Could not move the page"
 msgstr "无法移动页面"
@@ -8293,7 +8319,7 @@ msgstr "创建新的 API 密钥，以编程方式访问你的账号"
 msgid "Create a new branch from this message. Give it a name to help you identify it later."
 msgstr "从这条消息创建新分支。给它起个名字，方便以后识别。"
 
-#: src/features/auth/components/organization/create-organization-dialog.tsx:171
+#: src/features/auth/components/organization/create-organization-dialog.tsx:174
 msgid "Create a new organization to collaborate with your team"
 msgstr "创建新组织，与你的团队协作"
 
@@ -8417,8 +8443,8 @@ msgstr "请在评测页面中创建一个。"
 msgid "Create organization"
 msgstr "创建组织"
 
-#: src/features/auth/components/organization/create-organization-dialog.tsx:168
-#: src/features/auth/components/organization/create-organization-dialog.tsx:350
+#: src/features/auth/components/organization/create-organization-dialog.tsx:171
+#: src/features/auth/components/organization/create-organization-dialog.tsx:353
 #: src/features/auth/components/organization/organizations-card.tsx:37
 msgid "Create Organization"
 msgstr "创建组织"
@@ -8518,7 +8544,7 @@ msgstr "创建一个一次性链接，有效期 7 天。任何已登录的人打
 msgid "Creating branch..."
 msgstr "正在创建分支..."
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:309
+#: ../../packages/chat-ui/src/chat/message-content.tsx:310
 msgid "Creating slides..."
 msgstr "正在创建幻灯片..."
 
@@ -8594,8 +8620,8 @@ msgstr "希望用单个前沿品质模型同时生成和编辑图像的创作者
 msgid "Credits"
 msgstr "积分"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:145
-#: src/features/auth/components/organization/billing-settings-card.tsx:186
+#: src/features/auth/components/organization/billing-settings-card.tsx:146
+#: src/features/auth/components/organization/billing-settings-card.tsx:345
 msgid "Credits per user:"
 msgstr "每位用户的积分："
 
@@ -8692,8 +8718,8 @@ msgstr "当前方案："
 msgid "Current Prompt Variables"
 msgstr "当前提示词变量"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:142
-#: src/features/auth/components/organization/billing-settings-card.tsx:183
+#: src/features/auth/components/organization/billing-settings-card.tsx:143
+#: src/features/auth/components/organization/billing-settings-card.tsx:342
 msgid "Current tier:"
 msgstr "当前等级："
 
@@ -9372,7 +9398,7 @@ msgstr "删除目标 {title}"
 msgid "Delete group and children"
 msgstr "删除分组及其子节点"
 
-#: src/features/auth/components/organization/create-organization-dialog.tsx:246
+#: src/features/auth/components/organization/create-organization-dialog.tsx:249
 #: src/features/auth/components/organization/organization-logo-card.tsx:162
 msgid "Delete Logo"
 msgstr "删除徽标"
@@ -10124,7 +10150,7 @@ msgid "Do you want to add more rows?"
 msgstr "要添加更多行吗？"
 
 #: ../../packages/chat-ui/src/chat/document-artifact.tsx:44
-#: ../../packages/chat-ui/src/chat/message-content.tsx:284
+#: ../../packages/chat-ui/src/chat/message-content.tsx:285
 #: ../../packages/ui/src/components/file-renderers/docx-preview.tsx:114
 msgid "Document"
 msgstr "文档"
@@ -10274,7 +10300,7 @@ msgstr "下载文档"
 msgid "Download Export"
 msgstr "下载导出"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:447
+#: ../../packages/chat-ui/src/chat/message-content.tsx:448
 #: ../../packages/ui/src/components/file-renderers/generic-file-card.tsx:87
 msgid "Download file"
 msgstr "下载文件"
@@ -10296,6 +10322,7 @@ msgstr "下载 Markdown"
 msgid "Download Neore for desktop"
 msgstr "下载 Neore 桌面版"
 
+#: src/features/canvas/pdf-preview-panel.tsx:76
 #: src/features/chat/header/thread-download-button.tsx:122
 msgid "Download PDF"
 msgstr "下载 PDF"
@@ -11330,7 +11357,7 @@ msgstr "请输入有效的 AWS 区域，例如 us-east-1"
 msgid "Enter an API version such as v1 or 2024-10-21"
 msgstr "请输入 API 版本，例如 v1 或 2024-10-21"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:241
+#: src/features/auth/components/organization/billing-settings-card.tsx:203
 msgid "Enter billing email"
 msgstr "输入账单邮箱"
 
@@ -11364,12 +11391,12 @@ msgstr "输入模型 ID（例如“llama-4-scout”）..."
 msgid "Enter new password"
 msgstr "输入新密码"
 
-#: src/features/auth/components/organization/create-organization-dialog.tsx:274
+#: src/features/auth/components/organization/create-organization-dialog.tsx:277
 #: src/features/auth/components/organization/organization-name-card.tsx:125
 msgid "Enter organization name"
 msgstr "输入组织名称"
 
-#: src/features/auth/components/organization/create-organization-dialog.tsx:299
+#: src/features/auth/components/organization/create-organization-dialog.tsx:302
 #: src/features/auth/components/organization/organization-slug-card.tsx:129
 msgid "Enter organization slug"
 msgstr "输入组织 slug"
@@ -11632,7 +11659,7 @@ msgstr "错误率"
 msgid "Error trace:"
 msgstr "错误追踪："
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:245
+#: ../../packages/chat-ui/src/chat/message-content.tsx:246
 msgid "Error:"
 msgstr "错误："
 
@@ -11896,7 +11923,7 @@ msgstr "正在执行工具..."
 msgid "Execution"
 msgstr "执行"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:620
+#: ../../packages/chat-ui/src/chat/message-content.tsx:621
 msgid "Execution failed"
 msgstr "执行失败"
 
@@ -12239,11 +12266,11 @@ msgstr "提取页面"
 msgid "Extract subject"
 msgstr "提取主体"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:720
+#: ../../packages/chat-ui/src/chat/message-content.tsx:721
 msgid "Extracted"
 msgstr "已提取"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:655
+#: ../../packages/chat-ui/src/chat/message-content.tsx:656
 msgid "Extracting content..."
 msgstr "正在提取内容..."
 
@@ -14530,7 +14557,7 @@ msgstr "生成的视频"
 msgid "Generated videos will appear here. Start by describing what you want to create in the composer below."
 msgstr "生成的视频将显示在这里。在下方输入框中描述你想创作的内容即可开始。"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:462
+#: ../../packages/chat-ui/src/chat/message-content.tsx:463
 msgid "Generating audio..."
 msgstr "正在生成音频..."
 
@@ -14538,12 +14565,12 @@ msgstr "正在生成音频..."
 msgid "Generating draft…"
 msgstr "正在生成草稿…"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:463
+#: ../../packages/chat-ui/src/chat/message-content.tsx:464
 #: src/features/chat/thread/media-gallery-view.tsx:395
 msgid "Generating image..."
 msgstr "正在生成图像..."
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:306
+#: ../../packages/chat-ui/src/chat/message-content.tsx:307
 msgid "Generating presentation..."
 msgstr "正在生成演示文稿..."
 
@@ -14551,7 +14578,7 @@ msgstr "正在生成演示文稿..."
 msgid "Generating response"
 msgstr "正在生成回复"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:464
+#: ../../packages/chat-ui/src/chat/message-content.tsx:465
 #: src/features/chat/thread/media-gallery-view.tsx:395
 msgid "Generating video..."
 msgstr "正在生成视频..."
@@ -15852,7 +15879,7 @@ msgid "illustration"
 msgstr "插画"
 
 #: ../../packages/chat-ui/src/chat/document-artifact.tsx:42
-#: ../../packages/chat-ui/src/chat/message-content.tsx:414
+#: ../../packages/chat-ui/src/chat/message-content.tsx:415
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:643
 #: ../../packages/ui/src/components/ai-elements/attachments-utilities.tsx:47
 #: ../../packages/ui/src/components/ai-elements/attachments.tsx:107
@@ -16445,7 +16472,7 @@ msgstr "输入模板"
 msgid "Input tokens"
 msgstr "输入 token"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:229
+#: ../../packages/chat-ui/src/chat/message-content.tsx:230
 msgid "Input:"
 msgstr "输入："
 
@@ -16830,7 +16857,7 @@ msgstr ""
 msgid "It was not saved. Paste it again and save."
 msgstr ""
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:391
+#: ../../packages/chat-ui/src/chat/message-content.tsx:392
 msgid "It will be visible once approved by a moderator"
 msgstr "经审核员批准后即可显示"
 
@@ -17559,7 +17586,7 @@ msgstr "留空则使用已连接节点的输入"
 
 #: src/features/auth/components/organization/leave-organization-dialog.tsx:72
 #: src/features/auth/components/organization/leave-organization-dialog.tsx:103
-#: src/features/auth/components/organization/organization-cell.tsx:99
+#: src/features/auth/components/organization/organization-cell.tsx:105
 msgid "Leave Organization"
 msgstr "离开组织"
 
@@ -18002,7 +18029,7 @@ msgstr "正在加载编辑器..."
 msgid "Loading editor…"
 msgstr "正在加载编辑器…"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:328
+#: ../../packages/chat-ui/src/chat/message-content.tsx:329
 #: ../../packages/ui/src/components/file-renderers/fetched-text-preview.tsx:65
 msgid "Loading file…"
 msgstr "正在加载文件…"
@@ -18072,7 +18099,8 @@ msgstr "正在加载预设…"
 msgid "Loading preview..."
 msgstr "正在加载预览..."
 
-#: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:168
+#: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:170
+#: src/features/canvas/pdf-preview-panel.tsx:120
 #: src/features/chat/thread/sandbox-files.tsx:104
 msgid "Loading preview…"
 msgstr "正在加载预览…"
@@ -18173,7 +18201,7 @@ msgstr ""
 msgid "Loading..."
 msgstr "正在加载..."
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:331
+#: ../../packages/chat-ui/src/chat/message-content.tsx:332
 #: src/features/chat/thread/memory-usage-action.tsx:46
 #: src/features/chat/thread/request-secret-prompt.tsx:479
 #: src/features/code/components/code-workspace.tsx:90
@@ -18270,7 +18298,7 @@ msgstr "退出登录"
 msgid "Login"
 msgstr "登录"
 
-#: src/features/auth/components/organization/create-organization-dialog.tsx:209
+#: src/features/auth/components/organization/create-organization-dialog.tsx:212
 #: src/features/auth/components/organization/organization-logo-card.tsx:136
 #: src/features/auth/components/organization/organization-logo-card.tsx:195
 msgid "Logo"
@@ -18551,7 +18579,7 @@ msgstr "管理 <0>{0}</0> 的成员"
 msgid "Manage models on {0}"
 msgstr "管理 {0} 上的模型"
 
-#: src/features/auth/components/organization/organization-cell.tsx:88
+#: src/features/auth/components/organization/organization-cell.tsx:94
 msgid "Manage Organization"
 msgstr "管理组织"
 
@@ -18581,7 +18609,7 @@ msgstr "管理标签"
 msgid "Manage tags…"
 msgstr "管理标签…"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:199
+#: src/features/auth/components/organization/billing-settings-card.tsx:159
 msgid "Manage Team subscription"
 msgstr "管理 Team 订阅"
 
@@ -20144,11 +20172,11 @@ msgstr "浏览对话"
 msgid "navigate within each column"
 msgstr "在每列中导航"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:721
+#: ../../packages/chat-ui/src/chat/message-content.tsx:722
 msgid "Navigated"
 msgstr "已导航"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:662
+#: ../../packages/chat-ui/src/chat/message-content.tsx:663
 msgid "Navigating to {target}..."
 msgstr "正在导航到 {target}..."
 
@@ -20217,7 +20245,7 @@ msgstr "Neore 无法连接服务器。它将继续尝试重新连接。"
 msgid "Neore Chat"
 msgstr "Neore Chat"
 
-#: src/routes/__root.tsx:557
+#: src/routes/__root.tsx:565
 msgid "Neore Chat is a modern AI chat application. Chat with the latest AI models, organise your conversations, and stay productive."
 msgstr "Neore Chat 是一款现代 AI 聊天应用。与最新的 AI 模型聊天，整理你的对话，保持高效。"
 
@@ -20562,7 +20590,7 @@ msgstr "下一个选项"
 msgid "Next output mode"
 msgstr "下一个输出模式"
 
-#: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:121
+#: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:119
 #: src/features/prompts/components/prompts-sidebar-tab.tsx:879
 msgid "Next page"
 msgstr "下一页"
@@ -21875,7 +21903,7 @@ msgstr "每个 token 仅激活 3B 参数，高效节能"
 msgid "Only in one run"
 msgstr "仅在一次运行中"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:136
+#: src/features/auth/components/organization/billing-settings-card.tsx:336
 msgid "Only organization owners can manage billing settings"
 msgstr "只有组织所有者才能管理账单设置"
 
@@ -21977,7 +22005,7 @@ msgstr "哎呀！出错了"
 msgid "Opacity"
 msgstr "不透明度"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:707
+#: ../../packages/chat-ui/src/chat/message-content.tsx:708
 #: src/components/command-palette.tsx:700
 #: src/features/chat/link-preview/link-preview-card.tsx:117
 #: src/features/develop/components/pull-request-view.tsx:73
@@ -21994,6 +22022,10 @@ msgstr "营业中"
 msgctxt "stock opening price"
 msgid "Open"
 msgstr "开盘"
+
+#: ../../packages/ui/src/components/file-renderers/pdf-thumbnail.tsx:67
+msgid "Open {filename}"
+msgstr ""
 
 #: src/features/chat/thread/comparison-view.tsx:140
 msgid "Open {modelName} in full thread"
@@ -22110,6 +22142,14 @@ msgstr ""
 #: src/features/layout/components/sidebar-shortcut.tsx:124
 msgid "Open Pages"
 msgstr "打开页面"
+
+#: ../../packages/ui/src/components/file-renderers/pdf-thumbnail.tsx:67
+msgid "Open PDF"
+msgstr ""
+
+#: src/features/canvas/pdf-preview-panel.tsx:82
+msgid "Open PDF in a new tab to print"
+msgstr ""
 
 #: src/features/canvas/components/canvas-code-preview.tsx:219
 msgid "Open preview in new tab"
@@ -22692,7 +22732,7 @@ msgstr ""
 msgid "Organization"
 msgstr "组织"
 
-#: src/features/auth/components/organization/create-organization-dialog.tsx:112
+#: src/features/auth/components/organization/create-organization-dialog.tsx:115
 msgid "Organization created successfully"
 msgstr "组织已创建"
 
@@ -22700,13 +22740,13 @@ msgstr "组织已创建"
 msgid "Organization deleted successfully"
 msgstr "组织已删除"
 
-#: src/features/auth/components/organization/create-organization-dialog.tsx:266
+#: src/features/auth/components/organization/create-organization-dialog.tsx:269
 #: src/features/auth/components/organization/organization-name-card.tsx:106
 #: src/features/auth/components/organization/organization-name-card.tsx:157
 msgid "Organization Name"
 msgstr "组织名称"
 
-#: src/features/auth/components/organization/create-organization-dialog.tsx:70
+#: src/features/auth/components/organization/create-organization-dialog.tsx:71
 #: src/features/auth/components/organization/organization-name-card.tsx:23
 msgid "Organization name is required"
 msgstr "请输入组织名称"
@@ -22719,18 +22759,18 @@ msgstr "组织名称未改变"
 msgid "Organization name updated successfully"
 msgstr "组织名称已更新"
 
-#: src/features/auth/components/organization/create-organization-dialog.tsx:287
+#: src/features/auth/components/organization/create-organization-dialog.tsx:290
 #: src/features/auth/components/organization/organization-slug-card.tsx:111
 #: src/features/auth/components/organization/organization-slug-card.tsx:161
 msgid "Organization Slug"
 msgstr "组织 Slug"
 
-#: src/features/auth/components/organization/create-organization-dialog.tsx:78
+#: src/features/auth/components/organization/create-organization-dialog.tsx:79
 #: src/features/auth/components/organization/organization-slug-card.tsx:28
 msgid "Organization slug is invalid"
 msgstr "组织 slug 无效"
 
-#: src/features/auth/components/organization/create-organization-dialog.tsx:75
+#: src/features/auth/components/organization/create-organization-dialog.tsx:76
 #: src/features/auth/components/organization/delete-organization-dialog.tsx:30
 #: src/features/auth/components/organization/organization-slug-card.tsx:27
 msgid "Organization slug is required"
@@ -22826,7 +22866,7 @@ msgstr ""
 msgid "Outpaint"
 msgstr "扩图"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:562
+#: ../../packages/chat-ui/src/chat/message-content.tsx:563
 #: ../../packages/ui/src/components/ai-elements/context.tsx:276
 #: src/components/model-picker/model-picker.tsx:206
 #: src/features/devices/components/device-tool-call.tsx:174
@@ -22874,7 +22914,7 @@ msgstr "输出类型"
 msgid "Output-format focused"
 msgstr "侧重输出格式"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:237
+#: ../../packages/chat-ui/src/chat/message-content.tsx:238
 msgid "Output:"
 msgstr "输出："
 
@@ -22918,7 +22958,7 @@ msgstr ""
 msgid "Pacific Time (US & Canada)"
 msgstr "太平洋时间（美国和加拿大）"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:661
+#: ../../packages/chat-ui/src/chat/message-content.tsx:662
 msgid "page"
 msgstr "页面"
 
@@ -23261,7 +23301,7 @@ msgstr "已暂停"
 msgid "Pay for what <0>you use.</0>"
 msgstr "按实际<0>用量付费。</0>"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:223
+#: src/features/auth/components/organization/billing-settings-card.tsx:183
 #: src/features/billing/components/personal-plan-card.tsx:52
 msgid "Pay yearly"
 msgstr "按年付款"
@@ -23279,6 +23319,7 @@ msgid "Payments, subscriptions, and financial data"
 msgstr "付款、订阅和财务数据"
 
 #: src/components/model-picker/model-picker.tsx:82
+#: src/features/canvas/pdf-preview-panel.tsx:73
 #: src/features/settings/components/chat/models-settings.tsx:35
 msgid "PDF"
 msgstr "PDF"
@@ -23286,6 +23327,10 @@ msgstr "PDF"
 #: ../../packages/ui/src/components/file-renderers/hex-viewer.tsx:77
 msgid "PDF document"
 msgstr "PDF 文档"
+
+#: src/features/chat/assistant.tsx:120
+msgid "PDF preview"
+msgstr ""
 
 #: src/features/settings/components/knowledge/knowledge-base-settings.tsx:314
 msgid "PDF, DOCX, TXT, MD, CSV, JSON, XLS, XLSX — max 5MB"
@@ -24116,7 +24161,7 @@ msgstr "上一个选项"
 msgid "Previous output mode"
 msgstr "上一个输出模式"
 
-#: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:107
+#: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:105
 #: src/features/prompts/components/prompts-sidebar-tab.tsx:870
 msgid "Previous page"
 msgstr "上一页"
@@ -25707,7 +25752,7 @@ msgstr "移除 {fileName}"
 msgid "Remove {label}"
 msgstr "移除 {label}"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:262
+#: src/features/auth/components/organization/billing-settings-card.tsx:225
 #: src/features/auth/components/team/team-settings-dialog.tsx:177
 msgid "Remove {model}"
 msgstr "移除 {model}"
@@ -26755,7 +26800,7 @@ msgstr "运行你的工作流后，可在此查看执行历史。"
 msgid "Running"
 msgstr "运行中"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:523
+#: ../../packages/chat-ui/src/chat/message-content.tsx:524
 msgid "Running code..."
 msgstr "正在运行代码..."
 
@@ -26763,7 +26808,7 @@ msgstr "正在运行代码..."
 msgid "Running on {device}…"
 msgstr "正在 {device} 上运行…"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:206
+#: ../../packages/chat-ui/src/chat/message-content.tsx:207
 #: src/features/admin/components/admin-cleanup-dashboard.tsx:258
 #: src/features/workflow/components/canvas/workflow-controls.tsx:622
 #: src/features/workflow/components/nodes/base-node.tsx:263
@@ -26887,8 +26932,8 @@ msgstr "沙特阿拉伯"
 
 #: ../../packages/ui/src/components/inline-edit.tsx:108
 #: src/features/admin/components/admin-cleanup-dashboard.tsx:118
-#: src/features/auth/components/organization/billing-settings-card.tsx:162
-#: src/features/auth/components/organization/billing-settings-card.tsx:308
+#: src/features/auth/components/organization/billing-settings-card.tsx:132
+#: src/features/auth/components/organization/billing-settings-card.tsx:269
 #: src/features/auth/components/organization/organization-name-card.tsx:99
 #: src/features/auth/components/organization/organization-name-card.tsx:151
 #: src/features/auth/components/organization/organization-slug-card.tsx:104
@@ -27127,7 +27172,7 @@ msgid "Screen capture failed. Please try again."
 msgstr "屏幕截取失败。请重试。"
 
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:118
-#: ../../packages/chat-ui/src/chat/message-content.tsx:703
+#: ../../packages/chat-ui/src/chat/message-content.tsx:704
 msgid "Screenshot"
 msgstr "截图"
 
@@ -27675,7 +27720,7 @@ msgstr "选择到最后一列"
 msgid "Select to top of table"
 msgstr "选择到表格顶部"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:255
+#: src/features/auth/components/organization/billing-settings-card.tsx:218
 msgid "Select which AI models organization members can use. Leave empty for enterprise to allow all models."
 msgstr "选择组织成员可以使用的 AI 模型。企业版留空则允许所有模型。"
 
@@ -28662,7 +28707,7 @@ msgstr "跳过 CLIP 层（0 = 不跳过，1-2 = 更风格化）"
 msgid "Skip questions"
 msgstr "跳过问题"
 
-#: src/routes/__root.tsx:428
+#: src/routes/__root.tsx:435
 msgid "Skip to content"
 msgstr "跳到内容"
 
@@ -28743,7 +28788,7 @@ msgstr "幻灯片 {streamingSlideNumber}"
 msgid "Slide title"
 msgstr "幻灯片标题"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1079
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1080
 msgid "Slide updated"
 msgstr "幻灯片已更新"
 
@@ -28889,7 +28934,7 @@ msgstr "扎实的通用能力"
 msgid "Solid performance across most task types"
 msgstr "在大多数任务类型上表现扎实"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:612
+#: ../../packages/chat-ui/src/chat/message-content.tsx:613
 msgid "Some images from this run could not be saved."
 msgstr "此次运行中的部分图像无法保存。"
 
@@ -28978,7 +29023,7 @@ msgstr "已开启音效"
 msgid "Source"
 msgstr "来源"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1216
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1217
 #: src/features/chat/thread/message-content.tsx:141
 msgid "Source {index}"
 msgstr "来源 {index}"
@@ -30492,7 +30537,7 @@ msgstr "输入一张图像，移除背景，然后应用风格迁移"
 msgid "Take turns"
 msgstr "轮流发言"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:656
+#: ../../packages/chat-ui/src/chat/message-content.tsx:657
 msgid "Taking screenshot..."
 msgstr "正在截图..."
 
@@ -31513,6 +31558,12 @@ msgstr "该页面、所有子页面、评论及版本历史都将被删除。此
 msgid "The pasted text could not be attached and was not inserted."
 msgstr ""
 
+#: src/features/canvas/pdf-preview-panel.tsx:105
+#: src/features/canvas/use-pdf-download.ts:82
+#: src/features/canvas/use-pdf-download.ts:158
+msgid "The PDF could not be downloaded."
+msgstr ""
+
 #. placeholder {0}: records.length
 #. placeholder {1}: problems.length
 #: ../../packages/ui/src/components/file-renderers/jsonl-viewer.tsx:69
@@ -31580,7 +31631,7 @@ msgstr ""
 msgid "The right model, every time."
 msgstr "每次都用对模型。"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:732
+#: ../../packages/chat-ui/src/chat/message-content.tsx:733
 msgid "The screenshot could not be saved."
 msgstr "无法保存屏幕截图。"
 
@@ -31792,7 +31843,7 @@ msgid "Thinking-enabled vision-language model"
 msgstr "支持思考的视觉语言模型"
 
 #: ../../packages/chat-ui/src/chat/auto-continue-status.tsx:54
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1142
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1143
 #: ../../packages/ui/src/components/ai-elements/reasoning.tsx:114
 #: src/features/chat/thread/streaming-placeholder.tsx:799
 msgid "Thinking..."
@@ -32029,7 +32080,7 @@ msgstr ""
 msgid "This host does not offer any view of a {requestNoun} yet."
 msgstr ""
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:390
+#: ../../packages/chat-ui/src/chat/message-content.tsx:391
 msgid "This image has been flagged for review"
 msgstr "此图像已被标记待审核"
 
@@ -32145,7 +32196,10 @@ msgstr "此演示文稿还没有幻灯片。"
 msgid "This preset will be permanently removed."
 msgstr "此预设将被永久删除。"
 
-#: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:160
+#: ../../packages/ui/src/components/file-renderers/pdf-thumbnail.tsx:82
+#: ../../packages/ui/src/components/file-renderers/pdf-thumbnail.tsx:87
+#: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:162
+#: src/features/canvas/pdf-preview-panel.tsx:114
 #: src/features/chat/thread/sandbox-files.tsx:159
 #: src/features/chat/thread/sandbox-files.tsx:199
 msgid "This preview could not be loaded."
@@ -32224,11 +32278,11 @@ msgstr "此登录链接不完整。请从扩展中重新开始登录。"
 msgid "This skill is no longer available."
 msgstr "此技能已不可用。"
 
-#: src/features/auth/components/organization/create-organization-dialog.tsx:317
+#: src/features/auth/components/organization/create-organization-dialog.tsx:320
 msgid "This slug is already taken"
 msgstr "此 slug 已被占用"
 
-#: src/features/auth/components/organization/create-organization-dialog.tsx:321
+#: src/features/auth/components/organization/create-organization-dialog.tsx:324
 msgid "This slug is available"
 msgstr "此 slug 可用"
 
@@ -32366,7 +32420,7 @@ msgstr "对话已归档"
 msgid "Thread deleted."
 msgstr "对话已删除。"
 
-#: src/features/chat/assistant.tsx:80
+#: src/features/chat/assistant.tsx:127
 msgid "Thread details"
 msgstr ""
 
@@ -33247,7 +33301,7 @@ msgstr "输入你的消息..."
 msgid "Typeface for the whole interface. Code blocks always stay monospace."
 msgstr ""
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:657
+#: ../../packages/chat-ui/src/chat/message-content.tsx:658
 msgid "Typing text..."
 msgstr "正在输入文本..."
 
@@ -33722,11 +33776,11 @@ msgstr "更新的 OpenAI 前沿性能"
 msgid "Updated reasoning capabilities over the original R1"
 msgstr "相比原版 R1 推理能力更新"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1077
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1078
 msgid "Updated slide"
 msgstr "已更新幻灯片"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1077
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1078
 msgid "Updated slide {slideNumber}"
 msgstr "已更新第 {slideNumber} 张幻灯片"
 
@@ -33748,11 +33802,11 @@ msgstr "更新动态"
 msgid "Upgrade"
 msgstr "升级"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:211
+#: src/features/auth/components/organization/billing-settings-card.tsx:171
 msgid "Upgrade organization to Team"
 msgstr "将组织升级到 Team"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:211
+#: src/features/auth/components/organization/billing-settings-card.tsx:171
 msgid "Upgrade organization to Team, monthly"
 msgstr "将组织升级为 Team（按月）"
 
@@ -33770,7 +33824,7 @@ msgid "upload"
 msgstr ""
 
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:465
-#: src/features/auth/components/organization/create-organization-dialog.tsx:255
+#: src/features/auth/components/organization/create-organization-dialog.tsx:258
 #: src/features/vault/components/empty-states.tsx:45
 #: src/features/vault/components/upload-button.tsx:11
 msgid "Upload"
@@ -33848,7 +33902,7 @@ msgstr "上传图像"
 msgid "Upload image / video"
 msgstr "上传图像 / 视频"
 
-#: src/features/auth/components/organization/create-organization-dialog.tsx:240
+#: src/features/auth/components/organization/create-organization-dialog.tsx:243
 #: src/features/auth/components/organization/organization-logo-card.tsx:157
 msgid "Upload Logo"
 msgstr "上传徽标"
@@ -36141,7 +36195,7 @@ msgstr "你的页面"
 msgid "Your plan"
 msgstr "你的方案"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:188
+#: src/features/auth/components/organization/billing-settings-card.tsx:148
 msgid "Your plan and credit allowance follow your subscription."
 msgstr "你的方案和额度取决于你的订阅。"
 
@@ -36299,7 +36353,7 @@ msgstr "Zhipu AI 最强大的推理 LLM"
 msgid "ZIP archive"
 msgstr "ZIP 压缩包"
 
-#: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:143
+#: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:141
 #: ../../packages/ui/src/components/zoomable-image.tsx:311
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:284
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:290
@@ -36316,7 +36370,7 @@ msgstr "放大"
 msgid "Zoom Lens"
 msgstr "变焦镜头"
 
-#: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:133
+#: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:131
 #: ../../packages/ui/src/components/zoomable-image.tsx:305
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:250
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:256

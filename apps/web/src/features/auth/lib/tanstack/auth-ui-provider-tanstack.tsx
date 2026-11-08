@@ -15,7 +15,7 @@ const AuthUIProviderTanstack = ({
 }: AuthUIProviderProps & {
     /**
      * For state that must not outlive the old account: called with "before" as an account switch starts (it may still fail),
-     * and with "after" once the session has changed, before the new one is read.
+     * and with "after" once the switch has gone through. A sign-in is not a switch and calls neither.
      */
     onSessionSwitch?: (phase: "after" | "before") => void;
 }) => {
@@ -44,11 +44,11 @@ const AuthUIProviderTanstack = ({
         };
     }, [contextMutators, mutatorsProperty, onSessionSwitch]);
 
+    // Not a switch: this runs after every sign-in too, where the open document is still the reader's own.
     const onSessionChangeCallback = useCallback(async () => {
-        onSessionSwitch?.("after");
         await onSessionChange();
         await onSessionChangeProperty?.();
-    }, [onSessionChangeProperty, onSessionChange, onSessionSwitch]);
+    }, [onSessionChangeProperty, onSessionChange]);
 
     return (
         <AuthUIProvider

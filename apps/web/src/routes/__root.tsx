@@ -279,6 +279,8 @@ const AuthRecovery = ({ children }: { children: ReactNode }) => {
         else if (wasAuthenticated === true && !isAuthenticated) {
             console.log("[AuthRecovery] User logged out - clearing queries");
             queryClient.clear();
+            // The side panel's document or PDF was the ended session's: whoever signs in next, without a reload, must not find it.
+            closeSidePanelForSessionSwitch("after");
             // An expired session skips both sign-out handlers, so the dock badge is cleared here.
             void setNativeBadge(0);
         }

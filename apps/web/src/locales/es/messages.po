@@ -1181,6 +1181,14 @@ msgstr "{name} en pausa"
 msgid "{name} resumed"
 msgstr "{name} reanudado"
 
+#: ../../packages/ui/src/components/file-renderers/pdf-thumbnail.tsx:68
+msgid "{name}, {pages, plural, one {# page} other {# pages}}"
+msgstr ""
+
+#: ../../packages/ui/src/components/file-renderers/pdf-thumbnail.tsx:69
+msgid "{name}, preview unavailable"
+msgstr ""
+
 #: ../../packages/chat-ui/src/chat/tool-group.tsx:29
 msgid "{namesText}, +{more} more"
 msgstr ""
@@ -1200,6 +1208,10 @@ msgstr "{openCount} comentarios abiertos"
 #: src/features/workflow/components/collab/collaborator-facepile.tsx:92
 msgid "{overflowCount, plural, one {# more user} other {# more users}}"
 msgstr "{overflowCount, plural, one {# usuario más} other {# usuarios más}}"
+
+#: ../../packages/ui/src/components/file-renderers/pdf-thumbnail.tsx:113
+msgid "{pages, plural, one {# page} other {# pages}}"
+msgstr ""
 
 #: src/features/settings/components/chat/api-keys-settings.tsx:495
 msgid "{providerId} API key removed"
@@ -2052,7 +2064,7 @@ msgstr "Añade un comentario"
 msgid "Add a member from your organization to <0>{0}</0>"
 msgstr "Añade un miembro de tu organización a <0>{0}</0>"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:283
+#: src/features/auth/components/organization/billing-settings-card.tsx:246
 #: src/features/auth/components/team/team-settings-dialog.tsx:191
 msgid "Add a model..."
 msgstr "Añade un modelo..."
@@ -2798,7 +2810,7 @@ msgstr "Generación de video con IA"
 msgid "AI-assisted bug triage with full recording context"
 msgstr "Clasificación de errores asistida por IA con todo el contexto de la grabación"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:368
+#: ../../packages/chat-ui/src/chat/message-content.tsx:369
 msgid "AI-generated"
 msgstr "Generado por IA"
 
@@ -3127,7 +3139,7 @@ msgstr ""
 msgid "Allow this site ({0})"
 msgstr "Permitir este sitio ({0})"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:253
+#: src/features/auth/components/organization/billing-settings-card.tsx:216
 #: src/features/auth/components/team/team-settings-dialog.tsx:170
 msgid "Allowed AI Models"
 msgstr "Modelos de IA permitidos"
@@ -3229,7 +3241,7 @@ msgstr "Se produjo un error"
 msgid "An error occurred during One Tap sign in"
 msgstr "Se produjo un error al iniciar sesión con One Tap"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1146
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1147
 msgid "An error occurred while generating the response."
 msgstr "Se produjo un error al generar la respuesta."
 
@@ -4589,17 +4601,22 @@ msgstr "Se cobra a tu propia clave de API, no a tus créditos."
 msgid "Billing"
 msgstr "Facturación"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:234
+#: src/features/auth/components/organization/billing-settings-card.tsx:313
+msgid "Billing details for this organization"
+msgstr ""
+
+#: src/features/auth/components/organization/billing-settings-card.tsx:194
 msgid "Billing Email"
 msgstr "Correo de facturación"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:137
-#: src/features/auth/components/organization/billing-settings-card.tsx:168
-#: src/features/auth/components/organization/billing-settings-card.tsx:313
+#: src/features/auth/components/organization/billing-settings-card.tsx:136
+#: src/features/auth/components/organization/billing-settings-card.tsx:274
+#: src/features/auth/components/organization/billing-settings-card.tsx:314
+#: src/features/auth/components/organization/billing-settings-card.tsx:337
 msgid "Billing Settings"
 msgstr "Ajustes de facturación"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:91
+#: src/features/auth/components/organization/billing-settings-card.tsx:83
 msgid "Billing settings updated successfully"
 msgstr "Ajustes de facturación actualizados correctamente"
 
@@ -4869,11 +4886,11 @@ msgstr "Explora y restaura versiones anteriores de tu flujo de trabajo."
 msgid "Browse, fork, and remix workflows shared by the community"
 msgstr "Explora, bifurca y remezcla flujos de trabajo compartidos por la comunidad"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:729
+#: ../../packages/chat-ui/src/chat/message-content.tsx:730
 msgid "Browser"
 msgstr "Navegador"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:752
+#: ../../packages/chat-ui/src/chat/message-content.tsx:753
 msgid "Browser action failed"
 msgstr "La acción del navegador falló"
 
@@ -4881,7 +4898,7 @@ msgstr "La acción del navegador falló"
 msgid "Browser Automation"
 msgstr "Automatización del navegador"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:750
+#: ../../packages/chat-ui/src/chat/message-content.tsx:751
 msgid "Browser error"
 msgstr "Error del navegador"
 
@@ -4890,7 +4907,7 @@ msgid "Browser notes"
 msgstr "Notas del navegador"
 
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:259
-#: ../../packages/chat-ui/src/chat/message-content.tsx:712
+#: ../../packages/chat-ui/src/chat/message-content.tsx:713
 msgid "Browser screenshot"
 msgstr "Captura de pantalla del navegador"
 
@@ -4898,7 +4915,7 @@ msgstr "Captura de pantalla del navegador"
 msgid "Browser Session"
 msgstr "Sesión del navegador"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:662
+#: ../../packages/chat-ui/src/chat/message-content.tsx:663
 msgid "Browser working..."
 msgstr "El navegador está trabajando..."
 
@@ -5204,7 +5221,7 @@ msgstr "Canadá"
 #: src/features/admin/components/ban-user-dialog.tsx:146
 #: src/features/admin/components/impersonate-user-dialog.tsx:79
 #: src/features/admin/components/update-user-role-dialog.tsx:60
-#: src/features/auth/components/organization/create-organization-dialog.tsx:336
+#: src/features/auth/components/organization/create-organization-dialog.tsx:339
 #: src/features/auth/components/organization/delete-organization-dialog.tsx:144
 #: src/features/auth/components/organization/leave-organization-dialog.tsx:91
 #: src/features/auth/components/organization/remove-member-dialog.tsx:83
@@ -5346,7 +5363,7 @@ msgstr "No se puede usar el prompt: {errorMessages}"
 msgid "Canny Edge"
 msgstr "Bordes Canny"
 
-#: src/features/chat/assistant.tsx:71
+#: src/features/chat/assistant.tsx:120
 #: src/features/marketing/components/landing-page.tsx:217
 msgid "Canvas"
 msgstr "Lienzo"
@@ -5761,7 +5778,7 @@ msgstr "Las integraciones marcadas se ofrecen para configurar después de guarda
 msgid "Checked: {0}"
 msgstr ""
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:385
+#: ../../packages/chat-ui/src/chat/message-content.tsx:386
 msgid "Checking image safety..."
 msgstr "Comprobando la seguridad de la imagen..."
 
@@ -6164,7 +6181,7 @@ msgstr "Haz clic para editar"
 msgid "Click to edit..."
 msgstr "Haz clic para editar..."
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:654
+#: ../../packages/chat-ui/src/chat/message-content.tsx:655
 msgid "Clicking element..."
 msgstr "Haciendo clic en el elemento..."
 
@@ -6200,6 +6217,7 @@ msgstr ""
 #: src/components/command-palette.tsx:708
 #: src/features/admin/components/user-sessions-dialog.tsx:159
 #: src/features/canvas/canvas-panel.tsx:818
+#: src/features/canvas/pdf-preview-panel.tsx:98
 #: src/features/chat/thread/composer-text-attachment-editor.tsx:868
 #: src/features/develop/components/thread-pull-requests.tsx:256
 #: src/features/evals/components/save-eval-case-action.tsx:95
@@ -6258,6 +6276,10 @@ msgstr "Cerrar mejora del prompt"
 msgid "Close search"
 msgstr "Cerrar búsqueda"
 
+#: src/features/chat/assistant.tsx:82
+msgid "Close the open document to view this PDF in the panel."
+msgstr ""
+
 #: src/features/chat/translation/message-translation.tsx:133
 msgid "Close translation"
 msgstr "Cerrar traducción"
@@ -6297,7 +6319,7 @@ msgstr "Los modelos de Cloudflare Workers AI se ejecutan donde Cloudflare tenga 
 msgid "Code"
 msgstr "Código"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:127
+#: ../../packages/chat-ui/src/chat/message-content.tsx:128
 msgid "Code block"
 msgstr ""
 
@@ -6309,7 +6331,7 @@ msgstr "Ejecución de código"
 msgid "Code execution and sandbox files"
 msgstr "Ejecución de código y archivos del sandbox"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:630
+#: ../../packages/chat-ui/src/chat/message-content.tsx:631
 msgid "Code execution failed"
 msgstr "La ejecución del código falló"
 
@@ -6333,7 +6355,7 @@ msgstr ""
 msgid "Code navigation"
 msgstr ""
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:586
+#: ../../packages/chat-ui/src/chat/message-content.tsx:587
 msgid "Code output"
 msgstr "Salida del código"
 
@@ -6967,8 +6989,8 @@ msgstr "Configura el equipo \"{teamName}\""
 msgid "Configure team settings"
 msgstr "Configurar equipo"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:165
-#: src/features/auth/components/organization/billing-settings-card.tsx:311
+#: src/features/auth/components/organization/billing-settings-card.tsx:135
+#: src/features/auth/components/organization/billing-settings-card.tsx:272
 msgid "Configure the billing contact and available AI models"
 msgstr "Configura el contacto de facturación y los modelos de IA disponibles"
 
@@ -8033,6 +8055,10 @@ msgstr "No se pudieron cargar las herramientas: {error}"
 msgid "Could not load your activity."
 msgstr "No se pudo cargar tu actividad."
 
+#: src/features/auth/components/organization/billing-settings-card.tsx:319
+msgid "Could not load your organization's billing details. Try again later."
+msgstr ""
+
 #: src/features/pages/components/pages-sidebar.tsx:108
 msgid "Could not move the page"
 msgstr "No se pudo mover la página"
@@ -8293,7 +8319,7 @@ msgstr "Crea una nueva clave de API para acceder a tu cuenta de forma programát
 msgid "Create a new branch from this message. Give it a name to help you identify it later."
 msgstr "Crea una nueva rama a partir de este mensaje. Ponle un nombre para identificarla más tarde."
 
-#: src/features/auth/components/organization/create-organization-dialog.tsx:171
+#: src/features/auth/components/organization/create-organization-dialog.tsx:174
 msgid "Create a new organization to collaborate with your team"
 msgstr "Crea una nueva organización para colaborar con tu equipo"
 
@@ -8417,8 +8443,8 @@ msgstr "Crea uno en la página de evaluaciones."
 msgid "Create organization"
 msgstr "Crear organización"
 
-#: src/features/auth/components/organization/create-organization-dialog.tsx:168
-#: src/features/auth/components/organization/create-organization-dialog.tsx:350
+#: src/features/auth/components/organization/create-organization-dialog.tsx:171
+#: src/features/auth/components/organization/create-organization-dialog.tsx:353
 #: src/features/auth/components/organization/organizations-card.tsx:37
 msgid "Create Organization"
 msgstr "Crear organización"
@@ -8518,7 +8544,7 @@ msgstr "Crea un enlace de un solo uso, válido durante 7 días. Quien lo abra co
 msgid "Creating branch..."
 msgstr "Creando rama..."
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:309
+#: ../../packages/chat-ui/src/chat/message-content.tsx:310
 msgid "Creating slides..."
 msgstr "Creando diapositivas..."
 
@@ -8594,8 +8620,8 @@ msgstr "Creadores que quieren generar y editar imágenes con un único modelo de
 msgid "Credits"
 msgstr "Créditos"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:145
-#: src/features/auth/components/organization/billing-settings-card.tsx:186
+#: src/features/auth/components/organization/billing-settings-card.tsx:146
+#: src/features/auth/components/organization/billing-settings-card.tsx:345
 msgid "Credits per user:"
 msgstr "Créditos por usuario:"
 
@@ -8692,8 +8718,8 @@ msgstr "Plan actual:"
 msgid "Current Prompt Variables"
 msgstr "Variables del prompt actual"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:142
-#: src/features/auth/components/organization/billing-settings-card.tsx:183
+#: src/features/auth/components/organization/billing-settings-card.tsx:143
+#: src/features/auth/components/organization/billing-settings-card.tsx:342
 msgid "Current tier:"
 msgstr "Nivel actual:"
 
@@ -9372,7 +9398,7 @@ msgstr "Eliminar objetivo {title}"
 msgid "Delete group and children"
 msgstr "Eliminar grupo y su contenido"
 
-#: src/features/auth/components/organization/create-organization-dialog.tsx:246
+#: src/features/auth/components/organization/create-organization-dialog.tsx:249
 #: src/features/auth/components/organization/organization-logo-card.tsx:162
 msgid "Delete Logo"
 msgstr "Eliminar logo"
@@ -10124,7 +10150,7 @@ msgid "Do you want to add more rows?"
 msgstr "¿Quieres añadir más filas?"
 
 #: ../../packages/chat-ui/src/chat/document-artifact.tsx:44
-#: ../../packages/chat-ui/src/chat/message-content.tsx:284
+#: ../../packages/chat-ui/src/chat/message-content.tsx:285
 #: ../../packages/ui/src/components/file-renderers/docx-preview.tsx:114
 msgid "Document"
 msgstr "Documento"
@@ -10274,7 +10300,7 @@ msgstr "Descargar documento"
 msgid "Download Export"
 msgstr "Descargar exportación"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:447
+#: ../../packages/chat-ui/src/chat/message-content.tsx:448
 #: ../../packages/ui/src/components/file-renderers/generic-file-card.tsx:87
 msgid "Download file"
 msgstr "Descargar archivo"
@@ -10296,6 +10322,7 @@ msgstr "Descargar Markdown"
 msgid "Download Neore for desktop"
 msgstr "Descargar Neore para escritorio"
 
+#: src/features/canvas/pdf-preview-panel.tsx:76
 #: src/features/chat/header/thread-download-button.tsx:122
 msgid "Download PDF"
 msgstr "Descargar PDF"
@@ -11330,7 +11357,7 @@ msgstr "Introduce una región de AWS válida, p. ej. us-east-1"
 msgid "Enter an API version such as v1 or 2024-10-21"
 msgstr "Introduce una versión de API como v1 o 2024-10-21"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:241
+#: src/features/auth/components/organization/billing-settings-card.tsx:203
 msgid "Enter billing email"
 msgstr "Introduce el correo de facturación"
 
@@ -11364,12 +11391,12 @@ msgstr "Introduce el ID del modelo (p. ej., \"llama-4-scout\")..."
 msgid "Enter new password"
 msgstr "Introduce la nueva contraseña"
 
-#: src/features/auth/components/organization/create-organization-dialog.tsx:274
+#: src/features/auth/components/organization/create-organization-dialog.tsx:277
 #: src/features/auth/components/organization/organization-name-card.tsx:125
 msgid "Enter organization name"
 msgstr "Introduce el nombre de la organización"
 
-#: src/features/auth/components/organization/create-organization-dialog.tsx:299
+#: src/features/auth/components/organization/create-organization-dialog.tsx:302
 #: src/features/auth/components/organization/organization-slug-card.tsx:129
 msgid "Enter organization slug"
 msgstr "Introduce el slug de la organización"
@@ -11632,7 +11659,7 @@ msgstr "Tasa de errores"
 msgid "Error trace:"
 msgstr "Traza del error:"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:245
+#: ../../packages/chat-ui/src/chat/message-content.tsx:246
 msgid "Error:"
 msgstr "Error:"
 
@@ -11896,7 +11923,7 @@ msgstr "Ejecutando herramientas..."
 msgid "Execution"
 msgstr "Ejecución"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:620
+#: ../../packages/chat-ui/src/chat/message-content.tsx:621
 msgid "Execution failed"
 msgstr "La ejecución falló"
 
@@ -12239,11 +12266,11 @@ msgstr "Extraer página"
 msgid "Extract subject"
 msgstr "Extraer sujeto"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:720
+#: ../../packages/chat-ui/src/chat/message-content.tsx:721
 msgid "Extracted"
 msgstr "Extraído"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:655
+#: ../../packages/chat-ui/src/chat/message-content.tsx:656
 msgid "Extracting content..."
 msgstr "Extrayendo contenido..."
 
@@ -14530,7 +14557,7 @@ msgstr "Video generado"
 msgid "Generated videos will appear here. Start by describing what you want to create in the composer below."
 msgstr "Los videos generados aparecerán aquí. Empieza describiendo lo que quieres crear en el editor de abajo."
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:462
+#: ../../packages/chat-ui/src/chat/message-content.tsx:463
 msgid "Generating audio..."
 msgstr "Generando audio..."
 
@@ -14538,12 +14565,12 @@ msgstr "Generando audio..."
 msgid "Generating draft…"
 msgstr "Generando borrador…"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:463
+#: ../../packages/chat-ui/src/chat/message-content.tsx:464
 #: src/features/chat/thread/media-gallery-view.tsx:395
 msgid "Generating image..."
 msgstr "Generando imagen..."
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:306
+#: ../../packages/chat-ui/src/chat/message-content.tsx:307
 msgid "Generating presentation..."
 msgstr "Generando presentación..."
 
@@ -14551,7 +14578,7 @@ msgstr "Generando presentación..."
 msgid "Generating response"
 msgstr "Generando respuesta"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:464
+#: ../../packages/chat-ui/src/chat/message-content.tsx:465
 #: src/features/chat/thread/media-gallery-view.tsx:395
 msgid "Generating video..."
 msgstr "Generando video..."
@@ -15852,7 +15879,7 @@ msgid "illustration"
 msgstr "ilustración"
 
 #: ../../packages/chat-ui/src/chat/document-artifact.tsx:42
-#: ../../packages/chat-ui/src/chat/message-content.tsx:414
+#: ../../packages/chat-ui/src/chat/message-content.tsx:415
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:643
 #: ../../packages/ui/src/components/ai-elements/attachments-utilities.tsx:47
 #: ../../packages/ui/src/components/ai-elements/attachments.tsx:107
@@ -16445,7 +16472,7 @@ msgstr "Plantilla de entrada"
 msgid "Input tokens"
 msgstr "Tokens de entrada"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:229
+#: ../../packages/chat-ui/src/chat/message-content.tsx:230
 msgid "Input:"
 msgstr "Entrada:"
 
@@ -16830,7 +16857,7 @@ msgstr ""
 msgid "It was not saved. Paste it again and save."
 msgstr ""
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:391
+#: ../../packages/chat-ui/src/chat/message-content.tsx:392
 msgid "It will be visible once approved by a moderator"
 msgstr "Será visible cuando un moderador lo apruebe"
 
@@ -17559,7 +17586,7 @@ msgstr "Déjalo vacío para usar la entrada del nodo conectado"
 
 #: src/features/auth/components/organization/leave-organization-dialog.tsx:72
 #: src/features/auth/components/organization/leave-organization-dialog.tsx:103
-#: src/features/auth/components/organization/organization-cell.tsx:99
+#: src/features/auth/components/organization/organization-cell.tsx:105
 msgid "Leave Organization"
 msgstr "Salir de la organización"
 
@@ -18002,7 +18029,7 @@ msgstr "Cargando editor..."
 msgid "Loading editor…"
 msgstr "Cargando editor…"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:328
+#: ../../packages/chat-ui/src/chat/message-content.tsx:329
 #: ../../packages/ui/src/components/file-renderers/fetched-text-preview.tsx:65
 msgid "Loading file…"
 msgstr "Cargando archivo…"
@@ -18072,7 +18099,8 @@ msgstr "Cargando preajustes…"
 msgid "Loading preview..."
 msgstr "Cargando vista previa..."
 
-#: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:168
+#: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:170
+#: src/features/canvas/pdf-preview-panel.tsx:120
 #: src/features/chat/thread/sandbox-files.tsx:104
 msgid "Loading preview…"
 msgstr "Cargando vista previa…"
@@ -18173,7 +18201,7 @@ msgstr ""
 msgid "Loading..."
 msgstr "Cargando..."
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:331
+#: ../../packages/chat-ui/src/chat/message-content.tsx:332
 #: src/features/chat/thread/memory-usage-action.tsx:46
 #: src/features/chat/thread/request-secret-prompt.tsx:479
 #: src/features/code/components/code-workspace.tsx:90
@@ -18270,7 +18298,7 @@ msgstr "Cerrar sesión"
 msgid "Login"
 msgstr "Iniciar sesión"
 
-#: src/features/auth/components/organization/create-organization-dialog.tsx:209
+#: src/features/auth/components/organization/create-organization-dialog.tsx:212
 #: src/features/auth/components/organization/organization-logo-card.tsx:136
 #: src/features/auth/components/organization/organization-logo-card.tsx:195
 msgid "Logo"
@@ -18551,7 +18579,7 @@ msgstr "Gestionar miembros de <0>{0}</0>"
 msgid "Manage models on {0}"
 msgstr "Gestionar modelos en {0}"
 
-#: src/features/auth/components/organization/organization-cell.tsx:88
+#: src/features/auth/components/organization/organization-cell.tsx:94
 msgid "Manage Organization"
 msgstr "Gestionar organización"
 
@@ -18581,7 +18609,7 @@ msgstr "Gestionar etiquetas"
 msgid "Manage tags…"
 msgstr "Gestionar etiquetas…"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:199
+#: src/features/auth/components/organization/billing-settings-card.tsx:159
 msgid "Manage Team subscription"
 msgstr "Gestionar suscripción Team"
 
@@ -20144,11 +20172,11 @@ msgstr "Navegar por las conversaciones"
 msgid "navigate within each column"
 msgstr "navega dentro de cada columna"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:721
+#: ../../packages/chat-ui/src/chat/message-content.tsx:722
 msgid "Navigated"
 msgstr "Navegado"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:662
+#: ../../packages/chat-ui/src/chat/message-content.tsx:663
 msgid "Navigating to {target}..."
 msgstr "Navegando a {target}..."
 
@@ -20217,7 +20245,7 @@ msgstr "Neore no puede conectarse con el servidor. Seguirá intentando reconecta
 msgid "Neore Chat"
 msgstr "Neore Chat"
 
-#: src/routes/__root.tsx:557
+#: src/routes/__root.tsx:565
 msgid "Neore Chat is a modern AI chat application. Chat with the latest AI models, organise your conversations, and stay productive."
 msgstr "Neore Chat es una aplicación moderna de chat con IA. Chatea con los modelos de IA más recientes, organiza tus conversaciones y mantén tu productividad."
 
@@ -20562,7 +20590,7 @@ msgstr "Opción siguiente"
 msgid "Next output mode"
 msgstr "Siguiente modo de salida"
 
-#: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:121
+#: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:119
 #: src/features/prompts/components/prompts-sidebar-tab.tsx:879
 msgid "Next page"
 msgstr "Página siguiente"
@@ -21875,7 +21903,7 @@ msgstr "Solo 3B activados por token para mayor eficiencia"
 msgid "Only in one run"
 msgstr "Solo en una ejecución"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:136
+#: src/features/auth/components/organization/billing-settings-card.tsx:336
 msgid "Only organization owners can manage billing settings"
 msgstr "Solo los propietarios de la organización pueden gestionar la facturación"
 
@@ -21977,7 +22005,7 @@ msgstr "¡Vaya! Algo ha salido mal"
 msgid "Opacity"
 msgstr "Opacidad"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:707
+#: ../../packages/chat-ui/src/chat/message-content.tsx:708
 #: src/components/command-palette.tsx:700
 #: src/features/chat/link-preview/link-preview-card.tsx:117
 #: src/features/develop/components/pull-request-view.tsx:73
@@ -21994,6 +22022,10 @@ msgstr "Abierto"
 msgctxt "stock opening price"
 msgid "Open"
 msgstr "Apertura"
+
+#: ../../packages/ui/src/components/file-renderers/pdf-thumbnail.tsx:67
+msgid "Open {filename}"
+msgstr ""
 
 #: src/features/chat/thread/comparison-view.tsx:140
 msgid "Open {modelName} in full thread"
@@ -22110,6 +22142,14 @@ msgstr ""
 #: src/features/layout/components/sidebar-shortcut.tsx:124
 msgid "Open Pages"
 msgstr "Abrir páginas"
+
+#: ../../packages/ui/src/components/file-renderers/pdf-thumbnail.tsx:67
+msgid "Open PDF"
+msgstr ""
+
+#: src/features/canvas/pdf-preview-panel.tsx:82
+msgid "Open PDF in a new tab to print"
+msgstr ""
 
 #: src/features/canvas/components/canvas-code-preview.tsx:219
 msgid "Open preview in new tab"
@@ -22692,7 +22732,7 @@ msgstr ""
 msgid "Organization"
 msgstr "Organización"
 
-#: src/features/auth/components/organization/create-organization-dialog.tsx:112
+#: src/features/auth/components/organization/create-organization-dialog.tsx:115
 msgid "Organization created successfully"
 msgstr "Organización creada correctamente"
 
@@ -22700,13 +22740,13 @@ msgstr "Organización creada correctamente"
 msgid "Organization deleted successfully"
 msgstr "Organización eliminada correctamente"
 
-#: src/features/auth/components/organization/create-organization-dialog.tsx:266
+#: src/features/auth/components/organization/create-organization-dialog.tsx:269
 #: src/features/auth/components/organization/organization-name-card.tsx:106
 #: src/features/auth/components/organization/organization-name-card.tsx:157
 msgid "Organization Name"
 msgstr "Nombre de la organización"
 
-#: src/features/auth/components/organization/create-organization-dialog.tsx:70
+#: src/features/auth/components/organization/create-organization-dialog.tsx:71
 #: src/features/auth/components/organization/organization-name-card.tsx:23
 msgid "Organization name is required"
 msgstr "El nombre de la organización es obligatorio"
@@ -22719,18 +22759,18 @@ msgstr "El nombre de la organización es el mismo"
 msgid "Organization name updated successfully"
 msgstr "Nombre de la organización actualizado correctamente"
 
-#: src/features/auth/components/organization/create-organization-dialog.tsx:287
+#: src/features/auth/components/organization/create-organization-dialog.tsx:290
 #: src/features/auth/components/organization/organization-slug-card.tsx:111
 #: src/features/auth/components/organization/organization-slug-card.tsx:161
 msgid "Organization Slug"
 msgstr "Slug de la organización"
 
-#: src/features/auth/components/organization/create-organization-dialog.tsx:78
+#: src/features/auth/components/organization/create-organization-dialog.tsx:79
 #: src/features/auth/components/organization/organization-slug-card.tsx:28
 msgid "Organization slug is invalid"
 msgstr "El slug de la organización no es válido"
 
-#: src/features/auth/components/organization/create-organization-dialog.tsx:75
+#: src/features/auth/components/organization/create-organization-dialog.tsx:76
 #: src/features/auth/components/organization/delete-organization-dialog.tsx:30
 #: src/features/auth/components/organization/organization-slug-card.tsx:27
 msgid "Organization slug is required"
@@ -22826,7 +22866,7 @@ msgstr ""
 msgid "Outpaint"
 msgstr "Outpaint"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:562
+#: ../../packages/chat-ui/src/chat/message-content.tsx:563
 #: ../../packages/ui/src/components/ai-elements/context.tsx:276
 #: src/components/model-picker/model-picker.tsx:206
 #: src/features/devices/components/device-tool-call.tsx:174
@@ -22874,7 +22914,7 @@ msgstr "Tipo de salida"
 msgid "Output-format focused"
 msgstr "Centrado en el formato de salida"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:237
+#: ../../packages/chat-ui/src/chat/message-content.tsx:238
 msgid "Output:"
 msgstr "Salida:"
 
@@ -22918,7 +22958,7 @@ msgstr ""
 msgid "Pacific Time (US & Canada)"
 msgstr "Hora del Pacífico (EE. UU. y Canadá)"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:661
+#: ../../packages/chat-ui/src/chat/message-content.tsx:662
 msgid "page"
 msgstr "página"
 
@@ -23261,7 +23301,7 @@ msgstr "En pausa"
 msgid "Pay for what <0>you use.</0>"
 msgstr "Paga solo por <0>lo que usas.</0>"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:223
+#: src/features/auth/components/organization/billing-settings-card.tsx:183
 #: src/features/billing/components/personal-plan-card.tsx:52
 msgid "Pay yearly"
 msgstr "Pagar anualmente"
@@ -23279,6 +23319,7 @@ msgid "Payments, subscriptions, and financial data"
 msgstr "Pagos, suscripciones y datos financieros"
 
 #: src/components/model-picker/model-picker.tsx:82
+#: src/features/canvas/pdf-preview-panel.tsx:73
 #: src/features/settings/components/chat/models-settings.tsx:35
 msgid "PDF"
 msgstr "PDF"
@@ -23286,6 +23327,10 @@ msgstr "PDF"
 #: ../../packages/ui/src/components/file-renderers/hex-viewer.tsx:77
 msgid "PDF document"
 msgstr "Documento PDF"
+
+#: src/features/chat/assistant.tsx:120
+msgid "PDF preview"
+msgstr ""
 
 #: src/features/settings/components/knowledge/knowledge-base-settings.tsx:314
 msgid "PDF, DOCX, TXT, MD, CSV, JSON, XLS, XLSX — max 5MB"
@@ -24116,7 +24161,7 @@ msgstr "Opción anterior"
 msgid "Previous output mode"
 msgstr "Modo de salida anterior"
 
-#: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:107
+#: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:105
 #: src/features/prompts/components/prompts-sidebar-tab.tsx:870
 msgid "Previous page"
 msgstr "Página anterior"
@@ -25707,7 +25752,7 @@ msgstr "Quitar {fileName}"
 msgid "Remove {label}"
 msgstr "Quitar {label}"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:262
+#: src/features/auth/components/organization/billing-settings-card.tsx:225
 #: src/features/auth/components/team/team-settings-dialog.tsx:177
 msgid "Remove {model}"
 msgstr "Quitar {model}"
@@ -26755,7 +26800,7 @@ msgstr "Ejecuta tu flujo de trabajo para ver aquí el historial de ejecuciones."
 msgid "Running"
 msgstr "En ejecución"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:523
+#: ../../packages/chat-ui/src/chat/message-content.tsx:524
 msgid "Running code..."
 msgstr "Ejecutando código..."
 
@@ -26763,7 +26808,7 @@ msgstr "Ejecutando código..."
 msgid "Running on {device}…"
 msgstr "Ejecutándose en {device}…"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:206
+#: ../../packages/chat-ui/src/chat/message-content.tsx:207
 #: src/features/admin/components/admin-cleanup-dashboard.tsx:258
 #: src/features/workflow/components/canvas/workflow-controls.tsx:622
 #: src/features/workflow/components/nodes/base-node.tsx:263
@@ -26887,8 +26932,8 @@ msgstr "Arabia Saudí"
 
 #: ../../packages/ui/src/components/inline-edit.tsx:108
 #: src/features/admin/components/admin-cleanup-dashboard.tsx:118
-#: src/features/auth/components/organization/billing-settings-card.tsx:162
-#: src/features/auth/components/organization/billing-settings-card.tsx:308
+#: src/features/auth/components/organization/billing-settings-card.tsx:132
+#: src/features/auth/components/organization/billing-settings-card.tsx:269
 #: src/features/auth/components/organization/organization-name-card.tsx:99
 #: src/features/auth/components/organization/organization-name-card.tsx:151
 #: src/features/auth/components/organization/organization-slug-card.tsx:104
@@ -27127,7 +27172,7 @@ msgid "Screen capture failed. Please try again."
 msgstr "No se pudo capturar la pantalla. Inténtalo de nuevo."
 
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:118
-#: ../../packages/chat-ui/src/chat/message-content.tsx:703
+#: ../../packages/chat-ui/src/chat/message-content.tsx:704
 msgid "Screenshot"
 msgstr "Captura de pantalla"
 
@@ -27675,7 +27720,7 @@ msgstr "Seleccionar hasta la última columna"
 msgid "Select to top of table"
 msgstr "Seleccionar hasta el principio de la tabla"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:255
+#: src/features/auth/components/organization/billing-settings-card.tsx:218
 msgid "Select which AI models organization members can use. Leave empty for enterprise to allow all models."
 msgstr "Selecciona qué modelos de IA pueden usar los miembros de la organización. Déjalo vacío en Enterprise para permitir todos los modelos."
 
@@ -28662,7 +28707,7 @@ msgstr "Omitir capas CLIP (0 = ninguna, 1-2 = más estilizado)"
 msgid "Skip questions"
 msgstr "Omitir preguntas"
 
-#: src/routes/__root.tsx:428
+#: src/routes/__root.tsx:435
 msgid "Skip to content"
 msgstr "Saltar al contenido"
 
@@ -28743,7 +28788,7 @@ msgstr "Diapositiva {streamingSlideNumber}"
 msgid "Slide title"
 msgstr "Título de la diapositiva"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1079
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1080
 msgid "Slide updated"
 msgstr "Diapositiva actualizada"
 
@@ -28889,7 +28934,7 @@ msgstr "Sólida capacidad de propósito general"
 msgid "Solid performance across most task types"
 msgstr "Rendimiento sólido en la mayoría de tipos de tareas"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:612
+#: ../../packages/chat-ui/src/chat/message-content.tsx:613
 msgid "Some images from this run could not be saved."
 msgstr "Algunas imágenes de esta ejecución no se pudieron guardar."
 
@@ -28978,7 +29023,7 @@ msgstr "Efectos de sonido activados"
 msgid "Source"
 msgstr "Fuente"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1216
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1217
 #: src/features/chat/thread/message-content.tsx:141
 msgid "Source {index}"
 msgstr "Fuente {index}"
@@ -30492,7 +30537,7 @@ msgstr "Toma una imagen de entrada, elimina el fondo y aplica una transferencia 
 msgid "Take turns"
 msgstr "Por turnos"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:656
+#: ../../packages/chat-ui/src/chat/message-content.tsx:657
 msgid "Taking screenshot..."
 msgstr "Haciendo captura de pantalla..."
 
@@ -31513,6 +31558,12 @@ msgstr "Se eliminan la página, todas sus subpáginas, sus comentarios y su hist
 msgid "The pasted text could not be attached and was not inserted."
 msgstr ""
 
+#: src/features/canvas/pdf-preview-panel.tsx:105
+#: src/features/canvas/use-pdf-download.ts:82
+#: src/features/canvas/use-pdf-download.ts:158
+msgid "The PDF could not be downloaded."
+msgstr ""
+
 #. placeholder {0}: records.length
 #. placeholder {1}: problems.length
 #: ../../packages/ui/src/components/file-renderers/jsonl-viewer.tsx:69
@@ -31580,7 +31631,7 @@ msgstr ""
 msgid "The right model, every time."
 msgstr "El modelo adecuado, siempre."
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:732
+#: ../../packages/chat-ui/src/chat/message-content.tsx:733
 msgid "The screenshot could not be saved."
 msgstr "No se pudo guardar la captura de pantalla."
 
@@ -31792,7 +31843,7 @@ msgid "Thinking-enabled vision-language model"
 msgstr "Modelo de visión y lenguaje con pensamiento"
 
 #: ../../packages/chat-ui/src/chat/auto-continue-status.tsx:54
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1142
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1143
 #: ../../packages/ui/src/components/ai-elements/reasoning.tsx:114
 #: src/features/chat/thread/streaming-placeholder.tsx:799
 msgid "Thinking..."
@@ -32029,7 +32080,7 @@ msgstr ""
 msgid "This host does not offer any view of a {requestNoun} yet."
 msgstr ""
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:390
+#: ../../packages/chat-ui/src/chat/message-content.tsx:391
 msgid "This image has been flagged for review"
 msgstr "Esta imagen se ha marcado para revisión"
 
@@ -32145,7 +32196,10 @@ msgstr "Esta presentación todavía no tiene diapositivas."
 msgid "This preset will be permanently removed."
 msgstr "Este preajuste se eliminará de forma permanente."
 
-#: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:160
+#: ../../packages/ui/src/components/file-renderers/pdf-thumbnail.tsx:82
+#: ../../packages/ui/src/components/file-renderers/pdf-thumbnail.tsx:87
+#: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:162
+#: src/features/canvas/pdf-preview-panel.tsx:114
 #: src/features/chat/thread/sandbox-files.tsx:159
 #: src/features/chat/thread/sandbox-files.tsx:199
 msgid "This preview could not be loaded."
@@ -32224,11 +32278,11 @@ msgstr "Este enlace de inicio de sesión está incompleto. Vuelve a iniciar sesi
 msgid "This skill is no longer available."
 msgstr "Esta habilidad ya no está disponible."
 
-#: src/features/auth/components/organization/create-organization-dialog.tsx:317
+#: src/features/auth/components/organization/create-organization-dialog.tsx:320
 msgid "This slug is already taken"
 msgstr "Este slug ya está en uso"
 
-#: src/features/auth/components/organization/create-organization-dialog.tsx:321
+#: src/features/auth/components/organization/create-organization-dialog.tsx:324
 msgid "This slug is available"
 msgstr "Este slug está disponible"
 
@@ -32366,7 +32420,7 @@ msgstr "Conversación archivada"
 msgid "Thread deleted."
 msgstr "Conversación eliminada."
 
-#: src/features/chat/assistant.tsx:80
+#: src/features/chat/assistant.tsx:127
 msgid "Thread details"
 msgstr ""
 
@@ -33247,7 +33301,7 @@ msgstr "Escribe tu mensaje..."
 msgid "Typeface for the whole interface. Code blocks always stay monospace."
 msgstr ""
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:657
+#: ../../packages/chat-ui/src/chat/message-content.tsx:658
 msgid "Typing text..."
 msgstr "Escribiendo texto..."
 
@@ -33722,11 +33776,11 @@ msgstr "Rendimiento de vanguardia actualizado de OpenAI"
 msgid "Updated reasoning capabilities over the original R1"
 msgstr "Capacidades de razonamiento actualizadas respecto al R1 original"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1077
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1078
 msgid "Updated slide"
 msgstr "Diapositiva actualizada"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1077
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1078
 msgid "Updated slide {slideNumber}"
 msgstr "Diapositiva {slideNumber} actualizada"
 
@@ -33748,11 +33802,11 @@ msgstr "Novedades"
 msgid "Upgrade"
 msgstr "Mejorar plan"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:211
+#: src/features/auth/components/organization/billing-settings-card.tsx:171
 msgid "Upgrade organization to Team"
 msgstr "Mejorar la organización a Team"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:211
+#: src/features/auth/components/organization/billing-settings-card.tsx:171
 msgid "Upgrade organization to Team, monthly"
 msgstr "Mejorar la organización a Team, mensual"
 
@@ -33770,7 +33824,7 @@ msgid "upload"
 msgstr ""
 
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:465
-#: src/features/auth/components/organization/create-organization-dialog.tsx:255
+#: src/features/auth/components/organization/create-organization-dialog.tsx:258
 #: src/features/vault/components/empty-states.tsx:45
 #: src/features/vault/components/upload-button.tsx:11
 msgid "Upload"
@@ -33848,7 +33902,7 @@ msgstr "Subir imagen"
 msgid "Upload image / video"
 msgstr "Subir imagen / vídeo"
 
-#: src/features/auth/components/organization/create-organization-dialog.tsx:240
+#: src/features/auth/components/organization/create-organization-dialog.tsx:243
 #: src/features/auth/components/organization/organization-logo-card.tsx:157
 msgid "Upload Logo"
 msgstr "Subir logo"
@@ -36141,7 +36195,7 @@ msgstr "Tus páginas"
 msgid "Your plan"
 msgstr "Tu plan"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:188
+#: src/features/auth/components/organization/billing-settings-card.tsx:148
 msgid "Your plan and credit allowance follow your subscription."
 msgstr "Tu plan y tu asignación de créditos dependen de tu suscripción."
 
@@ -36299,7 +36353,7 @@ msgstr "El LLM de razonamiento más potente de Zhipu AI"
 msgid "ZIP archive"
 msgstr "Archivo ZIP"
 
-#: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:143
+#: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:141
 #: ../../packages/ui/src/components/zoomable-image.tsx:311
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:284
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:290
@@ -36316,7 +36370,7 @@ msgstr "Acercar"
 msgid "Zoom Lens"
 msgstr "Objetivo zoom"
 
-#: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:133
+#: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:131
 #: ../../packages/ui/src/components/zoomable-image.tsx:305
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:250
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:256

@@ -78,7 +78,8 @@ const AssistantContent: FC<{
 
             // Its editor holds edits that are not saved yet, and nothing reports them, so the panel does not replace it.
             if (isDocumentOpen(useChatUIStore.getState())) {
-                showWarning(t`Close the open document to view this PDF in the panel.`);
+                // Kept until dismissed: the thumbnail does not change, so a notice that left on its own would leave no reason.
+                showWarning(t`Close the open document to view this PDF in the panel.`, { duration: Infinity, id: "pdf-blocked-by-document" });
 
                 return;
             }
@@ -116,7 +117,7 @@ const AssistantContent: FC<{
                     </ResizablePanel>
                     {isPanelOpen && <ResizableHandle withHandle />}
                     {isPanelOpen && (
-                        <ResizablePanel aria-label={t`Canvas`} data-focus-area="canvas" defaultSize="50%" id="canvas" minSize="25%" role="region">
+                        <ResizablePanel aria-label={previewFile ? t`PDF preview` : t`Canvas`} data-focus-area="canvas" defaultSize="50%" id="canvas" minSize="25%" role="region">
                             {previewFile ? <PdfPreviewPanel file={previewFile} /> : <CanvasPanel />}
                         </ResizablePanel>
                     )}
