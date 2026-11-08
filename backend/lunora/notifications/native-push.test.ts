@@ -10,7 +10,7 @@ import { reassignGlobalRows } from "../lib/account-merge";
 import schema from "../schema";
 import { getNativePushConfig, registerPushDevice, unregisterPushDevice } from "./native-push";
 import { collectNotificationsForExport, deleteUserNotifications } from "./gdpr";
-import { dropPushDevicesOf, MAX_PUSH_DEVICES_PER_USER, trimPushDevices } from "./push-device-writes";
+import { deleteIfUnchanged, dropPushDevicesOf, MAX_PUSH_DEVICES_PER_USER, trimPushDevices } from "./push-device-writes";
 
 vi.mock("../lib/crpc-auth-helpers", async (importOriginal) => {
     const sessionFrom = async (context: { auth: { userId?: string | null } }) =>
@@ -260,6 +260,15 @@ describe("phone push tokens", () => {
         expect(await devicesOf(OTHER)).toMatchObject([{ sessionId: sessions[OTHER], token: PHONE }]);
     });
 
+    it("refuses a caller whose session expired before writing, so it never takes a phone from a live registration", async () => {
+        await call(registerPushDevice, OTHER, { platform: "ios", token: PHONE });
+        sessions[USER] = await startSession(USER, Date.now() - 1);
+
+        expect(await call(registerPushDevice, USER, { platform: "ios", token: PHONE })).toStrictEqual({ registered: false });
+        expect(await devicesOf(USER)).toHaveLength(0);
+        expect(await devicesOf(OTHER)).toMatchObject([{ sessionId: sessions[OTHER], token: PHONE }]);
+    });
+
     it("registers nothing for a call that carries no session", async () => {
         sessions = {};
 
@@ -306,6 +315,21 @@ describe("pushDevices writes", () => {
 
         expect(await dropPushDevicesOf(db as never, USER)).toBe(1);
         expect(deleted).toStrictEqual(["r2"]);
+    });
+
+    it("keeps a row the same phone registered again under a new session in the same millisecond", async () => {
+        const read = { _id: "r9", lastSeenAt: 5, sessionId: "s-old", userId: USER };
+        const db = {
+            delete: vi.fn(),
+            pushDevices: {
+                findFirst: vi.fn(async () => {
+                    return { ...read, sessionId: "s-new" };
+                }),
+            },
+        };
+
+        expect(await deleteIfUnchanged(db as never, read as never)).toBe(false);
+        expect(db.delete).not.toHaveBeenCalled();
     });
 
     it("trims past the cap without deleting a phone that registered again meanwhile", async () => {

@@ -22,6 +22,15 @@ const vExpoPushToken = v.string().check((value) => value.length <= 200 && EXPO_P
 
 const vPlatform = v.union(v.literal("android"), v.literal("ios"));
 
+/** SQLite's own wording for a unique index refusing a row, as Lunora's D1 layer reports it; nothing else is a race. */
+const UNIQUE_CONSTRAINT_FAILED = /unique constraint failed/iu;
+
+const isUniqueViolation = (error: unknown): boolean => {
+    const cause = error instanceof Error ? error.cause : undefined;
+
+    return UNIQUE_CONSTRAINT_FAILED.test(String(error)) || (cause !== undefined && UNIQUE_CONSTRAINT_FAILED.test(String(cause)));
+};
+
 /** Whether this deployment pushes to phones. The app asks for permission only when it does. */
 export const getNativePushConfig = authQuery
     .input({})
@@ -45,7 +54,7 @@ export const registerPushDevice = authMutation
     .input({ platform: vPlatform, token: vExpoPushToken })
     .output(v.object({ registered: v.boolean() }))
     .mutation(async ({ args, ctx }) => {
-        const refuse = (reason: "deleting" | "no_session" | "off" | "superseded") => {
+        const refuse = (reason: "deleting" | "no_session" | "off" | "session_ended" | "superseded") => {
             ctx.log.event("notifications.register_push_device", { platform: args.platform, refused: reason });
 
             return { registered: false };
@@ -69,10 +78,22 @@ export const registerPushDevice = authMutation
         }
 
         const now = Date.now();
+        const database = systemDb(ctx);
+        const isLive = async () => {
+            // An expired session counts as gone: a phone tied to it would never be sent to. Checked before the write too,
+            // so a request whose JWT outlived its session never takes a phone from a live registration.
+            const session = await database.session.findFirst({ consistency: "primary", where: { _id: sessionId as Id<"session"> } });
+
+            return session !== null && session !== undefined && session.expiresAt > Date.now();
+        };
+
+        if (!(await isLive())) {
+            return refuse("session_ended");
+        }
+
         // The row may be the account that signed in on this phone before. Reading and re-owning it needs the unguarded
         // database (RLS hides another user's row); every field written is the caller's own, nothing of the previous
         // owner's is read back or returned.
-        const database = systemDb(ctx);
         const existing = await database.pushDevices.findFirst({ consistency: "primary", where: { token: args.token } });
 
         // A registration that started before the row's last one (a request held up on its way) is older news: it must not
@@ -92,6 +113,10 @@ export const registerPushDevice = authMutation
             } catch (error) {
                 // Another registration of this phone inserted between the read and the write (`by_token` is unique):
                 // take its row over instead, so the phone still has exactly one owner, the latest to register.
+                if (!isUniqueViolation(error)) {
+                    throw error;
+                }
+
                 const raced = await database.pushDevices.findFirst({ consistency: "primary", where: { token: args.token } });
 
                 if (!raced) {
@@ -111,16 +136,17 @@ export const registerPushDevice = authMutation
         // ask again, and take back this row, so a phone never outlives the account's erasure. A guest is deleted
         // without a deletion request (inactive-guest cleanup, the end of a merge), its sessions first: a session gone
         // by now means the same.
-        const session = await database.session.findFirst({ consistency: "primary", where: { _id: sessionId as Id<"session"> } });
+        const isSessionLive = await isLive();
+        const isDeleting = isSessionLive && (await isAccountDeletionUnderway(ctx, userId));
 
-        if (!session || (await isAccountDeletionUnderway(ctx, userId))) {
+        if (!isSessionLive || isDeleting) {
             const written = await database.pushDevices.findFirst({ consistency: "primary", where: { token: args.token, userId } });
 
             if (written) {
                 await deleteIfUnchanged(database, written);
             }
 
-            return refuse("deleting");
+            return refuse(isSessionLive ? "deleting" : "session_ended");
         }
 
         // Past the cap, the phones not seen for longest go.

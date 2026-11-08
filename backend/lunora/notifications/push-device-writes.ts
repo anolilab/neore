@@ -9,7 +9,7 @@ import type { MutationCtx } from "../_generated/server";
 export const MAX_PUSH_DEVICES_PER_USER = 10;
 
 /**
- * Deletes a row read earlier only if it is still the same registration: the same owner, not seen since. Another
+ * Deletes a row read earlier only if it is still the same registration: the same owner and session, not seen since. Another
  * account may have taken the phone over, or the phone registered again, after the first read; that registration
  * stays. The check and the delete are two statements (the global table offers no conditional delete), so a write
  * landing between them can still lose its row; the app registers again on its next return to the foreground.
@@ -17,7 +17,7 @@ export const MAX_PUSH_DEVICES_PER_USER = 10;
 export const deleteIfUnchanged = async (db: MutationCtx["db"], read: Doc<"pushDevices">): Promise<boolean> => {
     const current = await db.pushDevices.findFirst({ consistency: "primary", where: { _id: read._id } });
 
-    if (current?.userId !== read.userId || current.lastSeenAt !== read.lastSeenAt) {
+    if (current?.userId !== read.userId || current.lastSeenAt !== read.lastSeenAt || current.sessionId !== read.sessionId) {
         return false;
     }
 
@@ -50,9 +50,10 @@ export const dropPushDevicesOf = async (db: MutationCtx["db"], userId: string): 
 
 /**
  * Keeps the `MAX_PUSH_DEVICES_PER_USER` phones of `userId` seen most recently and
- * deletes the rest. Registration adds one phone at a time; an account merge can
- * bring a whole second set, so the read is bounded by twice the cap plus a margin
- * and the trim loops until it is under.
+ * deletes the rest. Registration adds one phone at a time, so the excess is
+ * normally one row; the read still takes three times the cap and the trim loops,
+ * so rows written outside registration (seeded, or before the cap existed) are
+ * brought under it too.
  */
 export const trimPushDevices = async (db: MutationCtx["db"], userId: string): Promise<number> => {
     let removed = 0;
