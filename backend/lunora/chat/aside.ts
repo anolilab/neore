@@ -431,10 +431,11 @@ export const askAside = authAction
                 const at = Date.now();
                 const cost = sumMessageCosts((result.steps ?? []).map((step: { providerMetadata?: unknown }) => step.providerMetadata));
 
-                // The project as it is now, read again after the call: the pre-charge read stands in when this one fails.
+                // The project as it is now, read again after the call. The pre-charge read stands in when this one fails only
+                // if it found a project: a thread with none then may have been moved into one, which its own shard reads.
                 const recordedAttribution = await ctx
                     .runQuery(internal.usage.activity.getThreadAttribution, { threadId, userId })
-                    .catch(() => threadAttribution);
+                    .catch(() => (threadAttribution?.projectKey === undefined ? undefined : threadAttribution));
                 const usage = {
                     at,
                     costMicrodollars: Math.round(cost?.microdollars ?? 0),

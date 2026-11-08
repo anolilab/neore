@@ -427,6 +427,31 @@ describe("recording usage by project", () => {
         expect(await projectTotals(USER)).toStrictEqual({ [alpha.projectId!]: { costMicrodollars: 100, replies: 1, tokens: 10 } });
     });
 
+    it("files a noted project on a retry when its access check fails as the reply's first record lands", async () => {
+        const alpha = await insertThread(USER, "Alpha");
+
+        await record({ replyKey: "noted", retry: true, threadAttribution: { projectKey: alpha.projectId }, threadId: alpha.threadId });
+        projectReadFails.value = true;
+
+        try {
+            // The first record counts the total; the noted project's check fails, so the project waits for a retry.
+            await record({ projectUnread: true, replyKey: "noted", threadId: alpha.threadId });
+        } finally {
+            projectReadFails.value = false;
+        }
+
+        const counted = await heatmap(USER, "2026-09-25");
+
+        expect(counted.days).toMatchObject([{ costMicrodollars: 100, replies: 1 }]);
+        expect(await projectTotals(USER)).toStrictEqual({});
+
+        // The retry, with the read back, files the noted project once.
+        await record({ projectUnread: true, replyKey: "noted", retry: true, threadId: alpha.threadId });
+        await record({ projectUnread: true, replyKey: "noted", retry: true, threadId: alpha.threadId });
+
+        expect(await projectTotals(USER)).toStrictEqual({ [alpha.projectId!]: { costMicrodollars: 100, replies: 1, tokens: 10 } });
+    });
+
     it("files no project once the user's membership in the project's organization is revoked", async () => {
         const projectId = await harness.run(
             async (ctx: any) => await ctx.db.insert("projects", { createdAt: 1, organizationId: "org_1", title: "Org", userId: OTHER }),

@@ -255,27 +255,49 @@ export const recordReplyUsage = internalMutation
         // (its read failed) is filed here once its project reads: a failed read throws, and the scheduler retries this.
         // One a late retry's record noted (`awaitingTotal`) is counted now, by its first record, with the noted project.
         if (recorded) {
+            // The project of a reply counted without it: the one a late retry noted on the key, else the thread's.
+            const projectNow = async (): Promise<Attribution> =>
+                recorded.deferredProjectKey === undefined
+                    ? await attributionNow()
+                    : await readableAttribution(ctx, { projectKey: recorded.deferredProjectKey }, args.userId);
+
             if (recorded.awaitingTotal === true && args.retry !== true) {
                 await countTotal();
 
-                // The noted project, checked again: access revoked since files none, and a failed check never costs the
-                // total, which is counted already.
-                if (recorded.deferredProjectKey !== undefined) {
-                    await fileProject(
-                        await readableAttribution(ctx, { projectKey: recorded.deferredProjectKey }, args.userId).catch((error: unknown) => {
-                            usageLogger.warn("[usage] the noted project could not be read; the reply stays without it", {
-                                error,
-                                replyKey: args.replyKey,
-                            });
+                // The noted project, checked again: access revoked since files none. A check that fails never costs the
+                // total, counted already: the reply is marked without its project, and the project is tried again.
+                let project: Attribution | undefined;
 
-                            return {};
-                        }),
-                    );
+                try {
+                    project = await projectNow();
+                } catch (error) {
+                    usageLogger.warn("[usage] the noted project could not be read; counting the reply now and trying the project again", {
+                        error,
+                        replyKey: args.replyKey,
+                    });
+                    await ctx.db.patch("usageReplies", recorded._id, { awaitingTotal: false, withoutProject: true });
+                    await runAfterWithRetry(
+                        ctx.scheduler,
+                        RECORD_RETRY.baseMs,
+                        internal.usage.activity.recordReplyUsage,
+                        { ...args, retry: true },
+                        RECORD_RETRY,
+                    ).catch((bookingError: unknown) => {
+                        usageLogger.warn("[usage] the project retry could not be booked; the reply stays without its project", {
+                            error: bookingError,
+                            replyKey: args.replyKey,
+                        });
+                    });
                 }
 
-                await ctx.db.patch("usageReplies", recorded._id, { awaitingTotal: false });
-            } else if (recorded.withoutProject === true && args.projectUnread !== true) {
-                await fileProject(await attributionNow());
+                // Only the access check is guarded: the project row and the flag are written once it has answered.
+                if (project !== undefined) {
+                    await fileProject(project);
+                    await ctx.db.patch("usageReplies", recorded._id, { awaitingTotal: false });
+                }
+            } else if (recorded.withoutProject === true && (args.projectUnread !== true || args.retry === true)) {
+                // A retry: a read that fails throws, and the scheduler runs it again (`RECORD_RETRY`).
+                await fileProject(await projectNow());
                 await ctx.db.patch("usageReplies", recorded._id, { withoutProject: false });
             }
 
