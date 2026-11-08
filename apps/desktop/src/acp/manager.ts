@@ -25,6 +25,7 @@ import type { Handshake } from "./protocol";
 import { initialize } from "./protocol";
 import type { SendResult } from "./session";
 import { AgentSession } from "./session";
+import { AgentSignedOutError } from "./signed-out";
 import type { AcpView, ProbeResult, SessionSnapshot, SessionStatus, SessionSummary, SpawnPlan } from "./types";
 
 /** The window is told about changes at most this often; streamed text would otherwise re-render per chunk. */
@@ -84,6 +85,9 @@ export class AcpManager {
 
     /** Agents whose account is changing (`holdingAgent`): none of their sessions may start. */
     private readonly held = new Set<string>();
+
+    /** Imports running now, per agent: a sign-out waits for them, so none stays connected to the account it removes. */
+    private readonly importsRunning = new Map<string, Set<Promise<unknown>>>();
 
     private readonly processes = new Set<AgentProcess>();
 
@@ -170,8 +174,15 @@ export class AcpManager {
 
             return await use({ connection, handshake, plan, report, scrub: child.scrub, secretLength: child.secretLength });
         } catch (error) {
+            const masked = child.scrub((error as Error).message);
+
+            // The type stays: callers tell "not signed in" from other failures by it. The message is masked like the rest.
+            if (error instanceof AgentSignedOutError) {
+                throw new AgentSignedOutError(masked);
+            }
+
             // eslint-disable-next-line preserve-caught-error -- the cause is the agent's own error, which can quote its environment
-            throw new Error(child.scrub((error as Error).message));
+            throw new Error(masked);
         } finally {
             connection.close(new Error("finished"));
 
@@ -328,10 +339,49 @@ export class AcpManager {
         this.held.add(agentKey);
 
         try {
+            await Promise.allSettled(this.importsRunning.get(agentKey) ?? []);
+
             return await use();
         } finally {
             this.held.delete(agentKey);
         }
+    }
+
+    /** Runs an import of one agent's saved sessions. Refused while the agent's account is being signed out. */
+    public async importing<Result>(agentKey: string, use: () => Promise<Result>): Promise<Result> {
+        this.refuseHeld(agentKey);
+
+        const run = use();
+        const running = this.importsRunning.get(agentKey) ?? new Set<Promise<unknown>>();
+
+        running.add(run);
+        this.importsRunning.set(agentKey, running);
+
+        try {
+            return await run;
+        } finally {
+            running.delete(run);
+
+            if (running.size === 0) {
+                this.importsRunning.delete(agentKey);
+            }
+        }
+    }
+
+    /**
+     * Throws while the agent (or, with no key, any agent: an environment variable reaches all of them) is being signed
+     * out. A change to its command or variables then could not change the account a sign-out is checking.
+     */
+    public refuseWhileSigningOut(agentKey?: string): void {
+        if (agentKey === undefined) {
+            if (this.held.size > 0) {
+                throw new Error("an agent is being signed out; change its variables once that ends");
+            }
+
+            return;
+        }
+
+        this.refuseHeld(agentKey);
     }
 
     /** Ends every open session of one agent: its account is about to change (a sign-out). */

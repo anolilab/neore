@@ -472,3 +472,39 @@ describe("unsupported platforms and missing commands", () => {
         await expect(target.probe("missing")).rejects.toThrow(MISSING_COMMAND);
     });
 });
+
+/** A promise that stays pending until `open` is called. */
+const gate = (): { open: () => void; opened: Promise<void> } => {
+    let open: () => void = () => {};
+    const opened = new Promise<void>((resolve) => {
+        open = () => {
+            resolve();
+        };
+    });
+
+    return { open, opened };
+};
+
+describe("a sign-out of an agent", () => {
+    it("waits for an import of that agent that is running, and refuses a new one meanwhile", async () => {
+        const target = make({});
+        const finish = gate();
+        const running = target.importing("fake", async () => await finish.opened);
+        let signedOut = false;
+        const hold = target.holdingAgent("fake", async () => {
+            signedOut = true;
+        });
+
+        // The sign-out has begun: it must not run while the import still holds the agent's connection.
+        await Promise.resolve();
+        expect(await messageOf(target.importing("fake", async () => {}))).toContain("being signed out");
+        expect(signedOut).toBe(false);
+
+        finish.open();
+        await running;
+        await hold;
+
+        expect(signedOut).toBe(true);
+        target.killAll();
+    });
+});

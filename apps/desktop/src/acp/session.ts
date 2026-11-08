@@ -30,6 +30,7 @@ import type { AgentProcess } from "./process";
 import type { Handshake } from "./protocol";
 import { forkSession, initialize, loadSession, METHOD, newSession, promptParams } from "./protocol";
 import { INVALID_PARAMS, METHOD_NOT_FOUND, RpcError } from "./rpc-error";
+import { AgentSignedOutError } from "./signed-out";
 import { Turn } from "./turn";
 import type { SessionSnapshot, SessionStatus, SessionSummary, StopReason, ToolState, ToolStatus } from "./types";
 
@@ -235,6 +236,11 @@ export class AgentSession {
 
             this.end(message);
             await this.stopping;
+
+            // The sign-out answer keeps its type (callers tell it from other failures), with the same masked message.
+            if (error instanceof AgentSignedOutError && this.endReason === undefined) {
+                throw new AgentSignedOutError(message);
+            }
 
             // eslint-disable-next-line preserve-caught-error -- the cause is the agent's own error, which can quote its environment
             throw new Error(this.endReason ?? message);

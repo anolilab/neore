@@ -224,16 +224,43 @@ const SIGN_IN_PENDING: Record<SignInRequest, string> = {
  */
 const askSignIn = async (key: string, request: SignInRequest, ask: () => Promise<SignInStatus>): Promise<void> => {
     const config = agentConfig(key);
+    // The rows are rebuilt while the request runs; the control the person used gets its focus back after each rebuild.
+    const focused = focusedAgentControl();
 
     state.signInPending.set(key, request);
     renderAgents();
+    restoreAgentFocus(focused, key);
 
     try {
         state.signIn[key] = { config, status: await ask() };
     } finally {
         state.signInPending.delete(key);
         renderAgents();
+        restoreAgentFocus(focused, key);
     }
+};
+
+/** The label of the agent-list control that has focus, if one does: rebuilding the rows would drop it. */
+const focusedAgentControl = (): string | undefined => {
+    const active = document.activeElement;
+
+    return active instanceof HTMLButtonElement && $("acp-agents").contains(active) ? (active.getAttribute("aria-label") ?? undefined) : undefined;
+};
+
+/**
+ * Puts focus back on the control with `label` after the rows are rebuilt. A control that is hidden meanwhile (Sign out,
+ * during a request) falls back to the agent's own check, so keyboard focus never drops to the page.
+ */
+const restoreAgentFocus = (label: string | undefined, key: string): void => {
+    if (label === undefined) {
+        return;
+    }
+
+    const controls = [...$("acp-agents").querySelectorAll("button")];
+    const target = controls.find((control) => control.getAttribute("aria-label") === label)
+        ?? controls.find((control) => control.getAttribute("aria-label") === `Check whether ${agentLabel(key)} is signed in`);
+
+    target?.focus();
 };
 
 /** A sign-in request for `key` is running; its row says which, so a click meanwhile does nothing. */

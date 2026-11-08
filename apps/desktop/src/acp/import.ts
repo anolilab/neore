@@ -29,7 +29,7 @@ const MAX_TITLE_CHARS = 200;
 export interface ImporterOptions {
     /** The label the user gave the agent; undefined for one that is not registered. */
     agentLabel: (agentKey: string) => string | undefined;
-    agents: Pick<AcpManager, "withAgent">;
+    agents: Pick<AcpManager, "importing" | "withAgent">;
     /** The label of the folder the user approved for this agent (never its path); undefined when it is not approved. */
     hostInfo: (agentKey: string, folder: string) => { folderId: string; folderLabel: string } | undefined;
     io: ImportIo;
@@ -52,15 +52,15 @@ export class AcpImporter {
 
     /** The agent's saved sessions for this folder, newest first. */
     public async list(agentKey: string, folder: string): Promise<NativeSessionView[]> {
-        return await this.options.agents.withAgent(agentKey, folder, {}, async ({ connection, plan, report }) => {
-            requireAdvertised(report, "sessions.listNative", "list its saved sessions");
+        return await this.options.agents.importing(agentKey, async () => await this.options.agents.withAgent(agentKey, folder, {}, async ({ connection, plan, report }) => {
+                requireAdvertised(report, "sessions.listNative", "list its saved sessions");
 
-            const sessions = await listSessions(connection, plan.cwd);
+                const sessions = await listSessions(connection, plan.cwd);
 
-            return sessions.map((session) => {
-                return { sessionId: session.sessionId, title: session.title.slice(0, MAX_TITLE_CHARS), updatedAt: session.updatedAt };
-            });
-        });
+                return sessions.map((session) => {
+                    return { sessionId: session.sessionId, title: session.title.slice(0, MAX_TITLE_CHARS), updatedAt: session.updatedAt };
+                });
+            }));
     }
 
     public async import(agentKey: string, folder: string, nativeSessionId: string, title?: string): Promise<ImportSummary> {
@@ -76,7 +76,7 @@ export class AcpImporter {
 
         let collector: ReplayCollector | undefined;
 
-        return await this.options.agents.withAgent(
+        return await this.options.agents.importing(agentKey, async () => await this.options.agents.withAgent(
             agentKey,
             folder,
             { notification: (method, params) => method === METHOD.sessionUpdate && collector?.update(params) },
@@ -122,6 +122,6 @@ export class AcpImporter {
                     ? { status: "already" }
                     : { droppedTurns: replay.droppedTurns, shortenedTurns: replay.shortenedTurns, status: "imported", turns: outcome.turns };
             },
-        );
+        ));
     }
 }

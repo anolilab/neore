@@ -53,15 +53,32 @@ export type Spawner = (plan: SpawnPlan, agentKey: string) => AgentProcess;
  * Replaces every occurrence of a variable the user set. Agents sometimes echo their environment. The built
  * variables (`HOME`, `PATH`, …) are not secrets and stay readable, or every path in a message would be garbled.
  */
+/** The values in order, longest first: a shorter secret that is a prefix of a longer one must not hide the longer one's suffix. */
+const longestFirst = (values: string[]): string[] => {
+    const ordered: string[] = [];
+
+    for (const value of values) {
+        const at = ordered.findIndex((other) => other.length < value.length);
+
+        if (at === -1) {
+            ordered.push(value);
+        } else {
+            ordered.splice(at, 0, value);
+        }
+    }
+
+    return ordered;
+};
+
 export const scrub = (text: string, plan: SpawnPlan): string => {
+    const values = plan.secretNames
+        .map((name) => plan.env[name])
+        .filter((value): value is string => value !== undefined && value.length >= MIN_SCRUBBED_LENGTH);
+
     let result = text;
 
-    for (const name of plan.secretNames) {
-        const value = plan.env[name];
-
-        if (value !== undefined && value.length >= MIN_SCRUBBED_LENGTH) {
-            result = result.split(value).join("***");
-        }
+    for (const value of longestFirst(values)) {
+        result = result.split(value).join("***");
     }
 
     return result;

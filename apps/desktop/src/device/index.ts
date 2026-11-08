@@ -739,8 +739,12 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
     local(LOCAL_CHANNEL.acpView, () => JSON.parse(requireCore().acpView()) as AcpView);
 
     const updateAcp = async (update: string): Promise<AcpView> => {
-        const view = JSON.parse(requireCore().acpUpdate(update)) as AcpView;
         const { key, op } = JSON.parse(update) as { key?: string; op?: string };
+
+        // Refused before anything is saved: a sign-out is checking the account on the command or variables it would change.
+        state.acp?.refuseWhileSigningOut(key);
+
+        const view = JSON.parse(requireCore().acpUpdate(update)) as AcpView;
 
         // What an agent reported says nothing about a different program.
         if (key !== undefined && (op === "saveAgent" || op === "removeAgent")) {
@@ -783,6 +787,10 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
         });
 
         const key = readAgentKey(id);
+
+        // A new install changes the command a sign-out is checking the account with.
+        state.acp?.refuseWhileSigningOut(key);
+
         const view = await state.installer.install(key, readAgentVersion(version));
 
         if (view !== null) {
