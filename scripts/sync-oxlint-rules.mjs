@@ -186,12 +186,7 @@ const ignorePatterns = (scopes, linted) => {
 
     const projectDirs = scopes.filter((scope) => statSync(join(ROOT, scope)).isDirectory());
     const inProject = (file) => projectDirs.some((dir) => file.startsWith(`${dir}/`));
-    // Tracked symlinks to directories too: oxlint follows them, ESLint does not.
-    const symlinks = git("ls-files", "-z", "-s")
-        .filter((entry) => entry.startsWith("120000 "))
-        .map((entry) => entry.slice(entry.indexOf("\t") + 1))
-        .filter((path) => statSync(join(ROOT, path), { throwIfNoEntry: false })?.isDirectory());
-    const tracked = [...git("ls-files", "-z", "--", ...LINTABLE), ...symlinks].filter(inProject);
+    const tracked = git("ls-files", "-z", "--", ...LINTABLE).filter(inProject);
     const lintedDirs = new Set();
 
     for (const file of linted) {
@@ -227,7 +222,8 @@ const ignorePatterns = (scopes, linted) => {
 
 const main = () => {
     const scratch = mkdtempSync(join(tmpdir(), "oxlint-sync-"));
-    const views = eslintProjects().map(({ dir, only }, index) => {
+    const projects = eslintProjects();
+    const views = projects.map(({ dir, only }, index) => {
         const out = join(scratch, `${index}.json`);
 
         process.stderr.write(`ESLint view of ${relative(ROOT, dir) || "."}\n`);
@@ -237,7 +233,7 @@ const main = () => {
     });
 
     const linted = new Set(views.flatMap((view) => view.files));
-    const scopes = eslintProjects().flatMap(({ dir, only }) => (only.length > 0 ? only : [relative(ROOT, dir)]));
+    const scopes = projects.flatMap(({ dir, only }) => (only.length > 0 ? only : [relative(ROOT, dir)]));
     const loaded = (plugin) => views.reduce((sum, view) => sum + (view.plugins[plugin] ?? 0), 0);
 
     /** ESLint's single setting for a rule across every file it applies to, or undefined. */

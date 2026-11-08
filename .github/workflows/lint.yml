@@ -150,7 +150,9 @@ jobs:
             # enforces would fail here on code ESLint accepts.
             - name: "Check that .oxlintrc.json matches ESLint's config"
               shell: "bash"
-              run: "pnpm run lint:oxlint:sync && git diff --exit-code .oxlintrc.json"
+              run: |
+                  pnpm run lint:oxlint:sync
+                  git diff --exit-code .oxlintrc.json || { echo "::error::.oxlintrc.json is stale: run pnpm lint:oxlint:sync and commit it"; exit 1; }
 
             - name: "oxlint"
               shell: "bash"
