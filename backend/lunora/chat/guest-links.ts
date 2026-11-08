@@ -90,7 +90,7 @@ export const sweepGuestLinks = internalMutation
             routes.push(hash);
         }
 
-        // The rows went first: a route removed before a failed write would leave a live link unreachable.
+        // Routes are not rolled back with the rows: if this write fails after here, a link keeps its row but answers "not active".
         await dropGuestLinkRoutes(ctx, routes);
 
         // A full batch or an unfinished link may have left more behind: carry on now rather than at the shard's next housekeeping.

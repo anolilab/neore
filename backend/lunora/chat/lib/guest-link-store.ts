@@ -53,7 +53,7 @@ export const deleteGuestLink = async (ctx: Pick<MutationCtx, "db">, link: LinkRo
  * One batch of the thread's links made at or before `before`, and what guests left on them, minus their routes: the rows
  * go with the caller's write, and the returned hashes are the routes the caller removes once that write has gone through.
  * `done` is false while such rows remain; the caller runs it again. A link made after `before` (once the thread was
- * restored or unlocked) is not the removal's to take.
+ * restored or unlocked) is not the removal's to take, and does not keep the removal going.
  */
 export const removeGuestLinkRows = async (
     ctx: Pick<MutationCtx, "db">,
@@ -67,8 +67,10 @@ export const removeGuestLinkRows = async (
     const hashes: string[] = [];
 
     for (const link of links) {
+        // Every link lasts the same time, so the index's `expiresAt` order is the order they were made in: from the first
+        // link made after the cut-off on, none is the removal's to take.
         if (link.createdAt > before) {
-            continue;
+            return { done: true, hashes };
         }
 
         const hash = await deleteGuestLink(ctx, link);

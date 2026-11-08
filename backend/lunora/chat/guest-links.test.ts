@@ -127,6 +127,39 @@ describe("withdrawing a link with more than one page of messages", () => {
     });
 });
 
+describe("a withdrawal continuation that meets only links made after it started", () => {
+    it("stops instead of scheduling itself again", async () => {
+        await seedLink(threadId, "hash-old", Date.now() + 60_000, 101);
+        await harness.run(async (ctx: any) => await markThreadArchived({ ...ctx, now: Date.now() }, threadId as never));
+        const [job] = harness.scheduler.list();
+
+        // The old link is gone by other means, and the restored thread has a full batch of newer links.
+        const messages = (await rows("threadGuestMessages")) as { _id: string }[];
+        const links = (await rows("threadGuestLinks")) as { _id: string }[];
+
+        await harness.run(async (ctx: any) => {
+            for (const message of messages) {
+                await ctx.db.delete("threadGuestMessages", message._id);
+            }
+
+            for (const link of links) {
+                await ctx.db.delete("threadGuestLinks", link._id);
+            }
+        });
+
+        for (let index = 0; index < 50; index += 1) {
+            await seedLink(threadId, `hash-new-${index}`, Date.now() + 120_000 + index, 0, Date.now() + 1000 + index);
+        }
+
+        const scheduled = harness.scheduler.list().length;
+
+        await harness.run(async (ctx: any) => await ctx.runMutation(guestLinks.continueGuestLinkRemoval, job?.args));
+
+        expect(harness.scheduler.list()).toHaveLength(scheduled);
+        expect(await rows("threadGuestLinks")).toHaveLength(50);
+    });
+});
+
 describe("deleting a thread whose link holds more than one page of messages", () => {
     it("leaves no message behind", async () => {
         await seedLink(threadId, "hash-live", Date.now() + 60_000, 101);
