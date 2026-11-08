@@ -5,7 +5,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, onTestFinished, vi } from "vitest";
 
 import { DeviceRow, StartAgents } from "./devices-settings";
 
@@ -17,6 +17,14 @@ vi.mock("@lingui/react/macro", () => {
                 i18n: { _: (descriptor: { id: string }) => descriptor.id, locale: "en" },
                 t: (strings: TemplateStringsArray, ...values: unknown[]) => String.raw({ raw: strings }, ...values),
             };
+        },
+    };
+});
+
+vi.mock("@lingui/core/macro", () => {
+    return {
+        msg: (strings: TemplateStringsArray, ...values: unknown[]) => {
+            return { id: String.raw({ raw: strings }, ...values) };
         },
     };
 });
@@ -188,5 +196,30 @@ describe("<DeviceRow> connection failure", () => {
         view.rerender(rowElement(undefined, true));
         view.rerender(rowElement(undefined, false));
         expect(screen.getByRole("status").textContent).toBe("");
+    });
+
+    it("copies a report with the failure's category, never its text", async () => {
+        const writeText = vi.fn(async (_text: string): Promise<void> => {});
+
+        const original = Object.getOwnPropertyDescriptor(navigator, "clipboard");
+
+        Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
+        onTestFinished(() => {
+            if (original === undefined) {
+                Reflect.deleteProperty(navigator, "clipboard");
+            } else {
+                Object.defineProperty(navigator, "clipboard", original);
+            }
+        });
+        bridge.connect.mockRejectedValueOnce(new Error("Permission denied (publickey). Enter passphrase for /Users/dana/.ssh/id_ed25519"));
+        renderRow();
+
+        await press(screen.getByRole("button", { name: "Connect" }));
+        await waitFor(() => expect(screen.getByRole("status").textContent).toContain("passphrase"));
+        await press(screen.getByRole("button", { name: "Copy diagnostics for build box" }));
+
+        await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
+        expect(writeText.mock.calls[0]?.[0]).toContain("Last failure: login refused");
+        expect(writeText.mock.calls[0]?.[0]).not.toContain("id_ed25519");
     });
 });
