@@ -244,6 +244,26 @@ describe("phone push content", () => {
         expect(runQuery).not.toHaveBeenCalled();
     });
 
+    it("answers 400, and logs it, when the body cannot be read", async () => {
+        const runQuery = vi.fn();
+        const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+        const broken = new Request("https://api.test/notifications/push-content", {
+            body: new ReadableStream({
+                start(controller) {
+                    controller.error(new Error("connection reset"));
+                },
+            }),
+            duplex: "half",
+            method: "POST",
+        } as RequestInit);
+
+        const response = await pushContentHttpAction({ auth: { userId: USER }, runQuery } as never, broken);
+
+        expect(response.status).toBe(400);
+        expect(warn).toHaveBeenCalledWith("[notifications] push-content body could not be read:", expect.any(Error));
+        expect(runQuery).not.toHaveBeenCalled();
+    });
+
     it("answers 429 past the caller's rate limit, before any read", async () => {
         const runQuery = vi.fn();
 

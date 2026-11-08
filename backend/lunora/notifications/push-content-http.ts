@@ -94,7 +94,16 @@ export const pushContentHttpAction = async (context: HttpActionCtx, request: Req
         return Response.json({ error: "RATE_LIMITED" }, { headers: { ...NO_STORE, "Retry-After": retryAfter }, status: 429 });
     }
 
-    const raw = await readCappedBody(request);
+    let raw: string | undefined;
+
+    try {
+        raw = await readCappedBody(request);
+    } catch (error) {
+        // The phone dropped the connection mid-body, most likely: logged, and answered as a bad request.
+        console.warn("[notifications] push-content body could not be read:", error);
+
+        return Response.json({ error: "BAD_REQUEST" }, { headers: NO_STORE, status: 400 });
+    }
 
     if (raw === undefined) {
         return Response.json({ error: "PAYLOAD_TOO_LARGE" }, { headers: NO_STORE, status: 413 });
