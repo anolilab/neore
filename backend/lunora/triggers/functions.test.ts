@@ -32,7 +32,7 @@ import { collectAllTriggers } from "./export-pages";
 import { MAX_ACTIVE_EVENT_WATCHERS } from "./event-sources/types";
 import { compileWebhookPreset } from "./presets";
 import { findNextCronTime } from "./schedule";
-import { longestWebhookPrompt, MAX_RENDERED_PROMPT_LENGTH } from "./webhook-template";
+import { longestWebhookPrompt, MAX_PAYLOAD_LENGTH, MAX_RENDERED_PROMPT_LENGTH } from "./webhook-template";
 
 // `user` is a `.global()` (D1) table the in-memory harness cannot write, so the
 // session is read straight off the harness identity.
@@ -1262,6 +1262,21 @@ describe("run prompts", () => {
         // The whole row is counted, so the read is larger than what the export keeps of it.
         expect(exported.readBytes).toBeGreaterThan(JSON.stringify(exported.runs[0]).length);
         expect(exported.foreign.readBytes).toBe(0);
+
+        // A body cut at the export limit keeps an emoji on the boundary whole or leaves it out, never half of it.
+        const emoji = await harness.run(async (ctx: any) => {
+            const id = await ctx.db.insert("triggerExecutions", {
+                payload: `${"x".repeat(MAX_PAYLOAD_LENGTH - 1)}\u{1F600}tail`,
+                startedAt: 9,
+                status: "completed",
+                triggerId,
+            });
+            const { runs } = await ctx.runQuery(collectTriggerRunsForExport, { triggerId, userId: "user-a" });
+
+            return (runs as { payload: string; payloadTruncated: boolean }[]).find((run) => run.payload.startsWith("x")) ?? id;
+        });
+
+        expect(emoji).toMatchObject({ payload: "x".repeat(MAX_PAYLOAD_LENGTH - 1), payloadTruncated: true });
         expect(exported.runs[0]).toMatchObject({ payload: '{"ref":"main"}', payloadTruncated: false, prompt: "Summarise the issue" });
         expect(exported.foreign.runs).toEqual([]);
         expect(trigger).not.toHaveProperty("webhookSecret");

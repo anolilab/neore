@@ -9,7 +9,7 @@ import { v } from "lunorash/server";
 import { internalQuery, type MutationCtx } from "../_generated/server";
 import { BATCH, type BatchResult, full } from "../gdpr/batch";
 import { MAX_LENGTH } from "../lib/validators";
-import { MAX_PAYLOAD_LENGTH } from "./webhook-template";
+import { MAX_PAYLOAD_LENGTH, sliceUnits } from "./webhook-template";
 
 /** Triggers with their run history. A trigger whose history is longer than one batch stays for the next round. */
 export const eraseTriggersForUser = async (ctx: MutationCtx, userId: string): Promise<BatchResult> => {
@@ -39,8 +39,12 @@ export const eraseTriggersForUser = async (ctx: MutationCtx, userId: string): Pr
     return { hasMore: hasMore || full(triggers) };
 };
 
-/** Triggers per export page; a page holds settings only, so it stays small. */
-const EXPORT_TRIGGER_PAGE = 50;
+/**
+ * Triggers per export page. A page holds settings only, but a trigger's system prompt and Input Template may each hold 2
+ * million characters (`MAX_LENGTH.document`): two whole triggers stay under one query's 32 MiB read limit even at three
+ * bytes a character.
+ */
+const EXPORT_TRIGGER_PAGE = 2;
 
 /**
  * Runs per export page, the newest first. A query reads each run row whole, and a run can hold a webhook body of up to
@@ -129,7 +133,8 @@ export const collectTriggerRunsForExport = internalQuery
                 return {
                     completedAt: run.completedAt ?? null,
                     error: run.error ?? null,
-                    payload: payload === null ? null : payload.slice(0, MAX_PAYLOAD_LENGTH),
+                    // Cut on a code point, so an emoji at the boundary is kept whole or left out, never halved.
+                    payload: payload === null ? null : sliceUnits(payload, MAX_PAYLOAD_LENGTH),
                     payloadTruncated: payload !== null && payload.length > MAX_PAYLOAD_LENGTH,
                     prompt: run.prompt ?? null,
                     startedAt: run.startedAt,

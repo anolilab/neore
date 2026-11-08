@@ -85,7 +85,11 @@ export const collectAllTriggers = async (
         const pageTriggers = (page.triggers ?? []) as { id: string }[];
 
         for (const trigger of pageTriggers) {
-            left.writtenBytes -= byteLength(trigger);
+            // Settings are read whole and exported whole: they count against both budgets.
+            const settingsBytes = byteLength(trigger);
+
+            left.writtenBytes -= settingsBytes;
+            left.readBytes -= settingsBytes;
 
             const collected: { isCut: boolean; runs: { startedAt: number }[] } = isSpent
                 ? { isCut: true, runs: [] }

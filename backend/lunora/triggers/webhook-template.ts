@@ -157,7 +157,7 @@ const lookupJson = (root: unknown, segments: ReadonlyArray<string>): unknown => 
 const TRAILING_HIGH_SURROGATE = /[\uD800-\uDBFF]$/u;
 
 /** The first `max` UTF-16 units, without a surrogate pair cut in two: a lone high surrogate at the end is dropped. */
-const sliceUnits = (text: string, max: number): string => {
+export const sliceUnits = (text: string, max: number): string => {
     const cut = text.slice(0, max);
 
     return TRAILING_HIGH_SURROGATE.test(cut) ? cut.slice(0, -1) : cut;
