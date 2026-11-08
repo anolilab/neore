@@ -23,6 +23,7 @@ const api: DeviceWindowApi = {
     acpPermissionAnswerBatch: (ids) => ipcRenderer.invoke(LOCAL_CHANNEL.acpPermissionAnswerBatch, ids),
     acpPermissionDecline: (id) => ipcRenderer.invoke(LOCAL_CHANNEL.acpPermissionDecline, id),
     acpPermissions: () => ipcRenderer.invoke(LOCAL_CHANNEL.acpPermissions),
+    acpPorts: (sessionId) => ipcRenderer.invoke(LOCAL_CHANNEL.acpPorts, sessionId),
     acpProbe: (agentKey) => ipcRenderer.invoke(LOCAL_CHANNEL.acpProbe, agentKey),
     acpRegistryInstall: (id, version) => ipcRenderer.invoke(LOCAL_CHANNEL.acpRegistryInstall, id, version),
     acpRegistrySearch: (query) => ipcRenderer.invoke(LOCAL_CHANNEL.acpRegistrySearch, query),
