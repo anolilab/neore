@@ -1375,15 +1375,15 @@ msgstr "{success, plural, one {# pull request collegata.} other {# pull request 
 msgid "{text} (gave up after {attempts} attempts)"
 msgstr "{text} (rinunciato dopo {attempts} tentativi)"
 
-#: src/features/onboarding/components/setup-checklist.tsx:141
+#: src/features/onboarding/components/setup-checklist.tsx:138
 msgid "{title} is done."
 msgstr ""
 
-#: src/features/onboarding/components/setup-checklist.tsx:144
+#: src/features/onboarding/components/setup-checklist.tsx:141
 msgid "{title} is skipped."
 msgstr ""
 
-#: src/features/onboarding/components/setup-checklist.tsx:144
+#: src/features/onboarding/components/setup-checklist.tsx:141
 msgid "{title} is to do."
 msgstr ""
 
@@ -2193,7 +2193,7 @@ msgstr "Aggiungi un avviso qui sopra per ricevere una notifica quando il tuo uti
 msgid "Add an extra layer of security to your account by enabling two-factor authentication."
 msgstr "Aggiungi un ulteriore livello di sicurezza al tuo account attivando l'autenticazione a due fattori."
 
-#: src/features/onboarding/components/setup-checklist.tsx:135
+#: src/features/onboarding/components/setup-checklist.tsx:132
 msgid "Add an SSH server"
 msgstr ""
 
@@ -5876,7 +5876,7 @@ msgstr "Le integrazioni selezionate ti verranno proposte per la configurazione d
 msgid "Checked: {0}"
 msgstr "Controllato: {0}"
 
-#: src/features/onboarding/components/setup-checklist.tsx:164
+#: src/features/onboarding/components/setup-checklist.tsx:161
 msgid "Checking"
 msgstr ""
 
@@ -6548,11 +6548,11 @@ msgstr "Esecuzioni dell’agente di programmazione"
 msgid "Coding agents you can start on {0}"
 msgstr "Agenti di programmazione che puoi avviare su {0}"
 
-#: src/features/onboarding/components/setup-checklist.tsx:167
+#: src/features/onboarding/components/setup-checklist.tsx:164
 msgid "Coding setup"
 msgstr ""
 
-#: src/features/onboarding/components/setup-checklist.tsx:169
+#: src/features/onboarding/components/setup-checklist.tsx:166
 msgid "Coding setup steps"
 msgstr ""
 
@@ -8064,7 +8064,7 @@ msgstr "Impossibile cambiare modello. Riprova."
 msgid "Could not change where this device is offered."
 msgstr "Impossibile cambiare dove viene offerto questo dispositivo."
 
-#: src/features/onboarding/components/setup-checklist.tsx:164
+#: src/features/onboarding/components/setup-checklist.tsx:161
 msgid "Could not check"
 msgstr ""
 
@@ -8242,7 +8242,7 @@ msgstr "Impossibile caricare la tua attività."
 msgid "Could not load your organization's billing details. Try again later."
 msgstr "Impossibile caricare i dettagli di fatturazione della tua organizzazione. Riprova più tardi."
 
-#: src/features/onboarding/components/setup-checklist.tsx:233
+#: src/features/onboarding/components/setup-checklist.tsx:230
 msgid "Could not load your saved choices, so Skip and Resume are off until it is read again."
 msgstr ""
 
@@ -8301,7 +8301,7 @@ msgstr "Impossibile leggere quella chat"
 msgid "Could not read that chat. If it is locked, unlock it first."
 msgstr "Impossibile leggere quella chat. Se è bloccata, sbloccala prima."
 
-#: src/features/onboarding/components/setup-checklist.tsx:219
+#: src/features/onboarding/components/setup-checklist.tsx:216
 msgid "Could not read your devices, so the steps cannot be checked yet. The links still work."
 msgstr ""
 
@@ -8342,8 +8342,8 @@ msgstr "Impossibile riprendere la propria sessione, quindi la conversazione è s
 msgid "Could not retry. Please try again."
 msgstr "Impossibile riprovare. Riprova."
 
-#: src/features/onboarding/components/setup-checklist.tsx:107
-#: src/features/onboarding/components/setup-checklist.tsx:183
+#: src/features/onboarding/components/setup-checklist.tsx:99
+#: src/features/onboarding/components/setup-checklist.tsx:180
 msgid "Could not save that choice. Try again."
 msgstr ""
 
@@ -10419,7 +10419,7 @@ msgstr "Non hai un account?"
 #: src/features/chat/thread-list/hierarchical-thread-list.tsx:110
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:168
 #: src/features/devices/components/devices-settings.tsx:383
-#: src/features/onboarding/components/setup-checklist.tsx:138
+#: src/features/onboarding/components/setup-checklist.tsx:135
 #: src/features/skills/components/bundle-import-dialog.tsx:248
 #: src/features/sub-agents/components/sub-agent-tool-view.tsx:57
 #: src/features/sub-agents/components/worker-run-log.tsx:29
@@ -15025,7 +15025,7 @@ msgstr "Vai al messaggio: {snippet}"
 msgid "Go to next page"
 msgstr "Vai alla pagina successiva"
 
-#: src/features/onboarding/components/setup-checklist.tsx:128
+#: src/features/onboarding/components/setup-checklist.tsx:125
 msgid "Go to pairing"
 msgstr ""
 
@@ -15041,7 +15041,7 @@ msgstr "Vai ai prompt"
 msgid "Go to reply"
 msgstr "Vai alla risposta"
 
-#: src/features/onboarding/components/setup-checklist.tsx:133
+#: src/features/onboarding/components/setup-checklist.tsx:130
 msgid "Go to servers"
 msgstr ""
 
@@ -16783,11 +16783,11 @@ msgstr "installa"
 msgid "Install"
 msgstr "Installa"
 
-#: src/features/onboarding/components/setup-checklist.tsx:125
+#: src/features/onboarding/components/setup-checklist.tsx:122
 msgid "Install a coding agent"
 msgstr ""
 
-#: src/features/onboarding/components/setup-checklist.tsx:124
+#: src/features/onboarding/components/setup-checklist.tsx:121
 msgid "Install a coding agent in the Neore desktop app and approve it for a folder on a paired computer. The install happens in the desktop window, not here."
 msgstr ""
 
@@ -17864,6 +17864,11 @@ msgstr "Scopri di più su MCP"
 msgid "Learning"
 msgstr "Apprendimento"
 
+#: src/features/chat/guest-links/guest-page.tsx:147
+#: src/routes/(public)/guest.tsx:12
+msgid "Leave a message"
+msgstr "Lascia un messaggio"
+
 #: src/features/evals/components/run-dialog.tsx:135
 msgid "Leave all unchecked to search every indexed file."
 msgstr "Lascia tutto deselezionato per cercare in tutti i file indicizzati."
@@ -17950,7 +17955,7 @@ msgstr "Consenti all'agente di usare file, un terminale e server MCP locali sul 
 msgid "Let the agent work on a server you reach over SSH, with your own SSH client and keys. Neore asks you to trust the server's key the first time, and every action asks you on this computer before it is sent. The server holds no secret of yours."
 msgstr "Lascia che l’agente lavori su un server a cui accedi tramite SSH, con il tuo client SSH e le tue chiavi. Neore ti chiede di considerare attendibile la chiave del server la prima volta e ogni azione richiede la tua conferma su questo computer prima di essere inviata. Il server non conserva alcun tuo segreto."
 
-#: src/features/onboarding/components/setup-checklist.tsx:134
+#: src/features/onboarding/components/setup-checklist.tsx:131
 msgid "Let the agent work on a server you reach over SSH. Needs a paired computer, and the form to add one is in the desktop app."
 msgstr ""
 
@@ -23413,11 +23418,11 @@ msgstr "Pagine condivise con te"
 msgid "Paint over the areas you want to edit. White regions will be regenerated, dark regions will be preserved."
 msgstr "Dipingi sulle aree che vuoi modificare. Le aree bianche verranno rigenerate, quelle scure verranno mantenute."
 
-#: src/features/onboarding/components/setup-checklist.tsx:130
+#: src/features/onboarding/components/setup-checklist.tsx:127
 msgid "Pair a computer"
 msgstr ""
 
-#: src/features/onboarding/components/setup-checklist.tsx:129
+#: src/features/onboarding/components/setup-checklist.tsx:126
 msgid "Pair a computer in the Neore desktop app so agents can work on your files. You confirm the pairing on that computer, and the step is done once any computer is paired with your account."
 msgstr ""
 
@@ -25506,7 +25511,7 @@ msgstr "Sola lettura"
 msgid "Read the docs"
 msgstr "Leggi la documentazione"
 
-#: src/features/onboarding/components/setup-checklist.tsx:123
+#: src/features/onboarding/components/setup-checklist.tsx:120
 msgid "Read the guide"
 msgstr ""
 
@@ -26813,7 +26818,7 @@ msgstr "Risultato"
 msgid "Result not delivered"
 msgstr "Risultato non consegnato"
 
-#: src/features/onboarding/components/setup-checklist.tsx:205
+#: src/features/onboarding/components/setup-checklist.tsx:202
 #: src/features/settings/connectors/messenger/messenger-platform-card.tsx:233
 msgid "Resume"
 msgstr "Riprendi"
@@ -26875,7 +26880,7 @@ msgstr "riprova"
 #: src/features/chat/translation/message-translation.tsx:88
 #: src/features/devices/components/devices-settings.tsx:240
 #: src/features/local-models/components/ollama-model-manager.tsx:188
-#: src/features/onboarding/components/setup-checklist.tsx:241
+#: src/features/onboarding/components/setup-checklist.tsx:238
 #: src/features/settings/components/chat/agent-settings.tsx:224
 #: src/features/tasks/components/task-detail-dialog.tsx:108
 #: src/features/workflow/components/nodes/file-node.tsx:221
@@ -26897,7 +26902,7 @@ msgstr "Riprova tra {retryAfterMinutes} min"
 msgid "Retry now"
 msgstr "Riprova ora"
 
-#: src/features/onboarding/components/setup-checklist.tsx:227
+#: src/features/onboarding/components/setup-checklist.tsx:224
 msgid "Retry the device check"
 msgstr ""
 
@@ -28385,6 +28390,10 @@ msgstr "Invia questo al bot dal tuo account:"
 msgid "Send to agent"
 msgstr "Invia all’agente"
 
+#: src/features/chat/guest-links/guest-page.tsx:170
+msgid "Send to the owner"
+msgstr "Invia al proprietario"
+
 #: src/features/auth/components/auth/forms/two-factor-form.tsx:373
 msgid "Send verification code"
 msgstr "Invia codice di verifica"
@@ -28397,6 +28406,7 @@ msgstr "Invia codice di verifica"
 msgid "Sending your message and waiting for the reply"
 msgstr "Invio del messaggio e attesa della risposta"
 
+#: src/features/chat/guest-links/guest-page.tsx:170
 #: src/features/chat/thread/streaming-placeholder.tsx:617
 msgid "Sending…"
 msgstr "Invio in corso…"
@@ -28420,6 +28430,10 @@ msgstr "Inviato da un’esecuzione non presidiata"
 #: src/features/sub-agents/components/worker-run-log.tsx:31
 msgid "Sent by the lead agent"
 msgstr "Inviato dall’agente principale"
+
+#: src/features/chat/guest-links/guest-page.tsx:183
+msgid "Sent by the owner"
+msgstr "Inviato dal proprietario"
 
 #: src/features/sub-agents/components/worker-run-log.tsx:35
 msgid "Sent by you"
@@ -29212,7 +29226,7 @@ msgid "Skills views"
 msgstr "Viste delle skill"
 
 #: src/features/onboarding/components/onboarding-dialog.tsx:405
-#: src/features/onboarding/components/setup-checklist.tsx:205
+#: src/features/onboarding/components/setup-checklist.tsx:202
 msgid "Skip"
 msgstr "Salta"
 
@@ -29234,7 +29248,7 @@ msgstr "Salta il tour"
 
 #: src/features/develop/components/checks-tab.tsx:80
 #: src/features/evals/components/run-detail.tsx:36
-#: src/features/onboarding/components/setup-checklist.tsx:138
+#: src/features/onboarding/components/setup-checklist.tsx:135
 #: src/features/settings/components/chat/trigger-settings.tsx:182
 msgid "Skipped"
 msgstr "Saltato"
@@ -32114,6 +32128,10 @@ msgstr "Impossibile raggiungere il registro MCP, quindi potrebbero mancare sugge
 msgid "The MCP Registry is unavailable right now. Showing popular servers instead."
 msgstr "Il registro MCP non è disponibile al momento. Vengono mostrati i server più popolari."
 
+#: src/features/chat/guest-links/guest-page.tsx:70
+msgid "The message could not be sent. Check your connection and try again."
+msgstr "Impossibile inviare il messaggio. Controlla la connessione e riprova."
+
 #: src/features/chat/core/hooks/use-prompt-link-draft.ts:160
 msgid "The model in the link is not available. The chat keeps its model."
 msgstr "Il modello nel link non è disponibile. La chat mantiene il suo modello."
@@ -32762,9 +32780,22 @@ msgstr "È troppo corto: almeno {minLength} caratteri."
 msgid "This is your organization's URL namespace"
 msgstr "Questo è lo spazio URL della tua organizzazione"
 
+#: src/features/chat/guest-links/guest-page.tsx:64
+#: src/features/chat/guest-links/guest-page.tsx:164
+msgid "This link has ended."
+msgstr "Questo link non è più attivo."
+
+#: src/features/chat/guest-links/guest-page.tsx:61
+msgid "This link is already in use in another browser."
+msgstr "Questo link è già in uso in un altro browser."
+
 #: src/routes/dashboard/settings/connectors/callback.tsx:47
 msgid "This link is incomplete."
 msgstr "Questo link è incompleto."
+
+#: src/features/chat/guest-links/guest-page.tsx:152
+msgid "This link is not complete. Ask for the full link."
+msgstr "Questo link è incompleto. Chiedi il link completo."
 
 #: src/features/chat/thread/memory-usage-action.tsx:63
 msgid "This memory has since been deleted."
@@ -32775,6 +32806,10 @@ msgstr "Questo ricordo è stato poi eliminato."
 #: src/features/develop/components/merge-panel.tsx:132
 msgid "This merges the commit {0} into the base branch with “{1}” on {hostLabel}. If the branch has changed since you opened this page, {hostLabel} refuses."
 msgstr "Questo unisce il commit {0} nel branch di base con “{1}” su {hostLabel}. Se il branch è cambiato da quando hai aperto questa pagina, {hostLabel} la rifiuta."
+
+#: src/features/chat/guest-links/guest-page.tsx:58
+msgid "This message cannot be left. Keep it short, don't start it with / or mention anyone, or try again later."
+msgstr "Questo messaggio non può essere lasciato. Sii breve, non iniziarlo con / e non menzionare nessuno, oppure riprova più tardi."
 
 #: src/features/chat/thread/copy-prompt-link-action.tsx:51
 msgid "This message has no text to copy as a prompt link."
@@ -33174,7 +33209,7 @@ msgstr "Le conversazioni conservano tutta la cronologia. Crea branch delle idee,
 msgid "Threads working on this {requestNoun}"
 msgstr "Thread che lavorano su questa {requestNoun}"
 
-#: src/features/onboarding/components/setup-checklist.tsx:167
+#: src/features/onboarding/components/setup-checklist.tsx:164
 msgid "Three steps to use coding agents on your own machines. Skip any of them and come back later."
 msgstr ""
 
@@ -33264,7 +33299,7 @@ msgstr "A"
 msgid "to {0}"
 msgstr "a {0}"
 
-#: src/features/onboarding/components/setup-checklist.tsx:138
+#: src/features/onboarding/components/setup-checklist.tsx:135
 #: src/features/tasks/components/task-status.tsx:21
 msgid "To do"
 msgstr "Da fare"
@@ -33411,6 +33446,10 @@ msgstr "Troppo lungo per essere verificato come JSON"
 #: src/features/chat/thread/sandbox-files.tsx:282
 msgid "too many files"
 msgstr "troppi file"
+
+#: src/features/chat/guest-links/guest-page.tsx:67
+msgid "Too many messages. Please try again later."
+msgstr "Troppi messaggi. Riprova più tardi."
 
 #: src/features/chat/context-reset/use-clear-context.ts:72
 msgid "Too many new contexts in a short while. Try again in a minute."
@@ -35730,6 +35769,7 @@ msgstr "In attesa dell'output…"
 msgid "Waiting for the agent…"
 msgstr "In attesa dell’agente…"
 
+#: src/features/chat/guest-links/guest-page.tsx:183
 #: src/features/chat/thread/request-secret-prompt.tsx:343
 msgid "Waiting for the owner"
 msgstr "In attesa del proprietario"
@@ -36858,13 +36898,25 @@ msgstr "Il tuo server locale ha risposto, ma ha rifiutato questo sito (CORS). Co
 msgid "Your location (e.g., \"New York, USA\", \"Berlin, Germany\")."
 msgstr "La tua località (ad es. \"Roma, Italia\", \"Berlino, Germania\")."
 
+#: src/features/chat/guest-links/guest-page.tsx:155
+msgid "Your message"
+msgstr "Il tuo messaggio"
+
 #: src/features/chat/core/context/chat-context.tsx:716
 msgid "Your message contains inappropriate content that cannot be sent."
 msgstr "Il tuo messaggio contiene contenuti inappropriati e non può essere inviato."
 
+#: src/features/chat/guest-links/guest-page.tsx:148
+msgid "Your message waits for the owner of this conversation. Nothing happens until they send it."
+msgstr "Il tuo messaggio attende il proprietario di questa conversazione. Non succede nulla finché non lo invia."
+
 #: src/features/chat/thread/message-item.tsx:181
 msgid "Your message:"
 msgstr "Il tuo messaggio:"
+
+#: src/features/chat/guest-links/guest-page.tsx:177
+msgid "Your messages"
+msgstr "I tuoi messaggi"
 
 #: src/features/chat/header/temporary-chat-dropdown.tsx:261
 msgid "Your next chat is temporary. Turn this off in Settings to keep it."
@@ -36877,6 +36929,10 @@ msgstr "Il tuo prossimo messaggio è un obiettivo. L’agente continua a lavorar
 #: src/features/chat/header/temporary-chat-dropdown.tsx:264
 msgid "Your next message will start a self-destructing chat."
 msgstr "Il tuo prossimo messaggio avvierà una chat che si autodistrugge."
+
+#: src/features/chat/guest-links/guest-page.tsx:167
+msgid "Your notes could not be loaded. They are still there; try again in a moment."
+msgstr "Impossibile caricare i tuoi messaggi. Sono ancora lì; riprova tra un attimo."
 
 #: src/features/home/components/home-page.tsx:134
 msgid "Your overview could not be loaded."

@@ -21,6 +21,7 @@ import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as chatWorkflowRouteRouteImport } from './routes/(chat)/workflow/route'
 import { Route as publicIndexRouteImport } from './routes/(public)/index'
 import { Route as publicDatenschutzRouteImport } from './routes/(public)/datenschutz'
+import { Route as publicGuestRouteImport } from './routes/(public)/guest'
 import { Route as publicImpressumRouteImport } from './routes/(public)/impressum'
 import { Route as ShortcutDevelopRouteImport } from './routes/_shortcut/develop'
 import { Route as ShortcutEvalsRouteImport } from './routes/_shortcut/evals'
@@ -150,6 +151,11 @@ const publicIndexRoute = publicIndexRouteImport.update({
 const publicDatenschutzRoute = publicDatenschutzRouteImport.update({
   id: '/(public)/datenschutz',
   path: '/datenschutz',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const publicGuestRoute = publicGuestRouteImport.update({
+  id: '/(public)/guest',
+  path: '/guest',
   getParentRoute: () => rootRouteImport,
 } as any)
 const publicImpressumRoute = publicImpressumRouteImport.update({
@@ -549,6 +555,7 @@ export interface FileRoutesByFullPath {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/workflow': typeof chatWorkflowRouteRouteWithChildren
   '/datenschutz': typeof publicDatenschutzRoute
+  '/guest': typeof publicGuestRoute
   '/impressum': typeof publicImpressumRoute
   '/develop': typeof ShortcutDevelopRoute
   '/evals': typeof ShortcutEvalsRoute
@@ -629,6 +636,7 @@ export interface FileRoutesByTo {
   '/robots.txt': typeof RobotsDottxtRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/datenschutz': typeof publicDatenschutzRoute
+  '/guest': typeof publicGuestRoute
   '/impressum': typeof publicImpressumRoute
   '/develop': typeof ShortcutDevelopRoute
   '/evals': typeof ShortcutEvalsRoute
@@ -713,6 +721,7 @@ export interface FileRoutesById {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/(chat)/workflow': typeof chatWorkflowRouteRouteWithChildren
   '/(public)/datenschutz': typeof publicDatenschutzRoute
+  '/(public)/guest': typeof publicGuestRoute
   '/(public)/impressum': typeof publicImpressumRoute
   '/_shortcut/develop': typeof ShortcutDevelopRoute
   '/_shortcut/evals': typeof ShortcutEvalsRoute
@@ -800,6 +809,7 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/workflow'
     | '/datenschutz'
+    | '/guest'
     | '/impressum'
     | '/develop'
     | '/evals'
@@ -880,6 +890,7 @@ export interface FileRouteTypes {
     | '/robots.txt'
     | '/sitemap.xml'
     | '/datenschutz'
+    | '/guest'
     | '/impressum'
     | '/develop'
     | '/evals'
@@ -963,6 +974,7 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/(chat)/workflow'
     | '/(public)/datenschutz'
+    | '/(public)/guest'
     | '/(public)/impressum'
     | '/_shortcut/develop'
     | '/_shortcut/evals'
@@ -1049,6 +1061,7 @@ export interface RootRouteChildren {
   RobotsDottxtRoute: typeof RobotsDottxtRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   publicDatenschutzRoute: typeof publicDatenschutzRoute
+  publicGuestRoute: typeof publicGuestRoute
   publicImpressumRoute: typeof publicImpressumRoute
   ApiScribeTokenRoute: typeof ApiScribeTokenRoute
   publicIndexRoute: typeof publicIndexRoute
@@ -1146,6 +1159,13 @@ declare module '@tanstack/react-router' {
       path: '/datenschutz'
       fullPath: '/datenschutz'
       preLoaderRoute: typeof publicDatenschutzRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/(public)/guest': {
+      id: '/(public)/guest'
+      path: '/guest'
+      fullPath: '/guest'
+      preLoaderRoute: typeof publicGuestRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/(public)/impressum': {
@@ -1890,6 +1910,7 @@ const rootRouteChildren: RootRouteChildren = {
   RobotsDottxtRoute: RobotsDottxtRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   publicDatenschutzRoute: publicDatenschutzRoute,
+  publicGuestRoute: publicGuestRoute,
   publicImpressumRoute: publicImpressumRoute,
   ApiScribeTokenRoute: ApiScribeTokenRoute,
   publicIndexRoute: publicIndexRoute,

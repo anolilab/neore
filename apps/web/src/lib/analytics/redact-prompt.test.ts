@@ -12,7 +12,29 @@ describe(redactPromptFromEvent, () => {
     it("removes a prompt link's text from the page URL and keeps the rest of the address", () => {
         const event = redactPromptFromEvent(pageView({ $current_url: "https://app.test/chat?prompt=my+secret+%26+more&model=gpt#top" }));
 
-        expect(event?.properties.$current_url).toBe("https://app.test/chat?prompt=redacted&model=gpt#top");
+        expect(event?.properties.$current_url).toBe("https://app.test/chat?prompt=redacted&model=gpt");
+    });
+
+    it("drops the fragment of every address, where a guest link carries its token", () => {
+        const page = `https://app.test/guest#${"ab".repeat(32)}`;
+        const event = redactPromptFromEvent(
+            pageView({
+                $current_url: page,
+                $referrer: page,
+                $set: { $current_url: page },
+                $set_once: { $initial_current_url: page, $initial_referrer: page },
+                url: page,
+            }),
+        );
+
+        expect(JSON.stringify(event)).not.toContain("abab");
+        expect(event?.properties.$current_url).toBe("https://app.test/guest");
+    });
+
+    it("ends a dropped fragment at an escaped quote in an autocaptured link, keeping the rest of the chain", () => {
+        const event = redactPromptFromEvent(pageView({ $elements_chain: String.raw`a:attr__href="https://app.test/guest#token\"x"nth-child="1"` }));
+
+        expect(event?.properties.$elements_chain).toBe(String.raw`a:attr__href="https://app.test/guest\"x"nth-child="1"`);
     });
 
     it("removes the text of a link nested in a sign-in page's return address", () => {
