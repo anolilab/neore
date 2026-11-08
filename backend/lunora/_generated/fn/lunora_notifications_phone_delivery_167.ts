@@ -5,6 +5,32 @@ import { DEFER_VALIDATION as DEFER, installCompiledValidatorMap } from "lunorash
 import * as lunora_notifications_phone_delivery_167 from "../../notifications/phone-delivery.js";
 
 /** Install the precompiled argument parsers before the module is dispatched. */
+installCompiledValidatorMap(lunora_notifications_phone_delivery_167.checkPushReceipts.args, (source) => {
+if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
+if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
+let __has1 = false;
+let __val1;
+if (source["attempt"] !== undefined) {
+if (typeof source["attempt"] !== "number" || !Number.isFinite(source["attempt"])) return DEFER;
+__val1 = source["attempt"];
+__has1 = true;
+}
+if (!Array.isArray(source["entries"])) return DEFER;
+const __arr2 = new Array(source["entries"].length);
+for (let __i2 = 0; __i2 < source["entries"].length; __i2++) {
+const __e2 = source["entries"][__i2];
+if (typeof __e2 !== "object" || __e2 === null || Array.isArray(__e2)) return DEFER;
+if (Object.getPrototypeOf(__e2) !== Object.prototype && Object.getPrototypeOf(__e2) !== null) return DEFER;
+if (typeof __e2["deviceId"] !== "string") return DEFER;
+if (typeof __e2["receiptId"] !== "string") return DEFER;
+if (typeof __e2["sentAt"] !== "number" || !Number.isFinite(__e2["sentAt"])) return DEFER;
+if (typeof __e2["sessionId"] !== "string") return DEFER;
+if (typeof __e2["userId"] !== "string") return DEFER;
+const __obj3 = { "deviceId": __e2["deviceId"], "receiptId": __e2["receiptId"], "sentAt": __e2["sentAt"], "sessionId": __e2["sessionId"], "userId": __e2["userId"] };
+__arr2[__i2] = __obj3;
+}
+return { ...(__has1 ? { "attempt": __val1 } : {}), "entries": __arr2 };
+});
 installCompiledValidatorMap(lunora_notifications_phone_delivery_167.listPushDevicesForUser.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;

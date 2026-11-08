@@ -543,7 +543,7 @@ export interface InternalApiTypes {
         tools: {
             browser_node: {
                 closeBrowserSession: FunctionReference<"action", { sessionId: Id<"browserSessions"> }, void>;
-                executeBrowserAction: FunctionReference<"action", { action: "navigate" | "screenshot" | "click" | "type" | "extract" | "scroll"; browserSettings?: unknown; direction?: string; fullPage?: boolean; selector?: string; text?: string; threadId: Id<"threads">; url?: string; userId: string; userTier?: string }, unknown>;
+                executeBrowserAction: FunctionReference<"action", { action: "navigate" | "screenshot" | "click" | "type" | "extract" | "scroll"; browserSettings?: unknown; direction?: string; fullPage?: boolean; selector?: string; text?: string; threadId: Id<"threads">; url?: string; userId: string; userTier?: string }, import("@neore/service-sdk/browser-renderer").BrowserActionResponse>;
             };
             code_execution_node: {
                 default: FunctionReference<"action", { code: string; threadId?: Id<"threads">; timeoutMs?: number; userId?: string }, { files: import("../chat/tools/sandbox-outputs.js").SandboxOutputFile[]; skippedFiles: import("../chat/tools/sandbox-outputs.js").SkippedOutputFile[]; error: string | undefined; results: { type: "text"; value: string; }[]; stderr: string; stdout: string; } | { error: string; results: { type: "error"; value: string; }[]; stderr: string; stdout: string; } | { error: string | undefined; results: { format?: string; type: "text" | "image" | "error"; value: string; }[]; stderr: string; stdout: string; }>;
@@ -972,6 +972,7 @@ export interface InternalApiTypes {
             redactLockedLinks: FunctionReference<"mutation", { cursor?: string; threadId: Id<"threads">; userId: string }, null>;
         };
         phone_delivery: {
+            checkPushReceipts: FunctionReference<"action", { attempt?: number; entries: Array<{ deviceId: Id<"pushDevices">; receiptId: string; sentAt: number; sessionId: string; userId: string }> }, null>;
             listPushDevicesForUser: FunctionReference<"query", { userId: string }, { ended: Array<{ id: Id<"pushDevices">; lastSeenAt: number; sessionId: string }>; live: Array<{ id: Id<"pushDevices">; platform: "android" | "ios"; sessionId: string; token: string }> }>;
             recordPushDeliveries: FunctionReference<"mutation", { gone: Array<{ id: Id<"pushDevices">; sentAt: number; sessionId: string; userId: string }> }, null>;
             sendPhonePush: FunctionReference<"action", { notificationId: Id<"notifications">; userId: string }, null>;
@@ -2246,6 +2247,7 @@ export const internal: InternalApiTypes = {
             redactLockedLinks: { __lunoraRef: "notifications_locked_redact:redactLockedLinks" },
         },
         phone_delivery: {
+            checkPushReceipts: { __lunoraRef: "notifications_phone_delivery:checkPushReceipts" },
             listPushDevicesForUser: { __lunoraRef: "notifications_phone_delivery:listPushDevicesForUser" },
             recordPushDeliveries: { __lunoraRef: "notifications_phone_delivery:recordPushDeliveries" },
             sendPhonePush: { __lunoraRef: "notifications_phone_delivery:sendPhonePush" },

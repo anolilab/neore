@@ -8,10 +8,19 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { internal } from "../_generated/internal";
 import schema from "../schema";
-import { sendExpoMessages } from "./expo-push";
+import { getExpoReceipts, sendExpoMessages } from "./expo-push";
 import { registerPushDevice } from "./native-push";
 import { hasPhone } from "./notify";
-import { deliverToPhones, listPushDevicesForUser, phoneMessage, recordPushDeliveries, sendPhonePush } from "./phone-delivery";
+import {
+    checkPushReceipts,
+    deliverToPhones,
+    listPushDevicesForUser,
+    phoneMessage,
+    RECEIPT_DELAY_MS,
+    RECEIPT_RETRY_DELAYS_MS,
+    recordPushDeliveries,
+    sendPhonePush,
+} from "./phone-delivery";
 
 vi.mock("../lib/crpc-auth-helpers", async (importOriginal) => {
     const sessionFrom = async (context: { auth: { userId?: string | null } }) =>
@@ -26,7 +35,7 @@ vi.mock("../lib/crpc-auth-helpers", async (importOriginal) => {
 });
 
 vi.mock("./expo-push", async (importOriginal) => {
-    return { ...(await importOriginal<typeof import("./expo-push")>()), sendExpoMessages: vi.fn() };
+    return { ...(await importOriginal<typeof import("./expo-push")>()), getExpoReceipts: vi.fn(), sendExpoMessages: vi.fn() };
 });
 
 const USER = "user-a";
@@ -79,6 +88,7 @@ afterEach(() => {
     harness.close();
     vi.unstubAllEnvs();
     vi.mocked(sendExpoMessages).mockReset();
+    vi.mocked(getExpoReceipts).mockReset();
     vi.restoreAllMocks();
 });
 
@@ -220,6 +230,7 @@ const actionCtx = (devices: object[]) => {
         runQuery: vi.fn(async (): Promise<{ ended: object[]; live: object[] }> => {
             return { ended: [], live: devices };
         }),
+        scheduler: { runAfter: vi.fn(async () => "job") },
     };
 };
 
@@ -227,6 +238,26 @@ describe("deliverToPhones", () => {
     beforeEach(() => {
         vi.stubEnv("EXPO_ACCESS_TOKEN", "expo-secret");
         vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    });
+
+    it("never fails the send when the receipt check cannot be scheduled: a retry would send the alert again", async () => {
+        const ctx = actionCtx([{ id: "d1", platform: "ios", sessionId: "s1", token: PHONE }]);
+
+        vi.mocked(sendExpoMessages).mockResolvedValueOnce([{ id: "r1", status: "ok" }]);
+        ctx.scheduler.runAfter.mockRejectedValueOnce(new Error("scheduler unavailable") as never);
+
+        await expect(deliverToPhones(ctx as never, USER, { notificationId: "n1", urgency: "normal" })).resolves.toBeUndefined();
+        expect(ctx.log.event).toHaveBeenCalledWith("notifications.native_push", { delivered: 1, failed: 0, gone: 0 });
+    });
+
+    it("checks no receipt for a ticket that came back without an id", async () => {
+        const ctx = actionCtx([{ id: "d1", platform: "ios", sessionId: "s1", token: PHONE }]);
+
+        vi.mocked(sendExpoMessages).mockResolvedValueOnce([{ status: "ok" }]);
+
+        await deliverToPhones(ctx as never, USER, { notificationId: "n1", urgency: "normal" });
+
+        expect(ctx.scheduler.runAfter).not.toHaveBeenCalled();
     });
 
     it("logs what Expo answered even when dropping a gone phone fails", async () => {
@@ -240,7 +271,7 @@ describe("deliverToPhones", () => {
         expect(ctx.log.event).toHaveBeenCalledWith("notifications.native_push", { delivered: 0, failed: 0, gone: 1 });
     });
 
-    it("drops the phones Expo calls gone at once and keeps a failed one", async () => {
+    it("drops the phones Expo calls gone at once, keeps a failed one, and checks the receipts of the rest later", async () => {
         const ctx = actionCtx([
             { id: "d1", platform: "ios", sessionId: "s1", token: PHONE },
             { id: "d2", platform: "android", sessionId: "s1", token: SECOND_PHONE },
@@ -262,6 +293,10 @@ describe("deliverToPhones", () => {
         ]);
         expect(ctx.runMutation).toHaveBeenCalledWith(internal.notifications.phone_delivery.recordPushDeliveries, {
             gone: [{ id: "d1", sentAt: expect.any(Number), sessionId: "s1", userId: USER }],
+        });
+        expect(ctx.scheduler.runAfter).toHaveBeenCalledWith(RECEIPT_DELAY_MS, internal.notifications.phone_delivery.checkPushReceipts, {
+            attempt: 0,
+            entries: [{ deviceId: "d2", receiptId: "r2", sentAt: expect.any(Number), sessionId: "s1", userId: USER }],
         });
         expect(ctx.log.event).toHaveBeenCalledWith("notifications.native_push", { delivered: 1, failed: 1, gone: 1 });
     });
@@ -329,7 +364,7 @@ describe("sendPhonePush", () => {
                 ? { link: "/chat/t1", title: "Release run", type: "tool_approval" }
                 : { ended: [], live: [{ id: "d1", platform: "ios", sessionId: "s1", token: PHONE }] },
         );
-        const ctx = { log: { event: vi.fn() }, runMutation: vi.fn(async () => null), runQuery };
+        const ctx = { log: { event: vi.fn() }, runMutation: vi.fn(async () => null), runQuery, scheduler: { runAfter: vi.fn(async () => "job") } };
 
         vi.mocked(sendExpoMessages).mockResolvedValueOnce([{ id: "r1", status: "ok" }]);
 
@@ -344,5 +379,86 @@ describe("sendPhonePush", () => {
         await (sendPhonePush as unknown as Handler<null>).handler(ctx, { notificationId: "n2", userId: USER });
 
         expect(sendExpoMessages).not.toHaveBeenCalled();
+    });
+});
+
+describe("checkPushReceipts", () => {
+    beforeEach(() => {
+        vi.stubEnv("EXPO_ACCESS_TOKEN", "expo-secret");
+        vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    });
+
+    const receiptCtx = () => {
+        return { log: { event: vi.fn() }, runMutation: vi.fn(async () => null), scheduler: { runAfter: vi.fn(async () => "job") } };
+    };
+    const entry = (index: number) => {
+        return { deviceId: `d${String(index)}`, receiptId: `r${String(index)}`, sentAt: 5, sessionId: "s1", userId: USER };
+    };
+
+    it("deletes a phone only on DeviceNotRegistered; another receipt error keeps it, and one not there yet is asked for again", async () => {
+        const ctx = receiptCtx();
+
+        vi.mocked(getExpoReceipts).mockResolvedValueOnce({
+            r1: { error: "DeviceNotRegistered", message: "gone", status: "error" },
+            r2: { error: "InvalidCredentials", message: "bad key", status: "error" },
+            r3: { status: "ok" },
+        });
+
+        await (checkPushReceipts as unknown as Handler<null>).handler(ctx, { attempt: 0, entries: [entry(1), entry(2), entry(3), entry(4)] });
+
+        expect(getExpoReceipts).toHaveBeenCalledWith("expo-secret", ["r1", "r2", "r3", "r4"]);
+        expect(ctx.runMutation).toHaveBeenCalledTimes(1);
+        expect(ctx.runMutation).toHaveBeenCalledWith(internal.notifications.phone_delivery.recordPushDeliveries, {
+            gone: [{ id: "d1", sentAt: 5, sessionId: "s1", userId: USER }],
+        });
+        expect(ctx.scheduler.runAfter).toHaveBeenCalledWith(RECEIPT_RETRY_DELAYS_MS[0], internal.notifications.phone_delivery.checkPushReceipts, {
+            attempt: 1,
+            entries: [entry(4)],
+        });
+    });
+
+    it("drops a known-dead phone even when the next check cannot be scheduled", async () => {
+        const ctx = receiptCtx();
+
+        vi.mocked(getExpoReceipts).mockResolvedValueOnce({ r1: { error: "DeviceNotRegistered", message: "gone", status: "error" } });
+        ctx.scheduler.runAfter.mockRejectedValueOnce(new Error("scheduler unavailable") as never);
+
+        await expect((checkPushReceipts as unknown as Handler<null>).handler(ctx, { attempt: 0, entries: [entry(1), entry(2)] })).rejects.toThrow();
+        expect(ctx.runMutation).toHaveBeenCalledWith(internal.notifications.phone_delivery.recordPushDeliveries, {
+            gone: [{ id: "d1", sentAt: 5, sessionId: "s1", userId: USER }],
+        });
+    });
+
+    it("still schedules the next check when dropping a gone phone fails", async () => {
+        const ctx = receiptCtx();
+
+        vi.mocked(getExpoReceipts).mockResolvedValueOnce({ r1: { error: "DeviceNotRegistered", message: "gone", status: "error" } });
+        ctx.runMutation.mockRejectedValueOnce(new Error("D1 unavailable") as never);
+
+        await (checkPushReceipts as unknown as Handler<null>).handler(ctx, { attempt: 0, entries: [entry(1), entry(2)] });
+
+        expect(ctx.scheduler.runAfter).toHaveBeenCalledWith(RECEIPT_RETRY_DELAYS_MS[0], internal.notifications.phone_delivery.checkPushReceipts, {
+            attempt: 1,
+            entries: [entry(2)],
+        });
+    });
+
+    it("asks again for every receipt when Expo does not answer, and gives up after the last retry", async () => {
+        const ctx = receiptCtx();
+
+        vi.mocked(getExpoReceipts).mockRejectedValue(new Error("Expo push API answered 503"));
+
+        await (checkPushReceipts as unknown as Handler<null>).handler(ctx, { attempt: 1, entries: [entry(1)] });
+
+        expect(ctx.scheduler.runAfter).toHaveBeenCalledWith(RECEIPT_RETRY_DELAYS_MS[1], internal.notifications.phone_delivery.checkPushReceipts, {
+            attempt: 2,
+            entries: [entry(1)],
+        });
+
+        ctx.scheduler.runAfter.mockClear();
+        await (checkPushReceipts as unknown as Handler<null>).handler(ctx, { attempt: RECEIPT_RETRY_DELAYS_MS.length, entries: [entry(1)] });
+
+        expect(ctx.scheduler.runAfter).not.toHaveBeenCalled();
+        expect(ctx.runMutation).not.toHaveBeenCalled();
     });
 });

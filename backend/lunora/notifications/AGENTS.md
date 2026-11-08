@@ -49,8 +49,9 @@
   which is the AI-reply language) with only `notificationId`/`threadId` as data.
     - A phone is sent to only while the session that registered it exists and has
       not expired; an ended one is dropped at the next send.
-    - Otherwise a row is deleted only on `DeviceNotRegistered` in the send's
-      ticket. Every drop (this one, and an ended session's) needs the row to
+    - Otherwise a row is deleted only on `DeviceNotRegistered`, in the send's
+      ticket or in its receipt (read 15 min later, asked again on
+      `RECEIPT_RETRY_DELAYS_MS` while missing, inside Expo's 24 h). Every drop (this one, and an ended session's) needs the row to
       still have the owner and the session the send read, and not to have
       registered again since (`lastSeenAt <= sentAt`); any other error keeps it.
       Logs carry Expo's error code only, never its message (it can quote the
