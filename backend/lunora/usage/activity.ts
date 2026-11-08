@@ -17,7 +17,8 @@
  *
  * A reply in a thread that belongs to a project is also filed under that
  * project, as the thread stands when the record lands; moving the thread later
- * leaves its earlier usage where it was.
+ * leaves its earlier usage where it was. The project breakdown and a project's
+ * totals read those rows ({@link getProjectBreakdown}, {@link getProjectUsage}).
  */
 import { v } from "lunorash/server";
 
@@ -29,7 +30,7 @@ import { isAccountDeletionUnderway } from "../gdpr/deletion-guard";
 import { authQuery } from "../lib/crpc";
 import { logger } from "../lib/logger";
 import { runAfterOnShard, runAfterWithRetry } from "../lib/shard-scheduler";
-import { readableProject } from "../projects/functions";
+import { readableProject, readableProjectTitles } from "../projects/functions";
 import { leadThreadOf } from "../sub-agents/worker-thread";
 import type { Attribution, AttributionIncrement, ReplyUsageArgs, RollupIncrement } from "./activity-logic";
 import {
@@ -37,12 +38,16 @@ import {
     attributionRows,
     BREAKDOWN_ROW_LIMIT,
     foldDayTotals,
+    foldProjectTotals,
     foldSkillTotals,
     HEATMAP_DAYS,
     isDayKey,
+    PROJECT_ROW_LIMIT,
     PROJECT_SKILL_KEY,
     RECORD_RETRY,
+    remainderOf,
     RETRY_COUNTS_WITHIN_MS,
+    sumRows,
     TOTAL_SKILL_KEY,
     withDayTotals,
 } from "./activity-logic";
@@ -498,4 +503,110 @@ export const getSkillBreakdown = authQuery
             skills: foldSkillTotals(rows.page),
             truncated: rows.page.length >= BREAKDOWN_ROW_LIMIT,
         };
+    });
+
+const vTotals = { costMicrodollars: v.number(), replies: v.number(), tokens: v.number() };
+
+/** Projects one breakdown names, costliest first; the rest are summed as `otherProjects`, with no title read. */
+const PROJECTS_LISTED = 100;
+
+/** Total rows one project breakdown sums: one a day, two years of them. */
+const TOTAL_ROW_LIMIT = HEATMAP_DAYS * 2;
+
+/** Total rows from `fromDate` on, summed: one per day, so a year is a bounded read. */
+const totalSince = async (ctx: Pick<QueryCtx, "db">, userId: string, fromDate: string) => {
+    // One row past the limit tells a full read from a cut one.
+    const read = await ctx.db.usageDaily.findMany({
+        limit: TOTAL_ROW_LIMIT + 1,
+        orderBy: [{ date: "desc" }],
+        where: { date: { gte: fromDate }, skillKey: TOTAL_SKILL_KEY, userId },
+    });
+    const truncated = read.page.length > TOTAL_ROW_LIMIT;
+    const page = read.page.slice(0, TOTAL_ROW_LIMIT);
+
+    // When the read stopped short, the total covers only from its oldest day on: whatever is summed beside it must too.
+    return { coveredFrom: truncated ? page.at(-1)?.date : undefined, rows: page, total: sumRows(page), truncated };
+};
+
+/**
+ * Replies, tokens and cost per project from `fromDate` on, with what no project
+ * accounts for (`noProject`) and the overall `total` — the projects and
+ * `noProject` add up to it. A project the caller can no longer read has no
+ * `title`. Past the {@link PROJECTS_LISTED} costliest projects, the rest are summed as `otherProjects`. `truncated` as in {@link getSkillBreakdown}.
+ */
+export const getProjectBreakdown = authQuery
+    .input({ fromDate: vDayKey() })
+    .output(
+        v.object({
+            noProject: v.object({ ...vTotals }),
+            otherProjects: v.optional(v.object({ ...vTotals })),
+            projects: v.array(v.object({ ...vTotals, projectKey: v.string(), title: v.optional(v.string()) })),
+            total: v.object({ ...vTotals }),
+            truncated: v.boolean(),
+        }),
+    )
+    .query(async ({ args, ctx }) => {
+        const { userId } = ctx.user;
+        const [totals, read] = await Promise.all([
+            totalSince(ctx, userId, args.fromDate),
+            ctx.db.usageDaily.findMany({
+                limit: PROJECT_ROW_LIMIT + 1,
+                orderBy: [{ date: "desc" }],
+                where: { date: { gte: args.fromDate }, skillKey: PROJECT_SKILL_KEY, userId },
+            }),
+        ]);
+        // When either read stopped short, both cover only the days after the oldest day the shorter one reached — that
+        // day may be read only in part — so the projects and "No project" are taken over the same whole days as the
+        // total and add up to it.
+        const projectsCut = read.page.length > PROJECT_ROW_LIMIT;
+        const rows = { page: read.page.slice(0, PROJECT_ROW_LIMIT) };
+        const projectsFrom = projectsCut ? rows.page.at(-1)?.date : undefined;
+        const coveredFrom = [totals.coveredFrom, projectsFrom]
+            .filter((date) => date !== undefined)
+            .toSorted((a, b) => a!.localeCompare(b!))
+            .at(-1);
+        const projects = foldProjectTotals(coveredFrom === undefined ? rows.page : rows.page.filter((row) => row.date > coveredFrom));
+        const total = coveredFrom === undefined ? totals.total : sumRows(totals.rows.filter((row) => row.date > coveredFrom));
+
+        const listed = projects.slice(0, PROJECTS_LISTED);
+        const others = projects.slice(PROJECTS_LISTED);
+        // A few reads for all the listed projects, whatever their number: their rows, then the caller's memberships.
+        const titles = await readableProjectTitles(
+            ctx,
+            listed.map((project) => project.projectKey as Id<"projects">),
+            userId,
+        );
+        const titled = listed.map((project) => {
+            const title = titles.get(project.projectKey);
+
+            return { ...project, ...(title !== undefined && { title }) };
+        });
+
+        return {
+            noProject: remainderOf(total, projects),
+            ...(others.length > 0 && { otherProjects: sumRows(others) }),
+            projects: titled,
+            total,
+            truncated: totals.truncated || projectsCut,
+        };
+    });
+
+/** Project rows one project read sums: one row per day the project was used, two years of them. */
+const PROJECT_USAGE_ROW_LIMIT = HEATMAP_DAYS * 2;
+
+/**
+ * The caller's replies, tokens and cost in one project from `fromDate` on. `truncated` is set when the period held more
+ * rows than one read sums — the oldest days are the ones left out.
+ */
+export const getProjectUsage = authQuery
+    .input({ fromDate: vDayKey(), projectId: v.id("projects") })
+    .output(v.object({ ...vTotals, truncated: v.boolean() }))
+    .query(async ({ args, ctx }) => {
+        const { page } = await ctx.db.usageDaily.findMany({
+            limit: PROJECT_USAGE_ROW_LIMIT + 1,
+            orderBy: [{ date: "desc" }],
+            where: { date: { gte: args.fromDate }, projectKey: args.projectId as string, userId: ctx.user.userId },
+        });
+
+        return { ...sumRows(page.slice(0, PROJECT_USAGE_ROW_LIMIT)), truncated: page.length > PROJECT_USAGE_ROW_LIMIT };
     });

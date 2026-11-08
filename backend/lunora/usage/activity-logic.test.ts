@@ -5,11 +5,13 @@ import {
     addDays,
     DEFAULT_SKILL_KEY,
     foldDayTotals,
+    foldProjectTotals,
     attributionRows,
     foldSkillTotals,
     HEATMAP_DAYS,
     isDayKey,
     PROJECT_SKILL_KEY,
+    remainderOf,
     repliesByOrder,
     replyUsageArgs,
     skillKeyOf,
@@ -201,10 +203,29 @@ describe("withDayTotals", () => {
 });
 
 describe("project rows", () => {
-    it("are left out of the skill breakdown", () => {
-        const projectRow = { costMicrodollars: 100, date: "2026-09-20", projectKey: "p_a", replies: 1, skillKey: PROJECT_SKILL_KEY, tokens: 10, updatedAt: 1 };
+    const projectRow = (projectKey: string, costMicrodollars: number, replies = 1) => {
+        return { costMicrodollars, date: "2026-09-20", projectKey, replies, skillKey: PROJECT_SKILL_KEY, tokens: replies * 10, updatedAt: 1 };
+    };
 
-        expect(foldSkillTotals([projectRow, row({ skillKey: "sk_1" })]).map((skill) => skill.skillKey)).toStrictEqual(["sk_1"]);
+    it("folds per project, costliest first", () => {
+        expect(foldProjectTotals([projectRow("p_a", 100), projectRow("p_b", 300), projectRow("p_a", 50), row({ skillKey: "sk_1" })])).toStrictEqual([
+            { costMicrodollars: 300, projectKey: "p_b", replies: 1, tokens: 10 },
+            { costMicrodollars: 150, projectKey: "p_a", replies: 2, tokens: 20 },
+        ]);
+    });
+
+    it("leaves no project the rest of the total, never below zero", () => {
+        const projects = [
+            { costMicrodollars: 100, replies: 1, tokens: 10 },
+            { costMicrodollars: 40, replies: 1, tokens: 4 },
+        ];
+
+        expect(remainderOf({ costMicrodollars: 147, replies: 3, tokens: 15 }, projects)).toStrictEqual({ costMicrodollars: 7, replies: 1, tokens: 1 });
+        expect(remainderOf({ costMicrodollars: 100, replies: 1, tokens: 10 }, projects)).toStrictEqual({ costMicrodollars: 0, replies: 0, tokens: 0 });
+    });
+
+    it("are left out of the skill breakdown", () => {
+        expect(foldSkillTotals([projectRow("p_a", 100), row({ skillKey: "sk_1" })]).map((skill) => skill.skillKey)).toStrictEqual(["sk_1"]);
     });
 
     it("folds project increments into one row per day and project", () => {

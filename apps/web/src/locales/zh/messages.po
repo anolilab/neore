@@ -14,7 +14,7 @@ msgstr ""
 "Plural-Forms: \n"
 "X-Generator: @lingui/cli\n"
 
-#: src/features/settings/components/chat/usage-settings.tsx:630
+#: src/features/settings/components/chat/usage-settings.tsx:634
 msgid " · model: {modelFilter}"
 msgstr " · 模型：{modelFilter}"
 
@@ -122,7 +122,7 @@ msgstr "（从 {unfilteredRows} 行中筛选）"
 msgid "(maximum reached)"
 msgstr "（已达上限）"
 
-#: src/features/settings/components/chat/usage-settings.tsx:498
+#: src/features/settings/components/chat/usage-settings.tsx:502
 msgid "(microdollars; 1,000,000 = $1)"
 msgstr "（微美元；1,000,000 = $1）"
 
@@ -146,7 +146,7 @@ msgid "(opens in new tab)"
 msgstr "（在新标签页中打开）"
 
 #: src/features/settings/components/chat/mcp/server-form.tsx:34
-#: src/features/settings/components/chat/usage-settings.tsx:542
+#: src/features/settings/components/chat/usage-settings.tsx:546
 msgid "(optional)"
 msgstr "（可选）"
 
@@ -171,7 +171,7 @@ msgid "(valid until {pairingValidUntil})"
 msgstr "（有效期至 {pairingValidUntil}）"
 
 #. placeholder {0}: model.activeDays
-#: src/features/settings/components/chat/usage-activity-heatmap.tsx:104
+#: src/features/settings/components/chat/usage-activity-heatmap.tsx:110
 msgid "{0, plural, one {# active day} other {# active days}}"
 msgstr "{0, plural, other {# 个活跃日}}"
 
@@ -280,8 +280,8 @@ msgstr ""
 
 #. placeholder {0}: cell.replies
 #. placeholder {0}: model.totalReplies
-#: src/features/settings/components/chat/usage-activity-heatmap.tsx:93
-#: src/features/settings/components/chat/usage-activity-heatmap.tsx:103
+#: src/features/settings/components/chat/usage-activity-heatmap.tsx:99
+#: src/features/settings/components/chat/usage-activity-heatmap.tsx:109
 msgid "{0, plural, one {# reply} other {# replies}}"
 msgstr "{0, plural, other {# 条回复}}"
 
@@ -701,7 +701,7 @@ msgid "{0}, {1} participants. Its participants are included as skills."
 msgstr ""
 
 #. placeholder {0}: String(percent)
-#: src/features/settings/components/chat/usage-skill-breakdown.tsx:106
+#: src/features/settings/components/chat/usage-skill-breakdown.tsx:113
 msgid "{0}% of spend"
 msgstr "占支出的 {0}%"
 
@@ -830,11 +830,11 @@ msgstr "{count} 条排队中"
 msgid "{count} queued — sends when the current reply finishes"
 msgstr "{count} 条排队中——当前回复完成后发送"
 
-#: src/features/settings/components/chat/usage-activity-heatmap.tsx:96
+#: src/features/settings/components/chat/usage-activity-heatmap.tsx:102
 msgid "{date}: {replies}, {cost}"
 msgstr "{date}：{replies}，{cost}"
 
-#: src/features/settings/components/chat/usage-activity-heatmap.tsx:89
+#: src/features/settings/components/chat/usage-activity-heatmap.tsx:95
 msgid "{date}: no replies"
 msgstr "{date}：无回复"
 
@@ -1079,15 +1079,15 @@ msgstr ""
 msgid "{maxRounds} rounds"
 msgstr ""
 
-#: src/features/settings/components/chat/usage-settings.tsx:606
+#: src/features/settings/components/chat/usage-settings.tsx:610
 msgid "{metricLabel} > {threshold} per day"
 msgstr "{metricLabel} > 每天 {threshold}"
 
-#: src/features/settings/components/chat/usage-settings.tsx:610
+#: src/features/settings/components/chat/usage-settings.tsx:614
 msgid "{metricLabel} > {threshold} per hour"
 msgstr "{metricLabel} > 每小时 {threshold}"
 
-#: src/features/settings/components/chat/usage-settings.tsx:614
+#: src/features/settings/components/chat/usage-settings.tsx:618
 msgid "{metricLabel} > {threshold} per month"
 msgstr "{metricLabel} > 每月 {threshold}"
 
@@ -1241,6 +1241,10 @@ msgstr ""
 msgid "{prefixed}, selected"
 msgstr ""
 
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:134
+msgid "{project}: {spendShare} of spend"
+msgstr "{project}：支出的 {spendShare}"
+
 #: src/features/settings/components/chat/api-keys-settings.tsx:495
 msgid "{providerId} API key removed"
 msgstr "{providerId} API 密钥已移除"
@@ -1265,7 +1269,7 @@ msgstr "{providerName} · 你自己的 Bedrock 账号（{region}）"
 msgid "{refusedLabel} does not have the format this request asks for, so nothing was saved. Enter it again."
 msgstr "{refusedLabel} 的格式不符合此请求的要求，因此未保存任何内容。请重新输入。"
 
-#: src/features/settings/components/chat/usage-settings.tsx:391
+#: src/features/settings/components/chat/usage-settings.tsx:395
 #: src/routes/admin/gateway/index.tsx:67
 msgid "{requestCount} req"
 msgstr "{requestCount} 次请求"
@@ -1366,7 +1370,7 @@ msgstr "{toolId} API 密钥已保存"
 msgid "{total, plural, one {Used # tool · {tail}} other {Used # tools · {tail}}}"
 msgstr ""
 
-#: src/features/settings/components/chat/usage-activity-heatmap.tsx:106
+#: src/features/settings/components/chat/usage-activity-heatmap.tsx:112
 msgid "{totalReplies} on {activeDays} in the last year, {totalCost} spent."
 msgstr "过去一年在 {activeDays}中共 {totalReplies}，支出 {totalCost}。"
 
@@ -1994,7 +1998,7 @@ msgstr "已开始删除账号。你将被退出登录。"
 msgid "Accounts"
 msgstr "账号"
 
-#: src/features/settings/components/chat/usage-settings.tsx:515
+#: src/features/settings/components/chat/usage-settings.tsx:519
 msgid "Action"
 msgstr "操作"
 
@@ -2047,7 +2051,7 @@ msgstr "活跃"
 msgid "Active"
 msgstr "已启用"
 
-#: src/features/settings/components/chat/usage-activity-heatmap.tsx:245
+#: src/features/settings/components/chat/usage-activity-heatmap.tsx:251
 msgid "Active days"
 msgstr "活跃天数"
 
@@ -2064,11 +2068,11 @@ msgstr "活跃对话"
 msgid "Activities"
 msgstr "活动"
 
-#: src/features/settings/components/chat/usage-activity-heatmap.tsx:126
+#: src/features/settings/components/chat/usage-activity-heatmap.tsx:132
 msgid "Activity"
 msgstr "活动"
 
-#: src/features/settings/components/chat/usage-activity-heatmap.tsx:241
+#: src/features/settings/components/chat/usage-activity-heatmap.tsx:247
 msgid "Activity per month"
 msgstr "每月活动"
 
@@ -2130,11 +2134,11 @@ msgstr "添加标签..."
 msgid "Add Account"
 msgstr "添加账号"
 
-#: src/features/settings/components/chat/usage-settings.tsx:415
+#: src/features/settings/components/chat/usage-settings.tsx:419
 msgid "Add Alert"
 msgstr "添加提醒"
 
-#: src/features/settings/components/chat/usage-settings.tsx:667
+#: src/features/settings/components/chat/usage-settings.tsx:671
 msgid "Add an alert above to be notified when your usage crosses a threshold."
 msgstr "在上方添加提醒，在用量超过阈值时收到通知。"
 
@@ -2166,7 +2170,7 @@ msgstr "添加附件"
 msgid "Add background"
 msgstr "添加背景"
 
-#: src/features/settings/components/chat/usage-settings.tsx:413
+#: src/features/settings/components/chat/usage-settings.tsx:417
 msgid "Add budget alert"
 msgstr "添加预算提醒"
 
@@ -2445,7 +2449,7 @@ msgstr "正在添加文档… {0} / {1}"
 msgid "Adding the server was cancelled on this computer."
 msgstr ""
 
-#: src/features/settings/components/chat/usage-activity-heatmap.tsx:237
+#: src/features/settings/components/chat/usage-activity-heatmap.tsx:243
 msgid "Adding your earlier replies…"
 msgstr "正在添加你之前的回复…"
 
@@ -3553,7 +3557,7 @@ msgid "App Secret from your Meta app's App settings > Basic, used to verify X-Hu
 msgstr "Meta 应用“应用设置 > 基本”中的 App Secret，用于验证 X-Hub-Signature-256"
 
 #: ../../packages/ui/src/components/canvas-editor/canvas-property-panel.tsx:316
-#: src/features/projects/components/project-form-dialog.tsx:232
+#: src/features/projects/components/project-form-dialog.tsx:233
 #: src/features/settings/components/account/account-settings.tsx:178
 #: src/features/settings/lib/settings-keywords.ts:27
 msgid "Appearance"
@@ -3911,7 +3915,7 @@ msgstr "分配给"
 msgid "Assistant"
 msgstr "助手"
 
-#: src/features/settings/components/chat/usage-skill-breakdown.tsx:46
+#: src/features/settings/components/chat/usage-skill-breakdown.tsx:53
 msgid "Assistant (no skill)"
 msgstr "助手（无技能）"
 
@@ -4672,7 +4676,7 @@ msgstr "屏蔽"
 msgid "Block providers that may use your data for training or collect usage data."
 msgstr "屏蔽可能使用你的数据进行训练或收集使用数据的提供商。"
 
-#: src/features/settings/components/chat/usage-settings.tsx:103
+#: src/features/settings/components/chat/usage-settings.tsx:104
 msgid "Block requests"
 msgstr "阻止请求"
 
@@ -4868,7 +4872,7 @@ msgstr "巴西"
 msgid "Break down complex tasks into numbered steps with progress tracking. Ideal for multi-step projects and development tasks."
 msgstr "将复杂任务拆分为带进度跟踪的编号步骤，适合多步骤项目和开发任务。"
 
-#: src/features/projects/components/project-form-dialog.tsx:220
+#: src/features/projects/components/project-form-dialog.tsx:221
 msgid "Brief description of this project"
 msgstr "此项目的简短描述"
 
@@ -4980,15 +4984,15 @@ msgstr "经济"
 msgid "Budget"
 msgstr "预算"
 
-#: src/features/settings/components/chat/usage-settings.tsx:209
+#: src/features/settings/components/chat/usage-settings.tsx:210
 msgid "Budget alert created"
 msgstr "预算提醒已创建"
 
-#: src/features/settings/components/chat/usage-settings.tsx:225
+#: src/features/settings/components/chat/usage-settings.tsx:226
 msgid "Budget alert deleted"
 msgstr "预算提醒已删除"
 
-#: src/features/settings/components/chat/usage-settings.tsx:410
+#: src/features/settings/components/chat/usage-settings.tsx:414
 msgid "Budget Alerts"
 msgstr "预算提醒"
 
@@ -5304,7 +5308,7 @@ msgstr "加拿大"
 #: src/features/pages/components/page-agent-dialog.tsx:148
 #: src/features/pages/components/page-comments-panel.tsx:87
 #: src/features/projects/components/move-to-project-dialog.tsx:95
-#: src/features/projects/components/project-form-dialog.tsx:390
+#: src/features/projects/components/project-form-dialog.tsx:392
 #: src/features/prompts/components/prompt-form-dialog.tsx:501
 #: src/features/prompts/components/prompt-optimize-dialog.tsx:194
 #: src/features/prompts/components/variable-fill-dialog.tsx:185
@@ -5315,8 +5319,8 @@ msgstr "加拿大"
 #: src/features/settings/components/chat/rotate-webhook-secret-dialog.tsx:57
 #: src/features/settings/components/chat/system-prompt-preset-settings.tsx:239
 #: src/features/settings/components/chat/trigger-settings.tsx:389
-#: src/features/settings/components/chat/usage-settings.tsx:569
-#: src/features/settings/components/chat/usage-settings.tsx:577
+#: src/features/settings/components/chat/usage-settings.tsx:573
+#: src/features/settings/components/chat/usage-settings.tsx:581
 #: src/features/settings/components/knowledge/knowledge-base-settings.tsx:417
 #: src/features/settings/components/personalization/memory-item.tsx:141
 #: src/features/settings/components/personalization/memory-settings.tsx:246
@@ -6538,7 +6542,7 @@ msgstr "收起浏览器面板"
 msgid "Collapse chain of thought"
 msgstr "收起思维链"
 
-#: src/features/settings/components/chat/usage-settings.tsx:353
+#: src/features/settings/components/chat/usage-settings.tsx:357
 msgid "Collapse daily trend"
 msgstr "收起每日趋势"
 
@@ -6579,7 +6583,7 @@ msgid "Colombia"
 msgstr "哥伦比亚"
 
 #: src/features/canvas/canvas-panel.tsx:123
-#: src/features/projects/components/project-form-dialog.tsx:239
+#: src/features/projects/components/project-form-dialog.tsx:240
 msgid "Color"
 msgstr "颜色"
 
@@ -6596,7 +6600,7 @@ msgstr "标签 {0} 的颜色"
 msgid "Colorize"
 msgstr "着色"
 
-#: src/features/settings/components/chat/usage-activity-heatmap.tsx:131
+#: src/features/settings/components/chat/usage-activity-heatmap.tsx:137
 msgid "Colour days by"
 msgstr "日期着色依据"
 
@@ -6887,7 +6891,7 @@ msgstr "已完成"
 msgid "Completing the connection..."
 msgstr "正在完成连接..."
 
-#: src/features/settings/components/chat/usage-settings.tsx:284
+#: src/features/settings/components/chat/usage-settings.tsx:285
 msgid "Completion Tokens"
 msgstr "补全 token"
 
@@ -7017,7 +7021,7 @@ msgstr "配置高级 AI 智能体模块，增强任务执行能力"
 msgid "Configure chat behavior and preferences."
 msgstr "配置聊天行为和偏好。"
 
-#: src/features/projects/components/project-form-dialog.tsx:343
+#: src/features/projects/components/project-form-dialog.tsx:344
 msgid "Configure default model, reasoning effort, and features for new chats created in this project."
 msgstr "为此项目中新建的聊天配置默认模型、推理强度和功能。"
 
@@ -7462,7 +7466,7 @@ msgstr "内容页"
 msgid "Context"
 msgstr "上下文"
 
-#: src/features/projects/components/project-form-dialog.tsx:317
+#: src/features/projects/components/project-form-dialog.tsx:318
 msgid "Context / Instructions"
 msgstr "上下文 / 指令"
 
@@ -7866,7 +7870,7 @@ msgstr "圆角半径"
 #: src/features/evals/components/model-comparison.tsx:115
 #: src/features/evals/components/run-comparison.tsx:131
 #: src/features/evals/components/run-detail.tsx:226
-#: src/features/settings/components/chat/usage-settings.tsx:319
+#: src/features/settings/components/chat/usage-settings.tsx:320
 #: src/routes/admin/gateway/index.tsx:92
 msgid "Cost"
 msgstr "费用"
@@ -7875,7 +7879,7 @@ msgstr "费用"
 msgid "Cost {display}"
 msgstr "费用 {display}"
 
-#: src/features/settings/components/chat/usage-settings.tsx:297
+#: src/features/settings/components/chat/usage-settings.tsx:298
 msgid "Cost by Model"
 msgstr "按模型统计费用"
 
@@ -8115,7 +8119,11 @@ msgstr "无法加载市场，请稍后重试。"
 msgid "Could not load the memories."
 msgstr "无法加载记忆。"
 
-#: src/features/settings/components/chat/usage-skill-breakdown.tsx:76
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:94
+msgid "Could not load the project breakdown."
+msgstr "无法加载按项目的明细。"
+
+#: src/features/settings/components/chat/usage-skill-breakdown.tsx:83
 msgid "Could not load the skill breakdown."
 msgstr "无法加载技能明细。"
 
@@ -8127,11 +8135,15 @@ msgstr ""
 msgid "Could not load this"
 msgstr ""
 
+#: src/features/projects/components/project-usage-summary.tsx:61
+msgid "Could not load this project's usage."
+msgstr "无法加载此项目的用量。"
+
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:139
 msgid "Could not load tools: {error}"
 msgstr "无法加载工具：{error}"
 
-#: src/features/settings/components/chat/usage-activity-heatmap.tsx:151
+#: src/features/settings/components/chat/usage-activity-heatmap.tsx:157
 msgid "Could not load your activity."
 msgstr "无法加载你的活动。"
 
@@ -8403,7 +8415,7 @@ msgstr "从这条消息创建新分支。给它起个名字，方便以后识别
 msgid "Create a new organization to collaborate with your team"
 msgstr "创建新组织，与你的团队协作"
 
-#: src/features/projects/components/project-form-dialog.tsx:185
+#: src/features/projects/components/project-form-dialog.tsx:186
 msgid "Create a new project to group related chats with shared context."
 msgstr "创建新项目，将相关聊天归组并共享上下文。"
 
@@ -8539,8 +8551,8 @@ msgstr "创建 PR"
 msgid "Create project"
 msgstr "创建项目"
 
-#: src/features/projects/components/project-form-dialog.tsx:183
-#: src/features/projects/components/project-form-dialog.tsx:403
+#: src/features/projects/components/project-form-dialog.tsx:184
+#: src/features/projects/components/project-form-dialog.tsx:405
 msgid "Create Project"
 msgstr "创建项目"
 
@@ -8908,7 +8920,7 @@ msgstr "为常用操作自定义键盘快捷键。点击“录制”并按下你
 msgid "Customize the appearance of the application."
 msgstr "自定义应用的外观。"
 
-#: src/features/projects/components/project-form-dialog.tsx:233
+#: src/features/projects/components/project-form-dialog.tsx:234
 msgid "Customize the visual appearance of this project."
 msgstr "自定义此项目的视觉外观。"
 
@@ -8953,7 +8965,7 @@ msgid "Czech Republic"
 msgstr "捷克"
 
 #: src/features/notifications/components/notification-settings.tsx:224
-#: src/features/settings/components/chat/usage-skill-breakdown.tsx:50
+#: src/features/settings/components/chat/usage-skill-breakdown.tsx:57
 msgid "Daily Brief"
 msgstr "每日简报"
 
@@ -8966,11 +8978,11 @@ msgstr "每日简报已关闭"
 msgid "Daily Brief turned on"
 msgstr "每日简报已开启"
 
-#: src/features/settings/components/chat/usage-settings.tsx:90
+#: src/features/settings/components/chat/usage-settings.tsx:91
 msgid "Daily cost (microdollars)"
 msgstr "每日费用（微美元）"
 
-#: src/features/settings/components/chat/usage-settings.tsx:347
+#: src/features/settings/components/chat/usage-settings.tsx:351
 msgid "Daily Cost Trend"
 msgstr "每日费用趋势"
 
@@ -8982,7 +8994,7 @@ msgstr "每日收件箱摘要"
 msgid "Daily LLM spend and request volume"
 msgstr "每日 LLM 支出和请求量"
 
-#: src/features/settings/components/chat/usage-settings.tsx:349
+#: src/features/settings/components/chat/usage-settings.tsx:353
 msgid "Daily spend and request volume"
 msgstr "每日支出和请求量"
 
@@ -9083,7 +9095,7 @@ msgstr "日期"
 msgid "Date and time"
 msgstr "日期和时间"
 
-#: src/features/settings/components/chat/usage-settings.tsx:97
+#: src/features/settings/components/chat/usage-settings.tsx:98
 msgid "Day"
 msgstr "日期"
 
@@ -9223,7 +9235,7 @@ msgstr "默认智能体"
 msgid "Default AI Response Language"
 msgstr "默认 AI 回复语言"
 
-#: src/features/projects/components/project-form-dialog.tsx:341
+#: src/features/projects/components/project-form-dialog.tsx:342
 msgid "Default AI Settings"
 msgstr "默认 AI 设置"
 
@@ -9252,7 +9264,7 @@ msgstr "默认语言已更新"
 msgid "default model"
 msgstr ""
 
-#: src/features/projects/components/project-form-dialog.tsx:351
+#: src/features/projects/components/project-form-dialog.tsx:352
 msgid "Default Model"
 msgstr "默认模型"
 
@@ -9426,7 +9438,7 @@ msgstr "删除 {title}"
 msgid "Delete Account"
 msgstr "删除账号"
 
-#: src/features/settings/components/chat/usage-settings.tsx:641
+#: src/features/settings/components/chat/usage-settings.tsx:645
 msgid "Delete alert \"{ruleName}\""
 msgstr "删除提醒“{ruleName}”"
 
@@ -9848,7 +9860,7 @@ msgstr "描述你的工作流……例如“根据文本生成图片，放大后
 #: src/features/develop/components/pull-request-view.tsx:72
 #: src/features/evals/components/dataset-form-dialog.tsx:102
 #: src/features/knowledge/components/collection-dialog.tsx:69
-#: src/features/projects/components/project-form-dialog.tsx:213
+#: src/features/projects/components/project-form-dialog.tsx:214
 #: src/features/prompts/components/prompt-form-dialog.tsx:266
 #: src/features/prompts/components/prompt-list-view.tsx:117
 #: src/features/prompts/components/prompt-list-view.tsx:120
@@ -10607,7 +10619,7 @@ msgstr "动态运动"
 msgid "Dyslexia-friendly"
 msgstr ""
 
-#: src/features/settings/components/chat/usage-settings.tsx:551
+#: src/features/settings/components/chat/usage-settings.tsx:555
 msgid "e.g. claude-opus-4 (leave blank for all models)"
 msgstr "例如 claude-opus-4（留空表示所有模型）"
 
@@ -10627,7 +10639,7 @@ msgstr "例如：列出至少五个来源，每个附带链接"
 msgid "e.g. Make the output a table and drop web search"
 msgstr "例如：将输出改为表格，并去掉网络搜索"
 
-#: src/features/settings/components/chat/usage-settings.tsx:438
+#: src/features/settings/components/chat/usage-settings.tsx:442
 msgid "e.g. Monthly $10 limit"
 msgstr "例如 每月 $10 上限"
 
@@ -10655,7 +10667,7 @@ msgstr "例如：工作"
 msgid "e.g., Emphasize concise outputs, target a beginner audience..."
 msgstr "例如：强调简洁输出，面向初学者..."
 
-#: src/features/projects/components/project-form-dialog.tsx:201
+#: src/features/projects/components/project-form-dialog.tsx:202
 msgid "e.g., Financial Planning"
 msgstr "例如：财务规划"
 
@@ -10872,7 +10884,7 @@ msgstr "编辑模式"
 msgid "Edit preset"
 msgstr "编辑预设"
 
-#: src/features/projects/components/project-form-dialog.tsx:183
+#: src/features/projects/components/project-form-dialog.tsx:184
 msgid "Edit Project"
 msgstr "编辑项目"
 
@@ -12079,7 +12091,7 @@ msgstr "扩展画布"
 msgid "Expand chain of thought"
 msgstr "展开思维链"
 
-#: src/features/settings/components/chat/usage-settings.tsx:353
+#: src/features/settings/components/chat/usage-settings.tsx:357
 msgid "Expand daily trend"
 msgstr "展开每日趋势"
 
@@ -12536,7 +12548,7 @@ msgstr "创建 API 密钥失败"
 msgid "Failed to create branch"
 msgstr "创建分支失败"
 
-#: src/features/settings/components/chat/usage-settings.tsx:214
+#: src/features/settings/components/chat/usage-settings.tsx:215
 msgid "Failed to create budget alert"
 msgstr "创建预算提醒失败"
 
@@ -12568,7 +12580,7 @@ msgstr "删除失败"
 msgid "Failed to delete {fileName}"
 msgstr "删除 {fileName} 失败"
 
-#: src/features/settings/components/chat/usage-settings.tsx:228
+#: src/features/settings/components/chat/usage-settings.tsx:229
 msgid "Failed to delete budget alert"
 msgstr "删除预算提醒失败"
 
@@ -12764,7 +12776,7 @@ msgstr "加载技能失败"
 msgid "Failed to load spreadsheet"
 msgstr "加载电子表格失败"
 
-#: src/features/settings/components/chat/usage-settings.tsx:264
+#: src/features/settings/components/chat/usage-settings.tsx:265
 msgid "Failed to load usage data. Ensure the LLM Gateway is running and reachable."
 msgstr "加载用量数据失败。请确保 LLM Gateway 正在运行且可访问。"
 
@@ -14767,7 +14779,7 @@ msgstr "获取 API 密钥"
 msgid "Get cited, multi-step analysis in minutes. Deep Research reads sources so you don't have to."
 msgstr "几分钟内获得带引用的多步骤分析。深度研究替你阅读资料来源。"
 
-#: src/features/settings/components/chat/usage-settings.tsx:411
+#: src/features/settings/components/chat/usage-settings.tsx:415
 msgid "Get notified or block requests when usage thresholds are reached"
 msgstr "在用量达到阈值时收到通知或阻止请求"
 
@@ -15800,7 +15812,7 @@ msgstr ""
 msgid "hotkey"
 msgstr ""
 
-#: src/features/settings/components/chat/usage-settings.tsx:98
+#: src/features/settings/components/chat/usage-settings.tsx:99
 msgid "Hour"
 msgstr "小时"
 
@@ -15808,7 +15820,7 @@ msgstr "小时"
 msgid "Hours"
 msgstr "小时"
 
-#: src/features/settings/components/chat/usage-activity-heatmap.tsx:225
+#: src/features/settings/components/chat/usage-activity-heatmap.tsx:231
 msgid "Hover a day, or focus the chart and use the arrow keys."
 msgstr "将鼠标悬停在某一天上，或聚焦图表后使用方向键。"
 
@@ -15935,7 +15947,7 @@ msgstr "冰岛语"
 msgid "Icelandic (Iceland)"
 msgstr "冰岛语（冰岛）"
 
-#: src/features/projects/components/project-form-dialog.tsx:274
+#: src/features/projects/components/project-form-dialog.tsx:275
 msgid "Icon"
 msgstr "图标"
 
@@ -17424,17 +17436,17 @@ msgstr "大幅海报"
 msgid "Last 24h"
 msgstr "最近 24 小时"
 
-#: src/features/settings/components/chat/usage-settings.tsx:254
+#: src/features/settings/components/chat/usage-settings.tsx:255
 msgid "Last 30 days"
 msgstr "最近 30 天"
 
 #: src/features/chat/thread-list/hooks/use-thread-groups.ts:583
-#: src/features/settings/components/chat/usage-settings.tsx:253
+#: src/features/settings/components/chat/usage-settings.tsx:254
 #: src/routes/admin/gateway/index.tsx:234
 msgid "Last 7 days"
 msgstr "过去 7 天"
 
-#: src/features/settings/components/chat/usage-settings.tsx:255
+#: src/features/settings/components/chat/usage-settings.tsx:256
 msgid "Last 90 days"
 msgstr "最近 90 天"
 
@@ -17506,7 +17518,7 @@ msgstr "上次跳过的运行"
 msgid "Last slide"
 msgstr "最后一张幻灯片"
 
-#: src/features/settings/components/chat/usage-settings.tsx:635
+#: src/features/settings/components/chat/usage-settings.tsx:639
 msgid "Last triggered: {lastTriggeredAt}"
 msgstr "上次触发：{lastTriggeredAt}"
 
@@ -17774,7 +17786,7 @@ msgstr "镜头"
 msgid "Lens Type"
 msgstr "镜头类型"
 
-#: src/features/settings/components/chat/usage-activity-heatmap.tsx:228
+#: src/features/settings/components/chat/usage-activity-heatmap.tsx:234
 msgid "Less"
 msgstr "少"
 
@@ -18305,6 +18317,11 @@ msgstr ""
 #: src/features/settings/components/chat/trigger-settings.tsx:722
 msgid "Loading triggers..."
 msgstr "正在加载触发器..."
+
+#: src/features/projects/components/project-usage-summary.tsx:56
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:86
+msgid "Loading usage…"
+msgstr "正在加载用量…"
 
 #: src/routes/(chat)/workflow/$workflowId.tsx:47
 #: src/routes/(chat)/workflow/shared/$token.tsx:32
@@ -19339,7 +19356,7 @@ msgid "Meta's well-established and widely-deployed model"
 msgstr "Meta 成熟且部署广泛的模型"
 
 #: src/features/evals/components/run-comparison.tsx:102
-#: src/features/settings/components/chat/usage-settings.tsx:445
+#: src/features/settings/components/chat/usage-settings.tsx:449
 msgid "Metric"
 msgstr "指标"
 
@@ -19580,7 +19597,7 @@ msgstr "模式："
 #: src/features/evals/components/run-dialog.tsx:212
 #: src/features/prompts/components/prompt-form-dialog.tsx:387
 #: src/features/settings/components/chat/bots-settings.tsx:135
-#: src/features/settings/components/chat/usage-settings.tsx:316
+#: src/features/settings/components/chat/usage-settings.tsx:317
 #: src/features/tasks/components/task-form-dialog.tsx:388
 #: src/features/workflow/components/nodes/ai-node.tsx:34
 #: src/features/workflow/components/nodes/background-removal-node.tsx:63
@@ -19629,7 +19646,7 @@ msgstr "模型已停用"
 msgid "Model enabled"
 msgstr "模型已启用"
 
-#: src/features/settings/components/chat/usage-settings.tsx:541
+#: src/features/settings/components/chat/usage-settings.tsx:545
 msgid "Model filter"
 msgstr "模型筛选"
 
@@ -19776,8 +19793,8 @@ msgstr "蒙古语（蒙古）"
 msgid "Monospace"
 msgstr ""
 
-#: src/features/settings/components/chat/usage-activity-heatmap.tsx:244
-#: src/features/settings/components/chat/usage-settings.tsx:99
+#: src/features/settings/components/chat/usage-activity-heatmap.tsx:250
+#: src/features/settings/components/chat/usage-settings.tsx:100
 msgid "Month"
 msgstr "月"
 
@@ -19785,7 +19802,7 @@ msgstr "月"
 msgid "Monthly"
 msgstr "按月"
 
-#: src/features/settings/components/chat/usage-settings.tsx:91
+#: src/features/settings/components/chat/usage-settings.tsx:92
 msgid "Monthly cost (microdollars)"
 msgstr "月度成本（微美元）"
 
@@ -19818,7 +19835,7 @@ msgid "Moonshot's multimodal Kimi K2.5 on Workers AI"
 msgstr "Workers AI 上的 Moonshot 多模态 Kimi K2.5"
 
 #: ../../packages/ui/src/components/breadcrumb.tsx:68
-#: src/features/settings/components/chat/usage-activity-heatmap.tsx:232
+#: src/features/settings/components/chat/usage-activity-heatmap.tsx:238
 msgid "More"
 msgstr "多"
 
@@ -20172,7 +20189,7 @@ msgstr ""
 #: src/features/settings/components/chat/native-providers-settings.tsx:507
 #: src/features/settings/components/chat/system-prompt-preset-settings.tsx:154
 #: src/features/settings/components/chat/trigger-settings.tsx:222
-#: src/features/settings/components/chat/usage-settings.tsx:429
+#: src/features/settings/components/chat/usage-settings.tsx:433
 #: src/features/skills/components/skill-builder-diff.tsx:32
 #: src/features/skills/components/skill-builder-review.tsx:136
 #: src/features/skills/components/skill-form-dialog.tsx:201
@@ -20543,7 +20560,7 @@ msgstr ""
 msgid "New Branch"
 msgstr "新建分支"
 
-#: src/features/settings/components/chat/usage-settings.tsx:424
+#: src/features/settings/components/chat/usage-settings.tsx:428
 msgid "New Budget Alert"
 msgstr "新建预算提醒"
 
@@ -20887,7 +20904,7 @@ msgstr ""
 msgid "No bots yet."
 msgstr ""
 
-#: src/features/settings/components/chat/usage-settings.tsx:666
+#: src/features/settings/components/chat/usage-settings.tsx:670
 msgid "No budget alerts configured."
 msgstr "尚未配置预算提醒。"
 
@@ -20967,7 +20984,7 @@ msgstr "此期间无成本数据。"
 msgid "No custom endpoints yet."
 msgstr "还没有自定义端点。"
 
-#: src/features/settings/components/chat/usage-settings.tsx:398
+#: src/features/settings/components/chat/usage-settings.tsx:402
 msgid "No daily data for this period."
 msgstr "此期间无每日数据。"
 
@@ -21221,6 +21238,7 @@ msgstr ""
 msgid "No progress: {0}"
 msgstr ""
 
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:66
 #: src/features/tasks/components/task-form-dialog.tsx:411
 #: src/features/tasks/components/task-form-dialog.tsx:423
 msgid "No project"
@@ -21276,7 +21294,8 @@ msgstr "未选择参考图"
 msgid "No remote MCP servers match your search."
 msgstr "没有与搜索匹配的远程 MCP 服务器。"
 
-#: src/features/settings/components/chat/usage-skill-breakdown.tsx:78
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:98
+#: src/features/settings/components/chat/usage-skill-breakdown.tsx:85
 msgid "No replies recorded for this period."
 msgstr "此期间没有记录到回复。"
 
@@ -21442,7 +21461,7 @@ msgstr "没有未读通知。"
 msgid "No updates yet."
 msgstr "还没有更新。"
 
-#: src/features/settings/components/chat/usage-settings.tsx:310
+#: src/features/settings/components/chat/usage-settings.tsx:311
 #: src/routes/admin/gateway/index.tsx:125
 msgid "No usage data for this period."
 msgstr "此期间无用量数据。"
@@ -21742,11 +21761,11 @@ msgstr "你的浏览器已阻止此网站的通知。请在网站设置中允许
 msgid "Notifications, {badge} unread"
 msgstr "通知，{badge} 条未读"
 
-#: src/features/settings/components/chat/usage-settings.tsx:105
+#: src/features/settings/components/chat/usage-settings.tsx:106
 msgid "Notify + block"
 msgstr "通知并阻止"
 
-#: src/features/settings/components/chat/usage-settings.tsx:104
+#: src/features/settings/components/chat/usage-settings.tsx:105
 msgid "Notify only"
 msgstr "仅通知"
 
@@ -22079,6 +22098,10 @@ msgstr "仅在一次运行中"
 msgid "Only organization owners can manage billing settings"
 msgstr "只有组织所有者才能管理账单设置"
 
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:152
+msgid "Only part of this period is included."
+msgstr "仅包含此期间的一部分。"
+
 #: src/features/chat/group/group-mode.ts:66
 msgid "Only participants you @mention answer."
 msgstr "只有你 @提及 的参与者才会回答。"
@@ -22108,7 +22131,7 @@ msgstr "仅按状态筛选此处已加载的 {0} 个对话；更早的对话不�
 msgid "Only the first {MAX_DOCUMENTS_PER_IMPORT} documents were imported."
 msgstr "仅导入了前 {MAX_DOCUMENTS_PER_IMPORT} 个文档。"
 
-#: src/features/settings/components/chat/usage-skill-breakdown.tsx:122
+#: src/features/settings/components/chat/usage-skill-breakdown.tsx:129
 msgid "Only the most recent days of this period are included."
 msgstr "仅包含此期间最近的几天。"
 
@@ -23012,6 +23035,10 @@ msgstr ""
 msgid "Other presets"
 msgstr "其他预设"
 
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:62
+msgid "Other projects"
+msgstr "其他项目"
+
 #: src/features/marketing/components/model-detail-page.tsx:79
 msgid "Other text models"
 msgstr "其他文本模型"
@@ -23556,7 +23583,7 @@ msgstr "完美肤色，高端剧集质感"
 msgid "Performance comparable to Mistral Small 24B"
 msgstr "性能可与 Mistral Small 24B 媲美"
 
-#: src/features/settings/components/chat/usage-settings.tsx:469
+#: src/features/settings/components/chat/usage-settings.tsx:473
 msgid "Period"
 msgstr "期间"
 
@@ -24627,6 +24654,7 @@ msgstr "进度"
 msgid "Progress of {toolName}"
 msgstr ""
 
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:104
 #: src/features/tasks/components/task-form-dialog.tsx:408
 msgid "Project"
 msgstr "项目"
@@ -24635,9 +24663,13 @@ msgstr "项目"
 msgid "Project actions"
 msgstr "项目操作"
 
-#: src/features/projects/components/project-form-dialog.tsx:322
+#: src/features/projects/components/project-form-dialog.tsx:323
 msgid "Project Context"
 msgstr "项目上下文"
+
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:58
+msgid "Project no longer available"
+msgstr "项目已不可用"
 
 #: src/features/chat/thread-list/hooks/use-thread-groups.ts:548
 msgid "Projects"
@@ -24754,7 +24786,7 @@ msgstr "提示词优化成功"
 msgid "Prompt to run on all models..."
 msgstr "要在所有模型上运行的提示词..."
 
-#: src/features/settings/components/chat/usage-settings.tsx:279
+#: src/features/settings/components/chat/usage-settings.tsx:280
 msgid "Prompt Tokens"
 msgstr "提示词 token"
 
@@ -25912,8 +25944,8 @@ msgstr "记住我"
 #: src/features/chat/thread/composer-input.tsx:411
 #: src/features/devices/components/devices-settings.tsx:333
 #: src/features/devices/components/devices-settings.tsx:339
-#: src/features/projects/components/project-form-dialog.tsx:263
-#: src/features/projects/components/project-form-dialog.tsx:304
+#: src/features/projects/components/project-form-dialog.tsx:264
+#: src/features/projects/components/project-form-dialog.tsx:305
 #: src/features/settings/components/chat/custom-providers-settings.tsx:652
 #: src/features/settings/components/chat/favorite-models-settings.tsx:186
 #: src/features/settings/components/chat/native-providers-settings.tsx:723
@@ -26232,13 +26264,15 @@ msgid "Replay the welcome tour to review the core features of Neore."
 msgstr "重新播放欢迎导览，回顾 Neore 的核心功能。"
 
 #: src/features/chat/header/thread-stats-dialog.tsx:71
-#: src/features/settings/components/chat/usage-activity-heatmap.tsx:144
-#: src/features/settings/components/chat/usage-activity-heatmap.tsx:246
-#: src/features/settings/components/chat/usage-skill-breakdown.tsx:85
+#: src/features/projects/components/project-usage-summary.tsx:38
+#: src/features/settings/components/chat/usage-activity-heatmap.tsx:150
+#: src/features/settings/components/chat/usage-activity-heatmap.tsx:252
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:105
+#: src/features/settings/components/chat/usage-skill-breakdown.tsx:92
 msgid "Replies"
 msgstr "回复"
 
-#: src/features/settings/components/chat/usage-activity-heatmap.tsx:128
+#: src/features/settings/components/chat/usage-activity-heatmap.tsx:134
 msgid "Replies and spend per day over the last 53 weeks"
 msgstr "过去 53 周每天的回复与支出"
 
@@ -26262,7 +26296,11 @@ msgstr "回复将被朗读"
 msgid "Replies will no longer be read aloud"
 msgstr "回复将不再被朗读"
 
-#: src/features/settings/components/chat/usage-skill-breakdown.tsx:66
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:81
+msgid "Replies, tokens and spend per project for the selected period"
+msgstr "所选期间内每个项目的回复、令牌和花费"
+
+#: src/features/settings/components/chat/usage-skill-breakdown.tsx:73
 msgid "Replies, tokens and spend per skill or agent for the selected period"
 msgstr "所选期间内每个技能或智能体的回复、token 和支出"
 
@@ -26298,7 +26336,7 @@ msgstr ""
 msgid "Request changes"
 msgstr ""
 
-#: src/features/settings/components/chat/usage-settings.tsx:92
+#: src/features/settings/components/chat/usage-settings.tsx:93
 msgid "Request count"
 msgstr "请求数"
 
@@ -26327,8 +26365,8 @@ msgstr "请求的权限"
 msgid "Requesting..."
 msgstr "正在请求..."
 
-#: src/features/settings/components/chat/usage-settings.tsx:271
-#: src/features/settings/components/chat/usage-settings.tsx:317
+#: src/features/settings/components/chat/usage-settings.tsx:272
+#: src/features/settings/components/chat/usage-settings.tsx:318
 #: src/routes/admin/gateway/index.tsx:89
 #: src/routes/admin/gateway/index.tsx:256
 msgid "Requests"
@@ -26905,7 +26943,7 @@ msgstr ""
 msgid "Rubric"
 msgstr "评分标准"
 
-#: src/features/settings/components/chat/usage-settings.tsx:191
+#: src/features/settings/components/chat/usage-settings.tsx:192
 msgid "Rule name is required"
 msgstr "规则名称为必填项"
 
@@ -27176,7 +27214,7 @@ msgstr "保存并关闭"
 msgid "Save 25%"
 msgstr "节省 25%"
 
-#: src/features/settings/components/chat/usage-settings.tsx:566
+#: src/features/settings/components/chat/usage-settings.tsx:570
 msgid "Save Alert"
 msgstr "保存提醒"
 
@@ -27197,7 +27235,7 @@ msgstr "保存为预设"
 msgid "Save blocked websites"
 msgstr ""
 
-#: src/features/settings/components/chat/usage-settings.tsx:558
+#: src/features/settings/components/chat/usage-settings.tsx:562
 msgid "Save budget alert"
 msgstr "保存预算提醒"
 
@@ -27290,7 +27328,7 @@ msgstr "已保存到“{0}”"
 
 #: src/features/auth/components/team/team-settings-dialog.tsx:215
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:394
-#: src/features/projects/components/project-form-dialog.tsx:407
+#: src/features/projects/components/project-form-dialog.tsx:409
 #: src/features/prompts/components/prompt-form-dialog.tsx:521
 #: src/features/prompts/components/thread-variables-config.tsx:258
 #: src/features/settings/components/chat/api-keys-settings.tsx:436
@@ -27786,8 +27824,8 @@ msgid "Select all cells"
 msgstr "选择所有单元格"
 
 #: ../../packages/ui/src/components/icon-picker.tsx:431
-#: src/features/projects/components/project-form-dialog.tsx:286
-#: src/features/projects/components/project-form-dialog.tsx:299
+#: src/features/projects/components/project-form-dialog.tsx:287
+#: src/features/projects/components/project-form-dialog.tsx:300
 msgid "Select an icon"
 msgstr "选择图标"
 
@@ -28326,7 +28364,8 @@ msgstr "形状"
 msgid "Share"
 msgstr "分享"
 
-#: src/features/settings/components/chat/usage-skill-breakdown.tsx:89
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:109
+#: src/features/settings/components/chat/usage-skill-breakdown.tsx:96
 msgid "Share of spend"
 msgstr "支出占比"
 
@@ -28890,7 +28929,7 @@ msgstr "技能目标"
 msgid "Skill installed — use it with /{0}"
 msgstr "技能已安装——通过 /{0} 使用"
 
-#: src/features/settings/components/chat/usage-skill-breakdown.tsx:84
+#: src/features/settings/components/chat/usage-skill-breakdown.tsx:91
 msgid "Skill or agent"
 msgstr "技能或智能体"
 
@@ -29456,9 +29495,11 @@ msgstr "语速"
 msgid "Speed tier of Nano Banana 2 for fast text-to-image generation"
 msgstr "Nano Banana 2 的极速档，用于快速文生图"
 
-#: src/features/settings/components/chat/usage-activity-heatmap.tsx:145
-#: src/features/settings/components/chat/usage-activity-heatmap.tsx:247
-#: src/features/settings/components/chat/usage-skill-breakdown.tsx:87
+#: src/features/projects/components/project-usage-summary.tsx:43
+#: src/features/settings/components/chat/usage-activity-heatmap.tsx:151
+#: src/features/settings/components/chat/usage-activity-heatmap.tsx:253
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:107
+#: src/features/settings/components/chat/usage-skill-breakdown.tsx:94
 msgid "Spend"
 msgstr "支出"
 
@@ -32317,11 +32358,11 @@ msgstr ""
 msgid "This connection needs to be renewed."
 msgstr "此连接需要续期。"
 
-#: src/features/projects/components/project-form-dialog.tsx:326
+#: src/features/projects/components/project-form-dialog.tsx:327
 msgid "This context will be automatically added to each chat in your project. You can include instructions, background information, or any shared knowledge."
 msgstr "这些上下文会自动添加到项目中的每个聊天。你可以写入指令、背景信息或任何共享知识。"
 
-#: src/features/projects/components/project-form-dialog.tsx:331
+#: src/features/projects/components/project-form-dialog.tsx:332
 msgid "This context will be prepended to the system prompt for all chats in this project."
 msgstr "这些上下文会添加到此项目所有聊天的系统提示词开头。"
 
@@ -32860,7 +32901,7 @@ msgid "Threads working on this {requestNoun}"
 msgstr ""
 
 #: src/features/canvas/canvas-panel.tsx:215
-#: src/features/settings/components/chat/usage-settings.tsx:496
+#: src/features/settings/components/chat/usage-settings.tsx:500
 msgid "Threshold"
 msgstr "阈值"
 
@@ -32911,7 +32952,7 @@ msgid "Timezone updated"
 msgstr "时区已更新"
 
 #: src/features/chat/thread-list/rename-thread-dialog.tsx:148
-#: src/features/projects/components/project-form-dialog.tsx:194
+#: src/features/projects/components/project-form-dialog.tsx:195
 #: src/features/slides/components/slide-editor-dialog.tsx:90
 #: src/features/tasks/components/goal-form-dialog.tsx:88
 #: src/features/tasks/components/task-form-dialog.tsx:219
@@ -33047,16 +33088,18 @@ msgstr "token 预算"
 msgid "Token Cost Impact"
 msgstr "Token 成本影响"
 
-#: src/features/settings/components/chat/usage-settings.tsx:93
+#: src/features/settings/components/chat/usage-settings.tsx:94
 msgid "Token count"
 msgstr "Token 数"
 
-#: src/features/settings/components/chat/usage-settings.tsx:299
+#: src/features/settings/components/chat/usage-settings.tsx:300
 msgid "Token usage and cost breakdown per model for the selected period"
 msgstr "所选期间内每个模型的 token 用量和成本明细"
 
-#: src/features/settings/components/chat/usage-settings.tsx:318
-#: src/features/settings/components/chat/usage-skill-breakdown.tsx:86
+#: src/features/projects/components/project-usage-summary.tsx:40
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:106
+#: src/features/settings/components/chat/usage-settings.tsx:319
+#: src/features/settings/components/chat/usage-skill-breakdown.tsx:93
 msgid "Tokens"
 msgstr "Token"
 
@@ -33203,7 +33246,7 @@ msgstr "多伦多"
 msgid "Total cost"
 msgstr "总成本"
 
-#: src/features/settings/components/chat/usage-settings.tsx:274
+#: src/features/settings/components/chat/usage-settings.tsx:275
 #: src/routes/admin/gateway/index.tsx:262
 msgid "Total Cost"
 msgstr "总成本"
@@ -33228,7 +33271,7 @@ msgstr "追踪所有管理员操作，便于问责"
 msgid "Track every token and dollar."
 msgstr "追踪每一个 token 和每一美元。"
 
-#: src/features/settings/components/chat/usage-settings.tsx:245
+#: src/features/settings/components/chat/usage-settings.tsx:246
 msgid "Track your LLM token usage, cost, and set budget alerts"
 msgstr "追踪你的 LLM token 用量和成本，并设置预算提醒"
 
@@ -33356,7 +33399,7 @@ msgstr "面向法律、金融和技术任务的透明思考"
 msgid "Triangle"
 msgstr "三角形"
 
-#: src/features/settings/components/chat/usage-settings.tsx:425
+#: src/features/settings/components/chat/usage-settings.tsx:429
 msgid "Trigger a notification or block when a usage metric exceeds a threshold"
 msgstr "当用量指标超过阈值时触发通知或阻止"
 
@@ -33924,7 +33967,7 @@ msgstr ""
 msgid "Unmute"
 msgstr "取消静音"
 
-#: src/features/settings/components/chat/usage-skill-breakdown.tsx:53
+#: src/features/settings/components/chat/usage-skill-breakdown.tsx:60
 msgid "Unnamed skill"
 msgstr "未命名技能"
 
@@ -34043,7 +34086,7 @@ msgstr "更新时长"
 msgid "Update failed"
 msgstr "更新失败"
 
-#: src/features/projects/components/project-form-dialog.tsx:403
+#: src/features/projects/components/project-form-dialog.tsx:405
 msgid "Update Project"
 msgstr "更新项目"
 
@@ -34077,7 +34120,7 @@ msgstr "更新此成员的角色"
 msgid "Update your account email address"
 msgstr "更新你的账号邮箱地址"
 
-#: src/features/projects/components/project-form-dialog.tsx:185
+#: src/features/projects/components/project-form-dialog.tsx:186
 msgid "Update your project details below."
 msgstr "在下方更新项目详情。"
 
@@ -34349,10 +34392,11 @@ msgstr "美国"
 
 #: src/features/chat/sidebar/usage-card.tsx:117
 #: src/features/layout/lib/dashboard-page-names.ts:41
+#: src/features/projects/components/project-usage-summary.tsx:50
 msgid "Usage"
 msgstr "用量"
 
-#: src/features/settings/components/chat/usage-settings.tsx:244
+#: src/features/settings/components/chat/usage-settings.tsx:245
 msgid "Usage & Cost"
 msgstr "用量与成本"
 
@@ -34364,7 +34408,11 @@ msgstr "用量分析"
 msgid "Usage Analytics"
 msgstr "用量分析"
 
-#: src/features/settings/components/chat/usage-skill-breakdown.tsx:64
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:79
+msgid "Usage by project"
+msgstr "按项目的用量"
+
+#: src/features/settings/components/chat/usage-skill-breakdown.tsx:71
 msgid "Usage by skill"
 msgstr "按技能统计用量"
 
@@ -36566,6 +36614,10 @@ msgstr "你的方案和额度取决于你的订阅。"
 #: src/features/skills/components/marketplace-skill-detail-dialog.tsx:162
 msgid "Your rating"
 msgstr "你的评分"
+
+#: src/features/projects/components/project-usage-summary.tsx:52
+msgid "Your replies, tokens and spend in this project over the last 30 days."
+msgstr "您在过去 30 天内在此项目中的回复、令牌和花费。"
 
 #: src/features/develop/components/review-panel.tsx:196
 #: src/features/tasks/components/task-detail-dialog.tsx:90

@@ -14,27 +14,94 @@ import { throwForbidden } from "../lib/error-helpers";
 import { admitOrganization, systemDb } from "../lib/rls/scope";
 import { MAX_LENGTH } from "../lib/validators";
 
+/** Whether `userId` is a current member of an organization. */
+type MembershipCheck = (organizationId: string) => Promise<boolean>;
+
+/**
+ * The one rule for who may read a project: its owner, or a CURRENT member of its organization. A project without an owner
+ * is no exception. Every lookup below decides through this.
+ */
+const mayReadProject = async (project: Pick<Doc<"projects">, "organizationId" | "userId">, userId: string, isMember: MembershipCheck): Promise<boolean> =>
+    project.userId === userId || (Boolean(project.organizationId) && (await isMember(project.organizationId!)));
+
 /** The project when the caller owns it or belongs to its organization, else `null` (also for a missing one). */
 export const readableProject = async (context: QueryCtx | MutationCtx, projectId: Id<"projects">, userId: string): Promise<Doc<"projects"> | null> => {
     // Decide on the row's owner and organization past RLS: a project of a member's
     // NON-active organization is invisible to the guarded `ctx.db` until the org is admitted.
     const found = await systemDb(context).projects.findFirst({ where: { _id: projectId } });
 
-    if (!found) {
+    const isMember: MembershipCheck = async (organizationId) => (await getMemberByOrganizationAndUser(context, organizationId, userId)) !== null;
+
+    if (!found || !(await mayReadProject(found, userId, isMember))) {
         return null;
     }
 
-    // The owner, or a CURRENT member of the project's organization: a project without an owner is no exception.
+    // A proven membership: the project passes row-level security.
     if (found.userId !== userId) {
-        if (!found.organizationId || !(await getMemberByOrganizationAndUser(context, found.organizationId, userId))) {
-            return null;
-        }
-
-        // A proven membership: the project passes row-level security.
-        admitOrganization(context, found.organizationId);
+        admitOrganization(context, found.organizationId!);
     }
 
     return await context.db.projects.findFirst({ where: { _id: projectId } });
+};
+
+/** Ids one `in` read binds: D1 takes at most 100 parameters a statement, and the read binds others beside them. */
+const IDS_PER_READ = 90;
+
+/** `ids` in runs of {@link IDS_PER_READ}. */
+const inBatches = <T>(ids: ReadonlyArray<T>): T[][] => {
+    const batches: T[][] = [];
+
+    for (let index = 0; index < ids.length; index += IDS_PER_READ) {
+        batches.push(ids.slice(index, index + IDS_PER_READ));
+    }
+
+    return batches;
+};
+
+/**
+ * The titles of the projects in `projectIds` that `userId` can read, by id: the rule of {@link readableProject} for many
+ * projects in a few reads, the rows and then the caller's memberships in their organizations, each in batches of
+ * {@link IDS_PER_READ} ids. A project the caller cannot
+ * read, or that no longer exists, is left out. For a view that only names projects: no row-level-security re-read, as
+ * only titles leave here.
+ */
+export const readableProjectTitles = async (
+    context: QueryCtx | MutationCtx,
+    projectIds: ReadonlyArray<Id<"projects">>,
+    userId: string,
+): Promise<Map<string, string>> => {
+    if (projectIds.length === 0) {
+        return new Map();
+    }
+
+    const rows = [];
+
+    for (const ids of inBatches(projectIds)) {
+        const { page } = await systemDb(context).projects.findMany({ where: { _id: { in: ids } } });
+
+        rows.push(...page);
+    }
+
+    const organizations = [...new Set(rows.filter((row) => row.userId !== userId && row.organizationId).map((row) => row.organizationId!))];
+    const memberOf = new Set<string>();
+
+    for (const ids of inBatches(organizations)) {
+        const { page } = await context.db.member.findMany({ where: { organizationId: { in: ids }, userId } });
+
+        for (const membership of page) {
+            memberOf.add(membership.organizationId);
+        }
+    }
+
+    const titles = new Map<string, string>();
+
+    for (const row of rows) {
+        if (await mayReadProject(row, userId, async (organizationId) => memberOf.has(organizationId))) {
+            titles.set(row._id, row.title);
+        }
+    }
+
+    return titles;
 };
 
 /**
