@@ -418,6 +418,17 @@ const MAX_EXPORT_BYTES = 32 * 1024 * 1024;
 const TRIGGER_EXPORT_BYTES = 8 * 1024 * 1024;
 
 /**
+ * The most reading that history may cost. A run is read whole, its webhook body (up to 1 MiB) included, even when the
+ * export cuts it, and the export action's queries share one read budget (`ACTION_READ_BYTES`): the trigger history gets
+ * what the ACP sessions read before it leave, less a margin for the last page and anything read after.
+ */
+const TRIGGER_READ_BYTES = 12 * 1024 * 1024;
+
+/** Lunora's read budget for one request, shared by every query an action runs (`maxReadBytes`). */
+const ACTION_READ_BYTES = 32 * 1024 * 1024;
+const READ_MARGIN_BYTES = 8 * 1024 * 1024;
+
+/**
  * Usage history, sub-agent delegations (their task text and results) and
  * knowledge collections — user data the export used to leave out.
  */
@@ -579,9 +590,6 @@ export const generateExportFile = internalAction
         // Optional so an export workflow already in flight when this shipped
         // still replays against the new signature.
         threadTags: v.optional(v.any()),
-        // Triggers with their settings and their newest runs, read in this action when the workflow does not pass them
-        // (`triggers/gdpr.ts`). Optional so an export already in flight still replays with the list it recorded.
-        triggers: v.optional(v.any()),
         userEmail: v.string(),
         userId: v.string(),
         // The user's watched repositories (`source-control/gdpr.ts`). Optional for the same in-flight-replay reason.
@@ -589,14 +597,18 @@ export const generateExportFile = internalAction
     })
     .action(async ({ args, ctx: context }) => {
         const activity = args.activity as { knowledgeCollections?: unknown[]; subAgentRuns?: unknown[]; usageDaily?: unknown[] } | undefined;
+        // Read here, a page per query, so no workflow step result or action argument carries the history.
+        const acpSessions =
+            args.acpSessions ??
+            (await collectAcpSessionPages(
+                async (cursor) => await context.runQuery(internal.acp.gdpr.collectAcpSessionsForExport, { cursor, userId: args.userId }),
+                MAX_EXPORT_BYTES,
+            ));
+        // What the ACP sessions read is close to what they export: the trigger history reads only from what is left.
+        const acpReadBytes = new TextEncoder().encode(JSON.stringify(acpSessions)).byteLength;
+        const triggerReadBytes = Math.max(0, Math.min(TRIGGER_READ_BYTES, ACTION_READ_BYTES - acpReadBytes - READ_MARGIN_BYTES));
         const exportData = {
-            // Read here, a page per query, so no workflow step result or action argument carries the history.
-            acpSessions:
-                args.acpSessions ??
-                (await collectAcpSessionPages(
-                    async (cursor) => await context.runQuery(internal.acp.gdpr.collectAcpSessionsForExport, { cursor, userId: args.userId }),
-                    MAX_EXPORT_BYTES,
-                )),
+            acpSessions,
             bots: args.bots ?? { bots: [] },
             codingAgentRuns: args.codingAgentRuns ?? [],
             conversations: args.conversations,
@@ -622,19 +634,18 @@ export const generateExportFile = internalAction
             subAgentRuns: activity?.subAgentRuns ?? [],
             tasks: args.tasks ?? { goals: [], tasks: [] },
             threadTags: args.threadTags ?? [],
-            triggers:
-                args.triggers ??
-                (await collectAllTriggers(
-                    async (cursor) => await context.runQuery(internal.triggers.gdpr.collectTriggersForExport, { cursor, userId: args.userId }),
-                    async (triggerId, cursor, onlyOne) =>
-                        await context.runQuery(internal.triggers.gdpr.collectTriggerRunsForExport, {
-                            cursor,
-                            onlyOne,
-                            triggerId: triggerId as Id<"triggers">,
-                            userId: args.userId,
-                        }),
-                    TRIGGER_EXPORT_BYTES,
-                )),
+            // Triggers with their settings and their newest runs, read here within a byte budget (`triggers/gdpr.ts`).
+            triggers: await collectAllTriggers(
+                async (cursor) => await context.runQuery(internal.triggers.gdpr.collectTriggersForExport, { cursor, userId: args.userId }),
+                async (triggerId, cursor) =>
+                    await context.runQuery(internal.triggers.gdpr.collectTriggerRunsForExport, {
+                        cursor,
+                        triggerId: triggerId as Id<"triggers">,
+                        userId: args.userId,
+                    }),
+                TRIGGER_EXPORT_BYTES,
+                triggerReadBytes,
+            ),
             usageDaily: activity?.usageDaily ?? [],
             watchedRepositories: args.watchedRepositories ?? { watched: [] },
         };

@@ -8,11 +8,12 @@ interface TriggersPage extends ExportPage {
 }
 
 interface RunsPage extends ExportPage {
+    /** The bytes the page read, whole rows included; a run's webhook body is read whole even when the export cuts it. */
+    readBytes?: number;
     runs?: unknown[];
 }
 
-/** `onlyOne` asks for a single run: enough to tell whether a trigger has any. */
-type ReadRuns = (triggerId: string, cursor: string | null, onlyOne?: boolean) => Promise<RunsPage>;
+type ReadRuns = (triggerId: string, cursor: string | null) => Promise<RunsPage>;
 
 /** Where a trigger's runs stop in the export, when its history did not fit. */
 export interface RunsCut {
@@ -21,59 +22,61 @@ export interface RunsCut {
     runsTruncated: true;
 }
 
+/** What the export may still write and read. Reads count separately: the export action's queries share one read budget. */
+interface Budget {
+    readBytes: number;
+    writtenBytes: number;
+}
+
 const byteLength = (value: unknown): number => new TextEncoder().encode(JSON.stringify(value)).byteLength;
 
-/** One trigger's runs, newest first, until one does not fit in `budget` bytes. */
-const collectRuns = async (
-    readRuns: ReadRuns,
-    triggerId: string,
-    budget: number,
-): Promise<{ bytes: number; isCut: boolean; runs: { startedAt: number }[] }> => {
+/** One trigger's runs, newest first, until one does not fit the written budget or the read budget is spent. */
+const collectRuns = async (readRuns: ReadRuns, triggerId: string, left: Budget): Promise<{ isCut: boolean; runs: { startedAt: number }[] }> => {
     const runs: { startedAt: number }[] = [];
-    let bytes = 0;
     let cursor: string | null = null;
 
     do {
+        if (left.readBytes <= 0) {
+            return { isCut: true, runs };
+        }
+
         const page: RunsPage = await readRuns(triggerId, cursor);
         const pageRuns = (page.runs ?? []) as { startedAt: number }[];
+
+        left.readBytes -= page.readBytes ?? 0;
 
         for (const run of pageRuns) {
             const size = byteLength(run);
 
-            if (bytes + size > budget) {
-                return { bytes, isCut: true, runs };
+            if (size > left.writtenBytes) {
+                return { isCut: true, runs };
             }
 
-            bytes += size;
+            left.writtenBytes -= size;
             runs.push(run);
         }
 
         cursor = page.cursor ?? null;
     } while (cursor !== null);
 
-    return { bytes, isCut: false, runs };
-};
-
-/** A trigger past the budget: no run is exported, and it is marked as cut only if it has runs to leave out. */
-const hasRuns = async (readRuns: ReadRuns, triggerId: string): Promise<{ bytes: number; isCut: boolean; runs: { startedAt: number }[] }> => {
-    const page = await readRuns(triggerId, null, true);
-
-    return { bytes: 0, isCut: (page.runs ?? []).length > 0, runs: [] };
+    return { isCut: false, runs };
 };
 
 /**
- * Collects every trigger and as much of each one's run history as fits in `maxBytes`, newest runs first, reading each page
- * as a query inside the export action (`generateExportFile`). Settings are always exported. Once a run does not fit, no
- * further run page is read and each trigger whose runs stop early is marked (`runsTruncated`), so the export never fails
- * for a long history and never drops runs without saying so.
+ * Collects every trigger and as much of each one's run history as fits, newest runs first, reading each page as a query
+ * inside the export action (`generateExportFile`). Settings are always exported. Runs stop at `maxBytes` written or
+ * `maxReadBytes` read, whichever comes first; a page that starts under the read budget may end over it by one page and
+ * the row `paginate` reads ahead. Past either, no run is read again and every later trigger is marked (`runsTruncated`)
+ * whether it has runs or not: no field counts every run row, and the export must never drop runs without saying so.
  */
 export const collectAllTriggers = async (
     readTriggers: (cursor: string | null) => Promise<TriggersPage>,
     readRuns: ReadRuns,
     maxBytes: number,
+    maxReadBytes: number,
 ): Promise<{ triggers: unknown[] }> => {
     const triggers: unknown[] = [];
-    let bytes = 0;
+    const left: Budget = { readBytes: maxReadBytes, writtenBytes: maxBytes };
     let isSpent = false;
     let cursor: string | null = null;
 
@@ -82,17 +85,15 @@ export const collectAllTriggers = async (
         const pageTriggers = (page.triggers ?? []) as { id: string }[];
 
         for (const trigger of pageTriggers) {
-            bytes += byteLength(trigger);
+            left.writtenBytes -= byteLength(trigger);
 
-            // Once the budget is spent, later triggers export their settings; one read says whether any run was left out.
-            const collected: { bytes: number; isCut: boolean; runs: { startedAt: number }[] } = isSpent
-                ? await hasRuns(readRuns, trigger.id)
-                : await collectRuns(readRuns, trigger.id, maxBytes - bytes);
+            const collected: { isCut: boolean; runs: { startedAt: number }[] } = isSpent
+                ? { isCut: true, runs: [] }
+                : await collectRuns(readRuns, trigger.id, left);
             const cut: RunsCut | undefined = collected.isCut
                 ? { oldestExportedStartedAt: collected.runs.at(-1)?.startedAt ?? null, runsTruncated: true }
                 : undefined;
 
-            bytes += collected.bytes;
             isSpent ||= collected.isCut;
             triggers.push({ ...trigger, runs: collected.runs, ...cut });
         }

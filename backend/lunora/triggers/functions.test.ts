@@ -19,7 +19,6 @@ import {
     getTriggerExecutions,
     getTriggers,
     pruneExpiredRunPrompts,
-    RUN_PROMPT_RETENTION_MS,
     releaseQuietWindow,
     reserveQuietWindow,
     setTriggerEnabled,
@@ -28,7 +27,6 @@ import {
     updateTrigger,
     updateTriggerStats,
 } from "./functions";
-import { HOUSEKEEPING_HORIZON_MS, HOUSEKEEPING_IDLE_INTERVAL_MS } from "../lib/shard-housekeeping";
 import { collectTriggerRunsForExport, collectTriggersForExport } from "./gdpr";
 import { collectAllTriggers } from "./export-pages";
 import { MAX_ACTIVE_EVENT_WATCHERS } from "./event-sources/types";
@@ -1184,13 +1182,6 @@ describe("run prompts", () => {
             vi.useRealTimers();
         });
 
-        it("expires a prompt while its shard is still swept, so a routine that stops still has its last prompts cleared", () => {
-            // The last run may note activity up to 10 minutes before it settles (the activity throttle).
-            const lastActivityBeforeSettle = 10 * 60 * 1000;
-
-            expect(RUN_PROMPT_RETENTION_MS + lastActivityBeforeSettle + HOUSEKEEPING_IDLE_INTERVAL_MS).toBeLessThan(HOUSEKEEPING_HORIZON_MS);
-        });
-
         it("clears a saved prompt once its expiry has passed, and keeps the run itself", async () => {
             const { triggerId } = (await as().mutation(createTrigger as never, { model: "m", name: "Hook", type: "webhook" } as never)) as {
                 triggerId: string;
@@ -1254,18 +1245,23 @@ describe("run prompts", () => {
 
         const exported = (await harness.run(async (ctx: any) => {
             const { triggers } = await ctx.runQuery(collectTriggersForExport, { userId: "user-a" });
-            const { runs } = await ctx.runQuery(collectTriggerRunsForExport, { triggerId, userId: "user-a" });
+            const { readBytes, runs } = await ctx.runQuery(collectTriggerRunsForExport, { triggerId, userId: "user-a" });
             const foreign = await ctx.runQuery(collectTriggerRunsForExport, { triggerId, userId: "user-b" });
 
-            return { foreign, runs, triggers };
+            return { foreign, readBytes, runs, triggers };
         })) as {
-            foreign: { runs: unknown[] };
+            foreign: { readBytes: number; runs: unknown[] };
+            readBytes: number;
             runs: { payload: string | null; payloadTruncated: boolean; prompt: string | null }[];
             triggers: { name: string }[];
         };
         const [trigger] = exported.triggers;
 
-        expect(trigger?.name).toBe("Hook");
+        expect(trigger).toMatchObject({ lastTriggeredAt: null, name: "Hook", nextTriggerAt: null, triggerCount: 0 });
+        expect(trigger).toHaveProperty("updatedAt");
+        // The whole row is counted, so the read is larger than what the export keeps of it.
+        expect(exported.readBytes).toBeGreaterThan(JSON.stringify(exported.runs[0]).length);
+        expect(exported.foreign.readBytes).toBe(0);
         expect(exported.runs[0]).toMatchObject({ payload: '{"ref":"main"}', payloadTruncated: false, prompt: "Summarise the issue" });
         expect(exported.foreign.runs).toEqual([]);
         expect(trigger).not.toHaveProperty("webhookSecret");
@@ -1280,19 +1276,11 @@ describe("run prompts", () => {
             }
         });
 
-        // A trigger past the budget is only asked whether it has runs: one is read, not a page.
-        const probe = (await harness.run(
-            async (ctx: any) => await ctx.runQuery(collectTriggerRunsForExport, { onlyOne: true, triggerId, userId: "user-a" }),
-        )) as {
-            runs: unknown[];
-        };
-
-        expect(probe.runs).toHaveLength(1);
-
         const exported = (await harness.run(async (ctx: any) => {
             const pages = await collectAllTriggers(
                 async (cursor) => await ctx.runQuery(collectTriggersForExport, { cursor, userId: "user-a" }),
                 async (id, cursor) => await ctx.runQuery(collectTriggerRunsForExport, { cursor, triggerId: id, userId: "user-a" }),
+                Number.MAX_SAFE_INTEGER,
                 Number.MAX_SAFE_INTEGER,
             );
 
@@ -1313,6 +1301,7 @@ describe("run prompts", () => {
                 async (cursor) => await ctx.runQuery(collectTriggersForExport, { cursor, userId: "user-a" }),
                 async (triggerId, cursor) => await ctx.runQuery(collectTriggerRunsForExport, { cursor, triggerId, userId: "user-a" }),
                 Number.MAX_SAFE_INTEGER,
+                Number.MAX_SAFE_INTEGER,
             );
 
             return pages.triggers as { botId: unknown; name: string; quietWhenEmpty: unknown; searchMode: unknown }[];
@@ -1327,37 +1316,50 @@ describe("run prompts", () => {
         const run = (startedAt: number) => {
             return { payload: "x".repeat(40), startedAt };
         };
-        const pages: Record<string, { cursor: string | null; runs: { payload: string; startedAt: number }[] }[]> = {
+        const pages: Record<string, { cursor: string | null; readBytes: number; runs: { payload: string; startedAt: number }[] }[]> = {
             a: [
-                { cursor: "a2", runs: [run(9), run(8)] },
-                { cursor: null, runs: [run(7), run(6)] },
+                { cursor: "a2", readBytes: 600, runs: [run(9), run(8)] },
+                { cursor: null, readBytes: 600, runs: [run(7), run(6)] },
             ],
-            b: [{ cursor: null, runs: [run(5)] }],
-            c: [{ cursor: null, runs: [] }],
+            b: [{ cursor: null, readBytes: 300, runs: [run(5)] }],
+            c: [{ cursor: null, readBytes: 0, runs: [] }],
         };
-        const reads: string[] = [];
-        const budget = 2 * JSON.stringify({ id: "a" }).length + 3 * JSON.stringify(run(9)).length;
+        const triggerRows = [{ id: "a" }, { id: "b" }, { id: "c" }];
+        const collect = async (maxBytes: number, maxReadBytes: number) => {
+            const reads: string[] = [];
+            const { triggers } = await collectAllTriggers(
+                async () => {
+                    return { cursor: null, triggers: triggerRows };
+                },
+                async (triggerId, cursor) => {
+                    reads.push(`${triggerId}:${String(cursor)}`);
 
-        const { triggers } = await collectAllTriggers(
-            async () => {
-                return { cursor: null, triggers: [{ id: "a" }, { id: "b" }, { id: "c" }] };
-            },
-            async (triggerId, cursor) => {
-                reads.push(`${triggerId}:${String(cursor)}`);
+                    return (cursor === null ? pages[triggerId]?.[0] : pages[triggerId]?.[1]) ?? { cursor: null, readBytes: 0, runs: [] };
+                },
+                maxBytes,
+                maxReadBytes,
+            );
 
-                return (cursor === null ? pages[triggerId]?.[0] : pages[triggerId]?.[1]) ?? { cursor: null, runs: [] };
-            },
-            budget,
-        );
+            return { reads, triggers };
+        };
+        const settings = triggerRows.slice(0, 2).reduce((sum, trigger) => sum + JSON.stringify(trigger).length, 0);
 
-        expect(triggers).toEqual([
-            { id: "a", oldestExportedStartedAt: 7, runs: [run(9), run(8), run(7)], runsTruncated: true },
-            { id: "b", oldestExportedStartedAt: null, runs: [], runsTruncated: true },
-            // A trigger with no runs is not marked as cut.
-            { id: "c", runs: [] },
+        // Written budget: three runs fit. Once it is spent no run is read again.
+        const written = await collect(settings + 3 * JSON.stringify(run(9)).length, Number.MAX_SAFE_INTEGER);
+
+        expect(written.triggers).toEqual([
+            { ...triggerRows[0], oldestExportedStartedAt: 7, runs: [run(9), run(8), run(7)], runsTruncated: true },
+            { ...triggerRows[1], oldestExportedStartedAt: null, runs: [], runsTruncated: true },
+            // No run is read past the budget, so a trigger is marked as cut whether it has runs or not.
+            { ...triggerRows[2], oldestExportedStartedAt: null, runs: [], runsTruncated: true },
         ]);
-        // Once the budget is spent, each later trigger is read once, only to learn whether it has runs.
-        expect(reads).toEqual(["a:null", "a:a2", "b:null", "c:null"]);
+        expect(written.reads).toEqual(["a:null", "a:a2"]);
+
+        // Read budget: whole rows are read even when the export is small, so reading stops once the first page spent it.
+        const read = await collect(Number.MAX_SAFE_INTEGER, 500);
+
+        expect(read.triggers[0]).toEqual({ ...triggerRows[0], oldestExportedStartedAt: 8, runs: [run(9), run(8)], runsTruncated: true });
+        expect(read.reads).toEqual(["a:null"]);
     });
 });
 

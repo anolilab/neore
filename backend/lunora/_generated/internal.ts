@@ -720,7 +720,7 @@ export interface InternalApiTypes {
             collectPrompts: FunctionReference<"query", { userId: string }, { promptHistory: { _id: Id<"promptHistory">; changeType: string; content: string; createdAt: number; promptId: Id<"prompts">; version: number; }[]; prompts: { _id: Id<"prompts">; content: string; createdAt: number; description: string | undefined; isFavorite: boolean | undefined; lastUsedAt: number | undefined; name: string; tags: string[] | undefined; updatedAt: number | undefined; usageCount: number | undefined; }[]; }>;
             collectSettings: FunctionReference<"query", { userId: string }, { aiUserPreferences?: unknown | null; userSettings?: unknown | null }>;
             collectThreadTags: FunctionReference<"query", { userId: string }, Array<{ _id: string; color: string; createdAt: number; name: string; order: number; updatedAt: number }>>;
-            generateExportFile: FunctionReference<"action", { acpSessions?: unknown; activity?: unknown; bots?: unknown; codingAgentRuns?: unknown; conversations?: unknown; devices?: unknown; evals?: unknown; files?: unknown; memories?: unknown; notifications?: unknown; pages?: unknown; profile?: unknown; prompts?: unknown; pullRequestGuides?: unknown; pullRequestThreads?: unknown; requestId: Id<"gdprRequests">; reviewDrafts?: unknown; settings?: unknown; tasks?: unknown; threadTags?: unknown; triggers?: unknown; userEmail: string; userId: string; watchedRepositories?: unknown }, string>;
+            generateExportFile: FunctionReference<"action", { acpSessions?: unknown; activity?: unknown; bots?: unknown; codingAgentRuns?: unknown; conversations?: unknown; devices?: unknown; evals?: unknown; files?: unknown; memories?: unknown; notifications?: unknown; pages?: unknown; profile?: unknown; prompts?: unknown; pullRequestGuides?: unknown; pullRequestThreads?: unknown; requestId: Id<"gdprRequests">; reviewDrafts?: unknown; settings?: unknown; tasks?: unknown; threadTags?: unknown; userEmail: string; userId: string; watchedRepositories?: unknown }, string>;
             sendExportReadyEmail: FunctionReference<"action", { requestId: Id<"gdprRequests">; userEmail: string }, null>;
             deletion_steps: {
                 deleteAuthRecords: FunctionReference<"mutation", { userId: string }, null>;
@@ -1239,7 +1239,7 @@ export interface InternalApiTypes {
             updateTriggerStats: FunctionReference<"mutation", { error?: string; lastTriggeredAt?: number; nextTriggerAt?: number; triggerId: Id<"triggers"> }, null>;
         };
         gdpr: {
-            collectTriggerRunsForExport: FunctionReference<"query", { cursor?: string | null; onlyOne?: boolean; triggerId: Id<"triggers">; userId: string }, { cursor: string | null; runs: Array<unknown> }>;
+            collectTriggerRunsForExport: FunctionReference<"query", { cursor?: string | null; triggerId: Id<"triggers">; userId: string }, { cursor: string | null; readBytes: number; runs: Array<unknown> }>;
             collectTriggersForExport: FunctionReference<"query", { cursor?: string | null; userId: string }, { cursor: string | null; triggers: Array<unknown> }>;
         };
         quiet_inputs: {

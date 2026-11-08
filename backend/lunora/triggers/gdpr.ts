@@ -46,7 +46,7 @@ const EXPORT_TRIGGER_PAGE = 50;
  * Runs per export page, the newest first. A query reads each run row whole, and a run can hold a webhook body of up to
  * 1 MiB, so a page stays inside a transaction's read limit.
  */
-const EXPORT_RUN_PAGE = 20;
+const EXPORT_RUN_PAGE = 5;
 
 /** One page of the user's triggers and their settings, without runs (`collectTriggerRunsForExport`). Secrets are left out. */
 export const collectTriggersForExport = internalQuery
@@ -77,13 +77,17 @@ export const collectTriggersForExport = internalQuery
                     id: trigger._id as string,
                     inputTemplate: trigger.inputTemplate,
                     lastError: trigger.lastError ?? null,
+                    lastTriggeredAt: trigger.lastTriggeredAt ?? null,
                     model: trigger.model,
                     name: trigger.name,
+                    nextTriggerAt: trigger.nextTriggerAt ?? null,
                     quietWhenEmpty: trigger.quietWhenEmpty ?? null,
                     searchMode: trigger.searchMode ?? null,
                     systemPrompt: trigger.systemPrompt,
                     timezone: trigger.timezone,
+                    triggerCount: trigger.triggerCount ?? 0,
                     type: trigger.type,
+                    updatedAt: trigger.updatedAt ?? null,
                     webhookSignatureScheme: trigger.webhookSignatureScheme ?? null,
                 };
             }),
@@ -98,27 +102,27 @@ export const collectTriggersForExport = internalQuery
 export const collectTriggerRunsForExport = internalQuery
     .input({
         cursor: v.optional(v.union(v.string().max(MAX_LENGTH.cursor), v.null())),
-        // One run is enough to say whether a trigger has any; a page of runs can hold up to 1 MiB of webhook body each.
-        onlyOne: v.optional(v.boolean()),
         triggerId: v.id("triggers"),
         userId: v.string().max(MAX_LENGTH.id),
     })
-    .output(v.object({ cursor: v.union(v.string(), v.null()), runs: v.array(v.any()) }))
-    .query(async ({ args: { cursor, onlyOne, triggerId, userId }, ctx }) => {
+    .output(v.object({ cursor: v.union(v.string(), v.null()), readBytes: v.number(), runs: v.array(v.any()) }))
+    .query(async ({ args: { cursor, triggerId, userId }, ctx }) => {
         const trigger = await ctx.db.get("triggers", triggerId);
 
         if (!trigger || trigger.userId !== userId) {
-            return { cursor: null, runs: [] };
+            return { cursor: null, readBytes: 0, runs: [] };
         }
 
         const page = await ctx.db
             .query("triggerExecutions")
             .withIndex("by_triggerId_startedAt", (q) => q.eq("triggerId", triggerId))
             .order("desc")
-            .paginate({ cursor: cursor ?? null, numItems: onlyOne === true ? 1 : EXPORT_RUN_PAGE });
+            .paginate({ cursor: cursor ?? null, numItems: EXPORT_RUN_PAGE });
 
         return {
             cursor: page.isDone ? null : page.continueCursor,
+            // What this page read, whole rows included: the export action's queries share one read budget.
+            readBytes: page.page.reduce((sum, run) => sum + new TextEncoder().encode(JSON.stringify(run)).byteLength, 0),
             runs: page.page.map((run) => {
                 const payload = run.payload ?? null;
 
