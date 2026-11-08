@@ -56907,6 +56907,225 @@
         "x-lunora-function-kind": "query"
       }
     },
+    "/_lunora/rpc#usage_activity:getProjectBreakdown": {
+      "post": {
+        "description": "Invoke the `query` `usage_activity:getProjectBreakdown` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "usage_activity:getProjectBreakdown",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "fromDate": {}
+                    },
+                    "required": [],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "usage_activity:getProjectBreakdown",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "noProject": {
+                      "properties": {
+                        "costMicrodollars": {
+                          "type": "number"
+                        },
+                        "replies": {
+                          "type": "number"
+                        },
+                        "tokens": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "costMicrodollars",
+                        "replies",
+                        "tokens"
+                      ],
+                      "type": "object"
+                    },
+                    "projects": {
+                      "items": {
+                        "properties": {
+                          "costMicrodollars": {
+                            "type": "number"
+                          },
+                          "replies": {
+                            "type": "number"
+                          },
+                          "tokens": {
+                            "type": "number"
+                          },
+                          "projectKey": {
+                            "type": "string"
+                          },
+                          "title": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "costMicrodollars",
+                          "replies",
+                          "tokens",
+                          "projectKey"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "total": {
+                      "properties": {
+                        "costMicrodollars": {
+                          "type": "number"
+                        },
+                        "replies": {
+                          "type": "number"
+                        },
+                        "tokens": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "costMicrodollars",
+                        "replies",
+                        "tokens"
+                      ],
+                      "type": "object"
+                    },
+                    "truncated": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "noProject",
+                    "projects",
+                    "total",
+                    "truncated"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "query: usage_activity:getProjectBreakdown",
+        "tags": [
+          "usage"
+        ],
+        "x-lunora-function-kind": "query"
+      }
+    },
+    "/_lunora/rpc#usage_activity:getProjectUsage": {
+      "post": {
+        "description": "Invoke the `query` `usage_activity:getProjectUsage` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "usage_activity:getProjectUsage",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "fromDate": {},
+                      "projectId": {
+                        "description": "Id<\"projects\">",
+                        "type": "string",
+                        "x-lunora-table": "projects"
+                      }
+                    },
+                    "required": [
+                      "projectId"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "usage_activity:getProjectUsage",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "costMicrodollars": {
+                      "type": "number"
+                    },
+                    "replies": {
+                      "type": "number"
+                    },
+                    "tokens": {
+                      "type": "number"
+                    },
+                    "truncated": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "costMicrodollars",
+                    "replies",
+                    "tokens",
+                    "truncated"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "query: usage_activity:getProjectUsage",
+        "tags": [
+          "usage"
+        ],
+        "x-lunora-function-kind": "query"
+      }
+    },
     "/_lunora/rpc#usage_activity:getSkillBreakdown": {
       "post": {
         "description": "Invoke the `query` `usage_activity:getSkillBreakdown` over the Lunora RPC envelope (POST /_lunora/rpc).",
