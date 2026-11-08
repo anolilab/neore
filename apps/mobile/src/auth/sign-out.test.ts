@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { emptyCacheWhileSignedOut, signOutOnDevice } from "./sign-out";
+import { emptyCacheWhileSignedOut, RELEASE_PUSH_TIMEOUT_MS, signOutOnDevice } from "./sign-out";
 
 describe("signOutOnDevice", () => {
     it("empties the cache before it asks the server, so a request that fails or hangs cannot leave chats behind", async () => {
@@ -22,6 +22,47 @@ describe("signOutOnDevice", () => {
         });
 
         expect(calls).toEqual(["clear", "forget", "revoke"]);
+    });
+
+    it("releases the phone's push token after the local wipe and before the revoke, while the sign-in still works", async () => {
+        const calls: string[] = [];
+        const step = (name: string) => async () => {
+            calls.push(name);
+        };
+
+        await signOutOnDevice({
+            clearCache: step("clear"),
+            forgetLastChat: step("forget"),
+            releasePush: step("release"),
+            revokeGrant: step("revoke"),
+            warn: () => undefined,
+        });
+
+        expect(calls).toEqual(["clear", "forget", "release", "revoke"]);
+    });
+
+    it("signs out anyway when the release fails or never answers", async () => {
+        vi.useFakeTimers();
+
+        try {
+            const revokeGrant = vi.fn(async () => undefined);
+            const warn = vi.fn();
+            const signingOut = signOutOnDevice({
+                clearCache: async () => undefined,
+                forgetLastChat: async () => undefined,
+                releasePush: async () => await new Promise<void>(() => {}),
+                revokeGrant,
+                warn,
+            });
+
+            await vi.advanceTimersByTimeAsync(RELEASE_PUSH_TIMEOUT_MS);
+            await signingOut;
+
+            expect(revokeGrant).toHaveBeenCalledTimes(1);
+            expect(warn).toHaveBeenCalledWith("Could not stop notifications for this phone.", expect.any(Error));
+        } finally {
+            vi.useRealTimers();
+        }
     });
 
     it("still asks the server when the cache could not be emptied, and says so", async () => {

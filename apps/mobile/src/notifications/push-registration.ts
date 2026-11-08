@@ -92,6 +92,83 @@ export const registerPhoneForPush = async ({
 };
 
 /**
+ * Sign-out: the account stops getting pushes on this phone, unless `isCurrent` says
+ * the sign-out is over by the time the token is known. Released whatever the
+ * permission says now: a person who turned notifications off in the system settings
+ * after registering still has a row on the server. A phone the system gives no token
+ * has nothing registered to release.
+ */
+export const releasePhonePush = async ({
+    isCurrent = () => true,
+    platform,
+    server,
+}: {
+    isCurrent?: () => boolean;
+    platform: PushPlatform;
+    server: PushServer;
+}): Promise<void> => {
+    let token: string;
+
+    try {
+        token = await platform.getDeviceToken();
+    } catch {
+        return;
+    }
+
+    // A release that outlived its sign-out (it timed out and the next account signed in) would unregister THAT
+    // account's row: the client now carries its sign-in.
+    if (!isCurrent()) {
+        return;
+    }
+
+    await server.unregister(token);
+};
+
+/**
+ * Registrations, gated on the session. Sign-out `close`s the gate and then `settle`s:
+ * a registration already on its way is let finish, and one still before its send, or
+ * started later (a chat send that finishes during sign-out), finds `isCurrent` false
+ * and never reaches the server, where it would give the phone back to the account
+ * that just left. The next sign-in `open`s the gate again.
+ */
+export const createPendingWork = () => {
+    const pending = new Set<Promise<unknown>>();
+    const gate = { generation: 0, isClosed: false };
+
+    return {
+        /** Closes the gate. The guard it returns holds until the next `open` (a new sign-in) or `close`. */
+        close: (): () => boolean => {
+            gate.isClosed = true;
+            gate.generation += 1;
+
+            const { generation } = gate;
+
+            return () => gate.isClosed && gate.generation === generation;
+        },
+        // A new generation: work started while the gate was closed stays refused after it reopens.
+        open: (): void => {
+            gate.isClosed = false;
+            gate.generation += 1;
+        },
+        run: async <T>(work: (isCurrent: () => boolean) => Promise<T>): Promise<T> => {
+            const { generation } = gate;
+            const job = work(() => !gate.isClosed && gate.generation === generation);
+
+            pending.add(job);
+
+            try {
+                return await job;
+            } finally {
+                pending.delete(job);
+            }
+        },
+        settle: async (): Promise<void> => {
+            await Promise.allSettled(pending);
+        },
+    };
+};
+
+/**
  * A setup step that runs until it has worked once. A failed attempt is not remembered
  * as done, so the next call (the app coming back to the front) tries again.
  */
