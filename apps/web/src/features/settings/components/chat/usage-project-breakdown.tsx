@@ -2,7 +2,7 @@ import { useLingui } from "@lingui/react/macro";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@neore/ui/components/card";
 import { Skeleton } from "@neore/ui/components/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@neore/ui/components/table";
-import { skipToken, useQuery } from "@tanstack/react-query";
+import { keepPreviousData, skipToken, useQuery } from "@tanstack/react-query";
 import { FolderKanban } from "lucide-react";
 import type { FC } from "react";
 
@@ -43,10 +43,12 @@ const UsageProjectBreakdown: FC<UsageProjectBreakdownProps> = ({ backfilling, da
     const locale = i18n.locale || "en";
     const mine = useQuery({
         ...crpc.usage.activity.getProjectBreakdown.queryOptions(today === undefined ? skipToken : { fromDate: periodStart(today, days) }, { live: false }),
+        // A new day keeps the last figures in view until its own read lands, instead of a skeleton.
+        placeholderData: keepPreviousData,
         refetchInterval: backfilling ? BACKFILL_REFETCH_MS : false,
     });
 
-    useRefetchAfterBackfill(backfilling, mine.refetch);
+    useRefetchAfterBackfill(backfilling, mine.refetch, today !== undefined);
 
     const rows: ProjectRow[] = (mine.data?.projects ?? []).map((project) => {
         return { ...project, key: project.projectKey, label: project.title ?? t`Project no longer available` };

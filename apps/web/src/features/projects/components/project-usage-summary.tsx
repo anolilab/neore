@@ -1,7 +1,7 @@
 import { useLingui } from "@lingui/react/macro";
 import type { Id } from "@neore/backend/dataModel";
 import { Skeleton } from "@neore/ui/components/skeleton";
-import { skipToken, useQuery } from "@tanstack/react-query";
+import { keepPreviousData, skipToken, useQuery } from "@tanstack/react-query";
 import { useId } from "react";
 
 import { useUsageToday } from "@/features/settings/hooks/use-usage-today";
@@ -22,13 +22,15 @@ const ProjectUsageSummary = ({ projectId }: ProjectUsageSummaryProps) => {
     const headingId = useId();
     const { failed: zoneFailed, today } = useUsageToday();
     const locale = i18n.locale || "en";
-    const query = useQuery(
-        crpc.usage.activity.getProjectUsage.queryOptions(
+    const query = useQuery({
+        ...crpc.usage.activity.getProjectUsage.queryOptions(
             // The dialog receives `_id` as a plain `string`; it is always an id the backend returned for a `projects` row.
             today === undefined ? skipToken : { fromDate: periodStart(today, WINDOW_DAYS), projectId: projectId as Id<"projects"> },
             { live: false },
         ),
-    );
+        // A new day keeps the last figures in view until its own read lands, instead of a skeleton.
+        placeholderData: keepPreviousData,
+    });
     const { data } = query;
     const isError = query.isError || zoneFailed;
     const isPending = query.isPending && !zoneFailed;

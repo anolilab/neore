@@ -2,7 +2,7 @@ import { useLingui } from "@lingui/react/macro";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@neore/ui/components/card";
 import { Skeleton } from "@neore/ui/components/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@neore/ui/components/table";
-import { skipToken, useQuery } from "@tanstack/react-query";
+import { keepPreviousData, skipToken, useQuery } from "@tanstack/react-query";
 import { Sparkles } from "lucide-react";
 import type { FC } from "react";
 
@@ -36,10 +36,12 @@ const UsageSkillBreakdown: FC<UsageSkillBreakdownProps> = ({ backfilling, days }
 
     const query = useQuery({
         ...crpc.usage.activity.getSkillBreakdown.queryOptions(today === undefined ? skipToken : { fromDate: periodStart(today, days) }, { live: false }),
+        // A new day keeps the last figures in view until its own read lands, instead of a skeleton.
+        placeholderData: keepPreviousData,
         refetchInterval: backfilling ? BACKFILL_REFETCH_MS : false,
     });
 
-    useRefetchAfterBackfill(backfilling, query.refetch);
+    useRefetchAfterBackfill(backfilling, query.refetch, today !== undefined);
 
     const { data } = query;
     const isError = query.isError || zoneFailed;

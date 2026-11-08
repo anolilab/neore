@@ -19,6 +19,9 @@ export const useUsageToday = (): { failed: boolean; today: string | undefined } 
     const [now, setNow] = useState(() => new Date());
 
     useEffect(() => {
+        // A zone that changes while a view is open is applied to the time now, not to when the day last turned.
+        setNow(new Date());
+
         const timer = setInterval(() => {
             const next = new Date();
 

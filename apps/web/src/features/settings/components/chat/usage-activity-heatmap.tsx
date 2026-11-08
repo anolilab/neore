@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@neor
 import { Skeleton } from "@neore/ui/components/skeleton";
 import { ToggleGroup, ToggleGroupItem } from "@neore/ui/components/toggle-group";
 import cn from "@neore/ui/utils/cn";
-import { skipToken, useQuery } from "@tanstack/react-query";
+import { keepPreviousData, skipToken, useQuery } from "@tanstack/react-query";
 import { CalendarDays } from "lucide-react";
 import type { FC, KeyboardEvent } from "react";
 import { useId, useState } from "react";
@@ -71,10 +71,12 @@ const UsageActivityHeatmap: FC<UsageActivityHeatmapProps> = ({ backfilling }) =>
     // the backfill adds earlier replies it is re-read now and then instead.
     const query = useQuery({
         ...crpc.usage.activity.getActivityHeatmap.queryOptions(today === undefined ? skipToken : { toDate: today }, { live: false }),
+        // A new day keeps the last figures in view until its own read lands, instead of a skeleton.
+        placeholderData: keepPreviousData,
         refetchInterval: backfilling ? BACKFILL_REFETCH_MS : false,
     });
 
-    useRefetchAfterBackfill(backfilling, query.refetch);
+    useRefetchAfterBackfill(backfilling, query.refetch, today !== undefined);
 
     const { data } = query;
     const isError = query.isError || zoneFailed;
