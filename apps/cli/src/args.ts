@@ -64,7 +64,7 @@ export class UsageError extends Error {
 const isGroup = (value: string): value is keyof typeof GROUPS => Object.hasOwn(GROUPS, value);
 
 /** The commands `--wait` blocks; every flag is shared, so any other command would silently drop it. */
-const WAIT_COMMANDS: ReadonlySet<string> = new Set(["help", "thread send", "thread start"]);
+const WAIT_COMMANDS: ReadonlySet<string> = new Set(["thread send", "thread start"]);
 
 /** The blocking flag of a command that has one instead of `--wait`. */
 const WAIT_INSTEAD: Readonly<Record<string, string>> = { chat: "--no-stream", "skills run": "--no-stream", "tasks run": "`neore tasks status <id>`" };

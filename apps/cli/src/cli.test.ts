@@ -413,6 +413,7 @@ describe("chat end to end against a fake API", () => {
             expect(await run(["thread", "start", "hi", "--skill", "s"], context)).toBe(2);
             expect(context.io.stderr.text()).toContain("`thread` has no --skill");
             expect(await run(["chat", "--help", "--wait"], context)).toBe(0);
+            expect(await run(["--wait"], context)).toBe(2);
             expect(await run(["chat", "hi", "--wait"], context)).toBe(2);
             expect(context.io.stderr.text()).toContain("`chat` has no --wait: use --no-stream");
             expect(await run(["tasks", "run", "t1", "--wait"], context)).toBe(2);
