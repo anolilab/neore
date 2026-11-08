@@ -275,6 +275,7 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
     const isOptionsMenuOpen = useThreadListUIStore((state) => state.optionsMenuThreadId === node.threadId);
     const setOptionsMenuThreadId = useThreadListUIStore((state) => state.setOptionsMenuThreadId);
     const setRenameThreadId = useThreadListUIStore((state) => state.setRenameThreadId);
+    const setSnoozeThreadId = useThreadListUIStore((state) => state.setSnoozeThreadId);
     // The menu has a copy in the row (screens without hover) and one in the hover strip; only the copy this screen shows may open, so
     // opening it (by click or the context-menu key) never puts two menus on the page.
     const canHover = useCanHover();
@@ -900,6 +901,7 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                             <DropdownMenuItem
                                 onClick={() => snooze(node.threadId, "nextWeek", node.snoozedUntil)}
                             >{t`Snooze until next week`}</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => setSnoozeThreadId(node.threadId)}>{t`Snooze until…`}</DropdownMenuItem>
                             {isSnoozed(snoozedUntil, snoozeMenuNow) && (
                                 <DropdownMenuItem onClick={() => unsnooze(node.threadId, node.snoozedUntil)}>{t`Unsnooze`}</DropdownMenuItem>
                             )}

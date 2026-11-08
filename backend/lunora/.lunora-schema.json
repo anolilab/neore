@@ -26749,6 +26749,12 @@
           "unique": false,
           "literal": "\"host\""
         },
+        "snoozeChosenAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "snoozedUntil": {
           "kind": "number",
           "nullable": false,

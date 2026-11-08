@@ -34,6 +34,7 @@ import useThreadHandlers from "./hooks/use-thread-handlers";
 import useThreadListKeyboard from "./hooks/use-thread-list-keyboard";
 import { renameFocusTarget } from "./rename-focus-target";
 import RenameThreadDialog from "./rename-thread-dialog";
+import SnoozeUntilDialog from "./snooze-until-dialog";
 import SortableThreadItem from "./sortable-thread-item";
 import { useThreadListUIStore } from "./stores/thread-list-ui-store";
 import { isThreadLocked } from "./thread-lock";
@@ -1069,6 +1070,16 @@ const HierarchicalThreadList: FC<
     const setOptionsMenuThreadId = useThreadListUIStore((state) => state.setOptionsMenuThreadId);
     const renameThread = renameThreadId === null ? undefined : flattenedThreads.find((node) => node.threadId === renameThreadId);
     const optionsMenuThread = optionsMenuThreadId === null ? undefined : flattenedThreads.find((node) => node.threadId === optionsMenuThreadId);
+    const snoozeThreadId = useThreadListUIStore((state) => state.snoozeThreadId);
+    const setSnoozeThreadId = useThreadListUIStore((state) => state.setSnoozeThreadId);
+    const snoozeThread = snoozeThreadId === null ? undefined : flattenedThreads.find((node) => node.threadId === snoozeThreadId);
+
+    // Like rename: the snooze dialog closes with its thread, so it cannot reopen when the thread comes back.
+    useEffect(() => {
+        if (snoozeThreadId !== null && snoozeThread === undefined) {
+            setSnoozeThreadId(null);
+        }
+    }, [snoozeThread, snoozeThreadId, setSnoozeThreadId]);
 
     useEffect(() => {
         if (renameThreadId !== null && (renameThread === undefined || isThreadLocked(renameThread.lockedAt))) {
@@ -1323,6 +1334,20 @@ const HierarchicalThreadList: FC<
                     open={!!projectToDelete}
                     title={t`Delete Project`}
                 />
+                {snoozeThread && (
+                    <SnoozeUntilDialog
+                        key={snoozeThread.threadId}
+                        onOpenChange={(open) => {
+                            if (!open) {
+                                setSnoozeThreadId(null);
+                            }
+                        }}
+                        open
+                        previousUntil={snoozeThread.snoozedUntil}
+                        restoreFocus={() => renameFocusTarget(listRootReference.current, snoozeThread.threadId)}
+                        threadId={snoozeThread.threadId}
+                    />
+                )}
                 {renameThread && !isThreadLocked(renameThread.lockedAt) && (
                     <RenameThreadDialog
                         onOpenChange={(open) => {
