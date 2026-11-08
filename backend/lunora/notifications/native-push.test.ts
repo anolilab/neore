@@ -5,6 +5,7 @@
 import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { cascadeDeleteUser } from "../auth/hooks";
 import { reassignGlobalRows } from "../lib/account-merge";
 import schema from "../schema";
 import { getNativePushConfig, registerPushDevice, unregisterPushDevice } from "./native-push";
@@ -228,6 +229,22 @@ describe("phone push tokens", () => {
         const stored = await harness.run(async (ctx: any) => await ctx.db.pushDevices.findMany({ where: {} }));
 
         expect(stored.page.map((row: { token: string; userId: string }) => [row.token, row.userId])).toStrictEqual([[SECOND_PHONE, OTHER]]);
+    });
+
+    it("drops a deleted guest's phones with the rest of its account (inactive-guest cleanup and the merge's last step)", async () => {
+        await call(registerPushDevice, USER, { platform: "ios", token: PHONE });
+        await call(cascadeDeleteUser, null, { userId: USER });
+
+        expect(await devicesOf(USER)).toHaveLength(0);
+    });
+
+    it("takes its row back when the caller's session was deleted while the registration was on its way (a guest's cascade)", async () => {
+        await harness.run(async (ctx: any) => {
+            await ctx.db.delete("session", sessions[USER]);
+        });
+
+        expect(await call(registerPushDevice, USER, { platform: "ios", token: PHONE })).toStrictEqual({ registered: false });
+        expect(await devicesOf(USER)).toHaveLength(0);
     });
 
     it("registers nothing for a call that carries no session", async () => {

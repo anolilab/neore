@@ -12,7 +12,7 @@ import { v } from "lunorash/server";
 import type { Doc } from "../_generated/dataModel";
 import type { QueryCtx } from "../_generated/server";
 import { internalMutation, internalQuery } from "../_generated/server";
-import { MAX_PUSH_DEVICES_PER_USER } from "./push-device-writes";
+import { deleteIfUnchanged, MAX_PUSH_DEVICES_PER_USER } from "./push-device-writes";
 import { MAX_PUSH_SUBSCRIPTIONS_PER_USER } from "./push";
 
 const BATCH = 200;
@@ -87,7 +87,8 @@ export const deleteUserNotifications = internalMutation
         ]);
 
         await Promise.all([
-            ...phones.page.map(async (row) => await ctx.db.delete("pushDevices", row._id)),
+            // A phone another account took over since the read above is that account's now: it stays.
+            ...phones.page.map(async (row) => await deleteIfUnchanged(ctx.db, row)),
             ...notifications.page.map(async (row) => await ctx.db.delete("notifications", row._id)),
             ...briefState.page.map(async (row) => await ctx.db.delete("dailyBriefState", row._id)),
             ...outbox.page.map(async (row) => await ctx.db.delete("outcomeEmails", row._id)),

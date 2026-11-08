@@ -9,10 +9,11 @@
 import { v } from "lunorash/server";
 
 import { isAccountDeletionUnderway } from "../gdpr/deletion-guard";
+import type { Id } from "../_generated/dataModel";
 import { authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { systemDb } from "../lib/rls/scope";
 import { isPhonePushConfigured } from "./native-push-config";
-import { trimPushDevices } from "./push-device-writes";
+import { deleteIfUnchanged, trimPushDevices } from "./push-device-writes";
 
 /** Expo push tokens: `ExponentPushToken[…]` (and the newer `ExpoPushToken[…]`). */
 const EXPO_PUSH_TOKEN = /^Expo(?:nent)?PushToken\[[\w-]+\]$/u;
@@ -96,12 +97,16 @@ export const registerPushDevice = authMutation
         }
 
         // A deletion that started between the check above and this write has already run its phone step (or will):
-        // ask again, and take back this row, so a phone never outlives the account's erasure.
-        if (await isAccountDeletionUnderway(ctx, userId)) {
+        // ask again, and take back this row, so a phone never outlives the account's erasure. A guest is deleted
+        // without a deletion request (inactive-guest cleanup, the end of a merge), its sessions first: a session gone
+        // by now means the same.
+        const session = await database.session.findFirst({ consistency: "primary", where: { _id: sessionId as Id<"session"> } });
+
+        if (!session || (await isAccountDeletionUnderway(ctx, userId))) {
             const written = await database.pushDevices.findFirst({ consistency: "primary", where: { token: args.token, userId } });
 
             if (written) {
-                await database.delete("pushDevices", written._id);
+                await deleteIfUnchanged(database, written);
             }
 
             return refuse("deleting");
@@ -136,11 +141,10 @@ export const unregisterPushDevice = authMutation
                 ? await ctx.db.pushDevices.findFirst({ consistency: "primary", where: { sessionId, token: args.token, userId: ctx.user.userId } })
                 : undefined;
 
-        if (row) {
-            await ctx.db.delete("pushDevices", row._id);
-        }
+        // Skipped when the phone registered again (or moved to another account) since the read above.
+        const isRemoved = row ? await deleteIfUnchanged(ctx.db, row) : false;
 
-        ctx.log.event("notifications.unregister_push_device", { removed: Boolean(row) });
+        ctx.log.event("notifications.unregister_push_device", { removed: isRemoved });
 
         return null;
     });

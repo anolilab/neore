@@ -27,6 +27,7 @@ import { internalMutation } from "../_generated/server";
 import { ADMIN } from "../env";
 import { noteShardActivity } from "../lib/shard-housekeeping";
 import { deleteShardRoutesOf } from "../lib/shard-routes";
+import { dropPushDevicesOf } from "../notifications/push-device-writes";
 
 /** Emails in the `ADMIN` allowlist, trimmed and lowercased. */
 export const adminEmails = (): string[] =>
@@ -151,6 +152,10 @@ const cascadeDelete = async (ctx: MutationCtx, user: Id<"user">): Promise<void> 
     // `.global()` pointers at this user's shard: webhook/public-link routes and
     // the housekeeping census.
     await deleteShardRoutesOf(ctx, args.userId);
+
+    // `.global()` phone push rows, through the notifications module's own write surface: a guest's phone may have
+    // registered up to the moment its account goes.
+    await dropPushDevicesOf(ctx.db, args.userId);
 };
 
 /**

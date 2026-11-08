@@ -14,7 +14,7 @@ export const MAX_PUSH_DEVICES_PER_USER = 10;
  * stays. The check and the delete are two statements (the global table offers no conditional delete), so a write
  * landing between them can still lose its row; the app registers again on its next return to the foreground.
  */
-const deleteIfUnchanged = async (db: MutationCtx["db"], read: Doc<"pushDevices">): Promise<boolean> => {
+export const deleteIfUnchanged = async (db: MutationCtx["db"], read: Doc<"pushDevices">): Promise<boolean> => {
     const current = await db.pushDevices.findFirst({ consistency: "primary", where: { _id: read._id } });
 
     if (current?.userId !== read.userId || current.lastSeenAt !== read.lastSeenAt) {
