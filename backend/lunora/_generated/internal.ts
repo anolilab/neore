@@ -1212,8 +1212,8 @@ export interface InternalApiTypes {
             startEventRun: FunctionReference<"action", { attempt?: number; firing: number; payload: string; triggerId: Id<"triggers">; userId: string }, null>;
         };
         execute: {
-            default: FunctionReference<"action", { claim?: { claimedAt: number; key: string; scope: string }; firing?: number; ignoreDisabled?: boolean; invalidUtf8?: boolean; manual?: boolean; payload?: string; releaseUnlessRun?: boolean; triggerId: Id<"triggers"> }, void>;
-            executeTrigger: FunctionReference<"action", { claim?: { claimedAt: number; key: string; scope: string }; firing?: number; ignoreDisabled?: boolean; invalidUtf8?: boolean; manual?: boolean; payload?: string; releaseUnlessRun?: boolean; triggerId: Id<"triggers"> }, void>;
+            default: FunctionReference<"action", { claim?: { claimedAt: number; key: string; scope: string }; firing?: number; ignoreDisabled?: boolean; invalidUtf8?: boolean; manual?: boolean; payload?: string; releaseUnlessRun?: boolean; triggerId: Id<"triggers">; webhookPrompt?: string }, void>;
+            executeTrigger: FunctionReference<"action", { claim?: { claimedAt: number; key: string; scope: string }; firing?: number; ignoreDisabled?: boolean; invalidUtf8?: boolean; manual?: boolean; payload?: string; releaseUnlessRun?: boolean; triggerId: Id<"triggers">; webhookPrompt?: string }, void>;
         };
         functions: {
             admitTriggerRun: FunctionReference<"mutation", { claim?: { claimedAt: number; key: string; scope: string }; executionId?: Id<"triggerExecutions">; filterPayload?: string; releaseUnlessRun?: boolean; requireEnabled?: boolean; triggerId: Id<"triggers"> }, null | string | { filtered: string } | { skipped: "disabled" | "duplicate" }>;
@@ -1221,6 +1221,7 @@ export interface InternalApiTypes {
             getDueScheduleTriggers: FunctionReference<"query", { now: number }, import("./dataModel.js").Doc_triggers[]>;
             getTriggerInternal: FunctionReference<"query", { triggerId: Id<"triggers"> }, import("./dataModel.js").Doc_triggers | null>;
             recordFilteredExecution: FunctionReference<"mutation", { firing?: number; reason: string; triggerId: Id<"triggers"> }, null>;
+            recordRefusedDelivery: FunctionReference<"mutation", { reason: string; triggerId: Id<"triggers"> }, null>;
             releaseQuietWindow: FunctionReference<"mutation", { expected?: number; triggerId: Id<"triggers"> }, null>;
             reserveQuietWindow: FunctionReference<"mutation", { expected?: number; triggerId: Id<"triggers">; windowStart: number }, boolean>;
             setTriggerEnabledInternal: FunctionReference<"mutation", { enabled: boolean; triggerId: Id<"triggers"> }, null>;
@@ -2496,6 +2497,7 @@ export const internal: InternalApiTypes = {
             getDueScheduleTriggers: { __lunoraRef: "triggers_functions:getDueScheduleTriggers" },
             getTriggerInternal: { __lunoraRef: "triggers_functions:getTriggerInternal" },
             recordFilteredExecution: { __lunoraRef: "triggers_functions:recordFilteredExecution" },
+            recordRefusedDelivery: { __lunoraRef: "triggers_functions:recordRefusedDelivery" },
             releaseQuietWindow: { __lunoraRef: "triggers_functions:releaseQuietWindow" },
             reserveQuietWindow: { __lunoraRef: "triggers_functions:reserveQuietWindow" },
             setTriggerEnabledInternal: { __lunoraRef: "triggers_functions:setTriggerEnabledInternal" },
