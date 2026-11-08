@@ -1745,10 +1745,6 @@ msgstr "A dataset is a set of test cases you run against an agent, a model or yo
 msgid "A description is at most {0} characters."
 msgstr "A description is at most {0} characters."
 
-#: src/features/develop/components/pull-request-edit-action.tsx:156
-#~ msgid "A description is at most {MAX_BODY} characters."
-#~ msgstr "A description is at most {MAX_BODY} characters."
-
 #: src/features/marketing/components/landing-page.tsx:218
 msgid "A document editor that thinks with you."
 msgstr "A document editor that thinks with you."
@@ -1836,14 +1832,6 @@ msgstr "A placeholder or @mention outside quotes is read as null here, so this e
 #: src/features/settings/components/chat/event-trigger-fields.tsx:227
 msgid "A public http or https address. The first check only records how the page looks. Only the first 1 MiB of a page is read."
 msgstr "A public http or https address. The first check only records how the page looks. Only the first 1 MiB of a page is read."
-
-#: src/features/develop/components/pull-request-edit-action.tsx:134
-#~ msgid "A pull request needs a title. Enter one to save."
-#~ msgstr "A pull request needs a title. Enter one to save."
-
-#: src/features/develop/components/pull-request-edit-action.tsx:133
-#~ msgid "A pull request title is at most {MAX_TITLE} characters."
-#~ msgstr "A pull request title is at most {MAX_TITLE} characters."
 
 #: src/features/notifications/lib/notification-labels.ts:39
 msgid "A question is waiting for you"
@@ -25067,10 +25055,6 @@ msgstr "Pull"
 #: src/features/develop/lib/use-request-noun.ts:8
 msgid "pull request"
 msgstr "pull request"
-
-#: src/features/develop/components/pull-request-actions-panel.tsx:45
-#~ msgid "Pull request"
-#~ msgstr "Pull request"
 
 #: src/features/settings/components/chat/webhook-trigger-fields.tsx:86
 msgid "Pull request merged"
