@@ -1532,7 +1532,7 @@ export const threadGuestLinks = sqliteTable("threadGuestLinks", {
     threadId: text("threadId").references((): AnySQLiteColumn => threads._id).notNull(),
     userId: text("userId").notNull(),
 }, (t) => ({
-    by_thread: index("by_thread").on(t.threadId),
+    by_thread_expiresAt: index("by_thread_expiresAt").on(t.threadId, t.expiresAt),
     by_linkHash: index("by_linkHash").on(t.linkHash),
     by_expiresAt: index("by_expiresAt").on(t.expiresAt),
     by_userId: index("by_userId").on(t.userId),

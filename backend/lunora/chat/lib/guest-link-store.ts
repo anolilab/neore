@@ -5,7 +5,10 @@
  */
 import type { Id } from "../../_generated/dataModel";
 import type { MutationCtx } from "../../_generated/server";
+import { internal } from "../../_generated/internal";
+import { currentShard, ROOT_SHARD_KEY } from "../../lib/shard-context";
 import { deleteShardRoute } from "../../lib/shard-routes";
+import { runAfterOnShard } from "../../lib/shard-scheduler";
 
 /** Rows (held and sent) one link keeps. */
 export const GUEST_MAX_ROWS_PER_LINK = 100;
@@ -18,18 +21,26 @@ interface LinkRow {
     linkHash: string;
 }
 
+/** Messages one removal deletes per link per call. */
+export const GUEST_MESSAGE_REMOVAL_PAGE = 100;
+
 /**
- * One link with its messages, returning its route's hash for the caller to remove once the write has gone through (a
- * route write is global and does not roll back, so it goes after the rows, as `removeGuestLinkRows` does).
+ * One page of a link's messages, and the link itself once none are left. Returns the link's route hash when the link
+ * went, for the caller to remove once the write has gone through (a route write is global and does not roll back), or
+ * `undefined` while messages remain: the caller runs again, and the link is never deleted ahead of its messages.
  */
-export const deleteGuestLink = async (ctx: Pick<MutationCtx, "db">, link: LinkRow): Promise<string> => {
+export const deleteGuestLink = async (ctx: Pick<MutationCtx, "db">, link: LinkRow): Promise<string | undefined> => {
     const messages = await ctx.db
         .query("threadGuestMessages")
         .withIndex("by_link", (q) => q.eq("linkId", link._id))
-        .take(GUEST_MAX_ROWS_PER_LINK);
+        .take(GUEST_MESSAGE_REMOVAL_PAGE);
 
     for (const message of messages) {
         await ctx.db.delete("threadGuestMessages", message._id);
+    }
+
+    if (messages.length >= GUEST_MESSAGE_REMOVAL_PAGE) {
+        return undefined;
     }
 
     await ctx.db.delete("threadGuestLinks", link._id);
@@ -38,22 +49,29 @@ export const deleteGuestLink = async (ctx: Pick<MutationCtx, "db">, link: LinkRo
 };
 
 /**
- * A thread's links and what guests left on them, minus their routes: the shard-local rows go with the caller's
- * write, and the returned hashes are the routes the caller removes once that write has gone through. A route write
- * is global and does not roll back, so a route deleted before the write could leave a live link unreachable.
+ * One batch of a thread's links and what guests left on them, minus their routes: the rows go with the caller's write,
+ * and the returned hashes are the routes the caller removes once that write has gone through. `done` is false while
+ * rows remain; the caller runs it again.
  */
-export const removeGuestLinkRows = async (ctx: Pick<MutationCtx, "db">, threadId: Id<"threads">): Promise<string[]> => {
+export const removeGuestLinkRows = async (ctx: Pick<MutationCtx, "db">, threadId: Id<"threads">): Promise<{ done: boolean; hashes: string[] }> => {
     const links = await ctx.db
         .query("threadGuestLinks")
-        .withIndex("by_thread", (q) => q.eq("threadId", threadId))
+        .withIndex("by_thread_expiresAt", (q) => q.eq("threadId", threadId))
         .take(GUEST_LINK_REMOVAL_CAP);
     const hashes: string[] = [];
 
     for (const link of links) {
-        hashes.push(await deleteGuestLink(ctx, link));
+        const hash = await deleteGuestLink(ctx, link);
+
+        // One unfinished link per call keeps the write bounded; the rest wait for the next call.
+        if (hash === undefined) {
+            return { done: false, hashes };
+        }
+
+        hashes.push(hash);
     }
 
-    return hashes;
+    return { done: links.length < GUEST_LINK_REMOVAL_CAP, hashes };
 };
 
 /**
@@ -70,9 +88,21 @@ export const dropGuestLinkRoutes = async (ctx: Pick<MutationCtx, "db">, linkHash
     }
 };
 
-/** Every link of a thread, with what guests left on them: a revoke, an archive, a delete. */
-export const revokeGuestLinksForThread = async (ctx: Pick<MutationCtx, "db">, threadId: Id<"threads">): Promise<void> => {
-    const linkHashes = await removeGuestLinkRows(ctx, threadId);
+/** One batch of a thread's links, their messages and routes. True once none are left; the caller runs it again otherwise. */
+export const revokeGuestLinksForThread = async (ctx: Pick<MutationCtx, "db">, threadId: Id<"threads">): Promise<boolean> => {
+    const { done, hashes } = await removeGuestLinkRows(ctx, threadId);
 
-    await dropGuestLinkRoutes(ctx, linkHashes);
+    await dropGuestLinkRoutes(ctx, hashes);
+
+    return done;
+};
+
+/**
+ * Every link of a thread, for a write that cannot re-run itself (an archive, a trash, a lock, a temporary chat): the first
+ * batch now, and a continuation on this shard until none are left.
+ */
+export const withdrawGuestLinksForThread = async (ctx: Pick<MutationCtx, "db" | "scheduler">, threadId: Id<"threads">): Promise<void> => {
+    if (!(await revokeGuestLinksForThread(ctx, threadId))) {
+        await runAfterOnShard(ctx.scheduler, 0, internal.chat.guest_links.continueGuestLinkRemoval, { threadId }, currentShard() ?? ROOT_SHARD_KEY);
+    }
 };

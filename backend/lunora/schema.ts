@@ -2906,7 +2906,7 @@ export const schema = defineSchema({
         userId: v.string(),
     })
         .shardBy("userId")
-        .index("by_thread", ["threadId"])
+        .index("by_thread_expiresAt", ["threadId", "expiresAt"])
         .index("by_linkHash", ["linkHash"])
         .index("by_expiresAt", ["expiresAt"])
         .index("by_userId", ["userId"]),

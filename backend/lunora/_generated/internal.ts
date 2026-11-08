@@ -446,7 +446,8 @@ export interface InternalApiTypes {
             };
         };
         guest_links: {
-            listGuestNotesForExport: FunctionReference<"query", { threadId: Id<"threads"> }, Array<{ createdAt: number; status: "held" | "sent"; text: string }>>;
+            continueGuestLinkRemoval: FunctionReference<"mutation", { threadId: Id<"threads"> }, null>;
+            listGuestNotesForExport: FunctionReference<"query", { cursor: string | null; threadId: Id<"threads"> }, { continueCursor: string | null; isDone: boolean; page: Array<{ createdAt: number; status: "held" | "sent"; text: string }> }>;
             sweepGuestLinks: FunctionReference<"mutation", {}, null>;
         };
         mcp_registry: {
@@ -1709,6 +1710,7 @@ export const internal: InternalApiTypes = {
             },
         },
         guest_links: {
+            continueGuestLinkRemoval: { __lunoraRef: "chat_guest_links:continueGuestLinkRemoval" },
             listGuestNotesForExport: { __lunoraRef: "chat_guest_links:listGuestNotesForExport" },
             sweepGuestLinks: { __lunoraRef: "chat_guest_links:sweepGuestLinks" },
         },

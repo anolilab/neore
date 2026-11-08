@@ -299,9 +299,23 @@ export const collectConversations = internalAction.input({ userId: v.string() })
             // Outside the catch above: a failed guest-note read fails this export step (the workflow retries it), instead of
             // shipping an export that silently lacks the notes of a thread it did collect.
             if (collected) {
-                const guestNotes = await context.runQuery(internal.chat.guest_links.listGuestNotesForExport, {
-                    threadId: listed._id as Id<"threads">,
-                });
+                const guestNotes: (typeof conversations)[number]["guestNotes"] = [];
+                let noteCursor: string | null = null;
+
+                for (;;) {
+                    const notes: { continueCursor: string | null; isDone: boolean; page: (typeof guestNotes)[number][] } = await context.runQuery(
+                        internal.chat.guest_links.listGuestNotesForExport,
+                        { cursor: noteCursor, threadId: listed._id as Id<"threads"> },
+                    );
+
+                    guestNotes.push(...notes.page);
+
+                    if (notes.isDone) {
+                        break;
+                    }
+
+                    noteCursor = notes.continueCursor;
+                }
 
                 conversations.push({ ...collected, guestNotes });
             }

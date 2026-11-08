@@ -42,7 +42,7 @@ vi.mock("../lib/rate-limiter", async (importOriginal) => {
 
 const { default: schema } = await import("../schema");
 const guestLinks = await import("./guest-links");
-const { _deletePageForThreadId, createTemporaryThread, markThreadArchived } = await import("../agent/threads");
+const { _deletePageForThreadId, createTemporaryThread, markThreadArchived, softDeleteThread } = await import("../agent/threads");
 const { enableThreadLock } = await import("../agent/thread-lock");
 
 const OWNER = "user-owner";
@@ -82,6 +82,7 @@ describe("withdrawing a link", () => {
     const withdrawals: [string, () => Promise<unknown>][] = [
         ["archived", async () => await harness.run(async (ctx: any) => await markThreadArchived({ ...ctx, now: Date.now() }, threadId as never))],
         ["deleted", async () => await harness.run(async (ctx: any) => await ctx.runMutation(_deletePageForThreadId, { threadId }))],
+        ["trashed", async () => await harness.run(async (ctx: any) => await ctx.runMutation(softDeleteThread, { threadId }))],
         [
             "made temporary",
             async () => await harness.run(async (ctx: any) => await ctx.runMutation(createTemporaryThread, { expiresAt: Date.now() + 1, threadId })),
@@ -105,7 +106,48 @@ describe("withdrawing a link", () => {
     });
 });
 
+describe("deleting a thread whose link holds more than one page of messages", () => {
+    it("leaves no message behind", async () => {
+        await seedLink(threadId, "hash-live", Date.now() + 60_000, 101);
+
+        for (let page = 0; page < 5; page += 1) {
+            const { isDone } = (await harness.run(async (ctx: any) => await ctx.runMutation(_deletePageForThreadId, { threadId }))) as { isDone: boolean };
+
+            if (isDone) {
+                break;
+            }
+        }
+
+        expect(await rows("threadGuestMessages")).toHaveLength(0);
+        expect(await rows("threadGuestLinks")).toHaveLength(0);
+    });
+});
+
 describe("the sweep", () => {
+    it("carries on past a full batch and a link with more than one page of messages until nothing lapsed is left", async () => {
+        // A full batch first, then a link whose messages take more than one page, alone in its batch.
+        for (let index = 0; index < 50; index += 1) {
+            await seedLink(threadId, `hash-${index}`, 1, 0);
+        }
+
+        await seedLink(threadId, "hash-big", 2, 101);
+
+        // Nothing else here schedules anything: each new job is the sweep's own continuation, run here in its place.
+        for (let run = 0; run < 5; run += 1) {
+            const before = harness.scheduler.list().length;
+
+            await harness.run(async (ctx: any) => await ctx.runMutation(guestLinks.sweepGuestLinks, {}));
+
+            if (harness.scheduler.list().length === before) {
+                break;
+            }
+        }
+
+        expect(await rows("threadGuestLinks")).toHaveLength(0);
+        expect(await rows("threadGuestMessages")).toHaveLength(0);
+        expect(await rows("shardRoutes")).toHaveLength(0);
+    });
+
     it("removes lapsed links with their messages and routes, keeping live ones", async () => {
         const otherThread = (await harness.run(async (ctx: any) => await ctx.db.insert("threads", { status: "active", title: "U", userId: OWNER }))) as string;
 

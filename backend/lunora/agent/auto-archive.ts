@@ -82,16 +82,13 @@ const threadWaitsOnPerson = async (ctx: MutationCtx, threadId: Id<"threads">): P
  * a live link is not a sign the owner is idle, so such a thread stays.
  */
 const threadHasLiveGuestLink = async (ctx: MutationCtx, threadId: Id<"threads">): Promise<boolean> => {
-    const links = await ctx.db
+    const live = await ctx.db
         .query("threadGuestLinks")
-        .withIndex("by_thread", (q) => q.eq("threadId", threadId))
-        .take(GUEST_LINK_CHECK_BATCH);
+        .withIndex("by_thread_expiresAt", (q) => q.eq("threadId", threadId).gt("expiresAt", ctx.now))
+        .take(1);
 
-    return links.some((link) => link.expiresAt > ctx.now);
+    return live.length > 0;
 };
-
-/** The most links of one thread read to see whether any is live: a thread has one live link at a time. */
-const GUEST_LINK_CHECK_BATCH = 10;
 
 /**
  * Archives one thread if, as read now, it is still due. The eligibility check runs

@@ -25770,9 +25770,10 @@
           ],
           "unique": false
         },
-        "by_thread": {
+        "by_thread_expiresAt": {
           "fields": [
-            "threadId"
+            "threadId",
+            "expiresAt"
           ],
           "unique": false
         },

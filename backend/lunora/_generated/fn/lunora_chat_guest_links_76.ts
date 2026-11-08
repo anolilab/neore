@@ -5,7 +5,7 @@ import { DEFER_VALIDATION as DEFER, installCompiledValidatorMap } from "lunorash
 import * as lunora_chat_guest_links_76 from "../../chat/guest-links.js";
 
 /** Install the precompiled argument parsers before the module is dispatched. */
-installCompiledValidatorMap(lunora_chat_guest_links_76.listGuestNotesForExport.args, (source) => {
+installCompiledValidatorMap(lunora_chat_guest_links_76.continueGuestLinkRemoval.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["threadId"] !== "string") return DEFER;

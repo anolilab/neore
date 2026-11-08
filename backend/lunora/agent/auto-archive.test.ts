@@ -185,6 +185,11 @@ describe("archiveIfStillIdle and live guest links", () => {
         harness.run(async (ctx: any) => {
             const threadId = await ctx.db.insert("threads", { mode: "text", model: "gpt-4o", status: "active", title: "Old", updatedAt: 1, userId: OWNER });
 
+            // Older lapsed links first: they must not hide the one that counts.
+            for (let index = 0; index < 10; index += 1) {
+                await ctx.db.insert("threadGuestLinks", { createdAt: 0, expiresAt: 1, linkHash: `hash-lapsed-${index}`, threadId, userId: OWNER });
+            }
+
             await ctx.db.insert("threadGuestLinks", { createdAt: 0, expiresAt, linkHash: "hash-live", threadId, userId: OWNER });
 
             return await ctx.runMutation(archiveIfStillIdle, { cutoff: CUTOFF, threadId });

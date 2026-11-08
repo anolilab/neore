@@ -2570,7 +2570,7 @@ export interface IndexNamesByTable {
     threadAccess: "by_thread_and_user" | "by_user_and_owner";
     threadContextSummaries: "by_threadId" | "by_userId";
     threadGoals: "by_thread" | "by_thread_and_status" | "by_user" | "by_status_and_updatedAt";
-    threadGuestLinks: "by_thread" | "by_linkHash" | "by_expiresAt" | "by_userId";
+    threadGuestLinks: "by_thread_expiresAt" | "by_linkHash" | "by_expiresAt" | "by_userId";
     threadGuestMessages: "by_link" | "by_thread" | "by_userId";
     threadInvites: "by_thread" | "by_invite_token";
     threadKnowledge: "by_threadId" | "by_knowledgeFileId";

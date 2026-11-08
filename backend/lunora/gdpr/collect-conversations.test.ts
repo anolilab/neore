@@ -52,14 +52,17 @@ describe("collectConversations", () => {
                     if (t === 0) {
                         const linkId = await context.db.insert("threadGuestLinks", { createdAt: 0, expiresAt: 1, linkHash: "h", threadId, userId: "user-1" });
 
-                        await context.db.insert("threadGuestMessages", {
-                            createdAt: 0,
-                            linkId,
-                            status: "held",
-                            text: "a guest note",
-                            threadId,
-                            userId: "user-1",
-                        });
+                        // More than one export page of them.
+                        for (let n = 0; n < 101; n += 1) {
+                            await context.db.insert("threadGuestMessages", {
+                                createdAt: 0,
+                                linkId,
+                                status: "held",
+                                text: "a guest note",
+                                threadId,
+                                userId: "user-1",
+                            });
+                        }
                     }
 
                     for (let m = 0; m < MESSAGES_PER_THREAD; m += 1) {
@@ -110,7 +113,7 @@ describe("collectConversations", () => {
             expect(times?.[0]).toBe(1_600_000_000_000);
             expect(times?.[1]).toBeGreaterThan(1_600_000_000_000);
             // The notes guests left on the thread go with it.
-            expect((first as { guestNotes?: unknown } | undefined)?.guestNotes).toMatchObject([{ status: "held", text: "a guest note" }]);
+            expect((first as { guestNotes?: unknown[] } | undefined)?.guestNotes).toHaveLength(101);
 
             for (const conversation of exported) {
                 // Ascending, complete, in order.
