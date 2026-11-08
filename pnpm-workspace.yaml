@@ -917,4 +917,8 @@ trustPolicyExclude:
 trustPolicyIgnoreAfter: 1440
 patchedDependencies:
   expo-speech-recognition@58.0.1: patches/expo-speech-recognition@58.0.1.patch
+  # @expo/plist 0.10.1 calls parseFromString with no MIME type, and Expo's entitlements template starts with a
+  # newline before <?xml. xmldom 0.9 (the security pin above) rejects both, so the patch passes 'text/xml' and
+  # trims leading whitespace. Drop it once @expo/plist passes a MIME type and Expo's template no longer leads
+  # with whitespace; `expo prebuild --platform ios` shows whether it is still needed.
   "@expo/plist@0.10.1": patches/@expo__plist@0.10.1.patch
