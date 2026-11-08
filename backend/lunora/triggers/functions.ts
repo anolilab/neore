@@ -942,7 +942,8 @@ export const getTriggerExecutions = authQuery
             promptThreads.filter((_, index) => {
                 const thread = threads[index];
 
-                return thread !== null && thread !== undefined && isThreadLocked(thread);
+                // A thread that is gone may have been a locked one deleted without its passcode: its prompt stays hidden.
+                return thread === null || thread === undefined || isThreadLocked(thread);
             }),
         );
 

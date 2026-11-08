@@ -1110,9 +1110,11 @@ describe("getTriggerExecutions", () => {
     it("lists the prompt a run settled with, and keeps the first settlement's prompt", async () => {
         const triggerId = await seed(0);
         const executionId = await harness.run(async (ctx: any) => await ctx.db.insert("triggerExecutions", { startedAt: 500, status: "running", triggerId }));
+        // The run's thread exists: a prompt is shown only while its thread is there and unlocked.
+        const threadId = await harness.run(async (ctx: any) => await ctx.db.insert("threads", { status: "active", title: "T", userId: "user-a" }));
 
         await harness.run(
-            async (ctx: any) => await ctx.runMutation(updateExecution, { executionId, prompt: "Summarise the issue", status: "completed", threadId: "t1" }),
+            async (ctx: any) => await ctx.runMutation(updateExecution, { executionId, prompt: "Summarise the issue", status: "completed", threadId }),
         );
         // A second settlement (a redelivered catch path) must not overwrite the row's prompt.
         await harness.run(async (ctx: any) => await ctx.runMutation(updateExecution, { executionId, prompt: "other", status: "failed" }));
@@ -1153,7 +1155,7 @@ describe("run prompts", () => {
         expect(rows.find((row) => row.status === "failed")?.prompt).toBe("Summarise the issue");
     });
 
-    it("hides a run's prompt while its thread is locked", async () => {
+    it("hides a run's prompt while its thread is locked, and once the thread is gone", async () => {
         const { triggerId } = (await as().mutation(createTrigger as never, { model: "m", name: "Hook", type: "webhook" } as never)) as { triggerId: string };
         const threadId = (await harness.run(async (ctx: any) => {
             const id = await ctx.db.insert("threads", { status: "active", title: "T", userId: "user-a" });
@@ -1167,6 +1169,11 @@ describe("run prompts", () => {
         expect(await prompt()).toBe("Summarise the issue");
 
         await harness.run(async (ctx: any) => await ctx.db.patch("threads", threadId, { lockedAt: 1 }));
+
+        expect(await prompt()).toBeNull();
+
+        // A locked thread can be deleted without its passcode: its prompt does not come back.
+        await harness.run(async (ctx: any) => await ctx.db.delete("threads", threadId));
 
         expect(await prompt()).toBeNull();
     });
@@ -1266,6 +1273,16 @@ describe("run prompts", () => {
             triggerCount: 0,
         });
         expect(trigger).toHaveProperty("enabledAt");
+
+        // A pending run's payload can quote a watched thread: the export keeps the firing, not the text.
+        const watched = await harness.run(async (ctx: any) => {
+            await ctx.db.patch("triggers", triggerId, { eventState: { checkFailures: 0, pendingRun: { firing: 7, payload: "quoted reply" } } });
+            const { triggers } = await ctx.runQuery(collectTriggersForExport, { userId: "user-a" });
+
+            return (triggers as { eventState: { pendingRun?: { firing: number; payload?: string } } }[])[0]?.eventState.pendingRun;
+        });
+
+        expect(watched).toEqual({ firing: 7, payload: undefined });
         expect(trigger).toHaveProperty("updatedAt");
         // The whole row is counted, so the read is larger than what the export keeps of it.
         expect(exported.readBytes).toBeGreaterThan(JSON.stringify(exported.runs[0]).length);

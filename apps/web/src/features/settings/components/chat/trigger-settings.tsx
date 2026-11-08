@@ -1014,7 +1014,7 @@ const TriggerSettings: FC = () => {
                                                             </div>
                                                             {exec.prompt && (
                                                                 <details className="text-muted-foreground">
-                                                                    <summary className="cursor-pointer hover:underline">{t`Prompt`}</summary>
+                                                                    <summary className="flex min-h-11 min-w-11 cursor-pointer items-center hover:underline">{t`Prompt`}</summary>
                                                                     <pre className="mt-1 max-h-48 overflow-auto font-mono text-[11px] break-words whitespace-pre-wrap">
                                                                         {exec.prompt}
                                                                     </pre>

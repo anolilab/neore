@@ -52,6 +52,9 @@ const EXPORT_TRIGGER_PAGE = 2;
  */
 const EXPORT_RUN_PAGE = 5;
 
+const withoutPendingPayload = <T extends { pendingRun?: object }>(state: T): T =>
+    state.pendingRun === undefined ? state : { ...state, pendingRun: { ...state.pendingRun, payload: undefined } };
+
 /** One page of the user's triggers and their settings, without runs (`collectTriggerRunsForExport`). Secrets are left out. */
 export const collectTriggersForExport = internalQuery
     .input({
@@ -77,7 +80,8 @@ export const collectTriggersForExport = internalQuery
                     enabled: trigger.enabled,
                     enabledAt: trigger.enabledAt ?? null,
                     eventSource: trigger.eventSource,
-                    eventState: trigger.eventState ?? null,
+                    // A pending run's payload can quote a watched thread the owner may no longer have access to: it stays out.
+                    eventState: trigger.eventState ? withoutPendingPayload(trigger.eventState) : null,
                     failureStreak: trigger.failureStreak ?? 0,
                     filters: trigger.filters,
                     id: trigger._id as string,
