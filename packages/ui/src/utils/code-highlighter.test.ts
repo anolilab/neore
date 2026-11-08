@@ -73,9 +73,21 @@ describe("code highlighter plugin", () => {
         expect(run("x", language)).toBeNull();
     });
 
-    it.each(["r", "scala", "haskell", "elixir", "powershell", "graphql", "latex", "julia", "objective-c"])("highlights %s with its own grammar", (language) => {
+    it.each([
+        ["r", "f <- function(x) x", "function"],
+        ["scala", "def f = 1", "def"],
+        ["haskell", "module Main where", "module"],
+        ["elixir", "def f, do: 1", "def"],
+        ["powershell", "function Get-X { }", "function"],
+        ["graphql", "query Q { a }", "query"],
+        ["latex", String.raw`\section{A}`, String.raw`\section`],
+        ["julia", "function f() end", "function"],
+        ["objective-c", "@interface A @end", "@interface"],
+    ])("highlights %s with its own grammar", (language, source, keyword) => {
+        const token = run(source, language)?.tokens[0]?.find((candidate) => candidate.content === keyword);
+
         expect(code.supportsLanguage(language)).toBe(true);
-        expect(run("x", language)).not.toBeNull();
+        expect(token?.color).toBe("#cf222e");
     });
 
     it("highlights C with the C++ grammar", () => {
