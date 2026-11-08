@@ -230,13 +230,36 @@ export const recordReplyUsage = internalMutation
                 );
             }
         };
+        const countTotal = async (): Promise<void> => {
+            await addToRollup(
+                ctx,
+                args.userId,
+                [
+                    {
+                        costMicrodollars,
+                        date: args.date,
+                        replies: 1,
+                        skillKey: args.skillKey,
+                        tokens,
+                        ...(args.skillName !== undefined && { skillName: args.skillName }),
+                    },
+                ],
+                args.at,
+                true,
+            );
+        };
         const recorded = await ctx.db.usageReplies.findFirst({ where: { replyKey: args.replyKey, userId: args.userId } });
 
         // A redelivered job, or a reply the totals backfill already counted: counted once. A reply the backfill counted
         // stays under "No project" (project usage starts at deploy, `usage/AGENTS.md`). One counted without its project
         // (its read failed) is filed here once its project reads: a failed read throws, and the scheduler retries this.
+        // One a late retry's record noted (`awaitingTotal`) is counted now, by its first record, with the noted project.
         if (recorded) {
-            if (recorded.withoutProject === true && args.projectUnread !== true) {
+            if (recorded.awaitingTotal === true && args.retry !== true) {
+                await countTotal();
+                await fileProject(recorded.deferredProjectKey === undefined ? {} : { projectKey: recorded.deferredProjectKey });
+                await ctx.db.patch("usageReplies", recorded._id, { awaitingTotal: false });
+            } else if (recorded.withoutProject === true && args.projectUnread !== true) {
                 await fileProject(await attributionNow());
                 await ctx.db.patch("usageReplies", recorded._id, { withoutProject: false });
             }
@@ -245,8 +268,20 @@ export const recordReplyUsage = internalMutation
         }
 
         // A retry's record whose reply is no longer known: a recent reply's record simply has not landed yet, so this one
-        // counts it; an old one's key was pruned after its total was counted, so this adds nothing (`RETRY_COUNTS_WITHIN_MS`).
+        // counts it. An old one may have had its key pruned after its total was counted, or its first record may still be
+        // on its way: it counts nothing, and notes the project it read on the key, so a first record still to come counts
+        // the total with it (`RETRY_COUNTS_WITHIN_MS`). A pruned reply's note is pruned in turn.
         if (args.retry === true && ctx.now - args.at > RETRY_COUNTS_WITHIN_MS) {
+            const attribution = await attributionNow();
+
+            await ctx.db.insert("usageReplies", {
+                awaitingTotal: true,
+                recordedAt: args.at,
+                replyKey: args.replyKey,
+                userId: args.userId,
+                ...(attribution.projectKey !== undefined && { deferredProjectKey: attribution.projectKey }),
+            });
+
             return null;
         }
 
@@ -271,22 +306,7 @@ export const recordReplyUsage = internalMutation
         }
 
         await markReplyRecorded(ctx, args.userId, args.replyKey, args.at, projectUnread);
-        await addToRollup(
-            ctx,
-            args.userId,
-            [
-                {
-                    costMicrodollars,
-                    date: args.date,
-                    replies: 1,
-                    skillKey: args.skillKey,
-                    tokens,
-                    ...(args.skillName !== undefined && { skillName: args.skillName }),
-                },
-            ],
-            args.at,
-            true,
-        );
+        await countTotal();
 
         await fileProject(attribution);
 

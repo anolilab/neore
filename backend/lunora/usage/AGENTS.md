@@ -24,7 +24,10 @@
   (`usageReplies.withoutProject`) and retries the project alone
   (`RECORD_RETRY`); a forward sends the total (`projectUnread`) and retries
   its read (`projectRetry`). A retry files the project once and clears the
-  mark. Replies outside a project write none: "No project" is total − projects.
+  mark. A retry's record (`retry`) with no key counts the reply only within a
+  day (`RETRY_COUNTS_WITHIN_MS`; keys are pruned after two); past that it notes
+  its project on the key (`awaitingTotal`) for a first record still to come.
+  Replies outside a project write none: "No project" is total − projects.
 - **Project usage starts at deploy** — only replies recorded live are filed
   under a project. Older usage, and any reply the totals backfill counted,
   shows under "No project" until the project-history backfill ships (a later

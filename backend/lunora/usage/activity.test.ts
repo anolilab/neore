@@ -407,6 +407,26 @@ describe("recording usage by project", () => {
         expect(totals.days).toMatchObject([{ costMicrodollars: 100, replies: 1 }]);
     });
 
+    it("counts a reply with its project when a late retry's record lands before the reply's first record", async () => {
+        const alpha = await insertThread(USER, "Alpha");
+
+        // More than a day after the reply, the retry's record finds no key: it counts nothing and notes the project.
+        await record({ replyKey: "very-late", retry: true, threadAttribution: { projectKey: alpha.projectId }, threadId: alpha.threadId });
+
+        const before = await heatmap(USER, "2026-09-25");
+
+        expect(before.days).toStrictEqual([]);
+
+        // The reply's first record, without its project, counts the total with the noted project; a redelivery adds nothing.
+        await record({ projectUnread: true, replyKey: "very-late", threadId: alpha.threadId });
+        await record({ projectUnread: true, replyKey: "very-late", threadId: alpha.threadId });
+
+        const after = await heatmap(USER, "2026-09-25");
+
+        expect(after.days).toMatchObject([{ costMicrodollars: 100, replies: 1 }]);
+        expect(await projectTotals(USER)).toStrictEqual({ [alpha.projectId!]: { costMicrodollars: 100, replies: 1, tokens: 10 } });
+    });
+
     it("files no project once the user's membership in the project's organization is revoked", async () => {
         const projectId = await harness.run(
             async (ctx: any) => await ctx.db.insert("projects", { createdAt: 1, organizationId: "org_1", title: "Org", userId: OTHER }),

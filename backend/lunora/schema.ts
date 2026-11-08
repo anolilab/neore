@@ -3345,6 +3345,10 @@ export const schema = defineSchema({
     // what makes `recordReplyUsage` and the backfill count a reply once.
     // Pruned by `usage/backfill.ts#sweepUsageRollup` once the backfill is done.
     usageReplies: defineTable({
+        // Set by a retry's record that arrived more than a day after the reply with no key to find: the reply's total is
+        // still to come, from its first record, which counts it with `deferredProjectKey` (`usage/activity.ts`).
+        awaitingTotal: v.optional(v.boolean()),
+        deferredProjectKey: v.optional(v.string()),
         recordedAt: v.number(),
         replyKey: v.string(),
         userId: v.string(),
