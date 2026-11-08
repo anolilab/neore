@@ -88,7 +88,10 @@ describe("UsageProjectBreakdown", () => {
         try {
             render(<UsageProjectBreakdown backfilling={false} days={30} />, { wrapper });
 
-            expect(await screen.findByText("Could not load the project breakdown.")).toBeDefined();
+            // Announced as it appears, not left for a screen reader to find.
+            const alert = await screen.findByRole("alert");
+
+            expect(alert.textContent).toBe("Could not load the project breakdown.");
             expect(screen.queryByRole("status")).toBeNull();
             expect(screen.queryByText("Alpha")).toBeNull();
         } finally {

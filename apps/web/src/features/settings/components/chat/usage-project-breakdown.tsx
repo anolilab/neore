@@ -89,7 +89,11 @@ const UsageProjectBreakdown: FC<UsageProjectBreakdownProps> = ({ backfilling, da
                         ))}
                     </div>
                 )}
-                {isError && <p className="text-destructive text-sm">{t`Could not load the project breakdown.`}</p>}
+                {isError && (
+                    <p className="text-destructive text-sm" role="alert">
+                        {t`Could not load the project breakdown.`}
+                    </p>
+                )}
                 {!isPending && !isError && rows.length === 0 && (
                     <p className="text-muted-foreground py-4 text-center text-sm">{t`No replies recorded for this period.`}</p>
                 )}

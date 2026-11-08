@@ -56,7 +56,11 @@ const ProjectUsageSummary = ({ projectId }: ProjectUsageSummaryProps) => {
                     {t`Loading usage…`}
                 </p>
             )}
-            {isError && <p className="text-destructive text-sm">{t`Could not load this project's usage.`}</p>}
+            {isError && (
+                <p className="text-destructive text-sm" role="alert">
+                    {t`Could not load this project's usage.`}
+                </p>
+            )}
             {!isError && (
                 <dl aria-busy={isPending} className="grid grid-cols-3 gap-4">
                     {stats.map((stat) => (
