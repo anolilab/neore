@@ -1616,12 +1616,13 @@ export interface Doc_subAgentRuns {
     parentModel?: string;
     parentThreadId: string;
     postFailed?: string;
+    reapAt?: number;
     result?: string;
     resultPostedAt?: number;
     runner?: { kind: "headless" } | { deviceId: Id<"devices">; kind: "host" };
     skillSlug?: string;
     startedAt?: number;
-    status: "queued" | "running" | "succeeded" | "failed" | "cancelled";
+    status: "queued" | "running" | "awaiting" | "succeeded" | "failed" | "cancelled";
     task: string;
     toolAllowlist?: Array<string>;
     toolCallId?: string;
@@ -2577,7 +2578,7 @@ export interface IndexNamesByTable {
     skillStats: "by_skillId" | "by_usage";
     streamDeltas: "streamId_start_end";
     streamingMessages: "threadId_state_order_stepOrder" | "by_userId";
-    subAgentRuns: "by_parentThreadId_and_status" | "by_childThreadId" | "by_childThreadId_and_status" | "by_user_and_status" | "by_user_and_toolCallId" | "by_user_and_createdAt" | "by_createdAt";
+    subAgentRuns: "by_parentThreadId_and_status" | "by_childThreadId" | "by_childThreadId_and_status" | "by_status_and_reapAt" | "by_user_and_status" | "by_user_and_toolCallId" | "by_user_and_createdAt" | "by_createdAt";
     systemPromptPresets: "by_userId_modelId";
     taskRuns: "by_task_and_startedAt" | "by_cycle_and_round" | "by_user";
     tasks: "by_user_and_status" | "by_user_and_goal" | "by_recurring_and_nextRunAt" | "by_status_and_updatedAt";
@@ -4683,12 +4684,13 @@ export interface Insert_subAgentRuns {
     parentModel?: string;
     parentThreadId: string;
     postFailed?: string;
+    reapAt?: number;
     result?: string;
     resultPostedAt?: number;
     runner?: { kind: "headless" } | { deviceId: Id<"devices">; kind: "host" };
     skillSlug?: string;
     startedAt?: number;
-    status: "queued" | "running" | "succeeded" | "failed" | "cancelled";
+    status: "queued" | "running" | "awaiting" | "succeeded" | "failed" | "cancelled";
     task: string;
     toolAllowlist?: Array<string>;
     toolCallId?: string;

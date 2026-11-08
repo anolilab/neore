@@ -24,7 +24,7 @@ import { useId } from "react";
 import { useCRPC } from "@/lib/lunora/crpc";
 import { showError } from "@/lib/toast";
 
-type RunStatus = "cancelled" | "failed" | "queued" | "running" | "succeeded";
+type RunStatus = "awaiting" | "cancelled" | "failed" | "queued" | "running" | "succeeded";
 
 const TASK_PREVIEW_MAX = 200;
 
@@ -48,6 +48,8 @@ const SubAgentToolView: FC<{ part: ToolPart }> = ({ part }) => {
     const output = part.state === "output-available" ? (part.output as { error?: string } | undefined) : undefined;
 
     const statusLabels: Record<RunStatus, string> = {
+        // Waiting on an approval its owner answers in the sub-agent's own thread (linked below).
+        awaiting: t`Working`,
         cancelled: t`Stopped`,
         failed: t`Failed`,
         queued: t`Queued`,
@@ -105,7 +107,7 @@ const SubAgentToolView: FC<{ part: ToolPart }> = ({ part }) => {
 
             {notice && <p className="text-muted-foreground mt-2 text-xs">{notice}</p>}
 
-            {(run?.status === "running" || run?.status === "queued") && (
+            {(run?.status === "running" || run?.status === "queued" || run?.status === "awaiting") && (
                 <Button className="mt-2" disabled={stop.isPending} onClick={() => stop.mutate({ runId: run._id })} size="sm" type="button" variant="outline">
                     <CircleStop aria-hidden="true" />
                     {t`Stop`}

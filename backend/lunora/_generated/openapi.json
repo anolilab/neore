@@ -53956,6 +53956,10 @@
                           "type": "string"
                         },
                         {
+                          "const": "awaiting",
+                          "type": "string"
+                        },
+                        {
                           "const": "succeeded",
                           "type": "string"
                         },
@@ -54063,6 +54067,10 @@
                         },
                         {
                           "const": "running",
+                          "type": "string"
+                        },
+                        {
+                          "const": "awaiting",
                           "type": "string"
                         },
                         {
@@ -54211,6 +54219,10 @@
                             },
                             {
                               "const": "running",
+                              "type": "string"
+                            },
+                            {
+                              "const": "awaiting",
                               "type": "string"
                             },
                             {
@@ -54372,6 +54384,10 @@
                               "type": "string"
                             },
                             {
+                              "const": "awaiting",
+                              "type": "string"
+                            },
+                            {
                               "const": "succeeded",
                               "type": "string"
                             },
@@ -54477,6 +54493,10 @@
                                   },
                                   {
                                     "const": "running",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "awaiting",
                                     "type": "string"
                                   },
                                   {
@@ -54789,6 +54809,10 @@
                             "type": "string"
                           },
                           {
+                            "const": "awaiting",
+                            "type": "string"
+                          },
+                          {
                             "const": "succeeded",
                             "type": "string"
                           },
@@ -54894,6 +54918,10 @@
                                 },
                                 {
                                   "const": "running",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "awaiting",
                                   "type": "string"
                                 },
                                 {

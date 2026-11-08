@@ -63,6 +63,8 @@ const shardSweeps = (): ReadonlyArray<Sweep> => [
     { name: "purgeFinishedStreams", ref: internal.chat.streaming.persistent.purge.purgeFinishedStreams },
     { name: "failStaleMediaRows", ref: internal.chat.media_stale.failStaleMediaRows },
     { name: "reapStalledGoals", ref: internal.chat.goals.internal.reapStalledGoals },
+    // A sub-agent waiting on an approval whose own reaper was lost (`sub-agents/functions.ts`).
+    { name: "reapOverdueSubAgentWaits", ref: internal.sub_agents.functions.reapOverdueWaits },
     { name: "cleanupStaleWorkflowPresence", ref: internal.workflow.presence.cleanupStalePresence },
     { name: "reapLapsedClaims", ref: internal.lib.claim_once.reapLapsedClaims },
     { name: "purgeIdempotencyClaims", ref: internal.lib.claim_once.purgeExpiredClaims },
