@@ -368,7 +368,7 @@ describe("chat end to end against a fake API", () => {
 
             expect(await run(["thread", "start", "hi", "--wait"], context)).toBe(1);
             expect(context.io.stdout.text()).toBe("");
-            expect(context.io.stderr.text()).toContain("ended in failure (generation_failed)");
+            expect(context.io.stderr.text()).toContain("ended in failure (generation_failed). See what happened with `neore threads show th1`");
         });
 
         it.each(["interrupted", "relay_budget"])("--wait exits 2 and names threads show on %s", async (status) => {

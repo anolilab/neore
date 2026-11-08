@@ -270,7 +270,9 @@ const postThread = async (context: Context, flags: Flags, threadId: string | und
         return THREAD_EXIT.other;
     }
 
-    context.io.stderr.write(`${colors.red("error:")} the run ended in failure (${result.status}). Thread ${result.threadId}.\n`);
+    context.io.stderr.write(
+        `${colors.red("error:")} the run ended in failure (${result.status}). See what happened with \`neore threads show ${result.threadId}\`.\n`,
+    );
 
     return THREAD_EXIT.failed;
 };
