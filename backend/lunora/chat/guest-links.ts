@@ -34,10 +34,10 @@ import { isWorkerThread } from "../sub-agents/worker-thread";
 import {
     cleanGuestText,
     deleteGuestLink,
-    GUEST_LINK_REMOVAL_CAP,
     GUEST_LINK_TTL_MS,
     GUEST_MAX_HELD_PER_LINK,
     GUEST_MAX_ROWS_PER_LINK,
+    GUEST_ROUTE_BATCH,
     GUEST_ROUTE_DROP_ATTEMPTS,
     GUEST_TOKEN_MAX_LENGTH,
     hashGuestToken,
@@ -50,9 +50,6 @@ import {
 } from "./lib/guest-link-store";
 
 const SWEEP_BATCH = 50;
-
-/** The most hashes one route removal takes: a removal batch's links (`GUEST_LINK_REMOVAL_CAP`, `SWEEP_BATCH`). */
-const GUEST_ROUTE_BATCH = Math.max(GUEST_LINK_REMOVAL_CAP, SWEEP_BATCH);
 
 /** Notes or links per export page. */
 const EXPORT_PAGE = 100;

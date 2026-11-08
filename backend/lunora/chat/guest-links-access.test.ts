@@ -68,6 +68,9 @@ const OTHER_BROWSER = /another browser/u;
 const NOT_ACTIVE = /not active/u;
 const MINTED_TOKEN = /^[0-9a-f]{64}$/u;
 
+/** Posts one link takes per hour (`guest/message:public` in `lib/rate-limiter.ts`). */
+const PER_LINK_ALLOWANCE = 30;
+
 /** The pinned clock every test runs at, so whether a link has lapsed never depends on how long a test took. */
 const NOW = Date.UTC(2026, 0, 15, 12);
 
@@ -205,16 +208,32 @@ describe("a guest message", () => {
         expect((await hold(linkToken, "one too many", BROWSER)).reason).toBe("full");
     });
 
-    it("spends the per-link allowance only for the bound browser", async () => {
+    it("limits the bound browser per link, and spends nothing of it on another browser's refused posts", async () => {
         const { linkToken } = await createLink();
+        // Taken up by the owner, so the held cap does not stop the run before the per-link limit does.
+        const settle = async () =>
+            await harness.run(async (ctx: any) => {
+                const held = await ctx.db.query("threadGuestMessages").collect();
 
-        await hold(linkToken, "first");
+                for (const row of held) {
+                    await ctx.db.patch("threadGuestMessages", row._id, { status: "sent" });
+                }
+            });
+
+        expect((await hold(linkToken, "first")).ok).toBe(true);
 
         for (let index = 0; index < 40; index += 1) {
             expect((await hold(linkToken, `spam ${index}`, "someone-else")).reason).toBe("other_browser");
         }
 
-        expect((await hold(linkToken, "still me", BROWSER)).ok).toBe(true);
+        // The rest of the hourly allowance (`guest/message:public`), every post accepted.
+        for (let index = 1; index < PER_LINK_ALLOWANCE; index += 1) {
+            await settle();
+            expect((await hold(linkToken, `m${index}`, BROWSER)).ok).toBe(true);
+        }
+
+        await settle();
+        expect((await hold(linkToken, "one too many", BROWSER)).reason).toBe("limited");
     });
 
     it("is refused on a lapsed link", async () => {

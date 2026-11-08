@@ -149,6 +149,9 @@ export const removeGuestLinkRows = async (
     return { done: links.length < GUEST_LINK_REMOVAL_CAP, hashes };
 };
 
+/** The most hashes one route-removal job (`dropGuestLinkRoutesJob`) takes; {@link scheduleGuestLinkRouteDrop} splits longer lists. */
+export const GUEST_ROUTE_BATCH = 50;
+
 /** Attempts of a route removal (`dropGuestLinkRoutesJob`) before it is left to account erasure. */
 export const GUEST_ROUTE_DROP_ATTEMPTS = 5;
 
@@ -161,17 +164,16 @@ export const guestRouteDropDelayMs = (attempt: number): number => 60_000 * 2 ** 
  * it points at are gone for good. The job re-checks that no link row holds the hash before it deletes the route.
  */
 export const scheduleGuestLinkRouteDrop = async (ctx: Pick<MutationCtx, "scheduler">, linkHashes: string[], attempt = 0): Promise<void> => {
-    if (linkHashes.length === 0) {
-        return;
+    // One job per batch the job accepts, so a caller that removed more links (a replace over several passes) is never refused.
+    for (let start = 0; start < linkHashes.length; start += GUEST_ROUTE_BATCH) {
+        await runAfterOnShard(
+            ctx.scheduler,
+            attempt === 0 ? 0 : guestRouteDropDelayMs(attempt),
+            internal.chat.guest_links.dropGuestLinkRoutesJob,
+            { attempt, linkHashes: linkHashes.slice(start, start + GUEST_ROUTE_BATCH) },
+            currentShard() ?? ROOT_SHARD_KEY,
+        );
     }
-
-    await runAfterOnShard(
-        ctx.scheduler,
-        attempt === 0 ? 0 : guestRouteDropDelayMs(attempt),
-        internal.chat.guest_links.dropGuestLinkRoutesJob,
-        { attempt, linkHashes },
-        currentShard() ?? ROOT_SHARD_KEY,
-    );
 };
 
 /**
