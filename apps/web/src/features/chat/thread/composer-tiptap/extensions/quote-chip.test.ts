@@ -128,6 +128,12 @@ describe("the quote chip's clipboard", () => {
             formatQuote("Seen"),
         ],
         [
+            "keeps a line break inside a quoted line",
+            `<div data-quote-chip data-message-id="m"><blockquote><p>one<br>two</p></blockquote></div>`,
+            "quoteChip",
+            formatQuote("one\ntwo"),
+        ],
+        [
             "leaves out text the pasting page hid inside a quoted line",
             `<div data-quote-chip data-message-id="m"><blockquote><p>Seen<span style="display: none">hidden ask</span></p><p hidden>hidden line</p></blockquote><blockquote hidden><p>hidden block</p></blockquote></div>`,
             "quoteChip",
@@ -189,7 +195,8 @@ describe("the link back to the quoted reply", () => {
 
         const link = editor.view.dom.querySelector<HTMLButtonElement>(":scope [data-quote-chip] button");
 
-        link?.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, cancelable: true, key: "Enter" }));
+        expect(link).not.toBeNull();
+        link!.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, cancelable: true, key: "Enter" }));
 
         expect(submit).not.toHaveBeenCalled();
     });

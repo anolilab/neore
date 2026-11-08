@@ -35,6 +35,17 @@ const chipSchema = new Schema({
     },
 });
 
+/** The chip schema with Shift+Enter hard breaks, for displayed lines next to a chip. */
+const breakChipSchema = new Schema({
+    nodes: {
+        doc: { content: "block+" },
+        hardBreak: { group: "inline", inline: true, leafText: () => "\n", selectable: false },
+        paragraph: { content: "inline*", group: "block", toDOM: () => ["p", 0] },
+        quoteChip: { atom: true, group: "block", toDOM: () => ["div"] },
+        text: { group: "inline" },
+    },
+});
+
 /** A paragraph "first", a chip, then a paragraph "last", with the cursor at the start of "last". */
 const aroundChip = (): EditorState => {
     const doc = chipSchema.node("doc", null, [
@@ -196,6 +207,11 @@ describe("motions", () => {
         expect(press(chipSelected, ["j"]).state.selection.$head.parent.textContent).toBe("last");
         expect(press(chipSelected, ["k"]).state.selection.$head.parent.textContent).toBe("first");
         expect(press(chipSelected, ["d", "d"]).state.doc.childCount).toBe(2);
+        // `d` then another key cancels the operator: the chip stays.
+        expect(press(chipSelected, ["d", "x"]).state.doc.childCount).toBe(3);
+        // `I` and `A` go to the start and the end of the line before and after, `i` and `a` stay next to the chip.
+        expect(offsetOf(press(chipSelected, ["I"]).state)).toBe(0);
+        expect(offsetOf(press(chipSelected, ["A"]).state)).toBe(4);
 
         // `o` opens a new, empty line after the chip rather than joining "last".
         const opened = press(chipSelected, ["o"]);
@@ -203,6 +219,21 @@ describe("motions", () => {
         expect(opened.state.doc.childCount).toBe(4);
         expect(opened.state.selection.$head.parent.textContent).toBe("");
         expect(opened.state.doc.child(1).type.name).toBe("quoteChip");
+    });
+
+    it("places I and A on the displayed line next to a chip, not the whole paragraph", () => {
+        const lineBreak = breakChipSchema.nodes.hardBreak!.create();
+        const doc = breakChipSchema.node("doc", null, [
+            breakChipSchema.node("paragraph", null, [breakChipSchema.text("ab"), lineBreak, breakChipSchema.text("  cd")]),
+            breakChipSchema.node("quoteChip"),
+            breakChipSchema.node("paragraph", null, [breakChipSchema.text("ef"), lineBreak, breakChipSchema.text("gh")]),
+        ]);
+        const start = EditorState.create({ doc, schema: breakChipSchema });
+        const selected = start.apply(start.tr.setSelection(NodeSelection.create(doc, 9)));
+
+        // `I`: "c", the first non-space of the last line before the chip (position 6); `A`: after "ef", the first line after (13).
+        expect(press(selected, ["I"]).state.selection.from).toBe(6);
+        expect(press(selected, ["A"]).state.selection.from).toBe(13);
     });
 
     it("opens a line before a quote chip that starts the draft, so i does not type over it", () => {

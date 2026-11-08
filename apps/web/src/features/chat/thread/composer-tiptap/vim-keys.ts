@@ -304,8 +304,12 @@ const MOVE_BEFORE: ReadonlySet<string> = new Set(["b", "h", "k"]);
 const chipKey = (state: EditorState, vim: VimState, key: string): VimResult => {
     const { from, to } = state.selection;
 
-    // `x` and `dd` delete the chip.
-    if (key === "x" || (key === "d" && vim.pending === "d")) {
+    // A pending `d`: a second `d` deletes the chip, any other key cancels the operator and does nothing else, as on a line.
+    if (vim.pending === "d") {
+        return key === "d" ? handledAt(vim, state.tr.deleteSelection()) : { handled: key.length === 1, state: { ...vim, pending: "" } };
+    }
+
+    if (key === "x") {
         return handledAt(vim, state.tr.deleteSelection());
     }
 
@@ -339,7 +343,20 @@ const chipKey = (state: EditorState, vim: VimState, key: string): VimResult => {
         const target = Selection.findFrom(state.doc.resolve(before ? from : to), before ? -1 : 1, true);
 
         if (target) {
-            return handledAt(vim, state.tr.setSelection(target), { mode: "insert" });
+            // `I` starts that line at its first non-space character and `A` ends it, as they do on any line; `i`/`a` stay next
+            // to the chip.
+            // The displayed line next to the chip (a paragraph splits at its hard breaks), as `k`/`j` from the chip reach it.
+            const { $head } = target;
+            const line = segmentAt(state.doc, $head.index(0), $head.parentOffset);
+            let position = $head.pos;
+
+            if (key === "I") {
+                position = line.start + firstNonSpace(line.text);
+            } else if (key === "A") {
+                position = line.start + line.text.length;
+            }
+
+            return handledAt(vim, state.tr.setSelection(TextSelection.create(state.doc, position)), { mode: "insert" });
         }
 
         const { paragraph } = state.schema.nodes;

@@ -43,6 +43,11 @@ const visibleText = (line: Element): string => {
         hidden.remove();
     }
 
+    // A `<br>` inside a quoted line is a line break the reader sees.
+    for (const lineBreak of copy.querySelectorAll("br")) {
+        lineBreak.replaceWith("\n");
+    }
+
     return copy.textContent ?? "";
 };
 
