@@ -276,7 +276,14 @@ describe("stopping a server", () => {
         expect(system.signals.every(([pid]) => [30, 31, 99].includes(pid))).toBe(true);
 
         // Children before their parent, so none is re-parented out of the tree before its own signal.
-        const at = (pid: number, signal: string): number => system.signals.findIndex(([entry, sent]) => entry === pid && sent === signal);
+        const at = (pid: number, signal: string): number => {
+            const index = system.signals.findIndex(([entry, sent]) => entry === pid && sent === signal);
+
+            // A signal that was never sent must fail here, not pass the order check below as -1.
+            expect(index, `${String(pid)} ${signal}`).toBeGreaterThanOrEqual(0);
+
+            return index;
+        };
 
         expect(at(31, "SIGTERM")).toBeLessThan(at(30, "SIGTERM"));
         expect(at(99, "SIGKILL")).toBeLessThan(at(30, "SIGKILL"));
