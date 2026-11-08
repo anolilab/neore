@@ -31,6 +31,7 @@ type Story = StoryObj<typeof meta>;
 /** A guest leaves a note: it is posted with the browser's own token and a request id, and listed as waiting. */
 export const LeaveANote: Story = {
     play: async ({ canvas }) => {
+        await expect(await canvas.findByRole("heading", { level: 1, name: "Leave a message" })).toBeVisible();
         await userEvent.type(await canvas.findByRole("textbox", { name: "Your message" }), "Can we talk tomorrow?");
         await userEvent.click(canvas.getByRole("button", { name: "Send to the owner" }));
 
@@ -109,6 +110,7 @@ export const ViewFailsAfterPost: Story = {
         await expect(await canvas.findByText(/Your notes could not be loaded/u, undefined, { timeout: 15_000 })).toBeVisible();
         await expect(canvas.queryByText("This link has ended.")).not.toBeInTheDocument();
         await expect(canvas.getByRole("textbox", { name: "Your message" })).toBeEnabled();
+        await expect(canvas.getByRole("button", { name: "Try again" })).toBeVisible();
     },
 };
 

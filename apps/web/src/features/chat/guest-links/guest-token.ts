@@ -60,6 +60,22 @@ export const guestTokenFor = async (linkToken: string, { create = false } = {}):
     return token;
 };
 
+/**
+ * Keeps `token` as this browser's token for `linkToken`: the one a post was just accepted with. Another tab that made its own
+ * token at the same moment may have written over it; the accepted one wins.
+ */
+export const keepGuestToken = async (linkToken: string, token: string): Promise<void> => {
+    const key = await keyFor(linkToken);
+
+    memory.set(key, token);
+    write(key, token);
+};
+
+/** Drops this page's copy of the token, so the next read takes what storage holds (another tab's accepted token). */
+export const rereadGuestToken = async (linkToken: string): Promise<void> => {
+    memory.delete(await keyFor(linkToken));
+};
+
 /** Forgets this browser's token for a link that has ended. */
 export const forgetGuestToken = async (linkToken: string): Promise<void> => {
     const key = await keyFor(linkToken);

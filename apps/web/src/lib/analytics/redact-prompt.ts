@@ -46,12 +46,16 @@ const ENCODED_PROMPT = new RegExp(
  */
 const URL_FRAGMENT = /(https?:\/\/[^\s"#]*)#[^\s"\\]*/giu;
 
+/** A guest link written relative (`href="/guest#<token>"` in an autocaptured chain) loses its fragment too. */
+const GUEST_FRAGMENT = /(\/guest)#[^\s"\\]*/giu;
+
 /** Each prompt parameter keeps its name; its value is replaced. Every address loses its fragment. */
 const redactString = (value: string): string =>
     value
         .replaceAll(PLAIN_PROMPT, (_match: string, name: string) => `${name}${REDACTED}`)
         .replaceAll(ENCODED_PROMPT, (_match: string, name: string) => `${name}${REDACTED}`)
-        .replaceAll(URL_FRAGMENT, (_match: string, address: string) => address);
+        .replaceAll(URL_FRAGMENT, (_match: string, address: string) => address)
+        .replaceAll(GUEST_FRAGMENT, (_match: string, path: string) => path);
 
 const isPlainObject = (value: unknown): value is Record<string, unknown> => {
     if (value === null || typeof value !== "object") {

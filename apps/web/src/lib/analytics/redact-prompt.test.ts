@@ -31,6 +31,13 @@ describe(redactPromptFromEvent, () => {
         expect(event?.properties.$current_url).toBe("https://app.test/guest");
     });
 
+    it("drops the fragment of a guest link written relative, as an autocaptured href is", () => {
+        const event = redactPromptFromEvent(pageView({ $elements_chain: `a:href="/guest#${"cd".repeat(32)}"nth-child="1"` }));
+
+        expect(JSON.stringify(event)).not.toContain("cdcd");
+        expect(event?.properties.$elements_chain).toBe('a:href="/guest"nth-child="1"');
+    });
+
     it("ends a dropped fragment at an escaped quote in an autocaptured link, keeping the rest of the chain", () => {
         const event = redactPromptFromEvent(pageView({ $elements_chain: String.raw`a:attr__href="https://app.test/guest#token\"x"nth-child="1"` }));
 
