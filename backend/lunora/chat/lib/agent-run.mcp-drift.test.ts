@@ -41,6 +41,7 @@ const rebuiltWith = (fingerprint: string | undefined, offered = fingerprint !== 
         mcpToolFingerprints: fingerprint === undefined ? {} : { [TOOL]: fingerprint },
         permissionKeys: {},
         repeatable: [],
+        requiresApproval: [],
         tools: offered ? { [TOOL]: { execute: vi.fn() } as never } : {},
     });
 };

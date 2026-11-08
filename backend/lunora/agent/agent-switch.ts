@@ -138,11 +138,24 @@ const deltaBase = async (context: Reader, threadId: Id<"threads">, part: AgentSw
 };
 
 /**
+ * The order a handoff must come after to describe turns the context still holds: the newest context reset on the path, or
+ * the row before a run's own first turn (`fromOrder`, a fresh-context run that paused), whichever is later.
+ */
+const handoffFloor = (resetOrder: number | undefined, fromOrder: number | undefined): number | undefined => {
+    const floors = [resetOrder, fromOrder === undefined ? undefined : fromOrder - 1].filter((order): order is number => order !== undefined);
+
+    return floors.length > 0 ? Math.max(...floors) : undefined;
+};
+
+/**
  * The stored handoffs a context window needs when it starts below the divider that holds them, oldest first,
  * for the rows above `belowMessageId`. Empty for a thread no switch ever stored a handoff on — never switched,
  * or switched only with its full history — at the cost of one thread read.
  */
-export const handoffAboveOf = async (context: QueryCtx, args: { belowMessageId: Id<"messages">; threadId: Id<"threads"> }): Promise<string[]> => {
+export const handoffAboveOf = async (
+    context: QueryCtx,
+    args: { belowMessageId: Id<"messages">; fromOrder?: number; threadId: Id<"threads"> },
+): Promise<string[]> => {
     const thread = await context.db.get("threads", args.threadId);
 
     if (!thread?.activeAgent || !thread.hasHandoff) {
@@ -153,11 +166,11 @@ export const handoffAboveOf = async (context: QueryCtx, args: { belowMessageId: 
     const from = below && (await parentOf(context, args.threadId, below));
     const reset = below ? await resetForTip(context, thread, below) : null;
 
-    return await handoffBlocksAt(context, args.threadId, from, MAX_HANDOFF_DEPTH, reset?.order);
+    return await handoffBlocksAt(context, args.threadId, from, MAX_HANDOFF_DEPTH, handoffFloor(reset?.order, args.fromOrder));
 };
 
 export const getHandoffAbove = internalQuery
-    .input({ belowMessageId: v.id("messages"), threadId: v.id("threads") })
+    .input({ belowMessageId: v.id("messages"), fromOrder: v.optional(v.number()), threadId: v.id("threads") })
     .output(v.array(v.string()))
     .query(async ({ args, ctx }) => await handoffAboveOf(ctx, args));
 
@@ -165,17 +178,20 @@ export const getHandoffAbove = internalQuery
  * What the target of the `delta` divider `dividerMessageId` saw before it left, for a window that no longer
  * holds the divider it left through (`agent/handoff-context.ts`, `deltaOrphans`).
  */
-export const handoffBeforeDeltaOf = async (context: QueryCtx, args: { dividerMessageId: Id<"messages">; threadId: Id<"threads"> }): Promise<string[]> => {
+export const handoffBeforeDeltaOf = async (
+    context: QueryCtx,
+    args: { dividerMessageId: Id<"messages">; fromOrder?: number; threadId: Id<"threads"> },
+): Promise<string[]> => {
     const thread = await context.db.get("threads", args.threadId);
     const divider = await getThreadRow(context, args.threadId, args.dividerMessageId);
     const part = divider && agentSwitchOf(divider);
     const reset = divider && thread ? await resetForTip(context, thread, divider) : null;
 
-    return part ? await deltaBase(context, args.threadId, part, MAX_HANDOFF_DEPTH, reset?.order) : [];
+    return part ? await deltaBase(context, args.threadId, part, MAX_HANDOFF_DEPTH, handoffFloor(reset?.order, args.fromOrder)) : [];
 };
 
 export const getHandoffBeforeDelta = internalQuery
-    .input({ dividerMessageId: v.id("messages"), threadId: v.id("threads") })
+    .input({ dividerMessageId: v.id("messages"), fromOrder: v.optional(v.number()), threadId: v.id("threads") })
     .output(v.array(v.string()))
     .query(async ({ args, ctx }) => await handoffBeforeDeltaOf(ctx, args));
 

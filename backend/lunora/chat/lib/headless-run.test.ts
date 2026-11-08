@@ -28,6 +28,8 @@ const seen = vi.hoisted(() => {
         prompts: [] as (string | undefined)[],
         providerOptions: [] as unknown[],
         replies: [] as string[],
+        // Extra fields of the next generation's result (its prompt's order, its steps).
+        result: {} as Record<string, unknown>,
         saved: [] as unknown[][],
         system: [] as string[],
         tools: [] as string[][],
@@ -70,7 +72,7 @@ vi.mock("./get-agent", () => {
 
                     seen.system.push(args.system ?? instructions);
 
-                    return { savedMessages: seen.saved.shift() ?? [], text: seen.replies.shift() ?? "reply" };
+                    return { ...seen.result, savedMessages: seen.saved.shift() ?? [], text: seen.replies.shift() ?? "reply" };
                 },
             };
 
@@ -101,7 +103,12 @@ vi.mock("../goals/review", () => {
     };
 });
 
-vi.mock("./agent-tools", () => {
+vi.mock("./agent-tools", async () => {
+    const { default: z } = await import("zod/v4");
+    const { createTool } = await import("../../agent/client/create-tool");
+    // A real tool, as every built-in is: it carries a `needsApproval` function, which never asks.
+    const webSearch = createTool({ description: "Search the web", execute: async () => "results", inputSchema: z.object({}) });
+
     return {
         buildAgentTools: async (_ctx: unknown, options: unknown) => {
             seen.buildOptions.push(options);
@@ -113,7 +120,9 @@ vi.mock("./agent-tools", () => {
                 // A tool the allowlist drops keeps no fingerprint in the snapshot.
                 mcpToolFingerprints: { mcp_notes_other: "fp-other", mcp_notes_search: "fp-search" },
                 permissionKeys: { browser: "builtin:browser", mcp_notes_search: "mcp:notes:search", webSearch: "builtin:webSearch" },
-                tools: { browser: {}, dateTime: {}, imageGeneration: {}, mcp_notes_search: {}, webSearch: {} },
+                // The notes search is set to `ask`, a tool kept for a run that may pause.
+                requiresApproval: ["mcp_notes_search"],
+                tools: { browser: {}, dateTime: {}, imageGeneration: {}, mcp_notes_search: { needsApproval: true }, webSearch },
             };
         },
     };
@@ -654,6 +663,7 @@ const GOAL_REFUSED = /cannot have a goal/u;
 describe("runHeadlessAgent pauseForApproval", () => {
     beforeEach(() => {
         seen.buildOptions = [];
+        seen.result = {};
         seen.saved = [];
     });
 
@@ -772,6 +782,59 @@ describe("runHeadlessAgent pauseForApproval", () => {
 
         await expect(run(ctx, { pauseForApproval: { subAgentRunId: RUN_ID } })).rejects.toThrow("write failed");
         expect(ctx.scheduler.runAfter.mock.calls.map(([, reference]) => reference)).toContain("usage_activity:recordReplyUsage");
+    });
+
+    it("saves the steps left of the run's budget and a fresh-context run's own prompt order", async () => {
+        seen.saved = [approvalRequest];
+        seen.result = { order: 4, steps: [{}] };
+
+        const ctx = fakeCtx();
+
+        await run(ctx, { freshContext: true, maxSteps: 3, pauseForApproval: { subAgentRunId: RUN_ID } });
+
+        const [recorded] = calls(ctx, "chat_tool_permissions:recordPendingToolApprovals") as { config: Record<string, unknown> }[];
+
+        expect(recorded!.config).toMatchObject({ contextFromOrder: 4, stepsLeft: 2 });
+    });
+
+    it("saves no context boundary for a run that read the thread's usual window", async () => {
+        seen.saved = [approvalRequest];
+        seen.result = { order: 4, steps: [{}] };
+
+        const ctx = fakeCtx();
+
+        await run(ctx, { pauseForApproval: { subAgentRunId: RUN_ID } });
+
+        const [recorded] = calls(ctx, "chat_tool_permissions:recordPendingToolApprovals") as { config: Record<string, unknown> }[];
+
+        expect(recorded!.config).not.toHaveProperty("contextFromOrder");
+    });
+
+    it("records no pause for a request made on the run's last step, which no step is left to answer", async () => {
+        seen.saved = [approvalRequest];
+        seen.result = { steps: [{}] };
+
+        const ctx = fakeCtx();
+        const result = await run(ctx, { maxSteps: 1, pauseForApproval: { subAgentRunId: RUN_ID } });
+
+        expect(result.paused).toBeUndefined();
+        expect(calls(ctx, "chat_tool_permissions:recordPendingToolApprovals")).toHaveLength(0);
+    });
+
+    it("offers no ask tool on the run's last step, so a run with a budget of one never asks", async () => {
+        const lastStepTools = async (maxSteps: number, stepNumber: number) => {
+            await run(fakeCtx(), { maxSteps, pauseForApproval: { subAgentRunId: RUN_ID } });
+
+            const prepare = seen.prepareSteps.at(-1) as (step: { messages: unknown[]; stepNumber: number }) => Promise<{ activeTools?: string[] } | undefined>;
+
+            const prepared = await prepare({ messages: [], stepNumber });
+
+            return prepared?.activeTools;
+        };
+
+        expect(await lastStepTools(3, 1)).toBeUndefined();
+        expect(await lastStepTools(3, 2)).toStrictEqual(["webSearch"]);
+        expect(await lastStepTools(1, 0)).toStrictEqual(["webSearch"]);
     });
 
     it("refuses a goal, whose later rounds are not checked for a request", async () => {

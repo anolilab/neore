@@ -242,6 +242,24 @@ describe("a stored handoff across a context reset (/clear)", () => {
         expect(await run(async (ctx) => await handoffAboveOf(ctx, { belowMessageId: ids.u3 as never, threadId: threadId as never }))).toStrictEqual([]);
     });
 
+    it("returns no handoff from before a paused run's own first turn (fromOrder), and keeps one inside it", async () => {
+        await run(async (ctx) => {
+            await insertAgentSwitchRow(ctx.db, {
+                order: 2,
+                part: handoffPart(ids.a2 as string, "before the run"),
+                threadId: threadId as never,
+                userId: OWNER,
+            });
+        });
+        await insertRow("u3", 4, 0, text("user", "the run's task"));
+
+        const above = async (fromOrder: number) =>
+            await run(async (ctx) => await handoffAboveOf(ctx, { belowMessageId: ids.u3 as never, fromOrder, threadId: threadId as never }));
+
+        expect(await above(3)).toStrictEqual([]);
+        expect(await above(2)).toStrictEqual(["before the run"]);
+    });
+
     it("returns a handoff written by a switch after the reset", async () => {
         await clear();
         await run(async (ctx) => {
