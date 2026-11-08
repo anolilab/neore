@@ -11,11 +11,12 @@ import SetupChecklist from "./setup-checklist";
 
 const { account, devices, save, server, toastError } = vi.hoisted(() => {
     return {
-        account: { id: "user-a" },
+        account: { id: "user-a" as string | undefined },
         devices: { current: [] as unknown[], fail: false, hold: undefined as Promise<undefined> | undefined, reads: 0 },
         save: vi.fn(),
         server: {
             failSave: false,
+            refuse: false,
             failStep: undefined as string | undefined,
             noRow: false,
             reads: 0,
@@ -32,11 +33,8 @@ vi.mock("@/features/auth/lib/auth-ui-provider", () => {
         useAuth: () => {
             return {
                 authClient: {
-                    getSession: async () => {
-                        return { data: { user: { id: account.id } } };
-                    },
                     useSession: () => {
-                        return { data: { user: { id: account.id } } };
+                        return { data: account.id === undefined ? null : { user: { id: account.id } } };
                     },
                 },
             };
@@ -94,6 +92,10 @@ vi.mock("@/lib/lunora/crpc", () => {
                                         save(args);
 
                                         await server.hold;
+
+                                        if (server.refuse) {
+                                            throw Object.assign(new Error("another account"), { data: { code: "FORBIDDEN" } });
+                                        }
 
                                         if (server.failSave || server.failStep === args.stepId) {
                                             throw new Error("down");
@@ -176,6 +178,7 @@ describe("<SetupChecklist>", () => {
         devices.hold = undefined;
         account.id = "user-a";
         server.failSave = false;
+        server.refuse = false;
         server.failStep = undefined;
         server.noRow = false;
         server.reads = 0;
@@ -299,29 +302,38 @@ describe("<SetupChecklist>", () => {
         expect(screen.getAllByText("(To do)")).toHaveLength(2);
     });
 
-    it("refuses a queued save once the signed-in account has changed, and announces nothing", async () => {
+    it("says nothing when the server refuses a choice made for another account, and ends on the stored state", async () => {
         const user = userEvent.setup();
-        const gate = createGate();
 
-        const client = new QueryClient({ defaultOptions: { mutations: { retry: false }, queries: { retry: false } } });
-
-        server.hold = gate.promise;
-        renderChecklist(true, client);
+        server.refuse = true;
+        server.skipped = ["pair"];
+        renderChecklist();
         await user.click(await screen.findByRole("button", { name: RESkipAddAnSshServer }));
-        await user.click(screen.getByRole("button", { name: RESkipPairAComputer }));
-        // The session changes between the two clicks; the card is not re-rendered.
-        account.id = "user-b";
-        gate.open();
 
-        // Drained: both saves have settled, the second without being sent.
         await waitFor(() => {
-            expect(client.isMutating()).toBe(0);
+            expect(save).toHaveBeenCalledTimes(1);
+        });
+        await waitFor(() => {
+            expect(server.reads).toBe(2);
         });
 
-        expect(save).toHaveBeenCalledTimes(1);
-        expect(save).toHaveBeenCalledWith({ expectedUserId: "user-a", skipped: true, stepId: "ssh" });
-        expect(save).not.toHaveBeenCalledWith(expect.objectContaining({ stepId: "pair" }));
         expect(toastError).not.toHaveBeenCalled();
+        expect(screen.queryByText("Could not save that choice. Try again.")).toBeNull();
+        expect(screen.getAllByText("(Skipped)")).toHaveLength(1);
+        expect(screen.getAllByText("(To do)")).toHaveLength(2);
+    });
+
+    it("keeps Skip and Resume off until the session is known", async () => {
+        account.id = undefined;
+        renderChecklist();
+
+        expect(await screen.findAllByText("(To do)")).toHaveLength(3);
+
+        const buttons = screen.getAllByRole("button", { name: RESkip });
+
+        for (const button of buttons) {
+            expect((button as HTMLButtonElement).disabled).toBe(true);
+        }
     });
 
     it("keeps the second step's choice when the first of two quick saves fails, and re-reads once", async () => {

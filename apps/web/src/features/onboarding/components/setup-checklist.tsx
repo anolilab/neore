@@ -26,14 +26,19 @@ type SkippedRow = { setupStepsSkipped?: string[] } | null | undefined;
 
 const SAVE_SCOPE = "setup-steps-skip";
 
-/** A click carries the account that made it, so a save queued behind others never runs as someone who signed in since. */
+/** A click carries the account that made it; the server refuses a save whose account is not the one signed in. */
 interface SkipVariables {
-    owner: string | undefined;
+    owner: string;
     skipped: boolean;
     stepId: SetupStepId;
 }
 
-class StaleAccountError extends Error {}
+/** The server's refusal of a choice made for another account: the click is not this account's, so there is nothing to say. */
+const isOwnerRefusal = (error: unknown) => {
+    const { code, data } = error as { code?: string; data?: { code?: string } };
+
+    return code === "FORBIDDEN" || data?.code === "FORBIDDEN";
+};
 
 /**
  * First-run setup. The web only explains and links: pairing and agent installs happen in the desktop app's own
@@ -49,13 +54,8 @@ const SetupChecklist: FC<{ serverFormShown: boolean }> = ({ serverFormShown }) =
     const [failedStep, setFailedStep] = useState<SetupStepId | undefined>(undefined);
     const { authClient } = useAuth();
     const { data: session } = authClient.useSession();
-    // Who is signed in, read when a save runs. The card can be gone by then, so nothing here belongs to it.
-    const signedIn = async () => {
-        const { data } = await authClient.getSession();
-
-        return data?.user?.id;
-    };
-
+    // Skip and Resume wait for the session: a save is always sent for a known account.
+    const signedInId = session?.user?.id;
     // The list is live: a computer paired in the desktop app arrives as a push.
     const devicesQuery = useQuery(crpc.devices.functions.listDevices.queryOptions({}));
     const saveStep = crpc.auth.setup_steps.setSetupStepSkipped.mutationOptions();
@@ -65,20 +65,9 @@ const SetupChecklist: FC<{ serverFormShown: boolean }> = ({ serverFormShown }) =
         // Saves run in click order, so a Skip still on its way can never land after the Resume that followed it.
         mutationKey: [SAVE_SCOPE],
         scope: { id: SAVE_SCOPE },
-        mutationFn: async (args: SkipVariables, context) => {
-            const { owner, ...step } = args;
-
-            if (owner !== (await signedIn())) {
-                throw new StaleAccountError();
-            }
-
-            return (await saveStep.mutationFn?.({ ...step, expectedUserId: owner } as never, context)) ?? null;
-        },
+        mutationFn: async (args: SkipVariables, context) =>
+            (await saveStep.mutationFn?.({ expectedUserId: args.owner, skipped: args.skipped, stepId: args.stepId }, context)) ?? null,
         onMutate: async (args) => {
-            if (args.owner !== (await signedIn())) {
-                return undefined;
-            }
-
             setFailedStep(undefined);
             // A read still in flight would land after the patch with the value from before the click.
             await queryClient.cancelQueries({ queryKey: settingsKey });
@@ -86,31 +75,30 @@ const SetupChecklist: FC<{ serverFormShown: boolean }> = ({ serverFormShown }) =
             // An account with no settings row reads `null`: the click still shows, and an error puts the null back.
             const row = queryClient.getQueryData<SkippedRow>(settingsKey);
             const wasSkipped = row?.setupStepsSkipped?.includes(args.stepId) === true;
-
             const patched: SkippedRow = { ...row, setupStepsSkipped: toggleSkipped(row?.setupStepsSkipped, args.stepId, args.skipped) };
 
             queryClient.setQueryData<SkippedRow>(settingsKey, () => patched);
 
             return { hadRow: Boolean(row), wasSkipped };
         },
-        onError: async (_error, args, context) => {
-            // Another account is signed in now: the cache is theirs, so nothing is restored or announced.
-            if (context === undefined || args.owner !== (await signedIn())) {
+        onError: (error, args, context) => {
+            // Only this step goes back to its own previous value; a choice made on another step since stays.
+            queryClient.setQueryData<SkippedRow>(settingsKey, (row) => {
+                const list = toggleSkipped(row?.setupStepsSkipped, args.stepId, context?.wasSkipped === true);
+
+                return context?.hadRow === true || list.length > 0 ? { ...row, setupStepsSkipped: list } : null;
+            });
+
+            if (isOwnerRefusal(error)) {
                 return;
             }
 
-            // Only this step goes back to its own previous value; a choice made on another step since stays.
-            queryClient.setQueryData<SkippedRow>(settingsKey, (row) => {
-                const list = toggleSkipped(row?.setupStepsSkipped, args.stepId, context.wasSkipped);
-
-                return context.hadRow || list.length > 0 ? { ...row, setupStepsSkipped: list } : null;
-            });
             setFailedStep(args.stepId);
             toast.error(t`Could not save that choice. Try again.`);
         },
         // Settled, the cache ends on what the server stores, once no later save is still waiting its turn.
-        onSettled: async (_data, _error, args) => {
-            if (args.owner === (await signedIn()) && queryClient.isMutating({ mutationKey: [SAVE_SCOPE] }) <= 1) {
+        onSettled: async () => {
+            if (queryClient.isMutating({ mutationKey: [SAVE_SCOPE] }) <= 1) {
                 await queryClient.invalidateQueries({ queryKey: settingsKey });
             }
         },
@@ -195,9 +183,11 @@ const SetupChecklist: FC<{ serverFormShown: boolean }> = ({ serverFormShown }) =
                                     )}
                                     {status !== undefined && (
                                         <Button
-                                            disabled={settingsQuery.isError}
+                                            disabled={settingsQuery.isError || signedInId === undefined}
                                             onClick={() => {
-                                                setSkipped.mutate({ owner: session?.user?.id, skipped: status === "todo", stepId: id });
+                                                if (signedInId !== undefined) {
+                                                    setSkipped.mutate({ owner: signedInId, skipped: status === "todo", stepId: id });
+                                                }
                                             }}
                                             size="sm"
                                             variant="ghost"
