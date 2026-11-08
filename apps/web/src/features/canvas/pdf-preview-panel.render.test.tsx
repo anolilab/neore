@@ -281,16 +281,22 @@ describe("the side panel's failures", () => {
     });
 
     it("keeps a viewer failure to its own file, without a toast, so the next PDF opens", async () => {
-        vi.spyOn(console, "error").mockImplementation(() => {});
-        const { rerender } = render(panelFor({ ...DOCUMENT_A, url: "https://api.example/files/broken.pdf?sig=x" }));
+        // The viewer's thrown error is logged by React; silenced for this test only, and restored even if it fails.
+        const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
 
-        expect(await screen.findByText("This preview could not be loaded.")).toBeDefined();
+        try {
+            const { rerender } = render(panelFor({ ...DOCUMENT_A, url: "https://api.example/files/broken.pdf?sig=x" }));
 
-        rerender(panelFor(DOCUMENT_B));
+            expect(await screen.findByText("This preview could not be loaded.")).toBeDefined();
 
-        await waitFor(() => {
-            expect(screen.queryByText("This preview could not be loaded.")).toBeNull();
-        });
-        expect(showError).not.toHaveBeenCalled();
+            rerender(panelFor(DOCUMENT_B));
+
+            await waitFor(() => {
+                expect(screen.queryByText("This preview could not be loaded.")).toBeNull();
+            });
+            expect(showError).not.toHaveBeenCalled();
+        } finally {
+            consoleError.mockRestore();
+        }
     });
 });

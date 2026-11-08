@@ -91,7 +91,12 @@ describe("the thumbnail's load deadline", () => {
             );
         });
 
-        return container.querySelector("button");
+        // By its accessible name, as a reader finds it: a button that lost its name fails here.
+        const button = [...container.querySelectorAll("button")].find((element) => element.getAttribute("aria-label")?.startsWith("Open PDF"));
+
+        expect(button).toBeDefined();
+
+        return button!;
     };
 
     const advance = async (ms: number) => {
