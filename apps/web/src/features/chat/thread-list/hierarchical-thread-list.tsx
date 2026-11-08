@@ -1093,13 +1093,14 @@ const HierarchicalThreadList: FC<
         }
     }, [optionsMenuThread, optionsMenuThreadId, setOptionsMenuThreadId]);
 
-    // The targets live in the store, which outlives the list: leaving the list clears them, so neither reopens on return.
+    // The targets live in the store, which outlives the list: leaving the list clears them, so none reopens on return.
     useEffect(
         () => () => {
             setRenameThreadId(null);
             setOptionsMenuThreadId(null);
+            setSnoozeThreadId(null);
         },
-        [setRenameThreadId, setOptionsMenuThreadId],
+        [setRenameThreadId, setOptionsMenuThreadId, setSnoozeThreadId],
     );
 
     // Show loading state if threads are still loading
