@@ -163,7 +163,6 @@ describe("quoteRestoreDraft", () => {
     it("keeps the quote in the draft as plain quoted lines while the editor is not mounted", () => {
         expect(quoteRestoreDraft(null, quoted, "Before")).toBe(`Before\n${formatQuote(quoted.text)}`);
     });
-
 });
 
 describe("the link back to the quoted reply", () => {

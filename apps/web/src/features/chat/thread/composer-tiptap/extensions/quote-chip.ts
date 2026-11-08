@@ -48,7 +48,11 @@ const visibleText = (line: Element): string => {
 
 /** A pasted chip's quote, read from its visible quoted lines, never from an attribute the pasting page could fill unseen. */
 const visibleQuote = (element: HTMLElement): string =>
-    cleanQuote(Array.from(element.querySelectorAll(`:scope > blockquote:not(${HIDDEN}) > p`), visibleText).join("\n").trim());
+    cleanQuote(
+        Array.from(element.querySelectorAll(`:scope > blockquote:not(${HIDDEN}) > p`), visibleText)
+            .join("\n")
+            .trim(),
+    );
 
 const excerptOf = (text: string): string => {
     const flat = text.replaceAll(/\s+/gu, " ").trim();
@@ -127,7 +131,8 @@ const QuoteChip = Node.create<QuoteChipOptions>({
             fullText.textContent = String(node.attrs.text ?? "");
             source.type = "button";
             // 44px on a touch screen (WCAG 2.5.5), the chip's own size on a pointer.
-            source.className = "text-primary inline-flex shrink-0 items-center underline-offset-2 hover:underline pointer-coarse:min-h-11 pointer-coarse:min-w-11";
+            source.className =
+                "text-primary inline-flex shrink-0 items-center underline-offset-2 hover:underline pointer-coarse:min-h-11 pointer-coarse:min-w-11";
             paint();
             source.addEventListener("click", () => {
                 if (!scrollToMessage(String(node.attrs.messageId ?? ""))) {
