@@ -761,9 +761,8 @@ const portsQuiet = (quiet: boolean): void => {
 
 const showPorts = (selected: string | undefined, ports: Awaited<ReturnType<typeof globalThis.neoreDevice.acpPorts>>): void => {
     portsQuiet(ports.length === 0);
-    setPortsStatus("");
 
-    // The same ports for the same session are already on screen: leave the rows alone.
+    // The same ports for the same session are already on screen: leave the rows and the status alone.
     const shownKey = JSON.stringify([selected, ports]);
 
     if (shownKey === portsRead.shown) {
@@ -771,6 +770,10 @@ const showPorts = (selected: string | undefined, ports: Awaited<ReturnType<typeo
     }
 
     portsRead.shown = shownKey;
+    // The status region is polite and live, so a server that starts or stops is announced, once per change.
+    const servers = ports.length === 1 ? "1 server listening." : `${String(ports.length)} servers listening.`;
+
+    setPortsStatus(ports.length === 0 ? "No servers listening." : servers);
     $("acp-ports-list").replaceChildren(
         ...ports.length === 0
             ? [item("None.")]
