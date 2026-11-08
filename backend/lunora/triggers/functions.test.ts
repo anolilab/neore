@@ -1257,7 +1257,15 @@ describe("run prompts", () => {
         };
         const [trigger] = exported.triggers;
 
-        expect(trigger).toMatchObject({ lastTriggeredAt: null, name: "Hook", nextTriggerAt: null, triggerCount: 0 });
+        expect(trigger).toMatchObject({
+            failureStreak: 0,
+            lastSuccessStartedAt: null,
+            lastTriggeredAt: null,
+            name: "Hook",
+            nextTriggerAt: null,
+            triggerCount: 0,
+        });
+        expect(trigger).toHaveProperty("enabledAt");
         expect(trigger).toHaveProperty("updatedAt");
         // The whole row is counted, so the read is larger than what the export keeps of it.
         expect(exported.readBytes).toBeGreaterThan(JSON.stringify(exported.runs[0]).length);
