@@ -1450,11 +1450,11 @@ msgstr "<0>Enter</0> 创建"
 msgid "<0>Esc</0> Close"
 msgstr "<0>Esc</0> 关闭"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:1054
+#: src/features/settings/components/chat/trigger-settings.tsx:1062
 msgid "<0>Schedule</0> — Run on a cron schedule (e.g., daily at 8 AM). Uses standard 5-field cron expressions."
 msgstr "<0>定时</0>——按 cron 计划运行（例如每天早上 8 点）。使用标准的 5 字段 cron 表达式。"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:1063
+#: src/features/settings/components/chat/trigger-settings.tsx:1071
 msgid "<0>Webhook</0> — Receive HTTP POST requests from external services (Stripe, GitHub, Zapier). Requests are signed with a timestamped HMAC and replays are rejected."
 msgstr "<0>Webhook</0>——接收来自外部服务（Stripe、GitHub、Zapier）的 HTTP POST 请求。请求使用带时间戳的 HMAC 签名，重放请求会被拒绝。"
 
@@ -1844,7 +1844,7 @@ msgstr "有工具调用需要你批准"
 msgid "A tool cannot be both added and disabled"
 msgstr "工具不能同时被添加和禁用"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:343
+#: src/features/settings/components/chat/trigger-settings.tsx:344
 msgid "A unique webhook URL and secret will be generated when you create this trigger. Use the URL as the target for external services (Zapier, n8n, your own code, etc.)."
 msgstr "创建此触发器时将生成唯一的 webhook URL 和密钥。将该 URL 用作外部服务（Zapier、n8n、你自己的代码等）的目标地址。"
 
@@ -2045,7 +2045,7 @@ msgstr "活跃"
 #: src/features/chat/thread/widgets/flight-widget.tsx:55
 #: src/features/settings/components/chat/model-filter-settings.tsx:180
 #: src/features/settings/components/chat/model-filter-settings.tsx:241
-#: src/features/settings/components/chat/trigger-settings.tsx:826
+#: src/features/settings/components/chat/trigger-settings.tsx:827
 #: src/features/tasks/components/goal-form-dialog.tsx:46
 #: src/features/tasks/components/goal-list.tsx:25
 msgid "Active"
@@ -4155,7 +4155,7 @@ msgstr "输入时自动补全"
 #~ msgid "Automate agent execution on schedules or webhooks"
 #~ msgstr "通过计划或 Webhook 自动执行智能体"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:733
+#: src/features/settings/components/chat/trigger-settings.tsx:734
 msgid "Automate agent execution on schedules, webhooks or events"
 msgstr ""
 
@@ -5318,7 +5318,7 @@ msgstr "加拿大"
 #: src/features/settings/components/chat/native-providers-settings.tsx:708
 #: src/features/settings/components/chat/rotate-webhook-secret-dialog.tsx:57
 #: src/features/settings/components/chat/system-prompt-preset-settings.tsx:239
-#: src/features/settings/components/chat/trigger-settings.tsx:389
+#: src/features/settings/components/chat/trigger-settings.tsx:390
 #: src/features/settings/components/chat/usage-settings.tsx:573
 #: src/features/settings/components/chat/usage-settings.tsx:581
 #: src/features/settings/components/knowledge/knowledge-base-settings.tsx:417
@@ -5818,7 +5818,7 @@ msgid "Checked integrations are offered for setup after you save. Nothing connec
 msgstr "勾选的集成会在保存后提供设置。在你确认之前不会建立任何连接。"
 
 #. placeholder {0}: formatDateTime(trigger.eventStatus.checkedAt, i18n.locale)
-#: src/features/settings/components/chat/trigger-settings.tsx:850
+#: src/features/settings/components/chat/trigger-settings.tsx:851
 msgid "Checked: {0}"
 msgstr ""
 
@@ -6879,7 +6879,7 @@ msgid "completed"
 msgstr "已完成"
 
 #: src/features/evals/components/run-status.tsx:13
-#: src/features/settings/components/chat/trigger-settings.tsx:179
+#: src/features/settings/components/chat/trigger-settings.tsx:180
 #: src/features/tasks/components/goal-form-dialog.tsx:48
 #: src/features/tasks/components/goal-list.tsx:27
 #: src/features/workflow/components/canvas/execution-history-panel.tsx:63
@@ -7717,7 +7717,7 @@ msgstr "已复制！"
 #: src/features/chat/sharing/thread-share-button.tsx:366
 #: src/features/chat/thread/message-item.tsx:357
 #: src/features/chat/thread/text-selection-menu.tsx:525
-#: src/features/settings/components/chat/trigger-settings.tsx:781
+#: src/features/settings/components/chat/trigger-settings.tsx:782
 #: src/features/skills/components/bundle-import-dialog.tsx:207
 msgid "Copy"
 msgstr "复制"
@@ -7825,7 +7825,7 @@ msgstr ""
 msgid "Copy the Phone number ID, a permanent (System User) access token, and the App Secret (App settings > Basic). Choose any Verify token."
 msgstr "复制电话号码 ID、永久（系统用户）访问令牌以及 App Secret（应用设置 > 基本）。验证令牌可任意设定。"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:764
+#: src/features/settings/components/chat/trigger-settings.tsx:765
 #: src/features/skills/components/bundle-import-dialog.tsx:195
 msgid "Copy this secret now and store it with your webhook sender. It will not be shown again."
 msgstr "请立即复制此密钥并保存到你的 Webhook 发送方。之后将不会再次显示。"
@@ -7847,7 +7847,7 @@ msgstr "复制到剪贴板"
 msgid "Copy value"
 msgstr "复制值"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:869
+#: src/features/settings/components/chat/trigger-settings.tsx:870
 #: src/features/settings/connectors/messenger/messenger-platform-card.tsx:219
 msgid "Copy webhook URL"
 msgstr "复制 webhook URL"
@@ -8023,7 +8023,7 @@ msgstr "无法自动复制。公开链接：{publicLink}"
 msgid "Could not copy the prompt link. Your browser did not allow access to the clipboard."
 msgstr ""
 
-#: src/features/settings/components/chat/trigger-settings.tsx:655
+#: src/features/settings/components/chat/trigger-settings.tsx:656
 #: src/features/skills/components/bundle-import-dialog.tsx:188
 msgid "Could not copy the secret. Select it and copy it manually."
 msgstr "无法复制密钥。请选中后手动复制。"
@@ -8585,8 +8585,8 @@ msgstr "创建团队"
 msgid "Create teams to organize members into groups"
 msgstr "创建团队，将成员分组管理"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:753
-#: src/features/settings/components/chat/trigger-settings.tsx:1038
+#: src/features/settings/components/chat/trigger-settings.tsx:754
+#: src/features/settings/components/chat/trigger-settings.tsx:1046
 msgid "Create Trigger"
 msgstr "创建触发器"
 
@@ -8606,7 +8606,7 @@ msgstr "创建你的第一个提示词，用作对话的系统提示词。你也
 msgid "Create your first skill to automate workflows. Import from GitHub, upload SKILL.md files, or install from the official catalog."
 msgstr "创建你的第一个技能来自动化工作流。可以从 GitHub 导入、上传 SKILL.md 文件，或从官方目录安装。"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:1034
+#: src/features/settings/components/chat/trigger-settings.tsx:1042
 msgid "Create your first trigger to automate agent execution on a schedule or via webhooks."
 msgstr "创建你的第一个触发器，通过计划或 Webhook 自动执行智能体。"
 
@@ -8737,7 +8737,7 @@ msgstr "克罗地亚语"
 msgid "Croatian (Croatia)"
 msgstr "克罗地亚语（克罗地亚）"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:307
+#: src/features/settings/components/chat/trigger-settings.tsx:308
 msgid "Cron Expression"
 msgstr "Cron 表达式"
 
@@ -8745,7 +8745,7 @@ msgstr "Cron 表达式"
 msgid "Cron expression (UTC)"
 msgstr "Cron 表达式（UTC）"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:314
+#: src/features/settings/components/chat/trigger-settings.tsx:315
 msgid "Cron presets"
 msgstr "Cron 预设"
 
@@ -8986,7 +8986,7 @@ msgstr "每日费用（微美元）"
 msgid "Daily Cost Trend"
 msgstr "每日费用趋势"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:227
+#: src/features/settings/components/chat/trigger-settings.tsx:228
 msgid "Daily inbox summary"
 msgstr "每日收件箱摘要"
 
@@ -9376,7 +9376,7 @@ msgstr "将任务委派给 AI 软件工程师 Devin"
 #: src/features/settings/components/chat/bots-settings.tsx:181
 #: src/features/settings/components/chat/bots-settings.tsx:190
 #: src/features/settings/components/chat/system-prompt-preset-settings.tsx:343
-#: src/features/settings/components/chat/trigger-settings.tsx:1088
+#: src/features/settings/components/chat/trigger-settings.tsx:1096
 #: src/features/skills/components/skill-list.tsx:308
 #: src/features/tasks/components/goal-list.tsx:54
 #: src/features/tasks/components/task-card.tsx:113
@@ -9388,7 +9388,7 @@ msgstr "删除"
 #. placeholder {0}: deletingTrigger.name
 #. placeholder {0}: selected.name
 #: src/features/knowledge/components/collection-picker.tsx:106
-#: src/features/settings/components/chat/trigger-settings.tsx:1094
+#: src/features/settings/components/chat/trigger-settings.tsx:1102
 #: src/features/skills/components/skill-list.tsx:314
 msgid "Delete \"{0}\"?"
 msgstr "删除“{0}”？"
@@ -9645,11 +9645,11 @@ msgstr "删除对话？"
 msgid "Delete Threads"
 msgstr "删除对话"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:943
+#: src/features/settings/components/chat/trigger-settings.tsx:944
 msgid "Delete trigger"
 msgstr "删除触发器"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:1094
+#: src/features/settings/components/chat/trigger-settings.tsx:1102
 msgid "Delete trigger?"
 msgstr "删除触发器？"
 
@@ -9877,7 +9877,7 @@ msgid "Description"
 msgstr "描述"
 
 #: src/features/settings/components/chat/system-prompt-preset-settings.tsx:170
-#: src/features/settings/components/chat/trigger-settings.tsx:285
+#: src/features/settings/components/chat/trigger-settings.tsx:286
 #: src/features/skills/components/bundle-export-dialog.tsx:160
 msgid "Description (optional)"
 msgstr "描述（可选）"
@@ -10086,7 +10086,7 @@ msgstr "关闭深度工作模式"
 msgid "Disable tool <0>{0}</0>"
 msgstr "停用工具 <0>{0}</0>"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:922
+#: src/features/settings/components/chat/trigger-settings.tsx:923
 msgid "Disable trigger"
 msgstr "禁用触发器"
 
@@ -10095,7 +10095,7 @@ msgid "Disable Two-Factor"
 msgstr "停用双重验证"
 
 #: src/features/auth/components/settings/two-factor/two-factor-card.tsx:50
-#: src/features/settings/components/chat/trigger-settings.tsx:828
+#: src/features/settings/components/chat/trigger-settings.tsx:829
 msgid "Disabled"
 msgstr "已停用"
 
@@ -10185,7 +10185,7 @@ msgstr "关闭设置建议"
 msgid "Dismiss this side question"
 msgstr ""
 
-#: src/features/settings/components/chat/trigger-settings.tsx:767
+#: src/features/settings/components/chat/trigger-settings.tsx:768
 msgid "Dismiss webhook secret"
 msgstr "关闭 Webhook 密钥"
 
@@ -10728,7 +10728,7 @@ msgstr "每次运行都会追加到上次运行的对话中，智能体可以看
 msgid "Each run starts its own thread."
 msgstr "每次运行都会新建自己的对话。"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:1070
+#: src/features/settings/components/chat/trigger-settings.tsx:1078
 msgid "Each trigger creates a new thread and runs your agent with up to 25 iterations (Deep Work mode). Results are visible in your thread list."
 msgstr "每个触发器都会创建一个新对话，并以最多 25 次迭代运行你的智能体（深度工作模式）。结果会显示在你的对话列表中。"
 
@@ -10935,11 +10935,11 @@ msgstr "编辑任务"
 msgid "Edit the reply..."
 msgstr ""
 
-#: src/features/settings/components/chat/trigger-settings.tsx:916
+#: src/features/settings/components/chat/trigger-settings.tsx:917
 msgid "Edit trigger"
 msgstr "编辑触发器"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:808
+#: src/features/settings/components/chat/trigger-settings.tsx:809
 msgid "Edit Trigger"
 msgstr "编辑触发器"
 
@@ -11273,7 +11273,7 @@ msgstr "启用专用模块以增强 AI 能力"
 msgid "Enable tool <0>{0}</0>"
 msgstr "启用工具 <0>{0}</0>"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:922
+#: src/features/settings/components/chat/trigger-settings.tsx:923
 msgid "Enable trigger"
 msgstr "启用触发器"
 
@@ -11839,7 +11839,7 @@ msgstr "评测"
 msgid "Evaluate JS"
 msgstr "执行 JS"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:439
+#: src/features/settings/components/chat/trigger-settings.tsx:440
 #: src/features/settings/components/chat/trigger-type-picker.tsx:15
 #: src/features/settings/components/chat/webhook-trigger-fields.tsx:297
 msgid "Event"
@@ -11849,7 +11849,7 @@ msgstr "事件"
 #~ msgid "Event triggers are not supported: nothing starts this one automatically, and it cannot be edited. Delete it and create a schedule or webhook trigger instead."
 #~ msgstr "不支持事件触发器：没有任何机制会自动启动此触发器，也无法编辑。请删除它，并改为创建计划触发器或 Webhook 触发器。"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:173
+#: src/features/settings/components/chat/trigger-settings.tsx:174
 msgid "Every 6 hours"
 msgstr "每 6 小时"
 
@@ -11857,7 +11857,7 @@ msgstr "每 6 小时"
 msgid "Every day at 09:00 UTC"
 msgstr "每天 09:00 UTC"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:171
+#: src/features/settings/components/chat/trigger-settings.tsx:172
 msgid "Every day at 8 AM"
 msgstr "每天早上 8 点"
 
@@ -11897,7 +11897,7 @@ msgstr "所有提供商。<0>一个 SDK。</0>"
 msgid "Every request must be signed. Send <0>X-Neore-Timestamp</0> (the current Unix time in seconds) and <1>X-Signature-256: sha256=<hex></1>, the HMAC-SHA256 of <2><timestamp>.<raw body></2> keyed with the secret. Requests more than 5 minutes old, unsigned, or replayed are rejected, as is <3>X-Hub-Signature-256</3>."
 msgstr ""
 
-#: src/features/settings/components/chat/trigger-settings.tsx:174
+#: src/features/settings/components/chat/trigger-settings.tsx:175
 msgid "Every Sunday at midnight"
 msgstr "每周日午夜"
 
@@ -12040,7 +12040,7 @@ msgstr "执行失败"
 msgid "Execution history"
 msgstr "执行历史"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:965
+#: src/features/settings/components/chat/trigger-settings.tsx:966
 msgid "Execution History"
 msgstr "执行历史"
 
@@ -12435,7 +12435,7 @@ msgstr "失败"
 #: src/features/devices/components/devices-settings.tsx:385
 #: src/features/evals/components/model-comparison.tsx:112
 #: src/features/evals/components/run-status.tsx:15
-#: src/features/settings/components/chat/trigger-settings.tsx:180
+#: src/features/settings/components/chat/trigger-settings.tsx:181
 #: src/features/sub-agents/components/sub-agent-tool-view.tsx:52
 #: src/features/sub-agents/components/worker-run-log.tsx:28
 #: src/features/tasks/components/task-status.tsx:17
@@ -12564,7 +12564,7 @@ msgstr "创建预设失败"
 msgid "Failed to create tag"
 msgstr "创建标签失败"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:538
+#: src/features/settings/components/chat/trigger-settings.tsx:539
 msgid "Failed to create trigger"
 msgstr "创建触发器失败"
 
@@ -12642,7 +12642,7 @@ msgstr "删除数据集失败"
 msgid "Failed to delete threads"
 msgstr "删除对话失败"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:614
+#: src/features/settings/components/chat/trigger-settings.tsx:615
 msgid "Failed to delete trigger"
 msgstr "删除触发器失败"
 
@@ -12904,7 +12904,7 @@ msgstr "撤销会话失败"
 msgid "Failed to revoke the allow"
 msgstr ""
 
-#: src/features/settings/components/chat/trigger-settings.tsx:636
+#: src/features/settings/components/chat/trigger-settings.tsx:637
 msgid "Failed to rotate the secret"
 msgstr ""
 
@@ -13003,7 +13003,7 @@ msgstr "开始模拟登录失败"
 msgid "Failed to start import"
 msgstr "开始导入失败"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:670
+#: src/features/settings/components/chat/trigger-settings.tsx:671
 msgid "Failed to start test run"
 msgstr "启动测试运行失败"
 
@@ -13158,8 +13158,8 @@ msgstr "更新对话可见性失败"
 msgid "Failed to update tool permission"
 msgstr "更新工具权限失败"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:580
-#: src/features/settings/components/chat/trigger-settings.tsx:595
+#: src/features/settings/components/chat/trigger-settings.tsx:581
+#: src/features/settings/components/chat/trigger-settings.tsx:596
 msgid "Failed to update trigger"
 msgstr "更新触发器失败"
 
@@ -13870,7 +13870,7 @@ msgstr "Firefox 也可以使用，并且可能会询问同样的问题。"
 msgid "Fires when a message lands in it from a sub-agent, a model or another person. Your own messages do not count."
 msgstr ""
 
-#: src/features/settings/components/chat/trigger-settings.tsx:175
+#: src/features/settings/components/chat/trigger-settings.tsx:176
 msgid "First of each month at 9 AM"
 msgstr "每月 1 日上午 9 点"
 
@@ -15862,7 +15862,7 @@ msgstr ""
 msgid "How to merge"
 msgstr ""
 
-#: src/features/settings/components/chat/trigger-settings.tsx:1048
+#: src/features/settings/components/chat/trigger-settings.tsx:1056
 msgid "How Triggers Work"
 msgstr "触发器的工作原理"
 
@@ -16589,7 +16589,7 @@ msgstr "输入或生成图像"
 msgid "Input or transform text"
 msgstr "输入或转换文本"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:370
+#: src/features/settings/components/chat/trigger-settings.tsx:371
 msgid "Input Template"
 msgstr "输入模板"
 
@@ -17531,7 +17531,7 @@ msgstr "最后更新于 <0>{0}</0>"
 msgid "Last used {date}"
 msgstr "上次使用于 {date}"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:857
+#: src/features/settings/components/chat/trigger-settings.tsx:858
 msgid "Last: {lastRunAt}"
 msgstr "上次：{lastRunAt}"
 
@@ -17806,7 +17806,7 @@ msgstr "通过 Neore 桌面应用，让智能体使用你自己电脑上的文�
 msgid "Let the agent work on a server you reach over SSH, with your own SSH client and keys. Neore asks you to trust the server's key the first time, and every action asks you on this computer before it is sent. The server holds no secret of yours."
 msgstr ""
 
-#: src/features/settings/components/chat/trigger-settings.tsx:256
+#: src/features/settings/components/chat/trigger-settings.tsx:257
 msgid "Let the bot use its computer"
 msgstr ""
 
@@ -18314,7 +18314,7 @@ msgstr "正在加载对话..."
 msgid "Loading threads…"
 msgstr ""
 
-#: src/features/settings/components/chat/trigger-settings.tsx:722
+#: src/features/settings/components/chat/trigger-settings.tsx:723
 msgid "Loading triggers..."
 msgstr "正在加载触发器..."
 
@@ -18352,7 +18352,7 @@ msgstr ""
 #: src/features/settings/components/chat/default-models-settings.tsx:185
 #: src/features/settings/components/chat/native-providers-settings.tsx:396
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:289
-#: src/features/settings/components/chat/trigger-settings.tsx:973
+#: src/features/settings/components/chat/trigger-settings.tsx:974
 #: src/features/settings/components/privacy/data-access.tsx:25
 #: src/features/workflow/components/canvas/execution-history-panel.tsx:229
 #: src/routes/_shortcut.tsx:17
@@ -20188,7 +20188,7 @@ msgstr ""
 #: src/features/settings/components/chat/mcp/server-form.tsx:194
 #: src/features/settings/components/chat/native-providers-settings.tsx:507
 #: src/features/settings/components/chat/system-prompt-preset-settings.tsx:154
-#: src/features/settings/components/chat/trigger-settings.tsx:222
+#: src/features/settings/components/chat/trigger-settings.tsx:223
 #: src/features/settings/components/chat/usage-settings.tsx:433
 #: src/features/skills/components/skill-builder-diff.tsx:32
 #: src/features/skills/components/skill-builder-review.tsx:136
@@ -20712,7 +20712,7 @@ msgstr "新建对话"
 msgid "New Thread"
 msgstr "新建对话"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:737
+#: src/features/settings/components/chat/trigger-settings.tsx:738
 msgid "New Trigger"
 msgstr "新建触发器"
 
@@ -20896,7 +20896,7 @@ msgstr "无附件"
 msgid "No audit logs found"
 msgstr "没有审计日志"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:244
+#: src/features/settings/components/chat/trigger-settings.tsx:245
 msgid "No bot"
 msgstr ""
 
@@ -21027,7 +21027,7 @@ msgstr "此版本没有可用的差异数据"
 msgid "No enabled MCP servers."
 msgstr "没有已启用的 MCP 服务器。"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:1018
+#: src/features/settings/components/chat/trigger-settings.tsx:1026
 #: src/features/workflow/components/canvas/execution-history-panel.tsx:236
 msgid "No executions yet"
 msgstr "尚无执行记录"
@@ -21449,7 +21449,7 @@ msgstr "尚未共享任何工具"
 msgid "No tools."
 msgstr "没有工具。"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:1032
+#: src/features/settings/components/chat/trigger-settings.tsx:1040
 msgid "No triggers yet"
 msgstr "还没有触发器"
 
@@ -22110,7 +22110,7 @@ msgstr "只有你 @提及 的参与者才会回答。"
 msgid "Only PNG, JPEG, WEBP or GIF images, and PDFs up to 10 MB, 20 MB in all and four at most."
 msgstr "仅支持 PNG、JPEG、WEBP 或 GIF 图片，以及不超过 10 MB 的 PDF；总计不超过 20 MB，最多 4 个。"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:271
+#: src/features/settings/components/chat/trigger-settings.tsx:272
 msgid "Only post when there is something to report"
 msgstr ""
 
@@ -23544,7 +23544,7 @@ msgid "Pen"
 msgstr "画笔"
 
 #: src/features/develop/components/checks-tab.tsx:79
-#: src/features/settings/components/chat/trigger-settings.tsx:182
+#: src/features/settings/components/chat/trigger-settings.tsx:183
 #: src/features/workflow/components/canvas/execution-history-panel.tsx:59
 #: src/features/workflow/components/canvas/workflow-controls.tsx:53
 msgid "Pending"
@@ -23829,7 +23829,7 @@ msgstr "像素化"
 msgid "place"
 msgstr ""
 
-#: src/features/settings/components/chat/trigger-settings.tsx:381
+#: src/features/settings/components/chat/trigger-settings.tsx:382
 msgid "Placeholders: {PAYLOAD_TOKEN} inserts the whole body, framed as raw text. {WEBHOOK_BODY_TOKEN} inserts a JSON field, {WEBHOOK_HEADER_TOKEN} a header and {WEBHOOK_QUERY_TOKEN} a query parameter, each as quoted data. Headers and the query are not signed, and a credential-looking name is never read. With every value at its longest ({bodyLimit} characters for the body, {fieldLimit} for a field), a template must fit in {promptLimit} characters."
 msgstr ""
 
@@ -24706,6 +24706,7 @@ msgstr ""
 
 #: ../../packages/ui/src/components/image-gallery.tsx:400
 #: src/features/chat/thread/media-gallery-view.tsx:433
+#: src/features/settings/components/chat/trigger-settings.tsx:1017
 #: src/features/workflow/templates/index.ts:96
 #: src/features/workflow/templates/index.ts:230
 msgid "Prompt"
@@ -26895,7 +26896,7 @@ msgstr ""
 msgid "Rotate the secret of \"{name}\"?"
 msgstr ""
 
-#: src/features/settings/components/chat/trigger-settings.tsx:932
+#: src/features/settings/components/chat/trigger-settings.tsx:933
 msgid "Rotate webhook secret"
 msgstr ""
 
@@ -26967,7 +26968,7 @@ msgstr "在每个用例上运行一个技能，或一个带系统提示词的模
 msgid "Run again"
 msgstr "再次运行"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:235
+#: src/features/settings/components/chat/trigger-settings.tsx:236
 msgid "Run as bot (optional)"
 msgstr ""
 
@@ -27039,7 +27040,7 @@ msgstr "运行你的工作流后，可在此查看执行历史。"
 #: src/features/home/components/home-page.tsx:176
 #: src/features/home/components/home-page.tsx:184
 #: src/features/home/components/home-page.tsx:192
-#: src/features/settings/components/chat/trigger-settings.tsx:183
+#: src/features/settings/components/chat/trigger-settings.tsx:184
 #: src/features/tasks/components/task-detail-dialog.tsx:138
 #: src/features/tasks/components/task-status.tsx:20
 #: src/features/workflow/components/canvas/execution-history-panel.tsx:66
@@ -27100,7 +27101,7 @@ msgstr ""
 msgid "Runs you start from a chat appear here."
 msgstr ""
 
-#: src/features/settings/components/chat/trigger-settings.tsx:853
+#: src/features/settings/components/chat/trigger-settings.tsx:854
 msgid "Runs: {runCount}"
 msgstr "运行次数：{runCount}"
 
@@ -27371,7 +27372,7 @@ msgstr "正在扫描..."
 msgid "Scene Description"
 msgstr "场景描述"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:447
+#: src/features/settings/components/chat/trigger-settings.tsx:448
 #: src/features/settings/components/chat/trigger-type-picker.tsx:16
 msgid "Schedule"
 msgstr "计划"
@@ -27397,7 +27398,7 @@ msgstr "定时清理"
 msgid "Scheduled job"
 msgstr "定时任务"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:258
+#: src/features/settings/components/chat/trigger-settings.tsx:259
 msgid "Scheduled runs can run shell commands and edit files on the bot's computer, unless you turn those tools off in your tool settings."
 msgstr ""
 
@@ -27744,7 +27745,7 @@ msgstr ""
 msgid "Secret access key"
 msgstr "秘密访问密钥"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:638
+#: src/features/settings/components/chat/trigger-settings.tsx:639
 msgid "Secret rotated"
 msgstr ""
 
@@ -28303,7 +28304,7 @@ msgstr "设置应用的文字方向。RTL 用于阿拉伯语、希伯来语和�
 msgid "Set up a local model server"
 msgstr "设置本地模型服务器"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:217
+#: src/features/settings/components/chat/trigger-settings.tsx:218
 msgid "Set up a new automated agent execution"
 msgstr "设置新的自动化智能体执行"
 
@@ -28986,7 +28987,7 @@ msgstr "跳过导览"
 
 #: src/features/develop/components/checks-tab.tsx:80
 #: src/features/evals/components/run-detail.tsx:36
-#: src/features/settings/components/chat/trigger-settings.tsx:181
+#: src/features/settings/components/chat/trigger-settings.tsx:182
 msgid "Skipped"
 msgstr "已跳过"
 
@@ -29007,7 +29008,7 @@ msgstr "已跳过：等待你的审核"
 msgid "skipped: waiting on its dependencies"
 msgstr "已跳过：等待其依赖项"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:273
+#: src/features/settings/components/chat/trigger-settings.tsx:274
 msgid "Skips a run when your workspace has had no new activity since the routine last posted. A skipped run creates no chat and sends no notification."
 msgstr ""
 
@@ -30566,11 +30567,11 @@ msgstr "总结一篇文档或一个 URL..."
 msgid "Summarize any webpage in seconds"
 msgstr "几秒钟总结任意网页"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:290
+#: src/features/settings/components/chat/trigger-settings.tsx:291
 msgid "Summarize my email inbox every morning"
 msgstr "每天早上总结我的收件箱"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:375
+#: src/features/settings/components/chat/trigger-settings.tsx:376
 msgid "Summarize my inbox and highlight urgent items. Use {PAYLOAD_TOKEN} for webhook data."
 msgstr "总结我的收件箱并突出紧急事项。使用 {PAYLOAD_TOKEN} 获取 Webhook 数据。"
 
@@ -30776,7 +30777,7 @@ msgstr ""
 msgid "System prompt"
 msgstr "系统提示词"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:359
+#: src/features/settings/components/chat/trigger-settings.tsx:360
 #: src/features/workflow/components/nodes/ai-node.tsx:44
 msgid "System Prompt (optional)"
 msgstr "系统提示词（可选）"
@@ -31192,11 +31193,11 @@ msgstr "试运行已在临时聊天中就绪，它会被自动删除。"
 msgid "Test drive: {0}"
 msgstr "试运行：{0}"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:667
+#: src/features/settings/components/chat/trigger-settings.tsx:668
 msgid "Test run scheduled — check your threads for the result"
 msgstr "测试运行已安排——请在对话中查看结果"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:900
+#: src/features/settings/components/chat/trigger-settings.tsx:901
 msgid "Test run trigger"
 msgstr "测试运行触发器"
 
@@ -31929,7 +31930,7 @@ msgid "The preview stops after {0} records and {1} problem lines. The rest of th
 msgstr ""
 
 #. placeholder {0}: formatDateTime(trigger.webhookPreviousSecretExpiresAt, i18n.locale)
-#: src/features/settings/components/chat/trigger-settings.tsx:880
+#: src/features/settings/components/chat/trigger-settings.tsx:881
 msgid "The previous secret is still accepted until {0}."
 msgstr ""
 
@@ -32033,7 +32034,7 @@ msgstr "token 预算必须是整数。"
 msgid "The Token you entered in the server configuration"
 msgstr "你在服务器配置中输入的 Token"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:1089
+#: src/features/settings/components/chat/trigger-settings.tsx:1097
 msgid "The trigger stops running and its execution history is removed. This cannot be undone."
 msgstr "触发器将停止运行，其执行历史也会被删除。此操作无法撤销。"
 
@@ -32786,7 +32787,7 @@ msgstr ""
 
 #: src/features/chat/sidebar/thread-sidebar.tsx:302
 #: src/features/settings/components/chat/event-trigger-fields.tsx:270
-#: src/features/settings/components/chat/trigger-settings.tsx:1011
+#: src/features/settings/components/chat/trigger-settings.tsx:1010
 msgid "Thread"
 msgstr "对话"
 
@@ -32942,7 +32943,7 @@ msgid "Timestamps enabled"
 msgstr "已开启时间戳"
 
 #: src/features/settings/components/account/account-settings.tsx:314
-#: src/features/settings/components/chat/trigger-settings.tsx:328
+#: src/features/settings/components/chat/trigger-settings.tsx:329
 #: src/features/settings/lib/settings-keywords.ts:32
 msgid "Timezone"
 msgstr "时区"
@@ -33403,23 +33404,23 @@ msgstr "三角形"
 msgid "Trigger a notification or block when a usage metric exceeds a threshold"
 msgstr "当用量指标超过阈值时触发通知或阻止"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:540
+#: src/features/settings/components/chat/trigger-settings.tsx:541
 msgid "Trigger created"
 msgstr "触发器已创建"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:616
+#: src/features/settings/components/chat/trigger-settings.tsx:617
 msgid "Trigger deleted"
 msgstr "触发器已删除"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:597
+#: src/features/settings/components/chat/trigger-settings.tsx:598
 msgid "Trigger disabled"
 msgstr "触发器已停用"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:597
+#: src/features/settings/components/chat/trigger-settings.tsx:598
 msgid "Trigger enabled"
 msgstr "触发器已启用"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:515
+#: src/features/settings/components/chat/trigger-settings.tsx:516
 msgid "Trigger name is required"
 msgstr "触发器名称为必填项"
 
@@ -33435,17 +33436,17 @@ msgstr "触发器运行完成"
 msgid "Trigger type"
 msgstr "触发器类型"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:299
+#: src/features/settings/components/chat/trigger-settings.tsx:300
 msgid "Trigger Type"
 msgstr "触发器类型"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:582
+#: src/features/settings/components/chat/trigger-settings.tsx:583
 msgid "Trigger updated"
 msgstr "触发器已更新"
 
 #: src/features/auth/components/settings/api-key/api-key-scope-picker.tsx:36
 #: src/features/layout/lib/dashboard-page-names.ts:40
-#: src/features/settings/components/chat/trigger-settings.tsx:732
+#: src/features/settings/components/chat/trigger-settings.tsx:733
 msgid "Triggers"
 msgstr "触发器"
 
@@ -35565,7 +35566,7 @@ msgstr "集成网络搜索，了解时事"
 msgid "Web search via Parallel's search API"
 msgstr "通过 Parallel 搜索 API 进行网络搜索"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:455
+#: src/features/settings/components/chat/trigger-settings.tsx:456
 #: src/features/settings/components/chat/trigger-type-picker.tsx:17
 #: src/features/skills/components/bundle-export-dialog.tsx:185
 msgid "Webhook"
@@ -35579,13 +35580,13 @@ msgstr "Webhook 通知"
 #~ msgid "Webhook secret"
 #~ msgstr "Webhook 密钥"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:653
+#: src/features/settings/components/chat/trigger-settings.tsx:654
 #: src/features/skills/components/bundle-import-dialog.tsx:186
 msgid "Webhook secret copied to clipboard"
 msgstr "Webhook 密钥已复制到剪贴板"
 
 #. placeholder {0}: shown.name
-#: src/features/settings/components/chat/trigger-settings.tsx:762
+#: src/features/settings/components/chat/trigger-settings.tsx:763
 msgid "Webhook secret for \"{0}\""
 msgstr ""
 
@@ -35601,7 +35602,7 @@ msgstr "用于验证 Telegram 传入更新的 Webhook 密钥"
 msgid "Webhook URL"
 msgstr "Webhook URL"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:713
+#: src/features/settings/components/chat/trigger-settings.tsx:714
 #: src/features/settings/connectors/messenger/messenger-platform-card.tsx:132
 msgid "Webhook URL copied to clipboard"
 msgstr "Webhook URL 已复制到剪贴板"
@@ -35642,7 +35643,7 @@ msgstr "WeChat Token"
 msgid "Weekdays at 09:00 UTC"
 msgstr "工作日 09:00 UTC"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:172
+#: src/features/settings/components/chat/trigger-settings.tsx:173
 msgid "Weekdays at 8 AM"
 msgstr "工作日上午 8 点"
 
@@ -36197,7 +36198,7 @@ msgstr "你"
 msgid "You (another tab)"
 msgstr "你（另一个标签页）"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:363
+#: src/features/settings/components/chat/trigger-settings.tsx:364
 msgid "You are a helpful assistant that summarizes emails..."
 msgstr "你是一个帮助总结电子邮件的助手..."
 
