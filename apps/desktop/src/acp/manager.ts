@@ -19,7 +19,7 @@ import type { HostSessionInfo, SessionObserver } from "./ingest";
 import { JsonRpcConnection } from "./jsonrpc";
 import type { PermissionGate } from "./permission";
 import { declineGate } from "./permission";
-import type { PortView } from "./ports/ports";
+import type { PortView, StopResult, StopTarget } from "./ports/ports";
 import { PortsService } from "./ports/ports";
 import { realPortsSystem } from "./ports/system";
 import type { AgentProcess, Spawner } from "./process";
@@ -351,6 +351,11 @@ export class AcpManager {
         // A pid is reused only after its process ended, which ends the session: an agent that ended while its ports were
         // read may have handed its pid to another process, so its answer is dropped.
         return session.agentPid === agentPid ? ports : [];
+    }
+
+    /** Ends one listening server of the session and its own descendants; never the agent (`ports/ports.ts`). */
+    public async stopPort(sessionId: string, target: StopTarget): Promise<StopResult> {
+        return await this.portsService.stop(this.require(sessionId).agentPid, target);
     }
 
     /** Forgets an ended session. */

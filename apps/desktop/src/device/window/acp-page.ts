@@ -777,8 +777,38 @@ const showPorts = (selected: string | undefined, ports: Awaited<ReturnType<typeo
     $("acp-ports-list").replaceChildren(
         ...ports.length === 0
             ? [item("None.")]
-            : ports.map((port) => item(`Port ${String(port.port)} on ${port.address} — ${port.name} (process ${String(port.pid)})`)),
+            : ports.map((port) =>
+                item(
+                    `Port ${String(port.port)} on ${port.address} — ${port.name} (process ${String(port.pid)})`,
+                    button("Stop", `Stop ${port.name} on port ${String(port.port)}`, () => {
+                        guarded(() => stopPort(selected, port));
+                    }),
+                )),
     );
+};
+
+/** Ends one listed server, then reads the list again; a stop that did not end says why in the ports status line. */
+const stopPort = async (selected: string | undefined, port: Awaited<ReturnType<typeof globalThis.neoreDevice.acpPorts>>[number]): Promise<void> => {
+    // The row was drawn for another session: its pid may mean nothing here, so nothing is stopped.
+    if (selected === undefined || state.selected !== selected) {
+        return;
+    }
+
+    const result = await globalThis.neoreDevice.acpPortStop(selected, { name: port.name, pid: port.pid, startedAt: port.startedAt });
+
+    // Another session was opened during the stop: its own list is on screen now.
+    if (state.selected !== selected) {
+        return;
+    }
+
+    portsRead.quiet = 0;
+    await refreshPorts();
+
+    if (!result.ended && state.selected === selected) {
+        setPortsStatus(`${port.name} on port ${String(port.port)} did not end: ${result.reason}.`);
+        // The next read redraws the list, which brings the count back instead of leaving this reason up.
+        portsRead.shown = undefined;
+    }
 };
 
 /**

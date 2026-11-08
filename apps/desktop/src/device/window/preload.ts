@@ -24,6 +24,7 @@ const api: DeviceWindowApi = {
     acpPermissionDecline: (id) => ipcRenderer.invoke(LOCAL_CHANNEL.acpPermissionDecline, id),
     acpPermissions: () => ipcRenderer.invoke(LOCAL_CHANNEL.acpPermissions),
     acpPorts: (sessionId) => ipcRenderer.invoke(LOCAL_CHANNEL.acpPorts, sessionId),
+    acpPortStop: (sessionId, target) => ipcRenderer.invoke(LOCAL_CHANNEL.acpPortStop, sessionId, target.pid, target.startedAt, target.name),
     acpProbe: (agentKey) => ipcRenderer.invoke(LOCAL_CHANNEL.acpProbe, agentKey),
     acpRegistryInstall: (id, version) => ipcRenderer.invoke(LOCAL_CHANNEL.acpRegistryInstall, id, version),
     acpRegistrySearch: (query) => ipcRenderer.invoke(LOCAL_CHANNEL.acpRegistrySearch, query),

@@ -1,25 +1,65 @@
 /**
- * The ports an agent's processes listen on. Local window only: nothing here is reachable from the page, the backend
- * or an ACP command. The agent and every process below it are listed; anything outside the agent's tree never is.
+ * The ports an agent's processes listen on, and stopping one of those servers. Local window only: nothing here is
+ * reachable from the page, the backend or an ACP command. The agent and every process below it are listed; anything
+ * outside the agent's tree never is.
+ *
+ * Stop signals by PID, never by process group: an agent leads its own group and everything it starts inherits it, so a
+ * group signal would end the agent with the server. The listening process and its own descendants are signalled one by
+ * one, each only after a fresh process table shows it below this session's agent; never the agent, never this app.
  */
 import type { Listener, ProcessInfo } from "./process-table";
 import { descendantsOf } from "./process-table";
+
+/** How long a polite stop waits before the survivors are killed. */
+export const STOP_GRACE_MS = 2000;
+const POLL_MS = 100;
+const READ_ATTEMPTS = 3;
 
 export interface PortView {
     address: string;
     name: string;
     pid: number;
     port: number;
+    /** With `pid` and `name`, tells one process from a later one that reused the pid. */
+    startedAt: string;
 }
 
+/** The listed process a stop is for. */
+export interface StopTarget {
+    name: string;
+    pid: number;
+    startedAt: string;
+}
+
+/** How a stop ended; `reason` says in plain words why it did not. */
+export type StopResult = { ended: true } | { ended: false; reason: string };
+
+export const STOP_REASON = {
+    gone: "that server is no longer listening in this session",
+    refused: "a process could not be signalled (not permitted)",
+    survived: "a process was still running after it was force-killed",
+    unconfirmed: "it was force-killed, but the process list could not be read to confirm it ended",
+    unreadable: "the process list could not be read to confirm it, so nothing was force-killed",
+} as const;
+
 export interface PortsSystem {
+    /** ESRCH (already gone) is not an error; any other refusal throws. */
+    kill: (pid: number, signal: "SIGKILL" | "SIGTERM") => void;
     /** The TCP sockets in LISTEN state owned by these pids. */
     listeners: (pids: number[]) => Promise<Listener[]>;
     processes: () => Promise<ProcessInfo[]>;
+    sleep: (ms: number) => Promise<void>;
 }
 
 /** What tells two processes with one pid apart: `ps` start times are only to the second, so the name counts too. */
-const identity = (row: ProcessInfo): string => JSON.stringify([row.startedAt, row.name]);
+const identity = (row: { name: string; startedAt: string }): string => JSON.stringify([row.startedAt, row.name]);
+
+const sameProcess = (row: ProcessInfo, other: { name: string; pid: number; startedAt: string }): boolean =>
+    row.pid === other.pid && identity(row) === identity(other);
+
+/** Which of `victims` still run in `table`: the same process, and not a zombie (it has exited; its row stays until reaped). */
+const aliveOf = (table: ReadonlyArray<ProcessInfo>, victims: ReadonlyArray<ProcessInfo>): ProcessInfo[] =>
+    table.filter((row) => row.zombie !== true && victims.some((victim) => sameProcess(row, victim)));
 
 /** The agent's own row, if it is in the table, and every process below it. */
 const agentTree = (table: ReadonlyArray<ProcessInfo>, agentPid: number): ProcessInfo[] => {
@@ -29,7 +69,14 @@ const agentTree = (table: ReadonlyArray<ProcessInfo>, agentPid: number): Process
 };
 
 export class PortsService {
-    public constructor(private readonly system: PortsSystem) {}
+    public constructor(
+        private readonly system: PortsSystem,
+        /** This app's own pid: never a target, whatever the table says. */
+        private readonly selfPid: number = process.pid,
+        private readonly graceMs: number = STOP_GRACE_MS,
+        /** Milliseconds on a monotonic clock, injected so the grace deadline is tested without waiting. */
+        private readonly now: () => number = () => performance.now(),
+    ) {}
 
     public async list(agentPid: number | undefined): Promise<PortView[]> {
         if (agentPid === undefined) {
@@ -56,11 +103,177 @@ export class PortsService {
 
             if (row !== undefined && !seen.has(key) && stillBelow.get(row.pid) === identity(row)) {
                 seen.add(key);
-                views.push({ address: listener.address, name: row.name, pid: row.pid, port: listener.port });
+                views.push({ address: listener.address, name: row.name, pid: row.pid, port: listener.port, startedAt: row.startedAt });
             }
         }
 
         // A total order, so the same sockets always come out the same way and an unchanged list is not redrawn.
         return views.toSorted((a, b) => a.port - b.port || a.pid - b.pid || a.address.localeCompare(b.address));
+    }
+
+    /**
+     * Ends the listening process `target` and its own descendants: SIGTERM, then SIGKILL for the survivors after the
+     * grace period. Refused unless `target` is, in a fresh read, below the agent and still listening.
+     */
+    public async stop(agentPid: number | undefined, target: StopTarget): Promise<StopResult> {
+        const root = await this.locate(agentPid, target);
+
+        if (root === undefined || agentPid === undefined) {
+            return { ended: false, reason: STOP_REASON.gone };
+        }
+
+        const signalled: ProcessInfo[] = [root.current, ...this.newcomers(root.table, [root.current], [root.current], agentPid)];
+        const refused = signalled.map((victim) => !this.send(victim, "SIGTERM")).includes(true);
+
+        return await this.awaitGone(signalled, refused, agentPid);
+    }
+
+    /** Polls until every victim is gone or the grace period ends, then escalates. Both the polls and the clock count: a slow table read spends grace time too. */
+    private async awaitGone(signalled: ProcessInfo[], alreadyRefused: boolean, agentPid: number): Promise<StopResult> {
+        let refused = alreadyRefused;
+        const deadline = this.now() + this.graceMs;
+
+        for (let waited = 0; waited < this.graceMs && this.now() < deadline; waited += POLL_MS) {
+            // eslint-disable-next-line no-await-in-loop -- each poll waits for the previous one
+            const table = await this.tryProcesses();
+
+            if (table !== undefined) {
+                const alive = aliveOf(table, signalled);
+
+                // A child a victim started meanwhile goes down the same way, before its parent is gone.
+                for (const newcomer of this.newcomers(table, alive, signalled, agentPid)) {
+                    refused = !this.send(newcomer, "SIGTERM") || refused;
+                    signalled.push(newcomer);
+                }
+
+                if (alive.length === 0) {
+                    return refused ? { ended: false, reason: STOP_REASON.refused } : { ended: true };
+                }
+            }
+
+            // eslint-disable-next-line no-await-in-loop -- waiting between polls is the point
+            await this.system.sleep(POLL_MS);
+        }
+
+        return await this.escalate(signalled, refused, agentPid);
+    }
+
+    /** The target as it is right now: below the agent, still listening, and found again in a second read taken just before the first signal. */
+    private async locate(agentPid: number | undefined, target: StopTarget): Promise<{ current: ProcessInfo; table: ProcessInfo[] } | undefined> {
+        if (agentPid === undefined) {
+            return undefined;
+        }
+
+        const first = this.below(await this.system.processes(), agentPid).find((row) => sameProcess(row, target));
+
+        if (first === undefined) {
+            return undefined;
+        }
+
+        const sockets = await this.system.listeners([first.pid]);
+
+        if (sockets.length === 0) {
+            return undefined;
+        }
+
+        // A child the listener started since the list is part of its tree now.
+        const table = await this.system.processes();
+        const current = this.below(table, agentPid).find((row) => sameProcess(row, first));
+
+        return current === undefined ? undefined : { current, table };
+    }
+
+    /** SIGKILL for what still runs, matched by pid and identity in a fresh read; without that read nothing is killed. */
+    private async escalate(signalled: ProcessInfo[], alreadyRefused: boolean, agentPid: number): Promise<StopResult> {
+        const last = await this.readProcesses();
+
+        if (last === undefined) {
+            return { ended: false, reason: STOP_REASON.unreadable };
+        }
+
+        let refused = alreadyRefused;
+        // Only what is still below the agent: a survivor the system re-parented (to pid 1, say) has left its tree.
+        const stillBelow = this.below(last, agentPid);
+        const survivors = aliveOf(stillBelow, signalled);
+        const newcomers = this.newcomers(last, survivors, signalled, agentPid);
+
+        for (const target of [...survivors, ...newcomers]) {
+            refused = !this.send(target, "SIGKILL") || refused;
+        }
+
+        signalled.push(...newcomers);
+
+        // A process can take a moment to go after SIGKILL (a large heap, an uninterruptible wait): give it one poll.
+        await this.system.sleep(POLL_MS);
+
+        const after = await this.readProcesses();
+
+        if (after === undefined) {
+            return { ended: false, reason: STOP_REASON.unconfirmed };
+        }
+
+        if (refused) {
+            return { ended: false, reason: STOP_REASON.refused };
+        }
+
+        return aliveOf(after, signalled).length > 0 ? { ended: false, reason: STOP_REASON.survived } : { ended: true };
+    }
+
+    /** One table read, or undefined when it failed (a slow or failing `ps`). */
+    private async tryProcesses(): Promise<ProcessInfo[] | undefined> {
+        try {
+            return await this.system.processes();
+        } catch {
+            return undefined;
+        }
+    }
+
+    private async readProcesses(): Promise<ProcessInfo[] | undefined> {
+        for (let attempt = 0; attempt < READ_ATTEMPTS; attempt += 1) {
+            // eslint-disable-next-line no-await-in-loop -- attempts are sequential by design
+            const table = await this.tryProcesses();
+
+            if (table !== undefined) {
+                return table;
+            }
+        }
+
+        return undefined;
+    }
+
+    /** What may ever be signalled: below the agent, never the agent, never this app. */
+    private below(table: ReadonlyArray<ProcessInfo>, agentPid: number): ProcessInfo[] {
+        return descendantsOf(table, agentPid).filter((row) => row.pid !== this.selfPid);
+    }
+
+    /** A refused signal is reported, not thrown, so the other victims still get theirs. */
+    private send(victim: ProcessInfo, signal: "SIGKILL" | "SIGTERM"): boolean {
+        try {
+            this.system.kill(victim.pid, signal);
+
+            return true;
+        } catch {
+            return false;
+        }
+    }
+
+    /** Descendants of `roots` that are not `known` yet. Never the agent (a cyclic read could reach it) or this app. */
+    private newcomers(
+        table: ReadonlyArray<ProcessInfo>,
+        roots: ReadonlyArray<ProcessInfo>,
+        known: ReadonlyArray<ProcessInfo>,
+        agentPid: number,
+    ): ProcessInfo[] {
+        const found: ProcessInfo[] = [];
+
+        for (const root of roots) {
+            for (const row of descendantsOf(table, root.pid)) {
+                if (row.pid !== agentPid && row.pid !== this.selfPid && [...known, ...found].every((entry) => !sameProcess(entry, row))) {
+                    found.push(row);
+                }
+            }
+        }
+
+        return found;
     }
 }
