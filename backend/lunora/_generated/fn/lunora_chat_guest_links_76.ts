@@ -8,7 +8,8 @@ import * as lunora_chat_guest_links_76 from "../../chat/guest-links.js";
 installCompiledValidatorMap(lunora_chat_guest_links_76.continueGuestLinkRemoval.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
+if (typeof source["before"] !== "number" || !Number.isFinite(source["before"])) return DEFER;
 if (typeof source["threadId"] !== "string") return DEFER;
-return { "threadId": source["threadId"] };
+return { "before": source["before"], "threadId": source["threadId"] };
 });
 export * from "../../chat/guest-links.js";

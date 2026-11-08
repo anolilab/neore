@@ -53,12 +53,15 @@ export const listGuestNotesForExport = internalQuery
         };
     });
 
-/** The rest of a thread's guest links after a write that removed only the first batch (`withdrawGuestLinksForThread`). */
+/**
+ * The rest of a thread's guest links after a write that removed only the first batch (`withdrawGuestLinksForThread`):
+ * only links made by `before`, when that write ran.
+ */
 export const continueGuestLinkRemoval = internalMutation
-    .input({ threadId: v.id("threads") })
+    .input({ before: v.number(), threadId: v.id("threads") })
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
-        await withdrawGuestLinksForThread(ctx, args.threadId);
+        await withdrawGuestLinksForThread(ctx, args.threadId, args.before);
 
         return null;
     });

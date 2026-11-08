@@ -446,7 +446,7 @@ export interface InternalApiTypes {
             };
         };
         guest_links: {
-            continueGuestLinkRemoval: FunctionReference<"mutation", { threadId: Id<"threads"> }, null>;
+            continueGuestLinkRemoval: FunctionReference<"mutation", { before: number; threadId: Id<"threads"> }, null>;
             listGuestNotesForExport: FunctionReference<"query", { cursor: string | null; threadId: Id<"threads"> }, { continueCursor: string | null; isDone: boolean; page: Array<{ createdAt: number; status: "held" | "sent"; text: string }> }>;
             sweepGuestLinks: FunctionReference<"mutation", {}, null>;
         };

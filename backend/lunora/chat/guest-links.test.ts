@@ -53,9 +53,9 @@ let threadId: string;
 const rows = async (table: string) => await harness.run(async (ctx: any) => await ctx.db.query(table).collect());
 
 /** A link on `thread` with `messages` held notes and its route, as a guest's posts would leave them. */
-const seedLink = async (thread: string, linkHash: string, expiresAt: number, messages = 1) =>
+const seedLink = async (thread: string, linkHash: string, expiresAt: number, messages = 1, createdAt = 0) =>
     await harness.run(async (ctx: any) => {
-        const linkId = await ctx.db.insert("threadGuestLinks", { createdAt: 0, expiresAt, linkHash, threadId: thread, userId: OWNER });
+        const linkId = await ctx.db.insert("threadGuestLinks", { createdAt, expiresAt, linkHash, threadId: thread, userId: OWNER });
 
         for (let index = 0; index < messages; index += 1) {
             await ctx.db.insert("threadGuestMessages", { createdAt: 0, linkId, status: "held", text: `m${index}`, threadId: thread, userId: OWNER });
@@ -97,12 +97,33 @@ describe("withdrawing a link", () => {
     ];
 
     it.each(withdrawals)("removes the link, its messages and its route when the thread is %s", async (_label, withdraw) => {
-        await seedLink(threadId, "hash-live", Date.now() + 60_000);
+        // A full link: exactly one removal page of notes, which one pass finishes.
+        await seedLink(threadId, "hash-live", Date.now() + 60_000, 100);
         await withdraw();
 
         expect(await rows("threadGuestLinks")).toHaveLength(0);
         expect(await rows("threadGuestMessages")).toHaveLength(0);
         expect(await rows("shardRoutes")).toHaveLength(0);
+    });
+});
+
+describe("withdrawing a link with more than one page of messages", () => {
+    it("finishes it in a continuation, which leaves a link made after the withdrawal", async () => {
+        await seedLink(threadId, "hash-old", Date.now() + 60_000, 101);
+        await harness.run(async (ctx: any) => await markThreadArchived({ ...ctx, now: Date.now() }, threadId as never));
+
+        expect(await rows("threadGuestLinks")).toHaveLength(1);
+
+        // The owner restores the thread and gives out a new link before the continuation runs.
+        await seedLink(threadId, "hash-new", Date.now() + 60_000, 1, Date.now() + 1000);
+        // The fake scheduler cannot resolve a shard-routed job, so the job it holds is run here with the args it was given.
+        const [job] = harness.scheduler.list();
+
+        await harness.run(async (ctx: any) => await ctx.runMutation(guestLinks.continueGuestLinkRemoval, job?.args));
+
+        expect(await rows("threadGuestLinks")).toMatchObject([{ linkHash: "hash-new" }]);
+        expect(await rows("threadGuestMessages")).toHaveLength(1);
+        expect(await rows("shardRoutes")).toMatchObject([{ key: "guest-link:hash-new" }]);
     });
 });
 
