@@ -49,8 +49,7 @@ const ChatPage = () => {
     const parsedLink = Route.useSearch({
         select: ({ model, prompt }) => JSON.stringify([model, prompt].map((value: unknown) => [typeof value, String(value), JSON.stringify(value)])),
     });
-    const { model: linkModel, prompt: linkPrompt } = useLinkSearchAsWritten(
-        parsedLink,
+    const { model: linkModel, prompt: linkPrompt } = useLinkSearchAsWritten(parsedLink, () =>
         readPromptLinkSearch({ model: rawSearch.get("model") ?? undefined, prompt: rawSearch.get("prompt") ?? undefined }),
     );
     // TanStack keys each history entry; a new navigation gets a new key.

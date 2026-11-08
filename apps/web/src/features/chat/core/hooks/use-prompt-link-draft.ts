@@ -4,7 +4,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { filterModelsByBlockedCreators } from "@/components/model-picker/utilities";
-import useFeatureFlaggedModels, { useFeatureFlaggedModelsSettled } from "@/hooks/use-feature-flagged-models";
+import useFeatureFlaggedModels, { useFeatureFlaggedModelsSettled, useModelPreferencesFailed } from "@/hooks/use-feature-flagged-models";
 import { useModelFilterRules } from "@/hooks/use-model-filter-rules";
 import { showWarning } from "@/lib/toast";
 
@@ -29,10 +29,15 @@ const chosenOf = ({ comparisonMode, newThreadMode, selectedModel }: ReturnType<t
  * same. A navigation that keeps the search (opening Settings while a saved prompt loads) writes them back from the parsed values,
  * so `prompt=1.50` would become `1.5`; a new link, or the link leaving the address, changes `parsed`.
  */
-export const useLinkSearchAsWritten = <T>(parsed: string, written: T): T => {
-    const [held, setHeld] = useState({ parsed, written });
+export const useLinkSearchAsWritten = <T>(parsed: string, readWritten: () => T): T => {
+    // `readWritten` runs only when the link changes: a prompt can be long, and the page re-renders often while it waits.
+    const [held, setHeld] = useState(() => {
+        return { parsed, written: readWritten() };
+    });
 
     if (held.parsed !== parsed) {
+        const written = readWritten();
+
         setHeld({ parsed, written });
 
         return written;
@@ -70,6 +75,8 @@ export const usePromptLinkDraft = ({
         [blockedCreators, pickerModels],
     );
     const pickerSettled = useFeatureFlaggedModelsSettled();
+    // Without the person's preferences the list hides nothing they hid, so a link's model is refused rather than judged by it.
+    const preferencesFailed = useModelPreferencesFailed();
     const appliedRef = useRef<string | undefined>(undefined);
     // The model of a link whose prompt was applied, waiting for the picker's list: judged earlier, it could pick a model the
     // list then leaves out. The prompt itself does not wait for it. `chosen` is the chat's model, comparison and mode then: any of
@@ -144,7 +151,7 @@ export const usePromptLinkDraft = ({
             return;
         }
 
-        if (isLinkableModel(pending.model, pickerModelIds)) {
+        if (!preferencesFailed && isLinkableModel(pending.model, pickerModelIds)) {
             // A text draft on a text model: a comparison or another mode would send it elsewhere.
             state.setComparisonMode(false);
             state.setComposerMode("text", undefined, false);
@@ -153,5 +160,5 @@ export const usePromptLinkDraft = ({
             showWarning(t`The model in the link is not available. The chat keeps its model.`);
         }
         // `prompt` is read so this runs right after the effect above has set a model aside, in the same commit.
-    }, [pickerModelIds, pickerSettled, prompt, t]);
+    }, [pickerModelIds, pickerSettled, preferencesFailed, prompt, t]);
 };

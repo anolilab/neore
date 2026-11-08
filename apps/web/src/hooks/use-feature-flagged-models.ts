@@ -57,4 +57,15 @@ export const useFeatureFlaggedModelsSettled = (): boolean => {
     return gatewaySettled && !preferencesPending;
 };
 
+/**
+ * Whether this person's preferences could not be read. The list above then leaves out none of their switched-off models or
+ * hidden labs, so it must not decide what they chose not to see.
+ */
+export const useModelPreferencesFailed = (): boolean => {
+    const crpc = useCRPC();
+
+    // Only a first read that failed: a failed refetch keeps the preferences already read, and the list still applies them.
+    return useQuery(crpc.auth.functions.getAIUserPreferences.queryOptions({})).isLoadingError;
+};
+
 export default useFeatureFlaggedModels;

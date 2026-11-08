@@ -29,7 +29,7 @@ vi.mock("@/lib/toast", () => {
 
 /** The models the picker offers this person, and whether that list has settled. */
 const picker = vi.hoisted(() => {
-    return { blockedCreators: [] as string[], ids: [] as string[], settled: true };
+    return { blockedCreators: [] as string[], ids: [] as string[], preferencesFailed: false, settled: true };
 });
 
 vi.mock("@/hooks/use-model-filter-rules", () => {
@@ -47,6 +47,7 @@ vi.mock("@/hooks/use-feature-flagged-models", () => {
                 return { id };
             }),
         useFeatureFlaggedModelsSettled: () => picker.settled,
+        useModelPreferencesFailed: () => picker.preferencesFailed,
     };
 });
 
@@ -65,6 +66,7 @@ beforeEach(() => {
     picker.ids = textModel ? [textModel.id] : [];
     picker.settled = true;
     picker.blockedCreators = [];
+    picker.preferencesFailed = false;
     navigate.mockClear();
     showWarning.mockClear();
     useChatUIStore.getState().clearComposer();
@@ -185,6 +187,15 @@ describe(usePromptLinkDraft, () => {
         expect(showWarning).toHaveBeenCalledOnce();
     });
 
+    it("applies the prompt but not the link's model when the person's preferences could not be read", () => {
+        picker.preferencesFailed = true;
+        renderHook(() => usePromptLinkDraft({ model: textModel?.id, otherDraftSource: false, prompt: "Draft me" }));
+
+        expect(useChatUIStore.getState().composerText).toBe("Draft me");
+        expect(useModelStore.getState().selectedModel).toBe(startModel);
+        expect(showWarning).toHaveBeenCalledOnce();
+    });
+
     it("applies the prompt but not an external model", () => {
         renderHook(() => usePromptLinkDraft({ model: externalModel?.id, otherDraftSource: false, prompt: "Draft me" }));
 
@@ -204,8 +215,22 @@ describe(usePromptLinkDraft, () => {
 });
 
 describe(useLinkSearchAsWritten, () => {
+    it("reads the link again only when the router's parsed values change", () => {
+        const read = vi.fn(() => "1.50");
+        const { rerender } = renderHook(({ parsed }: { parsed: string }) => useLinkSearchAsWritten(parsed, read), { initialProps: { parsed: "1.5" } });
+
+        rerender({ parsed: "1.5" });
+        rerender({ parsed: "1.5" });
+
+        expect(read).toHaveBeenCalledOnce();
+
+        rerender({ parsed: "2" });
+
+        expect(read).toHaveBeenCalledTimes(2);
+    });
+
     it("keeps the link as written while a navigation writes it back from the router's parsed values", () => {
-        const { rerender, result } = renderHook(({ parsed, written }: { parsed: string; written: string }) => useLinkSearchAsWritten(parsed, written), {
+        const { rerender, result } = renderHook(({ parsed, written }: { parsed: string; written: string }) => useLinkSearchAsWritten(parsed, () => written), {
             initialProps: { parsed: "1.5", written: "1.50" },
         });
 
