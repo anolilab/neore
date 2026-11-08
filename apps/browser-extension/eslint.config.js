@@ -120,8 +120,8 @@ export default createConfig(
         files: ["**/*.{js,jsx,mjs,cjs,ts,tsx,mts,cts}"],
         rules: {
             /**
-             * Prettier owns formatting; these `@stylistic` rules disagree with
-             * the output it produces, so "fixing" one means writing code Prettier
+             * oxfmt owns formatting; these `@stylistic` rules disagree with
+             * the output it produces, so "fixing" one means writing code oxfmt
              * immediately reformats back. The same list `packages/chat-ui`
              * verified and turned off.
              */
@@ -132,7 +132,7 @@ export default createConfig(
             "@stylistic/multiline-ternary": "off",
             "@stylistic/no-extra-parens": "off",
             "@stylistic/operator-linebreak": "off",
-            // Prettier keeps single quotes around a string that holds double
+            // oxfmt keeps single quotes around a string that holds double
             // quotes (`'{"alg":"EdDSA"}'`), since that needs fewer escapes;
             // `avoidEscape` is the same rule on the eslint side.
             "@stylistic/quotes": ["error", "double", { avoidEscape: true }],

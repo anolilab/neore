@@ -619,9 +619,9 @@ export default createConfig(
             "unicorn/prefer-iterator-to-array": "off",
 
             /**
-             * Fights Prettier: it wants every call argument on its own line,
-             * and Prettier's last-argument hugging collapses them straight back.
-             * Its autofix produces `}),);`, which Prettier then rejects.
+             * Fights the formatter: it wants every call argument on its own line,
+             * and oxfmt's last-argument hugging collapses them straight back.
+             * Its autofix produces `}),);`, which oxfmt then rejects.
              * Formatting yields to the formatter.
              */
             "antfu/consistent-list-newline": "off",
@@ -773,8 +773,8 @@ export default createConfig(
         files: ["**/*.{js,mjs,cjs,ts,mts,cts}"],
         rules: {
             /**
-             * Fights Prettier: eslint inserts the blank line this rule wants
-             * before a JSDoc block, prettier removes it again. Ran both and
+             * Fights the formatter: eslint inserts the blank line this rule wants
+             * before a JSDoc block, the formatter removes it again. Ran both and
              * watched the loop. Formatting yields to the formatter, as it does
              * for `antfu/consistent-list-newline`.
              */

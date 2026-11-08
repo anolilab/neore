@@ -65,13 +65,13 @@ export default createConfig(
             /**
              * oxfmt owns formatting in this repo — it runs in `lint:oxfmt`
              * and on commit, and it passes. These `@stylistic` rules disagree
-             * with the output Prettier produces, so they are not findings anyone
-             * can act on: "fixing" one means writing code Prettier immediately
-             * reformats back.
+             * with the output it produces (the same output Prettier produced
+             * before it), so they are not findings anyone can act on: "fixing"
+             * one means writing code oxfmt immediately reformats back.
              *
              * Verified rather than assumed, on
              * `chat/auto-continue-status.tsx:84` — `multiline-ternary` objects
-             * to a JSX ternary that `prettier --check` calls correct.
+             * to a JSX ternary that the format check calls correct.
              *
              * 135 of this package's findings were these eight rules.
              */
