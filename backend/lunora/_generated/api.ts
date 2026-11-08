@@ -823,7 +823,7 @@ export interface ApiTypes {
     usage: {
         activity: {
             getActivityHeatmap: FunctionReference<"query", { toDate: unknown }, { days: Array<{ costMicrodollars: number; date: string; replies: number; tokens: number }>; trackingSince?: string }>;
-            getProjectBreakdown: FunctionReference<"query", { fromDate: unknown }, { noProject: { costMicrodollars: number; replies: number; tokens: number }; projects: Array<{ costMicrodollars: number; replies: number; tokens: number; projectKey: string; title?: string }>; total: { costMicrodollars: number; replies: number; tokens: number }; truncated: boolean }>;
+            getProjectBreakdown: FunctionReference<"query", { fromDate: unknown }, { noProject: { costMicrodollars: number; replies: number; tokens: number }; otherProjects?: { costMicrodollars: number; replies: number; tokens: number }; projects: Array<{ costMicrodollars: number; replies: number; tokens: number; projectKey: string; title?: string }>; total: { costMicrodollars: number; replies: number; tokens: number }; truncated: boolean }>;
             getProjectUsage: FunctionReference<"query", { fromDate: unknown; projectId: Id<"projects"> }, { costMicrodollars: number; replies: number; tokens: number; truncated: boolean }>;
             getSkillBreakdown: FunctionReference<"query", { fromDate: unknown }, { skills: Array<{ costMicrodollars: number; replies: number; skillKey: string; skillName?: string; tokens: number }>; truncated: boolean }>;
         };

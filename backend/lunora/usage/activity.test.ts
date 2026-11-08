@@ -528,6 +528,7 @@ describe("usage by project: the views", () => {
 
     interface ProjectBreakdown {
         noProject: Totals;
+        otherProjects?: Totals;
         projects: (Totals & { projectKey: string; title?: string })[];
         total: Totals;
         truncated: boolean;
@@ -638,6 +639,37 @@ describe("usage by project: the views", () => {
         expect(result.truncated).toBe(true);
         expect(result.projects[0]!.costMicrodollars).toBe(result.total.costMicrodollars);
         expect(result.noProject.costMicrodollars).toBe(0);
+    });
+
+    it("names the 100 costliest projects and sums the rest as other projects, still adding up to the total", async () => {
+        const projectIds: string[] = [];
+
+        for (let index = 0; index < 101; index += 1) {
+            const { projectId } = await insertThread(USER, `P${String(index)}`);
+
+            projectIds.push(projectId!);
+        }
+
+        await harness.run(async (ctx: any) => {
+            const row = { date: "2026-09-20", replies: 1, tokens: 1, updatedAt: 1, userId: USER };
+
+            // The first project costs the most and the last the least, so the last is the one past the cap.
+            for (const [index, projectKey] of projectIds.entries()) {
+                await ctx.db.insert("usageDaily", { ...row, costMicrodollars: 200 - index, projectKey, skillKey: "__project__" });
+            }
+
+            const spent = projectIds.reduce((sum, _id, index) => sum + 200 - index, 0);
+
+            await ctx.db.insert("usageDaily", { ...row, costMicrodollars: spent + 5, replies: 102, skillKey: "__total__", tokens: 102 });
+        });
+
+        const result = await projectBreakdown(USER, "2026-09-01");
+
+        expect(result.projects).toHaveLength(100);
+        expect(result.projects.every((project) => project.title !== undefined)).toBe(true);
+        expect(result.projects.map((project) => project.projectKey)).not.toContain(projectIds[100]);
+        expect(result.otherProjects).toStrictEqual({ costMicrodollars: 100, replies: 1, tokens: 1 });
+        expect(result.noProject).toStrictEqual({ costMicrodollars: 5, replies: 1, tokens: 1 });
     });
 
     it("lists a project the caller can no longer open with its totals but without its title", async () => {

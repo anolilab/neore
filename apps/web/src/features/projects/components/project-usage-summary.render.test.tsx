@@ -18,6 +18,7 @@ vi.mock("@lingui/react/macro", () => {
 
 vi.mock("@/features/settings/hooks/use-usage-today", () => {
     return {
+        keepAcrossDayTurn: (options: object) => options,
         useUsageToday: () => {
             return { failed: false, today: "2026-09-30" };
         },

@@ -2,14 +2,14 @@ import { useLingui } from "@lingui/react/macro";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@neore/ui/components/card";
 import { Skeleton } from "@neore/ui/components/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@neore/ui/components/table";
-import { keepPreviousData, skipToken, useQuery } from "@tanstack/react-query";
+import { skipToken, useQuery } from "@tanstack/react-query";
 import { Sparkles } from "lucide-react";
 import type { FC } from "react";
 
 import { useCRPC } from "@/lib/lunora/crpc";
 
 import { BACKFILL_REFETCH_MS, useRefetchAfterBackfill } from "../../hooks/use-usage-backfill";
-import { useUsageToday } from "../../hooks/use-usage-today";
+import { keepAcrossDayTurn, useUsageToday } from "../../hooks/use-usage-today";
 import { formatUsd, periodStart } from "../../lib/usage-activity";
 
 /** The `skillKey` the backend files plain-assistant replies under; mirrors DEFAULT_SKILL_KEY in the backend's activity logic. */
@@ -34,10 +34,11 @@ const UsageSkillBreakdown: FC<UsageSkillBreakdownProps> = ({ backfilling, days }
     const { failed: zoneFailed, today } = useUsageToday();
     const locale = i18n.locale || "en";
 
+    const skillsQuery = crpc.usage.activity.getSkillBreakdown.queryOptions(today === undefined ? skipToken : { fromDate: periodStart(today, days) }, {
+        live: false,
+    });
     const query = useQuery({
-        ...crpc.usage.activity.getSkillBreakdown.queryOptions(today === undefined ? skipToken : { fromDate: periodStart(today, days) }, { live: false }),
-        // A new day keeps the last figures in view until its own read lands, instead of a skeleton.
-        placeholderData: keepPreviousData,
+        ...keepAcrossDayTurn(skillsQuery, `skills:${String(days)}`),
         refetchInterval: backfilling ? BACKFILL_REFETCH_MS : false,
     });
 

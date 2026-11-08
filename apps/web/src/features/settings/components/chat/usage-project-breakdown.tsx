@@ -2,18 +2,21 @@ import { useLingui } from "@lingui/react/macro";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@neore/ui/components/card";
 import { Skeleton } from "@neore/ui/components/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@neore/ui/components/table";
-import { keepPreviousData, skipToken, useQuery } from "@tanstack/react-query";
+import { skipToken, useQuery } from "@tanstack/react-query";
 import { FolderKanban } from "lucide-react";
 import type { FC } from "react";
 
 import { useCRPC } from "@/lib/lunora/crpc";
 
 import { BACKFILL_REFETCH_MS, useRefetchAfterBackfill } from "../../hooks/use-usage-backfill";
-import { useUsageToday } from "../../hooks/use-usage-today";
+import { keepAcrossDayTurn, useUsageToday } from "../../hooks/use-usage-today";
 import { formatUsd, periodStart } from "../../lib/usage-activity";
 
 /** The row key of what no project accounts for; never a project id. */
 const NO_PROJECT_KEY = "__no_project__";
+
+/** The row key of the projects past the ones listed by name; never a project id. */
+const OTHER_PROJECTS_KEY = "__other_projects__";
 
 interface UsageProjectBreakdownProps {
     /** Earlier replies are still being added to the rollup (`useUsageBackfill`). */
@@ -41,10 +44,11 @@ const UsageProjectBreakdown: FC<UsageProjectBreakdownProps> = ({ backfilling, da
     const crpc = useCRPC();
     const { failed: zoneFailed, today } = useUsageToday();
     const locale = i18n.locale || "en";
+    const breakdownQuery = crpc.usage.activity.getProjectBreakdown.queryOptions(today === undefined ? skipToken : { fromDate: periodStart(today, days) }, {
+        live: false,
+    });
     const mine = useQuery({
-        ...crpc.usage.activity.getProjectBreakdown.queryOptions(today === undefined ? skipToken : { fromDate: periodStart(today, days) }, { live: false }),
-        // A new day keeps the last figures in view until its own read lands, instead of a skeleton.
-        placeholderData: keepPreviousData,
+        ...keepAcrossDayTurn(breakdownQuery, `projects:${String(days)}`),
         refetchInterval: backfilling ? BACKFILL_REFETCH_MS : false,
     });
 
@@ -53,6 +57,10 @@ const UsageProjectBreakdown: FC<UsageProjectBreakdownProps> = ({ backfilling, da
     const rows: ProjectRow[] = (mine.data?.projects ?? []).map((project) => {
         return { ...project, key: project.projectKey, label: project.title ?? t`Project no longer available` };
     });
+
+    if (mine.data?.otherProjects) {
+        rows.push({ ...mine.data.otherProjects, key: OTHER_PROJECTS_KEY, label: t`Other projects` });
+    }
 
     if (mine.data && (mine.data.noProject.replies > 0 || mine.data.noProject.costMicrodollars > 0)) {
         rows.push({ ...mine.data.noProject, key: NO_PROJECT_KEY, label: t`No project` });
@@ -106,7 +114,10 @@ const UsageProjectBreakdown: FC<UsageProjectBreakdownProps> = ({ backfilling, da
 
                                 return (
                                     <TableRow key={row.key}>
-                                        <TableHead className={row.key === NO_PROJECT_KEY ? "text-muted-foreground" : undefined} scope="row">
+                                        <TableHead
+                                            className={row.key === NO_PROJECT_KEY || row.key === OTHER_PROJECTS_KEY ? "text-muted-foreground" : undefined}
+                                            scope="row"
+                                        >
                                             {row.label}
                                         </TableHead>
                                         <TableCell className="text-right tabular-nums">{row.replies.toLocaleString(locale)}</TableCell>

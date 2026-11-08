@@ -56967,6 +56967,25 @@
                       ],
                       "type": "object"
                     },
+                    "otherProjects": {
+                      "properties": {
+                        "costMicrodollars": {
+                          "type": "number"
+                        },
+                        "replies": {
+                          "type": "number"
+                        },
+                        "tokens": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "costMicrodollars",
+                        "replies",
+                        "tokens"
+                      ],
+                      "type": "object"
+                    },
                     "projects": {
                       "items": {
                         "properties": {

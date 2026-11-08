@@ -510,6 +510,9 @@ const vTotals = { costMicrodollars: v.number(), replies: v.number(), tokens: v.n
 /** Project title lookups one breakdown runs at once. */
 const TITLE_LOOKUPS_AT_ONCE = 16;
 
+/** Projects one breakdown names, costliest first; the rest are summed as `otherProjects`, with no title read. */
+const PROJECTS_LISTED = 100;
+
 /** Total rows one project breakdown sums: one a day, two years of them. */
 const TOTAL_ROW_LIMIT = HEATMAP_DAYS * 2;
 
@@ -532,13 +535,14 @@ const totalSince = async (ctx: Pick<QueryCtx, "db">, userId: string, fromDate: s
  * Replies, tokens and cost per project from `fromDate` on, with what no project
  * accounts for (`noProject`) and the overall `total` — the projects and
  * `noProject` add up to it. A project the caller can no longer read has no
- * `title`. `truncated` as in {@link getSkillBreakdown}.
+ * `title`. Past the {@link PROJECTS_LISTED} costliest projects, the rest are summed as `otherProjects`. `truncated` as in {@link getSkillBreakdown}.
  */
 export const getProjectBreakdown = authQuery
     .input({ fromDate: vDayKey() })
     .output(
         v.object({
             noProject: v.object({ ...vTotals }),
+            otherProjects: v.optional(v.object({ ...vTotals })),
             projects: v.array(v.object({ ...vTotals, projectKey: v.string(), title: v.optional(v.string()) })),
             total: v.object({ ...vTotals }),
             truncated: v.boolean(),
@@ -569,9 +573,12 @@ export const getProjectBreakdown = authQuery
         const titled: (ProjectTotal & { title?: string })[] = [];
 
         // A few lookups at a time: each is up to three reads, and a long history holds many projects.
-        for (let index = 0; index < projects.length; index += TITLE_LOOKUPS_AT_ONCE) {
+        const listed = projects.slice(0, PROJECTS_LISTED);
+        const others = projects.slice(PROJECTS_LISTED);
+
+        for (let index = 0; index < listed.length; index += TITLE_LOOKUPS_AT_ONCE) {
             const batch = await Promise.all(
-                projects.slice(index, index + TITLE_LOOKUPS_AT_ONCE).map(async (project) => {
+                listed.slice(index, index + TITLE_LOOKUPS_AT_ONCE).map(async (project) => {
                     // A failed read fails the query, so the card shows an error rather than "no longer available".
                     const found = await readableProject(ctx, project.projectKey as Id<"projects">, userId);
 
@@ -584,6 +591,7 @@ export const getProjectBreakdown = authQuery
 
         return {
             noProject: remainderOf(total, projects),
+            ...(others.length > 0 && { otherProjects: sumRows(others) }),
             projects: titled,
             total,
             truncated: totals.truncated || projectsCut,

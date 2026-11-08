@@ -1,7 +1,7 @@
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { useUsageToday } from "./use-usage-today";
+import { keepAcrossDayTurn, useUsageToday } from "./use-usage-today";
 
 const { settings } = vi.hoisted(() => {
     return { settings: { data: { timezone: "Europe/Berlin" } as { timezone?: string } | undefined, isError: false, isLoadingError: false } };
@@ -60,5 +60,22 @@ describe("useUsageToday", () => {
         const { result } = renderHook(() => useUsageToday());
 
         expect(result.current).toStrictEqual({ failed: false, today: "2026-09-30" });
+    });
+});
+
+describe("keepAcrossDayTurn", () => {
+    it("keeps the last figures while the day turns, and drops them when the period or project changes", () => {
+        const { placeholderData } = keepAcrossDayTurn({}, "projects:30");
+
+        expect(placeholderData("figures", { meta: { usageScope: "projects:30" } })).toBe("figures");
+        expect(placeholderData("figures", { meta: { usageScope: "projects:7" } })).toBeUndefined();
+        expect(placeholderData("figures", undefined)).toBeUndefined();
+    });
+
+    it("keeps the options' own meta, so a one-shot read stays one-shot", () => {
+        const options = keepAcrossDayTurn({ meta: { lunoraLive: false }, queryKey: ["usage"] }, "skills:7");
+
+        expect(options.meta).toStrictEqual({ lunoraLive: false, usageScope: "skills:7" });
+        expect(options.queryKey).toStrictEqual(["usage"]);
     });
 });

@@ -35,3 +35,22 @@ export const useUsageToday = (): { failed: boolean; today: string | undefined } 
     // Only a first load that failed is a failure: a failed refetch keeps the settings it had, and their zone.
     return { failed: isLoadingError, today: settings === undefined ? undefined : dayKeyInZone(now, zone) };
 };
+
+/**
+ * `options` that keep a view's last figures in sight while the day turns, so it never drops back to a skeleton at
+ * midnight, but not when what it shows changes (`scope`: the selected period, or the project): those load afresh. The
+ * options' own `meta` (such as `lunoraLive: false`, which keeps a read one-shot) is kept.
+ */
+export const keepAcrossDayTurn = <O extends { meta?: Record<string, unknown> }>(
+    options: O,
+    scope: string,
+): O & {
+    meta: Record<string, unknown>;
+    placeholderData: <T>(previous: T | undefined, previousQuery: { meta?: Record<string, unknown> } | undefined) => T | undefined;
+} => {
+    return {
+        ...options,
+        meta: { ...options.meta, usageScope: scope },
+        placeholderData: (previous, previousQuery) => (previousQuery?.meta?.usageScope === scope ? previous : undefined),
+    };
+};
