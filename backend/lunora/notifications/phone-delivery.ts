@@ -178,9 +178,15 @@ export const deliverToPhones = async (ctx: ActionCtx, userId: string, message: P
         }
     }
 
-    if (gone.length > 0) {
-        await ctx.runMutation(internal.notifications.phone_delivery.recordPushDeliveries, { gone });
-    }
-
+    // Logged first: Expo has answered, and a failed drop below must not lose the record of what it said.
     ctx.log.event("notifications.native_push", { delivered, failed, gone: gone.length });
+
+    if (gone.length > 0) {
+        try {
+            await ctx.runMutation(internal.notifications.phone_delivery.recordPushDeliveries, { gone });
+        } catch (error) {
+            // The phone stays until a later send (or its receipt) reports it gone again.
+            console.warn("[notifications] Could not drop phones Expo reported gone:", error);
+        }
+    }
 };

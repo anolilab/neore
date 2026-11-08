@@ -145,7 +145,7 @@ export const notify = async (ctx: MutationCtx, rawInput: NotificationInput): Pro
 };
 
 /** A browser or phone of the user that a configured channel can reach. One indexed read each. */
-const hasPushTarget = async (ctx: MutationCtx, userId: string): Promise<boolean> => {
+export const hasPushTarget = async (ctx: MutationCtx, userId: string): Promise<boolean> => {
     if (isPushConfigured()) {
         // A failed browser lookup must not keep the phones from being checked.
         try {

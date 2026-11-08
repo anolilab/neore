@@ -10,6 +10,8 @@ import { internal } from "../_generated/internal";
 import schema from "../schema";
 import { sendExpoMessages } from "./expo-push";
 import { registerPushDevice } from "./native-push";
+import { hasPushTarget } from "./notify";
+import { isPushConfigured } from "./push-config";
 import { deliverToPhones, listPushDevicesForUser, phoneMessage, recordPushDeliveries } from "./phone-delivery";
 
 vi.mock("../lib/crpc-auth-helpers", async (importOriginal) => {
@@ -22,6 +24,10 @@ vi.mock("../lib/crpc-auth-helpers", async (importOriginal) => {
         getSessionUserForQuery: sessionFrom,
         getSessionUserForQueryLite: sessionFrom,
     };
+});
+
+vi.mock("./push-config", async (importOriginal) => {
+    return { ...(await importOriginal<typeof import("./push-config")>()), isPushConfigured: vi.fn(() => false) };
 });
 
 vi.mock("./expo-push", async (importOriginal) => {
@@ -78,6 +84,7 @@ afterEach(() => {
     harness.close();
     vi.unstubAllEnvs();
     vi.mocked(sendExpoMessages).mockReset();
+    vi.mocked(isPushConfigured).mockReset();
     vi.restoreAllMocks();
 });
 
@@ -228,6 +235,17 @@ describe("deliverToPhones", () => {
         vi.spyOn(console, "warn").mockImplementation(() => undefined);
     });
 
+    it("logs what Expo answered even when dropping a gone phone fails", async () => {
+        const ctx = actionCtx([{ id: "d1", platform: "ios", sessionId: "s1", token: PHONE }]);
+
+        vi.mocked(sendExpoMessages).mockResolvedValueOnce([{ error: "DeviceNotRegistered", message: "gone", status: "error" }]);
+        ctx.runMutation.mockRejectedValueOnce(new Error("D1 unavailable"));
+
+        await deliverToPhones(ctx as never, USER, { notificationId: "n1", urgency: "normal" });
+
+        expect(ctx.log.event).toHaveBeenCalledWith("notifications.native_push", { delivered: 0, failed: 0, gone: 1 });
+    });
+
     it("drops the phones Expo calls gone at once and keeps a failed one", async () => {
         const ctx = actionCtx([
             { id: "d1", platform: "ios", sessionId: "s1", token: PHONE },
@@ -291,5 +309,38 @@ describe("deliverToPhones", () => {
 
         expect(ctx.runMutation).not.toHaveBeenCalled();
         expect(ctx.log.event).toHaveBeenCalledWith("notifications.native_push", { delivered: 0, failed: 1, gone: 0 });
+    });
+});
+
+describe("whether notify() schedules a send", () => {
+    const target = async (push: { list: () => Promise<unknown[]> }) =>
+        await harness.run(async (ctx: any) => await hasPushTarget({ ...ctx, push } as never, USER));
+
+    it("schedules one for a user with only a phone, and none without one or while phone push is off", async () => {
+        const noBrowser = { list: async () => [] };
+
+        expect(await target(noBrowser)).toBe(false);
+
+        await call(registerPushDevice, USER, { platform: "ios", token: PHONE });
+
+        expect(await target(noBrowser)).toBe(true);
+
+        vi.stubEnv("EXPO_ACCESS_TOKEN", "");
+
+        expect(await target(noBrowser)).toBe(false);
+    });
+
+    it("still checks the phones when the browser lookup fails", async () => {
+        vi.mocked(isPushConfigured).mockReturnValueOnce(true);
+        vi.spyOn(console, "warn").mockImplementation(() => undefined);
+        await call(registerPushDevice, USER, { platform: "android", token: PHONE });
+
+        const failing = {
+            list: async () => {
+                throw new Error("D1 unavailable");
+            },
+        };
+
+        expect(await target(failing)).toBe(true);
     });
 });
