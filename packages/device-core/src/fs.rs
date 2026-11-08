@@ -873,6 +873,97 @@ pub fn list_page(
     )
 }
 
+/// Directory entries one [`browse_dirs`] pass reads before it says the folder was cut.
+const MAX_BROWSE_SCAN: usize = 1_000_000;
+
+/// Refuses anything but an absolute path with no NUL character.
+fn absolute(raw: &str) -> Result<PathBuf, String> {
+    if raw.contains('\0') {
+        return Err("the path has a NUL character".into());
+    }
+
+    let path = Path::new(raw);
+
+    if !path.is_absolute() {
+        return Err(format!("{raw}: not an absolute path"));
+    }
+
+    Ok(path.to_path_buf())
+}
+
+/// The names of the folders inside an absolute path, name-sorted, one page at a time. It is not confined to the
+/// shared folders: the picker needs to find a folder before it is shared. Files and symbolic links are not listed,
+/// so the answer holds no file names and no contents.
+pub fn browse_dirs(raw: &str, after: Option<&str>, limit: usize) -> Result<Value, String> {
+    let requested = absolute(raw)?;
+    let folder = fs::canonicalize(&requested).map_err(|_| format!("{raw}: not found"))?;
+
+    if !folder.is_dir() {
+        return Err(format!("{raw}: not a folder"));
+    }
+
+    let mut names = Vec::new();
+
+    for (scanned, entry) in fs::read_dir(&folder)
+        .map_err(|error| error.to_string())?
+        .enumerate()
+    {
+        if scanned >= MAX_BROWSE_SCAN {
+            return Err(format!("{raw}: too many entries to browse"));
+        }
+
+        let Ok(entry) = entry else {
+            continue;
+        };
+        let Ok(kind) = entry.file_type() else {
+            continue;
+        };
+
+        if !kind.is_dir() {
+            continue;
+        }
+
+        if let Ok(name) = entry.file_name().into_string() {
+            names.push(name);
+        }
+    }
+
+    names.sort();
+
+    let start = after.map_or(0, |after| {
+        names.partition_point(|name| name.as_str() <= after)
+    });
+    let page: Vec<&String> = names.iter().skip(start).take(limit).collect();
+    let next = (names.len() > start + page.len())
+        .then(|| page.last().map(|name| name.to_string()))
+        .flatten();
+    let entries: Vec<Value> = page.iter().map(|name| json!({ "name": name })).collect();
+
+    Ok(json!({
+        "path": folder.to_string_lossy(),
+        "parent": folder.parent().map(|parent| parent.to_string_lossy().into_owned()),
+        "entries": entries,
+        "next": next,
+    }))
+}
+
+/// Creates a folder, and any missing parents, at an absolute path. A folder already there is not an error; a file
+/// at the path is.
+pub fn make_dir(raw: &str) -> Result<Value, String> {
+    let path = absolute(raw)?;
+    let created = match fs::metadata(&path) {
+        Ok(meta) if meta.is_dir() => false,
+        Ok(_) => return Err(format!("{raw}: is a file")),
+        Err(_) => {
+            fs::create_dir_all(&path).map_err(|error| format!("{raw}: {error}"))?;
+            true
+        }
+    };
+    let folder = fs::canonicalize(&path).map_err(|_| format!("{raw}: cannot resolve"))?;
+
+    Ok(json!({ "path": folder.to_string_lossy(), "created": created }))
+}
+
 /// Up to [`MAX_FILE_BYTES`] of a file as text. Binary files are described, not dumped.
 pub fn read(roots: &[PathBuf], path: &Path) -> Result<String, String> {
     if roots.iter().any(|root| root == path) {
@@ -1091,6 +1182,57 @@ mod tests {
         fs::write(dir.join("root/a.txt"), "hello").unwrap();
         fs::write(dir.join("secret.txt"), "nope").unwrap();
         dir
+    }
+
+    #[test]
+    fn browse_lists_folders_only_and_pages_by_name() {
+        let dir = scratch("browse");
+        fs::create_dir_all(dir.join("browse/b")).unwrap();
+        fs::create_dir_all(dir.join("browse/a")).unwrap();
+        fs::create_dir_all(dir.join("browse/c")).unwrap();
+        fs::write(dir.join("browse/file.txt"), "x").unwrap();
+        let folder = dir.join("browse").to_string_lossy().into_owned();
+
+        let first = browse_dirs(&folder, None, 2).unwrap();
+        let names: Vec<&str> = first["entries"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|entry| entry["name"].as_str().unwrap())
+            .collect();
+
+        assert_eq!(names, ["a", "b"]);
+        assert_eq!(first["next"], json!("b"));
+
+        let second = browse_dirs(&folder, Some("b"), 2).unwrap();
+
+        assert_eq!(second["entries"], json!([{ "name": "c" }]));
+        assert_eq!(second["next"], Value::Null);
+    }
+
+    #[test]
+    fn browse_is_not_confined_to_roots_but_refuses_relative_and_files() {
+        let dir = scratch("browse-open");
+        let outside = dir.join("secret.txt").to_string_lossy().into_owned();
+
+        assert!(browse_dirs(&dir.to_string_lossy(), None, 10).is_ok());
+        assert!(browse_dirs("relative/path", None, 10).is_err());
+        assert!(browse_dirs(&outside, None, 10).is_err());
+        assert!(browse_dirs(&format!("{}\0x", dir.display()), None, 10).is_err());
+    }
+
+    #[test]
+    fn make_dir_creates_nested_folders_and_refuses_a_file() {
+        let dir = scratch("mkdir");
+        let nested = dir.join("made/deep/folder").to_string_lossy().into_owned();
+
+        let created = make_dir(&nested).unwrap();
+
+        assert_eq!(created["created"], json!(true));
+        assert!(dir.join("made/deep/folder").is_dir());
+        assert_eq!(make_dir(&nested).unwrap()["created"], json!(false));
+        assert!(make_dir(&dir.join("root/a.txt").to_string_lossy()).is_err());
+        assert!(make_dir("relative/folder").is_err());
     }
 
     #[test]
