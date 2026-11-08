@@ -30,7 +30,7 @@ import { isAccountDeletionUnderway } from "../gdpr/deletion-guard";
 import { authQuery } from "../lib/crpc";
 import { logger } from "../lib/logger";
 import { runAfterOnShard, runAfterWithRetry } from "../lib/shard-scheduler";
-import { readableProject, readableProjectTitle } from "../projects/functions";
+import { membershipCheck, readableProject, readableProjectTitle } from "../projects/functions";
 import { leadThreadOf } from "../sub-agents/worker-thread";
 import type { Attribution, AttributionIncrement, ProjectTotal, ReplyUsageArgs, RollupIncrement } from "./activity-logic";
 import {
@@ -574,6 +574,8 @@ export const getProjectBreakdown = authQuery
 
         // A few lookups at a time: each is up to three reads, and a long history holds many projects.
         const listed = projects.slice(0, PROJECTS_LISTED);
+        // One membership read per organization, however many of its projects are listed.
+        const isMember = membershipCheck(ctx, userId);
         const others = projects.slice(PROJECTS_LISTED);
 
         for (let index = 0; index < listed.length; index += TITLE_LOOKUPS_AT_ONCE) {
@@ -581,7 +583,7 @@ export const getProjectBreakdown = authQuery
                 listed.slice(index, index + TITLE_LOOKUPS_AT_ONCE).map(async (project) => {
                     // One read of the row, as many rows as one page of the project list. A failed read fails the query, so
                     // the card shows an error rather than "no longer available".
-                    const title = await readableProjectTitle(ctx, project.projectKey as Id<"projects">, userId);
+                    const title = await readableProjectTitle(ctx, project.projectKey as Id<"projects">, userId, isMember);
 
                     return { ...project, ...(title !== undefined && { title }) };
                 }),

@@ -14,24 +14,45 @@ import { throwForbidden } from "../lib/error-helpers";
 import { admitOrganization, systemDb } from "../lib/rls/scope";
 import { MAX_LENGTH } from "../lib/validators";
 
+/** Whether `userId` is a current member of an organization; {@link membershipCheck} reads each organization once. */
+export type MembershipCheck = (organizationId: string) => Promise<boolean>;
+
+/** A membership check for `userId` that reads each organization's membership once, however many projects ask. */
+export const membershipCheck = (context: QueryCtx | MutationCtx, userId: string): MembershipCheck => {
+    const read = new Map<string, Promise<boolean>>();
+
+    return async (organizationId) => {
+        let member = read.get(organizationId);
+
+        if (member === undefined) {
+            member = getMemberByOrganizationAndUser(context, organizationId, userId).then((row) => row !== null);
+            read.set(organizationId, member);
+        }
+
+        return await member;
+    };
+};
+
+/**
+ * The one rule for who may read a project: its owner, or a CURRENT member of its organization. A project without an owner
+ * is no exception. Every lookup below decides through this.
+ */
+const mayReadProject = async (project: Pick<Doc<"projects">, "organizationId" | "userId">, userId: string, isMember: MembershipCheck): Promise<boolean> =>
+    project.userId === userId || (Boolean(project.organizationId) && (await isMember(project.organizationId!)));
+
 /** The project when the caller owns it or belongs to its organization, else `null` (also for a missing one). */
 export const readableProject = async (context: QueryCtx | MutationCtx, projectId: Id<"projects">, userId: string): Promise<Doc<"projects"> | null> => {
     // Decide on the row's owner and organization past RLS: a project of a member's
     // NON-active organization is invisible to the guarded `ctx.db` until the org is admitted.
     const found = await systemDb(context).projects.findFirst({ where: { _id: projectId } });
 
-    if (!found) {
+    if (!found || !(await mayReadProject(found, userId, membershipCheck(context, userId)))) {
         return null;
     }
 
-    // The owner, or a CURRENT member of the project's organization: a project without an owner is no exception.
+    // A proven membership: the project passes row-level security.
     if (found.userId !== userId) {
-        if (!found.organizationId || !(await getMemberByOrganizationAndUser(context, found.organizationId, userId))) {
-            return null;
-        }
-
-        // A proven membership: the project passes row-level security.
-        admitOrganization(context, found.organizationId);
+        admitOrganization(context, found.organizationId!);
     }
 
     return await context.db.projects.findFirst({ where: { _id: projectId } });
@@ -39,22 +60,19 @@ export const readableProject = async (context: QueryCtx | MutationCtx, projectId
 
 /**
  * The title of a project `userId` can read, else `undefined` (also for a missing one): the rule of {@link readableProject}
- * (the owner, or a current member of its organization) in one read of the row rather than two, for a view that only
- * names projects.
+ * in one read of the row rather than two, for a view that only names projects. Pass one {@link membershipCheck} to name
+ * many projects, so an organization's membership is read once.
  */
-export const readableProjectTitle = async (context: QueryCtx | MutationCtx, projectId: Id<"projects">, userId: string): Promise<string | undefined> => {
+export const readableProjectTitle = async (
+    context: QueryCtx | MutationCtx,
+    projectId: Id<"projects">,
+    userId: string,
+    isMember: MembershipCheck = membershipCheck(context, userId),
+): Promise<string | undefined> => {
     // One read of the row: the access decision needs no second, row-level-security read, as only the title leaves here.
     const found = await systemDb(context).projects.findFirst({ where: { _id: projectId } });
 
-    if (!found) {
-        return undefined;
-    }
-
-    if (found.userId !== userId && (!found.organizationId || !(await getMemberByOrganizationAndUser(context, found.organizationId, userId)))) {
-        return undefined;
-    }
-
-    return found.title;
+    return found && (await mayReadProject(found, userId, isMember)) ? found.title : undefined;
 };
 
 /**
