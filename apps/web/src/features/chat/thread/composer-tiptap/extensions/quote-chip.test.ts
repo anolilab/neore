@@ -129,7 +129,7 @@ describe("the quote chip's clipboard", () => {
         ],
         [
             "leaves out text the pasting page hid inside a quoted line",
-            `<div data-quote-chip data-message-id="m"><blockquote><p>Seen<span style="display: none">hidden ask</span></p></blockquote></div>`,
+            `<div data-quote-chip data-message-id="m"><blockquote><p>Seen<span style="display: none">hidden ask</span></p><p hidden>hidden line</p></blockquote><blockquote hidden><p>hidden block</p></blockquote></div>`,
             "quoteChip",
             formatQuote("Seen"),
         ],

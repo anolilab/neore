@@ -31,8 +31,12 @@ const cleanQuote = (text: string): string => stripHiddenText(text).text;
 /** Elements a page can use to put text in the HTML that nobody sees. */
 const HIDDEN = '[hidden], [aria-hidden="true"], [style*="display" i][style*="none" i], [style*="visibility" i][style*="hidden" i], script, style, template';
 
-/** The text a reader sees in one quoted line: hidden descendants are left out. */
+/** The text a reader sees in one quoted line: nothing when the line itself is hidden, and its hidden descendants are left out. */
 const visibleText = (line: Element): string => {
+    if (line.matches(HIDDEN)) {
+        return "";
+    }
+
     const copy = line.cloneNode(true) as Element;
 
     for (const hidden of copy.querySelectorAll(HIDDEN)) {
@@ -44,7 +48,7 @@ const visibleText = (line: Element): string => {
 
 /** A pasted chip's quote, read from its visible quoted lines, never from an attribute the pasting page could fill unseen. */
 const visibleQuote = (element: HTMLElement): string =>
-    cleanQuote(Array.from(element.querySelectorAll(":scope > blockquote > p"), visibleText).join("\n").trim());
+    cleanQuote(Array.from(element.querySelectorAll(`:scope > blockquote:not(${HIDDEN}) > p`), visibleText).join("\n").trim());
 
 const excerptOf = (text: string): string => {
     const flat = text.replaceAll(/\s+/gu, " ").trim();
