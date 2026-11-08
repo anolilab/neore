@@ -1359,6 +1359,7 @@ export interface Doc_pushDevices {
     _id: Id<"pushDevices">;
     _creationTime: number;
     createdAt: number;
+    language?: string;
     lastSeenAt: number;
     platform: "android" | "ios";
     sessionId: string;
@@ -4422,6 +4423,7 @@ export interface Insert_pushDevices {
     _id?: Id<"pushDevices">;
     _creationTime?: number;
     createdAt: number;
+    language?: string;
     lastSeenAt: number;
     platform: "android" | "ios";
     sessionId: string;

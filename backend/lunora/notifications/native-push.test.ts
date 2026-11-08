@@ -93,6 +93,59 @@ describe("phone push tokens", () => {
         expect(await devicesOf(USER)).toMatchObject([{ platform: "ios", sessionId: sessions[USER], token: PHONE }]);
     });
 
+    it("stores the phone's language for the alert's wording, and drops it when the next registration reports none", async () => {
+        await call(registerPushDevice, USER, { language: "de-AT", platform: "ios", token: PHONE });
+
+        expect(await devicesOf(USER)).toMatchObject([{ language: "de-AT", token: PHONE }]);
+
+        await call(registerPushDevice, OTHER, { platform: "ios", token: PHONE });
+
+        const [row] = await devicesOf(OTHER);
+
+        expect(row).not.toHaveProperty("language");
+    });
+
+    it("puts the previous account's language back with its phone when a registration is refused after its write", async () => {
+        await call(registerPushDevice, OTHER, { language: "en-GB", platform: "ios", token: PHONE });
+
+        // USER's session ends while its registration is on its way: the first check passes, the second does not.
+        const live = sessions[USER]!;
+        let checks = 0;
+
+        await harness.run(async (ctx: any) => {
+            const findFirst = ctx.db.session.findFirst.bind(ctx.db.session);
+
+            vi.spyOn(ctx.db.session, "findFirst").mockImplementation(async (options: any) => {
+                if (options.where._id !== live) {
+                    return await findFirst(options);
+                }
+
+                checks += 1;
+
+                return checks === 1 ? await findFirst(options) : null;
+            });
+
+            await (registerPushDevice as unknown as Handler<unknown>).handler(
+                {
+                    ...ctx,
+                    auth: {
+                        getIdentity: async () => {
+                            return { sessionId: live };
+                        },
+                        userId: USER,
+                    },
+                },
+                { language: "de-AT", platform: "ios", token: PHONE },
+            );
+        });
+
+        expect(await devicesOf(OTHER)).toMatchObject([{ language: "en-GB", token: PHONE }]);
+    });
+
+    it("refuses a language that is not a language tag", async () => {
+        await expect(call(registerPushDevice, USER, { language: "../etc", platform: "ios", token: PHONE })).rejects.toThrow();
+    });
+
     it("moves the phone to the latest account to register it, so the previous one stops getting its pushes", async () => {
         await call(registerPushDevice, USER, { platform: "android", token: PHONE });
         await call(registerPushDevice, OTHER, { platform: "android", token: PHONE });
@@ -197,8 +250,8 @@ describe("phone push tokens", () => {
         expect(exported.pushDevices).toHaveLength(MAX_PUSH_DEVICES_PER_USER * 2 + 3);
     });
 
-    it("erases the phones with the account and exports them without their tokens", async () => {
-        await call(registerPushDevice, USER, { platform: "android", token: PHONE });
+    it("erases the phones with the account and exports them, with their language, without their tokens", async () => {
+        await call(registerPushDevice, USER, { language: "fr-CA", platform: "android", token: PHONE });
 
         // No browser subscriptions here: the GDPR steps read them through `ctx.push`.
         const withPush = async <R>(procedure: unknown, args: Record<string, unknown>): Promise<R> =>
@@ -211,7 +264,7 @@ describe("phone push tokens", () => {
             );
         const exported = await withPush<{ pushDevices: unknown[] }>(collectNotificationsForExport, { userId: USER });
 
-        expect(exported.pushDevices).toStrictEqual([{ createdAt: expect.any(Number), platform: "android", updatedAt: expect.any(Number) }]);
+        expect(exported.pushDevices).toStrictEqual([{ createdAt: expect.any(Number), language: "fr-CA", platform: "android", updatedAt: expect.any(Number) }]);
         expect(JSON.stringify(exported)).not.toContain(PHONE);
 
         await withPush(deleteUserNotifications, { userId: USER });

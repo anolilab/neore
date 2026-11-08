@@ -37037,6 +37037,9 @@
                 "properties": {
                   "args": {
                     "properties": {
+                      "language": {
+                        "type": "string"
+                      },
                       "platform": {
                         "anyOf": [
                           {

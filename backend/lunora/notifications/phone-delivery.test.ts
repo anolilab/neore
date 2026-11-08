@@ -202,7 +202,7 @@ describe("the phones a send goes to", () => {
 
 describe("phoneMessage", () => {
     it.each(["ios", "android"] as const)("gives a %s phone the generic alert, in the phone's language, with only ids as data", (platform) => {
-        const message = phoneMessage({ platform, token: PHONE }, { language: "de-DE", notificationId: "n1", threadId: "t1", urgency: "high" });
+        const message = phoneMessage({ language: "de-DE", platform, token: PHONE }, { notificationId: "n1", threadId: "t1", urgency: "high" });
 
         expect(message).toStrictEqual({
             body: "Du hast eine neue Benachrichtigung",
@@ -216,7 +216,7 @@ describe("phoneMessage", () => {
     });
 
     it("falls back to English for a language without a placeholder", () => {
-        expect(phoneMessage({ platform: "ios", token: PHONE }, { language: "sv", notificationId: "n1", urgency: "high" }).body).toBe(
+        expect(phoneMessage({ language: "sv", platform: "ios", token: PHONE }, { notificationId: "n1", urgency: "high" }).body).toBe(
             "You have a new notification",
         );
     });

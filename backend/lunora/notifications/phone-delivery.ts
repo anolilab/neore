@@ -49,7 +49,9 @@ export const listPushDevicesForUser = internalQuery
     .output(
         v.object({
             ended: v.array(v.object({ id: v.id("pushDevices"), lastSeenAt: v.number(), sessionId: v.string() })),
-            live: v.array(v.object({ id: v.id("pushDevices"), platform: vPlatform, sessionId: v.string(), token: v.string() })),
+            live: v.array(
+                v.object({ id: v.id("pushDevices"), language: v.optional(v.string()), platform: vPlatform, sessionId: v.string(), token: v.string() }),
+            ),
         }),
     )
     .query(async ({ args, ctx }) => {
@@ -63,13 +65,20 @@ export const listPushDevicesForUser = internalQuery
 
         const now = Date.now();
         const ended: { id: (typeof page)[number]["_id"]; lastSeenAt: number; sessionId: string }[] = [];
-        const live: { id: (typeof page)[number]["_id"]; platform: (typeof page)[number]["platform"]; sessionId: string; token: string }[] = [];
+        const live: { id: (typeof page)[number]["_id"]; language?: string; platform: (typeof page)[number]["platform"]; sessionId: string; token: string }[] =
+            [];
 
         for (const row of page) {
             const session = await ctx.db.session.findFirst({ consistency: "primary", where: { _id: row.sessionId as Id<"session"> } });
 
             if (session?.userId === args.userId && session.expiresAt > now) {
-                live.push({ id: row._id, platform: row.platform, sessionId: row.sessionId, token: row.token });
+                live.push({
+                    id: row._id,
+                    platform: row.platform,
+                    sessionId: row.sessionId,
+                    token: row.token,
+                    ...(row.language !== undefined && { language: row.language }),
+                });
             } else {
                 ended.push({ id: row._id, lastSeenAt: row.lastSeenAt, sessionId: row.sessionId });
             }
@@ -101,8 +110,6 @@ export const recordPushDeliveries = internalMutation
     });
 
 export interface PhonePushMessage {
-    /** The phone's language, for the placeholder text; English when unknown. */
-    language?: string;
     notificationId: string;
     /** The chat a tap opens, when the notification is about one. */
     threadId?: string;
@@ -113,11 +120,11 @@ export interface PhonePushMessage {
  * The message for one phone: the same generic alert on both platforms, in the phone's language. Nothing about the
  * notification itself leaves us, only its ids in `data`.
  */
-export const phoneMessage = (device: { platform: PhonePlatform; token: string }, message: PhonePushMessage): ExpoMessage => {
+export const phoneMessage = (device: { language?: string; platform: PhonePlatform; token: string }, message: PhonePushMessage): ExpoMessage => {
     const data = { notificationId: message.notificationId, ...(message.threadId !== undefined && { threadId: message.threadId }) };
 
     return {
-        body: phonePlaceholderBody(message.language),
+        body: phonePlaceholderBody(device.language),
         data,
         priority: message.urgency,
         sound: "default",

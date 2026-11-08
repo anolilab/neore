@@ -21843,6 +21843,12 @@
           "optional": false,
           "unique": false
         },
+        "language": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "lastSeenAt": {
           "kind": "number",
           "nullable": false,

@@ -440,6 +440,7 @@ export const pushDevices = sqliteTable("pushDevices", {
     _id: text("_id").primaryKey(),
     _creationTime: integer("_creationTime").notNull(),
     createdAt: real("createdAt").notNull(),
+    language: text("language"),
     lastSeenAt: real("lastSeenAt").notNull(),
     platform: text("platform", { mode: "json" }).$type<"android" | "ios">().notNull(),
     sessionId: text("sessionId").notNull(),
