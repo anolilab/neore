@@ -17,12 +17,18 @@ import { currentShard, ROOT_SHARD_KEY } from "../lib/shard-context";
 import { deleteShardRoute } from "../lib/shard-routes";
 import { runAfterOnShard } from "../lib/shard-scheduler";
 import { MAX_LENGTH } from "../lib/validators";
-import { deleteGuestLink, GUEST_ROUTE_DROP_ATTEMPTS, scheduleGuestLinkRouteDrop, withdrawGuestLinksForThread } from "./lib/guest-link-store";
+import {
+    deleteGuestLink,
+    GUEST_LINK_REMOVAL_CAP,
+    GUEST_ROUTE_DROP_ATTEMPTS,
+    scheduleGuestLinkRouteDrop,
+    withdrawGuestLinksForThread,
+} from "./lib/guest-link-store";
 
 const SWEEP_BATCH = 50;
 
 /** The most hashes one route removal takes: a removal batch's links (`GUEST_LINK_REMOVAL_CAP`, `SWEEP_BATCH`). */
-const GUEST_ROUTE_BATCH = 50;
+const GUEST_ROUTE_BATCH = Math.max(GUEST_LINK_REMOVAL_CAP, SWEEP_BATCH);
 
 /** Notes per export page. */
 const EXPORT_PAGE = 100;

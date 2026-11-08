@@ -275,13 +275,15 @@ describe("the sweep", () => {
 
         await seedLink(threadId, "hash-big", 2, 101);
 
-        // Nothing else here schedules anything: each new job is the sweep's own continuation, run here in its place.
+        // Each new sweep job is the sweep's own continuation, run here in its place; the route drops it also queues are not.
+        const sweeps = (): number => harness.scheduler.list().filter((job: { args: Record<string, unknown> }) => !("linkHashes" in job.args)).length;
+
         for (let run = 0; run < 5; run += 1) {
-            const before = harness.scheduler.list().length;
+            const before = sweeps();
 
             await harness.run(async (ctx: any) => await ctx.runMutation(guestLinks.sweepGuestLinks, {}));
 
-            if (harness.scheduler.list().length === before) {
+            if (sweeps() === before) {
                 break;
             }
         }
