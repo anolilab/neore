@@ -1442,6 +1442,7 @@ overrides:
   ajv>fast-uri: ^3.1.9
 
 patchedDependencies:
+  '@expo/plist@0.10.1': fb220eeab1e5424250af6083b371f46aa7813fbe12369e33e379375032182703
   expo-speech-recognition@58.0.1: 3061af3d5462cf5e08c2d9df868d9daaf5da574a829973df4a6916f58665084f
 
 importers:
@@ -28624,7 +28625,7 @@ snapshots:
       '@expo/osascript': 2.8.1
       '@expo/package-manager': 1.14.2
       '@expo/platforms': 58.0.1
-      '@expo/plist': 0.10.1
+      '@expo/plist': 0.10.1(patch_hash=fb220eeab1e5424250af6083b371f46aa7813fbe12369e33e379375032182703)
       '@expo/prebuild-config': 58.0.19(supports-color@10.2.2)(typescript@6.0.3)
       '@expo/require-utils': 58.0.5(supports-color@10.2.2)(typescript@6.0.3)
       '@expo/router-server': 58.0.21(@expo/metro-runtime@58.0.17)(expo-constants@58.0.15)(expo-font@58.0.11(expo@58.0.23)(react-native@0.88.1(@babel/core@7.29.7(supports-color@10.2.2))(@react-native/metro-config@0.88.1(@babel/core@7.29.7(supports-color@10.2.2))(supports-color@10.2.2))(@types/react@19.3.0)(react@19.3.1)(supports-color@10.2.2))(react@19.3.1))(expo-router@58.0.30)(expo-server@58.0.6)(expo@58.0.23)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(supports-color@10.2.2)
@@ -28693,7 +28694,7 @@ snapshots:
     dependencies:
       '@expo/config-types': 58.0.3
       '@expo/json-file': 11.2.1
-      '@expo/plist': 0.10.1
+      '@expo/plist': 0.10.1(patch_hash=fb220eeab1e5424250af6083b371f46aa7813fbe12369e33e379375032182703)
       '@expo/require-utils': 58.0.5(supports-color@10.2.2)(typescript@6.0.3)
       '@expo/sdk-runtime-versions': 1.0.1
       chalk: 4.1.2
@@ -28927,7 +28928,7 @@ snapshots:
 
   '@expo/platforms@58.0.1': {}
 
-  '@expo/plist@0.10.1':
+  '@expo/plist@0.10.1(patch_hash=fb220eeab1e5424250af6083b371f46aa7813fbe12369e33e379375032182703)':
     dependencies:
       '@xmldom/xmldom': 0.9.12
       base64-js: 1.5.1
@@ -43399,7 +43400,7 @@ snapshots:
     dependencies:
       '@expo/code-signing-certificates': 0.0.7
       '@expo/env': 2.5.4(supports-color@10.2.2)
-      '@expo/plist': 0.10.1
+      '@expo/plist': 0.10.1(patch_hash=fb220eeab1e5424250af6083b371f46aa7813fbe12369e33e379375032182703)
       '@expo/spawn-async': 1.8.0
       '@react-native/asset-utils': 0.88.1
       arg: 4.1.3
