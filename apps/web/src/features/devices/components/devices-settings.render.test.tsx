@@ -155,6 +155,20 @@ describe("<DeviceRow> connection failure", () => {
         expect(screen.getByRole("status").textContent).toBe("");
     });
 
+    it("shows why a Retry was refused until the device core reports a newer reason", async () => {
+        const gaveUp = { attempt: null, maxAttempts: 5, phase: "gaveUp" as const, reason: "Connection timed out" };
+
+        bridge.connect.mockRejectedValueOnce(new Error("too many attempts to reach this server"));
+
+        const view = renderRow(gaveUp);
+
+        await press(screen.getByRole("button", { name: "Retry" }));
+        await waitFor(() => expect(screen.getByRole("status").textContent).toBe("too many attempts to reach this server"));
+
+        view.rerender(rowElement({ ...gaveUp, reason: "No route to host" }, false));
+        expect(screen.getByRole("status").textContent).toBe("No route to host");
+    });
+
     it("shows why the person's Connect failed when the server is not kept, until it connects", async () => {
         bridge.connect.mockRejectedValueOnce(new Error("Permission denied (publickey)."));
 

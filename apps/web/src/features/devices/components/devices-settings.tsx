@@ -157,8 +157,15 @@ export const DeviceRow: FC<{
     };
 
     // The failure of the person's latest Connect or Retry on this row; the next action replaces it.
-    const [actionFailure, setActionFailure] = useState<string | undefined>();
+    // `coreReason`: the core's reason when it failed, so the core moving on to a newer reason replaces it on the row.
+    const [actionFailure, setActionFailure] = useState<{ coreReason: string | null; message: string } | undefined>();
     const latestAction = useRef(0);
+    // The core's reason as of the latest render, read when an action fails.
+    const reconnectReason = useRef<string | null>(null);
+
+    useEffect(() => {
+        reconnectReason.current = reconnect?.reason ?? null;
+    }, [reconnect?.reason]);
 
     // A connection made since (here or elsewhere) means the earlier failure explains nothing any more.
     if (connected && actionFailure !== undefined) {
@@ -171,7 +178,11 @@ export const DeviceRow: FC<{
     let failure: string | undefined;
 
     if (!connected) {
-        failure = reconnect === undefined ? actionFailure : (reconnect.reason ?? undefined);
+        const coreReason = reconnect?.reason ?? null;
+
+        // The person's own latest failure, until the core reports a newer reason of its own (a refused Retry leaves the
+        // core's view as it was, so it would otherwise stay hidden behind the older reason).
+        failure = actionFailure !== undefined && actionFailure.coreReason === coreReason ? actionFailure.message : (coreReason ?? undefined);
     }
 
     const errorId = `device-error-${device._id}`;
@@ -206,7 +217,7 @@ export const DeviceRow: FC<{
                 const message = cutFailure(error instanceof Error ? error.message : t`Could not connect to the server.`);
 
                 if (mine === latestAction.current) {
-                    setActionFailure(message);
+                    setActionFailure({ coreReason: reconnectReason.current, message });
                 }
 
                 toast.error(failureText(message));
