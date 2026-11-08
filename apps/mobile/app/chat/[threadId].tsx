@@ -419,6 +419,8 @@ const Chat = () => {
         }
 
         const controller = new AbortController();
+        // The account that sends: the offer below is its, even if another account is signed in by the time it lands.
+        const sender = accountId;
 
         sendAbort.current = controller;
         setSending(true);
@@ -457,8 +459,12 @@ const Chat = () => {
                 }));
 
             setThreadId(started.threadId);
+
             // A reply, a question or an approval may now arrive while the app is in the background.
-            offerPhonePush();
+            if (sender) {
+                offerPhonePush(sender);
+            }
+
             // The prompt is complete once the server has accepted it, whether or not the screen's next read succeeds.
             writeRows((current) => finishRow(current, userId));
 

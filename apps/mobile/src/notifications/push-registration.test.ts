@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import type { PushPermission, PushPlatform, PushServer } from "./push-registration";
-import { createForegroundGate, createTokenChangeFilter, languageTag, onceItWorks, registerPhoneForPush } from "./push-registration";
+import { createForegroundGate, createPromptOffer, createTokenChangeFilter, languageTag, onceItWorks, registerPhoneForPush } from "./push-registration";
 
 const TOKEN = "a".repeat(64);
 
@@ -170,5 +170,37 @@ describe("createForegroundGate", () => {
         await first;
 
         expect(attempt).toHaveBeenCalledTimes(1);
+    });
+});
+
+describe("createPromptOffer", () => {
+    it("offers the prompt once per sign-in, only to the account signed in now", () => {
+        const offer = createPromptOffer();
+
+        expect(offer.claim("a")).toBe(false);
+
+        offer.begin("a");
+
+        expect(offer.claim("b")).toBe(false);
+        expect(offer.claim("a")).toBe(true);
+        expect(offer.claim("a")).toBe(false);
+    });
+
+    it("reopens a failed offer only for the account still signed in, and offers none once sign-out began", () => {
+        const offer = createPromptOffer();
+
+        offer.begin("a");
+        offer.claim("a");
+        offer.begin("b");
+        offer.claim("b");
+        // A's attempt fails after B signed in: it must not reopen B's offer.
+        offer.release("a");
+
+        expect(offer.claim("b")).toBe(false);
+
+        offer.release("b");
+        offer.end();
+
+        expect(offer.claim("b")).toBe(false);
     });
 });

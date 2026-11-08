@@ -73,7 +73,8 @@ export const registerPhoneForPush = async ({
     }
 
     const permission = await platform.getPermission();
-    const isAllowed = permission.granted || (canPrompt && permission.canAskAgain && await platform.requestPermission());
+    // Asked again right before the prompt: a sign-out can begin while the permission is read.
+    const isAllowed = permission.granted || (canPrompt && permission.canAskAgain && isCurrent() && await platform.requestPermission());
 
     if (!isAllowed) {
         return undefined;
@@ -166,6 +167,39 @@ export const createForegroundGate = (intervalMs: number, now: () => number = Dat
                 }
             } finally {
                 state.isRunning = false;
+            }
+        },
+    };
+};
+
+/**
+ * Who may be offered the permission prompt: the account signed in now, once per sign-in. `claim` is the offer for
+ * `userId` (false for any other account, or one already offered); `release` reopens a failed one, but only while that
+ * account is still the one signed in; `end` is the moment its sign-out begins.
+ */
+export const createPromptOffer = () => {
+    const state: { isOffered: boolean; userId?: string } = { isOffered: false };
+
+    return {
+        begin: (userId: string): void => {
+            state.isOffered = false;
+            state.userId = userId;
+        },
+        claim: (userId: string): boolean => {
+            if (state.userId !== userId || state.isOffered) {
+                return false;
+            }
+
+            state.isOffered = true;
+
+            return true;
+        },
+        end: (): void => {
+            delete state.userId;
+        },
+        release: (userId: string): void => {
+            if (state.userId === userId) {
+                state.isOffered = false;
             }
         },
     };

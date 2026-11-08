@@ -5,7 +5,7 @@ import { AppState } from "react-native";
 import { useAuth } from "../auth/auth-state";
 import { getClient } from "../lib/lunora";
 import { backendPushServer, configurePhoneNotifications, deviceLocale, devicePushPlatform } from "./phone-push";
-import { createForegroundGate, createTokenChangeFilter, registerPhoneForPush } from "./push-registration";
+import { createForegroundGate, createPromptOffer, createTokenChangeFilter, registerPhoneForPush } from "./push-registration";
 
 /** Push is best-effort: a failure is logged (never the token) and never breaks the screen that asked. */
 const quietly = async (message: string, work: () => Promise<unknown>): Promise<void> => {
@@ -46,31 +46,40 @@ const register = async (canPrompt: boolean, isAccountCurrent: () => boolean = ()
     }
 };
 
-const offer = { isDone: false };
+const promptOffer = createPromptOffer();
 
-/** Whether the account signed in when the offer was made is still the one signed in; false while nobody is. */
-const signedIn = { isCurrent: (): boolean => false };
+/** The signed-in account's registrations carry `isCurrent`; false while nobody is, or once its sign-out began. */
+const signedIn: { account?: { isCurrent: boolean } } = {};
+
+/** Sign-out has begun: no prompt and no registration, offered or in the background, for the account that is leaving. */
+export const endPhonePushForAccount = (): void => {
+    if (signedIn.account) {
+        signedIn.account.isCurrent = false;
+    }
+
+    delete signedIn.account;
+    promptOffer.end();
+};
 
 /** Coming back to the front often (closing the notification shade, the permission prompt) registers at most this often. */
 export const FOREGROUND_REGISTER_INTERVAL_MS = 60_000;
 
 /**
- * The moment to ask: the person just sent a message, so a reply, a question or an approval may come while the app is
- * in the background. Asked at most once per sign-in; the system itself shows its prompt only once. An attempt that
- * failed (offline, the server did not answer) leaves the offer open for the next message.
+ * The moment to ask: `userId` just sent a message, so a reply, a question or an approval may come while the app is in
+ * the background. Only while that account is still the one signed in, at most once per sign-in; the system itself
+ * shows its prompt only once. An attempt that failed (offline, the server did not answer) leaves that account's offer
+ * open for its next message.
  */
-export const offerPhonePush = async (): Promise<void> => {
-    if (offer.isDone) {
+export const offerPhonePush = async (userId: string): Promise<void> => {
+    if (!promptOffer.claim(userId)) {
         return;
     }
 
-    offer.isDone = true;
-
-    const { isCurrent } = signedIn;
-    const { didRun } = await register(true, isCurrent);
+    const { account } = signedIn;
+    const { didRun } = await register(true, () => account?.isCurrent === true);
 
     if (!didRun) {
-        offer.isDone = false;
+        promptOffer.release(userId);
     }
 };
 
@@ -104,8 +113,8 @@ export const usePhonePush = (): void => {
         };
 
         // A new sign-in is offered the prompt again. Its registration counts toward the foreground spacing.
-        offer.isDone = false;
-        signedIn.isCurrent = isCurrent;
+        signedIn.account = account;
+        promptOffer.begin(userId);
         foreground.run(registerSilently);
 
         const tokenSubscription = addPushTokenListener(({ data }) => {
@@ -125,7 +134,7 @@ export const usePhonePush = (): void => {
 
         return () => {
             account.isCurrent = false;
-            signedIn.isCurrent = () => false;
+            endPhonePushForAccount();
             tokenSubscription.remove();
             appStateSubscription.remove();
         };
