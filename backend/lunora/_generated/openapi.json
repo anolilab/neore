@@ -36953,6 +36953,212 @@
         "x-lunora-function-kind": "mutation"
       }
     },
+    "/_lunora/rpc#notifications_native_push:getNativePushConfig": {
+      "post": {
+        "description": "Invoke the `query` `notifications_native_push:getNativePushConfig` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "notifications_native_push:getNativePushConfig",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {},
+                    "required": [],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "notifications_native_push:getNativePushConfig",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "enabled": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "enabled"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "query: notifications_native_push:getNativePushConfig",
+        "tags": [
+          "notifications"
+        ],
+        "x-lunora-function-kind": "query"
+      }
+    },
+    "/_lunora/rpc#notifications_native_push:registerPushDevice": {
+      "post": {
+        "description": "Invoke the `mutation` `notifications_native_push:registerPushDevice` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "notifications_native_push:registerPushDevice",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "platform": {
+                        "anyOf": [
+                          {
+                            "const": "android",
+                            "type": "string"
+                          },
+                          {
+                            "const": "ios",
+                            "type": "string"
+                          }
+                        ]
+                      },
+                      "token": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "platform",
+                      "token"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "notifications_native_push:registerPushDevice",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "registered": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "registered"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "mutation: notifications_native_push:registerPushDevice",
+        "tags": [
+          "notifications"
+        ],
+        "x-lunora-function-kind": "mutation"
+      }
+    },
+    "/_lunora/rpc#notifications_native_push:unregisterPushDevice": {
+      "post": {
+        "description": "Invoke the `mutation` `notifications_native_push:unregisterPushDevice` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "notifications_native_push:unregisterPushDevice",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "token": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "token"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "notifications_native_push:unregisterPushDevice",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "null"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "mutation: notifications_native_push:unregisterPushDevice",
+        "tags": [
+          "notifications"
+        ],
+        "x-lunora-function-kind": "mutation"
+      }
+    },
     "/_lunora/rpc#notifications_push:getPushConfig": {
       "post": {
         "description": "Invoke the `query` `notifications_push:getPushConfig` over the Lunora RPC envelope (POST /_lunora/rpc).",
@@ -60473,7 +60679,7 @@
       "name": "messenger"
     },
     {
-      "description": "In-app notifications, Web Push delivery (@lunora/notify) and the opt-in Daily Brief.",
+      "description": "In-app notifications, Web Push delivery (@lunora/notify), phone push (Expo) and the opt-in Daily Brief.",
       "name": "notifications"
     },
     {

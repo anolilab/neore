@@ -25,3 +25,15 @@
   (`userSettings.dailyBriefEnabled`) and scheduled like memory reflection —
   `afterRun` → `noteDailyBriefActivity` → `runAt` local 07:xx — and charged
   via `chargeRound` only when there is something to report.
+- **Phone push registration** (`native-push.ts`, `push-device-writes.ts`) —
+  on only with `EXPO_ACCESS_TOKEN` (a Worker secret; unset = no row).
+    - Tokens are `pushDevices` rows (global, unique `token`, owner-policied, every
+      read `consistency: "primary"`). `registerPushDevice` stamps the caller's
+      session (`sid`; a call without one registers nothing). A row another user
+      holds moves to the caller (`systemDb`): the latest registration wins. A
+      token is not a secret, so a leaked one can take a phone's pushes until it
+      registers again (accepted: only the generic alert reaches a phone).
+      A registration takes its row back if an account deletion started meanwhile.
+    - At most 10 per user (`trimPushDevices`). An account merge drops the guest's
+      rows (`dropPushDevicesOf`) instead of moving them: they belong to a session
+      that ends with the guest.
