@@ -29,7 +29,7 @@ describe("useUsageToday", () => {
 
         const { result } = renderHook(() => useUsageToday());
 
-        expect(result.current).toStrictEqual({ failed: false, today: "2026-09-30" });
+        expect(result.current).toStrictEqual({ failed: false, today: "2026-09-30", zone: "Europe/Berlin" });
 
         act(() => {
             vi.advanceTimersByTime(3 * 60_000);
@@ -43,12 +43,12 @@ describe("useUsageToday", () => {
 
         const { rerender, result } = renderHook(() => useUsageToday());
 
-        expect(result.current).toStrictEqual({ failed: false, today: undefined });
+        expect(result.current).toStrictEqual({ failed: false, today: undefined, zone: "UTC" });
 
         settings.isLoadingError = true;
         rerender();
 
-        expect(result.current).toStrictEqual({ failed: true, today: undefined });
+        expect(result.current).toStrictEqual({ failed: true, today: undefined, zone: "UTC" });
     });
 
     it("keeps the day when a later settings read fails but the settings it had remain", () => {
@@ -59,7 +59,7 @@ describe("useUsageToday", () => {
 
         const { result } = renderHook(() => useUsageToday());
 
-        expect(result.current).toStrictEqual({ failed: false, today: "2026-09-30" });
+        expect(result.current).toStrictEqual({ failed: false, today: "2026-09-30", zone: "Europe/Berlin" });
     });
 });
 
@@ -70,6 +70,8 @@ describe("keepAcrossDayTurn", () => {
         expect(placeholderData("figures", { meta: { usageScope: "projects:30" } })).toBe("figures");
         expect(placeholderData("figures", { meta: { usageScope: "projects:7" } })).toBeUndefined();
         expect(placeholderData("figures", undefined)).toBeUndefined();
+        // A changed time zone is a new period, not a turned day: its scope differs, so the figures go too.
+        expect(keepAcrossDayTurn({}, "projects:Europe/Berlin:30").placeholderData("figures", { meta: { usageScope: "projects:UTC:30" } })).toBeUndefined();
     });
 
     it("keeps the options' own meta, so a one-shot read stays one-shot", () => {

@@ -20,7 +20,7 @@ const ProjectUsageSummary = ({ projectId }: ProjectUsageSummaryProps) => {
     const { i18n, t } = useLingui();
     const crpc = useCRPC();
     const headingId = useId();
-    const { failed: zoneFailed, today } = useUsageToday();
+    const { failed: zoneFailed, today, zone } = useUsageToday();
     const locale = i18n.locale || "en";
     const usageQuery = crpc.usage.activity.getProjectUsage.queryOptions(
         // The dialog receives `_id` as a plain `string`; it is always an id the backend returned for a `projects` row.
@@ -28,7 +28,7 @@ const ProjectUsageSummary = ({ projectId }: ProjectUsageSummaryProps) => {
         { live: false },
     );
     const query = useQuery({
-        ...keepAcrossDayTurn(usageQuery, `project:${projectId}`),
+        ...keepAcrossDayTurn(usageQuery, `project:${zone}:${projectId}`),
     });
     const { data } = query;
     const isError = query.isError || zoneFailed;

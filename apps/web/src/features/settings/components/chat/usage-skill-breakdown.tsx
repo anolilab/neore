@@ -31,14 +31,14 @@ const formatTokens = (count: number, locale: string): string => new Intl.NumberF
 const UsageSkillBreakdown: FC<UsageSkillBreakdownProps> = ({ backfilling, days }) => {
     const { i18n, t } = useLingui();
     const crpc = useCRPC();
-    const { failed: zoneFailed, today } = useUsageToday();
+    const { failed: zoneFailed, today, zone } = useUsageToday();
     const locale = i18n.locale || "en";
 
     const skillsQuery = crpc.usage.activity.getSkillBreakdown.queryOptions(today === undefined ? skipToken : { fromDate: periodStart(today, days) }, {
         live: false,
     });
     const query = useQuery({
-        ...keepAcrossDayTurn(skillsQuery, `skills:${String(days)}`),
+        ...keepAcrossDayTurn(skillsQuery, `skills:${zone}:${String(days)}`),
         refetchInterval: backfilling ? BACKFILL_REFETCH_MS : false,
     });
 

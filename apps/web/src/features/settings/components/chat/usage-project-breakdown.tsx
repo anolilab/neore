@@ -42,13 +42,13 @@ const formatTokens = (count: number, locale: string): string => new Intl.NumberF
 const UsageProjectBreakdown: FC<UsageProjectBreakdownProps> = ({ backfilling, days }) => {
     const { i18n, t } = useLingui();
     const crpc = useCRPC();
-    const { failed: zoneFailed, today } = useUsageToday();
+    const { failed: zoneFailed, today, zone } = useUsageToday();
     const locale = i18n.locale || "en";
     const breakdownQuery = crpc.usage.activity.getProjectBreakdown.queryOptions(today === undefined ? skipToken : { fromDate: periodStart(today, days) }, {
         live: false,
     });
     const mine = useQuery({
-        ...keepAcrossDayTurn(breakdownQuery, `projects:${String(days)}`),
+        ...keepAcrossDayTurn(breakdownQuery, `projects:${zone}:${String(days)}`),
         refetchInterval: backfilling ? BACKFILL_REFETCH_MS : false,
     });
 

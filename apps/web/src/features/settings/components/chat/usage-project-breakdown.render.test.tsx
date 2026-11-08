@@ -24,7 +24,7 @@ const { breakdownReads, usageDay } = vi.hoisted(() => {
 vi.mock("@/features/settings/hooks/use-usage-today", () => {
     return {
         keepAcrossDayTurn: (options: object) => options,
-        useUsageToday: () => (usageDay.failed ? { failed: true, today: undefined } : { failed: false, today: "2026-09-30" }),
+        useUsageToday: () => (usageDay.failed ? { failed: true, today: undefined, zone: "UTC" } : { failed: false, today: "2026-09-30", zone: "UTC" }),
     };
 });
 
