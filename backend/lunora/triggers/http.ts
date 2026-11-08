@@ -332,17 +332,21 @@ const handleTriggerWebhook = async (context: HttpActionCtx, request: Request, tr
         // A delivery that cannot be rendered, or whose scheduled arguments would not fit Lunora's dispatch request, is
         // refused now and its claim given back: once it is acknowledged, the run could never start. The sender is told.
         // A refused delivery is told on the trigger as well as to the sender; failing to record it must not change the answer.
-        const recordRefused = async (reason: string): Promise<void> => {
+        // `refusedAt` is taken before the claim is given back, so a run that has already recorded a later start is not overwritten.
+        const recordRefused = async (refusedAt: number, reason: string): Promise<void> => {
             await context
-                .runMutation(internal.triggers.functions.recordRefusedDelivery, { reason, triggerId: triggerId as Id<"triggers"> })
+                .runMutation(internal.triggers.functions.recordRefusedDelivery, { reason, refusedAt, triggerId: triggerId as Id<"triggers"> })
                 .catch((error: unknown) => {
                     console.error(`[Triggers] Webhook trigger ${triggerId}: the refusal could not be recorded on the trigger:`, error);
                 });
         };
 
         if (webhookPrompt === undefined && (body || trigger.inputTemplate)) {
+            const refusedAt = Date.now();
+
             await taken.giveBack();
             await recordRefused(
+                refusedAt,
                 "A delivery could not be rendered into the Input Template (too long with this delivery's values, or a field nested too deep). Shorten the template or read fewer fields.",
             );
 
@@ -358,8 +362,10 @@ const handleTriggerWebhook = async (context: HttpActionCtx, request: Request, tr
         };
 
         if (new TextEncoder().encode(JSON.stringify(scheduled)).byteLength > MAX_SCHEDULED_ARGS_BYTES) {
+            const refusedAt = Date.now();
+
             await taken.giveBack();
-            await recordRefused("A delivery was too large to run once its body was quoted for the run. Ask the sender for smaller deliveries.");
+            await recordRefused(refusedAt, "A delivery was too large to run once its body was quoted for the run. Ask the sender for smaller deliveries.");
 
             return Response.json({ error: "This delivery is too large to run." }, { status: 413 });
         }

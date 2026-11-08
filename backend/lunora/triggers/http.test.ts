@@ -245,6 +245,28 @@ describe("trigger webhook signing", () => {
         expect(trigger.lastError).toContain("too large to run");
     });
 
+    it("does not write a refusal over a run that began after it", async () => {
+        const { triggerId } = await setup();
+        const refuse = async (refusedAt: number): Promise<void> => {
+            await harness.run(async (ctx: any) => await ctx.runMutation(recordRefusedDelivery, { reason: "refused", refusedAt, triggerId }));
+        };
+
+        const lastError = async (): Promise<string | undefined> => {
+            const trigger = await harness.run(async (ctx: any) => await ctx.db.get("triggers", triggerId));
+
+            return trigger.lastError;
+        };
+
+        await harness.run(async (ctx: any) => await ctx.db.patch("triggers", triggerId, { lastTriggeredAt: 2000 }));
+        await refuse(1000);
+
+        expect(await lastError()).toBeUndefined();
+
+        await refuse(3000);
+
+        expect(await lastError()).toBe("refused");
+    });
+
     it("runs a fresh, correctly signed delivery exactly once — a replay is acknowledged but not run", async () => {
         const { post, scheduled, statusOf } = await setup();
         const body = '{"event":"x"}';

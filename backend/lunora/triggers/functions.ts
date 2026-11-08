@@ -1321,16 +1321,18 @@ export const createExecution = internalMutation
     });
 
 /**
- * A webhook delivery the Input Template could not be rendered for (the route answered 422). It is no run, so only the
- * trigger's `lastError` says it, where the owner sees it on the trigger, with what to change.
+ * A webhook delivery the route refused: the Input Template could not be rendered for it (422), or it was too large to
+ * schedule (413). It is no run, so only the trigger's `lastError` says it, where the owner sees it on the trigger, with
+ * what to change. A run that has already recorded a later `lastTriggeredAt` is newer news: the refusal is not written
+ * over it. A run still going when the refusal lands writes its own outcome when it ends.
  */
 export const recordRefusedDelivery = internalMutation
-    .input({ reason: v.string().max(MAX_LENGTH.short), triggerId: v.id("triggers") })
+    .input({ reason: v.string().max(MAX_LENGTH.short), refusedAt: v.number(), triggerId: v.id("triggers") })
     .output(v.null())
-    .mutation(async ({ args: { reason, triggerId }, ctx }) => {
+    .mutation(async ({ args: { reason, refusedAt, triggerId }, ctx }) => {
         const trigger = await ctx.db.get("triggers", triggerId);
 
-        if (trigger) {
+        if (trigger && (trigger.lastTriggeredAt ?? -Infinity) <= refusedAt) {
             await patchRow(ctx.db, "triggers", trigger, { lastError: reason, updatedAt: ctx.now });
         }
 
