@@ -81,10 +81,9 @@ Write`; without them the deploy fails, hence the switch.
   cap. Cloudflare's error names no file, only "exceeded the uncompressed size limit", and
   every Worker that depends on the website fails with the same message.
 - **Held back on purpose**, each with a
-  comment in `pnpm-workspace.yaml`: `typescript` 6.0.3 (packem's dts build cannot import TS 7),
-  `@vercel/og` 1.0.1 (1.0.2 and 1.0.3 break `generate-og.mjs` with "Dynamic require of fs") and
-  `@c15t/*` 2.3 (3.0 renames the provider, a migration). `alchemy` stays at beta.81 until a newer
-  beta is a day old and a deploy has passed on it. The source of truth for Lunora versions is the
+  comment in `pnpm-workspace.yaml`: `typescript` 6.0.3 (packem's dts build cannot import TS 7) and
+  `@vercel/og` 1.0.1 (1.0.2 and 1.0.3 break `generate-og.mjs` with "Dynamic require of fs").
+  `alchemy` stays at beta.81 until a newer beta is a day old and a deploy has passed on it. The source of truth for Lunora versions is the
   catalog in `pnpm-workspace.yaml`, aligned to the cluster the meta-packages pin rather than the
   newest tags. The branded packages (`client`, `workflow`, `auth`) must resolve to one version
   each; a non-branded package may keep two copies when the meta-packages pin different versions,

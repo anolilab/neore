@@ -1522,6 +1522,37 @@ export const threadGoals = sqliteTable("threadGoals", {
     by_status_and_updatedAt: index("by_status_and_updatedAt").on(t.status, t.updatedAt),
 }));
 
+export const threadGuestLinks = sqliteTable("threadGuestLinks", {
+    _id: text("_id").primaryKey(),
+    _creationTime: integer("_creationTime").notNull(),
+    createdAt: real("createdAt").notNull(),
+    expiresAt: real("expiresAt").notNull(),
+    guestHash: text("guestHash"),
+    linkHash: text("linkHash").notNull(),
+    threadId: text("threadId").references((): AnySQLiteColumn => threads._id).notNull(),
+    userId: text("userId").notNull(),
+}, (t) => ({
+    by_thread_expiresAt: index("by_thread_expiresAt").on(t.threadId, t.expiresAt),
+    by_linkHash: index("by_linkHash").on(t.linkHash),
+    by_expiresAt: index("by_expiresAt").on(t.expiresAt),
+    by_userId: index("by_userId").on(t.userId),
+}));
+
+export const threadGuestMessages = sqliteTable("threadGuestMessages", {
+    _id: text("_id").primaryKey(),
+    _creationTime: integer("_creationTime").notNull(),
+    createdAt: real("createdAt").notNull(),
+    linkId: text("linkId").references((): AnySQLiteColumn => threadGuestLinks._id).notNull(),
+    status: text("status", { mode: "json" }).$type<"held" | "sent">().notNull(),
+    text: text("text").notNull(),
+    threadId: text("threadId").references((): AnySQLiteColumn => threads._id).notNull(),
+    userId: text("userId").notNull(),
+}, (t) => ({
+    by_link: index("by_link").on(t.linkId),
+    by_thread: index("by_thread").on(t.threadId),
+    by_userId: index("by_userId").on(t.userId),
+}));
+
 export const threadKnowledge = sqliteTable("threadKnowledge", {
     _id: text("_id").primaryKey(),
     _creationTime: integer("_creationTime").notNull(),
@@ -1624,6 +1655,7 @@ export const threads = sqliteTable("threads", {
     publicAccessToken: text("publicAccessToken"),
     reasoningEffort: real("reasoningEffort"),
     runner: text("runner"),
+    snoozeChosenAt: real("snoozeChosenAt"),
     snoozedUntil: real("snoozedUntil"),
     source: text("source"),
     statelessMode: integer("statelessMode", { mode: "boolean" }),
@@ -1683,7 +1715,7 @@ export const toolApprovalRuns = sqliteTable("toolApprovalRuns", {
     _id: text("_id").primaryKey(),
     _creationTime: integer("_creationTime").notNull(),
     approvalId: text("approvalId").notNull(),
-    config: text("config", { mode: "json" }).$type<{ autoMediaEnrichment: boolean; dispatchOrigin?: "outside_agent"; group?: { baseModel: string; isAnonymous: boolean; organizationId?: string; queue: Array<string>; skillId: string; spokenSkillIds: Array<string>; step?: { role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }; steps?: Array<{ role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }>; turnStartedAt: number }; instructions?: string; mcpServerNames: Array<string>; mcpToolFingerprints?: Record<string, string>; memory?: { botId?: string }; model: string; promptMessageId?: string; reasoningEffort?: number; replyKey?: string; researchDepth: "speed" | "balanced" | "thorough"; searchMode: string; shouldAutoContinue: boolean; startedBy?: string; toolNames: Array<string>; toolPermissionKeys?: Record<string, string>; untrustedContext?: boolean }>().notNull(),
+    config: text("config", { mode: "json" }).$type<{ autoMediaEnrichment: boolean; dispatchOrigin?: "outside_agent" | "trigger" | "messenger"; group?: { baseModel: string; isAnonymous: boolean; organizationId?: string; queue: Array<string>; skillId: string; spokenSkillIds: Array<string>; step?: { role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }; steps?: Array<{ role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }>; turnStartedAt: number }; headlessApproved?: Array<string>; instructions?: string; mcpServerNames: Array<string>; mcpToolFingerprints?: Record<string, string>; memory?: { botId?: string }; model: string; promptMessageId?: string; reasoningEffort?: number; replyKey?: string; researchDepth: "speed" | "balanced" | "thorough"; searchMode: string; shouldAutoContinue: boolean; startedBy?: string; subAgentRunId?: Id<"subAgentRuns">; toolNames: Array<string>; toolPermissionKeys?: Record<string, string>; untrustedContext?: boolean }>().notNull(),
     createdAt: real("createdAt").notNull(),
     resolvedAt: real("resolvedAt"),
     resolvedBy: text("resolvedBy"),
@@ -1788,6 +1820,7 @@ export const usageDaily = sqliteTable("usageDaily", {
     _creationTime: integer("_creationTime").notNull(),
     costMicrodollars: real("costMicrodollars").notNull(),
     date: text("date").notNull(),
+    projectKey: text("projectKey"),
     replies: real("replies").notNull(),
     skillKey: text("skillKey").notNull(),
     skillName: text("skillName"),
@@ -1797,15 +1830,19 @@ export const usageDaily = sqliteTable("usageDaily", {
 }, (t) => ({
     by_user_skill_date: index("by_user_skill_date").on(t.userId, t.skillKey, t.date),
     by_user_date: index("by_user_date").on(t.userId, t.date),
+    by_user_project_date: index("by_user_project_date").on(t.userId, t.projectKey, t.date),
     by_date: index("by_date").on(t.date),
 }));
 
 export const usageReplies = sqliteTable("usageReplies", {
     _id: text("_id").primaryKey(),
     _creationTime: integer("_creationTime").notNull(),
+    awaitingTotal: integer("awaitingTotal", { mode: "boolean" }),
+    deferredProjectKey: text("deferredProjectKey"),
     recordedAt: real("recordedAt").notNull(),
     replyKey: text("replyKey").notNull(),
     userId: text("userId").notNull(),
+    withoutProject: integer("withoutProject", { mode: "boolean" }),
 }, (t) => ({
     by_user_reply: index("by_user_reply").on(t.userId, t.replyKey),
     by_recordedAt: index("by_recordedAt").on(t.recordedAt),

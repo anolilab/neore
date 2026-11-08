@@ -11,7 +11,7 @@ Neore Chat v2 — AI chat app: React + TypeScript frontend, a **Lunora** backend
 ├── apps/
 │   ├── web/                # Main React app (TanStack Start)
 │   ├── browser-extension/  # CRXJS + React
-│   ├── desktop/            # Electron 44 shell around the DEPLOYED web app
+│   ├── desktop/            # Electron 45 shell around the DEPLOYED web app
 │   ├── cli/                # `neore` CLI for the public v1 API
 │   └── mobile/             # Expo / React Native app
 ├── backend/                # Lunora backend (ShardDO + .global() D1 + R2), Better Auth
@@ -60,13 +60,11 @@ Always `pnpm`. Lint does not include types: run both. Git hooks format on commit
 
 ```bash
 pnpm lint:types                          # vis run lint:types — NOT `pnpm typecheck`
-pnpm lint                                # prettier + eslint + dedupe; `lint:eslint:fix`, `lint:prettier:fix`
+pnpm lint                                # vis run lint:all: eslint + oxlint + oxfmt (Prettier for md) + dedupe; `lint:eslint:fix`, `lint:oxfmt:fix`
 pnpm vis run test                        # every test; there is NO root `pnpm test` (`pnpm test` inside a project)
 pnpm build:packages                      # then `pnpm --filter @neore/backend run build` for the Worker
 cd backend && pnpm codegen               # backend codegen
 ```
-
-Root Prettier covers only `*.{json,yml,yaml,js,mjs,cjs,ts}`: root markdown is not linted.
 
 ## SCOPED KNOWLEDGE — READ BEFORE YOU TOUCH
 

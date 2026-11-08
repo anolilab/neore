@@ -138,8 +138,11 @@ export default defineConfig({
     // 11 projects), so wiring it to pre-commit would block every commit until
     // that debt is paid. Add it once `pnpm lint:eslint` is green.
     staged: {
-        // Markdown is left out: CI does not check its formatting, so the hook would only churn tables.
-        "*.{js,jsx,mjs,cjs,ts,tsx,mts,cts,json,jsonc,yml,yaml,css,html}": "pnpm run --silent prettier:hooks --write",
+        // The same formatters as `pnpm lint:oxfmt`: oxfmt for code, data, CSS and HTML, Prettier
+        // for Markdown. Both read the root .gitignore and .prettierignore, so an ignored file
+        // that is staged is left alone.
+        "*.{js,jsx,mjs,cjs,ts,tsx,mts,cts,json,jsonc,json5,yml,yaml,css,html}": "pnpm exec oxfmt --no-error-on-unmatched-pattern",
+        "*.{md,mdx}": "pnpm exec prettier --config=.prettierrc.cjs --write",
         // CI checks the key order of every package.json (`lint.yml`, "Types").
         "**/package.json": "sort-package-json",
     },
@@ -184,14 +187,6 @@ export default defineConfig({
         "lint:package-json": {
             inputs: ["default"],
             cache: true,
-        },
-        "lint:prettier": {
-            inputs: ["default", "{workspaceRoot}/.prettierrc.cjs"],
-            cache: true,
-        },
-        "lint:prettier:fix": {
-            inputs: ["default", "{workspaceRoot}/.prettierrc.cjs"],
-            cache: false,
         },
         "lint:types": {
             // Type-checking a consumer needs its dependencies' emitted .d.ts files.

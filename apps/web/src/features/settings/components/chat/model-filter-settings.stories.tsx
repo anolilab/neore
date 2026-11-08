@@ -4,7 +4,7 @@ import { expect, screen, userEvent, waitFor } from "storybook/test";
 
 import { gatewayModelsHandler } from "@/storybook/fixtures/models";
 import { userFixtures } from "@/storybook/fixtures/user";
-import { lunoraAnswered, lunoraError, lunoraHandlers, lunoraPending } from "@/storybook/lunora";
+import { lunoraAnswered, lunoraError, lunoraHandlers, lunoraIdle, lunoraPending } from "@/storybook/lunora";
 
 import ModelFilterSettings from "./model-filter-settings";
 
@@ -102,17 +102,18 @@ export const SaveFails: Story = {
 export const ToggleZeroDataRetention: Story = {
     // The unchecked switch track meets 3:1 (non-text contrast) in every mode since the `--input` token was darkened.
     play: async ({ canvas }) => {
-        const toggle = await canvas.findByRole("switch", { name: /zero data retention/i });
+        const zdr = async () => await canvas.findByRole("switch", { name: /zero data retention/i });
 
+        // The edit builds on the loaded preferences: wait for them, and for the page to settle, so no refetch still in
+        // flight replaces the switch or the rules under the click.
         await lunoraAnswered(api.auth.functions.getAIUserPreferences);
-        await userEvent.click(toggle);
-        // Saved through the stateful fixture, so the refetch keeps it on. `waitFor` defaults to 1 s, which a loaded
-        // machine does not always give the save and the refetch.
-        await waitFor(
-            async () => {
-                await expect(toggle).toBeChecked();
-            },
-            { timeout: 5000 },
-        );
+        await lunoraIdle();
+        await userEvent.click(await zdr());
+        // The save went through (a refused one shows "Failed to update filter rules" instead)...
+        await expect(await screen.findByText("Filter rules updated")).toBeInTheDocument();
+        // ...and the stateful fixture kept it, so the switch on the page now, not the node first found, reads on.
+        await waitFor(async () => {
+            await expect(await zdr()).toBeChecked();
+        });
     },
 };

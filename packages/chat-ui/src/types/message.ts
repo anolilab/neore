@@ -61,7 +61,14 @@ export interface SourceDocumentPart {
 }
 
 export type MessagePart =
-    FilePart | ImagePart | ReasoningPart | SourceDocumentPart | SourceUrlPart | TextPart | ToolPart | { [key: string]: unknown; type: string };
+    | FilePart
+    | ImagePart
+    | ReasoningPart
+    | SourceDocumentPart
+    | SourceUrlPart
+    | TextPart
+    | ToolPart
+    | { [key: string]: unknown; type: string };
 
 export interface MessageUsage {
     completionTokens: number;

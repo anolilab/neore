@@ -8,27 +8,34 @@ import * as lunora_agent_streams_27 from "../../agent/streams.js";
 installCompiledValidatorMap(lunora_agent_streams_27.abort.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
-let __has3 = false;
-let __val3;
+let __has1 = false;
+let __val1;
+if (source["failed"] !== undefined) {
+if (typeof source["failed"] !== "boolean") return DEFER;
+__val1 = source["failed"];
+__has1 = true;
+}
+let __has4 = false;
+let __val4;
 if (source["finalDelta"] !== undefined) {
 if (typeof source["finalDelta"] !== "object" || source["finalDelta"] === null || Array.isArray(source["finalDelta"])) return DEFER;
 if (Object.getPrototypeOf(source["finalDelta"]) !== Object.prototype && Object.getPrototypeOf(source["finalDelta"]) !== null) return DEFER;
 if (typeof source["finalDelta"]["end"] !== "number" || !Number.isFinite(source["finalDelta"]["end"])) return DEFER;
 if (!Array.isArray(source["finalDelta"]["parts"])) return DEFER;
-const __arr1 = new Array(source["finalDelta"]["parts"].length);
-for (let __i1 = 0; __i1 < source["finalDelta"]["parts"].length; __i1++) {
-const __e1 = source["finalDelta"]["parts"][__i1];
-__arr1[__i1] = __e1;
+const __arr2 = new Array(source["finalDelta"]["parts"].length);
+for (let __i2 = 0; __i2 < source["finalDelta"]["parts"].length; __i2++) {
+const __e2 = source["finalDelta"]["parts"][__i2];
+__arr2[__i2] = __e2;
 }
 if (typeof source["finalDelta"]["start"] !== "number" || !Number.isFinite(source["finalDelta"]["start"])) return DEFER;
 if (typeof source["finalDelta"]["streamId"] !== "string") return DEFER;
-const __obj2 = { "end": source["finalDelta"]["end"], "parts": __arr1, "start": source["finalDelta"]["start"], "streamId": source["finalDelta"]["streamId"] };
-__val3 = __obj2;
-__has3 = true;
+const __obj3 = { "end": source["finalDelta"]["end"], "parts": __arr2, "start": source["finalDelta"]["start"], "streamId": source["finalDelta"]["streamId"] };
+__val4 = __obj3;
+__has4 = true;
 }
 if (typeof source["reason"] !== "string") return DEFER;
 if (typeof source["streamId"] !== "string") return DEFER;
-return { ...(__has3 ? { "finalDelta": __val3 } : {}), "reason": source["reason"], "streamId": source["streamId"] };
+return { ...(__has1 ? { "failed": __val1 } : {}), ...(__has4 ? { "finalDelta": __val4 } : {}), "reason": source["reason"], "streamId": source["streamId"] };
 });
 installCompiledValidatorMap(lunora_agent_streams_27.abortActiveForThread.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;

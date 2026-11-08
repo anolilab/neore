@@ -7,8 +7,12 @@
  * One reply writes TWO rows on the user's shard: the day's total
  * (`skillKey = TOTAL_SKILL_KEY`, what the heatmap reads — at most one row per
  * day, so a year is ≤ 371 rows) and the day's row for the skill that answered
- * (what the breakdown reads). Rows are summed on read rather than assumed
- * unique, so a guest→account merge that lands two rows for one key still adds up.
+ * (what the breakdown reads). A reply in a thread that belongs to a project
+ * writes a third: the day's row for that project (`skillKey = PROJECT_SKILL_KEY`,
+ * `projectKey` = the project id). Replies outside any project write none, so
+ * "No project" is the total less the projects, and the two always add up.
+ * Rows are summed on read rather than assumed unique, so a guest→account merge
+ * that lands two rows for one key still adds up.
  */
 import { sumMessageCosts, sumStepUsage } from "../agent/message-cost";
 import type { StepUsage } from "../agent/message-cost";
@@ -16,6 +20,12 @@ import { localDayOf } from "../memory/reflection-logic";
 
 /** `skillKey` of the per-day total row the heatmap reads. */
 export const TOTAL_SKILL_KEY = "__total__";
+
+/** `skillKey` of the per-day rows of one project (`projectKey`), what the project breakdown reads. */
+export const PROJECT_SKILL_KEY = "__project__";
+
+/** The `skillKey`s of the rollup's own rows, which no skill breakdown lists. */
+const ROLLUP_SKILL_KEYS: ReadonlySet<string> = new Set([PROJECT_SKILL_KEY, TOTAL_SKILL_KEY]);
 
 /** `skillKey` of replies no skill produced — the plain assistant. */
 export const DEFAULT_SKILL_KEY = "__assistant__";
@@ -72,6 +82,8 @@ export interface SavedRowLike {
     message?: { role?: string } | null;
     order?: number;
     providerMetadata?: unknown;
+    /** The thread the row is in: what the reply's project is read from. */
+    threadId?: string;
     usage?: StepUsage;
 }
 
@@ -135,6 +147,8 @@ export interface ReplyUsageArgs {
     replyKey: string;
     skillKey: string;
     skillName?: string;
+    /** The thread the reply is in; its project, read when the record lands, gets the reply's usage too. */
+    threadId?: string;
     tokens: number;
     userId: string;
 }
@@ -149,7 +163,8 @@ export const replyUsageArgs = (
     options: { at: number; skill?: ReplySkill; timeZone?: string; userId: string },
 ): ReplyUsageArgs | undefined => {
     const usage = summariseReply(savedMessages);
-    const replyKey = savedMessages.find((row) => row.message?.role !== "user")?._id;
+    const first = savedMessages.find((row) => row.message?.role !== "user");
+    const replyKey = first?._id;
 
     if (!usage || replyKey === undefined) {
         return undefined;
@@ -164,7 +179,67 @@ export const replyUsageArgs = (
         tokens: usage.tokens,
         userId: options.userId,
         ...(options.skill && { skillName: options.skill.name }),
+        ...(first?.threadId !== undefined && { threadId: first.threadId }),
     };
+};
+
+/**
+ * How a reply's project is tried again after its read failed: the reply's total has landed already, and this retry
+ * files only the project. A try that fails again throws, and the scheduler runs it again at +10 s, +30 s, +70 s and
+ * +130 s; past the last, the reply stays under "No project".
+ */
+export const RECORD_RETRY = { backoff: "exponential", baseMs: 10_000, maxAttempts: 4, maxMs: 60_000 } as const;
+
+/**
+ * How old a reply may be for a retry's record to still count it when its key is missing. A retry runs minutes after
+ * the reply, and a key is pruned only two days after it was written (`backfill.ts#REPLY_KEY_KEEP_MS`): a missing key
+ * within this window means the retry's record simply arrived first; past it, the key was pruned after the total was
+ * counted, and counting again would double it.
+ */
+export const RETRY_COUNTS_WITHIN_MS = 24 * 60 * 60 * 1000;
+
+/** Where a reply is filed besides the total: its thread's project. */
+export interface Attribution {
+    projectKey?: string;
+}
+
+/** What some replies of one day add to their project's row. */
+export interface AttributionIncrement {
+    costMicrodollars: number;
+    date: string;
+    projectKey: string;
+    replies: number;
+    tokens: number;
+}
+
+/** One project row a write touches. */
+export interface AttributionRow {
+    costMicrodollars: number;
+    date: string;
+    projectKey: string;
+    replies: number;
+    skillKey: typeof PROJECT_SKILL_KEY;
+    tokens: number;
+}
+
+/** The project rows some increments touch, each once: one per (day, project). */
+export const attributionRows = (increments: ReadonlyArray<AttributionIncrement>): AttributionRow[] => {
+    const rows = new Map<string, AttributionRow>();
+
+    for (const { costMicrodollars, date, projectKey, replies, tokens } of increments) {
+        const key = `${date}\u{0}${projectKey}`;
+        const current = rows.get(key);
+
+        if (current) {
+            current.costMicrodollars += costMicrodollars;
+            current.replies += replies;
+            current.tokens += tokens;
+        } else {
+            rows.set(key, { costMicrodollars, date, projectKey, replies, skillKey: PROJECT_SKILL_KEY, tokens });
+        }
+    }
+
+    return [...rows.values()];
 };
 
 /** What some replies of one day and skill add to the rollup. */
@@ -260,12 +335,12 @@ export interface SkillTotal {
     tokens: number;
 }
 
-/** Fold per-skill rows (total rows are skipped) into one entry per skill, costliest first. */
+/** Fold per-skill rows (total and project rows are skipped) into one entry per skill, costliest first. */
 export const foldSkillTotals = (rows: ReadonlyArray<RollupRowLike>): SkillTotal[] => {
     const bySkill = new Map<string, SkillTotal & { nameAt: number }>();
 
     for (const row of rows) {
-        if (row.skillKey === TOTAL_SKILL_KEY) {
+        if (ROLLUP_SKILL_KEYS.has(row.skillKey)) {
             continue;
         }
 

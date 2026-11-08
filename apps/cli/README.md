@@ -64,7 +64,7 @@ in Settings, then `neore login --api-url http://localhost:8788`.
 pnpm --filter @neore/cli test           # vitest; src/cli.test.ts fakes fetch, no network
 pnpm --filter @neore/cli lint:types
 pnpm --filter @neore/cli lint:eslint
-pnpm --filter @neore/cli lint:prettier
+pnpm lint:oxfmt   # from the repository root: formatting is checked repo-wide
 ```
 
 `neore` is private (`"private": true`) and requires Node 22.15 or later.

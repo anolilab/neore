@@ -16,7 +16,7 @@ export default createConfig(
             "./e2e/.results/**",
             // The shared test user's saved session (`e2e/auth.setup.ts`), also gitignored.
             "./e2e/.auth/**",
-            // Lingui-generated message catalogs. Already in `.prettierignore`;
+            // Lingui-generated message catalogs. Already in the root `.prettierignore`;
             // every finding in them is `unicorn/no-abusive-eslint-disable` on a
             // blanket disable the generator writes.
             "./src/locales/**",
@@ -276,9 +276,9 @@ export default createConfig(
     },
     {
         /**
-         * Prettier owns formatting, and it wants trailing commas in `.jsonc`
+         * oxfmt owns formatting, and it wants trailing commas in `.jsonc`
          * where `jsonc/comma-dangle` forbids them. Verified by letting eslint
-         * fix `wrangler.jsonc` and watching `prettier --check` reject the
+         * fix `wrangler.jsonc` and watching the format check reject the
          * result — the two disagree about the same 7 lines, so neither state is
          * reachable while both run.
          *
@@ -434,9 +434,9 @@ export default createConfig(
             "unicorn/prefer-iterator-to-array": "off",
 
             /**
-             * Fights Prettier: it wants every call argument on its own line,
-             * and Prettier's last-argument hugging collapses them straight back.
-             * Its autofix produces `}),);`, which Prettier then rejects.
+             * Fights the formatter: it wants every call argument on its own line,
+             * and oxfmt's last-argument hugging collapses them straight back.
+             * Its autofix produces `}),);`, which oxfmt then rejects.
              * Formatting yields to the formatter.
              */
             "antfu/consistent-list-newline": "off",

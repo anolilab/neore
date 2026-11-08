@@ -34,6 +34,7 @@ import type { QueryCtx } from "../_generated/server";
 import { internalMutation, internalQuery } from "../_generated/server";
 import type { AuthMutationCtx } from "../lib/crpc";
 import { saveAiUserPreferences } from "../auth/lib/preference-writes";
+import { patchThread } from "../agent/table-writes";
 import { isDeviceEligibleThread } from "../devices/internal";
 import { getConnectorMcpServers, withMcpServerGrants } from "../connectors/lib/grant-runtime";
 import { authAction, authMutation, authQuery, rateLimit } from "../lib/crpc";
@@ -536,6 +537,8 @@ export const recordPendingToolApprovals = internalMutation
         // The subset of `approvalIds` that are `askUser` questions rather than
         // tool calls — they notify as "a question is waiting", not "approve".
         askUserApprovalIds: v.optional(v.array(v.string())),
+        // A headless pause (`runHeadlessAgent`) marks its thread here, with the rows and the notification, never apart from them.
+        awaitingInput: v.optional(v.literal("approval")),
         config: vToolRunConfig,
         // The run that records: refused here, in this mutation and before any row or notification, once a newer run holds its stream.
         run: v.optional(vRunHold),
@@ -545,7 +548,7 @@ export const recordPendingToolApprovals = internalMutation
         userId: v.string(),
     })
     .output(v.null())
-    .mutation(async ({ args: { approvalIds, askUserApprovalIds, config, run, secretApprovalIds, threadId, userId }, ctx }) => {
+    .mutation(async ({ args: { approvalIds, askUserApprovalIds, awaitingInput, config, run, secretApprovalIds, threadId, userId }, ctx }) => {
         await assertRunHeld(ctx, run);
 
         const createdAt = ctx.now;
@@ -558,6 +561,10 @@ export const recordPendingToolApprovals = internalMutation
         const ownerId = thread?.userId ?? userId;
 
         await purgeExpiredToolApprovalRunsForUser(ctx, ownerId, createdAt);
+
+        if (awaitingInput && thread) {
+            await patchThread(ctx.db, thread._id, { awaitingInput });
+        }
 
         const uniqueIds = new Set(approvalIds);
         const secretIds = new Set(secretApprovalIds);

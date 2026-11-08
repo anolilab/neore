@@ -84,6 +84,7 @@ const NO_AUTH_MIDDLEWARE: Record<string, string[]> = {
     "auth/functions.ts": ["getAIUserPreferences", "getCurrentUser", "getSessionUserQuery", "getUserSettings", "hasPassword"],
     "changelog/functions.ts": ["getChangelogs"],
     "chat/functions.ts": ["getAnonymousMessageLimit", "getMessageRateLimit", "getThread", "validateThreadExists"],
+    "chat/guest-links.ts": ["getGuestView", "postGuestMessage"],
     "chat/sharing.ts": ["getPublicThread"],
     "chat/streaming/index.ts": ["getActiveStreamForThread", "getStreamBody"],
     "pages/sharing.ts": ["getPublicPage"],

@@ -1,7 +1,7 @@
 /* eslint-disable unicorn/max-nested-calls -- the assertions read best as `expect(offsetOf(press(...).state))` */
 import { history } from "@tiptap/pm/history";
 import { Schema } from "@tiptap/pm/model";
-import { EditorState, TextSelection } from "@tiptap/pm/state";
+import { EditorState, NodeSelection, TextSelection } from "@tiptap/pm/state";
 import { describe, expect, it } from "vitest";
 
 import type { VimKey, VimState } from "./vim-keys";
@@ -24,6 +24,39 @@ const breakSchema = new Schema({
         text: { group: "inline" },
     },
 });
+
+/** The composer's schema with a quote chip: a block that holds no text, between paragraphs. */
+const chipSchema = new Schema({
+    nodes: {
+        doc: { content: "block+" },
+        paragraph: { content: "text*", group: "block", toDOM: () => ["p", 0] },
+        quoteChip: { atom: true, group: "block", toDOM: () => ["div"] },
+        text: {},
+    },
+});
+
+/** The chip schema with Shift+Enter hard breaks, for displayed lines next to a chip. */
+const breakChipSchema = new Schema({
+    nodes: {
+        doc: { content: "block+" },
+        hardBreak: { group: "inline", inline: true, leafText: () => "\n", selectable: false },
+        paragraph: { content: "inline*", group: "block", toDOM: () => ["p", 0] },
+        quoteChip: { atom: true, group: "block", toDOM: () => ["div"] },
+        text: { group: "inline" },
+    },
+});
+
+/** A paragraph "first", a chip, then a paragraph "last", with the cursor at the start of "last". */
+const aroundChip = (): EditorState => {
+    const doc = chipSchema.node("doc", null, [
+        chipSchema.node("paragraph", null, [chipSchema.text("first")]),
+        chipSchema.node("quoteChip"),
+        chipSchema.node("paragraph", null, [chipSchema.text("last")]),
+    ]);
+    const state = EditorState.create({ doc, schema: chipSchema });
+
+    return state.apply(state.tr.setSelection(TextSelection.create(doc, doc.content.size - 5)));
+};
 
 const NORMAL: VimState = { mode: "normal", pending: "" };
 
@@ -150,6 +183,114 @@ describe("motions", () => {
         expect(down.state.selection.$head.index(0)).toBe(1);
         expect(offsetOf(down.state)).toBe(1);
         expect(press(stateOf(["only"], 2), ["j"]).handled).toBe(true);
+    });
+
+    it("passes over a quote chip with k and after dd, staying on a line it can act on", () => {
+        expect(press(aroundChip(), ["k"]).state.selection.$head.parent.textContent).toBe("first");
+        expect(press(aroundChip(), ["d", "d"]).state.selection.$head.parent.isTextblock).toBe(true);
+    });
+
+    it("acts on a selected quote chip with x, a and i, and types nothing over it", () => {
+        const start = aroundChip();
+        const chipSelected = start.apply(start.tr.setSelection(NodeSelection.create(start.doc, 7)));
+
+        expect(press(chipSelected, ["z"]).handled).toBe(true);
+        expect(press(chipSelected, ["z"]).state.doc.childCount).toBe(3);
+        expect(press(chipSelected, ["x"]).state.doc.childCount).toBe(2);
+
+        const after = press(chipSelected, ["a"]);
+
+        expect(after.vim.mode).toBe("insert");
+        expect(after.state.selection.$head.parent.textContent).toBe("last");
+
+        // Motions leave the chip, `dd` deletes it, and the chip's line count is what `o` changes.
+        expect(press(chipSelected, ["j"]).state.selection.$head.parent.textContent).toBe("last");
+        expect(press(chipSelected, ["k"]).state.selection.$head.parent.textContent).toBe("first");
+        expect(press(chipSelected, ["d", "d"]).state.doc.childCount).toBe(2);
+        // `d` then another key cancels the operator: the chip stays.
+        expect(press(chipSelected, ["d", "x"]).state.doc.childCount).toBe(3);
+        // `I` and `A` go to the start and the end of the line before and after, `i` and `a` stay next to the chip.
+        expect(offsetOf(press(chipSelected, ["I"]).state)).toBe(0);
+        expect(offsetOf(press(chipSelected, ["A"]).state)).toBe(4);
+
+        // `o` opens a new, empty line after the chip rather than joining "last".
+        const opened = press(chipSelected, ["o"]);
+
+        expect(opened.state.doc.childCount).toBe(4);
+        expect(opened.state.selection.$head.parent.textContent).toBe("");
+        expect(opened.state.doc.child(1).type.name).toBe("quoteChip");
+    });
+
+    it("places I and A on the displayed line next to a chip, not the whole paragraph", () => {
+        const lineBreak = breakChipSchema.nodes.hardBreak!.create();
+        const doc = breakChipSchema.node("doc", null, [
+            breakChipSchema.node("paragraph", null, [breakChipSchema.text("ab"), lineBreak, breakChipSchema.text("  cd")]),
+            breakChipSchema.node("quoteChip"),
+            breakChipSchema.node("paragraph", null, [breakChipSchema.text("ef"), lineBreak, breakChipSchema.text("gh")]),
+        ]);
+        const start = EditorState.create({ doc, schema: breakChipSchema });
+        const selected = start.apply(start.tr.setSelection(NodeSelection.create(doc, 9)));
+
+        // `I`: "c", the first non-space of the last line before the chip (position 6); `A`: after "ef", the first line after (13).
+        expect(press(selected, ["I"]).state.selection.from).toBe(6);
+        expect(press(selected, ["A"]).state.selection.from).toBe(13);
+    });
+
+    it("moves left off a selected chip with Backspace instead of deleting it", () => {
+        const start = aroundChip();
+        const chipSelected = start.apply(start.tr.setSelection(NodeSelection.create(start.doc, 7)));
+        const result = press(chipSelected, ["Backspace"]);
+
+        expect(result.handled).toBe(true);
+        expect(result.state.doc.childCount).toBe(3);
+        expect(result.state.selection.$head.parent.textContent).toBe("first");
+
+        // After `d`, Backspace cancels the operator; it is still not passed on to the editor, whose Backspace deletes the chip.
+        const cancelled = press(chipSelected, ["d", "Backspace"]);
+
+        expect(cancelled.handled).toBe(true);
+        expect(cancelled.state.doc.childCount).toBe(3);
+        expect(cancelled.vim.pending).toBe("");
+    });
+
+    it.each(["h", "k", "Backspace"])("%s off a chip lands on the last character of the line before, where x deletes it", (motion) => {
+        const start = aroundChip();
+        const chipSelected = start.apply(start.tr.setSelection(NodeSelection.create(start.doc, 7)));
+
+        expect(lines(press(chipSelected, [motion, "x"]).state)).toStrictEqual(["firs", "", "last"]);
+    });
+
+    it("leaves a chip onto the displayed line next to it: b to its last word, w to its first non-space", () => {
+        const lineBreak = breakChipSchema.nodes.hardBreak!.create();
+        const doc = breakChipSchema.node("doc", null, [
+            breakChipSchema.node("paragraph", null, [breakChipSchema.text("ab"), lineBreak, breakChipSchema.text("cd ef")]),
+            breakChipSchema.node("quoteChip"),
+            breakChipSchema.node("paragraph", null, [breakChipSchema.text("  gh")]),
+            breakChipSchema.node("paragraph"),
+        ]);
+        const start = EditorState.create({ doc, schema: breakChipSchema });
+        const selected = start.apply(start.tr.setSelection(NodeSelection.create(doc, 10)));
+
+        // "ef" starts at offset 6 of the paragraph before; "g" is at offset 2 of the one after.
+        expect(offsetOf(press(selected, ["b"]).state)).toBe(6);
+        expect(offsetOf(press(selected, ["w"]).state)).toBe(2);
+
+        // An empty line before the chip: the cursor sits at its start.
+        const empty = breakChipSchema.node("doc", null, [breakChipSchema.node("paragraph"), breakChipSchema.node("quoteChip")]);
+        const emptyStart = EditorState.create({ doc: empty, schema: breakChipSchema });
+
+        expect(offsetOf(press(emptyStart.apply(emptyStart.tr.setSelection(NodeSelection.create(empty, 2))), ["h"]).state)).toBe(0);
+    });
+
+    it("opens a line before a quote chip that starts the draft, so i does not type over it", () => {
+        const doc = chipSchema.node("doc", null, [chipSchema.node("quoteChip"), chipSchema.node("paragraph", null, [chipSchema.text("comment")])]);
+        const start = EditorState.create({ doc, schema: chipSchema });
+        const chipSelected = start.apply(start.tr.setSelection(NodeSelection.create(start.doc, 0)));
+        const { state, vim } = press(chipSelected, ["i"]);
+
+        expect(vim.mode).toBe("insert");
+        expect(state.selection.$head.parent.isTextblock).toBe(true);
+        expect(state.doc.child(1).type.name).toBe("quoteChip");
     });
 });
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { hasUnreadReply, hasUnseenReply, isSnoozed, snoozeUntil } from "./thread-state-rules";
+import { customSnoozeUntil, hasUnreadReply, hasUnseenReply, isSnoozed, nextSnoozeChoiceAt, snoozeUntil } from "./thread-state-rules";
 
 const idle = { isOpen: false, isStreaming: false };
 
@@ -63,5 +63,30 @@ describe("snoozeUntil", () => {
 
         expect(afterMonday).toEqual(new Date(2026, 10, 2, 9, 0, 0, 0));
         expect(afterSunday).toEqual(new Date(2026, 9, 26, 9, 0, 0, 0));
+    });
+});
+
+describe("customSnoozeUntil", () => {
+    const now = new Date(2026, 10, 8, 12, 0).getTime();
+
+    it("reads a local date and time in the future, within a year", () => {
+        expect(customSnoozeUntil("2026-11-08T12:01", now)).toBe(new Date(2026, 10, 8, 12, 1).getTime());
+        expect(customSnoozeUntil("2027-11-08T12:00", now)).toBe(new Date(2027, 10, 8, 12, 0).getTime());
+    });
+
+    it("refuses now, the past, more than the server's 366 days, and an unreadable value", () => {
+        expect(customSnoozeUntil("2026-11-08T12:00", now)).toBeUndefined();
+        expect(customSnoozeUntil("2026-11-07T09:00", now)).toBeUndefined();
+        expect(customSnoozeUntil("2027-11-10T12:00", now)).toBeUndefined();
+        expect(customSnoozeUntil("", now)).toBeUndefined();
+    });
+});
+
+describe("nextSnoozeChoiceAt", () => {
+    it("stamps choices made in the same millisecond strictly apart, in the order they were made", () => {
+        const first = nextSnoozeChoiceAt(5_000_000);
+        const second = nextSnoozeChoiceAt(5_000_000);
+
+        expect(second).toBeGreaterThan(first);
     });
 });

@@ -3,7 +3,8 @@
     "version": "0.0.0",
     "private": true,
     "sideEffects": [
-        "**/*.css"
+        "**/*.css",
+        "**/pdf-worker.ts"
     ],
     "type": "module",
     "exports": {
@@ -21,8 +22,6 @@
         "clean": "rimraf node_modules dist .eslintcache",
         "lint:eslint": "eslint . --cache --cache-location .eslint.cache.json",
         "lint:eslint:fix": "eslint . --fix --cache --cache-location .eslint.cache.json",
-        "lint:prettier": "prettier --check . --ignore-path ../../.prettierignore --ignore-path .prettierignore",
-        "lint:prettier:fix": "prettier --write . --ignore-path ../../.prettierignore --ignore-path .prettierignore",
         "lint:types": "tsc --noEmit",
         "lint:types:fast": "tsrs --noEmit",
         "test": "vitest run",

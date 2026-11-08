@@ -107,6 +107,11 @@ vi.mock("@/lib/lunora/crpc", () => {
     return { useCRPC: () => namespace };
 });
 
+// A user message's copy-link action asks whether the thread is a group chat; these threads are not.
+vi.mock("@/features/chat/group/use-group-chat", () => {
+    return { useGroupChat: () => null };
+});
+
 vi.mock("@/features/chat/goal/use-thread-goal", () => {
     return { useThreadGoal: () => harness.goal };
 });
@@ -144,7 +149,7 @@ vi.mock("./fork-branch-dialog", () => {
 });
 
 // Imported after the mocks.
-const { default: MessageList } = await import("./message-list");
+const { default: MessageList, scrollToMessage } = await import("./message-list");
 
 const THREAD_LENGTH = 200;
 
@@ -298,6 +303,32 @@ describe("message list text size hook", () => {
         mountInto();
 
         expect(screen.getByText("system note").closest(".message-text")).not.toBeNull();
+    });
+});
+
+describe("a jump to a message", () => {
+    it("marks the row it focuses for a focus ring, and only until focus leaves it", async () => {
+        harness.messages = Array.from({ length: 4 }, (_, index) => makeMessage(index));
+        harness.actions = { copyMessage: () => {}, reloadMessage: () => {} };
+        Element.prototype.scrollIntoView = vi.fn();
+
+        mountInto();
+
+        const row = screen.getByText("message 2").closest<HTMLElement>("[role=listitem]")!;
+
+        // A row a click in its text focused is not marked.
+        act(() => row.focus());
+        expect(row.dataset.jumped).toBeUndefined();
+        act(() => row.blur());
+
+        act(() => scrollToMessage(row.dataset.listMessageId!));
+
+        await vi.waitFor(() => expect(document.activeElement).toBe(row));
+        expect(row.dataset.jumped).toBe("");
+
+        act(() => row.blur());
+
+        expect(row.dataset.jumped).toBeUndefined();
     });
 });
 

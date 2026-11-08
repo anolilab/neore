@@ -17,8 +17,9 @@
  *
  * Headless callers (triggers, messenger, workflows) pass `headless: true`: nobody
  * is there to answer an approval request, so `ask` degrades to `off` rather than
- * being silently auto-approved. The one exception is a consent the run INHERITS
- * (`headlessApproved`, see {@link resolveToolPermission}).
+ * being silently auto-approved. The exceptions are a consent the run INHERITS
+ * (`headlessApproved`, see {@link resolveToolPermission}) and a run that pauses
+ * for its owner's answer instead (`headlessCanAsk`, a sub-agent child).
  *
  * Device tools (`device-tools.ts`) run on the user's own computer and are
  * approved THERE, in the desktop shell's local window — so their chat-side
@@ -142,6 +143,12 @@ export interface ToolPermissionOptions {
      */
     headlessApproved?: ReadonlySet<string>;
     /**
+     * Headless only: an `ask` tool stays (with an approval request) instead of being removed, because the run pauses
+     * and its owner answers in a conversation (a sub-agent child, `sub-agents/execute.ts`). Device tools and the tools
+     * that need a person's own input are still removed.
+     */
+    headlessCanAsk?: boolean;
+    /**
      * The user's opt-in quick check (`low-risk-approval.ts`). Given, an `ask` tool that is eligible for it asks the check
      * before pausing: `true` runs the call unasked, anything else pauses as before. Omitted (the setting is off, or the
      * run is not one a person is in), every `ask` tool pauses exactly as it always did.
@@ -218,7 +225,11 @@ export const resolveToolPermissionWithGrant = (
     }
 
     if (mode === "ask") {
-        return { mode: builtinName !== undefined && options.headlessApproved?.has(builtinName) ? "auto" : "off" };
+        if (builtinName !== undefined && options.headlessApproved?.has(builtinName)) {
+            return { mode: "auto" };
+        }
+
+        return { mode: options.headlessCanAsk ? "ask" : "off" };
     }
 
     return { mode };

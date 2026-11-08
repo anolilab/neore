@@ -83,7 +83,7 @@ pnpm --filter @neore/ai run build:prod
 pnpm --filter @neore/ai run test         # vitest run
 pnpm --filter @neore/ai run lint:types   # tsc --noEmit
 pnpm --filter @neore/ai run lint:eslint
-pnpm --filter @neore/ai run lint:prettier
+pnpm lint:oxfmt   # from the repository root: formatting is checked repo-wide
 ```
 
 Through `vis`, target the project by its `package.json` name:

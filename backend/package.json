@@ -61,8 +61,6 @@
         "dev": "lunora dev --inspector-port 9235",
         "lint:eslint": "eslint .",
         "lint:eslint:fix": "eslint . --fix",
-        "lint:prettier": "prettier --check . --ignore-path ../.prettierignore --ignore-path .prettierignore",
-        "lint:prettier:fix": "prettier --write . --ignore-path ../.prettierignore --ignore-path .prettierignore",
         "lint:types": "tsc --noEmit",
         "lint:types:fast": "tsrs --noEmit",
         "lunora:advise": "lunora advisor",

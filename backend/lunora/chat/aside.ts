@@ -58,7 +58,7 @@ import { gatewayFetch } from "../lib/services";
 import { MAX_LENGTH } from "../lib/validators";
 import { isWorkerThread } from "../sub-agents/functions";
 import { DEFAULT_SKILL_KEY, usageDayOf } from "../usage/activity-logic";
-import { scheduleReplyUsage } from "../usage/schedule";
+import { runAfterOnShard } from "../lib/shard-scheduler";
 import { isAgentRunError, loadUserProviderKeys, resolveRunModel } from "./lib/agent-run";
 import { defaultModelUnderRules, readsImagesAndCallsTools } from "../lib/utility-model";
 import {
@@ -424,14 +424,22 @@ export const askAside = authAction
                 const at = Date.now();
                 const cost = sumMessageCosts((result.steps ?? []).map((step: { providerMetadata?: unknown }) => step.providerMetadata));
 
-                scheduleReplyUsage(ctx.scheduler as never, {
+                const usage = {
                     at,
                     costMicrodollars: Math.round(cost?.microdollars ?? 0),
                     date: usageDayOf(at, timezone),
                     replyKey: `aside:${entryId}`,
                     skillKey: DEFAULT_SKILL_KEY,
+                    threadId,
                     tokens: result.totalUsage?.totalTokens ?? 0,
                     userId,
+                };
+
+                // No usage read here, so none can refuse or hold up the answer: the thread's own shard reads its project as
+                // the thread stands then, and forwards the record to the caller's shard, counting the total even when that
+                // read fails (`usage/AGENTS.md`). Awaited, so the booking is not cut off when the action returns.
+                await runAfterOnShard(ctx.scheduler, 0, internal.usage.activity.forwardReplyUsage, usage, thread?.userId ?? userId).catch((error: unknown) => {
+                    chatLogger.warn("[askAside] usage record not scheduled", { error: error instanceof Error ? error.message : String(error) });
                 });
             }
 

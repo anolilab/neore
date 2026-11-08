@@ -1,7 +1,8 @@
 import { plural } from "@lingui/core/macro";
 import { useLingui } from "@lingui/react/macro";
+import type { Id } from "@neore/backend/dataModel";
 import { skipToken, useQuery } from "@tanstack/react-query";
-import { createFileRoute, useLocation, useNavigate, useRouteContext } from "@tanstack/react-router";
+import { createFileRoute, useLocation, useNavigate, useRouteContext, useRouter } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
@@ -9,10 +10,22 @@ import RouteErrorBoundary from "@/components/error-boundaries/route-error-bounda
 import { useUserSettings } from "@/features/auth/hooks/use-user-settings";
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 import Assistant from "@/features/chat/assistant";
+import { useLinkSearchAsWritten, usePromptLinkDraft } from "@/features/chat/core/hooks/use-prompt-link-draft";
 import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
+import { readPromptLinkSearch } from "@/features/chat/core/utils/prompt-link";
 import { BOOTED_ON_CHAT_INDEX } from "@/features/chat/core/utils/resume-boot";
 import { LANDING_MESSAGE_KEY } from "@/features/marketing/stores/landing-store";
+import { useFeatureFlaggedModelsSettled } from "@/hooks/use-feature-flagged-models";
 import { useCRPC } from "@/lib/lunora/crpc";
+
+/** Whether a landing page left a message for this chat; storage can be unavailable (private mode, the server). */
+const hasLandingMessage = (): boolean => {
+    try {
+        return globalThis.sessionStorage?.getItem(LANDING_MESSAGE_KEY) != null;
+    } catch {
+        return false;
+    }
+};
 
 // Module scope, so it outlives this component's mounts: a page load resumes once.
 // Effects never run during SSR, so it is never shared between requests.
@@ -27,6 +40,18 @@ const ChatPage = () => {
     const redirectReason = Route.useSearch({ select: ({ redirectReason: selected }) => selected });
     const hasInitialMessage = Route.useSearch({ select: ({ initialMessage }) => initialMessage });
     const location = useLocation();
+    // Read from the address as written (the history's own query), not the router's search: its parser reads a value as JSON and
+    // `searchStr` is built back from that, which would change a prompt like `{"task":"summarise"}`, `"quoted"` or `1.50`.
+    // Decoded as a query string is, so `+` is a space (`?prompt=Explain+this` is how links write one); a literal plus is `%2B`.
+    const router = useRouter();
+    const rawSearch = new URLSearchParams(router.history.location.search);
+    // Each value's type and both renderings: JSON alone reads `?prompt=null` (and `1e999`) the same as no prompt at all.
+    const parsedLink = Route.useSearch({
+        select: ({ model, prompt }) => JSON.stringify([model, prompt].map((value: unknown) => [typeof value, String(value), JSON.stringify(value)])),
+    });
+    const { model: linkModel, prompt: linkPrompt } = useLinkSearchAsWritten(parsedLink, () =>
+        readPromptLinkSearch({ model: rawSearch.get("model") ?? undefined, prompt: rawSearch.get("prompt") ?? undefined }),
+    );
     // TanStack keys each history entry; a new navigation gets a new key.
     const navigationKey = location.state.__TSR_key;
     const { t } = useLingui();
@@ -42,6 +67,20 @@ const ChatPage = () => {
     const resumeScopeReady = !isOrgPending && !isSessionPending;
     const resumeLastChat =
         BOOTED_ON_CHAT_INDEX && userSettings?.resumeLastChat === true && !promptId && !redirectReason && !hasInitialMessage && resumeScopeReady;
+
+    // A landing message competes with the link only when it is really there: a stale `initialMessage` flag with nothing stored
+    // would otherwise turn the link away for a draft that never comes. Read before the effect below consumes it.
+    const [landingMessageStored] = useState(() => hasInitialMessage === true && hasLandingMessage());
+
+    // A saved prompt in the same address: the link waits until it has loaded. One that applies fills the composer first (its loader
+    // runs in a child, so its effect comes before this one), and the link then finds a draft; one that is missing or refused does
+    // not, and the link applies. The same query as the loader's, so it is read once.
+    const savedPrompt = useQuery(crpc.prompts.functions.getPrompt.queryOptions(promptId ? { promptId: promptId as Id<"prompts"> } : skipToken));
+    // The loader checks the prompt's model against the picker's list before it fills the composer, so it decides only once that
+    // list has settled too.
+    const modelsSettled = useFeatureFlaggedModelsSettled();
+    const savedPromptSettled = !promptId || ((savedPrompt.isSuccess || savedPrompt.isError) && modelsSettled);
+
     const { data: latestThreadId, isSuccess: latestResolved } = useQuery(
         // Not live, and skipped once decided: later visits to /chat must not re-run the scan.
         crpc.chat.resume.latestResumableThread.queryOptions(
@@ -51,6 +90,15 @@ const ChatPage = () => {
     );
 
     const [initialMessage, setInitialMessage] = useState<string | undefined>(undefined);
+
+    usePromptLinkDraft({
+        // Waiting only until the handoff is read: once it is, the message is the composer's draft (or was cleared), and a link
+        // opened later is judged against that, not against a handoff already used.
+        otherDraftSource: landingMessageStored && hasInitialMessage === true && initialMessage === undefined,
+        model: linkModel,
+        prompt: linkPrompt,
+        ready: savedPromptSettled,
+    });
 
     // Read the initial message from sessionStorage (only once). This consumes the
     // handoff — the entry is deleted — so it cannot run during render: React may
@@ -138,7 +186,7 @@ const ChatPage = () => {
     useEffect(() => {
         // Include initialMessage as allowed (though unused) to prevent warnings during navigation
         // TanStack Router may briefly carry over search params when navigating between routes
-        const supportedParams = new Set(["initialMessage", "promptId", "redirectReason", "settings", "settingsTab"]);
+        const supportedParams = new Set(["initialMessage", "model", "prompt", "promptId", "redirectReason", "settings", "settingsTab"]);
         const searchParams = new URLSearchParams(location.search);
         const unsupportedParams: string[] = [];
 
@@ -164,7 +212,13 @@ const ChatPage = () => {
 
 export const Route = createFileRoute("/(chat)/chat/")({
     validateSearch: (search: Record<string, unknown>) => {
+        // A prompt link (`core/utils/prompt-link.ts`): applied as a draft once, never sent (`core/hooks/use-prompt-link-draft.ts`).
+        // The page reads its text from the raw query; here the two keys are only passed on as the router parsed them, so clearing
+        // them is typed. A navigation that keeps the search writes them back from these values, so the page holds the raw text
+        // while they stay the same (`useLinkSearchAsWritten`).
         return {
+            model: search.model as unknown,
+            prompt: search.prompt as unknown,
             promptId: search.promptId as string | undefined,
             redirectReason: search.redirectReason as string | undefined,
             // `|| undefined`, not `false`: a default written into the search is put into the URL, and the

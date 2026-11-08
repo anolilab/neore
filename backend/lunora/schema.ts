@@ -2890,6 +2890,43 @@ export const schema = defineSchema({
                 thread: r.one("threads", { field: "threadId" }),
             };
         }),
+    /**
+     * A guest link for one thread (`chat/guest-links.ts`): what a person without access can use to LEAVE a
+     * message for the owner. It grants no read of the thread. Only the SHA-256 of the link token is stored
+     * (the owner sees the token once, at creation), and `guestHash` is the hash of the one browser's token
+     * that first posted. It lasts 24 hours; revoking, archiving or deleting the thread removes it with its
+     * held messages. Routed from `shardRoutes` (`guest-link`) so an anonymous request finds the owner's shard.
+     */
+    threadGuestLinks: defineTable({
+        createdAt: v.number(),
+        expiresAt: v.number(),
+        guestHash: v.optional(v.string()),
+        linkHash: v.string(),
+        threadId: v.id("threads"),
+        userId: v.string(),
+    })
+        .shardBy("userId")
+        .index("by_thread_expiresAt", ["threadId", "expiresAt"])
+        .index("by_linkHash", ["linkHash"])
+        .index("by_expiresAt", ["expiresAt"])
+        .index("by_userId", ["userId"]),
+    /**
+     * A message a guest left through a link. UNTRUSTED text that waits here: nothing reads it into a model,
+     * a title or a summary. Only the owner's Send hands it to the owner's own client, which sends it through
+     * the ordinary path; `sent` records that, so the guest sees it was taken up. Dismiss deletes the row.
+     */
+    threadGuestMessages: defineTable({
+        createdAt: v.number(),
+        linkId: v.id("threadGuestLinks"),
+        status: v.union(v.literal("held"), v.literal("sent")),
+        text: v.string(),
+        threadId: v.id("threads"),
+        userId: v.string(),
+    })
+        .shardBy("userId")
+        .index("by_link", ["linkId"])
+        .index("by_thread", ["threadId"])
+        .index("by_userId", ["userId"]),
     threadInvites: defineTable({
         acceptedAt: v.optional(v.number()),
         acceptedBy: v.optional(v.string()),
@@ -3056,7 +3093,10 @@ export const schema = defineSchema({
         // Where this thread's turns run (`acp/lib/host-thread.ts`): "host" = a coding agent on a paired
         // device. Unset = the cloud. Set at creation, never changed.
         runner: v.optional(v.literal("host")),
-        // Hidden from the owner's active list until then; written only by `chat/thread-state.ts`.
+        // The newest snooze ordering: an owner's choice time (client clock, capped at the server's) or a wake's server time.
+        // A queued snooze or unsnooze chosen before it changes nothing (`agent/table-writes.ts#setThreadSnooze`).
+        snoozeChosenAt: v.optional(v.number()),
+        // Hidden from the owner's active list until then. Written by `chat/thread-state.ts`, cleared by a wake (`agent/table-writes.ts#patchThread`).
         snoozedUntil: v.optional(v.number()),
         source: v.optional(v.string()),
         statelessMode: v.optional(v.boolean()),
@@ -3289,9 +3329,9 @@ export const schema = defineSchema({
         .triggers((t) => auditTriggersFor(t, "twoFactor", AUDIT_TABLES["twoFactor"]!)),
 
     // Per-day usage rollup behind the usage page's activity heatmap and skill
-    // breakdown (`usage/activity.ts`). Written by `afterRun` once per reply —
-    // one `__total__` row per day plus one row per (day, skill). New data only:
-    // there is no backfill from older messages.
+    // breakdown (`usage/activity.ts`). Written once per reply — one `__total__`
+    // row per day, one row per (day, skill), and one `__project__` row per
+    // (day, project) when the reply's thread is in a project.
     // One per user: the resumable walk that fills `usageDaily` from the replies
     // written before the rollup existed (`usage/backfill.ts`).
     usageBackfill: defineTable({
@@ -3320,8 +3360,10 @@ export const schema = defineSchema({
         costMicrodollars: v.number(),
         // The user's calendar day (their time zone when the reply landed), YYYY-MM-DD.
         date: v.string(),
+        // The project the reply's thread was in when it was recorded; set only on `__project__` rows.
+        projectKey: v.optional(v.string()),
         replies: v.number(),
-        // `__total__`, `__assistant__`, a skill id, or `draft:<slug>`. See `usage/activity-logic.ts`.
+        // `__total__`, `__project__`, `__assistant__`, a skill id, or `draft:<slug>`. See `usage/activity-logic.ts`.
         skillKey: v.string(),
         skillName: v.optional(v.string()),
         tokens: v.number(),
@@ -3331,6 +3373,8 @@ export const schema = defineSchema({
         .shardBy("userId")
         .index("by_user_skill_date", ["userId", "skillKey", "date"])
         .index("by_user_date", ["userId", "date"])
+        // One project's rows (the project settings' totals, and the project rows' upsert).
+        .index("by_user_project_date", ["userId", "projectKey", "date"])
         // The retention sweep (`gdpr/retention.ts`), which serves a whole shard.
         .index("by_date", ["date"]),
 
@@ -3338,9 +3382,16 @@ export const schema = defineSchema({
     // what makes `recordReplyUsage` and the backfill count a reply once.
     // Pruned by `usage/backfill.ts#sweepUsageRollup` once the backfill is done.
     usageReplies: defineTable({
+        // Set by a retry's record that arrived more than a day after the reply with no key to find: the reply's total is
+        // still to come, from its first record, which counts it with `deferredProjectKey` (`usage/activity.ts`).
+        awaitingTotal: v.optional(v.boolean()),
+        deferredProjectKey: v.optional(v.string()),
         recordedAt: v.number(),
         replyKey: v.string(),
         userId: v.string(),
+        // Set when the reply was counted while its project could not be read (`usage/activity.ts`): a retry of its
+        // record still files the project, once, and clears it.
+        withoutProject: v.optional(v.boolean()),
     })
         .shardBy("userId")
         .index("by_user_reply", ["userId", "replyKey"])

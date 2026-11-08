@@ -39,7 +39,11 @@ export type VoiceModeEvent =
     | { message: string; type: "ERROR" };
 
 export type VoiceModeAnnouncement =
-    { kind: "error"; message: string } | { kind: "listening" } | { kind: "speaking" } | { kind: "stopped" } | { kind: "thinking" };
+    | { kind: "error"; message: string }
+    | { kind: "listening" }
+    | { kind: "speaking" }
+    | { kind: "stopped" }
+    | { kind: "thinking" };
 
 export const INITIAL_VOICE_MODE_STATE: VoiceModeState = { error: null, phase: "idle" };
 

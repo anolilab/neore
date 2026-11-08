@@ -9,7 +9,7 @@ import { assistantMessage, chatFixtures, CONVERSATION, streamingBody, THREAD_IDS
 import { gatewayModelsHandler } from "@/storybook/fixtures/models";
 import { shellFixtures } from "@/storybook/fixtures/shell";
 import { userFixtures } from "@/storybook/fixtures/user";
-import { lunoraHandlers } from "@/storybook/lunora";
+import { lunoraHandlers, lunoraIdle } from "@/storybook/lunora";
 import { StoryPage } from "@/storybook/page";
 
 // Page data arrives after the route loads; under a loaded machine that can outlast the 1 s default of `find*`.
@@ -25,11 +25,22 @@ const bannerShown = async (banner: HTMLElement) => {
     await waitFor(() => expect(getComputedStyle(banner).opacity).toBe("1"), STATE_WAIT);
 };
 
-// The composer fades in over a few hundred milliseconds; axe must read settled colours, not mid-fade.
-const settle = () =>
-    new Promise<void>((resolve) => {
-        setTimeout(resolve, 1000);
-    });
+/**
+ * The page has finished fading in: the composer, the header and the rest animate in over a few hundred milliseconds, and axe
+ * must read their settled colours, not ones blended mid-fade. First the page itself (its route loads after `play` starts) and
+ * its data, then every animation that ends (an endless spinner never does), not a fixed time, which a loaded machine outlasts.
+ */
+const settle = async (canvas: { findByRole: (role: string, options: { name: string }, waitOptions: typeof PAGE_WAIT) => Promise<HTMLElement> }) => {
+    await canvas.findByRole("textbox", { name: "Message" }, PAGE_WAIT);
+    await lunoraIdle();
+    await waitFor(() => {
+        const fading = document
+            .getAnimations()
+            .filter((animation) => animation.playState === "running" && animation.effect?.getComputedTiming().iterations !== Infinity);
+
+        expect(fading).toHaveLength(0);
+    }, STATE_WAIT);
+};
 
 /** The chat: the real `(chat)` layout (sidebar, header, command palette) and the thread page. */
 const meta = {
@@ -145,10 +156,7 @@ export const FailedReply: Story = {
 export const ReadOnlyShare: Story = {
     play: async ({ canvas }) => {
         await expect(await canvas.findAllByText("Plan the Q1 product launch", undefined, STATE_WAIT)).not.toHaveLength(0);
-        // The composer fades in over a few hundred milliseconds; axe must read its settled colours, not mid-fade.
-        await new Promise((resolve) => {
-            setTimeout(resolve, 600);
-        });
+        await settle(canvas);
     },
     parameters: {
         msw: { handlers: { lunora: lunoraHandlers(...userFixtures(), ...shellFixtures(), ...chatFixtures({ permission: "read" })) } },
@@ -182,8 +190,8 @@ export const Offline: Story = {
 
 /** A fresh chat, before the first message. */
 export const NewChat: Story = {
-    play: async () => {
-        await settle();
+    play: async ({ canvas }) => {
+        await settle(canvas);
     },
     args: {
         levels: [
@@ -196,14 +204,14 @@ export const NewChat: Story = {
 
 export const Guest: Story = {
     parameters: { persona: "guest" },
-    play: async () => {
-        await settle();
+    play: async ({ canvas }) => {
+        await settle(canvas);
     },
 };
 
 export const FreeUser: Story = {
-    play: async () => {
-        await settle();
+    play: async ({ canvas }) => {
+        await settle(canvas);
     },
     parameters: {
         msw: { handlers: { lunora: lunoraHandlers(...userFixtures(), ...shellFixtures({ tier: "free" }), ...chatFixtures()) } },

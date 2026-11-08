@@ -1,0 +1,25 @@
+{
+    "$schema": "./node_modules/@visulima/vis/schemas/project.schema.json",
+    "name": "root",
+    "tags": ["type:root"],
+    "targets": {
+        "lint:all": {
+            "description": "every project's ESLint, oxlint, the format check and the dedupe check, in parallel (`pnpm lint`)",
+            "dependsOn": [{ "projects": "*", "target": "lint:eslint" }, "lint:oxlint", "lint:oxfmt", "lint:dedupe"]
+        },
+        "lint:oxlint": { "cache": false },
+        "lint:oxfmt": { "cache": false },
+        "lint:dedupe": { "cache": false },
+
+        "deploy": {
+            "command": "",
+            "description": "no-op: the root package.json scripts below share a name with project targets, so without this `vis run <name>` would also run the root script (`deploy` would run the Alchemy deploy). `pnpm <name>` still runs the script."
+        },
+        "generate": { "command": "", "description": "no-op under vis; see deploy" },
+        "lint": { "command": "", "description": "no-op under vis; see deploy" },
+        "postinstall": { "command": "", "description": "no-op under vis; see deploy" },
+        "storybook": { "command": "", "description": "no-op under vis; see deploy" },
+        "test:e2e": { "command": "", "description": "no-op under vis; see deploy" },
+        "test:storybook": { "command": "", "description": "no-op under vis; see deploy" }
+    }
+}

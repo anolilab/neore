@@ -19,6 +19,7 @@ import { hashPasscode, isAcceptablePasscode, isThreadLocked, mintUnlockProof, ne
 
 import { scheduleGranteeRedaction } from "../notifications/locked-redact";
 
+import { withdrawGuestLinksForThread } from "../chat/lib/guest-link-store";
 import { scheduleFileLinkBackfill } from "./file-link-backfill";
 import { deleteThreadSummaries } from "./thread-summaries";
 import { clearRecordedTitleAnswers, titleDispatchInFlight } from "./thread-title";
@@ -128,6 +129,8 @@ export const enableThreadLock = authMutation
             userId,
         });
         await patchRow(context.db, "threads", thread, { lockedAt: now, updatedAt: now });
+        // A locked chat refuses every guest post: a link already given out is withdrawn with its notes.
+        await withdrawGuestLinksForThread(context, thread._id);
         // Condensed copies of its content made before the lock are not kept (`thread-summaries.ts`).
         await deleteThreadSummaries(context, threadId);
         // Nor are title answers recorded for a run whose write has not settled (`agent/thread-title.ts`).
@@ -193,6 +196,8 @@ export const lockThread = authMutation
         // `lockedAt` moves too: a stream or background run started under the earlier proof is "created before the lock" and stops (`lockedAfterCreation`).
         await patchRow(context.db, "threadPasscodes", row, { epoch: newPasscodeEpoch(), updatedAt: now });
         await patchRow(context.db, "threads", thread, { lockedAt: now, updatedAt: now });
+        // A locked chat refuses every guest post: a link already given out is withdrawn with its notes.
+        await withdrawGuestLinksForThread(context, thread._id);
 
         const backfillScheduled = row.filesIndexedAt === undefined;
 
@@ -310,6 +315,7 @@ export const inheritPasscodeHandler = async (ctx: MutationCtx, args: { sourceThr
         userId: ownerId,
     });
     await patchRow(ctx.db, "threads", target, { lockedAt: now, updatedAt: now });
+    await withdrawGuestLinksForThread(ctx, target._id);
     await scheduleFileLinkBackfill(ctx, args.targetThreadId, ownerId);
 
     return null;

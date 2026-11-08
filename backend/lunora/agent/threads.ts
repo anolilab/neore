@@ -7,6 +7,7 @@ import { internalAction, internalMutation, internalQuery, type MutationCtx as Mu
 import { query } from "../lib/crpc";
 import { getAuthUserIdentity } from "../auth";
 import { dropQueuedSteersForThread } from "../chat/lib/steer-cleanup";
+import { revokeGuestLinksForThread, withdrawGuestLinksForThread } from "../chat/lib/guest-link-store";
 import { deleteThreadSecrets } from "../chat/lib/secret-requests";
 import { deleteToolApprovalRunsForThread } from "../chat/lib/tool-approval-cleanup";
 import { deleteGoalsForThread, endActiveGoals, hasLiveStream } from "../chat/goals/rows";
@@ -28,7 +29,7 @@ import { meetsThreadPermission, redactThreadForPublicViewer, requireOwnedThread,
 import { type ThreadDoc, vPaginationResult, vThreadCreateFields, vThreadDoc as vThreadDocument, vThreadPatchFields, vThreadStatus } from "./validators";
 import { systemDb } from "../lib/rls/scope";
 import { readPasscodeRow } from "./thread-passcode";
-import { clearAwaitingInput, patchesWithoutAwaitingInput } from "./table-writes";
+import { clearAwaitingInput, patchThread } from "./table-writes";
 import { deletePullRequestLinksOfThread, setLinksThreadDeleted } from "../source-control/pr-thread-links";
 import { deleteThreadSummaries } from "./thread-summaries";
 
@@ -52,7 +53,7 @@ export const publicThread = (thread: Doc<"threads">): ThreadDoc => {
  * Unread, snooze and "needs you" belong to the thread's OWNER; the row is shared with grantees, who must not see
  * (or act on) them. Reads that can reach a grantee return the row through here.
  */
-const OWNER_STATE_KEYS = ["awaitingInput", "lastReplyAt", "lastViewedAt", "snoozedUntil"] as const;
+const OWNER_STATE_KEYS = ["awaitingInput", "lastReplyAt", "lastViewedAt", "snoozeChosenAt", "snoozedUntil"] as const;
 
 export const threadForViewer = (thread: Doc<"threads">, viewerId: string | undefined): ThreadDoc => {
     const isOwner = thread.userId !== undefined && thread.userId === viewerId;
@@ -264,6 +265,8 @@ export type ThreadFieldsSupportingPatch = (typeof threadFieldsSupportingPatch)[n
 
 export const updateThread = internalMutation
     .input({
+        /** The run failed in place: a snoozed thread wakes in this same write (`patchThread`). */
+        failed: v.optional(v.boolean()),
         patch: v.object({ ...vThreadPatchFields }),
         threadId: v.id("threads"),
     })
@@ -273,12 +276,8 @@ export const updateThread = internalMutation
 
         assert(oldThread, `Thread ${args.threadId} not found`);
 
-        // Back to `running` ends a pause: awaitingInput goes in the same write (see `patchThread`).
-        if (patchesWithoutAwaitingInput(oldThread, args.patch)) {
-            await patchRow(ctx.db, "threads", oldThread, { ...withoutUndefined(args.patch), awaitingInput: undefined });
-        } else {
-            await ctx.db.patch("threads", args.threadId, withoutUndefined(args.patch));
-        }
+        // The run-state rules (a pause ending, a pause or failure waking a snooze) live in `patchThread`.
+        await patchThread(ctx.db, args.threadId, args.patch, { failed: args.failed });
 
         const newThread = (await ctx.db.get("threads", args.threadId))!;
 
@@ -333,6 +332,8 @@ export const markThreadArchived = async (context: MutationContext, threadId: Id<
         status: "archived",
         updatedAt: context.now,
     });
+    // A guest link is for a thread in use: archiving withdraws it and what guests left on it.
+    await withdrawGuestLinksForThread(context, threadId);
 };
 
 export const archiveThread = internalMutation
@@ -521,8 +522,14 @@ async function deletePageForThreadIdHandler(context: MutationContext, args: Dele
             return { cursor: messages.continueCursor, isDone: false };
         }
 
+        // The thread's guest links and their notes, one batch per call as the file links above;
+        // their routes go in a job that runs once the page commits.
+        if (!(await revokeGuestLinksForThread(context, args.threadId))) {
+            return { cursor: messages.continueCursor, isDone: false };
+        }
+
         // Steered messages still waiting on a run of this thread have nobody left to take them.
-        // Here, not above the link batches: this page re-runs once per batch of links.
+        // Here, after every batched removal (file links, guest links): this page re-runs once per batch.
         await dropQueuedSteersForThread(context, args.threadId);
 
         const thread = await context.db.get("threads", args.threadId);
@@ -754,6 +761,7 @@ export const softDeleteThread = internalMutation
         // A coding agent's turn does not outlive the thread it writes into, nor does a goal.
         await endHostThread(ctx, oldThread, ctx.now);
         await endActiveGoals(ctx, args.threadId, "user");
+        await withdrawGuestLinksForThread(ctx, args.threadId);
         const newThread = (await ctx.db.get("threads", args.threadId))!;
 
         // Remove from aggregates when soft deleted
@@ -1222,6 +1230,9 @@ export const createTemporaryThread = internalMutation
         if (thread) {
             await ctx.db.patch("threads", args.threadId, { isTemporary: true });
         }
+
+        // A temporary chat takes no guest posts: a link already given out is withdrawn with its notes, as archiving does.
+        await withdrawGuestLinksForThread(ctx, args.threadId);
 
         return null;
     });

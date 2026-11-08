@@ -1,6 +1,6 @@
 # Neore desktop
 
-`@neore/desktop` is an Electron 44 shell around the **deployed** web app. It
+`@neore/desktop` is an Electron 45 shell around the **deployed** web app. It
 holds no UI of its own beyond a few local windows; the main window loads the
 site, and a sandboxed preload exposes `window.neoreNative` on that origin only.
 The web side of the bridge is `apps/web/src/lib/native/bridge.ts`, a no-op

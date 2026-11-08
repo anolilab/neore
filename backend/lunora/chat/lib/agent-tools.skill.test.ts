@@ -187,6 +187,25 @@ describe("buildAgentTools MCP permission keys", () => {
         expect(Object.keys(permissionKeys)).not.toContain("mcp_my_server__delete_2");
     });
 
+    it("keeps an ask tool in a headless run only when the run pauses for its owner (triggers and tasks lose it)", async () => {
+        const headless = async (headlessCanAsk?: boolean) =>
+            await buildAgentTools(fakeCtx(), {
+                headless: true,
+                ...(headlessCanAsk && { headlessCanAsk }),
+                model: "test-model",
+                searchMode: "web",
+                userId: "user",
+            });
+
+        const unattended = await headless();
+
+        expect(Object.keys(unattended.tools)).not.toContain("mcp_my_server__delete");
+
+        const { tools } = await headless(true);
+
+        expect((tools["mcp_my_server__delete"] as { needsApproval?: unknown }).needsApproval).toBe(true);
+    });
+
     it("applies each server's own annotations to its default", async () => {
         const { tools } = await build();
 

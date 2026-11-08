@@ -374,7 +374,8 @@ export class DeltaStreamer<T> {
         });
     }
 
-    public async fail(reason: string) {
+    /** Ends the stream as aborted. `failed` is false for a stream that ends only to be retried, which is not the run failing. */
+    public async fail(reason: string, { failed = true }: { failed?: boolean } = {}) {
         if (this.abortController.signal.aborted) {
             return;
         }
@@ -387,6 +388,7 @@ export class DeltaStreamer<T> {
 
         await this.#ongoingWrite;
         await this.context.runMutation(internal.agent.streams.abort, {
+            failed,
             reason,
             streamId: this.streamId as Id<"streamingMessages">,
         });

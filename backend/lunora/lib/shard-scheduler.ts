@@ -198,9 +198,10 @@ export const runAfterWithRetry = async <A extends Record<string, unknown>>(
     );
 
 /**
- * `ctx.scheduler.runAfter` onto a NAMED shard. The runtime forwards a fourth
- * `{ shardKey }` argument (see `routeSchedule` above) but `@lunora/server`'s
- * `Scheduler` type declares three, so the one cast lives here.
+ * `ctx.scheduler.runAfter` onto a NAMED shard, with an optional per-job retry
+ * policy (as {@link runAfterWithRetry}). The runtime forwards a fourth
+ * `{ shardKey, retry }` argument (see `routeSchedule` above) but
+ * `@lunora/server`'s `Scheduler` type declares three, so the one cast lives here.
  */
 export const runAfterOnShard = async <A extends Record<string, unknown>>(
     scheduler: unknown,
@@ -208,10 +209,10 @@ export const runAfterOnShard = async <A extends Record<string, unknown>>(
     target: { __lunoraRef: string },
     args: A,
     shardKey: string,
+    retry?: { backoff?: "exponential" | "linear"; baseMs?: number; maxAttempts?: number; maxMs?: number },
 ): Promise<string> =>
-    await (scheduler as { runAfter: (delay: number, target: unknown, args: A, options: { shardKey: string }) => Promise<string> }).runAfter(
-        delayMs,
-        target,
-        args,
-        { shardKey },
-    );
+    await (
+        scheduler as {
+            runAfter: (delay: number, target: unknown, args: A, options: { retry?: typeof retry; shardKey: string }) => Promise<string>;
+        }
+    ).runAfter(delayMs, target, args, { shardKey, ...(retry !== undefined && { retry }) });

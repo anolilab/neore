@@ -277,6 +277,11 @@ export const RATE_LIMIT_CONFIGS = {
     // GDPR limits
     "gdpr/request:free": Ratelimit.fixedWindow(3, HOUR),
     "gdpr/request:premium": Ratelimit.fixedWindow(5, HOUR),
+    // A guest leaving a message through a link (`chat/guest-links.ts`): per client address, and again per
+    // link, which is what bounds a link passed around. The held cap on the link is the other bound.
+    "guest/message:free": Ratelimit.fixedWindow(30, HOUR),
+    "guest/message:premium": Ratelimit.fixedWindow(30, HOUR),
+    "guest/message:public": Ratelimit.fixedWindow(30, HOUR),
     // Remote control of a coding agent (`acp/remote.ts`, `acp/send.ts`): each one queues a signed command for a
     // computer that holds three open ones, so a person gets a burst, not a stream.
     "hosts/answer:free": Ratelimit.fixedWindow(60, MINUTE),
@@ -798,6 +803,59 @@ export const getUserTier = (user: { isAdmin?: boolean; plan?: SessionUser["plan"
     return "free";
 };
 
+const DOTTED_IPV4 = /^\d{1,3}(?:\.\d{1,3}){3}$/u;
+const LEADING_ZEROS = /^0+(?=.)/u;
+
+const groupsOf = (part: string): string[] => (part === "" ? [] : part.split(":"));
+
+/**
+ * The bucket an address is limited in: an IPv4-mapped IPv6 address (`::ffff:` and the IPv4 address, written dotted or in hex,
+ * compressed or expanded) as its IPv4 form; any other IPv6 address by its /64 network, which one connection is usually handed
+ * whole, so stepping through it buys no fresh allowance; an IPv4 address as is.
+ */
+export const clientBucket = (ip: string): string => {
+    if (!ip.includes(":")) {
+        return ip;
+    }
+
+    const lower = ip.toLowerCase();
+    const compressed = lower.includes("::");
+    const [head = "", tail = ""] = lower.split("::", 2);
+    const headGroups = groupsOf(head);
+    const tailGroups = groupsOf(tail);
+    // A dotted IPv4 address at the end stands for the last two groups.
+    const lastPart = compressed ? tailGroups : headGroups;
+    const dotted = lastPart.length > 0 && DOTTED_IPV4.test(lastPart.at(-1)!) ? lastPart.pop() : undefined;
+    const width = dotted === undefined ? 8 : 6;
+    const groups = [...headGroups];
+
+    // `::` stands for as many zero groups as the address leaves out.
+    if (compressed) {
+        while (groups.length < width - tailGroups.length) {
+            groups.push("0");
+        }
+
+        groups.push(...tailGroups);
+    }
+
+    const values = groups.map((group) => Number.parseInt(group, 16));
+
+    if (values.slice(0, 5).every((value) => value === 0) && values[5] === 0xff_ff) {
+        if (dotted !== undefined) {
+            return dotted;
+        }
+
+        const [high = 0, low = 0] = values.slice(6, 8);
+
+        return [high >> 8, high & 0xff, low >> 8, low & 0xff].join(".");
+    }
+
+    return `${groups
+        .slice(0, 4)
+        .map((group) => group.replace(LEADING_ZEROS, ""))
+        .join(":")}::/64`;
+};
+
 /**
  * Guard function to check and enforce rate limits for mutations and actions.
  * For mutation contexts, uses ctx.db directly.
@@ -826,17 +884,21 @@ export const rateLimitGuard = async (
         identifier = context.identifier;
     } else if (context.user?.userId) {
         identifier = context.user.userId;
+    } else if ((context as { ip?: string }).ip) {
+        // An anonymous call with the request's address (on Cloudflare the edge-stamped client address; every context type
+        // can carry it). Checked before `db`, which an action carries too: tested first, `db` sent every anonymous action to
+        // the session lookup below, which had no session to read, and so to the one bucket every anonymous caller shared.
+        identifier = clientBucket((context as { ip: string }).ip);
     } else if ("db" in context) {
-        // Mutation context: use IP for anonymous users to prevent shared bucket abuse
+        // No request address (a call the server started): the session's sign-in address, if there is a session.
         const signals = await getSessionNetworkSignals(context as MutationContext).catch(() => {
             return {};
         });
 
         identifier = (signals as { ip?: string }).ip ?? "anonymous";
     } else {
-        // An action has no session and no `db`. On Cloudflare `ip` is the edge-stamped
-        // client address; elsewhere it is undefined and the one shared bucket applies.
-        identifier = (context as { ip?: string }).ip ?? "anonymous";
+        // No address to key on: the one shared bucket applies.
+        identifier = "anonymous";
     }
 
     if ("db" in context) {

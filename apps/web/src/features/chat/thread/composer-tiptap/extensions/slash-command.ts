@@ -9,6 +9,7 @@
  * - Matches: /command or /command query
  */
 import { Extension } from "@tiptap/core";
+import type { Node as ProseMirrorNode } from "@tiptap/pm/model";
 import { Plugin, PluginKey } from "@tiptap/pm/state";
 
 export interface SlashCommandMatch {
@@ -72,6 +73,13 @@ export const isPrefixOfCommand = (typed: string, command: "clear" | "compact"): 
 
 /** Whether `match` is a bare `/compact`. */
 export const isBareCompact = (match: Pick<SlashCommandMatch, "command" | "query" | "wholeDraft">): boolean => isBareCommand(match, "compact");
+
+/**
+ * The draft-text length a non-text node adds, as `doc.textBetween(…, "\n")` counts it: a line break before each block after
+ * the first, and a leaf's own text (a quote chip's quoted lines), so offsets after a chip line up with the draft.
+ */
+export const nonTextLength = (node: ProseMirrorNode, pos: number): number =>
+    (node.isBlock && pos > 0 ? 1 : 0) + (node.isLeaf ? (node.type.spec.leafText?.(node).length ?? 0) : 0);
 
 const slashCommandPluginKey = new PluginKey("slashCommand");
 
@@ -205,8 +213,8 @@ const SlashCommand = Extension.create<SlashCommandOptions>({
                                     }
 
                                     textOffset += node.text!.length;
-                                } else if (node.isBlock && pos > 0) {
-                                    textOffset += 1; // newline
+                                } else {
+                                    textOffset += nonTextLength(node, pos);
                                 }
 
                                 return true;
@@ -246,8 +254,8 @@ const SlashCommand = Extension.create<SlashCommandOptions>({
                                         }
 
                                         currentTextOffset = nodeTextEnd;
-                                    } else if (node.isBlock && pos > 0) {
-                                        currentTextOffset += 1;
+                                    } else {
+                                        currentTextOffset += nonTextLength(node, pos);
                                     }
 
                                     return true;

@@ -81,6 +81,8 @@ const shardSweeps = (): ReadonlyArray<Sweep> => [
     { name: "pruneExpiredToolPermissionGrants", ref: internal.chat.tool_permissions.pruneExpiredToolPermissionGrants },
     // References the agent was never able to spend within their 24 hours (`chat/request-secret.ts`).
     { name: "sweepRequestedSecrets", ref: internal.chat.request_secret.sweepRequestedSecrets },
+    // Guest links past their 24 hours, with what guests left on them (`chat/guest-links.ts`).
+    { name: "sweepGuestLinks", ref: internal.chat.guest_links.sweepGuestLinks },
     { name: "backfillUnindexedFileLinks", ref: internal.agent.file_link_backfill.backfillUnindexedFileLinks },
 ];
 

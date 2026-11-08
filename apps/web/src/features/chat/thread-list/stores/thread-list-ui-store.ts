@@ -32,13 +32,12 @@ interface ThreadListUIState {
     /** The thread the rename dialog is open for, opened by F2 or the options menu. */
     renameThreadId: string | null;
     searchQuery: string;
-
     searchType: "threads" | "messages";
+
     selectedCategory: string | undefined;
     /** User tag filter; a thread matches when it carries any of these. */
     selectedTagIds: ReadonlyArray<string>;
     selectedThreadIds: Set<string>;
-
     // Keyboard help
     showKeyboardHelp: boolean;
 
@@ -47,8 +46,11 @@ interface ThreadListUIState {
 
     // Project form dialog
     showProjectFormDialog: boolean;
+
     // Search state
     showSearch: boolean;
+    /** The thread the "Snooze until…" dialog is open for. The list renders the dialog, so it outlives the row. */
+    snoozeThreadId: string | null;
 }
 
 interface ThreadListUIActions {
@@ -66,18 +68,19 @@ interface ThreadListUIActions {
     setRenameThreadId: (threadId: string | null) => void;
     setSearchQuery: (query: string) => void;
     setSearchType: (type: "threads" | "messages") => void;
-
     setSelectedCategory: (category: string | undefined) => void;
+
     setSelectedTagIds: (tagIds: ReadonlyArray<string>) => void;
     setSelectedThreadIds: Dispatch<SetStateAction<Set<string>>>;
-
     // Keyboard help actions - supports both direct values and functional updates
     setShowKeyboardHelp: Dispatch<SetStateAction<boolean>>;
+
     setShowManageTagsDialog: (show: boolean) => void;
     // Project form dialog actions
     setShowProjectFormDialog: (show: boolean) => void;
     // Search actions - supports both direct values and functional updates
     setShowSearch: Dispatch<SetStateAction<boolean>>;
+    setSnoozeThreadId: (threadId: string | null) => void;
     toggleShowKeyboardHelp: () => void;
 
     toggleShowSearch: () => void;
@@ -95,6 +98,7 @@ const initialState: ThreadListUIState = {
     selectedTagIds: [],
     optionsMenuThreadId: null,
     renameThreadId: null,
+    snoozeThreadId: null,
     selectedThreadIds: new Set(),
     showKeyboardHelp: false,
     showManageTagsDialog: false,
@@ -135,6 +139,7 @@ export const useThreadListUIStore = create<ThreadListUIStore>()(
                 reset: () => set(initialState),
                 setOptionsMenuThreadId: (threadId) => set({ optionsMenuThreadId: threadId }),
                 setRenameThreadId: (threadId) => set({ renameThreadId: threadId }),
+                setSnoozeThreadId: (threadId) => set({ snoozeThreadId: threadId }),
 
                 setEditingProject: (project) => set({ editingProject: project }),
                 setLastSelectedIndex: ((action: SetStateAction<number>) =>

@@ -26,7 +26,7 @@ import { fileURLToPath } from "node:url";
 // whisper.cpp v1.9.5.
 const WHISPER_CPP_SHA = "d1be6fde11ac6e0407606b4e42fe72d34add8037";
 const WHISPER_CPP_URL = "https://github.com/ggml-org/whisper.cpp.git";
-// The oldest macOS the app runs on: Electron 44's own LSMinimumSystemVersion. The helper must not require more.
+// The oldest macOS the app runs on: Electron 45's own LSMinimumSystemVersion. The helper must not require more.
 const MACOS_MINIMUM = "13.0";
 
 const root = fileURLToPath(new URL("..", import.meta.url));

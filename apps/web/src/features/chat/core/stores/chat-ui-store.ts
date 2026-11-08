@@ -8,6 +8,7 @@
  */
 
 import { stripHiddenText } from "@neore/ai/utils";
+import { forgetPdfUrls } from "@neore/ui/utils/pdf-preview-event";
 import { create } from "zustand";
 import { devtools, subscribeWithSelector } from "zustand/middleware";
 
@@ -52,6 +53,15 @@ const createBatcher = <T>() => {
 // Note: composerText is NOT batched - it needs synchronous updates to preserve cursor position
 const hoveredMessageBatcher = createBatcher<string | null>();
 const isAtBottomBatcher = createBatcher<boolean>();
+
+/** A chat PDF the side panel shows. `url` is the attachment's own (signed) URL; the panel shows it only in `threadId`. */
+export interface PreviewFile {
+    filename?: string;
+    /** The thumbnail that opened it: focus returns there when the panel closes. */
+    opener?: HTMLElement;
+    threadId?: string;
+    url: string;
+}
 
 /**
  * Pending attachment before upload completes
@@ -122,6 +132,9 @@ interface ChatUIStore {
 
     // Canvas/Artifact actions
     openCanvas: (documentId: string) => void;
+    openPreviewFile: (file: PreviewFile) => void;
+    /** A chat PDF open in the side panel, instead of a document. Cleared when a document opens or the panel closes. */
+    previewFile: PreviewFile | null;
     removeAttachedReference: (id: string) => void;
     removeAttachment: (id: string) => void;
     removeEditAttachment: (id: string) => void;
@@ -200,6 +213,7 @@ const initialState = {
     hoveredMessageId: null as string | null,
     isAtBottom: true,
     isCanvasOpen: false,
+    previewFile: null as PreviewFile | null,
     isSubmitting: false,
     transitioningMessage: null as { text: string; threadId: string } | null,
 };
@@ -268,7 +282,10 @@ export const useChatUIStore = create<ChatUIStore>()(
                 },
 
                 closeCanvas: () => {
-                    set({ canvasDirty: false, isCanvasOpen: false });
+                    set({ canvasDirty: false, isCanvasOpen: false, previewFile: null });
+                },
+                openPreviewFile: (file) => {
+                    set({ isCanvasOpen: true, previewFile: file });
                 },
 
                 // Canvas/Artifact actions
@@ -280,6 +297,7 @@ export const useChatUIStore = create<ChatUIStore>()(
                         canvasHistoryVersions: null,
                         canvasViewMode: "editor",
                         isCanvasOpen: true,
+                        previewFile: null,
                     });
                 },
 
@@ -523,9 +541,35 @@ export const useScrollState = () => {
     return { isAtBottom, setIsAtBottom };
 };
 
+/**
+ * Whether a document (not a PDF preview) is open in the side panel. Its editor may hold edits that nothing reports yet,
+ * so opening a PDF must not replace it.
+ */
+export const isDocumentOpen = (state: Pick<ChatUIStore, "isCanvasOpen" | "previewFile">): boolean => state.isCanvasOpen && state.previewFile === null;
+
+/**
+ * The side panel across an account switch: a PDF preview (a signed link, nothing unsaved) closes as the switch starts; a
+ * document, whose editor may hold unsaved edits, closes only once the switch has gone through, so a failed switch keeps it.
+ * Called with "after" on sign-out too, in every tab.
+ */
+export const closeSidePanelForSessionSwitch = (phase: "after" | "before"): void => {
+    const { closeCanvas, isCanvasOpen, previewFile } = useChatUIStore.getState();
+
+    if (isCanvasOpen && (phase === "after" || previewFile !== null)) {
+        closeCanvas();
+    }
+
+    // The newest signed URL of each PDF is the old account's: a panel opened after the switch must not follow one.
+    if (phase === "after") {
+        forgetPdfUrls();
+    }
+};
+
 export const useCanvasState = () => {
     const activeDocumentId = useChatUIStore((state) => state.activeDocumentId);
     const isCanvasOpen = useChatUIStore((state) => state.isCanvasOpen);
+    const previewFile = useChatUIStore((state) => state.previewFile);
+    const openPreviewFile = useChatUIStore((state) => state.openPreviewFile);
     const canvasEditMode = useChatUIStore((state) => state.canvasEditMode);
     const canvasDirty = useChatUIStore((state) => state.canvasDirty);
     const canvasViewMode = useChatUIStore((state) => state.canvasViewMode);
@@ -541,6 +585,8 @@ export const useCanvasState = () => {
     return {
         activeDocumentId,
         canvasDirty,
+        openPreviewFile,
+        previewFile,
         canvasEditMode,
         canvasHistoryVersions,
         canvasViewMode,

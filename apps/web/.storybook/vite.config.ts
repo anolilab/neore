@@ -76,7 +76,10 @@ export default defineConfig({
         entries: [".storybook/preview.tsx", "src/**/*.stories.tsx", "../../packages/ui/src/**/*.stories.tsx", "../../packages/chat-ui/src/**/*.stories.tsx"],
         exclude: ["@lingui/react/macro", "@lingui/core/macro", "@silvia-odwyer/photon"],
         // Reached only from Storybook's own runtime or a lazy import, which the crawl misses. When a
-        // run logs "dependencies optimized: <name>" and then reloads, add <name> here.
+        // run logs "dependencies optimized: <name>" and then reloads, add <name> here. `storybook/internal/*`: what
+        // addon-vitest's setup file imports (`setup-file-with-project-annotations.js`) beside the `storybook/preview-api` it
+        // pins itself; found only when the first story loads, each re-optimized and reloaded under the tests in flight
+        // ("Failed to fetch dynamically imported module" on that setup file).
         include: [
             "@neore/ui > @rive-app/react-webgl2",
             "@neore/ui > @tanstack/react-table",
@@ -90,6 +93,8 @@ export default defineConfig({
             "axe-core",
             "msw",
             "msw/browser",
+            "storybook/internal/channels",
+            "storybook/internal/preview-api",
             "storybook/test",
         ],
     },
