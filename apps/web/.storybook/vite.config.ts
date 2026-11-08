@@ -78,19 +78,19 @@ export default defineConfig({
         // Reached only from Storybook's own runtime or a lazy import, which the crawl misses. When a
         // run logs "dependencies optimized: <name>" and then reloads, add <name> here.
         include: [
+            "@neore/ui > @rive-app/react-webgl2",
+            "@neore/ui > @tanstack/react-table",
+            "@neore/ui > embla-carousel-react",
+            "@neore/ui > react-day-picker",
+            "@neore/ui > recharts",
+            "@neore/ui > tokenlens",
             "@onboardjs/posthog-plugin",
             "@onboardjs/react",
-            "@rive-app/react-webgl2",
-            "@tanstack/react-table",
             "@xyflow/react",
             "axe-core",
-            "embla-carousel-react",
             "msw",
             "msw/browser",
-            "react-day-picker",
-            "recharts",
             "storybook/test",
-            "tokenlens",
         ],
     },
     plugins: [
