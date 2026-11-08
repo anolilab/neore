@@ -17,7 +17,11 @@ vi.mock("@lingui/react/macro", () => {
 });
 
 vi.mock("@/features/settings/hooks/use-usage-today", () => {
-    return { useUsageToday: () => "2026-09-30" };
+    return {
+        useUsageToday: () => {
+            return { failed: false, today: "2026-09-30" };
+        },
+    };
 });
 
 vi.mock("@/lib/lunora/crpc", () => {

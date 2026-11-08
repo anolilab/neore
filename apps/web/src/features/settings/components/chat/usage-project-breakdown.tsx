@@ -39,7 +39,7 @@ const formatTokens = (count: number, locale: string): string => new Intl.NumberF
 const UsageProjectBreakdown: FC<UsageProjectBreakdownProps> = ({ backfilling, days }) => {
     const { i18n, t } = useLingui();
     const crpc = useCRPC();
-    const today = useUsageToday();
+    const { failed: zoneFailed, today } = useUsageToday();
     const locale = i18n.locale || "en";
     const mine = useQuery({
         ...crpc.usage.activity.getProjectBreakdown.queryOptions(today === undefined ? skipToken : { fromDate: periodStart(today, days) }, { live: false }),
@@ -56,6 +56,8 @@ const UsageProjectBreakdown: FC<UsageProjectBreakdownProps> = ({ backfilling, da
         rows.push({ ...mine.data.noProject, key: NO_PROJECT_KEY, label: t`No project` });
     }
 
+    const isError = mine.isError || zoneFailed;
+    const isPending = mine.isPending && !zoneFailed;
     const totalCost = rows.reduce((sum, row) => sum + row.costMicrodollars, 0);
     const truncated = mine.data?.truncated === true;
 
@@ -68,8 +70,8 @@ const UsageProjectBreakdown: FC<UsageProjectBreakdownProps> = ({ backfilling, da
                 </CardTitle>
                 <CardDescription>{t`Replies, tokens and spend per project for the selected period`}</CardDescription>
             </CardHeader>
-            <CardContent aria-busy={mine.isPending}>
-                {mine.isPending && (
+            <CardContent aria-busy={isPending}>
+                {isPending && (
                     <div className="space-y-2" role="status">
                         <span className="sr-only">{t`Loading usage…`}</span>
                         {[1, 2, 3].map((index) => (
@@ -77,11 +79,11 @@ const UsageProjectBreakdown: FC<UsageProjectBreakdownProps> = ({ backfilling, da
                         ))}
                     </div>
                 )}
-                {mine.isError && <p className="text-destructive text-sm">{t`Could not load the project breakdown.`}</p>}
-                {!mine.isPending && !mine.isError && rows.length === 0 && (
+                {isError && <p className="text-destructive text-sm">{t`Could not load the project breakdown.`}</p>}
+                {!isPending && !isError && rows.length === 0 && (
                     <p className="text-muted-foreground py-4 text-center text-sm">{t`No replies recorded for this period.`}</p>
                 )}
-                {!mine.isPending && !mine.isError && rows.length > 0 && (
+                {!isPending && !isError && rows.length > 0 && (
                     <Table>
                         <TableHeader>
                             <TableRow>

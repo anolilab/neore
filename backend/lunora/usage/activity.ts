@@ -510,15 +510,19 @@ const vTotals = { costMicrodollars: v.number(), replies: v.number(), tokens: v.n
 /** Project title lookups one breakdown runs at once. */
 const TITLE_LOOKUPS_AT_ONCE = 16;
 
+/** Total rows one project breakdown sums: one a day, two years of them. */
+const TOTAL_ROW_LIMIT = HEATMAP_DAYS * 2;
+
 /** Total rows from `fromDate` on, summed: one per day, so a year is a bounded read. */
 const totalSince = async (ctx: Pick<QueryCtx, "db">, userId: string, fromDate: string) => {
-    const { page } = await ctx.db.usageDaily.findMany({
-        limit: HEATMAP_DAYS * 2,
+    // One row past the limit tells a full read from a cut one.
+    const read = await ctx.db.usageDaily.findMany({
+        limit: TOTAL_ROW_LIMIT + 1,
         orderBy: [{ date: "desc" }],
         where: { date: { gte: fromDate }, skillKey: TOTAL_SKILL_KEY, userId },
     });
-
-    const truncated = page.length >= HEATMAP_DAYS * 2;
+    const truncated = read.page.length > TOTAL_ROW_LIMIT;
+    const page = read.page.slice(0, TOTAL_ROW_LIMIT);
 
     // When the read stopped short, the total covers only from its oldest day on: whatever is summed beside it must too.
     return { coveredFrom: truncated ? page.at(-1)?.date : undefined, rows: page, total: sumRows(page), truncated };
@@ -542,10 +546,10 @@ export const getProjectBreakdown = authQuery
     )
     .query(async ({ args, ctx }) => {
         const { userId } = ctx.user;
-        const [totals, rows] = await Promise.all([
+        const [totals, read] = await Promise.all([
             totalSince(ctx, userId, args.fromDate),
             ctx.db.usageDaily.findMany({
-                limit: PROJECT_ROW_LIMIT,
+                limit: PROJECT_ROW_LIMIT + 1,
                 orderBy: [{ date: "desc" }],
                 where: { date: { gte: args.fromDate }, skillKey: PROJECT_SKILL_KEY, userId },
             }),
@@ -553,7 +557,9 @@ export const getProjectBreakdown = authQuery
         // When either read stopped short, both cover only the days after the oldest day the shorter one reached — that
         // day may be read only in part — so the projects and "No project" are taken over the same whole days as the
         // total and add up to it.
-        const projectsFrom = rows.page.length >= PROJECT_ROW_LIMIT ? rows.page.at(-1)?.date : undefined;
+        const projectsCut = read.page.length > PROJECT_ROW_LIMIT;
+        const rows = { page: read.page.slice(0, PROJECT_ROW_LIMIT) };
+        const projectsFrom = projectsCut ? rows.page.at(-1)?.date : undefined;
         const coveredFrom = [totals.coveredFrom, projectsFrom]
             .filter((date) => date !== undefined)
             .toSorted((a, b) => a!.localeCompare(b!))
@@ -580,7 +586,7 @@ export const getProjectBreakdown = authQuery
             noProject: remainderOf(total, projects),
             projects: titled,
             total,
-            truncated: totals.truncated || rows.page.length >= PROJECT_ROW_LIMIT,
+            truncated: totals.truncated || projectsCut,
         };
     });
 

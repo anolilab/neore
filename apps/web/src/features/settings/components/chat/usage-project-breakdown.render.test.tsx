@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 
@@ -17,8 +17,14 @@ vi.mock("@lingui/react/macro", () => {
     };
 });
 
+const { breakdownReads, usageDay } = vi.hoisted(() => {
+    return { breakdownReads: { count: 0 }, usageDay: { failed: false } };
+});
+
 vi.mock("@/features/settings/hooks/use-usage-today", () => {
-    return { useUsageToday: () => "2026-09-30" };
+    return {
+        useUsageToday: () => (usageDay.failed ? { failed: true, today: undefined } : { failed: false, today: "2026-09-30" }),
+    };
 });
 
 vi.mock("@/lib/lunora/crpc", () => {
@@ -31,6 +37,8 @@ vi.mock("@/lib/lunora/crpc", () => {
                             queryOptions: (args: unknown) => {
                                 return {
                                     queryFn: async () => {
+                                        breakdownReads.count += 1;
+
                                         return {
                                             noProject: { costMicrodollars: 7, replies: 1, tokens: 1 },
                                             projects: [{ costMicrodollars: 140, projectKey: "p", replies: 2, title: "Alpha", tokens: 2 }],
@@ -66,8 +74,24 @@ describe("UsageProjectBreakdown", () => {
         expect(screen.getByRole("rowheader", { name: "Alpha" })).toBeDefined();
         expect(screen.getByRole("meter", { name: "Alpha: 95% of spend" })).toBeDefined();
 
-        // The backfill finishing reads the breakdown again.
+        // The backfill finishing reads the breakdown once more.
+        const readsBefore = breakdownReads.count;
+
         rerender(<UsageProjectBreakdown backfilling={false} days={30} />);
-        expect(await screen.findByText("Alpha")).toBeDefined();
+        await waitFor(() => expect(breakdownReads.count).toBe(readsBefore + 1));
+    });
+
+    it("shows an error, not a period in the wrong zone, when the time zone setting fails to load", async () => {
+        usageDay.failed = true;
+
+        try {
+            render(<UsageProjectBreakdown backfilling={false} days={30} />, { wrapper });
+
+            expect(await screen.findByText("Could not load the project breakdown.")).toBeDefined();
+            expect(screen.queryByRole("status")).toBeNull();
+            expect(screen.queryByText("Alpha")).toBeNull();
+        } finally {
+            usageDay.failed = false;
+        }
     });
 });

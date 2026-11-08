@@ -657,6 +657,39 @@ describe("usage by project: the views", () => {
         expect(result.projects).toStrictEqual([{ costMicrodollars: 40, projectKey: projectId, replies: 2, tokens: 4 }]);
     });
 
+    it("keeps every day of a period that holds exactly as many project rows as one read takes", async () => {
+        const projectKeys: string[] = [];
+
+        for (const title of ["P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8"]) {
+            const { projectId } = await insertThread(USER, title);
+
+            projectKeys.push(projectId!);
+        }
+
+        // Eight project rows a day for 500 days: 4000 rows, the project read's whole limit, and 500 totals, within theirs.
+        const days = 4000 / projectKeys.length;
+
+        await harness.run(async (ctx: any) => {
+            for (let day = 0; day < days; day += 1) {
+                const date = new Date(Date.UTC(2025, 0, 1) + day * 86_400_000).toISOString().slice(0, 10);
+                const row = { date, replies: 1, tokens: 1, updatedAt: 1, userId: USER };
+
+                await ctx.db.insert("usageDaily", { ...row, costMicrodollars: projectKeys.length, replies: projectKeys.length, skillKey: "__total__" });
+
+                for (const projectKey of projectKeys) {
+                    await ctx.db.insert("usageDaily", { ...row, costMicrodollars: 1, projectKey, skillKey: "__project__" });
+                }
+            }
+        });
+
+        const result = await projectBreakdown(USER, "2025-01-01");
+
+        expect(result.truncated).toBe(false);
+        expect(result.total.costMicrodollars).toBe(4000);
+        expect(result.projects.map((project) => project.costMicrodollars)).toStrictEqual(projectKeys.map(() => days));
+        expect(result.noProject.costMicrodollars).toBe(0);
+    });
+
     it("leaves out a day the project read reached only in part, so No project never takes that day's project spend", async () => {
         const projectKeys: string[] = [];
 

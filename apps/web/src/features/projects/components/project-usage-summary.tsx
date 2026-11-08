@@ -20,15 +20,18 @@ const ProjectUsageSummary = ({ projectId }: ProjectUsageSummaryProps) => {
     const { i18n, t } = useLingui();
     const crpc = useCRPC();
     const headingId = useId();
-    const today = useUsageToday();
+    const { failed: zoneFailed, today } = useUsageToday();
     const locale = i18n.locale || "en";
-    const { data, isError, isPending } = useQuery(
+    const query = useQuery(
         crpc.usage.activity.getProjectUsage.queryOptions(
             // The dialog receives `_id` as a plain `string`; it is always an id the backend returned for a `projects` row.
             today === undefined ? skipToken : { fromDate: periodStart(today, WINDOW_DAYS), projectId: projectId as Id<"projects"> },
             { live: false },
         ),
     );
+    const { data } = query;
+    const isError = query.isError || zoneFailed;
+    const isPending = query.isPending && !zoneFailed;
 
     const stats = [
         { label: t`Replies`, value: data ? data.replies.toLocaleString(locale) : undefined },
