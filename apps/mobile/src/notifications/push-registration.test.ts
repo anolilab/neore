@@ -135,16 +135,19 @@ describe("createPendingWork", () => {
                 });
                 order.push("registered");
             });
-            const failing = work.run(async () => {
-                throw new Error("offline");
-            });
+            // Handled as it starts: a rejection left until after the timers run is reported as unhandled.
+            const failing = expect(
+                work.run(async () => {
+                    throw new Error("offline");
+                }),
+            ).rejects.toThrow("offline");
             const settling = (async () => {
                 await work.settle();
                 order.push("settled");
             })();
 
             await vi.advanceTimersByTimeAsync(20);
-            await Promise.allSettled([registering, failing, settling]);
+            await Promise.all([registering, failing, settling]);
 
             expect(order).toEqual(["registered", "settled"]);
         } finally {
@@ -291,7 +294,7 @@ describe("noteAccountOnPhone", () => {
 
         await forgetAccountOnPhone({
             remove: async (key) => {
-                delete items[key];
+                Reflect.deleteProperty(items, key);
             },
         });
 
