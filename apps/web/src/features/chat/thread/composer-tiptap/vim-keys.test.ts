@@ -253,6 +253,35 @@ describe("motions", () => {
         expect(cancelled.vim.pending).toBe("");
     });
 
+    it.each(["h", "k", "Backspace"])("%s off a chip lands on the last character of the line before, where x deletes it", (motion) => {
+        const start = aroundChip();
+        const chipSelected = start.apply(start.tr.setSelection(NodeSelection.create(start.doc, 7)));
+
+        expect(lines(press(chipSelected, [motion, "x"]).state)).toStrictEqual(["firs", "", "last"]);
+    });
+
+    it("leaves a chip onto the displayed line next to it: b to its last word, w to its first non-space", () => {
+        const lineBreak = breakChipSchema.nodes.hardBreak!.create();
+        const doc = breakChipSchema.node("doc", null, [
+            breakChipSchema.node("paragraph", null, [breakChipSchema.text("ab"), lineBreak, breakChipSchema.text("cd ef")]),
+            breakChipSchema.node("quoteChip"),
+            breakChipSchema.node("paragraph", null, [breakChipSchema.text("  gh")]),
+            breakChipSchema.node("paragraph"),
+        ]);
+        const start = EditorState.create({ doc, schema: breakChipSchema });
+        const selected = start.apply(start.tr.setSelection(NodeSelection.create(doc, 10)));
+
+        // "ef" starts at offset 6 of the paragraph before; "g" is at offset 2 of the one after.
+        expect(offsetOf(press(selected, ["b"]).state)).toBe(6);
+        expect(offsetOf(press(selected, ["w"]).state)).toBe(2);
+
+        // An empty line before the chip: the cursor sits at its start.
+        const empty = breakChipSchema.node("doc", null, [breakChipSchema.node("paragraph"), breakChipSchema.node("quoteChip")]);
+        const emptyStart = EditorState.create({ doc: empty, schema: breakChipSchema });
+
+        expect(offsetOf(press(emptyStart.apply(emptyStart.tr.setSelection(NodeSelection.create(empty, 2))), ["h"]).state)).toBe(0);
+    });
+
     it("opens a line before a quote chip that starts the draft, so i does not type over it", () => {
         const doc = chipSchema.node("doc", null, [chipSchema.node("quoteChip"), chipSchema.node("paragraph", null, [chipSchema.text("comment")])]);
         const start = EditorState.create({ doc, schema: chipSchema });
