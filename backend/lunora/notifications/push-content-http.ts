@@ -11,10 +11,9 @@
  * on (a collaborator's chat is on its owner's shard), since a lock, a delete or a
  * revoked grant can arrive after the push went out: text comes back only while the
  * caller can still read the chat and it is not locked, passcode-protected, deleted
- * or archived. Anything else, or a check that fails, answers `{ generic: true }`. A failure on our side is
- * logged and answers 503,
- * kept apart from "not found"; the phone shows its placeholder for anything but
- * a 200 with text.
+ * or archived. Anything else, or a check that fails, answers `{ generic: true }`.
+ * A failure on our side is logged and answers 503, kept apart from "not found";
+ * the phone shows its placeholder for anything but a 200 with text.
  */
 import type { HttpActionCtx } from "lunorash/server";
 

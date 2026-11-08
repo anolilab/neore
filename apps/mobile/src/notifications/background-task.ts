@@ -14,7 +14,7 @@ import { secureGrantStore } from "../auth/secure-store";
 import { loadConfig } from "../lib/config";
 import { channelName, deviceLocale, fetchPushContent, showDataOnlyPush } from "./push-content";
 
-export const PHONE_PUSH_TASK = "neore-phone-push";
+const PHONE_PUSH_TASK = "neore-phone-push";
 
 /** The Android channel phone pushes show on. */
 export const ANDROID_CHANNEL_ID = "default";

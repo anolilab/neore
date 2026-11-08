@@ -34,9 +34,9 @@ export interface ExpoMessage {
 /** Expo's answer per message: `ok` with an id to read the receipt by, or an error (`details.error` is the code). */
 export type ExpoOutcome = { error?: string; message: string; status: "error" } | { id?: string; status: "ok" };
 
-const errorOf = (value: { details?: { error?: unknown }; message?: unknown; status?: unknown }): ExpoOutcome => {
+const errorOf = (value: { details?: { error?: unknown }; id?: unknown; message?: unknown; status?: unknown }): ExpoOutcome => {
     if (value.status === "ok") {
-        return { status: "ok", ...(typeof (value as { id?: unknown }).id === "string" && { id: (value as { id: string }).id }) };
+        return { status: "ok", ...(typeof value.id === "string" && { id: value.id }) };
     }
 
     return {

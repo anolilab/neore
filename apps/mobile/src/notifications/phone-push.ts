@@ -30,7 +30,7 @@ import { createPendingWork, onceItWorks } from "./push-registration";
 export const pushRegistrations = createPendingWork();
 
 /** The keychain item the iOS Notification Service Extension reads the backend URL from (`NotificationService.swift`). */
-export const EXTENSION_LUNORA_URL_KEY = "neore.mobile.lunora-url";
+const EXTENSION_LUNORA_URL_KEY = "neore.mobile.lunora-url";
 
 /** The EAS project the Expo push token belongs to (`app.config.ts`, from `EAS_PROJECT_ID`). */
 const easProjectId = (): string | undefined => {

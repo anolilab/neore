@@ -242,7 +242,7 @@ export const readThreadLockState = internalQuery
     });
 
 /**
- * Delivers one notification to every browser (Web Push) and phone (APNs, FCM) of
+ * Delivers one notification to every browser (Web Push) and phone (Expo push) of
  * its user. Each channel is skipped while its keys are unset.
  */
 export const sendPushForNotification = internalAction

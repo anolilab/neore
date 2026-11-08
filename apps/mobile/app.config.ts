@@ -6,7 +6,7 @@ import type { ConfigContext, ExpoConfig } from "expo/config";
  * identifier. A grant the app stored before this build already lives here, so the
  * extension can read it without anything being moved or deleted.
  */
-export const SHARED_KEYCHAIN_GROUP = "$(AppIdentifierPrefix)ai.neore.mobile";
+const SHARED_KEYCHAIN_GROUP = "$(AppIdentifierPrefix)ai.neore.mobile";
 
 /**
  * `app.json` plus what only exists at build time. `EAS_PROJECT_ID` is the Expo project

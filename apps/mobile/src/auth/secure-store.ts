@@ -14,7 +14,7 @@ const KEY = "neore.mobile.grant";
  * signs in with it to fetch a push's text, and pushes mostly arrive on a locked phone. It stays
  * out of backups and off a new device. The extension reads it from the app's own keychain group.
  */
-export const SHARED_KEYCHAIN_OPTIONS = { keychainAccessible: AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY };
+const SHARED_KEYCHAIN_OPTIONS = { keychainAccessible: AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY };
 
 /** Writes over an existing item in place (an expo-secure-store update), readable after the first unlock. */
 export const sharedKeychainOps: KeychainWriteOps = createKeychainWriteOps({
