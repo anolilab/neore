@@ -276,6 +276,15 @@ const MessageList: FC<MessageListProps> = memo(({ className, editComposerCompone
 
             // Move focus too, so keyboard and screen-reader users land where sighted users do.
             if (focus) {
+                // Marks the row a jump landed on, so it alone shows a focus ring; a row focused by a click in its text does not.
+                element.dataset.jumped = "";
+                element.addEventListener(
+                    "blur",
+                    () => {
+                        delete element.dataset.jumped;
+                    },
+                    { once: true },
+                );
                 element.focus({ preventScroll: true });
             }
         };
@@ -426,11 +435,15 @@ const MessageList: FC<MessageListProps> = memo(({ className, editComposerCompone
             initialIds !== null && shouldAnimateEntrance({ index, initialIds, messageId: message.id, role: message.role, total: messages.length });
 
         // One list item per message: the goal's banner and notes belong to it, so the list's count and positions stay the messages'.
+        // A jump focuses the item; after a keyboard action a ring shows where it landed (inset, so the scroller cannot clip it).
         return (
             <div
                 aria-posinset={index + 1}
                 aria-setsize={setSize}
-                className={cn("outline-none", isEntering && "animate-in fade-in slide-in-from-bottom-2 duration-200")}
+                className={cn(
+                    "data-jumped:focus-visible:ring-ring rounded-lg outline-none data-jumped:focus-visible:ring-2 data-jumped:focus-visible:ring-inset",
+                    isEntering && "animate-in fade-in slide-in-from-bottom-2 duration-200",
+                )}
                 data-list-message-id={message.id}
                 role="listitem"
                 tabIndex={-1}
