@@ -5,7 +5,7 @@
  * the one the reader left, and a download after the switch fetches the document on screen.
  */
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 
 import type { PreviewFile } from "@/features/chat/core/stores/chat-ui-store";
 import { showError } from "@/lib/toast";
@@ -78,6 +78,25 @@ const clickDownload = () => {
 
 // The file name of each link the panel clicked to save.
 const savedFilenames = () => clickSpy.mock.contexts.map((element) => (element instanceof HTMLAnchorElement ? element.download : ""));
+
+/**
+ * Stands the test's object URL functions in for this test and puts the earlier ones back after it: the first block restores
+ * the real ones once it ends, so a later test that saves a file needs them again.
+ */
+const standInObjectUrls = (revoke: (url: string) => void = () => {}): void => {
+    const { createObjectURL, revokeObjectURL } = URL;
+
+    onTestFinished(() => {
+        Object.defineProperties(URL, {
+            createObjectURL: { configurable: true, value: createObjectURL, writable: true },
+            revokeObjectURL: { configurable: true, value: revokeObjectURL, writable: true },
+        });
+    });
+    Object.defineProperties(URL, {
+        createObjectURL: { configurable: true, value: createObjectUrl, writable: true },
+        revokeObjectURL: { configurable: true, value: revoke, writable: true },
+    });
+};
 
 describe("the side panel's download after a document switch", () => {
     beforeEach(() => {
@@ -242,6 +261,7 @@ describe("the side panel's failures", () => {
             },
         });
 
+        standInObjectUrls();
         vi.stubGlobal("fetch", async () => new Response(oversized, { status: 200 }));
         render(panelFor(DOCUMENT_A));
         clickDownload();
@@ -255,11 +275,7 @@ describe("the side panel's failures", () => {
     it("lets the previous saved file go when the next download is saved, also from a reopened panel", async () => {
         const revoke = vi.fn();
 
-        // The first block restores the real object URL functions after it; this test stands them in again.
-        Object.defineProperties(URL, {
-            createObjectURL: { configurable: true, value: createObjectUrl, writable: true },
-            revokeObjectURL: { configurable: true, value: revoke, writable: true },
-        });
+        standInObjectUrls(revoke);
         vi.stubGlobal("fetch", async () => new Response("pdf", { status: 200 }));
         const { unmount } = render(panelFor(DOCUMENT_A));
 
