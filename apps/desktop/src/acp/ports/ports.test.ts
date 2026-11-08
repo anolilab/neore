@@ -319,6 +319,50 @@ describe("stopping a server", () => {
         expect(system.signals).not.toContainEqual([30, "SIGKILL"]);
     });
 
+    it("does not walk on through the agent or this app when a bad read puts one below the listener", async () => {
+        const system = new FakeSystem();
+
+        // An inconsistent read: the agent (10) and this app (1) appear below the listener, each with a process of its own.
+        const misplaced = new Map([
+            [1, 30],
+            [10, 31],
+        ]);
+
+        system.table = [
+            ...system.table.map((entry) => {
+                return { ...entry, ppid: misplaced.get(entry.pid) ?? entry.ppid };
+            }),
+            row(70, 10, "agent-child"),
+            row(80, 1, "app-child"),
+        ];
+
+        await stopper(system, 1).stop(10, SERVER_30);
+
+        expect(system.signals.map(([pid]) => pid)).not.toContain(70);
+        expect(system.signals.map(([pid]) => pid)).not.toContain(80);
+
+        // This app read below the agent: the unrelated server under it (50) is neither listed nor stoppable.
+        const appBelow = new FakeSystem();
+
+        const moved = new Map([
+            [1, 10],
+            [50, 1],
+        ]);
+
+        appBelow.table = appBelow.table.map((entry) => {
+            return { ...entry, ppid: moved.get(entry.pid) ?? entry.ppid };
+        });
+
+        const listed = await stopper(appBelow, 1).list(10);
+
+        expect(listed.map((port) => port.pid)).not.toContain(50);
+        expect(await stopper(appBelow, 1).stop(10, { name: "other", pid: 50, startedAt: SERVER_30.startedAt })).toEqual({
+            ended: false,
+            reason: STOP_REASON.gone,
+        });
+        expect(appBelow.signals).toEqual([]);
+    });
+
     it("signals no child that a survivor starts after it has left the agent's tree", async () => {
         const system = new FakeSystem();
 

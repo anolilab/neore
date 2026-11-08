@@ -87,7 +87,7 @@ export class PortsService {
             return [];
         }
 
-        const tree = agentTree(await this.system.processes(), agentPid);
+        const tree = agentTree(this.withoutSelf(await this.system.processes()), agentPid);
 
         if (tree.length === 0) {
             return [];
@@ -97,7 +97,8 @@ export class PortsService {
         const found = await this.system.listeners(tree.map((row) => row.pid));
         // A pid alone is not identity, and a process can leave the agent's tree meanwhile: re-read, and keep a socket only
         // while the process it was joined to is the same one (same start time) and still below the agent.
-        const stillBelow = new Map(agentTree(await this.system.processes(), agentPid).map((row) => [row.pid, identity(row)]));
+        const reread = agentTree(this.withoutSelf(await this.system.processes()), agentPid);
+        const stillBelow = new Map(reread.map((row) => [row.pid, identity(row)]));
         const seen = new Set<string>();
         const views: PortView[] = [];
 
@@ -264,9 +265,14 @@ export class PortsService {
         return undefined;
     }
 
-    /** What may ever be signalled: below the agent, never the agent, never this app. */
+    /** What may ever be signalled: below the agent, never the agent, never this app, and nothing reached only through it. */
     private below(table: ReadonlyArray<ProcessInfo>, agentPid: number): ProcessInfo[] {
-        return descendantsOf(table, agentPid).filter((row) => row.pid !== this.selfPid);
+        return descendantsOf(this.withoutSelf(table), agentPid);
+    }
+
+    /** The table without this app's row, so no walk goes on through it; a bad read could place it anywhere. */
+    private withoutSelf(table: ReadonlyArray<ProcessInfo>): ProcessInfo[] {
+        return table.filter((row) => row.pid !== this.selfPid);
     }
 
     /** A refused signal is reported, not thrown, so the other victims still get theirs. */
@@ -288,9 +294,11 @@ export class PortsService {
         agentPid: number,
     ): ProcessInfo[] {
         const found: ProcessInfo[] = [];
+        // Neither the agent nor this app is walked through: a bad read that puts one below a victim must not widen the stop.
+        const walked = this.withoutSelf(table).filter((row) => row.pid !== agentPid);
 
         for (const root of roots) {
-            for (const row of descendantsOf(table, root.pid)) {
+            for (const row of descendantsOf(walked, root.pid)) {
                 if (row.zombie !== true && row.pid !== agentPid && row.pid !== this.selfPid && [...known, ...found].every((entry) => !sameProcess(entry, row))) {
                     found.push(row);
                 }

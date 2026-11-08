@@ -825,6 +825,11 @@ const stopPort = async (
         try {
             result = await globalThis.neoreDevice.acpPortStop(selected, { name: port.name, pid: port.pid, startedAt: port.startedAt });
         } catch (error) {
+            // Another session was opened during the stop: its window is not the place for this error.
+            if (state.selected !== selected) {
+                return;
+            }
+
             // The error is shown on its own; the count comes back in place of "Stopping…".
             portsRead.shown = undefined;
             refreshPorts();
