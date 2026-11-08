@@ -34,7 +34,7 @@ const AGENT_KEY = /^[a-z0-9-]{1,40}$/u;
 const CHECK_TIMEOUT_MS = 20_000;
 
 export interface SignInOptions {
-    agents: Pick<AcpManager, "closeAgent" | "withAgent">;
+    agents: Pick<AcpManager, "closeAgent" | "holdingAgent" | "withAgent">;
     /** The folder the checks of all agents are opened in: one subfolder per agent, made private. */
     folder: string;
     now?: () => number;
@@ -75,18 +75,25 @@ export class AgentSignIn {
         }
     }
 
-    /** Ends the agent's open sessions, asks it to sign out, then checks again: the answer is what the agent says now. */
+    /**
+     * Ends the agent's open sessions, asks it to sign out, then checks again: the answer is what the agent says now. No
+     * session of the agent can start meanwhile, and an agent that cannot sign out is refused before any session ends.
+     */
     public async signOut(agentKey: string): Promise<SignInStatus> {
-        await this.options.agents.closeAgent(agentKey);
-        await this.options.agents.withAgent(agentKey, null, {}, async ({ connection, handshake }) => {
-            if (!handshake.canLogout) {
-                throw new Error("this agent cannot be signed out from Neore. Use the agent's own sign-out");
-            }
+        const { agents } = this.options;
 
-            await logout(connection, this.options.timeoutMs ?? CHECK_TIMEOUT_MS);
+        return await agents.holdingAgent(agentKey, async () => {
+            await agents.withAgent(agentKey, null, {}, async ({ connection, handshake }) => {
+                if (!handshake.canLogout) {
+                    throw new Error("this agent cannot be signed out from Neore. Use the agent's own sign-out");
+                }
+
+                await agents.closeAgent(agentKey);
+                await logout(connection, this.options.timeoutMs ?? CHECK_TIMEOUT_MS);
+            });
+
+            return await this.status(agentKey);
         });
-
-        return await this.status(agentKey);
     }
 
     private result(agentKey: string, state: SignInState, canSignOut: boolean, detail = ""): SignInStatus {
@@ -94,7 +101,8 @@ export class AgentSignIn {
     }
 
     private async folderOf(agentKey: string): Promise<string> {
-        // The key is the core's (`a-z0-9-`), so it cannot leave the folder; the check is for a caller that skipped it.
+        // The folder is made before the core refuses an unknown agent, and the window's key is only length-checked: a key
+        // with `/` or `..` would otherwise name a folder outside this one.
         if (!AGENT_KEY.test(agentKey)) {
             throw new Error("that agent is not registered");
         }

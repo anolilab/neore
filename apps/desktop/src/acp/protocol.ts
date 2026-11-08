@@ -143,7 +143,7 @@ export const newSession = async (
         return { answer: response, sessionId: response.sessionId };
     } catch (error) {
         if (error instanceof RpcError && error.code === AUTH_REQUIRED) {
-            throw new AgentSignedOutError("the agent needs you to sign in first. Sign in to it in Neore's device window, then start the session again");
+            throw new AgentSignedOutError("the agent needs you to sign in first. Sign in with the agent's own login command on this computer, then start the session again");
         }
 
         throw error;
@@ -245,7 +245,7 @@ export const loadSession = async (
         return await withTimeout(connection.request(METHOD.loadSession, params, answered), timeoutMs, "the agent did not finish loading the session");
     } catch (error) {
         if (error instanceof RpcError && error.code === AUTH_REQUIRED) {
-            throw new AgentSignedOutError("the agent needs you to sign in first. Sign in to it in Neore's device window, then import again");
+            throw new AgentSignedOutError("the agent needs you to sign in first. Sign in with the agent's own login command on this computer, then import again");
         }
 
         throw error;

@@ -184,12 +184,26 @@ const signInText = (status: SignInStatus | undefined): string => {
 
 const canSignOut = (status: SignInStatus | undefined): boolean => status?.state === "signed_in" && status.canSignOut;
 
+/** Counts sign-in requests per agent: only the answer to the latest one is shown, so a slow check cannot undo a sign-out. */
+const signInSerial: Record<string, number> = {};
+
+const showSignIn = async (key: string, request: Promise<SignInStatus>): Promise<void> => {
+    signInSerial[key] = (signInSerial[key] ?? 0) + 1;
+
+    const serial = signInSerial[key];
+    const status = await request;
+
+    if (serial === signInSerial[key]) {
+        state.signIn[key] = status;
+        renderAgents();
+    }
+};
+
 const checkSignIn = (key: string) =>
     guarded(async () => {
         $("acp-notice").textContent = `Asking ${agentLabel(key)} whether it is signed in…`;
-        state.signIn[key] = await globalThis.neoreDevice.acpSignInStatus(key);
+        await showSignIn(key, globalThis.neoreDevice.acpSignInStatus(key));
         $("acp-notice").textContent = "";
-        renderAgents();
     });
 
 const signOut = (key: string) =>
@@ -202,8 +216,7 @@ const signOut = (key: string) =>
             return;
         }
 
-        state.signIn[key] = await globalThis.neoreDevice.acpSignOut(key);
-        renderAgents();
+        await showSignIn(key, globalThis.neoreDevice.acpSignOut(key));
     });
 
 // ─── Importing saved sessions ───────────────────────────────────────────────

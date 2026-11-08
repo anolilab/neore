@@ -82,6 +82,9 @@ const savedSessionFields = (remote: { forkSessionId?: string; nativeSessionId?: 
 export class AcpManager {
     private changeTimer: ReturnType<typeof setTimeout> | undefined;
 
+    /** Agents whose account is changing (`holdingAgent`): none of their sessions may start. */
+    private readonly held = new Set<string>();
+
     private readonly processes = new Set<AgentProcess>();
 
     /** The hook runner of each session that has one; it lives and dies with the session. */
@@ -216,9 +219,7 @@ export class AcpManager {
             await Promise.all(superseded.map(async (session) => await session.close()));
         }
 
-        if (this.summaries().filter((session) => session.status !== "ended").length >= MAX_SESSIONS) {
-            throw new Error(`at most ${String(MAX_SESSIONS)} agents at once; close one first`);
-        }
+        this.refuseStart(agentKey);
 
         // The core decides: it refuses an unregistered agent and (with consent) a folder the user has not approved.
         const plan = this.options.plan(agentKey, folder);
@@ -313,6 +314,24 @@ export class AcpManager {
         await this.require(sessionId).close();
     }
 
+    /**
+     * Runs `use` while no session of `agentKey` may start, for a change to the agent's account (a sign-out): a session
+     * started meanwhile would run on an account that is going away. A second hold of the same agent is refused.
+     */
+    public async holdingAgent<Result>(agentKey: string, use: () => Promise<Result>): Promise<Result> {
+        if (this.held.has(agentKey)) {
+            throw new Error("that agent is already being signed out");
+        }
+
+        this.held.add(agentKey);
+
+        try {
+            return await use();
+        } finally {
+            this.held.delete(agentKey);
+        }
+    }
+
     /** Ends every open session of one agent: its account is about to change (a sign-out). */
     public async closeAgent(agentKey: string): Promise<void> {
         const closing: Promise<void>[] = [];
@@ -405,6 +424,17 @@ export class AcpManager {
             } catch {
                 // One group that cannot be signalled must not spare the others.
             }
+        }
+    }
+
+    /** Throws when no session of `agentKey` may start now: its account is changing, or too many agents run. */
+    private refuseStart(agentKey: string): void {
+        if (this.held.has(agentKey)) {
+            throw new Error("that agent is being signed out; start it again once that ends");
+        }
+
+        if (this.summaries().filter((session) => session.status !== "ended").length >= MAX_SESSIONS) {
+            throw new Error(`at most ${String(MAX_SESSIONS)} agents at once; close one first`);
         }
     }
 

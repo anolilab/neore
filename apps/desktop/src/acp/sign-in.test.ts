@@ -80,11 +80,23 @@ describe("signing out", () => {
         expect(scratch.methods()).toContain("logout");
     });
 
-    it("refuses an agent that has no sign-out, without sending one", async () => {
-        const { signIn } = setUp({ FAKE_AGENT_AUTH_FILE: authFile });
+    it("refuses an agent that has no sign-out before ending any of its sessions", async () => {
+        const { manager, signIn } = setUp({ FAKE_AGENT_AUTH_FILE: authFile });
+        const sessionId = await manager.startSession("fake", "Fake", scratch.work);
 
         await expect(signIn.signOut("fake")).rejects.toThrow("cannot be signed out from Neore");
+        expect(manager.statusOf(sessionId)).not.toBe("ended");
         expect(scratch.methods()).not.toContain("logout");
         expect(existsSync(authFile)).toBe(true);
+        manager.killAll();
+    });
+
+    it("starts no session of the agent and no second sign-out while one runs", async () => {
+        const { manager, signIn } = setUp({ FAKE_AGENT_AUTH_FILE: authFile, FAKE_AGENT_LOGOUT: "1" });
+        const signingOut = signIn.signOut("fake");
+
+        await expect(manager.startSession("fake", "Fake", scratch.work)).rejects.toThrow("being signed out");
+        await expect(signIn.signOut("fake")).rejects.toThrow("already being signed out");
+        await expect(signingOut).resolves.toMatchObject({ state: "signed_out" });
     });
 });

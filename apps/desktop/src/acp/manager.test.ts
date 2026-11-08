@@ -314,14 +314,14 @@ describe("a version probe", () => {
     it("tells the user to sign in with the agent's own tool when the agent asks for a login", async () => {
         const target = make({ FAKE_AGENT_AUTH: "1" });
 
-        await expect(start(target)).rejects.toThrow("sign in");
+        await expect(start(target)).rejects.toThrow("Sign in with the agent's own login command");
         target.killAll();
     });
 
     it("keeps the capability report of an agent whose start failed after the handshake", async () => {
         const target = make({ FAKE_AGENT_AUTH: "1" });
 
-        await expect(start(target)).rejects.toThrow("sign in");
+        await expect(start(target)).rejects.toThrow("Sign in with the agent's own login command");
         expect(Object.keys(target.allReports())).toEqual(["fake"]);
         target.killAll();
     });
