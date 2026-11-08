@@ -13,7 +13,7 @@ import { useEffect, useId, useRef, useState, useSyncExternalStore } from "react"
 import { useAction } from "@/lib/lunora/crpc";
 
 import { guestPollInterval } from "./guest-poll";
-import { forgetGuestToken, guestTokenFor, keepGuestToken, rereadGuestToken } from "./guest-token";
+import { forgetGuestToken, guestTokenFor, keepGuestToken, keepPendingPost, readPendingPost, rereadGuestToken } from "./guest-token";
 
 /** A guest note's cap (`GUEST_MESSAGE_MAX_CHARS` in the backend). */
 const MAX_CHARS = 2000;
@@ -47,6 +47,15 @@ const GuestLinkPage: FC<{ linkToken: string }> = ({ linkToken }) => {
     const [ended, setEnded] = useState(false);
     // A post that failed keeps its request id, so sending the same text again cannot store it twice.
     const pendingRef = useRef<{ requestId: string; text: string } | undefined>(undefined);
+
+    // A post sent before a reload, whose reply never came: sending its text again carries the same request id.
+    useEffect(() => {
+        void readPendingPost(linkToken).then((pending) => {
+            pendingRef.current ??= pending;
+
+            return undefined;
+        });
+    }, [linkToken]);
     const queryClient = useQueryClient();
     const postNote = useAction(api.chat.guest_links.postGuestMessage);
     const readView = useAction(api.chat.guest_links.getGuestView);
@@ -94,6 +103,8 @@ const GuestLinkPage: FC<{ linkToken: string }> = ({ linkToken }) => {
         mutationFn: async (note: { requestId: string; text: string }) => {
             const guestToken = (await guestTokenFor(linkToken, { create: true })) ?? "";
 
+            // Kept before it is sent, so a reload after a lost reply still sends it as this request.
+            await keepPendingPost(linkToken, note);
             await postNote({ guestToken, linkToken, ...note });
 
             return guestToken;
@@ -111,6 +122,7 @@ const GuestLinkPage: FC<{ linkToken: string }> = ({ linkToken }) => {
         },
         onSuccess: (guestToken, note) => {
             pendingRef.current = undefined;
+            void keepPendingPost(linkToken, undefined);
             setPostedAt(Date.now());
             // A draft typed while the post was on its way stays.
             setText((current) => (current.trim() === note.text ? "" : current));

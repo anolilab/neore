@@ -84,6 +84,44 @@ export const forgetGuestToken = async (linkToken: string): Promise<void> => {
     write(key, undefined);
 };
 
+/** Where a post not yet confirmed keeps its request id for this tab, under the same digest, so a reload retries it as itself. */
+const PENDING_PREFIX = "neore.guest-pending.";
+
+const pendingKeyFor = async (linkToken: string): Promise<string> => {
+    const tokenKey = await keyFor(linkToken);
+
+    return PENDING_PREFIX + tokenKey.slice(KEY_PREFIX.length);
+};
+
+/** A post sent but not yet confirmed (`{ requestId, text }`), kept for this tab across a reload; `undefined` once confirmed. */
+export const keepPendingPost = async (linkToken: string, pending: { requestId: string; text: string } | undefined): Promise<void> => {
+    const key = await pendingKeyFor(linkToken);
+
+    try {
+        if (pending === undefined) {
+            globalThis.sessionStorage.removeItem(key);
+        } else {
+            globalThis.sessionStorage.setItem(key, JSON.stringify(pending));
+        }
+    } catch {
+        // A tab whose storage refuses writes keeps it in memory only.
+    }
+};
+
+/** The post this tab sent for `linkToken` and has not seen confirmed, if any. */
+export const readPendingPost = async (linkToken: string): Promise<{ requestId: string; text: string } | undefined> => {
+    const key = await pendingKeyFor(linkToken);
+
+    try {
+        const parsed: unknown = JSON.parse(globalThis.sessionStorage.getItem(key) ?? "null");
+        const { requestId, text } = (parsed ?? {}) as { requestId?: unknown; text?: unknown };
+
+        return typeof requestId === "string" && typeof text === "string" ? { requestId, text } : undefined;
+    } catch {
+        return undefined;
+    }
+};
+
 /** Forgets every token of this page load; for tests, which then read only what storage holds. */
 export const clearGuestTokenMemory = (): void => {
     memory.clear();

@@ -1,12 +1,13 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { clearGuestTokenMemory, forgetGuestToken, guestTokenFor, keepGuestToken, rereadGuestToken } from "./guest-token";
+import { clearGuestTokenMemory, forgetGuestToken, guestTokenFor, keepGuestToken, keepPendingPost, readPendingPost, rereadGuestToken } from "./guest-token";
 
 const TOKEN_SHAPE = /^[0-9a-f]{64}$/u;
 const LINK = "cd".repeat(32);
 
 afterEach(() => {
     globalThis.localStorage.clear();
+    globalThis.sessionStorage.clear();
     clearGuestTokenMemory();
     vi.restoreAllMocks();
 });
@@ -53,5 +54,17 @@ describe(guestTokenFor, () => {
         clearGuestTokenMemory();
 
         expect(await guestTokenFor(LINK)).toBeUndefined();
+    });
+
+    it("keeps a post not yet confirmed across a reload of the tab, under a digest, until it is confirmed", async () => {
+        const pending = { requestId: "request-1234", text: "Can we talk tomorrow?" };
+
+        await keepPendingPost(LINK, pending);
+        expect(await readPendingPost(LINK)).toStrictEqual(pending);
+        expect(await readPendingPost("another-link")).toBeUndefined();
+        expect(JSON.stringify({ ...globalThis.sessionStorage })).not.toContain(LINK);
+
+        await keepPendingPost(LINK, undefined);
+        expect(await readPendingPost(LINK)).toBeUndefined();
     });
 });

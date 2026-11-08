@@ -2,17 +2,31 @@ import { api } from "@neore/backend/api";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, userEvent } from "storybook/test";
 
+import { clearGuestTokenMemory, forgetGuestToken, keepGuestToken, keepPendingPost } from "@/features/chat/guest-links/guest-token";
 import { Route as GuestRoute } from "@/routes/(public)/guest";
 import { HOUR, STORY_NOW as NOW } from "@/storybook/clock";
-import { GUEST_LINK_TOKEN, guestAttempts, guestPageFixtures, guestPosts, resetGuestPosts } from "@/storybook/fixtures/guest-page";
+import { GUEST_LINK_TOKEN, guestAttempts, guestPageFixtures, guestPosts, resetGuestPosts, RETURNING_GUEST_TOKEN } from "@/storybook/fixtures/guest-page";
 import { lunoraAnswered, lunoraHandlers } from "@/storybook/lunora";
 import { StoryPage } from "@/storybook/page";
 
-/** The page opens on `#<token>`, the only place the link carries its token. */
-const atFragment = (fragment: string) => () => {
-    resetGuestPosts();
-    globalThis.history.replaceState(null, "", `${globalThis.location.pathname}${globalThis.location.search}${fragment}`);
-};
+/**
+ * The page opens on `#<token>`, the only place the link carries its token. Each story starts as a browser that never
+ * opened the link (no token kept, no post pending), unless it is a returning guest's.
+ */
+const atFragment =
+    (fragment: string, { returning = false } = {}) =>
+    async (): Promise<void> => {
+        resetGuestPosts();
+        clearGuestTokenMemory();
+        await forgetGuestToken(GUEST_LINK_TOKEN);
+        await keepPendingPost(GUEST_LINK_TOKEN, undefined);
+
+        if (returning) {
+            await keepGuestToken(GUEST_LINK_TOKEN, RETURNING_GUEST_TOKEN);
+        }
+
+        globalThis.history.replaceState(null, "", `${globalThis.location.pathname}${globalThis.location.search}${fragment}`);
+    };
 
 const TOKEN_SHAPE = /^[0-9a-f]{64}$/u;
 
@@ -82,6 +96,7 @@ export const RetryAfterLostReply: Story = {
 
 /** Notes from an earlier visit: one waiting, one the owner sent on. */
 export const EarlierNotes: Story = {
+    beforeEach: atFragment(`#${GUEST_LINK_TOKEN}`, { returning: true }),
     parameters: {
         msw: {
             handlers: {
@@ -133,6 +148,7 @@ export const ViewFailsAfterPost: Story = {
 
 /** The owner revoked the link after the post: the page says the link has ended and takes no more messages. */
 export const LinkEnded: Story = {
+    beforeEach: atFragment(`#${GUEST_LINK_TOKEN}`, { returning: true }),
     // A note from earlier first, so the view answered something before the post: only the view after it can end the link.
     parameters: {
         msw: {

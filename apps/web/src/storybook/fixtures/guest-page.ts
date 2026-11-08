@@ -21,6 +21,9 @@ export const resetGuestPosts = (): void => {
     guestAttempts.length = 0;
 };
 
+/** A token this browser already holds for the story's link, as a guest who posted on an earlier visit has. */
+export const RETURNING_GUEST_TOKEN = "ab".repeat(32);
+
 /** A fixture whose first call goes through but loses its reply (answers `failure`), as a dropped connection does. */
 const failingOnce = (fixture: LunoraFixture, failure: LunoraFixture): LunoraFixture => {
     return {
