@@ -209,6 +209,7 @@ export const recordReplyUsage = internalMutation
 
         const costMicrodollars = Math.max(0, Math.round(args.costMicrodollars));
         const tokens = Math.max(0, Math.round(args.tokens));
+
         // A redelivered job, or a reply the totals backfill already counted: counted once. A reply the backfill counted
         // stays under "No project" (project usage starts at deploy, `usage/AGENTS.md`).
         if (await isReplyRecorded(ctx, args.userId, args.replyKey)) {
