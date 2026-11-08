@@ -21,6 +21,8 @@ const saved = vi.hoisted(() => {
         /** The step of the next send that fails, once. */
         fail: undefined as "agent" | "lost-reply" | "record" | "save" | undefined,
         prompts: [] as { message: { content: unknown[] } }[],
+        /** The release of a failed send fails too. */
+        releaseFails: false,
         scheduled: [] as string[],
         /** Writes the saved prompt as a real row, as the agent client does. */
         store: async (_message: unknown): Promise<string> => "saved-prompt",
@@ -125,7 +127,13 @@ const HANDLERS: Record<string, (args: any) => Promise<unknown>> = {
 
         return await run(async (ctx) => await ctx.runMutation(recordGuestNoteSent, args));
     },
-    "chat_guest_links:releaseGuestNoteSend": async (args) => await run(async (ctx) => await ctx.runMutation(releaseGuestNoteSend, args)),
+    "chat_guest_links:releaseGuestNoteSend": async (args) => {
+        if (saved.releaseFails) {
+            throw new Error("the release failed");
+        }
+
+        return await run(async (ctx) => await ctx.runMutation(releaseGuestNoteSend, args));
+    },
     "chat_streaming:createStreamWithMessage": async () => "stream-1",
 };
 
@@ -146,6 +154,7 @@ beforeEach(async () => {
     saved.prompts.length = 0;
     saved.scheduled.length = 0;
     saved.charges = 0;
+    saved.releaseFails = false;
     saved.store = async (message) =>
         await run(
             async (ctx) =>
@@ -231,5 +240,12 @@ describe("/chat/start with a held guest note", () => {
         await expect(sendNote()).rejects.toThrow();
         expect((await sendNote()).status).toBe(200);
         expect(saved.prompts).toHaveLength(1);
+    });
+
+    it("fails with the save's own error when releasing the failed send fails too", async () => {
+        saved.fail = "save";
+        saved.releaseFails = true;
+
+        await expect(sendNote()).rejects.toThrow("the save failed");
     });
 });

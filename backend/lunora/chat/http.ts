@@ -820,12 +820,19 @@ const runChatStartOnShard = async (
         return Response.json({ error: "That guest note was already sent." }, { status: 409 });
     }
 
+    // Never throws: a failed release must not hide why the send failed. The lease settles the send later.
     const releaseGuestSend = async (): Promise<void> => {
-        if (guestSend !== undefined) {
+        if (guestSend === undefined) {
+            return;
+        }
+
+        try {
             await context.runMutation(internal.chat.guest_links.releaseGuestNoteSend, {
                 claimedAt: guestSend,
                 messageId: body.guestMessageId as Id<"threadGuestMessages">,
             });
+        } catch (releaseError) {
+            chatLogger.error("[GuestLink] Could not release a guest send:", releaseError);
         }
     };
 
