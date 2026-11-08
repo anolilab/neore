@@ -243,12 +243,15 @@ catalogs:
     "@visulima/iso-locale": ^1.0.1
   iac:
     # 2.0 is an Effect-based rewrite. The beta ships roughly weekly and each release can
-    # move APIs, so the version is EXACT. beta.82 and .83 are younger than
-    # `minimumReleaseAge`; take a newer one once it is a day old and a preview deploy
-    # passes. Peers: `effect` ^4 and, for the CLI, `@effect/platform-node`.
+    # move APIs, so the version is EXACT. Take a newer beta (82 to 85 are out) only once a
+    # preview deploy passes on it. Peers: `effect` ^4 and, for the CLI, `@effect/platform-node`.
+    # `effect` and `@effect/platform-node` move WITH alchemy, never on their own: beta.81
+    # says `effect ^4.0.0` but imports `effect/Crypto`, which 4.1.0 moved to `effect/crypto`,
+    # so 4.1.x fails every `alchemy deploy` with ERR_MODULE_NOT_FOUND. 4.0.5 is what main
+    # deployed on before #589; beta.85 is the first release that asks for `^4.1.0`.
     alchemy: 2.0.0-beta.81
-    "@effect/platform-node": 4.1.2
-    effect: 4.1.2
+    "@effect/platform-node": 4.0.5
+    effect: 4.0.5
     tsx: 4.23.15
   icons:
     "@lobehub/icons": 6.15.0
@@ -736,6 +739,9 @@ overrides:
   dompurify@<=3.4.12: ">=3.4.13"
   drizzle-orm@<0.45.2: ">=0.45.2"
   effect@<3.20.0: ">=3.20.0"
+  # Moves with the `iac` catalog's effect/platform-node: platform-node 4.0.5 asks for
+  # `^4.0.5`, which reuses a 4.1.x shared package that peers on `effect ^4.1`.
+  "@effect/platform-node>@effect/platform-node-shared": 4.0.5
   express-rate-limit@>=8.2.0 <8.2.2: ">=8.2.2"
   # GHSA-v422-hmwv-36x6. Only `express` pulls a vulnerable copy.
   express>body-parser: ">=2.4.0"
