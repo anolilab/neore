@@ -7,13 +7,13 @@ import { v } from "lunorash/server";
 
 import { authMutation, rateLimit } from "../lib/crpc";
 import { saveUserSettings } from "./lib/preference-writes";
-import { MAX_SKIPPED_SETUP_STEPS } from "./lib/setup-step-limits";
+import { capSkippedSteps } from "./lib/setup-step-limits";
 
 /** The new skipped list for one step; ids stored by other versions are kept, the oldest going first when the list would pass its limit. */
 export const applyStepSkip = (stored: ReadonlyArray<string> | undefined, stepId: string, skipped: boolean): string[] => {
     const rest = (stored ?? []).filter((entry) => entry !== stepId);
 
-    return skipped ? [...rest, stepId].slice(-MAX_SKIPPED_SETUP_STEPS) : rest;
+    return skipped ? capSkippedSteps([...rest, stepId]) : rest;
 };
 
 export const setSetupStepSkipped = authMutation

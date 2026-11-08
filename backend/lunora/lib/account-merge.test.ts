@@ -344,7 +344,14 @@ describe("importShardRows for userSettings", () => {
         });
 
         expect(rows).toHaveLength(1);
-        expect(rows[0]).toMatchObject({ language: "de-DE", setupStepsSkipped: ["pair", "ssh", "agent"] });
+        expect(rows[0]).toMatchObject({ language: "de-DE", setupStepsSkipped: ["agent", "pair", "ssh"] });
+    });
+
+    it("keeps the new account's own steps when the merged list passes the cap", async () => {
+        const own = ["o1", "o2", "o3", "o4", "o5", "o6", "o7", "o8"];
+        const rows = await run([{ _id: "g1", setupStepsSkipped: ["g1", "g2", "g3"], userId: "guest" }], { setupStepsSkipped: own, userId: "user" });
+
+        expect(rows[0]?.setupStepsSkipped).toEqual(own);
     });
 
     it("takes only the converting guest's own row from a page that holds another user's too", async () => {

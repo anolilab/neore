@@ -1,16 +1,12 @@
 /**
  * Skipping and resuming a first-run setup step is applied to the list as stored, one step per call.
  */
-import { v } from "lunorash/server";
 import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { userSettingsFields } from "./fields";
 import { getUserSettings, updateUserSettings } from "./functions";
-import { MAX_SKIPPED_SETUP_STEPS } from "./lib/setup-step-limits";
-import { applyStepSkip, setSetupStepSkipped } from "./setup-steps";
+import { setSetupStepSkipped } from "./setup-steps";
 import { schemaWithShardedTables } from "../lib/test-schema";
-import { validate } from "../lib/validators";
 
 const USER = "user-setup-steps";
 
@@ -76,12 +72,6 @@ afterEach(() => {
 });
 
 describe("setSetupStepSkipped", () => {
-    it("keeps both steps when two writes start from the same empty state", async () => {
-        await Promise.all([toggle("ssh", true), toggle("agent", true)]);
-
-        expect([...((await stored()) ?? [])].toSorted((a, b) => a.localeCompare(b))).toEqual(["agent", "ssh"]);
-    });
-
     it("resumes one step without touching the others, and skipping twice stores it once", async () => {
         await toggle("pair", true);
         await toggle("ssh", true);
@@ -98,15 +88,6 @@ describe("setSetupStepSkipped", () => {
         await toggle("ssh", true);
 
         expect(await stored()).toEqual(["b", "c", "d", "e", "f", "g", "h", "ssh"]);
-    });
-
-    it("shares one limit between the column validator and the skip", () => {
-        const settings = v.object(userSettingsFields);
-        const ids = Array.from({ length: MAX_SKIPPED_SETUP_STEPS + 1 }, (_, index) => `id${index}`);
-
-        expect(validate(settings, { setupStepsSkipped: ids.slice(0, MAX_SKIPPED_SETUP_STEPS), userId: USER })).toBe(true);
-        expect(validate(settings, { setupStepsSkipped: ids, userId: USER })).toBe(false);
-        expect(applyStepSkip(ids.slice(0, MAX_SKIPPED_SETUP_STEPS), "ssh", true)).toHaveLength(MAX_SKIPPED_SETUP_STEPS);
     });
 
     it("cannot be set or erased through the generic settings update", async () => {

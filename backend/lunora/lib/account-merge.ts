@@ -121,8 +121,9 @@ export const listShardRowsPage = internalQuery
 
 /**
  * On the GUEST's shard: the ids of the first page of `table` — for the delete pass. With `ownedBy`, only that user's
- * rows: the tables the new account keeps its own row of are cleared of the guest's row alone, so a shard that also
- * holds the new account's row (one shard serving both, as local routing can) keeps it.
+ * rows: `userSettings` and `aiUserPreferences` (the tables the new account keeps its own row of) are cleared of the
+ * guest's row alone, so a shard that also holds the new account's row (one shard serving both, as local routing can)
+ * keeps it. Every other table is listed whole, as before.
  */
 export const listShardRowIds = internalQuery
     .input({ ownedBy: v.optional(v.string()), table: v.string() })
@@ -163,10 +164,10 @@ const carrySetupSteps = async (ctx: { db: unknown }, guestRows: Record<string, u
 
     if (existing) {
         await db.patch("userSettings", existing._id as string, {
-            setupStepsSkipped: mergeSkippedSteps(existing.setupStepsSkipped as string[] | undefined, skipped),
+            setupStepsSkipped: mergeSkippedSteps(skipped, existing.setupStepsSkipped as string[] | undefined),
         });
     } else {
-        await db.insert("userSettings", { setupStepsSkipped: mergeSkippedSteps(undefined, skipped), userId: to }, { allowExplicitId: false });
+        await db.insert("userSettings", { setupStepsSkipped: mergeSkippedSteps(skipped, undefined), userId: to }, { allowExplicitId: false });
     }
 };
 
