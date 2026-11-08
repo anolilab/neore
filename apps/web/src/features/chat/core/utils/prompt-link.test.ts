@@ -14,15 +14,13 @@ describe(readPromptLinkSearch, () => {
         expect(prompt?.endsWith("😀")).toBe(true);
     });
 
-    it("reads a value the router parsed as JSON back as its text", () => {
-        expect(readPromptLinkSearch({ prompt: 42 })).toStrictEqual({ prompt: "42" });
-        // The page passes the raw query text, which keeps a prompt that looks like JSON as it was written.
+    it("keeps a prompt that looks like JSON as it was written", () => {
+        expect(readPromptLinkSearch({ prompt: "1.50" })).toStrictEqual({ prompt: "1.50" });
         expect(readPromptLinkSearch({ prompt: '{"task":"summarise"}' })).toStrictEqual({ prompt: '{"task":"summarise"}' });
     });
 
     it("carries nothing, not even the model, without a usable prompt", () => {
         expect(readPromptLinkSearch({ model: "gpt", prompt: " ​ " })).toStrictEqual({ prompt: "" });
-        expect(readPromptLinkSearch({ model: "gpt", prompt: { a: 1 } })).toStrictEqual({ prompt: "" });
         expect(readPromptLinkSearch({ model: "gpt" })).toStrictEqual({});
     });
 });

@@ -6,7 +6,7 @@ import { getCreatorSlug } from "@/components/model-picker/utilities";
 
 import { useChatUIStore } from "../stores/chat-ui-store";
 import { useModelStore } from "../stores/model-store";
-import { usePromptLinkDraft } from "./use-prompt-link-draft";
+import { useLinkSearchAsWritten, usePromptLinkDraft } from "./use-prompt-link-draft";
 
 const navigate = vi.fn();
 const showWarning = vi.fn();
@@ -69,6 +69,7 @@ beforeEach(() => {
     showWarning.mockClear();
     useChatUIStore.getState().clearComposer();
     useModelStore.getState().setSelectedModel(startModel, undefined);
+    useModelStore.getState().setComparisonMode(false);
 });
 
 describe(usePromptLinkDraft, () => {
@@ -160,6 +161,20 @@ describe(usePromptLinkDraft, () => {
         expect(showWarning).not.toHaveBeenCalled();
     });
 
+    it("keeps a comparison or mode the person picks while the link's model waits for the picker's list", () => {
+        picker.settled = false;
+        const { rerender } = renderHook(() => usePromptLinkDraft({ model: textModel?.id, otherDraftSource: false, prompt: "Draft me" }));
+
+        useModelStore.getState().setSelectedModelsForComparison(["a", "b"]);
+        useModelStore.getState().setComparisonMode(true);
+        picker.settled = true;
+        rerender();
+
+        expect(useModelStore.getState().comparisonMode).toBe(true);
+        expect(useModelStore.getState().selectedModelsForComparison).toStrictEqual(["a", "b"]);
+        expect(useModelStore.getState().selectedModel).toBe(startModel);
+    });
+
     it("applies the prompt but not a model from a lab the person hid from the picker", () => {
         // The picker list holds ids only here, so the lab is read from the id as the picker reads it.
         picker.blockedCreators = [getCreatorSlug({ id: textModel!.id } as never)];
@@ -185,5 +200,22 @@ describe(usePromptLinkDraft, () => {
         expect(useChatUIStore.getState().composerText).toBe("Draft me");
         expect(useModelStore.getState().selectedModel).toBe(startModel);
         expect(showWarning).toHaveBeenCalledOnce();
+    });
+});
+
+describe(useLinkSearchAsWritten, () => {
+    it("keeps the link as written while a navigation writes it back from the router's parsed values", () => {
+        const { rerender, result } = renderHook(({ parsed, written }: { parsed: string; written: string }) => useLinkSearchAsWritten(parsed, written), {
+            initialProps: { parsed: "1.5", written: "1.50" },
+        });
+
+        // Opening Settings keeps the search: the router writes `1.5`, which it parses as before.
+        rerender({ parsed: "1.5", written: "1.5" });
+
+        expect(result.current).toBe("1.50");
+
+        rerender({ parsed: "2", written: "2" });
+
+        expect(result.current).toBe("2");
     });
 });

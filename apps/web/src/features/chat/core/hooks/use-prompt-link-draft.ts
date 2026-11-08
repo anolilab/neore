@@ -1,7 +1,7 @@
 import { useLingui } from "@lingui/react/macro";
 import { enabledModelOf } from "@neore/ai/models";
 import { useNavigate } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { filterModelsByBlockedCreators } from "@/components/model-picker/utilities";
 import useFeatureFlaggedModels, { useFeatureFlaggedModelsSettled } from "@/hooks/use-feature-flagged-models";
@@ -19,6 +19,27 @@ import { useModelStore } from "../stores/model-store";
  */
 const isLinkableModel = (model: string, pickerModelIds: ReadonlySet<string>): boolean =>
     enabledModelOf(model, { mode: "text" }) !== undefined && pickerModelIds.has(model);
+
+/** What the person has chosen in the composer: a link's model waiting for the picker's list is dropped once any of it changes. */
+const chosenOf = ({ comparisonMode, newThreadMode, selectedModel }: ReturnType<typeof useModelStore.getState>): string =>
+    JSON.stringify([selectedModel, comparisonMode, newThreadMode]);
+
+/**
+ * The link's parameters as the address first wrote them (`written`), held while the router's `parsed` values (serialized) stay the
+ * same. A navigation that keeps the search (opening Settings while a saved prompt loads) writes them back from the parsed values,
+ * so `prompt=1.50` would become `1.5`; a new link, or the link leaving the address, changes `parsed`.
+ */
+export const useLinkSearchAsWritten = <T>(parsed: string, written: T): T => {
+    const [held, setHeld] = useState({ parsed, written });
+
+    if (held.parsed !== parsed) {
+        setHeld({ parsed, written });
+
+        return written;
+    }
+
+    return held.written;
+};
 
 /**
  * Applies a prompt link once (`core/utils/prompt-link.ts`): its prompt becomes the new chat's draft, and its model is selected when
@@ -51,8 +72,8 @@ export const usePromptLinkDraft = ({
     const pickerSettled = useFeatureFlaggedModelsSettled();
     const appliedRef = useRef<string | undefined>(undefined);
     // The model of a link whose prompt was applied, waiting for the picker's list: judged earlier, it could pick a model the
-    // list then leaves out. The prompt itself does not wait for it. `chosen` is the chat's model then: a model the person
-    // picks in the meantime is theirs, and the link's is dropped.
+    // list then leaves out. The prompt itself does not wait for it. `chosen` is the chat's model, comparison and mode then: any of
+    // them the person changes in the meantime is theirs, and the link's model is dropped.
     const pendingModelRef = useRef<{ chosen: string; model: string } | undefined>(undefined);
 
     useEffect(() => {
@@ -102,7 +123,7 @@ export const usePromptLinkDraft = ({
             showWarning(t`Your draft is kept. The prompt from the link was not added.`);
         } else {
             setComposerText(prompt);
-            pendingModelRef.current = model === undefined ? undefined : { chosen: useModelStore.getState().selectedModel, model };
+            pendingModelRef.current = model === undefined ? undefined : { chosen: chosenOf(useModelStore.getState()), model };
         }
 
         clearLink();
@@ -119,7 +140,7 @@ export const usePromptLinkDraft = ({
 
         const state = useModelStore.getState();
 
-        if (state.selectedModel !== pending.chosen) {
+        if (chosenOf(state) !== pending.chosen) {
             return;
         }
 

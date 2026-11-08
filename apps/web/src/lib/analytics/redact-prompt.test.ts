@@ -70,4 +70,17 @@ describe(redactPromptFromEvent, () => {
         expect(event?.properties.$current_url).toContain("model%253Dgpt");
         expect(event?.properties.$current_url).toContain("&x=1");
     });
+
+    it("redacts a link nested four layers deep", () => {
+        let address = "/chat?prompt=my secret %26 more&model=gpt";
+
+        for (let layer = 0; layer < 4; layer += 1) {
+            address = `/auth/sign-in?redirectTo=${encodeURIComponent(address)}`;
+        }
+
+        const event = redactPromptFromEvent(pageView({ $current_url: `https://app.test${address}` }));
+
+        expect(JSON.stringify(event)).not.toMatch(PROMPT_WORDS);
+        expect(event?.properties.$current_url).toContain("prompt%2525253Dredacted%25252526model%2525253Dgpt");
+    });
 });

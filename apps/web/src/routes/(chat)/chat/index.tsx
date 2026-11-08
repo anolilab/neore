@@ -10,7 +10,7 @@ import RouteErrorBoundary from "@/components/error-boundaries/route-error-bounda
 import { useUserSettings } from "@/features/auth/hooks/use-user-settings";
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 import Assistant from "@/features/chat/assistant";
-import { usePromptLinkDraft } from "@/features/chat/core/hooks/use-prompt-link-draft";
+import { useLinkSearchAsWritten, usePromptLinkDraft } from "@/features/chat/core/hooks/use-prompt-link-draft";
 import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
 import { readPromptLinkSearch } from "@/features/chat/core/utils/prompt-link";
 import { BOOTED_ON_CHAT_INDEX } from "@/features/chat/core/utils/resume-boot";
@@ -45,10 +45,14 @@ const ChatPage = () => {
     // Decoded as a query string is, so `+` is a space (`?prompt=Explain+this` is how links write one); a literal plus is `%2B`.
     const router = useRouter();
     const rawSearch = new URLSearchParams(router.history.location.search);
-    const { model: linkModel, prompt: linkPrompt } = readPromptLinkSearch({
-        model: rawSearch.get("model") ?? undefined,
-        prompt: rawSearch.get("prompt") ?? undefined,
+    // Each value's type and both renderings: JSON alone reads `?prompt=null` (and `1e999`) the same as no prompt at all.
+    const parsedLink = Route.useSearch({
+        select: ({ model, prompt }) => JSON.stringify([model, prompt].map((value: unknown) => [typeof value, String(value), JSON.stringify(value)])),
     });
+    const { model: linkModel, prompt: linkPrompt } = useLinkSearchAsWritten(
+        parsedLink,
+        readPromptLinkSearch({ model: rawSearch.get("model") ?? undefined, prompt: rawSearch.get("prompt") ?? undefined }),
+    );
     // TanStack keys each history entry; a new navigation gets a new key.
     const navigationKey = location.state.__TSR_key;
     const { t } = useLingui();
@@ -210,8 +214,9 @@ const ChatPage = () => {
 export const Route = createFileRoute("/(chat)/chat/")({
     validateSearch: (search: Record<string, unknown>) => {
         // A prompt link (`core/utils/prompt-link.ts`): applied as a draft once, never sent (`core/hooks/use-prompt-link-draft.ts`).
-        // The page reads its text from the raw query; here the two keys are only passed on as the router parsed them, so a
-        // navigation that keeps the search writes them back unchanged, and clearing them is typed.
+        // The page reads its text from the raw query; here the two keys are only passed on as the router parsed them, so clearing
+        // them is typed. A navigation that keeps the search writes them back from these values, so the page holds the raw text
+        // while they stay the same (`useLinkSearchAsWritten`).
         return {
             model: search.model as unknown,
             prompt: search.prompt as unknown,
