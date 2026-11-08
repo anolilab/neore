@@ -28498,6 +28498,12 @@
           "nullable": false,
           "optional": false,
           "unique": false
+        },
+        "withoutProject": {
+          "kind": "boolean",
+          "nullable": false,
+          "optional": true,
+          "unique": false
         }
       },
       "indexes": {

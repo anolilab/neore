@@ -62,8 +62,9 @@ type ReadCtx = Pick<MutationCtx | QueryCtx, "db">;
 export const isReplyRecorded = async (ctx: DbCtx, userId: string, replyKey: string): Promise<boolean> =>
     (await ctx.db.usageReplies.findFirst({ where: { replyKey, userId } })) !== null;
 
-export const markReplyRecorded = async (ctx: DbCtx, userId: string, replyKey: string, at: number): Promise<void> => {
-    await ctx.db.insert("usageReplies", { recordedAt: at, replyKey, userId });
+/** `withoutProject`: the reply's fallback counted it without its project, which a later record may still file. */
+export const markReplyRecorded = async (ctx: DbCtx, userId: string, replyKey: string, at: number, withoutProject = false): Promise<void> => {
+    await ctx.db.insert("usageReplies", { recordedAt: at, replyKey, userId, ...(withoutProject && { withoutProject: true }) });
 };
 
 /** Where a reply in `thread` is filed besides the total: its project. */
@@ -210,19 +211,38 @@ export const recordReplyUsage = internalMutation
         const costMicrodollars = Math.max(0, Math.round(args.costMicrodollars));
         const tokens = Math.max(0, Math.round(args.tokens));
 
-        // A redelivered job, or a reply the totals backfill already counted: counted once. A reply the backfill counted
-        // stays under "No project" (project usage starts at deploy, `usage/AGENTS.md`).
-        if (await isReplyRecorded(ctx, args.userId, args.replyKey)) {
-            return null;
-        }
-
         // A project read by the caller is checked again here: access revoked since that read files none. A failed read
         // throws before anything is written, and the record is retried (`RECORD_RETRY`); its fallback files the reply
         // without a project.
-        const attribution =
+        const attributionNow = async (): Promise<Attribution> =>
             args.threadAttribution === undefined
                 ? await attributionFor(ctx, args.threadId, args.userId)
                 : await readableAttribution(ctx, args.threadAttribution, args.userId);
+        const fileProject = async (attribution: Attribution): Promise<void> => {
+            if (attribution.projectKey !== undefined) {
+                await addToAttributionRollup(
+                    ctx,
+                    args.userId,
+                    [{ costMicrodollars, date: args.date, projectKey: attribution.projectKey, replies: 1, tokens }],
+                    args.at,
+                );
+            }
+        };
+        const recorded = await ctx.db.usageReplies.findFirst({ where: { replyKey: args.replyKey, userId: args.userId } });
+
+        // A redelivered job, or a reply the totals backfill already counted: counted once. A reply the backfill counted
+        // stays under "No project" (project usage starts at deploy, `usage/AGENTS.md`). One its fallback counted first,
+        // because this record ran late, still gets its project — once.
+        if (recorded) {
+            if (recorded.withoutProject === true && args.fallback !== true) {
+                await fileProject(await attributionNow());
+                await ctx.db.patch("usageReplies", recorded._id, { withoutProject: false });
+            }
+
+            return null;
+        }
+
+        const attribution = await attributionNow();
 
         if (args.fallback === true) {
             usageLogger.warn("[usage] the reply's record never landed; its fallback records it without a project", {
@@ -232,7 +252,7 @@ export const recordReplyUsage = internalMutation
             });
         }
 
-        await markReplyRecorded(ctx, args.userId, args.replyKey, args.at);
+        await markReplyRecorded(ctx, args.userId, args.replyKey, args.at, args.fallback === true);
         await addToRollup(
             ctx,
             args.userId,
@@ -250,14 +270,7 @@ export const recordReplyUsage = internalMutation
             true,
         );
 
-        if (attribution.projectKey !== undefined) {
-            await addToAttributionRollup(
-                ctx,
-                args.userId,
-                [{ costMicrodollars, date: args.date, projectKey: attribution.projectKey, replies: 1, tokens }],
-                args.at,
-            );
-        }
+        await fileProject(attribution);
 
         return null;
     });

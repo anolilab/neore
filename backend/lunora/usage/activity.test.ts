@@ -336,7 +336,7 @@ describe("recording usage by project", () => {
         expect(forwarded).toMatchObject([{ threadAttribution: { projectKey: alpha.projectId } }]);
     });
 
-    it("lands a reply's total through its fallback when every try failed, and adds nothing when the record landed", async () => {
+    it("lands a reply's total through its fallback when every try failed, adds nothing when the record landed, and still files a late record's project", async () => {
         const alpha = await insertThread(USER, "Alpha");
         const fallback = async (replyKey: string) => await record({ fallback: true, replyKey, threadAttribution: {}, threadId: alpha.threadId });
 
@@ -350,6 +350,15 @@ describe("recording usage by project", () => {
 
         expect(totals.days).toMatchObject([{ costMicrodollars: 200, replies: 2 }]);
         expect(await projectTotals(USER)).toStrictEqual({ [alpha.projectId!]: { costMicrodollars: 100, replies: 1, tokens: 10 } });
+
+        // The record of the first reply was only late: landing after its fallback, it files the project, once.
+        await record({ replyKey: "never-landed", threadId: alpha.threadId });
+        await record({ replyKey: "never-landed", threadId: alpha.threadId });
+
+        const after = await heatmap(USER, "2026-09-25");
+
+        expect(after.days).toMatchObject([{ costMicrodollars: 200, replies: 2 }]);
+        expect(await projectTotals(USER)).toStrictEqual({ [alpha.projectId!]: { costMicrodollars: 200, replies: 2, tokens: 20 } });
     });
 
     it("files no project once the user's membership in the project's organization is revoked", async () => {
