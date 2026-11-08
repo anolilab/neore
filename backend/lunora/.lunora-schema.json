@@ -11124,6 +11124,12 @@
     "notifications": {
       "commitOrdered": false,
       "fields": {
+        "approvalId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "body": {
           "kind": "string",
           "nullable": false,
@@ -20857,6 +20863,13 @@
           "optional": true,
           "unique": false
         },
+        "machineId": {
+          "kind": "id",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "ref": "devices"
+        },
         "order": {
           "kind": "number",
           "nullable": false,
@@ -20864,6 +20877,12 @@
           "unique": false
         },
         "organizationId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "path": {
           "kind": "string",
           "nullable": false,
           "optional": true,

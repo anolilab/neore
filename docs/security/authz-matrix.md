@@ -544,7 +544,7 @@ for a schema table that is neither policed nor listed:
 | `pages_sharing.revokePageInvite` | mutation | authMutation + RL | pageInvites | page access | ok |
 | `pages_sharing.setPagePublic` | mutation | authMutation + RL | pages | page access | ok |
 | `pages_sharing.updatePageGrant` | mutation | authMutation + RL | pages | page access | ok |
-| `projects_functions.createProject` | mutation | authMutation + RL | — | org membership/role | **fixed** (medium) — organizationId must be the active org |
+| `projects_functions.createProject` | mutation | authMutation + RL | devices | org membership/role; optional `machineId` must be a device with `device.userId == caller` and no `revokedAt` (otherwise NOT_FOUND), with an absolute `path` | **fixed** (medium) — organizationId must be the active org; the machine and folder are recorded only for the caller's own live device |
 | `projects_functions.deleteProject` | mutation | authMutation + RL | projects | row.userId == caller | **fixed** (low) — move target must be the caller's project |
 | `projects_functions.getProject` | query | authQuery | projects | org membership/role; row.userId == caller | ok |
 | `projects_functions.listPinnedProjects` | query | authQuery | — | caller-scoped (ctx.user) | **fixed** (high) — via `agent_projects.listPinnedProjects` |

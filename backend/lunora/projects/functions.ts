@@ -27,6 +27,7 @@ import {
     ProjectRepoError,
     withDefault,
 } from "./repositories";
+import { resolveProjectLocation } from "./machine-location";
 
 /** Whether `userId` is a current member of an organization. */
 type MembershipCheck = (organizationId: string) => Promise<boolean>;
@@ -210,21 +211,31 @@ export const createProject = authMutation
         defaultReasoningEffort: v.optional(v.number()),
         description: v.optional(v.string().max(MAX_LENGTH.long)),
         icon: v.optional(v.string().max(MAX_LENGTH.url)),
+        // The device the folder lives on, with the folder's absolute path on it (checked in the handler).
+        machineId: v.optional(v.id("devices")),
         organizationId: v.optional(v.string().max(MAX_LENGTH.id)),
+        path: v.optional(v.string().max(MAX_LENGTH.key)),
         title: v.string().max(MAX_LENGTH.long),
     })
     .output(v.string())
-    .mutation(async ({ args, ctx: context }) => {
+    .mutation(async ({ args: { machineId, path, ...args }, ctx: context }) => {
         const { userId } = context.user;
 
         assertOwnOrganizationId(context.user, args.organizationId);
 
+        const location = await resolveProjectLocation(context, userId, machineId, path);
+
         const project = await context.runMutation(internal.agent.projects.createProject, {
             ...args,
+            ...location,
             userId,
         });
 
-        context.log.event("projects.create_project", { hasOrganization: args.organizationId !== undefined, projectId: project._id });
+        context.log.event("projects.create_project", {
+            hasMachine: location.machineId !== undefined,
+            hasOrganization: args.organizationId !== undefined,
+            projectId: project._id,
+        });
 
         return project._id;
     });

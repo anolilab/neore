@@ -41374,7 +41374,15 @@
                       "icon": {
                         "type": "string"
                       },
+                      "machineId": {
+                        "description": "Id<\"devices\">",
+                        "type": "string",
+                        "x-lunora-table": "devices"
+                      },
                       "organizationId": {
+                        "type": "string"
+                      },
+                      "path": {
                         "type": "string"
                       },
                       "title": {
@@ -41738,10 +41746,18 @@
                       "isPublic": {
                         "type": "boolean"
                       },
+                      "machineId": {
+                        "description": "Id<\"devices\">",
+                        "type": "string",
+                        "x-lunora-table": "devices"
+                      },
                       "order": {
                         "type": "number"
                       },
                       "organizationId": {
+                        "type": "string"
+                      },
+                      "path": {
                         "type": "string"
                       },
                       "pinnedAt": {
@@ -42150,10 +42166,18 @@
                           "isPublic": {
                             "type": "boolean"
                           },
+                          "machineId": {
+                            "description": "Id<\"devices\">",
+                            "type": "string",
+                            "x-lunora-table": "devices"
+                          },
                           "order": {
                             "type": "number"
                           },
                           "organizationId": {
+                            "type": "string"
+                          },
+                          "path": {
                             "type": "string"
                           },
                           "pinnedAt": {
