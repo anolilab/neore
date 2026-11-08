@@ -1604,9 +1604,9 @@ const REVERT_MUTATION = `mutation ($pullRequestId: ID!, $title: String, $body: S
 
 /**
  * A GitHub login: letters and digits, with single hyphens or underscores between them (managed users have underscores),
- * at most 39 characters. A trailing or doubled hyphen is not a login.
+ * at most 39 characters. A trailing or doubled hyphen or underscore is not a login.
  */
-const LOGIN = /^[A-Za-z0-9](?:\w|-\b){0,38}$/u;
+const LOGIN = /^[A-Za-z0-9](?:[A-Za-z0-9]|[-_](?=[A-Za-z0-9])){0,38}$/u;
 const CRLF = /\r\n/gu;
 
 /** Reviewers one call may add; a longer list is refused rather than split without the person knowing. */

@@ -85,6 +85,9 @@ describe("pull request actions refuse before reading a token", () => {
 
     it("a login that is not one, naming the first bad one", async () => {
         await expect(call(requestReviewers, { logins: ["octocat", "bad login", "-also-bad"] })).rejects.toThrow('"bad login" is not a valid login');
+        // A managed user's login has single underscores; a trailing or doubled one is not a login.
+        await expect(call(requestReviewers, { logins: ["dana_acme", "dana_"] })).rejects.toThrow('"dana_" is not a valid login');
+        await expect(call(requestReviewers, { logins: ["a__b"] })).rejects.toThrow('"a__b" is not a valid login');
         expect(resolveToken).not.toHaveBeenCalled();
     });
 });
