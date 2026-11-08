@@ -47,11 +47,12 @@
   (before any network wait), then the registration gate closes, in-flight registrations settle, the token is released
   (bounded to 5 s), and the session is revoked, with the token a failed keychain clear still carries. Delivered
   alerts and a held tap are dropped on sign-out, on a server-ended session (`emptyCacheWhileSignedOut`) and on an
-  account switch, which is detected across relaunches (`noteAccountOnPhone`, which keeps only a SHA-256 digest). A refused grant (401) clears only that
+  account switch, which is detected across relaunches (`noteAccountOnPhone`, which keeps only a SHA-256 digest; sign-out removes it after the alerts, `forgetAccountOnPhone`). A refused grant (401) clears only that
   grant, never a newer one: the push background task runs beside the app.
   `secureGrantStore` rewrites a pre-update grant over itself once (`upgradeGrantInPlace`, a `SecItemUpdate` that carries
   `keychainAccessible`, or the old accessibility stays), never delete-and-re-add, retried on the next use if it fails; keychain items are written only when they differ. A 404 from the content route (another account's
-  notification) posts nothing on Android. A tapped notification's chat is held (`pending-tap.ts`): the hook goes
+  notification) posts nothing on Android; iOS must show it, so the extension keeps the placeholder and drops its
+  `threadId`. A tapped notification's chat is held (`pending-tap.ts`): the hook goes
   there once signed in and past sign-in, otherwise the sign-in gate goes there instead of the chat list; a tap made with
   nobody signed in is never followed after sign-in (it may be the previous account's). Android needs
   `google-services.json` (`GOOGLE_SERVICES_JSON`).

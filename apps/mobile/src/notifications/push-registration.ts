@@ -217,8 +217,8 @@ export const LAST_ACCOUNT_KEY = "neore.mobile.last-push-account";
 /**
  * Records the account signed in on this phone and resolves whether it replaced another
  * one: then the alerts still on the phone are the previous person's. Kept on the device,
- * not in memory, so it holds across a relaunch; only a digest of the id is kept, so
- * nothing that names the account stays behind after it signs out.
+ * not in memory, so it holds across a relaunch (a sign-out that never finished); only a
+ * digest of the id is kept, and sign-out removes it ({@link forgetAccountOnPhone}).
  */
 export const noteAccountOnPhone = async (
     userId: string,
@@ -236,6 +236,14 @@ export const noteAccountOnPhone = async (
     }
 
     return isAccountSwitch(previous, current);
+};
+
+/**
+ * Sign-out, once the alerts are gone: the next person to sign in has nothing to be told apart
+ * from, and the phone keeps no trace of the account that left.
+ */
+export const forgetAccountOnPhone = async (store: { remove: (key: string) => Promise<void> }): Promise<void> => {
+    await store.remove(LAST_ACCOUNT_KEY);
 };
 
 /** The opaque ids a phone push carries; never any text. */

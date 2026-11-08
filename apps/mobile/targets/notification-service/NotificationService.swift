@@ -31,9 +31,16 @@ final class NotificationService: UNNotificationServiceExtension {
         }
 
         fetch = Task { [weak self] in
-            let text = await PushContent.fetch(notificationId: notificationId)
-
-            self?.deliver(text)
+            switch await PushContent.fetch(notificationId: notificationId) {
+            case let .text(text):
+                self?.deliver(text)
+            case .notThisAccount:
+                // Another account's notification: iOS must still show it, so the placeholder stays, but a tap
+                // must not open that account's chat under the one signed in now.
+                self?.deliver(withoutThread: true)
+            case .placeholder:
+                self?.deliver()
+            }
         }
     }
 
@@ -43,7 +50,7 @@ final class NotificationService: UNNotificationServiceExtension {
         deliver()
     }
 
-    private func deliver(_ text: PushContent.Text? = nil) {
+    private func deliver(_ text: PushContent.Text? = nil, withoutThread: Bool = false) {
         lock.lock()
         defer { lock.unlock() }
 
@@ -56,6 +63,10 @@ final class NotificationService: UNNotificationServiceExtension {
         if let text {
             content.title = text.title
             content.body = text.body
+        }
+
+        if withoutThread {
+            content.userInfo = PushIds.removingThreadId(from: content.userInfo)
         }
 
         contentHandler(content)
@@ -80,6 +91,22 @@ enum PushIds {
         return nil
     }
 
+    /// The same push with no `threadId` anywhere Expo may have put one, so a tap opens the chat list.
+    static func removingThreadId(from userInfo: [AnyHashable: Any]) -> [AnyHashable: Any] {
+        var stripped = userInfo
+
+        stripped.removeValue(forKey: "threadId")
+
+        for key in ["body", "data"] {
+            if var nested = stripped[key] as? [String: Any] {
+                nested.removeValue(forKey: "threadId")
+                stripped[key] = nested
+            }
+        }
+
+        return stripped
+    }
+
     private static func isId(_ value: String) -> Bool {
         !value.isEmpty && value.count <= 64 && value.unicodeScalars.allSatisfy { allowed.contains($0) }
     }
@@ -89,6 +116,14 @@ enum PushContent {
     struct Text {
         let title: String
         let body: String
+    }
+
+    enum Outcome {
+        case text(Text)
+        /// The content route answered 404: the notification is not the signed-in account's.
+        case notThisAccount
+        /// Signed out, offline, too slow, a failure on our side, or a locked chat (`generic`).
+        case placeholder
     }
 
     /// Keys of the app's keychain items (`src/auth/secure-store.ts`, `src/notifications/phone-push.ts`).
@@ -113,39 +148,51 @@ enum PushContent {
         return (token, userId)
     }
 
-    static func fetch(notificationId: String) async -> Text? {
+    static func fetch(notificationId: String) async -> Outcome {
         guard
             let fetchedFor = session(),
             let urlData = Keychain.read(lunoraUrlKey),
             let lunoraUrl = String(data: urlData, encoding: .utf8)
         else {
-            return nil
+            return .placeholder
         }
 
         let sessionToken = fetchedFor.token
 
         guard
-            let tokenAnswer = await post(lunoraUrl + "/extension/auth/token", body: ["token": sessionToken], bearer: nil),
-            let jwt = tokenAnswer["token"] as? String,
-            let content = await post(lunoraUrl + "/notifications/push-content", body: ["notificationId": notificationId], bearer: jwt),
+            let tokenAnswer = await post(lunoraUrl + "/extension/auth/token", body: ["token": sessionToken], bearer: nil).json,
+            let jwt = tokenAnswer["token"] as? String
+        else {
+            return .placeholder
+        }
+
+        let answer = await post(lunoraUrl + "/notifications/push-content", body: ["notificationId": notificationId], bearer: jwt)
+
+        // As `push-content.ts`: the notification is not the signed-in account's (it switched since the push went out).
+        if answer.status == 404 {
+            return .notThisAccount
+        }
+
+        guard
+            let content = answer.json,
             let title = content["title"] as? String,
             let body = content["body"] as? String
         else {
-            // Signed out, offline, too slow, not this account's, or a locked chat (`generic`): keep the placeholder.
-            return nil
+            return .placeholder
         }
 
         // The phone signed out or switched accounts while the text was on its way: it is not this person's to see.
         guard session()?.userId == fetchedFor.userId else {
-            return nil
+            return .placeholder
         }
 
-        return Text(title: title, body: body)
+        return .text(Text(title: title, body: body))
     }
 
-    private static func post(_ url: String, body: [String: String], bearer: String?) async -> [String: Any]? {
+    /// The response's status (`nil` when there was no answer) and its JSON body, read only for a 2xx.
+    private static func post(_ url: String, body: [String: String], bearer: String?) async -> (status: Int?, json: [String: Any]?) {
         guard let endpoint = URL(string: url), endpoint.scheme == "https" || endpoint.host == "localhost" else {
-            return nil
+            return (nil, nil)
         }
 
         var request = URLRequest(url: endpoint, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: timeout)
@@ -159,20 +206,23 @@ enum PushContent {
         }
 
         guard let payload = try? JSONSerialization.data(withJSONObject: body) else {
-            return nil
+            return (nil, nil)
         }
 
         request.httpBody = payload
 
         guard
             let (data, response) = try? await URLSession.shared.data(for: request),
-            let status = (response as? HTTPURLResponse)?.statusCode,
-            (200 ..< 300).contains(status)
+            let status = (response as? HTTPURLResponse)?.statusCode
         else {
-            return nil
+            return (nil, nil)
         }
 
-        return try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+        guard (200 ..< 300).contains(status) else {
+            return (status, nil)
+        }
+
+        return (status, try? JSONSerialization.jsonObject(with: data) as? [String: Any])
     }
 }
 

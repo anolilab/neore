@@ -1,5 +1,6 @@
 import { tokenRefreshDelayMs } from "@neore/client-runtime";
 import { dismissAllNotificationsAsync } from "expo-notifications";
+import { deleteItemAsync } from "expo-secure-store";
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -8,7 +9,7 @@ import { loadConfig } from "../lib/config";
 import { getClient } from "../lib/lunora";
 import { clearTapRoute } from "../notifications/pending-tap";
 import { backendPushServer, devicePushPlatform, pushRegistrations } from "../notifications/phone-push";
-import { releasePhonePush } from "../notifications/push-registration";
+import { forgetAccountOnPhone, releasePhonePush } from "../notifications/push-registration";
 import { getOfflineCache } from "../offline/database";
 import type { AuthStatus } from "./auth-state";
 import { AuthContext } from "./auth-state";
@@ -26,10 +27,14 @@ const TOKEN_RETRY_MS = 15_000;
 
 const nextTick = (tick: number): number => tick + 1;
 
-/** The alerts on the phone, and a chat held from a tap, belong to the account that is leaving: neither stays. */
+/**
+ * The alerts on the phone, and a chat held from a tap, belong to the account that is leaving: neither stays. The
+ * record of that account goes last: if the alerts could not be removed, the next sign-in still sees the switch.
+ */
 const dismissPreviousAccountAlerts = async (): Promise<void> => {
     clearTapRoute();
     await dismissAllNotificationsAsync();
+    await forgetAccountOnPhone({ remove: deleteItemAsync });
 };
 
 /**

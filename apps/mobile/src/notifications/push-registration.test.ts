@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import type { PushPermission, PushPlatform, PushServer } from "./push-registration";
-import { createPendingWork, createRegistrationRetry, isAccountSwitch, LAST_ACCOUNT_KEY, noteAccountOnPhone, onceItWorks, pushIdsFromNotification, pushIdsIn, registerPhoneForPush, releasePhonePush, routeForPush } from "./push-registration";
+import { createPendingWork, createRegistrationRetry, forgetAccountOnPhone, isAccountSwitch, LAST_ACCOUNT_KEY, noteAccountOnPhone, onceItWorks, pushIdsFromNotification, pushIdsIn, registerPhoneForPush, releasePhonePush, routeForPush } from "./push-registration";
 
 const TOKEN = "a".repeat(64);
 
@@ -284,6 +284,19 @@ describe("noteAccountOnPhone", () => {
         expect(same.store.writeInPlace).not.toHaveBeenCalled();
         expect(await noteAccountOnPhone("u1", first.store)).toBe(false);
         expect(first.items[LAST_ACCOUNT_KEY]).toBe("sha256:u1");
+    });
+
+    it("keeps nothing of an account that signed out, so the next sign-in is a first one", async () => {
+        const { items, store } = device("sha256:u1");
+
+        await forgetAccountOnPhone({
+            remove: async (key) => {
+                delete items[key];
+            },
+        });
+
+        expect(items[LAST_ACCOUNT_KEY]).toBeUndefined();
+        expect(await noteAccountOnPhone("u2", store)).toBe(false);
     });
 });
 

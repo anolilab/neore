@@ -125,8 +125,9 @@ export const usePhonePush = (): void => {
             return isRegistered;
         });
 
-        // A new sign-in reopens the gate the last sign-out closed.
+        // A new sign-in reopens the gate the last sign-out closed, and is offered the prompt again.
         pushRegistrations.open();
+        offer.isDone = false;
         registration.run();
 
         const tokenSubscription = addPushTokenListener(() => {
