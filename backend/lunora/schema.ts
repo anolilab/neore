@@ -2192,6 +2192,8 @@ export const schema = defineSchema({
     // store.
     pushDevices: defineTable({
         createdAt: v.number(),
+        // The phone's language (a BCP 47 tag the app reports), for the placeholder alert's wording.
+        language: v.optional(v.string()),
         lastSeenAt: v.number(),
         platform: v.union(v.literal("android"), v.literal("ios")),
         // The sign-in that registered the phone: once it ends or expires, the phone gets nothing more.

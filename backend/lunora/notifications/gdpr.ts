@@ -63,8 +63,8 @@ export const collectNotificationsForExport = internalQuery
                 return { _id, attempts, createdAt, link, sentAt, status, title };
             }),
             // The phone's platform and when it registered; the token, like a browser's keys, is a delivery credential.
-            pushDevices: phones.map(({ createdAt, lastSeenAt, platform }) => {
-                return { createdAt, platform, updatedAt: lastSeenAt };
+            pushDevices: phones.map(({ createdAt, language, lastSeenAt, platform }) => {
+                return { createdAt, platform, updatedAt: lastSeenAt, ...(language !== undefined && { language }) };
             }),
             // The browser and when it subscribed; the endpoint and keys are
             // credentials for delivering to that browser, not data about the user.

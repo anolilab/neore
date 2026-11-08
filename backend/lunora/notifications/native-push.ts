@@ -11,6 +11,7 @@ import { v } from "lunorash/server";
 import { isAccountDeletionUnderway } from "../gdpr/deletion-guard";
 import type { Id } from "../_generated/dataModel";
 import { authMutation, authQuery, rateLimit } from "../lib/crpc";
+import { patchRow, withoutUndefined } from "../lib/patch";
 import { systemDb } from "../lib/rls/scope";
 import { isPhonePushConfigured } from "./native-push-config";
 import { deleteIfUnchanged, trimPushDevices } from "./push-device-writes";
@@ -21,6 +22,11 @@ const EXPO_PUSH_TOKEN = /^Expo(?:nent)?PushToken\[[\w-]+\]$/u;
 const vExpoPushToken = v.string().check((value) => value.length <= 200 && EXPO_PUSH_TOKEN.test(value), { message: "Invalid push token" });
 
 const vPlatform = v.union(v.literal("android"), v.literal("ios"));
+
+/** A BCP 47 language tag, as `Intl` reports the phone's (`de`, `pt-BR`, `zh-Hans-CN`). */
+const LANGUAGE_TAG = /^[A-Za-z]{2,3}(?:-[A-Za-z\d]{1,8})*$/u;
+
+const vLanguage = v.string().check((value) => value.length <= 35 && LANGUAGE_TAG.test(value), { message: "Invalid language" });
 
 /** SQLite's wording, raw ("failed") or as Lunora rewords it ("violation"). */
 const UNIQUE_CONSTRAINT = /unique constraint (?:failed|violation)/iu;
@@ -68,8 +74,8 @@ export const getNativePushConfig = authQuery
  * deleted, or the request was superseded (it started before the row's last registration; the phone retries).
  */
 export const registerPushDevice = authMutation
-    .use(rateLimit("notifications/push"))
-    .input({ platform: vPlatform, token: vExpoPushToken })
+    .use(rateLimit("notifications/pushRegister"))
+    .input({ language: v.optional(vLanguage), platform: vPlatform, token: vExpoPushToken })
     .output(v.object({ registered: v.boolean() }))
     .mutation(async ({ args, ctx }) => {
         const refuse = (reason: "deleting" | "no_session" | "off" | "session_ended" | "superseded") => {
@@ -111,6 +117,9 @@ export const registerPushDevice = authMutation
         // The row may be the account that signed in on this phone before. Reading and re-owning it needs the unguarded
         // database (RLS hides another user's row); every field written is the caller's own, nothing of the previous
         // owner's is read back or returned.
+        // What this registration writes, whichever row it lands on. A phone that reports no language keeps none
+        // (`undefined` removes the field in `patchRow`): the previous registration's may have been another person's.
+        const phone = { language: args.language, platform: args.platform, sessionId, userId };
         const existing = await database.pushDevices.findFirst({ consistency: "primary", where: { token: args.token } });
 
         // A registration that started before the row's last one (a request held up on its way) is older news: it must not
@@ -124,10 +133,10 @@ export const registerPushDevice = authMutation
         let replaced = existing ?? undefined;
 
         if (existing) {
-            await database.patch("pushDevices", existing._id, { lastSeenAt: now, platform: args.platform, sessionId, userId });
+            await patchRow(database, "pushDevices", existing, { ...phone, lastSeenAt: now });
         } else {
             try {
-                await ctx.db.insert("pushDevices", { createdAt: now, lastSeenAt: now, platform: args.platform, sessionId, token: args.token, userId });
+                await ctx.db.insert("pushDevices", { ...withoutUndefined(phone), createdAt: now, lastSeenAt: now, token: args.token });
             } catch (error) {
                 // Another registration of this phone inserted between the read and the write (`by_token` is unique):
                 // take its row over instead, so the phone still has exactly one owner, the latest to register.
@@ -146,7 +155,7 @@ export const registerPushDevice = authMutation
                 }
 
                 replaced = raced;
-                await database.patch("pushDevices", raced._id, { lastSeenAt: now, platform: args.platform, sessionId, userId });
+                await patchRow(database, "pushDevices", raced, { ...phone, lastSeenAt: now });
             }
         }
 
@@ -169,9 +178,10 @@ export const registerPushDevice = authMutation
                 const restorable = replaced !== undefined && (await isLive(replaced)) && !(replaced.userId === userId && isDeleting) ? replaced : undefined;
 
                 if (restorable) {
-                    const { lastSeenAt, platform, sessionId: replacedSession, userId: replacedOwner } = restorable;
+                    const { language, lastSeenAt, platform, sessionId: replacedSession, userId: replacedOwner } = restorable;
 
-                    await database.patch("pushDevices", written._id, { lastSeenAt, platform, sessionId: replacedSession, userId: replacedOwner });
+                    // Its language too (`undefined` removes the field): the refused call's must not stay behind.
+                    await patchRow(database, "pushDevices", written, { language, lastSeenAt, platform, sessionId: replacedSession, userId: replacedOwner });
                     // That account may have registered other phones meanwhile: keep it under the cap.
                     await trimPushDevices(database, replacedOwner);
                 } else {

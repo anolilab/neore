@@ -45,8 +45,8 @@
       that ends with the guest.
 - **Phone push delivery** (`phone-delivery.ts`, `expo-push.ts`) — **no title
   ever leaves us**: every phone gets the same placeholder (`push-text.ts`,
-  English until the phone reports its language; never `userSettings.language`,
-  which is the AI-reply language) with only `notificationId`/`threadId` as data.
+  in the language the phone reported at registration, English without one; never
+  `userSettings.language`, which is the AI-reply language) with only `notificationId`/`threadId` as data.
     - A phone is sent to only while the session that registered it exists and has
       not expired; an ended one is dropped at the next send.
     - Otherwise a row is deleted only on `DeviceNotRegistered`, in the send's
