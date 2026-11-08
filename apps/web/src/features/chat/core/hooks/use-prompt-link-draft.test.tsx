@@ -25,9 +25,9 @@ vi.mock("@/lib/toast", () => {
     return { showWarning: (message: string) => showWarning(message) };
 });
 
-/** The models the picker offers this person; empty is the picker's list still loading. */
+/** The models the picker offers this person, and whether that list has settled. */
 const picker = vi.hoisted(() => {
-    return { ids: [] as string[] };
+    return { ids: [] as string[], settled: true };
 });
 
 vi.mock("@/hooks/use-feature-flagged-models", () => {
@@ -36,6 +36,7 @@ vi.mock("@/hooks/use-feature-flagged-models", () => {
             picker.ids.map((id) => {
                 return { id };
             }),
+        useFeatureFlaggedModelsSettled: () => picker.settled,
     };
 });
 
@@ -51,7 +52,8 @@ const strippedSearch = (): unknown => {
 };
 
 beforeEach(() => {
-    picker.ids = [];
+    picker.ids = textModel ? [textModel.id] : [];
+    picker.settled = true;
     navigate.mockClear();
     showWarning.mockClear();
     useChatUIStore.getState().clearComposer();
@@ -114,6 +116,23 @@ describe(usePromptLinkDraft, () => {
         expect(useModelStore.getState().selectedModel).toBe(startModel);
         expect(showWarning).toHaveBeenCalledOnce();
         expect(navigate).toHaveBeenCalledOnce();
+    });
+
+    it("applies the prompt at once and takes the model only once the picker's list settles, if that list offers it", () => {
+        picker.ids = [];
+        picker.settled = false;
+        const { rerender } = renderHook(() => usePromptLinkDraft({ model: textModel?.id, otherDraftSource: false, prompt: "Draft me" }));
+
+        expect(useChatUIStore.getState().composerText).toBe("Draft me");
+        expect(useModelStore.getState().selectedModel).toBe(startModel);
+        expect(showWarning).not.toHaveBeenCalled();
+
+        // The list settles without the model (switched off, or the catalog failed): the chat keeps its model.
+        picker.settled = true;
+        rerender();
+
+        expect(useModelStore.getState().selectedModel).toBe(startModel);
+        expect(showWarning).toHaveBeenCalledOnce();
     });
 
     it("applies the prompt but not an external model", () => {

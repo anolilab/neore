@@ -41,6 +41,7 @@ const ChatPage = () => {
     const location = useLocation();
     // Read from the address as written (the history's own query), not the router's search: its parser reads a value as JSON and
     // `searchStr` is built back from that, which would change a prompt like `{"task":"summarise"}`, `"quoted"` or `1.50`.
+    // Decoded as a query string is, so `+` is a space (`?prompt=Explain+this` is how links write one); a literal plus is `%2B`.
     const router = useRouter();
     const rawSearch = new URLSearchParams(router.history.location.search);
     const { model: linkModel, prompt: linkPrompt } = readPromptLinkSearch({

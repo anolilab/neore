@@ -3,7 +3,7 @@ import { enabledModelOf } from "@neore/ai/models";
 import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef } from "react";
 
-import useFeatureFlaggedModels from "@/hooks/use-feature-flagged-models";
+import useFeatureFlaggedModels, { useFeatureFlaggedModelsSettled } from "@/hooks/use-feature-flagged-models";
 import { showWarning } from "@/lib/toast";
 
 import { useChatUIStore } from "../stores/chat-ui-store";
@@ -12,11 +12,11 @@ import { useModelStore } from "../stores/model-store";
 
 /**
  * A model a link may select: an enabled text model the app can call (`MODEL_LOOKUP` leaves out external, marketing-only rows)
- * that the picker offers this person (`pickerModelIds`: flags, their own switched-off models and filter rules). While the
- * picker's list is still loading it is empty, and the registry alone decides; the server checks the model again on send.
+ * that the picker offers this person (`pickerModelIds`: flags, their own switched-off models and filter rules), read once that
+ * list has settled. A catalog that failed to load offers nothing, so the link's model is then not taken.
  */
 const isLinkableModel = (model: string, pickerModelIds: ReadonlySet<string>): boolean =>
-    enabledModelOf(model, { mode: "text" }) !== undefined && (pickerModelIds.size === 0 || pickerModelIds.has(model));
+    enabledModelOf(model, { mode: "text" }) !== undefined && pickerModelIds.has(model);
 
 /**
  * Applies a prompt link once (`core/utils/prompt-link.ts`): its prompt becomes the new chat's draft, and its model is selected when
@@ -41,7 +41,11 @@ export const usePromptLinkDraft = ({
     const navigate = useNavigate();
     const pickerModels = useFeatureFlaggedModels({ applyUserOverrides: true });
     const pickerModelIds = useMemo(() => new Set(pickerModels.map((entry) => entry.id)), [pickerModels]);
+    const pickerSettled = useFeatureFlaggedModelsSettled();
     const appliedRef = useRef<string | undefined>(undefined);
+    // The model of a link whose prompt was applied, waiting for the picker's list: judged earlier, it could pick a model the
+    // list then leaves out. The prompt itself does not wait for it.
+    const pendingModelRef = useRef<string | undefined>(undefined);
 
     useEffect(() => {
         // No link in the address: the next one, even the same link again, is a new visit.
@@ -88,19 +92,31 @@ export const usePromptLinkDraft = ({
             showWarning(t`Your draft is kept. The prompt from the link was not added.`);
         } else {
             setComposerText(prompt);
-
-            if (model !== undefined && isLinkableModel(model, pickerModelIds)) {
-                const state = useModelStore.getState();
-
-                // A text draft on a text model: a comparison or another mode would send it elsewhere.
-                state.setComparisonMode(false);
-                state.setComposerMode("text", undefined, false);
-                state.setSelectedModel(model as ModelId, undefined);
-            } else if (model !== undefined) {
-                showWarning(t`The model in the link is not available. The chat keeps its model.`);
-            }
+            pendingModelRef.current = model;
         }
 
         clearLink();
-    }, [model, navigate, otherDraftSource, pickerModelIds, prompt, ready, t]);
+    }, [model, navigate, otherDraftSource, prompt, ready, t]);
+
+    useEffect(() => {
+        const pendingModel = pendingModelRef.current;
+
+        if (pendingModel === undefined || !pickerSettled) {
+            return;
+        }
+
+        pendingModelRef.current = undefined;
+
+        if (isLinkableModel(pendingModel, pickerModelIds)) {
+            const state = useModelStore.getState();
+
+            // A text draft on a text model: a comparison or another mode would send it elsewhere.
+            state.setComparisonMode(false);
+            state.setComposerMode("text", undefined, false);
+            state.setSelectedModel(pendingModel as ModelId, undefined);
+        } else {
+            showWarning(t`The model in the link is not available. The chat keeps its model.`);
+        }
+        // `prompt` is read so this runs right after the effect above has set a model aside, in the same commit.
+    }, [pickerModelIds, pickerSettled, prompt, t]);
 };

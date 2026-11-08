@@ -6,7 +6,7 @@ import { usePostHog } from "posthog-js/react";
 
 import { useCRPC } from "@/lib/lunora/crpc";
 
-import { useGatewayModels } from "./use-gateway-models";
+import { useGatewayModels, useGatewayModelsSettled } from "./use-gateway-models";
 import { useFilteredModels } from "./use-model-filter-rules";
 
 /**
@@ -43,6 +43,18 @@ const useFeatureFlaggedModels = (options?: { applyUserOverrides?: boolean }): Ga
 
     // Apply user's model filter rules (region, provider, model block lists)
     return useFilteredModels(flagFiltered);
+};
+
+/**
+ * Whether the list above has its inputs: the catalog and this person's preferences (their switched-off models and filter rules)
+ * have loaded or failed to. Until then the list can still lose a model it shows, or gain one it leaves out.
+ */
+export const useFeatureFlaggedModelsSettled = (): boolean => {
+    const crpc = useCRPC();
+    const gatewaySettled = useGatewayModelsSettled();
+    const { isPending: preferencesPending } = useQuery(crpc.auth.functions.getAIUserPreferences.queryOptions({}));
+
+    return gatewaySettled && !preferencesPending;
 };
 
 export default useFeatureFlaggedModels;
