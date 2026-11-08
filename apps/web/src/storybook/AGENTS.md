@@ -61,5 +61,4 @@ ThreadRoute }`, `{ id: "(chat)", route: ChatLayoutRoute }` for a pathless group.
 - New UI strings need `pnpm --filter @neore/web run translate:extract` and `translate:compile`.
 - `.storybook/public/mockServiceWorker.js` must be the installed `msw`'s worker (`mock-service-worker.guard.test.ts`);
   msw 3 has no postinstall. After an msw bump: `pnpm --filter @neore/web exec msw init` (no path: it writes every
-  `package.json#msw.workerDirectory`, no prompt). The 3.0.1–3.0.3 worker is stopped by Chromium about five minutes
-  into a run (mswjs/msw#2801): random "Failed to fetch dynamically imported module" and timed-out stories.
+  `package.json#msw.workerDirectory`, no prompt).
