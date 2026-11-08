@@ -14,6 +14,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { registeredApi } from "../../test/registered-api";
 
+import { listGuestNotesForExport } from "../chat/guest-links";
 import { listMessagesByThreadIdAdmitted } from "../agent/messages";
 import { listThreadSummariesForExport } from "../agent/thread-summaries";
 import { getThreadInternal, listThreadsByUserIdInternal } from "../agent/threads";
@@ -39,6 +40,7 @@ describe("collectConversations", () => {
         registry.set("agent_threads:listThreadsByUserIdInternal", listThreadsByUserIdInternal);
         registry.set("gdpr_steps:collectThreadTags", collectThreadTags);
         registry.set("agent_thread_summaries:listThreadSummariesForExport", listThreadSummariesForExport);
+        registry.set("chat_guest_links:listGuestNotesForExport", listGuestNotesForExport);
 
         const harness = lunoraTest(schema as never);
 
@@ -46,6 +48,19 @@ describe("collectConversations", () => {
             await harness.run(async (context: any) => {
                 for (let t = 0; t < THREADS; t += 1) {
                     const threadId = await context.db.insert("threads", { status: "active", title: `Thread ${String(t)}`, userId: "user-1" });
+
+                    if (t === 0) {
+                        const linkId = await context.db.insert("threadGuestLinks", { createdAt: 0, expiresAt: 1, linkHash: "h", threadId, userId: "user-1" });
+
+                        await context.db.insert("threadGuestMessages", {
+                            createdAt: 0,
+                            linkId,
+                            status: "held",
+                            text: "a guest note",
+                            threadId,
+                            userId: "user-1",
+                        });
+                    }
 
                     for (let m = 0; m < MESSAGES_PER_THREAD; m += 1) {
                         await context.db.insert("messages", {
@@ -94,6 +109,8 @@ describe("collectConversations", () => {
             // A re-import keeps an imported message's source time; a row without one falls back to its creation time.
             expect(times?.[0]).toBe(1_600_000_000_000);
             expect(times?.[1]).toBeGreaterThan(1_600_000_000_000);
+            // The notes guests left on the thread go with it.
+            expect((first as { guestNotes?: unknown } | undefined)?.guestNotes).toMatchObject([{ status: "held", text: "a guest note" }]);
 
             for (const conversation of exported) {
                 // Ascending, complete, in order.
@@ -110,6 +127,7 @@ describe("collectConversations", () => {
         registry.set("agent_threads:listThreadsByUserIdInternal", listThreadsByUserIdInternal);
         registry.set("gdpr_steps:collectThreadTags", collectThreadTags);
         registry.set("agent_thread_summaries:listThreadSummariesForExport", listThreadSummariesForExport);
+        registry.set("chat_guest_links:listGuestNotesForExport", listGuestNotesForExport);
 
         const harness = lunoraTest(schema as never);
 
@@ -160,6 +178,7 @@ describe("collectConversations", () => {
         registry.set("agent_threads:listThreadsByUserIdInternal", listThreadsByUserIdInternal);
         registry.set("gdpr_steps:collectThreadTags", collectThreadTags);
         registry.set("agent_thread_summaries:listThreadSummariesForExport", listThreadSummariesForExport);
+        registry.set("chat_guest_links:listGuestNotesForExport", listGuestNotesForExport);
 
         const harness = lunoraTest(schema as never);
 
@@ -269,6 +288,7 @@ describe("collectConversations: a locked chat", () => {
         registry.set("agent_threads:getThreadInternal", getThreadInternal);
         registry.set("gdpr_steps:collectThreadTags", collectThreadTags);
         registry.set("agent_thread_summaries:listThreadSummariesForExport", listThreadSummariesForExport);
+        registry.set("chat_guest_links:listGuestNotesForExport", listGuestNotesForExport);
     };
 
     it("exports the owner's locked chat with its title and every message", async () => {

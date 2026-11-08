@@ -78,6 +78,22 @@ const threadWaitsOnPerson = async (ctx: MutationCtx, threadId: Id<"threads">): P
 };
 
 /**
+ * True when a guest link on the thread is still live. Archiving revokes its links and deletes the notes waiting on them, and
+ * a live link is not a sign the owner is idle, so such a thread stays.
+ */
+const threadHasLiveGuestLink = async (ctx: MutationCtx, threadId: Id<"threads">): Promise<boolean> => {
+    const links = await ctx.db
+        .query("threadGuestLinks")
+        .withIndex("by_thread", (q) => q.eq("threadId", threadId))
+        .take(GUEST_LINK_CHECK_BATCH);
+
+    return links.some((link) => link.expiresAt > ctx.now);
+};
+
+/** The most links of one thread read to see whether any is live: a thread has one live link at a time. */
+const GUEST_LINK_CHECK_BATCH = 10;
+
+/**
  * Archives one thread if, as read now, it is still due. The eligibility check runs
  * on the fresh row, its project's pin state, its live streams and any request waiting on the owner, in the same
  * transaction as the write, so nothing that happened after the scan is overwritten.
@@ -99,7 +115,12 @@ export const archiveIfStillIdle = internalMutation
         // The row checks run first, so a thread that is not due never reads its streams.
         const due = selectAutoArchiveDue([candidateOf(thread)], args.cutoff, { liveThreadIds: new Set<string>(), pinnedProjectIds }, 1);
 
-        if (due.length === 0 || (await threadHasLiveStream(ctx, args.threadId)) || (await threadWaitsOnPerson(ctx, args.threadId))) {
+        if (
+            due.length === 0 ||
+            (await threadHasLiveStream(ctx, args.threadId)) ||
+            (await threadWaitsOnPerson(ctx, args.threadId)) ||
+            (await threadHasLiveGuestLink(ctx, args.threadId))
+        ) {
             return false;
         }
 
