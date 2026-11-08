@@ -24,7 +24,15 @@ import {
 import { Button } from "../components/button";
 
 type TableCommand =
-    "addColumnAfter" | "addColumnBefore" | "addRowAfter" | "addRowBefore" | "deleteColumn" | "deleteRow" | "deleteTable" | "mergeCells" | "splitCell";
+    | "addColumnAfter"
+    | "addColumnBefore"
+    | "addRowAfter"
+    | "addRowBefore"
+    | "deleteColumn"
+    | "deleteRow"
+    | "deleteTable"
+    | "mergeCells"
+    | "splitCell";
 
 const run = (editor: Editor, command: TableCommand) => {
     editor.chain().focus()[command]().run();
