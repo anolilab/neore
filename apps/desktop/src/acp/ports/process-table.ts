@@ -13,6 +13,8 @@ export interface ProcessInfo {
     ppid: number;
     /** The start time as `ps` prints it. With the pid it identifies one process, so a reused pid does not match. */
     startedAt: string;
+    /** True for a process that has exited and not been reaped yet: its row stays in the table. */
+    zombie?: boolean;
 }
 
 export interface Listener {
@@ -80,7 +82,9 @@ const parsePsLine = (line: string): ProcessInfo | undefined => {
         return undefined;
     }
 
-    return { name: baseName(command), pid: Number(pidText), ppid: Number(ppidText), startedAt };
+    return { name: baseName(command), pid: Number(pidText), ppid: Number(ppidText), startedAt, // `l` is a process with threads still running (Linux shows `Zl` when only its main thread has exited): not gone.
+        ...(state.startsWith("Z") && !state.includes("l") && { zombie: true }),
+    };
 };
 
 /** Parses `ps -axo pid=,ppid=,stat=,lstart=,comm=` (`ucomm=` on macOS; run with `LC_ALL=C`). Lines that do not fit are dropped. */

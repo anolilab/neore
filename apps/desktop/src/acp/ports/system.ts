@@ -4,6 +4,7 @@
  */
 import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
+import { setTimeout as delay } from "node:timers/promises";
 
 import type { PortsSystem } from "./ports";
 import type { Listener } from "./process-table";
@@ -62,6 +63,15 @@ const requireSupported = (): void => {
 };
 
 export const realPortsSystem: PortsSystem = {
+    kill: (pid, signal) => {
+        try {
+            process.kill(pid, signal);
+        } catch (error) {
+            if ((error as NodeJS.ErrnoException).code !== "ESRCH") {
+                throw error;
+            }
+        }
+    },
     listeners: async (pids): Promise<Listener[]> => {
         requireSupported();
 
@@ -98,5 +108,8 @@ export const realPortsSystem: PortsSystem = {
         // macOS `comm` is argv[0], which a process sets itself (and title-setting tools fill with arguments); `ucomm` is the
         // kernel's own name there. Linux `comm` already is the kernel name.
         return parsePs(await run(ps, ["-axo", `pid=,ppid=,stat=,lstart=,${process.platform === "darwin" ? "ucomm" : "comm"}=`]));
+    },
+    sleep: async (ms) => {
+        await delay(ms);
     },
 };

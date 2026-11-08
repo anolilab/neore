@@ -777,8 +777,102 @@ const showPorts = (selected: string | undefined, ports: Awaited<ReturnType<typeo
     $("acp-ports-list").replaceChildren(
         ...ports.length === 0
             ? [item("None.")]
-            : ports.map((port) => item(`Port ${String(port.port)} on ${port.address} — ${port.name} (process ${String(port.pid)})`)),
+            : ports.map((port) => {
+                const label = `Port ${String(port.port)} on ${port.address} — ${port.name} (process ${String(port.pid)})`;
+
+                // The agent's own server ends with the session, not from here.
+                return port.agent
+                    ? item(`${label}, the agent itself`)
+                    : item(
+                        label,
+                        button("Stop", `Stop ${port.name} (process ${String(port.pid)}) on port ${String(port.port)}, address ${port.address}`, () => {
+                            guarded(() => stopPort(selected, port, $("acp-ports-list").contains(document.activeElement)));
+                        }),
+                    );
+            }),
     );
+};
+
+/** The processes a stop is running for, until the list is read again: a repeat click on the same row is ignored meanwhile. */
+const stopping = new Map<string, string>();
+
+/** Ends one listed server, then reads the list again; a stop that did not end says why in the ports status line. */
+const stopPort = async (
+    selected: string | undefined,
+    port: Awaited<ReturnType<typeof globalThis.neoreDevice.acpPorts>>[number],
+    hadFocus: boolean,
+): Promise<void> => {
+    // The row was drawn for another session: its pid may mean nothing here, so nothing is stopped.
+    if (selected === undefined || state.selected !== selected) {
+        return;
+    }
+
+    const key = JSON.stringify([selected, port.pid, port.startedAt, port.name]);
+
+    if (stopping.has(key)) {
+        return;
+    }
+
+    const label = `Stopping ${port.name} on port ${String(port.port)}…`;
+
+    stopping.set(key, label);
+    // A stop can take the whole grace period: say it started. Reads of an unchanged list leave this up until it answers.
+    setPortsStatus(label);
+
+    try {
+        let result: Awaited<ReturnType<typeof globalThis.neoreDevice.acpPortStop>>;
+
+        try {
+            result = await globalThis.neoreDevice.acpPortStop(selected, { name: port.name, pid: port.pid, startedAt: port.startedAt });
+        } catch (error) {
+            // Another session was opened during the stop: its window is not the place for this error.
+            if (state.selected !== selected) {
+                return;
+            }
+
+            // The error is shown on its own; the count comes back in place of "Stopping…".
+            portsRead.shown = undefined;
+            refreshPorts();
+
+            throw error;
+        }
+
+        // Another session was opened during the stop: its own list is on screen now.
+        if (state.selected !== selected) {
+            return;
+        }
+
+        portsRead.quiet = 0;
+
+        // An ended stop brings the count back; one that did not end writes its reason below, over "Stopping…" alone.
+        if (result.ended) {
+            portsRead.shown = undefined;
+        }
+
+        await refreshPorts();
+
+        // An ended session's servers are already cleared: neither a late reason nor a "Stopping…" may come back over that.
+        const sessionEnded = state.sessions.find((session) => session.id === selected)?.status === "ended";
+        // Another stop in this session is still running: its "Stopping…" comes back over the count this one brought.
+        const other = [...stopping].find(([entry]) => entry !== key && (JSON.parse(entry) as unknown[])[0] === selected);
+
+        if (other !== undefined && !sessionEnded && result.ended && state.selected === selected) {
+            setPortsStatus(other[1]);
+        }
+
+        // The redrawn list no longer has the button that was pressed: focus that fell to the page goes to the list.
+        if (hadFocus && (document.activeElement === null || document.activeElement === document.body)) {
+            $("acp-ports-list").focus();
+        }
+
+        if (!sessionEnded && !result.ended && state.selected === selected) {
+            setPortsStatus(`${port.name} on port ${String(port.port)} did not end: ${result.reason}.`);
+            // The next read redraws the list, which brings the count back instead of leaving this reason up.
+            portsRead.shown = undefined;
+        }
+    } finally {
+        stopping.delete(key);
+    }
 };
 
 /**

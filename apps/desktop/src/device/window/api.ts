@@ -2,7 +2,7 @@
 import type { CapabilityReport } from "@neore/ai/capabilities";
 
 import type { HooksView } from "../../acp/hooks/types";
-import type { PortView } from "../../acp/ports/ports";
+import type { PortView, StopResult, StopTarget } from "../../acp/ports/ports";
 import type { RegistryListing } from "../../acp/registry";
 import type { AcpUpdate, AcpView, ImportSummary, NativeSessionView, PermissionView, ProbeResult, SessionSnapshot, SessionSummary } from "../../acp/types";
 import type { Availability } from "../../terminal/shell";
@@ -35,6 +35,8 @@ export interface DeviceWindowApi {
     acpPermissions: () => Promise<PermissionView[]>;
     /** The ports this session's agent processes listen on. */
     acpPorts: (sessionId: string) => Promise<PortView[]>;
+    /** Ends one listening server (and its own descendants) of the session, never the agent. */
+    acpPortStop: (sessionId: string, target: StopTarget) => Promise<StopResult>;
     acpProbe: (agentKey: string) => Promise<ProbeResult>;
     /** Asks the main process to install a listed agent. It words and shows the confirmation itself; `null` is a "no". */
     acpRegistryInstall: (id: string, version: string) => Promise<AcpView | null>;

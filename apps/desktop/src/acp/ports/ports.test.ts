@@ -4,7 +4,7 @@ import { spawn } from "node:child_process";
 import { afterEach, describe, expect, it } from "vitest";
 
 import type { PortsSystem } from "./ports";
-import { PortsService } from "./ports";
+import { PortsService, STOP_GRACE_MS, STOP_REASON } from "./ports";
 import type { Listener, ProcessInfo } from "./process-table";
 import { descendantsOf, parseLsof, parsePs, parseSs } from "./process-table";
 import { firstExisting, portsSupported, realPortsSystem } from "./system";
@@ -36,6 +36,37 @@ const LISTENING: Listener[] = [
 class FakeSystem implements PortsSystem {
     public table: ProcessInfo[] = [...TABLE];
 
+    /** Pids that survive SIGTERM, pids the OS refuses to signal, and the injected clock the grace period runs on. */
+    public ignoreTerm = new Set<number>();
+
+    public denied = new Set<number>();
+
+    /** Pids still running after SIGKILL (an uninterruptible wait, say). */
+    public ignoreKill = new Set<number>();
+
+    public signals: [number, string][] = [];
+
+    public time = 0;
+
+    public onSleep: (() => void) | undefined;
+
+    public kill(pid: number, signal: "SIGKILL" | "SIGTERM"): void {
+        this.signals.push([pid, signal]);
+
+        if (this.denied.has(pid)) {
+            throw new Error("EPERM");
+        }
+
+        if (signal === "SIGKILL" ? !this.ignoreKill.has(pid) : !this.ignoreTerm.has(pid)) {
+            this.table = this.table.filter((entry) => entry.pid !== pid);
+        }
+    }
+
+    public async sleep(ms: number): Promise<void> {
+        this.time += ms;
+        this.onSleep?.();
+    }
+
     public async listeners(pids: number[]): Promise<Listener[]> {
         const alive = new Set(this.table.map((entry) => entry.pid));
 
@@ -59,6 +90,12 @@ describe("reading the process table", () => {
         ]);
     });
 
+    it("marks an exited process that has not been reaped", () => {
+        expect(parsePs("5 1 Z Mon Nov  3 10:00:00 2026 node")[0]?.zombie).toBe(true);
+        // Only its main thread has exited; the others still run.
+        expect(parsePs("6 1 Zl Mon Nov  3 10:00:00 2026 node")[0]?.zombie).toBeUndefined();
+    });
+
     it("cuts a long command name", () => {
         expect(parsePs(`1 0 Ss Mon Nov  3 10:00:00 2026 /bin/${"a".repeat(100)}`)[0]?.name).toHaveLength(40);
     });
@@ -72,16 +109,16 @@ describe("reading the process table", () => {
     });
 
     it("parses ss output", () => {
-        expect(parseSs("LISTEN 0 511 127.0.0.1:3000 0.0.0.0:* users:((\"node\",pid=77,fd=19))\nLISTEN 0 4096 [::]:22 [::]:*\n")).toEqual([
+        expect(parseSs('LISTEN 0 511 127.0.0.1:3000 0.0.0.0:* users:(("node",pid=77,fd=19))\nLISTEN 0 4096 [::]:22 [::]:*\n')).toEqual([
             { address: "127.0.0.1", pid: 77, port: 3000 },
         ]);
     });
 
     it("reads owners only from the users column, never a pid= inside a process name", () => {
-        expect(parseSs("LISTEN 0 511 127.0.0.1:3000 0.0.0.0:* users:((\"pid=30,fd=1\",pid=77,fd=19))\n")).toEqual([
+        expect(parseSs('LISTEN 0 511 127.0.0.1:3000 0.0.0.0:* users:(("pid=30,fd=1",pid=77,fd=19))\n')).toEqual([
             { address: "127.0.0.1", pid: 77, port: 3000 },
         ]);
-        expect(parseSs("LISTEN 0 511 *:80 *:* users:((\"nginx\",pid=5,fd=6),(\"nginx\",pid=6,fd=6))\n").map((entry) => entry.pid)).toEqual([5, 6]);
+        expect(parseSs('LISTEN 0 511 *:80 *:* users:(("nginx",pid=5,fd=6),("nginx",pid=6,fd=6))\n').map((entry) => entry.pid)).toEqual([5, 6]);
         // A quote in a name could make another pid look like the owner, so the row is dropped instead.
         expect(parseSs('LISTEN 0 511 *:80 *:* users:(("",pid=3,fd=1),(",pid=77,fd=19))\n')).toEqual([]);
     });
@@ -104,10 +141,10 @@ describe("listing ports", () => {
     it("lists what the agent and its tree listen on and nothing outside it", async () => {
         const ports = await new PortsService(new FakeSystem()).list(10);
 
-        expect(ports.map((port) => [port.port, port.pid, port.name])).toEqual([
-            [2000, 10, "agent"],
-            [3000, 30, "node"],
-            [4000, 40, "vite"],
+        expect(ports.map((port) => [port.port, port.pid, port.name, port.agent])).toEqual([
+            [2000, 10, "agent", true],
+            [3000, 30, "node", false],
+            [4000, 40, "vite", false],
         ]);
     });
 
@@ -164,12 +201,232 @@ describe("listing ports", () => {
 
             const table = await processes();
 
-            return table.map((entry) => reads > 1 && entry.pid === 30 ? { ...entry, startedAt: "Mon Nov 3 11:11:11 2026" } : entry);
+            return table.map((entry) => (reads > 1 && entry.pid === 30 ? { ...entry, startedAt: "Mon Nov 3 11:11:11 2026" } : entry));
         };
 
         const views = await new PortsService(system).list(10);
 
         expect(views.map((view) => view.pid)).toEqual([10, 40]);
+    });
+});
+
+const stopper = (system: FakeSystem, selfPid = 1) => new PortsService(system, selfPid, STOP_GRACE_MS, () => system.time);
+const SERVER_30 = { name: "node", pid: 30, startedAt: "Mon Nov 3 10:00:00 2026" };
+
+describe("stopping a server", () => {
+    it("signals the listener and its own descendants by pid, and nothing else", async () => {
+        const system = new FakeSystem();
+
+        // Pid 31 stands for this app: it is below the listener here, and still never a target. 32 has exited (a zombie).
+        system.table.push({ ...row(32, 30, "done"), zombie: true });
+        expect(await stopper(system, 31).stop(10, SERVER_30)).toEqual({ ended: true });
+        expect(system.signals).toEqual([[30, "SIGTERM"]]);
+        expect(system.table.map((entry) => entry.pid)).toContain(10);
+    });
+
+    it("says the process list could not be read, and signals nothing, when finding the target fails", async () => {
+        const system = new FakeSystem();
+
+        system.processes = async () => {
+            throw new Error("ps timed out");
+        };
+
+        expect(await stopper(system).stop(10, SERVER_30)).toEqual({ ended: false, reason: STOP_REASON.unlocated });
+
+        const sockets = new FakeSystem();
+
+        sockets.listeners = async () => {
+            throw new Error("lsof timed out");
+        };
+
+        expect(await stopper(sockets).stop(10, SERVER_30)).toEqual({ ended: false, reason: STOP_REASON.unlocated });
+        expect([...system.signals, ...sockets.signals]).toEqual([]);
+    });
+
+    it("signals nothing for a process that is not listening below the agent, or whose identity changed", async () => {
+        const system = new FakeSystem();
+        const service = stopper(system);
+
+        expect(await service.stop(10, { ...SERVER_30, name: "other", pid: 50 })).toEqual({ ended: false, reason: STOP_REASON.gone });
+        expect(await service.stop(10, { ...SERVER_30, name: "python3" })).toEqual({ ended: false, reason: STOP_REASON.gone });
+        expect(await service.stop(10, { ...SERVER_30, startedAt: "Mon Nov 3 11:11:11 2026" })).toEqual({ ended: false, reason: STOP_REASON.gone });
+        expect(await service.stop(undefined, SERVER_30)).toEqual({ ended: false, reason: STOP_REASON.gone });
+        expect(system.signals).toEqual([]);
+    });
+
+    it("kills what ignores SIGTERM once the grace period has passed, and a child it started meanwhile", async () => {
+        const system = new FakeSystem();
+
+        system.ignoreTerm.add(30);
+        system.ignoreTerm.add(99);
+
+        let isStarted = false;
+
+        // The listener starts one child during the grace period, which ignores SIGTERM too.
+        system.onSleep = () => {
+            if (isStarted) {
+                return;
+            }
+
+            isStarted = true;
+            system.table.push(row(99, 30, "late"));
+        };
+
+        expect(await stopper(system).stop(10, SERVER_30)).toEqual({ ended: true });
+        expect(system.time).toBeGreaterThanOrEqual(STOP_GRACE_MS);
+        expect(system.signals).toContainEqual([30, "SIGKILL"]);
+        expect(system.signals).toContainEqual([99, "SIGKILL"]);
+        expect(system.signals.every(([pid]) => [30, 31, 99].includes(pid))).toBe(true);
+
+        // Children before their parent, so none is re-parented out of the tree before its own signal.
+        const at = (pid: number, signal: string): number => {
+            const index = system.signals.findIndex(([entry, sent]) => entry === pid && sent === signal);
+
+            // A signal that was never sent must fail here, not pass the order check below as -1.
+            expect(index, `${String(pid)} ${signal}`).toBeGreaterThanOrEqual(0);
+
+            return index;
+        };
+
+        expect(at(31, "SIGTERM")).toBeLessThan(at(30, "SIGTERM"));
+        expect(at(99, "SIGKILL")).toBeLessThan(at(30, "SIGKILL"));
+    });
+
+    it("sends no SIGKILL and fails when the process table cannot be read to confirm", async () => {
+        const system = new FakeSystem();
+        const processes = system.processes.bind(system);
+        let signalled = false;
+
+        system.ignoreTerm.add(30);
+        system.processes = async () => {
+            if (signalled) {
+                throw new Error("ps timed out");
+            }
+
+            return await processes();
+        };
+        const kill = system.kill.bind(system);
+
+        system.kill = (pid, signal) => {
+            kill(pid, signal);
+            signalled = true;
+        };
+
+        expect(await stopper(system).stop(10, SERVER_30)).toEqual({ ended: false, reason: STOP_REASON.unreadable });
+        expect(system.signals.every(([, signal]) => signal === "SIGTERM")).toBe(true);
+    });
+
+    it("says a process survived when it still runs after it was force-killed", async () => {
+        const system = new FakeSystem();
+
+        system.ignoreTerm.add(30);
+        system.ignoreKill.add(30);
+
+        expect(await stopper(system).stop(10, SERVER_30)).toEqual({ ended: false, reason: STOP_REASON.survived });
+        expect(system.signals).toContainEqual([30, "SIGKILL"]);
+    });
+
+    it("does not force-kill a survivor that has left the agent's tree", async () => {
+        const system = new FakeSystem();
+
+        system.ignoreTerm.add(30);
+        // During the grace period the server is re-parented to pid 1, out of the agent's tree.
+        system.onSleep = () => {
+            system.table = system.table.map((entry) => (entry.pid === 30 ? { ...entry, ppid: 1 } : entry));
+        };
+
+        expect(await stopper(system).stop(10, SERVER_30)).toEqual({ ended: false, reason: STOP_REASON.left });
+        expect(system.signals).not.toContainEqual([30, "SIGKILL"]);
+    });
+
+    it("does not walk on through the agent or this app when a bad read puts one below the listener", async () => {
+        const system = new FakeSystem();
+
+        // An inconsistent read: the agent (10) and this app (1) appear below the listener, each with a process of its own.
+        const misplaced = new Map([
+            [1, 30],
+            [10, 31],
+        ]);
+
+        system.table = [
+            ...system.table.map((entry) => {
+                return { ...entry, ppid: misplaced.get(entry.pid) ?? entry.ppid };
+            }),
+            row(70, 10, "agent-child"),
+            row(80, 1, "app-child"),
+        ];
+
+        await stopper(system, 1).stop(10, SERVER_30);
+
+        expect(system.signals.map(([pid]) => pid)).not.toContain(70);
+        expect(system.signals.map(([pid]) => pid)).not.toContain(80);
+
+        // This app read below the agent: the unrelated server under it (50) is neither listed nor stoppable.
+        const appBelow = new FakeSystem();
+
+        const moved = new Map([
+            [1, 10],
+            [50, 1],
+        ]);
+
+        appBelow.table = appBelow.table.map((entry) => {
+            return { ...entry, ppid: moved.get(entry.pid) ?? entry.ppid };
+        });
+
+        const listed = await stopper(appBelow, 1).list(10);
+
+        expect(listed.map((port) => port.pid)).not.toContain(50);
+        expect(await stopper(appBelow, 1).stop(10, { name: "other", pid: 50, startedAt: SERVER_30.startedAt })).toEqual({
+            ended: false,
+            reason: STOP_REASON.gone,
+        });
+        expect(appBelow.signals).toEqual([]);
+    });
+
+    it("signals no child that a survivor starts after it has left the agent's tree", async () => {
+        const system = new FakeSystem();
+
+        system.ignoreTerm.add(30);
+        system.onSleep = () => {
+            system.table = [...system.table.map((entry) => (entry.pid === 30 ? { ...entry, ppid: 1 } : entry)), row(32, 30, "late")];
+        };
+
+        await stopper(system).stop(10, SERVER_30);
+
+        expect(system.signals.map(([pid]) => pid)).not.toContain(32);
+    });
+
+    it("says a force-kill was sent when only the check after it could not be read", async () => {
+        const system = new FakeSystem();
+        const processes = system.processes.bind(system);
+        let killed = false;
+
+        system.ignoreTerm.add(30);
+        system.processes = async () => {
+            if (killed) {
+                throw new Error("ps timed out");
+            }
+
+            return await processes();
+        };
+        const kill = system.kill.bind(system);
+
+        system.kill = (pid, signal) => {
+            kill(pid, signal);
+            killed ||= signal === "SIGKILL";
+        };
+
+        expect(await stopper(system).stop(10, SERVER_30)).toEqual({ ended: false, reason: STOP_REASON.unconfirmed });
+        expect(system.signals).toContainEqual([30, "SIGKILL"]);
+    });
+
+    it("reports a refused signal instead of throwing, and still signals the rest", async () => {
+        const system = new FakeSystem();
+
+        system.denied.add(30);
+
+        expect(await stopper(system).stop(10, SERVER_30)).toEqual({ ended: false, reason: STOP_REASON.refused });
+        expect(system.signals.map(([pid]) => pid)).toContain(31);
     });
 });
 
