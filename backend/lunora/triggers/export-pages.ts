@@ -36,7 +36,8 @@ const collectRuns = async (readRuns: ReadRuns, triggerId: string, left: Budget):
     let cursor: string | null = null;
 
     do {
-        if (left.readBytes <= 0) {
+        // Nothing more may be read, or nothing read could be written: the page is not read at all.
+        if (left.readBytes <= 0 || left.writtenBytes <= 0) {
             return { isCut: true, runs };
         }
 

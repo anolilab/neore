@@ -1375,6 +1375,11 @@ describe("run prompts", () => {
 
         expect(read.triggers[0]).toEqual({ ...triggerRows[0], oldestExportedStartedAt: 8, runs: [run(9), run(8)], runsTruncated: true });
         expect(read.reads).toEqual(["a:null"]);
+
+        // Settings alone spend the written budget: no run page is read for any trigger.
+        const settingsOnly = await collect(1, Number.MAX_SAFE_INTEGER);
+
+        expect(settingsOnly.reads).toEqual([]);
     });
 });
 
