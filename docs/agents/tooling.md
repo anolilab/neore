@@ -63,9 +63,10 @@ ESLint is the authority; oxlint is a fast first pass that enforces only what ESL
 `.oxlintrc.json` is generated, never edited: `pnpm lint:oxlint:sync` (`scripts/sync-oxlint-rules.mjs`) asks ESLint, from
 inside each project, which files it lints and how each rule is set, then enables a rule only when ESLint sets it the
 same way on every file it lints (or every file that loads its plugin), and ignores every file ESLint does not lint.
-Every oxlint category is off. Run it after a change to an ESLint config or to `@anolilab/eslint-config`, and after
-adding a workspace project, a root deploy file or a file ESLint ignores; the oxlint CI job regenerates the file and fails
-when the committed one differs. When oxlint reports code ESLint accepts, add the rule to `OXLINT_DIFFERS` in the
+Every oxlint category is off. Run it after a change to an ESLint config, to the `lint` catalog (ESLint, its plugins,
+`@anolilab/eslint-config`, oxlint) or to a project's dependencies (the shared config picks plugins from them), and after
+a change to the files ESLint lints: a new workspace project, the `lint:eslint:deploy` list, a file ESLint ignores. When
+unsure, run it: the oxlint CI job regenerates the file and fails when the committed one differs. When oxlint reports code ESLint accepts, add the rule to `OXLINT_DIFFERS` in the
 script, with its reason, and sync.
 No enabled rule is type-aware today, so oxlint needs no build; the sync turns type-aware mode on when one is, and from
 then on oxlint needs built packages and the backend codegen first, like `lint:types`. The JS-plugin versions in the
