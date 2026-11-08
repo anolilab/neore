@@ -15,9 +15,7 @@ import type { Id } from "../../_generated/dataModel";
 import type { ActionCtx } from "../../_generated/server";
 import { callOnShard } from "../../lib/cross-shard";
 import { streamLogger } from "../../lib/logger";
-import { isThreadLocked } from "../../lib/thread-lock";
-import { GOAL_CONTINUATION_AGENT } from "../goals/shared";
-import { afterRun, stampSavedToolCalls } from "./agent-run";
+import { afterRun, mayExtractMemory, stampSavedToolCalls } from "./agent-run";
 import type { McpToolLabels } from "./mcp-tool-labels";
 
 export interface FinishedReply {
@@ -52,8 +50,8 @@ export const recoverFinishedReply = async (ctx: Pick<ActionCtx, "runMutation" | 
         ctx.runQuery(internal.agent.messages.getMessagesByIdsUnfiltered, { messageIds: [messageId as Id<"messages">] }),
         ctx.runQuery(internal.chat.functions.getThreadSettings, { threadId }),
     ]);
-    // As a normal finish decides it: a locked chat's content and a goal round's instruction are never mined for memory.
-    const extractMemory = prefs?.memoryEnabled === true && thread !== null && !isThreadLocked(thread) && prompt[0]?.agentName !== GOAL_CONTINUATION_AGENT;
+    // As a normal finish decides it (`mayExtractMemory`).
+    const extractMemory = mayExtractMemory(prefs?.memoryEnabled === true, thread, prompt[0]);
 
     // What the normal end settles besides the thread's status (the close did that): the reply is stamped (`lastReplyAt`, which
     // the home and the activity views read) and follow-up suggestions are queued. A goal's thread is its own until it ends.

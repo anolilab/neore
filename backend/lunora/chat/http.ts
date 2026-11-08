@@ -30,7 +30,8 @@ import { NO_SERVICE_FETCH } from "../lib/services";
 import getAgent from "./lib/get-agent";
 import { capTitlePrompt, fileOnlyPromptPart } from "./lib/first-user-prompt";
 import { mediaThreadTitle, startTitleJobs } from "./lib/start-title-jobs";
-import { documentTextPart } from "./lib/attached-text";
+import { documentTextPart, guestTextPart, messageCarriesGuestText } from "./lib/attached-text";
+import { unsendableGuestText } from "./lib/guest-link-store";
 import { formatPageContextPart, parsePageContext } from "./lib/page-context";
 import { createStreamToken } from "./streaming/persistent/stream-token";
 
@@ -358,6 +359,8 @@ export interface ChatStartBody {
     fileIds?: string[];
     /** Run until a reviewer confirms this goal is met (`chat/goals/`). Text turns in the caller's own chat only. */
     goal?: { maxRounds?: number; text: string };
+    /** A held guest note the owner sends on (`chat/guest-links.ts`): its own text is saved, marked as guest text. */
+    guestMessageId?: string;
     imageSize?: string;
     language?: string;
     mcpServerNames?: string[];
@@ -470,6 +473,11 @@ export const runChatStart = async (
         return Response.json({ error: "Invalid pageContext" }, { status: 400 });
     }
 
+    // A held note is a send of its own: never a regeneration, which would answer some other prompt.
+    if (body.guestMessageId !== undefined && (!isValidDocumentIdFormat(body.guestMessageId) || body.regenerate)) {
+        return Response.json({ error: "Invalid guestMessageId" }, { status: 400 });
+    }
+
     // Auth: extract user from the forwarded JWT
     let user: BetterAuthUser | undefined;
 
@@ -566,10 +574,27 @@ const runChatStartOnShard = async (
     // A request refused below never awaits it; it is only a read.
     activeOrganizationPromise.catch(() => undefined);
 
+    const validThreadId = body.threadId && body.threadId !== "default" ? body.threadId : undefined;
+    // A held guest note goes only into its own chat, as text, and its stored text is saved, never the client's prompt.
+    const guestNote =
+        body.guestMessageId === undefined
+            ? undefined
+            : await context.runQuery(internal.chat.guest_links.getGuestNoteForSend, {
+                  messageId: body.guestMessageId as Id<"threadGuestMessages">,
+                  userId,
+              });
+
+    if (guestNote === null || (guestNote && (guestNote.threadId !== validThreadId || contentType !== "text" || unsendableGuestText(guestNote.text)))) {
+        return Response.json({ error: "That guest note cannot be sent in this chat." }, { status: 400 });
+    }
+
     // Build message content
     const messageContent: any[] = [];
 
-    if (body.prompt) {
+    if (guestNote && body.guestMessageId !== undefined) {
+        // The mark carries the note's id, so a send that stored this message but no record is found later (`settleSend`).
+        messageContent.push(guestTextPart(guestNote.text, body.guestMessageId));
+    } else if (body.prompt) {
         messageContent.push({ text: body.prompt.trim(), type: "text" });
     } else if (contentType === "image") {
         messageContent.push({ text: "Generate an image", type: "text" });
@@ -583,8 +608,6 @@ const runChatStartOnShard = async (
     if (pageContext && contentType === "text") {
         messageContent.unshift(formatPageContextPart(pageContext));
     }
-
-    const validThreadId = body.threadId && body.threadId !== "default" ? body.threadId : undefined;
 
     // Continuing a thread needs write access to it. Nothing checked this: the
     // continue branch below saved the prompt into whatever thread id it was
@@ -758,7 +781,8 @@ const runChatStartOnShard = async (
 
     // The config every round of a goal runs with, checked against what `startGoal` accepts BEFORE the turn is charged
     // and saved: an ordinary send tolerates any `researchDepth` and longer lists, a goal does not.
-    const goalSkill = body.goal === undefined || !body.prompt ? null : parseSkillCommand(body.prompt);
+    // A held guest note never selects a skill, whatever prompt the client sent alongside it.
+    const goalSkill = body.goal === undefined || !body.prompt || guestNote ? null : parseSkillCommand(body.prompt);
     const goalConfig =
         body.goal === undefined
             ? undefined
@@ -784,10 +808,33 @@ const runChatStartOnShard = async (
     // runs — `/chat/media`, which the client calls next with this prompt's id —
     // because that route can be called again for the same prompt; a charge here
     // would count the prompt, not the generations.
+    // A held note's send is taken before the charge, so one concurrent send wins and only it is charged (`settleSend` after).
+    const guestSend = guestNote
+        ? await context.runMutation(internal.chat.guest_links.claimGuestNoteSend, {
+              messageId: body.guestMessageId as Id<"threadGuestMessages">,
+              userId,
+          })
+        : undefined;
+
+    if (guestSend === null) {
+        return Response.json({ error: "That guest note was already sent." }, { status: 409 });
+    }
+
+    const releaseGuestSend = async (): Promise<void> => {
+        if (guestSend !== undefined) {
+            await context.runMutation(internal.chat.guest_links.releaseGuestNoteSend, {
+                claimedAt: guestSend,
+                messageId: body.guestMessageId as Id<"threadGuestMessages">,
+            });
+        }
+    };
+
     if (contentType === "text") {
         const dailyLimit = await chargeDailyLimit(context, user, "Text");
 
         if (!dailyLimit.ok) {
+            await releaseGuestSend();
+
             return Response.json(
                 {
                     error: "DAILY_MESSAGE_LIMIT_REACHED",
@@ -877,7 +924,11 @@ const runChatStartOnShard = async (
         // Existing thread: use agent to continue and save message
         // An HTTP action has no `ctx.services`: this agent only SAVES the user's
         // message. The reply is generated by `runStreamingAgent` on the jobs queue.
-        const agent = await getAgent(effectiveModel, { gateway: NO_SERVICE_FETCH, userId });
+        const agent = await getAgent(effectiveModel, { gateway: NO_SERVICE_FETCH, userId }).catch(async (error: unknown) => {
+            await releaseGuestSend();
+
+            throw error;
+        });
 
         // `agent.continueThread(context, { threadId: validThreadId })` used to run
         // here. It builds a Thread object with a dozen bound methods — and the only
@@ -889,19 +940,46 @@ const runChatStartOnShard = async (
         // Save message. `metadata.fileIds` is the attachment channel `saveMessages` reads
         // (see `SaveMessagesArgs.metadata` -> `base?.fileIds`), so it is typed, not `any`.
         const attachmentFileIds = body.fileIds && body.fileIds.length > 0 ? body.fileIds : undefined;
-        const result = await agent.saveMessage(context, {
-            fromUser: true,
-            message: { content: messageContent, role: "user" },
-            ...(attachmentFileIds && { metadata: { fileIds: attachmentFileIds } }),
-            promptMessageId: body.parentId,
-            threadId: validThreadId,
-        });
+        const result = await agent
+            .saveMessage(context, {
+                fromUser: true,
+                message: { content: messageContent, role: "user" },
+                ...(attachmentFileIds && { metadata: { fileIds: attachmentFileIds } }),
+                promptMessageId: body.parentId,
+                threadId: validThreadId,
+            })
+            .catch(async (error: unknown) => {
+                // Released, or marked sent if the save committed after all.
+                await releaseGuestSend();
+
+                throw error;
+            });
 
         threadId = validThreadId;
         messageId = result.messageId;
 
+        // One write records the saved message and marks the note sent; a failed one is logged and settled later (`settleSend`).
+        if (guestSend !== undefined) {
+            try {
+                const recorded = await context.runMutation(internal.chat.guest_links.recordGuestNoteSent, {
+                    claimedAt: guestSend,
+                    messageId: body.guestMessageId as Id<"threadGuestMessages">,
+                    savedMessageId: messageId,
+                });
+
+                if (!recorded) {
+                    chatLogger.warn("[GuestLink] A sent note's record found its send taken over", { savedMessageId: messageId });
+                }
+            } catch (error) {
+                chatLogger.error("[GuestLink] Could not record a sent note:", error);
+            }
+        }
+
         // Title generation for existing threads too — scheduled after the agent run below.
-        scheduleTitleJobs(threadId, false);
+        // A guest note's text never reaches the title model.
+        if (!guestNote) {
+            scheduleTitleJobs(threadId, false);
+        }
     } else {
         // New thread: batched creation
         const result = await context.runMutation(internal.chat.functions.createThreadWithInitialMessage, {
@@ -978,7 +1056,8 @@ const runChatStartOnShard = async (
             ...(origin && { origin }),
             // The typed text, for skill-command detection. Not on regenerate: that
             // replies to an existing prompt, which the run reads from the message.
-            ...(!body.regenerate && body.prompt && { userPrompt: body.prompt }),
+            // A guest note's text is not the owner's, so it is never handed over for skill detection.
+            ...(!body.regenerate && !guestNote && body.prompt && { userPrompt: body.prompt }),
             streamId: streamId!,
             streamingConfig: {
                 ...streamingConfig,
@@ -1120,6 +1199,11 @@ export const editMessageHttpAction = async (context: HttpActionCtx, request: Req
         // The reply would come from a cloud model, in a thread the desktop owns.
         if (gateResult.hostRun) {
             return hostRunThreadResponse();
+        }
+
+        // A guest's note the owner sent on stays the guest's words; an edit would save it as the owner's, so it is refused.
+        if (messageCarriesGuestText(message.message as Parameters<typeof messageCarriesGuestText>[0])) {
+            return Response.json({ error: "A guest's message cannot be edited." }, { headers: { "Content-Type": "application/json" }, status: 400 });
         }
 
         // The reply is generated by `streamAsync`, which builds its own agent;

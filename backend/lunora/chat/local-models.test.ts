@@ -9,6 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { listActivePathPage } from "../agent/branches";
 import { createTemporaryThread } from "../agent/threads";
 import schema from "../schema";
+import { guestTextPart } from "./lib/attached-text";
 import { saveLocalTurnHandler } from "./local-models";
 
 // The harness cannot run a generated `internal` reference (it has no `kind`), so the one the temporary
@@ -81,6 +82,8 @@ const seedEndpoint = async (userId: string, type: string) =>
                 userId,
             }),
     );
+
+const GUEST_EDIT_REFUSED = /guest's message cannot be edited/u;
 
 const save = async (userId: string, args: Record<string, unknown>) =>
     await harness.run(
@@ -266,6 +269,21 @@ describe("regenerate and edit on the local path", () => {
             { branch: "2/2", role: "user", text: "hello instead" },
             { branch: undefined, role: "assistant", text: "edited answer" },
         ]);
+    });
+
+    it("refuses an edit of a guest's note the owner sent on, which would save it as the owner's words", async () => {
+        await seedEndpoint(OWNER, "local-browser");
+
+        const first = await save(OWNER, { prompt: "hi", reply: "first answer" });
+
+        await harness.run(
+            async (ctx: any) =>
+                await ctx.db.patch("messages", first.userMessageId, { message: { content: [guestTextPart("a guest's words", "note-1")], role: "user" } }),
+        );
+
+        await expect(
+            save(OWNER, { branch: { kind: "edit", messageId: first.userMessageId }, prompt: "reworded", reply: "ok", threadId: first.threadId }),
+        ).rejects.toThrow(GUEST_EDIT_REFUSED);
     });
 
     it.each([

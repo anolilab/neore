@@ -27,6 +27,7 @@
  * | `public-api-idempotency` | `<sha256 of api key id + Idempotency-Key>` | 24 h        | `public-api/router.ts` (POSTs with an `Idempotency-Key`) |
  * | `aside-add`        | `<userId>:<threadId>:<entryId>` | {@link ASIDE_ADD_CLAIM_TTL_MS} | `chat/aside.ts` ("Add to thread", one click, retried or doubled) |
  * | `guest-post`       | `<linkId>:<hash of request id>` and `<linkId>:<hash of request id and text>` | {@link GUEST_POST_CLAIM_TTL_MS} | `chat/guest-links.ts` (`holdGuestMessage`: a guest's retry after a lost reply writes its note once) |
+ * | `guest-send`       | `<threadGuestMessages id>` | {@link GUEST_SEND_CLAIM_TTL_MS} | `chat/http.ts` (`/chat/start` with `guestMessageId`): one send of a held guest note; its `result` is the saved message's id (or `past-scan`), recorded with the note's sent mark; one without a result, once its lease (`GUEST_SEND_LEASE_MS`) lapses or its own send failed, is settled from the thread's messages (`chat/guest-links.ts#settleSend`): marked sent when its tagged message is found or the 3-page walk runs out (`past-scan`), freed only when none is found |
  * | `thread-cut`        | `<threadId>:<covered row id>` | 30 min | `agent/thread-summaries.ts` (idle summary) and `agent/thread-compaction.ts` (compaction): one scope, so a cut is paid for once |
  * | `thread-fold`       | `<threadId>`             | 3 min, released when the call ends | `agent/thread-summaries.ts` (`claimCut`): one paid summarising call in flight per thread, so two runs planning different cuts of the same rows do not both pay |
  * | `regenerate-title`  | `<threadId>`             | 5 min until the job starts, then held for 15 min from its start (`REGENERATE_TITLE_RUN_TTL_MS`); released when the job ends, or by `retryTitleWrite` once a handed-off write settles | `chat/functions.ts` (`regenerateThreadTitle`: one regenerate in flight per thread) |
@@ -115,6 +116,15 @@ export const GUEST_POST_CLAIM_TTL_MS = 24 * 60 * 60 * 1000;
 
 /** The scope of those claims. */
 export const GUEST_POST_SCOPE = "guest-post";
+
+/** A held guest note's send: outlives the note's link (24 h), so a stored send is never repeated while the note exists. */
+export const GUEST_SEND_CLAIM_TTL_MS = 2 * 24 * 60 * 60 * 1000;
+
+/** The scope of those claims. */
+export const GUEST_SEND_SCOPE = "guest-send";
+
+/** How long a guest send may take before a send with no stored message counts as dead and the note can be acted on again. */
+export const GUEST_SEND_LEASE_MS = 5 * 60 * 1000;
 
 /** A worker dispatch (`sub-agents/functions.ts`): the lead's tool call or the user's `clientId`, redelivered or retried within a day. */
 export const WORKER_DISPATCH_CLAIM_TTL_MS = 24 * 60 * 60 * 1000;

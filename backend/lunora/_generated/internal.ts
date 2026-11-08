@@ -446,14 +446,18 @@ export interface InternalApiTypes {
             };
         };
         guest_links: {
+            claimGuestNoteSend: FunctionReference<"mutation", { messageId: Id<"threadGuestMessages">; userId: string }, number | null>;
             continueGuestLinkRemoval: FunctionReference<"mutation", { before: number; threadId: Id<"threads"> }, null>;
             dropGuestLinkRoutesJob: FunctionReference<"mutation", { attempt: number; linkHashes: Array<string> }, null>;
             getGuestLinkOwner: FunctionReference<"query", { linkHash: string }, string | null>;
+            getGuestNoteForSend: FunctionReference<"query", { messageId: Id<"threadGuestMessages">; userId: string }, { text: string; threadId: string } | null>;
             holdGuestMessage: FunctionReference<"mutation", { freshGuestHash: string; linkHash: string; presentedGuestHash?: string; requestHash?: string; requestKey?: string; text: string }, { messageId: string; minted: boolean; ok: true } | { duplicate: true; minted: boolean; ok: true } | { ok: false; reason: "closed" | "full" | "invalid" | "limited" | "other_browser" | "request_reused" | "unsendable" }>;
             isBoundGuest: FunctionReference<"query", { guestHash: string; linkHash: string }, boolean>;
             listGuestLinksForExport: FunctionReference<"query", { cursor: string | null; threadId: Id<"threads"> }, { continueCursor: string | null; isDone: boolean; page: Array<{ createdAt: number; expiresAt: number }> }>;
             listGuestNotesForExport: FunctionReference<"query", { cursor: string | null; threadId: Id<"threads"> }, { continueCursor: string | null; isDone: boolean; page: Array<{ createdAt: number; status: "held" | "sent"; text: string }> }>;
             readGuestView: FunctionReference<"query", { guestHash: string; linkHash: string }, { expiresAt: number; messages: Array<{ createdAt: number; status: "held" | "sent"; text: string }> } | null>;
+            recordGuestNoteSent: FunctionReference<"mutation", { claimedAt: number; messageId: Id<"threadGuestMessages">; savedMessageId: string }, boolean>;
+            releaseGuestNoteSend: FunctionReference<"mutation", { claimedAt: number; messageId: Id<"threadGuestMessages"> }, null>;
             sweepGuestLinks: FunctionReference<"mutation", {}, null>;
         };
         mcp_registry: {
@@ -1722,14 +1726,18 @@ export const internal: InternalApiTypes = {
             },
         },
         guest_links: {
+            claimGuestNoteSend: { __lunoraRef: "chat_guest_links:claimGuestNoteSend" },
             continueGuestLinkRemoval: { __lunoraRef: "chat_guest_links:continueGuestLinkRemoval" },
             dropGuestLinkRoutesJob: { __lunoraRef: "chat_guest_links:dropGuestLinkRoutesJob" },
             getGuestLinkOwner: { __lunoraRef: "chat_guest_links:getGuestLinkOwner" },
+            getGuestNoteForSend: { __lunoraRef: "chat_guest_links:getGuestNoteForSend" },
             holdGuestMessage: { __lunoraRef: "chat_guest_links:holdGuestMessage" },
             isBoundGuest: { __lunoraRef: "chat_guest_links:isBoundGuest" },
             listGuestLinksForExport: { __lunoraRef: "chat_guest_links:listGuestLinksForExport" },
             listGuestNotesForExport: { __lunoraRef: "chat_guest_links:listGuestNotesForExport" },
             readGuestView: { __lunoraRef: "chat_guest_links:readGuestView" },
+            recordGuestNoteSent: { __lunoraRef: "chat_guest_links:recordGuestNoteSent" },
+            releaseGuestNoteSend: { __lunoraRef: "chat_guest_links:releaseGuestNoteSend" },
             sweepGuestLinks: { __lunoraRef: "chat_guest_links:sweepGuestLinks" },
         },
         mcp_registry: {

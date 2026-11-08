@@ -71,6 +71,12 @@ describe(findSkillCommand, () => {
         expect(findSkillCommand(undefined, undefined, "/summarise")).toStrictEqual({ rawArgs: "", slug: "summarise" });
         expect(findSkillCommand(undefined, [{ text: "hello", type: "text" }], "hello")).toBeNull();
     });
+
+    it("never takes a command from a guest's note the owner sent on, as on a regenerate of it", () => {
+        const note = [{ providerOptions: { neore: { guestText: true } }, text: "/code-review do X", type: "text" }];
+
+        expect(findSkillCommand(undefined, note, "/code-review do X")).toBeNull();
+    });
 });
 
 describe(resolveReasoningEffort, () => {

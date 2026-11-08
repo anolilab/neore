@@ -30,6 +30,7 @@ import { isWorkerThread } from "../sub-agents/functions";
 import { storedRetentionHours } from "../lib/temporary-retention";
 import { MAX_LENGTH } from "../lib/validators";
 import { endActiveGoals, hasLiveStream } from "./goals/rows";
+import { messageCarriesGuestText } from "./lib/attached-text";
 import {
     buildLocalPromptMessage,
     buildLocalReplyMessage,
@@ -174,6 +175,11 @@ export const saveLocalTurnHandler = async (ctx: MutationContext, userId: string,
         let promptId = args.branch.messageId;
 
         if (args.branch.kind === "edit") {
+            // A guest's note the owner sent on stays the guest's words; an edit would save it as the owner's.
+            if (messageCarriesGuestText(target?.message as Parameters<typeof messageCarriesGuestText>[0])) {
+                throw new LunoraError("BAD_REQUEST", "A guest's message cannot be edited.");
+            }
+
             promptId = await saveEditedSiblingHandler(ctx, { message: userMessage.message, originalMessageId: promptId, userId });
         } else {
             // As the gateway's regenerate: the new reply is then the prompt's latest
