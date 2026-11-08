@@ -269,6 +269,26 @@ describe("phone push tokens", () => {
         expect(await devicesOf(OTHER)).toMatchObject([{ sessionId: sessions[OTHER], token: PHONE }]);
     });
 
+    it("ties a phone app's registration to its grant's sign-in (`grantSessionId`)", async () => {
+        await harness.run(
+            async (ctx: object) =>
+                await (registerPushDevice as unknown as Handler<unknown>).handler(
+                    {
+                        ...ctx,
+                        auth: {
+                            getIdentity: async () => {
+                                return { grantSessionId: sessions[USER] };
+                            },
+                            userId: USER,
+                        },
+                    },
+                    { platform: "android", token: PHONE },
+                ),
+        );
+
+        expect(await devicesOf(USER)).toMatchObject([{ sessionId: sessions[USER], token: PHONE }]);
+    });
+
     it("registers nothing for a call that carries no session", async () => {
         sessions = {};
 
@@ -299,7 +319,7 @@ describe("pushDevices writes", () => {
                         return row._id === "r1" ? { ...row, userId: OTHER } : row;
                     }),
                     findMany: vi.fn(async () => {
-                        return { page: rows };
+                        return { page: rows.filter((row) => !deleted.includes(row._id)) };
                     }),
                 },
             },

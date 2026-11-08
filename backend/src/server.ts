@@ -10,6 +10,8 @@ import type { DurableObjectNamespaceLike } from "@lunora/scheduler";
 import type { R2BucketLike } from "@lunora/storage";
 import type { ExecutionContextLike, ScheduledControllerLike, ShardNamespaceLike } from "lunorash/runtime";
 
+import type { BearerIdentity } from "./bearer-identity";
+import { identityFromBearerClaims } from "./bearer-identity";
 import { createJwksCache, type JwksCache } from "./jwks-cache.js";
 import { inTimingFrame, installFetchTiming, isTimingEnabled, logTiming, timedD1 } from "./development-timing.js";
 import { env as workerEnv } from "cloudflare:workers";
@@ -233,7 +235,7 @@ const verifyBearer = async (env: Env, token: string, origin: string) => {
  * Shared by `resolveIdentity` and the ws-ticket mint, which must accept exactly
  * the callers RPC accepts.
  */
-const resolveSessionIdentity = async (env: Env, request: Request): Promise<null | { sessionId?: string; userId: string }> => {
+const resolveSessionIdentity = async (env: Env, request: Request): Promise<BearerIdentity | null> => {
     // Bearer first, deliberately. The browser's `LunoraClient`
     // authenticates with the JWT from `/api/auth/token`, so on the RPC
     // path — the hottest path in the app — a cookie lookup would be a
@@ -257,11 +259,11 @@ const resolveSessionIdentity = async (env: Env, request: Request): Promise<null 
             // replayed here if the key set is ever shared.
             const { payload } = await verifyBearer(env, bearer, origin);
 
-            if (typeof payload.sub === "string") {
-                // `sessionId` is what `getSession(ctx)` reads back
-                // (`lunora/auth/session.ts`); a token minted before
-                // `sid` was added simply carries none.
-                return { userId: payload.sub, ...(typeof payload.sid === "string" && { sessionId: payload.sid }) };
+            // `sid` and the grant's `gsid` stay apart: `bearer-identity.ts`.
+            const identity = identityFromBearerClaims(payload);
+
+            if (identity !== null) {
+                return identity;
             }
         } catch (error) {
             // Expired, wrong signature, unreachable JWKS — fall through

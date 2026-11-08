@@ -86,14 +86,21 @@ export const deleteUserNotifications = internalMutation
             ctx.db.pushDevices.findMany({ consistency: "primary", limit: BATCH, where: { userId } }),
         ]);
 
+        let phonesLeft = 0;
+
         await Promise.all([
             // A phone another account took over since the read above is that account's now: it stays.
-            ...phones.page.map(async (row) => await deleteIfUnchanged(ctx.db, row)),
+            ...phones.page.map(async (row) => {
+                phonesLeft += (await deleteIfUnchanged(ctx.db, row)) ? 0 : 1;
+            }),
             ...notifications.page.map(async (row) => await ctx.db.delete("notifications", row._id)),
             ...briefState.page.map(async (row) => await ctx.db.delete("dailyBriefState", row._id)),
             ...outbox.page.map(async (row) => await ctx.db.delete("outcomeEmails", row._id)),
             ...devices.map(async (device) => await ctx.push.unregister(device.id, { userId })),
         ]);
 
-        return { hasMore: [notifications.page, devices, briefState.page, outbox.page, phones.page].some((page) => page.length >= BATCH) };
+        // A phone skipped above (it registered again meanwhile) is still the account's: come back for it.
+        return {
+            hasMore: phonesLeft > 0 || [notifications.page, devices, briefState.page, outbox.page, phones.page].some((page) => page.length >= BATCH),
+        };
     });

@@ -31,6 +31,16 @@ const isUniqueViolation = (error: unknown): boolean => {
     return UNIQUE_CONSTRAINT_FAILED.test(String(error)) || (cause !== undefined && UNIQUE_CONSTRAINT_FAILED.test(String(cause)));
 };
 
+/**
+ * The sign-in a call comes from: the phone app's grant (`grantSessionId`, from its JWT's `gsid`) or a web session
+ * (`sessionId`). The grant's is never handed out as `sessionId` (`src/bearer-identity.ts`), so it is read here by name.
+ */
+const callerSignIn = (identity: Record<string, unknown> | null | undefined): string | undefined => {
+    const signIn = identity?.grantSessionId ?? identity?.sessionId;
+
+    return typeof signIn === "string" ? signIn : undefined;
+};
+
 /** Whether this deployment pushes to phones. The app asks for permission only when it does. */
 export const getNativePushConfig = authQuery
     .input({})
@@ -65,10 +75,9 @@ export const registerPushDevice = authMutation
         }
 
         const { userId } = ctx.user;
-        const identity = await ctx.auth.getIdentity();
-        const sessionId = identity?.sessionId;
+        const sessionId = callerSignIn(await ctx.auth.getIdentity());
 
-        if (typeof sessionId !== "string") {
+        if (sessionId === undefined) {
             return refuse("no_session");
         }
 
@@ -84,7 +93,7 @@ export const registerPushDevice = authMutation
             // so a request whose JWT outlived its session never takes a phone from a live registration.
             const session = await database.session.findFirst({ consistency: "primary", where: { _id: sessionId as Id<"session"> } });
 
-            return session !== null && session !== undefined && session.expiresAt > Date.now();
+            return session?.userId === userId && session.expiresAt > Date.now();
         };
 
         if (!(await isLive())) {
@@ -171,12 +180,11 @@ export const unregisterPushDevice = authMutation
     .input({ token: v.string().check((value) => value.length > 0 && value.length <= 200, { message: "Invalid push token" }) })
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
-        const identity = await ctx.auth.getIdentity();
-        const sessionId = identity?.sessionId;
+        const sessionId = callerSignIn(await ctx.auth.getIdentity());
         const row =
-            typeof sessionId === "string"
-                ? await ctx.db.pushDevices.findFirst({ consistency: "primary", where: { sessionId, token: args.token, userId: ctx.user.userId } })
-                : undefined;
+            sessionId === undefined
+                ? undefined
+                : await ctx.db.pushDevices.findFirst({ consistency: "primary", where: { sessionId, token: args.token, userId: ctx.user.userId } });
 
         // Skipped when the phone registered again (or moved to another account) since the read above.
         const isRemoved = row ? await deleteIfUnchanged(ctx.db, row) : false;

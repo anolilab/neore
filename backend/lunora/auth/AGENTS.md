@@ -25,6 +25,7 @@ reasoning are in [docs/agents/backend-auth.md](../../../docs/agents/backend-auth
 - `authorizeShard` (`backend/src/shard-routing.ts#createShardAuthorizer`) must COMPARE the shard key with the caller / a `.global()` grant's `ownerId`, never pattern-match a prefix; never admit an anonymous caller to a user shard.
 - Grants are cached 30s per isolate at the shard gate: procedures must re-read the grant themselves.
 - Bearer JWTs must be VERIFIED against our JWKS (`resolveIdentity`, `jose`), never just decoded.
+- Never give the extension/app grant JWT `sid`: its session is the exchange's fresh one with no impersonation mark, so as `sessionId` it would pass account deletion's checks. It carries `gsid` → `grantSessionId` (`src/bearer-identity.ts`).
 - The live-query socket never carries the JWT: POST the bearer to `/_lunora/ws-ticket` and send the single-use 30s ticket (`lib/ws-ticket.ts`, `wsTicket` table, `DELETE … RETURNING`). `?token=` is only ever redeemed as a ticket; `requestBearer` reads the `Authorization` header alone.
 - JWT note: `iss`/`aud` are set explicitly to the backend's `PUBLIC_ORIGIN` on `jwt()` in `auth.ts`; keep it. `VITE_LUNORA_URL` must equal `PUBLIC_ORIGIN` — the deploy feeds both from one secret, do not split them.
 - The better-auth tables in `schema.ts` are hand-maintained; run `lunora/auth.schema.test.ts` after any better-auth bump. New columns: declare optional; add them to the local D1 by hand with `sqlite3` (never ALTERed) and touch a source file.

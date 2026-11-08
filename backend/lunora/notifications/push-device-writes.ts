@@ -32,19 +32,26 @@ export const deleteIfUnchanged = async (db: MutationCtx["db"], read: Doc<"pushDe
  */
 export const dropPushDevicesOf = async (db: MutationCtx["db"], userId: string): Promise<number> => {
     let removed = 0;
+    // A skipped row (it registered again since the read) is still the guest's: read again, a few times.
+    let rereads = 3;
 
     for (;;) {
         const { page } = await db.pushDevices.findMany({ consistency: "primary", limit: MAX_PUSH_DEVICES_PER_USER * 3, where: { userId } });
+        let skipped = 0;
 
         for (const device of page) {
             if (await deleteIfUnchanged(db, device)) {
                 removed += 1;
+            } else {
+                skipped += 1;
             }
         }
 
-        if (page.length < MAX_PUSH_DEVICES_PER_USER * 3) {
+        if (page.length < MAX_PUSH_DEVICES_PER_USER * 3 && (skipped === 0 || rereads <= 0)) {
             return removed;
         }
+
+        rereads -= skipped > 0 ? 1 : 0;
     }
 };
 
