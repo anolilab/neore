@@ -685,7 +685,7 @@ msgstr "{0} 回使用"
 #. placeholder {1}: detail.commitCount
 #. placeholder {2}: detail.baseBranch
 #. placeholder {3}: detail.headBranch
-#: src/features/develop/components/pull-request-view.tsx:102
+#: src/features/develop/components/pull-request-view.tsx:104
 msgid "{0} wants to merge {1, plural, one {# commit} other {# commits}} into {2} from {3}"
 msgstr ""
 
@@ -974,6 +974,14 @@ msgstr ""
 
 #: src/features/develop/components/merge-panel.tsx:79
 msgid "{hostLabel} says this is ready to merge."
+msgstr ""
+
+#: src/features/develop/components/pull-request-edit-action.tsx:155
+msgid "{hostLabel} shortened this description, so it cannot be edited here. The title can still change."
+msgstr ""
+
+#: src/features/develop/components/pull-request-edit-action.tsx:120
+msgid "{hostLabel} shows the new title and description to everyone who can see this {requestNoun}."
 msgstr ""
 
 #. placeholder {0}: methodLabels[method]
@@ -1274,7 +1282,7 @@ msgstr "{refusedLabel} はこのリクエストの形式に合っていないた
 msgid "{requestCount} req"
 msgstr "{requestCount} 件"
 
-#: src/features/develop/components/pull-request-view.tsx:125
+#: src/features/develop/components/pull-request-view.tsx:136
 msgid "{requestNoun} views"
 msgstr ""
 
@@ -1675,6 +1683,15 @@ msgstr "9:16 比率"
 msgid "99.99% SLA"
 msgstr "99.99% の SLA"
 
+#: src/features/develop/components/pull-request-edit-action.tsx:138
+msgid "A {requestNoun} needs a title. Enter one to save."
+msgstr ""
+
+#. placeholder {0}: i18n.number(MAX_TITLE)
+#: src/features/develop/components/pull-request-edit-action.tsx:137
+msgid "A {requestNoun} title is at most {0} characters."
+msgstr ""
+
 #: src/features/develop/components/watched-repositories.tsx:72
 msgid "a change is waiting to be read"
 msgstr ""
@@ -1698,6 +1715,11 @@ msgstr "コーディネーターが回答者を選びます（1 メッセージ�
 #: src/features/evals/components/dataset-form-dialog.tsx:67
 msgid "A dataset is a set of test cases you run against an agent, a model or your knowledge base."
 msgstr "データセットとは、エージェント、モデル、またはナレッジベースに対して実行するテストケースの集まりです。"
+
+#. placeholder {0}: i18n.number(MAX_BODY)
+#: src/features/develop/components/pull-request-edit-action.tsx:160
+msgid "A description is at most {0} characters."
+msgstr ""
 
 #: src/features/marketing/components/landing-page.tsx:218
 msgid "A document editor that thinks with you."
@@ -5297,6 +5319,7 @@ msgstr "カナダ"
 #: src/features/chat/thread/generation-model-menu.tsx:162
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:227
 #: src/features/develop/components/comment-composer.tsx:62
+#: src/features/develop/components/pull-request-edit-action.tsx:172
 #: src/features/evals/components/case-form-dialog.tsx:68
 #: src/features/evals/components/dataset-form-dialog.tsx:168
 #: src/features/evals/components/import-cases-dialog.tsx:113
@@ -5838,7 +5861,7 @@ msgstr "確認しています..."
 msgid "Checking…"
 msgstr ""
 
-#: src/features/develop/components/pull-request-view.tsx:72
+#: src/features/develop/components/pull-request-view.tsx:74
 #: src/features/evals/components/case-fields.tsx:150
 #: src/features/evals/components/dataset-panel.tsx:147
 #: src/features/evals/components/run-detail.tsx:77
@@ -6338,7 +6361,7 @@ msgstr "翻訳を閉じる"
 
 #: src/features/chat/link-preview/link-preview-card.tsx:117
 #: src/features/chat/thread/widgets/places-widget.tsx:165
-#: src/features/develop/components/pull-request-view.tsx:73
+#: src/features/develop/components/pull-request-view.tsx:75
 msgid "Closed"
 msgstr "クローズ"
 
@@ -6722,7 +6745,7 @@ msgstr "Black Forest Labs の最高品質の画像を求める商用プロジェ
 msgid "Commit as me"
 msgstr "自分としてコミットする"
 
-#: src/features/develop/components/pull-request-view.tsx:72
+#: src/features/develop/components/pull-request-view.tsx:74
 msgid "Commits"
 msgstr ""
 
@@ -8003,6 +8026,10 @@ msgstr ""
 msgid "Could not confirm that this was merged. Check on {hostLabel} before you try again."
 msgstr ""
 
+#: src/features/develop/lib/pull-request-action-feedback.ts:51
+msgid "Could not confirm that. Check on {hostLabel} before you try again."
+msgstr ""
+
 #: src/features/develop/components/merge-panel.tsx:111
 msgid "Could not confirm the change to auto-merge. Check on {hostLabel} before you try again."
 msgstr ""
@@ -8209,6 +8236,11 @@ msgstr "そのチャットを読み込めませんでした。ロックされて
 #: src/features/skills/components/skill-builder-dialog.tsx:132
 msgid "Could not refine the draft. Try again."
 msgstr "下書きを改善できませんでした。もう一度お試しください。"
+
+#. placeholder {0}: host.label
+#: src/features/develop/components/pull-request-view.tsx:114
+msgid "Could not refresh this {requestNoun} from {0}. What you see may be out of date."
+msgstr ""
 
 #: src/features/devices/components/devices-settings.tsx:346
 msgid "Could not remove the device."
@@ -9857,7 +9889,8 @@ msgid "Describe your workflow... e.g., 'Generate an image from text, upscale it,
 msgstr "ワークフローを説明してください...例：「テキストから画像を生成し、アップスケールしてから背景を除去する」"
 
 #: src/components/model-picker/model-picker.tsx:167
-#: src/features/develop/components/pull-request-view.tsx:72
+#: src/features/develop/components/pull-request-edit-action.tsx:143
+#: src/features/develop/components/pull-request-view.tsx:74
 #: src/features/evals/components/dataset-form-dialog.tsx:102
 #: src/features/knowledge/components/collection-dialog.tsx:69
 #: src/features/projects/components/project-form-dialog.tsx:214
@@ -10472,7 +10505,7 @@ msgstr "ダウンロードは GitHub のリリースページに移動します�
 
 #: src/features/chat/link-preview/link-preview-card.tsx:117
 #: src/features/develop/components/inbox-list.tsx:118
-#: src/features/develop/components/pull-request-view.tsx:81
+#: src/features/develop/components/pull-request-view.tsx:83
 #: src/features/skills/components/skill-builder-review.tsx:133
 msgid "Draft"
 msgstr "下書き"
@@ -10933,6 +10966,14 @@ msgstr "タスクを編集"
 
 #: src/features/chat/thread/edit-composer.tsx:148
 msgid "Edit the reply..."
+msgstr ""
+
+#: src/features/develop/components/pull-request-edit-action.tsx:119
+msgid "Edit this {requestNoun}"
+msgstr ""
+
+#: src/features/develop/components/pull-request-edit-action.tsx:114
+msgid "Edit title and description"
 msgstr ""
 
 #: src/features/settings/components/chat/trigger-settings.tsx:917
@@ -13677,7 +13718,7 @@ msgstr "プロジェクトなしで保存: タスクのプロジェクトにチ�
 msgid "Filename cannot be empty"
 msgstr "ファイル名を空にすることはできません"
 
-#: src/features/develop/components/pull-request-view.tsx:72
+#: src/features/develop/components/pull-request-view.tsx:74
 msgid "Files"
 msgstr ""
 
@@ -15346,7 +15387,7 @@ msgstr "ゲストアカウントでは無料モデルのみ利用できます。
 msgid "Guest accounts use free models only. Sign up to unlock all models."
 msgstr "ゲストアカウントでは無料モデルのみ使用できます。サインアップするとすべてのモデルが利用できます。"
 
-#: src/features/develop/components/pull-request-view.tsx:72
+#: src/features/develop/components/pull-request-view.tsx:74
 msgid "Guide"
 msgstr ""
 
@@ -16406,7 +16447,7 @@ msgid "Improving..."
 msgstr "改善しています..."
 
 #. placeholder {0}: detail.changedFiles
-#: src/features/develop/components/pull-request-view.tsx:107
+#: src/features/develop/components/pull-request-view.tsx:109
 msgid "in {0, plural, one {# file} other {# files}}"
 msgstr ""
 
@@ -18120,7 +18161,7 @@ msgstr ""
 #: ../../packages/ui/src/components/spinner.tsx:8
 #: src/features/develop/components/develop-page.tsx:28
 #: src/features/develop/components/inbox-list.tsx:86
-#: src/features/develop/components/pull-request-view.tsx:57
+#: src/features/develop/components/pull-request-view.tsx:62
 #: src/features/develop/components/watched-repositories.tsx:171
 msgid "Loading"
 msgstr "読み込み中"
@@ -19225,7 +19266,7 @@ msgid "Merge when ready?"
 msgstr ""
 
 #: src/features/chat/link-preview/link-preview-card.tsx:117
-#: src/features/develop/components/pull-request-view.tsx:73
+#: src/features/develop/components/pull-request-view.tsx:75
 msgid "Merged"
 msgstr "マージ済み"
 
@@ -21011,7 +21052,7 @@ msgstr "データセットはまだありません"
 msgid "No description"
 msgstr "説明なし"
 
-#: src/features/develop/components/pull-request-view.tsx:135
+#: src/features/develop/components/pull-request-view.tsx:146
 msgid "No description provided."
 msgstr ""
 
@@ -21596,6 +21637,11 @@ msgstr "承認されませんでした"
 msgid "Not attached:"
 msgstr "添付されなかったファイル："
 
+#: src/features/develop/components/pull-request-actions-panel.tsx:65
+#: src/features/develop/components/pull-request-edit-action.tsx:167
+msgid "Not changed"
+msgstr ""
+
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:72
 msgid "not configured"
 msgstr "未設定"
@@ -21610,6 +21656,7 @@ msgstr "未設定"
 msgid "Not configured by the operator"
 msgstr "運営者によって設定されていません"
 
+#: src/features/develop/components/pull-request-actions-panel.tsx:65
 #: src/features/develop/components/review-panel.tsx:307
 msgid "Not confirmed"
 msgstr ""
@@ -22203,7 +22250,7 @@ msgstr "不透明度"
 #: ../../packages/chat-ui/src/chat/message-content.tsx:708
 #: src/components/command-palette.tsx:700
 #: src/features/chat/link-preview/link-preview-card.tsx:117
-#: src/features/develop/components/pull-request-view.tsx:73
+#: src/features/develop/components/pull-request-view.tsx:75
 #: src/features/tasks/hooks/use-task-notifications.ts:30
 msgid "Open"
 msgstr "開く"
@@ -22330,7 +22377,7 @@ msgid "Open new chat"
 msgstr "新しいチャットを開く"
 
 #. placeholder {0}: host.label
-#: src/features/develop/components/pull-request-view.tsx:93
+#: src/features/develop/components/pull-request-view.tsx:95
 msgid "Open on {0}"
 msgstr ""
 
@@ -27197,6 +27244,7 @@ msgstr "サウジアラビア"
 #: src/features/chat/thread/edit-composer.tsx:165
 #: src/features/chat/thread/request-secret-prompt.tsx:491
 #: src/features/develop/components/draft-comment-card.tsx:43
+#: src/features/develop/components/pull-request-edit-action.tsx:174
 #: src/features/knowledge/components/collection-dialog.tsx:100
 #: src/features/settings/components/chat/api-keys-settings.tsx:436
 #: src/features/settings/components/chat/custom-providers-settings.tsx:640
@@ -27322,6 +27370,10 @@ msgstr ""
 msgid "Saved as preset"
 msgstr "プリセットとして保存しました"
 
+#: src/features/develop/components/pull-request-edit-action.tsx:86
+msgid "Saved on {hostLabel}."
+msgstr ""
+
 #. placeholder {0}: chosen.name
 #: src/features/evals/components/save-eval-case-action.tsx:70
 msgid "Saved to \"{0}\""
@@ -27343,6 +27395,7 @@ msgid "Saving..."
 msgstr "保存しています..."
 
 #: src/features/canvas/canvas-panel.tsx:243
+#: src/features/develop/components/pull-request-edit-action.tsx:174
 #: src/features/skills/components/skill-builder-dialog.tsx:182
 #: src/features/skills/components/skill-form-dialog.tsx:515
 msgid "Saving…"
@@ -31598,7 +31651,7 @@ msgstr "コスト上限には正のドル金額を指定してください。"
 msgid "The dataset, its cases and every run of it are removed."
 msgstr "データセット、そのケース、およびすべての実行が削除されます。"
 
-#: src/features/develop/components/pull-request-view.tsx:137
+#: src/features/develop/components/pull-request-view.tsx:148
 msgid "The description is cut short."
 msgstr ""
 
@@ -31976,6 +32029,10 @@ msgstr ""
 
 #: src/lib/errors/index.ts:188
 msgid "The request timed out. Please try again."
+msgstr ""
+
+#: src/features/develop/lib/pull-request-action-feedback.ts:50
+msgid "The request was refused before it reached {hostLabel}. Nothing was changed."
 msgstr ""
 
 #: src/features/settings/components/chat/native-providers-settings.tsx:528
@@ -32447,7 +32504,7 @@ msgstr ""
 msgid "This host does not offer an inbox yet."
 msgstr ""
 
-#: src/features/develop/components/pull-request-view.tsx:122
+#: src/features/develop/components/pull-request-view.tsx:133
 msgid "This host does not offer any view of a {requestNoun} yet."
 msgstr ""
 
@@ -32953,6 +33010,7 @@ msgid "Timezone updated"
 msgstr "タイムゾーンを更新しました"
 
 #: src/features/chat/thread-list/rename-thread-dialog.tsx:148
+#: src/features/develop/components/pull-request-edit-action.tsx:124
 #: src/features/projects/components/project-form-dialog.tsx:195
 #: src/features/slides/components/slide-editor-dialog.tsx:90
 #: src/features/tasks/components/goal-form-dialog.tsx:88
@@ -35995,6 +36053,11 @@ msgstr "ワークフロー"
 #: src/features/sub-agents/components/worker-run-log.tsx:28
 msgid "Working"
 msgstr "作業中"
+
+#. placeholder {0}: host.label
+#: src/features/develop/components/pull-request-actions-panel.tsx:60
+msgid "Working on {0}…"
+msgstr ""
 
 #. placeholder {0}: goal.maxRounds
 #: src/features/chat/goal/goal-notes.tsx:61

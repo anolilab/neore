@@ -685,7 +685,7 @@ msgstr "{0} usos"
 #. placeholder {1}: detail.commitCount
 #. placeholder {2}: detail.baseBranch
 #. placeholder {3}: detail.headBranch
-#: src/features/develop/components/pull-request-view.tsx:102
+#: src/features/develop/components/pull-request-view.tsx:104
 msgid "{0} wants to merge {1, plural, one {# commit} other {# commits}} into {2} from {3}"
 msgstr ""
 
@@ -974,6 +974,14 @@ msgstr ""
 
 #: src/features/develop/components/merge-panel.tsx:79
 msgid "{hostLabel} says this is ready to merge."
+msgstr ""
+
+#: src/features/develop/components/pull-request-edit-action.tsx:155
+msgid "{hostLabel} shortened this description, so it cannot be edited here. The title can still change."
+msgstr ""
+
+#: src/features/develop/components/pull-request-edit-action.tsx:120
+msgid "{hostLabel} shows the new title and description to everyone who can see this {requestNoun}."
 msgstr ""
 
 #. placeholder {0}: methodLabels[method]
@@ -1274,7 +1282,7 @@ msgstr "{refusedLabel} no tiene el formato que pide esta solicitud, así que no 
 msgid "{requestCount} req"
 msgstr "{requestCount} sol."
 
-#: src/features/develop/components/pull-request-view.tsx:125
+#: src/features/develop/components/pull-request-view.tsx:136
 msgid "{requestNoun} views"
 msgstr ""
 
@@ -1675,6 +1683,15 @@ msgstr "Proporción 9:16"
 msgid "99.99% SLA"
 msgstr "SLA del 99,99 %"
 
+#: src/features/develop/components/pull-request-edit-action.tsx:138
+msgid "A {requestNoun} needs a title. Enter one to save."
+msgstr ""
+
+#. placeholder {0}: i18n.number(MAX_TITLE)
+#: src/features/develop/components/pull-request-edit-action.tsx:137
+msgid "A {requestNoun} title is at most {0} characters."
+msgstr ""
+
 #: src/features/develop/components/watched-repositories.tsx:72
 msgid "a change is waiting to be read"
 msgstr ""
@@ -1698,6 +1715,11 @@ msgstr "Un coordinador elige quién responde: hasta tres por mensaje."
 #: src/features/evals/components/dataset-form-dialog.tsx:67
 msgid "A dataset is a set of test cases you run against an agent, a model or your knowledge base."
 msgstr "Un conjunto de datos es un grupo de casos de prueba que ejecutas contra un agente, un modelo o tu base de conocimiento."
+
+#. placeholder {0}: i18n.number(MAX_BODY)
+#: src/features/develop/components/pull-request-edit-action.tsx:160
+msgid "A description is at most {0} characters."
+msgstr ""
 
 #: src/features/marketing/components/landing-page.tsx:218
 msgid "A document editor that thinks with you."
@@ -5297,6 +5319,7 @@ msgstr "Canadá"
 #: src/features/chat/thread/generation-model-menu.tsx:162
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:227
 #: src/features/develop/components/comment-composer.tsx:62
+#: src/features/develop/components/pull-request-edit-action.tsx:172
 #: src/features/evals/components/case-form-dialog.tsx:68
 #: src/features/evals/components/dataset-form-dialog.tsx:168
 #: src/features/evals/components/import-cases-dialog.tsx:113
@@ -5838,7 +5861,7 @@ msgstr "Comprobando..."
 msgid "Checking…"
 msgstr ""
 
-#: src/features/develop/components/pull-request-view.tsx:72
+#: src/features/develop/components/pull-request-view.tsx:74
 #: src/features/evals/components/case-fields.tsx:150
 #: src/features/evals/components/dataset-panel.tsx:147
 #: src/features/evals/components/run-detail.tsx:77
@@ -6338,7 +6361,7 @@ msgstr "Cerrar traducción"
 
 #: src/features/chat/link-preview/link-preview-card.tsx:117
 #: src/features/chat/thread/widgets/places-widget.tsx:165
-#: src/features/develop/components/pull-request-view.tsx:73
+#: src/features/develop/components/pull-request-view.tsx:75
 msgid "Closed"
 msgstr "Cerrado"
 
@@ -6722,7 +6745,7 @@ msgstr "Proyectos comerciales que exigen la mejor calidad de imagen de Black For
 msgid "Commit as me"
 msgstr "Hacer commit como yo"
 
-#: src/features/develop/components/pull-request-view.tsx:72
+#: src/features/develop/components/pull-request-view.tsx:74
 msgid "Commits"
 msgstr ""
 
@@ -8003,6 +8026,10 @@ msgstr ""
 msgid "Could not confirm that this was merged. Check on {hostLabel} before you try again."
 msgstr ""
 
+#: src/features/develop/lib/pull-request-action-feedback.ts:51
+msgid "Could not confirm that. Check on {hostLabel} before you try again."
+msgstr ""
+
 #: src/features/develop/components/merge-panel.tsx:111
 msgid "Could not confirm the change to auto-merge. Check on {hostLabel} before you try again."
 msgstr ""
@@ -8209,6 +8236,11 @@ msgstr "No se pudo leer ese chat. Si está bloqueado, desbloquéalo primero."
 #: src/features/skills/components/skill-builder-dialog.tsx:132
 msgid "Could not refine the draft. Try again."
 msgstr "No se pudo refinar el borrador. Inténtalo de nuevo."
+
+#. placeholder {0}: host.label
+#: src/features/develop/components/pull-request-view.tsx:114
+msgid "Could not refresh this {requestNoun} from {0}. What you see may be out of date."
+msgstr ""
 
 #: src/features/devices/components/devices-settings.tsx:346
 msgid "Could not remove the device."
@@ -9857,7 +9889,8 @@ msgid "Describe your workflow... e.g., 'Generate an image from text, upscale it,
 msgstr "Describe tu flujo de trabajo... p. ej., \"Genera una imagen a partir de texto, amplíala y luego quita el fondo\""
 
 #: src/components/model-picker/model-picker.tsx:167
-#: src/features/develop/components/pull-request-view.tsx:72
+#: src/features/develop/components/pull-request-edit-action.tsx:143
+#: src/features/develop/components/pull-request-view.tsx:74
 #: src/features/evals/components/dataset-form-dialog.tsx:102
 #: src/features/knowledge/components/collection-dialog.tsx:69
 #: src/features/projects/components/project-form-dialog.tsx:214
@@ -10472,7 +10505,7 @@ msgstr "Las descargas abren la página de versiones de GitHub. Si aún no aparec
 
 #: src/features/chat/link-preview/link-preview-card.tsx:117
 #: src/features/develop/components/inbox-list.tsx:118
-#: src/features/develop/components/pull-request-view.tsx:81
+#: src/features/develop/components/pull-request-view.tsx:83
 #: src/features/skills/components/skill-builder-review.tsx:133
 msgid "Draft"
 msgstr "Borrador"
@@ -10933,6 +10966,14 @@ msgstr "Editar tarea"
 
 #: src/features/chat/thread/edit-composer.tsx:148
 msgid "Edit the reply..."
+msgstr ""
+
+#: src/features/develop/components/pull-request-edit-action.tsx:119
+msgid "Edit this {requestNoun}"
+msgstr ""
+
+#: src/features/develop/components/pull-request-edit-action.tsx:114
+msgid "Edit title and description"
 msgstr ""
 
 #: src/features/settings/components/chat/trigger-settings.tsx:917
@@ -13677,7 +13718,7 @@ msgstr "guardada sin proyecto: ya no puedes añadir chats al proyecto de la tare
 msgid "Filename cannot be empty"
 msgstr "El nombre del archivo no puede estar vacío"
 
-#: src/features/develop/components/pull-request-view.tsx:72
+#: src/features/develop/components/pull-request-view.tsx:74
 msgid "Files"
 msgstr ""
 
@@ -15346,7 +15387,7 @@ msgstr "Las cuentas de invitado solo usan modelos gratuitos."
 msgid "Guest accounts use free models only. Sign up to unlock all models."
 msgstr "Las cuentas de invitado solo usan modelos gratuitos. Regístrate para desbloquear todos los modelos."
 
-#: src/features/develop/components/pull-request-view.tsx:72
+#: src/features/develop/components/pull-request-view.tsx:74
 msgid "Guide"
 msgstr ""
 
@@ -16406,7 +16447,7 @@ msgid "Improving..."
 msgstr "Mejorando..."
 
 #. placeholder {0}: detail.changedFiles
-#: src/features/develop/components/pull-request-view.tsx:107
+#: src/features/develop/components/pull-request-view.tsx:109
 msgid "in {0, plural, one {# file} other {# files}}"
 msgstr ""
 
@@ -18120,7 +18161,7 @@ msgstr ""
 #: ../../packages/ui/src/components/spinner.tsx:8
 #: src/features/develop/components/develop-page.tsx:28
 #: src/features/develop/components/inbox-list.tsx:86
-#: src/features/develop/components/pull-request-view.tsx:57
+#: src/features/develop/components/pull-request-view.tsx:62
 #: src/features/develop/components/watched-repositories.tsx:171
 msgid "Loading"
 msgstr "Cargando"
@@ -19225,7 +19266,7 @@ msgid "Merge when ready?"
 msgstr ""
 
 #: src/features/chat/link-preview/link-preview-card.tsx:117
-#: src/features/develop/components/pull-request-view.tsx:73
+#: src/features/develop/components/pull-request-view.tsx:75
 msgid "Merged"
 msgstr "Fusionado"
 
@@ -21011,7 +21052,7 @@ msgstr "Aún no hay conjuntos de datos"
 msgid "No description"
 msgstr "Sin descripción"
 
-#: src/features/develop/components/pull-request-view.tsx:135
+#: src/features/develop/components/pull-request-view.tsx:146
 msgid "No description provided."
 msgstr ""
 
@@ -21596,6 +21637,11 @@ msgstr "No aprobado"
 msgid "Not attached:"
 msgstr "No adjuntado:"
 
+#: src/features/develop/components/pull-request-actions-panel.tsx:65
+#: src/features/develop/components/pull-request-edit-action.tsx:167
+msgid "Not changed"
+msgstr ""
+
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:72
 msgid "not configured"
 msgstr "sin configurar"
@@ -21610,6 +21656,7 @@ msgstr "Sin configurar"
 msgid "Not configured by the operator"
 msgstr "No configurado por el operador"
 
+#: src/features/develop/components/pull-request-actions-panel.tsx:65
 #: src/features/develop/components/review-panel.tsx:307
 msgid "Not confirmed"
 msgstr ""
@@ -22203,7 +22250,7 @@ msgstr "Opacidad"
 #: ../../packages/chat-ui/src/chat/message-content.tsx:708
 #: src/components/command-palette.tsx:700
 #: src/features/chat/link-preview/link-preview-card.tsx:117
-#: src/features/develop/components/pull-request-view.tsx:73
+#: src/features/develop/components/pull-request-view.tsx:75
 #: src/features/tasks/hooks/use-task-notifications.ts:30
 msgid "Open"
 msgstr "Abrir"
@@ -22330,7 +22377,7 @@ msgid "Open new chat"
 msgstr "Abrir chat nuevo"
 
 #. placeholder {0}: host.label
-#: src/features/develop/components/pull-request-view.tsx:93
+#: src/features/develop/components/pull-request-view.tsx:95
 msgid "Open on {0}"
 msgstr ""
 
@@ -27197,6 +27244,7 @@ msgstr "Arabia Saudí"
 #: src/features/chat/thread/edit-composer.tsx:165
 #: src/features/chat/thread/request-secret-prompt.tsx:491
 #: src/features/develop/components/draft-comment-card.tsx:43
+#: src/features/develop/components/pull-request-edit-action.tsx:174
 #: src/features/knowledge/components/collection-dialog.tsx:100
 #: src/features/settings/components/chat/api-keys-settings.tsx:436
 #: src/features/settings/components/chat/custom-providers-settings.tsx:640
@@ -27322,6 +27370,10 @@ msgstr ""
 msgid "Saved as preset"
 msgstr "Guardado como preajuste"
 
+#: src/features/develop/components/pull-request-edit-action.tsx:86
+msgid "Saved on {hostLabel}."
+msgstr ""
+
 #. placeholder {0}: chosen.name
 #: src/features/evals/components/save-eval-case-action.tsx:70
 msgid "Saved to \"{0}\""
@@ -27343,6 +27395,7 @@ msgid "Saving..."
 msgstr "Guardando..."
 
 #: src/features/canvas/canvas-panel.tsx:243
+#: src/features/develop/components/pull-request-edit-action.tsx:174
 #: src/features/skills/components/skill-builder-dialog.tsx:182
 #: src/features/skills/components/skill-form-dialog.tsx:515
 msgid "Saving…"
@@ -31598,7 +31651,7 @@ msgstr "El límite de coste debe ser una cantidad positiva de dólares."
 msgid "The dataset, its cases and every run of it are removed."
 msgstr "Se eliminan el conjunto de datos, sus casos y todas sus ejecuciones."
 
-#: src/features/develop/components/pull-request-view.tsx:137
+#: src/features/develop/components/pull-request-view.tsx:148
 msgid "The description is cut short."
 msgstr ""
 
@@ -31976,6 +32029,10 @@ msgstr ""
 
 #: src/lib/errors/index.ts:188
 msgid "The request timed out. Please try again."
+msgstr ""
+
+#: src/features/develop/lib/pull-request-action-feedback.ts:50
+msgid "The request was refused before it reached {hostLabel}. Nothing was changed."
 msgstr ""
 
 #: src/features/settings/components/chat/native-providers-settings.tsx:528
@@ -32447,7 +32504,7 @@ msgstr ""
 msgid "This host does not offer an inbox yet."
 msgstr ""
 
-#: src/features/develop/components/pull-request-view.tsx:122
+#: src/features/develop/components/pull-request-view.tsx:133
 msgid "This host does not offer any view of a {requestNoun} yet."
 msgstr ""
 
@@ -32953,6 +33010,7 @@ msgid "Timezone updated"
 msgstr "Zona horaria actualizada"
 
 #: src/features/chat/thread-list/rename-thread-dialog.tsx:148
+#: src/features/develop/components/pull-request-edit-action.tsx:124
 #: src/features/projects/components/project-form-dialog.tsx:195
 #: src/features/slides/components/slide-editor-dialog.tsx:90
 #: src/features/tasks/components/goal-form-dialog.tsx:88
@@ -35995,6 +36053,11 @@ msgstr "Flujos de trabajo"
 #: src/features/sub-agents/components/worker-run-log.tsx:28
 msgid "Working"
 msgstr "Trabajando"
+
+#. placeholder {0}: host.label
+#: src/features/develop/components/pull-request-actions-panel.tsx:60
+msgid "Working on {0}…"
+msgstr ""
 
 #. placeholder {0}: goal.maxRounds
 #: src/features/chat/goal/goal-notes.tsx:61
