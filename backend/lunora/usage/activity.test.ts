@@ -6,7 +6,7 @@ import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import schema from "../schema";
-import { forwardReplyUsage, getActivityHeatmap, getSkillBreakdown, getThreadAttribution, recordReplyUsage } from "./activity";
+import { forwardReplyUsage, getActivityHeatmap, getSkillBreakdown, recordReplyUsage } from "./activity";
 import { DEFAULT_SKILL_KEY, RECORD_RETRY } from "./activity-logic";
 
 const { sessionFrom } = vi.hoisted(() => {
@@ -289,18 +289,32 @@ describe("recording usage by project", () => {
         expect(await projectTotals(USER)).toStrictEqual({ [alpha.projectId!]: { costMicrodollars: 100, replies: 1, tokens: 10 } });
     });
 
-    it("fails, rather than files no project, when the replier's access to the project cannot be read", async () => {
+    it("forwards a reply with its thread's project to its owner, and with none to a collaborator who cannot open it", async () => {
         const alpha = await insertThread(USER, "Alpha");
+        const forward = async (userId: string) =>
+            await harness.run(
+                async (ctx: any) =>
+                    await ctx.runMutation(forwardReplyUsage, {
+                        at: 1,
+                        costMicrodollars: 100,
+                        date: "2026-09-20",
+                        replyKey: `aside:${userId}`,
+                        skillKey: DEFAULT_SKILL_KEY,
+                        threadId: alpha.threadId,
+                        tokens: 10,
+                        userId,
+                    }),
+            );
 
-        projectReadFails.value = true;
+        forwarded.length = 0;
+        await forward(USER);
+        await forward(OTHER);
 
-        try {
-            await expect(
-                harness.run(async (ctx: any) => await ctx.runQuery(getThreadAttribution, { threadId: alpha.threadId, userId: OTHER })),
-            ).rejects.toThrow("project read failed");
-        } finally {
-            projectReadFails.value = false;
-        }
+        // The owner's personal project is not the collaborator's to open: their record goes with no project.
+        expect(forwarded).toMatchObject([
+            { threadAttribution: { projectKey: alpha.projectId }, userId: USER },
+            { threadAttribution: {}, userId: OTHER },
+        ]);
     });
 
     it("forwards a shared reply's total at once when its project read fails, and tries the project again", async () => {

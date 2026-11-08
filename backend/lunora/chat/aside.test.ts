@@ -10,16 +10,17 @@ import { v } from "lunorash/server";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { registeredApi, registerModule } from "../../test/registered-api";
+import { internal } from "../_generated/internal";
 import { internalQuery } from "../_generated/server";
 import { MODEL_FILTER_RULES_UNAVAILABLE_MESSAGE } from "./lib/model-filter-rules";
 
-const { generateText, getAgent, getUtilityModel, registry, scheduleReplyUsage, sessionFrom, users } = vi.hoisted(() => {
+const { generateText, getAgent, getUtilityModel, registry, runAfterOnShard, sessionFrom, users } = vi.hoisted(() => {
     return {
         generateText: vi.fn(),
         getAgent: vi.fn(),
         getUtilityModel: vi.fn(),
         registry: new Map<string, unknown>(),
-        scheduleReplyUsage: vi.fn(),
+        runAfterOnShard: vi.fn(),
         sessionFrom: async (context: { auth: { userId?: string | null } }) =>
             context.auth.userId
                 ? { activeOrganization: null, id: context.auth.userId, isAdmin: false, plan: null, role: null, userId: context.auth.userId }
@@ -35,8 +36,13 @@ vi.mock("ai", async (importOriginal) => {
     return { ...(await importOriginal<typeof import("ai")>()), generateText };
 });
 
-vi.mock("../usage/schedule", () => {
-    return { scheduleReplyUsage };
+// The real booking, watched: the side question's usage record is booked through it.
+vi.mock("../lib/shard-scheduler", async (importOriginal) => {
+    const actual = await importOriginal<typeof import("../lib/shard-scheduler")>();
+
+    runAfterOnShard.mockImplementation(actual.runAfterOnShard);
+
+    return { ...actual, runAfterOnShard };
 });
 
 vi.mock("../lib/utility-model", async (importOriginal) => {
@@ -234,7 +240,7 @@ afterEach(() => {
     generateText.mockReset();
     getAgent.mockReset();
     getUtilityModel.mockReset();
-    scheduleReplyUsage.mockReset();
+    runAfterOnShard.mockClear();
     delete process.env.STORAGE_SIGNING_SECRET;
 });
 
@@ -398,34 +404,6 @@ describe("askAside", () => {
         expect(await remainingText(OWNER)).toBe(before);
     });
 
-    it("answers when the thread's project cannot be read, and sends the record to the thread's shard to read it there", async () => {
-        const key = "usage_activity:getThreadAttribution";
-        const real = registry.get(key);
-
-        registry.set(
-            key,
-            internalQuery
-                .input({ threadId: v.string(), userId: v.string() })
-                .output(v.object({}))
-                .query(async () => {
-                    throw new Error("project read failed");
-                }),
-        );
-
-        try {
-            await ask();
-        } finally {
-            registry.set(key, real);
-        }
-
-        // Answered, and recorded through the thread's shard rather than with a project it could not read.
-        expect(generateText).toHaveBeenCalledOnce();
-        expect(scheduleReplyUsage).not.toHaveBeenCalled();
-        expect(harness.scheduler.list().filter((job) => (job.args as { replyKey?: string } | undefined)?.replyKey === `aside:${lastEntryId()}`)).toHaveLength(
-            1,
-        );
-    });
-
     it("refuses with its own code once the daily quota is spent, and calls no model", async () => {
         await harness.run(async (ctx: any) => {
             const limiter = createRatelimit("chat/dailyText:free", ctx.db as never);
@@ -449,20 +427,29 @@ describe("askAside", () => {
         expect(await errorCode(ask())).toBe("INTERNAL");
     });
 
-    it("records an aside on the thread's own model in the usage rollup, once, under its own key", async () => {
+    it("records an aside on the thread's own model once, under its own key, through the thread's shard", async () => {
         await ask();
 
-        expect(scheduleReplyUsage).toHaveBeenCalledOnce();
-        expect(scheduleReplyUsage.mock.calls[0]![1]).toMatchObject({ replyKey: `aside:${lastEntryId()}`, skillKey: "__assistant__", userId: OWNER });
+        expect(runAfterOnShard).toHaveBeenCalledOnce();
+
+        const [, delay, target, args, shard] = runAfterOnShard.mock.calls[0]!;
+
+        expect([delay, target, shard]).toStrictEqual([0, internal.usage.activity.forwardReplyUsage, OWNER]);
+        expect(args).toMatchObject({ replyKey: `aside:${lastEntryId()}`, skillKey: "__assistant__", threadId, userId: OWNER });
     });
 
-    it("hands the record the thread's project, read where the action can read the thread", async () => {
-        const projectId = await harness.run(async (ctx: any) => await ctx.db.insert("projects", { createdAt: 1, title: "Alpha", userId: OWNER }));
+    it("books a collaborator's record on the owner's shard, which reads the project there", async () => {
+        await grantRead();
+        await ask(QUESTION, OTHER);
 
-        await patchThread({ projectId });
-        await ask();
+        expect(generateText).toHaveBeenCalledOnce();
 
-        expect(scheduleReplyUsage.mock.calls[0]![1]).toMatchObject({ threadAttribution: { projectKey: projectId }, threadId });
+        const call = runAfterOnShard.mock.calls[0]!;
+        const args = call[3];
+
+        expect([call[2], call[4]]).toStrictEqual([internal.usage.activity.forwardReplyUsage, OWNER]);
+        expect(args).not.toHaveProperty("threadAttribution");
+        expect(args).toMatchObject({ threadId, userId: OTHER });
     });
 
     it("records nothing for an aside on the utility model", async () => {
@@ -470,7 +457,7 @@ describe("askAside", () => {
         await ask();
 
         expect(generateText).toHaveBeenCalledOnce();
-        expect(scheduleReplyUsage).not.toHaveBeenCalled();
+        expect(runAfterOnShard).not.toHaveBeenCalled();
     });
 
     it("records nothing for a coding agent's thread", async () => {
@@ -478,7 +465,7 @@ describe("askAside", () => {
         await ask();
 
         expect(generateText).toHaveBeenCalledOnce();
-        expect(scheduleReplyUsage).not.toHaveBeenCalled();
+        expect(runAfterOnShard).not.toHaveBeenCalled();
     });
 
     it("sends only the question to the utility model on a coding agent's thread", async () => {

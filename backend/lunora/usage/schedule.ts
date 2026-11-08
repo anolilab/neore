@@ -26,9 +26,8 @@ export const scheduleReplyUsage = (scheduler: SchedulerLike, usageArgs: ReplyUsa
     const target = internal.usage.activity.recordReplyUsage;
     let scheduled: Promise<unknown>;
 
-    if (usageArgs.threadId === undefined || usageArgs.threadAttribution !== undefined) {
-        // No thread to read, or the caller already read it: to the user's shard, named unless this job runs there — an
-        // action (a side question) has no shard of its own.
+    if (usageArgs.threadId === undefined) {
+        // No thread to read: to the user's shard, named unless this job runs there — an action has no shard of its own.
         scheduled =
             currentUserShard() === usageArgs.userId
                 ? scheduler.runAfter(0, target as never, usageArgs as never)
