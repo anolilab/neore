@@ -15,15 +15,22 @@ afterEach(() => {
     harness.close();
 });
 
-/** One anonymous call from `ip`, as a public action makes it: its context carries `db` as well as the client address. */
+/**
+ * One anonymous call from `ip`, as a public action makes it: its context carries `db` as well as the client address. True when
+ * it is let through, false when the limit refuses it; any other error is the test's to fail on.
+ */
 const callFrom = async (ip: string): Promise<boolean> =>
     await harness.run(async (ctx: any) => {
         try {
             await rateLimitGuard({ ...ctx, ip, rateLimitKey: "chat/promptImprovement", user: null });
 
             return true;
-        } catch {
-            return false;
+        } catch (error) {
+            if ((error as { code?: string }).code === "TOO_MANY_REQUESTS") {
+                return false;
+            }
+
+            throw error;
         }
     });
 
@@ -52,6 +59,10 @@ describe(clientBucket, () => {
     it.each([
         ["203.0.113.7", "203.0.113.7"],
         ["::ffff:203.0.113.7", "203.0.113.7"],
+        ["::ffff:cb00:7107", "203.0.113.7"],
+        ["0:0:0:0:0:ffff:203.0.113.7", "203.0.113.7"],
+        ["0:0:0:0:0:ffff:cb00:7107", "203.0.113.7"],
+        ["::ffff:cb00:7108", "203.0.113.8"],
         ["2001:0db8:000a:000b:1:2:3:4", "2001:db8:a:b::/64"],
         ["2001:db8::1", "2001:db8:0:0::/64"],
         ["::1", "0:0:0:0::/64"],

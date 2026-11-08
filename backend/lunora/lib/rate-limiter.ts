@@ -798,36 +798,51 @@ export const getUserTier = (user: { isAdmin?: boolean; plan?: SessionUser["plan"
     return "free";
 };
 
-const IPV4_MAPPED = /^::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/iu;
+const DOTTED_IPV4 = /^\d{1,3}(?:\.\d{1,3}){3}$/u;
 const LEADING_ZEROS = /^0+(?=.)/u;
 
+const groupsOf = (part: string): string[] => (part === "" ? [] : part.split(":"));
+
 /**
- * The bucket an address is limited in: an IPv6 address by its /64 network, which one connection is usually handed whole,
- * so stepping through it buys no fresh allowance; an IPv4-mapped IPv6 address as its IPv4 form; any other address as is.
+ * The bucket an address is limited in: an IPv4-mapped IPv6 address (`::ffff:` and the IPv4 address, written dotted or in hex,
+ * compressed or expanded) as its IPv4 form; any other IPv6 address by its /64 network, which one connection is usually handed
+ * whole, so stepping through it buys no fresh allowance; an IPv4 address as is.
  */
 export const clientBucket = (ip: string): string => {
-    const mapped = IPV4_MAPPED.exec(ip);
-
-    if (mapped) {
-        return mapped[1]!;
-    }
-
     if (!ip.includes(":")) {
         return ip;
     }
 
-    const [head = "", tail = ""] = ip.toLowerCase().split("::", 2);
-    const headGroups = head === "" ? [] : head.split(":");
-    const tailGroups = tail === "" ? [] : tail.split(":");
+    const lower = ip.toLowerCase();
+    const compressed = lower.includes("::");
+    const [head = "", tail = ""] = lower.split("::", 2);
+    const headGroups = groupsOf(head);
+    const tailGroups = groupsOf(tail);
+    // A dotted IPv4 address at the end stands for the last two groups.
+    const lastPart = compressed ? tailGroups : headGroups;
+    const dotted = lastPart.length > 0 && DOTTED_IPV4.test(lastPart.at(-1)!) ? lastPart.pop() : undefined;
+    const width = dotted === undefined ? 8 : 6;
     const groups = [...headGroups];
 
     // `::` stands for as many zero groups as the address leaves out.
-    if (ip.includes("::")) {
-        while (groups.length < 8 - tailGroups.length) {
+    if (compressed) {
+        while (groups.length < width - tailGroups.length) {
             groups.push("0");
         }
 
         groups.push(...tailGroups);
+    }
+
+    const values = groups.map((group) => Number.parseInt(group, 16));
+
+    if (values.slice(0, 5).every((value) => value === 0) && values[5] === 0xff_ff) {
+        if (dotted !== undefined) {
+            return dotted;
+        }
+
+        const [high = 0, low = 0] = values.slice(6, 8);
+
+        return [high >> 8, high & 0xff, low >> 8, low & 0xff].join(".");
     }
 
     return `${groups
