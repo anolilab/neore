@@ -49,11 +49,13 @@ export class AgentSignIn {
     }
 
     public async status(agentKey: string): Promise<SignInStatus> {
-        const folder = await this.folderOf(agentKey);
         const { timeoutMs = CHECK_TIMEOUT_MS } = this.options;
         let canSignOut = false;
 
         try {
+            // Inside: a folder that cannot be made (a full or read-only disk) is an answer of "unknown", like any other failure.
+            const folder = await this.folderOf(agentKey);
+
             return await this.options.agents.withAgent(agentKey, null, {}, async ({ connection, handshake, scrub }) => {
                 canSignOut = handshake.canLogout;
 
@@ -70,7 +72,7 @@ export class AgentSignIn {
                 }
             });
         } catch (error) {
-            // The agent did not start or did not finish the handshake; `withAgent` already masked its words.
+            // No folder, or the agent did not start or finish the handshake; `withAgent` already masked its words.
             return this.result(agentKey, "unknown", canSignOut, (error as Error).message);
         }
     }

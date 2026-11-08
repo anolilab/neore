@@ -53,17 +53,16 @@ const state: {
     selected?: string;
     sessions: SessionSummary[];
     signature: string;
+
     /**
      * Each agent's last sign-in answer, by key, with the agent's configuration when it was asked (`agentConfig`). An answer
      * for a configuration that changed since (another command, a removed and re-added key) is not shown.
      */
     signIn: Record<string, { config: string; status: SignInStatus }>;
-    /** Counts sign-in requests per agent: only the answer to the latest one is shown, so a slow check cannot undo a sign-out. */
-    signInSerial: Record<string, number>;
-    /** Agents being signed out: a check started meanwhile could answer from before the sign-out and replace its result. */
-    signingOut: Set<string>;
+    /** The sign-in request running for an agent, by key: one at a time (`askSignIn`). */
+    signInPending: Map<string, SignInRequest>;
     view: AcpView;
-} = { listings: [], reports: {}, requests: [], searchSerial: 0, sessions: [], signature: "", signIn: {}, signInSerial: {}, signingOut: new Set(), view: { agents: [], consents: [], envNames: [] } };
+} = { listings: [], reports: {}, requests: [], searchSerial: 0, sessions: [], signature: "", signIn: {}, signInPending: new Map(), view: { agents: [], consents: [], envNames: [] } };
 
 const showError = (error: unknown): void => {
     $("acp-error").textContent = String(error instanceof Error ? error.message : error).replace(IPC_PREFIX, "");
@@ -175,6 +174,8 @@ const probe = (key: string) =>
 
 // ─── Signing in to the agent's own account ──────────────────────────────────
 
+type SignInRequest = "check" | "signOut";
+
 const SIGN_IN_TEXT: Record<SignInStatus["state"], string> = {
     signed_in: "signed in",
     signed_out: "not signed in. Sign in with the agent's own login command on this computer",
@@ -198,6 +199,12 @@ const agentConfig = (key: string): string => {
     return JSON.stringify([agent?.command, agent?.args, agent?.install, agent?.envNames, state.view.envNames]);
 };
 
+const accountText = (key: string): string => {
+    const pending = state.signInPending.get(key);
+
+    return pending === undefined ? signInText(signInOf(key)) : SIGN_IN_PENDING[pending].row;
+};
+
 /** The agent's last sign-in answer, if it was given for the agent as it is configured now. */
 const signInOf = (key: string): SignInStatus | undefined => {
     const known = state.signIn[key];
@@ -205,46 +212,51 @@ const signInOf = (key: string): SignInStatus | undefined => {
     return known?.config === agentConfig(key) ? known.status : undefined;
 };
 
-const showSignIn = async (key: string, request: Promise<SignInStatus>): Promise<void> => {
-    state.signInSerial[key] = (state.signInSerial[key] ?? 0) + 1;
+/** How the row and the notice name a request that is running. */
+const SIGN_IN_PENDING: Record<SignInRequest, { notice: string; row: string }> = {
+    check: { notice: "being checked", row: "checking…" },
+    signOut: { notice: "being signed out", row: "signing out…" },
+};
 
-    const serial = state.signInSerial[key];
+/**
+ * Asks the main process about an agent's account, one request per agent at a time: a second would start another agent
+ * process, and a check answered from before a sign-out could replace its result. The row says what runs meanwhile.
+ */
+const askSignIn = async (key: string, request: SignInRequest, ask: () => Promise<SignInStatus>): Promise<void> => {
     const config = agentConfig(key);
-    const status = await request;
 
-    if (serial === state.signInSerial[key]) {
-        state.signIn[key] = { config, status };
+    state.signInPending.set(key, request);
+    renderAgents();
+
+    try {
+        state.signIn[key] = { config, status: await ask() };
+    } finally {
+        state.signInPending.delete(key);
         renderAgents();
     }
 };
 
-/** True, with a notice, while `key` is being signed out: nothing else about its account may start meanwhile. */
-const busySigningOut = (key: string): boolean => {
-    if (state.signingOut.has(key)) {
-        $("acp-notice").textContent = `${agentLabel(key)} is being signed out; try again once that ends.`;
+/** True, with a notice, while a sign-in request for `key` runs. */
+const signInBusy = (key: string): boolean => {
+    const pending = state.signInPending.get(key);
+
+    if (pending !== undefined) {
+        $("acp-notice").textContent = `${agentLabel(key)} is ${SIGN_IN_PENDING[pending].notice}; try again once that ends.`;
     }
 
-    return state.signingOut.has(key);
+    return pending !== undefined;
 };
 
 const checkSignIn = (key: string) =>
     guarded(async () => {
-        if (busySigningOut(key)) {
-            return;
-        }
-
-        $("acp-notice").textContent = `Asking ${agentLabel(key)} whether it is signed in…`;
-
-        try {
-            await showSignIn(key, globalThis.neoreDevice.acpSignInStatus(key));
-        } finally {
-            $("acp-notice").textContent = "";
+        if (!signInBusy(key)) {
+            await askSignIn(key, "check", () => globalThis.neoreDevice.acpSignInStatus(key));
         }
     });
 
 const signOut = (key: string) =>
     guarded(async () => {
-        if (busySigningOut(key)) {
+        if (signInBusy(key)) {
             return;
         }
 
@@ -256,17 +268,9 @@ const signOut = (key: string) =>
             return;
         }
 
-        // Checked again: a second click could have been confirmed while this one's dialog was open.
-        if (busySigningOut(key)) {
-            return;
-        }
-
-        state.signingOut.add(key);
-
-        try {
-            await showSignIn(key, globalThis.neoreDevice.acpSignOut(key));
-        } finally {
-            state.signingOut.delete(key);
+        // Checked again: a request could have started while this one's dialog was open.
+        if (!signInBusy(key)) {
+            await askSignIn(key, "signOut", () => globalThis.neoreDevice.acpSignOut(key));
         }
     });
 
@@ -363,8 +367,8 @@ const renderAgents = (): void => {
                     }),
                 ),
                 item(
-                    `↳ Account: ${signInText(signInOf(agent.key))}`,
-                    ...canSignOut(signInOf(agent.key)) ? [button("Sign out", `Sign ${agent.label} out of its account`, () => signOut(agent.key))] : [],
+                    `↳ Account: ${accountText(agent.key)}`,
+                    ...!state.signInPending.has(agent.key) && canSignOut(signInOf(agent.key)) ? [button("Sign out", `Sign ${agent.label} out of its account`, () => signOut(agent.key))] : [],
                 ),
                 ...view.consents
                     .filter((consent) => consent.agentKey === agent.key)

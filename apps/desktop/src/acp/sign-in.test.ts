@@ -2,6 +2,7 @@
  * The sign-in check and sign-out against the real scripted agent (`testing/fake-agent.mjs`), which checks every
  * frame against the SDK's schema. `FAKE_AGENT_AUTH_FILE` stands for the agent's own stored sign-in.
  */
+import { once } from "node:events";
 import { existsSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
@@ -103,12 +104,14 @@ describe("signing out", () => {
     it("refuses a start that would replace a thread's session without ending that session", async () => {
         const { manager } = setUp({ FAKE_AGENT_AUTH_FILE: authFile });
         const running = await manager.startSession("fake", "Fake", scratch.work, { sessionId: "session-1", threadId: "thread-1" });
-        let release = (): void => {};
-        const holding = manager.holdingAgent("fake", async () => await new Promise<void>((resolve) => { release = resolve; }));
+        const gate = new EventTarget();
+        const holding = manager.holdingAgent("fake", async () => {
+            await once(gate, "release");
+        });
 
         await expect(manager.startSession("fake", "Fake", scratch.work, { sessionId: "session-2", threadId: "thread-1" })).rejects.toThrow("being signed out");
         expect(manager.statusOf(running)).not.toBe("ended");
-        release();
+        gate.dispatchEvent(new Event("release"));
         await holding;
         manager.killAll();
     });

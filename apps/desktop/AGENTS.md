@@ -51,7 +51,7 @@
   preload bridge; `NEORE_E2E_MICROPHONE=1` uses the (fake) microphone, and `NEORE_WHISPER_CLI` / `_MODEL` / `_CLIP` run
   a real recogniser.
 
-- **Agent sign-in** (`apps/desktop/src/acp/sign-in.ts`, plan provider-sign-in.md): Neore keeps no agent credential. The
+- **Agent sign-in** (`apps/desktop/src/acp/sign-in.ts`): Neore keeps no agent credential. The
   state is the agent's answer to `session/new` on a short-lived connection with no prompt (`AUTH_REQUIRED` = signed out),
   opened in ONE stable folder per agent under `<userData>/acp-sign-in/`: some agents keep a record per folder, so a fresh
   folder per check would add one each time. Sign-out is the agent's own `logout`, after its open sessions end. Never
