@@ -798,6 +798,44 @@ export const getUserTier = (user: { isAdmin?: boolean; plan?: SessionUser["plan"
     return "free";
 };
 
+const IPV4_MAPPED = /^::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/iu;
+const LEADING_ZEROS = /^0+(?=.)/u;
+
+/**
+ * The bucket an address is limited in: an IPv6 address by its /64 network, which one connection is usually handed whole,
+ * so stepping through it buys no fresh allowance; an IPv4-mapped IPv6 address as its IPv4 form; any other address as is.
+ */
+export const clientBucket = (ip: string): string => {
+    const mapped = IPV4_MAPPED.exec(ip);
+
+    if (mapped) {
+        return mapped[1]!;
+    }
+
+    if (!ip.includes(":")) {
+        return ip;
+    }
+
+    const [head = "", tail = ""] = ip.toLowerCase().split("::", 2);
+    const headGroups = head === "" ? [] : head.split(":");
+    const tailGroups = tail === "" ? [] : tail.split(":");
+    const groups = [...headGroups];
+
+    // `::` stands for as many zero groups as the address leaves out.
+    if (ip.includes("::")) {
+        while (groups.length < 8 - tailGroups.length) {
+            groups.push("0");
+        }
+
+        groups.push(...tailGroups);
+    }
+
+    return `${groups
+        .slice(0, 4)
+        .map((group) => group.replace(LEADING_ZEROS, ""))
+        .join(":")}::/64`;
+};
+
 /**
  * Guard function to check and enforce rate limits for mutations and actions.
  * For mutation contexts, uses ctx.db directly.
@@ -826,17 +864,21 @@ export const rateLimitGuard = async (
         identifier = context.identifier;
     } else if (context.user?.userId) {
         identifier = context.user.userId;
+    } else if ((context as { ip?: string }).ip) {
+        // An anonymous call with the request's address (on Cloudflare the edge-stamped client address; every context type
+        // can carry it). Checked before `db`, which an action carries too: tested first, `db` sent every anonymous action to
+        // the session lookup below, which had no session to read, and so to the one bucket every anonymous caller shared.
+        identifier = clientBucket((context as { ip: string }).ip);
     } else if ("db" in context) {
-        // Mutation context: use IP for anonymous users to prevent shared bucket abuse
+        // No request address (a call the server started): the session's sign-in address, if there is a session.
         const signals = await getSessionNetworkSignals(context as MutationContext).catch(() => {
             return {};
         });
 
         identifier = (signals as { ip?: string }).ip ?? "anonymous";
     } else {
-        // An action has no session and no `db`. On Cloudflare `ip` is the edge-stamped
-        // client address; elsewhere it is undefined and the one shared bucket applies.
-        identifier = (context as { ip?: string }).ip ?? "anonymous";
+        // No address to key on: the one shared bucket applies.
+        identifier = "anonymous";
     }
 
     if ("db" in context) {
