@@ -4661,8 +4661,8 @@ export interface Caller {
             unregisterPushDevice: (args: { token: string }) => Promise<null>;
         };
         phone_delivery: {
-            listPushDevicesForUser: (args: { userId: string }) => Promise<{ ended: Array<{ id: Id<"pushDevices">; lastSeenAt: number }>; live: Array<{ id: Id<"pushDevices">; platform: "android" | "ios"; token: string }> }>;
-            recordPushDeliveries: (args: { gone: Array<{ id: Id<"pushDevices">; sentAt: number; userId: string }> }) => Promise<null>;
+            listPushDevicesForUser: (args: { userId: string }) => Promise<{ ended: Array<{ id: Id<"pushDevices">; lastSeenAt: number; sessionId: string }>; live: Array<{ id: Id<"pushDevices">; platform: "android" | "ios"; sessionId: string; token: string }> }>;
+            recordPushDeliveries: (args: { gone: Array<{ id: Id<"pushDevices">; sentAt: number; sessionId: string; userId: string }> }) => Promise<null>;
         };
         push: {
             getPushConfig: (args?: {}) => Promise<{ publicKey?: string; subscriptionCount: number }>;

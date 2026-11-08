@@ -22,8 +22,9 @@ if (typeof __e1 !== "object" || __e1 === null || Array.isArray(__e1)) return DEF
 if (Object.getPrototypeOf(__e1) !== Object.prototype && Object.getPrototypeOf(__e1) !== null) return DEFER;
 if (typeof __e1["id"] !== "string") return DEFER;
 if (typeof __e1["sentAt"] !== "number" || !Number.isFinite(__e1["sentAt"])) return DEFER;
+if (typeof __e1["sessionId"] !== "string") return DEFER;
 if (typeof __e1["userId"] !== "string") return DEFER;
-const __obj2 = { "id": __e1["id"], "sentAt": __e1["sentAt"], "userId": __e1["userId"] };
+const __obj2 = { "id": __e1["id"], "sentAt": __e1["sentAt"], "sessionId": __e1["sessionId"], "userId": __e1["userId"] };
 __arr1[__i1] = __obj2;
 }
 return { "gone": __arr1 };

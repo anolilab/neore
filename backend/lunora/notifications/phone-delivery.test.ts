@@ -49,7 +49,10 @@ const call = async <R>(procedure: unknown, userId: string | null, args: Record<s
             ),
     );
 
-type DeviceList = { ended: { id: string; lastSeenAt: number }[]; live: { id: string; platform: string; token: string }[] };
+type DeviceList = {
+    ended: { id: string; lastSeenAt: number; sessionId: string }[];
+    live: { id: string; platform: string; sessionId: string; token: string }[];
+};
 
 const listOf = async (userId: string) => await call<DeviceList>(listPushDevicesForUser, null, { userId });
 
@@ -102,8 +105,8 @@ describe("the phones a send goes to", () => {
         await call(registerPushDevice, OTHER, { platform: "ios", token: SECOND_PHONE });
         await call(recordPushDeliveries, null, {
             gone: [
-                { id: first.id, sentAt: Date.now() + 1000, userId: USER },
-                { id: second.id, sentAt: Date.now() + 1000, userId: USER },
+                { id: first.id, sentAt: Date.now() + 1000, sessionId: first.sessionId, userId: USER },
+                { id: second.id, sentAt: Date.now() + 1000, sessionId: second.sessionId, userId: USER },
             ],
         });
 
@@ -125,7 +128,7 @@ describe("the phones a send goes to", () => {
             await call(registerPushDevice, USER, { platform: "ios", token: PHONE });
             await call(recordPushDeliveries, null, {
                 gone: devices.map((device) => {
-                    return { id: device.id, sentAt, userId: USER };
+                    return { id: device.id, sentAt, sessionId: device.sessionId, userId: USER };
                 }),
             });
 
@@ -135,6 +138,20 @@ describe("the phones a send goes to", () => {
         } finally {
             vi.useRealTimers();
         }
+    });
+
+    it("keeps a phone that registered again under a new sign-in in the same millisecond as the send", async () => {
+        const newer = await startSession(USER);
+
+        const id = await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("pushDevices", { createdAt: 5, lastSeenAt: 5, platform: "ios", sessionId: newer, token: PHONE, userId: USER }),
+        );
+
+        // Reported gone for the older sign-in, sent at the very millisecond the newer one registered.
+        await call(recordPushDeliveries, null, { gone: [{ id, sentAt: 5, sessionId: sessions[USER], userId: USER }] });
+
+        expect(await devicesOf(USER)).toMatchObject([{ token: PHONE }]);
     });
 
     it("stops sending to a phone whose session the server ended or let expire, and reports it to be dropped", async () => {
@@ -162,7 +179,7 @@ describe("the phones a send goes to", () => {
 
         await call(recordPushDeliveries, null, {
             gone: revoked.ended.map((row) => {
-                return { id: row.id, sentAt: row.lastSeenAt, userId: USER };
+                return { id: row.id, sentAt: row.lastSeenAt, sessionId: row.sessionId, userId: USER };
             }),
         });
 
@@ -213,9 +230,9 @@ describe("deliverToPhones", () => {
 
     it("drops the phones Expo calls gone at once and keeps a failed one", async () => {
         const ctx = actionCtx([
-            { id: "d1", platform: "ios", token: PHONE },
-            { id: "d2", platform: "android", token: SECOND_PHONE },
-            { id: "d3", platform: "ios", token: "ExponentPushToken[c]" },
+            { id: "d1", platform: "ios", sessionId: "s1", token: PHONE },
+            { id: "d2", platform: "android", sessionId: "s1", token: SECOND_PHONE },
+            { id: "d3", platform: "ios", sessionId: "s1", token: "ExponentPushToken[c]" },
         ]);
 
         vi.mocked(sendExpoMessages).mockResolvedValueOnce([
@@ -232,7 +249,7 @@ describe("deliverToPhones", () => {
             expect.objectContaining({ to: "ExponentPushToken[c]" }),
         ]);
         expect(ctx.runMutation).toHaveBeenCalledWith(internal.notifications.phone_delivery.recordPushDeliveries, {
-            gone: [{ id: "d1", sentAt: expect.any(Number), userId: USER }],
+            gone: [{ id: "d1", sentAt: expect.any(Number), sessionId: "s1", userId: USER }],
         });
         expect(ctx.log.event).toHaveBeenCalledWith("notifications.native_push", { delivered: 1, failed: 1, gone: 1 });
     });
@@ -240,14 +257,29 @@ describe("deliverToPhones", () => {
     it("sends nothing to a phone whose session ended, and has it dropped", async () => {
         const ctx = actionCtx([]);
 
-        ctx.runQuery.mockResolvedValueOnce({ ended: [{ id: "d9", lastSeenAt: 7 }], live: [] });
+        ctx.runQuery.mockResolvedValueOnce({ ended: [{ id: "d9", lastSeenAt: 7, sessionId: "s9" }], live: [] });
 
         await deliverToPhones(ctx as never, USER, { notificationId: "n1", urgency: "normal" });
 
         expect(sendExpoMessages).not.toHaveBeenCalled();
         expect(ctx.runMutation).toHaveBeenCalledWith(internal.notifications.phone_delivery.recordPushDeliveries, {
-            gone: [{ id: "d9", sentAt: 7, userId: USER }],
+            gone: [{ id: "d9", sentAt: 7, sessionId: "s9", userId: USER }],
         });
+    });
+
+    it("still sends to the live phones when dropping an ended one fails", async () => {
+        const ctx = actionCtx([]);
+
+        ctx.runQuery.mockResolvedValueOnce({
+            ended: [{ id: "d9", lastSeenAt: 7, sessionId: "s9" }],
+            live: [{ id: "d1", platform: "ios", sessionId: "s1", token: PHONE }],
+        });
+        ctx.runMutation.mockRejectedValueOnce(new Error("D1 unavailable"));
+        vi.mocked(sendExpoMessages).mockResolvedValueOnce([{ id: "r1", status: "ok" }]);
+
+        await deliverToPhones(ctx as never, USER, { notificationId: "n1", urgency: "normal" });
+
+        expect(sendExpoMessages).toHaveBeenCalledWith("expo-secret", [expect.objectContaining({ to: PHONE })]);
     });
 
     it("keeps every phone when Expo cannot be reached", async () => {
