@@ -1,12 +1,18 @@
-/** The edit dialog keeps what was typed after a refusal, closes after an unconfirmed answer, and says what happened on the panel. */
+/** The edit dialog keeps what was typed after a refusal, closes after an unconfirmed answer, and says what happened on the panel; the reviewer and revert actions follow the same rules. */
 
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import PullRequestActionsPanel from "./pull-request-actions-panel";
 
-const { available, edit, pending } = vi.hoisted(() => {
-    return { available: vi.fn(() => true), edit: vi.fn(), pending: { current: false } };
+const { available, edit, pending, requestReviewers, revert } = vi.hoisted(() => {
+    return {
+        available: vi.fn((_report: unknown, _key: string) => true),
+        edit: vi.fn(),
+        pending: { current: false },
+        requestReviewers: vi.fn(),
+        revert: vi.fn(),
+    };
 });
 
 // The unit-test transform does not compile Lingui macros (vi.mock is hoisted).
@@ -34,6 +40,8 @@ vi.mock("../lib/use-pull-request-actions", async (importOriginal) => {
         usePullRequestActions: () => {
             return {
                 edit: { isPending: pending.current, mutateAsync: edit },
+                requestReviewers: { isPending: pending.current, mutateAsync: requestReviewers },
+                revert: { isPending: pending.current, mutateAsync: revert },
             };
         },
     };
@@ -68,13 +76,14 @@ const typeInto = (element: HTMLElement, value: string): void => {
 
 const ADDRESS = { number: 7, repository: "octo/hello" } as const;
 
-const renderPanel = (bodyTruncated = false, body = "The description", noun = "pull request") =>
-    render(
-        <PullRequestActionsPanel
-            host={{ capabilities: {} as never, label: "GitHub", noun }}
-            pull={{ address: ADDRESS as never, body, bodyTruncated, title: "Old title" }}
-        />,
-    );
+const panel = (bodyTruncated = false, body = "The description", noun = "pull request", state: "closed" | "merged" | "open" = "open", maxReviewers = 15) => (
+    <PullRequestActionsPanel
+        host={{ capabilities: {} as never, label: "GitHub", maxReviewers, noun }}
+        pull={{ address: ADDRESS as never, body, bodyTruncated, state, title: "Old title" }}
+    />
+);
+
+const renderPanel = (...args: Parameters<typeof panel>) => render(panel(...args));
 
 /** Opens the edit dialog and types a new title, so Save has a change to send. */
 const typeNewTitle = async () => {
@@ -86,7 +95,11 @@ const typeNewTitle = async () => {
 };
 
 beforeEach(() => {
+    available.mockReset();
+    available.mockReturnValue(true);
     edit.mockReset();
+    requestReviewers.mockReset();
+    revert.mockReset();
     pending.current = false;
 });
 
@@ -183,7 +196,21 @@ describe("PullRequestActionsPanel capability", () => {
         renderPanel();
 
         expect(screen.queryByRole("button", { name: "Edit title and description" })).toBeNull();
-        available.mockReturnValue(true);
+    });
+
+    it("offers reviewers only on an open request and a revert only on a merged one, each by its own capability", () => {
+        const view = renderPanel(false, "d", "pull request", "open");
+
+        expect(screen.getByRole("button", { name: "Request reviewers" })).toBeTruthy();
+        expect(screen.queryByRole("button", { name: "Revert" })).toBeNull();
+
+        view.rerender(panel(false, "d", "pull request", "merged"));
+        expect(screen.queryByRole("button", { name: "Request reviewers" })).toBeNull();
+        expect(screen.getByRole("button", { name: "Revert" })).toBeTruthy();
+
+        available.mockImplementation((_report, key) => key === "pullRequest.edit");
+        view.rerender(panel(false, "d", "pull request", "merged"));
+        expect(screen.queryByRole("button", { name: "Revert" })).toBeNull();
     });
 });
 
@@ -194,12 +221,7 @@ describe("PullRequestActionsPanel while saving", () => {
         await typeNewTitle();
         pending.current = true;
         // A new render of the panel reads the pending flag.
-        view.rerender(
-            <PullRequestActionsPanel
-                host={{ capabilities: {} as never, label: "GitHub", noun: "pull request" }}
-                pull={{ address: ADDRESS as never, body: "The description", bodyTruncated: false, title: "Old title" }}
-            />,
-        );
+        view.rerender(panel());
 
         expect((screen.getByLabelText("Title") as HTMLInputElement).readOnly).toBe(true);
         expect((screen.getByLabelText("Description") as HTMLTextAreaElement).readOnly).toBe(true);
@@ -260,5 +282,146 @@ describe("PullRequestActionsPanel validation notes", () => {
         expect(note.textContent).toContain("needs a title");
         expect(title.getAttribute("aria-invalid")).toBe("true");
         expect(title.getAttribute("aria-describedby")).toBe(note.id);
+    });
+});
+
+/** Opens the reviewers dialog and types the logins. */
+const typeLogins = async (value: string) => {
+    pressButton(screen.getByRole("button", { name: "Request reviewers" }));
+    typeInto(await screen.findByLabelText("Logins"), value);
+};
+
+describe("PullRequestActionsPanel reviewers", () => {
+    it("keeps the dialog open with the typed logins when the host refuses", async () => {
+        requestReviewers.mockResolvedValueOnce({ reason: "Cannot review", status: "rejected" });
+        renderPanel();
+
+        await typeLogins("@octocat, hubot");
+        pressButton(screen.getByRole("button", { name: "Request" }));
+
+        expect(await screen.findAllByText("The host answered rejected: Cannot review")).not.toHaveLength(0);
+        expect(requestReviewers).toHaveBeenCalledTimes(1);
+        expect(requestReviewers).toHaveBeenCalledWith(["octocat", "hubot"]);
+        expect((screen.getByLabelText("Logins") as HTMLInputElement).value).toBe("@octocat, hubot");
+    });
+
+    it("says the review was requested and closes the dialog when the host took it", async () => {
+        requestReviewers.mockResolvedValueOnce({ status: "ok" });
+        renderPanel();
+
+        await typeLogins("octocat");
+        pressButton(screen.getByRole("button", { name: "Request" }));
+
+        expect(await screen.findByText("Review requested on GitHub.")).toBeTruthy();
+        await waitFor(() => {
+            expect(screen.queryByLabelText("Logins")).toBeNull();
+        });
+    });
+
+    it("says it is not confirmed, without a retry, when the answer never came back", async () => {
+        requestReviewers.mockResolvedValueOnce({ status: "unconfirmed" });
+        renderPanel();
+
+        await typeLogins("octocat");
+        pressButton(screen.getByRole("button", { name: "Request" }));
+
+        expect(await screen.findByText("Not confirmed")).toBeTruthy();
+        expect(screen.queryByText("Review requested on GitHub.")).toBeNull();
+        expect(requestReviewers).toHaveBeenCalledTimes(1);
+    });
+
+    it("announces a login the host would refuse, links it to the field and sends nothing", async () => {
+        renderPanel();
+
+        await typeLogins("octo--cat");
+
+        const field = screen.getByLabelText("Logins");
+        const note = screen.getByRole("alert");
+
+        expect(note.textContent).toContain('"octo--cat" is not a valid login');
+        expect(field.getAttribute("aria-invalid")).toBe("true");
+        expect(field.getAttribute("aria-describedby")).toBe(note.id);
+        expect((screen.getByRole("button", { name: "Request" }) as HTMLButtonElement).disabled).toBe(true);
+        expect(requestReviewers).not.toHaveBeenCalled();
+    });
+
+    it("announces more logins than the host takes in one request", async () => {
+        renderPanel(false, "d", "merge request", "open", 2);
+
+        await typeLogins("a b c");
+
+        expect(screen.getByRole("alert").textContent).toBe("Request at most 2 reviewers at a time.");
+        expect((screen.getByRole("button", { name: "Request" }) as HTMLButtonElement).disabled).toBe(true);
+    });
+
+    it("keeps the field read-only and shows the progress cue while the request is pending", async () => {
+        const view = renderPanel();
+
+        await typeLogins("octocat");
+        pending.current = true;
+        view.rerender(panel());
+
+        expect((screen.getByLabelText("Logins") as HTMLInputElement).readOnly).toBe(true);
+        expect(screen.getByRole("button", { name: "Requesting…" })).toBeTruthy();
+    });
+});
+
+describe("PullRequestActionsPanel revert", () => {
+    const pressRevert = async () => {
+        pressButton(screen.getByRole("button", { name: "Revert" }));
+        pressButton(await screen.findByRole("button", { name: "Open revert" }));
+    };
+
+    it("names the host's noun in the confirmation and links to the new request on the host", async () => {
+        revert.mockResolvedValueOnce({ number: 8, repository: "octo/hello", status: "ok", url: "https://example.test/octo/hello/pull/8" });
+        renderPanel(false, "d", "merge request", "merged");
+
+        pressButton(screen.getByRole("button", { name: "Revert" }));
+        expect(await screen.findByText("Open a revert of this merge request?")).toBeTruthy();
+        pressButton(screen.getByRole("button", { name: "Open revert" }));
+
+        expect(await screen.findByText("Opened a revert merge request on GitHub.")).toBeTruthy();
+        expect(revert).toHaveBeenCalledTimes(1);
+        expect(screen.getByRole("link", { name: "Open the revert merge request on GitHub" }).getAttribute("href")).toBe(
+            "https://example.test/octo/hello/pull/8",
+        );
+    });
+
+    it("shows no link when the returned address is not an https one", async () => {
+        revert.mockResolvedValueOnce({ number: 8, repository: "octo/hello", status: "ok", url: "ftp://example.test/octo/hello/pull/8" });
+        renderPanel(false, "d", "pull request", "merged");
+
+        await pressRevert();
+
+        expect(await screen.findByText("Opened a revert pull request on GitHub.")).toBeTruthy();
+        expect(screen.queryByRole("link")).toBeNull();
+    });
+
+    it("shows the host's reason when it refuses, with no link and no success", async () => {
+        revert.mockResolvedValueOnce({ reason: "Already reverted", status: "rejected" });
+        renderPanel(false, "d", "pull request", "merged");
+
+        await pressRevert();
+
+        expect(await screen.findByText("The host answered rejected: Already reverted")).toBeTruthy();
+        expect(screen.getByText("Not changed")).toBeTruthy();
+        expect(screen.queryByRole("link")).toBeNull();
+    });
+
+    it("says it is not confirmed when the answer never came back", async () => {
+        revert.mockResolvedValueOnce({ status: "unconfirmed" });
+        renderPanel(false, "d", "pull request", "merged");
+
+        await pressRevert();
+
+        expect(await screen.findByText("Not confirmed")).toBeTruthy();
+        expect(screen.queryByText("Opened a revert pull request on GitHub.")).toBeNull();
+    });
+
+    it("shows the progress cue and disables the button while the revert is pending", () => {
+        pending.current = true;
+        renderPanel(false, "d", "pull request", "merged");
+
+        expect((screen.getByRole("button", { name: "Reverting…" }) as HTMLButtonElement).disabled).toBe(true);
     });
 });

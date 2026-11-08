@@ -52,6 +52,11 @@ msgstr "\"{0}\" ha variabili che richiedono un valore."
 msgid "\"{0}\" will start once its dependencies are done"
 msgstr "\"{0}\" partirà quando le sue dipendenze saranno completate"
 
+#. placeholder {0}: i18n.number(MAX_LOGIN)
+#: src/features/develop/components/pull-request-reviewers-action.tsx:65
+msgid "\"{badLogin}\" is not a valid login. A login starts with a letter or digit, has at most {0} characters, and uses only letters, digits, and single hyphens or underscores."
+msgstr ""
+
 #: src/features/chat/thread/composer-input.tsx:612
 msgid "\"{fileName}\" cannot be attached: this file type is not supported."
 msgstr "Impossibile allegare «{fileName}»: questo tipo di file non è supportato."
@@ -962,6 +967,10 @@ msgstr ""
 #. placeholder {0}: current.leftOut
 #: src/features/develop/components/guide-tab.tsx:223
 msgid "{hostLabel} lists only part of this change; {0} files are not in the guide."
+msgstr ""
+
+#: src/features/develop/components/pull-request-revert-action.tsx:53
+msgid "{hostLabel} opens a new {requestNoun} that undoes the merged change. It is a separate change for you to review and merge."
 msgstr ""
 
 #: src/features/develop/components/guide-tab.tsx:65
@@ -5320,6 +5329,7 @@ msgstr "Canada"
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:227
 #: src/features/develop/components/comment-composer.tsx:62
 #: src/features/develop/components/pull-request-edit-action.tsx:172
+#: src/features/develop/components/pull-request-reviewers-action.tsx:137
 #: src/features/evals/components/case-form-dialog.tsx:68
 #: src/features/evals/components/dataset-form-dialog.tsx:168
 #: src/features/evals/components/import-cases-dialog.tsx:113
@@ -11579,6 +11589,10 @@ msgstr "Inserisci la chiave API"
 #: src/features/settings/components/chat/custom-providers-settings.tsx:113
 msgid "Enter the endpoint URL first"
 msgstr "Inserisci prima l'URL dell'endpoint"
+
+#: src/features/develop/components/pull-request-reviewers-action.tsx:111
+msgid "Enter the logins of the people {hostLabel} should ask to review this {requestNoun}. Reviewers already requested stay requested."
+msgstr ""
 
 #: src/features/chat/thread/ask-user-prompt.tsx:301
 msgid "Enter to send, Shift+Enter for a new line."
@@ -18501,6 +18515,10 @@ msgstr "Accedi"
 msgid "login refused"
 msgstr ""
 
+#: src/features/develop/components/pull-request-reviewers-action.tsx:114
+msgid "Logins"
+msgstr ""
+
 #: src/features/auth/components/organization/create-organization-dialog.tsx:212
 #: src/features/auth/components/organization/organization-logo-card.tsx:136
 #: src/features/auth/components/organization/organization-logo-card.tsx:195
@@ -21637,8 +21655,9 @@ msgstr "Non approvato"
 msgid "Not attached:"
 msgstr "Non allegato:"
 
-#: src/features/develop/components/pull-request-actions-panel.tsx:65
+#: src/features/develop/components/pull-request-actions-panel.tsx:104
 #: src/features/develop/components/pull-request-edit-action.tsx:167
+#: src/features/develop/components/pull-request-reviewers-action.tsx:132
 msgid "Not changed"
 msgstr ""
 
@@ -21656,7 +21675,7 @@ msgstr "Non configurato"
 msgid "Not configured by the operator"
 msgstr "Non configurato dall'operatore"
 
-#: src/features/develop/components/pull-request-actions-panel.tsx:65
+#: src/features/develop/components/pull-request-actions-panel.tsx:104
 #: src/features/develop/components/review-panel.tsx:307
 msgid "Not confirmed"
 msgstr ""
@@ -22250,6 +22269,7 @@ msgstr "Opacità"
 #: ../../packages/chat-ui/src/chat/message-content.tsx:708
 #: src/components/command-palette.tsx:700
 #: src/features/chat/link-preview/link-preview-card.tsx:117
+#: src/features/develop/components/pull-request-actions-panel.tsx:95
 #: src/features/develop/components/pull-request-view.tsx:75
 #: src/features/tasks/hooks/use-task-notifications.ts:30
 msgid "Open"
@@ -22276,6 +22296,10 @@ msgstr "Apri {modelName} nella conversazione completa"
 #: src/features/tasks/components/task-form-dialog.tsx:328
 msgid "Open a pull request with the change (GitHub, needs the GitHub connector)"
 msgstr "Apri una pull request con la modifica (GitHub, richiede il connettore GitHub)"
+
+#: src/features/develop/components/pull-request-revert-action.tsx:58
+msgid "Open a revert of this {requestNoun}?"
+msgstr ""
 
 #: src/features/pages/components/open-as-page-button.tsx:35
 msgid "Open as page"
@@ -22401,6 +22425,10 @@ msgstr "Apri anteprima in una nuova scheda"
 msgid "Open Prompts"
 msgstr "Apri Prompt"
 
+#: src/features/develop/components/pull-request-revert-action.tsx:52
+msgid "Open revert"
+msgstr ""
+
 #: src/features/tasks/components/task-detail-dialog.tsx:172
 msgid "Open run thread"
 msgstr "Apri la conversazione dell'esecuzione"
@@ -22489,6 +22517,12 @@ msgstr ""
 #. placeholder {1}: link.number
 #: src/features/develop/components/thread-pull-requests.tsx:176
 msgid "Open the pull request {0}#{1}"
+msgstr ""
+
+#. placeholder {0}: host.noun
+#. placeholder {1}: host.label
+#: src/features/develop/components/pull-request-actions-panel.tsx:89
+msgid "Open the revert {0} on {1}"
 msgstr ""
 
 #: src/features/evals/components/run-detail.tsx:118
@@ -22774,6 +22808,10 @@ msgstr ""
 
 #: src/components/settings/settings-modal.tsx:339
 msgid "Opened {tabLabel}: {label}"
+msgstr ""
+
+#: src/features/develop/components/pull-request-revert-action.tsx:40
+msgid "Opened a revert {requestNoun} on {hostLabel}."
 msgstr ""
 
 #: src/features/develop/components/work-on-pull-request.tsx:89
@@ -26380,6 +26418,15 @@ msgstr "Repository"
 msgid "Repository to watch"
 msgstr ""
 
+#: src/features/develop/components/pull-request-reviewers-action.tsx:139
+msgid "Request"
+msgstr ""
+
+#. placeholder {0}: i18n.number(maxReviewers)
+#: src/features/develop/components/pull-request-reviewers-action.tsx:63
+msgid "Request at most {0} reviewers at a time."
+msgstr ""
+
 #: src/features/develop/components/review-panel.tsx:64
 msgid "Request changes"
 msgstr ""
@@ -26391,6 +26438,11 @@ msgstr "Numero di richieste"
 #: src/features/settings/components/privacy/data-export.tsx:146
 msgid "Request Data Export"
 msgstr "Richiedi esportazione dati"
+
+#: src/features/develop/components/pull-request-reviewers-action.tsx:105
+#: src/features/develop/components/pull-request-reviewers-action.tsx:110
+msgid "Request reviewers"
+msgstr ""
 
 #: src/lib/toast.ts:233
 msgid "Request timed out"
@@ -26412,6 +26464,10 @@ msgstr "Permessi richiesti"
 #: src/features/settings/components/privacy/data-export.tsx:146
 msgid "Requesting..."
 msgstr "Richiesta in corso..."
+
+#: src/features/develop/components/pull-request-reviewers-action.tsx:139
+msgid "Requesting…"
+msgstr ""
 
 #: src/features/settings/components/chat/usage-settings.tsx:272
 #: src/features/settings/components/chat/usage-settings.tsx:318
@@ -26753,6 +26809,14 @@ msgstr "Torna alla home"
 msgid "Return to home"
 msgstr "Torna alla home"
 
+#: src/features/develop/components/pull-request-revert-action.tsx:49
+msgid "Revert"
+msgstr ""
+
+#: src/features/develop/components/pull-request-revert-action.tsx:49
+msgid "Reverting…"
+msgstr ""
+
 #: src/features/tasks/components/task-card.tsx:94
 msgid "Review"
 msgstr "Rivedi"
@@ -26768,6 +26832,10 @@ msgstr "Rivedi e modera i contenuti segnalati in chat e nell'Archivio."
 #: src/features/settings/components/privacy/privacy-policy.tsx:16
 msgid "Review our privacy policy and data processing practices"
 msgstr "Consulta la nostra informativa sulla privacy e le pratiche di trattamento dei dati"
+
+#: src/features/develop/components/pull-request-reviewers-action.tsx:77
+msgid "Review requested on {hostLabel}."
+msgstr ""
 
 #: src/features/settings/components/chat/webhook-trigger-fields.tsx:88
 msgid "Review requested on a pull request"
@@ -36055,7 +36123,7 @@ msgid "Working"
 msgstr "In corso"
 
 #. placeholder {0}: host.label
-#: src/features/develop/components/pull-request-actions-panel.tsx:60
+#: src/features/develop/components/pull-request-actions-panel.tsx:81
 msgid "Working on {0}…"
 msgstr ""
 
