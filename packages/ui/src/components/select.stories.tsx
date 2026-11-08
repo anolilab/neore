@@ -46,7 +46,10 @@ export const Open: Story = {
     play: async ({ canvasElement }) => {
         const body = within(canvasElement.ownerDocument.body);
 
-        await expect(await body.findByRole("option", { name: "Balanced" })).toBeVisible();
+        // The popup fades in from opacity 0, so visibility is checked until the fade ends.
+        await waitFor(() => {
+            expect(body.getByRole("option", { name: "Balanced" })).toBeVisible();
+        });
     },
 };
 

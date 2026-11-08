@@ -41,7 +41,9 @@ export const Default: Story = {
 export const Open: Story = {
     args: { defaultOpen: true },
     play: async ({ canvasElement }) => {
-        await expect(await within(canvasElement.ownerDocument.body).findByRole("option", { name: "Nuxt" })).toBeVisible();
+        await waitFor(() => {
+            expect(within(canvasElement.ownerDocument.body).getByRole("option", { name: "Nuxt" })).toBeVisible();
+        });
     },
 };
 
@@ -68,7 +70,9 @@ export const Filtering: Story = {
 export const NoResults: Story = {
     args: { defaultInputValue: "zzz", defaultOpen: true },
     play: async ({ canvasElement }) => {
-        await expect(await within(canvasElement.ownerDocument.body).findByText("No framework found.")).toBeVisible();
+        await waitFor(() => {
+            expect(within(canvasElement.ownerDocument.body).getByText("No framework found.")).toBeVisible();
+        });
     },
 };
 

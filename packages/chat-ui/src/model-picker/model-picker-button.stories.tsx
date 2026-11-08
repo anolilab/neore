@@ -99,6 +99,8 @@ export const MobileDrawer: Story = {
     args: { isMobile: true },
     play: async ({ canvas }) => {
         await userEvent.click(canvas.getByRole("button", { name: "Claude Sonnet 4.5" }));
-        await expect(await within(document.body).findByText("Select Model")).toBeVisible();
+        await waitFor(() => {
+            expect(within(document.body).getByText("Select Model")).toBeVisible();
+        });
     },
 };

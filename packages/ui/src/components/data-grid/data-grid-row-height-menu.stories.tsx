@@ -3,7 +3,7 @@ import type { ColumnDef } from "@tanstack/react-table";
 import { useDataGrid } from "@ui/hooks/use-data-grid";
 import type { DataGridFeatures } from "@ui/lib/data-grid-features";
 import type { RowHeightValue } from "@ui/types/data-grid";
-import { expect, screen, userEvent } from "storybook/test";
+import { expect, screen, userEvent, waitFor } from "storybook/test";
 
 import DataGridRowHeightMenu from "./data-grid-row-height-menu";
 
@@ -58,7 +58,9 @@ export const TallSelected: Story = {
 export const Open: Story = {
     play: async ({ canvas }) => {
         await userEvent.click(await canvas.findByRole("combobox"));
-        await expect(await screen.findByRole("option", { name: "Extra Tall" })).toBeVisible();
+        await waitFor(() => {
+            expect(screen.getByRole("option", { name: "Extra Tall" })).toBeVisible();
+        });
     },
 };
 

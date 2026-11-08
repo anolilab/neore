@@ -41,7 +41,9 @@ export const Default: Story = {
 export const Open: Story = {
     args: { defaultOpen: true },
     play: async ({ canvasElement }) => {
-        await expect(await within(canvasElement.ownerDocument.body).findByRole("option", { name: "Mango" })).toBeVisible();
+        await waitFor(() => {
+            expect(within(canvasElement.ownerDocument.body).getByRole("option", { name: "Mango" })).toBeVisible();
+        });
     },
 };
 
@@ -64,7 +66,9 @@ export const Typing: Story = {
 export const NoResults: Story = {
     args: { defaultOpen: true, defaultValue: "zzz" },
     play: async ({ canvasElement }) => {
-        await expect(await within(canvasElement.ownerDocument.body).findByText("No fruit found.")).toBeVisible();
+        await waitFor(() => {
+            expect(within(canvasElement.ownerDocument.body).getByText("No fruit found.")).toBeVisible();
+        });
     },
 };
 
