@@ -303,7 +303,20 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
         const startedAt = Date.now();
         // A fresh context reads no recent rows; with none read, no thread summary is added either (`agent/client/search.ts`).
         const callOptions = options.freshContext ? { contextOptions: { recentMessages: 0 } } : undefined;
-        const result = await thread.generateText(generateArgs as never, callOptions);
+        // A generation that fails on a thread this run continues wakes it if the owner snoozed it, as a chat run that fails
+        // does; the first generation and every later goal round go through here. The generation's own error is the one thrown.
+        const wakeOnFailure = async (error: unknown): Promise<never> => {
+            if (existingThreadId !== undefined) {
+                await ctx
+                    .runMutation(internal.agent.threads.updateThread, { failed: true, patch: {}, threadId: threadId as Id<"threads"> })
+                    .catch((wakeError: unknown) => {
+                        console.error("[headless-run] could not wake the thread after a failed run", { threadId, wakeError });
+                    });
+            }
+
+            throw error;
+        };
+        const result = await thread.generateText(generateArgs as never, callOptions).catch(wakeOnFailure);
         const text = result.text ?? "";
 
         const finishedAt = Date.now();
@@ -369,7 +382,7 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
             review: async ({ round, transcript }) =>
                 await reviewRound({ gateway: gatewayFetch(ctx), goal: goalText, round, rules: modelFilterRules, threadId, transcript, userId }),
             // A further round continues this run, so it reads the run's own turns: only the first generation starts fresh.
-            runRound: async (instruction) => settle(await thread.generateText({ ...generateArgs, prompt: instruction } as never)),
+            runRound: async (instruction) => settle(await thread.generateText({ ...generateArgs, prompt: instruction } as never).catch(wakeOnFailure)),
             startedAt,
             stopped: options.shouldStop,
         });

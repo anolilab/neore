@@ -74,18 +74,44 @@ export const patchesWithoutAwaitingInput = (
     fields: Pick<ThreadPatch, "awaitingInput" | "lastReplyAt" | "status">,
 ): boolean => (fields.status === "running" || fields.lastReplyAt !== undefined) && fields.awaitingInput === undefined && row?.awaitingInput !== undefined;
 
-export const patchThread = async (db: Database, threadId: Id<"threads">, fields: ThreadPatch): Promise<void> => {
-    if (fields.status === "running" || fields.lastReplyAt !== undefined) {
-        const row = await db.get("threads", threadId);
+/**
+ * The wake rule: a write that pauses for the owner (an approval or a question), or that records a failure. The owner should not
+ * have to find the thread in Snoozed to answer it, or to learn that it broke. A finished reply or any other write keeps the snooze.
+ */
+const fieldsWake = (fields: Pick<ThreadPatch, "awaitingInput" | "status">, failed: boolean): boolean =>
+    fields.awaitingInput !== undefined || fields.status === "error" || failed;
 
-        if (row && patchesWithoutAwaitingInput(row, fields)) {
-            await patchRow(db, "threads", row, { ...withoutUndefined(fields), awaitingInput: undefined });
+/**
+ * The one writer of a thread's run state; `agent/threads.ts#updateThread` delegates here. A write that ends a pause or records a
+ * reply removes `awaitingInput` (`patchesWithoutAwaitingInput`); a write that pauses for the owner or fails (`failed`: the run
+ * failed in place, whatever status the thread goes back to) removes `snoozedUntil`. Each removal is in the same write as its cause.
+ */
+export const patchThread = async (db: Database, threadId: Id<"threads">, fields: ThreadPatch, { failed = false }: { failed?: boolean } = {}): Promise<void> => {
+    const endsPause = fields.status === "running" || fields.lastReplyAt !== undefined;
+    const wakes = fieldsWake(fields, failed);
+
+    if (endsPause || wakes) {
+        const row = await db.get("threads", threadId);
+        const clearsAwaiting = endsPause && patchesWithoutAwaitingInput(row, fields);
+        const clearsSnooze = wakes && row?.snoozedUntil !== undefined;
+
+        if (row && (clearsAwaiting || clearsSnooze)) {
+            await patchRow(db, "threads", row, {
+                ...withoutUndefined(fields),
+                ...(clearsAwaiting && { awaitingInput: undefined }),
+                ...(clearsSnooze && { snoozedUntil: undefined }),
+            });
 
             return;
         }
     }
 
-    await db.patch("threads", threadId, withoutUndefined(fields));
+    const patch = withoutUndefined(fields);
+
+    // A failure with nothing to change (`{}`, `failed`) writes nothing: the thread list is a live query.
+    if (Object.keys(patch).length > 0) {
+        await db.patch("threads", threadId, patch);
+    }
 };
 
 /** Removes `awaitingInput` from a thread whose pause can no longer be answered (its approval snapshot expired). */

@@ -121,6 +121,37 @@ describe("awaitingInput leaves with the pause", () => {
     });
 });
 
+describe("a snoozed thread wakes early", () => {
+    const SNOOZED_UNTIL = 9_000_000_000_000;
+
+    // One row per write a run makes. `patchThread` owns the rule and `updateThread` delegates to it, so a row through each
+    // proves both paths. A pause for the owner or a failure removes the snooze in the same write; anything else keeps it.
+    it.each([
+        ["an approval pause wakes it", "patchThread", { awaitingInput: "approval", status: "active", updatedAt: 9 }, false, true],
+        ["a question pause wakes it", "updateThread", { awaitingInput: "question", status: "active", updatedAt: 9 }, false, true],
+        ["a run that failed in place wakes it, though the thread goes back to active", "updateThread", { status: "active", updatedAt: 9 }, true, true],
+        ["an ordinary write keeps the snooze", "patchThread", { updatedAt: 9 }, false, false],
+        ["a finished reply keeps the snooze", "updateThread", { lastReplyAt: 3000, status: "active", updatedAt: 9 }, false, false],
+    ] as const)("%s", async (_name, via, patch, failed, wakes) => {
+        await harness.run(
+            async (context: any) => await context.db.replace("threads", threadId, { snoozedUntil: SNOOZED_UNTIL, status: "running", userId: OWNER }),
+        );
+
+        await harness.run(async (context: any) => {
+            if (via === "patchThread") {
+                await patchThread(context.db, threadId as never, patch, { failed });
+            } else {
+                await context.runMutation(updateThread as never, { ...(failed && { failed }), patch, threadId } as never);
+            }
+        });
+
+        const row = await read();
+
+        expect(row).toMatchObject(patch);
+        expect(row.snoozedUntil).toBe(wakes ? undefined : SNOOZED_UNTIL);
+    });
+});
+
 describe("markThreadViewed", () => {
     it("stamps lastViewedAt for the owner without touching updatedAt, and only while a reply is unseen", async () => {
         const first: any = await as(OWNER).mutation(markThreadViewed as never, { threadId } as never);
