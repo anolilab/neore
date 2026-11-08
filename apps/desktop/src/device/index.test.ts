@@ -495,6 +495,14 @@ describe("servers over SSH", () => {
         await expect(invoke(DEVICE_CHANNEL.manifest, siteEvent(), 7)).rejects.toThrow("device: deviceId is invalid");
     });
 
+    it("report the app version with this computer's manifest only", async () => {
+        const own = (await invoke(DEVICE_CHANNEL.manifest, siteEvent())) as Record<string, unknown>;
+        const server = (await invoke(DEVICE_CHANNEL.manifest, siteEvent(), "host-1")) as Record<string, unknown>;
+
+        expect(own.appVersion).toBe("1.2.3");
+        expect(server).not.toHaveProperty("appVersion");
+    });
+
     it("keep removing a server and forgetting its key out of the page's reach", () => {
         for (const channel of [
             LOCAL_CHANNEL.hostRemove,

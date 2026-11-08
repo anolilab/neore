@@ -77,3 +77,9 @@ export const DEVICE_POLL_MAX_MS = 2000;
 
 /** Projects one device can be limited to. */
 export const MAX_DEVICE_SCOPE_PROJECTS = 50;
+
+/** Longest `appVersion` the backend keeps; a longer or malformed value is ignored and never fails the manifest update. */
+export const MAX_APP_VERSION_LENGTH = 40;
+
+/** Longest `appVersion` the manifest call accepts at all; a value between this and the one above is ignored, a longer one is refused. */
+export const MAX_APP_VERSION_INPUT_LENGTH = 256;

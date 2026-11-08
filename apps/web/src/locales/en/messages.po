@@ -603,7 +603,7 @@ msgid "{0} of {1} tokens used ({2}%)"
 msgstr "{0} of {1} tokens used ({2}%)"
 
 #. placeholder {0}: parallelSelectedIds.size
-#: src/components/model-picker/model-picker.tsx:1273
+#: src/components/model-picker/model-picker.tsx:1275
 msgid "{0} of {MAX_PARALLEL} selected"
 msgstr "{0} of {MAX_PARALLEL} selected"
 
@@ -671,7 +671,7 @@ msgstr "{0} tools discovered"
 
 #. placeholder {0}: device.toolNames.length
 #. placeholder {1}: device.toolNames.join(", ")
-#: src/features/devices/components/devices-settings.tsx:177
+#: src/features/devices/components/devices-settings.tsx:179
 msgid "{0} tools: {1}"
 msgstr "{0} tools: {1}"
 
@@ -2133,7 +2133,7 @@ msgstr "Add a note..."
 msgid "Add a note…"
 msgstr "Add a note…"
 
-#: src/features/devices/components/devices-settings.tsx:342
+#: src/features/devices/components/devices-settings.tsx:350
 msgid "Add a server over SSH"
 msgstr "Add a server over SSH"
 
@@ -2465,7 +2465,7 @@ msgstr "Added:"
 msgid "Adding documents… {0} of {1}"
 msgstr "Adding documents… {0} of {1}"
 
-#: src/features/devices/components/devices-settings.tsx:324
+#: src/features/devices/components/devices-settings.tsx:332
 msgid "Adding the server was cancelled on this computer."
 msgstr "Adding the server was cancelled on this computer."
 
@@ -2477,7 +2477,7 @@ msgstr "Adding your earlier replies…"
 msgid "Adding…"
 msgstr "Adding…"
 
-#: src/features/devices/components/devices-settings.tsx:355
+#: src/features/devices/components/devices-settings.tsx:363
 msgid "Address"
 msgstr "Address"
 
@@ -2716,7 +2716,7 @@ msgstr "After activating the connection here, you'll get a webhook URL to set as
 msgid "After activating the connection here, you'll get a webhook URL to set as the Request URL in your Slack App's Event Subscriptions."
 msgstr "After activating the connection here, you'll get a webhook URL to set as the Request URL in your Slack App's Event Subscriptions."
 
-#: src/features/devices/components/devices-settings.tsx:271
+#: src/features/devices/components/devices-settings.tsx:279
 msgid "After outside content"
 msgstr "After outside content"
 
@@ -2991,8 +2991,8 @@ msgstr "Align vertically (V)"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:655
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:717
-#: src/components/model-picker/model-picker.tsx:1121
-#: src/components/model-picker/model-picker.tsx:1199
+#: src/components/model-picker/model-picker.tsx:1123
+#: src/components/model-picker/model-picker.tsx:1201
 #: src/features/chat/tags/thread-category-filter.tsx:16
 #: src/features/marketing/components/tutorials-page.tsx:130
 #: src/features/settings/components/chat/models-settings.tsx:422
@@ -3078,7 +3078,7 @@ msgid "All MCP servers active"
 msgstr "All MCP servers active"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:601
-#: src/components/model-picker/model-picker.tsx:1069
+#: src/components/model-picker/model-picker.tsx:1071
 #: src/features/marketing/components/model-detail-page.tsx:165
 msgid "All models"
 msgstr "All models"
@@ -4024,7 +4024,7 @@ msgid "Auckland"
 msgstr "Auckland"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:705
-#: src/components/model-picker/model-picker.tsx:1173
+#: src/components/model-picker/model-picker.tsx:1175
 #: src/features/chat/sidebar/usage-card.tsx:131
 #: src/features/chat/thread/composer.tsx:124
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:85
@@ -5547,7 +5547,7 @@ msgstr "Central Time (US & Canada)"
 msgid "CFG Scale"
 msgstr "CFG Scale"
 
-#: ../../packages/ui/src/components/ai-elements/chain-of-thought.tsx:72
+#: ../../packages/ui/src/components/ai-elements/chain-of-thought.tsx:76
 msgid "Chain of Thought"
 msgstr "Chain of Thought"
 
@@ -6208,7 +6208,7 @@ msgstr "Click"
 msgid "Click \"{selector}\""
 msgstr "Click \"{selector}\""
 
-#: src/components/model-picker/model-picker.tsx:1232
+#: src/components/model-picker/model-picker.tsx:1234
 msgid "Click ★ on any model in All models to add it here."
 msgstr "Click ★ on any model in All models to add it here."
 
@@ -6494,7 +6494,7 @@ msgid "Coding agent runs"
 msgstr "Coding agent runs"
 
 #. placeholder {0}: device.name
-#: src/features/devices/components/devices-settings.tsx:87
+#: src/features/devices/components/devices-settings.tsx:89
 msgid "Coding agents you can start on {0}"
 msgstr "Coding agents you can start on {0}"
 
@@ -6554,7 +6554,7 @@ msgstr "Collapse branches"
 msgid "Collapse browser panel"
 msgstr "Collapse browser panel"
 
-#: ../../packages/ui/src/components/ai-elements/chain-of-thought.tsx:61
+#: ../../packages/ui/src/components/ai-elements/chain-of-thought.tsx:64
 msgid "Collapse chain of thought"
 msgstr "Collapse chain of thought"
 
@@ -7093,7 +7093,7 @@ msgstr "Configured"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:805
 #: ../../packages/ui/src/components/confirm-dialog.tsx:29
-#: src/components/model-picker/model-picker.tsx:1295
+#: src/components/model-picker/model-picker.tsx:1297
 msgid "Confirm"
 msgstr "Confirm"
 
@@ -7126,7 +7126,7 @@ msgstr "Confirm password is required"
 msgid "Confirm your password"
 msgstr "Confirm your password"
 
-#: src/features/devices/components/devices-settings.tsx:135
+#: src/features/devices/components/devices-settings.tsx:137
 #: src/features/settings/connectors/messenger/messenger-platform-card.tsx:250
 #: src/features/skills/components/skill-builder-setup.tsx:136
 #: src/routes/auth/extension.tsx:154
@@ -7170,7 +7170,7 @@ msgstr "Connect an audio/file node as input"
 msgid "Connect an image node as input"
 msgstr "Connect an image node as input"
 
-#: src/features/devices/components/devices-settings.tsx:373
+#: src/features/devices/components/devices-settings.tsx:381
 msgid "Connect and add"
 msgstr "Connect and add"
 
@@ -7327,7 +7327,7 @@ msgstr "Connection error. Please check your internet connection and try again."
 msgid "Connection failed"
 msgstr "Connection failed"
 
-#: src/features/devices/components/devices-settings.tsx:189
+#: src/features/devices/components/devices-settings.tsx:197
 msgid "Connection lost"
 msgstr "Connection lost"
 
@@ -7925,7 +7925,7 @@ msgstr "Cost-sensitive applications needing reliable Google AI at the lowest Gem
 msgid "Costa Rica"
 msgstr "Costa Rica"
 
-#: src/features/devices/components/devices-settings.tsx:334
+#: src/features/devices/components/devices-settings.tsx:342
 msgid "Could not add the server."
 msgstr "Could not add the server."
 
@@ -8009,7 +8009,7 @@ msgstr "Could not confirm that this was merged. Check on {hostLabel} before you 
 msgid "Could not confirm the change to auto-merge. Check on {hostLabel} before you try again."
 msgstr "Could not confirm the change to auto-merge. Check on {hostLabel} before you try again."
 
-#: src/features/devices/components/devices-settings.tsx:148
+#: src/features/devices/components/devices-settings.tsx:150
 msgid "Could not connect to the server."
 msgstr "Could not connect to the server."
 
@@ -8160,7 +8160,7 @@ msgstr "Could not open as a page"
 msgid "Could not open the pull request."
 msgstr "Could not open the pull request."
 
-#: src/features/devices/components/devices-settings.tsx:438
+#: src/features/devices/components/devices-settings.tsx:446
 msgid "Could not pair this computer. Try again."
 msgstr "Could not pair this computer. Try again."
 
@@ -8203,7 +8203,7 @@ msgstr "Could not read that chat. If it is locked, unlock it first."
 msgid "Could not refine the draft. Try again."
 msgstr "Could not refine the draft. Try again."
 
-#: src/features/devices/components/devices-settings.tsx:219
+#: src/features/devices/components/devices-settings.tsx:227
 msgid "Could not remove the device."
 msgstr "Could not remove the device."
 
@@ -8211,7 +8211,7 @@ msgstr "Could not remove the device."
 msgid "Could not remove the participant"
 msgstr "Could not remove the participant"
 
-#: src/features/devices/components/devices-settings.tsx:169
+#: src/features/devices/components/devices-settings.tsx:171
 msgid "Could not rename the device."
 msgstr "Could not rename the device."
 
@@ -9317,7 +9317,7 @@ msgstr "Default model updated"
 msgid "Default Models"
 msgstr "Default Models"
 
-#: src/components/model-picker/model-picker.tsx:1184
+#: src/components/model-picker/model-picker.tsx:1186
 msgid "Default order"
 msgstr "Default order"
 
@@ -9707,7 +9707,7 @@ msgstr "Demanding tasks requiring Z.AI's most powerful and capable frontier GLM 
 msgid "Demanding tasks where maximum AI capability and refined reasoning matter most"
 msgstr "Demanding tasks where maximum AI capability and refined reasoning matter most"
 
-#: src/features/devices/components/devices-settings.tsx:256
+#: src/features/devices/components/devices-settings.tsx:264
 msgid "Denied"
 msgstr "Denied"
 
@@ -9997,19 +9997,19 @@ msgstr "Developers who need strong coding and general-purpose capabilities from 
 msgid "Development"
 msgstr "Development"
 
-#: src/features/devices/components/devices-settings.tsx:513
+#: src/features/devices/components/devices-settings.tsx:521
 msgid "Device activity"
 msgstr "Device activity"
 
-#: src/features/devices/components/devices-settings.tsx:158
+#: src/features/devices/components/devices-settings.tsx:160
 msgid "Device name"
 msgstr "Device name"
 
-#: src/features/devices/components/devices-settings.tsx:222
+#: src/features/devices/components/devices-settings.tsx:230
 msgid "Device removed"
 msgstr "Device removed"
 
-#: src/features/devices/components/devices-settings.tsx:448
+#: src/features/devices/components/devices-settings.tsx:456
 #: src/features/layout/lib/dashboard-page-names.ts:23
 msgid "Devices"
 msgstr "Devices"
@@ -10116,7 +10116,7 @@ msgstr "Discard comments"
 msgid "Discard the review"
 msgstr "Discard the review"
 
-#: src/features/devices/components/devices-settings.tsx:138
+#: src/features/devices/components/devices-settings.tsx:140
 #: src/features/settings/connectors/connector-card.tsx:189
 #: src/features/settings/connectors/connector-card.tsx:209
 msgid "Disconnect"
@@ -10153,7 +10153,7 @@ msgstr "Discord Public Key"
 #: src/features/chat/thread/ask-user-prompt.tsx:346
 #: src/features/chat/thread/composer-long-text-prompt.tsx:71
 #: src/features/develop/components/guide-view.tsx:141
-#: src/features/devices/components/devices-settings.tsx:202
+#: src/features/devices/components/devices-settings.tsx:210
 #: src/features/workflow/components/nodes/file-node.tsx:231
 msgid "Dismiss"
 msgstr "Dismiss"
@@ -10301,7 +10301,7 @@ msgstr "Don't have an account?"
 #: src/features/chat/tags/manage-thread-tags-dialog.tsx:248
 #: src/features/chat/thread-list/hierarchical-thread-list.tsx:110
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:168
-#: src/features/devices/components/devices-settings.tsx:255
+#: src/features/devices/components/devices-settings.tsx:263
 #: src/features/skills/components/bundle-import-dialog.tsx:248
 #: src/features/sub-agents/components/sub-agent-tool-view.tsx:55
 #: src/features/sub-agents/components/worker-run-log.tsx:28
@@ -12076,7 +12076,7 @@ msgstr "Expand browser panel"
 msgid "Expand canvas"
 msgstr "Expand canvas"
 
-#: ../../packages/ui/src/components/ai-elements/chain-of-thought.tsx:61
+#: ../../packages/ui/src/components/ai-elements/chain-of-thought.tsx:64
 msgid "Expand chain of thought"
 msgstr "Expand chain of thought"
 
@@ -12164,7 +12164,7 @@ msgid "expired"
 msgstr "expired"
 
 #: src/features/chat/thread-list/thread-node.tsx:331
-#: src/features/devices/components/devices-settings.tsx:257
+#: src/features/devices/components/devices-settings.tsx:265
 #: src/features/settings/connectors/connector-card.tsx:76
 msgid "Expired"
 msgstr "Expired"
@@ -12421,7 +12421,7 @@ msgstr "failed"
 #: src/features/chat/thread-list/thread-status-icon.tsx:88
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:165
 #: src/features/develop/components/checks-tab.tsx:77
-#: src/features/devices/components/devices-settings.tsx:258
+#: src/features/devices/components/devices-settings.tsx:266
 #: src/features/evals/components/model-comparison.tsx:112
 #: src/features/evals/components/run-status.tsx:15
 #: src/features/settings/components/chat/trigger-settings.tsx:175
@@ -15331,7 +15331,7 @@ msgstr "Guest Account"
 msgid "Guest accounts"
 msgstr "Guest accounts"
 
-#: src/components/model-picker/model-picker.tsx:1023
+#: src/components/model-picker/model-picker.tsx:1025
 msgid "Guest accounts use free models only."
 msgstr "Guest accounts use free models only."
 
@@ -15498,7 +15498,7 @@ msgstr "Hidden in Model Picker"
 msgid "Hide {fieldLabel}"
 msgstr "Hide {fieldLabel}"
 
-#: src/components/model-picker/model-picker.tsx:1208
+#: src/components/model-picker/model-picker.tsx:1210
 msgid "Hide {name} from model picker"
 msgstr "Hide {name} from model picker"
 
@@ -16004,7 +16004,7 @@ msgstr "illustration"
 #: ../../packages/ui/src/components/ai-elements/attachments.tsx:109
 #: ../../packages/ui/src/components/canvas-editor/canvas-element-palette.tsx:330
 #: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:341
-#: src/components/model-picker/model-picker.tsx:1147
+#: src/components/model-picker/model-picker.tsx:1149
 #: src/features/chat/sidebar/usage-card.tsx:129
 #: src/features/chat/thread/composer.tsx:122
 #: src/features/marketing/components/landing-footer.tsx:165
@@ -17187,7 +17187,7 @@ msgstr "Keep the full history"
 msgid "Kenya"
 msgstr "Kenya"
 
-#: src/features/devices/components/devices-settings.tsx:367
+#: src/features/devices/components/devices-settings.tsx:375
 msgid "Key file (optional, absolute path)"
 msgstr "Key file (optional, absolute path)"
 
@@ -17788,11 +17788,11 @@ msgstr "Let a quick check approve low-risk calls"
 msgid "Let replies use tools"
 msgstr "Let replies use tools"
 
-#: src/features/devices/components/devices-settings.tsx:447
+#: src/features/devices/components/devices-settings.tsx:455
 msgid "Let the agent use files, a terminal and local MCP servers on your own computer through the Neore desktop app. Every action asks you on that computer first, and nothing runs from shared chats or background tasks."
 msgstr "Let the agent use files, a terminal and local MCP servers on your own computer through the Neore desktop app. Every action asks you on that computer first, and nothing runs from shared chats or background tasks."
 
-#: src/features/devices/components/devices-settings.tsx:505
+#: src/features/devices/components/devices-settings.tsx:513
 msgid "Let the agent work on a server you reach over SSH, with your own SSH client and keys. Neore asks you to trust the server's key the first time, and every action asks you on this computer before it is sent. The server holds no secret of yours."
 msgstr "Let the agent work on a server you reach over SSH, with your own SSH client and keys. Neore asks you to trust the server's key the first time, and every action asks you on this computer before it is sent. The server holds no secret of yours."
 
@@ -18420,7 +18420,7 @@ msgid "Locked chat"
 msgstr "Locked chat"
 
 #. placeholder {0}: getModelModeName(anchorMode)
-#: src/components/model-picker/model-picker.tsx:1278
+#: src/components/model-picker/model-picker.tsx:1280
 msgid "Locked to {0} models"
 msgstr "Locked to {0} models"
 
@@ -18930,7 +18930,7 @@ msgid "Max size: {size} • Max {maxFiles} files"
 msgstr "Max size: {size} • Max {maxFiles} files"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:782
-#: src/components/model-picker/model-picker.tsx:1272
+#: src/components/model-picker/model-picker.tsx:1274
 msgid "Maximum {MAX_PARALLEL} models reached"
 msgstr "Maximum {MAX_PARALLEL} models reached"
 
@@ -20122,11 +20122,11 @@ msgstr "Mute"
 msgid "my data"
 msgstr "my data"
 
-#: src/features/devices/components/devices-settings.tsx:412
+#: src/features/devices/components/devices-settings.tsx:420
 msgid "My Linux computer"
 msgstr "My Linux computer"
 
-#: src/features/devices/components/devices-settings.tsx:412
+#: src/features/devices/components/devices-settings.tsx:420
 msgid "My Mac"
 msgstr "My Mac"
 
@@ -20138,7 +20138,7 @@ msgstr "My MCP Server"
 msgid "My skills"
 msgstr "My skills"
 
-#: src/features/devices/components/devices-settings.tsx:412
+#: src/features/devices/components/devices-settings.tsx:420
 msgid "My Windows PC"
 msgstr "My Windows PC"
 
@@ -20164,7 +20164,7 @@ msgstr "name"
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:478
 #: src/features/auth/components/settings/account/update-name-card.tsx:23
 #: src/features/auth/components/settings/api-key/create-api-key-dialog.tsx:117
-#: src/features/devices/components/devices-settings.tsx:351
+#: src/features/devices/components/devices-settings.tsx:359
 #: src/features/evals/components/dataset-form-dialog.tsx:81
 #: src/features/knowledge/components/collection-dialog.tsx:57
 #: src/features/prompts/components/prompt-form-dialog.tsx:247
@@ -20184,7 +20184,7 @@ msgstr "name"
 msgid "Name"
 msgstr "Name"
 
-#: src/components/model-picker/model-picker.tsx:1185
+#: src/components/model-picker/model-picker.tsx:1187
 msgid "Name (A to Z)"
 msgstr "Name (A to Z)"
 
@@ -20387,6 +20387,11 @@ msgstr "Neore - AI Text & Video & Audio & Image & Documents Generation Platform"
 msgid "Neore (timestamped)"
 msgstr "Neore (timestamped)"
 
+#. placeholder {0}: device.appVersion
+#: src/features/devices/components/devices-settings.tsx:184
+msgid "Neore {0}"
+msgstr "Neore {0}"
+
 #: src/features/chat/thread/composer.tsx:654
 msgid "Neore can make mistakes. Check important information."
 msgstr "Neore can make mistakes. Check important information."
@@ -20443,13 +20448,17 @@ msgstr "Neore includes 30+ models: GPT-4, Claude, Gemini, and DeepSeek for chat.
 msgid "Neore keeps these up to date and tells you when someone asks for your review."
 msgstr "Neore keeps these up to date and tells you when someone asks for your review."
 
-#: src/features/devices/components/devices-settings.tsx:181
+#: src/features/devices/components/devices-settings.tsx:189
 msgid "Neore on this computer is out of date, so the agent cannot use it. Update the app there to turn it back on."
 msgstr "Neore on this computer is out of date, so the agent cannot use it. Update the app there to turn it back on."
 
 #: src/features/chat/host/host-send-errors.ts:17
 msgid "Neore on your computer is out of date. Update it, then try again."
 msgstr "Neore on your computer is out of date. Update it, then try again."
+
+#: src/features/devices/components/devices-settings.tsx:184
+msgid "Neore version not reported"
+msgstr "Neore version not reported"
 
 #: src/features/develop/components/guide-tab.tsx:173
 msgid "Neore, from the diff"
@@ -20589,7 +20598,7 @@ msgstr "New dataset"
 msgid "New Export"
 msgstr "New Export"
 
-#: src/components/model-picker/model-picker.tsx:1186
+#: src/components/model-picker/model-picker.tsx:1188
 msgid "New first"
 msgstr "New first"
 
@@ -20989,7 +20998,7 @@ msgstr "No description"
 msgid "No description provided."
 msgstr "No description provided."
 
-#: src/features/devices/components/devices-settings.tsx:499
+#: src/features/devices/components/devices-settings.tsx:507
 msgid "No devices paired."
 msgstr "No devices paired."
 
@@ -21133,7 +21142,7 @@ msgid "No models found matching your filters."
 msgstr "No models found matching your filters."
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:749
-#: src/components/model-picker/model-picker.tsx:1237
+#: src/components/model-picker/model-picker.tsx:1239
 msgid "No models found."
 msgstr "No models found."
 
@@ -21351,7 +21360,7 @@ msgid "No speech detected. Hands-free mode stopped."
 msgstr "No speech detected. Hands-free mode stopped."
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:742
-#: src/components/model-picker/model-picker.tsx:1230
+#: src/components/model-picker/model-picker.tsx:1232
 msgid "No starred models"
 msgstr "No starred models"
 
@@ -21413,7 +21422,7 @@ msgstr "No threads yet"
 msgid "No tier data yet. Tier info is recorded for new requests after the gateway upgrade."
 msgstr "No tier data yet. Tier info is recorded for new requests after the gateway upgrade."
 
-#: src/features/devices/components/devices-settings.tsx:177
+#: src/features/devices/components/devices-settings.tsx:179
 msgid "No tools shared yet"
 msgstr "No tools shared yet"
 
@@ -21674,7 +21683,7 @@ msgstr "Note: Modules are applied per conversation, not per message. Enable only
 msgid "Nothing found"
 msgstr "Nothing found"
 
-#: src/features/devices/components/devices-settings.tsx:250
+#: src/features/devices/components/devices-settings.tsx:258
 msgid "Nothing has run on a device yet."
 msgstr "Nothing has run on a device yet."
 
@@ -21838,7 +21847,7 @@ msgstr "Official"
 
 #: src/features/code/components/code-shell.tsx:81
 #: src/features/code/components/host-details.tsx:32
-#: src/features/devices/components/devices-settings.tsx:188
+#: src/features/devices/components/devices-settings.tsx:196
 #: src/routes/admin/gateway/index.tsx:37
 msgid "Offline"
 msgstr "Offline"
@@ -22045,7 +22054,7 @@ msgstr "One-time password is required"
 
 #: src/features/code/components/code-shell.tsx:81
 #: src/features/code/components/host-details.tsx:32
-#: src/features/devices/components/devices-settings.tsx:188
+#: src/features/devices/components/devices-settings.tsx:196
 msgid "Online"
 msgstr "Online"
 
@@ -22285,7 +22294,7 @@ msgstr "Open model picker"
 msgid "Open Model Picker"
 msgstr "Open Model Picker"
 
-#: src/features/devices/components/devices-settings.tsx:452
+#: src/features/devices/components/devices-settings.tsx:460
 msgid "Open Neore in the desktop app to pair this computer. Devices you paired before are listed below."
 msgstr "Open Neore in the desktop app to pair this computer. Devices you paired before are listed below."
 
@@ -23201,11 +23210,11 @@ msgstr "Pair one in Settings"
 msgid "Paired"
 msgstr "Paired"
 
-#: src/features/devices/components/devices-settings.tsx:485
+#: src/features/devices/components/devices-settings.tsx:493
 msgid "Paired devices"
 msgstr "Paired devices"
 
-#: src/features/devices/components/devices-settings.tsx:428
+#: src/features/devices/components/devices-settings.tsx:436
 msgid "Pairing was cancelled on this computer."
 msgstr "Pairing was cancelled on this computer."
 
@@ -23232,7 +23241,7 @@ msgid "Paraguay"
 msgstr "Paraguay"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:633
-#: src/components/model-picker/model-picker.tsx:1099
+#: src/components/model-picker/model-picker.tsx:1101
 msgid "Parallel"
 msgstr "Parallel"
 
@@ -23937,7 +23946,7 @@ msgstr "Polished Hollywood look"
 msgid "Popular"
 msgstr "Popular"
 
-#: src/features/devices/components/devices-settings.tsx:363
+#: src/features/devices/components/devices-settings.tsx:371
 msgid "Port"
 msgstr "Port"
 
@@ -24351,11 +24360,11 @@ msgstr "Previous version"
 msgid "Price per 1M tokens"
 msgstr "Price per 1M tokens"
 
-#: src/components/model-picker/model-picker.tsx:1188
+#: src/components/model-picker/model-picker.tsx:1190
 msgid "Price: high to low"
 msgstr "Price: high to low"
 
-#: src/components/model-picker/model-picker.tsx:1187
+#: src/components/model-picker/model-picker.tsx:1189
 msgid "Price: low to high"
 msgstr "Price: low to high"
 
@@ -25525,7 +25534,7 @@ msgstr "Reconnect {0}"
 msgid "Reconnect your Git host in settings to link a pull request."
 msgstr "Reconnect your Git host in settings to link a pull request."
 
-#: src/features/devices/components/devices-settings.tsx:190
+#: src/features/devices/components/devices-settings.tsx:198
 msgid "Reconnecting"
 msgstr "Reconnecting"
 
@@ -25894,8 +25903,8 @@ msgstr "Remember me"
 #: src/features/chat/thread/composer-input.tsx:348
 #: src/features/chat/thread/composer-input.tsx:402
 #: src/features/chat/thread/composer-input.tsx:411
-#: src/features/devices/components/devices-settings.tsx:206
-#: src/features/devices/components/devices-settings.tsx:212
+#: src/features/devices/components/devices-settings.tsx:214
+#: src/features/devices/components/devices-settings.tsx:220
 #: src/features/projects/components/project-form-dialog.tsx:263
 #: src/features/projects/components/project-form-dialog.tsx:304
 #: src/features/settings/components/chat/custom-providers-settings.tsx:652
@@ -25912,7 +25921,7 @@ msgid "Remove \"{0}\"?"
 msgstr "Remove \"{0}\"?"
 
 #. placeholder {0}: device.name
-#: src/features/devices/components/devices-settings.tsx:229
+#: src/features/devices/components/devices-settings.tsx:237
 msgid "Remove “{0}”?"
 msgstr "Remove “{0}”?"
 
@@ -26427,7 +26436,7 @@ msgstr "Reset to defaults"
 msgid "Reset to Defaults"
 msgstr "Reset to Defaults"
 
-#: ../../packages/ui/src/components/zoomable-image.tsx:389
+#: ../../packages/ui/src/components/zoomable-image.tsx:394
 msgid "Reset zoom"
 msgstr "Reset zoom"
 
@@ -26595,7 +26604,7 @@ msgstr "retry"
 #: src/features/chat/thread/chat-error.tsx:56
 #: src/features/chat/thread/request-secret-prompt.tsx:476
 #: src/features/chat/translation/message-translation.tsx:88
-#: src/features/devices/components/devices-settings.tsx:140
+#: src/features/devices/components/devices-settings.tsx:142
 #: src/features/local-models/components/ollama-model-manager.tsx:188
 #: src/features/settings/components/chat/agent-settings.tsx:224
 #: src/features/tasks/components/task-detail-dialog.tsx:108
@@ -27511,7 +27520,7 @@ msgid "Search models by name, ID, or provider..."
 msgstr "Search models by name, ID, or provider..."
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:566
-#: src/components/model-picker/model-picker.tsx:1039
+#: src/components/model-picker/model-picker.tsx:1041
 msgid "Search models..."
 msgstr "Search models..."
 
@@ -28105,7 +28114,7 @@ msgstr "Sending your message and waiting for the reply"
 msgid "Sending…"
 msgstr "Sending…"
 
-#: src/features/devices/components/devices-settings.tsx:259
+#: src/features/devices/components/devices-settings.tsx:267
 msgid "Sent"
 msgstr "Sent"
 
@@ -28157,7 +28166,7 @@ msgstr "Serbian (Serbia)"
 msgid "Serif"
 msgstr "Serif"
 
-#: src/features/devices/components/devices-settings.tsx:331
+#: src/features/devices/components/devices-settings.tsx:339
 msgid "Server added. Choose which of its folders to share in the desktop app."
 msgstr "Server added. Choose which of its folders to share in the desktop app."
 
@@ -28173,7 +28182,7 @@ msgstr "Server error. Please try again later."
 msgid "Server name is required"
 msgstr "Server name is required"
 
-#: src/features/devices/components/devices-settings.tsx:187
+#: src/features/devices/components/devices-settings.tsx:195
 msgid "Server over SSH"
 msgstr "Server over SSH"
 
@@ -28197,7 +28206,7 @@ msgstr "Serverless Postgres database with branching"
 msgid "servers"
 msgstr "servers"
 
-#: src/features/devices/components/devices-settings.tsx:506
+#: src/features/devices/components/devices-settings.tsx:514
 msgid "Servers over SSH"
 msgstr "Servers over SSH"
 
@@ -28347,7 +28356,7 @@ msgstr "shared"
 msgid "Shared conversation"
 msgstr "Shared conversation"
 
-#: src/features/devices/components/devices-settings.tsx:480
+#: src/features/devices/components/devices-settings.tsx:488
 msgid "Shared folders and local servers…"
 msgstr "Shared folders and local servers…"
 
@@ -28676,7 +28685,7 @@ msgstr "Sign in to the Neore desktop app"
 msgid "Sign in to unlock all models"
 msgstr "Sign in to unlock all models"
 
-#: src/components/model-picker/model-picker.tsx:1030
+#: src/components/model-picker/model-picker.tsx:1032
 msgid "Sign in to unlock all models."
 msgstr "Sign in to unlock all models."
 
@@ -28817,7 +28826,7 @@ msgid "Singapore"
 msgstr "Singapore"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:620
-#: src/components/model-picker/model-picker.tsx:1087
+#: src/components/model-picker/model-picker.tsx:1089
 msgid "Single"
 msgstr "Single"
 
@@ -29222,7 +29231,7 @@ msgstr "Sort desc"
 msgid "Sort direction"
 msgstr "Sort direction"
 
-#: src/components/model-picker/model-picker.tsx:1178
+#: src/components/model-picker/model-picker.tsx:1180
 msgid "Sort models"
 msgstr "Sort models"
 
@@ -29576,7 +29585,7 @@ msgid "starred"
 msgstr "starred"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:585
-#: src/components/model-picker/model-picker.tsx:1056
+#: src/components/model-picker/model-picker.tsx:1058
 msgid "Starred"
 msgstr "Starred"
 
@@ -29587,7 +29596,7 @@ msgstr "Start"
 
 #. placeholder {0}: offer.agentLabel
 #. placeholder {1}: offer.folderLabel
-#: src/features/devices/components/devices-settings.tsx:109
+#: src/features/devices/components/devices-settings.tsx:111
 msgid "Start {0} in {1}"
 msgstr "Start {0} in {1}"
 
@@ -30422,7 +30431,7 @@ msgstr "Submit review"
 msgid "Submitting…"
 msgstr "Submitting…"
 
-#: src/components/model-picker/model-picker.tsx:1026
+#: src/components/model-picker/model-picker.tsx:1028
 msgid "Subscribe for $8/mo to unlock all models."
 msgstr "Subscribe for $8/mo to unlock all models."
 
@@ -30739,7 +30748,7 @@ msgstr "System Prompts"
 msgid "System UI"
 msgstr "System UI"
 
-#: ../../packages/ui/src/components/zoomable-image.tsx:381
+#: ../../packages/ui/src/components/zoomable-image.tsx:386
 msgid "Tab to the zoom buttons, then plus and minus zoom, zero resets, and arrow keys pan when zoomed. Double-click or scroll to zoom, drag to pan."
 msgstr "Tab to the zoom buttons, then plus and minus zoom, zero resets, and arrow keys pan when zoomed. Double-click or scroll to zoom, drag to pan."
 
@@ -31156,7 +31165,7 @@ msgstr "text"
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:667
 #: ../../packages/ui/src/components/canvas-editor/canvas-element-palette.tsx:317
 #: ../../packages/ui/src/components/canvas-editor/canvas-property-panel.tsx:351
-#: src/components/model-picker/model-picker.tsx:1134
+#: src/components/model-picker/model-picker.tsx:1136
 #: src/features/chat/sidebar/usage-card.tsx:128
 #: src/features/chat/thread/composer.tsx:121
 #: src/features/marketing/components/landing-footer.tsx:164
@@ -31389,7 +31398,7 @@ msgstr "The {requestNoun} has a newer commit. Write the guide again before addin
 msgid "The 43-character EncodingAESKey (message encryption must be set to safe mode)"
 msgstr "The 43-character EncodingAESKey (message encryption must be set to safe mode)"
 
-#: src/features/devices/components/devices-settings.tsx:213
+#: src/features/devices/components/devices-settings.tsx:221
 msgid "The agent can no longer ask this device for anything. Its activity log stays until it expires."
 msgstr "The agent can no longer ask this device for anything. Its activity log stays until it expires."
 
@@ -32241,7 +32250,7 @@ msgstr "This collection is shared with you by a member of your organization. You
 msgid "This command name is reserved"
 msgstr "This command name is reserved"
 
-#: src/features/devices/components/devices-settings.tsx:186
+#: src/features/devices/components/devices-settings.tsx:194
 #: src/features/settings/components/chat/custom-providers-settings.tsx:368
 msgid "This computer"
 msgstr "This computer"
@@ -32250,20 +32259,20 @@ msgstr "This computer"
 msgid "This computer did not resume its own session, so the conversation was handed over"
 msgstr "This computer did not resume its own session, so the conversation was handed over"
 
-#: src/features/devices/components/devices-settings.tsx:457
+#: src/features/devices/components/devices-settings.tsx:465
 msgid "This computer is not paired yet."
 msgstr "This computer is not paired yet."
 
 #. placeholder {0}: pairedHere.name
-#: src/features/devices/components/devices-settings.tsx:473
+#: src/features/devices/components/devices-settings.tsx:481
 msgid "This computer is paired as “{0}”."
 msgstr "This computer is paired as “{0}”."
 
-#: src/features/devices/components/devices-settings.tsx:457
+#: src/features/devices/components/devices-settings.tsx:465
 msgid "This computer is paired with another account."
 msgstr "This computer is paired with another account."
 
-#: src/features/devices/components/devices-settings.tsx:435
+#: src/features/devices/components/devices-settings.tsx:443
 msgid "This computer is paired. Choose which folders to share in the desktop app."
 msgstr "This computer is paired. Choose which folders to share in the desktop app."
 
@@ -33601,7 +33610,7 @@ msgstr "Two-factor authentication is currently enabled for your account. This ad
 
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:125
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:644
-#: src/components/model-picker/model-picker.tsx:1110
+#: src/components/model-picker/model-picker.tsx:1112
 #: src/features/devices/components/device-tool-call.tsx:119
 msgid "Type"
 msgstr "Type"
@@ -34460,7 +34469,7 @@ msgstr "Use the organization's allowed models"
 msgid "Use these keyboard shortcuts to navigate and interact with the data grid more efficiently."
 msgstr "Use these keyboard shortcuts to navigate and interact with the data grid more efficiently."
 
-#: src/features/devices/components/devices-settings.tsx:467
+#: src/features/devices/components/devices-settings.tsx:475
 msgid "Use this computer for agent tools"
 msgstr "Use this computer for agent tools"
 
@@ -34500,7 +34509,7 @@ msgstr "user"
 #: src/features/auth/components/user-view.tsx:35
 #: src/features/auth/components/user-view.tsx:38
 #: src/features/auth/components/user-view.tsx:44
-#: src/features/devices/components/devices-settings.tsx:359
+#: src/features/devices/components/devices-settings.tsx:367
 #: src/features/layout/components/nav-user.tsx:340
 #: src/features/layout/components/nav-user.tsx:340
 #: src/features/layout/components/sidebar-shortcut.tsx:212
@@ -34913,7 +34922,7 @@ msgid "video"
 msgstr "video"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:691
-#: src/components/model-picker/model-picker.tsx:1160
+#: src/components/model-picker/model-picker.tsx:1162
 #: src/features/chat/sidebar/usage-card.tsx:130
 #: src/features/chat/thread/composer.tsx:123
 #: src/features/marketing/components/landing-footer.tsx:166
@@ -35374,7 +35383,7 @@ msgstr "Waiting for {0}."
 msgid "Waiting for {device} to pick this up…"
 msgstr "Waiting for {device} to pick this up…"
 
-#: src/features/devices/components/devices-settings.tsx:254
+#: src/features/devices/components/devices-settings.tsx:262
 msgid "Waiting for approval"
 msgstr "Waiting for approval"
 
@@ -35700,7 +35709,7 @@ msgstr "What should the AI call you?"
 msgid "What should the guide pay attention to?"
 msgstr "What should the guide pay attention to?"
 
-#: src/features/devices/components/devices-settings.tsx:513
+#: src/features/devices/components/devices-settings.tsx:521
 msgid "What the agent asked your devices to do in the last 30 days."
 msgstr "What the agent asked your devices to do in the last 30 days."
 
@@ -35874,7 +35883,7 @@ msgstr "With email/password"
 msgid "With this, it fires when the text starts to contain the phrase, not on every change."
 msgstr "With this, it fires when the text starts to contain the phrase, not on every change."
 
-#: src/features/devices/components/devices-settings.tsx:369
+#: src/features/devices/components/devices-settings.tsx:377
 msgid "Without one, your SSH agent and default keys are used. Passwords are not supported yet."
 msgstr "Without one, your SSH agent and default keys are used. Passwords are not supported yet."
 
@@ -36710,7 +36719,7 @@ msgid "ZIP archive"
 msgstr "ZIP archive"
 
 #: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:141
-#: ../../packages/ui/src/components/zoomable-image.tsx:392
+#: ../../packages/ui/src/components/zoomable-image.tsx:397
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:284
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:290
 #: src/features/workflow/hooks/use-canvas-aria-labels.ts:25
@@ -36727,7 +36736,7 @@ msgid "Zoom Lens"
 msgstr "Zoom Lens"
 
 #: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:131
-#: ../../packages/ui/src/components/zoomable-image.tsx:386
+#: ../../packages/ui/src/components/zoomable-image.tsx:391
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:250
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:256
 #: src/features/workflow/hooks/use-canvas-aria-labels.ts:26
@@ -36739,7 +36748,7 @@ msgstr "Zoom out"
 msgid "Zoom Out"
 msgstr "Zoom Out"
 
-#: ../../packages/ui/src/components/zoomable-image.tsx:347
+#: ../../packages/ui/src/components/zoomable-image.tsx:352
 msgid "Zoomable image"
 msgstr "Zoomable image"
 
