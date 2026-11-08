@@ -82,7 +82,9 @@ const parsePsLine = (line: string): ProcessInfo | undefined => {
         return undefined;
     }
 
-    return { name: baseName(command), pid: Number(pidText), ppid: Number(ppidText), startedAt, ...(state.startsWith("Z") && { zombie: true }) };
+    return { name: baseName(command), pid: Number(pidText), ppid: Number(ppidText), startedAt, // `l` is a process with threads still running (Linux shows `Zl` when only its main thread has exited): not gone.
+        ...(state.startsWith("Z") && !state.includes("l") && { zombie: true }),
+    };
 };
 
 /** Parses `ps -axo pid=,ppid=,stat=,lstart=,comm=` (`ucomm=` on macOS; run with `LC_ALL=C`). Lines that do not fit are dropped. */

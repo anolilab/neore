@@ -280,7 +280,7 @@ export class PortsService {
         }
     }
 
-    /** Descendants of `roots` that are not `known` yet. Never the agent (a cyclic read could reach it) or this app. */
+    /** Running descendants of `roots` that are not `known` yet. Never the agent (a cyclic read could reach it), this app, or a zombie (it has exited). */
     private newcomers(
         table: ReadonlyArray<ProcessInfo>,
         roots: ReadonlyArray<ProcessInfo>,
@@ -291,7 +291,7 @@ export class PortsService {
 
         for (const root of roots) {
             for (const row of descendantsOf(table, root.pid)) {
-                if (row.pid !== agentPid && row.pid !== this.selfPid && [...known, ...found].every((entry) => !sameProcess(entry, row))) {
+                if (row.zombie !== true && row.pid !== agentPid && row.pid !== this.selfPid && [...known, ...found].every((entry) => !sameProcess(entry, row))) {
                     found.push(row);
                 }
             }

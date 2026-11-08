@@ -794,7 +794,7 @@ const showPorts = (selected: string | undefined, ports: Awaited<ReturnType<typeo
 };
 
 /** The processes a stop is running for, until the list is read again: a repeat click on the same row is ignored meanwhile. */
-const stopping = new Set<string>();
+const stopping = new Map<string, string>();
 
 /** Ends one listed server, then reads the list again; a stop that did not end says why in the ports status line. */
 const stopPort = async (
@@ -813,9 +813,11 @@ const stopPort = async (
         return;
     }
 
-    stopping.add(key);
+    const label = `Stopping ${port.name} on port ${String(port.port)}…`;
+
+    stopping.set(key, label);
     // A stop can take the whole grace period: say it started. Reads of an unchanged list leave this up until it answers.
-    setPortsStatus(`Stopping ${port.name} on port ${String(port.port)}…`);
+    setPortsStatus(label);
 
     try {
         let result: Awaited<ReturnType<typeof globalThis.neoreDevice.acpPortStop>>;
@@ -844,13 +846,19 @@ const stopPort = async (
 
         await refreshPorts();
 
+        // An ended session's servers are already cleared: neither a late reason nor a "Stopping…" may come back over that.
+        const sessionEnded = state.sessions.find((session) => session.id === selected)?.status === "ended";
+        // Another stop in this session is still running: its "Stopping…" comes back over the count this one brought.
+        const other = [...stopping].find(([entry]) => entry !== key && (JSON.parse(entry) as unknown[])[0] === selected);
+
+        if (other !== undefined && !sessionEnded && result.ended && state.selected === selected) {
+            setPortsStatus(other[1]);
+        }
+
         // The redrawn list no longer has the button that was pressed: focus that fell to the page goes to the list.
         if (hadFocus && (document.activeElement === null || document.activeElement === document.body)) {
             $("acp-ports-list").focus();
         }
-
-        // An ended session's servers are already cleared: a late reason must not come back over that.
-        const sessionEnded = state.sessions.find((session) => session.id === selected)?.status === "ended";
 
         if (!sessionEnded && !result.ended && state.selected === selected) {
             setPortsStatus(`${port.name} on port ${String(port.port)} did not end: ${result.reason}.`);

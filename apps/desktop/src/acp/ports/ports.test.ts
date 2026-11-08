@@ -89,6 +89,8 @@ describe("reading the process table", () => {
 
     it("marks an exited process that has not been reaped", () => {
         expect(parsePs("5 1 Z Mon Nov  3 10:00:00 2026 node")[0]?.zombie).toBe(true);
+        // Only its main thread has exited; the others still run.
+        expect(parsePs("6 1 Zl Mon Nov  3 10:00:00 2026 node")[0]?.zombie).toBeUndefined();
     });
 
     it("cuts a long command name", () => {
@@ -212,7 +214,8 @@ describe("stopping a server", () => {
     it("signals the listener and its own descendants by pid, and nothing else", async () => {
         const system = new FakeSystem();
 
-        // Pid 31 stands for this app: it is below the listener here, and still never a target.
+        // Pid 31 stands for this app: it is below the listener here, and still never a target. 32 has exited (a zombie).
+        system.table.push({ ...row(32, 30, "done"), zombie: true });
         expect(await stopper(system, 31).stop(10, SERVER_30)).toEqual({ ended: true });
         expect(system.signals).toEqual([[30, "SIGTERM"]]);
         expect(system.table.map((entry) => entry.pid)).toContain(10);
