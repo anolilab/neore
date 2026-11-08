@@ -25,7 +25,7 @@ import { threadShardFor } from "../lib/thread-shard";
 
 const NO_STORE = { "cache-control": "no-store" };
 
-/** Lunora ids are short and plain (`[\w-]`); anything else is not one, and is refused before a read. */
+/** Lunora ids are short and plain (`[\w-]`); anything else is not one, and is refused (400) before a read. */
 const NOTIFICATION_ID = /^[\w-]{1,64}$/u;
 
 /** The body is one id in JSON; anything longer is refused while it is read, before it is buffered. */
@@ -83,7 +83,9 @@ export const pushContentHttpAction = async (context: HttpActionCtx, request: Req
     }
 
     // Per caller, before any read: each request costs a notification read and possibly a cross-shard chat check.
-    const limited = await checkRateLimit(context, "notifications/pushContent", { key: userId, throws: false });
+    // Fail open: the limiter only bounds read cost, so an outage of its store must not refuse every phone (the reads
+    // are still owner-only and capped).
+    const limited = await checkRateLimit(context, "notifications/pushContent", { failMode: "open", key: userId, throws: false });
 
     if (!limited.ok) {
         return Response.json({ error: "RATE_LIMITED" }, { headers: NO_STORE, status: 429 });

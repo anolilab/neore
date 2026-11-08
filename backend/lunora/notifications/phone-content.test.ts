@@ -83,6 +83,8 @@ describe("phone push content", () => {
             title: "A tool call needs your approval",
         });
         expect(await call(loadPhonePushContent, null, { notificationId: plain, userId: OTHER })).toBeNull();
+        // A well-formed string that is no notification id reads as nothing: the same 404, never an outage.
+        expect(await call(loadPhonePushContent, null, { notificationId: "mine", userId: USER })).toBeNull();
         expect(await call(loadPhonePushContent, null, { notificationId: locked, userId: USER })).toStrictEqual({ generic: true });
     });
 

@@ -29,7 +29,9 @@ export const loadPhonePushContent = internalQuery
         ),
     )
     .query(async ({ args, ctx }) => {
-        const notification = await ctx.db.get("notifications", args.notificationId);
+        // `findFirst`, not `get`: a well-formed string that is no notification id reads as nothing (the same 404 as
+        // another user's), never as a lookup error the route would report as an outage.
+        const notification = await ctx.db.notifications.findFirst({ where: { _id: args.notificationId } });
 
         if (notification?.userId !== args.userId) {
             return null;
