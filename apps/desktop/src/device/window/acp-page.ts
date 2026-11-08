@@ -828,6 +828,11 @@ const refreshSessions = async (): Promise<void> => {
         selectSession(undefined);
     }
 
+    // An ended session has no processes left, so its servers go at once rather than at the next (possibly backed-off) read.
+    if (state.sessions.find((session) => session.id === state.selected)?.status === "ended") {
+        showPorts(state.selected, []);
+    }
+
     $("acp-sessions").replaceChildren(
         ...state.sessions.length === 0
             ? [item("None.")]

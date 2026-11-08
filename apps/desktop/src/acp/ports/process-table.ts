@@ -164,8 +164,9 @@ export const descendantsOf = (table: ReadonlyArray<ProcessInfo>, rootPid: number
     const found: ProcessInfo[] = [];
     const queue = [rootPid];
 
-    for (let pid = queue.shift(); pid !== undefined; pid = queue.shift()) {
-        const kids = children.get(pid) ?? [];
+    // An index into the queue, not `shift()`, so the walk stays linear in the number of processes.
+    for (let next = 0; next < queue.length; next += 1) {
+        const kids = children.get(queue[next] as number) ?? [];
         const fresh = kids.filter((row) => !seen.has(row.pid));
 
         for (const child of fresh) {

@@ -344,7 +344,13 @@ export class AcpManager {
 
     /** The ports the session's agent processes listen on (`ports/ports.ts`). Empty for a session with no local process. */
     public async ports(sessionId: string): Promise<PortView[]> {
-        return await this.portsService.list(this.require(sessionId).agentPid);
+        const session = this.require(sessionId);
+        const { agentPid } = session;
+        const ports = await this.portsService.list(agentPid);
+
+        // A pid is reused only after its process ended, which ends the session: an agent that ended while its ports were
+        // read may have handed its pid to another process, so its answer is dropped.
+        return session.agentPid === agentPid ? ports : [];
     }
 
     /** Forgets an ended session. */

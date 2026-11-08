@@ -18,9 +18,6 @@ export interface PortsSystem {
     processes: () => Promise<ProcessInfo[]>;
 }
 
-/** The same process: a pid alone is not identity, since the system reuses pids. */
-const sameProcess = (row: ProcessInfo, other: ProcessInfo): boolean => row.pid === other.pid && row.startedAt === other.startedAt;
-
 /** The agent's own row, if it is in the table, and every process below it. */
 const agentTree = (table: ReadonlyArray<ProcessInfo>, agentPid: number): ProcessInfo[] => {
     const agent = table.find((row) => row.pid === agentPid);
@@ -44,8 +41,9 @@ export class PortsService {
 
         const byPid = new Map(tree.map((row) => [row.pid, row]));
         const found = await this.system.listeners(tree.map((row) => row.pid));
-        // A pid alone is not identity: re-read, and keep a socket only while the process it was joined to is still the same one.
-        const reread = await this.system.processes();
+        // A pid alone is not identity, and a process can leave the agent's tree meanwhile: re-read, and keep a socket only
+        // while the process it was joined to is the same one (same start time) and still below the agent.
+        const stillBelow = new Map(agentTree(await this.system.processes(), agentPid).map((row) => [row.pid, row.startedAt]));
         const seen = new Set<string>();
         const views: PortView[] = [];
 
@@ -53,7 +51,7 @@ export class PortsService {
             const row = byPid.get(listener.pid);
             const key = `${String(listener.pid)}:${listener.address}:${String(listener.port)}`;
 
-            if (row !== undefined && !seen.has(key) && reread.some((entry) => sameProcess(entry, row))) {
+            if (row !== undefined && !seen.has(key) && stillBelow.get(row.pid) === row.startedAt) {
                 seen.add(key);
                 views.push({ address: listener.address, name: row.name, pid: row.pid, port: listener.port });
             }

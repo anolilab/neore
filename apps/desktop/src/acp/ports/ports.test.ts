@@ -115,6 +115,25 @@ describe("listing ports", () => {
         expect(await new PortsService(new FakeSystem()).list(undefined)).toEqual([]);
     });
 
+    it("drops a socket whose process left the agent's tree while it was read", async () => {
+        const system = new FakeSystem();
+        const processes = system.processes.bind(system);
+        let reads = 0;
+
+        // After the listener query, the server (30) has been re-parented to pid 1, out of the agent's tree.
+        system.processes = async () => {
+            reads += 1;
+
+            const table = await processes();
+
+            return table.map((entry) => (reads > 1 && entry.pid === 30 ? { ...entry, ppid: 1 } : entry));
+        };
+
+        const views = await new PortsService(system).list(10);
+
+        expect(views.map((view) => view.pid)).toEqual([10, 40]);
+    });
+
     it("drops a socket whose pid now belongs to another process", async () => {
         const system = new FakeSystem();
         const processes = system.processes.bind(system);
