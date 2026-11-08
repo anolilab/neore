@@ -27,19 +27,51 @@ const MAX_PASTED_QUOTE_LINES = 10;
 /** The quote as the draft keeps it: without the hidden characters the composer strips from every draft. */
 const cleanQuote = (text: string): string => stripHiddenText(text).text;
 
-/** Elements a page can use to put text in the HTML that nobody sees. */
-const HIDDEN = '[hidden], [aria-hidden="true"], [style*="display" i][style*="none" i], [style*="visibility" i][style*="hidden" i], script, style, template';
+/** Elements a page can use to put text in the HTML that nobody sees, by what they are or by an attribute. */
+const HIDDEN_ELEMENTS = '[hidden], [aria-hidden="true"], script, style, template';
+
+/** Inline style values that hide an element's text, by property. */
+const HIDING_VALUES: ReadonlyArray<[property: string, values: ReadonlyArray<string>]> = [
+    ["display", ["none"]],
+    ["visibility", ["hidden", "collapse"]],
+    ["content-visibility", ["hidden"]],
+];
+
+/**
+ * Whether a page hid this element: one of the elements above, or an inline style that hides it. The style is read as parsed
+ * declarations, so `display: block; background: none` is visible, as a reader sees it. A value this cannot resolve here (a
+ * `var()`, `attr()` or `env()`), or a style on an element without one to read, counts as hidden: the guard fails closed.
+ */
+const isHidden = (element: Element): boolean => {
+    if (element.matches(HIDDEN_ELEMENTS)) {
+        return true;
+    }
+
+    const { style } = element as Partial<HTMLElement>;
+
+    if (style === undefined) {
+        return element.hasAttribute("style");
+    }
+
+    return HIDING_VALUES.some(([property, values]) => {
+        const value = style.getPropertyValue(property).trim().toLowerCase();
+
+        return values.includes(value) || value.includes("(");
+    });
+};
 
 /** The text a reader sees in one quoted line: nothing when the line itself is hidden, and its hidden descendants are left out. */
 const visibleText = (line: Element): string => {
-    if (line.matches(HIDDEN)) {
+    if (isHidden(line)) {
         return "";
     }
 
     const copy = line.cloneNode(true) as Element;
 
-    for (const hidden of copy.querySelectorAll(HIDDEN)) {
-        hidden.remove();
+    for (const descendant of copy.querySelectorAll("*")) {
+        if (isHidden(descendant)) {
+            descendant.remove();
+        }
     }
 
     // A `<br>` inside a quoted line is a line break the reader sees.
@@ -53,7 +85,9 @@ const visibleText = (line: Element): string => {
 /** A pasted chip's quote, read from its visible quoted lines, never from an attribute the pasting page could fill unseen. */
 const visibleQuote = (element: HTMLElement): string =>
     cleanQuote(
-        Array.from(element.querySelectorAll(`:scope > blockquote:not(${HIDDEN}) > p`), visibleText)
+        [...element.querySelectorAll(":scope > blockquote")]
+            .filter((blockquote) => !isHidden(blockquote))
+            .flatMap((blockquote) => Array.from(blockquote.querySelectorAll(":scope > p"), visibleText))
             .join("\n")
             .trim(),
     );

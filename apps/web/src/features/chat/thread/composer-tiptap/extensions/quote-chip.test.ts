@@ -136,6 +136,18 @@ describe("the quote chip's clipboard", () => {
             formatQuote("Seen"),
         ],
         [
+            "keeps a line whose style names display and none in different declarations",
+            `<div data-quote-chip data-message-id="m"><blockquote><p style="display: block; background: none">Seen</p><p style="visibility: hidden">hidden line</p></blockquote></div>`,
+            "quoteChip",
+            formatQuote("Seen"),
+        ],
+        [
+            "leaves out a line hidden through a CSS variable or content-visibility",
+            `<div data-quote-chip data-message-id="m"><blockquote><p>Seen<span style="content-visibility: hidden">hidden ask</span></p><p style="--x: none; display: var(--x)">hidden line</p></blockquote></div>`,
+            "quoteChip",
+            formatQuote("Seen"),
+        ],
+        [
             "pastes a quote past the long-paste limit as quoted lines, not a chip",
             `<div data-quote-chip data-message-id="m"><blockquote><p>${"long ".repeat(120)}</p></blockquote></div>`,
             "paragraph",
