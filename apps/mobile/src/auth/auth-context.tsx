@@ -12,7 +12,7 @@ import { getOfflineCache } from "../offline/database";
 import type { AuthStatus } from "./auth-state";
 import { AuthContext } from "./auth-state";
 import type { GrantUser } from "./grant";
-import { fetchAccessToken, readStoredUser, signOutGrant } from "./grant";
+import { fetchAccessToken, readStoredUser, revokeSessionToken, takeStoredGrant } from "./grant";
 import { secureGrantStore } from "./secure-store";
 import { signInWithBrowser } from "./sign-in";
 import { emptyCacheWhileSignedOut, signOutOnDevice } from "./sign-out";
@@ -134,7 +134,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 forgetLastChat: clearLastThread,
                 releasePush: async () =>
                     await releaseOnSignOut({ platform: devicePushPlatform, registrations: pushRegistrations, server: backendPushServer(client) }),
-                revokeGrant: () => signOutGrant({ fetch, lunoraUrl: config.lunoraUrl, store: secureGrantStore }),
+                revokeSession: async (token) => await revokeSessionToken({ fetch, lunoraUrl: config.lunoraUrl, token }),
+                takeCredential: async () => await takeStoredGrant(secureGrantStore),
                 // eslint-disable-next-line no-console -- no logger in the app; a failed clear must not be silent
                 warn: console.warn,
             });

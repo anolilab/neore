@@ -1,3 +1,10 @@
+/** The session token a failed credential clear carries (`StoredGrantNotClearedError`), if any. */
+const tokenOf = (error: unknown): string | undefined => {
+    const { token } = (error ?? {}) as { token?: unknown };
+
+    return typeof token === "string" ? token : undefined;
+};
+
 /** How long sign-out waits for the server to drop this phone's push token before it carries on without it. */
 export const RELEASE_PUSH_TIMEOUT_MS = 5000;
 
@@ -6,10 +13,12 @@ interface SignOutSteps {
     clearCache: () => Promise<void>;
     /** Forgets the chat saved to reopen on launch. */
     forgetLastChat: () => Promise<void>;
-    /** Tells the server this phone stops getting the account's pushes. Needs the sign-in, so it runs before the revoke. */
+    /** Tells the server this phone stops getting the account's pushes. Signs in with the in-memory JWT. */
     releasePush?: () => Promise<void>;
-    /** Tells the server and clears the stored grant. May fail, or never answer, with no network. */
-    revokeGrant: () => Promise<void>;
+    /** Revokes the session server-side. May fail, or never answer, with no network. */
+    revokeSession: (token: string) => Promise<void>;
+    /** Clears the stored session and resolves its token, or `undefined`. Runs before anything waits on the network. */
+    takeCredential: () => Promise<string | undefined>;
     warn: (message: string, error: unknown) => void;
 }
 
@@ -17,11 +26,11 @@ interface SignOutSteps {
  * Signing out takes the person's saved chats off the device FIRST, locally, before the server is asked anything: a
  * sign-out request that fails or hangs offline must not leave their chats behind for the next person to open.
  *
- * Then the phone's push token is released while the sign-in still works, waited on for at most
- * {@link RELEASE_PUSH_TIMEOUT_MS}: the server stops sending once the session is revoked anyway, so a release that
- * fails or hangs only means the row waits for the next send to be dropped. Last the grant is revoked and cleared.
+ * Then the stored session is cleared, still locally, so nothing on the phone can sign in as them from here on. Then the
+ * phone's push token is released while the in-memory sign-in still works, waited on for at most
+ * {@link RELEASE_PUSH_TIMEOUT_MS}. Last the session is revoked server-side with the token taken above.
  */
-export const signOutOnDevice = async ({ clearCache, forgetLastChat, releasePush, revokeGrant, warn }: SignOutSteps): Promise<void> => {
+export const signOutOnDevice = async ({ clearCache, forgetLastChat, releasePush, revokeSession, takeCredential, warn }: SignOutSteps): Promise<void> => {
     try {
         await clearCache();
     } catch (error) {
@@ -32,6 +41,17 @@ export const signOutOnDevice = async ({ clearCache, forgetLastChat, releasePush,
         await forgetLastChat();
     } catch (error) {
         warn("Could not forget the last viewed chat.", error);
+    }
+
+    let token: string | undefined;
+
+    try {
+        token = await takeCredential();
+    } catch (error) {
+        // The stored session could not be cleared. The user is still signed out in memory by the caller, and the session
+        // is still revoked below with the token the failed clear carries, so a grant left behind stops working.
+        warn("Could not clear the stored sign-in.", error);
+        token = tokenOf(error);
     }
 
     if (releasePush) {
@@ -51,11 +71,12 @@ export const signOutOnDevice = async ({ clearCache, forgetLastChat, releasePush,
         }
     }
 
-    try {
-        await revokeGrant();
-    } catch (error) {
-        // The stored grant could not be cleared. The user is still signed out in memory by the caller.
-        warn("Could not clear the stored sign-in.", error);
+    if (token !== undefined) {
+        try {
+            await revokeSession(token);
+        } catch {
+            // Offline: the session expires on its own, and nothing on the phone holds it any more.
+        }
     }
 };
 
