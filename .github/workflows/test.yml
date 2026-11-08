@@ -152,14 +152,20 @@ jobs:
     # The Rust Worker is the one project with a `test` target and no `test:coverage`
     # (cargo test has no v8 coverage), so the coverage run in `test` skips it. Its own
     # job, in parallel: it needs no workspace build and was the tail of `test`.
-    # The run covers every story in four modes. Once the stories grew, it took longer than
-    # the 20-minute limit on the runner and was cancelled mid-suite, so the limit leaves room for it.
+    # One job per mode, so each run stays well inside the runner's limit. Run as one job, the four
+    # modes took longer than the runner allowed and were cut off mid-suite, and the output only
+    # appears at the end, so a cut-off run reports no story at all. `fail-fast: false` lets every
+    # mode report, not just the first to fail.
     storybook:
         name: "Storybook (stories, a11y)"
         if: "needs.files-changed.outputs.packages == 'true'"
         needs: "files-changed"
         runs-on: "ubuntu-24.04"
-        timeout-minutes: 35
+        timeout-minutes: 25
+        strategy:
+            fail-fast: false
+            matrix:
+                mode: ["light", "dark-violet", "mobile", "rtl"]
         steps:
             - name: "Harden Runner"
               uses: "step-security/harden-runner@46b06cea07f9e64621fdf066ba77ac6915163d43" # v2.22.3
@@ -217,13 +223,13 @@ jobs:
               shell: "bash"
               run: "bash .github/scripts/apt-retry.sh pnpm --filter @neore/web exec playwright install-deps chromium"
 
-            # Every story of the web app, packages/ui and packages/chat-ui, in light, dark and the
-            # violet accent (`apps/web/vitest.storybook.config.ts`). A story fails on a render error,
-            # a failing `play` function or an axe violation; one that cannot meet axe yet is marked
-            # `a11y: { test: "todo" }` in its file, with the reason.
-            - name: "Run the stories (affected)"
+            # Every story of the web app, packages/ui and packages/chat-ui, in one mode of
+            # `apps/web/vitest.storybook.config.ts` (light, dark + violet, phone, right-to-left).
+            # A story fails on a render error, a failing `play` function or an axe violation; one
+            # that cannot meet axe yet is marked `a11y: { test: "todo" }` in its file, with the reason.
+            - name: "Run the stories (${{ matrix.mode }})"
               shell: "bash"
-              run: 'pnpm exec vis affected test:storybook --if-present --base "$VIS_BASE" --head "$VIS_HEAD" --fail-fast'
+              run: 'pnpm --filter @neore/web exec vitest run --config vitest.storybook.config.ts --project "storybook:${{ matrix.mode }}"'
 
     rust-worker:
         name: "Rust Worker tests"
