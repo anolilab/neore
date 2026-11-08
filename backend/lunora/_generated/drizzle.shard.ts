@@ -1624,6 +1624,7 @@ export const threads = sqliteTable("threads", {
     publicAccessToken: text("publicAccessToken"),
     reasoningEffort: real("reasoningEffort"),
     runner: text("runner"),
+    snoozeChosenAt: real("snoozeChosenAt"),
     snoozedUntil: real("snoozedUntil"),
     source: text("source"),
     statelessMode: integer("statelessMode", { mode: "boolean" }),

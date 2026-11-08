@@ -204,7 +204,7 @@ describe("collectConversations", () => {
                     userId: "user-b",
                 });
 
-                await context.db.patch("threads", threadId, { activeLeafMessageId: second });
+                await context.db.patch("threads", threadId, { activeLeafMessageId: second, snoozeChosenAt: 1000, snoozedUntil: 2000 });
                 ids.first = String(first);
                 ids.second = String(second);
                 ids.prompt = String(prompt);
@@ -227,7 +227,7 @@ describe("collectConversations", () => {
             const conversations = await harness.action(async (context: any) => await context.runAction(collectConversations, { userId: "user-b" }));
             const exported = conversations as {
                 messages: { _id: string; parentMessageId?: string; text?: string }[];
-                thread: { _id: string; activeLeafMessageId?: string; title?: string };
+                thread: { _id: string; activeLeafMessageId?: string; snoozeChosenAt?: number; snoozedUntil?: number; title?: string };
             }[];
 
             const branched = exported.find((conversation) => conversation.thread.title === "Branched");
@@ -236,6 +236,8 @@ describe("collectConversations", () => {
             // The ids in the export resolve within the same export: the leaf and the parents name exported rows.
             expect(branched?.thread._id).toBe(ids.thread);
             expect(branched?.thread.activeLeafMessageId).toBe(ids.second);
+            // The owner's snooze and its ordering stamp are their data too.
+            expect(branched?.thread).toMatchObject({ snoozeChosenAt: 1000, snoozedUntil: 2000 });
             expect(branched?.messages.map((message) => message._id)).toEqual(expect.arrayContaining([ids.prompt, ids.first, ids.second]));
             expect(branched?.messages.find((message) => message._id === ids.first)?.parentMessageId).toBe(ids.prompt);
             expect(branched?.messages.find((message) => message._id === ids.second)?.parentMessageId).toBe(ids.prompt);

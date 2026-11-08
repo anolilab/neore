@@ -192,6 +192,7 @@ describe("snooze and unsnooze", () => {
     it("snoozes for the owner, then removes the column, leaving updatedAt alone", async () => {
         const until = Date.now() + DAY;
 
+        // An older client sends no stamp: the server stamps it now.
         await as(OWNER).mutation(snoozeThread as never, { threadId, until } as never);
         expect(await read()).toMatchObject({ snoozedUntil: until, updatedAt: 111 });
 
@@ -216,10 +217,59 @@ describe("snooze and unsnooze", () => {
     });
 });
 
+describe("snooze choices apply in the order they were made", () => {
+    const snooze = async (chosenAt: number, until: number): Promise<unknown> =>
+        await as(OWNER).mutation(snoozeThread as never, { chosenAt, threadId, until } as never);
+
+    it("drops a choice that reaches the server after a later one, even one stamped a millisecond before it", async () => {
+        const now = Date.now();
+
+        // Two rapid choices on one device are stamped strictly apart (`nextSnoozeChoiceAt`); the later one arrives first.
+        expect(await snooze(now - 500, now + 2 * DAY)).toStrictEqual({ applied: true });
+        expect(await snooze(now - 501, now + DAY)).toStrictEqual({ applied: false });
+        expect(await as(OWNER).mutation(unsnoozeThread as never, { chosenAt: now - 501, threadId } as never)).toStrictEqual({ applied: false });
+        const row = await read();
+
+        expect(row.snoozedUntil).toBe(now + 2 * DAY);
+    });
+
+    it("keeps a fast clock's choices in order, and a wake after them is not undone by a redelivered one", async () => {
+        // A device 10 s ahead of the server: both stamps are in the future, inside the allowance.
+        const ahead = Date.now() + 10_000;
+
+        expect(await snooze(ahead + 1, Date.now() + 2 * DAY)).toStrictEqual({ applied: true });
+        expect(await snooze(ahead, Date.now() + DAY)).toStrictEqual({ applied: false });
+
+        await harness.run(async (context: any) => await patchThread(context.db, threadId as never, { status: "error" }));
+
+        expect(await snooze(ahead + 1, Date.now() + 2 * DAY)).toStrictEqual({ applied: false });
+
+        const row = await read();
+
+        expect(row.snoozedUntil).toBeUndefined();
+    });
+
+    it("drops a snooze queued before a wake, so it does not hide the thread again, and one whose time has since passed", async () => {
+        const chosenAt = Date.now() - 1000;
+
+        // The run fails with nothing snoozed; the snooze chosen before the failure arrives after it.
+        await harness.run(async (context: any) => await patchThread(context.db, threadId as never, { status: "error" }));
+
+        expect(await snooze(chosenAt, Date.now() + DAY)).toStrictEqual({ applied: false });
+        expect(await snooze(chosenAt, Date.now() - 1)).toStrictEqual({ applied: false });
+        const row = await read();
+
+        expect(row.snoozedUntil).toBeUndefined();
+
+        // A choice made after the wake applies.
+        expect(await snooze(Date.now(), Date.now() + DAY)).toStrictEqual({ applied: true });
+    });
+});
+
 describe("who can read the state", () => {
     it("shows it to the owner and strips it for a grantee", async () => {
         await harness.run(async (context: any) => {
-            await context.db.patch("threads", threadId, { lastViewedAt: 3000, snoozedUntil: Date.now() + DAY });
+            await context.db.patch("threads", threadId, { lastViewedAt: 3000, snoozeChosenAt: 1, snoozedUntil: Date.now() + DAY });
             await context.db.insert("threadAccess", { grantedAt: 0, grantedBy: OWNER, permission: "read", threadId, userId: GRANTEE });
         });
 
@@ -230,7 +280,7 @@ describe("who can read the state", () => {
         expect(asOwner.snoozedUntil).toBeDefined();
         expect(asGrantee).toMatchObject({ title: "Shared", userId: OWNER });
 
-        for (const key of ["awaitingInput", "lastReplyAt", "lastViewedAt", "snoozedUntil"]) {
+        for (const key of ["awaitingInput", "lastReplyAt", "lastViewedAt", "snoozeChosenAt", "snoozedUntil"]) {
             expect(key in asGrantee).toBe(false);
         }
     });

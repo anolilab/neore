@@ -85,6 +85,8 @@ const fieldsWake = (fields: Pick<ThreadPatch, "awaitingInput" | "status">, faile
  * The one writer of a thread's run state; `agent/threads.ts#updateThread` delegates here. A write that ends a pause or records a
  * reply removes `awaitingInput` (`patchesWithoutAwaitingInput`); a write that pauses for the owner or fails (`failed`: the run
  * failed in place, whatever status the thread goes back to) removes `snoozedUntil`. Each removal is in the same write as its cause.
+ * A wake also stamps `snoozeChosenAt`, snoozed or not, so a snooze chosen before it and delivered after it changes nothing. The stamp
+ * is the server's now, or just past the stored one when a client clock put that ahead, so a redelivered choice cannot re-hide the thread.
  */
 export const patchThread = async (db: Database, threadId: Id<"threads">, fields: ThreadPatch, { failed = false }: { failed?: boolean } = {}): Promise<void> => {
     const endsPause = fields.status === "running" || fields.lastReplyAt !== undefined;
@@ -95,11 +97,12 @@ export const patchThread = async (db: Database, threadId: Id<"threads">, fields:
         const clearsAwaiting = endsPause && patchesWithoutAwaitingInput(row, fields);
         const clearsSnooze = wakes && row?.snoozedUntil !== undefined;
 
-        if (row && (clearsAwaiting || clearsSnooze)) {
+        if (row && (clearsAwaiting || wakes)) {
             await patchRow(db, "threads", row, {
                 ...withoutUndefined(fields),
                 ...(clearsAwaiting && { awaitingInput: undefined }),
                 ...(clearsSnooze && { snoozedUntil: undefined }),
+                ...(wakes && { snoozeChosenAt: Math.max(Date.now(), (row.snoozeChosenAt ?? 0) + 1) }),
             });
 
             return;
@@ -108,7 +111,8 @@ export const patchThread = async (db: Database, threadId: Id<"threads">, fields:
 
     const patch = withoutUndefined(fields);
 
-    // A failure with nothing to change (`{}`, `failed`) writes nothing: the thread list is a live query.
+    // A wake always writes above (it stamps `snoozeChosenAt`), so this is a write that does not wake, or a thread that is gone.
+    // Nothing to change writes nothing: the thread list is a live query.
     if (Object.keys(patch).length > 0) {
         await db.patch("threads", threadId, patch);
     }
@@ -137,17 +141,19 @@ export const markThreadViewedAt = async (db: Database, thread: Doc<"threads">, n
     return true;
 };
 
-/** Snoozes the thread until `until`; `undefined` removes the column. Leaves `updatedAt` alone. */
-export const setThreadSnooze = async (db: Database, thread: Doc<"threads">, until: number | undefined): Promise<void> => {
-    if (until === undefined) {
-        if (thread.snoozedUntil !== undefined) {
-            await patchRow(db, "threads", thread, { snoozedUntil: undefined });
-        }
-
-        return;
+/**
+ * Snoozes the thread until `until`, or `undefined` to bring it back, as the owner chose it at `chosenAt`. Leaves `updatedAt` alone.
+ * A choice older than the thread's `snoozeChosenAt` (a newer choice, or a wake) is stale: it writes nothing and returns false.
+ * An equal stamp applies, so the later of two same-stamp writes wins; one device never sends two (`nextSnoozeChoiceAt` on the web).
+ */
+export const setThreadSnooze = async (db: Database, thread: Doc<"threads">, until: number | undefined, chosenAt: number): Promise<boolean> => {
+    if (thread.snoozeChosenAt !== undefined && chosenAt < thread.snoozeChosenAt) {
+        return false;
     }
 
-    await db.patch("threads", thread._id, { snoozedUntil: until });
+    await patchRow(db, "threads", thread, { snoozeChosenAt: chosenAt, snoozedUntil: until });
+
+    return true;
 };
 
 /**
