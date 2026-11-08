@@ -56,6 +56,8 @@ export const dropPushDevicesOf = async (db: MutationCtx["db"], userId: string): 
  */
 export const trimPushDevices = async (db: MutationCtx["db"], userId: string): Promise<number> => {
     let removed = 0;
+    // A skipped row (it registered again since the read) means the count may still be over: read again, a few times.
+    let rereads = 3;
 
     for (;;) {
         const { page } = await db.pushDevices.findMany({
@@ -66,14 +68,20 @@ export const trimPushDevices = async (db: MutationCtx["db"], userId: string): Pr
         });
         const excess = page.slice(MAX_PUSH_DEVICES_PER_USER);
 
+        let skipped = 0;
+
         for (const device of excess) {
             if (await deleteIfUnchanged(db, device)) {
                 removed += 1;
+            } else {
+                skipped += 1;
             }
         }
 
-        if (page.length < MAX_PUSH_DEVICES_PER_USER * 3) {
+        if (page.length < MAX_PUSH_DEVICES_PER_USER * 3 && (skipped === 0 || rereads <= 0)) {
             return removed;
         }
+
+        rereads -= skipped > 0 ? 1 : 0;
     }
 };

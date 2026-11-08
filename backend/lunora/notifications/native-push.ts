@@ -37,15 +37,15 @@ export const getNativePushConfig = authQuery
  * signing in on it takes its pushes over even if the first one's sign-out never reached us. A push token is not a
  * secret, so whoever holds a leaked one can take a phone's pushes the same way, until the phone registers again;
  * nothing but the generic alert ever reaches a phone, and the move is logged (`moved`).
- * `registered: false` means phone push is off (no access token), the call carries no session, or the account is
- * being deleted.
+ * `registered: false` means phone push is off (no access token), the call carries no session, the account is being
+ * deleted, or the request was superseded (it started before the row's last registration; the phone retries).
  */
 export const registerPushDevice = authMutation
     .use(rateLimit("notifications/push"))
     .input({ platform: vPlatform, token: vExpoPushToken })
     .output(v.object({ registered: v.boolean() }))
     .mutation(async ({ args, ctx }) => {
-        const refuse = (reason: "deleting" | "no_session" | "off") => {
+        const refuse = (reason: "deleting" | "no_session" | "off" | "superseded") => {
             ctx.log.event("notifications.register_push_device", { platform: args.platform, refused: reason });
 
             return { registered: false };
@@ -74,6 +74,13 @@ export const registerPushDevice = authMutation
         // owner's is read back or returned.
         const database = systemDb(ctx);
         const existing = await database.pushDevices.findFirst({ consistency: "primary", where: { token: args.token } });
+
+        // A registration that started before the row's last one (a request held up on its way) is older news: it must not
+        // overwrite a later sign-in's owner and session. The phone registers again on its next return to the front.
+        if (existing && existing.lastSeenAt > now) {
+            return refuse("superseded");
+        }
+
         // The account the row was taken from, when it was another one: logged, so a takeover can be seen.
         let previousOwner = existing?.userId;
 
@@ -89,6 +96,10 @@ export const registerPushDevice = authMutation
 
                 if (!raced) {
                     throw error;
+                }
+
+                if (raced.lastSeenAt > now) {
+                    return refuse("superseded");
                 }
 
                 previousOwner = raced.userId;

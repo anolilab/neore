@@ -247,6 +247,19 @@ describe("phone push tokens", () => {
         expect(await devicesOf(USER)).toHaveLength(0);
     });
 
+    it("never lets a registration held up on its way overwrite a later sign-in's", async () => {
+        await call(registerPushDevice, OTHER, { platform: "ios", token: PHONE });
+        // OTHER's row was written after USER's request started.
+        await harness.run(async (ctx: any) => {
+            const { page } = await ctx.db.pushDevices.findMany({ where: { token: PHONE } });
+
+            await ctx.db.patch("pushDevices", page[0]._id, { lastSeenAt: Date.now() + 60_000 });
+        });
+
+        expect(await call(registerPushDevice, USER, { platform: "ios", token: PHONE })).toStrictEqual({ registered: false });
+        expect(await devicesOf(OTHER)).toMatchObject([{ sessionId: sessions[OTHER], token: PHONE }]);
+    });
+
     it("registers nothing for a call that carries no session", async () => {
         sessions = {};
 
@@ -308,5 +321,7 @@ describe("pushDevices writes", () => {
 
         expect(await trimPushDevices(db as never, USER)).toBe(0);
         expect(deleted).toHaveLength(0);
+        // A skip means the count may still be over the cap: the trim reads again (a bounded number of times).
+        expect(db.pushDevices.findMany.mock.calls.length).toBeGreaterThan(1);
     });
 });
