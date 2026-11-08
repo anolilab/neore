@@ -25,6 +25,10 @@ vi.mock("@/features/settings/hooks/use-usage-today", () => {
     };
 });
 
+const { usageArgs } = vi.hoisted(() => {
+    return { usageArgs: [] as unknown[] };
+});
+
 vi.mock("@/lib/lunora/crpc", () => {
     return {
         useCRPC: () => {
@@ -33,6 +37,8 @@ vi.mock("@/lib/lunora/crpc", () => {
                     activity: {
                         getProjectUsage: {
                             queryOptions: (args: unknown) => {
+                                usageArgs.push(args);
+
                                 return {
                                     queryFn: async () => {
                                         return { costMicrodollars: 1_500_000, replies: 3, tokens: 1200, truncated: false };
@@ -60,5 +66,7 @@ describe("ProjectUsageSummary", () => {
 
         expect(screen.getByRole("region", { name: "Usage" }).contains(heading)).toBe(true);
         expect(await screen.findByText("3")).toBeDefined();
+        // This project's figures, over the 30 days ending today in the usage zone.
+        expect(usageArgs.at(-1)).toStrictEqual({ fromDate: "2026-09-01", projectId: "project-1" });
     });
 });
