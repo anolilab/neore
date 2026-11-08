@@ -72,6 +72,9 @@ const { withdrawGuestLinksForThread } = await import("./lib/guest-link-store");
 
 const OWNER = "user-owner";
 
+/** The pinned clock every test runs at, so an expiry is decided by the values here and never by how long a test took. */
+const NOW = Date.UTC(2026, 0, 15, 12);
+
 let harness: ReturnType<typeof lunoraTest>;
 let threadId: string;
 
@@ -115,11 +118,14 @@ beforeAll(async () => {
 }, 60_000);
 
 beforeEach(async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(NOW);
     harness = lunoraTest(schema as never);
     threadId = (await harness.run(async (ctx: any) => await ctx.db.insert("threads", { status: "active", title: "T", userId: OWNER }))) as string;
 });
 
 afterEach(() => {
+    vi.useRealTimers();
     routeFailures.deletes = 0;
     routeFailures.left = 0;
     vi.unstubAllEnvs();
@@ -128,13 +134,10 @@ afterEach(() => {
 
 describe("withdrawing a link", () => {
     const withdrawals: [string, () => Promise<unknown>][] = [
-        ["archived", async () => await harness.run(async (ctx: any) => await markThreadArchived({ ...ctx, now: Date.now() }, threadId as never))],
+        ["archived", async () => await harness.run(async (ctx: any) => await markThreadArchived({ ...ctx, now: NOW }, threadId as never))],
         ["deleted", async () => await harness.run(async (ctx: any) => await ctx.runMutation(_deletePageForThreadId, { threadId }))],
         ["trashed", async () => await harness.run(async (ctx: any) => await ctx.runMutation(softDeleteThread, { threadId }))],
-        [
-            "made temporary",
-            async () => await harness.run(async (ctx: any) => await ctx.runMutation(createTemporaryThread, { expiresAt: Date.now() + 1, threadId })),
-        ],
+        ["made temporary", async () => await harness.run(async (ctx: any) => await ctx.runMutation(createTemporaryThread, { expiresAt: NOW + 1, threadId }))],
         [
             "locked",
             async () => {
@@ -146,7 +149,7 @@ describe("withdrawing a link", () => {
 
     it.each(withdrawals)("removes the link, its messages and its route when the thread is %s", async (_label, withdraw) => {
         // A full link: exactly one removal page of notes, which one pass finishes.
-        await seedLink(threadId, "hash-live", Date.now() + 60_000, 100);
+        await seedLink(threadId, "hash-live", NOW + 60_000, 100);
         await withdraw();
         await runRouteDrops();
 
@@ -158,11 +161,11 @@ describe("withdrawing a link", () => {
 
 describe("a link's route", () => {
     it("stays when the write that withdrew the link fails", async () => {
-        await seedLink(threadId, "hash-live", Date.now() + 60_000);
+        await seedLink(threadId, "hash-live", NOW + 60_000);
 
         await expect(
             harness.run(async (ctx: any) => {
-                await withdrawGuestLinksForThread({ ...ctx, now: Date.now() }, threadId as never);
+                await withdrawGuestLinksForThread({ ...ctx, now: NOW }, threadId as never);
 
                 throw new Error("a later step of the lock failed");
             }),
@@ -178,9 +181,9 @@ describe("a link's route", () => {
     });
 
     it("is removed on a retry when its first delete throws", async () => {
-        await seedLink(threadId, "hash-live", Date.now() + 60_000);
+        await seedLink(threadId, "hash-live", NOW + 60_000);
         routeFailures.left = 1;
-        await harness.run(async (ctx: any) => await markThreadArchived({ ...ctx, now: Date.now() }, threadId as never));
+        await harness.run(async (ctx: any) => await markThreadArchived({ ...ctx, now: NOW }, threadId as never));
         await runRouteDrops();
 
         expect(routeFailures.left).toBe(0);
@@ -188,7 +191,7 @@ describe("a link's route", () => {
     });
 
     it("is kept while a link row with its hash still exists", async () => {
-        await seedLink(threadId, "hash-live", Date.now() + 60_000);
+        await seedLink(threadId, "hash-live", NOW + 60_000);
         await harness.run(async (ctx: any) => await ctx.runMutation(guestLinks.dropGuestLinkRoutesJob, { attempt: 0, linkHashes: ["hash-live"] }));
 
         expect(await rows("shardRoutes")).toHaveLength(1);
@@ -197,13 +200,13 @@ describe("a link's route", () => {
 
 describe("withdrawing a link with more than one page of messages", () => {
     it("finishes it in a continuation, which leaves a link made after the withdrawal", async () => {
-        await seedLink(threadId, "hash-old", Date.now() + 60_000, 101);
-        await harness.run(async (ctx: any) => await markThreadArchived({ ...ctx, now: Date.now() }, threadId as never));
+        await seedLink(threadId, "hash-old", NOW + 60_000, 101);
+        await harness.run(async (ctx: any) => await markThreadArchived({ ...ctx, now: NOW }, threadId as never));
 
         expect(await rows("threadGuestLinks")).toHaveLength(1);
 
         // The owner restores the thread and gives out a new link before the continuation runs.
-        await seedLink(threadId, "hash-new", Date.now() + 60_000, 1, Date.now() + 1000);
+        await seedLink(threadId, "hash-new", NOW + 60_000, 1, NOW + 1000);
         // The fake scheduler cannot resolve a shard-routed job, so the job it holds is run here with the args it was given.
         const [job] = harness.scheduler.list();
 
@@ -218,8 +221,8 @@ describe("withdrawing a link with more than one page of messages", () => {
 
 describe("a withdrawal continuation that meets only links made after it started", () => {
     it("stops instead of scheduling itself again", async () => {
-        await seedLink(threadId, "hash-old", Date.now() + 60_000, 101);
-        await harness.run(async (ctx: any) => await markThreadArchived({ ...ctx, now: Date.now() }, threadId as never));
+        await seedLink(threadId, "hash-old", NOW + 60_000, 101);
+        await harness.run(async (ctx: any) => await markThreadArchived({ ...ctx, now: NOW }, threadId as never));
         const [job] = harness.scheduler.list();
 
         // The old link is gone by other means, and the restored thread has a full batch of newer links.
@@ -237,7 +240,7 @@ describe("a withdrawal continuation that meets only links made after it started"
         });
 
         for (let index = 0; index < 50; index += 1) {
-            await seedLink(threadId, `hash-new-${index}`, Date.now() + 120_000 + index, 0, Date.now() + 1000 + index);
+            await seedLink(threadId, `hash-new-${index}`, NOW + 120_000 + index, 0, NOW + 1000 + index);
         }
 
         const scheduled = harness.scheduler.list().length;
@@ -251,7 +254,7 @@ describe("a withdrawal continuation that meets only links made after it started"
 
 describe("deleting a thread whose link holds more than one page of messages", () => {
     it("leaves no message behind", async () => {
-        await seedLink(threadId, "hash-live", Date.now() + 60_000, 101);
+        await seedLink(threadId, "hash-live", NOW + 60_000, 101);
 
         for (let page = 0; page < 5; page += 1) {
             const { isDone } = (await harness.run(async (ctx: any) => await ctx.runMutation(_deletePageForThreadId, { threadId }))) as { isDone: boolean };
@@ -299,7 +302,7 @@ describe("the sweep", () => {
         const otherThread = (await harness.run(async (ctx: any) => await ctx.db.insert("threads", { status: "active", title: "U", userId: OWNER }))) as string;
 
         await seedLink(threadId, "hash-lapsed", 1);
-        await seedLink(otherThread, "hash-live", Date.now() + 60_000, 0);
+        await seedLink(otherThread, "hash-live", NOW + 60_000, 0);
         await harness.run(async (ctx: any) => await ctx.runMutation(guestLinks.sweepGuestLinks, {}));
         await runRouteDrops();
 
@@ -311,7 +314,7 @@ describe("the sweep", () => {
 
 describe("erasing the account", () => {
     it("removes the messages, then the links and their routes", async () => {
-        await seedLink(threadId, "hash-live", Date.now() + 60_000, BATCH + 1);
+        await seedLink(threadId, "hash-live", NOW + 60_000, BATCH + 1);
 
         const erase = async () => (await harness.run(async (ctx: any) => await erasePersistentStreamsForUser(ctx, OWNER))) as { hasMore: boolean };
 

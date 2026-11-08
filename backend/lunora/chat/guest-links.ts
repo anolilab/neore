@@ -30,10 +30,38 @@ const SWEEP_BATCH = 50;
 /** The most hashes one route removal takes: a removal batch's links (`GUEST_LINK_REMOVAL_CAP`, `SWEEP_BATCH`). */
 const GUEST_ROUTE_BATCH = Math.max(GUEST_LINK_REMOVAL_CAP, SWEEP_BATCH);
 
-/** Notes per export page. */
+/** Notes or links per export page. */
 const EXPORT_PAGE = 100;
 
 const vGuestMessageStatus = v.union(v.literal("held"), v.literal("sent"));
+
+/**
+ * One page of a thread's guest links for the owner's data export, notes or none: when each was made and when it lapses.
+ * Never the token's hash, which is a credential, not the owner's data.
+ */
+export const listGuestLinksForExport = internalQuery
+    .input({ cursor: v.union(v.string().max(MAX_LENGTH.cursor), v.null()), threadId: v.id("threads") })
+    .output(
+        v.object({
+            continueCursor: v.union(v.string(), v.null()),
+            isDone: v.boolean(),
+            page: v.array(v.object({ createdAt: v.number(), expiresAt: v.number() })),
+        }),
+    )
+    .query(async ({ args, ctx }) => {
+        const result = await ctx.db
+            .query("threadGuestLinks")
+            .withIndex("by_thread_expiresAt", (q) => q.eq("threadId", args.threadId))
+            .paginate({ cursor: args.cursor, numItems: EXPORT_PAGE });
+
+        return {
+            continueCursor: result.continueCursor,
+            isDone: result.isDone,
+            page: result.page.map((row) => {
+                return { createdAt: row.createdAt, expiresAt: row.expiresAt };
+            }),
+        };
+    });
 
 /**
  * One page of a thread's guest notes for the owner's data export (`gdpr/steps.ts#collectConversations`), which reads

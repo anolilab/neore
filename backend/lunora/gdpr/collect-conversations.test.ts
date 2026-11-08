@@ -14,7 +14,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { registeredApi } from "../../test/registered-api";
 
-import { listGuestNotesForExport } from "../chat/guest-links";
+import { listGuestLinksForExport, listGuestNotesForExport } from "../chat/guest-links";
 import { listMessagesByThreadIdAdmitted } from "../agent/messages";
 import { listThreadSummariesForExport } from "../agent/thread-summaries";
 import { getThreadInternal, listThreadsByUserIdInternal } from "../agent/threads";
@@ -41,6 +41,7 @@ describe("collectConversations", () => {
         registry.set("gdpr_steps:collectThreadTags", collectThreadTags);
         registry.set("agent_thread_summaries:listThreadSummariesForExport", listThreadSummariesForExport);
         registry.set("chat_guest_links:listGuestNotesForExport", listGuestNotesForExport);
+        registry.set("chat_guest_links:listGuestLinksForExport", listGuestLinksForExport);
 
         const harness = lunoraTest(schema as never);
 
@@ -63,6 +64,9 @@ describe("collectConversations", () => {
                                 userId: "user-1",
                             });
                         }
+                    } else if (t === 1) {
+                        // A link no guest has written on yet is still the owner's data.
+                        await context.db.insert("threadGuestLinks", { createdAt: 5, expiresAt: 6, linkHash: "h1", threadId, userId: "user-1" });
                     }
 
                     for (let m = 0; m < MESSAGES_PER_THREAD; m += 1) {
@@ -114,6 +118,9 @@ describe("collectConversations", () => {
             expect(times?.[1]).toBeGreaterThan(1_600_000_000_000);
             // The notes guests left on the thread go with it.
             expect((first as { guestNotes?: unknown[] } | undefined)?.guestNotes).toHaveLength(101);
+            // Each thread's links go with it, without their token hashes.
+            expect((first as { guestLinks?: unknown[] } | undefined)?.guestLinks).toEqual([{ createdAt: 0, expiresAt: 1 }]);
+            expect(exported.find((conversation) => conversation.messages[0]?.text === "t1-m0")).toMatchObject({ guestLinks: [{ createdAt: 5, expiresAt: 6 }] });
 
             for (const conversation of exported) {
                 // Ascending, complete, in order.
@@ -131,6 +138,7 @@ describe("collectConversations", () => {
         registry.set("gdpr_steps:collectThreadTags", collectThreadTags);
         registry.set("agent_thread_summaries:listThreadSummariesForExport", listThreadSummariesForExport);
         registry.set("chat_guest_links:listGuestNotesForExport", listGuestNotesForExport);
+        registry.set("chat_guest_links:listGuestLinksForExport", listGuestLinksForExport);
 
         const harness = lunoraTest(schema as never);
 
@@ -182,6 +190,7 @@ describe("collectConversations", () => {
         registry.set("gdpr_steps:collectThreadTags", collectThreadTags);
         registry.set("agent_thread_summaries:listThreadSummariesForExport", listThreadSummariesForExport);
         registry.set("chat_guest_links:listGuestNotesForExport", listGuestNotesForExport);
+        registry.set("chat_guest_links:listGuestLinksForExport", listGuestLinksForExport);
 
         const harness = lunoraTest(schema as never);
 
@@ -292,6 +301,7 @@ describe("collectConversations: a locked chat", () => {
         registry.set("gdpr_steps:collectThreadTags", collectThreadTags);
         registry.set("agent_thread_summaries:listThreadSummariesForExport", listThreadSummariesForExport);
         registry.set("chat_guest_links:listGuestNotesForExport", listGuestNotesForExport);
+        registry.set("chat_guest_links:listGuestLinksForExport", listGuestLinksForExport);
     };
 
     it("exports the owner's locked chat with its title and every message", async () => {

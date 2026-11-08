@@ -183,6 +183,24 @@ export const collectThreadTags = internalQuery
         });
     });
 
+/** Every row of a paged export read: the pages one after another until the last. */
+const readAllPages = async <T>(readPage: (cursor: string | null) => Promise<{ continueCursor: string | null; isDone: boolean; page: T[] }>): Promise<T[]> => {
+    const rows: T[] = [];
+    let cursor: string | null = null;
+
+    for (;;) {
+        const result = await readPage(cursor);
+
+        rows.push(...result.page);
+
+        if (result.isDone) {
+            return rows;
+        }
+
+        cursor = result.continueCursor;
+    }
+};
+
 export const collectConversations = internalAction.input({ userId: v.string() }).action(async ({ args: { userId }, ctx: context }) => {
     // OPTIMIZED: Use paginated approach to handle large datasets safely
     // Process threads in batches to prevent memory exhaustion and timeouts
@@ -198,6 +216,8 @@ export const collectConversations = internalAction.input({ userId: v.string() })
         /** The condensed copies of the thread's older turns made while it sat idle (`agent/thread-summaries.ts`). */
         contextSummaries: { coveredCount: number; coveredUpToMessageId: string; createdAt: number; kind?: "compact"; summary: string }[];
         /** The notes strangers left through the thread's guest link, held and sent (`chat/guest-links.ts`). */
+        /** The thread's guest links, with or without notes: when each was made and when it lapses. */
+        guestLinks: { createdAt: number; expiresAt: number }[];
         guestNotes: { createdAt: number; status: string; text: string }[];
         messages: {
             _id: string;
@@ -245,7 +265,7 @@ export const collectConversations = internalAction.input({ userId: v.string() })
 
         // Process current batch of threads
         for (const listed of threads.page) {
-            let collected: Omit<(typeof conversations)[number], "guestNotes"> | undefined;
+            let collected: Omit<(typeof conversations)[number], "guestLinks" | "guestNotes"> | undefined;
 
             try {
                 // A locked chat is listed as its stub (no title, no model, no tags). The export
@@ -296,28 +316,18 @@ export const collectConversations = internalAction.input({ userId: v.string() })
                 gdprLogger.error(`Failed to collect messages for thread ${listed._id}:`, error);
             }
 
-            // Outside the catch above: a failed guest-note read fails this export step (the workflow retries it), instead of
+            // Outside the catch above: a failed guest-link or guest-note read fails this export step (the workflow retries it), instead of
             // shipping an export that silently lacks the notes of a thread it did collect.
             if (collected) {
-                const guestNotes: (typeof conversations)[number]["guestNotes"] = [];
-                let noteCursor: string | null = null;
+                const threadId = listed._id as Id<"threads">;
+                const guestLinks = await readAllPages(
+                    async (cursor) => await context.runQuery(internal.chat.guest_links.listGuestLinksForExport, { cursor, threadId }),
+                );
+                const guestNotes = await readAllPages(
+                    async (cursor) => await context.runQuery(internal.chat.guest_links.listGuestNotesForExport, { cursor, threadId }),
+                );
 
-                for (;;) {
-                    const notes: { continueCursor: string | null; isDone: boolean; page: (typeof guestNotes)[number][] } = await context.runQuery(
-                        internal.chat.guest_links.listGuestNotesForExport,
-                        { cursor: noteCursor, threadId: listed._id as Id<"threads"> },
-                    );
-
-                    guestNotes.push(...notes.page);
-
-                    if (notes.isDone) {
-                        break;
-                    }
-
-                    noteCursor = notes.continueCursor;
-                }
-
-                conversations.push({ ...collected, guestNotes });
+                conversations.push({ ...collected, guestLinks, guestNotes });
             }
         }
 
