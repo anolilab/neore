@@ -12,9 +12,12 @@ const navigate = vi.fn();
 const showWarning = vi.fn();
 
 vi.mock("@lingui/react/macro", () => {
+    // One `t`, as Lingui keeps it across renders: a new one each render would re-run the hook's effects by itself.
+    const t = (strings: TemplateStringsArray) => strings.join("");
+
     return {
         useLingui: () => {
-            return { t: (strings: TemplateStringsArray) => strings.join("") };
+            return { t };
         },
     };
 });
@@ -40,12 +43,22 @@ vi.mock("@/hooks/use-model-filter-rules", () => {
     };
 });
 
+const lists = vi.hoisted(() => new WeakMap<string[], { id: string }[]>());
+
 vi.mock("@/hooks/use-feature-flagged-models", () => {
     return {
-        default: () =>
-            picker.ids.map((id) => {
-                return { id };
-            }),
+        // One array per id list, as a memoized list is: a new array on each render would re-run the hook's effects by itself.
+        default: () => {
+            const known =
+                lists.get(picker.ids) ??
+                picker.ids.map((id) => {
+                    return { id };
+                });
+
+            lists.set(picker.ids, known);
+
+            return known;
+        },
         useFeatureFlaggedModelsSettled: () => picker.settled,
         useModelPreferencesFailed: () => picker.preferencesFailed,
     };
@@ -194,6 +207,20 @@ describe(usePromptLinkDraft, () => {
         expect(useChatUIStore.getState().composerText).toBe("Draft me");
         expect(useModelStore.getState().selectedModel).toBe(startModel);
         expect(showWarning).toHaveBeenCalledOnce();
+    });
+
+    it("selects the link's model once a saved prompt in the same address settles, with the picker's list unchanged", () => {
+        const { rerender } = renderHook(
+            ({ ready }: { ready: boolean }) => usePromptLinkDraft({ model: textModel?.id, otherDraftSource: false, prompt: "Draft me", ready }),
+            {
+                initialProps: { ready: false },
+            },
+        );
+
+        rerender({ ready: true });
+
+        expect(useChatUIStore.getState().composerText).toBe("Draft me");
+        expect(useModelStore.getState().selectedModel).toBe(textModel?.id);
     });
 
     it("applies the prompt but not an external model", () => {

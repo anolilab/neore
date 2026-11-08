@@ -159,6 +159,7 @@ export const usePromptLinkDraft = ({
         } else {
             showWarning(t`The model in the link is not available. The chat keeps its model.`);
         }
-        // `prompt` is read so this runs right after the effect above has set a model aside, in the same commit.
-    }, [pickerModelIds, pickerSettled, preferencesFailed, prompt, t]);
+        // `model`, `otherDraftSource`, `prompt` and `ready` are what let the effect above set a model aside, so a change to any of
+        // them runs this right after it, in the same commit.
+    }, [model, otherDraftSource, pickerModelIds, pickerSettled, preferencesFailed, prompt, ready, t]);
 };
