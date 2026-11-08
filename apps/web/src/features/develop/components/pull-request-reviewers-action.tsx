@@ -23,12 +23,15 @@ const MAX_LOGIN = 39;
 const SEPARATORS = /[\s,]+/u;
 const LEADING_AT = /^@/u;
 
-/** Splits what the person typed into logins: commas or spaces, an optional leading @. A login named twice counts once. */
+/**
+ * Splits what the person typed into logins: commas or spaces, an optional leading @. A login named twice counts once. A
+ * bare "@" stays as typed, so it is named as not a login instead of being dropped without a word.
+ */
 const parseLogins = (input: string): string[] => {
     const logins = input
         .split(SEPARATORS)
-        .map((login) => login.replace(LEADING_AT, ""))
-        .filter((login) => login !== "");
+        .filter((login) => login !== "")
+        .map((login) => (login === "@" ? login : login.replace(LEADING_AT, "")));
 
     return [...new Map(logins.map((login) => [login.toLowerCase(), login])).values()];
 };

@@ -88,7 +88,13 @@ const PullRequestActionsPanel = ({
                     />
                 )}
             </div>
-            <div aria-live="polite" className="outline-none" ref={statusRef} role="status" tabIndex={-1}>
+            <div
+                aria-live="polite"
+                className="focus-visible:ring-ring rounded-sm outline-none focus-visible:ring-2"
+                ref={statusRef}
+                role="status"
+                tabIndex={-1}
+            >
                 {busy && <p className="text-muted-foreground text-sm">{t`Working on ${host.label}…`}</p>}
                 {!busy && feedback?.kind === "success" && (
                     <p className="text-sm">

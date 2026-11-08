@@ -396,6 +396,15 @@ describe("PullRequestActionsPanel reviewers", () => {
         expect(requestReviewers).not.toHaveBeenCalled();
     });
 
+    it("names a bare @ instead of dropping it", async () => {
+        renderPanel();
+
+        await typeLogins("octocat, @");
+
+        expect(screen.getByRole("alert").textContent).toContain('"@" is not a valid login');
+        expect(requestReviewers).not.toHaveBeenCalled();
+    });
+
     it("announces more logins than the host takes in one request", async () => {
         renderPanel(false, "d", "merge request", "open", 2);
 
