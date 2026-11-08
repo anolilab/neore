@@ -159,7 +159,7 @@ const approveFolder = (key: string) =>
         );
 
         if (confirmed) {
-            state.view = await savedView(globalThis.neoreDevice.acpUpdate({ agentKey: key, folder, op: "grant" }));
+            state.view = await savedView({ agentKey: key, folder, op: "grant" });
             renderAgents();
         }
     });
@@ -196,15 +196,43 @@ const canSignOut = (status: SignInStatus | undefined): boolean => status?.state 
  * Bumped by every saved change: an agent's variable can change its value without changing its names, so a sign-in
  * answer given before a save is not trusted after it.
  */
-const saves = { count: 0 };
+const saves: { count: number; queue: Promise<unknown> } = { count: 0, queue: Promise.resolve() };
+
+/** What the window asks the core to save: the same request the bridge takes. */
+type SavedUpdate = Parameters<typeof globalThis.neoreDevice.acpUpdate>[0];
 
 /** A view the window saved: the answers given before it are no longer about the configuration it left. */
-const savedView = async (saved: Promise<AcpView>): Promise<AcpView> => {
-    const view = await saved;
+const savedView = async (update: SavedUpdate): Promise<AcpView> => {
+    // Saves go one at a time, in the order they were made: an older answer cannot land after a newer one.
+    const previous = saves.queue;
+    let finish: () => void = () => {};
 
-    saves.count += 1;
+    saves.queue = new Promise<void>((resolve) => {
+        finish = () => {
+            resolve();
+        };
+    });
 
-    return view;
+    await previous;
+
+    try {
+        const view = await globalThis.neoreDevice.acpUpdate(update);
+
+        saves.count += 1;
+
+        return view;
+    } finally {
+        finish();
+    }
+};
+
+/** The account line of an agent's row: a polite live region, so a sign-in answer or request is announced to screen readers. */
+const accountItem = (key: string, ...actions: HTMLElement[]): HTMLLIElement => {
+    const row = item(`↳ Account: ${accountText(key)}`, ...actions);
+
+    row.firstElementChild?.setAttribute("role", "status");
+
+    return row;
 };
 
 /** What decides which account an agent reaches: its program, its variables, and every change saved since. */
@@ -395,13 +423,13 @@ const renderAgents = (): void => {
                                 return;
                             }
 
-                            state.view = await savedView(globalThis.neoreDevice.acpUpdate({ key: agent.key, op: "removeAgent" }));
+                            state.view = await savedView({ key: agent.key, op: "removeAgent" });
                             renderAgents();
                         });
                     }),
                 ),
-                item(
-                    `↳ Account: ${accountText(agent.key)}`,
+                accountItem(
+                    agent.key,
                     ...!state.signInPending.has(agent.key) && canSignOut(signInOf(agent.key)) ? [button("Sign out", `Sign ${agent.label} out of its account`, () => signOut(agent.key))] : [],
                 ),
                 ...view.consents
@@ -416,7 +444,7 @@ const renderAgents = (): void => {
                                 : [],
                             button("Stop approving", `Stop approving ${agent.label} in ${consent.folderPath}`, () => {
                                 guarded(async () => {
-                                    state.view = await savedView(globalThis.neoreDevice.acpUpdate({ agentKey: agent.key, folderId: consent.folderId, op: "revoke" }));
+                                    state.view = await savedView({ agentKey: agent.key, folderId: consent.folderId, op: "revoke" });
                                     renderAgents();
                                 });
                             }),
@@ -449,7 +477,7 @@ const renderAgents = (): void => {
                     `${owner}: ${name} = ••••••••`,
                     button("Remove", `Remove ${name} for ${owner}`, () => {
                         guarded(async () => {
-                            state.view = await savedView(globalThis.neoreDevice.acpUpdate({ agentKey, name, op: "removeEnv" }));
+                            state.view = await savedView({ agentKey, name, op: "removeEnv" });
                             renderAgents();
                         });
                     }),
@@ -945,7 +973,7 @@ export const initAcp = async (): Promise<void> => {
                 return;
             }
 
-            state.view = await savedView(globalThis.neoreDevice.acpUpdate({ args, command, key: slug(label), label, op: "saveAgent" }));
+            state.view = await savedView({ args, command, key: slug(label), label, op: "saveAgent" });
             ($("acp-agent-form") as HTMLFormElement).reset();
             renderAgents();
         });
@@ -975,7 +1003,7 @@ export const initAcp = async (): Promise<void> => {
         guarded(async () => {
             const agentKey = $<HTMLSelectElement>("acp-env-scope").value || undefined;
 
-            state.view = await savedView(globalThis.neoreDevice.acpUpdate({ agentKey, name: field("acp-env-name").trim(), op: "setEnv", value: field("acp-env-value") }));
+            state.view = await savedView({ agentKey, name: field("acp-env-name").trim(), op: "setEnv", value: field("acp-env-value") });
             // The value is not kept anywhere in the page once it is saved.
             ($("acp-env-form") as HTMLFormElement).reset();
             renderAgents();
