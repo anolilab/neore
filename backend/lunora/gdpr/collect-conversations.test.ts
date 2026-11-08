@@ -117,7 +117,13 @@ describe("collectConversations", () => {
             expect(times?.[0]).toBe(1_600_000_000_000);
             expect(times?.[1]).toBeGreaterThan(1_600_000_000_000);
             // The notes guests left on the thread go with it.
-            expect((first as { guestNotes?: unknown[] } | undefined)?.guestNotes).toHaveLength(101);
+            const guestNotes = (first as { guestNotes?: unknown[] } | undefined)?.guestNotes;
+
+            expect(guestNotes).toHaveLength(101);
+            // Every note whole, across both pages: its text and whether it is still held.
+            expect(new Set(guestNotes?.map((note) => JSON.stringify(note)))).toEqual(
+                new Set([JSON.stringify({ createdAt: 0, status: "held", text: "a guest note" })]),
+            );
             // Each thread's links go with it, without their token hashes.
             expect((first as { guestLinks?: unknown[] } | undefined)?.guestLinks).toEqual([{ createdAt: 0, expiresAt: 1 }]);
             expect(exported.find((conversation) => conversation.messages[0]?.text === "t1-m0")).toMatchObject({ guestLinks: [{ createdAt: 5, expiresAt: 6 }] });
