@@ -833,6 +833,9 @@ const refreshSessions = async (): Promise<void> => {
 
     // An ended session has no processes left, so its servers go at once rather than at the next (possibly backed-off) read.
     if (state.sessions.find((session) => session.id === state.selected)?.status === "ended") {
+        // A read still in flight was taken while the agent ran: it must not bring its servers back.
+        portsRead.latest += 1;
+        portsRead.busy = false;
         showPorts(state.selected, []);
     }
 

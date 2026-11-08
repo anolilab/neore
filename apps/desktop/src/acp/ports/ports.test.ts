@@ -134,6 +134,25 @@ describe("listing ports", () => {
         expect(views.map((view) => view.pid)).toEqual([10, 40]);
     });
 
+    it("drops a socket whose pid was reused within the same second by another program", async () => {
+        const system = new FakeSystem();
+        const processes = system.processes.bind(system);
+        let reads = 0;
+
+        // Same pid, same start second, another program: `ps` start times are not finer than a second.
+        system.processes = async () => {
+            reads += 1;
+
+            const table = await processes();
+
+            return table.map((entry) => (reads > 1 && entry.pid === 30 ? { ...entry, name: "python3" } : entry));
+        };
+
+        const views = await new PortsService(system).list(10);
+
+        expect(views.map((view) => view.pid)).toEqual([10, 40]);
+    });
+
     it("drops a socket whose pid now belongs to another process", async () => {
         const system = new FakeSystem();
         const processes = system.processes.bind(system);
