@@ -1,0 +1,7 @@
+# Kept because `lunora codegen` writes this file back whenever it is missing. The formatters
+# run from the repository root and read only the root .prettierignore, which covers these too.
+lunora/_generated/
+lunora/.lunora-schema.json
+lunora.advisor.map.json
+.lunora/
+.wrangler/

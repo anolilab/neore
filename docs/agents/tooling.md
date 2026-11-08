@@ -78,7 +78,7 @@ then on oxlint needs built packages and the backend codegen first, like `lint:ty
 Prettier on Markdown, `sort-package-json` on staged `package.json` files, from the `staged` map in `vis.config.ts`).
 **pre-push** runs the package.json order check and the same two formatters in check mode on every file changed since
 the merge base with `main`, root files included. Both hooks and `pnpm lint:oxfmt` run from the repository root and read
-the same ignore files: `.gitignore` (nested ones too) and the root `.prettierignore`, the only one, which also lists the
+the same ignore files: `.gitignore` (nested ones too) and the root `.prettierignore`, the only one they read, which lists the
 projects and docs that have no format check. pre-push then runs `vis affected lint:types:fast` from that same base. The fast type check runs `tsrs`, a Rust port of the compiler
 with TS 7.1 semantics (beta): about 13 s for every project, against 4.5 min for `lint:types`, plus up to a minute when a
 backend change reruns its `codegen`. CI and
