@@ -6,7 +6,7 @@ import BannedWordDecoration, { bannedWordPluginKey } from "./banned-word-decorat
 import QuoteChip from "./quote-chip";
 
 const labels = () => {
-    return { goToReply: "Go to reply", notOnScreen: "Not on screen" };
+    return { goToReply: "Go to reply" };
 };
 
 describe("banned-word decorations", () => {

@@ -15,7 +15,6 @@ import { Fragment } from "@tiptap/pm/model";
 import { textAfterRestore } from "@/features/chat/core/utils/composer-restore";
 import { formatQuote } from "@/features/chat/core/utils/quote-selection";
 import { scrollToMessage } from "@/features/chat/core/utils/scroll-to-message";
-import { showWarning } from "@/lib/toast";
 
 import { plainTextToHtml } from "../plain-text";
 
@@ -67,12 +66,11 @@ const excerptOf = (text: string): string => {
 
 export interface QuoteChipLabels {
     goToReply: string;
-    notOnScreen: string;
 }
 
 export interface QuoteChipOptions {
     /**
-     * The link's label, and the notice when the quoted reply is not on screen. A getter, so each read is in the current
+     * The link's label. A getter, so each read is in the current
      * locale: the composer's editor is not recreated on a locale switch, and `refreshQuoteChipLabels` repaints the chips
      * already drawn.
      */
@@ -140,9 +138,8 @@ const QuoteChip = Node.create<QuoteChipOptions>({
                 "text-primary inline-flex shrink-0 items-center underline-offset-2 hover:underline pointer-coarse:min-h-11 pointer-coarse:min-w-11";
             paint();
             source.addEventListener("click", () => {
-                if (!scrollToMessage(String(node.attrs.messageId ?? ""))) {
-                    showWarning(labels().notOnScreen);
-                }
+                // The list mounts a windowed-out reply and pages in an older one, and says so when it is not in the thread.
+                scrollToMessage(String(node.attrs.messageId ?? ""));
             });
             dom.appendChild(fullText);
             dom.appendChild(excerpt);
@@ -219,7 +216,7 @@ const QuoteChip = Node.create<QuoteChipOptions>({
     addOptions() {
         return {
             labels: () => {
-                return { goToReply: "Go to reply", notOnScreen: "The quoted reply is not on screen" };
+                return { goToReply: "Go to reply" };
             },
         };
     },

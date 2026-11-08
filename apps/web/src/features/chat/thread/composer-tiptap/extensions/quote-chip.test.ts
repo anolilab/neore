@@ -4,17 +4,13 @@ import { StarterKit } from "@tiptap/starter-kit";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { formatQuote } from "@/features/chat/core/utils/quote-selection";
-import { showWarning } from "@/lib/toast";
+import { scrollToMessageChannel } from "@/features/chat/core/utils/scroll-to-message";
 
 import { plainTextToHtml } from "../plain-text";
 import QuoteChip, { insertQuoteChip, quoteRestoreDraft, refreshQuoteChipLabels } from "./quote-chip";
 
-vi.mock("@/lib/toast", () => {
-    return { showWarning: vi.fn() };
-});
-
 const labels = () => {
-    return { goToReply: "Go to reply", notOnScreen: "Not on screen" };
+    return { goToReply: "Go to reply" };
 };
 const quoted = { messageId: "msg-4", text: "The first line\nthe second line" };
 
@@ -200,6 +196,22 @@ describe("the link back to the quoted reply", () => {
 
         expect(submit).not.toHaveBeenCalled();
     });
+
+    it("asks the message list to jump to the reply, which it can mount when the reply is windowed out", () => {
+        const jumps: string[] = [];
+        const unsubscribe = scrollToMessageChannel.consume(({ messageId }) => {
+            jumps.push(messageId);
+        });
+
+        editor = new Editor({
+            content: { content: [{ attrs: { messageId: "msg-7", text: "A line" }, type: "quoteChip" }], type: "doc" },
+            extensions: [StarterKit.configure({ blockquote: false }), QuoteChip.configure({ labels })],
+        });
+        editor.view.dom.querySelector<HTMLButtonElement>(":scope [data-quote-chip] button")?.click();
+        unsubscribe();
+
+        expect(jumps).toEqual(["msg-7"]);
+    });
 });
 
 describe("quoteRestoreDraft when the draft changed before the editor synced", () => {
@@ -247,19 +259,16 @@ describe("the quote chip's labels after an in-place locale switch", () => {
     const translated = () => {
         return {
             goToReply: translate("quote.goToReply", "Go to reply"),
-            notOnScreen: translate("quote.notOnScreen", "The quoted reply is not on screen"),
         };
     };
     const german = {
         "quote.goToReply": "Zur Antwort",
-        "quote.notOnScreen": "Die zitierte Antwort ist nicht auf dem Bildschirm",
     };
 
     afterEach(() => {
         editor?.destroy();
         editor = undefined;
         document.body.replaceChildren();
-        vi.mocked(showWarning).mockClear();
     });
 
     const linkLabels = (instance: Editor): string[] =>
@@ -274,17 +283,6 @@ describe("the quote chip's labels after an in-place locale switch", () => {
         insertQuoteChip(editor, { messageId: "msg-9", text: "A later selection" });
 
         expect(linkLabels(editor)).toEqual(["Go to reply", "Zur Antwort"]);
-    });
-
-    it("warns in the new language when the chip's reply is not on screen", () => {
-        i18n.loadAndActivate({ locale: "en", messages: {} });
-        editor = new Editor({ content: "", extensions: [StarterKit.configure({ blockquote: false }), QuoteChip.configure({ labels: translated })] });
-
-        i18n.loadAndActivate({ locale: "de", messages: german });
-        insertQuoteChip(editor, { messageId: "msg-missing", text: "Gone" });
-        editor.view.dom.querySelector<HTMLButtonElement>(":scope [data-quote-chip] button")?.click();
-
-        expect(showWarning).toHaveBeenCalledWith("Die zitierte Antwort ist nicht auf dem Bildschirm");
     });
 
     it("repaints a chip drawn before the switch when the composer refreshes its labels", () => {

@@ -236,6 +236,23 @@ describe("motions", () => {
         expect(press(selected, ["A"]).state.selection.from).toBe(13);
     });
 
+    it("moves left off a selected chip with Backspace instead of deleting it", () => {
+        const start = aroundChip();
+        const chipSelected = start.apply(start.tr.setSelection(NodeSelection.create(start.doc, 7)));
+        const result = press(chipSelected, ["Backspace"]);
+
+        expect(result.handled).toBe(true);
+        expect(result.state.doc.childCount).toBe(3);
+        expect(result.state.selection.$head.parent.textContent).toBe("first");
+
+        // After `d`, Backspace cancels the operator; it is still not passed on to the editor, whose Backspace deletes the chip.
+        const cancelled = press(chipSelected, ["d", "Backspace"]);
+
+        expect(cancelled.handled).toBe(true);
+        expect(cancelled.state.doc.childCount).toBe(3);
+        expect(cancelled.vim.pending).toBe("");
+    });
+
     it("opens a line before a quote chip that starts the draft, so i does not type over it", () => {
         const doc = chipSchema.node("doc", null, [chipSchema.node("quoteChip"), chipSchema.node("paragraph", null, [chipSchema.text("comment")])]);
         const start = EditorState.create({ doc, schema: chipSchema });

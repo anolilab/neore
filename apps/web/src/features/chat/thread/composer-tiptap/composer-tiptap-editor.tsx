@@ -304,7 +304,7 @@ const ComposerTiptapEditor = ({
             BannedWordDecoration,
             QuoteChip.configure({
                 labels: () => {
-                    return { goToReply: t`Go to reply`, notOnScreen: t`The quoted reply is not on screen` };
+                    return { goToReply: t`Go to reply` };
                 },
             }),
             // eslint-disable-next-line react-hooks/refs -- tiptap calls these options from editor events, never during render

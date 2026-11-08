@@ -25,11 +25,11 @@ msgstr " · modello: {modelFilter}"
 msgid "- {0, plural, one {# row} other {# rows}}, {1, plural, one {# column} other {# columns}}"
 msgstr "- {0, plural, one {# riga} other {# righe}}, {1, plural, one {# colonna} other {# colonne}}"
 
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:617
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:620
 msgid "-- INSERT --"
 msgstr "-- INSERISCI --"
 
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:617
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:620
 msgid "-- NORMAL --"
 msgstr "-- NORMALE --"
 
@@ -7551,7 +7551,7 @@ msgid "Conversations on lines this diff no longer shows"
 msgstr ""
 
 #: src/features/chat/thread/composer-input.tsx:796
-#: src/features/chat/thread/composer-input.tsx:1414
+#: src/features/chat/thread/composer-input.tsx:1420
 msgid "Conversion failed"
 msgstr "Conversione non riuscita"
 
@@ -7857,7 +7857,7 @@ msgstr "Impossibile allegare {0}. Gli altri file sono stati allegati; riprova co
 msgid "Could not attach {0}. Try those again."
 msgstr "Impossibile allegare {0}. Riprova."
 
-#: src/features/chat/thread/composer-input.tsx:1436
+#: src/features/chat/thread/composer-input.tsx:1442
 msgid "Could not attach the chat"
 msgstr "Impossibile allegare la chat"
 
@@ -8089,11 +8089,11 @@ msgstr ""
 msgid "Could not reach the server. Try again."
 msgstr ""
 
-#: src/features/chat/thread/composer-input.tsx:1439
+#: src/features/chat/thread/composer-input.tsx:1445
 msgid "Could not read that chat"
 msgstr "Impossibile leggere quella chat"
 
-#: src/features/chat/thread/composer-input.tsx:1440
+#: src/features/chat/thread/composer-input.tsx:1446
 msgid "Could not read that chat. If it is locked, unlock it first."
 msgstr "Impossibile leggere quella chat. Se è bloccata, sbloccala prima."
 
@@ -10408,7 +10408,7 @@ msgstr "Rilascia un file o fai clic per caricarlo"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-file.tsx:686
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-file.tsx:765
-#: src/features/chat/thread/composer-input.tsx:1624
+#: src/features/chat/thread/composer-input.tsx:1630
 msgid "Drop files here"
 msgstr "Rilascia qui i file"
 
@@ -12352,7 +12352,7 @@ msgid "Failed to attach collection"
 msgstr "Impossibile allegare la raccolta"
 
 #: src/features/chat/header/kb-attachment-button.tsx:128
-#: src/features/chat/thread/composer-input.tsx:1266
+#: src/features/chat/thread/composer-input.tsx:1271
 msgid "Failed to attach file"
 msgstr "Impossibile allegare il file"
 
@@ -12749,7 +12749,7 @@ msgstr "Impossibile richiedere l'esportazione"
 msgid "Failed to reset to defaults"
 msgstr "Impossibile ripristinare i valori predefiniti"
 
-#: src/features/chat/thread/composer-input.tsx:1298
+#: src/features/chat/thread/composer-input.tsx:1303
 msgid "Failed to restore attachment"
 msgstr "Impossibile ripristinare l'allegato"
 
@@ -14778,7 +14778,7 @@ msgstr "Vai alla pagina precedente"
 msgid "Go to Prompts"
 msgstr "Vai ai prompt"
 
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:304
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:307
 msgid "Go to reply"
 msgstr ""
 
@@ -19057,7 +19057,7 @@ msgid "Merging…"
 msgstr ""
 
 #: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:267
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:415
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:418
 msgid "Message"
 msgstr ""
 
@@ -27135,7 +27135,7 @@ msgstr "Punteggio"
 msgid "Scores each answer 0–100% against the expected answer or rubric. Adds a small model call per case."
 msgstr "Assegna a ogni risposta un punteggio da 0 a 100% rispetto alla risposta attesa o alla rubrica. Aggiunge una piccola chiamata al modello per caso."
 
-#: src/features/chat/thread/composer-input.tsx:1225
+#: src/features/chat/thread/composer-input.tsx:1230
 msgid "Screen capture failed. Please try again."
 msgstr "Acquisizione dello schermo non riuscita. Riprova."
 
@@ -30188,7 +30188,7 @@ msgstr "Suggeriti"
 msgid "Suggested answers"
 msgstr "Risposte suggerite"
 
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:491
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:494
 msgid "Suggestion available, press Right Arrow to accept"
 msgstr "Suggerimento disponibile, premi Freccia destra per accettarlo"
 
@@ -31054,7 +31054,7 @@ msgstr ""
 msgid "That link could not be read."
 msgstr ""
 
-#: src/features/chat/thread/message-list.tsx:320
+#: src/features/chat/thread/message-list.tsx:303
 msgid "That message could not be found in this conversation."
 msgstr "Impossibile trovare quel messaggio in questa conversazione."
 
@@ -31522,7 +31522,7 @@ msgstr "La pagina ora mostra l'altra versione. Copia dalla tua tutto ciò che vu
 msgid "The page, every sub-page, its comments and its version history are deleted. This cannot be undone."
 msgstr "La pagina, tutte le sottopagine, i relativi commenti e la cronologia delle versioni vengono eliminati. Questa azione non può essere annullata."
 
-#: src/features/chat/thread/composer-input.tsx:932
+#: src/features/chat/thread/composer-input.tsx:937
 msgid "The pasted text could not be attached and was not inserted."
 msgstr ""
 
@@ -31554,8 +31554,8 @@ msgid "The quick check only looks at tools from servers you trust. A trusted ser
 msgstr ""
 
 #: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:304
-msgid "The quoted reply is not on screen"
-msgstr ""
+#~ msgid "The quoted reply is not on screen"
+#~ msgstr ""
 
 #: src/features/skills/components/skill-builder-diff.tsx:23
 msgid "The refinement did not change any field."
@@ -33255,7 +33255,7 @@ msgid "Type your answer…"
 msgstr "Scrivi la tua risposta…"
 
 #: src/features/chat/signed-out/signed-out-chat.tsx:249
-#: src/features/chat/thread/composer-input.tsx:1614
+#: src/features/chat/thread/composer-input.tsx:1620
 #: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:183
 msgid "Type your message..."
 msgstr "Scrivi il tuo messaggio..."
@@ -33646,7 +33646,7 @@ msgstr "Documentazione aggiornata per qualsiasi libreria o framework"
 msgid "Update Duration"
 msgstr "Aggiorna durata"
 
-#: src/features/chat/thread/composer-input.tsx:1471
+#: src/features/chat/thread/composer-input.tsx:1477
 msgid "Update failed"
 msgstr "Aggiornamento non riuscito"
 
@@ -33836,12 +33836,12 @@ msgstr "Carica documenti nella tua base di conoscenza e raggruppali in raccolte.
 
 #: src/features/chat/thread/composer-input.tsx:417
 #: src/features/chat/thread/composer-input.tsx:651
-#: src/features/chat/thread/composer-input.tsx:1392
+#: src/features/chat/thread/composer-input.tsx:1398
 msgid "Upload failed"
 msgstr "Caricamento non riuscito"
 
 #. placeholder {0}: fresh.name
-#: src/features/chat/thread/composer-input.tsx:1385
+#: src/features/chat/thread/composer-input.tsx:1391
 msgid "Upload failed: {0}"
 msgstr ""
 

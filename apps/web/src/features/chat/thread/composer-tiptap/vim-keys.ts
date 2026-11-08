@@ -298,7 +298,7 @@ const INSERT_AFTER: ReadonlySet<string> = new Set(["a", "A"]);
 
 /** The motions that leave a selected chip for the text after it, and those that leave it for the text before it. */
 const MOVE_AFTER: ReadonlySet<string> = new Set(["j", "l", "w"]);
-const MOVE_BEFORE: ReadonlySet<string> = new Set(["b", "h", "k"]);
+const MOVE_BEFORE: ReadonlySet<string> = new Set(["b", "Backspace", "h", "k"]);
 
 /** Keys pressed while a block without text (a quote chip) is selected instead of a cursor. */
 const chipKey = (state: EditorState, vim: VimState, key: string): VimResult => {
@@ -306,7 +306,8 @@ const chipKey = (state: EditorState, vim: VimState, key: string): VimResult => {
 
     // A pending `d`: a second `d` deletes the chip, any other key cancels the operator and does nothing else, as on a line.
     if (vim.pending === "d") {
-        return key === "d" ? handledAt(vim, state.tr.deleteSelection()) : { handled: key.length === 1, state: { ...vim, pending: "" } };
+        // Backspace is taken too: passed on, the editor's own Backspace would delete the chip.
+        return key === "d" ? handledAt(vim, state.tr.deleteSelection()) : { handled: key.length === 1 || key === "Backspace", state: { ...vim, pending: "" } };
     }
 
     if (key === "x") {
@@ -321,7 +322,8 @@ const chipKey = (state: EditorState, vim: VimState, key: string): VimResult => {
         return runUndo(state, vim);
     }
 
-    // A motion moves off the chip to the text after it (`j`, `l`, `w`) or before it (`k`, `h`, `b`), staying in normal mode.
+    // A motion moves off the chip to the text after it (`j`, `l`, `w`) or before it (`k`, `h`, `b`, Backspace), staying in normal
+    // mode; Backspace moves left in normal mode as it does on a line, and never deletes.
     if (MOVE_AFTER.has(key) || MOVE_BEFORE.has(key)) {
         const target = Selection.findFrom(state.doc.resolve(MOVE_AFTER.has(key) ? to : from), MOVE_AFTER.has(key) ? 1 : -1, true);
 
