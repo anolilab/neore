@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 
 import { HostApiError } from "../origin-fetch";
 import type { HostRequest, HostRequestOptions } from "../origin-fetch";
-import { githubDriver } from "./github";
+import { BODY_TOO_LONG_REASON, githubDriver } from "./github";
 
 const REF = { number: 7, repository: "octo/hello" };
 
@@ -154,7 +154,7 @@ describe("editPullRequest guards", () => {
         }, "x".repeat(70_000));
 
         await expect(githubDriver.editPullRequest(request, REF, { body: "new" })).rejects.toMatchObject({
-            detail: "This description is too long to edit here; edit it on the host.",
+            detail: BODY_TOO_LONG_REASON,
             status: 422,
         });
         expect(sent.filter((call) => call.path === "/graphql")).toHaveLength(0);
@@ -171,8 +171,9 @@ describe("editPullRequest guards", () => {
     });
 
     it("sends the trimmed title and confirms it against the host's trimmed one", async () => {
+        // The host answers with a trailing space of its own: the comparison trims both sides.
         const { request, sent } = graphql(() => {
-            return { data: { updatePullRequest: { pullRequest: { body: null, id: "PR_node", title: "New" } } } };
+            return { data: { updatePullRequest: { pullRequest: { body: null, id: "PR_node", title: "New " } } } };
         });
 
         await expect(githubDriver.editPullRequest(request, REF, { title: "New  " })).resolves.toBeUndefined();

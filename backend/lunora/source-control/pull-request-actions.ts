@@ -41,6 +41,12 @@ export const editPullRequest = authAction
         }
 
         const title = args.title?.trim();
+
+        // A title of only spaces would be sent as "": refused here, before the host is asked.
+        if (title === "") {
+            throw new LunoraError("BAD_REQUEST", "A title cannot be empty");
+        }
+
         const token = await resolveGithubToken(ctx, ctx.user.userId);
         const outcome = await writeToHost(DEVELOP_DRIVER, token, async (request) => {
             await DEVELOP_DRIVER.editPullRequest(request, args, { body: args.body, title });
