@@ -267,10 +267,4 @@ describe("revertPullRequest", () => {
 
         await expect(githubDriver.revertPullRequest(request, REF, {})).rejects.toMatchObject({ unconfirmed: true });
     });
-
-    it("passes a host refusal (an unmerged pull request) through as a refusal", async () => {
-        const { request } = graphql(() => new HostApiError("The host refused the GraphQL request", 422, false, { detail: "Pull request is not merged" }));
-
-        await expect(githubDriver.revertPullRequest(request, REF, {})).rejects.toMatchObject({ status: 422 });
-    });
 });

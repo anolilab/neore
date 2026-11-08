@@ -62,7 +62,8 @@ export const editPullRequest = authAction
 /** Adds reviewers by login; the ones already requested stay. The host checks that each login may review. */
 export const requestReviewers = authAction
     .use(rateLimit("sourceControl/write"))
-    .input({ ...vRef, logins: v.array(v.string().max(MAX_LENGTH.short)) })
+    // A ceiling for any host, so an oversized list is refused before it is processed; the handler applies the host's own limit.
+    .input({ ...vRef, logins: v.array(v.string().max(MAX_LENGTH.short)).check((value) => value.length <= 100, { message: "Too many logins" }) })
     .output(v.union(vOk, vWriteFailed))
     .action(async ({ args, ctx }) => {
         requireCapability("reviewers.request");
