@@ -263,8 +263,7 @@ describe("a child that waited on a request", () => {
     });
 
     it("schedules the backstop's next pass at once when a pass reaps a full batch", async () => {
-        // The harness records this self-scheduled job without its path, so the queue's length tells.
-        const queued = () => harness.scheduler.list().length;
+        // The harness records this self-scheduled job without its path, so the new job is found by id.
         const overdue = async (count: number): Promise<void> =>
             await run(async (context) => {
                 const { _creationTime, _id, ...row } = await context.db.get("subAgentRuns", runId);
@@ -274,15 +273,18 @@ describe("a child that waited on a request", () => {
                 }
             });
 
-        await overdue(20);
+        await overdue(21);
 
-        const before = queued();
+        const before = harness.scheduler.list().map((job) => job.id);
 
         expect(await internalCall(reapOverdueWaits, {})).toBe(20);
-        expect(queued()).toBe(before + 1);
 
-        await overdue(1);
-        expect(await internalCall(reapOverdueWaits, {})).toBe(1);
-        expect(queued()).toBe(before + 1);
+        const [next, ...others] = harness.scheduler.list().filter((job) => !before.includes(job.id));
+
+        expect(next).toBeDefined();
+        expect(others).toHaveLength(0);
+        // The follow-up, run as the scheduler would, takes the rest and queues no further pass.
+        expect(await internalCall(reapOverdueWaits, next?.args ?? {})).toBe(1);
+        expect(harness.scheduler.list()).toHaveLength(before.length + 1);
     });
 });
