@@ -685,7 +685,7 @@ msgstr "{0} 次使用"
 #. placeholder {1}: detail.commitCount
 #. placeholder {2}: detail.baseBranch
 #. placeholder {3}: detail.headBranch
-#: src/features/develop/components/pull-request-view.tsx:103
+#: src/features/develop/components/pull-request-view.tsx:104
 msgid "{0} wants to merge {1, plural, one {# commit} other {# commits}} into {2} from {3}"
 msgstr ""
 
@@ -976,7 +976,7 @@ msgstr ""
 msgid "{hostLabel} says this is ready to merge."
 msgstr ""
 
-#: src/features/develop/components/pull-request-edit-action.tsx:154
+#: src/features/develop/components/pull-request-edit-action.tsx:155
 msgid "{hostLabel} shortened this description, so it cannot be edited here. The title can still change."
 msgstr ""
 
@@ -1282,7 +1282,7 @@ msgstr "{refusedLabel} 的格式不符合此请求的要求，因此未保存任
 msgid "{requestCount} req"
 msgstr "{requestCount} 次请求"
 
-#: src/features/develop/components/pull-request-view.tsx:130
+#: src/features/develop/components/pull-request-view.tsx:136
 msgid "{requestNoun} views"
 msgstr ""
 
@@ -1683,12 +1683,12 @@ msgstr "9:16 比例"
 msgid "99.99% SLA"
 msgstr "99.99% SLA"
 
-#: src/features/develop/components/pull-request-edit-action.tsx:137
+#: src/features/develop/components/pull-request-edit-action.tsx:138
 msgid "A {requestNoun} needs a title. Enter one to save."
 msgstr ""
 
 #. placeholder {0}: i18n.number(MAX_TITLE)
-#: src/features/develop/components/pull-request-edit-action.tsx:136
+#: src/features/develop/components/pull-request-edit-action.tsx:137
 msgid "A {requestNoun} title is at most {0} characters."
 msgstr ""
 
@@ -1717,7 +1717,7 @@ msgid "A dataset is a set of test cases you run against an agent, a model or you
 msgstr "数据集是一组测试用例，你可以用它来测试智能体、模型或你的知识库。"
 
 #. placeholder {0}: i18n.number(MAX_BODY)
-#: src/features/develop/components/pull-request-edit-action.tsx:159
+#: src/features/develop/components/pull-request-edit-action.tsx:160
 msgid "A description is at most {0} characters."
 msgstr ""
 
@@ -5331,7 +5331,7 @@ msgstr "加拿大"
 #: src/features/chat/thread/generation-model-menu.tsx:162
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:227
 #: src/features/develop/components/comment-composer.tsx:62
-#: src/features/develop/components/pull-request-edit-action.tsx:171
+#: src/features/develop/components/pull-request-edit-action.tsx:172
 #: src/features/evals/components/case-form-dialog.tsx:68
 #: src/features/evals/components/dataset-form-dialog.tsx:168
 #: src/features/evals/components/import-cases-dialog.tsx:113
@@ -5873,7 +5873,7 @@ msgstr "正在检查..."
 msgid "Checking…"
 msgstr ""
 
-#: src/features/develop/components/pull-request-view.tsx:73
+#: src/features/develop/components/pull-request-view.tsx:74
 #: src/features/evals/components/case-fields.tsx:150
 #: src/features/evals/components/dataset-panel.tsx:147
 #: src/features/evals/components/run-detail.tsx:77
@@ -6373,7 +6373,7 @@ msgstr "关闭翻译"
 
 #: src/features/chat/link-preview/link-preview-card.tsx:117
 #: src/features/chat/thread/widgets/places-widget.tsx:165
-#: src/features/develop/components/pull-request-view.tsx:74
+#: src/features/develop/components/pull-request-view.tsx:75
 msgid "Closed"
 msgstr "已关闭"
 
@@ -6757,7 +6757,7 @@ msgstr "需要 Black Forest Labs 顶级图像质量的商业项目"
 msgid "Commit as me"
 msgstr "以我的身份提交"
 
-#: src/features/develop/components/pull-request-view.tsx:73
+#: src/features/develop/components/pull-request-view.tsx:74
 msgid "Commits"
 msgstr ""
 
@@ -8248,6 +8248,11 @@ msgstr "无法读取该聊天。如果已锁定，请先解锁。"
 #: src/features/skills/components/skill-builder-dialog.tsx:132
 msgid "Could not refine the draft. Try again."
 msgstr "无法优化草稿，请重试。"
+
+#. placeholder {0}: host.label
+#: src/features/develop/components/pull-request-view.tsx:114
+msgid "Could not refresh this {requestNoun} from {0}. What you see may be out of date."
+msgstr ""
 
 #: src/features/devices/components/devices-settings.tsx:346
 msgid "Could not remove the device."
@@ -9896,8 +9901,8 @@ msgid "Describe your workflow... e.g., 'Generate an image from text, upscale it,
 msgstr "描述你的工作流……例如“根据文本生成图片，放大后再移除背景”"
 
 #: src/components/model-picker/model-picker.tsx:167
-#: src/features/develop/components/pull-request-edit-action.tsx:142
-#: src/features/develop/components/pull-request-view.tsx:73
+#: src/features/develop/components/pull-request-edit-action.tsx:143
+#: src/features/develop/components/pull-request-view.tsx:74
 #: src/features/evals/components/dataset-form-dialog.tsx:102
 #: src/features/knowledge/components/collection-dialog.tsx:69
 #: src/features/projects/components/project-form-dialog.tsx:214
@@ -10512,7 +10517,7 @@ msgstr "下载会打开 GitHub 发布页面。如果页面上还没有安装包�
 
 #: src/features/chat/link-preview/link-preview-card.tsx:117
 #: src/features/develop/components/inbox-list.tsx:118
-#: src/features/develop/components/pull-request-view.tsx:82
+#: src/features/develop/components/pull-request-view.tsx:83
 #: src/features/skills/components/skill-builder-review.tsx:133
 msgid "Draft"
 msgstr "草稿"
@@ -13725,7 +13730,7 @@ msgstr "未归入任何项目：你已无法向该任务的项目添加对话"
 msgid "Filename cannot be empty"
 msgstr "文件名不能为空"
 
-#: src/features/develop/components/pull-request-view.tsx:73
+#: src/features/develop/components/pull-request-view.tsx:74
 msgid "Files"
 msgstr ""
 
@@ -15394,7 +15399,7 @@ msgstr "访客账号只能使用免费模型。"
 msgid "Guest accounts use free models only. Sign up to unlock all models."
 msgstr "访客账号仅可使用免费模型。注册即可解锁所有模型。"
 
-#: src/features/develop/components/pull-request-view.tsx:73
+#: src/features/develop/components/pull-request-view.tsx:74
 msgid "Guide"
 msgstr ""
 
@@ -16454,7 +16459,7 @@ msgid "Improving..."
 msgstr "正在优化..."
 
 #. placeholder {0}: detail.changedFiles
-#: src/features/develop/components/pull-request-view.tsx:108
+#: src/features/develop/components/pull-request-view.tsx:109
 msgid "in {0, plural, one {# file} other {# files}}"
 msgstr ""
 
@@ -18168,7 +18173,7 @@ msgstr ""
 #: ../../packages/ui/src/components/spinner.tsx:8
 #: src/features/develop/components/develop-page.tsx:28
 #: src/features/develop/components/inbox-list.tsx:86
-#: src/features/develop/components/pull-request-view.tsx:58
+#: src/features/develop/components/pull-request-view.tsx:62
 #: src/features/develop/components/watched-repositories.tsx:171
 msgid "Loading"
 msgstr "加载中"
@@ -19273,7 +19278,7 @@ msgid "Merge when ready?"
 msgstr ""
 
 #: src/features/chat/link-preview/link-preview-card.tsx:117
-#: src/features/develop/components/pull-request-view.tsx:74
+#: src/features/develop/components/pull-request-view.tsx:75
 msgid "Merged"
 msgstr "已合并"
 
@@ -21059,7 +21064,7 @@ msgstr "还没有数据集"
 msgid "No description"
 msgstr "无描述"
 
-#: src/features/develop/components/pull-request-view.tsx:140
+#: src/features/develop/components/pull-request-view.tsx:146
 msgid "No description provided."
 msgstr ""
 
@@ -21645,7 +21650,7 @@ msgid "Not attached:"
 msgstr "未附加："
 
 #: src/features/develop/components/pull-request-actions-panel.tsx:65
-#: src/features/develop/components/pull-request-edit-action.tsx:166
+#: src/features/develop/components/pull-request-edit-action.tsx:167
 msgid "Not changed"
 msgstr ""
 
@@ -22257,7 +22262,7 @@ msgstr "不透明度"
 #: ../../packages/chat-ui/src/chat/message-content.tsx:708
 #: src/components/command-palette.tsx:700
 #: src/features/chat/link-preview/link-preview-card.tsx:117
-#: src/features/develop/components/pull-request-view.tsx:74
+#: src/features/develop/components/pull-request-view.tsx:75
 #: src/features/tasks/hooks/use-task-notifications.ts:30
 msgid "Open"
 msgstr "打开"
@@ -22384,7 +22389,7 @@ msgid "Open new chat"
 msgstr "打开新聊天"
 
 #. placeholder {0}: host.label
-#: src/features/develop/components/pull-request-view.tsx:94
+#: src/features/develop/components/pull-request-view.tsx:95
 msgid "Open on {0}"
 msgstr ""
 
@@ -27255,7 +27260,7 @@ msgstr "沙特阿拉伯"
 #: src/features/chat/thread/edit-composer.tsx:165
 #: src/features/chat/thread/request-secret-prompt.tsx:491
 #: src/features/develop/components/draft-comment-card.tsx:43
-#: src/features/develop/components/pull-request-edit-action.tsx:173
+#: src/features/develop/components/pull-request-edit-action.tsx:174
 #: src/features/knowledge/components/collection-dialog.tsx:100
 #: src/features/settings/components/chat/api-keys-settings.tsx:436
 #: src/features/settings/components/chat/custom-providers-settings.tsx:640
@@ -27406,7 +27411,7 @@ msgid "Saving..."
 msgstr "正在保存..."
 
 #: src/features/canvas/canvas-panel.tsx:243
-#: src/features/develop/components/pull-request-edit-action.tsx:173
+#: src/features/develop/components/pull-request-edit-action.tsx:174
 #: src/features/skills/components/skill-builder-dialog.tsx:182
 #: src/features/skills/components/skill-form-dialog.tsx:515
 msgid "Saving…"
@@ -31662,7 +31667,7 @@ msgstr "费用上限必须是正数（美元）。"
 msgid "The dataset, its cases and every run of it are removed."
 msgstr "数据集、其用例及所有运行记录都将被删除。"
 
-#: src/features/develop/components/pull-request-view.tsx:142
+#: src/features/develop/components/pull-request-view.tsx:148
 msgid "The description is cut short."
 msgstr ""
 
@@ -32515,7 +32520,7 @@ msgstr ""
 msgid "This host does not offer an inbox yet."
 msgstr ""
 
-#: src/features/develop/components/pull-request-view.tsx:127
+#: src/features/develop/components/pull-request-view.tsx:133
 msgid "This host does not offer any view of a {requestNoun} yet."
 msgstr ""
 

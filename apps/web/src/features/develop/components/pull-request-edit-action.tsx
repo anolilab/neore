@@ -127,6 +127,7 @@ const EditPullRequestAction = ({
                                 aria-invalid={titleProblem || undefined}
                                 id={`${titleId}-title`}
                                 onChange={(event) => setEditing((current) => (current === null ? current : { ...current, title: event.target.value }))}
+                                readOnly={actions.edit.isPending}
                                 required
                                 value={editing?.title ?? ""}
                             />
@@ -145,7 +146,7 @@ const EditPullRequestAction = ({
                                 aria-invalid={bodyTooLong || undefined}
                                 id={`${titleId}-body`}
                                 onChange={(event) => setEditing((current) => (current === null ? current : { ...current, body: event.target.value }))}
-                                readOnly={bodyLocked}
+                                readOnly={bodyLocked || actions.edit.isPending}
                                 rows={8}
                                 value={editing?.body ?? ""}
                             />

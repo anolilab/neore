@@ -54,12 +54,13 @@ const PullRequestView = ({
     // A file the guide pointed at: the Files tab opens it. The token makes a second click on the same file act again.
     const [focus, setFocus] = useState<{ path: string; token: number } | null>(null);
 
-    if (pull.isPending) {
-        return <Skeleton aria-label={t`Loading`} className="h-40 w-full" role="status" />;
-    }
-
-    if (pull.isError) {
-        return <FailureNotice label={host.label} status="host_error" />;
+    // A failed refetch keeps the data it had: the page stays, so the outcome of a write made on it stays visible.
+    if (pull.data === undefined) {
+        return pull.isError ? (
+            <FailureNotice label={host.label} status="host_error" />
+        ) : (
+            <Skeleton aria-label={t`Loading`} className="h-40 w-full" role="status" />
+        );
     }
 
     if (pull.data.status !== "ok") {
@@ -108,6 +109,11 @@ const PullRequestView = ({
                     <span className="text-muted-foreground">{t`in ${plural(detail.changedFiles, { one: "# file", other: "# files" })}`}</span>
                 </p>
             </header>
+            {pull.isError && (
+                <p className="text-muted-foreground text-xs" role="status">
+                    {t`Could not refresh this ${requestNoun} from ${host.label}. What you see may be out of date.`}
+                </p>
+            )}
             <WorkOnPullRequest
                 address={address}
                 baseBranch={detail.baseBranch}

@@ -1,12 +1,12 @@
 /** The edit dialog keeps what was typed after a refusal, closes after an unconfirmed answer, and says what happened on the panel. */
 
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import PullRequestActionsPanel from "./pull-request-actions-panel";
 
-const { available, edit } = vi.hoisted(() => {
-    return { available: vi.fn(() => true), edit: vi.fn() };
+const { available, edit, pending } = vi.hoisted(() => {
+    return { available: vi.fn(() => true), edit: vi.fn(), pending: { current: false } };
 });
 
 // The unit-test transform does not compile Lingui macros (vi.mock is hoisted).
@@ -33,7 +33,7 @@ vi.mock("../lib/use-pull-request-actions", async (importOriginal) => {
         ...(await importOriginal<typeof import("../lib/use-pull-request-actions")>()),
         usePullRequestActions: () => {
             return {
-                edit: { isPending: false, mutateAsync: edit },
+                edit: { isPending: pending.current, mutateAsync: edit },
             };
         },
     };
@@ -84,6 +84,11 @@ const typeNewTitle = async () => {
 
     typeInto(title, "New title");
 };
+
+beforeEach(() => {
+    edit.mockReset();
+    pending.current = false;
+});
 
 describe("PullRequestActionsPanel edit dialog", () => {
     it("keeps the dialog open with the typed title when the host refuses the edit", async () => {
@@ -150,8 +155,9 @@ describe("PullRequestActionsPanel cut-short description", () => {
         pressButton(screen.getByRole("button", { name: "Save" }));
 
         await waitFor(() => {
-            expect(edit).toHaveBeenLastCalledWith({ title: "New title" });
+            expect(edit).toHaveBeenCalledTimes(1);
         });
+        expect(edit).toHaveBeenCalledWith({ title: "New title" });
     });
 });
 
@@ -165,8 +171,9 @@ describe("PullRequestActionsPanel description comparison", () => {
         pressButton(screen.getByRole("button", { name: "Save" }));
 
         await waitFor(() => {
-            expect(edit).toHaveBeenLastCalledWith({ title: "New title" });
+            expect(edit).toHaveBeenCalledTimes(1);
         });
+        expect(edit).toHaveBeenCalledWith({ title: "New title" });
     });
 });
 
@@ -177,5 +184,25 @@ describe("PullRequestActionsPanel capability", () => {
 
         expect(screen.queryByRole("button", { name: "Edit title and description" })).toBeNull();
         available.mockReturnValue(true);
+    });
+});
+
+describe("PullRequestActionsPanel while saving", () => {
+    it("keeps the fields read-only and shows the progress cue", async () => {
+        const view = renderPanel();
+
+        await typeNewTitle();
+        pending.current = true;
+        // A new render of the panel reads the pending flag.
+        view.rerender(
+            <PullRequestActionsPanel
+                host={{ capabilities: {} as never, label: "GitHub", noun: "pull request" }}
+                pull={{ address: ADDRESS as never, body: "The description", bodyTruncated: false, title: "Old title" }}
+            />,
+        );
+
+        expect((screen.getByLabelText("Title") as HTMLInputElement).readOnly).toBe(true);
+        expect((screen.getByLabelText("Description") as HTMLTextAreaElement).readOnly).toBe(true);
+        expect(screen.getByRole("button", { name: "Saving…" })).toBeTruthy();
     });
 });
