@@ -184,16 +184,23 @@ const withReadLaterHint = async <T>(threadId: string | undefined, request: Promi
     }
 };
 
-const postThread = async (context: Context, flags: Flags, threadId: string | undefined, prompt: string): Promise<number> => {
-    // These are `chat` flags; dropping them would start a new thread or skip the wait the caller asked for.
-    if (flags.thread !== undefined) {
+/** The flags `thread start|send` use. Every flag is shared, so any other one would be dropped while a billed run starts. */
+const THREAD_FLAGS: ReadonlySet<string> = new Set(["api-key", "api-url", "help", "json", "model", "wait"]);
+
+/** Refuses a flag `thread start|send` would drop; checked before stdin is read, so an open pipe cannot hold it back. */
+const refuseUnusedFlags = (flags: Flags): void => {
+    const unused = Object.keys(flags).filter((flag) => !THREAD_FLAGS.has(flag));
+
+    if (unused.includes("thread")) {
         throw new UsageError("`thread` has no -t/--thread: the thread id is the first argument of `thread send`.");
     }
 
-    if (flags["no-stream"] || flags.reasoning) {
-        throw new UsageError("`thread` has no --no-stream or --reasoning: use --wait to wait for the reply.");
+    if (unused.length > 0) {
+        throw new UsageError(`\`thread\` has no ${unused.map((flag) => `--${flag}`).join(", ")}. It takes -m, --wait and --json; --wait waits for the reply.`);
     }
+};
 
+const postThread = async (context: Context, flags: Flags, threadId: string | undefined, prompt: string): Promise<number> => {
     const client = await clientFor(context, flags);
     const body = { model: flags.model, prompt, ...(threadId && { threadId }) };
 
@@ -226,7 +233,8 @@ const postThread = async (context: Context, flags: Flags, threadId: string | und
     if (flags.json) {
         printJson(context.io, result);
     } else {
-        if (result.text) {
+        // Only a finished reply goes to stdout; a cut or failed one is read from the thread, as the message below says.
+        if (result.status === "done" && result.text) {
             context.io.stdout.write(result.text.endsWith("\n") ? result.text : `${result.text}\n`);
         }
 
@@ -274,6 +282,8 @@ const promptFrom = async (context: Context, args: ReadonlyArray<string>): Promis
 };
 
 export const threadStart = async (context: Context, { args, flags }: ParsedCommand): Promise<number> => {
+    refuseUnusedFlags(flags);
+
     const prompt = await promptFrom(context, args);
 
     if (!prompt) {
@@ -284,6 +294,8 @@ export const threadStart = async (context: Context, { args, flags }: ParsedComma
 };
 
 export const threadSend = async (context: Context, { args, flags }: ParsedCommand): Promise<number> => {
+    refuseUnusedFlags(flags);
+
     const threadId = requireArgument(args, "thread-id");
     const prompt = await promptFrom(context, args.slice(1));
 

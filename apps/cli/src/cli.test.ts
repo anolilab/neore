@@ -355,10 +355,11 @@ describe("chat end to end against a fake API", () => {
             expect(JSON.parse(context.io.stdout.text())).toMatchObject({ status: "done", text: "Hello", threadId: "th1" });
         });
 
-        it("--wait exits 1 when the run ended in failure", async () => {
+        it("--wait exits 1 when the run ended in failure, with no partial reply on stdout", async () => {
             const { context } = await setup(() => completed("generation_failed", "partial"));
 
             expect(await run(["thread", "start", "hi", "--wait"], context)).toBe(1);
+            expect(context.io.stdout.text()).toBe("");
             expect(context.io.stderr.text()).toContain("ended in failure (generation_failed)");
         });
 
@@ -403,6 +404,14 @@ describe("chat end to end against a fake API", () => {
             expect(await run(["thread", "--help"], context)).toBe(0);
             expect(await run(["thread", "start", "hi", "-t", "th5"], context)).toBe(2);
             expect(await run(["thread", "start", "hi", "--no-stream"], context)).toBe(2);
+
+            const piped = { ...context, readStdin: async () => await new Promise<string>(() => {}), stdinIsTTY: false };
+
+            // Refused before stdin is read, so an open pipe cannot hold it.
+            expect(await run(["thread", "send", "th1", "--reasoning"], piped)).toBe(2);
+            expect(await run(["thread", "start", "hi", "--skill", "s"], context)).toBe(2);
+            expect(context.io.stderr.text()).toContain("`thread` has no --skill");
+            expect(await run(["chat", "--help", "--wait"], context)).toBe(0);
             expect(await run(["chat", "hi", "--wait"], context)).toBe(2);
             expect(context.io.stderr.text()).toContain("`chat` has no --wait: use --no-stream");
             expect(await run(["tasks", "run", "t1", "--wait"], context)).toBe(2);

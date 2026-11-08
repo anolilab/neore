@@ -72,7 +72,7 @@ const WAIT_INSTEAD: Readonly<Record<string, string>> = { chat: "--no-stream", "s
 export const parseCommand = (argv: ReadonlyArray<string>): ParsedCommand => {
     const parsed = parseWords(argv);
 
-    if (parsed.flags.wait && !WAIT_COMMANDS.has(parsed.command)) {
+    if (parsed.flags.wait && !parsed.flags.help && !WAIT_COMMANDS.has(parsed.command)) {
         const instead = WAIT_INSTEAD[parsed.command];
 
         throw new UsageError(`\`${parsed.command}\` has no --wait${instead ? `: use ${instead}` : ""}. It is for \`thread start\` and \`thread send\`.`);
