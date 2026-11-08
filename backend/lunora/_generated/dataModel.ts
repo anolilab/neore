@@ -2150,6 +2150,7 @@ export interface Doc_userSettings {
     resumeLastChat?: boolean;
     searchDomainBlocklist?: Array<string>;
     sendBehavior?: string;
+    setupStepsSkipped?: Array<string>;
     taskEmailEnabled?: boolean;
     temporaryChatRetentionHours?: number;
     threadSummariesEnabled?: boolean;
@@ -5216,6 +5217,7 @@ export interface Insert_userSettings {
     resumeLastChat?: boolean;
     searchDomainBlocklist?: Array<string>;
     sendBehavior?: string;
+    setupStepsSkipped?: Array<string>;
     taskEmailEnabled?: boolean;
     temporaryChatRetentionHours?: number;
     threadSummariesEnabled?: boolean;
