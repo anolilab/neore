@@ -50,3 +50,8 @@ export const rememberPdfUrl = (url: string): void => {
 
 /** The newest URL seen for the same file as `url`, or `url` itself: a signed URL expires, and its message re-signs it. */
 export const latestPdfUrl = (url: string): string => latestUrls.get(pdfFileKey(url)) ?? url;
+
+/** Forgets every remembered URL: they were signed for the session that ended, and the next one on this tab must not reuse them. */
+export const forgetPdfUrls = (): void => {
+    latestUrls.clear();
+};

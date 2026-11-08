@@ -8,6 +8,7 @@
  */
 
 import { stripHiddenText } from "@neore/ai/utils";
+import { forgetPdfUrls } from "@neore/ui/utils/pdf-preview-event";
 import { create } from "zustand";
 import { devtools, subscribeWithSelector } from "zustand/middleware";
 
@@ -549,12 +550,18 @@ export const isDocumentOpen = (state: Pick<ChatUIStore, "isCanvasOpen" | "previe
 /**
  * The side panel across an account switch: a PDF preview (a signed link, nothing unsaved) closes as the switch starts; a
  * document, whose editor may hold unsaved edits, closes only once the switch has gone through, so a failed switch keeps it.
+ * Called with "after" on sign-out too, in every tab.
  */
 export const closeSidePanelForSessionSwitch = (phase: "after" | "before"): void => {
     const { closeCanvas, isCanvasOpen, previewFile } = useChatUIStore.getState();
 
     if (isCanvasOpen && (phase === "after" || previewFile !== null)) {
         closeCanvas();
+    }
+
+    // The newest signed URL of each PDF is the old account's: a panel opened after the switch must not follow one.
+    if (phase === "after") {
+        forgetPdfUrls();
     }
 };
 

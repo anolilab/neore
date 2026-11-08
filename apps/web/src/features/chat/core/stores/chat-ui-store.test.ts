@@ -1,4 +1,5 @@
 import { stripHiddenText } from "@neore/ai/utils";
+import { latestPdfUrl, rememberPdfUrl } from "@neore/ui/utils/pdf-preview-event";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import type { ReferenceSelection } from "@/features/chat/components/reference-picker/types";
@@ -132,6 +133,20 @@ describe("the side-panel PDF preview", () => {
         closeSidePanelForSessionSwitch(phase);
 
         expect(useChatUIStore.getState().isCanvasOpen).toBe(staysOpen);
+    });
+
+    it("forgets the old account's newest PDF links once the switch has gone through, and not before", () => {
+        const opened = "https://files.example/report.pdf?sig=old";
+        const renewed = "https://files.example/report.pdf?sig=new";
+
+        rememberPdfUrl(renewed);
+        closeSidePanelForSessionSwitch("before");
+
+        expect(latestPdfUrl(opened)).toBe(renewed);
+
+        closeSidePanelForSessionSwitch("after");
+
+        expect(latestPdfUrl(opened)).toBe(opened);
     });
 
     it("counts an open document as blocking a PDF, and a PDF preview or a closed panel as not", () => {
