@@ -10,7 +10,7 @@ import { markThreadViewedAt, setThreadSnooze } from "../agent/table-writes";
 import { requireOwnedThreadIgnoringLock } from "../agent/thread-read-access";
 import { authMutation, rateLimit } from "../lib/crpc";
 import { throwBadRequest } from "../lib/error-helpers";
-import { isSnoozeInRange } from "./lib/thread-state-logic";
+import { isSnoozeInRange, snoozeChoiceStamp } from "./lib/thread-state-logic";
 
 /** Marks the thread's latest reply as seen. A no-op unless a reply is newer than the last view. */
 export const markThreadViewed = authMutation
@@ -27,22 +27,21 @@ export const markThreadViewed = authMutation
     });
 
 /**
- * Hides the thread from the owner's active list until `until`. `chosenAt` orders the choice: the time the client made it, which a
- * write queued offline keeps, capped at the server's clock so a device whose clock runs ahead cannot shut later choices out. A choice
- * older than the thread's newest one, or than a wake, is dropped before the range check (a stale queued write is not an error) and
- * returns `applied: false`. A device whose clock runs behind can have a choice made just after a wake dropped; it is told so.
+ * Hides the thread from the owner's active list until `until`. `chosenAt` orders the choice (`snoozeChoiceStamp`). A choice older
+ * than the thread's newest one, or than a wake, is dropped before the range check (a stale queued write is not an error) and returns
+ * `applied: false`.
  */
 export const snoozeThread = authMutation
     .use(rateLimit("chat/update"))
     .input({
-        chosenAt: v.number().check((value) => Number.isFinite(value), { message: "Invalid choice time" }),
+        chosenAt: v.optional(v.number().check((value) => Number.isFinite(value), { message: "Invalid choice time" })),
         threadId: v.id("threads"),
         until: v.number().check((value) => Number.isFinite(value), { message: "Invalid snooze time" }),
     })
     .output(v.object({ applied: v.boolean() }))
     .mutation(async ({ args: { chosenAt, threadId, until }, ctx: context }) => {
         const thread = await requireOwnedThreadIgnoringLock(context, threadId, context.user.userId);
-        const stamp = Math.min(chosenAt, context.now);
+        const stamp = snoozeChoiceStamp(chosenAt, context.now);
 
         if (thread.snoozeChosenAt !== undefined && stamp < thread.snoozeChosenAt) {
             context.log.event("chat.snooze_dropped", { reason: "stale" });
@@ -61,17 +60,17 @@ export const snoozeThread = authMutation
         return { applied: true };
     });
 
-/** Brings a snoozed thread back to the active list. A choice older than the thread's newest one returns `applied: false`. */
+/** Brings a snoozed thread back to the active list. A choice older than the thread's newest one (`snoozeChoiceStamp`) returns `applied: false`. */
 export const unsnoozeThread = authMutation
     .use(rateLimit("chat/update"))
     .input({
-        chosenAt: v.number().check((value) => Number.isFinite(value), { message: "Invalid choice time" }),
+        chosenAt: v.optional(v.number().check((value) => Number.isFinite(value), { message: "Invalid choice time" })),
         threadId: v.id("threads"),
     })
     .output(v.object({ applied: v.boolean() }))
     .mutation(async ({ args: { chosenAt, threadId }, ctx: context }) => {
         const thread = await requireOwnedThreadIgnoringLock(context, threadId, context.user.userId);
-        const applied = await setThreadSnooze(context.db, thread, undefined, Math.min(chosenAt, context.now));
+        const applied = await setThreadSnooze(context.db, thread, undefined, snoozeChoiceStamp(chosenAt, context.now));
 
         context.log.event(applied ? "chat.unsnooze_thread" : "chat.unsnooze_dropped", { wasSnoozed: thread.snoozedUntil !== undefined });
 

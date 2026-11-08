@@ -85,7 +85,8 @@ const fieldsWake = (fields: Pick<ThreadPatch, "awaitingInput" | "status">, faile
  * The one writer of a thread's run state; `agent/threads.ts#updateThread` delegates here. A write that ends a pause or records a
  * reply removes `awaitingInput` (`patchesWithoutAwaitingInput`); a write that pauses for the owner or fails (`failed`: the run
  * failed in place, whatever status the thread goes back to) removes `snoozedUntil`. Each removal is in the same write as its cause.
- * A wake also stamps `snoozeChosenAt`, snoozed or not, so a snooze chosen before it and delivered after it changes nothing.
+ * A wake also stamps `snoozeChosenAt`, snoozed or not, so a snooze chosen before it and delivered after it changes nothing. The stamp
+ * is the server's now, or just past the stored one when a client clock put that ahead, so a redelivered choice cannot re-hide the thread.
  */
 export const patchThread = async (db: Database, threadId: Id<"threads">, fields: ThreadPatch, { failed = false }: { failed?: boolean } = {}): Promise<void> => {
     const endsPause = fields.status === "running" || fields.lastReplyAt !== undefined;
@@ -101,7 +102,7 @@ export const patchThread = async (db: Database, threadId: Id<"threads">, fields:
                 ...withoutUndefined(fields),
                 ...(clearsAwaiting && { awaitingInput: undefined }),
                 ...(clearsSnooze && { snoozedUntil: undefined }),
-                ...(wakes && { snoozeChosenAt: Date.now() }),
+                ...(wakes && { snoozeChosenAt: Math.max(Date.now(), (row.snoozeChosenAt ?? 0) + 1) }),
             });
 
             return;
@@ -110,7 +111,8 @@ export const patchThread = async (db: Database, threadId: Id<"threads">, fields:
 
     const patch = withoutUndefined(fields);
 
-    // A failure with nothing to change (`{}`, `failed`) writes nothing: the thread list is a live query.
+    // A wake always writes above (it stamps `snoozeChosenAt`), so this is a write that does not wake, or a thread that is gone.
+    // Nothing to change writes nothing: the thread list is a live query.
     if (Object.keys(patch).length > 0) {
         await db.patch("threads", threadId, patch);
     }

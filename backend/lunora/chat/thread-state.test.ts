@@ -192,26 +192,25 @@ describe("snooze and unsnooze", () => {
     it("snoozes for the owner, then removes the column, leaving updatedAt alone", async () => {
         const until = Date.now() + DAY;
 
-        await as(OWNER).mutation(snoozeThread as never, { chosenAt: 1, threadId, until } as never);
+        // An older client sends no stamp: the server stamps it now.
+        await as(OWNER).mutation(snoozeThread as never, { threadId, until } as never);
         expect(await read()).toMatchObject({ snoozedUntil: until, updatedAt: 111 });
 
-        await as(OWNER).mutation(unsnoozeThread as never, { chosenAt: 2, threadId } as never);
+        await as(OWNER).mutation(unsnoozeThread as never, { threadId } as never);
 
         const row = await read();
 
         expect("snoozedUntil" in row).toBe(false);
         expect(row.updatedAt).toBe(111);
         // Removing it again is quiet.
-        await as(OWNER).mutation(unsnoozeThread as never, { chosenAt: 2, threadId } as never);
+        await as(OWNER).mutation(unsnoozeThread as never, { threadId } as never);
     });
 
     it("rejects a past time or one beyond 366 days, and any non-owner", async () => {
-        await expect(as(OWNER).mutation(snoozeThread as never, { chosenAt: 1, threadId, until: Date.now() - 1000 } as never)).rejects.toThrow();
-        await expect(as(OWNER).mutation(snoozeThread as never, { chosenAt: 1, threadId, until: Date.now() + 400 * DAY } as never)).rejects.toThrow();
-        await expect(as(STRANGER).mutation(snoozeThread as never, { chosenAt: 1, threadId, until: Date.now() + DAY } as never)).rejects.toThrow(
-            NOT_FOUND_PATTERN,
-        );
-        await expect(as(STRANGER).mutation(unsnoozeThread as never, { chosenAt: 1, threadId } as never)).rejects.toThrow(NOT_FOUND_PATTERN);
+        await expect(as(OWNER).mutation(snoozeThread as never, { threadId, until: Date.now() - 1000 } as never)).rejects.toThrow();
+        await expect(as(OWNER).mutation(snoozeThread as never, { threadId, until: Date.now() + 400 * DAY } as never)).rejects.toThrow();
+        await expect(as(STRANGER).mutation(snoozeThread as never, { threadId, until: Date.now() + DAY } as never)).rejects.toThrow(NOT_FOUND_PATTERN);
+        await expect(as(STRANGER).mutation(unsnoozeThread as never, { threadId } as never)).rejects.toThrow(NOT_FOUND_PATTERN);
         const rowAfter169 = await read();
 
         expect(rowAfter169.snoozedUntil).toBeUndefined();
@@ -232,6 +231,22 @@ describe("snooze choices apply in the order they were made", () => {
         const row = await read();
 
         expect(row.snoozedUntil).toBe(now + 2 * DAY);
+    });
+
+    it("keeps a fast clock's choices in order, and a wake after them is not undone by a redelivered one", async () => {
+        // A device 10 s ahead of the server: both stamps are in the future, inside the allowance.
+        const ahead = Date.now() + 10_000;
+
+        expect(await snooze(ahead + 1, Date.now() + 2 * DAY)).toStrictEqual({ applied: true });
+        expect(await snooze(ahead, Date.now() + DAY)).toStrictEqual({ applied: false });
+
+        await harness.run(async (context: any) => await patchThread(context.db, threadId as never, { status: "error" }));
+
+        expect(await snooze(ahead + 1, Date.now() + 2 * DAY)).toStrictEqual({ applied: false });
+
+        const row = await read();
+
+        expect(row.snoozedUntil).toBeUndefined();
     });
 
     it("drops a snooze queued before a wake, so it does not hide the thread again, and one whose time has since passed", async () => {

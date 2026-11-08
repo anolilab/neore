@@ -18,7 +18,7 @@ interface ThreadStateActions {
     unsnooze: (threadId: string, previousUntil: number | undefined) => void;
 }
 
-/** The server answers `applied: false` when the thread already has a newer choice, or woke after this one was made. */
+/** The server answers `applied: false` when the thread has a newer choice, or woke, after this one was made. */
 const wasSuperseded = (result: { applied: boolean } | null | undefined): boolean => result?.applied === false;
 
 export const useThreadStateActions = (): ThreadStateActions => {
@@ -26,7 +26,7 @@ export const useThreadStateActions = (): ThreadStateActions => {
     const crpc = useCRPC();
     const { mutateAsync: snoozeMutation } = useMutation(crpc.chat.thread_state.snoozeThread.mutationOptions());
     const { mutateAsync: unsnoozeMutation } = useMutation(crpc.chat.thread_state.unsnoozeThread.mutationOptions());
-    const superseded = useCallback(() => showError(t`A newer change to this thread is already in place, so this did not apply.`), [t]);
+    const superseded = useCallback(() => showError(t`This thread changed since, so this was not applied.`), [t]);
 
     // Every write is stamped when the owner makes the choice, not when it is sent: a write queued offline keeps that stamp.
     const restore = useCallback(

@@ -1720,8 +1720,8 @@ msgid "A new version of the app is available."
 msgstr "Uma nova versão do app está disponível."
 
 #: src/features/chat/thread-list/hooks/use-thread-state-actions.ts:29
-msgid "A newer change to this thread is already in place, so this did not apply."
-msgstr ""
+#~ msgid "A newer change to this thread is already in place, so this did not apply."
+#~ msgstr ""
 
 #: src/features/settings/components/chat/event-trigger-fields.tsx:56
 msgid "A page changes"
@@ -32296,6 +32296,10 @@ msgstr "Esta conversa"
 
 #: src/features/develop/components/thread-pull-requests.tsx:74
 msgid "This thread already has as many pull requests linked as it can keep."
+msgstr ""
+
+#: src/features/chat/thread-list/hooks/use-thread-state-actions.ts:29
+msgid "This thread changed since, so this was not applied."
 msgstr ""
 
 #: src/routes/(chat)/chat/index.tsx:121
