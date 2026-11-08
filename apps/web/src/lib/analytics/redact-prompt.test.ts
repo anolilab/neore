@@ -23,6 +23,12 @@ describe(redactPromptFromEvent, () => {
         expect(JSON.stringify(event)).toContain("model%3Dgpt");
     });
 
+    it("removes the text of a nested link whose separator is encoded but whose = is not", () => {
+        const event = redactPromptFromEvent(pageView({ $current_url: "https://app.test/auth/sign-in?redirectTo=%2Fchat%3Fprompt=my+secret%26model%3Dgpt" }));
+
+        expect(event?.properties.$current_url).toBe("https://app.test/auth/sign-in?redirectTo=%2Fchat%3Fprompt=redacted%26model%3Dgpt");
+    });
+
     it("removes the text from heatmap data, which is filed under the page address", () => {
         const event = redactPromptFromEvent({
             event: "$$heatmap",
