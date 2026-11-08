@@ -30,11 +30,17 @@ export const promptFromLink = (raw: string): string => [...stripHiddenText(raw).
 
 /** The prompt and model a link carries. A link without a usable prompt carries nothing, its model included. */
 export const readPromptLinkSearch = (search: { model?: unknown; prompt?: unknown }): { model?: string; prompt?: string } => {
+    if (search.prompt === undefined) {
+        return {};
+    }
+
     const raw = textOf(search.prompt);
     const prompt = raw === undefined ? "" : promptFromLink(raw);
 
+    // A link whose prompt is blank once cleaned carries nothing, not even its model; the empty prompt still says a link was
+    // there, so its parameters are cleared from the address.
     if (prompt === "") {
-        return {};
+        return { prompt: "" };
     }
 
     const model = typeof search.model === "string" ? search.model.trim() : "";

@@ -17,6 +17,15 @@ import { LANDING_MESSAGE_KEY } from "@/features/marketing/stores/landing-store";
 import { useCRPC } from "@/lib/lunora/crpc";
 
 // Module scope, so it outlives this component's mounts: a page load resumes once.
+/** Whether a landing page left a message for this chat; storage can be unavailable (private mode, the server). */
+const hasLandingMessage = (): boolean => {
+    try {
+        return globalThis.sessionStorage?.getItem(LANDING_MESSAGE_KEY) != null;
+    } catch {
+        return false;
+    }
+};
+
 // Effects never run during SSR, so it is never shared between requests.
 // `firstKey` is the navigation that first showed the chat index on this page load. Only
 // that visit may resume: a later New chat (a new navigation) must open a blank chat.
@@ -47,7 +56,11 @@ const ChatPage = () => {
     const resumeLastChat =
         BOOTED_ON_CHAT_INDEX && userSettings?.resumeLastChat === true && !promptId && !redirectReason && !hasInitialMessage && resumeScopeReady;
 
-    usePromptLinkDraft({ model: linkModel, otherDraftSource: Boolean(promptId) || Boolean(hasInitialMessage), prompt: linkPrompt });
+    // A landing message competes with the link only when it is really there: a stale `initialMessage` flag with nothing stored
+    // would otherwise turn the link away for a draft that never comes. Read before the effect below consumes it.
+    const [landingMessageWaiting] = useState(() => hasInitialMessage === true && hasLandingMessage());
+
+    usePromptLinkDraft({ model: linkModel, otherDraftSource: Boolean(promptId) || landingMessageWaiting, prompt: linkPrompt });
 
     const { data: latestThreadId, isSuccess: latestResolved } = useQuery(
         // Not live, and skipped once decided: later visits to /chat must not re-run the scan.

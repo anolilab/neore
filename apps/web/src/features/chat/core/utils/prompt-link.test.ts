@@ -19,7 +19,8 @@ describe(readPromptLinkSearch, () => {
     });
 
     it("carries nothing, not even the model, without a usable prompt", () => {
-        expect(readPromptLinkSearch({ model: "gpt", prompt: " ​ " })).toStrictEqual({});
-        expect(readPromptLinkSearch({ model: "gpt", prompt: { a: 1 } })).toStrictEqual({});
+        expect(readPromptLinkSearch({ model: "gpt", prompt: " ​ " })).toStrictEqual({ prompt: "" });
+        expect(readPromptLinkSearch({ model: "gpt", prompt: { a: 1 } })).toStrictEqual({ prompt: "" });
+        expect(readPromptLinkSearch({ model: "gpt" })).toStrictEqual({});
     });
 });

@@ -33,7 +33,10 @@ export const usePromptLinkDraft = ({
     const appliedRef = useRef<string | undefined>(undefined);
 
     useEffect(() => {
+        // No link in the address: the next one, even the same link again, is a new visit.
         if (prompt === undefined) {
+            appliedRef.current = undefined;
+
             return;
         }
 
@@ -44,6 +47,24 @@ export const usePromptLinkDraft = ({
         }
 
         appliedRef.current = key;
+
+        const clearLink = () => {
+            void navigate({
+                hash: true,
+                replace: true,
+                search: (previous: { model?: string; prompt?: string }) => {
+                    return { ...previous, model: undefined, prompt: undefined };
+                },
+                to: "/chat",
+            });
+        };
+
+        // A link with nothing usable in it is only cleared from the address.
+        if (prompt === "") {
+            clearLink();
+
+            return;
+        }
 
         const { attachedReferences, composerAttachments, composerText, setComposerText } = useChatUIStore.getState();
         const hasDraft = composerText.trim() !== "" || composerAttachments.length > 0 || attachedReferences.length > 0;
@@ -65,13 +86,6 @@ export const usePromptLinkDraft = ({
             }
         }
 
-        void navigate({
-            hash: true,
-            replace: true,
-            search: (previous: { model?: string; prompt?: string }) => {
-                return { ...previous, model: undefined, prompt: undefined };
-            },
-            to: "/chat",
-        });
+        clearLink();
     }, [model, navigate, otherDraftSource, prompt, t]);
 };

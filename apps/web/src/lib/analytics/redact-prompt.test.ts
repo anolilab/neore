@@ -42,4 +42,13 @@ describe(redactPromptFromEvent, () => {
 
         expect(event?.properties.$elements_chain).toBe('a:attr__href="/chat?prompt=redacted"');
     });
+
+    it("redacts a prompt parameter whose name is percent-encoded, in an address and in a nested one", () => {
+        const nested = encodeURIComponent("/chat?%70rompt=private text");
+        const event = redactPromptFromEvent(
+            pageView({ $current_url: "https://app.test/chat?%70rompt=private%20text", $referrer: `https://app.test/auth/sign-in?redirectTo=${nested}` }),
+        );
+
+        expect(JSON.stringify(event)).not.toContain("private");
+    });
 });

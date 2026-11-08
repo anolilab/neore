@@ -10,14 +10,27 @@ import type { CaptureResult } from "posthog-js";
 const REDACTED = "redacted";
 
 /**
+ * The parameter name `prompt`, any of whose letters may be percent-encoded (the router decodes a key before it reads it), as
+ * `%70` in an address or `%2570` inside an encoded one. `escapes` are the prefixes an encoded letter may carry.
+ */
+const keyPattern = (escapes: ReadonlyArray<string>): string =>
+    [..."prompt"]
+        .map((letter) => {
+            const hex = letter.codePointAt(0)!.toString(16);
+
+            return `(?:${letter}|${escapes.map((escape) => `${escape}${hex}`).join("|")})`;
+        })
+        .join("");
+
+/**
  * A `prompt` parameter in an address: its value runs to the next `&` or `#` (an `&` inside the text is encoded as `%26`), or to
  * a double quote, where an autocaptured `href="…"` in `$elements_chain` ends. Not at an apostrophe or a space: a link written in
  * a message can hold either raw, and stopping there would send the rest of the prompt.
  */
-const PLAIN_PROMPT = /([?&]prompt=)[^&#"]*/gi;
+const PLAIN_PROMPT = new RegExp(`([?&]${keyPattern(["%"])}=)[^&#"]*`, "giu");
 
 /** The same parameter in a link encoded once as another parameter's value: its value runs to the next encoded `&` or `#`. */
-const ENCODED_PROMPT = /((?:%3F|%26)prompt%3D)(?:[^%&#"]|%(?!26|23))*/gi;
+const ENCODED_PROMPT = new RegExp(`((?:%3F|%26)${keyPattern(["%", "%25"])}%3D)(?:[^%&#"]|%(?!26|23))*`, "giu");
 
 /** Each prompt parameter keeps its name; its value is replaced. */
 const redactString = (value: string): string =>

@@ -55,6 +55,28 @@ describe(usePromptLinkDraft, () => {
         expect(strippedSearch()).toStrictEqual({ model: undefined, prompt: undefined, promptId: "kept" });
     });
 
+    it("only clears a link with nothing usable in it from the address, with no notice about a draft it never had", () => {
+        useChatUIStore.getState().setComposerText("Mine");
+        renderHook(() => usePromptLinkDraft({ model: undefined, otherDraftSource: false, prompt: "" }));
+
+        expect(useChatUIStore.getState().composerText).toBe("Mine");
+        expect(showWarning).not.toHaveBeenCalled();
+        expect(strippedSearch()).toStrictEqual({ model: undefined, prompt: undefined, promptId: "kept" });
+    });
+
+    it("applies the same link again once it has left the address and is opened anew", () => {
+        const { rerender } = renderHook((prompt: string | undefined) => usePromptLinkDraft({ model: undefined, otherDraftSource: false, prompt }), {
+            initialProps: "Draft me",
+        });
+
+        useChatUIStore.getState().clearComposer();
+        rerender(undefined);
+        rerender("Draft me");
+
+        expect(useChatUIStore.getState().composerText).toBe("Draft me");
+        expect(navigate).toHaveBeenCalledTimes(2);
+    });
+
     it("keeps a draft already in the composer, and the chat's model, with a notice", () => {
         useChatUIStore.getState().setComposerText("Mine");
 
