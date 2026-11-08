@@ -22,7 +22,7 @@ import { releaseRetryDelayMs } from "../lib/claim-once";
 import { filterTextOf } from "./filters";
 import { eventInputMessage } from "./event-sources";
 import { canBeQuiet, isQuietRunSkipped, TRIGGER_THREAD_TAG } from "./quiet";
-import { MAX_PAYLOAD_LENGTH, randomFrameId, renderWebhookPrompt } from "./webhook-template";
+import { MAX_PAYLOAD_LENGTH, randomFrameId, renderWebhookPrompt, sliceUnits } from "./webhook-template";
 
 /** Waits before the admission transaction is tried again after it threw: it is all-or-nothing, so a retry cannot charge twice. */
 const ADMISSION_RETRY_DELAYS_MS = [100, 400];
@@ -37,17 +37,7 @@ const MAX_LOGGED_PROMPT_LENGTH = 2000;
 export const promptForLog = (input: string): string | undefined => {
     const agentInput = agentPromptText(input);
 
-    return agentInput === undefined ? undefined : cutOnCodePoint(agentInput, MAX_LOGGED_PROMPT_LENGTH);
-};
-
-/** A high surrogate at the end of a string: the first half of a pair that a cut would split. */
-const TRAILING_HIGH_SURROGATE = /[\uD800-\uDBFF]$/u;
-
-/** The first `max` UTF-16 units, without a surrogate pair cut in two: a lone high surrogate at the end is dropped. */
-export const cutOnCodePoint = (text: string, max: number): string => {
-    const cut = text.slice(0, max);
-
-    return TRAILING_HIGH_SURROGATE.test(cut) ? cut.slice(0, -1) : cut;
+    return agentInput === undefined ? undefined : sliceUnits(agentInput, MAX_LOGGED_PROMPT_LENGTH);
 };
 
 const RELEASE_DEFERRED_NOTE = "Giving this delivery back failed; a retry is scheduled, and a redelivery is refused as a duplicate until it succeeds.";
