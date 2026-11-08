@@ -42,4 +42,13 @@ describe("the notice that an open document blocks a PDF", () => {
 
         expect(dismissToast).toHaveBeenCalledWith(BLOCKED_PDF_NOTICE_ID);
     });
+
+    it("goes when the chat view leaves while a document is still open", () => {
+        useChatUIStore.getState().openCanvas("doc-1");
+        const { unmount } = renderHook(() => useBlockedPdfNoticeLifetime());
+
+        unmount();
+
+        expect(dismissToast).toHaveBeenCalledWith(BLOCKED_PDF_NOTICE_ID);
+    });
 });
