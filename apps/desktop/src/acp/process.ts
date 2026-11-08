@@ -52,32 +52,19 @@ export type Spawner = (plan: SpawnPlan, agentKey: string) => AgentProcess;
 /**
  * Replaces every occurrence of a variable the user set. Agents sometimes echo their environment. The built
  * variables (`HOME`, `PATH`, …) are not secrets and stay readable, or every path in a message would be garbled.
+ * Longest first: a shorter value that is a prefix of a longer one would otherwise leave the longer one's tail.
  */
-/** The values in order, longest first: a shorter secret that is a prefix of a longer one must not hide the longer one's suffix. */
-const longestFirst = (values: string[]): string[] => {
-    const ordered: string[] = [];
-
-    for (const value of values) {
-        const at = ordered.findIndex((other) => other.length < value.length);
-
-        if (at === -1) {
-            ordered.push(value);
-        } else {
-            ordered.splice(at, 0, value);
-        }
-    }
-
-    return ordered;
-};
-
 export const scrub = (text: string, plan: SpawnPlan): string => {
     const values = plan.secretNames
         .map((name) => plan.env[name])
         .filter((value): value is string => value !== undefined && value.length >= MIN_SCRUBBED_LENGTH);
 
+    // `sort` on the list this call built: the desktop's tsconfig `lib` predates `toSorted`.
+    // eslint-disable-next-line unicorn/no-array-sort
+    const longestFirst = values.sort((a, b) => b.length - a.length);
     let result = text;
 
-    for (const value of longestFirst(values)) {
+    for (const value of longestFirst) {
         result = result.split(value).join("***");
     }
 

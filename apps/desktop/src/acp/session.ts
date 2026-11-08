@@ -237,9 +237,10 @@ export class AgentSession {
             this.end(message);
             await this.stopping;
 
-            // The sign-out answer keeps its type (callers tell it from other failures), with the same masked message.
-            if (error instanceof AgentSignedOutError && this.endReason === undefined) {
-                throw new AgentSignedOutError(message);
+            // The sign-out answer keeps its type (callers tell it from other failures). Its text is `endReason`, which
+            // `end` masked: `message` itself is not, and can quote the agent's stderr.
+            if (error instanceof AgentSignedOutError) {
+                throw new AgentSignedOutError(this.endReason ?? message);
             }
 
             // eslint-disable-next-line preserve-caught-error -- the cause is the agent's own error, which can quote its environment
