@@ -29,7 +29,9 @@
   on only with `EXPO_ACCESS_TOKEN` (a Worker secret; unset = no row).
     - Tokens are `pushDevices` rows (global, unique `token`, owner-policied, every
       read `consistency: "primary"`). `registerPushDevice` stamps the caller's
-      session (`sid`; a call without one registers nothing). A row another user
+      sign-in: the app grant's `grantSessionId` (JWT `gsid`, never `sid`:
+      see `auth/AGENTS.md`), else a web `sessionId`; a call without a live one
+      registers nothing. A row another user
       holds moves to the caller (`systemDb`): the latest registration wins (one
       that started before the row's last write is refused as superseded). A
       token is not a secret, so a leaked one can take a phone's pushes until it

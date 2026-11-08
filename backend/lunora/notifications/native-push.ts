@@ -164,10 +164,11 @@ export const registerPushDevice = authMutation
             if (written?.sessionId === sessionId && written.lastSeenAt === now) {
                 // The registration this call replaced goes back only while it is still a live sign-in of an account that
                 // is not being erased: one that signed out or was deleted meanwhile must not come back.
-                const canRestore = replaced !== undefined && (await isLive(replaced)) && !(await isAccountDeletionUnderway(ctx, replaced.userId));
+                const restorable =
+                    replaced !== undefined && (await isLive(replaced)) && !(await isAccountDeletionUnderway(ctx, replaced.userId)) ? replaced : undefined;
 
-                if (canRestore) {
-                    const { lastSeenAt, platform, sessionId: replacedSession, userId: replacedOwner } = replaced!;
+                if (restorable) {
+                    const { lastSeenAt, platform, sessionId: replacedSession, userId: replacedOwner } = restorable;
 
                     await database.patch("pushDevices", written._id, { lastSeenAt, platform, sessionId: replacedSession, userId: replacedOwner });
                     // That account may have registered other phones meanwhile: keep it under the cap.
