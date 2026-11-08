@@ -81,7 +81,10 @@ export const sendExpoMessages = async (accessToken: string, messages: ExpoMessag
     return outcomes;
 };
 
-/** The receipts Expo has for these ids. An id with no receipt yet is simply absent. */
+/**
+ * The receipts Expo has for these ids. An id with no receipt yet is simply absent, and so is one whose entry is not an
+ * object (a malformed answer): absent ids are asked for again, so neither is mistaken for a final error.
+ */
 export const getExpoReceipts = async (accessToken: string, ids: string[]): Promise<Record<string, ExpoOutcome>> => {
     const receipts: Record<string, ExpoOutcome> = {};
 
@@ -91,7 +94,9 @@ export const getExpoReceipts = async (accessToken: string, ids: string[]): Promi
         const entries = Object.entries((data ?? {}) as Record<string, unknown>);
 
         for (const [id, receipt] of entries) {
-            receipts[id] = errorOf((receipt ?? {}) as Parameters<typeof errorOf>[0]);
+            if (typeof receipt === "object" && receipt !== null) {
+                receipts[id] = errorOf(receipt as Parameters<typeof errorOf>[0]);
+            }
         }
     }
 

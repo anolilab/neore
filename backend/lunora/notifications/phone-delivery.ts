@@ -301,20 +301,22 @@ export const checkPushReceipts = internalAction
             pending: pending.length,
         });
 
-        const retryDelay = RECEIPT_RETRY_DELAYS_MS[attempt];
-
-        if (pending.length > 0 && retryDelay !== undefined) {
-            await ctx.scheduler.runAfter(retryDelay, internal.notifications.phone_delivery.checkPushReceipts, { attempt: attempt + 1, entries: pending });
-        }
-
         if (gone.length > 0) {
-            // Not retried: a retry would schedule the pending check above a second time. The phone stays until a
-            // later send reports it gone.
+            // Before the next check is scheduled, so a failed schedule cannot keep a known-dead phone. A failed drop
+            // is logged; the phone stays until a later send or receipt reports it gone.
             try {
                 await ctx.runMutation(internal.notifications.phone_delivery.recordPushDeliveries, { gone });
             } catch (error) {
                 console.warn("[notifications] Could not drop phones a receipt reported gone:", error);
             }
+        }
+
+        // Last: if this throws, the scheduler retries the whole check, which reads the receipts again; the drop above
+        // is idempotent, and nothing was queued yet.
+        const retryDelay = RECEIPT_RETRY_DELAYS_MS[attempt];
+
+        if (pending.length > 0 && retryDelay !== undefined) {
+            await ctx.scheduler.runAfter(retryDelay, internal.notifications.phone_delivery.checkPushReceipts, { attempt: attempt + 1, entries: pending });
         }
 
         return null;

@@ -78,6 +78,12 @@ describe("getExpoReceipts", () => {
         expect(JSON.parse(fetchMock.mock.calls[0]![1]?.body as string)).toStrictEqual({ ids: ["r1", "r2", "r3"] });
         expect(receipts).toStrictEqual({ r1: { status: "ok" }, r2: { error: "MessageRateExceeded", message: "slow down", status: "error" } });
     });
+
+    it("leaves a malformed receipt absent, so it is asked for again rather than taken as a final error", async () => {
+        fetchMock.mockResolvedValueOnce(Response.json({ data: { r1: null, r2: "nope", r3: { status: "ok" } } }));
+
+        expect(await getExpoReceipts("secret", ["r1", "r2", "r3"])).toStrictEqual({ r3: { status: "ok" } });
+    });
 });
 
 describe("isDeviceGone", () => {

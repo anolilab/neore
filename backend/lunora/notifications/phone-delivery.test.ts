@@ -240,6 +240,16 @@ describe("deliverToPhones", () => {
         vi.spyOn(console, "warn").mockImplementation(() => undefined);
     });
 
+    it("never fails the send when the receipt check cannot be scheduled: a retry would send the alert again", async () => {
+        const ctx = actionCtx([{ id: "d1", platform: "ios", sessionId: "s1", token: PHONE }]);
+
+        vi.mocked(sendExpoMessages).mockResolvedValueOnce([{ id: "r1", status: "ok" }]);
+        ctx.scheduler.runAfter.mockRejectedValueOnce(new Error("scheduler unavailable") as never);
+
+        await expect(deliverToPhones(ctx as never, USER, { notificationId: "n1", urgency: "normal" })).resolves.toBeUndefined();
+        expect(ctx.log.event).toHaveBeenCalledWith("notifications.native_push", { delivered: 1, failed: 0, gone: 0 });
+    });
+
     it("checks no receipt for a ticket that came back without an id", async () => {
         const ctx = actionCtx([{ id: "d1", platform: "ios", sessionId: "s1", token: PHONE }]);
 
@@ -404,6 +414,18 @@ describe("checkPushReceipts", () => {
         expect(ctx.scheduler.runAfter).toHaveBeenCalledWith(RECEIPT_RETRY_DELAYS_MS[0], internal.notifications.phone_delivery.checkPushReceipts, {
             attempt: 1,
             entries: [entry(4)],
+        });
+    });
+
+    it("drops a known-dead phone even when the next check cannot be scheduled", async () => {
+        const ctx = receiptCtx();
+
+        vi.mocked(getExpoReceipts).mockResolvedValueOnce({ r1: { error: "DeviceNotRegistered", message: "gone", status: "error" } });
+        ctx.scheduler.runAfter.mockRejectedValueOnce(new Error("scheduler unavailable") as never);
+
+        await expect((checkPushReceipts as unknown as Handler<null>).handler(ctx, { attempt: 0, entries: [entry(1), entry(2)] })).rejects.toThrow();
+        expect(ctx.runMutation).toHaveBeenCalledWith(internal.notifications.phone_delivery.recordPushDeliveries, {
+            gone: [{ id: "d1", sentAt: 5, sessionId: "s1", userId: USER }],
         });
     });
 
