@@ -59,4 +59,6 @@ ThreadRoute }`, `{ id: "(chat)", route: ChatLayoutRoute }` for a pathless group.
   (`optimizeDeps.entries`) misses packages reached only through a lazy import: add `<name>` to `optimizeDeps.include`
   in `.storybook/vite.config.ts`. On a warm cache a new story can trigger it once; run again.
 - New UI strings need `pnpm --filter @neore/web run translate:extract` and `translate:compile`.
-- `.storybook/public/mockServiceWorker.js` is written by `msw` on install (`package.json#msw.workerDirectory`).
+- `.storybook/public/mockServiceWorker.js` must be the installed `msw`'s worker (`mock-service-worker.guard.test.ts`);
+  msw 3 has no postinstall. After an msw bump: `pnpm --filter @neore/web exec msw init` (no path: it writes every
+  `package.json#msw.workerDirectory`, no prompt).
