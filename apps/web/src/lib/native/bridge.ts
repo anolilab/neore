@@ -298,7 +298,7 @@ export interface NativeHostReconnect {
     attempt: number | null;
     maxAttempts: number;
     phase: "connecting" | "gaveUp" | "waiting";
-    /** Why it gave up. */
+    /** Why the last attempt failed: set while waiting or connecting after a failure, and when it gave up. Free text from ssh. */
     reason: string | null;
 }
 
