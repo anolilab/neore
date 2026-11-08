@@ -1,5 +1,5 @@
 /**
- * Expo's push API: send messages. Every request carries
+ * Expo's push API: send messages, then read their receipts. Every request carries
  * the access token (push security on), so a leaked phone token alone cannot be
  * used to push to our users. Runs only inside actions: these are external calls.
  *
@@ -9,9 +9,11 @@
 import { fetchWithDeadline } from "../lib/fetch-timeout";
 
 const EXPO_SEND_URL = "https://exp.host/--/api/v2/push/send";
+const EXPO_RECEIPTS_URL = "https://exp.host/--/api/v2/push/getReceipts";
 
-/** Expo takes at most 100 messages per send request. */
+/** Expo takes at most 100 messages per send request and 1000 ids per receipt request. */
 const SEND_BATCH = 100;
+const RECEIPT_BATCH = 1000;
 
 const TIMEOUT_MS = 10_000;
 
@@ -77,6 +79,23 @@ export const sendExpoMessages = async (accessToken: string, messages: ExpoMessag
     }
 
     return outcomes;
+};
+
+/** The receipts Expo has for these ids. An id with no receipt yet is simply absent. */
+export const getExpoReceipts = async (accessToken: string, ids: string[]): Promise<Record<string, ExpoOutcome>> => {
+    const receipts: Record<string, ExpoOutcome> = {};
+
+    for (const batch of chunk(ids, RECEIPT_BATCH)) {
+        const data = await post(EXPO_RECEIPTS_URL, accessToken, { ids: batch });
+
+        const entries = Object.entries((data ?? {}) as Record<string, unknown>);
+
+        for (const [id, receipt] of entries) {
+            receipts[id] = errorOf((receipt ?? {}) as Parameters<typeof errorOf>[0]);
+        }
+    }
+
+    return receipts;
 };
 
 /** The one error that means the phone will never take a push again; the row is deleted only for this. */

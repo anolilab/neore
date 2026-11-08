@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { ExpoMessage } from "./expo-push";
-import { isDeviceGone, sendExpoMessages } from "./expo-push";
+import { getExpoReceipts, isDeviceGone, sendExpoMessages } from "./expo-push";
 
 const fetchMock = vi.fn<typeof fetch>();
 
@@ -64,6 +64,19 @@ describe("sendExpoMessages", () => {
         fetchMock.mockResolvedValueOnce(Response.json({ errors: [{ code: "UNAUTHORIZED" }] }, { status: 401 }));
 
         await expect(sendExpoMessages("wrong", [message(1)])).rejects.toThrow("Expo push API answered 401");
+    });
+});
+
+describe("getExpoReceipts", () => {
+    it("reads receipts by id; an id Expo has nothing for yet is absent", async () => {
+        fetchMock.mockResolvedValueOnce(
+            Response.json({ data: { r1: { status: "ok" }, r2: { details: { error: "MessageRateExceeded" }, message: "slow down", status: "error" } } }),
+        );
+
+        const receipts = await getExpoReceipts("secret", ["r1", "r2", "r3"]);
+
+        expect(JSON.parse(fetchMock.mock.calls[0]![1]?.body as string)).toStrictEqual({ ids: ["r1", "r2", "r3"] });
+        expect(receipts).toStrictEqual({ r1: { status: "ok" }, r2: { error: "MessageRateExceeded", message: "slow down", status: "error" } });
     });
 });
 

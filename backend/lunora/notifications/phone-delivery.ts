@@ -4,7 +4,7 @@
  * What leaves our infrastructure is a generic alert and opaque ids, never a thread or run title: every phone shows
  * the localised placeholder (`push-text.ts`), with only `notificationId`/`threadId` as data. A phone is sent to only
  * while the sign-in that registered it lives (`native-push.ts`). `notify()` schedules {@link sendPhonePush}, which
- * sends through {@link deliverToPhones}.
+ * sends through {@link deliverToPhones}; receipts are read {@link RECEIPT_DELAY_MS} later ({@link checkPushReceipts}).
  */
 import { v } from "lunorash/server";
 
@@ -13,7 +13,7 @@ import { internal } from "../_generated/internal";
 import type { ActionCtx } from "../_generated/server";
 import { internalAction, internalMutation, internalQuery } from "../_generated/server";
 import type { ExpoMessage, ExpoOutcome } from "./expo-push";
-import { isDeviceGone, sendExpoMessages } from "./expo-push";
+import { getExpoReceipts, isDeviceGone, sendExpoMessages } from "./expo-push";
 import type { PhonePlatform } from "./native-push-config";
 import { expoAccessToken } from "./native-push-config";
 import { MAX_PUSH_DEVICES_PER_USER } from "./push-device-writes";
@@ -21,6 +21,17 @@ import { threadIdOfLink } from "./locked-link";
 import { PHONE_PLACEHOLDER_TITLE, phonePlaceholderBody, pushUrgency } from "./push-text";
 
 const vPlatform = v.union(v.literal("android"), v.literal("ios"));
+
+/** Expo advises reading receipts about 15 minutes after the send; it keeps them for a day. */
+export const RECEIPT_DELAY_MS = 15 * 60 * 1000;
+
+/**
+ * When a receipt is not there yet (or Expo did not answer), it is asked for again after these delays; the last retry
+ * lands well inside the 24 hours Expo keeps receipts.
+ */
+export const RECEIPT_RETRY_DELAYS_MS: ReadonlyArray<number> = [30 * 60 * 1000, 2 * 60 * 60 * 1000, 6 * 60 * 60 * 1000];
+
+const vReceiptEntry = v.object({ deviceId: v.id("pushDevices"), receiptId: v.string(), sentAt: v.number(), sessionId: v.string(), userId: v.string() });
 
 /** A phone that was off this long gets nothing late; matches the Web Push TTL. */
 const PUSH_TTL_SECONDS = 24 * 60 * 60;
@@ -163,6 +174,7 @@ export const deliverToPhones = async (ctx: ActionCtx, userId: string, message: P
     }
 
     const gone: { id: (typeof devices)[number]["id"]; sentAt: number; sessionId: string; userId: string }[] = [];
+    const receipts: { deviceId: (typeof devices)[number]["id"]; receiptId: string; sentAt: number; sessionId: string; userId: string }[] = [];
     let delivered = 0;
     let failed = 0;
 
@@ -171,6 +183,11 @@ export const deliverToPhones = async (ctx: ActionCtx, userId: string, message: P
 
         if (outcome.status === "ok") {
             delivered += 1;
+
+            // A ticket without an id has no receipt to read; the phone is checked again on its next send.
+            if (outcome.id !== undefined) {
+                receipts.push({ deviceId: device.id, receiptId: outcome.id, sentAt, sessionId: device.sessionId, userId });
+            }
         } else if (isDeviceGone(outcome)) {
             gone.push({ id: device.id, sentAt, sessionId: device.sessionId, userId });
         } else {
@@ -189,6 +206,15 @@ export const deliverToPhones = async (ctx: ActionCtx, userId: string, message: P
         } catch (error) {
             // The phone stays until a later send (or its receipt) reports it gone again.
             console.warn("[notifications] Could not drop phones Expo reported gone:", error);
+        }
+    }
+
+    // A failed schedule must not fail the job after the send: a retry would send the phones the alert again.
+    if (receipts.length > 0) {
+        try {
+            await ctx.scheduler.runAfter(RECEIPT_DELAY_MS, internal.notifications.phone_delivery.checkPushReceipts, { attempt: 0, entries: receipts });
+        } catch (error) {
+            console.warn("[notifications] Could not schedule the phone push receipt check:", error);
         }
     }
 };
@@ -214,6 +240,82 @@ export const sendPhonePush = internalAction
             urgency: pushUrgency(notification.type),
             ...(threadId !== undefined && { threadId }),
         });
+
+        return null;
+    });
+
+/**
+ * Reads the receipts of a send. Only `DeviceNotRegistered` drops a phone (with the same owner, session and last-seen
+ * check as a send); any other error is logged by its code and the phone kept (a credential or rate problem is ours,
+ * not the phone's). A receipt Expo does not have yet, or a request Expo does not answer, is asked for again on
+ * {@link RECEIPT_RETRY_DELAYS_MS}, so a dead phone is still found.
+ */
+export const checkPushReceipts = internalAction
+    .input({ attempt: v.optional(v.number()), entries: v.array(vReceiptEntry) })
+    .output(v.null())
+    .action(async ({ args, ctx }) => {
+        const accessToken = expoAccessToken(process.env);
+
+        if (!accessToken || args.entries.length === 0) {
+            return null;
+        }
+
+        const attempt = args.attempt ?? 0;
+        let receipts: Awaited<ReturnType<typeof getExpoReceipts>> = {};
+        let isAnswered = true;
+
+        try {
+            receipts = await getExpoReceipts(
+                accessToken,
+                args.entries.map((entry) => entry.receiptId),
+            );
+        } catch (error) {
+            isAnswered = false;
+            console.warn("[notifications] Phone push receipts could not be read:", error);
+        }
+
+        const gone: { id: (typeof args.entries)[number]["deviceId"]; sentAt: number; sessionId: string; userId: string }[] = [];
+        const pending: (typeof args.entries)[number][] = [];
+        let failed = 0;
+
+        for (const entry of args.entries) {
+            const receipt = receipts[entry.receiptId];
+
+            if (isDeviceGone(receipt)) {
+                gone.push({ id: entry.deviceId, sentAt: entry.sentAt, sessionId: entry.sessionId, userId: entry.userId });
+            } else if (receipt?.status === "error") {
+                failed += 1;
+                // The error code only: Expo's message can quote the push token, which stays out of the logs.
+                console.warn(`[notifications] Phone push receipt error: ${receipt.error ?? "unknown error"}`);
+            } else if (receipt === undefined) {
+                pending.push(entry);
+            }
+        }
+
+        ctx.log.event("notifications.native_push_receipts", {
+            answered: isAnswered,
+            attempt,
+            checked: args.entries.length,
+            failed,
+            gone: gone.length,
+            pending: pending.length,
+        });
+
+        const retryDelay = RECEIPT_RETRY_DELAYS_MS[attempt];
+
+        if (pending.length > 0 && retryDelay !== undefined) {
+            await ctx.scheduler.runAfter(retryDelay, internal.notifications.phone_delivery.checkPushReceipts, { attempt: attempt + 1, entries: pending });
+        }
+
+        if (gone.length > 0) {
+            // Not retried: a retry would schedule the pending check above a second time. The phone stays until a
+            // later send reports it gone.
+            try {
+                await ctx.runMutation(internal.notifications.phone_delivery.recordPushDeliveries, { gone });
+            } catch (error) {
+                console.warn("[notifications] Could not drop phones a receipt reported gone:", error);
+            }
+        }
 
         return null;
     });

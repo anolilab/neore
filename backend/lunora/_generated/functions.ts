@@ -1071,6 +1071,7 @@ export const LUNORA_FUNCTION_MANIFEST: Readonly<Record<string, FunctionManifestE
     "notifications_native_push:getNativePushConfig": {"argumentDescriptors":[],"exportName":"getNativePushConfig","kind":"query","moduleId":"lunora_notifications_native_push_166","visibility":"public"},
     "notifications_native_push:registerPushDevice": {"argumentDescriptors":[{"kind":"union","name":"platform","optional":false},{"kind":"string","name":"token","optional":false}],"exportName":"registerPushDevice","kind":"mutation","moduleId":"lunora_notifications_native_push_166","visibility":"public"},
     "notifications_native_push:unregisterPushDevice": {"argumentDescriptors":[{"kind":"string","name":"token","optional":false}],"exportName":"unregisterPushDevice","kind":"mutation","moduleId":"lunora_notifications_native_push_166","visibility":"public"},
+    "notifications_phone_delivery:checkPushReceipts": {"argumentDescriptors":[{"kind":"number","name":"attempt","optional":true},{"kind":"array","name":"entries","optional":false,"element":"object"}],"exportName":"checkPushReceipts","kind":"action","moduleId":"lunora_notifications_phone_delivery_167","visibility":"internal"},
     "notifications_phone_delivery:listPushDevicesForUser": {"argumentDescriptors":[{"kind":"string","name":"userId","optional":false}],"exportName":"listPushDevicesForUser","kind":"query","moduleId":"lunora_notifications_phone_delivery_167","visibility":"internal"},
     "notifications_phone_delivery:recordPushDeliveries": {"argumentDescriptors":[{"kind":"array","name":"gone","optional":false,"element":"object"}],"exportName":"recordPushDeliveries","kind":"mutation","moduleId":"lunora_notifications_phone_delivery_167","visibility":"internal"},
     "notifications_phone_delivery:sendPhonePush": {"argumentDescriptors":[{"kind":"id","name":"notificationId","optional":false,"table":"notifications"},{"kind":"string","name":"userId","optional":false}],"exportName":"sendPhonePush","kind":"action","moduleId":"lunora_notifications_phone_delivery_167","visibility":"internal"},
@@ -2814,6 +2815,7 @@ export const LUNORA_FUNCTIONS: Record<string, RegisteredLunoraFunction> = {
     "notifications_native_push:getNativePushConfig": { args: {}, handler: unloadedFunctionHandler, "argumentDescriptors":[],"kind":"query","visibility":"public" } satisfies RegisteredLunoraFunction & Pick<FunctionManifestEntry, "argumentDescriptors" | "channel" | "expose">,
     "notifications_native_push:registerPushDevice": { args: {}, handler: unloadedFunctionHandler, "argumentDescriptors":[{"kind":"union","name":"platform","optional":false},{"kind":"string","name":"token","optional":false}],"kind":"mutation","visibility":"public" } satisfies RegisteredLunoraFunction & Pick<FunctionManifestEntry, "argumentDescriptors" | "channel" | "expose">,
     "notifications_native_push:unregisterPushDevice": { args: {}, handler: unloadedFunctionHandler, "argumentDescriptors":[{"kind":"string","name":"token","optional":false}],"kind":"mutation","visibility":"public" } satisfies RegisteredLunoraFunction & Pick<FunctionManifestEntry, "argumentDescriptors" | "channel" | "expose">,
+    "notifications_phone_delivery:checkPushReceipts": { args: {}, handler: unloadedFunctionHandler, "argumentDescriptors":[{"kind":"number","name":"attempt","optional":true},{"kind":"array","name":"entries","optional":false,"element":"object"}],"kind":"action","visibility":"internal" } satisfies RegisteredLunoraFunction & Pick<FunctionManifestEntry, "argumentDescriptors" | "channel" | "expose">,
     "notifications_phone_delivery:listPushDevicesForUser": { args: {}, handler: unloadedFunctionHandler, "argumentDescriptors":[{"kind":"string","name":"userId","optional":false}],"kind":"query","visibility":"internal" } satisfies RegisteredLunoraFunction & Pick<FunctionManifestEntry, "argumentDescriptors" | "channel" | "expose">,
     "notifications_phone_delivery:recordPushDeliveries": { args: {}, handler: unloadedFunctionHandler, "argumentDescriptors":[{"kind":"array","name":"gone","optional":false,"element":"object"}],"kind":"mutation","visibility":"internal" } satisfies RegisteredLunoraFunction & Pick<FunctionManifestEntry, "argumentDescriptors" | "channel" | "expose">,
     "notifications_phone_delivery:sendPhonePush": { args: {}, handler: unloadedFunctionHandler, "argumentDescriptors":[{"kind":"id","name":"notificationId","optional":false,"table":"notifications"},{"kind":"string","name":"userId","optional":false}],"kind":"action","visibility":"internal" } satisfies RegisteredLunoraFunction & Pick<FunctionManifestEntry, "argumentDescriptors" | "channel" | "expose">,
@@ -4663,6 +4665,7 @@ export interface Caller {
             unregisterPushDevice: (args: { token: string }) => Promise<null>;
         };
         phone_delivery: {
+            checkPushReceipts: (args: { attempt?: number; entries: Array<{ deviceId: Id<"pushDevices">; receiptId: string; sentAt: number; sessionId: string; userId: string }> }) => Promise<null>;
             listPushDevicesForUser: (args: { userId: string }) => Promise<{ ended: Array<{ id: Id<"pushDevices">; lastSeenAt: number; sessionId: string }>; live: Array<{ id: Id<"pushDevices">; platform: "android" | "ios"; sessionId: string; token: string }> }>;
             recordPushDeliveries: (args: { gone: Array<{ id: Id<"pushDevices">; sentAt: number; sessionId: string; userId: string }> }) => Promise<null>;
             sendPhonePush: (args: { notificationId: Id<"notifications">; userId: string }) => Promise<null>;
@@ -6659,6 +6662,7 @@ export const createCaller = (context: CallerCtx): Caller => ({
             unregisterPushDevice: (args) => callRegistered(context, "notifications_native_push:unregisterPushDevice", args),
         },
         phone_delivery: {
+            checkPushReceipts: (args) => callRegistered(context, "notifications_phone_delivery:checkPushReceipts", args),
             listPushDevicesForUser: (args) => callRegistered(context, "notifications_phone_delivery:listPushDevicesForUser", args),
             recordPushDeliveries: (args) => callRegistered(context, "notifications_phone_delivery:recordPushDeliveries", args),
             sendPhonePush: (args) => callRegistered(context, "notifications_phone_delivery:sendPhonePush", args),
