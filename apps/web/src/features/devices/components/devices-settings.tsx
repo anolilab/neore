@@ -120,6 +120,22 @@ export const StartAgents: FC<{ device: DeviceView; online: boolean }> = ({ devic
 const CONNECTION_LOST = "the connection was lost";
 const GAVE_UP = / \(gave up after (\d+) attempts\)$/u;
 
+/** The longest failure a row or a toast shows, as the device core caps its own (`lifecycle.rs`). */
+const MAX_FAILURE_CHARS = 300;
+
+/** `text` cut to {@link MAX_FAILURE_CHARS} in the middle, so its start and the advice at its end both stay. */
+const cutFailure = (text: string): string => {
+    const characters = [...text];
+
+    if (characters.length <= MAX_FAILURE_CHARS) {
+        return text;
+    }
+
+    const head = Math.floor((MAX_FAILURE_CHARS - 1) / 2);
+
+    return `${characters.slice(0, head).join("")}…${characters.slice(characters.length - (MAX_FAILURE_CHARS - 1 - head)).join("")}`;
+};
+
 export const DeviceRow: FC<{
     connected?: boolean;
     device: DeviceView;
@@ -187,7 +203,7 @@ export const DeviceRow: FC<{
             try {
                 await action();
             } catch (error) {
-                const message = error instanceof Error ? error.message : t`Could not connect to the server.`;
+                const message = cutFailure(error instanceof Error ? error.message : t`Could not connect to the server.`);
 
                 if (mine === latestAction.current) {
                     setActionFailure(message);

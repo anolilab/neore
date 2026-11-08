@@ -164,6 +164,12 @@ describe("<DeviceRow> connection failure", () => {
         await waitFor(() => expect(screen.getByRole("status").textContent).toBe("Permission denied (publickey)."));
         expect(screen.getByRole("button", { name: "Connect" }).getAttribute("aria-describedby")).toBe("device-error-s1");
 
+        // A long failure is cut in the middle, keeping its end.
+        bridge.connect.mockRejectedValueOnce(new Error(`${"x".repeat(400)} connect again`));
+        await press(screen.getByRole("button", { name: "Connect" }));
+        await waitFor(() => expect(screen.getByRole("status").textContent?.endsWith("connect again")).toBe(true));
+        expect([...(screen.getByRole("status").textContent ?? "")]).toHaveLength(300);
+
         // Connected from elsewhere, then let go: the earlier failure explains nothing any more.
         view.rerender(rowElement(undefined, true));
         view.rerender(rowElement(undefined, false));
