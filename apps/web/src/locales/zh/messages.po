@@ -25,11 +25,11 @@ msgstr " · 模型：{modelFilter}"
 msgid "- {0, plural, one {# row} other {# rows}}, {1, plural, one {# column} other {# columns}}"
 msgstr "- {0, plural, other {# 行}}，{1, plural, other {# 列}}"
 
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:602
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:620
 msgid "-- INSERT --"
 msgstr "-- 插入 --"
 
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:602
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:620
 msgid "-- NORMAL --"
 msgstr "-- 普通 --"
 
@@ -52,23 +52,23 @@ msgstr "“{0}” 中有变量需要填写。"
 msgid "\"{0}\" will start once its dependencies are done"
 msgstr "“{0}” 将在其依赖项完成后开始"
 
-#: src/features/chat/thread/composer-input.tsx:611
+#: src/features/chat/thread/composer-input.tsx:612
 msgid "\"{fileName}\" cannot be attached: this file type is not supported."
 msgstr "无法附加“{fileName}”：不支持此文件类型。"
 
-#: src/features/chat/thread/composer-input.tsx:604
+#: src/features/chat/thread/composer-input.tsx:605
 msgid "\"{fileName}\" could not be attached: its contents do not match its file type."
 msgstr "无法附加“{fileName}”：文件内容与其文件类型不符。"
 
-#: src/features/chat/thread/composer-input.tsx:606
+#: src/features/chat/thread/composer-input.tsx:607
 msgid "\"{fileName}\" could not be uploaded. Check your connection and try again."
 msgstr "无法上传“{fileName}”。请检查你的网络连接，然后重试。"
 
-#: src/features/chat/thread/composer-input.tsx:609
+#: src/features/chat/thread/composer-input.tsx:610
 msgid "\"{fileName}\" is too large. Documents can be at most {maxMegabytes} MB."
 msgstr "“{fileName}”太大了。文档最大为 {maxMegabytes} MB。"
 
-#: src/features/chat/thread/composer-input.tsx:610
+#: src/features/chat/thread/composer-input.tsx:611
 msgid "\"{fileName}\" is too large. Files of this type can be at most {maxMegabytes} MB."
 msgstr "“{fileName}”太大了。此类文件最大为 {maxMegabytes} MB。"
 
@@ -2052,7 +2052,7 @@ msgstr "添加评论"
 msgid "Add a member from your organization to <0>{0}</0>"
 msgstr "从你的组织中添加成员到 <0>{0}</0>"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:283
+#: src/features/auth/components/organization/billing-settings-card.tsx:246
 #: src/features/auth/components/team/team-settings-dialog.tsx:191
 msgid "Add a model..."
 msgstr "添加模型..."
@@ -3127,7 +3127,7 @@ msgstr ""
 msgid "Allow this site ({0})"
 msgstr "允许此网站（{0}）"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:253
+#: src/features/auth/components/organization/billing-settings-card.tsx:216
 #: src/features/auth/components/team/team-settings-dialog.tsx:170
 msgid "Allowed AI Models"
 msgstr "允许的 AI 模型"
@@ -4589,17 +4589,22 @@ msgstr "费用计入你自己的 API 密钥，而非你的积分。"
 msgid "Billing"
 msgstr "账单"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:234
+#: src/features/auth/components/organization/billing-settings-card.tsx:313
+msgid "Billing details for this organization"
+msgstr ""
+
+#: src/features/auth/components/organization/billing-settings-card.tsx:194
 msgid "Billing Email"
 msgstr "账单邮箱"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:137
-#: src/features/auth/components/organization/billing-settings-card.tsx:168
-#: src/features/auth/components/organization/billing-settings-card.tsx:313
+#: src/features/auth/components/organization/billing-settings-card.tsx:136
+#: src/features/auth/components/organization/billing-settings-card.tsx:274
+#: src/features/auth/components/organization/billing-settings-card.tsx:314
+#: src/features/auth/components/organization/billing-settings-card.tsx:337
 msgid "Billing Settings"
 msgstr "账单设置"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:91
+#: src/features/auth/components/organization/billing-settings-card.tsx:83
 msgid "Billing settings updated successfully"
 msgstr "账单设置已更新"
 
@@ -5204,7 +5209,7 @@ msgstr "加拿大"
 #: src/features/admin/components/ban-user-dialog.tsx:146
 #: src/features/admin/components/impersonate-user-dialog.tsx:79
 #: src/features/admin/components/update-user-role-dialog.tsx:60
-#: src/features/auth/components/organization/create-organization-dialog.tsx:336
+#: src/features/auth/components/organization/create-organization-dialog.tsx:339
 #: src/features/auth/components/organization/delete-organization-dialog.tsx:144
 #: src/features/auth/components/organization/leave-organization-dialog.tsx:91
 #: src/features/auth/components/organization/remove-member-dialog.tsx:83
@@ -6156,7 +6161,7 @@ msgstr "点击任意消息上的图钉图标即可保存到这里。"
 msgid "Click the star on any model in All models to add it here."
 msgstr "在“所有模型”中点击任意模型的星标即可将其添加到这里。"
 
-#: src/features/chat/thread/composer-input.tsx:309
+#: src/features/chat/thread/composer-input.tsx:310
 msgid "Click to edit"
 msgstr "点击编辑"
 
@@ -6967,8 +6972,8 @@ msgstr "配置团队“{teamName}”的设置"
 msgid "Configure team settings"
 msgstr "配置团队设置"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:165
-#: src/features/auth/components/organization/billing-settings-card.tsx:311
+#: src/features/auth/components/organization/billing-settings-card.tsx:135
+#: src/features/auth/components/organization/billing-settings-card.tsx:272
 msgid "Configure the billing contact and available AI models"
 msgstr "配置账单联系人和可用的 AI 模型"
 
@@ -7545,8 +7550,8 @@ msgstr ""
 msgid "Conversations on lines this diff no longer shows"
 msgstr ""
 
-#: src/features/chat/thread/composer-input.tsx:795
-#: src/features/chat/thread/composer-input.tsx:1403
+#: src/features/chat/thread/composer-input.tsx:796
+#: src/features/chat/thread/composer-input.tsx:1420
 msgid "Conversion failed"
 msgstr "转换失败"
 
@@ -7629,7 +7634,7 @@ msgstr "已复制！"
 #: src/features/auth/components/settings/two-factor/backup-codes-dialog.tsx:100
 #: src/features/chat/sharing/thread-share-button.tsx:366
 #: src/features/chat/thread/message-item.tsx:356
-#: src/features/chat/thread/text-selection-menu.tsx:526
+#: src/features/chat/thread/text-selection-menu.tsx:525
 #: src/features/settings/components/chat/trigger-settings.tsx:766
 #: src/features/skills/components/bundle-import-dialog.tsx:207
 msgid "Copy"
@@ -7852,7 +7857,7 @@ msgstr "无法附加 {0}。其他文件已附加；请重试这些文件。"
 msgid "Could not attach {0}. Try those again."
 msgstr "无法附加 {0}。请重试。"
 
-#: src/features/chat/thread/composer-input.tsx:1425
+#: src/features/chat/thread/composer-input.tsx:1442
 msgid "Could not attach the chat"
 msgstr "无法附加该聊天"
 
@@ -8033,6 +8038,10 @@ msgstr "无法加载工具：{error}"
 msgid "Could not load your activity."
 msgstr "无法加载你的活动。"
 
+#: src/features/auth/components/organization/billing-settings-card.tsx:319
+msgid "Could not load your organization's billing details. Try again later."
+msgstr ""
+
 #: src/features/pages/components/pages-sidebar.tsx:108
 msgid "Could not move the page"
 msgstr "无法移动页面"
@@ -8080,11 +8089,11 @@ msgstr ""
 msgid "Could not reach the server. Try again."
 msgstr ""
 
-#: src/features/chat/thread/composer-input.tsx:1428
+#: src/features/chat/thread/composer-input.tsx:1445
 msgid "Could not read that chat"
 msgstr "无法读取该聊天"
 
-#: src/features/chat/thread/composer-input.tsx:1429
+#: src/features/chat/thread/composer-input.tsx:1446
 msgid "Could not read that chat. If it is locked, unlock it first."
 msgstr "无法读取该聊天。如果已锁定，请先解锁。"
 
@@ -8293,7 +8302,7 @@ msgstr "创建新的 API 密钥，以编程方式访问你的账号"
 msgid "Create a new branch from this message. Give it a name to help you identify it later."
 msgstr "从这条消息创建新分支。给它起个名字，方便以后识别。"
 
-#: src/features/auth/components/organization/create-organization-dialog.tsx:171
+#: src/features/auth/components/organization/create-organization-dialog.tsx:174
 msgid "Create a new organization to collaborate with your team"
 msgstr "创建新组织，与你的团队协作"
 
@@ -8417,8 +8426,8 @@ msgstr "请在评测页面中创建一个。"
 msgid "Create organization"
 msgstr "创建组织"
 
-#: src/features/auth/components/organization/create-organization-dialog.tsx:168
-#: src/features/auth/components/organization/create-organization-dialog.tsx:350
+#: src/features/auth/components/organization/create-organization-dialog.tsx:171
+#: src/features/auth/components/organization/create-organization-dialog.tsx:353
 #: src/features/auth/components/organization/organizations-card.tsx:37
 msgid "Create Organization"
 msgstr "创建组织"
@@ -8594,8 +8603,8 @@ msgstr "希望用单个前沿品质模型同时生成和编辑图像的创作者
 msgid "Credits"
 msgstr "积分"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:145
-#: src/features/auth/components/organization/billing-settings-card.tsx:186
+#: src/features/auth/components/organization/billing-settings-card.tsx:146
+#: src/features/auth/components/organization/billing-settings-card.tsx:345
 msgid "Credits per user:"
 msgstr "每位用户的积分："
 
@@ -8692,8 +8701,8 @@ msgstr "当前方案："
 msgid "Current Prompt Variables"
 msgstr "当前提示词变量"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:142
-#: src/features/auth/components/organization/billing-settings-card.tsx:183
+#: src/features/auth/components/organization/billing-settings-card.tsx:143
+#: src/features/auth/components/organization/billing-settings-card.tsx:342
 msgid "Current tier:"
 msgstr "当前等级："
 
@@ -9372,7 +9381,7 @@ msgstr "删除目标 {title}"
 msgid "Delete group and children"
 msgstr "删除分组及其子节点"
 
-#: src/features/auth/components/organization/create-organization-dialog.tsx:246
+#: src/features/auth/components/organization/create-organization-dialog.tsx:249
 #: src/features/auth/components/organization/organization-logo-card.tsx:162
 msgid "Delete Logo"
 msgstr "删除徽标"
@@ -10399,7 +10408,7 @@ msgstr "拖放文件或点击上传"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-file.tsx:686
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-file.tsx:765
-#: src/features/chat/thread/composer-input.tsx:1613
+#: src/features/chat/thread/composer-input.tsx:1630
 msgid "Drop files here"
 msgstr "将文件拖放到此处"
 
@@ -10688,8 +10697,8 @@ msgstr "编辑集合"
 msgid "Edit comment"
 msgstr ""
 
-#: src/features/chat/thread/composer-input.tsx:316
-#: src/features/chat/thread/composer-input.tsx:328
+#: src/features/chat/thread/composer-input.tsx:317
+#: src/features/chat/thread/composer-input.tsx:329
 msgid "Edit content"
 msgstr "编辑内容"
 
@@ -11330,7 +11339,7 @@ msgstr "请输入有效的 AWS 区域，例如 us-east-1"
 msgid "Enter an API version such as v1 or 2024-10-21"
 msgstr "请输入 API 版本，例如 v1 或 2024-10-21"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:241
+#: src/features/auth/components/organization/billing-settings-card.tsx:203
 msgid "Enter billing email"
 msgstr "输入账单邮箱"
 
@@ -11364,12 +11373,12 @@ msgstr "输入模型 ID（例如“llama-4-scout”）..."
 msgid "Enter new password"
 msgstr "输入新密码"
 
-#: src/features/auth/components/organization/create-organization-dialog.tsx:274
+#: src/features/auth/components/organization/create-organization-dialog.tsx:277
 #: src/features/auth/components/organization/organization-name-card.tsx:125
 msgid "Enter organization name"
 msgstr "输入组织名称"
 
-#: src/features/auth/components/organization/create-organization-dialog.tsx:299
+#: src/features/auth/components/organization/create-organization-dialog.tsx:302
 #: src/features/auth/components/organization/organization-slug-card.tsx:129
 msgid "Enter organization slug"
 msgstr "输入组织 slug"
@@ -12343,7 +12352,7 @@ msgid "Failed to attach collection"
 msgstr "附加集合失败"
 
 #: src/features/chat/header/kb-attachment-button.tsx:128
-#: src/features/chat/thread/composer-input.tsx:1265
+#: src/features/chat/thread/composer-input.tsx:1271
 msgid "Failed to attach file"
 msgstr "附加文件失败"
 
@@ -12740,7 +12749,7 @@ msgstr "请求导出失败"
 msgid "Failed to reset to defaults"
 msgstr "恢复默认设置失败"
 
-#: src/features/chat/thread/composer-input.tsx:1297
+#: src/features/chat/thread/composer-input.tsx:1303
 msgid "Failed to restore attachment"
 msgstr "恢复附件失败"
 
@@ -14768,6 +14777,10 @@ msgstr "上一页"
 #: src/components/command-palette.tsx:418
 msgid "Go to Prompts"
 msgstr "前往提示词"
+
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:307
+msgid "Go to reply"
+msgstr ""
 
 #: src/components/command-palette.tsx:430
 msgid "Go to Settings"
@@ -17559,7 +17572,7 @@ msgstr "留空则使用已连接节点的输入"
 
 #: src/features/auth/components/organization/leave-organization-dialog.tsx:72
 #: src/features/auth/components/organization/leave-organization-dialog.tsx:103
-#: src/features/auth/components/organization/organization-cell.tsx:99
+#: src/features/auth/components/organization/organization-cell.tsx:105
 msgid "Leave Organization"
 msgstr "离开组织"
 
@@ -18270,7 +18283,7 @@ msgstr "退出登录"
 msgid "Login"
 msgstr "登录"
 
-#: src/features/auth/components/organization/create-organization-dialog.tsx:209
+#: src/features/auth/components/organization/create-organization-dialog.tsx:212
 #: src/features/auth/components/organization/organization-logo-card.tsx:136
 #: src/features/auth/components/organization/organization-logo-card.tsx:195
 msgid "Logo"
@@ -18330,7 +18343,7 @@ msgstr "检测到长文本"
 msgid "Long text generation in images"
 msgstr "图像中的长文本生成"
 
-#: src/features/chat/thread/composer-input.tsx:853
+#: src/features/chat/thread/composer-input.tsx:854
 msgid "Long text was attached as a file."
 msgstr ""
 
@@ -18551,7 +18564,7 @@ msgstr "管理 <0>{0}</0> 的成员"
 msgid "Manage models on {0}"
 msgstr "管理 {0} 上的模型"
 
-#: src/features/auth/components/organization/organization-cell.tsx:88
+#: src/features/auth/components/organization/organization-cell.tsx:94
 msgid "Manage Organization"
 msgstr "管理组织"
 
@@ -18581,7 +18594,7 @@ msgstr "管理标签"
 msgid "Manage tags…"
 msgstr "管理标签…"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:199
+#: src/features/auth/components/organization/billing-settings-card.tsx:159
 msgid "Manage Team subscription"
 msgstr "管理 Team 订阅"
 
@@ -19043,8 +19056,8 @@ msgstr ""
 msgid "Merging…"
 msgstr ""
 
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:266
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:409
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:267
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:418
 msgid "Message"
 msgstr ""
 
@@ -21875,7 +21888,7 @@ msgstr "每个 token 仅激活 3B 参数，高效节能"
 msgid "Only in one run"
 msgstr "仅在一次运行中"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:136
+#: src/features/auth/components/organization/billing-settings-card.tsx:336
 msgid "Only organization owners can manage billing settings"
 msgstr "只有组织所有者才能管理账单设置"
 
@@ -22692,7 +22705,7 @@ msgstr ""
 msgid "Organization"
 msgstr "组织"
 
-#: src/features/auth/components/organization/create-organization-dialog.tsx:112
+#: src/features/auth/components/organization/create-organization-dialog.tsx:115
 msgid "Organization created successfully"
 msgstr "组织已创建"
 
@@ -22700,13 +22713,13 @@ msgstr "组织已创建"
 msgid "Organization deleted successfully"
 msgstr "组织已删除"
 
-#: src/features/auth/components/organization/create-organization-dialog.tsx:266
+#: src/features/auth/components/organization/create-organization-dialog.tsx:269
 #: src/features/auth/components/organization/organization-name-card.tsx:106
 #: src/features/auth/components/organization/organization-name-card.tsx:157
 msgid "Organization Name"
 msgstr "组织名称"
 
-#: src/features/auth/components/organization/create-organization-dialog.tsx:70
+#: src/features/auth/components/organization/create-organization-dialog.tsx:71
 #: src/features/auth/components/organization/organization-name-card.tsx:23
 msgid "Organization name is required"
 msgstr "请输入组织名称"
@@ -22719,18 +22732,18 @@ msgstr "组织名称未改变"
 msgid "Organization name updated successfully"
 msgstr "组织名称已更新"
 
-#: src/features/auth/components/organization/create-organization-dialog.tsx:287
+#: src/features/auth/components/organization/create-organization-dialog.tsx:290
 #: src/features/auth/components/organization/organization-slug-card.tsx:111
 #: src/features/auth/components/organization/organization-slug-card.tsx:161
 msgid "Organization Slug"
 msgstr "组织 Slug"
 
-#: src/features/auth/components/organization/create-organization-dialog.tsx:78
+#: src/features/auth/components/organization/create-organization-dialog.tsx:79
 #: src/features/auth/components/organization/organization-slug-card.tsx:28
 msgid "Organization slug is invalid"
 msgstr "组织 slug 无效"
 
-#: src/features/auth/components/organization/create-organization-dialog.tsx:75
+#: src/features/auth/components/organization/create-organization-dialog.tsx:76
 #: src/features/auth/components/organization/delete-organization-dialog.tsx:30
 #: src/features/auth/components/organization/organization-slug-card.tsx:27
 msgid "Organization slug is required"
@@ -23261,7 +23274,7 @@ msgstr "已暂停"
 msgid "Pay for what <0>you use.</0>"
 msgstr "按实际<0>用量付费。</0>"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:223
+#: src/features/auth/components/organization/billing-settings-card.tsx:183
 #: src/features/billing/components/personal-plan-card.tsx:52
 msgid "Pay yearly"
 msgstr "按年付款"
@@ -23520,7 +23533,7 @@ msgstr "Pika Labs 2.2 — 注重叙事的视频模型，具备出色的故事表
 #: ../../packages/chat-ui/src/chat/message-item.tsx:144
 #: ../../packages/chat-ui/src/chat/message-item.tsx:193
 #: src/features/chat/thread-list/group-header.tsx:142
-#: src/features/chat/thread/text-selection-menu.tsx:505
+#: src/features/chat/thread/text-selection-menu.tsx:504
 msgid "Pin"
 msgstr "置顶"
 
@@ -24839,7 +24852,7 @@ msgstr "使用阿里巴巴 Wan 模型快速、低质量级别的实惠视频生�
 msgid "Quote Card"
 msgstr "引言卡片"
 
-#: src/features/chat/thread/text-selection-menu.tsx:516
+#: src/features/chat/thread/text-selection-menu.tsx:515
 msgid "Quote in reply"
 msgstr ""
 
@@ -24847,7 +24860,7 @@ msgstr ""
 msgid "Quoted diff lines will be shortened to fit; your comments are sent in full."
 msgstr ""
 
-#: src/features/chat/thread/text-selection-menu.tsx:426
+#: src/features/chat/thread/text-selection-menu.tsx:425
 msgid "Quoted in composer"
 msgstr ""
 
@@ -25049,7 +25062,7 @@ msgstr "只读预览——复刻后可编辑"
 msgid "Read-only shared conversation"
 msgstr "只读共享对话"
 
-#: src/features/chat/thread/composer-input.tsx:273
+#: src/features/chat/thread/composer-input.tsx:274
 msgid "Reading \"{attachmentName}\"…"
 msgstr "正在读取“{attachmentName}”…"
 
@@ -25657,10 +25670,10 @@ msgstr "记住我"
 #: src/features/chat/host/host-composer.tsx:908
 #: src/features/chat/sharing/thread-share-button.tsx:267
 #: src/features/chat/sharing/thread-share-button.tsx:339
-#: src/features/chat/thread/composer-input.tsx:335
-#: src/features/chat/thread/composer-input.tsx:347
-#: src/features/chat/thread/composer-input.tsx:401
-#: src/features/chat/thread/composer-input.tsx:410
+#: src/features/chat/thread/composer-input.tsx:336
+#: src/features/chat/thread/composer-input.tsx:348
+#: src/features/chat/thread/composer-input.tsx:402
+#: src/features/chat/thread/composer-input.tsx:411
 #: src/features/devices/components/devices-settings.tsx:206
 #: src/features/devices/components/devices-settings.tsx:212
 #: src/features/projects/components/project-form-dialog.tsx:263
@@ -25707,7 +25720,7 @@ msgstr "移除 {fileName}"
 msgid "Remove {label}"
 msgstr "移除 {label}"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:262
+#: src/features/auth/components/organization/billing-settings-card.tsx:225
 #: src/features/auth/components/team/team-settings-dialog.tsx:177
 msgid "Remove {model}"
 msgstr "移除 {model}"
@@ -26385,11 +26398,11 @@ msgstr "{retryAfterMinutes} 分钟后重试"
 msgid "Retry now"
 msgstr ""
 
-#: src/features/chat/thread/composer-input.tsx:424
+#: src/features/chat/thread/composer-input.tsx:425
 msgid "Retry upload"
 msgstr ""
 
-#: src/features/chat/thread/composer-input.tsx:419
+#: src/features/chat/thread/composer-input.tsx:420
 msgid "Retry upload of {attachmentName}"
 msgstr ""
 
@@ -26887,8 +26900,8 @@ msgstr "沙特阿拉伯"
 
 #: ../../packages/ui/src/components/inline-edit.tsx:108
 #: src/features/admin/components/admin-cleanup-dashboard.tsx:118
-#: src/features/auth/components/organization/billing-settings-card.tsx:162
-#: src/features/auth/components/organization/billing-settings-card.tsx:308
+#: src/features/auth/components/organization/billing-settings-card.tsx:132
+#: src/features/auth/components/organization/billing-settings-card.tsx:269
 #: src/features/auth/components/organization/organization-name-card.tsx:99
 #: src/features/auth/components/organization/organization-name-card.tsx:151
 #: src/features/auth/components/organization/organization-slug-card.tsx:104
@@ -27122,7 +27135,7 @@ msgstr "得分"
 msgid "Scores each answer 0–100% against the expected answer or rubric. Adds a small model call per case."
 msgstr "根据预期答案或评分标准为每个答案打 0–100% 的分。每个用例会额外调用一次小模型。"
 
-#: src/features/chat/thread/composer-input.tsx:1224
+#: src/features/chat/thread/composer-input.tsx:1230
 msgid "Screen capture failed. Please try again."
 msgstr "屏幕截取失败。请重试。"
 
@@ -27675,7 +27688,7 @@ msgstr "选择到最后一列"
 msgid "Select to top of table"
 msgstr "选择到表格顶部"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:255
+#: src/features/auth/components/organization/billing-settings-card.tsx:218
 msgid "Select which AI models organization members can use. Leave empty for enterprise to allow all models."
 msgstr "选择组织成员可以使用的 AI 模型。企业版留空则允许所有模型。"
 
@@ -27699,7 +27712,7 @@ msgstr ""
 msgid "Selection"
 msgstr "选择"
 
-#: src/features/chat/thread/text-selection-menu.tsx:485
+#: src/features/chat/thread/text-selection-menu.tsx:484
 msgid "Selection actions"
 msgstr ""
 
@@ -30175,7 +30188,7 @@ msgstr "推荐"
 msgid "Suggested answers"
 msgstr "建议的答案"
 
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:476
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:494
 msgid "Suggestion available, press Right Arrow to accept"
 msgstr "有可用建议，按右方向键接受"
 
@@ -30903,7 +30916,7 @@ msgstr "文字方向已设为 LTR"
 msgid "Text direction set to RTL"
 msgstr "文字方向已设为 RTL"
 
-#: src/features/chat/thread/composer-input.tsx:309
+#: src/features/chat/thread/composer-input.tsx:310
 msgid "Text document"
 msgstr "文本文档"
 
@@ -31041,7 +31054,7 @@ msgstr ""
 msgid "That link could not be read."
 msgstr ""
 
-#: src/features/chat/thread/message-list.tsx:320
+#: src/features/chat/thread/message-list.tsx:303
 msgid "That message could not be found in this conversation."
 msgstr "在此对话中找不到该消息。"
 
@@ -31509,7 +31522,7 @@ msgstr "页面现在显示的是另一个版本。请从你的版本中复制想
 msgid "The page, every sub-page, its comments and its version history are deleted. This cannot be undone."
 msgstr "该页面、所有子页面、评论及版本历史都将被删除。此操作无法撤销。"
 
-#: src/features/chat/thread/composer-input.tsx:931
+#: src/features/chat/thread/composer-input.tsx:937
 msgid "The pasted text could not be attached and was not inserted."
 msgstr ""
 
@@ -31539,6 +31552,10 @@ msgstr "队列已暂停。点击“发送下一条”以继续发送排队的消
 #: src/features/settings/components/chat/trust-server-switch.tsx:53
 msgid "The quick check only looks at tools from servers you trust. A trusted server's tool descriptions reach the model, so they can influence which calls are approved automatically. Changing a server's address ends its trust."
 msgstr ""
+
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:304
+#~ msgid "The quoted reply is not on screen"
+#~ msgstr ""
 
 #: src/features/skills/components/skill-builder-diff.tsx:23
 msgid "The refinement did not change any field."
@@ -31637,7 +31654,7 @@ msgstr ""
 msgid "The unified LLM gateway for modern AI applications."
 msgstr "面向现代 AI 应用的统一 LLM 网关。"
 
-#: src/features/chat/thread/composer-input.tsx:605
+#: src/features/chat/thread/composer-input.tsx:606
 msgid "The upload of \"{fileName}\" expired. Please attach it again."
 msgstr "“{fileName}”的上传已过期。请重新附加该文件。"
 
@@ -32224,11 +32241,11 @@ msgstr "此登录链接不完整。请从扩展中重新开始登录。"
 msgid "This skill is no longer available."
 msgstr "此技能已不可用。"
 
-#: src/features/auth/components/organization/create-organization-dialog.tsx:317
+#: src/features/auth/components/organization/create-organization-dialog.tsx:320
 msgid "This slug is already taken"
 msgstr "此 slug 已被占用"
 
-#: src/features/auth/components/organization/create-organization-dialog.tsx:321
+#: src/features/auth/components/organization/create-organization-dialog.tsx:324
 msgid "This slug is available"
 msgstr "此 slug 可用"
 
@@ -33238,8 +33255,8 @@ msgid "Type your answer…"
 msgstr "输入你的回答…"
 
 #: src/features/chat/signed-out/signed-out-chat.tsx:249
-#: src/features/chat/thread/composer-input.tsx:1603
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:182
+#: src/features/chat/thread/composer-input.tsx:1620
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:183
 msgid "Type your message..."
 msgstr "输入你的消息..."
 
@@ -33401,7 +33418,7 @@ msgstr "技术内幕"
 #: src/features/chat/thread-list/hooks/use-thread-state-actions.ts:48
 #: src/features/chat/thread-list/hooks/use-thread-state-actions.ts:64
 #: src/features/chat/thread/composer-draw-dialog.tsx:349
-#: src/features/chat/thread/composer-input.tsx:855
+#: src/features/chat/thread/composer-input.tsx:856
 #: src/features/workflow/components/canvas/keyboard-shortcuts-dialog.tsx:36
 msgid "Undo"
 msgstr "撤销"
@@ -33629,7 +33646,7 @@ msgstr "任意库或框架的最新文档"
 msgid "Update Duration"
 msgstr "更新时长"
 
-#: src/features/chat/thread/composer-input.tsx:1460
+#: src/features/chat/thread/composer-input.tsx:1477
 msgid "Update failed"
 msgstr "更新失败"
 
@@ -33748,11 +33765,11 @@ msgstr "更新动态"
 msgid "Upgrade"
 msgstr "升级"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:211
+#: src/features/auth/components/organization/billing-settings-card.tsx:171
 msgid "Upgrade organization to Team"
 msgstr "将组织升级到 Team"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:211
+#: src/features/auth/components/organization/billing-settings-card.tsx:171
 msgid "Upgrade organization to Team, monthly"
 msgstr "将组织升级为 Team（按月）"
 
@@ -33770,7 +33787,7 @@ msgid "upload"
 msgstr ""
 
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:465
-#: src/features/auth/components/organization/create-organization-dialog.tsx:255
+#: src/features/auth/components/organization/create-organization-dialog.tsx:258
 #: src/features/vault/components/empty-states.tsx:45
 #: src/features/vault/components/upload-button.tsx:11
 msgid "Upload"
@@ -33817,14 +33834,14 @@ msgstr "上传 CSV、运行 Python 分析并导出图表——无需配置 Jupyt
 msgid "Upload documents to your knowledge base and group them into collections. The AI searches them for relevant context and cites the passages it used."
 msgstr "将文档上传到知识库并分组为集合。AI 会从中搜索相关上下文，并引用所用的段落。"
 
-#: src/features/chat/thread/composer-input.tsx:416
-#: src/features/chat/thread/composer-input.tsx:650
-#: src/features/chat/thread/composer-input.tsx:1381
+#: src/features/chat/thread/composer-input.tsx:417
+#: src/features/chat/thread/composer-input.tsx:651
+#: src/features/chat/thread/composer-input.tsx:1398
 msgid "Upload failed"
 msgstr "上传失败"
 
 #. placeholder {0}: fresh.name
-#: src/features/chat/thread/composer-input.tsx:1374
+#: src/features/chat/thread/composer-input.tsx:1391
 msgid "Upload failed: {0}"
 msgstr ""
 
@@ -33848,7 +33865,7 @@ msgstr "上传图像"
 msgid "Upload image / video"
 msgstr "上传图像 / 视频"
 
-#: src/features/auth/components/organization/create-organization-dialog.tsx:240
+#: src/features/auth/components/organization/create-organization-dialog.tsx:243
 #: src/features/auth/components/organization/organization-logo-card.tsx:157
 msgid "Upload Logo"
 msgstr "上传徽标"
@@ -33874,7 +33891,7 @@ msgstr "已上传"
 msgid "Uploaded {fileName}"
 msgstr "已上传 {fileName}"
 
-#: src/features/chat/thread/composer-input.tsx:353
+#: src/features/chat/thread/composer-input.tsx:354
 msgid "Uploading {attachmentName}"
 msgstr "正在上传 {attachmentName}"
 
@@ -36067,12 +36084,12 @@ msgid "Your First Chat"
 msgstr "你的第一次聊天"
 
 #. placeholder {0}: formatNumber(contextStats.estimatedTokens, i18n.locale)
-#: src/features/chat/thread/composer-input.tsx:715
+#: src/features/chat/thread/composer-input.tsx:716
 msgid "Your input is large (~{0} tokens) and will consume a significant portion of the model's context window."
 msgstr "你的输入较大（约 {0} 个 token），将占用模型上下文窗口的很大一部分。"
 
 #. placeholder {0}: formatNumber(contextStats.estimatedTokens, i18n.locale)
-#: src/features/chat/thread/composer-input.tsx:708
+#: src/features/chat/thread/composer-input.tsx:709
 msgid "Your input is too large (~{0} tokens) and exceeds the model's context window. Please reduce the message length or remove attachments to submit."
 msgstr "你的输入过大（约 {0} 个 token），超出了模型的上下文窗口。请缩短消息或移除附件后再提交。"
 
@@ -36141,7 +36158,7 @@ msgstr "你的页面"
 msgid "Your plan"
 msgstr "你的方案"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:188
+#: src/features/auth/components/organization/billing-settings-card.tsx:148
 msgid "Your plan and credit allowance follow your subscription."
 msgstr "你的方案和额度取决于你的订阅。"
 

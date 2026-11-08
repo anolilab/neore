@@ -25,11 +25,11 @@ msgstr " · model: {modelFilter}"
 msgid "- {0, plural, one {# row} other {# rows}}, {1, plural, one {# column} other {# columns}}"
 msgstr "- {0, plural, one {# wiersz} few {# wiersze} many {# wierszy} other {# wiersza}}, {1, plural, one {# kolumna} few {# kolumny} many {# kolumn} other {# kolumny}}"
 
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:602
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:620
 msgid "-- INSERT --"
 msgstr "-- WSTAWIANIE --"
 
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:602
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:620
 msgid "-- NORMAL --"
 msgstr "-- NORMALNY --"
 
@@ -52,23 +52,23 @@ msgstr "„{0}” zawiera zmienne, które wymagają wartości."
 msgid "\"{0}\" will start once its dependencies are done"
 msgstr "„{0}” wystartuje, gdy jego zależności zostaną ukończone"
 
-#: src/features/chat/thread/composer-input.tsx:611
+#: src/features/chat/thread/composer-input.tsx:612
 msgid "\"{fileName}\" cannot be attached: this file type is not supported."
 msgstr "Nie można załączyć „{fileName}”: ten typ pliku nie jest obsługiwany."
 
-#: src/features/chat/thread/composer-input.tsx:604
+#: src/features/chat/thread/composer-input.tsx:605
 msgid "\"{fileName}\" could not be attached: its contents do not match its file type."
 msgstr "Nie udało się załączyć „{fileName}”: zawartość nie pasuje do typu pliku."
 
-#: src/features/chat/thread/composer-input.tsx:606
+#: src/features/chat/thread/composer-input.tsx:607
 msgid "\"{fileName}\" could not be uploaded. Check your connection and try again."
 msgstr "Nie udało się przesłać „{fileName}”. Sprawdź połączenie i spróbuj ponownie."
 
-#: src/features/chat/thread/composer-input.tsx:609
+#: src/features/chat/thread/composer-input.tsx:610
 msgid "\"{fileName}\" is too large. Documents can be at most {maxMegabytes} MB."
 msgstr "„{fileName}” jest za duży. Dokumenty mogą mieć maksymalnie {maxMegabytes} MB."
 
-#: src/features/chat/thread/composer-input.tsx:610
+#: src/features/chat/thread/composer-input.tsx:611
 msgid "\"{fileName}\" is too large. Files of this type can be at most {maxMegabytes} MB."
 msgstr "„{fileName}” jest za duży. Pliki tego typu mogą mieć maksymalnie {maxMegabytes} MB."
 
@@ -2052,7 +2052,7 @@ msgstr "Dodaj komentarz"
 msgid "Add a member from your organization to <0>{0}</0>"
 msgstr "Dodaj członka ze swojej organizacji do <0>{0}</0>"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:283
+#: src/features/auth/components/organization/billing-settings-card.tsx:246
 #: src/features/auth/components/team/team-settings-dialog.tsx:191
 msgid "Add a model..."
 msgstr "Dodaj model..."
@@ -3127,7 +3127,7 @@ msgstr ""
 msgid "Allow this site ({0})"
 msgstr "Zezwól tej witrynie ({0})"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:253
+#: src/features/auth/components/organization/billing-settings-card.tsx:216
 #: src/features/auth/components/team/team-settings-dialog.tsx:170
 msgid "Allowed AI Models"
 msgstr "Dozwolone modele AI"
@@ -4589,17 +4589,22 @@ msgstr "Rozliczane z twojego własnego klucza API, nie z twoich kredytów."
 msgid "Billing"
 msgstr "Rozliczenia"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:234
+#: src/features/auth/components/organization/billing-settings-card.tsx:313
+msgid "Billing details for this organization"
+msgstr ""
+
+#: src/features/auth/components/organization/billing-settings-card.tsx:194
 msgid "Billing Email"
 msgstr "E-mail rozliczeniowy"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:137
-#: src/features/auth/components/organization/billing-settings-card.tsx:168
-#: src/features/auth/components/organization/billing-settings-card.tsx:313
+#: src/features/auth/components/organization/billing-settings-card.tsx:136
+#: src/features/auth/components/organization/billing-settings-card.tsx:274
+#: src/features/auth/components/organization/billing-settings-card.tsx:314
+#: src/features/auth/components/organization/billing-settings-card.tsx:337
 msgid "Billing Settings"
 msgstr "Ustawienia rozliczeń"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:91
+#: src/features/auth/components/organization/billing-settings-card.tsx:83
 msgid "Billing settings updated successfully"
 msgstr "Zaktualizowano ustawienia rozliczeń"
 
@@ -5204,7 +5209,7 @@ msgstr "Kanada"
 #: src/features/admin/components/ban-user-dialog.tsx:146
 #: src/features/admin/components/impersonate-user-dialog.tsx:79
 #: src/features/admin/components/update-user-role-dialog.tsx:60
-#: src/features/auth/components/organization/create-organization-dialog.tsx:336
+#: src/features/auth/components/organization/create-organization-dialog.tsx:339
 #: src/features/auth/components/organization/delete-organization-dialog.tsx:144
 #: src/features/auth/components/organization/leave-organization-dialog.tsx:91
 #: src/features/auth/components/organization/remove-member-dialog.tsx:83
@@ -6156,7 +6161,7 @@ msgstr "Kliknij ikonę pinezki przy dowolnej wiadomości, aby ją tu zapisać."
 msgid "Click the star on any model in All models to add it here."
 msgstr "Kliknij gwiazdkę przy dowolnym modelu w sekcji Wszystkie modele, aby go tu dodać."
 
-#: src/features/chat/thread/composer-input.tsx:309
+#: src/features/chat/thread/composer-input.tsx:310
 msgid "Click to edit"
 msgstr "Kliknij, aby edytować"
 
@@ -6967,8 +6972,8 @@ msgstr "Skonfiguruj ustawienia zespołu „{teamName}”"
 msgid "Configure team settings"
 msgstr "Skonfiguruj ustawienia zespołu"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:165
-#: src/features/auth/components/organization/billing-settings-card.tsx:311
+#: src/features/auth/components/organization/billing-settings-card.tsx:135
+#: src/features/auth/components/organization/billing-settings-card.tsx:272
 msgid "Configure the billing contact and available AI models"
 msgstr "Skonfiguruj kontakt rozliczeniowy i dostępne modele AI"
 
@@ -7545,8 +7550,8 @@ msgstr ""
 msgid "Conversations on lines this diff no longer shows"
 msgstr ""
 
-#: src/features/chat/thread/composer-input.tsx:795
-#: src/features/chat/thread/composer-input.tsx:1403
+#: src/features/chat/thread/composer-input.tsx:796
+#: src/features/chat/thread/composer-input.tsx:1420
 msgid "Conversion failed"
 msgstr "Konwersja nie powiodła się"
 
@@ -7629,7 +7634,7 @@ msgstr "Skopiowano!"
 #: src/features/auth/components/settings/two-factor/backup-codes-dialog.tsx:100
 #: src/features/chat/sharing/thread-share-button.tsx:366
 #: src/features/chat/thread/message-item.tsx:356
-#: src/features/chat/thread/text-selection-menu.tsx:526
+#: src/features/chat/thread/text-selection-menu.tsx:525
 #: src/features/settings/components/chat/trigger-settings.tsx:766
 #: src/features/skills/components/bundle-import-dialog.tsx:207
 msgid "Copy"
@@ -7852,7 +7857,7 @@ msgstr "Nie udało się dołączyć: {0}. Pozostałe pliki zostały dołączone;
 msgid "Could not attach {0}. Try those again."
 msgstr "Nie udało się dołączyć: {0}. Spróbuj ponownie."
 
-#: src/features/chat/thread/composer-input.tsx:1425
+#: src/features/chat/thread/composer-input.tsx:1442
 msgid "Could not attach the chat"
 msgstr "Nie udało się dołączyć czatu"
 
@@ -8033,6 +8038,10 @@ msgstr "Nie udało się wczytać narzędzi: {error}"
 msgid "Could not load your activity."
 msgstr "Nie udało się wczytać Twojej aktywności."
 
+#: src/features/auth/components/organization/billing-settings-card.tsx:319
+msgid "Could not load your organization's billing details. Try again later."
+msgstr ""
+
 #: src/features/pages/components/pages-sidebar.tsx:108
 msgid "Could not move the page"
 msgstr "Nie udało się przenieść strony"
@@ -8080,11 +8089,11 @@ msgstr ""
 msgid "Could not reach the server. Try again."
 msgstr ""
 
-#: src/features/chat/thread/composer-input.tsx:1428
+#: src/features/chat/thread/composer-input.tsx:1445
 msgid "Could not read that chat"
 msgstr "Nie udało się odczytać tego czatu"
 
-#: src/features/chat/thread/composer-input.tsx:1429
+#: src/features/chat/thread/composer-input.tsx:1446
 msgid "Could not read that chat. If it is locked, unlock it first."
 msgstr "Nie udało się odczytać tego czatu. Jeśli jest zablokowany, najpierw go odblokuj."
 
@@ -8293,7 +8302,7 @@ msgstr "Utwórz nowy klucz API do programowego dostępu do konta"
 msgid "Create a new branch from this message. Give it a name to help you identify it later."
 msgstr "Utwórz nową gałąź od tej wiadomości. Nadaj jej nazwę, aby łatwiej ją później rozpoznać."
 
-#: src/features/auth/components/organization/create-organization-dialog.tsx:171
+#: src/features/auth/components/organization/create-organization-dialog.tsx:174
 msgid "Create a new organization to collaborate with your team"
 msgstr "Utwórz nową organizację, aby współpracować ze swoim zespołem"
 
@@ -8417,8 +8426,8 @@ msgstr "Utwórz go na stronie Ewaluacje."
 msgid "Create organization"
 msgstr "Utwórz organizację"
 
-#: src/features/auth/components/organization/create-organization-dialog.tsx:168
-#: src/features/auth/components/organization/create-organization-dialog.tsx:350
+#: src/features/auth/components/organization/create-organization-dialog.tsx:171
+#: src/features/auth/components/organization/create-organization-dialog.tsx:353
 #: src/features/auth/components/organization/organizations-card.tsx:37
 msgid "Create Organization"
 msgstr "Utwórz organizację"
@@ -8594,8 +8603,8 @@ msgstr "Dla twórców, którzy chcą zarówno generować, jak i edytować obrazy
 msgid "Credits"
 msgstr "Kredyty"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:145
-#: src/features/auth/components/organization/billing-settings-card.tsx:186
+#: src/features/auth/components/organization/billing-settings-card.tsx:146
+#: src/features/auth/components/organization/billing-settings-card.tsx:345
 msgid "Credits per user:"
 msgstr "Kredyty na użytkownika:"
 
@@ -8692,8 +8701,8 @@ msgstr "Obecny plan:"
 msgid "Current Prompt Variables"
 msgstr "Bieżące zmienne promptu"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:142
-#: src/features/auth/components/organization/billing-settings-card.tsx:183
+#: src/features/auth/components/organization/billing-settings-card.tsx:143
+#: src/features/auth/components/organization/billing-settings-card.tsx:342
 msgid "Current tier:"
 msgstr "Obecny plan:"
 
@@ -9372,7 +9381,7 @@ msgstr "Usuń cel {title}"
 msgid "Delete group and children"
 msgstr "Usuń grupę i elementy podrzędne"
 
-#: src/features/auth/components/organization/create-organization-dialog.tsx:246
+#: src/features/auth/components/organization/create-organization-dialog.tsx:249
 #: src/features/auth/components/organization/organization-logo-card.tsx:162
 msgid "Delete Logo"
 msgstr "Usuń logo"
@@ -10399,7 +10408,7 @@ msgstr "Upuść plik lub kliknij, aby przesłać"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-file.tsx:686
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-file.tsx:765
-#: src/features/chat/thread/composer-input.tsx:1613
+#: src/features/chat/thread/composer-input.tsx:1630
 msgid "Drop files here"
 msgstr "Upuść pliki tutaj"
 
@@ -10688,8 +10697,8 @@ msgstr "Edytuj kolekcję"
 msgid "Edit comment"
 msgstr ""
 
-#: src/features/chat/thread/composer-input.tsx:316
-#: src/features/chat/thread/composer-input.tsx:328
+#: src/features/chat/thread/composer-input.tsx:317
+#: src/features/chat/thread/composer-input.tsx:329
 msgid "Edit content"
 msgstr "Edytuj treść"
 
@@ -11330,7 +11339,7 @@ msgstr "Wpisz prawidłowy region AWS, np. us-east-1"
 msgid "Enter an API version such as v1 or 2024-10-21"
 msgstr "Wpisz wersję API, np. v1 lub 2024-10-21"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:241
+#: src/features/auth/components/organization/billing-settings-card.tsx:203
 msgid "Enter billing email"
 msgstr "Wpisz e-mail rozliczeniowy"
 
@@ -11364,12 +11373,12 @@ msgstr "Wpisz ID modelu (np. „llama-4-scout”)..."
 msgid "Enter new password"
 msgstr "Wpisz nowe hasło"
 
-#: src/features/auth/components/organization/create-organization-dialog.tsx:274
+#: src/features/auth/components/organization/create-organization-dialog.tsx:277
 #: src/features/auth/components/organization/organization-name-card.tsx:125
 msgid "Enter organization name"
 msgstr "Wpisz nazwę organizacji"
 
-#: src/features/auth/components/organization/create-organization-dialog.tsx:299
+#: src/features/auth/components/organization/create-organization-dialog.tsx:302
 #: src/features/auth/components/organization/organization-slug-card.tsx:129
 msgid "Enter organization slug"
 msgstr "Wpisz slug organizacji"
@@ -12343,7 +12352,7 @@ msgid "Failed to attach collection"
 msgstr "Nie udało się dołączyć kolekcji"
 
 #: src/features/chat/header/kb-attachment-button.tsx:128
-#: src/features/chat/thread/composer-input.tsx:1265
+#: src/features/chat/thread/composer-input.tsx:1271
 msgid "Failed to attach file"
 msgstr "Nie udało się dołączyć pliku"
 
@@ -12740,7 +12749,7 @@ msgstr "Nie udało się wysłać żądania eksportu"
 msgid "Failed to reset to defaults"
 msgstr "Nie udało się przywrócić ustawień domyślnych"
 
-#: src/features/chat/thread/composer-input.tsx:1297
+#: src/features/chat/thread/composer-input.tsx:1303
 msgid "Failed to restore attachment"
 msgstr "Nie udało się przywrócić załącznika"
 
@@ -14768,6 +14777,10 @@ msgstr "Przejdź do poprzedniej strony"
 #: src/components/command-palette.tsx:418
 msgid "Go to Prompts"
 msgstr "Przejdź do promptów"
+
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:307
+msgid "Go to reply"
+msgstr ""
 
 #: src/components/command-palette.tsx:430
 msgid "Go to Settings"
@@ -17559,7 +17572,7 @@ msgstr "Pozostaw puste, aby użyć danych z połączonego węzła"
 
 #: src/features/auth/components/organization/leave-organization-dialog.tsx:72
 #: src/features/auth/components/organization/leave-organization-dialog.tsx:103
-#: src/features/auth/components/organization/organization-cell.tsx:99
+#: src/features/auth/components/organization/organization-cell.tsx:105
 msgid "Leave Organization"
 msgstr "Opuść organizację"
 
@@ -18270,7 +18283,7 @@ msgstr "Wyloguj się"
 msgid "Login"
 msgstr "Logowanie"
 
-#: src/features/auth/components/organization/create-organization-dialog.tsx:209
+#: src/features/auth/components/organization/create-organization-dialog.tsx:212
 #: src/features/auth/components/organization/organization-logo-card.tsx:136
 #: src/features/auth/components/organization/organization-logo-card.tsx:195
 msgid "Logo"
@@ -18330,7 +18343,7 @@ msgstr "Wykryto długi tekst"
 msgid "Long text generation in images"
 msgstr "Generowanie długich tekstów na obrazach"
 
-#: src/features/chat/thread/composer-input.tsx:853
+#: src/features/chat/thread/composer-input.tsx:854
 msgid "Long text was attached as a file."
 msgstr ""
 
@@ -18551,7 +18564,7 @@ msgstr "Zarządzaj członkami zespołu <0>{0}</0>"
 msgid "Manage models on {0}"
 msgstr "Zarządzaj modelami w {0}"
 
-#: src/features/auth/components/organization/organization-cell.tsx:88
+#: src/features/auth/components/organization/organization-cell.tsx:94
 msgid "Manage Organization"
 msgstr "Zarządzaj organizacją"
 
@@ -18581,7 +18594,7 @@ msgstr "Zarządzaj tagami"
 msgid "Manage tags…"
 msgstr "Zarządzaj tagami…"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:199
+#: src/features/auth/components/organization/billing-settings-card.tsx:159
 msgid "Manage Team subscription"
 msgstr "Zarządzaj subskrypcją Team"
 
@@ -19043,8 +19056,8 @@ msgstr ""
 msgid "Merging…"
 msgstr ""
 
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:266
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:409
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:267
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:418
 msgid "Message"
 msgstr ""
 
@@ -21875,7 +21888,7 @@ msgstr "Tylko 3B aktywnych parametrów na token dla wydajności"
 msgid "Only in one run"
 msgstr "Tylko w jednym przebiegu"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:136
+#: src/features/auth/components/organization/billing-settings-card.tsx:336
 msgid "Only organization owners can manage billing settings"
 msgstr "Tylko właściciele organizacji mogą zarządzać ustawieniami rozliczeń"
 
@@ -22692,7 +22705,7 @@ msgstr ""
 msgid "Organization"
 msgstr "Organizacja"
 
-#: src/features/auth/components/organization/create-organization-dialog.tsx:112
+#: src/features/auth/components/organization/create-organization-dialog.tsx:115
 msgid "Organization created successfully"
 msgstr "Utworzono organizację"
 
@@ -22700,13 +22713,13 @@ msgstr "Utworzono organizację"
 msgid "Organization deleted successfully"
 msgstr "Usunięto organizację"
 
-#: src/features/auth/components/organization/create-organization-dialog.tsx:266
+#: src/features/auth/components/organization/create-organization-dialog.tsx:269
 #: src/features/auth/components/organization/organization-name-card.tsx:106
 #: src/features/auth/components/organization/organization-name-card.tsx:157
 msgid "Organization Name"
 msgstr "Nazwa organizacji"
 
-#: src/features/auth/components/organization/create-organization-dialog.tsx:70
+#: src/features/auth/components/organization/create-organization-dialog.tsx:71
 #: src/features/auth/components/organization/organization-name-card.tsx:23
 msgid "Organization name is required"
 msgstr "Nazwa organizacji jest wymagana"
@@ -22719,18 +22732,18 @@ msgstr "Nazwa organizacji jest taka sama"
 msgid "Organization name updated successfully"
 msgstr "Zaktualizowano nazwę organizacji"
 
-#: src/features/auth/components/organization/create-organization-dialog.tsx:287
+#: src/features/auth/components/organization/create-organization-dialog.tsx:290
 #: src/features/auth/components/organization/organization-slug-card.tsx:111
 #: src/features/auth/components/organization/organization-slug-card.tsx:161
 msgid "Organization Slug"
 msgstr "Slug organizacji"
 
-#: src/features/auth/components/organization/create-organization-dialog.tsx:78
+#: src/features/auth/components/organization/create-organization-dialog.tsx:79
 #: src/features/auth/components/organization/organization-slug-card.tsx:28
 msgid "Organization slug is invalid"
 msgstr "Slug organizacji jest nieprawidłowy"
 
-#: src/features/auth/components/organization/create-organization-dialog.tsx:75
+#: src/features/auth/components/organization/create-organization-dialog.tsx:76
 #: src/features/auth/components/organization/delete-organization-dialog.tsx:30
 #: src/features/auth/components/organization/organization-slug-card.tsx:27
 msgid "Organization slug is required"
@@ -23261,7 +23274,7 @@ msgstr "Wstrzymano"
 msgid "Pay for what <0>you use.</0>"
 msgstr "Płać za to, <0>czego używasz.</0>"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:223
+#: src/features/auth/components/organization/billing-settings-card.tsx:183
 #: src/features/billing/components/personal-plan-card.tsx:52
 msgid "Pay yearly"
 msgstr "Płać rocznie"
@@ -23520,7 +23533,7 @@ msgstr "Pika Labs 2.2 — model wideo nastawiony na narrację, z mocnym storytel
 #: ../../packages/chat-ui/src/chat/message-item.tsx:144
 #: ../../packages/chat-ui/src/chat/message-item.tsx:193
 #: src/features/chat/thread-list/group-header.tsx:142
-#: src/features/chat/thread/text-selection-menu.tsx:505
+#: src/features/chat/thread/text-selection-menu.tsx:504
 msgid "Pin"
 msgstr "Przypnij"
 
@@ -24839,7 +24852,7 @@ msgstr "Szybkie i przystępne generowanie wideo modelem Wan od Alibaba w szybsze
 msgid "Quote Card"
 msgstr "Karta z cytatem"
 
-#: src/features/chat/thread/text-selection-menu.tsx:516
+#: src/features/chat/thread/text-selection-menu.tsx:515
 msgid "Quote in reply"
 msgstr ""
 
@@ -24847,7 +24860,7 @@ msgstr ""
 msgid "Quoted diff lines will be shortened to fit; your comments are sent in full."
 msgstr ""
 
-#: src/features/chat/thread/text-selection-menu.tsx:426
+#: src/features/chat/thread/text-selection-menu.tsx:425
 msgid "Quoted in composer"
 msgstr ""
 
@@ -25049,7 +25062,7 @@ msgstr "Podgląd tylko do odczytu – rozwidlij, aby edytować"
 msgid "Read-only shared conversation"
 msgstr "Udostępniona rozmowa tylko do odczytu"
 
-#: src/features/chat/thread/composer-input.tsx:273
+#: src/features/chat/thread/composer-input.tsx:274
 msgid "Reading \"{attachmentName}\"…"
 msgstr "Odczytywanie „{attachmentName}”…"
 
@@ -25657,10 +25670,10 @@ msgstr "Zapamiętaj mnie"
 #: src/features/chat/host/host-composer.tsx:908
 #: src/features/chat/sharing/thread-share-button.tsx:267
 #: src/features/chat/sharing/thread-share-button.tsx:339
-#: src/features/chat/thread/composer-input.tsx:335
-#: src/features/chat/thread/composer-input.tsx:347
-#: src/features/chat/thread/composer-input.tsx:401
-#: src/features/chat/thread/composer-input.tsx:410
+#: src/features/chat/thread/composer-input.tsx:336
+#: src/features/chat/thread/composer-input.tsx:348
+#: src/features/chat/thread/composer-input.tsx:402
+#: src/features/chat/thread/composer-input.tsx:411
 #: src/features/devices/components/devices-settings.tsx:206
 #: src/features/devices/components/devices-settings.tsx:212
 #: src/features/projects/components/project-form-dialog.tsx:263
@@ -25707,7 +25720,7 @@ msgstr "Usuń {fileName}"
 msgid "Remove {label}"
 msgstr "Usuń {label}"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:262
+#: src/features/auth/components/organization/billing-settings-card.tsx:225
 #: src/features/auth/components/team/team-settings-dialog.tsx:177
 msgid "Remove {model}"
 msgstr "Usuń {model}"
@@ -26385,11 +26398,11 @@ msgstr "Ponów za {retryAfterMinutes} min"
 msgid "Retry now"
 msgstr ""
 
-#: src/features/chat/thread/composer-input.tsx:424
+#: src/features/chat/thread/composer-input.tsx:425
 msgid "Retry upload"
 msgstr ""
 
-#: src/features/chat/thread/composer-input.tsx:419
+#: src/features/chat/thread/composer-input.tsx:420
 msgid "Retry upload of {attachmentName}"
 msgstr ""
 
@@ -26887,8 +26900,8 @@ msgstr "Arabia Saudyjska"
 
 #: ../../packages/ui/src/components/inline-edit.tsx:108
 #: src/features/admin/components/admin-cleanup-dashboard.tsx:118
-#: src/features/auth/components/organization/billing-settings-card.tsx:162
-#: src/features/auth/components/organization/billing-settings-card.tsx:308
+#: src/features/auth/components/organization/billing-settings-card.tsx:132
+#: src/features/auth/components/organization/billing-settings-card.tsx:269
 #: src/features/auth/components/organization/organization-name-card.tsx:99
 #: src/features/auth/components/organization/organization-name-card.tsx:151
 #: src/features/auth/components/organization/organization-slug-card.tsx:104
@@ -27122,7 +27135,7 @@ msgstr "Wynik"
 msgid "Scores each answer 0–100% against the expected answer or rubric. Adds a small model call per case."
 msgstr "Ocenia każdą odpowiedź w skali 0–100% względem oczekiwanej odpowiedzi lub kryteriów oceny. Dodaje małe wywołanie modelu na przypadek."
 
-#: src/features/chat/thread/composer-input.tsx:1224
+#: src/features/chat/thread/composer-input.tsx:1230
 msgid "Screen capture failed. Please try again."
 msgstr "Przechwytywanie ekranu nie powiodło się. Spróbuj ponownie."
 
@@ -27675,7 +27688,7 @@ msgstr "Zaznacz do ostatniej kolumny"
 msgid "Select to top of table"
 msgstr "Zaznacz do góry tabeli"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:255
+#: src/features/auth/components/organization/billing-settings-card.tsx:218
 msgid "Select which AI models organization members can use. Leave empty for enterprise to allow all models."
 msgstr "Wybierz modele AI, z których mogą korzystać członkowie organizacji. W planie enterprise pozostaw puste, aby zezwolić na wszystkie modele."
 
@@ -27699,7 +27712,7 @@ msgstr ""
 msgid "Selection"
 msgstr "Zaznaczanie"
 
-#: src/features/chat/thread/text-selection-menu.tsx:485
+#: src/features/chat/thread/text-selection-menu.tsx:484
 msgid "Selection actions"
 msgstr ""
 
@@ -30175,7 +30188,7 @@ msgstr "Sugerowane"
 msgid "Suggested answers"
 msgstr "Sugerowane odpowiedzi"
 
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:476
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:494
 msgid "Suggestion available, press Right Arrow to accept"
 msgstr "Dostępna sugestia, naciśnij Strzałkę w prawo, aby ją przyjąć"
 
@@ -30903,7 +30916,7 @@ msgstr "Ustawiono kierunek tekstu na LTR"
 msgid "Text direction set to RTL"
 msgstr "Ustawiono kierunek tekstu na RTL"
 
-#: src/features/chat/thread/composer-input.tsx:309
+#: src/features/chat/thread/composer-input.tsx:310
 msgid "Text document"
 msgstr "Dokument tekstowy"
 
@@ -31041,7 +31054,7 @@ msgstr ""
 msgid "That link could not be read."
 msgstr ""
 
-#: src/features/chat/thread/message-list.tsx:320
+#: src/features/chat/thread/message-list.tsx:303
 msgid "That message could not be found in this conversation."
 msgstr "Nie znaleziono tej wiadomości w tej rozmowie."
 
@@ -31509,7 +31522,7 @@ msgstr "Strona pokazuje teraz drugą wersję. Skopiuj ze swojej wszystko, co chc
 msgid "The page, every sub-page, its comments and its version history are deleted. This cannot be undone."
 msgstr "Strona, wszystkie podstrony, komentarze i historia wersji zostaną usunięte. Tej operacji nie można cofnąć."
 
-#: src/features/chat/thread/composer-input.tsx:931
+#: src/features/chat/thread/composer-input.tsx:937
 msgid "The pasted text could not be attached and was not inserted."
 msgstr ""
 
@@ -31539,6 +31552,10 @@ msgstr "Kolejka jest wstrzymana. Wybierz „Wyślij następną”, aby kontynuow
 #: src/features/settings/components/chat/trust-server-switch.tsx:53
 msgid "The quick check only looks at tools from servers you trust. A trusted server's tool descriptions reach the model, so they can influence which calls are approved automatically. Changing a server's address ends its trust."
 msgstr ""
+
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:304
+#~ msgid "The quoted reply is not on screen"
+#~ msgstr ""
 
 #: src/features/skills/components/skill-builder-diff.tsx:23
 msgid "The refinement did not change any field."
@@ -31637,7 +31654,7 @@ msgstr ""
 msgid "The unified LLM gateway for modern AI applications."
 msgstr "Ujednolicona brama LLM dla nowoczesnych aplikacji AI."
 
-#: src/features/chat/thread/composer-input.tsx:605
+#: src/features/chat/thread/composer-input.tsx:606
 msgid "The upload of \"{fileName}\" expired. Please attach it again."
 msgstr "Przesyłanie „{fileName}” wygasło. Załącz plik ponownie."
 
@@ -32224,11 +32241,11 @@ msgstr "Ten link logowania jest niekompletny. Rozpocznij logowanie z rozszerzeni
 msgid "This skill is no longer available."
 msgstr "Ta umiejętność nie jest już dostępna."
 
-#: src/features/auth/components/organization/create-organization-dialog.tsx:317
+#: src/features/auth/components/organization/create-organization-dialog.tsx:320
 msgid "This slug is already taken"
 msgstr "Ten slug jest już zajęty"
 
-#: src/features/auth/components/organization/create-organization-dialog.tsx:321
+#: src/features/auth/components/organization/create-organization-dialog.tsx:324
 msgid "This slug is available"
 msgstr "Ten slug jest dostępny"
 
@@ -33238,8 +33255,8 @@ msgid "Type your answer…"
 msgstr "Wpisz odpowiedź…"
 
 #: src/features/chat/signed-out/signed-out-chat.tsx:249
-#: src/features/chat/thread/composer-input.tsx:1603
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:182
+#: src/features/chat/thread/composer-input.tsx:1620
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:183
 msgid "Type your message..."
 msgstr "Wpisz wiadomość..."
 
@@ -33401,7 +33418,7 @@ msgstr "Pod maską"
 #: src/features/chat/thread-list/hooks/use-thread-state-actions.ts:48
 #: src/features/chat/thread-list/hooks/use-thread-state-actions.ts:64
 #: src/features/chat/thread/composer-draw-dialog.tsx:349
-#: src/features/chat/thread/composer-input.tsx:855
+#: src/features/chat/thread/composer-input.tsx:856
 #: src/features/workflow/components/canvas/keyboard-shortcuts-dialog.tsx:36
 msgid "Undo"
 msgstr "Cofnij"
@@ -33629,7 +33646,7 @@ msgstr "Aktualna dokumentacja dowolnej biblioteki lub frameworka"
 msgid "Update Duration"
 msgstr "Zmień czas trwania"
 
-#: src/features/chat/thread/composer-input.tsx:1460
+#: src/features/chat/thread/composer-input.tsx:1477
 msgid "Update failed"
 msgstr "Aktualizacja nie powiodła się"
 
@@ -33748,11 +33765,11 @@ msgstr "Aktualizacje"
 msgid "Upgrade"
 msgstr "Ulepsz plan"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:211
+#: src/features/auth/components/organization/billing-settings-card.tsx:171
 msgid "Upgrade organization to Team"
 msgstr "Przenieś organizację na plan Team"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:211
+#: src/features/auth/components/organization/billing-settings-card.tsx:171
 msgid "Upgrade organization to Team, monthly"
 msgstr "Ulepsz organizację do Team, miesięcznie"
 
@@ -33770,7 +33787,7 @@ msgid "upload"
 msgstr ""
 
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:465
-#: src/features/auth/components/organization/create-organization-dialog.tsx:255
+#: src/features/auth/components/organization/create-organization-dialog.tsx:258
 #: src/features/vault/components/empty-states.tsx:45
 #: src/features/vault/components/upload-button.tsx:11
 msgid "Upload"
@@ -33817,14 +33834,14 @@ msgstr "Przesyłaj pliki CSV, uruchamiaj analizy w Pythonie i eksportuj wykresy 
 msgid "Upload documents to your knowledge base and group them into collections. The AI searches them for relevant context and cites the passages it used."
 msgstr "Przesyłaj dokumenty do bazy wiedzy i grupuj je w kolekcje. AI przeszukuje je pod kątem kontekstu i cytuje użyte fragmenty."
 
-#: src/features/chat/thread/composer-input.tsx:416
-#: src/features/chat/thread/composer-input.tsx:650
-#: src/features/chat/thread/composer-input.tsx:1381
+#: src/features/chat/thread/composer-input.tsx:417
+#: src/features/chat/thread/composer-input.tsx:651
+#: src/features/chat/thread/composer-input.tsx:1398
 msgid "Upload failed"
 msgstr "Przesyłanie nie powiodło się"
 
 #. placeholder {0}: fresh.name
-#: src/features/chat/thread/composer-input.tsx:1374
+#: src/features/chat/thread/composer-input.tsx:1391
 msgid "Upload failed: {0}"
 msgstr ""
 
@@ -33848,7 +33865,7 @@ msgstr "Prześlij obraz"
 msgid "Upload image / video"
 msgstr "Prześlij obraz / wideo"
 
-#: src/features/auth/components/organization/create-organization-dialog.tsx:240
+#: src/features/auth/components/organization/create-organization-dialog.tsx:243
 #: src/features/auth/components/organization/organization-logo-card.tsx:157
 msgid "Upload Logo"
 msgstr "Prześlij logo"
@@ -33874,7 +33891,7 @@ msgstr "Przesłane"
 msgid "Uploaded {fileName}"
 msgstr "Przesłano {fileName}"
 
-#: src/features/chat/thread/composer-input.tsx:353
+#: src/features/chat/thread/composer-input.tsx:354
 msgid "Uploading {attachmentName}"
 msgstr "Przesyłanie {attachmentName}"
 
@@ -36067,12 +36084,12 @@ msgid "Your First Chat"
 msgstr "Twój pierwszy czat"
 
 #. placeholder {0}: formatNumber(contextStats.estimatedTokens, i18n.locale)
-#: src/features/chat/thread/composer-input.tsx:715
+#: src/features/chat/thread/composer-input.tsx:716
 msgid "Your input is large (~{0} tokens) and will consume a significant portion of the model's context window."
 msgstr "Twoje dane wejściowe są duże (~{0} tokenów) i zajmą znaczną część okna kontekstu modelu."
 
 #. placeholder {0}: formatNumber(contextStats.estimatedTokens, i18n.locale)
-#: src/features/chat/thread/composer-input.tsx:708
+#: src/features/chat/thread/composer-input.tsx:709
 msgid "Your input is too large (~{0} tokens) and exceeds the model's context window. Please reduce the message length or remove attachments to submit."
 msgstr "Twoje dane wejściowe są za duże (~{0} tokenów) i przekraczają okno kontekstu modelu. Skróć wiadomość lub usuń załączniki, aby ją wysłać."
 
@@ -36141,7 +36158,7 @@ msgstr "Twoje strony"
 msgid "Your plan"
 msgstr "Twój plan"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:188
+#: src/features/auth/components/organization/billing-settings-card.tsx:148
 msgid "Your plan and credit allowance follow your subscription."
 msgstr "Twój plan i limit kredytów zależą od subskrypcji."
 

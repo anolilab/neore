@@ -35,7 +35,8 @@ import { Fragment, memo, useCallback, useEffect, useLayoutEffect, useRef, useSta
 
 import { useChatIsStreaming, useChatMessages, useChatThread } from "@/features/chat/core/context/chat-context";
 import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
-import { createRequestChannel } from "@/features/chat/core/stores/request-channel-store";
+import type { ScrollToMessageDetail } from "@/features/chat/core/utils/scroll-to-message";
+import { scrollToMessageChannel } from "@/features/chat/core/utils/scroll-to-message";
 import { GoalBanner, GoalReviewNote, GoalVerdictNote } from "@/features/chat/goal/goal-notes";
 import { anchorVerdicts, goalReviewNotes, withoutGoalInstructions, withoutNotedVerdicts } from "@/features/chat/goal/goal-view";
 import { useThreadGoal } from "@/features/chat/goal/use-thread-goal";
@@ -64,17 +65,6 @@ const ESTIMATED_ROW_HEIGHT = 160;
 /** How big each older page a jump pulls in looking for its target is. */
 const JUMP_PAGE_SIZE = 50;
 
-interface ScrollToMessageDetail {
-    /** Move focus to the message after scrolling. Defaults to true; the find bar keeps focus in its field. */
-    focus?: boolean;
-    messageId: string;
-    /** Where the message sits, for a stored step that renders merged into an earlier message. */
-    position?: MessagePosition;
-    threadId?: string;
-}
-
-const scrollToMessageChannel = createRequestChannel<ScrollToMessageDetail>();
-
 interface PendingJump {
     focus?: boolean;
     messageId: string;
@@ -84,15 +74,8 @@ interface PendingJump {
     threadId?: string;
 }
 
-/**
- * Scrolls the open thread to a message and focuses it, mounting it first if it
- * is virtualized and loading older pages if it is not loaded yet. Pass
- * `threadId` when the request races a navigation to that thread: the jump then
- * waits until that thread's messages are showing.
- */
-export const scrollToMessage = (messageId: string, options: { focus?: boolean; position?: MessagePosition; threadId?: string } = {}): void => {
-    scrollToMessageChannel.request({ messageId, ...options });
-};
+// Kept here as well: the callers that render inside the list import it from the list.
+export { scrollToMessage } from "@/features/chat/core/utils/scroll-to-message";
 
 // The flag is read once per mount; flipping it takes a reload.
 const subscribeToNothing = (): (() => void) => () => {};
@@ -293,6 +276,15 @@ const MessageList: FC<MessageListProps> = memo(({ className, editComposerCompone
 
             // Move focus too, so keyboard and screen-reader users land where sighted users do.
             if (focus) {
+                // Marks the row a jump landed on, so it alone shows a focus ring; a row focused by a click in its text does not.
+                element.dataset.jumped = "";
+                element.addEventListener(
+                    "blur",
+                    () => {
+                        delete element.dataset.jumped;
+                    },
+                    { once: true },
+                );
                 element.focus({ preventScroll: true });
             }
         };
@@ -443,11 +435,15 @@ const MessageList: FC<MessageListProps> = memo(({ className, editComposerCompone
             initialIds !== null && shouldAnimateEntrance({ index, initialIds, messageId: message.id, role: message.role, total: messages.length });
 
         // One list item per message: the goal's banner and notes belong to it, so the list's count and positions stay the messages'.
+        // A jump focuses the item; after a keyboard action a ring shows where it landed (inset, so the scroller cannot clip it).
         return (
             <div
                 aria-posinset={index + 1}
                 aria-setsize={setSize}
-                className={cn("outline-none", isEntering && "animate-in fade-in slide-in-from-bottom-2 duration-200")}
+                className={cn(
+                    "data-jumped:focus-visible:ring-ring rounded-lg outline-none data-jumped:focus-visible:ring-2 data-jumped:focus-visible:ring-inset",
+                    isEntering && "animate-in fade-in slide-in-from-bottom-2 duration-200",
+                )}
                 data-list-message-id={message.id}
                 role="listitem"
                 tabIndex={-1}

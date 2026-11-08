@@ -12,7 +12,7 @@
 import { undo } from "@tiptap/pm/history";
 import type { Node as ProseMirrorNode } from "@tiptap/pm/model";
 import type { EditorState, Transaction } from "@tiptap/pm/state";
-import { TextSelection } from "@tiptap/pm/state";
+import { Selection, TextSelection } from "@tiptap/pm/state";
 
 export type VimMode = "insert" | "normal";
 
@@ -133,17 +133,29 @@ const segmentAt = (doc: ProseMirrorNode, index: number, offset: number): Line =>
     return { index, from, start: paragraphStart(doc, index) + from, text: text.slice(from, to) };
 };
 
+/**
+ * The index of the nearest paragraph from `index` in `step`'s direction (`index` itself included), or -1. Lines live only in
+ * paragraphs: a block without text, such as a quote chip, is passed over.
+ */
+const textblockFrom = (doc: ProseMirrorNode, index: number, step: 1 | -1): number => {
+    for (let at = index; at >= 0 && at < doc.childCount; at += step) {
+        if (doc.child(at).isTextblock) {
+            return at;
+        }
+    }
+
+    return -1;
+};
+
 /** The displayed line before `line`: the one ending at the break before it, or the last one of the paragraph before. */
 const previousLine = (doc: ProseMirrorNode, line: Line): Line | null => {
     if (line.from > 0) {
         return segmentAt(doc, line.index, line.from - 1);
     }
 
-    if (line.index === 0) {
-        return null;
-    }
+    const before = textblockFrom(doc, line.index - 1, -1);
 
-    return segmentAt(doc, line.index - 1, paragraphText(doc.child(line.index - 1)).length);
+    return before === -1 ? null : segmentAt(doc, before, paragraphText(doc.child(before)).length);
 };
 
 /** The displayed line after `line`: the one past the break after it, or the first one of the next paragraph. */
@@ -154,7 +166,9 @@ const nextLine = (doc: ProseMirrorNode, line: Line): Line | null => {
         return segmentAt(doc, line.index, end + 1);
     }
 
-    return line.index + 1 < doc.childCount ? segmentAt(doc, line.index + 1, 0) : null;
+    const after = textblockFrom(doc, line.index + 1, 1);
+
+    return after === -1 ? null : segmentAt(doc, after, 0);
 };
 
 /** The cursor's line and its offset into it, or `null` when the cursor is not inside a paragraph. */
@@ -238,8 +252,18 @@ const deleteLine = (state: EditorState, vim: VimState, line: Line): VimResult =>
     }
 
     const tr = state.tr.delete(from, to);
-    const target = segmentAt(tr.doc, Math.min(line.index, tr.doc.childCount - 1), 0);
+    const nearest = Math.min(line.index, tr.doc.childCount - 1);
+    const after = textblockFrom(tr.doc, nearest, 1);
+    const index = after === -1 ? textblockFrom(tr.doc, nearest, -1) : after;
 
+    // Only blocks without text are left (a quote chip): a paragraph goes after them for the cursor.
+    if (index === -1) {
+        tr.insert(tr.doc.content.size, paragraph!.create());
+
+        return handledAt(vim, tr.setSelection(TextSelection.create(tr.doc, tr.doc.content.size - 1)));
+    }
+
+    const target = segmentAt(tr.doc, index, 0);
     const cursor = target.start + Math.min(firstNonSpace(target.text), lastOffset(target));
 
     return handledAt(vim, tr.setSelection(TextSelection.create(tr.doc, cursor)));
@@ -268,11 +292,92 @@ const runUndo = (state: EditorState, vim: VimState): VimResult => {
     return handledAt(vim, tr);
 };
 
+/** The insert keys that start typing in the text before a selected chip, and those that start in the text after it. */
+const INSERT_BEFORE: ReadonlySet<string> = new Set(["i", "I"]);
+const INSERT_AFTER: ReadonlySet<string> = new Set(["a", "A"]);
+
+/** The motions that leave a selected chip for the text after it, and those that leave it for the text before it. */
+const MOVE_AFTER: ReadonlySet<string> = new Set(["j", "l", "w"]);
+const MOVE_BEFORE: ReadonlySet<string> = new Set(["b", "Backspace", "h", "k"]);
+
+/** Keys pressed while a block without text (a quote chip) is selected instead of a cursor. */
+const chipKey = (state: EditorState, vim: VimState, key: string): VimResult => {
+    const { from, to } = state.selection;
+
+    // A pending `d`: a second `d` deletes the chip, any other key cancels the operator and does nothing else, as on a line.
+    if (vim.pending === "d") {
+        // Backspace is taken too: passed on, the editor's own Backspace would delete the chip.
+        return key === "d" ? handledAt(vim, state.tr.deleteSelection()) : { handled: key.length === 1 || key === "Backspace", state: { ...vim, pending: "" } };
+    }
+
+    if (key === "x") {
+        return handledAt(vim, state.tr.deleteSelection());
+    }
+
+    if (key === "d") {
+        return handledAt(vim, undefined, { pending: "d" });
+    }
+
+    if (key === "u") {
+        return runUndo(state, vim);
+    }
+
+    // A motion moves off the chip to the text after it (`j`, `l`, `w`) or before it (`k`, `h`, `b`, Backspace), staying in normal
+    // mode; Backspace moves left in normal mode as it does on a line, and never deletes.
+    if (MOVE_AFTER.has(key) || MOVE_BEFORE.has(key)) {
+        const target = Selection.findFrom(state.doc.resolve(MOVE_AFTER.has(key) ? to : from), MOVE_AFTER.has(key) ? 1 : -1, true);
+
+        return handledAt(vim, target ? state.tr.setSelection(target) : undefined);
+    }
+
+    // `o` and `O` always open a new line, after or before the chip, as they do next to any other line.
+    if (key === "o" || key === "O") {
+        const at = key === "o" ? to : from;
+        const tr = state.tr.insert(at, state.schema.nodes.paragraph!.create());
+
+        return handledAt(vim, tr.setSelection(TextSelection.create(tr.doc, at + 1)), { mode: "insert" });
+    }
+
+    if (INSERT_BEFORE.has(key) || INSERT_AFTER.has(key)) {
+        const before = INSERT_BEFORE.has(key);
+        // A text position on that side of the chip; when the chip is the first or last block there is none, so an empty line
+        // is opened there, and typing never lands on the chip itself.
+        const target = Selection.findFrom(state.doc.resolve(before ? from : to), before ? -1 : 1, true);
+
+        if (target) {
+            // `I` starts that line at its first non-space character and `A` ends it, as they do on any line; `i`/`a` stay next
+            // to the chip.
+            // The displayed line next to the chip (a paragraph splits at its hard breaks), as `k`/`j` from the chip reach it.
+            const { $head } = target;
+            const line = segmentAt(state.doc, $head.index(0), $head.parentOffset);
+            let position = $head.pos;
+
+            if (key === "I") {
+                position = line.start + firstNonSpace(line.text);
+            } else if (key === "A") {
+                position = line.start + line.text.length;
+            }
+
+            return handledAt(vim, state.tr.setSelection(TextSelection.create(state.doc, position)), { mode: "insert" });
+        }
+
+        const { paragraph } = state.schema.nodes;
+        const at = before ? from : to;
+        const tr = state.tr.insert(at, paragraph!.create());
+
+        return handledAt(vim, tr.setSelection(TextSelection.create(tr.doc, at + 1)), { mode: "insert" });
+    }
+
+    return { handled: key.length === 1, state: { ...vim, pending: "" } };
+};
+
 const normalKey = (state: EditorState, vim: VimState, key: string): VimResult => {
     const cursor = cursorOf(state);
 
+    // Not in a paragraph (a quote chip is selected): see `chipKey`. No letter or symbol is typed into the draft, where it would
+    // replace the chip; Enter, Tab and arrows keep their meaning.
     if (!cursor) {
-        return { handled: false, state: vim };
+        return chipKey(state, vim, key);
     }
 
     const { line, offset } = cursor;

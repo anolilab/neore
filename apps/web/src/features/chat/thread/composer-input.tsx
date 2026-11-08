@@ -68,12 +68,13 @@ import type { ChatReference } from "./chat-reference";
 import { buildChatTranscript, chatReferenceFileName } from "./chat-reference";
 import CompletionSound from "./completion-sound";
 import type { TextFileResult } from "./composer-draft-file";
-import { attachLongPaste, draftFitsAsFile, moveDraftToFile, undoLongPaste } from "./composer-draft-file";
+import { attachLongPaste, draftFitsAsFile, moveDraftToFile, pasteHasText, undoLongPaste } from "./composer-draft-file";
 import type { ComposerInputAreaRef } from "./composer-input-area";
 import ComposerInputArea from "./composer-input-area";
 import ComposerLongTextPrompt from "./composer-long-text-prompt";
 import ComposerPromptQueue from "./composer-prompt-queue";
 import { isEditable, TextAttachmentEditorDialog } from "./composer-text-attachment-editor";
+import { quoteRestoreDraft } from "./composer-tiptap/extensions/quote-chip";
 import useComposerAutocomplete from "./composer-tiptap/use-composer-autocomplete";
 import interruptAndSend from "./interrupt-and-send";
 import { readChatMessages } from "./read-chat-messages";
@@ -898,10 +899,15 @@ const ComposerInput = ({
             }
 
             if (files.length > 0) {
-                e.preventDefault();
                 handleFileSelect(files);
 
-                return;
+                // A paste of files alone is the composer's to take. Office apps put a picture of the copied text next to the
+                // text itself: the picture is attached, and the text goes on to the long-text check below like any paste.
+                if (!pasteHasText(e.clipboardData, files)) {
+                    e.preventDefault();
+
+                    return;
+                }
             }
 
             // Check for long text content
@@ -1306,7 +1312,18 @@ const ComposerInput = ({
         () =>
             onComposerRestore((payload) => {
                 promptHistory.reset();
-                setText(textAfterRestore(getComposerText(), payload));
+
+                if (payload.quote) {
+                    // The chip goes into the editor itself, so the draft and the editor agree and the sync leaves it alone.
+                    // Before the editor exists the quote is kept in the draft as text, so the request is not lost.
+                    const editor = inputAreaRef.current?.getEditor()?.getEditor() ?? null;
+
+                    // A restore that does not append replaces the draft, quote or not.
+                    setText(quoteRestoreDraft(editor, payload.quote, payload.append === true ? getComposerText() : ""));
+                } else {
+                    setText(textAfterRestore(getComposerText(), payload));
+                }
+
                 void Promise.all(payload.files.map((file, index) => restoreFile(file, index)));
                 inputAreaRef.current?.focus();
             }),
