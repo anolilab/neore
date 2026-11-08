@@ -42,8 +42,10 @@ interface ZoomState {
 
 const INITIAL_STATE: ZoomState = { eased: false, view: INITIAL_ZOOM_VIEW };
 
-// Frames to wait for the image to get a size before a step is dropped (about a second at 60 Hz).
-const FRAME_RETRIES = 60;
+// Retries for the image to get a size before a step is dropped: about 5 seconds at 16 ms. A timer, not an
+// animation frame, because frames can stall for a long time when the page is busy or in a background tab.
+const LAYOUT_RETRIES = 300;
+const LAYOUT_RETRY_MS = 16;
 
 const cursorClass = (isDragging: boolean, isZoomed: boolean): string => {
     if (isDragging) {
@@ -100,12 +102,17 @@ const ZoomableImage = ({ alt, className, onError, src }: ZoomableImageProps) => 
     // A functional update, so several wheel events in one frame each build on the last.
     // Eased only for the discrete steps; continuous input (wheel, pinch, drag) must
     // track the pointer without lag.
-    const apply = useCallback(function applyStep(step: (current: ZoomView, frame: Frame) => ZoomView, isEased = false, retriesLeft = FRAME_RETRIES) {
+    // `isEased` null keeps the announcement as it is, for a change that is not a user step (a resize).
+    const apply = useCallback(function applyStep(
+        step: (current: ZoomView, frame: Frame) => ZoomView,
+        isEased: boolean | null = false,
+        retriesLeft = LAYOUT_RETRIES,
+    ) {
         const surface = surfaceRef.current;
         const image = imageRef.current;
 
         // Before the image has layout its size is zero, and a cursor-anchored zoom would clamp its pan to nothing.
-        // Retry for a bounded number of frames, so a click that lands before the first layout still counts
+        // Retry for a bounded number of times, so a click that lands before the first layout still counts
         // and a picture that never gets a size cannot loop forever.
         if (!surface || !image) {
             return;
@@ -113,7 +120,7 @@ const ZoomableImage = ({ alt, className, onError, src }: ZoomableImageProps) => 
 
         if (image.offsetWidth === 0 || image.offsetHeight === 0) {
             if (retriesLeft > 0) {
-                requestAnimationFrame(() => applyStep(step, isEased, retriesLeft - 1));
+                setTimeout(applyStep, LAYOUT_RETRY_MS, step, isEased, retriesLeft - 1);
             }
 
             return;
@@ -126,7 +133,7 @@ const ZoomableImage = ({ alt, className, onError, src }: ZoomableImageProps) => 
         };
 
         setState((current) => {
-            return { eased: isEased, view: step(current.view, frame) };
+            return { eased: isEased ?? current.eased, view: step(current.view, frame) };
         });
     }, []);
 
@@ -166,7 +173,7 @@ const ZoomableImage = ({ alt, className, onError, src }: ZoomableImageProps) => 
             return undefined;
         }
 
-        const observer = new ResizeObserver(() => apply(clampPan));
+        const observer = new ResizeObserver(() => apply(clampPan, null));
 
         observer.observe(surface);
 
