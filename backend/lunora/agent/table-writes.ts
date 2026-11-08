@@ -118,11 +118,14 @@ export const patchThread = async (db: Database, threadId: Id<"threads">, fields:
     }
 };
 
-/** Removes `awaitingInput` from a thread whose pause can no longer be answered (its approval snapshot expired). */
-export const clearAwaitingInput = async (db: Database, threadId: Id<"threads">): Promise<void> => {
+/**
+ * Removes `awaitingInput` from a thread whose pause can no longer be answered (its approval snapshot expired). With `kind`,
+ * only a pause of that kind is cleared: another kind belongs to someone else's turn on the thread.
+ */
+export const clearAwaitingInput = async (db: Database, threadId: Id<"threads">, kind?: "approval" | "question"): Promise<void> => {
     const row = await db.get("threads", threadId);
 
-    if (row?.awaitingInput !== undefined) {
+    if (row?.awaitingInput !== undefined && (kind === undefined || row.awaitingInput === kind)) {
         await patchRow(db, "threads", row, { awaitingInput: undefined });
     }
 };

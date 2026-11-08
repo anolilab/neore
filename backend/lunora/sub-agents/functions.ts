@@ -1425,9 +1425,9 @@ const closeChildApprovals = async (ctx: MutationCtx, childThreadId: string, runI
         }
     }
 
-    // The child is awaiting input only while some request of it is still open.
+    // The child awaits an approval only while some request of it is still open; a question pause is the owner's own chat's.
     if (!othersOpen) {
-        await clearAwaitingInput(ctx.db, childThreadId as Id<"threads">);
+        await clearAwaitingInput(ctx.db, childThreadId as Id<"threads">, "approval");
     }
 };
 

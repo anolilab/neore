@@ -206,9 +206,12 @@ describe("a child that stopped on a request", () => {
         expect(await pendingRequests()).toHaveLength(2);
     });
 
-    it("closes its requests and the child's waiting state when a later message moved the thread past them", async () => {
+    it.each([
+        ["clears the child's approval wait", "approval", undefined],
+        ["leaves the child's open question alone", "question", "question"],
+    ] as const)("closes its requests when a later message moved the thread past them, and %s", async (_case, before, after) => {
         await run(async (context) => {
-            await context.db.patch("threads", childId, { awaitingInput: "approval" });
+            await context.db.patch("threads", childId, { awaitingInput: before });
             await context.db.insert("messages", {
                 message: { content: "Never mind, I did it myself.", role: "user" },
                 order: 2,
@@ -226,7 +229,7 @@ describe("a child that stopped on a request", () => {
 
         const child = await run(async (context) => await context.db.get("threads", childId));
 
-        expect(child.awaitingInput).toBeUndefined();
+        expect(child.awaitingInput).toBe(after);
     });
 
     it("is taken down by a Stop of its parent, which denies its open request", async () => {
