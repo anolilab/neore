@@ -59,6 +59,7 @@ import { MAX_LENGTH } from "../lib/validators";
 import { isWorkerThread } from "../sub-agents/functions";
 import type { Attribution } from "../usage/activity-logic";
 import { DEFAULT_SKILL_KEY, usageDayOf } from "../usage/activity-logic";
+import { runAfterOnShard } from "../lib/shard-scheduler";
 import { scheduleReplyUsage } from "../usage/schedule";
 import { isAgentRunError, loadUserProviderKeys, resolveRunModel } from "./lib/agent-run";
 import { defaultModelUnderRules, readsImagesAndCallsTools } from "../lib/utility-model";
@@ -359,8 +360,8 @@ export const askAside = authAction
         let threadAttribution: Attribution | undefined;
 
         if (chosen.kind === "thread") {
-            // The thread's project is read here, before the call is charged: a failed read refuses the question rather
-            // than dropping an answer already paid for.
+            // The thread's project is read here, before the call is charged; a failed read does not stop the question, and
+            // the record finds the project where the thread is stored instead.
             const [prefs, userProviderKeys, modelFilterRules, runModel, attribution] = await Promise.all([
                 ctx.runQuery(internal.auth.functions.getUserPreferencesQuery, { userId }),
                 loadUserProviderKeys(ctx, userId),
@@ -369,10 +370,7 @@ export const askAside = authAction
                     throw error instanceof ModelFilterRulesUnavailableError ? new LunoraError("BAD_REQUEST", MODEL_FILTER_RULES_UNAVAILABLE_MESSAGE) : error;
                 }),
                 resolveRunModel(ctx, chosen.model, userId),
-                // A failed read refuses the question before it is charged, with a message, not an internal error.
-                ctx.runQuery(internal.usage.activity.getThreadAttribution, { threadId, userId }).catch(() => {
-                    throw new LunoraError("BAD_REQUEST", "This chat could not be read just now. Ask the side question again.");
-                }),
+                ctx.runQuery(internal.usage.activity.getThreadAttribution, { threadId, userId }).catch(() => undefined),
             ]);
             // A thread on the Workers AI default under a region rule asks a default the rules allow.
             const runModelId =
@@ -433,23 +431,32 @@ export const askAside = authAction
                 const at = Date.now();
                 const cost = sumMessageCosts((result.steps ?? []).map((step: { providerMetadata?: unknown }) => step.providerMetadata));
 
-                // The project as it is now, read again after the call: the pre-charge read stands in when this one fails,
-                // so a paid answer always records its total.
+                // The project as it is now, read again after the call: the pre-charge read stands in when this one fails.
                 const recordedAttribution = await ctx
                     .runQuery(internal.usage.activity.getThreadAttribution, { threadId, userId })
                     .catch(() => threadAttribution);
-
-                scheduleReplyUsage(ctx.scheduler as never, {
+                const usage = {
                     at,
                     costMicrodollars: Math.round(cost?.microdollars ?? 0),
                     date: usageDayOf(at, timezone),
                     replyKey: `aside:${entryId}`,
                     skillKey: DEFAULT_SKILL_KEY,
-                    threadAttribution: recordedAttribution,
                     threadId,
                     tokens: result.totalUsage?.totalTokens ?? 0,
                     userId,
-                });
+                };
+
+                if (recordedAttribution === undefined) {
+                    // Neither read worked: the thread's own shard reads the project and forwards the record, with its retry,
+                    // so the paid answer still records its total.
+                    void runAfterOnShard(ctx.scheduler, 0, internal.usage.activity.forwardReplyUsage, usage, thread?.userId ?? userId).catch(
+                        (error: unknown) => {
+                            chatLogger.warn("[askAside] usage record not scheduled", { error: error instanceof Error ? error.message : String(error) });
+                        },
+                    );
+                } else {
+                    scheduleReplyUsage(ctx.scheduler as never, { ...usage, threadAttribution: recordedAttribution });
+                }
             }
 
             return { answer, token: await signAsideAnswer({ answer, question, threadId, userId }, secret), withThread: !hostRun };

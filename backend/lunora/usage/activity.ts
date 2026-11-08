@@ -257,7 +257,22 @@ export const recordReplyUsage = internalMutation
         if (recorded) {
             if (recorded.awaitingTotal === true && args.retry !== true) {
                 await countTotal();
-                await fileProject(recorded.deferredProjectKey === undefined ? {} : { projectKey: recorded.deferredProjectKey });
+
+                // The noted project, checked again: access revoked since files none, and a failed check never costs the
+                // total, which is counted already.
+                if (recorded.deferredProjectKey !== undefined) {
+                    await fileProject(
+                        await readableAttribution(ctx, { projectKey: recorded.deferredProjectKey }, args.userId).catch((error: unknown) => {
+                            usageLogger.warn("[usage] the noted project could not be read; the reply stays without it", {
+                                error,
+                                replyKey: args.replyKey,
+                            });
+
+                            return {};
+                        }),
+                    );
+                }
+
                 await ctx.db.patch("usageReplies", recorded._id, { awaitingTotal: false });
             } else if (recorded.withoutProject === true && args.projectUnread !== true) {
                 await fileProject(await attributionNow());
@@ -274,9 +289,10 @@ export const recordReplyUsage = internalMutation
         if (args.retry === true && ctx.now - args.at > RETRY_COUNTS_WITHIN_MS) {
             const attribution = await attributionNow();
 
+            // Stamped with when it is written, so the prune keeps it as long as any key, for the first record to find.
             await ctx.db.insert("usageReplies", {
                 awaitingTotal: true,
-                recordedAt: args.at,
+                recordedAt: ctx.now,
                 replyKey: args.replyKey,
                 userId: args.userId,
                 ...(attribution.projectKey !== undefined && { deferredProjectKey: attribution.projectKey }),
@@ -301,7 +317,19 @@ export const recordReplyUsage = internalMutation
                     userId: args.userId,
                 });
                 projectUnread = true;
-                await runAfterWithRetry(ctx.scheduler, RECORD_RETRY.baseMs, internal.usage.activity.recordReplyUsage, { ...args, retry: true }, RECORD_RETRY);
+                // Booking the retry never costs the total: if it fails, the reply is counted without its project.
+                await runAfterWithRetry(
+                    ctx.scheduler,
+                    RECORD_RETRY.baseMs,
+                    internal.usage.activity.recordReplyUsage,
+                    { ...args, retry: true },
+                    RECORD_RETRY,
+                ).catch((bookingError: unknown) => {
+                    usageLogger.warn("[usage] the project retry could not be booked; the reply stays without its project", {
+                        error: bookingError,
+                        replyKey: args.replyKey,
+                    });
+                });
             }
         }
 
@@ -353,13 +381,19 @@ export const forwardReplyUsage = internalMutation
                 userId: usage.userId,
             });
             await runAfterOnShard(ctx.scheduler as never, 0, internal.usage.activity.recordReplyUsage, { ...usage, projectUnread: true }, usage.userId);
+            // Booking the retry never costs the total sent above: if it fails, the reply stays without its project.
             await runAfterWithRetry(
                 ctx.scheduler,
                 RECORD_RETRY.baseMs,
                 internal.usage.activity.forwardReplyUsage,
                 { ...usage, projectRetry: true },
                 RECORD_RETRY,
-            );
+            ).catch((bookingError: unknown) => {
+                usageLogger.warn("[usage] the project retry could not be booked; the reply stays without its project", {
+                    error: bookingError,
+                    replyKey: usage.replyKey,
+                });
+            });
 
             return null;
         }

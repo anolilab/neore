@@ -28481,6 +28481,18 @@
     "usageReplies": {
       "commitOrdered": false,
       "fields": {
+        "awaitingTotal": {
+          "kind": "boolean",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "deferredProjectKey": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "recordedAt": {
           "kind": "number",
           "nullable": false,

@@ -398,10 +398,9 @@ describe("askAside", () => {
         expect(await remainingText(OWNER)).toBe(before);
     });
 
-    it("refuses with a message, and charges nothing, when the thread's project cannot be read", async () => {
+    it("answers when the thread's project cannot be read, and sends the record to the thread's shard to read it there", async () => {
         const key = "usage_activity:getThreadAttribution";
         const real = registry.get(key);
-        const before = await remainingText(OWNER);
 
         registry.set(
             key,
@@ -414,13 +413,17 @@ describe("askAside", () => {
         );
 
         try {
-            expect(await errorCode(ask())).toBe("BAD_REQUEST");
+            await ask();
         } finally {
             registry.set(key, real);
         }
 
-        expect(generateText).not.toHaveBeenCalled();
-        expect(await remainingText(OWNER)).toBe(before);
+        // Answered, and recorded through the thread's shard rather than with a project it could not read.
+        expect(generateText).toHaveBeenCalledOnce();
+        expect(scheduleReplyUsage).not.toHaveBeenCalled();
+        expect(harness.scheduler.list().filter((job) => (job.args as { replyKey?: string } | undefined)?.replyKey === `aside:${lastEntryId()}`)).toHaveLength(
+            1,
+        );
     });
 
     it("refuses with its own code once the daily quota is spent, and calls no model", async () => {
