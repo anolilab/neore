@@ -126,13 +126,13 @@ describe("releasePhonePush", () => {
         expect(server.unregister).not.toHaveBeenCalled();
     });
 
-    it("has nothing to release when the system gives no token", async () => {
+    it("lets a failure to get the token reach sign-out, which logs it, and sends nothing", async () => {
         const platform = platformWith({ canAskAgain: true, granted: false });
         const server = serverWith();
 
         vi.mocked(platform.getDeviceToken).mockRejectedValueOnce(new Error("no token"));
-        await releasePhonePush({ platform, server });
 
+        await expect(releasePhonePush({ platform, server })).rejects.toThrow("no token");
         expect(server.unregister).not.toHaveBeenCalled();
     });
 });

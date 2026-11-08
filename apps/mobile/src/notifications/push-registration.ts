@@ -95,8 +95,8 @@ export const registerPhoneForPush = async ({
  * Sign-out: the account stops getting pushes on this phone, unless `isCurrent` says
  * the sign-out is over by the time the token is known. Released whatever the
  * permission says now: a person who turned notifications off in the system settings
- * after registering still has a row on the server. A phone the system gives no token
- * has nothing registered to release.
+ * after registering still has a row on the server. A failure to get the token is not
+ * swallowed: sign-out logs it, and the server stops sending once the session is revoked.
  */
 export const releasePhonePush = async ({
     isCurrent = () => true,
@@ -107,13 +107,7 @@ export const releasePhonePush = async ({
     platform: PushPlatform;
     server: PushServer;
 }): Promise<void> => {
-    let token: string;
-
-    try {
-        token = await platform.getDeviceToken();
-    } catch {
-        return;
-    }
+    const token = await platform.getDeviceToken();
 
     // A release that outlived its sign-out (it timed out and the next account signed in) would unregister THAT
     // account's row: the client now carries its sign-in.
