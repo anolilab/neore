@@ -3,8 +3,7 @@ import "unfonts.css";
 // Imported for its boot-time read of the URL: see BOOTED_ON_CHAT_INDEX.
 import "@/features/chat/core/utils/resume-boot";
 
-import type { ConsentManagerOptions } from "@c15t/react";
-import { ConsentManagerProvider } from "@c15t/react";
+import { ConsentProvider, hosted, local } from "@c15t/react";
 import { ConsentBanner } from "@c15t/react/components/consent-banner";
 import { ConsentDialog } from "@c15t/react/components/consent-dialog";
 import geistLatinFont from "@fontsource-variable/geist/files/geist-latin-wght-normal.woff2?url";
@@ -45,7 +44,7 @@ import NativeBridge from "@/lib/native/native-bridge";
 import { getClientPostHogState } from "@/lib/posthog/client-state";
 import { forgetClientPostHog, readRequestContext, rememberClientPostHog } from "@/lib/request-context";
 import { jsonLd, seo } from "@/lib/seo";
-import { syncConsentToPostHog } from "@/providers/analytics-provider";
+import { PostHogConsentSync } from "@/providers/analytics-provider";
 import type { AppContext } from "@/router";
 import type { FileRouteTypes } from "@/routeTree.gen";
 import appCss from "@/styles.css?url";
@@ -139,6 +138,10 @@ const CONSENT_CATEGORIES: ("experience" | "functionality" | "marketing" | "measu
     "measurement",
     "marketing",
 ];
+
+// Built once: c15t 3 reads `mode` only when the provider mounts. Local mode (the default) resolves the policy in
+// the browser with no geolocation, so every visitor is treated as an unknown location and asked to opt in.
+const CONSENT_MODE = env.VITE_C15T_MODE === "c15t" && env.VITE_C15T_BACKEND_URL ? hosted({ backendURL: env.VITE_C15T_BACKEND_URL }) : local();
 
 /**
  * Handles data refetching after authentication changes.
@@ -445,20 +448,8 @@ const RootComponent = () => {
                                         >
                                             <PostHogIdentitySync />
                                             <ThemeProvider attribute="class" defaultTheme="system" enableSystem nonce={context.nonce}>
-                                                <ConsentManagerProvider
-                                                    options={
-                                                        {
-                                                            mode: (env.VITE_C15T_MODE || "offline") as ConsentManagerOptions["mode"],
-                                                            // This is the manager that actually runs. The
-                                                            // callback used to be registered against a
-                                                            // throwaway one in `analytics-provider`, so a
-                                                            // consent decision never reached PostHog.
-                                                            callbacks: { onConsentSet: syncConsentToPostHog },
-                                                            consentCategories: CONSENT_CATEGORIES,
-                                                            ignoreGeoLocation: import.meta.env.DEV,
-                                                        } as ConsentManagerOptions
-                                                    }
-                                                >
+                                                <ConsentProvider options={{ consentCategories: CONSENT_CATEGORIES, mode: CONSENT_MODE, nonce: context.nonce }}>
+                                                    <PostHogConsentSync />
                                                     <ImpersonationBanner />
                                                     <ConnectionProvider>
                                                         {/* Eager, not lazy: a lazy chunk cannot load while the app is offline, which is when this screen is needed. */}
@@ -487,7 +478,7 @@ const RootComponent = () => {
                                                     <ConsentDialog />
                                                     <Scripts />
                                                     <IconSpriteSheet />
-                                                </ConsentManagerProvider>
+                                                </ConsentProvider>
                                             </ThemeProvider>
                                         </AuthUIProviderTanstack>
                                     </AuthQueryProvider>

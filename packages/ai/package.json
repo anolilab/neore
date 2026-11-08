@@ -97,7 +97,6 @@
         "@ai-sdk/provider": "catalog:ai",
         "@ai-sdk/react": "catalog:ai",
         "@ai-sdk/replicate": "catalog:ai",
-        "@ai-sdk/ui-utils": "catalog:ai",
         "@ai-sdk/xai": "catalog:ai",
         "@openrouter/ai-sdk-provider": "catalog:ai",
         "@requesty/ai-sdk": "catalog:ai",

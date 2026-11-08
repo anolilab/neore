@@ -56,6 +56,19 @@ const env = createEnv({
         ...process.env,
     },
 
+    // Hosted consent needs its backend: without the URL the app would quietly fall back to
+    // browser-local consent, so refuse the configuration instead.
+    createFinalSchema: (shape) =>
+        z.object(shape).superRefine((value, context) => {
+            if (value.VITE_C15T_MODE === "c15t" && !value.VITE_C15T_BACKEND_URL) {
+                context.addIssue({
+                    code: "custom",
+                    message: 'VITE_C15T_MODE is "c15t" but VITE_C15T_BACKEND_URL is not set',
+                    path: ["VITE_C15T_BACKEND_URL"],
+                });
+            }
+        }),
+
     server: {
         // PostHog Personal API Key (optional, for local feature flag evaluation)
         POSTHOG_PERSONAL_API_KEY: z.string().optional(),

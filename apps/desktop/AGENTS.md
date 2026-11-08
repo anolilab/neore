@@ -2,7 +2,7 @@
 
 ## INVARIANTS
 
-- **Native shell** (`apps/desktop`, Electron 44) loads the deployed app from a
+- **Native shell** (`apps/desktop`, Electron 45) loads the deployed app from a
   BUILD-TIME `NEORE_SITE_URL` and exposes `window.neoreNative` only on that
   origin, through a sandboxed preload; every IPC handler checks the sender's
   origin in the main process. Device execution sits behind `packages/device-core`. The web side is `apps/web/src/lib/native/bridge.ts`,

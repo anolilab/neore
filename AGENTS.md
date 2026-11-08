@@ -11,7 +11,7 @@ Neore Chat v2 — AI chat app: React + TypeScript frontend, a **Lunora** backend
 ├── apps/
 │   ├── web/                # Main React app (TanStack Start)
 │   ├── browser-extension/  # CRXJS + React
-│   ├── desktop/            # Electron 44 shell around the DEPLOYED web app
+│   ├── desktop/            # Electron 45 shell around the DEPLOYED web app
 │   ├── cli/                # `neore` CLI for the public v1 API
 │   └── mobile/             # Expo / React Native app
 ├── backend/                # Lunora backend (ShardDO + .global() D1 + R2), Better Auth
