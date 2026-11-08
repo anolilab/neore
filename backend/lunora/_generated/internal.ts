@@ -720,7 +720,7 @@ export interface InternalApiTypes {
             collectPrompts: FunctionReference<"query", { userId: string }, { promptHistory: { _id: Id<"promptHistory">; changeType: string; content: string; createdAt: number; promptId: Id<"prompts">; version: number; }[]; prompts: { _id: Id<"prompts">; content: string; createdAt: number; description: string | undefined; isFavorite: boolean | undefined; lastUsedAt: number | undefined; name: string; tags: string[] | undefined; updatedAt: number | undefined; usageCount: number | undefined; }[]; }>;
             collectSettings: FunctionReference<"query", { userId: string }, { aiUserPreferences?: unknown | null; userSettings?: unknown | null }>;
             collectThreadTags: FunctionReference<"query", { userId: string }, Array<{ _id: string; color: string; createdAt: number; name: string; order: number; updatedAt: number }>>;
-            generateExportFile: FunctionReference<"action", { acpSessions?: unknown; activity?: unknown; bots?: unknown; codingAgentRuns?: unknown; conversations?: unknown; devices?: unknown; evals?: unknown; files?: unknown; memories?: unknown; notifications?: unknown; pages?: unknown; profile?: unknown; prompts?: unknown; pullRequestGuides?: unknown; pullRequestThreads?: unknown; requestId: Id<"gdprRequests">; reviewDrafts?: unknown; settings?: unknown; tasks?: unknown; threadTags?: unknown; userEmail: string; userId: string; watchedRepositories?: unknown }, string>;
+            generateExportFile: FunctionReference<"action", { acpSessions?: unknown; activity?: unknown; bots?: unknown; codingAgentRuns?: unknown; conversations?: unknown; devices?: unknown; evals?: unknown; files?: unknown; memories?: unknown; notifications?: unknown; pages?: unknown; profile?: unknown; prompts?: unknown; pullRequestGuides?: unknown; pullRequestThreads?: unknown; requestId: Id<"gdprRequests">; reviewDrafts?: unknown; settings?: unknown; tasks?: unknown; threadTags?: unknown; triggers?: unknown; userEmail: string; userId: string; watchedRepositories?: unknown }, string>;
             sendExportReadyEmail: FunctionReference<"action", { requestId: Id<"gdprRequests">; userEmail: string }, null>;
             deletion_steps: {
                 deleteAuthRecords: FunctionReference<"mutation", { userId: string }, null>;
@@ -1228,14 +1228,19 @@ export interface InternalApiTypes {
             createExecution: FunctionReference<"mutation", { firing?: number; payload?: string; triggerId: Id<"triggers"> }, Id<"triggerExecutions">>;
             getDueScheduleTriggers: FunctionReference<"query", { now: number }, import("./dataModel.js").Doc_triggers[]>;
             getTriggerInternal: FunctionReference<"query", { triggerId: Id<"triggers"> }, import("./dataModel.js").Doc_triggers | null>;
+            pruneExpiredRunPrompts: FunctionReference<"mutation", {}, null>;
             recordFilteredExecution: FunctionReference<"mutation", { firing?: number; reason: string; triggerId: Id<"triggers"> }, null>;
             recordRefusedDelivery: FunctionReference<"mutation", { reason: string; refusedAt: number; triggerId: Id<"triggers"> }, null>;
             releaseQuietWindow: FunctionReference<"mutation", { expected?: number; triggerId: Id<"triggers"> }, null>;
             reserveQuietWindow: FunctionReference<"mutation", { expected?: number; triggerId: Id<"triggers">; windowStart: number }, boolean>;
             setTriggerEnabledInternal: FunctionReference<"mutation", { enabled: boolean; triggerId: Id<"triggers"> }, null>;
             switchOffConsumedMoment: FunctionReference<"mutation", { claimKey?: string; firing?: number; triggerId: Id<"triggers"> }, null>;
-            updateExecution: FunctionReference<"mutation", { error?: string; executionId: Id<"triggerExecutions">; status: string; threadId?: string; userFixable?: boolean }, null>;
+            updateExecution: FunctionReference<"mutation", { error?: string; executionId: Id<"triggerExecutions">; prompt?: string; status: string; threadId?: string; userFixable?: boolean }, null>;
             updateTriggerStats: FunctionReference<"mutation", { error?: string; lastTriggeredAt?: number; nextTriggerAt?: number; triggerId: Id<"triggers"> }, null>;
+        };
+        gdpr: {
+            collectTriggerRunsForExport: FunctionReference<"query", { cursor?: string | null; onlyOne?: boolean; triggerId: Id<"triggers">; userId: string }, { cursor: string | null; runs: Array<unknown> }>;
+            collectTriggersForExport: FunctionReference<"query", { cursor?: string | null; userId: string }, { cursor: string | null; triggers: Array<unknown> }>;
         };
         quiet_inputs: {
             loadQuietSnapshot: FunctionReference<"query", { since: number; userId: string }, { events: Array<{ createdAt: number; type: string }>; needsYou: Array<{ at: number; kind: string; title: string }>; running: Array<{ at: number; kind: string; title: string }>; threads: Array<{ title?: string; updatedAt: number }> }>;
@@ -2512,6 +2517,7 @@ export const internal: InternalApiTypes = {
             createExecution: { __lunoraRef: "triggers_functions:createExecution" },
             getDueScheduleTriggers: { __lunoraRef: "triggers_functions:getDueScheduleTriggers" },
             getTriggerInternal: { __lunoraRef: "triggers_functions:getTriggerInternal" },
+            pruneExpiredRunPrompts: { __lunoraRef: "triggers_functions:pruneExpiredRunPrompts" },
             recordFilteredExecution: { __lunoraRef: "triggers_functions:recordFilteredExecution" },
             recordRefusedDelivery: { __lunoraRef: "triggers_functions:recordRefusedDelivery" },
             releaseQuietWindow: { __lunoraRef: "triggers_functions:releaseQuietWindow" },
@@ -2520,6 +2526,10 @@ export const internal: InternalApiTypes = {
             switchOffConsumedMoment: { __lunoraRef: "triggers_functions:switchOffConsumedMoment" },
             updateExecution: { __lunoraRef: "triggers_functions:updateExecution" },
             updateTriggerStats: { __lunoraRef: "triggers_functions:updateTriggerStats" },
+        },
+        gdpr: {
+            collectTriggerRunsForExport: { __lunoraRef: "triggers_gdpr:collectTriggerRunsForExport" },
+            collectTriggersForExport: { __lunoraRef: "triggers_gdpr:collectTriggersForExport" },
         },
         quiet_inputs: {
             loadQuietSnapshot: { __lunoraRef: "triggers_quiet_inputs:loadQuietSnapshot" },

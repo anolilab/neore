@@ -17,6 +17,7 @@ import { internal } from "../_generated/internal";
 import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
 import { internalMutation, internalQuery } from "../_generated/server";
+import { isThreadLocked } from "../lib/thread-lock";
 import { authAction, authMutation, authQuery, rateLimit } from "../lib/crpc";
 import {
     CLAIM_PREFIX_BATCH,
@@ -40,7 +41,7 @@ import { canBeQuiet } from "./quiet";
 import { resolveTimeZone } from "../memory/reflection-logic";
 import { findNextCronTime, isHourlyOrSlowerCronExpression } from "./schedule";
 import { deleteShardRoute, setShardRoute } from "../lib/shard-routes";
-import { noteShardDue } from "../lib/shard-housekeeping";
+import { noteShardActivity, noteShardDue } from "../lib/shard-housekeeping";
 import { notifyQuietly } from "../notifications/notify";
 import { MAX_LENGTH } from "../lib/validators";
 import { chargeRound, DAILY_LIMIT_MESSAGE, loadTaskAccount, taskAccessProblem } from "../tasks/account";
@@ -889,6 +890,7 @@ const vGetTriggerExecutionsOutput = v.array(
         _id: v.string(),
         completedAt: v.union(v.number(), v.null()),
         error: v.union(v.string(), v.null()),
+        prompt: v.union(v.string(), v.null()),
         startedAt: v.number(),
         status: v.string(),
         threadId: v.union(v.string(), v.null()),
@@ -932,11 +934,24 @@ export const getTriggerExecutions = authQuery
             return keep;
         });
 
-        return visible.slice(0, args.limit ?? 20).map((entry) => {
+        const shown = visible.slice(0, args.limit ?? 20);
+        // A run's prompt is its thread's first message, so it is hidden while that thread is locked, read at the moment of use.
+        const promptThreads = [...new Set(shown.flatMap((entry) => (entry.prompt && entry.threadId ? [entry.threadId] : [])))];
+        const threads = await Promise.all(promptThreads.map(async (threadId) => await context.db.get("threads", threadId as Id<"threads">)));
+        const lockedThreads = new Set(
+            promptThreads.filter((_, index) => {
+                const thread = threads[index];
+
+                return thread !== null && thread !== undefined && isThreadLocked(thread);
+            }),
+        );
+
+        return shown.map((entry) => {
             return {
                 _id: entry._id as string,
                 completedAt: entry.completedAt ?? null,
                 error: entry.error ?? null,
+                prompt: entry.threadId && lockedThreads.has(entry.threadId) ? null : (entry.prompt ?? null),
                 startedAt: entry.startedAt,
                 status: entry.status as string,
                 threadId: entry.threadId ?? null,
@@ -1404,6 +1419,45 @@ const settleFailureStreak = async (ctx: MutationCtx, trigger: Doc<"triggers">, s
 };
 
 /**
+ * How long a run keeps its saved prompt after it settles. The run row, its status and its thread stay; only the prompt
+ * text goes. Shorter than the housekeeping horizon (`HOUSEKEEPING_HORIZON_MS`, 30 days) by more than one idle sweep
+ * interval, so a shard that goes quiet after its last run is still swept once after that run's prompt has expired.
+ */
+export const RUN_PROMPT_RETENTION_MS = 28 * 24 * 60 * 60 * 1000;
+
+/**
+ * The most runs one housekeeping pass rewrites. A run row can hold a webhook body of up to 1 MiB, and a pass reads and
+ * rewrites each row inside one transaction, so the batch is sized for the largest rows; a larger backlog is worked off
+ * over later passes.
+ */
+const PRUNE_RUN_PROMPTS_BATCH = 16;
+
+/**
+ * Housekeeping sweep (`shardSweeps()`): clears the saved prompt of each run past its expiry. Rows without an expiry are in
+ * the index too, so the range starts above zero, as `reapLapsedClaims` does; otherwise they would fill every batch.
+ */
+export const pruneExpiredRunPrompts = internalMutation
+    .input({})
+    .output(v.null())
+    .mutation(async ({ ctx }) => {
+        const expired = await ctx.db
+            .query("triggerExecutions")
+            .withIndex("by_promptExpiresAt", (q) => q.gt("promptExpiresAt", 0).lt("promptExpiresAt", ctx.now))
+            .take(PRUNE_RUN_PROMPTS_BATCH);
+
+        for (const row of expired) {
+            await patchRow(ctx.db, "triggerExecutions", row, { prompt: undefined, promptExpiresAt: undefined });
+        }
+
+        // A full batch may leave more expired prompts: sweep again at once, so a backlog drains within this pass.
+        if (expired.length === PRUNE_RUN_PROMPTS_BATCH) {
+            await ctx.scheduler.runAfter(0, internal.triggers.functions.pruneExpiredRunPrompts, {});
+        }
+
+        return null;
+    });
+
+/**
  * Closes an execution and tells the owner. A run is counted toward the trigger's failure
  * streak once, on the `running` to settled transition of its own execution row: a
  * redelivered call finds it already settled. `userFixable` marks a failure only the owner
@@ -1413,12 +1467,14 @@ export const updateExecution = internalMutation
     .input({
         error: v.optional(v.string()),
         executionId: v.id("triggerExecutions"),
+        // The prompt the run was given, for the run log. Written only by the settle that changes the row.
+        prompt: v.optional(v.string().max(MAX_LENGTH.long)),
         status: v.string(),
         threadId: v.optional(v.string()),
         userFixable: v.optional(v.boolean()),
     })
     .output(v.null())
-    .mutation(async ({ args: { error, executionId, status, threadId, userFixable }, ctx }) => {
+    .mutation(async ({ args: { error, executionId, prompt, status, threadId, userFixable }, ctx }) => {
         const execution = await ctx.db.get("triggerExecutions", executionId);
 
         if (!execution) {
@@ -1434,8 +1490,15 @@ export const updateExecution = internalMutation
                 status,
                 ...(threadId && { threadId }),
                 ...(error && { error }),
+                ...(prompt !== undefined && { prompt, promptExpiresAt: ctx.now + RUN_PROMPT_RETENTION_MS }),
                 completedAt: ctx.now,
             });
+
+            // A saved prompt is cleared by this shard's housekeeping, which visits only shards active in the last 30 days:
+            // a routine that keeps running for an owner who no longer signs in must keep its shard in that set.
+            if (prompt !== undefined) {
+                await noteShardActivity(ctx);
+            }
         }
 
         if (settled.status !== "completed" && settled.status !== "failed") {

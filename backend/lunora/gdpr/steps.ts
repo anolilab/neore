@@ -2,6 +2,7 @@ import { LunoraError, v } from "lunorash/server";
 
 import { PROJECT_SKILL_KEY } from "../usage/activity-logic";
 import { collectAcpSessionPages } from "../acp/gdpr";
+import { collectAllTriggers } from "../triggers/export-pages";
 import { internal } from "../_generated/internal";
 import type { Doc, Id } from "../_generated/dataModel";
 import { internalAction, internalQuery } from "../_generated/server";
@@ -413,6 +414,9 @@ const EXPORT_ACTIVITY_CAP = 5000;
 /** The export JSON is built whole in memory before it is stored; this is the largest one we will write. */
 const MAX_EXPORT_BYTES = 32 * 1024 * 1024;
 
+/** The share of the export trigger run history may take; past it, the oldest runs are left out and marked as cut. */
+const TRIGGER_EXPORT_BYTES = 8 * 1024 * 1024;
+
 /**
  * Usage history, sub-agent delegations (their task text and results) and
  * knowledge collections — user data the export used to leave out.
@@ -575,6 +579,9 @@ export const generateExportFile = internalAction
         // Optional so an export workflow already in flight when this shipped
         // still replays against the new signature.
         threadTags: v.optional(v.any()),
+        // Triggers with their settings and their newest runs, read in this action when the workflow does not pass them
+        // (`triggers/gdpr.ts`). Optional so an export already in flight still replays with the list it recorded.
+        triggers: v.optional(v.any()),
         userEmail: v.string(),
         userId: v.string(),
         // The user's watched repositories (`source-control/gdpr.ts`). Optional for the same in-flight-replay reason.
@@ -615,6 +622,19 @@ export const generateExportFile = internalAction
             subAgentRuns: activity?.subAgentRuns ?? [],
             tasks: args.tasks ?? { goals: [], tasks: [] },
             threadTags: args.threadTags ?? [],
+            triggers:
+                args.triggers ??
+                (await collectAllTriggers(
+                    async (cursor) => await context.runQuery(internal.triggers.gdpr.collectTriggersForExport, { cursor, userId: args.userId }),
+                    async (triggerId, cursor, onlyOne) =>
+                        await context.runQuery(internal.triggers.gdpr.collectTriggerRunsForExport, {
+                            cursor,
+                            onlyOne,
+                            triggerId: triggerId as Id<"triggers">,
+                            userId: args.userId,
+                        }),
+                    TRIGGER_EXPORT_BYTES,
+                )),
             usageDaily: activity?.usageDaily ?? [],
             watchedRepositories: args.watchedRepositories ?? { watched: [] },
         };
