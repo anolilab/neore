@@ -250,6 +250,8 @@ describe(pasteHasText, () => {
             false,
             '<html>\r\n<body>\r\n<!--StartFragment--><img src="https://cdn.example.com/p/photo.jpg"><!--EndFragment-->\r\n</body>\r\n</html>',
         ],
+        ["a picture copied out of Word, with an HTML document and no text", "\r\n", picture, false, '<html><head><style>p{}</style></head><body><p class=MsoNormal><img src="clip.png"></p></body></html>'],
+        ["copied text that happens to match the picture's name", "notes.txt", [{ name: "notes.txt" }], true, "<p>notes.txt</p>"],
         ["a spreadsheet's copied links, next to a picture of the cells", "https://a.example\nhttps://b.example", picture, true, "<table><tr><td>https://a.example</td></tr></table>"],
     ])("%s: %s", (_label, plain, files, expected, html = "") => {
         expect(pasteHasText(clipboard(plain, html), files)).toBe(expected);

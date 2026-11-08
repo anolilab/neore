@@ -116,15 +116,18 @@ describe(isPrefixOfCommand, () => {
     });
 });
 
+const chip = { attrs: { messageId: "m", text: "quoted" }, type: "quoteChip" };
+const command = { content: [{ text: "/model x", type: "text" }], type: "paragraph" };
+
 describe(nonTextLength, () => {
-    it("counts a quote chip's text, so a command typed after a chip maps to the draft offset it has", () => {
+    it.each([
+        ["after text", [{ content: [{ text: "hi", type: "text" }], type: "paragraph" }, chip, command]],
+        ["after an empty first line", [{ type: "paragraph" }, chip, command]],
+        ["after text and an empty line", [{ content: [{ text: "hi", type: "text" }], type: "paragraph" }, { type: "paragraph" }, chip, command]],
+    ])("counts a quote chip's text, so a command typed %s and a chip maps to the draft offset it has", (_label, content) => {
         const editor = new Editor({
             content: {
-                content: [
-                    { content: [{ text: "hi", type: "text" }], type: "paragraph" },
-                    { attrs: { messageId: "m", text: "quoted" }, type: "quoteChip" },
-                    { content: [{ text: "/model x", type: "text" }], type: "paragraph" },
-                ],
+                content,
                 type: "doc",
             },
             extensions: [StarterKit.configure({ blockquote: false }), QuoteChip],

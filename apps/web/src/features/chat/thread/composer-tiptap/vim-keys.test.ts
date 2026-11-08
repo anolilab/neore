@@ -183,8 +183,8 @@ describe("motions", () => {
         const start = aroundChip();
         const chipSelected = start.apply(start.tr.setSelection(NodeSelection.create(start.doc, 7)));
 
-        expect(press(chipSelected, ["j"]).handled).toBe(true);
-        expect(press(chipSelected, ["j"]).state.doc.childCount).toBe(3);
+        expect(press(chipSelected, ["z"]).handled).toBe(true);
+        expect(press(chipSelected, ["z"]).state.doc.childCount).toBe(3);
         expect(press(chipSelected, ["x"]).state.doc.childCount).toBe(2);
 
         const after = press(chipSelected, ["a"]);
@@ -192,11 +192,17 @@ describe("motions", () => {
         expect(after.vim.mode).toBe("insert");
         expect(after.state.selection.$head.parent.textContent).toBe("last");
 
+        // Motions leave the chip, `dd` deletes it, and the chip's line count is what `o` changes.
+        expect(press(chipSelected, ["j"]).state.selection.$head.parent.textContent).toBe("last");
+        expect(press(chipSelected, ["k"]).state.selection.$head.parent.textContent).toBe("first");
+        expect(press(chipSelected, ["d", "d"]).state.doc.childCount).toBe(2);
+
         // `o` opens a new, empty line after the chip rather than joining "last".
         const opened = press(chipSelected, ["o"]);
 
         expect(opened.state.doc.childCount).toBe(4);
         expect(opened.state.selection.$head.parent.textContent).toBe("");
+        expect(opened.state.doc.child(1).type.name).toBe("quoteChip");
     });
 
     it("opens a line before a quote chip that starts the draft, so i does not type over it", () => {

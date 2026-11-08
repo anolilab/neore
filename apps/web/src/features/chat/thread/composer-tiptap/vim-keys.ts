@@ -296,12 +296,32 @@ const runUndo = (state: EditorState, vim: VimState): VimResult => {
 const INSERT_BEFORE: ReadonlySet<string> = new Set(["i", "I"]);
 const INSERT_AFTER: ReadonlySet<string> = new Set(["a", "A"]);
 
+/** The motions that leave a selected chip for the text after it, and those that leave it for the text before it. */
+const MOVE_AFTER: ReadonlySet<string> = new Set(["j", "l", "w"]);
+const MOVE_BEFORE: ReadonlySet<string> = new Set(["b", "h", "k"]);
+
 /** Keys pressed while a block without text (a quote chip) is selected instead of a cursor. */
 const chipKey = (state: EditorState, vim: VimState, key: string): VimResult => {
     const { from, to } = state.selection;
 
-    if (key === "x") {
+    // `x` and `dd` delete the chip.
+    if (key === "x" || (key === "d" && vim.pending === "d")) {
         return handledAt(vim, state.tr.deleteSelection());
+    }
+
+    if (key === "d") {
+        return handledAt(vim, undefined, { pending: "d" });
+    }
+
+    if (key === "u") {
+        return runUndo(state, vim);
+    }
+
+    // A motion moves off the chip to the text after it (`j`, `l`, `w`) or before it (`k`, `h`, `b`), staying in normal mode.
+    if (MOVE_AFTER.has(key) || MOVE_BEFORE.has(key)) {
+        const target = Selection.findFrom(state.doc.resolve(MOVE_AFTER.has(key) ? to : from), MOVE_AFTER.has(key) ? 1 : -1, true);
+
+        return handledAt(vim, target ? state.tr.setSelection(target) : undefined);
     }
 
     // `o` and `O` always open a new line, after or before the chip, as they do next to any other line.
@@ -335,8 +355,8 @@ const chipKey = (state: EditorState, vim: VimState, key: string): VimResult => {
 const normalKey = (state: EditorState, vim: VimState, key: string): VimResult => {
     const cursor = cursorOf(state);
 
-    // Not in a paragraph (a quote chip is selected): `x` deletes the chip, the insert keys start typing next to it, and any
-    // other letter or symbol is not typed into the draft, where it would replace the chip. Enter, Tab and arrows keep their meaning.
+    // Not in a paragraph (a quote chip is selected): see `chipKey`. No letter or symbol is typed into the draft, where it would
+    // replace the chip; Enter, Tab and arrows keep their meaning.
     if (!cursor) {
         return chipKey(state, vim, key);
     }

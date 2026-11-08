@@ -35,18 +35,19 @@ const HTML_WRAPPER = /<!--[\s\S]*?-->|<\/?(?:html|body)\b[^>]*>/giu;
  */
 export const pasteHasText = (data: Pick<DataTransfer, "getData">, files: ReadonlyArray<Pick<File, "name">>): boolean => {
     const names = new Set(files.map((file) => file.name));
-    // A link line is the files' own address only where nothing else says otherwise: no HTML (a file manager), or HTML that is
-    // just the image (a browser's "Copy Image"). Next to a spreadsheet's table, links are the text that was copied.
     const html = data.getData("text/html");
     const fragment = html.replaceAll(HTML_WRAPPER, "");
-    const linksDescribeFiles = fragment.trim() === "" || IMAGE_ONLY_HTML.test(fragment);
+    // With nothing else in the HTML, the text can only describe the files (a file manager, "Copy Image"): their names, paths or
+    // links. HTML with text in it says the lines were copied as text, whatever they look like.
+    const describesFiles = fragment.trim() === "" || IMAGE_ONLY_HTML.test(fragment);
     const lines = data
         .getData("text/plain")
         .split(LINE_BREAK)
         .map((line) => line.trim())
         .filter((line) => line !== "");
 
-    return lines.some((line) => !(linksDescribeFiles && LINK_LINE.test(line)) && !names.has(line.split(PATH_SEPARATOR).at(-1) ?? line));
+    // No text lines at all (a picture copied out of Word or Outlook carries its HTML document and nothing else): files only.
+    return lines.length > 0 && (!describesFiles || lines.some((line) => !LINK_LINE.test(line) && !names.has(line.split(PATH_SEPARATOR).at(-1) ?? line)));
 };
 
 /** The characters a text attachment of `draft` adds to the context: its UTF-8 bytes, as `attachmentTextChars` counts them. */
