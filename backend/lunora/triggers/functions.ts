@@ -668,7 +668,12 @@ export const updateTrigger = authMutation
 
         if (args.inputTemplate !== undefined) {
             patch.inputTemplate = cleanPromptField(args.inputTemplate, "The input");
-            assertWebhookTemplateFits(trigger.type, patch.inputTemplate);
+
+            // The settings form sends the stored template back with every edit: one saved before the fit check is
+            // judged only once it is changed, so the trigger can still be renamed or otherwise edited.
+            if (patch.inputTemplate !== trigger.inputTemplate) {
+                assertWebhookTemplateFits(trigger.type, patch.inputTemplate);
+            }
         }
 
         // Clearing the bot clears its computer and quiet flags too: a routine without a bot has neither.

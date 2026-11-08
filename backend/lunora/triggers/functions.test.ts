@@ -305,6 +305,19 @@ describe("trigger schedules", () => {
         await as().mutation(updateTrigger as never, { inputTemplate: fits, triggerId } as never);
     });
 
+    it("lets an edit to another field through when the stored template is over the limit", async () => {
+        const over = "x".repeat(MAX_RENDERED_PROMPT_LENGTH);
+        const { triggerId } = (await as().mutation(createTrigger as never, { model: "m", name: "Hook", type: "webhook" } as never)) as { triggerId: string };
+
+        // Saved before the fit check existed.
+        await harness.run(async (ctx: any) => await ctx.db.patch("triggers", triggerId as never, { inputTemplate: over }));
+
+        await as().mutation(updateTrigger as never, { inputTemplate: over, name: "Renamed", triggerId } as never);
+
+        expect(await readTrigger(triggerId)).toMatchObject({ inputTemplate: over, name: "Renamed" });
+        await expect(as().mutation(updateTrigger as never, { inputTemplate: `${over}y`, triggerId } as never)).rejects.toThrow("over the limit");
+    });
+
     it("refuses an unknown time zone on create and on update, storing nothing", async () => {
         await expect(as().mutation(createTrigger as never, { ...schedule("0 9 * * 1"), timezone: "Europe/Berln" } as never)).rejects.toThrow(
             "Unknown time zone",
