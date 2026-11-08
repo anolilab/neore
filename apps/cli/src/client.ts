@@ -391,8 +391,22 @@ export class NeoreClient {
             }
         }
 
+        let text: string;
+
+        // A body that stops arriving (the deadline, a dropped connection) is a network failure; only one that came whole and
+        // does not parse is an answer that is not JSON.
         try {
-            return (await response.json()) as T;
+            text = await response.text();
+        } catch (error) {
+            throw new ApiError({
+                code: "network_error",
+                message: `The answer from ${this.#baseUrl} was cut off: ${error instanceof Error ? error.message : String(error)}`,
+                status: response.status,
+            });
+        }
+
+        try {
+            return JSON.parse(text) as T;
         } catch {
             throw new ApiError({ code: "invalid_response", message: "The API answered with a body that is not JSON.", status: response.status });
         }

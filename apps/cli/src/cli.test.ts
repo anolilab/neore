@@ -453,6 +453,21 @@ describe("chat end to end against a fake API", () => {
             expect(await run(["thread", "send", "th1", "hi", "--wait"], textless.context)).toBe(2);
             expect(textless.context.io.stderr.text()).toContain("neore threads show th1");
 
+            const stalled = await setup(
+                () =>
+                    new Response(
+                        new ReadableStream({
+                            start(controller) {
+                                controller.error(new Error("The operation was aborted due to timeout"));
+                            },
+                        }),
+                        { headers: { "Content-Type": "application/json" }, status: 200 },
+                    ),
+            );
+
+            expect(await run(["thread", "send", "th1", "hi", "--wait"], stalled.context)).toBe(EXIT.network);
+            expect(stalled.context.io.stderr.text()).toContain("neore threads show th1");
+
             const cut = await setup(() => new Response('{"messageId":"m1","thr', { headers: { "Content-Type": "application/json" }, status: 200 }));
 
             expect(await run(["thread", "send", "th1", "hi", "--wait"], cut.context)).toBe(2);
