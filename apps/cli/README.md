@@ -32,17 +32,20 @@ neore logout
 `neore --help` is the reference. Every command takes `--json` (NDJSON for
 streams).
 
-| Area      | Commands                                                           |
-| --------- | ------------------------------------------------------------------ |
-| Account   | `login`, `logout`, `whoami`, `doctor`                              |
-| Chat      | `chat [prompt]` (no prompt opens an interactive session), `models` |
-| Threads   | `threads ls`, `threads show <id>`, `threads rm <id> [--yes]`       |
-| Skills    | `skills ls`, `skills run <slug> [input]`                           |
-| Tasks     | `tasks ls`, `tasks create`, `tasks run <id>`, `tasks status <id>`  |
-| Knowledge | `kb upload <file>`, `kb ls`, `kb search <query>`                   |
+| Area      | Commands                                                                                                                             |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| Account   | `login`, `logout`, `whoami`, `doctor`                                                                                                |
+| Chat      | `chat [prompt]` (no prompt opens an interactive session), `models`                                                                   |
+| Threads   | `thread start <prompt> [--wait]`, `thread send <id> <prompt> [--wait]`, `threads ls`, `threads show <id>`, `threads rm <id> [--yes]` |
+| Skills    | `skills ls`, `skills run <slug> [input]`                                                                                             |
+| Tasks     | `tasks ls`, `tasks create`, `tasks run <id>`, `tasks status <id>`                                                                    |
+| Knowledge | `kb upload <file>`, `kb ls`, `kb search <query>`                                                                                     |
 
 Exit codes: 0 ok, 1 error, 2 usage, 3 auth or missing scope, 4 not found,
-5 rate or daily limit, 6 network.
+5 rate or daily limit, 6 network. `thread start` and `thread send` keep 1 for a
+run that failed: a generic error exits 2 instead (3-6 are unchanged), as does
+a `--wait` that ended without a finished reply (read it later with
+`neore threads show <id>`). Both read the prompt from stdin when it is piped.
 
 `kb upload` goes over the TUS upload route (`/api/v1/uploads`, which needs a key
 with `knowledge:write`), like every other upload in the stack.

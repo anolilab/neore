@@ -59,12 +59,18 @@ describe("argument parsing", () => {
         });
         expect(parseCommand(["threads"]).command).toBe("threads ls");
         expect(parseCommand([]).command).toBe("help");
+        expect(parseCommand(["thread", "--help"]).command).toBe("help");
+        expect(parseCommand(["chat", "--help", "--wait"]).flags.help).toBe(true);
     });
 
     it("rejects unknown commands, subcommands and flags as usage errors", () => {
         expect(() => parseCommand(["thread", "ls"])).toThrow(UsageError);
         expect(() => parseCommand(["threads", "delete"])).toThrow("threads rm");
         expect(() => parseCommand(["chat", "--no-strem"])).toThrow(UsageError);
+        expect(() => parseCommand(["thread"])).toThrow("thread start");
+        expect(() => parseCommand(["--wait"])).toThrow(UsageError);
+        expect(() => parseCommand(["chat", "hi", "--wait"])).toThrow("`chat` has no --wait: use --no-stream");
+        expect(() => parseCommand(["tasks", "run", "t1", "--wait"])).toThrow("`neore tasks status <id>`");
     });
 
     it("exits 2 on a usage error and 0 on --version", async () => {
@@ -304,6 +310,194 @@ describe("chat end to end against a fake API", () => {
         expect(context.io.stdout.text()).toBe("Hi there\n");
         expect(context.io.stderr.text()).toContain("thread th1");
         expect(seen).toEqual(["POST /api/v1/chat Bearer nk_1", "POST /api/v1/chat/stream Bearer nk_1"]);
+    });
+
+    describe("thread start and send", () => {
+        const completed = (status: string, text = "Hello"): Response => Response.json({ messageId: "m1", reasoning: "", status, text, threadId: "th1" });
+
+        const started = (threadId = "th1"): Response => Response.json({ messageId: "m1", streamId: "s1", streamToken: "tok", threadId }, { status: 202 });
+
+        const setup = async (reply: () => Response | Promise<Response>) => {
+            await writeConfig({ apiKey: "nk_1", apiUrl: "https://api.test" }, join(directory, "config.json"));
+
+            const bodies: unknown[] = [];
+            const context = contextWith((async (url: string, init: RequestInit) => {
+                expect(`${init.method} ${new URL(url).pathname}`).toBe("POST /api/v1/chat");
+                bodies.push(JSON.parse(String(init.body)));
+
+                return await reply();
+            }) as unknown as typeof fetch);
+
+            return { bodies, context };
+        };
+
+        it("without --wait posts a streaming start, prints the thread id and exits 0", async () => {
+            const { bodies, context } = await setup(() => started());
+
+            expect(await run(["thread", "start", "do", "it", "-m", "gpt"], context)).toBe(0);
+            expect(context.io.stdout.text()).toBe("th1\n");
+            expect(bodies).toEqual([{ model: "gpt", prompt: "do it", stream: true }]);
+        });
+
+        it("--json keeps messageId as null when the start answer names none", async () => {
+            const { context } = await setup(() => Response.json({ threadId: "th1" }, { status: 202 }));
+
+            expect(await run(["thread", "start", "hi", "--json"], context)).toBe(0);
+            expect(JSON.parse(context.io.stdout.text())).toStrictEqual({ messageId: null, threadId: "th1" });
+        });
+
+        it("send posts with the thread id", async () => {
+            const { bodies, context } = await setup(() => started("th9"));
+
+            expect(await run(["thread", "send", "th9", "more"], context)).toBe(0);
+            expect(bodies).toEqual([{ prompt: "more", stream: true, threadId: "th9" }]);
+        });
+
+        it("--wait prints the reply, names the thread on stderr and exits 0", async () => {
+            const { bodies, context } = await setup(() => completed("done"));
+
+            expect(await run(["thread", "start", "hi", "--wait"], context)).toBe(0);
+            expect(context.io.stdout.text()).toBe("Hello\n");
+            expect(context.io.stderr.text()).toBe("thread th1\n");
+            expect(bodies).toEqual([{ prompt: "hi", stream: false }]);
+        });
+
+        it("--wait --json prints the completed reply", async () => {
+            const { context } = await setup(() => completed("done"));
+
+            expect(await run(["thread", "send", "th1", "hi", "--wait", "--json"], context)).toBe(0);
+            expect(JSON.parse(context.io.stdout.text())).toMatchObject({ status: "done", text: "Hello", threadId: "th1" });
+        });
+
+        it("--wait exits 1 when the run ended in failure, with no partial reply on stdout", async () => {
+            const { context } = await setup(() => completed("generation_failed", "partial"));
+
+            expect(await run(["thread", "start", "hi", "--wait"], context)).toBe(1);
+            expect(context.io.stdout.text()).toBe("");
+            expect(context.io.stderr.text()).toContain("ended in failure (generation_failed). See what happened with `neore threads show th1`");
+        });
+
+        it.each(["interrupted", "relay_budget"])("--wait exits 2 and names threads show on %s", async (status) => {
+            const { context } = await setup(() => completed(status, ""));
+
+            expect(await run(["thread", "send", "th1", "hi", "--wait"], context)).toBe(2);
+            expect(context.io.stderr.text()).toContain("neore threads show th1");
+        });
+
+        it("--wait on a run paused for a person names what it waits on and exits 2", async () => {
+            const { context } = await setup(() =>
+                Response.json({
+                    messageId: "m1",
+                    pendingRequest: { question: "Which branch?\n\u{1B}[31merror: forged" },
+                    reasoning: "",
+                    status: "waiting_on_person",
+                    text: "",
+                    threadId: "th1",
+                }),
+            );
+
+            expect(await run(["thread", "send", "th1", "hi", "--wait"], context)).toBe(2);
+            expect(context.io.stderr.text()).toContain("waiting on a person (Which branch? [31merror: forged). Answer it in the app");
+        });
+
+        it("reads the prompt from piped stdin", async () => {
+            const { bodies, context } = await setup(() => started("th9"));
+            const piped = { ...context, readStdin: async () => "from a pipe\n", stdinIsTTY: false };
+
+            expect(await run(["thread", "send", "th9"], piped)).toBe(0);
+            expect(bodies).toEqual([{ prompt: "from a pipe", stream: true, threadId: "th9" }]);
+        });
+
+        it("exits 2 on a usage error", async () => {
+            const { context } = await setup(() => completed("done"));
+
+            expect(await run(["thread", "start"], context)).toBe(2);
+            expect(await run(["thread", "send", "th1"], context)).toBe(2);
+            expect(await run(["thread", "start", "hi", "-t", "th5"], context)).toBe(2);
+            expect(await run(["thread", "start", "hi", "--no-stream"], context)).toBe(2);
+
+            const piped = { ...context, readStdin: async () => await new Promise<string>(() => {}), stdinIsTTY: false };
+
+            // Refused before stdin is read, so an open pipe cannot hold it.
+            expect(await run(["thread", "send", "th1", "--reasoning"], piped)).toBe(2);
+            expect(await run(["thread", "start", "hi", "--skill", "s"], context)).toBe(2);
+            expect(context.io.stderr.text()).toContain("`thread` has no --skill");
+        });
+
+        it("keeps the sign-in exit code", async () => {
+            const { context } = await setup(() => Response.json({ error: { code: "invalid_api_key", message: "bad key" } }, { status: 401 }));
+
+            expect(await run(["thread", "start", "hi", "--wait"], context)).toBe(EXIT.auth);
+        });
+
+        it("exits 2 on an error with no code of its own", async () => {
+            const { context } = await setup(() => Response.json({ error: { code: "conflict", message: "no" } }, { status: 409 }));
+
+            expect(await run(["thread", "start", "hi", "--wait"], context)).toBe(2);
+        });
+
+        it("on a success answer it cannot use, exits non-zero and says where to read the run", async () => {
+            const { context } = await setup(() => Response.json({ messageId: "m1" }, { status: 202 }));
+
+            expect(await run(["thread", "start", "hi"], context)).toBe(2);
+            expect(context.io.stdout.text()).toBe("");
+            expect(context.io.stderr.text()).toContain("neore threads ls");
+
+            const empty = await setup(() => Response.json(null, { status: 202 }));
+
+            expect(await run(["thread", "start", "hi"], empty.context)).toBe(2);
+            expect(empty.context.io.stderr.text()).toContain("neore threads ls");
+
+            const textless = await setup(() => Response.json({ messageId: "m1", status: "done", threadId: "th1" }));
+
+            expect(await run(["thread", "send", "th1", "hi", "--wait"], textless.context)).toBe(2);
+            expect(textless.context.io.stderr.text()).toContain("neore threads show th1");
+
+            const stalled = await setup(
+                () =>
+                    new Response(
+                        new ReadableStream({
+                            start(controller) {
+                                controller.error(new Error("The operation was aborted due to timeout"));
+                            },
+                        }),
+                        { headers: { "Content-Type": "application/json" }, status: 200 },
+                    ),
+            );
+
+            expect(await run(["thread", "send", "th1", "hi", "--wait"], stalled.context)).toBe(EXIT.network);
+            expect(stalled.context.io.stderr.text()).toContain("neore threads show th1");
+
+            const cut = await setup(() => new Response('{"messageId":"m1","thr', { headers: { "Content-Type": "application/json" }, status: 200 }));
+
+            expect(await run(["thread", "send", "th1", "hi", "--wait"], cut.context)).toBe(2);
+            expect(cut.context.io.stderr.text()).toContain("neore threads show th1");
+        });
+
+        it("sends once after a lost send or a 5xx, which the server may have run, and says where to read the run", async () => {
+            await writeConfig({ apiKey: "nk_1", apiUrl: "https://api.test" }, join(directory, "config.json"));
+
+            let calls = 0;
+            const lost = contextWith((async () => {
+                calls += 1;
+
+                throw new TypeError("fetch failed");
+            }) as unknown as typeof fetch);
+
+            expect(await run(["thread", "send", "th1", "hi", "--wait"], lost)).toBe(EXIT.network);
+            expect(lost.io.stderr.text()).toContain("neore threads show th1");
+            expect(calls).toBe(1);
+
+            const failed = contextWith((async () => {
+                calls += 1;
+
+                return Response.json({ error: { code: "internal_error", message: "The chat could not be started." } }, { status: 500 });
+            }) as unknown as typeof fetch);
+
+            expect(await run(["thread", "start", "hi"], failed)).toBe(2);
+            expect(failed.io.stderr.text()).toContain("neore threads ls");
+            expect(calls).toBe(2);
+        });
     });
 
     it("follows resume events across requests without showing them", async () => {
