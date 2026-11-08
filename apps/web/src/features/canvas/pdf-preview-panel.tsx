@@ -2,7 +2,7 @@ import { useLingui } from "@lingui/react/macro";
 import { FetchableOriginsProvider } from "@neore/ui/components/file-renderers/fetchable-origins-provider";
 import { isFetchableUrl, originsOf } from "@neore/ui/hooks/use-fetchable-origins";
 import cn from "@neore/ui/utils/cn";
-import { latestPdfUrl } from "@neore/ui/utils/pdf-preview-event";
+import { latestPdfUrl, pdfFileKey } from "@neore/ui/utils/pdf-preview-event";
 import { Download, ExternalLink, X } from "lucide-react";
 import type { FC, SyntheticEvent } from "react";
 import { lazy, Suspense, useEffect, useRef } from "react";
@@ -41,10 +41,12 @@ const PdfPreviewPanel: FC<PdfPreviewPanelProps> = ({ className, file }) => {
     };
     const headingReference = useRef<HTMLHeadingElement>(null);
     const openerReference = useRef<HTMLElement | undefined>(undefined);
+    const fileKeyReference = useRef(pdfFileKey(file.url));
 
     // Each opened file moves focus here, so a keyboard user is not left behind in the thread.
     useEffect(() => {
         openerReference.current = file.opener;
+        fileKeyReference.current = pdfFileKey(file.url);
         headingReference.current?.focus();
     }, [file.opener, file.url]);
 
@@ -60,9 +62,14 @@ const PdfPreviewPanel: FC<PdfPreviewPanelProps> = ({ className, file }) => {
             const active = document.activeElement;
             const focusLost = !active || active === document.body || !active.isConnected || root?.contains(active) === true;
 
-            if (focusLost && opener?.isConnected) {
-                opener.focus();
+            if (!focusLost) {
+                return;
             }
+
+            // The thumbnail remounts when its message re-signs the file's URL: the same file's new button takes its place.
+            const target = opener?.isConnected ? opener : document.querySelector<HTMLElement>(`[data-pdf-file="${CSS.escape(fileKeyReference.current)}"]`);
+
+            target?.focus();
         };
     }, []);
 

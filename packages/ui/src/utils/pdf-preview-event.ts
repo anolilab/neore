@@ -20,7 +20,7 @@ export const requestPdfPreview = (detail: OpenPdfPreviewDetail, target: EventTar
     !target.dispatchEvent(new CustomEvent<OpenPdfPreviewDetail>(OPEN_PDF_PREVIEW_EVENT, { cancelable: true, detail }));
 
 /** A signed URL's identity: the same file signed again has the same origin and path, and a new signature. */
-const fileKey = (url: string): string => {
+export const pdfFileKey = (url: string): string => {
     try {
         const parsed = new URL(url);
 
@@ -36,7 +36,7 @@ const latestUrls = new Map<string, string>();
 
 /** Records the newest signed URL of a PDF on screen, so a panel opened with an older one can follow it. */
 export const rememberPdfUrl = (url: string): void => {
-    const key = fileKey(url);
+    const key = pdfFileKey(url);
 
     latestUrls.delete(key);
     latestUrls.set(key, url);
@@ -49,4 +49,4 @@ export const rememberPdfUrl = (url: string): void => {
 };
 
 /** The newest URL seen for the same file as `url`, or `url` itself: a signed URL expires, and its message re-signs it. */
-export const latestPdfUrl = (url: string): string => latestUrls.get(fileKey(url)) ?? url;
+export const latestPdfUrl = (url: string): string => latestUrls.get(pdfFileKey(url)) ?? url;

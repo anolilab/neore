@@ -157,6 +157,23 @@ describe("the side panel's opener and links", () => {
         expect(document.activeElement).toBe(thumbnailB);
     });
 
+    it("returns focus to the same file's new thumbnail when the one that opened it remounted after a re-sign", () => {
+        const opener = document.createElement("button");
+        const remounted = document.createElement("button");
+
+        remounted.dataset.pdfFile = "https://api.example/files/a.pdf";
+        document.body.appendChild(opener);
+
+        const { unmount } = render(panelFor({ ...DOCUMENT_A, opener }));
+
+        opener.remove();
+        document.body.appendChild(remounted);
+        unmount();
+
+        // eslint-disable-next-line testing-library/no-node-access -- focus placement is what this test asserts
+        expect(document.activeElement).toBe(remounted);
+    });
+
     it("links the new tab to the file's newest signed URL, so a middle click or a copied link is not the expired one", () => {
         const resigned = "https://api.example/files/a.pdf?sig=renewed-link";
 

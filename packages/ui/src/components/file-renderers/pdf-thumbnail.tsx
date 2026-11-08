@@ -11,6 +11,7 @@ import { plural } from "@lingui/core/macro";
 import { Plural, useLingui } from "@lingui/react/macro";
 import { isFetchableUrl, useFetchableOrigins } from "@ui/hooks/use-fetchable-origins";
 import cn from "@ui/utils/cn";
+import { pdfFileKey } from "@ui/utils/pdf-preview-event";
 import type { FC } from "react";
 import { useEffect, useRef, useState } from "react";
 import { Document, Page } from "react-pdf";
@@ -73,6 +74,8 @@ const PdfThumbnail: FC<PdfThumbnailProps> = ({ className, filename, onOpen, url 
             aria-busy={loading}
             aria-label={label}
             className={cn("bg-muted/40 hover:bg-muted/70 flex w-fit max-w-full flex-col items-center gap-2 rounded-lg border p-2 text-left", className)}
+            // The file, not its signed URL: a side panel finds this button again after the message re-signs it and it remounts.
+            data-pdf-file={pdfFileKey(url)}
             onClick={(event) => onOpen(event.currentTarget)}
             type="button"
         >
