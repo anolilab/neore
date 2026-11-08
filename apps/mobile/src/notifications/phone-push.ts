@@ -17,7 +17,10 @@ import {
 import { Platform } from "react-native";
 
 import type { PushPlatform, PushServer } from "./push-registration";
-import { languageTag, onceItWorks } from "./push-registration";
+import { createPendingWork, languageTag, onceItWorks } from "./push-registration";
+
+/** Registrations in flight; sign-out settles them before it releases the token. */
+export const pushRegistrations = createPendingWork();
 
 /** The Android channel phone pushes show on: Expo sends to `default` when a message names none. */
 const ANDROID_CHANNEL_ID = "default";

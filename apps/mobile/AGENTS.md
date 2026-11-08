@@ -40,6 +40,7 @@
   given. A token event registers only when the token changed (`createTokenChangeFilter`): fetching the token fires the
   same event, so registering on every event would loop. The server gives a token to whoever registered it last, so the foreground registration is what takes a phone back
   after someone else registered its token. The system prompt shows only after the person sends a message
-  (`offerPhonePush`), once per sign-in, and only when the server has push on. The token is never logged. The
-  server sends only while the registering session lives, so sign-out (which revokes it) stops the pushes; a
-  registration still on its way then is refused. Pushes carry only a generic alert and ids.
+  (`offerPhonePush`), once per sign-in, and only when the server has push on. The token is never logged. Sign-out
+  closes the registration gate (`pushRegistrations`), lets registrations in flight settle, then releases the token
+  (bounded to 5 s) before the grant is revoked, since the release needs the sign-in. The server also sends only while
+  the registering session lives, so a failed release still stops the pushes once the revoke lands. Pushes carry only a generic alert and ids.

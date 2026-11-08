@@ -4,7 +4,7 @@ import { AppState } from "react-native";
 
 import { useAuth } from "../auth/auth-state";
 import { getClient } from "../lib/lunora";
-import { backendPushServer, configurePhoneNotifications, deviceLocale, devicePushPlatform } from "./phone-push";
+import { backendPushServer, configurePhoneNotifications, deviceLocale, devicePushPlatform, pushRegistrations } from "./phone-push";
 import { createForegroundGate, createPromptOffer, createTokenChangeFilter, registerPhoneForPush } from "./push-registration";
 
 /** Push is best-effort: a failure is logged (never the token) and never breaks the screen that asked. */
@@ -24,27 +24,28 @@ interface RegisterResult {
 }
 
 /**
- * Sends the token only while `isAccountCurrent` holds (the screen's account has not changed). A registration still on
- * its way when the account signs out is refused by the server: the session it carries is revoked by then.
+ * Tracked, so sign-out can wait for it. It sends the token only while the session gate is open (sign-out closes it)
+ * and `isAccountCurrent` holds (the account it registers for is still the one signed in).
  */
-const register = async (canPrompt: boolean, isAccountCurrent: () => boolean = () => true): Promise<RegisterResult> => {
-    try {
-        const token = await registerPhoneForPush({
-            canPrompt,
-            isCurrent: isAccountCurrent,
-            language: deviceLocale(),
-            platform: devicePushPlatform,
-            server: backendPushServer(getClient()),
-        });
+const register = async (canPrompt: boolean, isAccountCurrent: () => boolean = () => true): Promise<RegisterResult> =>
+    await pushRegistrations.run(async (isSessionCurrent) => {
+        try {
+            const token = await registerPhoneForPush({
+                canPrompt,
+                isCurrent: () => isSessionCurrent() && isAccountCurrent(),
+                language: deviceLocale(),
+                platform: devicePushPlatform,
+                server: backendPushServer(getClient()),
+            });
 
-        return { didRun: true, isRegistered: token !== undefined };
-    } catch (error) {
-        // eslint-disable-next-line no-console -- no logger in the app; a failed registration must not be silent
-        console.warn("Could not register this phone for notifications.", error);
+            return { didRun: true, isRegistered: token !== undefined };
+        } catch (error) {
+            // eslint-disable-next-line no-console -- no logger in the app; a failed registration must not be silent
+            console.warn("Could not register this phone for notifications.", error);
 
-        return { didRun: false, isRegistered: false };
-    }
-};
+            return { didRun: false, isRegistered: false };
+        }
+    });
 
 const promptOffer = createPromptOffer();
 
@@ -112,7 +113,9 @@ export const usePhonePush = (): void => {
             return isRegistered;
         };
 
-        // A new sign-in is offered the prompt again. Its registration counts toward the foreground spacing.
+        // A new sign-in reopens the gate the last sign-out closed and is offered the prompt again. Its registration
+        // counts toward the foreground spacing.
+        pushRegistrations.open();
         signedIn.account = account;
         promptOffer.begin(userId);
         foreground.run(registerSilently);
