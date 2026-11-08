@@ -10,10 +10,9 @@
  */
 import { internal } from "../_generated/internal";
 import { streamLogger } from "../lib/logger";
-import { servesUser } from "../lib/shard-context";
-import { runAfterOnShard, runAfterWithRetry } from "../lib/shard-scheduler";
+import { currentUserShard, servesUser } from "../lib/shard-context";
+import { runAfterOnShard } from "../lib/shard-scheduler";
 import type { ReplyUsageArgs } from "./activity-logic";
-import { RECORD_FALLBACK_MS, RECORD_RETRY } from "./activity-logic";
 
 interface SchedulerLike {
     runAfter: (delayMs: number, target: never, args: never) => Promise<unknown>;
@@ -27,29 +26,18 @@ export const scheduleReplyUsage = (scheduler: SchedulerLike, usageArgs: ReplyUsa
     const target = internal.usage.activity.recordReplyUsage;
     let scheduled: Promise<unknown>;
 
-    // A job that reads the thread's project fails when that read fails, and is retried (`RECORD_RETRY`).
-    if (servesUser(usageArgs.userId)) {
-        // Only a record that reads a project fails fast on a failed read; any other keeps the scheduler's default retries.
+    if (usageArgs.threadId === undefined || usageArgs.threadAttribution !== undefined) {
+        // No thread to read, or the caller already read it: to the user's shard, named unless this job runs there — an
+        // action (a side question) has no shard of its own.
         scheduled =
-            usageArgs.threadId === undefined
+            currentUserShard() === usageArgs.userId
                 ? scheduler.runAfter(0, target as never, usageArgs as never)
-                : runAfterWithRetry(scheduler, 0, target, { ...usageArgs }, RECORD_RETRY);
-    } else if (usageArgs.threadId === undefined || usageArgs.threadAttribution !== undefined) {
-        // No thread to read, or the caller already read it: straight to the user's shard.
-        scheduled = runAfterOnShard(scheduler, 0, target, { ...usageArgs }, usageArgs.userId);
+                : runAfterOnShard(scheduler, 0, target, { ...usageArgs }, usageArgs.userId);
+    } else if (servesUser(usageArgs.userId)) {
+        scheduled = scheduler.runAfter(0, target as never, usageArgs as never);
     } else {
         // Another user's thread: its project is read here, on its shard, then forwarded.
-        scheduled = runAfterWithRetry(scheduler, 0, internal.usage.activity.forwardReplyUsage, { ...usageArgs, threadId: usageArgs.threadId }, RECORD_RETRY);
-    }
-
-    // A record that reads a project can fail every try: its fallback, well after the last one, lands the reply's total
-    // and skill rows without a project. The reply's key makes it add nothing when the record landed.
-    if (usageArgs.threadId !== undefined) {
-        const fallback = runAfterOnShard(scheduler, RECORD_FALLBACK_MS, target, { ...usageArgs, fallback: true, threadAttribution: {} }, usageArgs.userId);
-
-        void fallback.catch((error: unknown) => {
-            streamLogger.warn("[usage] fallback record not scheduled", error);
-        });
+        scheduled = scheduler.runAfter(0, internal.usage.activity.forwardReplyUsage as never, { ...usageArgs, threadId: usageArgs.threadId } as never);
     }
 
     void scheduled.catch((error: unknown) => {

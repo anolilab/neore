@@ -3348,8 +3348,8 @@ export const schema = defineSchema({
         recordedAt: v.number(),
         replyKey: v.string(),
         userId: v.string(),
-        // Set when the reply's fallback record counted it without its project (`usage/schedule.ts`): a later record of
-        // the reply still files the project, once, and clears it.
+        // Set when the reply was counted while its project could not be read (`usage/activity.ts`): a retry of its
+        // record still files the project, once, and clears it.
         withoutProject: v.optional(v.boolean()),
     })
         .shardBy("userId")

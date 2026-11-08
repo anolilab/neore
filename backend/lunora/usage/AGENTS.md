@@ -19,10 +19,12 @@
   user can open: no access files none, a failed read throws). A caller off the
   thread's shard passes `threadAttribution` (`getThreadAttribution`), checked
   again when the record lands; a shared thread's record goes through
-  `forwardReplyUsage`. Reading jobs are scheduled with `RECORD_RETRY` (a failed
-  read fails the try); each also gets a fallback record (`RECORD_FALLBACK_MS`,
-  no project) that adds nothing once the record landed, so the total always
-  lands. Replies outside a project write none: "No project" is total − projects.
+  `forwardReplyUsage`. A failed project read never costs the total: the
+  record counts the reply at once without its project
+  (`usageReplies.withoutProject`) and retries the project alone
+  (`RECORD_RETRY`); a forward sends the total (`projectUnread`) and retries
+  its read (`projectRetry`). A retry files the project once and clears the
+  mark. Replies outside a project write none: "No project" is total − projects.
 - **Project usage starts at deploy** — only replies recorded live are filed
   under a project. Older usage, and any reply the totals backfill counted,
   shows under "No project" until the project-history backfill ships (a later

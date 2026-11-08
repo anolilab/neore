@@ -303,9 +303,9 @@ describe("recording usage by project", () => {
         }
     });
 
-    it("fails a forward whose project read fails so it is retried, then forwards with the project once the read works", async () => {
+    it("forwards a shared reply's total at once when its project read fails, and tries the project again", async () => {
         const alpha = await insertThread(USER, "Alpha");
-        const forward = async () =>
+        const forward = async (projectRetry?: boolean) =>
             await harness.run(
                 async (ctx: any) =>
                     await ctx.runMutation(forwardReplyUsage, {
@@ -317,6 +317,7 @@ describe("recording usage by project", () => {
                         threadId: alpha.threadId,
                         tokens: 10,
                         userId: USER,
+                        ...(projectRetry !== undefined && { projectRetry }),
                     }),
             );
 
@@ -324,41 +325,47 @@ describe("recording usage by project", () => {
         projectReadFails.value = true;
 
         try {
-            // Every try whose read fails fails, however late it runs, so the scheduler runs it again (`RECORD_RETRY`).
-            await expect(forward()).rejects.toThrow("project read failed");
-            expect(forwarded).toStrictEqual([]);
+            // The first try sends the total without the project, and books a retry for the project.
+            await forward();
+            expect(forwarded).toMatchObject([{ costMicrodollars: 100, projectUnread: true, replyKey: "shared-reply" }]);
+            // A retry that fails again throws, so the scheduler runs it again.
+            await expect(forward(true)).rejects.toThrow("project read failed");
         } finally {
             projectReadFails.value = false;
         }
 
         // A retry whose read works forwards the reply with its project.
-        await forward();
+        forwarded.length = 0;
+        await forward(true);
         expect(forwarded).toMatchObject([{ threadAttribution: { projectKey: alpha.projectId } }]);
     });
 
-    it("lands a reply's total through its fallback when every try failed, adds nothing when the record landed, and still files a late record's project", async () => {
+    it("counts a reply at once when its project read fails, and files the project once a retry reads it", async () => {
         const alpha = await insertThread(USER, "Alpha");
-        const fallback = async (replyKey: string) => await record({ fallback: true, replyKey, threadAttribution: {}, threadId: alpha.threadId });
 
-        // The record never landed: the fallback counts the reply, without a project.
-        await fallback("never-landed");
-        // The record landed first: its fallback, later, adds nothing.
-        await record({ replyKey: "landed", threadId: alpha.threadId });
-        await fallback("landed");
+        projectReadFails.value = true;
 
-        const totals = await heatmap(USER, "2026-09-25");
+        try {
+            await record({ replyKey: "unread", threadId: alpha.threadId });
+            // A retry that fails again throws, so the scheduler runs it again.
+            await expect(record({ replyKey: "unread", threadId: alpha.threadId })).rejects.toThrow("project read failed");
+        } finally {
+            projectReadFails.value = false;
+        }
 
-        expect(totals.days).toMatchObject([{ costMicrodollars: 200, replies: 2 }]);
-        expect(await projectTotals(USER)).toStrictEqual({ [alpha.projectId!]: { costMicrodollars: 100, replies: 1, tokens: 10 } });
+        const counted = await heatmap(USER, "2026-09-25");
 
-        // The record of the first reply was only late: landing after its fallback, it files the project, once.
-        await record({ replyKey: "never-landed", threadId: alpha.threadId });
-        await record({ replyKey: "never-landed", threadId: alpha.threadId });
+        expect(counted.days).toMatchObject([{ costMicrodollars: 100, replies: 1 }]);
+        expect(await projectTotals(USER)).toStrictEqual({});
+
+        // The retry whose read works files the project, once; a later delivery adds nothing.
+        await record({ replyKey: "unread", threadId: alpha.threadId });
+        await record({ replyKey: "unread", threadId: alpha.threadId });
 
         const after = await heatmap(USER, "2026-09-25");
 
-        expect(after.days).toMatchObject([{ costMicrodollars: 200, replies: 2 }]);
-        expect(await projectTotals(USER)).toStrictEqual({ [alpha.projectId!]: { costMicrodollars: 200, replies: 2, tokens: 20 } });
+        expect(after.days).toMatchObject([{ costMicrodollars: 100, replies: 1 }]);
+        expect(await projectTotals(USER)).toStrictEqual({ [alpha.projectId!]: { costMicrodollars: 100, replies: 1, tokens: 10 } });
     });
 
     it("files no project once the user's membership in the project's organization is revoked", async () => {

@@ -28,7 +28,7 @@ import { internalMutation, internalQuery } from "../_generated/server";
 import { isAccountDeletionUnderway } from "../gdpr/deletion-guard";
 import { authQuery } from "../lib/crpc";
 import { logger } from "../lib/logger";
-import { runAfterOnShard } from "../lib/shard-scheduler";
+import { runAfterOnShard, runAfterWithRetry } from "../lib/shard-scheduler";
 import { readableProject } from "../projects/functions";
 import { leadThreadOf } from "../sub-agents/worker-thread";
 import type { Attribution, AttributionIncrement, ReplyUsageArgs, RollupIncrement } from "./activity-logic";
@@ -41,6 +41,7 @@ import {
     HEATMAP_DAYS,
     isDayKey,
     PROJECT_SKILL_KEY,
+    RECORD_RETRY,
     TOTAL_SKILL_KEY,
     withDayTotals,
 } from "./activity-logic";
@@ -62,7 +63,7 @@ type ReadCtx = Pick<MutationCtx | QueryCtx, "db">;
 export const isReplyRecorded = async (ctx: DbCtx, userId: string, replyKey: string): Promise<boolean> =>
     (await ctx.db.usageReplies.findFirst({ where: { replyKey, userId } })) !== null;
 
-/** `withoutProject`: the reply's fallback counted it without its project, which a later record may still file. */
+/** `withoutProject`: the reply was counted while its project could not be read; a retry still files the project. */
 export const markReplyRecorded = async (ctx: DbCtx, userId: string, replyKey: string, at: number, withoutProject = false): Promise<void> => {
     await ctx.db.insert("usageReplies", { recordedAt: at, replyKey, userId, ...(withoutProject && { withoutProject: true }) });
 };
@@ -186,8 +187,8 @@ export const recordReplyUsage = internalMutation
         at: v.number(),
         costMicrodollars: v.number(),
         date: v.string(),
-        /** The reply's fallback record (`usage/schedule.ts`): it lands only when every try of the record failed. */
-        fallback: v.optional(v.boolean()),
+        /** The project could not be read where the record was sent from: count the total now, and file no project. */
+        projectUnread: v.optional(v.boolean()),
         replyKey: v.string(),
         skillKey: v.string(),
         skillName: v.optional(v.string()),
@@ -211,9 +212,7 @@ export const recordReplyUsage = internalMutation
         const costMicrodollars = Math.max(0, Math.round(args.costMicrodollars));
         const tokens = Math.max(0, Math.round(args.tokens));
 
-        // A project read by the caller is checked again here: access revoked since that read files none. A failed read
-        // throws before anything is written, and the record is retried (`RECORD_RETRY`); its fallback files the reply
-        // without a project.
+        // A project read by the caller is checked again here: access revoked since that read files none.
         const attributionNow = async (): Promise<Attribution> =>
             args.threadAttribution === undefined
                 ? await attributionFor(ctx, args.threadId, args.userId)
@@ -231,10 +230,10 @@ export const recordReplyUsage = internalMutation
         const recorded = await ctx.db.usageReplies.findFirst({ where: { replyKey: args.replyKey, userId: args.userId } });
 
         // A redelivered job, or a reply the totals backfill already counted: counted once. A reply the backfill counted
-        // stays under "No project" (project usage starts at deploy, `usage/AGENTS.md`). One its fallback counted first,
-        // because this record ran late, still gets its project — once.
+        // stays under "No project" (project usage starts at deploy, `usage/AGENTS.md`). One counted without its project
+        // (its read failed) is filed here once its project reads: a failed read throws, and the scheduler retries this.
         if (recorded) {
-            if (recorded.withoutProject === true && args.fallback !== true) {
+            if (recorded.withoutProject === true && args.projectUnread !== true) {
                 await fileProject(await attributionNow());
                 await ctx.db.patch("usageReplies", recorded._id, { withoutProject: false });
             }
@@ -242,17 +241,27 @@ export const recordReplyUsage = internalMutation
             return null;
         }
 
-        const attribution = await attributionNow();
+        // The total and skill rows land now, whatever the project read does: a read that fails counts the reply without
+        // its project and tries the project again on its own (`RECORD_RETRY`).
+        let attribution: Attribution = {};
+        let projectUnread = args.projectUnread === true;
 
-        if (args.fallback === true) {
-            usageLogger.warn("[usage] the reply's record never landed; its fallback records it without a project", {
-                replyKey: args.replyKey,
-                threadId: args.threadId,
-                userId: args.userId,
-            });
+        if (!projectUnread) {
+            try {
+                attribution = await attributionNow();
+            } catch (error) {
+                usageLogger.warn("[usage] the reply's project could not be read; counting it now and trying the project again", {
+                    error,
+                    replyKey: args.replyKey,
+                    threadId: args.threadId,
+                    userId: args.userId,
+                });
+                projectUnread = true;
+                await runAfterWithRetry(ctx.scheduler, RECORD_RETRY.baseMs, internal.usage.activity.recordReplyUsage, { ...args }, RECORD_RETRY);
+            }
         }
 
-        await markReplyRecorded(ctx, args.userId, args.replyKey, args.at, args.fallback === true);
+        await markReplyRecorded(ctx, args.userId, args.replyKey, args.at, projectUnread);
         await addToRollup(
             ctx,
             args.userId,
@@ -285,6 +294,8 @@ export const forwardReplyUsage = internalMutation
         at: v.number(),
         costMicrodollars: v.number(),
         date: v.string(),
+        /** A retry for the project alone: the reply's total has been sent already. */
+        projectRetry: v.optional(v.boolean()),
         replyKey: v.string(),
         skillKey: v.string(),
         skillName: v.optional(v.string()),
@@ -294,12 +305,39 @@ export const forwardReplyUsage = internalMutation
     })
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
-        // A failed read throws, and the scheduler runs this again (`RECORD_RETRY`); if every try fails, the reply's fallback
-        // record (`usage/schedule.ts`) still lands its total and skill rows.
-        const threadAttribution = await attributionFor(ctx, args.threadId, args.userId);
-        const record: ReplyUsageArgs & { threadAttribution: Attribution } = { ...args, threadAttribution };
+        const { projectRetry, ...usage } = args;
+        let threadAttribution: Attribution;
 
-        await runAfterOnShard(ctx.scheduler as never, 0, internal.usage.activity.recordReplyUsage, { ...record }, args.userId);
+        try {
+            threadAttribution = await attributionFor(ctx, usage.threadId, usage.userId);
+        } catch (error) {
+            // A retry that fails again throws, and the scheduler runs it again (`RECORD_RETRY`).
+            if (projectRetry === true) {
+                throw error;
+            }
+
+            // The total and skill rows go now, without the project; the project is tried again from here.
+            usageLogger.warn("[usage] the thread's project could not be read; forwarding the reply's total and trying the project again", {
+                error,
+                replyKey: usage.replyKey,
+                threadId: usage.threadId,
+                userId: usage.userId,
+            });
+            await runAfterOnShard(ctx.scheduler as never, 0, internal.usage.activity.recordReplyUsage, { ...usage, projectUnread: true }, usage.userId);
+            await runAfterWithRetry(
+                ctx.scheduler,
+                RECORD_RETRY.baseMs,
+                internal.usage.activity.forwardReplyUsage,
+                { ...usage, projectRetry: true },
+                RECORD_RETRY,
+            );
+
+            return null;
+        }
+
+        const record: ReplyUsageArgs & { threadAttribution: Attribution } = { ...usage, threadAttribution };
+
+        await runAfterOnShard(ctx.scheduler as never, 0, internal.usage.activity.recordReplyUsage, { ...record }, usage.userId);
 
         return null;
     });

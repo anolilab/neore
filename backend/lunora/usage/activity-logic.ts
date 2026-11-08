@@ -144,8 +144,6 @@ export interface ReplyUsageArgs {
     costMicrodollars: number;
     date: string;
     /** What makes the record idempotent: the reply's first row id, or a key of the run's own. */
-    /** Set on a reply's fallback record (`usage/schedule.ts`). */
-    fallback?: boolean;
     replyKey: string;
     skillKey: string;
     skillName?: string;
@@ -188,18 +186,11 @@ export const replyUsageArgs = (
 };
 
 /**
- * How a usage record whose read of the thread's project failed is run again: the job throws, and the scheduler runs it
- * again at +10 s, +30 s, +70 s and +130 s (it dead-letters only past `maxAttempts` failures).
+ * How a reply's project is tried again after its read failed: the reply's total has landed already, and this retry
+ * files only the project. A try that fails again throws, and the scheduler runs it again at +10 s, +30 s, +70 s and
+ * +130 s; past the last, the reply stays under "No project".
  */
 export const RECORD_RETRY = { backoff: "exponential", baseMs: 10_000, maxAttempts: 4, maxMs: 60_000 } as const;
-
-/**
- * When the fallback record of a reply runs: past every retry chain that can still file the reply's project — a
- * forward's own (`RECORD_RETRY`, to +130 s) followed by its record's, which runs on the scheduler's default policy
- * (five retries, to about +930 s) — with room for a scheduler lane running behind. It carries no project, and the
- * reply's key makes it add nothing once the record landed (`usage/schedule.ts`).
- */
-export const RECORD_FALLBACK_MS = 60 * 60_000;
 
 /** Where a reply is filed besides the total: its thread's project. */
 export interface Attribution {

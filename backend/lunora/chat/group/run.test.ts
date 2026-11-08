@@ -596,10 +596,8 @@ describe("runGroupTurn — stop", () => {
         ]);
         expect(await streamStatus()).toBe("done");
 
-        // The stopped reply is on the usage page, once: its record, beside a fallback that adds nothing once it lands.
-        const usageJobs = harness.scheduler.list().filter((job) => "replyKey" in ((job.args ?? {}) as object));
-
-        expect(usageJobs.filter((job) => (job.args as { fallback?: boolean }).fallback !== true)).toHaveLength(1);
+        // The stopped reply is on the usage page, once.
+        expect(harness.scheduler.list().filter((job) => "replyKey" in ((job.args ?? {}) as object))).toHaveLength(1);
     });
 
     it("does not carry a stop from an earlier turn into the next one", async () => {
