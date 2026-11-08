@@ -291,7 +291,7 @@ export interface ApiTypes {
             createGuestLink: FunctionReference<"mutation", { discardWaiting?: boolean; threadId: Id<"threads"> }, { expiresAt: number; linkToken: string }>;
             getGuestLink: FunctionReference<"query", { threadId: Id<"threads">; unlockProof?: string }, { link: { bound: boolean; expiresAt: number } | null; messages: Array<{ createdAt: number; id: string; status: "held" | "sent"; text: string }> }>;
             getGuestView: FunctionReference<"action", { guestToken: string; linkToken: string }, { expiresAt: number; messages: Array<{ createdAt: number; status: "held" | "sent"; text: string }> } | null>;
-            postGuestMessage: FunctionReference<"action", { guestToken?: string; linkToken: string; text: string }, { guestToken?: string }>;
+            postGuestMessage: FunctionReference<"action", { guestToken?: string; linkToken: string; requestId?: string; text: string }, { guestToken?: string }>;
             revokeGuestLink: FunctionReference<"mutation", { threadId: Id<"threads"> }, null>;
         };
         link_preview: {

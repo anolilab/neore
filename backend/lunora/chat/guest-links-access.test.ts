@@ -66,6 +66,8 @@ const OWNER = "user-owner";
 const BROWSER = "fresh-browser-token";
 const OTHER_BROWSER = /another browser/u;
 const NOT_ACTIVE = /not active/u;
+const REUSED_REQUEST = /already used for a different message/u;
+const LIMITED = /Too many messages on this link/u;
 const MINTED_TOKEN = /^[0-9a-f]{64}$/u;
 
 /** Posts one link takes per hour (`guest/message:public` in `lib/rate-limiter.ts`). */
@@ -102,6 +104,16 @@ const runRouteDrops = async () => {
         }
     }
 };
+
+/** Every held note taken up by the owner, so the held cap does not stop a run before the per-link limit does. */
+const settle = async () =>
+    await harness.run(async (ctx: any) => {
+        const held = await ctx.db.query("threadGuestMessages").collect();
+
+        for (const row of held) {
+            await ctx.db.patch("threadGuestMessages", row._id, { status: "sent" });
+        }
+    });
 
 const lapse = async () =>
     await harness.run(async (ctx: any) => {
@@ -210,15 +222,6 @@ describe("a guest message", () => {
 
     it("limits the bound browser per link, and spends nothing of it on another browser's refused posts", async () => {
         const { linkToken } = await createLink();
-        // Taken up by the owner, so the held cap does not stop the run before the per-link limit does.
-        const settle = async () =>
-            await harness.run(async (ctx: any) => {
-                const held = await ctx.db.query("threadGuestMessages").collect();
-
-                for (const row of held) {
-                    await ctx.db.patch("threadGuestMessages", row._id, { status: "sent" });
-                }
-            });
 
         expect((await hold(linkToken, "first")).ok).toBe(true);
 
@@ -246,27 +249,92 @@ describe("a guest message", () => {
 });
 
 describe("the guest actions", () => {
-    const post = async (args: { guestToken?: string; linkToken: string; text: string }) =>
+    const post = async (args: { guestToken?: string; linkToken: string; requestId?: string; text: string }) =>
         (await harness.action(async (ctx: any) => await ctx.runAction(guestLinks.postGuestMessage, args))) as { guestToken?: string };
     const view = async (args: { guestToken: string; linkToken: string }) =>
         await harness.action(async (ctx: any) => await ctx.runAction(guestLinks.getGuestView, args));
+    const NAMED = "ab".repeat(32);
+    const STRANGER = "cd".repeat(32);
 
-    it("bind the first browser with a server-minted token and refuse every other one", async () => {
+    it("bind the first browser and refuse every other one, minting a token for a name not of the minted shape", async () => {
         await expect(post({ linkToken: "not-a-link", text: "hi" })).rejects.toThrow(NOT_ACTIVE);
 
         const { linkToken } = await createLink();
-        // A token the browser names before binding is ignored: the server mints the one that binds.
-        const { guestToken } = await post({ guestToken: "ab".repeat(32), linkToken, text: "hello" });
+        const { guestToken } = await post({ guestToken: "short", linkToken, text: "hello" });
 
         expect(guestToken).toMatch(MINTED_TOKEN);
-        expect(guestToken).not.toBe("ab".repeat(32));
         expect(JSON.stringify(await rows("threadGuestLinks"))).not.toContain(guestToken);
         expect(await post({ guestToken, linkToken, text: "again" })).toEqual({});
         await expect(post({ linkToken, text: "me too" })).rejects.toThrow(OTHER_BROWSER);
-        await expect(post({ guestToken: "ab".repeat(32), linkToken, text: "me too" })).rejects.toThrow(OTHER_BROWSER);
+        await expect(post({ guestToken: STRANGER, linkToken, text: "me too" })).rejects.toThrow(OTHER_BROWSER);
 
         expect((await view({ guestToken: guestToken!, linkToken }))?.messages).toHaveLength(2);
-        expect(await view({ guestToken: "ab".repeat(32), linkToken })).toBeNull();
+        expect(await view({ guestToken: STRANGER, linkToken })).toBeNull();
+    });
+
+    it("bind one browser and store one note when a first post whose reply was lost is retried", async () => {
+        const { linkToken } = await createLink();
+        const first = { guestToken: NAMED, linkToken, requestId: "req-00000001", text: "hello" };
+
+        expect(await post(first)).toEqual({ guestToken: NAMED });
+        // The reply never arrived: the browser sends the same post again, with the token it named.
+        expect(await post(first)).toEqual({});
+
+        expect(await rows("threadGuestMessages")).toHaveLength(1);
+        expect(await rows("threadGuestLinks")).toMatchObject([{ guestHash: await hashGuestToken(NAMED) }]);
+        expect(JSON.stringify(await rows("threadGuestLinks"))).not.toContain(NAMED);
+        expect((await view({ guestToken: NAMED, linkToken }))?.messages).toHaveLength(1);
+    });
+
+    it("never binds the link token itself as the guest's, so holding the link is not reading the guest's notes", async () => {
+        const { linkToken } = await createLink();
+        const { guestToken } = await post({ guestToken: linkToken, linkToken, text: "hello" });
+
+        expect(guestToken).toMatch(MINTED_TOKEN);
+        expect(guestToken).not.toBe(linkToken);
+        expect(await view({ guestToken: linkToken, linkToken })).toBeNull();
+    });
+
+    it("store a later post once when its request id comes twice, and refuse the id for other text", async () => {
+        const { linkToken } = await createLink();
+
+        await post({ guestToken: NAMED, linkToken, text: "first" });
+        await post({ guestToken: NAMED, linkToken, requestId: "req-00000002", text: "second" });
+        await post({ guestToken: NAMED, linkToken, requestId: "req-00000002", text: "second" });
+        await expect(post({ guestToken: NAMED, linkToken, requestId: "req-00000002", text: "edited" })).rejects.toThrow(REUSED_REQUEST);
+
+        expect(await rows("threadGuestMessages")).toHaveLength(2);
+    });
+
+    it("refuse another browser that repeats a bound browser's request", async () => {
+        const { linkToken } = await createLink();
+        const first = { guestToken: NAMED, linkToken, requestId: "req-00000003", text: "hello" };
+
+        await post(first);
+
+        await expect(post({ ...first, guestToken: STRANGER })).rejects.toThrow(OTHER_BROWSER);
+        await expect(post({ ...first, guestToken: undefined })).rejects.toThrow(OTHER_BROWSER);
+    });
+
+    it("charge the per-link allowance once per accepted post, never for a retry", async () => {
+        const { linkToken } = await createLink();
+        const retried = { guestToken: NAMED, linkToken, requestId: "req-00000004", text: "once" };
+
+        await post({ guestToken: NAMED, linkToken, text: "first" });
+        await post(retried);
+
+        for (let index = 0; index < 10; index += 1) {
+            await post(retried);
+        }
+
+        // The other accepted posts the hourly allowance has room for, then one past it.
+        for (let index = 2; index < PER_LINK_ALLOWANCE; index += 1) {
+            await settle();
+            await post({ guestToken: NAMED, linkToken, text: `m${index}` });
+        }
+
+        await settle();
+        await expect(post({ guestToken: NAMED, linkToken, text: "one too many" })).rejects.toThrow(LIMITED);
     });
 });
 
