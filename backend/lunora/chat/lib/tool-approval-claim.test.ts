@@ -225,6 +225,23 @@ describe("a collaborator's paused turn", () => {
 });
 
 describe("what a pause notifies as", () => {
+    it("marks a headless pause's thread awaiting in the write that records its request", async () => {
+        await harness.run(
+            async (ctx: any) =>
+                await ctx.runMutation(recordPendingToolApprovals, {
+                    approvalIds: ["plain-1"],
+                    awaitingInput: "approval",
+                    config: CONFIG,
+                    threadId,
+                    userId: OWNER,
+                }),
+        );
+
+        const thread = await harness.run(async (ctx: any) => await ctx.db.get("threads", threadId));
+
+        expect(thread.awaitingInput).toBe("approval");
+    });
+
     const notifications = async () => await harness.run(async (ctx: any) => await ctx.db.query("notifications").collect());
 
     it("is a tool approval for an ordinary call, a question for askUser and its own type for a secret request", async () => {
