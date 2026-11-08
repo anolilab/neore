@@ -323,9 +323,11 @@ export const collectConversations = internalAction.input({ userId: v.string() })
                 const guestLinks = await readAllPages(
                     async (cursor) => await context.runQuery(internal.chat.guest_links.listGuestLinksForExport, { cursor, threadId }),
                 );
-                const guestNotes = await readAllPages(
-                    async (cursor) => await context.runQuery(internal.chat.guest_links.listGuestNotesForExport, { cursor, threadId }),
-                );
+                // A link goes only once its notes have (`deleteGuestLink`), so a thread with no links has no notes to read.
+                const guestNotes =
+                    guestLinks.length === 0
+                        ? []
+                        : await readAllPages(async (cursor) => await context.runQuery(internal.chat.guest_links.listGuestNotesForExport, { cursor, threadId }));
 
                 conversations.push({ ...collected, guestLinks, guestNotes });
             }

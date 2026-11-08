@@ -522,15 +522,15 @@ async function deletePageForThreadIdHandler(context: MutationContext, args: Dele
             return { cursor: messages.continueCursor, isDone: false };
         }
 
-        // Steered messages still waiting on a run of this thread have nobody left to take them.
-        // Here, not above the link batches: this page re-runs once per batch of links.
-        await dropQueuedSteersForThread(context, args.threadId);
-
         // The thread's guest links and their notes, one batch per call as the file links above;
         // their routes go in a job that runs once the page commits.
         if (!(await revokeGuestLinksForThread(context, args.threadId))) {
             return { cursor: messages.continueCursor, isDone: false };
         }
+
+        // Steered messages still waiting on a run of this thread have nobody left to take them.
+        // Here, after every batched removal (file links, guest links): this page re-runs once per batch.
+        await dropQueuedSteersForThread(context, args.threadId);
 
         const thread = await context.db.get("threads", args.threadId);
 
