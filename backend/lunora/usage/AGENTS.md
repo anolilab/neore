@@ -12,3 +12,23 @@
   grouping (`backfill-logic.ts#groupReplies`) must keep matching what one run
   saves, or its keys stop lining up with the live ones. Keys are pruned only
   after the user's backfill is done.
+- **Project rows** — a reply in a thread with a project also adds a
+  `__project__` row (`projectKey` = project id), read when `recordReplyUsage`
+  lands through `threadProject` (a sub-agent's or worker's thread: its lead's
+  project, via `subAgentRuns`) and `readableAttribution` (only a project the
+  user can open: no access files none, a failed read throws). A caller off the
+  thread's shard passes `threadAttribution` (`getThreadAttribution`), checked
+  again when the record lands; a shared thread's record goes through
+  `forwardReplyUsage`. A failed project read never costs the total: the
+  record counts the reply at once without its project
+  (`usageReplies.withoutProject`) and retries the project alone
+  (`RECORD_RETRY`); a forward sends the total (`projectUnread`) and retries
+  its read (`projectRetry`). A retry files the project once and clears the
+  mark. A retry's record (`retry`) with no key counts the reply only within a
+  day (`RETRY_COUNTS_WITHIN_MS`; keys are pruned after two); past that it notes
+  its project on the key (`awaitingTotal`) for a first record still to come.
+  Replies outside a project write none: "No project" is total − projects.
+- **Project usage starts at deploy** — only replies recorded live are filed
+  under a project. Older usage, and any reply the totals backfill counted,
+  shows under "No project" until the project-history backfill ships (a later
+  part). Do not file a project row for a reply the live record did not count.

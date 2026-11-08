@@ -1789,6 +1789,7 @@ export const usageDaily = sqliteTable("usageDaily", {
     _creationTime: integer("_creationTime").notNull(),
     costMicrodollars: real("costMicrodollars").notNull(),
     date: text("date").notNull(),
+    projectKey: text("projectKey"),
     replies: real("replies").notNull(),
     skillKey: text("skillKey").notNull(),
     skillName: text("skillName"),
@@ -1798,15 +1799,19 @@ export const usageDaily = sqliteTable("usageDaily", {
 }, (t) => ({
     by_user_skill_date: index("by_user_skill_date").on(t.userId, t.skillKey, t.date),
     by_user_date: index("by_user_date").on(t.userId, t.date),
+    by_user_project_date: index("by_user_project_date").on(t.userId, t.projectKey, t.date),
     by_date: index("by_date").on(t.date),
 }));
 
 export const usageReplies = sqliteTable("usageReplies", {
     _id: text("_id").primaryKey(),
     _creationTime: integer("_creationTime").notNull(),
+    awaitingTotal: integer("awaitingTotal", { mode: "boolean" }),
+    deferredProjectKey: text("deferredProjectKey"),
     recordedAt: real("recordedAt").notNull(),
     replyKey: text("replyKey").notNull(),
     userId: text("userId").notNull(),
+    withoutProject: integer("withoutProject", { mode: "boolean" }),
 }, (t) => ({
     by_user_reply: index("by_user_reply").on(t.userId, t.replyKey),
     by_recordedAt: index("by_recordedAt").on(t.recordedAt),

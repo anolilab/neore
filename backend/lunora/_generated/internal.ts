@@ -1220,7 +1220,9 @@ export interface InternalApiTypes {
     };
     usage: {
         activity: {
-            recordReplyUsage: FunctionReference<"mutation", { at: number; costMicrodollars: number; date: string; replyKey: string; skillKey: string; skillName?: string; tokens: number; userId: string }, null>;
+            forwardReplyUsage: FunctionReference<"mutation", { at: number; costMicrodollars: number; date: string; projectRetry?: boolean; replyKey: string; skillKey: string; skillName?: string; threadId: string; tokens: number; userId: string }, null>;
+            getThreadAttribution: FunctionReference<"query", { threadId: string; userId: string }, { projectKey?: string }>;
+            recordReplyUsage: FunctionReference<"mutation", { at: number; costMicrodollars: number; date: string; projectUnread?: boolean; replyKey: string; retry?: boolean; skillKey: string; skillName?: string; threadAttribution?: { projectKey?: string }; threadId?: string; tokens: number; userId: string }, null>;
         };
         backfill: {
             runUsageBackfillStep: FunctionReference<"mutation", { runId: string; userId: string }, null>;
@@ -2477,6 +2479,8 @@ export const internal: InternalApiTypes = {
     },
     usage: {
         activity: {
+            forwardReplyUsage: { __lunoraRef: "usage_activity:forwardReplyUsage" },
+            getThreadAttribution: { __lunoraRef: "usage_activity:getThreadAttribution" },
             recordReplyUsage: { __lunoraRef: "usage_activity:recordReplyUsage" },
         },
         backfill: {

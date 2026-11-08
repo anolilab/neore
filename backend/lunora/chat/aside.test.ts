@@ -80,6 +80,7 @@ beforeAll(async () => {
     registerModule(registry, "chat_custom_providers", await import("./custom-providers"));
     registerModule(registry, "chat_aside", await import("./aside"));
     registerModule(registry, "agent_threads", await import("../agent/threads"));
+    registerModule(registry, "usage_activity", await import("../usage/activity"));
     registerModule(registry, "chat_streaming_persistent_library", await import("./streaming/persistent/library"));
 });
 
@@ -397,6 +398,34 @@ describe("askAside", () => {
         expect(await remainingText(OWNER)).toBe(before);
     });
 
+    it("answers when the thread's project cannot be read, and sends the record to the thread's shard to read it there", async () => {
+        const key = "usage_activity:getThreadAttribution";
+        const real = registry.get(key);
+
+        registry.set(
+            key,
+            internalQuery
+                .input({ threadId: v.string(), userId: v.string() })
+                .output(v.object({}))
+                .query(async () => {
+                    throw new Error("project read failed");
+                }),
+        );
+
+        try {
+            await ask();
+        } finally {
+            registry.set(key, real);
+        }
+
+        // Answered, and recorded through the thread's shard rather than with a project it could not read.
+        expect(generateText).toHaveBeenCalledOnce();
+        expect(scheduleReplyUsage).not.toHaveBeenCalled();
+        expect(harness.scheduler.list().filter((job) => (job.args as { replyKey?: string } | undefined)?.replyKey === `aside:${lastEntryId()}`)).toHaveLength(
+            1,
+        );
+    });
+
     it("refuses with its own code once the daily quota is spent, and calls no model", async () => {
         await harness.run(async (ctx: any) => {
             const limiter = createRatelimit("chat/dailyText:free", ctx.db as never);
@@ -425,6 +454,15 @@ describe("askAside", () => {
 
         expect(scheduleReplyUsage).toHaveBeenCalledOnce();
         expect(scheduleReplyUsage.mock.calls[0]![1]).toMatchObject({ replyKey: `aside:${lastEntryId()}`, skillKey: "__assistant__", userId: OWNER });
+    });
+
+    it("hands the record the thread's project, read where the action can read the thread", async () => {
+        const projectId = await harness.run(async (ctx: any) => await ctx.db.insert("projects", { createdAt: 1, title: "Alpha", userId: OWNER }));
+
+        await patchThread({ projectId });
+        await ask();
+
+        expect(scheduleReplyUsage.mock.calls[0]![1]).toMatchObject({ threadAttribution: { projectKey: projectId }, threadId });
     });
 
     it("records nothing for an aside on the utility model", async () => {

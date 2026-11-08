@@ -131,6 +131,11 @@ describe("runAfterOnShard", () => {
         await runAfterOnShard(scheduler, 0, { __lunoraRef: "a:b" }, { x: 1 }, "user-a");
 
         expect(seen[0]).toStrictEqual([0, { __lunoraRef: "a:b" }, { x: 1 }, { shardKey: "user-a" }]);
+
+        // With a retry policy, the policy goes in the same argument.
+        await runAfterOnShard(scheduler, 0, { __lunoraRef: "a:b" }, { x: 1 }, "user-a", { baseMs: 10, maxAttempts: 3 });
+
+        expect(seen[1]).toStrictEqual([0, { __lunoraRef: "a:b" }, { x: 1 }, { retry: { baseMs: 10, maxAttempts: 3 }, shardKey: "user-a" }]);
     });
 });
 

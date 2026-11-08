@@ -1,5 +1,6 @@
 import { LunoraError, v } from "lunorash/server";
 
+import { PROJECT_SKILL_KEY } from "../usage/activity-logic";
 import { collectAcpSessionPages } from "../acp/gdpr";
 import { internal } from "../_generated/internal";
 import type { Doc, Id } from "../_generated/dataModel";
@@ -380,10 +381,16 @@ export const collectActivityForExport = internalQuery
     .input({ userId: v.string() })
     .output(v.object({ knowledgeCollections: v.array(v.any()), subAgentRuns: v.array(v.any()), usageDaily: v.array(v.any()) }))
     .query(async ({ args: { userId }, ctx: context }) => {
-        const [usageDaily, subAgentRuns, { page: collections }] = await Promise.all([
+        // Project rows are read on their own, under their own cap, so they never crowd the day and skill rows out of it.
+        const [{ page: dayAndSkillRows }, projectRows, subAgentRuns, { page: collections }] = await Promise.all([
+            context.db.usageDaily.findMany({
+                limit: EXPORT_ACTIVITY_CAP,
+                orderBy: [{ date: "asc" }],
+                where: { skillKey: { ne: PROJECT_SKILL_KEY }, userId },
+            }),
             context.db
                 .query("usageDaily")
-                .withIndex("by_user_date", (q) => q.eq("userId", userId))
+                .withIndex("by_user_skill_date", (q) => q.eq("userId", userId).eq("skillKey", PROJECT_SKILL_KEY))
                 .take(EXPORT_ACTIVITY_CAP),
             context.db
                 .query("subAgentRuns")
@@ -417,15 +424,15 @@ export const collectActivityForExport = internalQuery
                     task: run.task,
                 };
             }),
-            usageDaily: usageDaily.map((row) => {
-                return {
-                    costMicrodollars: row.costMicrodollars,
-                    date: row.date,
-                    replies: row.replies,
-                    skill: row.skillName ?? row.skillKey,
-                    tokens: row.tokens,
-                };
-            }),
+            // In date order, project rows among the day and skill rows of their day.
+            usageDaily: [...dayAndSkillRows, ...projectRows]
+                .toSorted((a, b) => a.date.localeCompare(b.date))
+                .map((row) => {
+                    // A project row is the day's usage in one project, not one more skill: it names the project instead.
+                    const breakdown = row.projectKey === undefined ? { skill: row.skillName ?? row.skillKey } : { project: row.projectKey };
+
+                    return { costMicrodollars: row.costMicrodollars, date: row.date, replies: row.replies, tokens: row.tokens, ...breakdown };
+                }),
         };
     });
 

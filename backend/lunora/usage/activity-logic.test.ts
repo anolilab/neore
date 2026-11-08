@@ -5,9 +5,11 @@ import {
     addDays,
     DEFAULT_SKILL_KEY,
     foldDayTotals,
+    attributionRows,
     foldSkillTotals,
     HEATMAP_DAYS,
     isDayKey,
+    PROJECT_SKILL_KEY,
     repliesByOrder,
     replyUsageArgs,
     skillKeyOf,
@@ -147,6 +149,12 @@ describe("replyUsageArgs", () => {
         });
     });
 
+    it("carries the thread of the first reply row, whose project the record files it under", () => {
+        const args = replyUsageArgs([{ _id: "m_reply", message: { role: "assistant" }, threadId: "th_1", usage: { totalTokens: 1 } }], { at, userId: "u1" });
+
+        expect(args?.threadId).toBe("th_1");
+    });
+
     it("records nothing for a run that saved no reply row", () => {
         expect(replyUsageArgs([{ _id: "m_prompt", message: { role: "user" } }], { at, userId: "u1" })).toBeUndefined();
         expect(replyUsageArgs([{ message: { role: "assistant" } }], { at, userId: "u1" })).toBeUndefined();
@@ -188,6 +196,29 @@ describe("withDayTotals", () => {
             { costMicrodollars: 20, date: "2026-09-01", replies: 1, skillKey: "sk_1", skillName: "Alice", tokens: 2 },
             { costMicrodollars: 5, date: "2026-09-02", replies: 2, skillKey: "sk_1", tokens: 4 },
             { costMicrodollars: 5, date: "2026-09-02", replies: 2, skillKey: TOTAL_SKILL_KEY, tokens: 4 },
+        ]);
+    });
+});
+
+describe("project rows", () => {
+    it("are left out of the skill breakdown", () => {
+        const projectRow = { costMicrodollars: 100, date: "2026-09-20", projectKey: "p_a", replies: 1, skillKey: PROJECT_SKILL_KEY, tokens: 10, updatedAt: 1 };
+
+        expect(foldSkillTotals([projectRow, row({ skillKey: "sk_1" })]).map((skill) => skill.skillKey)).toStrictEqual(["sk_1"]);
+    });
+
+    it("folds project increments into one row per day and project", () => {
+        const one = { costMicrodollars: 1, date: "2026-09-20", replies: 1, tokens: 1 };
+
+        expect(
+            attributionRows([
+                { ...one, projectKey: "p_a" },
+                { ...one, projectKey: "p_a" },
+                { ...one, projectKey: "p_b" },
+            ]),
+        ).toStrictEqual([
+            { ...one, costMicrodollars: 2, projectKey: "p_a", replies: 2, skillKey: PROJECT_SKILL_KEY, tokens: 2 },
+            { ...one, projectKey: "p_b", skillKey: PROJECT_SKILL_KEY },
         ]);
     });
 });

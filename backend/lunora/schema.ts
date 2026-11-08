@@ -3292,9 +3292,9 @@ export const schema = defineSchema({
         .triggers((t) => auditTriggersFor(t, "twoFactor", AUDIT_TABLES["twoFactor"]!)),
 
     // Per-day usage rollup behind the usage page's activity heatmap and skill
-    // breakdown (`usage/activity.ts`). Written by `afterRun` once per reply —
-    // one `__total__` row per day plus one row per (day, skill). New data only:
-    // there is no backfill from older messages.
+    // breakdown (`usage/activity.ts`). Written once per reply — one `__total__`
+    // row per day, one row per (day, skill), and one `__project__` row per
+    // (day, project) when the reply's thread is in a project.
     // One per user: the resumable walk that fills `usageDaily` from the replies
     // written before the rollup existed (`usage/backfill.ts`).
     usageBackfill: defineTable({
@@ -3323,8 +3323,10 @@ export const schema = defineSchema({
         costMicrodollars: v.number(),
         // The user's calendar day (their time zone when the reply landed), YYYY-MM-DD.
         date: v.string(),
+        // The project the reply's thread was in when it was recorded; set only on `__project__` rows.
+        projectKey: v.optional(v.string()),
         replies: v.number(),
-        // `__total__`, `__assistant__`, a skill id, or `draft:<slug>`. See `usage/activity-logic.ts`.
+        // `__total__`, `__project__`, `__assistant__`, a skill id, or `draft:<slug>`. See `usage/activity-logic.ts`.
         skillKey: v.string(),
         skillName: v.optional(v.string()),
         tokens: v.number(),
@@ -3334,6 +3336,8 @@ export const schema = defineSchema({
         .shardBy("userId")
         .index("by_user_skill_date", ["userId", "skillKey", "date"])
         .index("by_user_date", ["userId", "date"])
+        // One project's rows (the project settings' totals, and the project rows' upsert).
+        .index("by_user_project_date", ["userId", "projectKey", "date"])
         // The retention sweep (`gdpr/retention.ts`), which serves a whole shard.
         .index("by_date", ["date"]),
 
@@ -3341,9 +3345,16 @@ export const schema = defineSchema({
     // what makes `recordReplyUsage` and the backfill count a reply once.
     // Pruned by `usage/backfill.ts#sweepUsageRollup` once the backfill is done.
     usageReplies: defineTable({
+        // Set by a retry's record that arrived more than a day after the reply with no key to find: the reply's total is
+        // still to come, from its first record, which counts it with `deferredProjectKey` (`usage/activity.ts`).
+        awaitingTotal: v.optional(v.boolean()),
+        deferredProjectKey: v.optional(v.string()),
         recordedAt: v.number(),
         replyKey: v.string(),
         userId: v.string(),
+        // Set when the reply was counted while its project could not be read (`usage/activity.ts`): a retry of its
+        // record still files the project, once, and clears it.
+        withoutProject: v.optional(v.boolean()),
     })
         .shardBy("userId")
         .index("by_user_reply", ["userId", "replyKey"])
