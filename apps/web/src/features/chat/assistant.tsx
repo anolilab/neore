@@ -25,6 +25,7 @@ import ThreadSidebar from "./sidebar/thread-sidebar";
 import Thread from "./thread/thread";
 import ThreadList from "./thread-list/thread-list";
 import ThreadListHeader from "./thread-list/thread-list-header";
+import useBlockedPdfNoticeLifetime, { BLOCKED_PDF_NOTICE_ID } from "./use-blocked-pdf-notice";
 
 interface ThreadData {
     _id: string;
@@ -78,8 +79,8 @@ const AssistantContent: FC<{
 
             // Its editor holds edits that are not saved yet, and nothing reports them, so the panel does not replace it.
             if (isDocumentOpen(useChatUIStore.getState())) {
-                // Kept until dismissed: the thumbnail does not change, so a notice that left on its own would leave no reason.
-                showWarning(t`Close the open document to view this PDF in the panel.`, { duration: Infinity, id: "pdf-blocked-by-document" });
+                // Kept while the document is open: the thumbnail does not change, so a notice that left on its own would leave no reason.
+                showWarning(t`Close the open document to view this PDF in the panel.`, { duration: Infinity, id: BLOCKED_PDF_NOTICE_ID });
 
                 return;
             }
@@ -91,6 +92,8 @@ const AssistantContent: FC<{
 
         return () => globalThis.removeEventListener(OPEN_PDF_PREVIEW_EVENT, onOpenPdf);
     }, [openPreviewFile, t, threadId]);
+
+    useBlockedPdfNoticeLifetime();
 
     // A PDF belongs to the thread it was opened in: leaving that thread closes its preview, so it does not come back on return.
     useEffect(
