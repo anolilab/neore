@@ -13,6 +13,7 @@ import type {
     CheckLog,
     CheckSummary,
     CommitPage,
+    RevertPullRequestResult,
     CursorPage,
     FilePage,
     HostView,
@@ -23,6 +24,7 @@ import type {
     MergeRequest,
     MergeStatus,
     PullRequestDetail,
+    PullRequestEdit,
     PullRequestRef,
     PullRequestReview,
     RepoPoll,
@@ -56,6 +58,8 @@ export interface HostDriver {
      * `pullRequest.create` reads as unsupported.
      */
     createPullRequest?: (request: HostRequest, input: CreatePullRequestInput) => Promise<CreatedPullRequest>;
+    /** Changes the title and/or description; a field left out stays as it is. */
+    editPullRequest: (request: HostRequest, ref: PullRequestRef, edit: PullRequestEdit) => Promise<void>;
     /**
      * The open pull request already made from `head` (a branch of `repository`), if any. Asked before a create, so a
      * create whose answer was lost and is retried records the pull request the host holds instead of opening another.
@@ -94,6 +98,8 @@ export interface HostDriver {
     readCheckLog: (request: HostRequest, ref: PullRequestRef, checkId: string, maxChars: number, timeoutMs?: number) => Promise<CheckLog>;
     /** Posts a reply to the thread `commentId` belongs to, at once. */
     replyToThread: (request: HostRequest, ref: PullRequestRef, commentId: string, body: string) => Promise<{ id: string }>;
+    /** Adds reviewers by login to the ones already requested. */
+    requestReviewers: (request: HostRequest, ref: PullRequestRef, logins: string[]) => Promise<void>;
     /** Re-runs the narrowest scope the host offers for one check: a single job, not its whole workflow. */
     rerunCheck: (request: HostRequest, ref: PullRequestRef, checkId: string) => Promise<void>;
     /** Re-runs every failed job of one group in ONE host call: a group's jobs cannot be re-run one by one once one runs. */
@@ -108,6 +114,8 @@ export interface HostDriver {
      * cannot all be listed: the grouped call is used only when these are exactly the checks chosen.
      */
     rerunnableOfGroup?: (request: HostRequest, ref: PullRequestRef, groupId: string) => Promise<string[] | null>;
+    /** Opens a pull request that reverts a merged one; the host's rules may refuse it. */
+    revertPullRequest: (request: HostRequest, ref: PullRequestRef, revert: PullRequestEdit) => Promise<RevertPullRequestResult>;
     /** Turns auto-merge on (merging `headSha` with `method` once the host's rules are met) or off. */
     setAutoMerge: (request: HostRequest, ref: PullRequestRef, enabled: boolean, method: MergeMethod, headSha: string) => Promise<void>;
     setThreadResolved: (request: HostRequest, threadId: string, resolved: boolean) => Promise<void>;

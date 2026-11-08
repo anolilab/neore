@@ -19,6 +19,18 @@ const ERROR_STATUS: Record<string, number> = {
 
 const DETAIL_MAX_CHARS = 300;
 
+/**
+ * The codes GitHub gives a request that failed validation, before anything ran. Any other code is an execution error that may
+ * have taken effect, so it is not on this list: an unlisted validation code reads as unconfirmed, which is the safe side.
+ */
+const VALIDATION_CODES = new Set(["argumentLiteralsIncompatible", "missingRequiredArguments", "undefinedField"]);
+
+const isValidationError = (error: { extensions?: unknown }): boolean => {
+    const code = typeof error.extensions === "object" && error.extensions !== null && "code" in error.extensions ? error.extensions.code : undefined;
+
+    return typeof code === "string" && VALIDATION_CODES.has(code);
+};
+
 /** The status a GraphQL error type stands for; an error type this does not know is a refused request. */
 export const statusOfGraphqlError = (type: string | undefined): number => ERROR_STATUS[type ?? ""] ?? 422;
 
@@ -28,16 +40,20 @@ export const graphqlRequest = async <T>(
     variables: Record<string, unknown>,
     dataSchema: z.ZodType<T>,
     path = "/graphql",
+    // A write that may already have run: an error with no type (a timeout comes that way) is then a failure the host may have
+    // acted on, status 0, so the caller reads it as unconfirmed. Every other caller keeps the refusal it was given.
+    options: { untypedMayHaveRun?: boolean } = {},
 ): Promise<T> => {
     const body = (await readJson(await request(path, { json: { query, variables }, method: "POST" }))) as {
         data?: unknown;
-        errors?: { message?: unknown; type?: unknown }[];
+        errors?: { extensions?: unknown; message?: unknown; type?: unknown }[];
     } | null;
 
     const [first] = body?.errors ?? [];
 
     if (first !== undefined) {
-        const status = statusOfGraphqlError(typeof first.type === "string" ? first.type : undefined);
+        const type = typeof first.type === "string" ? first.type : undefined;
+        const status = type === undefined && options.untypedMayHaveRun === true && !isValidationError(first) ? 0 : statusOfGraphqlError(type);
         const detail = typeof first.message === "string" ? first.message.slice(0, DETAIL_MAX_CHARS) : undefined;
 
         throw new HostApiError("The host refused the GraphQL request", status, status === 429, { detail });
