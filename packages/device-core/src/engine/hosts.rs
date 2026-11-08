@@ -1392,6 +1392,38 @@ impl DeviceState {
         })
     }
 
+    /// One page of the folders inside an absolute path on a connected server, for the add-project picker. Not
+    /// confined to the server's shared folders, and it lists no files. The caller decides what to do with the
+    /// folder; the desktop asks for the connection and any share before this is reached.
+    pub fn host_browse(
+        &self,
+        device_id: &str,
+        path: &str,
+        after: Option<&str>,
+    ) -> Result<Value, String> {
+        let (host, link) = self.files_link(device_id)?;
+        let params = json!({ "after": after, "path": path });
+        let page = link.browse(&params, FILES_WAIT);
+
+        self.audit_files(&host, "folder_browse", path, page.is_ok());
+
+        page.map(|mut page| {
+            page["host"] = json!(host.name);
+
+            page
+        })
+    }
+
+    /// Creates an absolute folder (and its missing parents) on a connected server. The desktop confirms it first.
+    pub fn host_make_dir(&self, device_id: &str, path: &str) -> Result<Value, String> {
+        let (host, link) = self.files_link(device_id)?;
+        let created = link.make_dir(&json!({ "path": path }), FILES_WAIT);
+
+        self.audit_files(&host, "folder_create", path, created.is_ok());
+
+        created
+    }
+
     /// Records what the local window did on a server. It decided itself, so the decision is "window".
     fn audit_files(&self, host: &Host, tool: &str, path: &str, completed: bool) {
         self.audit(json!({
