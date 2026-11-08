@@ -30,7 +30,12 @@ const keyPattern = (escapes: ReadonlyArray<string>): string =>
 const PLAIN_PROMPT = new RegExp(`([?&]${keyPattern(["%"])}=)[^&#"]*`, "giu");
 
 /** The same parameter in a link encoded once as another parameter's value: its value runs to the next encoded `&` or `#`. */
-const ENCODED_PROMPT = new RegExp(`((?:%3F|%26)${keyPattern(["%", "%25"])}%3D)(?:[^%&#"]|%(?!26|23))*`, "giu");
+// One to three layers deep (a link in a sign-in `redirectTo`, itself in another one): `%3F`, `%253F`, `%25253F`. The layer is
+// taken at the separator, and the value ends only at a `&` or `#` of that same layer, never at the prompt's own (one deeper).
+const ENCODED_PROMPT = new RegExp(
+    String.raw`(%(?<layer>(?:25){0,2})(?:3F|26)${keyPattern(["%", "%25", "%2525", "%252525"])}%\k<layer>3D)(?:[^%&#"]|%(?!\k<layer>(?:26|23)))*`,
+    "giu",
+);
 
 /** Each prompt parameter keeps its name; its value is replaced. */
 const redactString = (value: string): string =>

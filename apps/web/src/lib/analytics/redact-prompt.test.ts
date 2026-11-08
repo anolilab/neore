@@ -3,6 +3,9 @@ import { describe, expect, it } from "vitest";
 
 import { redactPromptFromEvent } from "./redact-prompt";
 
+/** Words of the nested test's prompt, none of which may reach the event. */
+const PROMPT_WORDS = /secret|more|end/u;
+
 const pageView = (properties: CaptureResult["properties"]): CaptureResult => ({ event: "$pageview", properties, uuid: "event" }) as CaptureResult;
 
 describe(redactPromptFromEvent, () => {
@@ -50,5 +53,15 @@ describe(redactPromptFromEvent, () => {
         );
 
         expect(JSON.stringify(event)).not.toContain("private");
+    });
+
+    it("redacts a link nested through two sign-in redirects, keeping the parameters around it", () => {
+        const inner = `/auth/sign-in?redirectTo=${encodeURIComponent("/chat?prompt=my secret%20%26 more %23 end&model=gpt")}`;
+        const event = redactPromptFromEvent(pageView({ $current_url: `https://app.test/auth/sign-in?redirectTo=${encodeURIComponent(inner)}&x=1` }));
+
+        // The prompt's own `&` and `#` are one layer deeper than the link's, so the whole text goes, not just its start.
+        expect(JSON.stringify(event)).not.toMatch(PROMPT_WORDS);
+        expect(event?.properties.$current_url).toContain("model%253Dgpt");
+        expect(event?.properties.$current_url).toContain("&x=1");
     });
 });

@@ -22,11 +22,14 @@ export const usePromptLinkDraft = ({
     model,
     otherDraftSource,
     prompt,
+    ready = true,
 }: {
     model: string | undefined;
-    /** A saved prompt or a landing message in the same address supplies this chat's draft. */
+    /** A landing message in the same address supplies this chat's draft. */
     otherDraftSource: boolean;
     prompt: string | undefined;
+    /** False while another source of the draft has not settled yet (a saved prompt still loading): the link waits in the address. */
+    ready?: boolean;
 }): void => {
     const { t } = useLingui();
     const navigate = useNavigate();
@@ -37,6 +40,10 @@ export const usePromptLinkDraft = ({
         if (prompt === undefined) {
             appliedRef.current = undefined;
 
+            return;
+        }
+
+        if (!ready) {
             return;
         }
 
@@ -87,5 +94,5 @@ export const usePromptLinkDraft = ({
         }
 
         clearLink();
-    }, [model, navigate, otherDraftSource, prompt, t]);
+    }, [model, navigate, otherDraftSource, prompt, ready, t]);
 };

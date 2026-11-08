@@ -77,6 +77,19 @@ describe(usePromptLinkDraft, () => {
         expect(navigate).toHaveBeenCalledTimes(2);
     });
 
+    it("waits in the address while a saved prompt is still loading, then applies once it settles with no draft", () => {
+        const { rerender } = renderHook((ready: boolean) => usePromptLinkDraft({ model: undefined, otherDraftSource: false, prompt: "Draft me", ready }), {
+            initialProps: false,
+        });
+
+        expect(navigate).not.toHaveBeenCalled();
+        expect(useChatUIStore.getState().composerText).toBe("");
+
+        rerender(true);
+
+        expect(useChatUIStore.getState().composerText).toBe("Draft me");
+    });
+
     it("keeps a draft already in the composer, and the chat's model, with a notice", () => {
         useChatUIStore.getState().setComposerText("Mine");
 

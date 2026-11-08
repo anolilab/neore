@@ -1,5 +1,6 @@
 import { plural } from "@lingui/core/macro";
 import { useLingui } from "@lingui/react/macro";
+import type { Id } from "@neore/backend/dataModel";
 import { skipToken, useQuery } from "@tanstack/react-query";
 import { createFileRoute, useLocation, useNavigate, useRouteContext } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
@@ -60,7 +61,13 @@ const ChatPage = () => {
     // would otherwise turn the link away for a draft that never comes. Read before the effect below consumes it.
     const [landingMessageWaiting] = useState(() => hasInitialMessage === true && hasLandingMessage());
 
-    usePromptLinkDraft({ model: linkModel, otherDraftSource: Boolean(promptId) || landingMessageWaiting, prompt: linkPrompt });
+    // A saved prompt in the same address: the link waits until it has loaded. One that applies fills the composer first (its loader
+    // runs in a child, so its effect comes before this one), and the link then finds a draft; one that is missing or refused does
+    // not, and the link applies. The same query as the loader's, so it is read once.
+    const savedPrompt = useQuery(crpc.prompts.functions.getPrompt.queryOptions(promptId ? { promptId: promptId as Id<"prompts"> } : skipToken));
+    const savedPromptSettled = !promptId || savedPrompt.isSuccess || savedPrompt.isError;
+
+    usePromptLinkDraft({ model: linkModel, otherDraftSource: landingMessageWaiting, prompt: linkPrompt, ready: savedPromptSettled });
 
     const { data: latestThreadId, isSuccess: latestResolved } = useQuery(
         // Not live, and skipped once decided: later visits to /chat must not re-run the scan.
