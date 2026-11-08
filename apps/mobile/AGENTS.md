@@ -33,3 +33,26 @@
   pnpm patch on `expo-speech-recognition` that makes iOS fail such a request instead of using the network. Re-check
   that patch on every upgrade of the module. The recognizer is one per app (`createRecognizerLock`): an aborted
   recognition holds it ("draining") until its `end`, heard by an app-wide listener, so a late end never closes a newer press.
+- **Push** (`src/notifications/`, `targets/notification-service/`) — the EXPO push token (`getExpoPushTokenAsync`,
+  project id from `EAS_PROJECT_ID`) is registered on every sign-in and token rotation, silently when permission was
+  already given, and retried on foreground until registered; the system prompt shows only after the person sends a
+  message (`offerPhonePush`) and only when the server has push on. A push carries only ids, never text: iOS shows the
+  placeholder, and the Notification Service Extension (Swift, `@bacons/apple-targets`) rewrites it with the text from
+  `/notifications/push-content`, signing in with the session grant from the APP'S OWN keychain group (its application
+  identifier, listed for both in `app.config.ts`), so a pre-update grant is already readable; the grant is
+  `AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY` so a locked phone can read it). Android gets a data-only message: `background-task.ts`, loaded first from `index.ts`, fetches the text
+  and posts the notification itself; the placeholder on any failure. Mirror any change to the fetch in both
+  `push-content.ts` and `NotificationService.swift`; both re-read the session after the fetch and keep the placeholder
+  if it changed or is gone. Sign-out: cache wipe, then `takeStoredGrant` clears the keychain item the extension reads
+  (before any network wait), then the registration gate closes, in-flight registrations settle, the token is released
+  (bounded to 5 s), and the session is revoked, with the token a failed keychain clear still carries. Delivered
+  alerts and a held tap are dropped on sign-out, on a server-ended session (`emptyCacheWhileSignedOut`) and on an
+  account switch, which is detected across relaunches (`noteAccountOnPhone`, which keeps only a SHA-256 digest; sign-out removes it after the alerts, `forgetAccountOnPhone`). A refused grant (401) clears only that
+  grant, never a newer one: the push background task runs beside the app.
+  `secureGrantStore` rewrites a pre-update grant over itself once (`upgradeGrantInPlace`, a `SecItemUpdate` that carries
+  `keychainAccessible`, or the old accessibility stays), never delete-and-re-add, retried on the next use if it fails; keychain items are written only when they differ. A 404 from the content route (another account's
+  notification) posts nothing on Android; iOS must show it, so the extension keeps the placeholder and drops its
+  `threadId`. A tapped notification's chat is held (`pending-tap.ts`): the hook goes
+  there once signed in and past sign-in, otherwise the sign-in gate goes there instead of the chat list; a tap made with
+  nobody signed in is never followed after sign-in (it may be the previous account's). Android needs
+  `google-services.json` (`GOOGLE_SERVICES_JSON`).

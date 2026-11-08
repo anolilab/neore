@@ -3,7 +3,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
 
 import type { Fetch, GrantStore, StoredGrant } from "./grant";
-import { buildAuthorizeUrl, createPkce, exchangeGrant, fetchAccessToken, parseAuthorizeResponse, readStoredUser, SignInError, signOutGrant, toBase64Url } from "./grant";
+import { buildAuthorizeUrl, createPkce, exchangeGrant, fetchAccessToken, parseAuthorizeResponse, readStoredUser, SignInError, StoredGrantNotClearedError, takeStoredGrant, toBase64Url } from "./grant";
 
 const REDIRECT = "neore-mobile://auth/callback";
 const LUNORA = "https://backend.example";
@@ -198,29 +198,64 @@ describe("grant storage", () => {
         expect(await fetchAccessToken({ fetch, lunoraUrl: LUNORA, store })).toBe("jwt-1");
         expect(sent).toEqual({ token: "session-1" });
     });
+});
 
-    it("sign-out forgets the grant even when the revoke fails", async () => {
-        const store = memoryStore({ token: "session-1", user: USER });
+describe("fetchAccessToken on a refused grant", () => {
+    it("forgets only the grant that was refused, never a newer one a sign-in stored meanwhile", async () => {
+        const store = memoryStore({ token: "old-session", user: USER });
         const fetch: Fetch = async () => {
-            throw new Error("offline");
+            // While the request for the old session is out, another account signs in on the phone.
+            store.value = { token: "new-session", user: USER };
+
+            return json({ error: "UNAUTHORIZED" }, 401);
         };
 
-        await signOutGrant({ fetch, lunoraUrl: LUNORA, store });
+        expect(await fetchAccessToken({ fetch, lunoraUrl: LUNORA, store })).toBeNull();
+        expect(store.value).toEqual({ token: "new-session", user: USER });
+    });
+
+    it("forgets the refused grant itself", async () => {
+        const store = memoryStore({ token: "old-session", user: USER });
+
+        expect(await fetchAccessToken({ fetch: async () => json({}, 401), lunoraUrl: LUNORA, store })).toBeNull();
         expect(store.value).toBeNull();
     });
 });
 
-describe("signOutGrant", () => {
-    it("lets a store that cannot be cleared reject, so the provider can still sign out in memory", async () => {
-        const store: GrantStore = {
+describe("takeStoredGrant", () => {
+    it("resolves the session token and leaves nothing stored", async () => {
+        const store = memoryStore({ token: "session-1", user: USER });
+
+        expect(await takeStoredGrant(store)).toBe("session-1");
+        expect(store.value).toBeNull();
+        expect(await takeStoredGrant(store)).toBeUndefined();
+    });
+});
+
+describe("a stored grant that cannot be cleared", () => {
+    const stuckStore = (): GrantStore => {
+        return {
             clear: async () => {
                 throw new Error("keychain locked");
             },
-            get: async () => null,
+            get: async () => {
+                return { token: "session-1", user: USER };
+            },
             set: async () => {},
         };
+    };
 
-        await expect(signOutGrant({ fetch: async () => json({}), lunoraUrl: LUNORA, store })).rejects.toThrow("keychain locked");
+    it("still hands back its token, so the session can be revoked", async () => {
+        let failure: unknown;
+
+        try {
+            await takeStoredGrant(stuckStore());
+        } catch (error) {
+            failure = error;
+        }
+
+        expect(failure).toBeInstanceOf(StoredGrantNotClearedError);
+        expect((failure as StoredGrantNotClearedError).token).toBe("session-1");
     });
 });
 

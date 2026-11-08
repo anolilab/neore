@@ -1,31 +1,69 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { emptyCacheWhileSignedOut, signOutOnDevice } from "./sign-out";
+import { emptyCacheWhileSignedOut, RELEASE_PUSH_TIMEOUT_MS, signOutOnDevice } from "./sign-out";
+
+const recorder = () => {
+    const calls: string[] = [];
+    const step = (name: string) => async () => {
+        calls.push(name);
+    };
+
+    return { calls, step };
+};
 
 describe("signOutOnDevice", () => {
-    it("empties the cache before it asks the server, so a request that fails or hangs cannot leave chats behind", async () => {
-        const calls: string[] = [];
+    it("empties the cache, then clears the stored sign-in, both before the server is asked anything", async () => {
+        const { calls, step } = recorder();
 
         await signOutOnDevice({
-            clearCache: async () => {
-                calls.push("clear");
-            },
-            forgetLastChat: async () => {
-                calls.push("forget");
-            },
-            revokeGrant: async () => {
-                calls.push("revoke");
+            clearCache: step("clear"),
+            dismissNotifications: step("dismiss"),
+            forgetLastChat: step("forget"),
+            releasePush: step("release"),
+            revokeSession: async (token) => {
+                calls.push(`revoke ${token}`);
 
                 throw new TypeError("Network request failed");
+            },
+            takeCredential: async () => {
+                calls.push("take");
+
+                return "session-1";
             },
             warn: () => undefined,
         });
 
-        expect(calls).toEqual(["clear", "forget", "revoke"]);
+        expect(calls).toEqual(["clear", "forget", "take", "dismiss", "release", "revoke session-1"]);
     });
 
-    it("still asks the server when the cache could not be emptied, and says so", async () => {
-        const revokeGrant = vi.fn(async () => undefined);
+    it("has the credential the notification extension reads gone before push release or revoke even start", async () => {
+        const keychain: { grant?: string } = { grant: "session-1" };
+        const seen: (string | undefined)[] = [];
+
+        await signOutOnDevice({
+            clearCache: async () => undefined,
+            forgetLastChat: async () => undefined,
+            releasePush: async () => {
+                seen.push(keychain.grant);
+            },
+            revokeSession: async () => {
+                seen.push(keychain.grant);
+            },
+            takeCredential: async () => {
+                const { grant } = keychain;
+
+                keychain.grant = undefined;
+
+                return grant;
+            },
+            warn: () => undefined,
+        });
+
+        expect(seen).toEqual([undefined, undefined]);
+    });
+
+    it("still clears the sign-in when the cache could not be emptied, and says so", async () => {
+        const takeCredential = vi.fn(async () => undefined);
         const warn = vi.fn();
 
         await signOutOnDevice({
@@ -33,29 +71,103 @@ describe("signOutOnDevice", () => {
                 throw new Error("disk I/O error");
             },
             forgetLastChat: async () => undefined,
-            revokeGrant,
+            revokeSession: vi.fn(),
+            takeCredential,
             warn,
         });
 
-        expect(revokeGrant).toHaveBeenCalledTimes(1);
+        expect(takeCredential).toHaveBeenCalledTimes(1);
         expect(warn).toHaveBeenCalledWith("Could not empty the offline cache.", expect.any(Error));
     });
 
-    it("still asks the server when the saved chat could not be forgotten, and says so", async () => {
-        const revokeGrant = vi.fn(async () => undefined);
+    it("still clears the sign-in when the saved chat could not be forgotten, and says so", async () => {
+        const takeCredential = vi.fn(async () => undefined);
         const warn = vi.fn();
 
         await signOutOnDevice({
             clearCache: async () => undefined,
             forgetLastChat: async () => {
-                throw new Error("keychain locked");
+                throw new Error("disk I/O error");
             },
-            revokeGrant,
+            revokeSession: vi.fn(),
+            takeCredential,
             warn,
         });
 
-        expect(revokeGrant).toHaveBeenCalledTimes(1);
+        expect(takeCredential).toHaveBeenCalledTimes(1);
         expect(warn).toHaveBeenCalledWith("Could not forget the last viewed chat.", expect.any(Error));
+    });
+
+    it("still revokes the session when the stored sign-in could not be cleared, so what is left behind stops working", async () => {
+        const revokeSession = vi.fn(async () => undefined);
+        const notCleared = Object.assign(new Error("keychain locked"), { token: "session-1" });
+
+        await signOutOnDevice({
+            clearCache: async () => undefined,
+            forgetLastChat: async () => undefined,
+            revokeSession,
+            takeCredential: async () => {
+                throw notCleared;
+            },
+            warn: vi.fn(),
+        });
+
+        expect(revokeSession).toHaveBeenCalledWith("session-1");
+    });
+
+    it("revokes nothing when no session was stored, and warns when the stored one cannot be cleared", async () => {
+        const revokeSession = vi.fn(async () => undefined);
+        const warn = vi.fn();
+
+        await signOutOnDevice({
+            clearCache: async () => undefined,
+            forgetLastChat: async () => undefined,
+            revokeSession,
+            takeCredential: async () => {
+                throw new Error("keychain locked");
+            },
+            warn,
+        });
+
+        expect(revokeSession).not.toHaveBeenCalled();
+        expect(warn).toHaveBeenCalledWith("Could not clear the stored sign-in.", expect.any(Error));
+    });
+});
+
+describe("signOutOnDevice releasing push", () => {
+    it("signs out anyway when the release fails or never answers", async () => {
+        vi.useFakeTimers();
+
+        try {
+            const revokeSession = vi.fn(async () => undefined);
+            const warn = vi.fn();
+            const signingOut = signOutOnDevice({
+                clearCache: async () => undefined,
+                forgetLastChat: async () => undefined,
+                releasePush: async () => await new Promise<void>(() => {}),
+                revokeSession,
+                takeCredential: async () => "session-1",
+                warn,
+            });
+
+            await vi.advanceTimersByTimeAsync(RELEASE_PUSH_TIMEOUT_MS);
+            await signingOut;
+
+            expect(revokeSession).toHaveBeenCalledWith("session-1");
+            expect(warn).toHaveBeenCalledWith("Could not stop notifications for this phone.", expect.any(Error));
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+});
+
+describe("emptyCacheWhileSignedOut removing alerts", () => {
+    it("removes the previous account's alerts when the server ended the session, which never ran the sign-out", async () => {
+        const dismissNotifications = vi.fn(async () => undefined);
+
+        await emptyCacheWhileSignedOut({ clearCache: async () => undefined, dismissNotifications, forgetLastChat: async () => undefined, warn: vi.fn() });
+
+        expect(dismissNotifications).toHaveBeenCalledTimes(1);
     });
 });
 

@@ -14,6 +14,8 @@ import { crashReportStore } from "@/lib/crash-report-store";
 import { applyStoredCrashReportChoice, startCrashReporting } from "@/lib/crash-reporting";
 import { installMarker } from "@/lib/install-marker";
 import { createPostHogClient } from "@/lib/posthog-client";
+import { routeAfterSignIn } from "@/notifications/pending-tap";
+import { usePhonePush } from "@/notifications/use-phone-push";
 import { OfflineProvider } from "@/offline/offline-provider";
 
 /** Starts crash reporting when the build has a PostHog key, and applies the stored choice. */
@@ -41,13 +43,16 @@ const SignInGate = () => {
     // Settings is open without a sign-in: a saved crash-report choice stays in force after sign-out, so it must stay reachable.
     const isOnSettings = segments[0] === "settings";
 
+    usePhonePush();
+
     useEffect(() => {
         if (status === "signed-out" && !isOnSignIn && !isOnSettings) {
             router.replace("/sign-in");
         }
 
         if (status === "signed-in" && isOnSignIn) {
-            router.replace("/");
+            // A notification tapped before or during sign-in goes to its chat, not the chat list.
+            router.replace(routeAfterSignIn());
         }
     }, [isOnSettings, isOnSignIn, router, status]);
 

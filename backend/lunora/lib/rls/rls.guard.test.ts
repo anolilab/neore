@@ -62,6 +62,10 @@ const SYSTEM_DB_IMPORTERS = [
     // Whether the lead is shared at all, before a worker is allowed to reach the owner's computer: a refusal, never rows.
     "sub-agents/functions.ts",
     "skills/marketplace.ts",
+    // A phone's token row held by the account signed in on it before: registering moves it to the caller (the token is
+    // the capability), and `notify()` asks whether the RECIPIENT has a phone when another user's request writes the row.
+    "notifications/native-push.ts",
+    "notifications/notify.ts",
 ].toSorted(byName);
 
 /** `relative()` with POSIX separators, so the keys below hold on Windows too. */

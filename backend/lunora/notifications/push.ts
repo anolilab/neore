@@ -16,7 +16,11 @@ import { internal } from "../_generated/internal";
 import { internalAction, internalQuery } from "../_generated/server";
 import { isAccountDeletionUnderway } from "../gdpr/deletion-guard";
 import { authMutation, authQuery, rateLimit } from "../lib/crpc";
-import { linksToLockedThread, redactForLockedThread } from "./locked-link";
+import { linksToLockedThread, redactForLockedThread, threadIdOfLink } from "./locked-link";
+import { resolveThreadReadAccess } from "../agent/thread-read-access";
+import type { Id } from "../_generated/dataModel";
+import { deliverToPhones } from "./native-push";
+import { isPhonePushConfigured } from "./native-push-config";
 import { webPushConfig } from "./push-config";
 import { isAllowedPushEndpoint } from "./push-endpoint";
 import { pushTitle, pushUrgency } from "./push-text";
@@ -142,6 +146,7 @@ export const loadPushNotification = internalQuery
             v.null(),
             v.object({
                 body: v.optional(v.string()),
+                language: v.optional(v.string()),
                 link: v.optional(v.string()),
                 outcome: v.optional(v.union(v.literal("success"), v.literal("failure"))),
                 title: v.string(),
@@ -158,8 +163,10 @@ export const loadPushNotification = internalQuery
 
         // Queued before its chat was locked, the push still carries the title: redact it as the inbox does.
         const shown = (await linksToLockedThread(ctx.db, notification.link)) ? redactForLockedThread(notification) : notification;
+        const settings = await ctx.db.userSettings.findFirst({ where: { userId: args.userId } });
 
         return {
+            ...(settings?.language !== undefined && { language: settings.language }),
             title: shown.title,
             type: shown.type,
             ...(shown.body !== undefined && { body: shown.body }),
@@ -171,11 +178,80 @@ export const loadPushNotification = internalQuery
 /** Push body cap, well inside the 4 KiB a push service accepts after encryption. */
 const PUSH_BODY_MAX = 300;
 
+/** The headline and text of a push, as the browser and the phone show them. */
+const pushText = (notification: { body?: string; outcome?: "failure" | "success"; title: string; type: string }): { body: string; title: string } => {
+    return {
+        body: notification.body ? `${notification.title}\n${notification.body}`.slice(0, PUSH_BODY_MAX) : notification.title.slice(0, PUSH_BODY_MAX),
+        title: pushTitle(notification.type, notification.outcome),
+    };
+};
+
+/**
+ * What a phone shows for a push it got with only the notification id (`push-content-http.ts`): the owner's own
+ * notification only, `null` for any other. A notification about a locked chat stays generic, as the phone already
+ * shows it, whenever it was queued.
+ */
+export const loadPhonePushContent = internalQuery
+    .input({ notificationId: v.id("notifications"), userId: v.string() })
+    .output(
+        v.union(
+            v.null(),
+            v.object({ generic: v.literal(true) }),
+            // `threadId`: the chat the text is about. Its lock is checked again where the chat lives
+            // (`push-content-http.ts`), since a collaborator's chat is on its owner's shard, not here.
+            v.object({ body: v.string(), threadId: v.optional(v.string()), title: v.string() }),
+        ),
+    )
+    .query(async ({ args, ctx }) => {
+        const notification = await ctx.db.get("notifications", args.notificationId);
+
+        if (notification?.userId !== args.userId) {
+            return null;
+        }
+
+        if (await linksToLockedThread(ctx.db, notification.link)) {
+            return { generic: true as const };
+        }
+
+        const threadId = threadIdOfLink(notification.link);
+
+        return { ...pushText(notification), ...(threadId !== undefined && { threadId }) };
+    });
+
+/**
+ * Whether a phone may show text about a chat right now, read on the shard the chat lives on, for the caller:
+ * `open` only when the caller can still read the chat in full (owner, or an unexpired grant: `resolveThreadReadAccess`)
+ * and it is neither deleted nor archived; `locked` for a lock or a passcode (both set `lockedAt`); `missing` for
+ * anything else (deleted, archived, gone, or no longer the caller's to read). Only `open` lets text through.
+ */
+export const readThreadLockState = internalQuery
+    .input({ threadId: v.string(), userId: v.string() })
+    .output(v.union(v.literal("locked"), v.literal("missing"), v.literal("open")))
+    .query(async ({ args, ctx }) => {
+        const access = await resolveThreadReadAccess(ctx, args.threadId as Id<"threads">, args.userId);
+
+        if (access?.kind === "locked") {
+            return "locked" as const;
+        }
+
+        if (access?.kind !== "full" || access.thread.deleted === true || access.thread.status === "archived") {
+            return "missing" as const;
+        }
+
+        return "open" as const;
+    });
+
+/**
+ * Delivers one notification to every browser (Web Push) and phone (Expo push) of
+ * its user. Each channel is skipped while its keys are unset.
+ */
 export const sendPushForNotification = internalAction
     .input({ notificationId: v.id("notifications"), userId: v.string() })
     .output(v.null())
     .action(async ({ args, ctx }) => {
-        if (!webPushConfig(process.env)) {
+        const isWebPushOn = webPushConfig(process.env) !== undefined;
+
+        if (!isWebPushOn && !isPhonePushConfigured(process.env)) {
             return null;
         }
 
@@ -185,18 +261,31 @@ export const sendPushForNotification = internalAction
             return null;
         }
 
-        // `public/push-sw.js` reads `title`/`body` and `data.{link,tag}`.
-        const result = await ctx.push.broadcast(
-            {
-                body: notification.body ? `${notification.title}\n${notification.body}`.slice(0, PUSH_BODY_MAX) : notification.title.slice(0, PUSH_BODY_MAX),
-                data: { link: notification.link ?? "/dashboard", tag: args.notificationId },
-                title: pushTitle(notification.type, notification.outcome),
-                urgency: pushUrgency(notification.type),
-            },
-            { userId: args.userId },
-        );
+        const { body, title } = pushText(notification);
+        const link = notification.link ?? "/dashboard";
+        const urgency = pushUrgency(notification.type);
 
-        ctx.log.event("notifications.push", { delivered: result.sent, failed: result.failed, gone: result.pruned, type: notification.type });
+        if (isWebPushOn) {
+            // A browser-side failure must not keep the phones from getting it.
+            try {
+                // `public/push-sw.js` reads `title`/`body` and `data.{link,tag}`.
+                const result = await ctx.push.broadcast({ body, data: { link, tag: args.notificationId }, title, urgency }, { userId: args.userId });
+
+                ctx.log.event("notifications.push", { delivered: result.sent, failed: result.failed, gone: result.pruned, type: notification.type });
+            } catch (error) {
+                console.warn("[notifications] Web Push broadcast failed:", error);
+            }
+        }
+
+        // Phones get no text from here: only the ids, and the account's language for the placeholder.
+        const threadId = threadIdOfLink(notification.link);
+
+        await deliverToPhones(ctx, args.userId, {
+            notificationId: args.notificationId,
+            urgency,
+            ...(notification.language !== undefined && { language: notification.language }),
+            ...(threadId !== undefined && { threadId }),
+        });
 
         return null;
     });

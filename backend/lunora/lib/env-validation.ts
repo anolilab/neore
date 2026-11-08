@@ -129,6 +129,9 @@ const optionalEnvSchema = z.object({
     CREEM_WEBHOOK_SECRET: z.string().trim().optional(),
     CREEM_YEARLY_CHECKOUT: z.string().trim().optional(),
     DPO_EMAIL: z.string().trim().optional(),
+    // Phone push through Expo's push service (`notifications/native-push-config.ts`), with
+    // its access-token security on. Optional: unset, phones get no push.
+    EXPO_ACCESS_TOKEN: z.string().trim().optional(),
     FEATUREBASE_API_KEY: z.string().trim().optional(),
     // Pre-registered OAuth clients for connectors whose MCP server has no dynamic
     // client registration. A connector without its client id shows "not configured".

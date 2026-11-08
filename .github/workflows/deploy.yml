@@ -538,6 +538,9 @@ jobs:
                   VAPID_PUBLIC_KEY: "${{ secrets.VAPID_PUBLIC_KEY }}"
                   VAPID_PRIVATE_KEY: "${{ secrets.VAPID_PRIVATE_KEY }}"
                   VAPID_SUBJECT: "${{ secrets.VAPID_SUBJECT }}"
+                  # Phone push — optional; off until set. An Expo access token
+                  # with push security ("enhanced security") enabled on the project.
+                  EXPO_ACCESS_TOKEN: "${{ secrets.EXPO_ACCESS_TOKEN }}"
                   # Display name sent in connector OAuth client registration;
                   # unset = "Neore".
                   APP_NAME: "${{ secrets.APP_NAME }}"

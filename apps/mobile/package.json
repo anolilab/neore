@@ -2,7 +2,7 @@
     "name": "@neore/mobile",
     "version": "0.0.0",
     "private": true,
-    "main": "expo-router/entry",
+    "main": "index.ts",
     "scripts": {
         "android": "expo run:android",
         "build": "expo export --platform ios --platform android --output-dir dist",
@@ -30,6 +30,7 @@
         "expo-font": "~58.0.11",
         "expo-linking": "~58.0.16",
         "expo-network": "~58.0.4",
+        "expo-notifications": "~58.1.5",
         "expo-router": "~58.0.30",
         "expo-secure-store": "~58.0.2",
         "expo-speech-recognition": "58.0.1",
@@ -37,6 +38,7 @@
         "expo-sqlite": "~58.0.15",
         "expo-status-bar": "~58.0.3",
         "expo-system-ui": "~58.0.7",
+        "expo-task-manager": "~58.0.12",
         "expo-updates": "~58.0.21",
         "expo-web-browser": "~58.0.7",
         "posthog-react-native": "4.85.3",
@@ -51,6 +53,7 @@
     },
     "devDependencies": {
         "@anolilab/eslint-config": "catalog:lint",
+        "@bacons/apple-targets": "5.0.0",
         "@react-native/metro-config": "0.88.1",
         "@types/node": "catalog:types",
         "@types/react": "catalog:types",

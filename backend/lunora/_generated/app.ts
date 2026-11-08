@@ -734,6 +734,7 @@ class AppBuilder<Env extends object> {
             ["prompts", { mode: { kind: "global" } }],
             ["pullRequestGuides", { mode: { field: "userId", kind: "shardBy" } }],
             ["pullRequestThreads", { mode: { field: "userId", kind: "shardBy" } }],
+            ["pushDevices", { mode: { kind: "global" } }],
             ["rateLimit", { mode: { kind: "global" } }],
             ["rateLimits", { mode: { kind: "root" } }],
             ["requestedSecrets", { mode: { field: "userId", kind: "shardBy" } }],
