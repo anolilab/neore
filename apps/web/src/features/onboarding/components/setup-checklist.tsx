@@ -12,7 +12,7 @@ import { useUserSettings } from "@/features/auth/hooks/use-user-settings";
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 import { useCRPC } from "@/lib/lunora/crpc";
 
-import type { SetupStepId } from "../lib/setup-steps";
+import type { SetupStepId, SetupStepStatus } from "../lib/setup-steps";
 import { deriveSetupSteps, SETUP_STEP_IDS, toggleSkipped } from "../lib/setup-steps";
 
 /** Where each step's action goes: the control on this page, or the guide for the part that happens in the desktop app. */
@@ -117,8 +117,11 @@ const SetupChecklist: FC<{ serverFormShown: boolean }> = ({ serverFormShown }) =
     });
     // An account with no settings row answers `null`; only `undefined` means the read has not finished. Until both reads
     // have answered, no step has a status: a skip that is stored but not yet read must not show as "To do".
+    // Cached results from before this mount (another account's, say) are not answers: both reads must have been fetched since.
     const steps =
-        settingsQuery.data !== undefined && devicesQuery.isSuccess ? deriveSetupSteps(devicesQuery.data, settingsQuery.data?.setupStepsSkipped) : undefined;
+        settingsQuery.isFetchedAfterMount && settingsQuery.data !== undefined && devicesQuery.isFetchedAfterMount && devicesQuery.isSuccess
+            ? deriveSetupSteps(devicesQuery.data, settingsQuery.data?.setupStepsSkipped)
+            : undefined;
 
     const copy: Record<SetupStepId, { action: string; description: string; title: string }> = {
         agent: {
@@ -138,6 +141,13 @@ const SetupChecklist: FC<{ serverFormShown: boolean }> = ({ serverFormShown }) =
         },
     };
     const statusLabel = { done: t`Done`, skipped: t`Skipped`, todo: t`To do` };
+    const announce = (status: SetupStepStatus, title: string) => {
+        if (status === "done") {
+            return t`${title} is done.`;
+        }
+
+        return status === "skipped" ? t`${title} is skipped.` : t`${title} is to do.`;
+    };
     const [seen, setSeen] = useState<{ key: string; steps: NonNullable<typeof steps> } | undefined>(undefined);
     const [announcement, setAnnouncement] = useState("");
     const statusKey = steps?.map((step) => step.status).join(",");
@@ -150,8 +160,8 @@ const SetupChecklist: FC<{ serverFormShown: boolean }> = ({ serverFormShown }) =
             setAnnouncement(
                 steps
                     .filter((step, index) => step.status !== seen.steps[index]?.status)
-                    .map((step) => `${copy[step.id].title}: ${statusLabel[step.status]}`)
-                    .join(". "),
+                    .map((step) => announce(step.status, copy[step.id].title))
+                    .join(" "),
             );
         }
     }

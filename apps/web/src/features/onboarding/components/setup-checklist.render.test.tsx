@@ -12,7 +12,7 @@ import SetupChecklist from "./setup-checklist";
 const { account, devices, save, server, toastError } = vi.hoisted(() => {
     return {
         account: { id: "user-a" },
-        devices: { current: [] as unknown[], fail: false, reads: 0 },
+        devices: { current: [] as unknown[], fail: false, hold: undefined as Promise<undefined> | undefined, reads: 0 },
         save: vi.fn(),
         server: {
             failSave: false,
@@ -112,6 +112,7 @@ vi.mock("@/lib/lunora/crpc", () => {
                                 return {
                                     queryFn: async () => {
                                         devices.reads += 1;
+                                        await devices.hold;
 
                                         if (devices.fail) {
                                             throw new Error("offline");
@@ -154,8 +155,7 @@ const createGate = () => {
     return { open, promise };
 };
 
-const renderChecklist = (serverFormShown = true) => {
-    const client = new QueryClient({ defaultOptions: { mutations: { retry: false }, queries: { retry: false } } });
+const renderChecklist = (serverFormShown = true, client = new QueryClient({ defaultOptions: { mutations: { retry: false }, queries: { retry: false } } })) => {
     const tree = (
         <QueryClientProvider client={client}>
             <SetupChecklist serverFormShown={serverFormShown} />
@@ -175,6 +175,7 @@ describe("<SetupChecklist>", () => {
         devices.current = [];
         devices.fail = false;
         devices.reads = 0;
+        devices.hold = undefined;
         account.id = "user-a";
         server.failSave = false;
         server.failStep = undefined;
@@ -253,7 +254,10 @@ describe("<SetupChecklist>", () => {
     });
 
     it("completes steps from the device list, and done wins over a stored skip", async () => {
-        devices.current = [{ transport: "ssh" }, { acpOffers: [{}] }];
+        devices.current = [
+            { lastSeenAt: 1, transport: "ssh" },
+            { acpOffers: [{}], lastSeenAt: 1 },
+        ];
         server.skipped = ["pair"];
         renderChecklist();
 
@@ -377,7 +381,34 @@ describe("<SetupChecklist>", () => {
         await user.click(screen.getByRole("button", { name: RESkipAddAnSshServer }));
 
         await waitFor(() => {
-            expect(region.textContent).toBe("Add an SSH server: Skipped");
+            expect(region.textContent).toBe("Add an SSH server is skipped.");
         });
+    });
+
+    it("shows no status from results cached before this mount until both reads are fetched again", async () => {
+        const client = new QueryClient({ defaultOptions: { mutations: { retry: false }, queries: { retry: false } } });
+        const settingsGate = createGate();
+        const devicesGate = createGate();
+
+        // The previous account's answers, under the same keys.
+        client.setQueryData(["getUserSettings"], { setupStepsSkipped: ["ssh"] });
+        client.setQueryData(["listDevices"], [{ lastSeenAt: 1 }]);
+        server.settingsHold = settingsGate.promise;
+        devices.hold = devicesGate.promise;
+        renderChecklist(true, client);
+
+        expect(screen.getAllByText("(Checking)")).toHaveLength(3);
+        expect(screen.queryByRole("button", { name: RESkip })).toBeNull();
+
+        devicesGate.open();
+        await waitFor(() => {
+            expect(client.getQueryState(["listDevices"])?.fetchStatus).toBe("idle");
+        });
+
+        expect(screen.getAllByText("(Checking)")).toHaveLength(3);
+
+        settingsGate.open();
+
+        expect(await screen.findAllByText("(To do)")).toHaveLength(3);
     });
 });
