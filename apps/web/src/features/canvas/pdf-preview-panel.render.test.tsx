@@ -72,14 +72,6 @@ Object.defineProperty(URL, "createObjectURL", { configurable: true, value: creat
 
 const panelFor = (file: PreviewFile) => <PdfPreviewPanel file={file} />;
 
-const flush = async () => {
-    await act(async () => {
-        await new Promise((resolve) => {
-            setTimeout(resolve, 0);
-        });
-    });
-};
-
 const clickDownload = () => {
     fireEvent.click(screen.getByRole("button", { name: "Download PDF" }));
 };
@@ -98,6 +90,7 @@ describe("the side panel's download after a document switch", () => {
         createObjectUrl.mockClear();
         clickSpy.mockClear();
         vi.unstubAllGlobals();
+        vi.useRealTimers();
     });
 
     afterAll(() => {
@@ -106,6 +99,8 @@ describe("the side panel's download after a document switch", () => {
     });
 
     it("saves nothing from a download that was still fetching when the document changed", async () => {
+        vi.useFakeTimers();
+
         const { rerender } = render(panelFor(DOCUMENT_A));
 
         clickDownload();
@@ -118,7 +113,10 @@ describe("the side panel's download after a document switch", () => {
         await act(async () => {
             pendingFetches[0]?.resolve(new Response(new Blob(["A"]), { status: 200 }));
         });
-        await flush();
+        // Runs the rest of the left download, its stall deadline included, so nothing is left that could still save it.
+        await act(async () => {
+            await vi.runAllTimersAsync();
+        });
 
         expect(createObjectUrl).not.toHaveBeenCalled();
         expect(savedFilenames()).toEqual([]);
