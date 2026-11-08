@@ -44,12 +44,16 @@
       rows (`dropPushDevicesOf`) instead of moving them: they belong to a session
       that ends with the guest.
 - **Phone push delivery** (`phone-delivery.ts`, `expo-push.ts`) — **no title
-  ever leaves us**: every phone gets the same localised placeholder
-  (`push-text.ts`) with only `notificationId`/`threadId` as data.
+  ever leaves us**: every phone gets the same placeholder (`push-text.ts`,
+  English until the phone reports its language; never `userSettings.language`,
+  which is the AI-reply language) with only `notificationId`/`threadId` as data.
     - A phone is sent to only while the session that registered it exists and has
       not expired; an ended one is dropped at the next send.
     - Otherwise a row is deleted only on `DeviceNotRegistered` in the send's
-      ticket, and only while it has the owner the send was for and has not
+      ticket. Every drop (this one, and an ended session's) needs the row to
+      still have the owner and the session the send read, and not to have
       registered again since (`lastSeenAt <= sentAt`); any other error keeps it.
+      Logs carry Expo's error code only, never its message (it can quote the
+      token).
     - `notify()` schedules a send when the recipient has a browser subscription
       or a phone; a failed browser lookup still checks the phones.

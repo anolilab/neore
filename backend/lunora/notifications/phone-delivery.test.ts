@@ -197,7 +197,7 @@ describe("the phones a send goes to", () => {
 });
 
 describe("phoneMessage", () => {
-    it.each(["ios", "android"] as const)("gives a %s phone the generic alert, in the account's language, with only ids as data", (platform) => {
+    it.each(["ios", "android"] as const)("gives a %s phone the generic alert, in the phone's language, with only ids as data", (platform) => {
         const message = phoneMessage({ platform, token: PHONE }, { language: "de-DE", notificationId: "n1", threadId: "t1", urgency: "high" });
 
         expect(message).toStrictEqual({

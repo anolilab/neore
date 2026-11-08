@@ -976,7 +976,7 @@ export interface InternalApiTypes {
             recordPushDeliveries: FunctionReference<"mutation", { gone: Array<{ id: Id<"pushDevices">; sentAt: number; sessionId: string; userId: string }> }, null>;
         };
         push: {
-            loadPushNotification: FunctionReference<"query", { notificationId: Id<"notifications">; userId: string }, null | { body?: string; language?: string; link?: string; outcome?: "success" | "failure"; title: string; type: string }>;
+            loadPushNotification: FunctionReference<"query", { notificationId: Id<"notifications">; userId: string }, null | { body?: string; link?: string; outcome?: "success" | "failure"; title: string; type: string }>;
             sendPushForNotification: FunctionReference<"action", { notificationId: Id<"notifications">; userId: string }, null>;
         };
         task_email: {

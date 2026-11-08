@@ -4667,7 +4667,7 @@ export interface Caller {
         push: {
             getPushConfig: (args?: {}) => Promise<{ publicKey?: string; subscriptionCount: number }>;
             getPushSubscriptionStatus: (args: { endpoint: string }) => Promise<{ subscribed: boolean }>;
-            loadPushNotification: (args: { notificationId: Id<"notifications">; userId: string }) => Promise<null | { body?: string; language?: string; link?: string; outcome?: "success" | "failure"; title: string; type: string }>;
+            loadPushNotification: (args: { notificationId: Id<"notifications">; userId: string }) => Promise<null | { body?: string; link?: string; outcome?: "success" | "failure"; title: string; type: string }>;
             sendPushForNotification: (args: { notificationId: Id<"notifications">; userId: string }) => Promise<null>;
             subscribePush: (args: { endpoint: string; keys: { auth: unknown; p256dh: unknown }; replacedEndpoint?: string; userAgent?: string }) => Promise<{ taken: boolean }>;
             unsubscribePush: (args: { endpoint: string }) => Promise<null>;

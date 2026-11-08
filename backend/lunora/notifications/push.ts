@@ -13,7 +13,6 @@ import { webPushId } from "@lunora/notify";
 import { LunoraError, v } from "lunorash/server";
 
 import { internal } from "../_generated/internal";
-import type { QueryCtx } from "../_generated/server";
 import { internalAction, internalQuery } from "../_generated/server";
 import { isAccountDeletionUnderway } from "../gdpr/deletion-guard";
 import { authMutation, authQuery, rateLimit } from "../lib/crpc";
@@ -145,7 +144,6 @@ export const loadPushNotification = internalQuery
             v.null(),
             v.object({
                 body: v.optional(v.string()),
-                language: v.optional(v.string()),
                 link: v.optional(v.string()),
                 outcome: v.optional(v.union(v.literal("success"), v.literal("failure"))),
                 title: v.string(),
@@ -162,10 +160,8 @@ export const loadPushNotification = internalQuery
 
         // Queued before its chat was locked, the push still carries the title: redact it as the inbox does.
         const shown = (await linksToLockedThread(ctx.db, notification.link)) ? redactForLockedThread(notification) : notification;
-        const language = await accountLanguage(ctx.db, args.userId);
 
         return {
-            ...(language !== undefined && { language }),
             title: shown.title,
             type: shown.type,
             ...(shown.body !== undefined && { body: shown.body }),
@@ -173,19 +169,6 @@ export const loadPushNotification = internalQuery
             ...(shown.outcome !== undefined && { outcome: shown.outcome }),
         };
     });
-
-/** Only picks the phone placeholder's wording: a failed read falls back to English instead of stopping the push. */
-const accountLanguage = async (db: QueryCtx["db"], userId: string): Promise<string | undefined> => {
-    try {
-        const settings = await db.userSettings.findFirst({ where: { userId } });
-
-        return settings?.language;
-    } catch (error) {
-        console.warn("[notifications] Could not read the account language for a push:", error);
-
-        return undefined;
-    }
-};
 
 /** Push body cap, well inside the 4 KiB a push service accepts after encryption. */
 const PUSH_BODY_MAX = 300;
@@ -234,15 +217,20 @@ export const sendPushForNotification = internalAction
             }
         }
 
-        // Phones get no text from here: only the ids, and the account's language for the placeholder.
+        // Phones get no text from here: only the ids. The placeholder is English until the phone tells us its language
+        // when it registers; the account settings hold the language for AI replies, not the one the app is shown in.
         const threadId = threadIdOfLink(notification.link);
 
-        await deliverToPhones(ctx, args.userId, {
-            notificationId: args.notificationId,
-            urgency,
-            ...(notification.language !== undefined && { language: notification.language }),
-            ...(threadId !== undefined && { threadId }),
-        });
+        // A phone lookup or send that fails must not fail the job: Web Push has already gone out.
+        try {
+            await deliverToPhones(ctx, args.userId, {
+                notificationId: args.notificationId,
+                urgency,
+                ...(threadId !== undefined && { threadId }),
+            });
+        } catch (error) {
+            console.warn("[notifications] Phone push failed:", error);
+        }
 
         return null;
     });

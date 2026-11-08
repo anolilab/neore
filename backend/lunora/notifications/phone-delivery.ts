@@ -89,7 +89,7 @@ export const recordPushDeliveries = internalMutation
     });
 
 export interface PhonePushMessage {
-    /** The account's language, for the placeholder text. */
+    /** The phone's language, for the placeholder text; English when unknown. */
     language?: string;
     notificationId: string;
     /** The chat a tap opens, when the notification is about one. */
@@ -98,7 +98,7 @@ export interface PhonePushMessage {
 }
 
 /**
- * The message for one phone: the same generic alert on both platforms, in the account's language. Nothing about the
+ * The message for one phone: the same generic alert on both platforms, in the phone's language. Nothing about the
  * notification itself leaves us, only its ids in `data`.
  */
 export const phoneMessage = (device: { platform: PhonePlatform; token: string }, message: PhonePushMessage): ExpoMessage => {
@@ -174,7 +174,8 @@ export const deliverToPhones = async (ctx: ActionCtx, userId: string, message: P
             gone.push({ id: device.id, sentAt, sessionId: device.sessionId, userId });
         } else {
             failed += 1;
-            console.warn(`[notifications] Phone push failed (${device.platform}): ${outcome.error ?? outcome.message}`);
+            // The error code only: Expo's message can quote the push token, which stays out of the logs.
+            console.warn(`[notifications] Phone push failed (${device.platform}): ${outcome.error ?? "unknown error"}`);
         }
     }
 

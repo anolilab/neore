@@ -41,8 +41,9 @@ export const pushUrgency = (type: string): "high" | "normal" => (WAITING_ON_A_PE
 
 /**
  * The only text a phone push carries through Expo, Apple and Google: a generic
- * alert, the same for every notification. Worded in the account's language,
- * with the same locales as the web app.
+ * alert, the same for every notification. Worded in the phone's language, with
+ * the same locales as the web app; English while the phone's language is not
+ * known (`userSettings.language` is the language for AI replies, not this).
  */
 const PHONE_PLACEHOLDER_BODIES: Readonly<Record<string, string>> = {
     de: "Du hast eine neue Benachrichtigung",
