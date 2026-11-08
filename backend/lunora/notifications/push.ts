@@ -13,6 +13,7 @@ import { webPushId } from "@lunora/notify";
 import { LunoraError, v } from "lunorash/server";
 
 import { internal } from "../_generated/internal";
+import type { QueryCtx } from "../_generated/server";
 import { internalAction, internalQuery } from "../_generated/server";
 import { isAccountDeletionUnderway } from "../gdpr/deletion-guard";
 import { authMutation, authQuery, rateLimit } from "../lib/crpc";
@@ -161,10 +162,10 @@ export const loadPushNotification = internalQuery
 
         // Queued before its chat was locked, the push still carries the title: redact it as the inbox does.
         const shown = (await linksToLockedThread(ctx.db, notification.link)) ? redactForLockedThread(notification) : notification;
-        const settings = await ctx.db.userSettings.findFirst({ where: { userId: args.userId } });
+        const language = await accountLanguage(ctx.db, args.userId);
 
         return {
-            ...(settings?.language !== undefined && { language: settings.language }),
+            ...(language !== undefined && { language }),
             title: shown.title,
             type: shown.type,
             ...(shown.body !== undefined && { body: shown.body }),
@@ -172,6 +173,19 @@ export const loadPushNotification = internalQuery
             ...(shown.outcome !== undefined && { outcome: shown.outcome }),
         };
     });
+
+/** Only picks the phone placeholder's wording: a failed read falls back to English instead of stopping the push. */
+const accountLanguage = async (db: QueryCtx["db"], userId: string): Promise<string | undefined> => {
+    try {
+        const settings = await db.userSettings.findFirst({ where: { userId } });
+
+        return settings?.language;
+    } catch (error) {
+        console.warn("[notifications] Could not read the account language for a push:", error);
+
+        return undefined;
+    }
+};
 
 /** Push body cap, well inside the 4 KiB a push service accepts after encryption. */
 const PUSH_BODY_MAX = 300;
