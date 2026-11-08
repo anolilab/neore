@@ -62,7 +62,13 @@ const pad = (value: number): string => String(value).padStart(2, "0");
 /** The browser's local calendar day of `date`. */
 export const localDayKey = (date: Date): string => `${String(date.getFullYear())}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 
-const dayFormat = (timeZone: string): Intl.DateTimeFormat => new Intl.DateTimeFormat("en-CA", { day: "2-digit", month: "2-digit", timeZone, year: "numeric" });
+/** `YYYY-MM-DD` from the parts of `date` in `timeZone`, whatever order or separators a locale's format would use. */
+const dayKeyOf = (date: Date, timeZone: string): string => {
+    const parts = new Intl.DateTimeFormat("en-US", { day: "2-digit", month: "2-digit", timeZone, year: "numeric" }).formatToParts(date);
+    const part = (type: Intl.DateTimeFormatPartTypes): string => parts.find((entry) => entry.type === type)?.value ?? "";
+
+    return `${part("year")}-${part("month")}-${part("day")}`;
+};
 
 /**
  * `date`'s calendar day in `timeZone`, the zone the backend dates usage rows in (the user's setting, else UTC). A zone
@@ -70,9 +76,9 @@ const dayFormat = (timeZone: string): Intl.DateTimeFormat => new Intl.DateTimeFo
  */
 export const dayKeyInZone = (date: Date, timeZone: string | null | undefined): string => {
     try {
-        return dayFormat(timeZone || "UTC").format(date);
+        return dayKeyOf(date, timeZone || "UTC");
     } catch {
-        return dayFormat("UTC").format(date);
+        return dayKeyOf(date, "UTC");
     }
 };
 
