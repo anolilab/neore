@@ -143,22 +143,19 @@ const ZoomableImage = ({ alt, className, onError, src }: ZoomableImageProps) => 
         // Wait a bounded number of times, so a click before the first layout still counts and a picture that never
         // gets a size cannot hold the queue forever.
         if (image.offsetWidth === 0 || image.offsetHeight === 0) {
-            // Each timer tick spends one try. Past the budget the queue is dropped, so the picture never gets a size.
-            if (fromTimer) {
-                if (pending.retriesLeft <= 0) {
-                    pending.queue = [];
-
-                    return;
-                }
-
-                pending.timer = setTimeout(flushZoom, LAYOUT_RETRY_MS, null, true);
+            // Each timer tick spends one try. Past the budget the queue is dropped.
+            if (fromTimer && pending.retriesLeft <= 0) {
+                pending.queue = [];
 
                 return;
             }
 
             // A step taken while no wait is running starts a fresh one, with its full budget.
             if (pending.timer === null) {
-                pending.retriesLeft = LAYOUT_RETRIES;
+                if (!fromTimer) {
+                    pending.retriesLeft = LAYOUT_RETRIES;
+                }
+
                 pending.timer = setTimeout(flushZoom, LAYOUT_RETRY_MS, null, true);
             }
 
