@@ -28,6 +28,7 @@ import {
     probeNativeHost,
 } from "@/lib/native/bridge";
 
+import { buildDeviceDiagnostics, routeOf } from "../lib/device-diagnostics";
 import { DEVICE_PAIRED_EVENT } from "../lib/device-events";
 import { isDeviceOnline } from "../lib/device-relay";
 import DeviceScope from "./device-scope";
@@ -143,8 +144,10 @@ export const DeviceRow: FC<{
     now: number;
     onConnectionChange: () => void;
     reconnect?: NativeHostReconnect;
-}> = ({ connected, device, isThisComputer, now, onConnectionChange, reconnect }) => {
-    const { t } = useLingui();
+    /** The name of the paired computer that holds this device, when it is an SSH server. */
+    viaName?: string;
+}> = ({ connected, device, isThisComputer, now, onConnectionChange, reconnect, viaName }) => {
+    const { i18n, t } = useLingui();
 
     /** A failure as the row shows it: the device core's own phrases translated, ssh's text as it came. */
     const failureText = (message: string): string => {
@@ -186,6 +189,39 @@ export const DeviceRow: FC<{
     }
 
     const errorId = `device-error-${device._id}`;
+    const copyDiagnostics = (): void => {
+        // Only what the row shows; its failure is reduced to a category, never copied as it came.
+        const text = buildDeviceDiagnostics(
+            {
+                clientAgent: navigator.userAgent,
+                failure,
+                lastSeenAt: device.lastSeenAt,
+                name: device.name,
+                route: routeOf(device.transport, isThisComputer),
+                viaName,
+            },
+            i18n,
+        );
+        const { clipboard }: { clipboard?: Clipboard } = navigator;
+        const failed = (): void => {
+            toast.error(t`Could not copy to the clipboard`);
+        };
+
+        if (!clipboard) {
+            failed();
+
+            return;
+        }
+
+        clipboard
+            .writeText(text)
+            .then(() => {
+                toast.success(t`Diagnostics copied`);
+
+                return undefined;
+            })
+            .catch(failed);
+    };
     const crpc = useCRPC();
     const [name, setName] = useState(device.name);
     const [confirming, setConfirming] = useState(false);
@@ -269,7 +305,7 @@ export const DeviceRow: FC<{
                     </p>
                 )}
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
                 {isThisComputer && <Badge variant="outline">{t`This computer`}</Badge>}
                 {device.transport === "ssh" && <Badge variant="outline">{t`Server over SSH`}</Badge>}
                 <Badge variant={online ? "default" : "secondary"}>{online ? t`Online` : t`Offline`}</Badge>
@@ -290,6 +326,9 @@ export const DeviceRow: FC<{
                         {t`Dismiss`}
                     </Button>
                 )}
+                <Button aria-label={t`Copy diagnostics for ${device.name}`} onClick={copyDiagnostics} size="sm" variant="outline">
+                    {t`Copy diagnostics`}
+                </Button>
                 <Button onClick={() => setConfirming(true)} size="sm" variant="outline">
                     {t`Remove`}
                 </Button>
@@ -580,6 +619,7 @@ const DevicesSettings: FC = () => {
                                     now={now}
                                     onConnectionChange={refreshNative}
                                     reconnect={native?.hosts?.find((host) => host.deviceId === device._id)?.reconnect}
+                                    viaName={devices.find((other) => other._id === device.viaDeviceId)?.name}
                                 />
                             ))}
                         </ul>
