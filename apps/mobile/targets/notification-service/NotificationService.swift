@@ -130,7 +130,7 @@ enum PushContent {
     private static let grantKey = "neore.mobile.grant"
     private static let lunoraUrlKey = "neore.mobile.lunora-url"
 
-    /// Each request; two of them stay well inside the extension's budget.
+    /// Both requests together, as `PUSH_CONTENT_TIMEOUT_MS` in `push-content.ts`; well inside the extension's budget.
     private static let timeout: TimeInterval = 10
 
     /// The session stored on the phone right now: its token and whose it is. `nil` once signed out
@@ -158,15 +158,16 @@ enum PushContent {
         }
 
         let sessionToken = fetchedFor.token
+        let deadline = Date().addingTimeInterval(timeout)
 
         guard
-            let tokenAnswer = await post(lunoraUrl + "/extension/auth/token", body: ["token": sessionToken], bearer: nil).json,
+            let tokenAnswer = await post(lunoraUrl + "/extension/auth/token", body: ["token": sessionToken], bearer: nil, deadline: deadline).json,
             let jwt = tokenAnswer["token"] as? String
         else {
             return .placeholder
         }
 
-        let answer = await post(lunoraUrl + "/notifications/push-content", body: ["notificationId": notificationId], bearer: jwt)
+        let answer = await post(lunoraUrl + "/notifications/push-content", body: ["notificationId": notificationId], bearer: jwt, deadline: deadline)
 
         // As `push-content.ts`: the notification is not the signed-in account's (it switched since the push went out).
         if answer.status == 404 {
@@ -190,12 +191,14 @@ enum PushContent {
     }
 
     /// The response's status (`nil` when there was no answer) and its JSON body, read only for a 2xx.
-    private static func post(_ url: String, body: [String: String], bearer: String?) async -> (status: Int?, json: [String: Any]?) {
-        guard let endpoint = URL(string: url), endpoint.scheme == "https" || endpoint.host == "localhost" else {
+    private static func post(_ url: String, body: [String: String], bearer: String?, deadline: Date) async -> (status: Int?, json: [String: Any]?) {
+        let remaining = deadline.timeIntervalSinceNow
+
+        guard remaining > 0, let endpoint = URL(string: url), endpoint.scheme == "https" || endpoint.host == "localhost" else {
             return (nil, nil)
         }
 
-        var request = URLRequest(url: endpoint, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: timeout)
+        var request = URLRequest(url: endpoint, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: remaining)
 
         request.httpMethod = "POST"
         request.httpShouldHandleCookies = false
