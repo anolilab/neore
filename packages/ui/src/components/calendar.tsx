@@ -42,7 +42,7 @@ const Calendar = ({
 }: React.ComponentProps<typeof DayPicker> & {
     buttonVariant?: React.ComponentProps<typeof Button>["variant"];
 }) => {
-    const { i18n } = useLingui();
+    const { i18n, t } = useLingui();
     const defaultClassNames = getDefaultClassNames();
 
     return (
@@ -124,9 +124,9 @@ const Calendar = ({
                 // (axe label-content-name-mismatch). "d" keeps the plain number.
                 labelDayButton: (date, modifiers, options, dateLibrary) => {
                     const label = (dateLibrary ?? new DateLib(options)).format(date, "EEEE, MMMM d, yyyy");
-                    const prefixed = modifiers.today ? `Today, ${label}` : label;
+                    const prefixed = modifiers.today ? t`Today, ${label}` : label;
 
-                    return modifiers.selected ? `${prefixed}, selected` : prefixed;
+                    return modifiers.selected ? t`${prefixed}, selected` : prefixed;
                 },
                 ...labels,
             }}

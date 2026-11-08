@@ -46,6 +46,21 @@ const INITIAL_STATE: ZoomState = { eased: false, view: INITIAL_ZOOM_VIEW };
 // animation frame, because frames can stall for a long time when the page is busy or in a background tab.
 const LAYOUT_RETRIES = 300;
 const LAYOUT_RETRY_MS = 16;
+// Steps queued before layout. Continuous input (wheel) can send many; the oldest are dropped past this bound.
+const MAX_PENDING_STEPS = 16;
+
+type ZoomStep = (current: ZoomView, frame: Frame) => ZoomView;
+
+interface PendingStep {
+    isEased: boolean | null;
+    step: ZoomStep;
+}
+
+interface PendingZoom {
+    queue: PendingStep[];
+    retriesLeft: number;
+    timer: ReturnType<typeof setTimeout> | null;
+}
 
 const cursorClass = (isDragging: boolean, isZoomed: boolean): string => {
     if (isDragging) {
@@ -98,33 +113,58 @@ const ZoomableImage = ({ alt, className, onError, src }: ZoomableImageProps) => 
     const dragRef = useRef<DragState | null>(null);
     const hintId = useId();
 
-    // The one way the view changes: measure once, then apply `step` to the latest view.
-    // A functional update, so several wheel events in one frame each build on the last.
-    // Eased only for the discrete steps; continuous input (wheel, pinch, drag) must
-    // track the pointer without lag.
-    // `isEased` null keeps the announcement as it is, for a change that is not a user step (a resize).
-    const apply = useCallback(function applyStep(
-        step: (current: ZoomView, frame: Frame) => ZoomView,
-        isEased: boolean | null = false,
-        retriesLeft = LAYOUT_RETRIES,
-    ) {
+    // Steps taken before the image has layout wait in one queue, flushed in order once it has a size. One timer
+    // serves the whole queue, so continuous input does not start a chain of timers per event.
+    const pendingRef = useRef<PendingZoom>({ queue: [], retriesLeft: 0, timer: null });
+
+    const flush = useCallback(function flushZoom(next: PendingStep | null, fromTimer = false) {
+        const pending = pendingRef.current;
         const surface = surfaceRef.current;
         const image = imageRef.current;
 
-        // Before the image has layout its size is zero, and a cursor-anchored zoom would clamp its pan to nothing.
-        // Retry for a bounded number of times, so a click that lands before the first layout still counts
-        // and a picture that never gets a size cannot loop forever.
-        if (!surface || !image) {
+        if (next) {
+            if (pending.queue.length >= MAX_PENDING_STEPS) {
+                pending.queue.shift();
+            }
+
+            pending.queue.push(next);
+        }
+
+        if (fromTimer) {
+            pending.timer = null;
+            pending.retriesLeft -= 1;
+        }
+
+        if (!surface || !image || pending.queue.length === 0) {
             return;
         }
 
+        // Before the image has layout its size is zero, and a cursor-anchored zoom would clamp its pan to nothing.
+        // Wait a bounded number of times, so a click before the first layout still counts and a picture that never
+        // gets a size cannot hold the queue forever.
         if (image.offsetWidth === 0 || image.offsetHeight === 0) {
-            if (retriesLeft > 0) {
-                setTimeout(applyStep, LAYOUT_RETRY_MS, step, isEased, retriesLeft - 1);
+            if (pending.retriesLeft <= 0) {
+                pending.queue = [];
+
+                return;
+            }
+
+            if (pending.timer === null) {
+                pending.retriesLeft = LAYOUT_RETRIES;
+                pending.timer = setTimeout(flushZoom, LAYOUT_RETRY_MS, null, true);
             }
 
             return;
         }
+
+        if (pending.timer !== null) {
+            clearTimeout(pending.timer);
+            pending.timer = null;
+        }
+
+        const steps = pending.queue;
+
+        pending.queue = [];
 
         // offsetWidth/offsetHeight ignore transforms: the fitted, unscaled size.
         const frame: Frame = {
@@ -132,10 +172,31 @@ const ZoomableImage = ({ alt, className, onError, src }: ZoomableImageProps) => 
             viewport: { height: surface.clientHeight, width: surface.clientWidth },
         };
 
-        setState((current) => {
-            return { eased: isEased ?? current.eased, view: step(current.view, frame) };
-        });
+        setState((current) =>
+            steps.reduce<ZoomState>((state, { isEased, step }) => {
+                return { eased: isEased ?? state.eased, view: step(state.view, frame) };
+            }, current),
+        );
     }, []);
+
+    // The one way the view changes: measure once, then apply `step` to the latest view. A functional update, so several
+    // wheel events in one frame each build on the last. Eased only for the discrete steps; continuous input (wheel,
+    // pinch, drag) must track the pointer without lag. `isEased` null keeps the announcement, for a resize.
+    const apply = useCallback((step: ZoomStep, isEased: boolean | null = false) => flush({ isEased, step }), [flush]);
+
+    // A new image drops the steps that were waiting for the old one.
+    useEffect(
+        () => () => {
+            const pending = pendingRef.current;
+
+            if (pending.timer !== null) {
+                clearTimeout(pending.timer);
+            }
+
+            pendingRef.current = { queue: [], retriesLeft: 0, timer: null };
+        },
+        [src],
+    );
 
     const zoomBy = useCallback((factor: number) => apply((current, frame) => zoomAround(current, current.scale * factor, CENTRE, frame), true), [apply]);
     const reset = useCallback(() => apply(() => INITIAL_ZOOM_VIEW, true), [apply]);

@@ -156,7 +156,10 @@ const OrgSwitcher: FC<OrgSwitcherProps> = ({
         <div className="flex min-w-0 items-center gap-2">
             {/* The name comes from the content, so the visible workspace name is part of it. */}
             <span className="sr-only">{t`Switch workspace: currently`} </span>
-            {triggerAvatar}
+            {/* The avatar's alt text repeats the workspace name, so it stays out of the trigger's name. */}
+            <span aria-hidden="true" className="contents">
+                {triggerAvatar}
+            </span>
             {size === "icon" ? <span className="sr-only">{triggerLabel}</span> : <span className="min-w-0 truncate text-xs font-medium">{triggerLabel}</span>}
             {size === "icon" ? null : <ChevronsUpDown aria-hidden="true" className="ml-auto size-3.5 shrink-0 opacity-40" />}
         </div>

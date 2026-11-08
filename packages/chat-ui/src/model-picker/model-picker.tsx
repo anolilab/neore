@@ -520,6 +520,8 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
     const selectedCount = parallelSelectedIds.size;
     const anchorModeName = anchorMode ? i18n._(getModelModeName(anchorMode)) : "";
 
+    const [favoriteNotice, setFavoriteNotice] = useState("");
+
     // The star button on each row is pointer-only (it cannot live inside the listbox), so the same action is bound to
     // Alt+S on the highlighted row, from the search field.
     const handleActionShortcut = useCallback(
@@ -534,15 +536,22 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
                 return;
             }
 
+            // Announced from its own region: the focus stays on the search field, and the footer's count is a different message.
+            const name = models.find((model) => model.id === modelId)?.name ?? modelId;
+
+            setFavoriteNotice(favoriteSet.has(modelId) ? t`${name} removed from starred` : t`${name} added to starred`);
             onToggleFavorite(modelId);
             event.preventDefault();
             event.stopPropagation();
         },
-        [onToggleFavorite],
+        [favoriteSet, models, onToggleFavorite, t],
     );
 
     return (
         <div ref={pickerRef}>
+            <span aria-live="polite" className="sr-only" role="status">
+                {favoriteNotice}
+            </span>
             <Command filter={() => true} items={groupedItems} onValueChange={setSearchQuery} value={searchQuery}>
                 {/* Anonymous banner */}
                 {isAnonymous ? (

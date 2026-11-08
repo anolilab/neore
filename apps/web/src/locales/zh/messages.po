@@ -1156,6 +1156,10 @@ msgstr "{name} — AI 文本生成模型 | Neore"
 msgid "{name} — AI Video Generation Model | Neore"
 msgstr "{name} — AI 视频生成模型 | Neore"
 
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:542
+msgid "{name} added to starred"
+msgstr ""
+
 #: src/routes/dashboard/settings/connectors/callback.tsx:58
 msgid "{name} connected"
 msgstr "{name} 已连接"
@@ -1193,6 +1197,10 @@ msgstr "{name} 正在回复"
 msgid "{name} paused"
 msgstr "{name} 已暂停"
 
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:542
+msgid "{name} removed from starred"
+msgstr ""
+
 #: src/features/settings/connectors/messenger/messenger-platform-card.tsx:92
 msgid "{name} resumed"
 msgstr "{name} 已恢复"
@@ -1227,6 +1235,10 @@ msgstr "{overflowCount, plural, other {另外 # 位用户}}"
 
 #: ../../packages/ui/src/components/file-renderers/pdf-thumbnail.tsx:116
 msgid "{pages, plural, one {# page} other {# pages}}"
+msgstr ""
+
+#: ../../packages/ui/src/components/calendar.tsx:129
+msgid "{prefixed}, selected"
 msgstr ""
 
 #: src/features/settings/components/chat/api-keys-settings.tsx:495
@@ -1302,7 +1314,7 @@ msgstr "{selectedCount, plural, other {已选择 # 个提示词}}"
 msgid "{selectedCount, plural, one {# thread selected} other {# threads selected}}"
 msgstr "{selectedCount, plural, other {已选中 # 个对话}}"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:773
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:782
 msgid "{selectedCount} of {MAX_PARALLEL} selected"
 msgstr "已选择 {selectedCount}/{MAX_PARALLEL}"
 
@@ -2949,8 +2961,8 @@ msgstr "垂直对齐"
 msgid "Align vertically (V)"
 msgstr "垂直对齐（V）"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:646
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:708
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:655
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:717
 #: src/components/model-picker/model-picker.tsx:1121
 #: src/components/model-picker/model-picker.tsx:1199
 #: src/features/chat/tags/thread-category-filter.tsx:16
@@ -3037,7 +3049,7 @@ msgstr "所有安装包"
 msgid "All MCP servers active"
 msgstr "所有 MCP 服务器已启用"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:592
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:601
 #: src/components/model-picker/model-picker.tsx:1069
 #: src/features/marketing/components/model-detail-page.tsx:165
 msgid "All models"
@@ -3983,7 +3995,7 @@ msgstr "尝试次数：{0}"
 msgid "Auckland"
 msgstr "奥克兰"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:696
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:705
 #: src/components/model-picker/model-picker.tsx:1173
 #: src/features/chat/sidebar/usage-card.tsx:131
 #: src/features/chat/thread/composer.tsx:124
@@ -6197,7 +6209,7 @@ msgstr "点击下方按钮，在你的设备上注册新的通行密钥。"
 msgid "Click the pin icon on any message to save it here."
 msgstr "点击任意消息上的图钉图标即可保存到这里。"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:735
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:744
 msgid "Click the star on any model in All models to add it here."
 msgstr "在“所有模型”中点击任意模型的星标即可将其添加到这里。"
 
@@ -7051,7 +7063,7 @@ msgstr "配置你的应用设置"
 msgid "Configured"
 msgstr "已配置"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:796
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:805
 #: ../../packages/ui/src/components/confirm-dialog.tsx:29
 #: src/components/model-picker/model-picker.tsx:1295
 msgid "Confirm"
@@ -8480,7 +8492,7 @@ msgstr "创建新行"
 msgid "Create one on the Evals page."
 msgstr "请在评测页面中创建一个。"
 
-#: ../../packages/chat-ui/src/org-switcher/org-switcher.tsx:251
+#: ../../packages/chat-ui/src/org-switcher/org-switcher.tsx:254
 msgid "Create organization"
 msgstr "创建组织"
 
@@ -9413,7 +9425,7 @@ msgstr "删除用例 {0}"
 msgid "Delete collection"
 msgstr "删除集合"
 
-#: ../../packages/ui/src/lib/tiptap-table-bubble.tsx:49
+#: ../../packages/ui/src/lib/tiptap-table-bubble.tsx:57
 msgid "Delete column"
 msgstr ""
 
@@ -9506,7 +9518,7 @@ msgstr "删除提示词"
 msgid "Delete reply"
 msgstr "删除回复"
 
-#: ../../packages/ui/src/lib/tiptap-table-bubble.tsx:50
+#: ../../packages/ui/src/lib/tiptap-table-bubble.tsx:58
 msgid "Delete row"
 msgstr ""
 
@@ -9541,7 +9553,7 @@ msgstr "删除所选行"
 msgid "Delete skill?"
 msgstr "删除技能？"
 
-#: ../../packages/ui/src/lib/tiptap-table-bubble.tsx:51
+#: ../../packages/ui/src/lib/tiptap-table-bubble.tsx:59
 msgid "Delete table"
 msgstr ""
 
@@ -13683,11 +13695,11 @@ msgstr "专注视觉叙事和故事品质、制作电影感视频的电影人"
 msgid "Filter by action"
 msgstr "按操作筛选"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:633
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:642
 msgid "Filter by mode"
 msgstr "按模式筛选"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:704
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:713
 msgid "Filter by provider"
 msgstr "按提供商筛选"
 
@@ -15287,7 +15299,7 @@ msgstr "访客账号"
 msgid "Guest accounts use free models only."
 msgstr "访客账号只能使用免费模型。"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:552
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:561
 msgid "Guest accounts use free models only. Sign up to unlock all models."
 msgstr "访客账号仅可使用免费模型。注册即可解锁所有模型。"
 
@@ -15950,7 +15962,7 @@ msgstr "插画"
 
 #: ../../packages/chat-ui/src/chat/document-artifact.tsx:42
 #: ../../packages/chat-ui/src/chat/message-content.tsx:415
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:670
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:679
 #: ../../packages/ui/src/components/ai-elements/attachments-utilities.tsx:47
 #: ../../packages/ui/src/components/ai-elements/attachments.tsx:107
 #: ../../packages/ui/src/components/ai-elements/attachments.tsx:109
@@ -16551,11 +16563,11 @@ msgstr "输入："
 msgid "Insert a saved prompt"
 msgstr "插入已保存的提示词"
 
-#: ../../packages/ui/src/lib/tiptap-table-bubble.tsx:45
+#: ../../packages/ui/src/lib/tiptap-table-bubble.tsx:53
 msgid "Insert column after"
 msgstr ""
 
-#: ../../packages/ui/src/lib/tiptap-table-bubble.tsx:46
+#: ../../packages/ui/src/lib/tiptap-table-bubble.tsx:54
 msgid "Insert column before"
 msgstr ""
 
@@ -16563,12 +16575,12 @@ msgstr ""
 msgid "Insert Prompt"
 msgstr "插入提示词"
 
-#: ../../packages/ui/src/lib/tiptap-table-bubble.tsx:48
+#: ../../packages/ui/src/lib/tiptap-table-bubble.tsx:56
 msgid "Insert row above"
 msgstr ""
 
 #: ../../packages/ui/src/components/data-grid/data-grid-keyboard-shortcuts.tsx:190
-#: ../../packages/ui/src/lib/tiptap-table-bubble.tsx:47
+#: ../../packages/ui/src/lib/tiptap-table-bubble.tsx:55
 msgid "Insert row below"
 msgstr "在下方插入行"
 
@@ -18365,7 +18377,7 @@ msgstr ""
 msgid "Locked to {0} models"
 msgstr "已锁定为{0}模型"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:778
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:787
 msgid "Locked to {anchorModeName} models"
 msgstr "已锁定为 {anchorModeName} 模型"
 
@@ -18870,7 +18882,7 @@ msgstr "最大大小：{size}"
 msgid "Max size: {size} • Max {maxFiles} files"
 msgstr "最大大小：{size} • 最多 {maxFiles} 个文件"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:773
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:782
 #: src/components/model-picker/model-picker.tsx:1272
 msgid "Maximum {MAX_PARALLEL} models reached"
 msgstr "已达到 {MAX_PARALLEL} 个模型的上限"
@@ -19119,7 +19131,7 @@ msgstr "菜单"
 msgid "Merge"
 msgstr ""
 
-#: ../../packages/ui/src/lib/tiptap-table-bubble.tsx:52
+#: ../../packages/ui/src/lib/tiptap-table-bubble.tsx:60
 msgid "Merge cells"
 msgstr ""
 
@@ -19595,7 +19607,7 @@ msgstr "模型限制"
 msgid "Model server"
 msgstr "模型服务器"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:561
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:570
 msgid "Model tabs"
 msgstr "模型标签页"
 
@@ -21073,7 +21085,7 @@ msgstr "没有可用的模型"
 msgid "No models found matching your filters."
 msgstr "未找到符合筛选条件的模型。"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:740
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:749
 #: src/components/model-picker/model-picker.tsx:1237
 msgid "No models found."
 msgstr "未找到模型。"
@@ -21291,7 +21303,7 @@ msgstr "未应用排序"
 msgid "No speech detected. Hands-free mode stopped."
 msgstr "未检测到语音。免提模式已停止。"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:733
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:742
 #: src/components/model-picker/model-picker.tsx:1230
 msgid "No starred models"
 msgstr "没有星标模型"
@@ -22267,7 +22279,7 @@ msgstr "打开运行对话"
 msgid "Open search"
 msgstr "打开搜索"
 
-#: ../../packages/chat-ui/src/org-switcher/org-switcher.tsx:200
+#: ../../packages/chat-ui/src/org-switcher/org-switcher.tsx:203
 msgid "Open settings"
 msgstr "打开设置"
 
@@ -23163,7 +23175,7 @@ msgstr ""
 msgid "Paraguay"
 msgstr "巴拉圭"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:624
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:633
 #: src/components/model-picker/model-picker.tsx:1099
 msgid "Parallel"
 msgstr "并行"
@@ -23534,7 +23546,7 @@ msgid "persona"
 msgstr ""
 
 #: ../../packages/chat-ui/src/org-switcher/org-switcher.tsx:112
-#: ../../packages/chat-ui/src/org-switcher/org-switcher.tsx:225
+#: ../../packages/chat-ui/src/org-switcher/org-switcher.tsx:228
 msgid "Personal"
 msgstr "个人"
 
@@ -26355,7 +26367,7 @@ msgstr "恢复默认"
 msgid "Reset to Defaults"
 msgstr "恢复默认"
 
-#: ../../packages/ui/src/components/zoomable-image.tsx:328
+#: ../../packages/ui/src/components/zoomable-image.tsx:389
 msgid "Reset zoom"
 msgstr ""
 
@@ -27438,7 +27450,7 @@ msgstr ""
 msgid "Search models by name, ID, or provider..."
 msgstr "按名称、ID 或提供商搜索模型..."
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:557
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:566
 #: src/components/model-picker/model-picker.tsx:1039
 msgid "Search models..."
 msgstr "搜索模型..."
@@ -27881,7 +27893,7 @@ msgstr ""
 msgid "Selection context"
 msgstr "选区上下文"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:599
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:608
 msgid "Selection mode"
 msgstr "选择模式"
 
@@ -28181,7 +28193,7 @@ msgstr ""
 msgid "Set up triggers to automate tasks on a schedule, via webhooks, or in response to events."
 msgstr "设置触发器，按计划、通过 Webhook 或响应事件来自动执行任务。"
 
-#: ../../packages/chat-ui/src/org-switcher/org-switcher.tsx:257
+#: ../../packages/chat-ui/src/org-switcher/org-switcher.tsx:260
 #: src/components/settings/settings-modal.tsx:404
 #: src/components/settings/settings-modal.tsx:502
 #: src/features/layout/components/mobile-section-nav.tsx:59
@@ -28730,7 +28742,7 @@ msgstr "已被替换"
 msgid "Singapore"
 msgstr "新加坡"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:611
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:620
 #: src/components/model-picker/model-picker.tsx:1087
 msgid "Single"
 msgstr "单个"
@@ -29372,7 +29384,7 @@ msgstr "支出"
 msgid "Spent {0} of a {1} cap."
 msgstr "已花费 {0}，上限为 {1}。"
 
-#: ../../packages/ui/src/lib/tiptap-table-bubble.tsx:53
+#: ../../packages/ui/src/lib/tiptap-table-bubble.tsx:61
 msgid "Split cell"
 msgstr ""
 
@@ -29489,7 +29501,7 @@ msgstr ""
 msgid "starred"
 msgstr ""
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:576
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:585
 #: src/components/model-picker/model-picker.tsx:1056
 msgid "Starred"
 msgstr "星标"
@@ -30653,7 +30665,7 @@ msgstr "系统提示词"
 msgid "System UI"
 msgstr ""
 
-#: ../../packages/ui/src/components/zoomable-image.tsx:320
+#: ../../packages/ui/src/components/zoomable-image.tsx:381
 msgid "Tab to the zoom buttons, then plus and minus zoom, zero resets, and arrow keys pan when zoomed. Double-click or scroll to zoom, drag to pan."
 msgstr ""
 
@@ -30662,7 +30674,7 @@ msgstr ""
 #: ../../packages/ui/src/components/file-renderers/delimited-text-preview.tsx:50
 #: ../../packages/ui/src/components/file-renderers/delimited-text-preview.tsx:67
 #: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:344
-#: ../../packages/ui/src/lib/tiptap-table-bubble.tsx:63
+#: ../../packages/ui/src/lib/tiptap-table-bubble.tsx:71
 msgid "Table"
 msgstr ""
 
@@ -31067,7 +31079,7 @@ msgstr "测试"
 msgid "text"
 msgstr "文本"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:658
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:667
 #: ../../packages/ui/src/components/canvas-editor/canvas-element-palette.tsx:317
 #: ../../packages/ui/src/components/canvas-editor/canvas-property-panel.tsx:351
 #: src/components/model-picker/model-picker.tsx:1134
@@ -32810,6 +32822,10 @@ msgstr "待办"
 msgid "Today"
 msgstr "今天"
 
+#: ../../packages/ui/src/components/calendar.tsx:127
+msgid "Today, {label}"
+msgstr ""
+
 #: src/features/settings/lib/settings-keywords.ts:44
 #: src/features/settings/lib/settings-keywords.ts:45
 msgid "toggle"
@@ -33460,7 +33476,7 @@ msgid "Two-factor authentication is currently enabled for your account. This add
 msgstr "你的账号当前已启用双重验证，为账号增加了一层额外的安全保护。"
 
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:125
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:635
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:644
 #: src/components/model-picker/model-picker.tsx:1110
 #: src/features/devices/components/device-tool-call.tsx:119
 msgid "Type"
@@ -34772,7 +34788,7 @@ msgstr "单次生成成本极低"
 msgid "video"
 msgstr "视频"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:682
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:691
 #: src/components/model-picker/model-picker.tsx:1160
 #: src/features/chat/sidebar/usage-card.tsx:130
 #: src/features/chat/thread/composer.tsx:123
@@ -36570,7 +36586,7 @@ msgid "ZIP archive"
 msgstr "ZIP 压缩包"
 
 #: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:141
-#: ../../packages/ui/src/components/zoomable-image.tsx:331
+#: ../../packages/ui/src/components/zoomable-image.tsx:392
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:284
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:290
 #: src/features/workflow/hooks/use-canvas-aria-labels.ts:25
@@ -36587,7 +36603,7 @@ msgid "Zoom Lens"
 msgstr "变焦镜头"
 
 #: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:131
-#: ../../packages/ui/src/components/zoomable-image.tsx:325
+#: ../../packages/ui/src/components/zoomable-image.tsx:386
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:250
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:256
 #: src/features/workflow/hooks/use-canvas-aria-labels.ts:26
@@ -36599,7 +36615,7 @@ msgstr "缩小"
 msgid "Zoom Out"
 msgstr "缩小"
 
-#: ../../packages/ui/src/components/zoomable-image.tsx:286
+#: ../../packages/ui/src/components/zoomable-image.tsx:347
 msgid "Zoomable image"
 msgstr ""
 

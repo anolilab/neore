@@ -1156,6 +1156,10 @@ msgstr "{name} — AI テキスト生成モデル | Neore"
 msgid "{name} — AI Video Generation Model | Neore"
 msgstr "{name} — AI 動画生成モデル | Neore"
 
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:542
+msgid "{name} added to starred"
+msgstr ""
+
 #: src/routes/dashboard/settings/connectors/callback.tsx:58
 msgid "{name} connected"
 msgstr "{name} を接続しました"
@@ -1193,6 +1197,10 @@ msgstr "{name} が応答中です"
 msgid "{name} paused"
 msgstr "{name} を一時停止しました"
 
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:542
+msgid "{name} removed from starred"
+msgstr ""
+
 #: src/features/settings/connectors/messenger/messenger-platform-card.tsx:92
 msgid "{name} resumed"
 msgstr "{name} を再開しました"
@@ -1227,6 +1235,10 @@ msgstr "{overflowCount, plural, other {ほか # 人のユーザー}}"
 
 #: ../../packages/ui/src/components/file-renderers/pdf-thumbnail.tsx:116
 msgid "{pages, plural, one {# page} other {# pages}}"
+msgstr ""
+
+#: ../../packages/ui/src/components/calendar.tsx:129
+msgid "{prefixed}, selected"
 msgstr ""
 
 #: src/features/settings/components/chat/api-keys-settings.tsx:495
@@ -1302,7 +1314,7 @@ msgstr "{selectedCount, plural, other {# 件のプロンプトを選択中}}"
 msgid "{selectedCount, plural, one {# thread selected} other {# threads selected}}"
 msgstr "{selectedCount, plural, other {# 件のスレッドを選択中}}"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:773
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:782
 msgid "{selectedCount} of {MAX_PARALLEL} selected"
 msgstr "{MAX_PARALLEL} 個中 {selectedCount} 個を選択中"
 
@@ -2949,8 +2961,8 @@ msgstr "垂直方向に整列"
 msgid "Align vertically (V)"
 msgstr "垂直方向に整列（V）"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:646
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:708
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:655
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:717
 #: src/components/model-picker/model-picker.tsx:1121
 #: src/components/model-picker/model-picker.tsx:1199
 #: src/features/chat/tags/thread-category-filter.tsx:16
@@ -3037,7 +3049,7 @@ msgstr "すべてのインストーラー"
 msgid "All MCP servers active"
 msgstr "すべての MCP サーバーが有効"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:592
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:601
 #: src/components/model-picker/model-picker.tsx:1069
 #: src/features/marketing/components/model-detail-page.tsx:165
 msgid "All models"
@@ -3983,7 +3995,7 @@ msgstr "試行回数：{0}"
 msgid "Auckland"
 msgstr "オークランド"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:696
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:705
 #: src/components/model-picker/model-picker.tsx:1173
 #: src/features/chat/sidebar/usage-card.tsx:131
 #: src/features/chat/thread/composer.tsx:124
@@ -6197,7 +6209,7 @@ msgstr "下のボタンをクリックして、お使いのデバイスで新し
 msgid "Click the pin icon on any message to save it here."
 msgstr "メッセージのピンアイコンをクリックすると、ここに保存されます。"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:735
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:744
 msgid "Click the star on any model in All models to add it here."
 msgstr "「すべてのモデル」で任意のモデルの星をクリックすると、ここに追加されます。"
 
@@ -7051,7 +7063,7 @@ msgstr "アプリケーションの設定を構成します"
 msgid "Configured"
 msgstr "設定済み"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:796
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:805
 #: ../../packages/ui/src/components/confirm-dialog.tsx:29
 #: src/components/model-picker/model-picker.tsx:1295
 msgid "Confirm"
@@ -8480,7 +8492,7 @@ msgstr "新しい行を作成"
 msgid "Create one on the Evals page."
 msgstr "評価ページで作成してください。"
 
-#: ../../packages/chat-ui/src/org-switcher/org-switcher.tsx:251
+#: ../../packages/chat-ui/src/org-switcher/org-switcher.tsx:254
 msgid "Create organization"
 msgstr "組織を作成"
 
@@ -9413,7 +9425,7 @@ msgstr "ケース {0} を削除"
 msgid "Delete collection"
 msgstr "コレクションを削除"
 
-#: ../../packages/ui/src/lib/tiptap-table-bubble.tsx:49
+#: ../../packages/ui/src/lib/tiptap-table-bubble.tsx:57
 msgid "Delete column"
 msgstr ""
 
@@ -9506,7 +9518,7 @@ msgstr "プロンプトを削除"
 msgid "Delete reply"
 msgstr "返信を削除"
 
-#: ../../packages/ui/src/lib/tiptap-table-bubble.tsx:50
+#: ../../packages/ui/src/lib/tiptap-table-bubble.tsx:58
 msgid "Delete row"
 msgstr ""
 
@@ -9541,7 +9553,7 @@ msgstr "選択した行を削除"
 msgid "Delete skill?"
 msgstr "スキルを削除しますか？"
 
-#: ../../packages/ui/src/lib/tiptap-table-bubble.tsx:51
+#: ../../packages/ui/src/lib/tiptap-table-bubble.tsx:59
 msgid "Delete table"
 msgstr ""
 
@@ -13683,11 +13695,11 @@ msgstr "映像による物語とストーリーテリングの質を重視した
 msgid "Filter by action"
 msgstr "操作で絞り込み"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:633
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:642
 msgid "Filter by mode"
 msgstr "モードで絞り込み"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:704
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:713
 msgid "Filter by provider"
 msgstr "プロバイダーで絞り込み"
 
@@ -15287,7 +15299,7 @@ msgstr "ゲストアカウント"
 msgid "Guest accounts use free models only."
 msgstr "ゲストアカウントでは無料モデルのみ利用できます。"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:552
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:561
 msgid "Guest accounts use free models only. Sign up to unlock all models."
 msgstr "ゲストアカウントでは無料モデルのみ使用できます。サインアップするとすべてのモデルが利用できます。"
 
@@ -15950,7 +15962,7 @@ msgstr "イラスト"
 
 #: ../../packages/chat-ui/src/chat/document-artifact.tsx:42
 #: ../../packages/chat-ui/src/chat/message-content.tsx:415
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:670
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:679
 #: ../../packages/ui/src/components/ai-elements/attachments-utilities.tsx:47
 #: ../../packages/ui/src/components/ai-elements/attachments.tsx:107
 #: ../../packages/ui/src/components/ai-elements/attachments.tsx:109
@@ -16551,11 +16563,11 @@ msgstr "入力:"
 msgid "Insert a saved prompt"
 msgstr "保存したプロンプトを挿入"
 
-#: ../../packages/ui/src/lib/tiptap-table-bubble.tsx:45
+#: ../../packages/ui/src/lib/tiptap-table-bubble.tsx:53
 msgid "Insert column after"
 msgstr ""
 
-#: ../../packages/ui/src/lib/tiptap-table-bubble.tsx:46
+#: ../../packages/ui/src/lib/tiptap-table-bubble.tsx:54
 msgid "Insert column before"
 msgstr ""
 
@@ -16563,12 +16575,12 @@ msgstr ""
 msgid "Insert Prompt"
 msgstr "プロンプトを挿入"
 
-#: ../../packages/ui/src/lib/tiptap-table-bubble.tsx:48
+#: ../../packages/ui/src/lib/tiptap-table-bubble.tsx:56
 msgid "Insert row above"
 msgstr ""
 
 #: ../../packages/ui/src/components/data-grid/data-grid-keyboard-shortcuts.tsx:190
-#: ../../packages/ui/src/lib/tiptap-table-bubble.tsx:47
+#: ../../packages/ui/src/lib/tiptap-table-bubble.tsx:55
 msgid "Insert row below"
 msgstr "下に行を挿入"
 
@@ -18365,7 +18377,7 @@ msgstr ""
 msgid "Locked to {0} models"
 msgstr "{0}モデルに固定"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:778
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:787
 msgid "Locked to {anchorModeName} models"
 msgstr "{anchorModeName} モデルに固定"
 
@@ -18870,7 +18882,7 @@ msgstr "最大サイズ: {size}"
 msgid "Max size: {size} • Max {maxFiles} files"
 msgstr "最大サイズ: {size} • 最大 {maxFiles} ファイル"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:773
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:782
 #: src/components/model-picker/model-picker.tsx:1272
 msgid "Maximum {MAX_PARALLEL} models reached"
 msgstr "モデルは最大 {MAX_PARALLEL} 個までです"
@@ -19119,7 +19131,7 @@ msgstr "メニュー"
 msgid "Merge"
 msgstr ""
 
-#: ../../packages/ui/src/lib/tiptap-table-bubble.tsx:52
+#: ../../packages/ui/src/lib/tiptap-table-bubble.tsx:60
 msgid "Merge cells"
 msgstr ""
 
@@ -19595,7 +19607,7 @@ msgstr "モデルの制限"
 msgid "Model server"
 msgstr "モデルサーバー"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:561
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:570
 msgid "Model tabs"
 msgstr "モデルタブ"
 
@@ -21073,7 +21085,7 @@ msgstr "利用可能なモデルがありません"
 msgid "No models found matching your filters."
 msgstr "フィルターに一致するモデルが見つかりません。"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:740
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:749
 #: src/components/model-picker/model-picker.tsx:1237
 msgid "No models found."
 msgstr "モデルが見つかりません。"
@@ -21291,7 +21303,7 @@ msgstr "並べ替えは適用されていません"
 msgid "No speech detected. Hands-free mode stopped."
 msgstr "音声が検出されませんでした。ハンズフリーモードを停止しました。"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:733
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:742
 #: src/components/model-picker/model-picker.tsx:1230
 msgid "No starred models"
 msgstr "スター付きのモデルはありません"
@@ -22267,7 +22279,7 @@ msgstr "実行のスレッドを開く"
 msgid "Open search"
 msgstr "検索を開く"
 
-#: ../../packages/chat-ui/src/org-switcher/org-switcher.tsx:200
+#: ../../packages/chat-ui/src/org-switcher/org-switcher.tsx:203
 msgid "Open settings"
 msgstr "設定を開く"
 
@@ -23163,7 +23175,7 @@ msgstr ""
 msgid "Paraguay"
 msgstr "パラグアイ"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:624
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:633
 #: src/components/model-picker/model-picker.tsx:1099
 msgid "Parallel"
 msgstr "並列"
@@ -23534,7 +23546,7 @@ msgid "persona"
 msgstr ""
 
 #: ../../packages/chat-ui/src/org-switcher/org-switcher.tsx:112
-#: ../../packages/chat-ui/src/org-switcher/org-switcher.tsx:225
+#: ../../packages/chat-ui/src/org-switcher/org-switcher.tsx:228
 msgid "Personal"
 msgstr "個人"
 
@@ -26355,7 +26367,7 @@ msgstr "デフォルトに戻す"
 msgid "Reset to Defaults"
 msgstr "既定に戻す"
 
-#: ../../packages/ui/src/components/zoomable-image.tsx:328
+#: ../../packages/ui/src/components/zoomable-image.tsx:389
 msgid "Reset zoom"
 msgstr ""
 
@@ -27438,7 +27450,7 @@ msgstr ""
 msgid "Search models by name, ID, or provider..."
 msgstr "名前、ID、プロバイダーでモデルを検索..."
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:557
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:566
 #: src/components/model-picker/model-picker.tsx:1039
 msgid "Search models..."
 msgstr "モデルを検索..."
@@ -27881,7 +27893,7 @@ msgstr ""
 msgid "Selection context"
 msgstr "選択範囲のコンテキスト"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:599
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:608
 msgid "Selection mode"
 msgstr "選択モード"
 
@@ -28181,7 +28193,7 @@ msgstr ""
 msgid "Set up triggers to automate tasks on a schedule, via webhooks, or in response to events."
 msgstr "トリガーを設定して、スケジュール、Webhook、またはイベントに応じてタスクを自動化しましょう。"
 
-#: ../../packages/chat-ui/src/org-switcher/org-switcher.tsx:257
+#: ../../packages/chat-ui/src/org-switcher/org-switcher.tsx:260
 #: src/components/settings/settings-modal.tsx:404
 #: src/components/settings/settings-modal.tsx:502
 #: src/features/layout/components/mobile-section-nav.tsx:59
@@ -28730,7 +28742,7 @@ msgstr "置き換え済み"
 msgid "Singapore"
 msgstr "シンガポール"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:611
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:620
 #: src/components/model-picker/model-picker.tsx:1087
 msgid "Single"
 msgstr "単一"
@@ -29372,7 +29384,7 @@ msgstr "支出"
 msgid "Spent {0} of a {1} cap."
 msgstr "上限 {1} のうち {0} を使用しました。"
 
-#: ../../packages/ui/src/lib/tiptap-table-bubble.tsx:53
+#: ../../packages/ui/src/lib/tiptap-table-bubble.tsx:61
 msgid "Split cell"
 msgstr ""
 
@@ -29489,7 +29501,7 @@ msgstr ""
 msgid "starred"
 msgstr ""
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:576
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:585
 #: src/components/model-picker/model-picker.tsx:1056
 msgid "Starred"
 msgstr "スター付き"
@@ -30653,7 +30665,7 @@ msgstr "システムプロンプト"
 msgid "System UI"
 msgstr ""
 
-#: ../../packages/ui/src/components/zoomable-image.tsx:320
+#: ../../packages/ui/src/components/zoomable-image.tsx:381
 msgid "Tab to the zoom buttons, then plus and minus zoom, zero resets, and arrow keys pan when zoomed. Double-click or scroll to zoom, drag to pan."
 msgstr ""
 
@@ -30662,7 +30674,7 @@ msgstr ""
 #: ../../packages/ui/src/components/file-renderers/delimited-text-preview.tsx:50
 #: ../../packages/ui/src/components/file-renderers/delimited-text-preview.tsx:67
 #: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:344
-#: ../../packages/ui/src/lib/tiptap-table-bubble.tsx:63
+#: ../../packages/ui/src/lib/tiptap-table-bubble.tsx:71
 msgid "Table"
 msgstr ""
 
@@ -31067,7 +31079,7 @@ msgstr "テスト"
 msgid "text"
 msgstr "テキスト"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:658
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:667
 #: ../../packages/ui/src/components/canvas-editor/canvas-element-palette.tsx:317
 #: ../../packages/ui/src/components/canvas-editor/canvas-property-panel.tsx:351
 #: src/components/model-picker/model-picker.tsx:1134
@@ -32810,6 +32822,10 @@ msgstr "未着手"
 msgid "Today"
 msgstr "今日"
 
+#: ../../packages/ui/src/components/calendar.tsx:127
+msgid "Today, {label}"
+msgstr ""
+
 #: src/features/settings/lib/settings-keywords.ts:44
 #: src/features/settings/lib/settings-keywords.ts:45
 msgid "toggle"
@@ -33460,7 +33476,7 @@ msgid "Two-factor authentication is currently enabled for your account. This add
 msgstr "お使いのアカウントでは現在、二要素認証が有効になっています。これによりセキュリティが強化されます。"
 
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:125
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:635
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:644
 #: src/components/model-picker/model-picker.tsx:1110
 #: src/features/devices/components/device-tool-call.tsx:119
 msgid "Type"
@@ -34772,7 +34788,7 @@ msgstr "生成あたりの非常に低いコスト"
 msgid "video"
 msgstr "動画"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:682
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:691
 #: src/components/model-picker/model-picker.tsx:1160
 #: src/features/chat/sidebar/usage-card.tsx:130
 #: src/features/chat/thread/composer.tsx:123
@@ -36570,7 +36586,7 @@ msgid "ZIP archive"
 msgstr "ZIP アーカイブ"
 
 #: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:141
-#: ../../packages/ui/src/components/zoomable-image.tsx:331
+#: ../../packages/ui/src/components/zoomable-image.tsx:392
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:284
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:290
 #: src/features/workflow/hooks/use-canvas-aria-labels.ts:25
@@ -36587,7 +36603,7 @@ msgid "Zoom Lens"
 msgstr "ズームレンズ"
 
 #: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:131
-#: ../../packages/ui/src/components/zoomable-image.tsx:325
+#: ../../packages/ui/src/components/zoomable-image.tsx:386
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:250
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:256
 #: src/features/workflow/hooks/use-canvas-aria-labels.ts:26
@@ -36599,7 +36615,7 @@ msgstr "縮小"
 msgid "Zoom Out"
 msgstr "縮小"
 
-#: ../../packages/ui/src/components/zoomable-image.tsx:286
+#: ../../packages/ui/src/components/zoomable-image.tsx:347
 msgid "Zoomable image"
 msgstr ""
 

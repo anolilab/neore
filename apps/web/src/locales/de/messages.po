@@ -1156,6 +1156,10 @@ msgstr "{name} — KI-Modell zur Textgenerierung | Neore"
 msgid "{name} — AI Video Generation Model | Neore"
 msgstr "{name} — KI-Modell zur Videogenerierung | Neore"
 
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:542
+msgid "{name} added to starred"
+msgstr ""
+
 #: src/routes/dashboard/settings/connectors/callback.tsx:58
 msgid "{name} connected"
 msgstr "{name} verbunden"
@@ -1193,6 +1197,10 @@ msgstr "{name} antwortet"
 msgid "{name} paused"
 msgstr "{name} pausiert"
 
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:542
+msgid "{name} removed from starred"
+msgstr ""
+
 #: src/features/settings/connectors/messenger/messenger-platform-card.tsx:92
 msgid "{name} resumed"
 msgstr "{name} fortgesetzt"
@@ -1227,6 +1235,10 @@ msgstr "{overflowCount, plural, one {# weiterer Benutzer} other {# weitere Benut
 
 #: ../../packages/ui/src/components/file-renderers/pdf-thumbnail.tsx:116
 msgid "{pages, plural, one {# page} other {# pages}}"
+msgstr ""
+
+#: ../../packages/ui/src/components/calendar.tsx:129
+msgid "{prefixed}, selected"
 msgstr ""
 
 #: src/features/settings/components/chat/api-keys-settings.tsx:495
@@ -1302,7 +1314,7 @@ msgstr "{selectedCount, plural, one {# Prompt ausgewählt} other {# Prompts ausg
 msgid "{selectedCount, plural, one {# thread selected} other {# threads selected}}"
 msgstr "{selectedCount, plural, one {# Thread ausgewählt} other {# Threads ausgewählt}}"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:773
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:782
 msgid "{selectedCount} of {MAX_PARALLEL} selected"
 msgstr "{selectedCount} von {MAX_PARALLEL} ausgewählt"
 
@@ -2949,8 +2961,8 @@ msgstr "Vertikal ausrichten"
 msgid "Align vertically (V)"
 msgstr "Vertikal ausrichten (V)"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:646
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:708
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:655
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:717
 #: src/components/model-picker/model-picker.tsx:1121
 #: src/components/model-picker/model-picker.tsx:1199
 #: src/features/chat/tags/thread-category-filter.tsx:16
@@ -3037,7 +3049,7 @@ msgstr "Alle Installationsprogramme"
 msgid "All MCP servers active"
 msgstr "Alle MCP-Server aktiv"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:592
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:601
 #: src/components/model-picker/model-picker.tsx:1069
 #: src/features/marketing/components/model-detail-page.tsx:165
 msgid "All models"
@@ -3983,7 +3995,7 @@ msgstr "Versuche: {0}"
 msgid "Auckland"
 msgstr "Auckland"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:696
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:705
 #: src/components/model-picker/model-picker.tsx:1173
 #: src/features/chat/sidebar/usage-card.tsx:131
 #: src/features/chat/thread/composer.tsx:124
@@ -6197,7 +6209,7 @@ msgstr "Klicke auf die Schaltfläche unten, um einen neuen Passkey mit deinem Ge
 msgid "Click the pin icon on any message to save it here."
 msgstr "Klicke auf das Pin-Symbol bei einer Nachricht, um sie hier zu speichern."
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:735
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:744
 msgid "Click the star on any model in All models to add it here."
 msgstr "Klicke bei einem beliebigen Modell unter Alle Modelle auf den Stern, um es hier hinzuzufügen."
 
@@ -7051,7 +7063,7 @@ msgstr "Anwendungseinstellungen konfigurieren"
 msgid "Configured"
 msgstr "Konfiguriert"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:796
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:805
 #: ../../packages/ui/src/components/confirm-dialog.tsx:29
 #: src/components/model-picker/model-picker.tsx:1295
 msgid "Confirm"
@@ -8480,7 +8492,7 @@ msgstr "Neue Zeilen erstellen"
 msgid "Create one on the Evals page."
 msgstr "Erstelle einen auf der Evals-Seite."
 
-#: ../../packages/chat-ui/src/org-switcher/org-switcher.tsx:251
+#: ../../packages/chat-ui/src/org-switcher/org-switcher.tsx:254
 msgid "Create organization"
 msgstr "Organisation erstellen"
 
@@ -9413,7 +9425,7 @@ msgstr "Testfall {0} löschen"
 msgid "Delete collection"
 msgstr "Sammlung löschen"
 
-#: ../../packages/ui/src/lib/tiptap-table-bubble.tsx:49
+#: ../../packages/ui/src/lib/tiptap-table-bubble.tsx:57
 msgid "Delete column"
 msgstr ""
 
@@ -9506,7 +9518,7 @@ msgstr "Prompts löschen"
 msgid "Delete reply"
 msgstr "Antwort löschen"
 
-#: ../../packages/ui/src/lib/tiptap-table-bubble.tsx:50
+#: ../../packages/ui/src/lib/tiptap-table-bubble.tsx:58
 msgid "Delete row"
 msgstr ""
 
@@ -9541,7 +9553,7 @@ msgstr "Ausgewählte Zeilen löschen"
 msgid "Delete skill?"
 msgstr "Skill löschen?"
 
-#: ../../packages/ui/src/lib/tiptap-table-bubble.tsx:51
+#: ../../packages/ui/src/lib/tiptap-table-bubble.tsx:59
 msgid "Delete table"
 msgstr ""
 
@@ -13683,11 +13695,11 @@ msgstr "Filmemacher, die filmische Videos mit starkem Fokus auf visuelle Erzähl
 msgid "Filter by action"
 msgstr "Nach Aktion filtern"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:633
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:642
 msgid "Filter by mode"
 msgstr "Nach Modus filtern"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:704
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:713
 msgid "Filter by provider"
 msgstr "Nach Anbieter filtern"
 
@@ -15287,7 +15299,7 @@ msgstr "Gastkonten"
 msgid "Guest accounts use free models only."
 msgstr "Gastkonten verwenden nur kostenlose Modelle."
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:552
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:561
 msgid "Guest accounts use free models only. Sign up to unlock all models."
 msgstr "Gastkonten nutzen nur kostenlose Modelle. Registriere dich, um alle Modelle freizuschalten."
 
@@ -15950,7 +15962,7 @@ msgstr "Illustration"
 
 #: ../../packages/chat-ui/src/chat/document-artifact.tsx:42
 #: ../../packages/chat-ui/src/chat/message-content.tsx:415
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:670
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:679
 #: ../../packages/ui/src/components/ai-elements/attachments-utilities.tsx:47
 #: ../../packages/ui/src/components/ai-elements/attachments.tsx:107
 #: ../../packages/ui/src/components/ai-elements/attachments.tsx:109
@@ -16551,11 +16563,11 @@ msgstr "Eingabe:"
 msgid "Insert a saved prompt"
 msgstr "Gespeicherten Prompt einfügen"
 
-#: ../../packages/ui/src/lib/tiptap-table-bubble.tsx:45
+#: ../../packages/ui/src/lib/tiptap-table-bubble.tsx:53
 msgid "Insert column after"
 msgstr ""
 
-#: ../../packages/ui/src/lib/tiptap-table-bubble.tsx:46
+#: ../../packages/ui/src/lib/tiptap-table-bubble.tsx:54
 msgid "Insert column before"
 msgstr ""
 
@@ -16563,12 +16575,12 @@ msgstr ""
 msgid "Insert Prompt"
 msgstr "Prompt einfügen"
 
-#: ../../packages/ui/src/lib/tiptap-table-bubble.tsx:48
+#: ../../packages/ui/src/lib/tiptap-table-bubble.tsx:56
 msgid "Insert row above"
 msgstr ""
 
 #: ../../packages/ui/src/components/data-grid/data-grid-keyboard-shortcuts.tsx:190
-#: ../../packages/ui/src/lib/tiptap-table-bubble.tsx:47
+#: ../../packages/ui/src/lib/tiptap-table-bubble.tsx:55
 msgid "Insert row below"
 msgstr "Zeile darunter einfügen"
 
@@ -18365,7 +18377,7 @@ msgstr ""
 msgid "Locked to {0} models"
 msgstr "Auf {0}-Modelle beschränkt"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:778
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:787
 msgid "Locked to {anchorModeName} models"
 msgstr "Auf {anchorModeName}-Modelle beschränkt"
 
@@ -18870,7 +18882,7 @@ msgstr "Max. Größe: {size}"
 msgid "Max size: {size} • Max {maxFiles} files"
 msgstr "Max. Größe: {size} • Max. {maxFiles} Dateien"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:773
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:782
 #: src/components/model-picker/model-picker.tsx:1272
 msgid "Maximum {MAX_PARALLEL} models reached"
 msgstr "Maximale Anzahl von {MAX_PARALLEL} Modellen erreicht"
@@ -19119,7 +19131,7 @@ msgstr "Menü"
 msgid "Merge"
 msgstr ""
 
-#: ../../packages/ui/src/lib/tiptap-table-bubble.tsx:52
+#: ../../packages/ui/src/lib/tiptap-table-bubble.tsx:60
 msgid "Merge cells"
 msgstr ""
 
@@ -19595,7 +19607,7 @@ msgstr "Modellbeschränkungen"
 msgid "Model server"
 msgstr "Modellserver"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:561
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:570
 msgid "Model tabs"
 msgstr "Modell-Tabs"
 
@@ -21073,7 +21085,7 @@ msgstr "Keine Modelle verfügbar"
 msgid "No models found matching your filters."
 msgstr "Keine Modelle gefunden, die deinen Filtern entsprechen."
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:740
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:749
 #: src/components/model-picker/model-picker.tsx:1237
 msgid "No models found."
 msgstr "Keine Modelle gefunden."
@@ -21291,7 +21303,7 @@ msgstr "Keine Sortierung angewendet"
 msgid "No speech detected. Hands-free mode stopped."
 msgstr "Keine Sprache erkannt. Freihandmodus beendet."
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:733
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:742
 #: src/components/model-picker/model-picker.tsx:1230
 msgid "No starred models"
 msgstr "Keine markierten Modelle"
@@ -22267,7 +22279,7 @@ msgstr "Thread des Durchlaufs öffnen"
 msgid "Open search"
 msgstr "Suche öffnen"
 
-#: ../../packages/chat-ui/src/org-switcher/org-switcher.tsx:200
+#: ../../packages/chat-ui/src/org-switcher/org-switcher.tsx:203
 msgid "Open settings"
 msgstr "Einstellungen öffnen"
 
@@ -23163,7 +23175,7 @@ msgstr ""
 msgid "Paraguay"
 msgstr "Paraguay"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:624
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:633
 #: src/components/model-picker/model-picker.tsx:1099
 msgid "Parallel"
 msgstr "Parallel"
@@ -23534,7 +23546,7 @@ msgid "persona"
 msgstr ""
 
 #: ../../packages/chat-ui/src/org-switcher/org-switcher.tsx:112
-#: ../../packages/chat-ui/src/org-switcher/org-switcher.tsx:225
+#: ../../packages/chat-ui/src/org-switcher/org-switcher.tsx:228
 msgid "Personal"
 msgstr "Persönlich"
 
@@ -26355,7 +26367,7 @@ msgstr "Auf Standard zurücksetzen"
 msgid "Reset to Defaults"
 msgstr "Auf Standardwerte zurücksetzen"
 
-#: ../../packages/ui/src/components/zoomable-image.tsx:328
+#: ../../packages/ui/src/components/zoomable-image.tsx:389
 msgid "Reset zoom"
 msgstr ""
 
@@ -27438,7 +27450,7 @@ msgstr ""
 msgid "Search models by name, ID, or provider..."
 msgstr "Modelle nach Name, ID oder Anbieter suchen..."
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:557
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:566
 #: src/components/model-picker/model-picker.tsx:1039
 msgid "Search models..."
 msgstr "Modelle suchen..."
@@ -27881,7 +27893,7 @@ msgstr ""
 msgid "Selection context"
 msgstr "Auswahlkontext"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:599
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:608
 msgid "Selection mode"
 msgstr "Auswahlmodus"
 
@@ -28181,7 +28193,7 @@ msgstr ""
 msgid "Set up triggers to automate tasks on a schedule, via webhooks, or in response to events."
 msgstr "Richte Trigger ein, um Aufgaben nach Zeitplan, über Webhooks oder als Reaktion auf Events zu automatisieren."
 
-#: ../../packages/chat-ui/src/org-switcher/org-switcher.tsx:257
+#: ../../packages/chat-ui/src/org-switcher/org-switcher.tsx:260
 #: src/components/settings/settings-modal.tsx:404
 #: src/components/settings/settings-modal.tsx:502
 #: src/features/layout/components/mobile-section-nav.tsx:59
@@ -28730,7 +28742,7 @@ msgstr "inzwischen ersetzt"
 msgid "Singapore"
 msgstr "Singapur"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:611
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:620
 #: src/components/model-picker/model-picker.tsx:1087
 msgid "Single"
 msgstr "Einzeln"
@@ -29372,7 +29384,7 @@ msgstr "Ausgaben"
 msgid "Spent {0} of a {1} cap."
 msgstr "{0} von einem Limit von {1} ausgegeben."
 
-#: ../../packages/ui/src/lib/tiptap-table-bubble.tsx:53
+#: ../../packages/ui/src/lib/tiptap-table-bubble.tsx:61
 msgid "Split cell"
 msgstr ""
 
@@ -29489,7 +29501,7 @@ msgstr ""
 msgid "starred"
 msgstr ""
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:576
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:585
 #: src/components/model-picker/model-picker.tsx:1056
 msgid "Starred"
 msgstr "Markiert"
@@ -30653,7 +30665,7 @@ msgstr "System-Prompts"
 msgid "System UI"
 msgstr ""
 
-#: ../../packages/ui/src/components/zoomable-image.tsx:320
+#: ../../packages/ui/src/components/zoomable-image.tsx:381
 msgid "Tab to the zoom buttons, then plus and minus zoom, zero resets, and arrow keys pan when zoomed. Double-click or scroll to zoom, drag to pan."
 msgstr ""
 
@@ -30662,7 +30674,7 @@ msgstr ""
 #: ../../packages/ui/src/components/file-renderers/delimited-text-preview.tsx:50
 #: ../../packages/ui/src/components/file-renderers/delimited-text-preview.tsx:67
 #: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:344
-#: ../../packages/ui/src/lib/tiptap-table-bubble.tsx:63
+#: ../../packages/ui/src/lib/tiptap-table-bubble.tsx:71
 msgid "Table"
 msgstr ""
 
@@ -31067,7 +31079,7 @@ msgstr "Testen"
 msgid "text"
 msgstr "Text"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:658
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:667
 #: ../../packages/ui/src/components/canvas-editor/canvas-element-palette.tsx:317
 #: ../../packages/ui/src/components/canvas-editor/canvas-property-panel.tsx:351
 #: src/components/model-picker/model-picker.tsx:1134
@@ -32810,6 +32822,10 @@ msgstr "Zu erledigen"
 msgid "Today"
 msgstr "Heute"
 
+#: ../../packages/ui/src/components/calendar.tsx:127
+msgid "Today, {label}"
+msgstr ""
+
 #: src/features/settings/lib/settings-keywords.ts:44
 #: src/features/settings/lib/settings-keywords.ts:45
 msgid "toggle"
@@ -33460,7 +33476,7 @@ msgid "Two-factor authentication is currently enabled for your account. This add
 msgstr "Zwei-Faktor-Authentifizierung ist derzeit für dein Konto aktiviert. Dies fügt eine zusätzliche Sicherheitsebene hinzu."
 
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:125
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:635
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:644
 #: src/components/model-picker/model-picker.tsx:1110
 #: src/features/devices/components/device-tool-call.tsx:119
 msgid "Type"
@@ -34772,7 +34788,7 @@ msgstr "Sehr niedrige Kosten pro Generierung"
 msgid "video"
 msgstr "Video"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:682
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:691
 #: src/components/model-picker/model-picker.tsx:1160
 #: src/features/chat/sidebar/usage-card.tsx:130
 #: src/features/chat/thread/composer.tsx:123
@@ -36570,7 +36586,7 @@ msgid "ZIP archive"
 msgstr "ZIP-Archiv"
 
 #: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:141
-#: ../../packages/ui/src/components/zoomable-image.tsx:331
+#: ../../packages/ui/src/components/zoomable-image.tsx:392
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:284
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:290
 #: src/features/workflow/hooks/use-canvas-aria-labels.ts:25
@@ -36587,7 +36603,7 @@ msgid "Zoom Lens"
 msgstr "Zoomobjektiv"
 
 #: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:131
-#: ../../packages/ui/src/components/zoomable-image.tsx:325
+#: ../../packages/ui/src/components/zoomable-image.tsx:386
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:250
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:256
 #: src/features/workflow/hooks/use-canvas-aria-labels.ts:26
@@ -36599,7 +36615,7 @@ msgstr "Verkleinern"
 msgid "Zoom Out"
 msgstr "Verkleinern"
 
-#: ../../packages/ui/src/components/zoomable-image.tsx:286
+#: ../../packages/ui/src/components/zoomable-image.tsx:347
 msgid "Zoomable image"
 msgstr ""
 
