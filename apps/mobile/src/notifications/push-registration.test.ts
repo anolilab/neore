@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import type { PushPermission, PushPlatform, PushServer } from "./push-registration";
-import { createForegroundGate, createPendingWork, createPromptOffer, createTokenChangeFilter, languageTag, onceItWorks, registerPhoneForPush, releasePhonePush } from "./push-registration";
+import { createForegroundGate, createPendingWork, createPromptOffer, createTokenChangeFilter, languageTag, onceItWorks, registerPhoneForPush, releaseOnSignOut, releasePhonePush } from "./push-registration";
 
 const TOKEN = "a".repeat(64);
 
@@ -133,6 +133,40 @@ describe("releasePhonePush", () => {
         vi.mocked(platform.getDeviceToken).mockRejectedValueOnce(new Error("no token"));
 
         await expect(releasePhonePush({ platform, server })).rejects.toThrow("no token");
+        expect(server.unregister).not.toHaveBeenCalled();
+    });
+});
+
+describe("releaseOnSignOut", () => {
+    it("closes the gate, waits for a registration already on its way, then releases the token", async () => {
+        const order: string[] = [];
+        const registrations = createPendingWork();
+        const server = serverWith();
+        const platform = platformWith({ canAskAgain: true, granted: true });
+
+        vi.mocked(server.unregister).mockImplementation(async () => {
+            order.push("release");
+        });
+
+        const registering = registrations.run(async (isCurrent) => {
+            await Promise.resolve();
+            order.push(isCurrent() ? "registered while open" : "registration refused");
+        });
+
+        await releaseOnSignOut({ platform, registrations, server });
+        await registering;
+
+        expect(order).toEqual(["registration refused", "release"]);
+        expect(server.unregister).toHaveBeenCalledWith(TOKEN);
+    });
+
+    it("releases nothing, and warns of nothing, on a build that cannot receive push", async () => {
+        const platform = { ...platformWith({ canAskAgain: true, granted: true }), canReceivePush: false };
+        const server = serverWith();
+
+        await releaseOnSignOut({ platform, registrations: createPendingWork(), server });
+
+        expect(platform.getDeviceToken).not.toHaveBeenCalled();
         expect(server.unregister).not.toHaveBeenCalled();
     });
 });

@@ -95,7 +95,8 @@ export const registerPhoneForPush = async ({
  * Sign-out: the account stops getting pushes on this phone, unless `isCurrent` says
  * the sign-out is over by the time the token is known. Released whatever the
  * permission says now: a person who turned notifications off in the system settings
- * after registering still has a row on the server. A failure to get the token is not
+ * after registering still has a row on the server. A build that cannot receive push
+ * registered nothing, so it releases nothing. A failure to get the token is not
  * swallowed: sign-out logs it, and the server stops sending once the session is revoked.
  */
 export const releasePhonePush = async ({
@@ -107,6 +108,10 @@ export const releasePhonePush = async ({
     platform: PushPlatform;
     server: PushServer;
 }): Promise<void> => {
+    if (!platform.canReceivePush) {
+        return;
+    }
+
     const token = await platform.getDeviceToken();
 
     // A release that outlived its sign-out (it timed out and the next account signed in) would unregister THAT
@@ -160,6 +165,25 @@ export const createPendingWork = () => {
             await Promise.allSettled(pending);
         },
     };
+};
+
+/**
+ * Sign-out's release step: no registration may send the token from here on, one already on its way finishes first (so
+ * it cannot land after the release and give the phone back to the leaving account), then the token is released.
+ */
+export const releaseOnSignOut = async ({
+    platform,
+    registrations,
+    server,
+}: {
+    platform: PushPlatform;
+    registrations: Pick<ReturnType<typeof createPendingWork>, "close" | "settle">;
+    server: PushServer;
+}): Promise<void> => {
+    const isSigningOut = registrations.close();
+
+    await registrations.settle();
+    await releasePhonePush({ isCurrent: isSigningOut, platform, server });
 };
 
 /**

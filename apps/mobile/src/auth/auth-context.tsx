@@ -6,7 +6,7 @@ import { clearLastThread } from "../chat/last-thread-store";
 import { loadConfig } from "../lib/config";
 import { getClient } from "../lib/lunora";
 import { backendPushServer, devicePushPlatform, pushRegistrations } from "../notifications/phone-push";
-import { releasePhonePush } from "../notifications/push-registration";
+import { releaseOnSignOut } from "../notifications/push-registration";
 import { endPhonePushForAccount } from "../notifications/use-phone-push";
 import { getOfflineCache } from "../offline/database";
 import type { AuthStatus } from "./auth-state";
@@ -132,14 +132,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             await signOutOnDevice({
                 clearCache: () => getOfflineCache().clear(),
                 forgetLastChat: clearLastThread,
-                releasePush: async () => {
-                    // No registration may send the token from here on; one already on its way finishes first, so it
-                    // cannot land after the release and give the phone back to this account.
-                    const isSigningOut = pushRegistrations.close();
-
-                    await pushRegistrations.settle();
-                    await releasePhonePush({ isCurrent: isSigningOut, platform: devicePushPlatform, server: backendPushServer(client) });
-                },
+                releasePush: async () =>
+                    await releaseOnSignOut({ platform: devicePushPlatform, registrations: pushRegistrations, server: backendPushServer(client) }),
                 revokeGrant: () => signOutGrant({ fetch, lunoraUrl: config.lunoraUrl, store: secureGrantStore }),
                 // eslint-disable-next-line no-console -- no logger in the app; a failed clear must not be silent
                 warn: console.warn,
