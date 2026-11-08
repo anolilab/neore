@@ -128,7 +128,7 @@ const sendPrompt = async (context: Context, client: NeoreClient, flags: Flags, p
 // ─── Thread start / send ────────────────────────────────────────────────────
 
 /** Exit codes of `thread start|send` for an answer: a reply (0), a failed run (1), no finished reply yet (2). */
-export const THREAD_EXIT = { failed: 1, ok: 0, other: 2 } as const;
+const THREAD_EXIT = { failed: 1, ok: 0, other: 2 } as const;
 
 /**
  * `ChatCompleted.status` values that mean the reply cannot be read from this
@@ -146,12 +146,28 @@ const readLaterHint = (threadId: string | undefined): string =>
         ? `read it later with \`neore threads show ${threadId}\``
         : "find the new thread with `neore threads ls`, then read it with `neore threads show <thread-id>`";
 
+/**
+ * Whether the server may have run the send despite the error: a 5xx, one of {@link MAYBE_RUNNING_CODES}, or a success
+ * status whose body could not be read.
+ */
+const mayHaveRun = (error: ApiError): boolean =>
+    error.status >= 500 || MAYBE_RUNNING_CODES.has(error.code) || (error.code === "invalid_response" && error.status >= 200 && error.status < 300);
+
+/** A success answer from `POST /chat` that names no thread: the run started, but the CLI cannot say where. */
+const requireThreadId = <T extends { threadId?: unknown }>(answer: T, status: number): T & { threadId: string } => {
+    if (typeof answer.threadId !== "string" || answer.threadId === "") {
+        throw new ApiError({ code: "invalid_response", message: "The API answered without a thread id.", status });
+    }
+
+    return answer as T & { threadId: string };
+};
+
 /** Runs one send; an error after which the run may have started names where to find it instead of inviting a resend. */
 const withReadLaterHint = async <T>(threadId: string | undefined, request: Promise<T>): Promise<T> => {
     try {
         return await request;
     } catch (error) {
-        if (error instanceof ApiError && (error.status >= 500 || MAYBE_RUNNING_CODES.has(error.code))) {
+        if (error instanceof ApiError && mayHaveRun(error)) {
             // A new invocation sends a new idempotency key, so sending again could start and bill a second run.
             throw new ApiError({
                 code: error.code,
@@ -173,7 +189,9 @@ const postThread = async (context: Context, flags: Flags, threadId: string | und
     if (!flags.wait) {
         const started = await withReadLaterHint(
             threadId,
-            client.request<ChatStarted>("POST", "/chat", { body: { ...body, stream: true }, retryAmbiguous: false }),
+            client
+                .request<ChatStarted>("POST", "/chat", { body: { ...body, stream: true }, retryAmbiguous: false })
+                .then((answer) => requireThreadId(answer, 202)),
         );
 
         if (flags.json) {
@@ -187,7 +205,9 @@ const postThread = async (context: Context, flags: Flags, threadId: string | und
 
     const result = await withReadLaterHint(
         threadId,
-        client.request<ChatCompleted>("POST", "/chat", { body: { ...body, stream: false }, retryAmbiguous: false, timeoutMs: BLOCKING_TIMEOUT_MS }),
+        client
+            .request<ChatCompleted>("POST", "/chat", { body: { ...body, stream: false }, retryAmbiguous: false, timeoutMs: BLOCKING_TIMEOUT_MS })
+            .then((answer) => requireThreadId(answer, 200)),
     );
 
     if (flags.json) {

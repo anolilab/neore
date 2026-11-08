@@ -398,6 +398,19 @@ describe("chat end to end against a fake API", () => {
             expect(await run(["thread", "start", "hi", "--wait"], context)).toBe(2);
         });
 
+        it("on a success answer it cannot use, exits non-zero and says where to read the run", async () => {
+            const { context } = await setup(() => Response.json({ messageId: "m1" }, { status: 202 }));
+
+            expect(await run(["thread", "start", "hi"], context)).toBe(2);
+            expect(context.io.stdout.text()).toBe("");
+            expect(context.io.stderr.text()).toContain("neore threads ls");
+
+            const cut = await setup(() => new Response('{"messageId":"m1","thr', { headers: { "Content-Type": "application/json" }, status: 200 }));
+
+            expect(await run(["thread", "send", "th1", "hi", "--wait"], cut.context)).toBe(2);
+            expect(cut.context.io.stderr.text()).toContain("neore threads show th1");
+        });
+
         it("sends once after a lost send or a 5xx, which the server may have run, and says where to read the run", async () => {
             await writeConfig({ apiKey: "nk_1", apiUrl: "https://api.test" }, join(directory, "config.json"));
 
