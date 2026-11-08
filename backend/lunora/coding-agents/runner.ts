@@ -413,7 +413,9 @@ export const startPullRequest = async (
 };
 
 export type PullRequestCheck =
-    { log: string; status: "pending" } | { error: string; log: string; status: "failed" } | { branch: string; log: string; status: "pushed" };
+    | { log: string; status: "pending" }
+    | { error: string; log: string; status: "failed" }
+    | { branch: string; log: string; status: "pushed" };
 
 const PR_FAILURE: Record<string, string> = {
     apply: "The change no longer applies to the base branch.",

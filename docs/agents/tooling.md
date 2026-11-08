@@ -50,14 +50,37 @@ CI deploys; run this only when told to.
 DEPLOY_ENV=preview pnpm run deploy
 ```
 
+## Linters
+
+`pnpm lint` runs the root vis target `lint:all` (root `project.json`): every project's `lint:eslint`, plus the root
+`lint:oxlint`, `lint:oxfmt` and `lint:dedupe`, in parallel, failing if any fails. vis treats the root `package.json`
+scripts as root targets, except those that start with `vis run`. A root script that shares its name with a project
+target (`deploy`, `test:storybook`, …) is set to a no-op in `project.json`, or `vis run <name>` would run it too
+(`vis run deploy` would run the Alchemy deploy); `pnpm <name>` still runs it. Add a name there when a project gains a
+target that matches a root script.
+
+ESLint is the authority; oxlint is a fast first pass that enforces only what ESLint enforces, and gates CI like it.
+`.oxlintrc.json` is generated, never edited: `pnpm lint:oxlint:sync` (`scripts/sync-oxlint-rules.mjs`) asks ESLint, from
+inside each project, which files it lints and how each rule is set, then enables a rule only when ESLint sets it the
+same way on every file it lints (or every file that loads its plugin), and ignores every file ESLint does not lint.
+Every oxlint category is off. Run it after a change to an ESLint config, to the `lint` catalog (ESLint, its plugins,
+`@anolilab/eslint-config`, oxlint) or to a project's dependencies (the shared config picks plugins from them), and after
+a change to the files ESLint lints: a new workspace project, the `lint:eslint:deploy` list, a file ESLint ignores. When
+unsure, run it: the oxlint CI job regenerates the file and fails when the committed one differs. When oxlint reports code ESLint accepts, add the rule to `OXLINT_DIFFERS` in the
+script, with its reason, and sync.
+No enabled rule is type-aware today, so oxlint needs no build; the sync turns type-aware mode on when one is, and from
+then on oxlint needs built packages and the backend codegen first, like `lint:types`. The JS-plugin versions in the
+`lint` catalog match the ones `@anolilab/eslint-config` loads, so both run the same rule code.
+
 ## Git hooks
 
 `vis hook install` (run by `postinstall`) points `core.hooksPath` at `.vis/hooks/_`, which runs the scripts in
-`.vis/hooks/`. **pre-commit** runs the secret scan and `vis staged` (Prettier on staged files except Markdown, `sort-package-json` on
-staged `package.json` files, from the `staged` map in `vis.config.ts`). **pre-push** runs the package.json order check
-and Prettier on every file changed since the merge base with `main` (root files included, Markdown skipped as in CI; both hooks also read `.prettierignore-hooks`, which lists the
-projects without a `lint:prettier` task and is read by no project check),
-then `vis affected lint:types:fast` from that same base. The fast type check runs `tsrs`, a Rust port of the compiler
+`.vis/hooks/`. **pre-commit** runs the secret scan and `vis staged` (oxfmt on staged code, data, CSS and HTML,
+Prettier on Markdown, `sort-package-json` on staged `package.json` files, from the `staged` map in `vis.config.ts`).
+**pre-push** runs the package.json order check and the same two formatters in check mode on every file changed since
+the merge base with `main`, root files included. Both hooks and `pnpm lint:oxfmt` run from the repository root and read
+the same ignore files: `.gitignore` (nested ones too) and the root `.prettierignore`, the only one they read, which lists the
+projects and docs that have no format check. pre-push then runs `vis affected lint:types:fast` from that same base. The fast type check runs `tsrs`, a Rust port of the compiler
 with TS 7.1 semantics (beta): about 13 s for every project, against 4.5 min for `lint:types`, plus up to a minute when a
 backend change reruns its `codegen`. CI and
 `pnpm lint:types` stay on `tsc` 6, so the hook can report a difference that only TS 7 sees; the CI result decides.

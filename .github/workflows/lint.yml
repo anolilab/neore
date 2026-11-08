@@ -40,8 +40,8 @@ jobs:
             node_version: "24.22.1"
 
     # The shared workflow above accepts exactly eight `lint_*` inputs and none of
-    # them is prettier or secret scanning — checked against its own definition,
-    # not assumed. Both are enforced locally (`pnpm lint:prettier`, `pnpm vis
+    # them is oxfmt or secret scanning — checked against its own definition,
+    # not assumed. Both are enforced locally (`pnpm lint:oxfmt`, `pnpm vis
     # secrets`, and the pre-commit hook), so before this job a PR could go green
     # having never had either run in CI.
     # `dorny/paths-filter` reads the PR's file list through the REST API, so the
@@ -71,7 +71,7 @@ jobs:
                   token: "${{ github.token }}"
                   filters: ".github/file-filters.yml"
     format-and-secrets:
-        name: "Prettier and secret scan"
+        name: "oxfmt and secret scan"
         runs-on: "ubuntu-latest"
         timeout-minutes: 20
         permissions:
@@ -102,7 +102,7 @@ jobs:
 
             - name: "Check formatting"
               shell: "bash"
-              run: "pnpm lint:prettier"
+              run: "pnpm lint:oxfmt"
 
             - name: "Scan for secrets"
               shell: "bash"
@@ -115,6 +115,48 @@ jobs:
             - name: "Check the deploy script"
               shell: "bash"
               run: "pnpm run lint:types:deploy && pnpm run lint:eslint:deploy"
+
+    # oxlint enforces only what ESLint enforces (`.oxlintrc.json` is generated from
+    # ESLint's config by `pnpm lint:oxlint:sync`), so it gates like ESLint does.
+    oxlint:
+        name: "oxlint"
+        needs: "files-changed"
+        if: "github.event_name == 'merge_group' || needs.files-changed.outputs.code == 'true'"
+        runs-on: "ubuntu-latest"
+        timeout-minutes: 30
+        permissions:
+            contents: "read"
+        steps:
+            - name: "Harden Runner"
+              uses: "step-security/harden-runner@46b06cea07f9e64621fdf066ba77ac6915163d43" # v2.22.3
+              with:
+                  egress-policy: "audit"
+
+            - name: "Git checkout"
+              uses: "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1" # v7.0.1
+              with:
+                  persist-credentials: false
+
+            - name: "Setup resources and environment"
+              id: "setup"
+              uses: "anolilab/workflows/step/setup@1f3a7f7e561f7690fe19dea5d2ed225def53c908" # v26.0.6
+              with:
+                  enable-nx-cache: "false" # no Nx in this repo: the cache never hits
+                  node-version: "24.22.1"
+                  npm-version: "11"
+                  skip-playwright: "true"
+
+            # A rule ESLint turned off for some files but the committed config still
+            # enforces would fail here on code ESLint accepts.
+            - name: "Check that .oxlintrc.json matches ESLint's config"
+              shell: "bash"
+              run: |
+                  pnpm run lint:oxlint:sync
+                  git diff --exit-code .oxlintrc.json || { echo "::error::.oxlintrc.json is stale: run pnpm lint:oxlint:sync and commit it"; exit 1; }
+
+            - name: "oxlint"
+              shell: "bash"
+              run: "pnpm run lint:oxlint"
 
     types:
         name: "Types"
@@ -228,7 +270,7 @@ jobs:
     # `if:` reports success, so the gate must run when a need fails.
     lint-required-check:
         name: "Check Lint"
-        needs: ["lint", "files-changed", "format-and-secrets", "types", "eslint", "actionlint"]
+        needs: ["lint", "files-changed", "format-and-secrets", "oxlint", "types", "eslint", "actionlint"]
         if: "always()"
         runs-on: "ubuntu-latest"
         timeout-minutes: 5

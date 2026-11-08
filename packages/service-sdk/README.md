@@ -41,7 +41,7 @@ exists on actions only. See `backend/AGENTS.md`, "Services (service bindings)".
 - `openapi/*.json`: one spec per service (`llm-gateway`, `document-parser`,
   `nsfw-checker`, `browser-renderer`, `embeddings`).
 - `src/generated/<service>/`: generator output, committed. Do not edit;
-  prettier ignores it (`.prettierignore`). `embeddings` has a spec but no
+  the formatters skip it (the root `.prettierignore`). `embeddings` has a spec but no
   sub-export: nothing calls it.
 - `src/client-factory.ts`: the hand-written client factory. It uses the
   llm-gateway copy of the generated fetch client for all services.

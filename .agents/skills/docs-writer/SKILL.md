@@ -152,5 +152,5 @@ and that all links are functional.
 3.  **Link check:** Verify all new and existing links leading to or from modified
     pages.
 4.  **Format:** Once all changes are complete, ask to execute
-    `pnpm run lint:prettier:root:fix` to ensure consistent formatting across
+    `pnpm run lint:oxfmt:fix` to ensure consistent formatting across
     the project. If the user confirms, execute the command.

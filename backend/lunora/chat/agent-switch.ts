@@ -171,7 +171,8 @@ export const vSwitchTarget = v.union(
 const vRequestedMode = v.union(v.literal("full"), v.literal("portable"));
 
 type Checked =
-    { agent: AgentRef; kind: "same"; thread: Doc<"threads"> } | { from: AgentRef; kind: "ready"; leaf: Doc<"messages">; thread: Doc<"threads">; to: AgentRef };
+    | { agent: AgentRef; kind: "same"; thread: Doc<"threads"> }
+    | { from: AgentRef; kind: "ready"; leaf: Doc<"messages">; thread: Doc<"threads">; to: AgentRef };
 
 /**
  * A bot runs on its bot's model, a group chat on its participants, a messenger thread on the connection's, and a

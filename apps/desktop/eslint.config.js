@@ -52,8 +52,9 @@ export default [
     },
     {
         /**
-         * Prettier owns formatting: the pre-push hook checks every changed file with it. These rules disagree with the
-         * output Prettier produces, so "fixing" one means writing code Prettier reformats back, as in `packages/chat-ui`.
+         * This code follows the repository formatter's output (formatted with Prettier, which oxfmt matches), though the
+         * desktop has no format check yet (it is in the root `.prettierignore`). These rules disagree with that output, so
+         * "fixing" one means writing code the formatter reformats back, as in `packages/chat-ui`.
          * Found by formatting all of `src/` with Prettier and linting the result: these seven rules made every new
          * finding.
          */

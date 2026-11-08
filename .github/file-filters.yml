@@ -67,8 +67,8 @@ packages: &packages
     - ".github/actions/**"
     - ".github/file-filters.yml"
 
-# What the Types and ESLint jobs check: code, its configuration and the lint
-# workflow itself. A change to docs or markdown alone skips both jobs.
+# What the Types, ESLint and oxlint jobs check: code, its configuration and the lint
+# workflow itself. A change to docs or markdown alone skips all three.
 code:
     - "**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs}"
     - "**/*.jsonc"
@@ -82,6 +82,7 @@ code:
     - "pnpm-workspace.yaml"
     - "vis.config.ts"
     - "eslint.config.mjs"
+    - ".oxlintrc.json"
     - ".github/scripts/**"
     - ".github/workflows/lint.yml"
     - ".github/actions/**"

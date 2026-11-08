@@ -31,7 +31,9 @@ type ImportOpen = Extract<Event, { kind: "import_open" }>;
 type ImportTurn = Extract<Event, { kind: "import_turn" }>;
 
 export type ImportResult =
-    { ended: boolean; existing?: boolean; next: number; outcome: "applied"; threadId?: string } | { next: number; outcome: "gap" } | { outcome: "refused" };
+    | { ended: boolean; existing?: boolean; next: number; outcome: "applied"; threadId?: string }
+    | { next: number; outcome: "gap" }
+    | { outcome: "refused" };
 
 const REFUSED: ImportResult = { outcome: "refused" };
 

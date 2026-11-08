@@ -62,7 +62,7 @@ first; 8788 belongs to the backend, and each service's inspector port is pinned.
 ```bash
 pnpm --filter browser-renderer lint:types
 pnpm --filter browser-renderer lint:eslint
-pnpm --filter browser-renderer lint:prettier
+pnpm lint:oxfmt   # from the repository root: formatting is checked repo-wide
 pnpm --filter browser-renderer build      # wrangler deploy --dry-run
 ```
 

@@ -9,8 +9,6 @@
         "dev": "vite",
         "lint:eslint": "eslint . --cache --cache-location .eslint.cache.json",
         "lint:eslint:fix": "eslint . --fix --cache --cache-location .eslint.cache.json",
-        "lint:prettier": "prettier --check . --ignore-path ../../.prettierignore --ignore-path .prettierignore",
-        "lint:prettier:fix": "prettier --write . --ignore-path ../../.prettierignore --ignore-path .prettierignore",
         "lint:types": "tsc -b",
         "lint:types:fast": "tsrs -b",
         "preview": "vite preview",

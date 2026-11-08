@@ -118,7 +118,14 @@ export const getTaskFormDefaults = (task?: BoardTask | null, goalId?: Id<"goals"
 };
 
 export type TaskFormErrorKey =
-    "cronInvalid" | "instructionsRequired" | "instructionsTooLong" | "titleRequired" | "titleTooLong" | "criteriaTooLong" | "repoInvalid" | "repoRequired";
+    | "cronInvalid"
+    | "instructionsRequired"
+    | "instructionsTooLong"
+    | "titleRequired"
+    | "titleTooLong"
+    | "criteriaTooLong"
+    | "repoInvalid"
+    | "repoRequired";
 
 // https:// URL or GitHub `owner/repo`; the backend validates the rest.
 const REPO_RE = /^(?:https:\/\/\S+|[\w.-]+\/[\w.-]+)$/u;

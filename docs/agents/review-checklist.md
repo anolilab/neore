@@ -84,10 +84,11 @@ package.json order, formatting and types (`vis affected lint:types:fast`, the fa
 the full `tsc` type check below are yours to run:
 
 ```bash
-pnpm lint:prettier:fix                 # formatting, the most frequent avoidable CI failure
+pnpm lint:oxfmt:fix                    # formatting, the most frequent avoidable CI failure
 pnpm exec sort-package-json <changed package.json files>
+pnpm lint:oxlint:sync                  # when lint config, lint dependencies or the files ESLint lints changed (tooling.md, "Linters"); commit .oxlintrc.json
+pnpm lint                              # ESLint, oxlint, the format check and dedupe in parallel, as CI gates them
 pnpm lint:types                        # tsc, as in CI; before opening a pull request and before a push that changes types
-pnpm exec vis affected lint:eslint
 pnpm exec vis affected test
 ```
 
