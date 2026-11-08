@@ -261,4 +261,28 @@ describe("a child that waited on a request", () => {
         expect(await internalCall(reapOverdueWaits, {})).toBe(1);
         expect(await runRow()).toMatchObject({ error: SUB_AGENT_APPROVAL_EXPIRED_MESSAGE, status: "failed" });
     });
+
+    it("schedules the backstop's next pass at once when a pass reaps a full batch", async () => {
+        // The harness records this self-scheduled job without its path, so the queue's length tells.
+        const queued = () => harness.scheduler.list().length;
+        const overdue = async (count: number): Promise<void> =>
+            await run(async (context) => {
+                const { _creationTime, _id, ...row } = await context.db.get("subAgentRuns", runId);
+
+                for (let index = 0; index < count; index += 1) {
+                    await context.db.insert("subAgentRuns", { ...row, reapAt: Date.now() - 1000, status: "awaiting" });
+                }
+            });
+
+        await overdue(20);
+
+        const before = queued();
+
+        expect(await internalCall(reapOverdueWaits, {})).toBe(20);
+        expect(queued()).toBe(before + 1);
+
+        await overdue(1);
+        expect(await internalCall(reapOverdueWaits, {})).toBe(1);
+        expect(queued()).toBe(before + 1);
+    });
 });

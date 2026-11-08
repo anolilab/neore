@@ -54,7 +54,8 @@ import { claimOnce, releaseClaim, WORKER_DISPATCH_CLAIM_TTL_MS, WORKER_DISPATCH_
 import { authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { enqueueJob } from "../lib/job-queue";
 import { patchById } from "../lib/patch";
-import { runAfterWithRetry } from "../lib/shard-scheduler";
+import { currentShard, ROOT_SHARD_KEY } from "../lib/shard-context";
+import { runAfterOnShard, runAfterWithRetry } from "../lib/shard-scheduler";
 import { systemDb } from "../lib/rls/scope";
 import { createRatelimit } from "../lib/rate-limiter";
 import { notifyQuietly } from "../notifications/notify";
@@ -1634,7 +1635,7 @@ export const reapRun = internalMutation
         return null;
     });
 
-/** Overdue waiting runs reaped per housekeeping pass; the next pass takes the rest. */
+/** Overdue waiting runs reaped per pass; a full pass schedules the next at once (an idle shard is swept only daily). */
 const OVERDUE_WAITS_REAPED = 20;
 
 /**
@@ -1652,6 +1653,11 @@ export const reapOverdueWaits = internalMutation
 
         for (const run of overdue) {
             await reapSubAgentRun(ctx, run._id, ctx.now);
+        }
+
+        if (overdue.length === OVERDUE_WAITS_REAPED) {
+            // Named, not defaulted: the next pass must stay on this owner's shard.
+            await runAfterOnShard(ctx.scheduler, 0, internal.sub_agents.functions.reapOverdueWaits, {}, currentShard() ?? ROOT_SHARD_KEY);
         }
 
         return overdue.length;
