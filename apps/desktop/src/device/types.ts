@@ -86,6 +86,21 @@ export interface FilesPage {
     truncated: boolean;
 }
 
+/** One page of the folders inside a folder on a connected server (`host_browse`): names only. */
+export interface BrowsePage {
+    entries: { name: string }[];
+    host: string;
+    next: string | null;
+    parent: string | null;
+    path: string;
+}
+
+/** What creating a folder on a server did (`host_make_dir`). */
+export interface CreatedFolder {
+    created: boolean;
+    path: string;
+}
+
 /** A file of a server as text (`host_file_read`). */
 export interface FileRead {
     host: string;
@@ -239,12 +254,14 @@ export interface DeviceCore {
     hostAgentStart: (deviceId: string, handle: number, agentKey: string, folder: string) => string;
     hostAgentStop: (handle: number) => void;
     hostAgentWrite: (handle: number, bytes: Buffer) => void;
+    hostBrowse: (deviceId: string, path: string, after?: string) => Promise<string>;
     hostConnect: (deviceId: string, retry: boolean) => Promise<string>;
     hostDisconnect: (deviceId: string) => void;
     hostDownload: (deviceId: string, path: string, destination: string) => Promise<string>;
     hostFileRead: (deviceId: string, path: string) => Promise<string>;
     hostFilesList: (deviceId: string, path: string, after?: string) => Promise<string>;
     hostForgetKey: (deviceId: string) => void;
+    hostMakeDir: (deviceId: string, path: string) => Promise<string>;
     hostPair: (spec: string, deviceId: string, secret: string) => Promise<boolean>;
     hostProbe: (spec: string) => Promise<string>;
     hostRemove: (deviceId: string) => void;
