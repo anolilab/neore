@@ -14,8 +14,8 @@ const labels = () => {
 };
 const quoted = { messageId: "msg-4", text: "The first line\nthe second line" };
 
-/** The chip's draft text is the quote as a blockquote, then the separator before the comment paragraph. */
-const quotedDraft = "> The first line\n> the second line\n\n";
+/** The chip's draft text is the quote as a blockquote, ending its last line; the comment paragraph's separator adds the blank line. */
+const quotedDraft = "> The first line\n> the second line\n";
 
 describe("insertQuoteChip", () => {
     let editor: Editor | undefined;
@@ -121,31 +121,37 @@ describe("the quote chip's clipboard", () => {
             "takes the quote from the visible lines, not a hidden attribute",
             `<div data-quote-chip data-message-id="m" data-quote-text="${"hidden ".repeat(200)}"><blockquote><p>Seen</p></blockquote></div>`,
             "quoteChip",
-            formatQuote("Seen"),
+            "> Seen\n",
         ],
         [
             "keeps a line break inside a quoted line",
             `<div data-quote-chip data-message-id="m"><blockquote><p>one<br>two</p></blockquote></div>`,
             "quoteChip",
-            formatQuote("one\ntwo"),
+            "> one\n> two\n",
         ],
         [
             "leaves out text the pasting page hid inside a quoted line",
             `<div data-quote-chip data-message-id="m"><blockquote><p>Seen<span style="display: none">hidden ask</span></p><p hidden>hidden line</p></blockquote><blockquote hidden><p>hidden block</p></blockquote></div>`,
             "quoteChip",
-            formatQuote("Seen"),
+            "> Seen\n",
         ],
         [
             "keeps a line whose style names display and none in different declarations",
             `<div data-quote-chip data-message-id="m"><blockquote><p style="display: block; background: none">Seen</p><p style="visibility: hidden">hidden line</p></blockquote></div>`,
             "quoteChip",
-            formatQuote("Seen"),
+            "> Seen\n",
         ],
         [
             "leaves out a line hidden through a CSS variable or content-visibility",
             `<div data-quote-chip data-message-id="m"><blockquote><p>Seen<span style="content-visibility: hidden">hidden ask</span></p><p style="--x: none; display: var(--x)">hidden line</p></blockquote></div>`,
             "quoteChip",
-            formatQuote("Seen"),
+            "> Seen\n",
+        ],
+        [
+            "makes no chip from a chip the pasting page hid as a whole",
+            `<div data-quote-chip hidden data-message-id="m"><blockquote><p>hidden ask</p></blockquote></div><div data-quote-chip style="display: none" data-message-id="m"><blockquote><p>hidden ask</p></blockquote></div>`,
+            "paragraph",
+            "\n",
         ],
         [
             "pastes a quote past the long-paste limit as quoted lines, not a chip",
@@ -176,6 +182,18 @@ describe("quoteRestoreDraft", () => {
 
     it("keeps the quote in the draft as plain quoted lines while the editor is not mounted", () => {
         expect(quoteRestoreDraft(null, quoted, "Before")).toBe(`Before\n${formatQuote(quoted.text)}`);
+    });
+
+    it("gives the same draft, one blank line between the quote and the comment, with and without the editor", () => {
+        editor = new Editor({ content: "", extensions: [StarterKit.configure({ blockquote: false }), QuoteChip.configure({ labels })] });
+
+        const withEditor = quoteRestoreDraft(editor, quoted, "Before");
+
+        expect(withEditor).toBe(quoteRestoreDraft(null, quoted, "Before"));
+
+        editor.commands.insertContentAt(editor.state.doc.content.size - 1, "comment");
+
+        expect(editor.getText({ blockSeparator: "\n" })).toBe("Before\n> The first line\n> the second line\n\ncomment");
     });
 });
 

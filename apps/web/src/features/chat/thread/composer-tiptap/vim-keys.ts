@@ -323,11 +323,23 @@ const chipKey = (state: EditorState, vim: VimState, key: string): VimResult => {
     }
 
     // A motion moves off the chip to the text after it (`j`, `l`, `w`) or before it (`k`, `h`, `b`, Backspace), staying in normal
-    // mode; Backspace moves left in normal mode as it does on a line, and never deletes.
+    // mode; Backspace moves left in normal mode as it does on a line, and never deletes. The cursor lands on a character of the
+    // displayed line next to the chip, as these motions leave it on any line.
     if (MOVE_AFTER.has(key) || MOVE_BEFORE.has(key)) {
-        const target = Selection.findFrom(state.doc.resolve(MOVE_AFTER.has(key) ? to : from), MOVE_AFTER.has(key) ? 1 : -1, true);
+        const after = MOVE_AFTER.has(key);
+        const target = Selection.findFrom(state.doc.resolve(after ? to : from), after ? 1 : -1, true);
 
-        return handledAt(vim, target ? state.tr.setSelection(target) : undefined);
+        if (!target) {
+            return handledAt(vim, undefined);
+        }
+
+        const line = segmentAt(state.doc, target.$head.index(0), target.$head.parentOffset);
+
+        if (after) {
+            return move(state, vim, line, key === "w" ? firstNonSpace(line.text) : 0);
+        }
+
+        return move(state, vim, line, key === "b" ? previousWordStart(line.text, line.text.length) : lastOffset(line));
     }
 
     // `o` and `O` always open a new line, after or before the chip, as they do next to any other line.

@@ -82,15 +82,26 @@ const visibleText = (line: Element): string => {
     return copy.textContent ?? "";
 };
 
-/** A pasted chip's quote, read from its visible quoted lines, never from an attribute the pasting page could fill unseen. */
+/**
+ * A pasted chip's quote, read from its visible quoted lines, never from an attribute the pasting page could fill unseen. A chip
+ * the page hid as a whole has no visible quote.
+ */
 const visibleQuote = (element: HTMLElement): string =>
-    cleanQuote(
-        [...element.querySelectorAll(":scope > blockquote")]
-            .filter((blockquote) => !isHidden(blockquote))
-            .flatMap((blockquote) => Array.from(blockquote.querySelectorAll(":scope > p"), visibleText))
-            .join("\n")
-            .trim(),
-    );
+    isHidden(element)
+        ? ""
+        : cleanQuote(
+              [...element.querySelectorAll(":scope > blockquote")]
+                  .filter((blockquote) => !isHidden(blockquote))
+                  .flatMap((blockquote) => Array.from(blockquote.querySelectorAll(":scope > p"), visibleText))
+                  .join("\n")
+                  .trim(),
+          );
+
+/**
+ * A chip's draft text: the quote, ending its last line. The block separator before the comment paragraph makes the one blank
+ * line `formatQuote` ends with, so the draft matches a quote added as plain text.
+ */
+const chipText = (node: ProseMirrorNode): string => `${formatQuote(String(node.attrs.text ?? "")).trimEnd()}\n`;
 
 const excerptOf = (text: string): string => {
     const flat = text.replaceAll(/\s+/gu, " ").trim();
@@ -188,7 +199,7 @@ const QuoteChip = Node.create<QuoteChipOptions>({
 
     /** The quote as leaf text, so `doc.textBetween` (cursor and paste offsets) counts the same text the draft holds. */
     extendNodeSchema(extension) {
-        return extension.name === "quoteChip" ? { leafText: (node: ProseMirrorNode) => formatQuote(String(node.attrs.text ?? "")) } : {};
+        return extension.name === "quoteChip" ? { leafText: chipText } : {};
     },
 
     atom: true,
@@ -210,10 +221,15 @@ const QuoteChip = Node.create<QuoteChipOptions>({
             },
             {
                 // The long quote the rule above passes on keeps its quote markers, as the draft text of a chip has them.
+                // A chip with no visible quote (hidden as a whole) leaves an empty line, not a lone quote marker.
                 getContent: (element, schema) => {
-                    const lines = formatQuote(visibleQuote(element as HTMLElement))
-                        .trimEnd()
-                        .split("\n");
+                    const quote = visibleQuote(element as HTMLElement);
+
+                    if (quote === "") {
+                        return Fragment.empty;
+                    }
+
+                    const lines = formatQuote(quote).trimEnd().split("\n");
                     const lineBreak = schema.nodes.hardBreak;
 
                     return Fragment.fromArray(
@@ -244,7 +260,7 @@ const QuoteChip = Node.create<QuoteChipOptions>({
     },
 
     renderText({ node }) {
-        return formatQuote(String(node.attrs.text ?? ""));
+        return chipText(node);
     },
 
     addOptions() {
