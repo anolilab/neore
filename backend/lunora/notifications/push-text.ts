@@ -61,5 +61,9 @@ export const PHONE_PLACEHOLDER_TITLE = "Neore";
 
 const LANGUAGE_SEPARATOR = /[-_]/u;
 
-export const phonePlaceholderBody = (language: string | undefined): string =>
-    PHONE_PLACEHOLDER_BODIES[language?.toLowerCase().split(LANGUAGE_SEPARATOR, 1)[0] ?? "en"] ?? (PHONE_PLACEHOLDER_BODIES.en as string);
+export const phonePlaceholderBody = (language: string | undefined): string => {
+    const base = language?.toLowerCase().split(LANGUAGE_SEPARATOR, 1)[0] ?? "en";
+
+    // Own keys only: a language such as `constructor` must not read an inherited property.
+    return Object.hasOwn(PHONE_PLACEHOLDER_BODIES, base) ? (PHONE_PLACEHOLDER_BODIES[base] as string) : (PHONE_PLACEHOLDER_BODIES.en as string);
+};

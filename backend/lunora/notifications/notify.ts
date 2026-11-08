@@ -131,34 +131,35 @@ export const notify = async (ctx: MutationCtx, rawInput: NotificationInput): Pro
         }
     }
 
-    // Push is best-effort: the rows are already written, and a failed schedule must not undo them.
+    // Push is best-effort: the rows are already written, and a failed schedule must not undo them. Browsers and
+    // phones are separate jobs, so neither can hold the other back or send it twice. The phone job is retried only
+    // for a failure before its send; a failed send itself is logged, never retried, so no phone gets it twice.
+
+    if (isPushConfigured()) {
+        try {
+            const [device] = await ctx.push.list({ limit: 1, userId: row.userId });
+
+            if (device) {
+                await ctx.scheduler.runAfter(0, internal.notifications.push.sendPushForNotification, { notificationId, userId: row.userId });
+            }
+        } catch (error) {
+            console.warn("[notifications] Failed to schedule the push notification:", error);
+        }
+    }
 
     try {
-        if (await hasPushTarget(ctx, row.userId)) {
-            await ctx.scheduler.runAfter(0, internal.notifications.push.sendPushForNotification, { notificationId, userId: row.userId });
+        if (await hasPhone(ctx, row.userId)) {
+            await ctx.scheduler.runAfter(0, internal.notifications.phone_delivery.sendPhonePush, { notificationId, userId: row.userId });
         }
     } catch (error) {
-        console.warn("[notifications] Failed to schedule the push notification:", error);
+        console.warn("[notifications] Failed to schedule the phone push:", error);
     }
 
     return notificationId;
 };
 
-/** A browser or phone of the user that a configured channel can reach. One indexed read each. */
-export const hasPushTarget = async (ctx: MutationCtx, userId: string): Promise<boolean> => {
-    if (isPushConfigured()) {
-        // A failed browser lookup must not keep the phones from being checked.
-        try {
-            const [device] = await ctx.push.list({ limit: 1, userId });
-
-            if (device) {
-                return true;
-            }
-        } catch (error) {
-            console.warn("[notifications] Browser push lookup failed; checking phones:", error);
-        }
-    }
-
+/** Whether a phone of the user can be reached: phone push is on and the user has registered one. One indexed read. */
+export const hasPhone = async (ctx: MutationCtx, userId: string): Promise<boolean> => {
     if (!isPhonePushConfigured(process.env)) {
         return false;
     }

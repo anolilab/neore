@@ -55,5 +55,7 @@
       registered again since (`lastSeenAt <= sentAt`); any other error keeps it.
       Logs carry Expo's error code only, never its message (it can quote the
       token).
-    - `notify()` schedules a send when the recipient has a browser subscription
-      or a phone; a failed browser lookup still checks the phones.
+    - `notify()` schedules browsers (`sendPushForNotification`) and phones
+      (`sendPhonePush`) as separate jobs, so neither holds the other back. The
+      phone job is retried only for a failure before its send; a failed send is
+      logged, never retried, so no phone gets an alert twice.

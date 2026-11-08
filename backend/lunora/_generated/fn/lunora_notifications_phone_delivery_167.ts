@@ -29,4 +29,11 @@ __arr1[__i1] = __obj2;
 }
 return { "gone": __arr1 };
 });
+installCompiledValidatorMap(lunora_notifications_phone_delivery_167.sendPhonePush.args, (source) => {
+if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
+if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
+if (typeof source["notificationId"] !== "string") return DEFER;
+if (typeof source["userId"] !== "string") return DEFER;
+return { "notificationId": source["notificationId"], "userId": source["userId"] };
+});
 export * from "../../notifications/phone-delivery.js";

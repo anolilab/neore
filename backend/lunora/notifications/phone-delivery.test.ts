@@ -10,9 +10,8 @@ import { internal } from "../_generated/internal";
 import schema from "../schema";
 import { sendExpoMessages } from "./expo-push";
 import { registerPushDevice } from "./native-push";
-import { hasPushTarget } from "./notify";
-import { isPushConfigured } from "./push-config";
-import { deliverToPhones, listPushDevicesForUser, phoneMessage, recordPushDeliveries } from "./phone-delivery";
+import { hasPhone } from "./notify";
+import { deliverToPhones, listPushDevicesForUser, phoneMessage, recordPushDeliveries, sendPhonePush } from "./phone-delivery";
 
 vi.mock("../lib/crpc-auth-helpers", async (importOriginal) => {
     const sessionFrom = async (context: { auth: { userId?: string | null } }) =>
@@ -24,10 +23,6 @@ vi.mock("../lib/crpc-auth-helpers", async (importOriginal) => {
         getSessionUserForQuery: sessionFrom,
         getSessionUserForQueryLite: sessionFrom,
     };
-});
-
-vi.mock("./push-config", async (importOriginal) => {
-    return { ...(await importOriginal<typeof import("./push-config")>()), isPushConfigured: vi.fn(() => false) };
 });
 
 vi.mock("./expo-push", async (importOriginal) => {
@@ -84,7 +79,6 @@ afterEach(() => {
     harness.close();
     vi.unstubAllEnvs();
     vi.mocked(sendExpoMessages).mockReset();
-    vi.mocked(isPushConfigured).mockReset();
     vi.restoreAllMocks();
 });
 
@@ -312,35 +306,43 @@ describe("deliverToPhones", () => {
     });
 });
 
-describe("whether notify() schedules a send", () => {
-    const target = async (push: { list: () => Promise<unknown[]> }) =>
-        await harness.run(async (ctx: any) => await hasPushTarget({ ...ctx, push } as never, USER));
+describe("whether notify() schedules a phone push", () => {
+    const reachable = async () => await harness.run(async (ctx: any) => await hasPhone(ctx, USER));
 
-    it("schedules one for a user with only a phone, and none without one or while phone push is off", async () => {
-        const noBrowser = { list: async () => [] };
-
-        expect(await target(noBrowser)).toBe(false);
+    it("schedules one for a user with a phone, none without one or while phone push is off", async () => {
+        expect(await reachable()).toBe(false);
 
         await call(registerPushDevice, USER, { platform: "ios", token: PHONE });
 
-        expect(await target(noBrowser)).toBe(true);
+        expect(await reachable()).toBe(true);
 
         vi.stubEnv("EXPO_ACCESS_TOKEN", "");
 
-        expect(await target(noBrowser)).toBe(false);
+        expect(await reachable()).toBe(false);
     });
+});
 
-    it("still checks the phones when the browser lookup fails", async () => {
-        vi.mocked(isPushConfigured).mockReturnValueOnce(true);
-        vi.spyOn(console, "warn").mockImplementation(() => undefined);
-        await call(registerPushDevice, USER, { platform: "android", token: PHONE });
+describe("sendPhonePush", () => {
+    it("sends the generic alert with the notification's ids and urgency, and nothing for a notification that is gone", async () => {
+        const runQuery = vi.fn(async (reference: unknown) =>
+            reference === internal.notifications.push.loadPushNotification
+                ? { link: "/chat/t1", title: "Release run", type: "tool_approval" }
+                : { ended: [], live: [{ id: "d1", platform: "ios", sessionId: "s1", token: PHONE }] },
+        );
+        const ctx = { log: { event: vi.fn() }, runMutation: vi.fn(async () => null), runQuery };
 
-        const failing = {
-            list: async () => {
-                throw new Error("D1 unavailable");
-            },
-        };
+        vi.mocked(sendExpoMessages).mockResolvedValueOnce([{ id: "r1", status: "ok" }]);
 
-        expect(await target(failing)).toBe(true);
+        await (sendPhonePush as unknown as Handler<null>).handler(ctx, { notificationId: "n1", userId: USER });
+
+        expect(sendExpoMessages).toHaveBeenCalledWith("expo-secret", [
+            expect.objectContaining({ body: "You have a new notification", data: { notificationId: "n1", threadId: "t1" }, priority: "high", title: "Neore" }),
+        ]);
+
+        runQuery.mockResolvedValueOnce(null as never);
+        vi.mocked(sendExpoMessages).mockClear();
+        await (sendPhonePush as unknown as Handler<null>).handler(ctx, { notificationId: "n2", userId: USER });
+
+        expect(sendExpoMessages).not.toHaveBeenCalled();
     });
 });

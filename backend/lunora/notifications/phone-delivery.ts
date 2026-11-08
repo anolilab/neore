@@ -3,21 +3,22 @@
  *
  * What leaves our infrastructure is a generic alert and opaque ids, never a thread or run title: every phone shows
  * the localised placeholder (`push-text.ts`), with only `notificationId`/`threadId` as data. A phone is sent to only
- * while the sign-in that registered it lives (`native-push.ts`). Sending is {@link deliverToPhones}, called from
- * `sendPushForNotification`.
+ * while the sign-in that registered it lives (`native-push.ts`). `notify()` schedules {@link sendPhonePush}, which
+ * sends through {@link deliverToPhones}.
  */
 import { v } from "lunorash/server";
 
 import type { Id } from "../_generated/dataModel";
 import { internal } from "../_generated/internal";
 import type { ActionCtx } from "../_generated/server";
-import { internalMutation, internalQuery } from "../_generated/server";
+import { internalAction, internalMutation, internalQuery } from "../_generated/server";
 import type { ExpoMessage, ExpoOutcome } from "./expo-push";
 import { isDeviceGone, sendExpoMessages } from "./expo-push";
 import type { PhonePlatform } from "./native-push-config";
 import { expoAccessToken } from "./native-push-config";
 import { MAX_PUSH_DEVICES_PER_USER } from "./push-device-writes";
-import { PHONE_PLACEHOLDER_TITLE, phonePlaceholderBody } from "./push-text";
+import { threadIdOfLink } from "./locked-link";
+import { PHONE_PLACEHOLDER_TITLE, phonePlaceholderBody, pushUrgency } from "./push-text";
 
 const vPlatform = v.union(v.literal("android"), v.literal("ios"));
 
@@ -191,3 +192,28 @@ export const deliverToPhones = async (ctx: ActionCtx, userId: string, message: P
         }
     }
 };
+
+/**
+ * The phone half of a notification's push, its own job beside the browsers' (`push.ts`), so each is retried on its
+ * own. Only the ids and the urgency are read from the notification; its title and text never leave here.
+ */
+export const sendPhonePush = internalAction
+    .input({ notificationId: v.id("notifications"), userId: v.string() })
+    .output(v.null())
+    .action(async ({ args, ctx }) => {
+        const notification = await ctx.runQuery(internal.notifications.push.loadPushNotification, args);
+
+        if (!notification) {
+            return null;
+        }
+
+        const threadId = threadIdOfLink(notification.link);
+
+        await deliverToPhones(ctx, args.userId, {
+            notificationId: args.notificationId,
+            urgency: pushUrgency(notification.type),
+            ...(threadId !== undefined && { threadId }),
+        });
+
+        return null;
+    });

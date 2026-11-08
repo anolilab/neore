@@ -974,6 +974,7 @@ export interface InternalApiTypes {
         phone_delivery: {
             listPushDevicesForUser: FunctionReference<"query", { userId: string }, { ended: Array<{ id: Id<"pushDevices">; lastSeenAt: number; sessionId: string }>; live: Array<{ id: Id<"pushDevices">; platform: "android" | "ios"; sessionId: string; token: string }> }>;
             recordPushDeliveries: FunctionReference<"mutation", { gone: Array<{ id: Id<"pushDevices">; sentAt: number; sessionId: string; userId: string }> }, null>;
+            sendPhonePush: FunctionReference<"action", { notificationId: Id<"notifications">; userId: string }, null>;
         };
         push: {
             loadPushNotification: FunctionReference<"query", { notificationId: Id<"notifications">; userId: string }, null | { body?: string; link?: string; outcome?: "success" | "failure"; title: string; type: string }>;
@@ -2247,6 +2248,7 @@ export const internal: InternalApiTypes = {
         phone_delivery: {
             listPushDevicesForUser: { __lunoraRef: "notifications_phone_delivery:listPushDevicesForUser" },
             recordPushDeliveries: { __lunoraRef: "notifications_phone_delivery:recordPushDeliveries" },
+            sendPhonePush: { __lunoraRef: "notifications_phone_delivery:sendPhonePush" },
         },
         push: {
             loadPushNotification: { __lunoraRef: "notifications_push:loadPushNotification" },
