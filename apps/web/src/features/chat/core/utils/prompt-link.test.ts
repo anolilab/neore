@@ -1,0 +1,26 @@
+import { describe, expect, it } from "vitest";
+
+import { PROMPT_LINK_MAX_CHARS, readPromptLinkSearch } from "./prompt-link";
+
+describe(readPromptLinkSearch, () => {
+    it("takes hidden characters out and trims the prompt", () => {
+        expect(readPromptLinkSearch({ model: " gpt ", prompt: "  Hi​ there\u{E0041}\n" })).toStrictEqual({ model: "gpt", prompt: "Hi there" });
+    });
+
+    it("cuts a long prompt at the cap without splitting an emoji", () => {
+        const { prompt } = readPromptLinkSearch({ prompt: "😀".repeat(PROMPT_LINK_MAX_CHARS + 1) });
+
+        expect([...(prompt ?? "")]).toHaveLength(PROMPT_LINK_MAX_CHARS);
+        expect(prompt?.endsWith("😀")).toBe(true);
+    });
+
+    it("keeps a prompt that looks like JSON as it was written", () => {
+        expect(readPromptLinkSearch({ prompt: "1.50" })).toStrictEqual({ prompt: "1.50" });
+        expect(readPromptLinkSearch({ prompt: '{"task":"summarise"}' })).toStrictEqual({ prompt: '{"task":"summarise"}' });
+    });
+
+    it("carries nothing, not even the model, without a usable prompt", () => {
+        expect(readPromptLinkSearch({ model: "gpt", prompt: " ​ " })).toStrictEqual({ prompt: "" });
+        expect(readPromptLinkSearch({ model: "gpt" })).toStrictEqual({});
+    });
+});

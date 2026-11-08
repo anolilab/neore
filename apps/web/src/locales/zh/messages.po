@@ -375,7 +375,7 @@ msgstr "{0, plural, other {再显示 # 个视频}}"
 #. placeholder {0}: unsupportedParams.length
 #. placeholder {1}: unsupportedParams.join(", ")
 #: src/routes/(chat)/chat/$threadId.tsx:86
-#: src/routes/(chat)/chat/index.tsx:153
+#: src/routes/(chat)/chat/index.tsx:202
 msgid "{0, plural, one {Unsupported query parameter} other {Unsupported query parameters}}: {1}"
 msgstr "{0, plural, other {不支持的查询参数}}：{1}"
 
@@ -1181,11 +1181,11 @@ msgstr "{name} 已暂停"
 msgid "{name} resumed"
 msgstr "{name} 已恢复"
 
-#: ../../packages/ui/src/components/file-renderers/pdf-thumbnail.tsx:68
+#: ../../packages/ui/src/components/file-renderers/pdf-thumbnail.tsx:69
 msgid "{name}, {pages, plural, one {# page} other {# pages}}"
 msgstr ""
 
-#: ../../packages/ui/src/components/file-renderers/pdf-thumbnail.tsx:69
+#: ../../packages/ui/src/components/file-renderers/pdf-thumbnail.tsx:70
 msgid "{name}, preview unavailable"
 msgstr ""
 
@@ -1209,7 +1209,7 @@ msgstr "{openCount} 条未解决的评论"
 msgid "{overflowCount, plural, one {# more user} other {# more users}}"
 msgstr "{overflowCount, plural, other {另外 # 位用户}}"
 
-#: ../../packages/ui/src/components/file-renderers/pdf-thumbnail.tsx:113
+#: ../../packages/ui/src/components/file-renderers/pdf-thumbnail.tsx:116
 msgid "{pages, plural, one {# page} other {# pages}}"
 msgstr ""
 
@@ -5360,7 +5360,7 @@ msgid "Cannot be exported: {0}"
 msgstr ""
 
 #: src/features/prompts/components/prompts-sidebar-tab.tsx:168
-#: src/features/prompts/hooks/use-prompt-loader.tsx:52
+#: src/features/prompts/hooks/use-prompt-loader.tsx:63
 msgid "Cannot use prompt: {errorMessages}"
 msgstr "无法使用提示词：{errorMessages}"
 
@@ -5368,7 +5368,7 @@ msgstr "无法使用提示词：{errorMessages}"
 msgid "Canny Edge"
 msgstr "Canny 边缘"
 
-#: src/features/chat/assistant.tsx:120
+#: src/features/chat/assistant.tsx:124
 #: src/features/marketing/components/landing-page.tsx:217
 msgid "Canvas"
 msgstr "画布"
@@ -5762,7 +5762,7 @@ msgstr "检查项 {0} 值"
 msgid "Check every (minutes)"
 msgstr ""
 
-#: src/components/error-boundaries/route-error-boundary.tsx:127
+#: src/components/error-boundaries/route-error-boundary.tsx:124
 msgid "Check your internet connection and try again."
 msgstr "请检查网络连接后重试。"
 
@@ -6226,7 +6226,7 @@ msgstr ""
 #: src/components/command-palette.tsx:708
 #: src/features/admin/components/user-sessions-dialog.tsx:159
 #: src/features/canvas/canvas-panel.tsx:818
-#: src/features/canvas/pdf-preview-panel.tsx:98
+#: src/features/canvas/pdf-preview-panel.tsx:105
 #: src/features/chat/thread/composer-text-attachment-editor.tsx:868
 #: src/features/develop/components/thread-pull-requests.tsx:256
 #: src/features/evals/components/save-eval-case-action.tsx:95
@@ -6285,7 +6285,7 @@ msgstr "关闭提示词优化"
 msgid "Close search"
 msgstr "关闭搜索"
 
-#: src/features/chat/assistant.tsx:82
+#: src/features/chat/assistant.tsx:83
 msgid "Close the open document to view this PDF in the panel."
 msgstr ""
 
@@ -7310,7 +7310,7 @@ msgstr "连接器"
 msgid "Connectors talk to each provider's own MCP server over OAuth 2.0. Your tokens are stored encrypted, the AI asks before using a tool that can change data, and disconnecting revokes access."
 msgstr "连接器通过 OAuth 2.0 与各提供商自己的 MCP 服务器通信。你的 token 加密存储，AI 在使用可能更改数据的工具前会先询问，断开连接即撤销访问权限。"
 
-#: src/features/settings/components/privacy/consent-preferences.tsx:18
+#: src/features/settings/components/privacy/consent-preferences.tsx:17
 #: src/features/settings/lib/settings-keywords.ts:108
 msgid "Consent Preferences"
 msgstr "同意偏好"
@@ -9452,7 +9452,7 @@ msgstr "删除预设"
 msgid "Delete preset?"
 msgstr "删除预设？"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1335
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1336
 msgid "Delete Project"
 msgstr "删除项目"
 
@@ -10331,7 +10331,7 @@ msgstr "下载 Markdown"
 msgid "Download Neore for desktop"
 msgstr "下载 Neore 桌面版"
 
-#: src/features/canvas/pdf-preview-panel.tsx:76
+#: src/features/canvas/pdf-preview-panel.tsx:83
 #: src/features/chat/header/thread-download-button.tsx:122
 msgid "Download PDF"
 msgstr "下载 PDF"
@@ -11644,7 +11644,7 @@ msgstr "错误详情："
 msgid "Error ID: <0>{displayErrorId}</0>"
 msgstr "错误 ID：<0>{displayErrorId}</0>"
 
-#: src/components/error-boundaries/route-error-boundary.tsx:143
+#: src/components/error-boundaries/route-error-boundary.tsx:128
 msgid "Error ID: <0>{errorId}</0>"
 msgstr "错误 ID：<0>{errorId}</0>"
 
@@ -15870,7 +15870,7 @@ msgid "If it kept the review as pending, submit or delete it there first."
 msgstr ""
 
 #: src/components/error-boundaries/global-error-boundary-provider.tsx:271
-#: src/components/error-boundaries/route-error-boundary.tsx:139
+#: src/components/error-boundaries/route-error-boundary.tsx:126
 msgid "If this problem persists, please contact support."
 msgstr "如果问题仍然存在，请联系支持。"
 
@@ -16664,7 +16664,7 @@ msgstr "密码无效"
 msgid "Invalid password. Please try again."
 msgstr "密码无效，请重试。"
 
-#: src/routes/(chat)/chat/index.tsx:116
+#: src/routes/(chat)/chat/index.tsx:165
 msgid "Invalid thread ID"
 msgstr "对话 ID 无效"
 
@@ -18113,7 +18113,7 @@ msgid "Loading preview..."
 msgstr "正在加载预览..."
 
 #: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:170
-#: src/features/canvas/pdf-preview-panel.tsx:120
+#: src/features/canvas/pdf-preview-panel.tsx:127
 #: src/features/chat/thread/sandbox-files.tsx:104
 msgid "Loading preview…"
 msgstr "正在加载预览…"
@@ -18166,7 +18166,7 @@ msgstr ""
 msgid "Loading threads"
 msgstr "正在加载对话"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1111
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1112
 msgid "Loading threads..."
 msgstr "正在加载对话..."
 
@@ -18233,11 +18233,11 @@ msgid "Local models are text only. Remove the attachments to send."
 msgstr "本地模型仅支持文本。请移除附件后再发送。"
 
 #. placeholder {0}: info.detail
-#: src/features/local-models/lib/local-errors.ts:195
+#: src/features/local-models/lib/local-errors.ts:204
 msgid "Local request failed: {0}"
 msgstr "本地请求失败：{0}"
 
-#: src/features/local-models/lib/local-errors.ts:195
+#: src/features/local-models/lib/local-errors.ts:204
 msgid "Local request failed."
 msgstr "本地请求失败。"
 
@@ -18570,7 +18570,7 @@ msgstr "马耳他语"
 msgid "Maltese (Malta)"
 msgstr "马耳他语（马耳他）"
 
-#: src/features/settings/components/privacy/consent-preferences.tsx:24
+#: src/features/settings/components/privacy/consent-preferences.tsx:23
 msgid "Manage Consent Preferences"
 msgstr "管理同意偏好"
 
@@ -18646,7 +18646,7 @@ msgstr "管理你的已关联账号"
 msgid "Manage your connected social accounts and third-party providers"
 msgstr "管理你已关联的社交账号和第三方提供商"
 
-#: src/features/settings/components/privacy/consent-preferences.tsx:18
+#: src/features/settings/components/privacy/consent-preferences.tsx:17
 msgid "Manage your consent preferences for cookies and data processing"
 msgstr "管理你对 Cookie 和数据处理的同意偏好"
 
@@ -20258,7 +20258,7 @@ msgstr "Neore 无法连接服务器。它将继续尝试重新连接。"
 msgid "Neore Chat"
 msgstr "Neore Chat"
 
-#: src/routes/__root.tsx:565
+#: src/routes/__root.tsx:558
 msgid "Neore Chat is a modern AI chat application. Chat with the latest AI models, organise your conversations, and stay productive."
 msgstr "Neore Chat 是一款现代 AI 聊天应用。与最新的 AI 模型聊天，整理你的对话，保持高效。"
 
@@ -20969,7 +20969,7 @@ msgstr "没有此类型的记忆。"
 msgid "No memories yet. The AI will start learning from your conversations automatically."
 msgstr "还没有记忆。AI 会自动从你的对话中开始学习。"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1130
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1131
 msgid "No messages found for"
 msgstr "未找到消息："
 
@@ -21251,7 +21251,7 @@ msgstr "无可显示的文本。"
 msgid "No thread has worked on this {requestNoun} yet."
 msgstr ""
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1130
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1131
 msgid "No threads found for"
 msgstr "未找到对话："
 
@@ -21264,7 +21264,7 @@ msgid "No threads were active in that date range."
 msgstr ""
 
 #: src/features/chat/signed-out/signed-out-chat.tsx:273
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1121
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1122
 msgid "No threads yet"
 msgstr "还没有对话"
 
@@ -21541,7 +21541,7 @@ msgstr "尚未在任何设备上运行过操作。"
 msgid "Nothing here."
 msgstr ""
 
-#: src/features/local-models/lib/local-errors.ts:192
+#: src/features/local-models/lib/local-errors.ts:201
 msgid "Nothing is listening at that address. Start Ollama or LM Studio's server, check the port, and make sure the URL ends in /v1."
 msgstr "该地址上没有服务在监听。请启动 Ollama 或 LM Studio 的服务器，检查端口，并确保 URL 以 /v1 结尾。"
 
@@ -22036,7 +22036,7 @@ msgctxt "stock opening price"
 msgid "Open"
 msgstr "开盘"
 
-#: ../../packages/ui/src/components/file-renderers/pdf-thumbnail.tsx:67
+#: ../../packages/ui/src/components/file-renderers/pdf-thumbnail.tsx:68
 msgid "Open {filename}"
 msgstr ""
 
@@ -22156,11 +22156,11 @@ msgstr ""
 msgid "Open Pages"
 msgstr "打开页面"
 
-#: ../../packages/ui/src/components/file-renderers/pdf-thumbnail.tsx:67
+#: ../../packages/ui/src/components/file-renderers/pdf-thumbnail.tsx:68
 msgid "Open PDF"
 msgstr ""
 
-#: src/features/canvas/pdf-preview-panel.tsx:82
+#: src/features/canvas/pdf-preview-panel.tsx:89
 msgid "Open PDF in a new tab to print"
 msgstr ""
 
@@ -23332,7 +23332,7 @@ msgid "Payments, subscriptions, and financial data"
 msgstr "付款、订阅和财务数据"
 
 #: src/components/model-picker/model-picker.tsx:82
-#: src/features/canvas/pdf-preview-panel.tsx:73
+#: src/features/canvas/pdf-preview-panel.tsx:80
 #: src/features/settings/components/chat/models-settings.tsx:35
 msgid "PDF"
 msgstr "PDF"
@@ -23341,7 +23341,7 @@ msgstr "PDF"
 msgid "PDF document"
 msgstr "PDF 文档"
 
-#: src/features/chat/assistant.tsx:120
+#: src/features/chat/assistant.tsx:124
 msgid "PDF preview"
 msgstr ""
 
@@ -24031,8 +24031,8 @@ msgstr "预设已更新"
 msgid "Presets"
 msgstr "预设"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1123
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1147
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1124
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1148
 msgid "Press ? for keyboard shortcuts"
 msgstr "按 ? 查看键盘快捷键"
 
@@ -24566,7 +24566,7 @@ msgstr "图像生成需要提示词"
 msgid "Prompt is required for inpainting"
 msgstr "局部重绘需要提示词"
 
-#: src/features/prompts/hooks/use-prompt-loader.tsx:94
+#: src/features/prompts/hooks/use-prompt-loader.tsx:105
 msgid "Prompt loaded"
 msgstr "提示词已加载"
 
@@ -26899,7 +26899,7 @@ msgstr "俄语（俄罗斯）"
 msgid "S&P Global financial metrics, company data, and market info"
 msgstr "S&P Global 财务指标、公司数据和市场信息"
 
-#: src/features/local-models/lib/local-errors.ts:177
+#: src/features/local-models/lib/local-errors.ts:186
 msgid "Safari blocks this secure page from calling http://localhost. Use Chrome, Edge or Firefox for local models."
 msgstr "Safari 会阻止此安全页面调用 http://localhost。请使用 Chrome、Edge 或 Firefox 运行本地模型。"
 
@@ -27478,7 +27478,7 @@ msgstr "搜索..."
 msgid "Searched the latest messages only"
 msgstr ""
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1137
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1138
 msgid "Searching..."
 msgstr "正在搜索..."
 
@@ -28720,7 +28720,7 @@ msgstr "跳过 CLIP 层（0 = 不跳过，1-2 = 更风格化）"
 msgid "Skip questions"
 msgstr "跳过问题"
 
-#: src/routes/__root.tsx:435
+#: src/routes/__root.tsx:440
 msgid "Skip to content"
 msgstr "跳到内容"
 
@@ -29417,7 +29417,7 @@ msgstr "新建聊天即可开始"
 msgid "Start a new context: earlier messages are no longer sent to the model"
 msgstr "开始新的上下文：之前的消息不再发送给模型"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1122
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1123
 msgid "Start a new conversation to create your first thread"
 msgstr "开始聊天，创建你的第一个对话"
 
@@ -29788,7 +29788,7 @@ msgstr ""
 msgid "Stopped: you sent a new message"
 msgstr ""
 
-#: src/features/local-models/lib/local-errors.ts:166
+#: src/features/local-models/lib/local-errors.ts:175
 msgid "Stopped."
 msgstr "已停止。"
 
@@ -31111,7 +31111,7 @@ msgstr ""
 msgid "That link could not be read."
 msgstr ""
 
-#: src/features/chat/thread/message-list.tsx:303
+#: src/features/chat/thread/message-list.tsx:312
 msgid "That message could not be found in this conversation."
 msgstr "在此对话中找不到该消息。"
 
@@ -31485,30 +31485,30 @@ msgid "The link may be wrong, or its owner has unpublished or deleted the page."
 msgstr "链接可能有误，或者所有者已取消发布或删除该页面。"
 
 #. placeholder {0}: info.detail
-#: src/features/local-models/lib/local-errors.ts:186
+#: src/features/local-models/lib/local-errors.ts:195
 msgid "The local model reported an error: {0}"
 msgstr "本地模型报告错误：{0}"
 
-#: src/features/local-models/lib/local-errors.ts:186
+#: src/features/local-models/lib/local-errors.ts:195
 msgid "The local model reported an error."
 msgstr "本地模型报告了一个错误。"
 
 #. placeholder {0}: info.status ?? 0
 #. placeholder {1}: info.detail
-#: src/features/local-models/lib/local-errors.ts:173
+#: src/features/local-models/lib/local-errors.ts:182
 msgid "The local server answered HTTP {0}: {1}"
 msgstr "本地服务器返回 HTTP {0}：{1}"
 
 #. placeholder {0}: info.status ?? 0
-#: src/features/local-models/lib/local-errors.ts:174
+#: src/features/local-models/lib/local-errors.ts:183
 msgid "The local server answered HTTP {0}."
 msgstr "本地服务器返回 HTTP {0}。"
 
-#: src/features/local-models/lib/local-errors.ts:189
+#: src/features/local-models/lib/local-errors.ts:198
 msgid "The local server did not answer in time. Is it still loading the model?"
 msgstr "本地服务器未及时响应。它是否仍在加载模型？"
 
-#: src/features/local-models/lib/local-errors.ts:180
+#: src/features/local-models/lib/local-errors.ts:189
 msgid "The local server does not have this model. Pull it first (Ollama: ollama pull <model>) or pick another one."
 msgstr "本地服务器上没有此模型。请先拉取（Ollama：ollama pull <model>），或选择其他模型。"
 
@@ -31519,6 +31519,10 @@ msgstr "无法访问 MCP 注册表，因此可能缺少服务器建议。"
 #: src/features/settings/components/chat/mcp/server-catalog.tsx:187
 msgid "The MCP Registry is unavailable right now. Showing popular servers instead."
 msgstr "MCP 注册表当前不可用，改为显示热门服务器。"
+
+#: src/features/chat/core/hooks/use-prompt-link-draft.ts:153
+msgid "The model in the link is not available. The chat keeps its model."
+msgstr ""
 
 #. placeholder {0}: modelIds.length
 #. placeholder {1}: provider.name
@@ -31583,7 +31587,7 @@ msgstr "该页面、所有子页面、评论及版本历史都将被删除。此
 msgid "The pasted text could not be attached and was not inserted."
 msgstr ""
 
-#: src/features/canvas/pdf-preview-panel.tsx:105
+#: src/features/canvas/pdf-preview-panel.tsx:112
 #: src/features/canvas/use-pdf-download.ts:82
 #: src/features/canvas/use-pdf-download.ts:158
 msgid "The PDF could not be downloaded."
@@ -32229,10 +32233,10 @@ msgstr "此演示文稿还没有幻灯片。"
 msgid "This preset will be permanently removed."
 msgstr "此预设将被永久删除。"
 
-#: ../../packages/ui/src/components/file-renderers/pdf-thumbnail.tsx:82
-#: ../../packages/ui/src/components/file-renderers/pdf-thumbnail.tsx:87
+#: ../../packages/ui/src/components/file-renderers/pdf-thumbnail.tsx:85
+#: ../../packages/ui/src/components/file-renderers/pdf-thumbnail.tsx:90
 #: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:162
-#: src/features/canvas/pdf-preview-panel.tsx:114
+#: src/features/canvas/pdf-preview-panel.tsx:121
 #: src/features/chat/thread/sandbox-files.tsx:159
 #: src/features/chat/thread/sandbox-files.tsx:199
 msgid "This preview could not be loaded."
@@ -32347,7 +32351,7 @@ msgstr ""
 msgid "This thread changed since, so this was not applied."
 msgstr ""
 
-#: src/routes/(chat)/chat/index.tsx:121
+#: src/routes/(chat)/chat/index.tsx:170
 msgid "This thread has been deleted"
 msgstr "此对话已被删除"
 
@@ -32394,7 +32398,7 @@ msgstr "这将永久删除 {0} 个匿名用户账号及其所有数据。此操�
 msgid "This will permanently delete all {0} memories and their daily digests. The AI will start learning fresh from your next conversation."
 msgstr "这将永久删除全部 {0} 条记忆及其每日摘要。AI 将从你的下一次对话开始重新学习。"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1325
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1326
 msgid "This will permanently delete the project and all associated threads. This action cannot be undone."
 msgstr "这将永久删除该项目及所有相关对话。此操作无法撤销。"
 
@@ -32457,7 +32461,7 @@ msgstr "对话已归档"
 msgid "Thread deleted."
 msgstr "对话已删除。"
 
-#: src/features/chat/assistant.tsx:127
+#: src/features/chat/assistant.tsx:137
 msgid "Thread details"
 msgstr ""
 
@@ -32486,7 +32490,7 @@ msgstr "对话已设为公开"
 msgid "Thread management"
 msgstr "对话管理"
 
-#: src/routes/(chat)/chat/index.tsx:126
+#: src/routes/(chat)/chat/index.tsx:175
 msgid "Thread not found or you don't have access to it"
 msgstr "未找到对话，或你无权访问"
 
@@ -33184,11 +33188,11 @@ msgstr "立即试用"
 msgid "Try searching for a different term."
 msgstr "尝试搜索其他词。"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1143
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1144
 msgid "Try searching in message content"
 msgstr "尝试搜索消息内容"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1143
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1144
 msgid "Try searching in thread titles or summaries"
 msgstr "尝试搜索对话标题或摘要"
 
@@ -35892,7 +35896,7 @@ msgstr "如对你的个人数据、GDPR 权利或隐私有任何疑问，可以�
 msgid "You can edit the optimized prompt before applying it."
 msgstr "应用前你可以编辑优化后的提示词。"
 
-#: src/features/settings/components/privacy/consent-preferences.tsx:21
+#: src/features/settings/components/privacy/consent-preferences.tsx:20
 msgid "You can manage your consent preferences for different types of data processing, including analytics, marketing, and AI features."
 msgstr "你可以管理对不同类型数据处理的同意偏好，包括分析、营销和 AI 功能。"
 
@@ -35986,7 +35990,7 @@ msgstr "你需要由团队管理员重新添加。"
 msgid "You will need to click \"Stop Impersonating\" to return to your account"
 msgstr "你需要点击“停止模拟登录”才能返回你的账号"
 
-#: src/components/error-boundaries/route-error-boundary.tsx:133
+#: src/components/error-boundaries/route-error-boundary.tsx:125
 msgid "You'll be redirected back here after signing in."
 msgstr "登录后你将被重定向回此处。"
 
@@ -36092,7 +36096,7 @@ msgstr "你的背景、偏好或所在地，帮助 AI 更好地了解你"
 msgid "Your bots"
 msgstr ""
 
-#: src/features/local-models/lib/local-errors.ts:183
+#: src/features/local-models/lib/local-errors.ts:192
 msgid "Your browser blocked access to local network devices for this site. Allow \"Local network access\" in the site settings (the icon left of the address bar), then try again."
 msgstr "你的浏览器阻止了此网站访问本地网络设备。请在网站设置（地址栏左侧的图标）中允许“本地网络访问”，然后重试。"
 
@@ -36153,6 +36157,10 @@ msgstr "你的数据导出已就绪"
 msgid "Your display name for your account"
 msgstr "你账号的显示名称"
 
+#: src/features/chat/core/hooks/use-prompt-link-draft.ts:123
+msgid "Your draft is kept. The prompt from the link was not added."
+msgstr ""
+
 #: src/features/settings/components/privacy/data-export.tsx:164
 msgid "Your export will include: profile, settings, conversations, files metadata, prompts, and usage history. The download link expires in 7 days."
 msgstr "你的导出将包括：个人资料、设置、对话、文件元数据、提示词和使用历史。下载链接 7 天后失效。"
@@ -36188,7 +36196,7 @@ msgstr "上次导入在完成前已停止。继续导入即可导入剩余的对
 msgid "Your latest changes are not saved yet."
 msgstr "你最新的更改尚未保存。"
 
-#: src/features/local-models/lib/local-errors.ts:169
+#: src/features/local-models/lib/local-errors.ts:178
 msgid "Your local server answered, but refused this site (CORS). Allow this site's origin — for Ollama set OLLAMA_ORIGINS, for LM Studio turn on \"Enable CORS\" — then restart the server."
 msgstr "你的本地服务器有响应，但拒绝了此网站（CORS）。请允许此网站的来源——Ollama 设置 OLLAMA_ORIGINS，LM Studio 开启“Enable CORS”——然后重启服务器。"
 

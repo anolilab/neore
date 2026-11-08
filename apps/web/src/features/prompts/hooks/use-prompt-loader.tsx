@@ -9,7 +9,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
 import { useModelStore } from "@/features/chat/core/stores/model-store";
-import useFeatureFlaggedModels from "@/hooks/use-feature-flagged-models";
+import useFeatureFlaggedModels, { useFeatureFlaggedModelsSettled } from "@/hooks/use-feature-flagged-models";
 import { useCRPC } from "@/lib/lunora/crpc";
 
 import validatePromptSettings from "../lib/prompt-validation";
@@ -23,8 +23,12 @@ const usePromptLoader = (promptId: string | undefined) => {
     const { t } = useLingui();
     const crpc = useCRPC();
     const models = useFeatureFlaggedModels();
+    // The prompt's model is checked against that list, so the check waits for it: an empty list still loading would refuse it.
+    const modelsSettled = useFeatureFlaggedModelsSettled();
     const setComposerText = useChatUIStore((state) => state.setComposerText);
-    const hasAppliedPrompt = useRef(false);
+    // The prompt last applied or refused. An id, not a flag: a flag reset in a later effect let the apply effect of a changed
+    // `promptId` run first and skip the new prompt, which a cache hit hands over in the same render.
+    const handledPromptId = useRef<string | undefined>(undefined);
 
     const setSelectedModel = useModelStore((state) => state.setSelectedModel);
     const setPendingSettings = useModelStore((state) => state.setPendingSettings);
@@ -39,7 +43,14 @@ const usePromptLoader = (promptId: string | undefined) => {
     const { data: prompt } = useQuery(crpc.prompts.functions.getPrompt.queryOptions(promptId ? { promptId: promptId as Id<"prompts"> } : skipToken));
 
     useEffect(() => {
-        if (!promptId || !prompt || hasAppliedPrompt.current) {
+        // Leaving the saved prompt's address: opening it again later is a new visit.
+        if (!promptId) {
+            handledPromptId.current = undefined;
+
+            return;
+        }
+
+        if (!prompt || !modelsSettled || handledPromptId.current === promptId) {
             return;
         }
 
@@ -50,7 +61,7 @@ const usePromptLoader = (promptId: string | undefined) => {
             const errorMessages = Object.values(validationResult.errors).filter(Boolean).flat().join(", ");
 
             toast.error(t`Cannot use prompt: ${errorMessages}`);
-            hasAppliedPrompt.current = true;
+            handledPromptId.current = promptId;
 
             return;
         }
@@ -92,13 +103,8 @@ const usePromptLoader = (promptId: string | undefined) => {
         // Set the composer text with the prompt content
         setComposerText(content);
         toast.success(t`Prompt loaded`);
-        hasAppliedPrompt.current = true;
-    }, [promptId, prompt, models, setComposerText, setSelectedModel, setPendingSettings, sessionData, activeOrganization, t]);
-
-    // Reset the ref when promptId changes
-    useEffect(() => {
-        hasAppliedPrompt.current = false;
-    }, [promptId]);
+        handledPromptId.current = promptId;
+    }, [promptId, prompt, models, modelsSettled, setComposerText, setSelectedModel, setPendingSettings, sessionData, activeOrganization, t]);
 };
 
 export default usePromptLoader;
