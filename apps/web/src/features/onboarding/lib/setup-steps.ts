@@ -29,7 +29,7 @@ export const deriveSetupSteps = (
     const done = detectSetupDone(devices);
 
     return SETUP_STEP_IDS.map((id) => {
-        if (done[id]) {
+        if (done[id] === true) {
             return { id, status: "done" };
         }
 

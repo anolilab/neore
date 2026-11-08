@@ -52,14 +52,6 @@ const SetupChecklist: FC = () => {
         ...crpc.auth.setup_steps.setSetupStepSkipped.mutationOptions(),
         // Saves run in click order, so a Skip still on its way can never land after the Resume that followed it.
         scope: { id: "setup-steps-skip" },
-        onError: (_error, args) => {
-            // Undo only this step; the server's push carries whatever is stored.
-            queryClient.setQueryData<SkippedRow>(settingsKey, (row) =>
-                row ? { ...row, setupStepsSkipped: toggleSkipped(row.setupStepsSkipped, args.stepId, !args.skipped) } : row,
-            );
-            setFailedStep(args.stepId);
-            toast.error(t`Could not save that choice. Try again.`);
-        },
         onMutate: async (args) => {
             setFailedStep(undefined);
             // A read still in flight would land after the patch with the value from before the click.
@@ -67,6 +59,14 @@ const SetupChecklist: FC = () => {
             queryClient.setQueryData<SkippedRow>(settingsKey, (row) =>
                 row ? { ...row, setupStepsSkipped: toggleSkipped(row.setupStepsSkipped, args.stepId, args.skipped) } : row,
             );
+        },
+        onError: (_error, args) => {
+            // Undo only this step; the server's push carries whatever is stored.
+            queryClient.setQueryData<SkippedRow>(settingsKey, (row) =>
+                row ? { ...row, setupStepsSkipped: toggleSkipped(row.setupStepsSkipped, args.stepId, !args.skipped) } : row,
+            );
+            setFailedStep(args.stepId);
+            toast.error(t`Could not save that choice. Try again.`);
         },
     });
     // An account with no settings row answers `null`; only `undefined` means the read has not finished. Until both reads
@@ -98,7 +98,12 @@ const SetupChecklist: FC = () => {
         <SettingsCard description={t`Three steps to use coding agents on your own machines. Skip any of them and come back later.`} title={t`Coding setup`}>
             <CardContent>
                 <ol aria-label={t`Coding setup steps`} aria-live="polite" className="space-y-3">
-                    {(steps ?? SETUP_STEP_IDS.map((id) => ({ id, status: undefined }))).map(({ id, status }) => (
+                    {(
+                        steps ??
+                        SETUP_STEP_IDS.map((id) => {
+                            return { id, status: undefined };
+                        })
+                    ).map(({ id, status }) => (
                         <li className="flex flex-wrap items-center gap-3" key={id}>
                             <div className="min-w-0 flex-1">
                                 <p className="text-sm font-medium">

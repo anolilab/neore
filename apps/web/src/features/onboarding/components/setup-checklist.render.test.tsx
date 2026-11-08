@@ -44,7 +44,12 @@ vi.mock("@/lib/lunora/crpc", () => {
                     functions: {
                         getUserSettings: {
                             queryOptions: () => {
-                                return { queryFn: async () => ({ setupStepsSkipped: server.skipped }), queryKey: ["getUserSettings"] };
+                                return {
+                                    queryFn: async () => {
+                                        return { setupStepsSkipped: server.skipped };
+                                    },
+                                    queryKey: ["getUserSettings"],
+                                };
                             },
                         },
                     },
@@ -91,6 +96,16 @@ vi.mock("@/lib/lunora/crpc", () => {
     };
 });
 
+const RESkip = /Skip/;
+const REGoToPairing = /Go to pairing/;
+const REGoToServers = /Go to servers/;
+const REReadTheGuide = /Read the guide/;
+const RESkipAddAnSshServer = /Skip: Add an SSH server/;
+const REResumeAddAnSshServer = /Resume: Add an SSH server/;
+const RESkipPairAComputer = /Skip: Pair a computer/;
+const RESkipResume = /Skip|Resume/;
+const RECouldNotReadYourDevices = /Could not read your devices/;
+
 const renderChecklist = () => {
     const client = new QueryClient({ defaultOptions: { mutations: { retry: false }, queries: { retry: false } } });
 
@@ -115,24 +130,24 @@ describe("<SetupChecklist>", () => {
         renderChecklist();
 
         expect(screen.getAllByText("(Checking)")).toHaveLength(3);
-        expect(screen.queryByRole("button", { name: /Skip/ })).toBeNull();
+        expect(screen.queryByRole("button", { name: RESkip })).toBeNull();
 
         expect(await screen.findAllByText("(To do)")).toHaveLength(3);
-        expect(screen.getByRole("link", { name: /Go to pairing/ }).getAttribute("href")).toBe("#devices-pairing");
-        expect(screen.getByRole("link", { name: /Go to servers/ }).getAttribute("href")).toBe("#devices-ssh");
-        expect(screen.getByRole("link", { name: /Read the guide/ }).getAttribute("href")).toBe("/docs/devices#coding-agents-on-a-computer");
+        expect(screen.getByRole("link", { name: REGoToPairing }).getAttribute("href")).toBe("#devices-pairing");
+        expect(screen.getByRole("link", { name: REGoToServers }).getAttribute("href")).toBe("#devices-ssh");
+        expect(screen.getByRole("link", { name: REReadTheGuide }).getAttribute("href")).toBe("/docs/devices#coding-agents-on-a-computer");
     });
 
     it("skips and resumes a step through the server", async () => {
         const user = userEvent.setup();
 
         renderChecklist();
-        await user.click(await screen.findByRole("button", { name: /Skip: Add an SSH server/ }));
+        await user.click(await screen.findByRole("button", { name: RESkipAddAnSshServer }));
 
         expect(await screen.findByText("(Skipped)")).toBeTruthy();
         expect(save).toHaveBeenCalledWith({ skipped: true, stepId: "ssh" });
 
-        await user.click(screen.getByRole("button", { name: /Resume: Add an SSH server/ }));
+        await user.click(screen.getByRole("button", { name: REResumeAddAnSshServer }));
 
         await waitFor(() => {
             expect(screen.queryByText("(Skipped)")).toBeNull();
@@ -145,9 +160,11 @@ describe("<SetupChecklist>", () => {
 
         server.failSave = true;
         renderChecklist();
-        await user.click(await screen.findByRole("button", { name: /Skip: Pair a computer/ }));
+        await user.click(await screen.findByRole("button", { name: RESkipPairAComputer }));
 
-        expect((await screen.findByRole("alert")).textContent).toBe("Could not save that choice. Try again.");
+        const alert = await screen.findByRole("alert");
+
+        expect(alert.textContent).toBe("Could not save that choice. Try again.");
         expect(toastError).toHaveBeenCalled();
         expect(screen.queryByText("(Skipped)")).toBeNull();
     });
@@ -158,7 +175,7 @@ describe("<SetupChecklist>", () => {
         renderChecklist();
 
         expect(await screen.findAllByText("(Done)")).toHaveLength(3);
-        expect(screen.queryByRole("button", { name: /Skip|Resume/ })).toBeNull();
+        expect(screen.queryByRole("button", { name: RESkipResume })).toBeNull();
         expect(screen.queryByRole("link")).toBeNull();
     });
 
@@ -168,9 +185,9 @@ describe("<SetupChecklist>", () => {
         devices.fail = true;
         renderChecklist();
 
-        expect(await screen.findByText(/Could not read your devices/)).toBeTruthy();
-        expect(screen.getByRole("link", { name: /Go to pairing/ })).toBeTruthy();
-        expect(screen.queryByRole("button", { name: /Skip/ })).toBeNull();
+        expect(await screen.findByText(RECouldNotReadYourDevices)).toBeTruthy();
+        expect(screen.getByRole("link", { name: REGoToPairing })).toBeTruthy();
+        expect(screen.queryByRole("button", { name: RESkip })).toBeNull();
 
         devices.fail = false;
         await user.click(screen.getByRole("button", { name: "Retry the device check" }));
