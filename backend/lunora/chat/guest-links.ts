@@ -21,6 +21,7 @@ import {
     deleteGuestLink,
     GUEST_LINK_REMOVAL_CAP,
     GUEST_ROUTE_DROP_ATTEMPTS,
+    newRemovalBudget,
     scheduleGuestLinkRouteDrop,
     withdrawGuestLinksForThread,
 } from "./lib/guest-link-store";
@@ -114,12 +115,13 @@ export const sweepGuestLinks = internalMutation
             .withIndex("by_expiresAt", (q) => q.lte("expiresAt", ctx.now))
             .take(SWEEP_BATCH);
         const routes: string[] = [];
+        const budget = newRemovalBudget();
         let unfinished = false;
 
         for (const link of lapsed) {
-            const hash = await deleteGuestLink(ctx, link);
+            const hash = await deleteGuestLink(ctx, link, budget);
 
-            // A link with more messages than one page keeps its row; the continuation below finishes it.
+            // Once the call's message budget is spent a link keeps its row; the continuation below finishes it.
             if (hash === undefined) {
                 unfinished = true;
                 break;

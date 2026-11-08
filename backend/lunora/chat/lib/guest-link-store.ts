@@ -21,26 +21,38 @@ interface LinkRow {
     linkHash: string;
 }
 
-/** Messages one removal deletes per link per call. */
+/** Messages one removal deletes per call, across all the links it takes, so a call's writes stay bounded. */
 export const GUEST_MESSAGE_REMOVAL_PAGE = 100;
 
+/** What is left of a call's message deletes ({@link GUEST_MESSAGE_REMOVAL_PAGE}), shared by every link the call removes. */
+export interface RemovalBudget {
+    left: number;
+}
+
+export const newRemovalBudget = (): RemovalBudget => {
+    return { left: GUEST_MESSAGE_REMOVAL_PAGE };
+};
+
 /**
- * One page of a link's messages, and the link itself once none are left. Returns the link's route hash when the link
- * went, for the caller to hand to {@link scheduleGuestLinkRouteDrop}, or `undefined` while messages remain: the caller
- * runs again, and the link is never deleted ahead of its messages.
+ * As many of a link's messages as the budget allows, and the link itself once none are left. Returns the link's route hash
+ * when the link went, for the caller to hand to {@link scheduleGuestLinkRouteDrop}, or `undefined` while messages remain:
+ * the caller runs again, and the link is never deleted ahead of its messages.
  */
-export const deleteGuestLink = async (ctx: Pick<MutationCtx, "db">, link: LinkRow): Promise<string | undefined> => {
-    // One past the page tells a link that holds exactly one page (a full one) from one that holds more.
+export const deleteGuestLink = async (ctx: Pick<MutationCtx, "db">, link: LinkRow, budget: RemovalBudget = newRemovalBudget()): Promise<string | undefined> => {
+    // One past the budget tells a link whose messages exactly use it up from one that holds more.
     const messages = await ctx.db
         .query("threadGuestMessages")
         .withIndex("by_link", (q) => q.eq("linkId", link._id))
-        .take(GUEST_MESSAGE_REMOVAL_PAGE + 1);
+        .take(budget.left + 1);
+    const deleting = messages.slice(0, budget.left);
 
-    for (const message of messages.slice(0, GUEST_MESSAGE_REMOVAL_PAGE)) {
+    for (const message of deleting) {
         await ctx.db.delete("threadGuestMessages", message._id);
     }
 
-    if (messages.length > GUEST_MESSAGE_REMOVAL_PAGE) {
+    budget.left -= deleting.length;
+
+    if (messages.length > deleting.length) {
         return undefined;
     }
 
@@ -65,6 +77,7 @@ export const removeGuestLinkRows = async (
         .withIndex("by_thread_expiresAt", (q) => q.eq("threadId", threadId))
         .take(GUEST_LINK_REMOVAL_CAP);
     const hashes: string[] = [];
+    const budget = newRemovalBudget();
 
     for (const link of links) {
         // Every link lasts the same time, so the index's `expiresAt` order is the order they were made in: from the first
@@ -73,9 +86,9 @@ export const removeGuestLinkRows = async (
             return { done: true, hashes };
         }
 
-        const hash = await deleteGuestLink(ctx, link);
+        const hash = await deleteGuestLink(ctx, link, budget);
 
-        // One unfinished link per call keeps the write bounded; the rest wait for the next call.
+        // An unfinished link means the call's budget is spent; the rest wait for the next call.
         if (hash === undefined) {
             return { done: false, hashes };
         }

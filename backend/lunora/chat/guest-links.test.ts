@@ -206,7 +206,8 @@ describe("withdrawing a link with more than one page of messages", () => {
         expect(await rows("threadGuestLinks")).toHaveLength(1);
 
         // The owner restores the thread and gives out a new link before the continuation runs.
-        await seedLink(threadId, "hash-new", NOW + 60_000, 1, NOW + 1000);
+        // As links are made: expiry follows creation, so the later link also lapses later.
+        await seedLink(threadId, "hash-new", NOW + 1000 + 60_000, 1, NOW + 1000);
         // The fake scheduler cannot resolve a shard-routed job, so the job it holds is run here with the args it was given.
         const [job] = harness.scheduler.list();
 
@@ -249,6 +250,18 @@ describe("a withdrawal continuation that meets only links made after it started"
 
         expect(harness.scheduler.list()).toHaveLength(scheduled);
         expect(await rows("threadGuestLinks")).toHaveLength(50);
+    });
+});
+
+describe("withdrawing several links that together hold more than one page of messages", () => {
+    it("deletes no more than one page of messages in one write, and leaves the rest to the continuation", async () => {
+        await seedLink(threadId, "hash-a", NOW + 60_000, 60);
+        await seedLink(threadId, "hash-b", NOW + 60_000, 60);
+        await harness.run(async (ctx: any) => await markThreadArchived({ ...ctx, now: NOW }, threadId as never));
+
+        // 60 + 40 of the 120 messages: the first link goes whole, the second keeps its row and its last 20.
+        expect(await rows("threadGuestMessages")).toHaveLength(20);
+        expect(await rows("threadGuestLinks")).toHaveLength(1);
     });
 });
 
