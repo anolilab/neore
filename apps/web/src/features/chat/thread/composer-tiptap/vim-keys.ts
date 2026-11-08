@@ -292,9 +292,9 @@ const runUndo = (state: EditorState, vim: VimState): VimResult => {
     return handledAt(vim, tr);
 };
 
-/** The insert keys that start typing before a selected chip, and those that start after it. */
-const INSERT_BEFORE: ReadonlySet<string> = new Set(["i", "I", "O"]);
-const INSERT_AFTER: ReadonlySet<string> = new Set(["a", "A", "o"]);
+/** The insert keys that start typing in the text before a selected chip, and those that start in the text after it. */
+const INSERT_BEFORE: ReadonlySet<string> = new Set(["i", "I"]);
+const INSERT_AFTER: ReadonlySet<string> = new Set(["a", "A"]);
 
 /** Keys pressed while a block without text (a quote chip) is selected instead of a cursor. */
 const chipKey = (state: EditorState, vim: VimState, key: string): VimResult => {
@@ -302,6 +302,14 @@ const chipKey = (state: EditorState, vim: VimState, key: string): VimResult => {
 
     if (key === "x") {
         return handledAt(vim, state.tr.deleteSelection());
+    }
+
+    // `o` and `O` always open a new line, after or before the chip, as they do next to any other line.
+    if (key === "o" || key === "O") {
+        const at = key === "o" ? to : from;
+        const tr = state.tr.insert(at, state.schema.nodes.paragraph!.create());
+
+        return handledAt(vim, tr.setSelection(TextSelection.create(tr.doc, at + 1)), { mode: "insert" });
     }
 
     if (INSERT_BEFORE.has(key) || INSERT_AFTER.has(key)) {

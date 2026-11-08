@@ -191,6 +191,12 @@ describe("motions", () => {
 
         expect(after.vim.mode).toBe("insert");
         expect(after.state.selection.$head.parent.textContent).toBe("last");
+
+        // `o` opens a new, empty line after the chip rather than joining "last".
+        const opened = press(chipSelected, ["o"]);
+
+        expect(opened.state.doc.childCount).toBe(4);
+        expect(opened.state.selection.$head.parent.textContent).toBe("");
     });
 
     it("opens a line before a quote chip that starts the draft, so i does not type over it", () => {

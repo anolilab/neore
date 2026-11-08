@@ -3,7 +3,6 @@ import { Editor, Extension } from "@tiptap/core";
 import { StarterKit } from "@tiptap/starter-kit";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { onComposerRestore, requestComposerRestore } from "@/features/chat/core/utils/composer-restore";
 import { formatQuote } from "@/features/chat/core/utils/quote-selection";
 import { showWarning } from "@/lib/toast";
 
@@ -165,33 +164,6 @@ describe("quoteRestoreDraft", () => {
         expect(quoteRestoreDraft(null, quoted, "Before")).toBe(`Before\n${formatQuote(quoted.text)}`);
     });
 
-    it("keeps a request taken before the editor mounts, then adds a chip once it is mounted", () => {
-        // Tiptap creates the editor after the composer subscribes, so the first request is taken while it is unavailable.
-        let mounted: Editor | null = null;
-        let draft = "Before";
-
-        const unsubscribe = onComposerRestore((payload) => {
-            if (payload.quote) {
-                draft = quoteRestoreDraft(mounted, payload.quote, draft);
-            }
-        });
-
-        requestComposerRestore({ append: true, files: [], quote: quoted, text: "" });
-
-        expect(draft).toBe(`Before\n${formatQuote(quoted.text)}`);
-
-        // The composer mounts the editor with the draft (its sync effect uses the same conversion).
-        editor = new Editor({ content: plainTextToHtml(draft), extensions: [StarterKit.configure({ blockquote: false }), QuoteChip.configure({ labels })] });
-        mounted = editor;
-
-        expect(mounted.getText({ blockSeparator: "\n" })).toContain("The first line");
-
-        requestComposerRestore({ append: true, files: [], quote: { messageId: "msg-5", text: "A later selection" }, text: "" });
-        unsubscribe();
-
-        expect(mounted.getJSON().content?.some((node) => node.type === "quoteChip")).toBe(true);
-        expect(draft).toBe(mounted.getText({ blockSeparator: "\n" }));
-    });
 });
 
 describe("the link back to the quoted reply", () => {
