@@ -1,20 +1,70 @@
 /**
- * Guest links, the parts that need no procedure builder (`chat/guest-links.ts`): the caps and the removal that
- * archiving, trashing, deleting, locking or making a thread temporary shares with the sweep. Kept apart so
- * `agent/threads.ts` can call the removal without importing the procedures.
+ * Guest links, the parts that need no procedure builder (`chat/guest-links.ts`): the lifetime and caps, the token and text
+ * helpers, and the removal that a revoke, the sweep and archiving, trashing, deleting, locking or making a thread temporary
+ * share. Kept apart so `agent/threads.ts` can call the removal without importing the procedures.
  */
+import { stripHiddenText } from "@neore/ai/utils";
+
 import type { Id } from "../../_generated/dataModel";
 import type { MutationCtx } from "../../_generated/server";
 import { internal } from "../../_generated/internal";
+import { sha256Hex } from "../../lib/crypto";
 import { currentShard, ROOT_SHARD_KEY } from "../../lib/shard-context";
 import { deleteShardRoute } from "../../lib/shard-routes";
 import { runAfterOnShard } from "../../lib/shard-scheduler";
 
-/** Rows (held and sent) one link keeps. */
+/**
+ * How long a link lasts. Every link's `expiresAt` is its `createdAt` plus this, never anything else: the removal reads a
+ * thread's links in `expiresAt` order as the order they were made in, and stops at the first one made after its cut-off
+ * (`removeGuestLinkRows`). A link with its own lifetime would break that order.
+ */
+export const GUEST_LINK_TTL_MS = 24 * 60 * 60 * 1000;
+
+/** A guest message is a note, not a document. */
+export const GUEST_MESSAGE_MAX_CHARS = 2000;
+
+/** Messages waiting for the owner, per link. A guest who reaches it is refused until the owner acts. */
+export const GUEST_MAX_HELD_PER_LINK = 20;
+
+/** Rows (held and sent) one link keeps; the held cap above leaves room for the owner's sent ones. */
 export const GUEST_MAX_ROWS_PER_LINK = 100;
 
 /** The most links of one thread a removal reads: a thread has one live link at a time, and lapsed ones go with the sweep. */
 export const GUEST_LINK_REMOVAL_CAP = 50;
+
+/** Tokens are two UUIDs without dashes: 64 characters. Anything much longer is not one. */
+export const GUEST_TOKEN_MAX_LENGTH = 128;
+
+export const newGuestToken = (): string => `${crypto.randomUUID()}${crypto.randomUUID()}`.replaceAll("-", "");
+
+/** A token's stored form: only this ever reaches the database. */
+export const hashGuestToken = async (token: string): Promise<string> => await sha256Hex(token);
+
+/** The shape of a mention as the group parser reads one (`chat/group/logic.ts`), without its participant list. */
+const GUEST_MENTION_SHAPE = /(?:^|[^\w@.])@[a-z0-9]/i;
+
+/**
+ * Why a guest's text cannot be sent later, or `undefined`. A text that starts with `/` could select one of the owner's
+ * commands or skills, and a mention could choose who answers in a group chat: neither is a guest's to decide. Refused when
+ * posted, so no note is left waiting on a Send that can only fail.
+ */
+export const unsendableGuestText = (text: string): string | undefined => {
+    const plain = stripHiddenText(text).text.trimStart();
+
+    if (plain.startsWith("/")) {
+        return "A message cannot start with /.";
+    }
+
+    return GUEST_MENTION_SHAPE.test(plain) ? "A message cannot @mention anyone." : undefined;
+};
+
+/** The text a guest may leave, trimmed, or `null` when it is empty or over the cap. */
+export const cleanGuestText = (text: string): string | null => {
+    // Hidden characters can carry instructions the person never sees: they go, as they do from an ordinary prompt.
+    const trimmed = stripHiddenText(text).text.trim();
+
+    return trimmed.length === 0 || trimmed.length > GUEST_MESSAGE_MAX_CHARS ? null : trimmed;
+};
 
 interface LinkRow {
     _id: Id<"threadGuestLinks">;

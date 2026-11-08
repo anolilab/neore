@@ -277,6 +277,11 @@ export const RATE_LIMIT_CONFIGS = {
     // GDPR limits
     "gdpr/request:free": Ratelimit.fixedWindow(3, HOUR),
     "gdpr/request:premium": Ratelimit.fixedWindow(5, HOUR),
+    // A guest leaving a message through a link (`chat/guest-links.ts`): per client address, and again per
+    // link, which is what bounds a link passed around. The held cap on the link is the other bound.
+    "guest/message:free": Ratelimit.fixedWindow(30, HOUR),
+    "guest/message:premium": Ratelimit.fixedWindow(30, HOUR),
+    "guest/message:public": Ratelimit.fixedWindow(30, HOUR),
     // Remote control of a coding agent (`acp/remote.ts`, `acp/send.ts`): each one queues a signed command for a
     // computer that holds three open ones, so a person gets a burst, not a stream.
     "hosts/answer:free": Ratelimit.fixedWindow(60, MINUTE),
