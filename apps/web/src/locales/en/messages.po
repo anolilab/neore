@@ -681,7 +681,7 @@ msgid "{0} tools: {1}"
 msgstr "{0} tools: {1}"
 
 #. placeholder {0}: overview.unreadCount
-#: src/features/home/components/home-page.tsx:204
+#: src/features/home/components/home-page.tsx:212
 msgid "{0} unread"
 msgstr "{0} unread"
 
@@ -1749,7 +1749,7 @@ msgstr "A {requestNoun} title is at most {0} characters."
 msgid "a change is waiting to be read"
 msgstr "a change is waiting to be read"
 
-#: src/features/home/components/home-page.tsx:158
+#: src/features/home/components/home-page.tsx:166
 msgid "A chat is waiting for your answer"
 msgstr "A chat is waiting for your answer"
 
@@ -3103,7 +3103,7 @@ msgstr "All Categories"
 msgid "All changes saved"
 msgstr "All changes saved"
 
-#: src/features/home/components/home-page.tsx:245
+#: src/features/home/components/home-page.tsx:253
 msgid "All chats"
 msgstr "All chats"
 
@@ -8101,7 +8101,7 @@ msgstr "Could not change push notifications. Try again."
 msgid "Could not change the model. Please try again."
 msgstr "Could not change the model. Please try again."
 
-#: src/features/chat/thread/composer-permission-mode.tsx:185
+#: src/features/chat/thread/composer-permission-mode.tsx:202
 msgid "Could not change the permission mode. Please try again."
 msgstr "Could not change the permission mode. Please try again."
 
@@ -8486,7 +8486,7 @@ msgstr "Could not stop the worker."
 msgid "Could not switch the model. Please try again."
 msgstr "Could not switch the model. Please try again."
 
-#: src/features/home/components/home-page.tsx:228
+#: src/features/home/components/home-page.tsx:236
 msgid "Could not turn on the Daily Brief."
 msgstr "Could not turn on the Daily Brief."
 
@@ -9131,7 +9131,7 @@ msgstr "Daily Brief"
 msgid "Daily Brief turned off"
 msgstr "Daily Brief turned off"
 
-#: src/features/home/components/home-page.tsx:229
+#: src/features/home/components/home-page.tsx:237
 #: src/features/notifications/components/notification-settings.tsx:112
 msgid "Daily Brief turned on"
 msgstr "Daily Brief turned on"
@@ -14928,7 +14928,7 @@ msgstr "German (Switzerland)"
 msgid "Germany"
 msgstr "Germany"
 
-#: src/features/home/components/home-page.tsx:221
+#: src/features/home/components/home-page.tsx:229
 msgid "Get a short summary here every morning."
 msgstr "Get a short summary here every morning."
 
@@ -15953,7 +15953,7 @@ msgid "HLS playback is not supported in this browser."
 msgstr "HLS playback is not supported in this browser."
 
 #: src/components/error-boundaries/route-error-boundary.tsx:118
-#: src/features/home/components/home-page.tsx:120
+#: src/features/home/components/home-page.tsx:128
 #: src/features/layout/components/sidebar-shortcut.tsx:71
 #: src/features/layout/lib/dashboard-page-names.ts:24
 msgid "Home"
@@ -18554,7 +18554,7 @@ msgstr "Loading your items…"
 msgid "Loading your messages…"
 msgstr "Loading your messages…"
 
-#: src/features/home/components/home-page.tsx:128
+#: src/features/home/components/home-page.tsx:136
 msgid "Loading your overview…"
 msgstr "Loading your overview…"
 
@@ -20595,7 +20595,7 @@ msgid "Needs review"
 msgstr "Needs review"
 
 #: src/features/chat/thread-list/hooks/use-thread-groups.ts:492
-#: src/features/home/components/home-page.tsx:151
+#: src/features/home/components/home-page.tsx:159
 msgid "Needs you"
 msgstr "Needs you"
 
@@ -21144,7 +21144,7 @@ msgstr "No camera selected"
 msgid "No cases yet. Add one by hand, import a CSV or JSONL file, or save a chat turn with \"Save as eval case\"."
 msgstr "No cases yet. Add one by hand, import a CSV or JSONL file, or save a chat turn with \"Save as eval case\"."
 
-#: src/features/home/components/home-page.tsx:252
+#: src/features/home/components/home-page.tsx:260
 msgid "No chats yet. Start one above."
 msgstr "No chats yet. Start one above."
 
@@ -21681,7 +21681,7 @@ msgstr "No tools."
 msgid "No triggers yet"
 msgstr "No triggers yet"
 
-#: src/features/home/components/home-page.tsx:211
+#: src/features/home/components/home-page.tsx:219
 msgid "No unread notifications."
 msgstr "No unread notifications."
 
@@ -21908,7 +21908,7 @@ msgstr "Not set"
 msgid "Not shown to this model: {0}"
 msgstr "Not shown to this model: {0}"
 
-#: src/features/sub-agents/components/sub-agent-tool-view.tsx:77
+#: src/features/sub-agents/components/sub-agent-tool-view.tsx:78
 msgid "Not started"
 msgstr "Not started"
 
@@ -21953,7 +21953,7 @@ msgstr "Nothing here."
 msgid "Nothing is listening at that address. Start Ollama or LM Studio's server, check the port, and make sure the URL ends in /v1."
 msgstr "Nothing is listening at that address. Start Ollama or LM Studio's server, check the port, and make sure the URL ends in /v1."
 
-#: src/features/home/components/home-page.tsx:172
+#: src/features/home/components/home-page.tsx:180
 msgid "Nothing is running right now."
 msgstr "Nothing is running right now."
 
@@ -21961,7 +21961,7 @@ msgstr "Nothing is running right now."
 msgid "Nothing is saved, installed or enabled until you choose to save."
 msgstr "Nothing is saved, installed or enabled until you choose to save."
 
-#: src/features/home/components/home-page.tsx:153
+#: src/features/home/components/home-page.tsx:161
 msgid "Nothing is waiting on you."
 msgstr "Nothing is waiting on you."
 
@@ -21977,7 +21977,7 @@ msgstr "Notification"
 msgid "Notification workflows, channels, and recipient preferences"
 msgstr "Notification workflows, channels, and recipient preferences"
 
-#: src/features/home/components/home-page.tsx:208
+#: src/features/home/components/home-page.tsx:216
 #: src/features/notifications/components/notification-bell.tsx:72
 #: src/features/notifications/components/notification-bell.tsx:102
 #: src/features/notifications/components/notification-settings.tsx:199
@@ -22712,7 +22712,7 @@ msgstr "Open the run's conversation"
 msgid "Open the side-question panel without interrupting a running reply ({0})"
 msgstr "Open the side-question panel without interrupting a running reply ({0})"
 
-#: src/features/sub-agents/components/sub-agent-tool-view.tsx:124
+#: src/features/sub-agents/components/sub-agent-tool-view.tsx:129
 msgid "Open the sub-agent's thread"
 msgstr "Open the sub-agent's thread"
 
@@ -23887,12 +23887,13 @@ msgstr "Permanently delete your account and all associated data"
 msgid "Permission Level"
 msgstr "Permission Level"
 
-#: src/features/chat/thread/composer-permission-mode.tsx:78
+#: src/features/chat/thread/composer-permission-mode.tsx:89
 msgid "Permission mode"
 msgstr "Permission mode"
 
 #. placeholder {0}: labels[mode]
-#: src/features/chat/thread/composer-permission-mode.tsx:60
+#: src/features/chat/thread/composer-permission-mode.tsx:63
+#: src/features/chat/thread/composer-permission-mode.tsx:81
 msgid "Permission mode: {0}"
 msgstr "Permission mode: {0}"
 
@@ -25336,7 +25337,7 @@ msgstr "Queue message"
 msgid "Queue message — sends when the current reply finishes"
 msgstr "Queue message — sends when the current reply finishes"
 
-#: src/features/home/components/home-page.tsx:176
+#: src/features/home/components/home-page.tsx:111
 #: src/features/home/components/home-page.tsx:184
 #: src/features/home/components/home-page.tsx:192
 #: src/features/sub-agents/components/sub-agent-tool-view.tsx:55
@@ -25826,7 +25827,7 @@ msgstr "Rebase and merge"
 msgid "Recent"
 msgstr "Recent"
 
-#: src/features/home/components/home-page.tsx:249
+#: src/features/home/components/home-page.tsx:257
 msgid "Recent chats"
 msgstr "Recent chats"
 
@@ -27013,7 +27014,7 @@ msgstr "Retry with note"
 msgid "Retrying now"
 msgstr "Retrying now"
 
-#: src/features/home/components/home-page.tsx:144
+#: src/features/home/components/home-page.tsx:152
 msgid "Retrying…"
 msgstr "Retrying…"
 
@@ -27076,7 +27077,7 @@ msgid "Review submitted"
 msgstr "Review submitted"
 
 #. placeholder {0}: task.title
-#: src/features/home/components/home-page.tsx:163
+#: src/features/home/components/home-page.tsx:171
 msgid "Review task: {0}"
 msgstr "Review task: {0}"
 
@@ -27372,8 +27373,8 @@ msgstr "Run your workflow to see execution history here."
 
 #: src/features/evals/components/run-detail.tsx:28
 #: src/features/evals/components/run-status.tsx:16
-#: src/features/home/components/home-page.tsx:170
-#: src/features/home/components/home-page.tsx:176
+#: src/features/home/components/home-page.tsx:114
+#: src/features/home/components/home-page.tsx:178
 #: src/features/home/components/home-page.tsx:184
 #: src/features/home/components/home-page.tsx:192
 #: src/features/settings/components/chat/trigger-settings.tsx:184
@@ -30204,7 +30205,7 @@ msgstr "started on schedule"
 msgid "started when its dependencies finished"
 msgstr "started when its dependencies finished"
 
-#: src/features/sub-agents/components/sub-agent-tool-view.tsx:82
+#: src/features/sub-agents/components/sub-agent-tool-view.tsx:83
 msgid "Starting"
 msgstr "Starting"
 
@@ -30347,7 +30348,7 @@ msgstr "Stocks"
 #: src/features/develop/components/watched-repositories.tsx:86
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:354
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:367
-#: src/features/sub-agents/components/sub-agent-tool-view.tsx:113
+#: src/features/sub-agents/components/sub-agent-tool-view.tsx:118
 #: src/features/sub-agents/components/worker-stop-bar.tsx:56
 #: src/features/workflow/components/canvas/workflow-controls.tsx:618
 msgid "Stop"
@@ -30832,7 +30833,7 @@ msgstr "Styled Result"
 msgid "stylized animation"
 msgstr "stylized animation"
 
-#: src/features/sub-agents/components/sub-agent-tool-view.tsx:97
+#: src/features/sub-agents/components/sub-agent-tool-view.tsx:102
 msgid "Sub-agent"
 msgstr "Sub-agent"
 
@@ -32728,7 +32729,7 @@ msgstr "This collection is shared with you by a member of your organization. You
 msgid "This command name is reserved"
 msgstr "This command name is reserved"
 
-#: src/features/chat/thread/composer-permission-mode.tsx:181
+#: src/features/chat/thread/composer-permission-mode.tsx:198
 msgid "This comparison's mode applies to every column. Change it on the comparison."
 msgstr "This comparison's mode applies to every column. Change it on the comparison."
 
@@ -33991,7 +33992,7 @@ msgstr "Try adjusting your search terms."
 #: src/features/connection/components/offline-screen.tsx:59
 #: src/features/develop/components/files-tab.tsx:275
 #: src/features/develop/components/thread-pull-requests.tsx:169
-#: src/features/home/components/home-page.tsx:144
+#: src/features/home/components/home-page.tsx:152
 #: src/features/tasks/components/task-form-dialog.tsx:440
 msgid "Try again"
 msgstr "Try again"
@@ -34077,7 +34078,7 @@ msgstr "Turn off auto-merge?"
 #~ msgid "Turn off run until done"
 #~ msgstr "Turn off run until done"
 
-#: src/features/home/components/home-page.tsx:236
+#: src/features/home/components/home-page.tsx:244
 msgid "Turn on Daily Brief"
 msgstr "Turn on Daily Brief"
 
@@ -34537,7 +34538,7 @@ msgstr "Until {until}"
 msgid "Untitled"
 msgstr "Untitled"
 
-#: src/features/home/components/home-page.tsx:257
+#: src/features/home/components/home-page.tsx:265
 msgid "Untitled chat"
 msgstr "Untitled chat"
 
@@ -35971,13 +35972,15 @@ msgid "Waiting for your answer"
 msgstr "Waiting for your answer"
 
 #. placeholder {0}: approval.threadTitle
-#: src/features/home/components/home-page.tsx:158
+#: src/features/home/components/home-page.tsx:166
 msgid "Waiting for your answer in {0}"
 msgstr "Waiting for your answer in {0}"
 
 #: src/features/chat/thread-list/thread-node.tsx:634
 #: src/features/chat/thread-list/thread-node.tsx:641
 #: src/features/chat/thread/tool-approval.tsx:74
+#: src/features/home/components/home-page.tsx:114
+#: src/features/sub-agents/components/sub-agent-tool-view.tsx:52
 msgid "Waiting for your approval"
 msgstr "Waiting for your approval"
 
@@ -36221,7 +36224,7 @@ msgstr "What is the Canvas feature?"
 msgid "What it evaluates"
 msgstr "What it evaluates"
 
-#: src/features/home/components/home-page.tsx:121
+#: src/features/home/components/home-page.tsx:129
 msgid "What needs you, what's running, and where you left off."
 msgstr "What needs you, what's running, and where you left off."
 
@@ -36484,7 +36487,6 @@ msgid "Workflows"
 msgstr "Workflows"
 
 #: src/features/chat/thread-list/hooks/use-thread-groups.ts:493
-#: src/features/sub-agents/components/sub-agent-tool-view.tsx:52
 #: src/features/sub-agents/components/sub-agent-tool-view.tsx:56
 #: src/features/sub-agents/components/worker-list.tsx:80
 #: src/features/sub-agents/components/worker-run-log.tsx:29
@@ -37105,7 +37107,7 @@ msgstr "Your next message will start a self-destructing chat."
 msgid "Your notes could not be loaded. They are still there; try again in a moment."
 msgstr "Your notes could not be loaded. They are still there; try again in a moment."
 
-#: src/features/home/components/home-page.tsx:134
+#: src/features/home/components/home-page.tsx:142
 msgid "Your overview could not be loaded."
 msgstr "Your overview could not be loaded."
 

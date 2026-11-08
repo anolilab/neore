@@ -13,7 +13,15 @@ import { PENDING_APPROVAL_TTL_MS } from "../chat/lib/tool-approval-cleanup";
 import { THREAD_LOCKED_CODE } from "../lib/thread-lock";
 import type { Id } from "../_generated/dataModel";
 import schema from "../schema";
-import { cancelSubAgentRunsForStop, completeResumedRun, markRunAwaiting, reapOverdueWaits, reapSubAgentRun, watchSubAgentRunBeat } from "./functions";
+import {
+    cancelSubAgentRunsForStop,
+    completeResumedRun,
+    markRunAwaiting,
+    postRunResult,
+    reapOverdueWaits,
+    reapSubAgentRun,
+    watchSubAgentRunBeat,
+} from "./functions";
 import { SUB_AGENT_APPROVAL_EXPIRED_MESSAGE, SUB_AGENT_NAME, SUB_AGENT_STALE_MS } from "./logic";
 
 const OWNER = "user-owner";
@@ -222,13 +230,12 @@ describe("a child that stopped on a request", () => {
         expect(await pendingRequests()).toHaveLength(0);
     });
 
-    it("leaves a run's requests open when it ends without ever having waited", async () => {
-        // The seeded requests belong to a run that is still running: it ends without ever having waited, so its end reads no
-        // approval rows. The requests stay open, and the claim's refusal for an ended run (lands in the next part: "refuses an answer ...
-        // after it ended") keeps them unanswerable; `markRunAwaiting` closes them if the run's own wait comes after.
+    it("closes a run's requests when it ends without ever having waited", async () => {
+        // The seeded requests belong to a run that is still running: it failed (or was stopped) between recording them and
+        // its wait. Its end closes them, so they do not stay open, with the child shown as waiting, until they expire.
         expect(await run(async (context) => await cancelSubAgentRunsForStop(context, parentId, OWNER))).toBe(1);
         expect(await runStatus()).toBe("cancelled");
-        expect(await pendingRequests()).toHaveLength(2);
+        expect(await pendingRequests()).toHaveLength(0);
     });
 
     it.each([
@@ -468,5 +475,72 @@ describe("a child that waited on a request", () => {
         // The follow-up, run as the scheduler would, takes the rest and queues no further pass.
         expect(await internalCall(reapOverdueWaits, next?.args ?? {})).toBe(1);
         expect(harness.scheduler.list()).toHaveLength(before.length + 1);
+    });
+
+    it("posts a nested result held back while its parent's run went, when that run ends without ever having waited", async () => {
+        const nestedId = await run(
+            async (context) =>
+                await context.db.insert("subAgentRuns", {
+                    completedAt: Date.now(),
+                    createdAt: Date.now(),
+                    depth: 2,
+                    parentThreadId: childId,
+                    result: "The grandchild's answer.",
+                    status: "succeeded",
+                    task: "Look it up",
+                    toolCallId: "call-nested",
+                    updatedAt: Date.now(),
+                    userId: OWNER,
+                }),
+        );
+
+        // The child's run goes (running, no wait yet): the result is held.
+        expect(await run(async (context) => await postRunResult(context, nestedId, 0))).toBe(false);
+
+        await run(async (context) => await cancelSubAgentRunsForStop(context, parentId, OWNER));
+
+        expect(harness.scheduler.list()).toContainEqual(expect.objectContaining({ args: { attempt: 0, runId: nestedId } }));
+    });
+
+    it("holds a nested run's result back while it waits, so its request stays answerable, and posts it once the run ends", async () => {
+        const nestedId = await run(
+            async (context) =>
+                await context.db.insert("subAgentRuns", {
+                    completedAt: Date.now(),
+                    createdAt: Date.now(),
+                    depth: 2,
+                    parentThreadId: childId,
+                    result: "The grandchild's answer.",
+                    status: "succeeded",
+                    task: "Look it up",
+                    toolCallId: "call-nested",
+                    updatedAt: Date.now(),
+                    userId: OWNER,
+                }),
+        );
+        const childRows = async () =>
+            await run(
+                async (context) =>
+                    await context.db
+                        .query("messages")
+                        .withIndex("by_threadId_order_stepOrder", (q: any) => q.eq("threadId", childId))
+                        .collect(),
+            );
+        const rowsBefore = await childRows();
+
+        await run(async (context) => await markRunAwaiting(context, runId));
+
+        expect(await run(async (context) => await postRunResult(context, nestedId, 0))).toBe(false);
+        // Nothing landed after the request: it is still the child's latest turn, so it can still be answered.
+        expect(await childRows()).toHaveLength(rowsBefore.length);
+
+        await run(async (context) => await cancelSubAgentRunsForStop(context, parentId, OWNER));
+
+        // The run's end posts it at once, not at the held post's next check.
+        expect(harness.scheduler.list()).toContainEqual(expect.objectContaining({ args: { attempt: 0, runId: nestedId } }));
+        expect(await run(async (context) => await postRunResult(context, nestedId, 0))).toBe(true);
+        const rowsAfter = await childRows();
+
+        expect(JSON.stringify(rowsAfter.at(-1)?.message)).toContain("The grandchild's answer.");
     });
 });

@@ -1139,6 +1139,7 @@ export const continueAfterToolApproval = internalAction
             // A sub-agent's child thread is not read as a new reply: its run's own reply is delivered to the parent, as before.
             await setThreadStatus(ctx, threadId, "active", {
                 awaitingInput,
+                ...(subAgentRunId !== undefined && { keepQuestion: true }),
                 replied: subAgentRunId === undefined && !resumed.paused && !resumed.stopped,
             });
 

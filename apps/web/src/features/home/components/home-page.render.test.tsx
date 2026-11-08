@@ -1,6 +1,7 @@
 /**
  * The home page's failure path: a failed overview reads as an alert with a
- * retry, and the retry asks for the overview again.
+ * retry, and the retry asks for the overview again. A sub-agent waiting on its
+ * owner's approval reads as waiting, not running.
  */
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -9,7 +10,7 @@ import { createElement } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const harness = vi.hoisted(() => {
-    return { overviewCalls: 0, shouldFail: true };
+    return { overview: null as unknown, overviewCalls: 0, shouldFail: true };
 });
 
 vi.mock("@lingui/react/macro", () => {
@@ -34,7 +35,7 @@ vi.mock("@/lib/lunora/crpc", () => {
                         throw new Error("backend down");
                     }
 
-                    return null;
+                    return harness.overview;
                 },
                 queryKey: ["home-overview"],
             };
@@ -78,8 +79,31 @@ const mount = () => {
 };
 
 afterEach(() => {
+    harness.overview = null;
     harness.overviewCalls = 0;
     harness.shouldFail = true;
+});
+
+describe("home page sub-agents", () => {
+    it("shows a sub-agent waiting on its owner's approval as waiting, not running", async () => {
+        harness.shouldFail = false;
+        harness.overview = {
+            approvals: [],
+            codingAgents: [],
+            dailyBriefEnabled: true,
+            notifications: [],
+            recentThreads: [],
+            reviews: [],
+            runningTasks: [],
+            subAgents: [{ _id: "run-1", createdAt: 1, parentThreadId: "thread-1", status: "awaiting", task: "Delete the old files" }],
+            unreadCount: 0,
+        };
+        mount();
+
+        await screen.findByText("Delete the old files");
+
+        expect(screen.getByText("Waiting for your approval")).toBeTruthy();
+    });
 });
 
 describe("home page error state", () => {

@@ -34364,6 +34364,10 @@
                               {
                                 "const": "running",
                                 "type": "string"
+                              },
+                              {
+                                "const": "awaiting",
+                                "type": "string"
                               }
                             ]
                           },
