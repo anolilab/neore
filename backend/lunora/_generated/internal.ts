@@ -975,6 +975,10 @@ export interface InternalApiTypes {
         locked_redact: {
             redactLockedLinks: FunctionReference<"mutation", { cursor?: string; threadId: Id<"threads">; userId: string }, null>;
         };
+        phone_content: {
+            loadPhonePushContent: FunctionReference<"query", { notificationId: Id<"notifications">; userId: string }, null | { generic: true } | { body: string; threadId: string; title: string }>;
+            readThreadLockState: FunctionReference<"query", { threadId: string; userId: string }, "locked" | "missing" | "open">;
+        };
         phone_delivery: {
             checkPushReceipts: FunctionReference<"action", { attempt?: number; entries: Array<{ deviceId: Id<"pushDevices">; receiptId: string; sentAt: number; sessionId: string; userId: string }> }, null>;
             listPushDevicesForUser: FunctionReference<"query", { userId: string }, { ended: Array<{ id: Id<"pushDevices">; lastSeenAt: number; sessionId: string }>; live: Array<{ id: Id<"pushDevices">; language?: string; platform: "android" | "ios"; sessionId: string; token: string }> }>;
@@ -2254,6 +2258,10 @@ export const internal: InternalApiTypes = {
         },
         locked_redact: {
             redactLockedLinks: { __lunoraRef: "notifications_locked_redact:redactLockedLinks" },
+        },
+        phone_content: {
+            loadPhonePushContent: { __lunoraRef: "notifications_phone_content:loadPhonePushContent" },
+            readThreadLockState: { __lunoraRef: "notifications_phone_content:readThreadLockState" },
         },
         phone_delivery: {
             checkPushReceipts: { __lunoraRef: "notifications_phone_delivery:checkPushReceipts" },

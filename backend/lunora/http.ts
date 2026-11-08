@@ -250,6 +250,11 @@ app.on(["POST", "PATCH", "GET"], [HOST_UPLOAD_PATH, `${HOST_UPLOAD_PATH}/:upload
 app.post("/extension/auth/authorize", httpAction(lazy(async () => await import("./auth/extension-grant-http"), "authorizeExtensionHttpAction")));
 app.post("/extension/auth/exchange", httpAction(lazy(async () => await import("./auth/extension-grant-http"), "exchangeExtensionCodeHttpAction")));
 app.post("/extension/auth/token", httpAction(lazy(async () => await import("./auth/extension-grant-http"), "extensionAccessTokenHttpAction")));
+// The text of one notification for the phone that got a push carrying only its id (`notifications/push-content-http.ts`).
+app.post(
+    "/notifications/push-content",
+    httpAction(onCallerShard(lazy(async () => await import("./notifications/push-content-http"), "pushContentHttpAction"))),
+);
 app.post("/extension/auth/revoke", httpAction(lazy(async () => await import("./auth/extension-grant-http"), "revokeExtensionSessionHttpAction")));
 
 app.post("/chat/start", httpAction(onCallerShard(lazy(async () => await import("./chat/http"), "chatStartHttpAction"))));

@@ -35,6 +35,25 @@ export const pushTitle = (type: string, outcome: "failure" | "success" | undefin
  * pushed `high`, so a dozing phone wakes for it; everything else waits for the
  * device's next convenient moment.
  */
+/** Push body cap, well inside the 4 KiB a push service accepts after encryption. */
+const PUSH_BODY_MAX = 300;
+
+/**
+ * The headline and text of a push, the same for a browser (Web Push) and for the text a phone fetches
+ * (`phone-content.ts`): the type's headline, then the subject and its body, capped.
+ */
+export const pushHeadline = (notification: {
+    body?: string;
+    outcome?: "failure" | "success";
+    title: string;
+    type: string;
+}): { body: string; title: string } => {
+    return {
+        body: (notification.body ? `${notification.title}\n${notification.body}` : notification.title).slice(0, PUSH_BODY_MAX),
+        title: pushTitle(notification.type, notification.outcome),
+    };
+};
+
 const WAITING_ON_A_PERSON: ReadonlySet<string> = new Set(["ask_user", "secret_request", "tool_approval"]);
 
 export const pushUrgency = (type: string): "high" | "normal" => (WAITING_ON_A_PERSON.has(type) ? "high" : "normal");

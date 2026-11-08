@@ -60,3 +60,15 @@
       (`sendPhonePush`) as separate jobs, so neither holds the other back. The
       phone job is retried only for a failure before its send; a failed send is
       logged, never retried, so no phone gets an alert twice.
+- **Phone push content** (`push-content-http.ts`, `phone-content.ts`) —
+  `POST /notifications/push-content` gives a phone the text of one of its
+  owner's notifications (`pushHeadline`, the same as Web Push). Another user's
+  or a missing id: the same 404; not an id: 400; a failure on our side: a
+  logged 503. Only a notification linking to a chat ever gets text: one linking
+  elsewhere can carry chat content (a task round's answer on `/tasks`, the
+  Daily Brief) with no chat to check, so it stays generic. A chat-linked one
+  gets text only while the chat, read
+  at request time on the shard it lives on (`threadShardFor`, `callOnShard`),
+  is fully readable by the caller (`resolveThreadReadAccess`) and not locked,
+  passcode-protected, deleted or archived; otherwise `{ generic: true }`. Body
+  capped at 1 KiB while read; 120 requests a minute per caller.
