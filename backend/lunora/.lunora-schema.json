@@ -24002,6 +24002,12 @@
           "optional": true,
           "unique": false
         },
+        "reapAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "result": {
           "kind": "string",
           "nullable": false,
@@ -24077,6 +24083,13 @@
           "optional": false,
           "unique": false,
           "members": [
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"awaiting\""
+            },
             {
               "kind": "literal",
               "nullable": false,
@@ -24175,6 +24188,13 @@
           "fields": [
             "parentThreadId",
             "status"
+          ],
+          "unique": false
+        },
+        "by_status_and_reapAt": {
+          "fields": [
+            "status",
+            "reapAt"
           ],
           "unique": false
         },
