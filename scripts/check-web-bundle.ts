@@ -17,8 +17,11 @@ const MANIFEST = join(CLIENT_DIRECTORY, ".vite", "manifest.json");
 
 /** gzip KiB. Set just above the measured size, so a regression is caught and a
  * small change is not. Raise it in the same commit as the change that grows it. */
-const ENTRY_GZIP_BUDGET_KIB = 285;
-const CLOSURE_GZIP_BUDGET_KIB = 600;
+const ENTRY_GZIP_BUDGET_KIB = 200;
+// 600 -> 675 with the dependency refresh (#589): c15t 3 (@c15t/core + schema, ~+30),
+// posthog-js 1.447 (~+14), TanStack Start's createServerFn as its own chunk (+11), and
+// ~25 of small shared chunks the new chunk split hoists into the first load.
+const CLOSURE_GZIP_BUDGET_KIB = 675;
 
 interface ManifestChunk {
     file: string;
