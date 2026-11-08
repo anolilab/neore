@@ -1181,6 +1181,14 @@ msgstr "{name} を一時停止しました"
 msgid "{name} resumed"
 msgstr "{name} を再開しました"
 
+#: ../../packages/ui/src/components/file-renderers/pdf-thumbnail.tsx:68
+msgid "{name}, {pages, plural, one {# page} other {# pages}}"
+msgstr ""
+
+#: ../../packages/ui/src/components/file-renderers/pdf-thumbnail.tsx:69
+msgid "{name}, preview unavailable"
+msgstr ""
+
 #: ../../packages/chat-ui/src/chat/tool-group.tsx:29
 msgid "{namesText}, +{more} more"
 msgstr ""
@@ -1200,6 +1208,10 @@ msgstr "未解決のコメント {openCount} 件"
 #: src/features/workflow/components/collab/collaborator-facepile.tsx:92
 msgid "{overflowCount, plural, one {# more user} other {# more users}}"
 msgstr "{overflowCount, plural, other {ほか # 人のユーザー}}"
+
+#: ../../packages/ui/src/components/file-renderers/pdf-thumbnail.tsx:113
+msgid "{pages, plural, one {# page} other {# pages}}"
+msgstr ""
 
 #: src/features/settings/components/chat/api-keys-settings.tsx:495
 msgid "{providerId} API key removed"
@@ -2798,7 +2810,7 @@ msgstr "AI 動画生成"
 msgid "AI-assisted bug triage with full recording context"
 msgstr "完全な記録コンテキストによる AI 支援のバグトリアージ"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:368
+#: ../../packages/chat-ui/src/chat/message-content.tsx:369
 msgid "AI-generated"
 msgstr "AI生成"
 
@@ -3229,7 +3241,7 @@ msgstr "エラーが発生しました"
 msgid "An error occurred during One Tap sign in"
 msgstr "One Tap サインイン中にエラーが発生しました"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1146
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1147
 msgid "An error occurred while generating the response."
 msgstr "応答の生成中にエラーが発生しました。"
 
@@ -4874,11 +4886,11 @@ msgstr "ワークフローの以前のバージョンを閲覧して復元しま
 msgid "Browse, fork, and remix workflows shared by the community"
 msgstr "コミュニティが共有したワークフローを閲覧、フォーク、リミックス"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:729
+#: ../../packages/chat-ui/src/chat/message-content.tsx:730
 msgid "Browser"
 msgstr "ブラウザー"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:752
+#: ../../packages/chat-ui/src/chat/message-content.tsx:753
 msgid "Browser action failed"
 msgstr "ブラウザー操作に失敗しました"
 
@@ -4886,7 +4898,7 @@ msgstr "ブラウザー操作に失敗しました"
 msgid "Browser Automation"
 msgstr "ブラウザー自動化"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:750
+#: ../../packages/chat-ui/src/chat/message-content.tsx:751
 msgid "Browser error"
 msgstr "ブラウザーエラー"
 
@@ -4895,7 +4907,7 @@ msgid "Browser notes"
 msgstr "ブラウザーに関する注意"
 
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:259
-#: ../../packages/chat-ui/src/chat/message-content.tsx:712
+#: ../../packages/chat-ui/src/chat/message-content.tsx:713
 msgid "Browser screenshot"
 msgstr "ブラウザーのスクリーンショット"
 
@@ -4903,7 +4915,7 @@ msgstr "ブラウザーのスクリーンショット"
 msgid "Browser Session"
 msgstr "ブラウザーセッション"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:662
+#: ../../packages/chat-ui/src/chat/message-content.tsx:663
 msgid "Browser working..."
 msgstr "ブラウザーで作業中..."
 
@@ -5351,7 +5363,7 @@ msgstr "プロンプトを使用できません：{errorMessages}"
 msgid "Canny Edge"
 msgstr "Canny エッジ"
 
-#: src/features/chat/assistant.tsx:71
+#: src/features/chat/assistant.tsx:120
 #: src/features/marketing/components/landing-page.tsx:217
 msgid "Canvas"
 msgstr "キャンバス"
@@ -5766,7 +5778,7 @@ msgstr "チェックした連携は、保存後にセットアップの候補と
 msgid "Checked: {0}"
 msgstr ""
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:385
+#: ../../packages/chat-ui/src/chat/message-content.tsx:386
 msgid "Checking image safety..."
 msgstr "画像の安全性を確認しています..."
 
@@ -6169,7 +6181,7 @@ msgstr "クリックして編集"
 msgid "Click to edit..."
 msgstr "クリックして編集..."
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:654
+#: ../../packages/chat-ui/src/chat/message-content.tsx:655
 msgid "Clicking element..."
 msgstr "要素をクリックしています..."
 
@@ -6205,6 +6217,7 @@ msgstr ""
 #: src/components/command-palette.tsx:708
 #: src/features/admin/components/user-sessions-dialog.tsx:159
 #: src/features/canvas/canvas-panel.tsx:818
+#: src/features/canvas/pdf-preview-panel.tsx:98
 #: src/features/chat/thread/composer-text-attachment-editor.tsx:868
 #: src/features/develop/components/thread-pull-requests.tsx:256
 #: src/features/evals/components/save-eval-case-action.tsx:95
@@ -6263,6 +6276,10 @@ msgstr "プロンプト改善を閉じる"
 msgid "Close search"
 msgstr "検索を閉じる"
 
+#: src/features/chat/assistant.tsx:82
+msgid "Close the open document to view this PDF in the panel."
+msgstr ""
+
 #: src/features/chat/translation/message-translation.tsx:133
 msgid "Close translation"
 msgstr "翻訳を閉じる"
@@ -6302,7 +6319,7 @@ msgstr "Cloudflare Workers AI のモデルは Cloudflare に空きのある場�
 msgid "Code"
 msgstr "コード"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:127
+#: ../../packages/chat-ui/src/chat/message-content.tsx:128
 msgid "Code block"
 msgstr ""
 
@@ -6314,7 +6331,7 @@ msgstr "コード実行"
 msgid "Code execution and sandbox files"
 msgstr "コード実行とサンドボックスのファイル"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:630
+#: ../../packages/chat-ui/src/chat/message-content.tsx:631
 msgid "Code execution failed"
 msgstr "コードの実行に失敗しました"
 
@@ -6338,7 +6355,7 @@ msgstr ""
 msgid "Code navigation"
 msgstr ""
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:586
+#: ../../packages/chat-ui/src/chat/message-content.tsx:587
 msgid "Code output"
 msgstr "コードの出力"
 
@@ -8527,7 +8544,7 @@ msgstr "7 日間有効な 1 回限りのリンクを作成します。サイン�
 msgid "Creating branch..."
 msgstr "ブランチを作成しています..."
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:309
+#: ../../packages/chat-ui/src/chat/message-content.tsx:310
 msgid "Creating slides..."
 msgstr "スライドを作成しています..."
 
@@ -10133,7 +10150,7 @@ msgid "Do you want to add more rows?"
 msgstr "行を追加しますか？"
 
 #: ../../packages/chat-ui/src/chat/document-artifact.tsx:44
-#: ../../packages/chat-ui/src/chat/message-content.tsx:284
+#: ../../packages/chat-ui/src/chat/message-content.tsx:285
 #: ../../packages/ui/src/components/file-renderers/docx-preview.tsx:114
 msgid "Document"
 msgstr "ドキュメント"
@@ -10283,7 +10300,7 @@ msgstr "ドキュメントをダウンロード"
 msgid "Download Export"
 msgstr "エクスポートをダウンロード"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:447
+#: ../../packages/chat-ui/src/chat/message-content.tsx:448
 #: ../../packages/ui/src/components/file-renderers/generic-file-card.tsx:87
 msgid "Download file"
 msgstr "ファイルをダウンロード"
@@ -10305,6 +10322,7 @@ msgstr "Markdown をダウンロード"
 msgid "Download Neore for desktop"
 msgstr "デスクトップ版 Neore をダウンロード"
 
+#: src/features/canvas/pdf-preview-panel.tsx:76
 #: src/features/chat/header/thread-download-button.tsx:122
 msgid "Download PDF"
 msgstr "PDF をダウンロード"
@@ -11641,7 +11659,7 @@ msgstr "エラー率"
 msgid "Error trace:"
 msgstr "エラートレース:"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:245
+#: ../../packages/chat-ui/src/chat/message-content.tsx:246
 msgid "Error:"
 msgstr "エラー:"
 
@@ -11905,7 +11923,7 @@ msgstr "ツールを実行しています..."
 msgid "Execution"
 msgstr "実行"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:620
+#: ../../packages/chat-ui/src/chat/message-content.tsx:621
 msgid "Execution failed"
 msgstr "実行に失敗しました"
 
@@ -12248,11 +12266,11 @@ msgstr "ページを抽出"
 msgid "Extract subject"
 msgstr "被写体を抽出"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:720
+#: ../../packages/chat-ui/src/chat/message-content.tsx:721
 msgid "Extracted"
 msgstr "抽出済み"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:655
+#: ../../packages/chat-ui/src/chat/message-content.tsx:656
 msgid "Extracting content..."
 msgstr "コンテンツを抽出しています..."
 
@@ -14539,7 +14557,7 @@ msgstr "生成された動画"
 msgid "Generated videos will appear here. Start by describing what you want to create in the composer below."
 msgstr "生成した動画はここに表示されます。まずは下の入力欄で作りたいものを説明してください。"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:462
+#: ../../packages/chat-ui/src/chat/message-content.tsx:463
 msgid "Generating audio..."
 msgstr "音声を生成しています..."
 
@@ -14547,12 +14565,12 @@ msgstr "音声を生成しています..."
 msgid "Generating draft…"
 msgstr "下書きを生成しています…"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:463
+#: ../../packages/chat-ui/src/chat/message-content.tsx:464
 #: src/features/chat/thread/media-gallery-view.tsx:395
 msgid "Generating image..."
 msgstr "画像を生成しています..."
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:306
+#: ../../packages/chat-ui/src/chat/message-content.tsx:307
 msgid "Generating presentation..."
 msgstr "プレゼンテーションを生成しています..."
 
@@ -14560,7 +14578,7 @@ msgstr "プレゼンテーションを生成しています..."
 msgid "Generating response"
 msgstr "応答を生成中"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:464
+#: ../../packages/chat-ui/src/chat/message-content.tsx:465
 #: src/features/chat/thread/media-gallery-view.tsx:395
 msgid "Generating video..."
 msgstr "動画を生成しています..."
@@ -15865,7 +15883,7 @@ msgid "illustration"
 msgstr "イラスト"
 
 #: ../../packages/chat-ui/src/chat/document-artifact.tsx:42
-#: ../../packages/chat-ui/src/chat/message-content.tsx:414
+#: ../../packages/chat-ui/src/chat/message-content.tsx:415
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:643
 #: ../../packages/ui/src/components/ai-elements/attachments-utilities.tsx:47
 #: ../../packages/ui/src/components/ai-elements/attachments.tsx:107
@@ -16458,7 +16476,7 @@ msgstr "入力テンプレート"
 msgid "Input tokens"
 msgstr "入力トークン"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:229
+#: ../../packages/chat-ui/src/chat/message-content.tsx:230
 msgid "Input:"
 msgstr "入力:"
 
@@ -16843,7 +16861,7 @@ msgstr ""
 msgid "It was not saved. Paste it again and save."
 msgstr ""
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:391
+#: ../../packages/chat-ui/src/chat/message-content.tsx:392
 msgid "It will be visible once approved by a moderator"
 msgstr "モデレーターの承認後に表示されます"
 
@@ -18015,7 +18033,7 @@ msgstr "エディターを読み込んでいます..."
 msgid "Loading editor…"
 msgstr "エディターを読み込んでいます…"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:328
+#: ../../packages/chat-ui/src/chat/message-content.tsx:329
 #: ../../packages/ui/src/components/file-renderers/fetched-text-preview.tsx:65
 msgid "Loading file…"
 msgstr "ファイルを読み込んでいます…"
@@ -18085,7 +18103,8 @@ msgstr "プリセットを読み込み中…"
 msgid "Loading preview..."
 msgstr "プレビューを読み込んでいます..."
 
-#: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:168
+#: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:170
+#: src/features/canvas/pdf-preview-panel.tsx:120
 #: src/features/chat/thread/sandbox-files.tsx:104
 msgid "Loading preview…"
 msgstr "プレビューを読み込んでいます…"
@@ -18186,7 +18205,7 @@ msgstr ""
 msgid "Loading..."
 msgstr "読み込んでいます..."
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:331
+#: ../../packages/chat-ui/src/chat/message-content.tsx:332
 #: src/features/chat/thread/memory-usage-action.tsx:46
 #: src/features/chat/thread/request-secret-prompt.tsx:479
 #: src/features/code/components/code-workspace.tsx:90
@@ -20157,11 +20176,11 @@ msgstr "スレッド間を移動"
 msgid "navigate within each column"
 msgstr "各列内を移動"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:721
+#: ../../packages/chat-ui/src/chat/message-content.tsx:722
 msgid "Navigated"
 msgstr "移動しました"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:662
+#: ../../packages/chat-ui/src/chat/message-content.tsx:663
 msgid "Navigating to {target}..."
 msgstr "{target} に移動しています..."
 
@@ -20230,7 +20249,7 @@ msgstr "Neore はサーバーに接続できません。再接続を試み続け
 msgid "Neore Chat"
 msgstr "Neore Chat"
 
-#: src/routes/__root.tsx:557
+#: src/routes/__root.tsx:565
 msgid "Neore Chat is a modern AI chat application. Chat with the latest AI models, organise your conversations, and stay productive."
 msgstr "Neore Chat はモダンな AI チャットアプリケーションです。最新の AI モデルとチャットし、会話を整理して、生産性を高めましょう。"
 
@@ -20575,7 +20594,7 @@ msgstr "次のオプション"
 msgid "Next output mode"
 msgstr "次の出力モード"
 
-#: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:121
+#: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:119
 #: src/features/prompts/components/prompts-sidebar-tab.tsx:879
 msgid "Next page"
 msgstr "次のページ"
@@ -21990,7 +22009,7 @@ msgstr "問題が発生しました"
 msgid "Opacity"
 msgstr "不透明度"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:707
+#: ../../packages/chat-ui/src/chat/message-content.tsx:708
 #: src/components/command-palette.tsx:700
 #: src/features/chat/link-preview/link-preview-card.tsx:117
 #: src/features/develop/components/pull-request-view.tsx:73
@@ -22007,6 +22026,10 @@ msgstr "営業中"
 msgctxt "stock opening price"
 msgid "Open"
 msgstr "始値"
+
+#: ../../packages/ui/src/components/file-renderers/pdf-thumbnail.tsx:67
+msgid "Open {filename}"
+msgstr ""
 
 #: src/features/chat/thread/comparison-view.tsx:140
 msgid "Open {modelName} in full thread"
@@ -22123,6 +22146,14 @@ msgstr ""
 #: src/features/layout/components/sidebar-shortcut.tsx:124
 msgid "Open Pages"
 msgstr "ページを開く"
+
+#: ../../packages/ui/src/components/file-renderers/pdf-thumbnail.tsx:67
+msgid "Open PDF"
+msgstr ""
+
+#: src/features/canvas/pdf-preview-panel.tsx:82
+msgid "Open PDF in a new tab to print"
+msgstr ""
 
 #: src/features/canvas/components/canvas-code-preview.tsx:219
 msgid "Open preview in new tab"
@@ -22839,7 +22870,7 @@ msgstr ""
 msgid "Outpaint"
 msgstr "アウトペイント"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:562
+#: ../../packages/chat-ui/src/chat/message-content.tsx:563
 #: ../../packages/ui/src/components/ai-elements/context.tsx:276
 #: src/components/model-picker/model-picker.tsx:206
 #: src/features/devices/components/device-tool-call.tsx:174
@@ -22887,7 +22918,7 @@ msgstr "出力タイプ"
 msgid "Output-format focused"
 msgstr "出力形式重視"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:237
+#: ../../packages/chat-ui/src/chat/message-content.tsx:238
 msgid "Output:"
 msgstr "出力:"
 
@@ -22931,7 +22962,7 @@ msgstr ""
 msgid "Pacific Time (US & Canada)"
 msgstr "太平洋標準時（米国およびカナダ）"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:661
+#: ../../packages/chat-ui/src/chat/message-content.tsx:662
 msgid "page"
 msgstr "ページ"
 
@@ -23292,6 +23323,7 @@ msgid "Payments, subscriptions, and financial data"
 msgstr "支払い、サブスクリプション、財務データ"
 
 #: src/components/model-picker/model-picker.tsx:82
+#: src/features/canvas/pdf-preview-panel.tsx:73
 #: src/features/settings/components/chat/models-settings.tsx:35
 msgid "PDF"
 msgstr "PDF"
@@ -23299,6 +23331,10 @@ msgstr "PDF"
 #: ../../packages/ui/src/components/file-renderers/hex-viewer.tsx:77
 msgid "PDF document"
 msgstr "PDF ドキュメント"
+
+#: src/features/chat/assistant.tsx:120
+msgid "PDF preview"
+msgstr ""
 
 #: src/features/settings/components/knowledge/knowledge-base-settings.tsx:314
 msgid "PDF, DOCX, TXT, MD, CSV, JSON, XLS, XLSX — max 5MB"
@@ -24129,7 +24165,7 @@ msgstr "前のオプション"
 msgid "Previous output mode"
 msgstr "前の出力モード"
 
-#: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:107
+#: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:105
 #: src/features/prompts/components/prompts-sidebar-tab.tsx:870
 msgid "Previous page"
 msgstr "前のページ"
@@ -26768,7 +26804,7 @@ msgstr "ワークフローを実行すると、ここに実行履歴が表示さ
 msgid "Running"
 msgstr "実行中"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:523
+#: ../../packages/chat-ui/src/chat/message-content.tsx:524
 msgid "Running code..."
 msgstr "コードを実行しています..."
 
@@ -26776,7 +26812,7 @@ msgstr "コードを実行しています..."
 msgid "Running on {device}…"
 msgstr "{device} で実行中…"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:206
+#: ../../packages/chat-ui/src/chat/message-content.tsx:207
 #: src/features/admin/components/admin-cleanup-dashboard.tsx:258
 #: src/features/workflow/components/canvas/workflow-controls.tsx:622
 #: src/features/workflow/components/nodes/base-node.tsx:263
@@ -27140,7 +27176,7 @@ msgid "Screen capture failed. Please try again."
 msgstr "画面のキャプチャに失敗しました。もう一度お試しください。"
 
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:118
-#: ../../packages/chat-ui/src/chat/message-content.tsx:703
+#: ../../packages/chat-ui/src/chat/message-content.tsx:704
 msgid "Screenshot"
 msgstr "スクリーンショット"
 
@@ -28675,7 +28711,7 @@ msgstr "CLIP レイヤーをスキップ (0 = なし、1〜2 = よりスタイ�
 msgid "Skip questions"
 msgstr "質問をスキップ"
 
-#: src/routes/__root.tsx:428
+#: src/routes/__root.tsx:435
 msgid "Skip to content"
 msgstr "コンテンツへスキップ"
 
@@ -28756,7 +28792,7 @@ msgstr "スライド {streamingSlideNumber}"
 msgid "Slide title"
 msgstr "スライドのタイトル"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1079
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1080
 msgid "Slide updated"
 msgstr "スライドを更新しました"
 
@@ -28902,7 +28938,7 @@ msgstr "堅実な汎用能力"
 msgid "Solid performance across most task types"
 msgstr "ほとんどのタスクで堅実な性能"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:612
+#: ../../packages/chat-ui/src/chat/message-content.tsx:613
 msgid "Some images from this run could not be saved."
 msgstr "この実行の一部の画像を保存できませんでした。"
 
@@ -28991,7 +29027,7 @@ msgstr "効果音を有効にしました"
 msgid "Source"
 msgstr "ソース"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1216
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1217
 #: src/features/chat/thread/message-content.tsx:141
 msgid "Source {index}"
 msgstr "出典 {index}"
@@ -30505,7 +30541,7 @@ msgstr "入力画像の背景を削除し、スタイル転送を適用"
 msgid "Take turns"
 msgstr "順番に回答"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:656
+#: ../../packages/chat-ui/src/chat/message-content.tsx:657
 msgid "Taking screenshot..."
 msgstr "スクリーンショットを撮影しています..."
 
@@ -31526,6 +31562,12 @@ msgstr "ページ、すべてのサブページ、コメント、バージョン
 msgid "The pasted text could not be attached and was not inserted."
 msgstr ""
 
+#: src/features/canvas/pdf-preview-panel.tsx:105
+#: src/features/canvas/use-pdf-download.ts:82
+#: src/features/canvas/use-pdf-download.ts:158
+msgid "The PDF could not be downloaded."
+msgstr ""
+
 #. placeholder {0}: records.length
 #. placeholder {1}: problems.length
 #: ../../packages/ui/src/components/file-renderers/jsonl-viewer.tsx:69
@@ -31597,7 +31639,7 @@ msgstr ""
 msgid "The right model, every time."
 msgstr "いつでも、最適なモデルを。"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:732
+#: ../../packages/chat-ui/src/chat/message-content.tsx:733
 msgid "The screenshot could not be saved."
 msgstr "スクリーンショットを保存できませんでした。"
 
@@ -31809,7 +31851,7 @@ msgid "Thinking-enabled vision-language model"
 msgstr "思考機能を備えた視覚言語モデル"
 
 #: ../../packages/chat-ui/src/chat/auto-continue-status.tsx:54
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1142
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1143
 #: ../../packages/ui/src/components/ai-elements/reasoning.tsx:114
 #: src/features/chat/thread/streaming-placeholder.tsx:799
 msgid "Thinking..."
@@ -32046,7 +32088,7 @@ msgstr ""
 msgid "This host does not offer any view of a {requestNoun} yet."
 msgstr ""
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:390
+#: ../../packages/chat-ui/src/chat/message-content.tsx:391
 msgid "This image has been flagged for review"
 msgstr "この画像はレビュー対象としてフラグが付けられています"
 
@@ -32162,7 +32204,10 @@ msgstr "このプレゼンテーションにはまだスライドがありませ
 msgid "This preset will be permanently removed."
 msgstr "このプリセットは完全に削除されます。"
 
-#: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:160
+#: ../../packages/ui/src/components/file-renderers/pdf-thumbnail.tsx:82
+#: ../../packages/ui/src/components/file-renderers/pdf-thumbnail.tsx:87
+#: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:162
+#: src/features/canvas/pdf-preview-panel.tsx:114
 #: src/features/chat/thread/sandbox-files.tsx:159
 #: src/features/chat/thread/sandbox-files.tsx:199
 msgid "This preview could not be loaded."
@@ -32383,7 +32428,7 @@ msgstr "スレッドをアーカイブしました"
 msgid "Thread deleted."
 msgstr "スレッドを削除しました。"
 
-#: src/features/chat/assistant.tsx:80
+#: src/features/chat/assistant.tsx:127
 msgid "Thread details"
 msgstr ""
 
@@ -33264,7 +33309,7 @@ msgstr "メッセージを入力..."
 msgid "Typeface for the whole interface. Code blocks always stay monospace."
 msgstr ""
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:657
+#: ../../packages/chat-ui/src/chat/message-content.tsx:658
 msgid "Typing text..."
 msgstr "テキストを入力しています..."
 
@@ -33739,11 +33784,11 @@ msgstr "OpenAI のフロンティア性能を更新"
 msgid "Updated reasoning capabilities over the original R1"
 msgstr "初代 R1 から推論能力を更新"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1077
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1078
 msgid "Updated slide"
 msgstr "スライドを更新しました"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1077
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1078
 msgid "Updated slide {slideNumber}"
 msgstr "スライド {slideNumber} を更新しました"
 
@@ -36316,7 +36361,7 @@ msgstr "Zhipu AI の最も強力な推論 LLM"
 msgid "ZIP archive"
 msgstr "ZIP アーカイブ"
 
-#: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:143
+#: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:141
 #: ../../packages/ui/src/components/zoomable-image.tsx:311
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:284
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:290
@@ -36333,7 +36378,7 @@ msgstr "拡大"
 msgid "Zoom Lens"
 msgstr "ズームレンズ"
 
-#: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:133
+#: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:131
 #: ../../packages/ui/src/components/zoomable-image.tsx:305
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:250
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:256

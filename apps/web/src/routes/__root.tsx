@@ -29,6 +29,7 @@ import { CHAT_TEXT_SIZE_BOOT_SCRIPT } from "@/features/appearance/lib/chat-text-
 import LoginPromptHost from "@/features/auth/components/auth/login-prompt-host";
 import { AuthQueryProvider } from "@/features/auth/lib/auth-query-provider";
 import AuthUIProviderTanstack from "@/features/auth/lib/tanstack/auth-ui-provider-tanstack";
+import { closeSidePanelForSessionSwitch } from "@/features/chat/core/stores/chat-ui-store";
 import ConnectionProvider from "@/features/connection/components/connection-provider";
 import OfflineScreen from "@/features/connection/components/offline-screen";
 import { useUIStateStore } from "@/features/layout/stores/ui-state-store";
@@ -278,6 +279,8 @@ const AuthRecovery = ({ children }: { children: ReactNode }) => {
         else if (wasAuthenticated === true && !isAuthenticated) {
             console.log("[AuthRecovery] User logged out - clearing queries");
             queryClient.clear();
+            // The side panel's document or PDF was the ended session's: whoever signs in next, without a reload, must not find it.
+            closeSidePanelForSessionSwitch("after");
             // An expired session skips both sign-out handlers, so the dock badge is cleared here.
             void setNativeBadge(0);
         }
@@ -404,6 +407,12 @@ const RootComponent = () => {
         [router],
     );
 
+    // The side panel may show the previous account's document or PDF. A PDF (a signed link, nothing unsaved) closes as a switch
+    // starts; a document, whose editor may hold unsaved edits, only once the switch has gone through, so a failed one keeps them.
+    const closeSidePanel = useCallback((phase: "after" | "before") => {
+        closeSidePanelForSessionSwitch(phase);
+    }, []);
+
     const handleSessionChange = useCallback(async () => {
         console.log("[Root] Session changed - invalidating router");
 
@@ -442,6 +451,7 @@ const RootComponent = () => {
                                             captcha={CAPTCHA_CONFIG}
                                             navigate={handleNavigate}
                                             onSessionChange={handleSessionChange}
+                                            onSessionSwitch={closeSidePanel}
                                             persistClient={false}
                                             replace={handleReplace}
                                             twoFactor={TWO_FACTOR_METHODS}

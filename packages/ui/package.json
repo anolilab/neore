@@ -3,7 +3,8 @@
     "version": "0.0.0",
     "private": true,
     "sideEffects": [
-        "**/*.css"
+        "**/*.css",
+        "**/pdf-worker.ts"
     ],
     "type": "module",
     "exports": {

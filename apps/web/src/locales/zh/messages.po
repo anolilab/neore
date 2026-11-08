@@ -1181,6 +1181,14 @@ msgstr "{name} 已暂停"
 msgid "{name} resumed"
 msgstr "{name} 已恢复"
 
+#: ../../packages/ui/src/components/file-renderers/pdf-thumbnail.tsx:68
+msgid "{name}, {pages, plural, one {# page} other {# pages}}"
+msgstr ""
+
+#: ../../packages/ui/src/components/file-renderers/pdf-thumbnail.tsx:69
+msgid "{name}, preview unavailable"
+msgstr ""
+
 #: ../../packages/chat-ui/src/chat/tool-group.tsx:29
 msgid "{namesText}, +{more} more"
 msgstr ""
@@ -1200,6 +1208,10 @@ msgstr "{openCount} 条未解决的评论"
 #: src/features/workflow/components/collab/collaborator-facepile.tsx:92
 msgid "{overflowCount, plural, one {# more user} other {# more users}}"
 msgstr "{overflowCount, plural, other {另外 # 位用户}}"
+
+#: ../../packages/ui/src/components/file-renderers/pdf-thumbnail.tsx:113
+msgid "{pages, plural, one {# page} other {# pages}}"
+msgstr ""
 
 #: src/features/settings/components/chat/api-keys-settings.tsx:495
 msgid "{providerId} API key removed"
@@ -2798,7 +2810,7 @@ msgstr "AI 视频生成"
 msgid "AI-assisted bug triage with full recording context"
 msgstr "借助完整录制上下文进行 AI 辅助的缺陷分诊"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:368
+#: ../../packages/chat-ui/src/chat/message-content.tsx:369
 msgid "AI-generated"
 msgstr "AI生成"
 
@@ -3229,7 +3241,7 @@ msgstr "发生错误"
 msgid "An error occurred during One Tap sign in"
 msgstr "One Tap 登录时出错"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1146
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1147
 msgid "An error occurred while generating the response."
 msgstr "生成回复时发生错误。"
 
@@ -4874,11 +4886,11 @@ msgstr "浏览并恢复工作流的历史版本。"
 msgid "Browse, fork, and remix workflows shared by the community"
 msgstr "浏览、复刻并改编社区分享的工作流"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:729
+#: ../../packages/chat-ui/src/chat/message-content.tsx:730
 msgid "Browser"
 msgstr "浏览器"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:752
+#: ../../packages/chat-ui/src/chat/message-content.tsx:753
 msgid "Browser action failed"
 msgstr "浏览器操作失败"
 
@@ -4886,7 +4898,7 @@ msgstr "浏览器操作失败"
 msgid "Browser Automation"
 msgstr "浏览器自动化"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:750
+#: ../../packages/chat-ui/src/chat/message-content.tsx:751
 msgid "Browser error"
 msgstr "浏览器错误"
 
@@ -4895,7 +4907,7 @@ msgid "Browser notes"
 msgstr "浏览器说明"
 
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:259
-#: ../../packages/chat-ui/src/chat/message-content.tsx:712
+#: ../../packages/chat-ui/src/chat/message-content.tsx:713
 msgid "Browser screenshot"
 msgstr "浏览器截图"
 
@@ -4903,7 +4915,7 @@ msgstr "浏览器截图"
 msgid "Browser Session"
 msgstr "浏览器会话"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:662
+#: ../../packages/chat-ui/src/chat/message-content.tsx:663
 msgid "Browser working..."
 msgstr "浏览器运行中..."
 
@@ -5351,7 +5363,7 @@ msgstr "无法使用提示词：{errorMessages}"
 msgid "Canny Edge"
 msgstr "Canny 边缘"
 
-#: src/features/chat/assistant.tsx:71
+#: src/features/chat/assistant.tsx:120
 #: src/features/marketing/components/landing-page.tsx:217
 msgid "Canvas"
 msgstr "画布"
@@ -5766,7 +5778,7 @@ msgstr "勾选的集成会在保存后提供设置。在你确认之前不会建
 msgid "Checked: {0}"
 msgstr ""
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:385
+#: ../../packages/chat-ui/src/chat/message-content.tsx:386
 msgid "Checking image safety..."
 msgstr "正在检查图片安全性..."
 
@@ -6169,7 +6181,7 @@ msgstr "点击编辑"
 msgid "Click to edit..."
 msgstr "点击编辑..."
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:654
+#: ../../packages/chat-ui/src/chat/message-content.tsx:655
 msgid "Clicking element..."
 msgstr "正在点击元素..."
 
@@ -6205,6 +6217,7 @@ msgstr ""
 #: src/components/command-palette.tsx:708
 #: src/features/admin/components/user-sessions-dialog.tsx:159
 #: src/features/canvas/canvas-panel.tsx:818
+#: src/features/canvas/pdf-preview-panel.tsx:98
 #: src/features/chat/thread/composer-text-attachment-editor.tsx:868
 #: src/features/develop/components/thread-pull-requests.tsx:256
 #: src/features/evals/components/save-eval-case-action.tsx:95
@@ -6263,6 +6276,10 @@ msgstr "关闭提示词优化"
 msgid "Close search"
 msgstr "关闭搜索"
 
+#: src/features/chat/assistant.tsx:82
+msgid "Close the open document to view this PDF in the panel."
+msgstr ""
+
 #: src/features/chat/translation/message-translation.tsx:133
 msgid "Close translation"
 msgstr "关闭翻译"
@@ -6302,7 +6319,7 @@ msgstr "Cloudflare Workers AI 模型在 Cloudflare 有可用容量的任何地�
 msgid "Code"
 msgstr "代码"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:127
+#: ../../packages/chat-ui/src/chat/message-content.tsx:128
 msgid "Code block"
 msgstr ""
 
@@ -6314,7 +6331,7 @@ msgstr "代码执行"
 msgid "Code execution and sandbox files"
 msgstr "代码执行和沙盒文件"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:630
+#: ../../packages/chat-ui/src/chat/message-content.tsx:631
 msgid "Code execution failed"
 msgstr "代码执行失败"
 
@@ -6338,7 +6355,7 @@ msgstr ""
 msgid "Code navigation"
 msgstr ""
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:586
+#: ../../packages/chat-ui/src/chat/message-content.tsx:587
 msgid "Code output"
 msgstr "代码输出"
 
@@ -8527,7 +8544,7 @@ msgstr "创建一个一次性链接，有效期 7 天。任何已登录的人打
 msgid "Creating branch..."
 msgstr "正在创建分支..."
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:309
+#: ../../packages/chat-ui/src/chat/message-content.tsx:310
 msgid "Creating slides..."
 msgstr "正在创建幻灯片..."
 
@@ -10133,7 +10150,7 @@ msgid "Do you want to add more rows?"
 msgstr "要添加更多行吗？"
 
 #: ../../packages/chat-ui/src/chat/document-artifact.tsx:44
-#: ../../packages/chat-ui/src/chat/message-content.tsx:284
+#: ../../packages/chat-ui/src/chat/message-content.tsx:285
 #: ../../packages/ui/src/components/file-renderers/docx-preview.tsx:114
 msgid "Document"
 msgstr "文档"
@@ -10283,7 +10300,7 @@ msgstr "下载文档"
 msgid "Download Export"
 msgstr "下载导出"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:447
+#: ../../packages/chat-ui/src/chat/message-content.tsx:448
 #: ../../packages/ui/src/components/file-renderers/generic-file-card.tsx:87
 msgid "Download file"
 msgstr "下载文件"
@@ -10305,6 +10322,7 @@ msgstr "下载 Markdown"
 msgid "Download Neore for desktop"
 msgstr "下载 Neore 桌面版"
 
+#: src/features/canvas/pdf-preview-panel.tsx:76
 #: src/features/chat/header/thread-download-button.tsx:122
 msgid "Download PDF"
 msgstr "下载 PDF"
@@ -11641,7 +11659,7 @@ msgstr "错误率"
 msgid "Error trace:"
 msgstr "错误追踪："
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:245
+#: ../../packages/chat-ui/src/chat/message-content.tsx:246
 msgid "Error:"
 msgstr "错误："
 
@@ -11905,7 +11923,7 @@ msgstr "正在执行工具..."
 msgid "Execution"
 msgstr "执行"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:620
+#: ../../packages/chat-ui/src/chat/message-content.tsx:621
 msgid "Execution failed"
 msgstr "执行失败"
 
@@ -12248,11 +12266,11 @@ msgstr "提取页面"
 msgid "Extract subject"
 msgstr "提取主体"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:720
+#: ../../packages/chat-ui/src/chat/message-content.tsx:721
 msgid "Extracted"
 msgstr "已提取"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:655
+#: ../../packages/chat-ui/src/chat/message-content.tsx:656
 msgid "Extracting content..."
 msgstr "正在提取内容..."
 
@@ -14539,7 +14557,7 @@ msgstr "生成的视频"
 msgid "Generated videos will appear here. Start by describing what you want to create in the composer below."
 msgstr "生成的视频将显示在这里。在下方输入框中描述你想创作的内容即可开始。"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:462
+#: ../../packages/chat-ui/src/chat/message-content.tsx:463
 msgid "Generating audio..."
 msgstr "正在生成音频..."
 
@@ -14547,12 +14565,12 @@ msgstr "正在生成音频..."
 msgid "Generating draft…"
 msgstr "正在生成草稿…"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:463
+#: ../../packages/chat-ui/src/chat/message-content.tsx:464
 #: src/features/chat/thread/media-gallery-view.tsx:395
 msgid "Generating image..."
 msgstr "正在生成图像..."
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:306
+#: ../../packages/chat-ui/src/chat/message-content.tsx:307
 msgid "Generating presentation..."
 msgstr "正在生成演示文稿..."
 
@@ -14560,7 +14578,7 @@ msgstr "正在生成演示文稿..."
 msgid "Generating response"
 msgstr "正在生成回复"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:464
+#: ../../packages/chat-ui/src/chat/message-content.tsx:465
 #: src/features/chat/thread/media-gallery-view.tsx:395
 msgid "Generating video..."
 msgstr "正在生成视频..."
@@ -15865,7 +15883,7 @@ msgid "illustration"
 msgstr "插画"
 
 #: ../../packages/chat-ui/src/chat/document-artifact.tsx:42
-#: ../../packages/chat-ui/src/chat/message-content.tsx:414
+#: ../../packages/chat-ui/src/chat/message-content.tsx:415
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:643
 #: ../../packages/ui/src/components/ai-elements/attachments-utilities.tsx:47
 #: ../../packages/ui/src/components/ai-elements/attachments.tsx:107
@@ -16458,7 +16476,7 @@ msgstr "输入模板"
 msgid "Input tokens"
 msgstr "输入 token"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:229
+#: ../../packages/chat-ui/src/chat/message-content.tsx:230
 msgid "Input:"
 msgstr "输入："
 
@@ -16843,7 +16861,7 @@ msgstr ""
 msgid "It was not saved. Paste it again and save."
 msgstr ""
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:391
+#: ../../packages/chat-ui/src/chat/message-content.tsx:392
 msgid "It will be visible once approved by a moderator"
 msgstr "经审核员批准后即可显示"
 
@@ -18015,7 +18033,7 @@ msgstr "正在加载编辑器..."
 msgid "Loading editor…"
 msgstr "正在加载编辑器…"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:328
+#: ../../packages/chat-ui/src/chat/message-content.tsx:329
 #: ../../packages/ui/src/components/file-renderers/fetched-text-preview.tsx:65
 msgid "Loading file…"
 msgstr "正在加载文件…"
@@ -18085,7 +18103,8 @@ msgstr "正在加载预设…"
 msgid "Loading preview..."
 msgstr "正在加载预览..."
 
-#: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:168
+#: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:170
+#: src/features/canvas/pdf-preview-panel.tsx:120
 #: src/features/chat/thread/sandbox-files.tsx:104
 msgid "Loading preview…"
 msgstr "正在加载预览…"
@@ -18186,7 +18205,7 @@ msgstr ""
 msgid "Loading..."
 msgstr "正在加载..."
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:331
+#: ../../packages/chat-ui/src/chat/message-content.tsx:332
 #: src/features/chat/thread/memory-usage-action.tsx:46
 #: src/features/chat/thread/request-secret-prompt.tsx:479
 #: src/features/code/components/code-workspace.tsx:90
@@ -20157,11 +20176,11 @@ msgstr "浏览对话"
 msgid "navigate within each column"
 msgstr "在每列中导航"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:721
+#: ../../packages/chat-ui/src/chat/message-content.tsx:722
 msgid "Navigated"
 msgstr "已导航"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:662
+#: ../../packages/chat-ui/src/chat/message-content.tsx:663
 msgid "Navigating to {target}..."
 msgstr "正在导航到 {target}..."
 
@@ -20230,7 +20249,7 @@ msgstr "Neore 无法连接服务器。它将继续尝试重新连接。"
 msgid "Neore Chat"
 msgstr "Neore Chat"
 
-#: src/routes/__root.tsx:557
+#: src/routes/__root.tsx:565
 msgid "Neore Chat is a modern AI chat application. Chat with the latest AI models, organise your conversations, and stay productive."
 msgstr "Neore Chat 是一款现代 AI 聊天应用。与最新的 AI 模型聊天，整理你的对话，保持高效。"
 
@@ -20575,7 +20594,7 @@ msgstr "下一个选项"
 msgid "Next output mode"
 msgstr "下一个输出模式"
 
-#: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:121
+#: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:119
 #: src/features/prompts/components/prompts-sidebar-tab.tsx:879
 msgid "Next page"
 msgstr "下一页"
@@ -21990,7 +22009,7 @@ msgstr "哎呀！出错了"
 msgid "Opacity"
 msgstr "不透明度"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:707
+#: ../../packages/chat-ui/src/chat/message-content.tsx:708
 #: src/components/command-palette.tsx:700
 #: src/features/chat/link-preview/link-preview-card.tsx:117
 #: src/features/develop/components/pull-request-view.tsx:73
@@ -22007,6 +22026,10 @@ msgstr "营业中"
 msgctxt "stock opening price"
 msgid "Open"
 msgstr "开盘"
+
+#: ../../packages/ui/src/components/file-renderers/pdf-thumbnail.tsx:67
+msgid "Open {filename}"
+msgstr ""
 
 #: src/features/chat/thread/comparison-view.tsx:140
 msgid "Open {modelName} in full thread"
@@ -22123,6 +22146,14 @@ msgstr ""
 #: src/features/layout/components/sidebar-shortcut.tsx:124
 msgid "Open Pages"
 msgstr "打开页面"
+
+#: ../../packages/ui/src/components/file-renderers/pdf-thumbnail.tsx:67
+msgid "Open PDF"
+msgstr ""
+
+#: src/features/canvas/pdf-preview-panel.tsx:82
+msgid "Open PDF in a new tab to print"
+msgstr ""
 
 #: src/features/canvas/components/canvas-code-preview.tsx:219
 msgid "Open preview in new tab"
@@ -22839,7 +22870,7 @@ msgstr ""
 msgid "Outpaint"
 msgstr "扩图"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:562
+#: ../../packages/chat-ui/src/chat/message-content.tsx:563
 #: ../../packages/ui/src/components/ai-elements/context.tsx:276
 #: src/components/model-picker/model-picker.tsx:206
 #: src/features/devices/components/device-tool-call.tsx:174
@@ -22887,7 +22918,7 @@ msgstr "输出类型"
 msgid "Output-format focused"
 msgstr "侧重输出格式"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:237
+#: ../../packages/chat-ui/src/chat/message-content.tsx:238
 msgid "Output:"
 msgstr "输出："
 
@@ -22931,7 +22962,7 @@ msgstr ""
 msgid "Pacific Time (US & Canada)"
 msgstr "太平洋时间（美国和加拿大）"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:661
+#: ../../packages/chat-ui/src/chat/message-content.tsx:662
 msgid "page"
 msgstr "页面"
 
@@ -23292,6 +23323,7 @@ msgid "Payments, subscriptions, and financial data"
 msgstr "付款、订阅和财务数据"
 
 #: src/components/model-picker/model-picker.tsx:82
+#: src/features/canvas/pdf-preview-panel.tsx:73
 #: src/features/settings/components/chat/models-settings.tsx:35
 msgid "PDF"
 msgstr "PDF"
@@ -23299,6 +23331,10 @@ msgstr "PDF"
 #: ../../packages/ui/src/components/file-renderers/hex-viewer.tsx:77
 msgid "PDF document"
 msgstr "PDF 文档"
+
+#: src/features/chat/assistant.tsx:120
+msgid "PDF preview"
+msgstr ""
 
 #: src/features/settings/components/knowledge/knowledge-base-settings.tsx:314
 msgid "PDF, DOCX, TXT, MD, CSV, JSON, XLS, XLSX — max 5MB"
@@ -24129,7 +24165,7 @@ msgstr "上一个选项"
 msgid "Previous output mode"
 msgstr "上一个输出模式"
 
-#: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:107
+#: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:105
 #: src/features/prompts/components/prompts-sidebar-tab.tsx:870
 msgid "Previous page"
 msgstr "上一页"
@@ -26768,7 +26804,7 @@ msgstr "运行你的工作流后，可在此查看执行历史。"
 msgid "Running"
 msgstr "运行中"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:523
+#: ../../packages/chat-ui/src/chat/message-content.tsx:524
 msgid "Running code..."
 msgstr "正在运行代码..."
 
@@ -26776,7 +26812,7 @@ msgstr "正在运行代码..."
 msgid "Running on {device}…"
 msgstr "正在 {device} 上运行…"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:206
+#: ../../packages/chat-ui/src/chat/message-content.tsx:207
 #: src/features/admin/components/admin-cleanup-dashboard.tsx:258
 #: src/features/workflow/components/canvas/workflow-controls.tsx:622
 #: src/features/workflow/components/nodes/base-node.tsx:263
@@ -27140,7 +27176,7 @@ msgid "Screen capture failed. Please try again."
 msgstr "屏幕截取失败。请重试。"
 
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:118
-#: ../../packages/chat-ui/src/chat/message-content.tsx:703
+#: ../../packages/chat-ui/src/chat/message-content.tsx:704
 msgid "Screenshot"
 msgstr "截图"
 
@@ -28675,7 +28711,7 @@ msgstr "跳过 CLIP 层（0 = 不跳过，1-2 = 更风格化）"
 msgid "Skip questions"
 msgstr "跳过问题"
 
-#: src/routes/__root.tsx:428
+#: src/routes/__root.tsx:435
 msgid "Skip to content"
 msgstr "跳到内容"
 
@@ -28756,7 +28792,7 @@ msgstr "幻灯片 {streamingSlideNumber}"
 msgid "Slide title"
 msgstr "幻灯片标题"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1079
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1080
 msgid "Slide updated"
 msgstr "幻灯片已更新"
 
@@ -28902,7 +28938,7 @@ msgstr "扎实的通用能力"
 msgid "Solid performance across most task types"
 msgstr "在大多数任务类型上表现扎实"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:612
+#: ../../packages/chat-ui/src/chat/message-content.tsx:613
 msgid "Some images from this run could not be saved."
 msgstr "此次运行中的部分图像无法保存。"
 
@@ -28991,7 +29027,7 @@ msgstr "已开启音效"
 msgid "Source"
 msgstr "来源"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1216
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1217
 #: src/features/chat/thread/message-content.tsx:141
 msgid "Source {index}"
 msgstr "来源 {index}"
@@ -30505,7 +30541,7 @@ msgstr "输入一张图像，移除背景，然后应用风格迁移"
 msgid "Take turns"
 msgstr "轮流发言"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:656
+#: ../../packages/chat-ui/src/chat/message-content.tsx:657
 msgid "Taking screenshot..."
 msgstr "正在截图..."
 
@@ -31526,6 +31562,12 @@ msgstr "该页面、所有子页面、评论及版本历史都将被删除。此
 msgid "The pasted text could not be attached and was not inserted."
 msgstr ""
 
+#: src/features/canvas/pdf-preview-panel.tsx:105
+#: src/features/canvas/use-pdf-download.ts:82
+#: src/features/canvas/use-pdf-download.ts:158
+msgid "The PDF could not be downloaded."
+msgstr ""
+
 #. placeholder {0}: records.length
 #. placeholder {1}: problems.length
 #: ../../packages/ui/src/components/file-renderers/jsonl-viewer.tsx:69
@@ -31597,7 +31639,7 @@ msgstr ""
 msgid "The right model, every time."
 msgstr "每次都用对模型。"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:732
+#: ../../packages/chat-ui/src/chat/message-content.tsx:733
 msgid "The screenshot could not be saved."
 msgstr "无法保存屏幕截图。"
 
@@ -31809,7 +31851,7 @@ msgid "Thinking-enabled vision-language model"
 msgstr "支持思考的视觉语言模型"
 
 #: ../../packages/chat-ui/src/chat/auto-continue-status.tsx:54
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1142
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1143
 #: ../../packages/ui/src/components/ai-elements/reasoning.tsx:114
 #: src/features/chat/thread/streaming-placeholder.tsx:799
 msgid "Thinking..."
@@ -32046,7 +32088,7 @@ msgstr ""
 msgid "This host does not offer any view of a {requestNoun} yet."
 msgstr ""
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:390
+#: ../../packages/chat-ui/src/chat/message-content.tsx:391
 msgid "This image has been flagged for review"
 msgstr "此图像已被标记待审核"
 
@@ -32162,7 +32204,10 @@ msgstr "此演示文稿还没有幻灯片。"
 msgid "This preset will be permanently removed."
 msgstr "此预设将被永久删除。"
 
-#: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:160
+#: ../../packages/ui/src/components/file-renderers/pdf-thumbnail.tsx:82
+#: ../../packages/ui/src/components/file-renderers/pdf-thumbnail.tsx:87
+#: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:162
+#: src/features/canvas/pdf-preview-panel.tsx:114
 #: src/features/chat/thread/sandbox-files.tsx:159
 #: src/features/chat/thread/sandbox-files.tsx:199
 msgid "This preview could not be loaded."
@@ -32383,7 +32428,7 @@ msgstr "对话已归档"
 msgid "Thread deleted."
 msgstr "对话已删除。"
 
-#: src/features/chat/assistant.tsx:80
+#: src/features/chat/assistant.tsx:127
 msgid "Thread details"
 msgstr ""
 
@@ -33264,7 +33309,7 @@ msgstr "输入你的消息..."
 msgid "Typeface for the whole interface. Code blocks always stay monospace."
 msgstr ""
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:657
+#: ../../packages/chat-ui/src/chat/message-content.tsx:658
 msgid "Typing text..."
 msgstr "正在输入文本..."
 
@@ -33739,11 +33784,11 @@ msgstr "更新的 OpenAI 前沿性能"
 msgid "Updated reasoning capabilities over the original R1"
 msgstr "相比原版 R1 推理能力更新"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1077
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1078
 msgid "Updated slide"
 msgstr "已更新幻灯片"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1077
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1078
 msgid "Updated slide {slideNumber}"
 msgstr "已更新第 {slideNumber} 张幻灯片"
 
@@ -36316,7 +36361,7 @@ msgstr "Zhipu AI 最强大的推理 LLM"
 msgid "ZIP archive"
 msgstr "ZIP 压缩包"
 
-#: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:143
+#: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:141
 #: ../../packages/ui/src/components/zoomable-image.tsx:311
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:284
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:290
@@ -36333,7 +36378,7 @@ msgstr "放大"
 msgid "Zoom Lens"
 msgstr "变焦镜头"
 
-#: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:133
+#: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:131
 #: ../../packages/ui/src/components/zoomable-image.tsx:305
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:250
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:256
