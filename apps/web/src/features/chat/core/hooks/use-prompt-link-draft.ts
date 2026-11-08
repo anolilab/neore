@@ -3,7 +3,9 @@ import { enabledModelOf } from "@neore/ai/models";
 import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef } from "react";
 
+import { filterModelsByBlockedCreators } from "@/components/model-picker/utilities";
 import useFeatureFlaggedModels, { useFeatureFlaggedModelsSettled } from "@/hooks/use-feature-flagged-models";
+import { useModelFilterRules } from "@/hooks/use-model-filter-rules";
 import { showWarning } from "@/lib/toast";
 
 import { useChatUIStore } from "../stores/chat-ui-store";
@@ -40,7 +42,12 @@ export const usePromptLinkDraft = ({
     const { t } = useLingui();
     const navigate = useNavigate();
     const pickerModels = useFeatureFlaggedModels({ applyUserOverrides: true });
-    const pickerModelIds = useMemo(() => new Set(pickerModels.map((entry) => entry.id)), [pickerModels]);
+    // The labs the person hid from the picker are not offered there, so a link cannot pick their models either.
+    const blockedCreators = useModelFilterRules()?.blockedCreators;
+    const pickerModelIds = useMemo(
+        () => new Set(filterModelsByBlockedCreators(pickerModels, blockedCreators ?? []).map((entry) => entry.id)),
+        [blockedCreators, pickerModels],
+    );
     const pickerSettled = useFeatureFlaggedModelsSettled();
     const appliedRef = useRef<string | undefined>(undefined);
     // The model of a link whose prompt was applied, waiting for the picker's list: judged earlier, it could pick a model the

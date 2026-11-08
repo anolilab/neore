@@ -2,6 +2,8 @@ import { MODEL_REGISTRY } from "@neore/ai/models";
 import { renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { getCreatorSlug } from "@/components/model-picker/utilities";
+
 import { useChatUIStore } from "../stores/chat-ui-store";
 import { useModelStore } from "../stores/model-store";
 import { usePromptLinkDraft } from "./use-prompt-link-draft";
@@ -27,7 +29,15 @@ vi.mock("@/lib/toast", () => {
 
 /** The models the picker offers this person, and whether that list has settled. */
 const picker = vi.hoisted(() => {
-    return { ids: [] as string[], settled: true };
+    return { blockedCreators: [] as string[], ids: [] as string[], settled: true };
+});
+
+vi.mock("@/hooks/use-model-filter-rules", () => {
+    return {
+        useModelFilterRules: () => {
+            return { blockedCreators: picker.blockedCreators };
+        },
+    };
 });
 
 vi.mock("@/hooks/use-feature-flagged-models", () => {
@@ -54,6 +64,7 @@ const strippedSearch = (): unknown => {
 beforeEach(() => {
     picker.ids = textModel ? [textModel.id] : [];
     picker.settled = true;
+    picker.blockedCreators = [];
     navigate.mockClear();
     showWarning.mockClear();
     useChatUIStore.getState().clearComposer();
@@ -147,6 +158,16 @@ describe(usePromptLinkDraft, () => {
 
         expect(useModelStore.getState().selectedModel).toBe(other?.id);
         expect(showWarning).not.toHaveBeenCalled();
+    });
+
+    it("applies the prompt but not a model from a lab the person hid from the picker", () => {
+        // The picker list holds ids only here, so the lab is read from the id as the picker reads it.
+        picker.blockedCreators = [getCreatorSlug({ id: textModel!.id } as never)];
+        renderHook(() => usePromptLinkDraft({ model: textModel?.id, otherDraftSource: false, prompt: "Draft me" }));
+
+        expect(useChatUIStore.getState().composerText).toBe("Draft me");
+        expect(useModelStore.getState().selectedModel).toBe(startModel);
+        expect(showWarning).toHaveBeenCalledOnce();
     });
 
     it("applies the prompt but not an external model", () => {
