@@ -93,6 +93,16 @@ describe("connectionFailureCategory", () => {
         expect(category("could not connect to me@login.example.com: Connection timed out")).toBe("timed out");
         expect(category("Connection closed by authenticating user dana 10.0.0.2 port 22")).toBe("login refused");
         expect(category("connect to host box port 22: Operation timed out")).toBe("timed out");
+        expect(category("could not connect to dana@box: the server did not answer in time")).toBe("timed out");
+        expect(category("neore-host 0.4.0 is not installed on deploy@authentication.corp.example:22. Install it from the server's settings.")).toBe(
+            "the host software is not installed",
+        );
+        expect(category("could not connect to dana@box:22: the host speaks protocol 3 and this app speaks 4")).toBe(
+            "the host software does not match this app",
+        );
+        expect(category("neore-host on dana@box did not understand how it was started: the software there is out of date.")).toBe(
+            "the host software is out of date",
+        );
         expect(category("connect to host box port 22: Connection refused")).toBe("server not reachable");
         expect(category("Banner: token=abcd1234 weird")).toBe("connection failed");
         expect(category("the passphrase channel failed: Permission denied (os error 13)")).toBe("connection failed");

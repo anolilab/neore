@@ -6261,7 +6261,7 @@ msgstr "Clicking element..."
 msgid "Client secret (App password) of the bot's app registration"
 msgstr "Client secret (App password) of the bot's app registration"
 
-#: src/features/devices/lib/device-diagnostics.ts:82
+#: src/features/devices/lib/device-diagnostics.ts:88
 msgid "Client: {client}"
 msgstr "Client: {client}"
 
@@ -7329,7 +7329,8 @@ msgstr "Connecting…"
 msgid "Connection error. Please check your internet connection and try again."
 msgstr "Connection error. Please check your internet connection and try again."
 
-#: src/features/devices/lib/device-diagnostics.ts:48
+#: src/features/devices/lib/device-diagnostics.ts:31
+#: src/features/devices/lib/device-diagnostics.ts:54
 msgid "connection failed"
 msgstr "connection failed"
 
@@ -7361,7 +7362,7 @@ msgstr "Connection successful"
 msgid "Connection test failed"
 msgstr "Connection test failed"
 
-#: src/features/devices/lib/device-diagnostics.ts:81
+#: src/features/devices/lib/device-diagnostics.ts:87
 msgid "Connection: {name}"
 msgstr "Connection: {name}"
 
@@ -17495,7 +17496,7 @@ msgstr "Last confirmed {0}"
 msgid "Last error"
 msgstr "Last error"
 
-#: src/features/devices/lib/device-diagnostics.ts:85
+#: src/features/devices/lib/device-diagnostics.ts:91
 msgid "Last failure: {failure}"
 msgstr "Last failure: {failure}"
 
@@ -17534,7 +17535,7 @@ msgstr "Last run"
 msgid "Last seen"
 msgstr "Last seen"
 
-#: src/features/devices/lib/device-diagnostics.ts:84
+#: src/features/devices/lib/device-diagnostics.ts:90
 msgid "Last seen: {lastSeen}"
 msgstr "Last seen: {lastSeen}"
 
@@ -18485,7 +18486,7 @@ msgstr "Log out"
 msgid "Login"
 msgstr "Login"
 
-#: src/features/devices/lib/device-diagnostics.ts:32
+#: src/features/devices/lib/device-diagnostics.ts:38
 msgid "login refused"
 msgstr "login refused"
 
@@ -20541,7 +20542,7 @@ msgstr "Neutral"
 msgid "Neutral color, blockbuster look"
 msgstr "Neutral color, blockbuster look"
 
-#: src/features/devices/lib/device-diagnostics.ts:77
+#: src/features/devices/lib/device-diagnostics.ts:83
 msgid "never"
 msgstr "never"
 
@@ -21567,7 +21568,7 @@ msgstr "Node type"
 msgid "Noise Reduction"
 msgstr "Noise Reduction"
 
-#: src/features/devices/lib/device-diagnostics.ts:78
+#: src/features/devices/lib/device-diagnostics.ts:84
 msgid "none"
 msgstr "none"
 
@@ -25839,11 +25840,11 @@ msgstr "Regular Users"
 msgid "Reject"
 msgstr "Reject"
 
-#: src/features/devices/lib/device-diagnostics.ts:55
+#: src/features/devices/lib/device-diagnostics.ts:61
 msgid "relay (another paired computer)"
 msgstr "relay (another paired computer)"
 
-#: src/features/devices/lib/device-diagnostics.ts:55
+#: src/features/devices/lib/device-diagnostics.ts:61
 msgid "relay (another paired computer): {viaName}"
 msgstr "relay (another paired computer): {viaName}"
 
@@ -26935,7 +26936,7 @@ msgstr "Round {0}: not yet. {1}"
 msgid "Route, track, <0>optimize.</0>"
 msgstr "Route, track, <0>optimize.</0>"
 
-#: src/features/devices/lib/device-diagnostics.ts:83
+#: src/features/devices/lib/device-diagnostics.ts:89
 msgid "Route: {route}"
 msgstr "Route: {route}"
 
@@ -28244,7 +28245,7 @@ msgstr "Server error. Please try again later."
 msgid "Server name is required"
 msgstr "Server name is required"
 
-#: src/features/devices/lib/device-diagnostics.ts:34
+#: src/features/devices/lib/device-diagnostics.ts:40
 msgid "server not reachable"
 msgstr "server not reachable"
 
@@ -29580,11 +29581,11 @@ msgstr "Squash and merge"
 msgid "Sri Lanka"
 msgstr "Sri Lanka"
 
-#: src/features/devices/lib/device-diagnostics.ts:58
+#: src/features/devices/lib/device-diagnostics.ts:64
 msgid "SSH server via a paired computer"
 msgstr "SSH server via a paired computer"
 
-#: src/features/devices/lib/device-diagnostics.ts:58
+#: src/features/devices/lib/device-diagnostics.ts:64
 msgid "SSH server via a paired computer: {viaName}"
 msgstr "SSH server via a paired computer: {viaName}"
 
@@ -31769,11 +31770,11 @@ msgstr "The host is limiting requests. Try again shortly."
 msgid "The host is limiting requests. Trying again later."
 msgstr "The host is limiting requests. Trying again later."
 
-#: src/features/devices/lib/device-diagnostics.ts:30
+#: src/features/devices/lib/device-diagnostics.ts:36
 msgid "the host key changed"
 msgstr "the host key changed"
 
-#: src/features/devices/lib/device-diagnostics.ts:31
+#: src/features/devices/lib/device-diagnostics.ts:37
 msgid "the host key could not be verified"
 msgstr "the host key could not be verified"
 
@@ -31796,6 +31797,18 @@ msgstr "The host lists at most {fileLimit, plural, one {# file} other {# files}}
 #: src/features/develop/components/files-tab.tsx:109
 msgid "The host sent no diff for this file (binary, or too large for it)."
 msgstr "The host sent no diff for this file (binary, or too large for it)."
+
+#: src/features/devices/lib/device-diagnostics.ts:35
+msgid "the host software does not match this app"
+msgstr "the host software does not match this app"
+
+#: src/features/devices/lib/device-diagnostics.ts:33
+msgid "the host software is not installed"
+msgstr "the host software is not installed"
+
+#: src/features/devices/lib/device-diagnostics.ts:34
+msgid "the host software is out of date"
+msgstr "the host software is out of date"
 
 #: src/features/canvas/canvas-panel.tsx:638
 msgid "The imported file appears to be empty."
@@ -32336,7 +32349,7 @@ msgstr "This collection is shared with you by a member of your organization. You
 msgid "This command name is reserved"
 msgstr "This command name is reserved"
 
-#: src/features/devices/lib/device-diagnostics.ts:61
+#: src/features/devices/lib/device-diagnostics.ts:67
 msgid "this computer"
 msgstr "this computer"
 
@@ -32366,7 +32379,7 @@ msgstr "This computer is paired with another account."
 msgid "This computer is paired. Choose which folders to share in the desktop app."
 msgstr "This computer is paired. Choose which folders to share in the desktop app."
 
-#: src/features/devices/lib/device-diagnostics.ts:61
+#: src/features/devices/lib/device-diagnostics.ts:67
 msgid "this computer: {viaName}"
 msgstr "this computer: {viaName}"
 
@@ -32983,7 +32996,7 @@ msgstr "Tilt-Shift"
 msgid "time zone"
 msgstr "time zone"
 
-#: src/features/devices/lib/device-diagnostics.ts:33
+#: src/features/devices/lib/device-diagnostics.ts:39
 msgid "timed out"
 msgstr "timed out"
 

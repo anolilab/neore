@@ -6233,7 +6233,7 @@ msgstr "Clicando no elemento..."
 msgid "Client secret (App password) of the bot's app registration"
 msgstr "Client secret (App password) do registro de app do bot"
 
-#: src/features/devices/lib/device-diagnostics.ts:82
+#: src/features/devices/lib/device-diagnostics.ts:88
 msgid "Client: {client}"
 msgstr ""
 
@@ -7297,7 +7297,8 @@ msgstr "Conectando…"
 msgid "Connection error. Please check your internet connection and try again."
 msgstr "Erro de conexão. Verifique sua conexão com a internet e tente novamente."
 
-#: src/features/devices/lib/device-diagnostics.ts:48
+#: src/features/devices/lib/device-diagnostics.ts:31
+#: src/features/devices/lib/device-diagnostics.ts:54
 msgid "connection failed"
 msgstr ""
 
@@ -7329,7 +7330,7 @@ msgstr "Conexão bem-sucedida"
 msgid "Connection test failed"
 msgstr "Falha no teste de conexão"
 
-#: src/features/devices/lib/device-diagnostics.ts:81
+#: src/features/devices/lib/device-diagnostics.ts:87
 msgid "Connection: {name}"
 msgstr ""
 
@@ -17454,7 +17455,7 @@ msgstr "Confirmada pela última vez {0}"
 msgid "Last error"
 msgstr "Último erro"
 
-#: src/features/devices/lib/device-diagnostics.ts:85
+#: src/features/devices/lib/device-diagnostics.ts:91
 msgid "Last failure: {failure}"
 msgstr ""
 
@@ -17493,7 +17494,7 @@ msgstr "Última execução"
 msgid "Last seen"
 msgstr ""
 
-#: src/features/devices/lib/device-diagnostics.ts:84
+#: src/features/devices/lib/device-diagnostics.ts:90
 msgid "Last seen: {lastSeen}"
 msgstr ""
 
@@ -18438,7 +18439,7 @@ msgstr "Sair"
 msgid "Login"
 msgstr "Entrar"
 
-#: src/features/devices/lib/device-diagnostics.ts:32
+#: src/features/devices/lib/device-diagnostics.ts:38
 msgid "login refused"
 msgstr ""
 
@@ -20494,7 +20495,7 @@ msgstr "Neutro"
 msgid "Neutral color, blockbuster look"
 msgstr "Cor neutra, visual de blockbuster"
 
-#: src/features/devices/lib/device-diagnostics.ts:77
+#: src/features/devices/lib/device-diagnostics.ts:83
 msgid "never"
 msgstr ""
 
@@ -21520,7 +21521,7 @@ msgstr "Tipo de nó"
 msgid "Noise Reduction"
 msgstr "Redução de ruído"
 
-#: src/features/devices/lib/device-diagnostics.ts:78
+#: src/features/devices/lib/device-diagnostics.ts:84
 msgid "none"
 msgstr ""
 
@@ -25779,11 +25780,11 @@ msgstr "Usuários comuns"
 msgid "Reject"
 msgstr "Recusar"
 
-#: src/features/devices/lib/device-diagnostics.ts:55
+#: src/features/devices/lib/device-diagnostics.ts:61
 msgid "relay (another paired computer)"
 msgstr ""
 
-#: src/features/devices/lib/device-diagnostics.ts:55
+#: src/features/devices/lib/device-diagnostics.ts:61
 msgid "relay (another paired computer): {viaName}"
 msgstr ""
 
@@ -26875,7 +26876,7 @@ msgstr ""
 msgid "Route, track, <0>optimize.</0>"
 msgstr "Roteie, acompanhe, <0>otimize.</0>"
 
-#: src/features/devices/lib/device-diagnostics.ts:83
+#: src/features/devices/lib/device-diagnostics.ts:89
 msgid "Route: {route}"
 msgstr ""
 
@@ -28175,7 +28176,7 @@ msgstr "Erro no servidor. Tente novamente mais tarde."
 msgid "Server name is required"
 msgstr "O nome do servidor é obrigatório"
 
-#: src/features/devices/lib/device-diagnostics.ts:34
+#: src/features/devices/lib/device-diagnostics.ts:40
 msgid "server not reachable"
 msgstr ""
 
@@ -29506,11 +29507,11 @@ msgstr ""
 msgid "Sri Lanka"
 msgstr "Sri Lanka"
 
-#: src/features/devices/lib/device-diagnostics.ts:58
+#: src/features/devices/lib/device-diagnostics.ts:64
 msgid "SSH server via a paired computer"
 msgstr ""
 
-#: src/features/devices/lib/device-diagnostics.ts:58
+#: src/features/devices/lib/device-diagnostics.ts:64
 msgid "SSH server via a paired computer: {viaName}"
 msgstr ""
 
@@ -31695,11 +31696,11 @@ msgstr ""
 msgid "The host is limiting requests. Trying again later."
 msgstr ""
 
-#: src/features/devices/lib/device-diagnostics.ts:30
+#: src/features/devices/lib/device-diagnostics.ts:36
 msgid "the host key changed"
 msgstr ""
 
-#: src/features/devices/lib/device-diagnostics.ts:31
+#: src/features/devices/lib/device-diagnostics.ts:37
 msgid "the host key could not be verified"
 msgstr ""
 
@@ -31713,6 +31714,18 @@ msgstr ""
 
 #: src/features/develop/components/files-tab.tsx:109
 msgid "The host sent no diff for this file (binary, or too large for it)."
+msgstr ""
+
+#: src/features/devices/lib/device-diagnostics.ts:35
+msgid "the host software does not match this app"
+msgstr ""
+
+#: src/features/devices/lib/device-diagnostics.ts:33
+msgid "the host software is not installed"
+msgstr ""
+
+#: src/features/devices/lib/device-diagnostics.ts:34
+msgid "the host software is out of date"
 msgstr ""
 
 #: src/features/canvas/canvas-panel.tsx:638
@@ -32246,7 +32259,7 @@ msgstr "Esta coleção foi compartilhada com você por um membro da sua organiza
 msgid "This command name is reserved"
 msgstr "Este nome de comando é reservado"
 
-#: src/features/devices/lib/device-diagnostics.ts:61
+#: src/features/devices/lib/device-diagnostics.ts:67
 msgid "this computer"
 msgstr ""
 
@@ -32276,7 +32289,7 @@ msgstr "Este computador está emparelhado com outra conta."
 msgid "This computer is paired. Choose which folders to share in the desktop app."
 msgstr "Este computador está emparelhado. Escolha no aplicativo de desktop quais pastas compartilhar."
 
-#: src/features/devices/lib/device-diagnostics.ts:61
+#: src/features/devices/lib/device-diagnostics.ts:67
 msgid "this computer: {viaName}"
 msgstr ""
 
@@ -32859,7 +32872,7 @@ msgstr "Tilt-Shift"
 msgid "time zone"
 msgstr ""
 
-#: src/features/devices/lib/device-diagnostics.ts:33
+#: src/features/devices/lib/device-diagnostics.ts:39
 msgid "timed out"
 msgstr ""
 
