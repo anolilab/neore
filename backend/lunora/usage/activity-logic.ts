@@ -39,6 +39,9 @@ export const HEATMAP_DAYS = 53 * 7;
 /** Rows one breakdown read takes (total rows included) — about ten skills a day over a full year. */
 export const BREAKDOWN_ROW_LIMIT = 4000;
 
+/** Project rows one project breakdown read takes — about ten projects a day over a full year. */
+export const PROJECT_ROW_LIMIT = 4000;
+
 const DAY_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -303,6 +306,7 @@ export interface DayTotal {
 interface RollupRowLike {
     costMicrodollars: number;
     date: string;
+    projectKey?: string;
     replies: number;
     skillKey: string;
     skillName?: string;
@@ -362,4 +366,67 @@ export const foldSkillTotals = (rows: ReadonlyArray<RollupRowLike>): SkillTotal[
     return [...bySkill.values()]
         .map(({ nameAt: _nameAt, ...total }) => total)
         .toSorted((a, b) => b.costMicrodollars - a.costMicrodollars || b.replies - a.replies || a.skillKey.localeCompare(b.skillKey));
+};
+
+export interface UsageTotals {
+    costMicrodollars: number;
+    replies: number;
+    tokens: number;
+}
+
+export interface ProjectTotal extends UsageTotals {
+    projectKey: string;
+}
+
+const emptyTotals = (): UsageTotals => {
+    return { costMicrodollars: 0, replies: 0, tokens: 0 };
+};
+
+/** The sum of some rows, whatever their kind. */
+export const sumRows = (rows: ReadonlyArray<UsageTotals>): UsageTotals => {
+    const sum = emptyTotals();
+
+    for (const row of rows) {
+        sum.costMicrodollars += row.costMicrodollars;
+        sum.replies += row.replies;
+        sum.tokens += row.tokens;
+    }
+
+    return sum;
+};
+
+/** Fold project rows (others are skipped) into one entry per project, costliest first. */
+export const foldProjectTotals = (rows: ReadonlyArray<RollupRowLike>): ProjectTotal[] => {
+    const byProject = new Map<string, ProjectTotal>();
+
+    for (const row of rows) {
+        if (row.skillKey !== PROJECT_SKILL_KEY || row.projectKey === undefined) {
+            continue;
+        }
+
+        const current = byProject.get(row.projectKey) ?? { ...emptyTotals(), projectKey: row.projectKey };
+
+        current.costMicrodollars += row.costMicrodollars;
+        current.replies += row.replies;
+        current.tokens += row.tokens;
+        byProject.set(row.projectKey, current);
+    }
+
+    return [...byProject.values()].toSorted(
+        (a, b) => b.costMicrodollars - a.costMicrodollars || b.replies - a.replies || a.projectKey.localeCompare(b.projectKey),
+    );
+};
+
+/**
+ * What no project accounts for: the total less every project, never below zero.
+ * Replies outside a project write no project row, so this is their sum.
+ */
+export const remainderOf = (total: UsageTotals, projects: ReadonlyArray<UsageTotals>): UsageTotals => {
+    const filed = sumRows(projects);
+
+    return {
+        costMicrodollars: Math.max(0, total.costMicrodollars - filed.costMicrodollars),
+        replies: Math.max(0, total.replies - filed.replies),
+        tokens: Math.max(0, total.tokens - filed.tokens),
+    };
 };

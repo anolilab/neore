@@ -17,7 +17,8 @@
  *
  * A reply in a thread that belongs to a project is also filed under that
  * project, as the thread stands when the record lands; moving the thread later
- * leaves its earlier usage where it was.
+ * leaves its earlier usage where it was. The project breakdown and a project's
+ * totals read those rows ({@link getProjectBreakdown}, {@link getProjectUsage}).
  */
 import { v } from "lunorash/server";
 
@@ -31,18 +32,22 @@ import { logger } from "../lib/logger";
 import { runAfterOnShard, runAfterWithRetry } from "../lib/shard-scheduler";
 import { readableProject } from "../projects/functions";
 import { leadThreadOf } from "../sub-agents/worker-thread";
-import type { Attribution, AttributionIncrement, ReplyUsageArgs, RollupIncrement } from "./activity-logic";
+import type { Attribution, AttributionIncrement, ProjectTotal, ReplyUsageArgs, RollupIncrement } from "./activity-logic";
 import {
     addDays,
     attributionRows,
     BREAKDOWN_ROW_LIMIT,
     foldDayTotals,
+    foldProjectTotals,
     foldSkillTotals,
     HEATMAP_DAYS,
     isDayKey,
+    PROJECT_ROW_LIMIT,
     PROJECT_SKILL_KEY,
     RECORD_RETRY,
+    remainderOf,
     RETRY_COUNTS_WITHIN_MS,
+    sumRows,
     TOTAL_SKILL_KEY,
     withDayTotals,
 } from "./activity-logic";
@@ -498,4 +503,103 @@ export const getSkillBreakdown = authQuery
             skills: foldSkillTotals(rows.page),
             truncated: rows.page.length >= BREAKDOWN_ROW_LIMIT,
         };
+    });
+
+const vTotals = { costMicrodollars: v.number(), replies: v.number(), tokens: v.number() };
+
+/** Project title lookups one breakdown runs at once. */
+const TITLE_LOOKUPS_AT_ONCE = 16;
+
+/** Total rows from `fromDate` on, summed: one per day, so a year is a bounded read. */
+const totalSince = async (ctx: Pick<QueryCtx, "db">, userId: string, fromDate: string) => {
+    const { page } = await ctx.db.usageDaily.findMany({
+        limit: HEATMAP_DAYS * 2,
+        orderBy: [{ date: "desc" }],
+        where: { date: { gte: fromDate }, skillKey: TOTAL_SKILL_KEY, userId },
+    });
+
+    const truncated = page.length >= HEATMAP_DAYS * 2;
+
+    // When the read stopped short, the total covers only from its oldest day on: whatever is summed beside it must too.
+    return { coveredFrom: truncated ? page.at(-1)?.date : undefined, rows: page, total: sumRows(page), truncated };
+};
+
+/**
+ * Replies, tokens and cost per project from `fromDate` on, with what no project
+ * accounts for (`noProject`) and the overall `total` — the projects and
+ * `noProject` add up to it. A project the caller can no longer read has no
+ * `title`. `truncated` as in {@link getSkillBreakdown}.
+ */
+export const getProjectBreakdown = authQuery
+    .input({ fromDate: vDayKey() })
+    .output(
+        v.object({
+            noProject: v.object({ ...vTotals }),
+            projects: v.array(v.object({ ...vTotals, projectKey: v.string(), title: v.optional(v.string()) })),
+            total: v.object({ ...vTotals }),
+            truncated: v.boolean(),
+        }),
+    )
+    .query(async ({ args, ctx }) => {
+        const { userId } = ctx.user;
+        const [totals, rows] = await Promise.all([
+            totalSince(ctx, userId, args.fromDate),
+            ctx.db.usageDaily.findMany({
+                limit: PROJECT_ROW_LIMIT,
+                orderBy: [{ date: "desc" }],
+                where: { date: { gte: args.fromDate }, skillKey: PROJECT_SKILL_KEY, userId },
+            }),
+        ]);
+        // When either read stopped short, both cover only the days after the oldest day the shorter one reached — that
+        // day may be read only in part — so the projects and "No project" are taken over the same whole days as the
+        // total and add up to it.
+        const projectsFrom = rows.page.length >= PROJECT_ROW_LIMIT ? rows.page.at(-1)?.date : undefined;
+        const coveredFrom = [totals.coveredFrom, projectsFrom]
+            .filter((date) => date !== undefined)
+            .toSorted((a, b) => a!.localeCompare(b!))
+            .at(-1);
+        const projects = foldProjectTotals(coveredFrom === undefined ? rows.page : rows.page.filter((row) => row.date > coveredFrom));
+        const total = coveredFrom === undefined ? totals.total : sumRows(totals.rows.filter((row) => row.date > coveredFrom));
+        const titled: (ProjectTotal & { title?: string })[] = [];
+
+        // A few lookups at a time: each is up to three reads, and a long history holds many projects.
+        for (let index = 0; index < projects.length; index += TITLE_LOOKUPS_AT_ONCE) {
+            const batch = await Promise.all(
+                projects.slice(index, index + TITLE_LOOKUPS_AT_ONCE).map(async (project) => {
+                    // A failed read fails the query, so the card shows an error rather than "no longer available".
+                    const found = await readableProject(ctx, project.projectKey as Id<"projects">, userId);
+
+                    return { ...project, ...(found && { title: found.title }) };
+                }),
+            );
+
+            titled.push(...batch);
+        }
+
+        return {
+            noProject: remainderOf(total, projects),
+            projects: titled,
+            total,
+            truncated: totals.truncated || rows.page.length >= PROJECT_ROW_LIMIT,
+        };
+    });
+
+/** Project rows one project read sums: one row per day the project was used, two years of them. */
+const PROJECT_USAGE_ROW_LIMIT = HEATMAP_DAYS * 2;
+
+/**
+ * The caller's replies, tokens and cost in one project from `fromDate` on. `truncated` is set when the period held more
+ * rows than one read sums — the oldest days are the ones left out.
+ */
+export const getProjectUsage = authQuery
+    .input({ fromDate: vDayKey(), projectId: v.id("projects") })
+    .output(v.object({ ...vTotals, truncated: v.boolean() }))
+    .query(async ({ args, ctx }) => {
+        const { page } = await ctx.db.usageDaily.findMany({
+            limit: PROJECT_USAGE_ROW_LIMIT + 1,
+            orderBy: [{ date: "desc" }],
+            where: { date: { gte: args.fromDate }, projectKey: args.projectId as string, userId: ctx.user.userId },
+        });
+
+        return { ...sumRows(page.slice(0, PROJECT_USAGE_ROW_LIMIT)), truncated: page.length > PROJECT_USAGE_ROW_LIMIT };
     });

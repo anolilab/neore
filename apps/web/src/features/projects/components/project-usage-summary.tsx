@@ -1,0 +1,70 @@
+import { useLingui } from "@lingui/react/macro";
+import type { Id } from "@neore/backend/dataModel";
+import { Skeleton } from "@neore/ui/components/skeleton";
+import { skipToken, useQuery } from "@tanstack/react-query";
+import { useId } from "react";
+
+import { useUsageToday } from "@/features/settings/hooks/use-usage-today";
+import { formatUsd, periodStart } from "@/features/settings/lib/usage-activity";
+import { useCRPC } from "@/lib/lunora/crpc";
+
+/** The window the project's totals cover, in days. */
+const WINDOW_DAYS = 30;
+
+interface ProjectUsageSummaryProps {
+    projectId: string;
+}
+
+/** The caller's replies, tokens and spend in one project over the last 30 days. */
+const ProjectUsageSummary = ({ projectId }: ProjectUsageSummaryProps) => {
+    const { i18n, t } = useLingui();
+    const crpc = useCRPC();
+    const headingId = useId();
+    const today = useUsageToday();
+    const locale = i18n.locale || "en";
+    const { data, isError, isPending } = useQuery(
+        crpc.usage.activity.getProjectUsage.queryOptions(
+            // The dialog receives `_id` as a plain `string`; it is always an id the backend returned for a `projects` row.
+            today === undefined ? skipToken : { fromDate: periodStart(today, WINDOW_DAYS), projectId: projectId as Id<"projects"> },
+            { live: false },
+        ),
+    );
+
+    const stats = [
+        { label: t`Replies`, value: data ? data.replies.toLocaleString(locale) : undefined },
+        {
+            label: t`Tokens`,
+            value: data ? new Intl.NumberFormat(locale, { maximumFractionDigits: 1, notation: "compact" }).format(data.tokens) : undefined,
+        },
+        { label: t`Spend`, value: data ? formatUsd(data.costMicrodollars, locale) : undefined },
+    ];
+
+    return (
+        <section aria-labelledby={headingId} className="bg-muted/30 space-y-3 rounded-lg border p-4">
+            <div className="space-y-1">
+                <h3 className="text-sm font-medium" id={headingId}>
+                    {t`Usage`}
+                </h3>
+                <p className="text-muted-foreground text-xs">{t`Your replies, tokens and spend in this project over the last 30 days.`}</p>
+            </div>
+            {isPending && (
+                <p className="sr-only" role="status">
+                    {t`Loading usage…`}
+                </p>
+            )}
+            {isError && <p className="text-destructive text-sm">{t`Could not load this project's usage.`}</p>}
+            {!isError && (
+                <dl aria-busy={isPending} className="grid grid-cols-3 gap-4">
+                    {stats.map((stat) => (
+                        <div key={stat.label}>
+                            <dt className="text-muted-foreground text-xs">{stat.label}</dt>
+                            <dd className="mt-1 text-lg font-semibold tabular-nums">{isPending ? <Skeleton className="h-6 w-16" /> : stat.value}</dd>
+                        </div>
+                    ))}
+                </dl>
+            )}
+        </section>
+    );
+};
+
+export default ProjectUsageSummary;

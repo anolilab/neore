@@ -679,6 +679,8 @@ for a schema table that is neither policed nor listed:
 | `triggers_functions.updateTrigger` | mutation | authMutation + RL | triggers | row.userId == caller; a new botId must be a bot the caller owns; a new event source is checked as on create | ok |
 | `usage_activity.getActivityHeatmap` | query | authQuery | usageDaily | caller-scoped (ctx.user) | ok — new; at most 378 rows via `(userId, skillKey, date)` |
 | `usage_activity.getSkillBreakdown` | query | authQuery | usageDaily | caller-scoped (ctx.user) | ok — new; at most 4000 rows via `(userId, date)` |
+| `usage_activity.getProjectBreakdown` | query | authQuery | usageDaily, projects | caller-scoped (ctx.user); a project's title only through `readableProject` (owner or org member) | ok — new; at most 378 total rows + 4000 project rows via `(userId, skillKey, date)` |
+| `usage_activity.getProjectUsage` | query | authQuery | usageDaily | caller-scoped (ctx.user); only the caller's own rows for the project id | ok — new; at most 742 rows via `(userId, projectKey, date)`, with `truncated` when the period holds more |
 | `usage_backfill.getUsageBackfillStatus` | query | authQuery | usageBackfill | caller-scoped (ctx.user) | ok — new; one row via `by_userId` |
 | `usage_backfill.startUsageBackfill` | mutation | authMutation | usageBackfill | caller-scoped (ctx.user); no args | ok — new; idempotent — schedules at most one step chain per 5-minute lease, the walk reads only the caller's own shard |
 | `vault_functions.deleteAttachments` | mutation | authMutation + RL | — | row.userId == caller | **fixed** (medium) — uploader-only; org members could delete each other's files |

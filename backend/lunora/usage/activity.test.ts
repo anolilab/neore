@@ -6,7 +6,7 @@ import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import schema from "../schema";
-import { forwardReplyUsage, getActivityHeatmap, getSkillBreakdown, recordReplyUsage } from "./activity";
+import { forwardReplyUsage, getActivityHeatmap, getProjectBreakdown, getProjectUsage, getSkillBreakdown, recordReplyUsage } from "./activity";
 import { DEFAULT_SKILL_KEY, RECORD_RETRY } from "./activity-logic";
 
 const { sessionFrom } = vi.hoisted(() => {
@@ -79,6 +79,15 @@ const heatmap = async (userId: string, toDate: string): Promise<Heatmap> =>
 
 const breakdown = async (userId: string, fromDate: string): Promise<Breakdown> =>
     (await as(userId).query(getSkillBreakdown as never, { fromDate } as never)) as Breakdown;
+
+/** A project of `userId`'s and a thread of theirs in it (or in none). */
+const insertThread = async (userId: string, title?: string): Promise<{ projectId?: string; threadId: string }> =>
+    await harness.run(async (ctx: any) => {
+        const projectId = title === undefined ? undefined : await ctx.db.insert("projects", { createdAt: 1, title, userId });
+        const threadId = await ctx.db.insert("threads", { status: "active", title: "T", userId, ...(projectId !== undefined && { projectId }) });
+
+        return { projectId, threadId };
+    });
 
 let replies = 0;
 
@@ -204,15 +213,6 @@ describe("recording usage by project", () => {
             }
 
             return totals;
-        });
-
-    /** A project of `userId`'s and a thread of theirs in it (or in none). */
-    const insertThread = async (userId: string, title?: string): Promise<{ projectId?: string; threadId: string }> =>
-        await harness.run(async (ctx: any) => {
-            const projectId = title === undefined ? undefined : await ctx.db.insert("projects", { createdAt: 1, title, userId });
-            const threadId = await ctx.db.insert("threads", { status: "active", title: "T", userId, ...(projectId !== undefined && { projectId }) });
-
-            return { projectId, threadId };
         });
 
     it("files each reply under its thread's project, and nothing for a reply outside one", async () => {
@@ -516,5 +516,176 @@ describe("recording usage by project", () => {
         });
 
         expect(keys).toStrictEqual(["first-record"]);
+    });
+});
+
+describe("usage by project: the views", () => {
+    interface Totals {
+        costMicrodollars: number;
+        replies: number;
+        tokens: number;
+    }
+
+    interface ProjectBreakdown {
+        noProject: Totals;
+        projects: (Totals & { projectKey: string; title?: string })[];
+        total: Totals;
+        truncated: boolean;
+    }
+
+    const projectBreakdown = async (userId: string, fromDate: string): Promise<ProjectBreakdown> =>
+        (await as(userId).query(getProjectBreakdown as never, { fromDate } as never)) as ProjectBreakdown;
+
+    const projectUsage = async (userId: string, projectId: string, fromDate: string): Promise<Totals> => {
+        const { truncated, ...totals } = (await as(userId).query(getProjectUsage as never, { fromDate, projectId } as never)) as Totals & {
+            truncated: boolean;
+        };
+
+        expect(truncated).toBe(false);
+
+        return totals;
+    };
+
+    it("shows two threads in two projects as separate totals that add up to the overall total", async () => {
+        const alpha = await insertThread(USER, "Alpha");
+        const beta = await insertThread(USER, "Beta");
+        const loose = await insertThread(USER);
+
+        await record({ costMicrodollars: 300, threadId: alpha.threadId, tokens: 30 });
+        await record({ costMicrodollars: 200, skillKey: "sk_1", skillName: "/writer", threadId: alpha.threadId, tokens: 20 });
+        await record({ costMicrodollars: 100, date: "2026-09-21", threadId: beta.threadId, tokens: 10 });
+        await record({ costMicrodollars: 7, threadId: loose.threadId, tokens: 1 });
+        await record({ costMicrodollars: 3, tokens: 1 });
+
+        const result = await projectBreakdown(USER, "2026-09-01");
+
+        expect(result.projects).toStrictEqual([
+            { costMicrodollars: 500, projectKey: alpha.projectId, replies: 2, title: "Alpha", tokens: 50 },
+            { costMicrodollars: 100, projectKey: beta.projectId, replies: 1, title: "Beta", tokens: 10 },
+        ]);
+        expect(result.noProject).toStrictEqual({ costMicrodollars: 10, replies: 2, tokens: 2 });
+        expect(result.total).toStrictEqual({ costMicrodollars: 610, replies: 5, tokens: 62 });
+
+        const sum = [...result.projects, result.noProject].reduce((total, row) => total + row.costMicrodollars, 0);
+
+        expect(sum).toBe(result.total.costMicrodollars);
+        expect(await projectUsage(USER, alpha.projectId!, "2026-09-01")).toStrictEqual({ costMicrodollars: 500, replies: 2, tokens: 50 });
+        expect(await projectUsage(USER, beta.projectId!, "2026-09-21")).toStrictEqual({ costMicrodollars: 100, replies: 1, tokens: 10 });
+
+        // The skill breakdown is unchanged by the project rows.
+        const skills = await breakdown(USER, "2026-09-01");
+
+        expect(skills.skills.reduce((total, skill) => total + skill.costMicrodollars, 0)).toBe(610);
+    });
+
+    it("shows a user only their own project usage", async () => {
+        const alpha = await insertThread(USER, "Alpha");
+
+        await record({ threadId: alpha.threadId });
+
+        expect(await projectUsage(OTHER, alpha.projectId!, "2026-09-01")).toStrictEqual({ costMicrodollars: 0, replies: 0, tokens: 0 });
+        const theirs = await projectBreakdown(OTHER, "2026-09-01");
+
+        expect(theirs.projects).toStrictEqual([]);
+    });
+
+    it("says when a project's period held more rows than one read sums", async () => {
+        const alpha = await insertThread(USER, "Alpha");
+
+        await harness.run(async (ctx: any) => {
+            for (let day = 0; day <= 53 * 7 * 2; day += 1) {
+                const date = new Date(Date.UTC(2025, 0, 1) + day * 86_400_000).toISOString().slice(0, 10);
+
+                await ctx.db.insert("usageDaily", {
+                    costMicrodollars: 1,
+                    date,
+                    projectKey: alpha.projectId,
+                    replies: 1,
+                    skillKey: "__project__",
+                    tokens: 1,
+                    updatedAt: 1,
+                    userId: USER,
+                });
+            }
+        });
+
+        const result = (await as(USER).query(getProjectUsage as never, { fromDate: "2025-01-01", projectId: alpha.projectId } as never)) as {
+            costMicrodollars: number;
+            truncated: boolean;
+        };
+
+        expect(result.truncated).toBe(true);
+        expect(result.costMicrodollars).toBe(53 * 7 * 2);
+    });
+
+    it("sums the projects over the days the total covers, so they never exceed it when the total is cut short", async () => {
+        const alpha = await insertThread(USER, "Alpha");
+
+        await harness.run(async (ctx: any) => {
+            const days = 53 * 7 * 2 + 3;
+
+            for (let day = 0; day < days; day += 1) {
+                const date = new Date(Date.UTC(2025, 0, 1) + day * 86_400_000).toISOString().slice(0, 10);
+                const row = { costMicrodollars: 1, date, replies: 1, tokens: 1, updatedAt: 1, userId: USER };
+
+                await ctx.db.insert("usageDaily", { ...row, skillKey: "__total__" });
+                await ctx.db.insert("usageDaily", { ...row, projectKey: alpha.projectId, skillKey: "__project__" });
+            }
+        });
+
+        const result = await projectBreakdown(USER, "2025-01-01");
+
+        expect(result.truncated).toBe(true);
+        expect(result.projects[0]!.costMicrodollars).toBe(result.total.costMicrodollars);
+        expect(result.noProject.costMicrodollars).toBe(0);
+    });
+
+    it("lists a project the caller can no longer open with its totals but without its title", async () => {
+        const projectId = await harness.run(
+            async (ctx: any) => await ctx.db.insert("projects", { createdAt: 1, organizationId: "org_left", title: "Secret", userId: OTHER }),
+        );
+
+        await harness.run(async (ctx: any) => {
+            const row = { costMicrodollars: 40, date: "2026-09-20", replies: 2, tokens: 4, updatedAt: 1, userId: USER };
+
+            await ctx.db.insert("usageDaily", { ...row, skillKey: "__total__" });
+            await ctx.db.insert("usageDaily", { ...row, projectKey: projectId, skillKey: "__project__" });
+        });
+
+        const result = await projectBreakdown(USER, "2026-09-01");
+
+        expect(result.projects).toStrictEqual([{ costMicrodollars: 40, projectKey: projectId, replies: 2, tokens: 4 }]);
+    });
+
+    it("leaves out a day the project read reached only in part, so No project never takes that day's project spend", async () => {
+        const projectKeys: string[] = [];
+
+        for (const title of ["P1", "P2", "P3", "P4", "P5", "P6"]) {
+            const { projectId } = await insertThread(USER, title);
+
+            projectKeys.push(projectId!);
+        }
+
+        // Six project rows a day: the read stops two rows into its oldest day.
+        const days = Math.ceil((4000 + 1) / projectKeys.length);
+
+        await harness.run(async (ctx: any) => {
+            for (let day = 0; day < days; day += 1) {
+                const date = new Date(Date.UTC(2025, 0, 1) + day * 86_400_000).toISOString().slice(0, 10);
+                const row = { date, replies: 1, tokens: 1, updatedAt: 1, userId: USER };
+
+                await ctx.db.insert("usageDaily", { ...row, costMicrodollars: projectKeys.length, replies: projectKeys.length, skillKey: "__total__" });
+
+                for (const projectKey of projectKeys) {
+                    await ctx.db.insert("usageDaily", { ...row, costMicrodollars: 1, projectKey, skillKey: "__project__" });
+                }
+            }
+        });
+
+        const result = await projectBreakdown(USER, "2025-01-01");
+
+        expect(result.truncated).toBe(true);
+        expect(result.noProject).toStrictEqual({ costMicrodollars: 0, replies: 0, tokens: 0 });
+        expect(result.total.costMicrodollars).toBe((days - 1) * projectKeys.length);
     });
 });
