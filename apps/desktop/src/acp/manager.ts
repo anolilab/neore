@@ -26,7 +26,7 @@ import { initialize } from "./protocol";
 import type { SendResult } from "./session";
 import { AgentSession } from "./session";
 import { AgentSignedOutError } from "./signed-out";
-import type { AcpView, ProbeResult, SessionSnapshot, SessionStatus, SessionSummary, SpawnPlan } from "./types";
+import type { AcpUpdate, AcpView, ProbeResult, SessionSnapshot, SessionStatus, SessionSummary, SpawnPlan } from "./types";
 
 /** The window is told about changes at most this often; streamed text would otherwise re-render per chunk. */
 const CHANGE_INTERVAL_MS = 50;
@@ -86,8 +86,11 @@ export class AcpManager {
     /** Agents whose account is changing (`holdingAgent`): none of their sessions may start. */
     private readonly held = new Set<string>();
 
-    /** Imports running now, per agent: a sign-out waits for them, so none stays connected to the account it removes. */
-    private readonly importsRunning = new Map<string, Set<Promise<unknown>>>();
+    /**
+     * Imports and installs running now, per agent (`usingAgent`): a sign-out waits for them, so no import stays connected
+     * to the account it removes and no install changes the program whose account it checks.
+     */
+    private readonly inUse = new Map<string, Set<Promise<unknown>>>();
 
     private readonly processes = new Set<AgentProcess>();
 
@@ -339,7 +342,7 @@ export class AcpManager {
         this.held.add(agentKey);
 
         try {
-            await Promise.allSettled(this.importsRunning.get(agentKey) ?? []);
+            await Promise.allSettled(this.inUse.get(agentKey) ?? []);
 
             return await use();
         } finally {
@@ -347,15 +350,18 @@ export class AcpManager {
         }
     }
 
-    /** Runs an import of one agent's saved sessions. Refused while the agent's account is being signed out. */
-    public async importing<Result>(agentKey: string, use: () => Promise<Result>): Promise<Result> {
+    /**
+     * Runs an import of the agent's saved sessions or an install of its program. Refused while the agent's account is
+     * being signed out, and a sign-out that begins meanwhile waits for it.
+     */
+    public async usingAgent<Result>(agentKey: string, use: () => Promise<Result>): Promise<Result> {
         this.refuseHeld(agentKey);
 
         const run = use();
-        const running = this.importsRunning.get(agentKey) ?? new Set<Promise<unknown>>();
+        const running = this.inUse.get(agentKey) ?? new Set<Promise<unknown>>();
 
         running.add(run);
-        this.importsRunning.set(agentKey, running);
+        this.inUse.set(agentKey, running);
 
         try {
             return await run;
@@ -363,25 +369,31 @@ export class AcpManager {
             running.delete(run);
 
             if (running.size === 0) {
-                this.importsRunning.delete(agentKey);
+                this.inUse.delete(agentKey);
             }
         }
     }
 
     /**
-     * Throws while the agent (or, with no key, any agent: an environment variable reaches all of them) is being signed
-     * out. A change to its command or variables then could not change the account a sign-out is checking.
+     * Throws when `update` would change which account an agent being signed out reaches: its command, or a variable it
+     * gets (one for all agents, while any is signed out). A folder approval changes no account and is never refused.
      */
-    public refuseWhileSigningOut(agentKey?: string): void {
-        if (agentKey === undefined) {
-            if (this.held.size > 0) {
-                throw new Error("an agent is being signed out; change its variables once that ends");
-            }
+    public refuseUpdateWhileSigningOut(update: AcpUpdate): void {
+        if (update.op === "grant" || update.op === "revoke") {
+            return;
+        }
+
+        if (update.op === "saveAgent" || update.op === "removeAgent") {
+            this.refuseHeld(update.key);
 
             return;
         }
 
-        this.refuseHeld(agentKey);
+        if (update.agentKey !== undefined) {
+            this.refuseHeld(update.agentKey);
+        } else if (this.held.size > 0) {
+            throw new Error("an agent is being signed out; change the variables for all agents once that ends");
+        }
     }
 
     /** Ends every open session of one agent: its account is about to change (a sign-out). */

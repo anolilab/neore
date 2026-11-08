@@ -29,7 +29,7 @@ const MAX_TITLE_CHARS = 200;
 export interface ImporterOptions {
     /** The label the user gave the agent; undefined for one that is not registered. */
     agentLabel: (agentKey: string) => string | undefined;
-    agents: Pick<AcpManager, "importing" | "withAgent">;
+    agents: Pick<AcpManager, "usingAgent" | "withAgent">;
     /** The label of the folder the user approved for this agent (never its path); undefined when it is not approved. */
     hostInfo: (agentKey: string, folder: string) => { folderId: string; folderLabel: string } | undefined;
     io: ImportIo;
@@ -52,7 +52,7 @@ export class AcpImporter {
 
     /** The agent's saved sessions for this folder, newest first. */
     public async list(agentKey: string, folder: string): Promise<NativeSessionView[]> {
-        return await this.options.agents.importing(agentKey, async () => await this.options.agents.withAgent(agentKey, folder, {}, async ({ connection, plan, report }) => {
+        return await this.options.agents.usingAgent(agentKey, async () => await this.options.agents.withAgent(agentKey, folder, {}, async ({ connection, plan, report }) => {
                 requireAdvertised(report, "sessions.listNative", "list its saved sessions");
 
                 const sessions = await listSessions(connection, plan.cwd);
@@ -76,7 +76,7 @@ export class AcpImporter {
 
         let collector: ReplayCollector | undefined;
 
-        return await this.options.agents.importing(agentKey, async () => await this.options.agents.withAgent(
+        return await this.options.agents.usingAgent(agentKey, async () => await this.options.agents.withAgent(
             agentKey,
             folder,
             { notification: (method, params) => method === METHOD.sessionUpdate && collector?.update(params) },

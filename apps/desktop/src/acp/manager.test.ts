@@ -13,7 +13,7 @@ import { spawnAgent } from "./process";
 import { newSession } from "./protocol";
 import { AgentSignedOutError } from "./signed-out";
 import { alive, expectGone, Scratch } from "./testing/harness";
-import type { SessionSnapshot, SpawnPlan } from "./types";
+import type { AcpUpdate, SessionSnapshot, SpawnPlan } from "./types";
 
 const SENTINEL = "sentinel-secret-7f3a";
 const PID_PREFIX = /^pid:\d+/u;
@@ -497,7 +497,7 @@ describe("a sign-out of an agent", () => {
     it("waits for an import of that agent that is running, and refuses a new one meanwhile", async () => {
         const target = make({});
         const finish = gate();
-        const running = target.importing("fake", async () => await finish.opened);
+        const running = target.usingAgent("fake", async () => await finish.opened);
         let signedOut = false;
         const hold = target.holdingAgent("fake", async () => {
             signedOut = true;
@@ -505,7 +505,7 @@ describe("a sign-out of an agent", () => {
 
         // The sign-out has begun: it must not run while the import still holds the agent's connection.
         await Promise.resolve();
-        expect(await messageOf(target.importing("fake", async () => {}))).toContain("being signed out");
+        expect(await messageOf(target.usingAgent("fake", async () => {}))).toContain("being signed out");
         expect(signedOut).toBe(false);
 
         finish.open();
@@ -513,6 +513,33 @@ describe("a sign-out of an agent", () => {
         await hold;
 
         expect(signedOut).toBe(true);
+        target.killAll();
+    });
+
+    it("refuses only the updates that would change the account being signed out", async () => {
+        const target = make({});
+        const finish = gate();
+        const hold = target.holdingAgent("fake", async () => await finish.opened);
+        const refused = (update: AcpUpdate): string => {
+            try {
+                target.refuseUpdateWhileSigningOut(update);
+
+                return "";
+            } catch (error) {
+                return (error as Error).message;
+            }
+        };
+
+        expect(refused({ agentKey: "fake", folder: "/work", op: "grant" })).toBe("");
+        expect(refused({ agentKey: "fake", folderId: "f1", op: "revoke" })).toBe("");
+        expect(refused({ agentKey: "other", name: "TOKEN", op: "setEnv", value: "v" })).toBe("");
+        expect(refused({ key: "other", op: "removeAgent" })).toBe("");
+        expect(refused({ args: [], command: "x", key: "fake", label: "Fake", op: "saveAgent" })).toContain("being signed out");
+        expect(refused({ agentKey: "fake", name: "TOKEN", op: "removeEnv" })).toContain("being signed out");
+        expect(refused({ name: "TOKEN", op: "setEnv", value: "v" })).toContain("being signed out");
+
+        finish.open();
+        await hold;
         target.killAll();
     });
 });

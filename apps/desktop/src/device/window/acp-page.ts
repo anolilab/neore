@@ -277,9 +277,12 @@ const askSignIn = async (key: string, request: SignInRequest, ask: () => Promise
     try {
         state.signIn[key] = { config, status: await ask() };
     } finally {
+        // Read again: the person can have moved on to another field while the request ran.
+        const stillFocused = focusedAgentControl();
+
         state.signInPending.delete(key);
         renderAgents();
-        restoreAgentFocus(focused, key);
+        restoreAgentFocus(stillFocused, key);
     }
 };
 

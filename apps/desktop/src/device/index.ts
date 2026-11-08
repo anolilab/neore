@@ -30,7 +30,7 @@ import { AgentRegistry } from "../acp/registry";
 import { RemoteAgents } from "../acp/remote-process";
 import { ServerAgents } from "../acp/servers";
 import { AgentSignIn } from "../acp/sign-in";
-import type { AcpView, PermissionView, SpawnPlan } from "../acp/types";
+import type { AcpUpdate, AcpView, PermissionView, SpawnPlan } from "../acp/types";
 import { backendOrigin } from "../site";
 import type { TerminalOpener } from "../terminal/index";
 import { DEVICE_CHANNEL, LOCAL_CHANNEL, LOCAL_EVENT } from "./channels";
@@ -739,10 +739,11 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
     local(LOCAL_CHANNEL.acpView, () => JSON.parse(requireCore().acpView()) as AcpView);
 
     const updateAcp = async (update: string): Promise<AcpView> => {
-        const { key, op } = JSON.parse(update) as { key?: string; op?: string };
+        const parsed = JSON.parse(update) as AcpUpdate;
+        const { key, op } = parsed as { key?: string; op?: string };
 
         // Refused before anything is saved: a sign-out is checking the account on the command or variables it would change.
-        state.acp?.refuseWhileSigningOut(key);
+        state.acp?.refuseUpdateWhileSigningOut(parsed);
 
         const view = JSON.parse(requireCore().acpUpdate(update)) as AcpView;
 
@@ -787,11 +788,10 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
         });
 
         const key = readAgentKey(id);
-
-        // A new install changes the command a sign-out is checking the account with.
-        state.acp?.refuseWhileSigningOut(key);
-
-        const view = await state.installer.install(key, readAgentVersion(version));
+        const { installer } = state;
+        const install = async (): Promise<AcpView | null> => await installer.install(key, readAgentVersion(version));
+        // An install changes the program a sign-out checks the account of: refused during one, and one waits for it.
+        const view = state.acp === undefined ? await install() : await state.acp.usingAgent(key, install);
 
         if (view !== null) {
             state.acp?.forgetReport(key);

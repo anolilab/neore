@@ -7,7 +7,8 @@ const planWith = (env: Record<string, string>): SpawnPlan => ({ env, secretNames
 
 describe("scrub", () => {
     it("masks the longer of two overlapping secrets in full, not only its shorter prefix", () => {
-        const plan = planWith({ LONG_KEY: "sk-abcdef-tail", SHORT_KEY: "sk-abcd" });
+        // The names sort the shorter value first: replacing in the variables' own order would leave the longer one's tail.
+        const plan = planWith({ A_SHORT_KEY: "sk-abcd", B_LONG_KEY: "sk-abcdef-tail" });
 
         expect(scrub("the agent echoed sk-abcdef-tail", plan)).toBe("the agent echoed ***");
     });
