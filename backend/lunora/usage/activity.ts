@@ -30,7 +30,7 @@ import { isAccountDeletionUnderway } from "../gdpr/deletion-guard";
 import { authQuery } from "../lib/crpc";
 import { logger } from "../lib/logger";
 import { runAfterOnShard, runAfterWithRetry } from "../lib/shard-scheduler";
-import { readableProject } from "../projects/functions";
+import { readableProject, readableProjectTitle } from "../projects/functions";
 import { leadThreadOf } from "../sub-agents/worker-thread";
 import type { Attribution, AttributionIncrement, ProjectTotal, ReplyUsageArgs, RollupIncrement } from "./activity-logic";
 import {
@@ -579,10 +579,11 @@ export const getProjectBreakdown = authQuery
         for (let index = 0; index < listed.length; index += TITLE_LOOKUPS_AT_ONCE) {
             const batch = await Promise.all(
                 listed.slice(index, index + TITLE_LOOKUPS_AT_ONCE).map(async (project) => {
-                    // A failed read fails the query, so the card shows an error rather than "no longer available".
-                    const found = await readableProject(ctx, project.projectKey as Id<"projects">, userId);
+                    // One read of the row, as many rows as one page of the project list. A failed read fails the query, so
+                    // the card shows an error rather than "no longer available".
+                    const title = await readableProjectTitle(ctx, project.projectKey as Id<"projects">, userId);
 
-                    return { ...project, ...(found && { title: found.title }) };
+                    return { ...project, ...(title !== undefined && { title }) };
                 }),
             );
 

@@ -38,6 +38,26 @@ export const readableProject = async (context: QueryCtx | MutationCtx, projectId
 };
 
 /**
+ * The title of a project `userId` can read, else `undefined` (also for a missing one): the rule of {@link readableProject}
+ * (the owner, or a current member of its organization) in one read of the row rather than two, for a view that only
+ * names projects.
+ */
+export const readableProjectTitle = async (context: QueryCtx | MutationCtx, projectId: Id<"projects">, userId: string): Promise<string | undefined> => {
+    // One read of the row: the access decision needs no second, row-level-security read, as only the title leaves here.
+    const found = await systemDb(context).projects.findFirst({ where: { _id: projectId } });
+
+    if (!found) {
+        return undefined;
+    }
+
+    if (found.userId !== userId && (!found.organizationId || !(await getMemberByOrganizationAndUser(context, found.organizationId, userId)))) {
+        return undefined;
+    }
+
+    return found.title;
+};
+
+/**
  * The project when `userId` may file threads in it, else `null`: readable (owner or a current member of its
  * organization) AND owned by `userId` or by nobody. The same rule as moving a thread into a project
  * (`moveThreadToProject` here) and updating one: a member never files into another member's project.

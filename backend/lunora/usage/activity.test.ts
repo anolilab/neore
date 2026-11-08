@@ -672,6 +672,24 @@ describe("usage by project: the views", () => {
         expect(result.noProject).toStrictEqual({ costMicrodollars: 5, replies: 1, tokens: 1 });
     });
 
+    it("names a teammate's project in an organization the caller belongs to", async () => {
+        const projectId = await harness.run(
+            async (ctx: any) => await ctx.db.insert("projects", { createdAt: 1, organizationId: "org_team", title: "Team", userId: OTHER }),
+        );
+
+        await harness.run(async (ctx: any) => {
+            const row = { costMicrodollars: 40, date: "2026-09-20", replies: 2, tokens: 4, updatedAt: 1, userId: USER };
+
+            await ctx.db.insert("member", { createdAt: 0, organizationId: "org_team", role: "member", userId: USER });
+            await ctx.db.insert("usageDaily", { ...row, skillKey: "__total__" });
+            await ctx.db.insert("usageDaily", { ...row, projectKey: projectId, skillKey: "__project__" });
+        });
+
+        const result = await projectBreakdown(USER, "2026-09-01");
+
+        expect(result.projects).toMatchObject([{ projectKey: projectId, title: "Team" }]);
+    });
+
     it("lists a project the caller can no longer open with its totals but without its title", async () => {
         const projectId = await harness.run(
             async (ctx: any) => await ctx.db.insert("projects", { createdAt: 1, organizationId: "org_left", title: "Secret", userId: OTHER }),
@@ -703,7 +721,7 @@ describe("usage by project: the views", () => {
             await harness.run(async (ctx: any) => {
                 const row = { date, replies: 1, tokens: 1, updatedAt: 1, userId: USER };
 
-                await ctx.db.insert("usageDaily", { ...row, costMicrodollars: keys.length, replies: keys.length, skillKey: "__total__" });
+                await ctx.db.insert("usageDaily", { ...row, costMicrodollars: keys.length, replies: keys.length, skillKey: "__total__", tokens: keys.length });
 
                 for (const projectKey of keys) {
                     await ctx.db.insert("usageDaily", { ...row, costMicrodollars: 1, projectKey, skillKey: "__project__" });
@@ -722,7 +740,9 @@ describe("usage by project: the views", () => {
         expect(full.truncated).toBe(false);
         expect(full.total.costMicrodollars).toBe(4000);
         expect(full.projects.map((project) => project.costMicrodollars)).toStrictEqual(projectKeys.map(() => days));
-        expect(full.noProject.costMicrodollars).toBe(0);
+        expect(full.noProject).toStrictEqual({ costMicrodollars: 0, replies: 0, tokens: 0 });
+        expect(full.total.tokens).toBe(days * projectKeys.length);
+        expect(full.projects.reduce((sum, project) => sum + project.tokens, 0)).toBe(full.total.tokens);
 
         // One project row more, on a new oldest day: the read is cut, and its oldest kept day may be partial, so both that
         // day and the older one are left out of the projects and the total alike — never moved into "No project".
@@ -733,5 +753,7 @@ describe("usage by project: the views", () => {
         expect(cut.truncated).toBe(true);
         expect(cut.noProject).toStrictEqual({ costMicrodollars: 0, replies: 0, tokens: 0 });
         expect(cut.total.costMicrodollars).toBe((days - 1) * projectKeys.length);
+        expect(cut.total.tokens).toBe((days - 1) * projectKeys.length);
+        expect(cut.projects.reduce((sum, project) => sum + project.tokens, 0)).toBe(cut.total.tokens);
     });
 });
