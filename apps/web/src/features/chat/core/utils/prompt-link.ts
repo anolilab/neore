@@ -30,3 +30,27 @@ export const readPromptLinkSearch = (search: { model?: string; prompt?: string }
 
     return model === "" ? { prompt } : { model, prompt };
 };
+
+/**
+ * The longest query a copied link may carry once encoded. A letter outside ASCII takes up to twelve characters in a link, so a
+ * prompt under the cap could still give an address too long for the server to accept.
+ */
+export const PROMPT_LINK_MAX_QUERY_CHARS = 8192;
+
+/** Half of a character pair (text cut inside an emoji) as the replacement character: `encodeURIComponent` throws on it. */
+const LONE_SURROGATE = /\p{Cs}/gu;
+
+/** The query of a link to `prompt` on `model`. `encodeURIComponent`, not `URLSearchParams`, so the address carries `%20`, never `+`. */
+const promptLinkQuery = (prompt: string, model: string | undefined): string =>
+    `prompt=${encodeURIComponent(prompt.replaceAll(LONE_SURROGATE, "\u{FFFD}"))}${model ? `&model=${encodeURIComponent(model)}` : ""}`;
+
+/** Whether a link to `raw` would carry less than all of it, or an address too long to open: such a copy is refused, never cut. */
+export const isPromptLinkTooLong = (raw: string, model?: string): boolean => {
+    const prompt = stripHiddenText(raw).text.trim();
+
+    return [...prompt].length > PROMPT_LINK_MAX_CHARS || promptLinkQuery(prompt, model).length > PROMPT_LINK_MAX_QUERY_CHARS;
+};
+
+/** A link on `origin` that `readPromptLinkSearch` reads back as `promptFromLink(prompt)` and `model`. */
+export const buildPromptLink = (origin: string, { model, prompt }: { model?: string; prompt: string }): string =>
+    `${origin}/chat?${promptLinkQuery(promptFromLink(prompt), model?.trim())}`;
