@@ -95,6 +95,7 @@ describe("connectionFailureCategory", () => {
         expect(category("connect to host box port 22: Operation timed out")).toBe("timed out");
         expect(category("connect to host box port 22: Connection refused")).toBe("server not reachable");
         expect(category("Banner: token=abcd1234 weird")).toBe("connection failed");
+        expect(category("the passphrase channel failed: Permission denied (os error 13)")).toBe("connection failed");
     });
 });
 

@@ -27,9 +27,11 @@ export const routeOf = (transport: string | undefined, isThisComputer: boolean):
 // Checked in order, against both OpenSSH's wording and the device core's own (`packages/device-core/src/ssh.rs`). ssh ends
 // a refused key with "Connection closed by authenticating user", which must read as a login, not as a closed connection.
 const CONNECTION_CATEGORIES: ReadonlyArray<readonly [RegExp, MessageDescriptor]> = [
+    // The core's own passphrase channel failed on this computer, whatever its error says ("Permission denied (os error 13)").
+    [/^the passphrase channel failed/iu, msg`connection failed`],
     [/remote host identification has changed|host key (?:of|for) .* changed|offending .* key/iu, msg`the host key changed`],
     [/host key verification failed|no matching host key|host key was not trusted|presented no host key/iu, msg`the host key could not be verified`],
-    [/permission denied|refused the login|authenticat|passphrase|publickey/iu, msg`login refused`],
+    [/permission denied|refused the login|authenticat|(?:enter|bad|incorrect) passphrase|publickey/iu, msg`login refused`],
     [/timed out|timeout/iu, msg`timed out`],
     [/refused|unreachable|resolve|no route|lost|closed|reset/iu, msg`server not reachable`],
 ];
