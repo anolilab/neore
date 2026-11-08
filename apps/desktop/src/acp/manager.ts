@@ -313,6 +313,21 @@ export class AcpManager {
         await this.require(sessionId).close();
     }
 
+    /** Ends every open session of one agent: its account is about to change (a sign-out). */
+    public async closeAgent(agentKey: string): Promise<void> {
+        const closing: Promise<void>[] = [];
+
+        for (const session of this.sessions.values()) {
+            const summary = session.summary();
+
+            if (summary.agentKey === agentKey && summary.status !== "ended") {
+                closing.push(session.close());
+            }
+        }
+
+        await Promise.all(closing);
+    }
+
     /**
      * Ends the sessions the user's approvals no longer cover: an agent that was removed, or a folder whose
      * approval is gone (revoked, or dropped because the agent's command or `PATH` changed).

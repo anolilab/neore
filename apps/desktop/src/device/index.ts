@@ -29,6 +29,7 @@ import { acpSupported, spawnAgent } from "../acp/process";
 import { AgentRegistry } from "../acp/registry";
 import { RemoteAgents } from "../acp/remote-process";
 import { ServerAgents } from "../acp/servers";
+import { AgentSignIn } from "../acp/sign-in";
 import type { AcpView, PermissionView, SpawnPlan } from "../acp/types";
 import { backendOrigin } from "../site";
 import type { TerminalOpener } from "../terminal/index";
@@ -100,6 +101,7 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
         registry?: AgentRegistry;
         remote?: RemoteAgents;
         servers?: ServerAgents;
+        signIn?: AgentSignIn;
         transport?: HostTransport;
     } = {};
     /** Every site window that has made a trusted relay call and is still open: progress and changes go to each. */
@@ -795,6 +797,16 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
     });
 
     local(LOCAL_CHANNEL.acpProbe, (agentKey) => requireAcp().probe(readAgentKey(agentKey)));
+
+    const requireSignIn = (): AgentSignIn => {
+        state.signIn ??= new AgentSignIn({ agents: requireAcp(), folder: path.join(app.getPath("userData"), "acp-sign-in") });
+
+        return state.signIn;
+    };
+
+    local(LOCAL_CHANNEL.acpSignInStatus, (agentKey) => requireSignIn().status(readAgentKey(agentKey)));
+
+    local(LOCAL_CHANNEL.acpSignOut, (agentKey) => requireSignIn().signOut(readAgentKey(agentKey)));
 
     local(LOCAL_CHANNEL.acpReports, () => requireAcp().allReports());
 

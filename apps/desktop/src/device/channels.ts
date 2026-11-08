@@ -42,6 +42,8 @@ export const LOCAL_CHANNEL = {
     acpSend: "neore:device-local:acp-send",
     acpSession: "neore:device-local:acp-session",
     acpSessions: "neore:device-local:acp-sessions",
+    acpSignInStatus: "neore:device-local:acp-sign-in-status",
+    acpSignOut: "neore:device-local:acp-sign-out",
     acpStart: "neore:device-local:acp-start",
     acpUpdate: "neore:device-local:acp-update",
     acpView: "neore:device-local:acp-view",

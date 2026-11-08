@@ -7,6 +7,7 @@ import type { CapabilityReport } from "@neore/ai/capabilities";
 
 import type { HooksView } from "../../acp/hooks/types";
 import type { RegistryListing } from "../../acp/registry";
+import type { SignInStatus } from "../../acp/sign-in";
 import type { AcpView, ImportSummary, NativeSessionView, PermissionView, SessionSnapshot, SessionSummary, ToolStatus } from "../../acp/types";
 import { HooksPanelModel } from "./hooks-panel";
 import { canImportSessions } from "./import-control";
@@ -52,8 +53,10 @@ const state: {
     selected?: string;
     sessions: SessionSummary[];
     signature: string;
+    /** Each agent's last sign-in check, by key. Not checked since the window opened: absent. */
+    signIn: Record<string, SignInStatus>;
     view: AcpView;
-} = { listings: [], reports: {}, requests: [], searchSerial: 0, sessions: [], signature: "", view: { agents: [], consents: [], envNames: [] } };
+} = { listings: [], reports: {}, requests: [], searchSerial: 0, sessions: [], signature: "", signIn: {}, view: { agents: [], consents: [], envNames: [] } };
 
 const showError = (error: unknown): void => {
     $("acp-error").textContent = String(error instanceof Error ? error.message : error).replace(IPC_PREFIX, "");
@@ -163,6 +166,46 @@ const probe = (key: string) =>
         $("acp-notice").textContent = `${agentLabel(key)}: ${result.agentName || "agent"} ${result.agentVersion}, protocol ${String(result.protocolVersion)}. No session was opened.${canImportSessions(state.reports[key]) ? " Its saved sessions can be imported." : ""}`;
     });
 
+// ─── Signing in to the agent's own account ──────────────────────────────────
+
+const SIGN_IN_TEXT: Record<SignInStatus["state"], string> = {
+    signed_in: "signed in",
+    signed_out: "not signed in. Sign in with the agent's own login command on this computer",
+    unknown: "could not tell",
+};
+
+const signInText = (status: SignInStatus | undefined): string => {
+    if (status === undefined) {
+        return "not checked";
+    }
+
+    return status.detail === "" ? SIGN_IN_TEXT[status.state] : `${SIGN_IN_TEXT[status.state]}: ${status.detail}`;
+};
+
+const canSignOut = (status: SignInStatus | undefined): boolean => status?.state === "signed_in" && status.canSignOut;
+
+const checkSignIn = (key: string) =>
+    guarded(async () => {
+        $("acp-notice").textContent = `Asking ${agentLabel(key)} whether it is signed in…`;
+        state.signIn[key] = await globalThis.neoreDevice.acpSignInStatus(key);
+        $("acp-notice").textContent = "";
+        renderAgents();
+    });
+
+const signOut = (key: string) =>
+    guarded(async () => {
+        const open = state.sessions.filter((session) => session.agentKey === key && session.status !== "ended").length;
+        const sessions = open === 1 ? "session" : "sessions";
+        const ending = open === 0 ? "" : ` Its ${String(open)} open ${sessions} on this computer end first.`;
+
+        if (!await globalThis.neoreDevice.confirm(`Sign ${agentLabel(key)} out of its account?${ending}`)) {
+            return;
+        }
+
+        state.signIn[key] = await globalThis.neoreDevice.acpSignOut(key);
+        renderAgents();
+    });
+
 // ─── Importing saved sessions ───────────────────────────────────────────────
 
 const refreshReports = async (): Promise<void> => {
@@ -242,6 +285,7 @@ const renderAgents = (): void => {
                         ? `${agent.label}: ${[agent.command, ...agent.args].join(" ")}`
                         : `${agent.label} ${agent.install.version} from the registry, by ${agent.install.publisher} (pinned, checksum ${agent.install.sha256.slice(0, 12)}…)`,
                     button("Check version", `Check the version of ${agent.label}`, () => probe(agent.key)),
+                    button("Check sign-in", `Check whether ${agent.label} is signed in`, () => checkSignIn(agent.key)),
                     button("Approve a folder…", `Approve a folder for ${agent.label}`, () => approveFolder(agent.key)),
                     button("Remove", `Remove ${agent.label}`, () => {
                         guarded(async () => {
@@ -253,6 +297,12 @@ const renderAgents = (): void => {
                             renderAgents();
                         });
                     }),
+                ),
+                item(
+                    `↳ Account: ${signInText(state.signIn[agent.key])}`,
+                    ...canSignOut(state.signIn[agent.key])
+                        ? [button("Sign out", `Sign ${agent.label} out of its account`, () => signOut(agent.key))]
+                        : [],
                 ),
                 ...view.consents
                     .filter((consent) => consent.agentKey === agent.key)
