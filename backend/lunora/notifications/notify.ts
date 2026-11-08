@@ -11,9 +11,9 @@
  *   never looks.
  * - is idempotent on `dedupeKey`: queue jobs and workflow steps are delivered at
  *   least once, and a redelivered "task finished" must not notify twice.
- * - schedules Web Push only when the user has a subscription (`ctx.push`, in
- *   D1) and the deployment has VAPID keys, so a user without push costs one
- *   indexed read, no job.
+ * - schedules push only when the user has a browser subscription (`ctx.push`,
+ *   in D1) or a phone (`pushDevices`) that a configured channel reaches, so a
+ *   user without push costs an indexed read or two, no job.
  */
 import type { Infer } from "lunorash/server";
 
@@ -21,8 +21,10 @@ import { internal } from "../_generated/internal";
 import type { Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
 import { isAccountDeletionUnderway } from "../gdpr/deletion-guard";
+import { systemDb } from "../lib/rls/scope";
 import { servesUser } from "../lib/shard-context";
 import { runAfterOnShard } from "../lib/shard-scheduler";
+import { isPhonePushConfigured } from "./native-push-config";
 import { isPushConfigured } from "./push-config";
 import { linksToLockedThread, redactForLockedThread } from "./locked-link";
 import type { vNotificationInput } from "./validators";
@@ -129,7 +131,9 @@ export const notify = async (ctx: MutationCtx, rawInput: NotificationInput): Pro
         }
     }
 
-    // Push is best-effort: the rows are already written, and a failed schedule must not undo them.
+    // Push is best-effort: the rows are already written, and a failed schedule must not undo them. Browsers and
+    // phones are separate jobs, so neither can hold the other back or send it twice. The phone job is retried only
+    // for a failure before its send; a failed send itself is logged, never retried, so no phone gets it twice.
 
     if (isPushConfigured()) {
         try {
@@ -143,7 +147,27 @@ export const notify = async (ctx: MutationCtx, rawInput: NotificationInput): Pro
         }
     }
 
+    try {
+        if (await hasPhone(ctx, row.userId)) {
+            await ctx.scheduler.runAfter(0, internal.notifications.phone_delivery.sendPhonePush, { notificationId, userId: row.userId });
+        }
+    } catch (error) {
+        console.warn("[notifications] Failed to schedule the phone push:", error);
+    }
+
     return notificationId;
+};
+
+/** Whether a phone of the user can be reached: phone push is on and the user has registered one. One indexed read. */
+export const hasPhone = async (ctx: MutationCtx, userId: string): Promise<boolean> => {
+    if (!isPhonePushConfigured(process.env)) {
+        return false;
+    }
+
+    // The writer may be another user's request (a grantee's run notifying the owner): RLS would hide the owner's phone.
+    const phone = await systemDb(ctx).pushDevices.findFirst({ consistency: "primary", where: { userId } });
+
+    return Boolean(phone);
 };
 
 /**

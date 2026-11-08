@@ -43,3 +43,19 @@
     - At most 10 per user (`trimPushDevices`). An account merge drops the guest's
       rows (`dropPushDevicesOf`) instead of moving them: they belong to a session
       that ends with the guest.
+- **Phone push delivery** (`phone-delivery.ts`, `expo-push.ts`) — **no title
+  ever leaves us**: every phone gets the same placeholder (`push-text.ts`,
+  English until the phone reports its language; never `userSettings.language`,
+  which is the AI-reply language) with only `notificationId`/`threadId` as data.
+    - A phone is sent to only while the session that registered it exists and has
+      not expired; an ended one is dropped at the next send.
+    - Otherwise a row is deleted only on `DeviceNotRegistered` in the send's
+      ticket. Every drop (this one, and an ended session's) needs the row to
+      still have the owner and the session the send read, and not to have
+      registered again since (`lastSeenAt <= sentAt`); any other error keeps it.
+      Logs carry Expo's error code only, never its message (it can quote the
+      token).
+    - `notify()` schedules browsers (`sendPushForNotification`) and phones
+      (`sendPhonePush`) as separate jobs, so neither holds the other back. The
+      phone job is retried only for a failure before its send; a failed send is
+      logged, never retried, so no phone gets an alert twice.

@@ -65,6 +65,8 @@ const SYSTEM_DB_IMPORTERS = [
     // A phone's token row held by another account: registering re-owns it to the caller (the latest registration
     // wins). Every field written is the caller's own; nothing of the previous owner's is read back or returned.
     "notifications/native-push.ts",
+    // `notify()` asks whether the RECIPIENT has a phone when another user's request (a grantee's run) writes the row.
+    "notifications/notify.ts",
 ].toSorted(byName);
 
 /** `relative()` with POSIX separators, so the keys below hold on Windows too. */
