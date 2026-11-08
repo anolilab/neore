@@ -56,7 +56,7 @@ const LoadingSkeleton = () => {
     const { t } = useLingui();
 
     return (
-        <div aria-busy="true" aria-label={t`Loading threads`} className="flex flex-col gap-1 px-1">
+        <div aria-busy="true" aria-label={t`Loading threads`} className="flex flex-col gap-1 px-1" role="status">
             {SKELETON_ROWS.map((rowKey) => (
                 <div className="flex animate-pulse flex-col gap-1.5 rounded-lg px-2 py-2" key={rowKey}>
                     <div className="h-3.5 w-3/4 rounded bg-gray-200 dark:bg-gray-700" />
@@ -120,8 +120,8 @@ const ThreadList = ({
 
                 {!isEmpty && threads.length === 0 && (
                     <div className="flex flex-col items-center justify-center gap-2 py-8 text-center">
-                        <p className="text-sm text-gray-500 dark:text-gray-400">{t`No conversations yet`}</p>
-                        <p className="text-xs text-gray-400 dark:text-gray-500">{t`Start a new chat to get started`}</p>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">{t`No conversations yet`}</p>
+                        <p className="text-xs text-gray-600 dark:text-gray-400">{t`Start a new chat to get started`}</p>
                     </div>
                 )}
 
@@ -137,7 +137,7 @@ const ThreadList = ({
                             return (
                                 <div className="mb-3" key={group}>
                                     <div className="mb-1 px-2 py-1">
-                                        <span className="text-[11px] font-semibold tracking-wider text-gray-400 uppercase dark:text-gray-500">
+                                        <span className="text-[11px] font-semibold tracking-wider text-gray-600 uppercase dark:text-gray-400">
                                             {i18n._(GROUP_LABELS[group])}
                                         </span>
                                     </div>
@@ -164,7 +164,7 @@ const ThreadList = ({
                                 <button
                                     className={cn(
                                         "flex w-full items-center justify-center gap-2 rounded-lg px-3 py-2 text-xs font-medium",
-                                        "text-gray-500 hover:bg-gray-100 hover:text-gray-700",
+                                        "text-gray-600 hover:bg-gray-100 hover:text-gray-700",
                                         "dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200",
                                         "focus-visible:ring-2 focus-visible:ring-gray-400 focus-visible:outline-none",
                                         "transition-colors",

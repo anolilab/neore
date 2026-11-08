@@ -21,7 +21,7 @@ const DEFAULT_PHOTON_EDITOR_MESSAGES: PhotonEditorMessages = {
     ready: "Ready",
     redo: "Redo",
     reset: "Reset",
-    saveAriaLabel: "Save as new version",
+    saveAriaLabel: "Save version as new",
     saveFailed: "Save failed",
     saveVersion: "Save version",
     saving: "Saving…",

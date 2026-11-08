@@ -208,7 +208,7 @@ const ModelPickerButton: FC<ModelPickerButtonProps> = ({
     return (
         <Popover onOpenChange={setOpen} open={open}>
             <PopoverTrigger render={triggerButton} />
-            <PopoverContent align="start" className="max-h-125 w-145 gap-0 overflow-hidden p-0" sideOffset={4}>
+            <PopoverContent align="start" aria-label={t`Select model`} className="max-h-125 w-145 gap-0 overflow-hidden p-0" sideOffset={4}>
                 {pickerContent}
             </PopoverContent>
         </Popover>

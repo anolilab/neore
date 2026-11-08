@@ -81,8 +81,15 @@ export default defineConfig({
         // pins itself; found only when the first story loads, each re-optimized and reloaded under the tests in flight
         // ("Failed to fetch dynamically imported module" on that setup file).
         include: [
+            "@neore/ui > @rive-app/react-webgl2",
+            "@neore/ui > @tanstack/react-table",
+            "@neore/ui > embla-carousel-react",
+            "@neore/ui > react-day-picker",
+            "@neore/ui > recharts",
+            "@neore/ui > tokenlens",
             "@onboardjs/posthog-plugin",
             "@onboardjs/react",
+            "@xyflow/react",
             "axe-core",
             "msw",
             "msw/browser",

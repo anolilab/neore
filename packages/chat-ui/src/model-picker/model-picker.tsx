@@ -170,7 +170,9 @@ const ModelItemContent = memo<{
 ModelItemContent.displayName = "ModelItemContent";
 
 // ─── Model item favorite toggle ────────────────────────────────────────────────
-// Rendered beside the option, not inside it: an option may not hold focusable controls (axe nested-interactive).
+// Rendered beside the option, not inside it, and hidden from assistive technology: a listbox may only own options, so
+// this pointer control cannot be part of its accessibility tree. Keyboard and screen-reader users reach the same
+// action through the Alt+S shortcut on the search field (see `handleActionShortcut` in ModelPicker).
 
 const ModelItemFavoriteToggle = memo<{
     isFavorite: boolean;
@@ -181,12 +183,14 @@ const ModelItemFavoriteToggle = memo<{
 
     return (
         <button
+            aria-hidden="true"
             aria-label={isFavorite ? t`Remove from starred` : t`Add to starred`}
             className={cn(
                 "absolute top-1/2 right-2 -translate-y-1/2 rounded p-1 transition-all duration-100",
                 isFavorite ? "text-amber-400 opacity-100" : "text-muted-foreground/30 opacity-0 group-hover/row:opacity-100 hover:text-amber-400",
             )}
             onClick={() => onToggleFavorite(modelId)}
+            tabIndex={-1}
             type="button"
         >
             <Star aria-hidden="true" className={cn("size-3.5", isFavorite && "fill-current")} />
@@ -274,6 +278,7 @@ const ModelGroupRenderer = memo<{
                                         isSelected && selectionMode === "single" ? "bg-accent/60" : "",
                                         isParallelSelected && selectionMode === "parallel" ? "bg-accent/40" : "",
                                     )}
+                                    data-model-id={item.model.id}
                                     onClick={(event: React.MouseEvent & { preventBaseUIHandler?: () => void }) => {
                                         event.preventBaseUIHandler?.();
 
@@ -358,6 +363,7 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
     const [chosenProvider, setChosenProvider] = useState<string | null | undefined>(undefined);
     const selectedProvider = chosenProvider === undefined ? initialCreatorSlug(models, initialModelId) : chosenProvider;
 
+    const pickerRef = useRef<HTMLDivElement>(null);
     const onSelectRef = useRef(onSelect);
     const onSelectMultipleRef = useRef(onSelectMultiple);
 
@@ -514,8 +520,38 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
     const selectedCount = parallelSelectedIds.size;
     const anchorModeName = anchorMode ? i18n._(getModelModeName(anchorMode)) : "";
 
+    const [favoriteNotice, setFavoriteNotice] = useState("");
+
+    // The star button on each row is pointer-only (it cannot live inside the listbox), so the same action is bound to
+    // Alt+S on the highlighted row, from the search field.
+    const handleActionShortcut = useCallback(
+        (event: React.KeyboardEvent) => {
+            if (!onToggleFavorite || event.code !== "KeyS" || !event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) {
+                return;
+            }
+
+            const modelId = pickerRef.current?.querySelector<HTMLElement>("[data-model-id][data-highlighted]")?.dataset.modelId;
+
+            if (!modelId) {
+                return;
+            }
+
+            // Announced from its own region: the focus stays on the search field, and the footer's count is a different message.
+            const name = models.find((model) => model.id === modelId)?.name ?? modelId;
+
+            setFavoriteNotice(favoriteSet.has(modelId) ? t`${name} removed from starred` : t`${name} added to starred`);
+            onToggleFavorite(modelId);
+            event.preventDefault();
+            event.stopPropagation();
+        },
+        [favoriteSet, models, onToggleFavorite, t],
+    );
+
     return (
-        <div>
+        <div ref={pickerRef}>
+            <span aria-live="polite" className="sr-only" role="status">
+                {favoriteNotice}
+            </span>
             <Command filter={() => true} items={groupedItems} onValueChange={setSearchQuery} value={searchQuery}>
                 {/* Anonymous banner */}
                 {isAnonymous ? (
@@ -527,7 +563,7 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
                     </div>
                 ) : null}
 
-                <CommandInput placeholder={t`Search models...`} />
+                <CommandInput aria-keyshortcuts="Alt+S" onKeyDown={handleActionShortcut} placeholder={t`Search models...`} />
 
                 {/* Tab bar */}
                 <div className="flex items-center border-t">
@@ -696,41 +732,41 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
 
                     {/* Model list */}
                     <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-                        {isStarredEmpty ? (
-                            <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 py-10 text-center">
-                                <div className="border-border/30 flex size-10 items-center justify-center rounded-xl border">
-                                    <Star aria-hidden="true" className="text-muted-foreground/30 size-4" />
+                        <CommandEmpty className="not-empty:size-full">
+                            {isStarredEmpty ? (
+                                <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 py-10 text-center">
+                                    <div className="border-border/30 flex size-10 items-center justify-center rounded-xl border">
+                                        <Star aria-hidden="true" className="text-muted-foreground/30 size-4" />
+                                    </div>
+                                    <div>
+                                        <p className="text-foreground/80 text-sm font-medium">{t`No starred models`}</p>
+                                        <p className="text-muted-foreground mt-1 text-[11.5px] leading-relaxed">
+                                            {t`Click the star on any model in All models to add it here.`}
+                                        </p>
+                                    </div>
                                 </div>
-                                <div>
-                                    <p className="text-foreground/80 text-sm font-medium">{t`No starred models`}</p>
-                                    <p className="text-muted-foreground mt-1 text-[11.5px] leading-relaxed">
-                                        {t`Click the star on any model in All models to add it here.`}
-                                    </p>
-                                </div>
-                            </div>
-                        ) : (
-                            <>
-                                <CommandEmpty className="not-empty:size-full">{t`No models found.`}</CommandEmpty>
-                                <CommandList className="py-1.5">
-                                    {groupedItems.map((group) => (
-                                        <ModelGroupRenderer
-                                            anchorMode={selectionMode === "parallel" ? anchorMode : null}
-                                            favorites={favoriteSet}
-                                            group={group}
-                                            isAnonymous={isAnonymous}
-                                            key={`${activeTab}-${group.value}`}
-                                            onToggleFavorite={onToggleFavorite}
-                                            parallelMaxReached={isParallelMaxReached}
-                                            parallelSelectedIds={parallelSelectedIds}
-                                            selectedModelId={selectedModelId}
-                                            selectionMode={selectionMode}
-                                            showGroupLabel={isShowGroupLabels}
-                                            showProviderIcon={activeTab === "starred"}
-                                        />
-                                    ))}
-                                </CommandList>
-                            </>
-                        )}
+                            ) : (
+                                t`No models found.`
+                            )}
+                        </CommandEmpty>
+                        <CommandList className="py-1.5">
+                            {groupedItems.map((group) => (
+                                <ModelGroupRenderer
+                                    anchorMode={selectionMode === "parallel" ? anchorMode : null}
+                                    favorites={favoriteSet}
+                                    group={group}
+                                    isAnonymous={isAnonymous}
+                                    key={`${activeTab}-${group.value}`}
+                                    onToggleFavorite={onToggleFavorite}
+                                    parallelMaxReached={isParallelMaxReached}
+                                    parallelSelectedIds={parallelSelectedIds}
+                                    selectedModelId={selectedModelId}
+                                    selectionMode={selectionMode}
+                                    showGroupLabel={isShowGroupLabels}
+                                    showProviderIcon={activeTab === "starred"}
+                                />
+                            ))}
+                        </CommandList>
                     </div>
                 </CommandPanel>
 

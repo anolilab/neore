@@ -338,7 +338,9 @@ const ModelItemContent = memo<{
 });
 
 // ─── Model Item Actions ───────────────────────────────────────────────────────
-// Rendered beside the option, not inside it: an option may not hold focusable controls (axe nested-interactive).
+// Rendered beside the option, not inside it, and hidden from assistive technology: a listbox may only own options, so
+// these pointer controls cannot be part of its accessibility tree. Keyboard and screen-reader users reach the same
+// actions through the shortcuts on the search field (see `handleActionShortcut` in ModelPicker).
 
 const ModelItemActions = memo<{
     /** Only set while the starred order can be changed; the buttons are hidden otherwise. */
@@ -356,7 +358,7 @@ const ModelItemActions = memo<{
     const { t } = useLingui();
 
     return (
-        <div className="absolute top-1/2 right-2 flex -translate-y-1/2 items-center gap-0.5">
+        <div aria-hidden="true" className="absolute top-1/2 right-2 flex -translate-y-1/2 items-center gap-0.5">
             <button
                 aria-label={isFavorite ? t`Remove from starred` : t`Add to starred`}
                 className={cn(
@@ -364,6 +366,7 @@ const ModelItemActions = memo<{
                     isFavorite ? "text-amber-400 opacity-100" : "text-muted-foreground opacity-0 group-hover/row:opacity-100 hover:text-amber-400",
                 )}
                 onClick={() => onToggleFavorite(modelId, !isFavorite)}
+                tabIndex={-1}
                 type="button"
             >
                 <Star className={cn("size-3.5", isFavorite && "fill-current")} />
@@ -377,6 +380,7 @@ const ModelItemActions = memo<{
                         data-move-id={modelId}
                         disabled={!canMoveUp}
                         onClick={() => onMove(-1)}
+                        tabIndex={-1}
                         type="button"
                     >
                         <ArrowUp aria-hidden="true" className="size-3.5" />
@@ -388,6 +392,7 @@ const ModelItemActions = memo<{
                         data-move-id={modelId}
                         disabled={!canMoveDown}
                         onClick={() => onMove(1)}
+                        tabIndex={-1}
                         type="button"
                     >
                         <ArrowDown aria-hidden="true" className="size-3.5" />
@@ -403,6 +408,7 @@ const ModelItemActions = memo<{
                 onClick={() => onInfo(modelId)}
                 onMouseEnter={() => onInfo(modelId)}
                 onMouseLeave={onInfoLeave}
+                tabIndex={-1}
                 type="button"
             >
                 <Info className="size-3.5" />
@@ -505,6 +511,7 @@ const ModelGroupRenderer = memo<{
                                         isSelected && selectionMode === "single" ? "bg-accent/60" : "",
                                         isParallelSelected && selectionMode === "parallel" ? "bg-accent/40" : "",
                                     )}
+                                    data-model-id={item.model.id}
                                     onClick={(e: React.MouseEvent & { preventBaseUIHandler?: () => void }) => {
                                         e.preventBaseUIHandler?.();
 
@@ -880,8 +887,9 @@ const ModelPicker: FC<ModelPickerProps> = ({
     const isShowGroupLabels = activeTab !== "starred" && sort === "default";
 
     // Moves a starred model one place and remembers which arrow did it, so focus can follow the row (see the effect below).
+    // A move from the keyboard shortcut keeps focus in the search field instead.
     const moveFavorite = useCallback(
-        (modelId: string, delta: -1 | 1) => {
+        (modelId: string, delta: -1 | 1, followFocus = true) => {
             if (!onMoveFavorite) {
                 return;
             }
@@ -895,7 +903,9 @@ const ModelPicker: FC<ModelPickerProps> = ({
 
             const saved = onMoveFavorite(modelId, target);
 
-            setPendingMoveFocus({ before: ids.join("\u{0}"), delta, modelId });
+            if (followFocus) {
+                setPendingMoveFocus({ before: ids.join("\u{0}"), delta, modelId });
+            }
 
             // The swap puts the model one place along, so its new position is its old index plus the step.
             const model = favoriteModels.find((entry) => entry.id === modelId);
@@ -944,6 +954,43 @@ const ModelPicker: FC<ModelPickerProps> = ({
         setPendingMoveFocus(undefined);
     }, [orderKey, pendingMoveFocus]);
 
+    // The row buttons for star, move and info are pointer-only (they cannot live inside the listbox), so the same
+    // actions are bound to Alt+S, Alt+Arrow and Alt+I on the highlighted row, from the search field.
+    const handleActionShortcut = useCallback(
+        (event: React.KeyboardEvent & { preventBaseUIHandler?: () => void }) => {
+            if (!event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) {
+                return;
+            }
+
+            const modelId = pickerRef.current?.querySelector<HTMLElement>("[data-model-id][data-highlighted]")?.dataset.modelId;
+
+            if (!modelId) {
+                return;
+            }
+
+            if (event.code === "KeyS") {
+                const isStarred = isFavorite(modelId);
+                const model = sourceModels.find((entry) => entry.id === modelId);
+                const label = model ? getModelLabel(model, nicknames) : modelId;
+
+                toggleFavorite(modelId, !isStarred);
+                setMoveAnnouncement(isStarred ? t`${label} removed from starred` : t`${label} added to starred`);
+            } else if (event.code === "KeyI") {
+                handleInfo(modelId);
+            } else if ((event.code === "ArrowUp" || event.code === "ArrowDown") && reorder?.ids.includes(modelId)) {
+                moveFavorite(modelId, event.code === "ArrowUp" ? -1 : 1, false);
+            } else {
+                return;
+            }
+
+            // Base UI's list navigation runs on the same ArrowUp/ArrowDown keydown; it would move the highlight to a neighbour.
+            event.preventBaseUIHandler?.();
+            event.preventDefault();
+            event.stopPropagation();
+        },
+        [handleInfo, isFavorite, moveFavorite, nicknames, reorder, sourceModels, t, toggleFavorite],
+    );
+
     // Derive the "anchor" mode from the first selected model in parallel mode.
     // All other types are locked out once a selection is made.
     const anchorMode = useMemo(() => {
@@ -988,7 +1035,11 @@ const ModelPicker: FC<ModelPickerProps> = ({
                             </p>
                         </div>
                     )}
-                    <CommandInput placeholder={t`Search models...`} />
+                    <CommandInput
+                        aria-keyshortcuts="Alt+S Alt+I Alt+ArrowUp Alt+ArrowDown"
+                        onKeyDown={handleActionShortcut}
+                        placeholder={t`Search models...`}
+                    />
 
                     {/* Tab bar */}
                     <div className="flex items-center border-t">
@@ -1171,46 +1222,46 @@ const ModelPicker: FC<ModelPickerProps> = ({
 
                         {/* Model list */}
                         <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-                            {isStarredEmpty ? (
-                                <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 py-10 text-center">
-                                    <div className="border-border/30 flex size-10 items-center justify-center rounded-xl border">
-                                        <Star className="text-muted-foreground size-4" />
+                            <CommandEmpty className="not-empty:size-full">
+                                {isStarredEmpty ? (
+                                    <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 py-10 text-center">
+                                        <div className="border-border/30 flex size-10 items-center justify-center rounded-xl border">
+                                            <Star className="text-muted-foreground size-4" />
+                                        </div>
+                                        <div>
+                                            <p className="text-foreground/80 text-sm font-medium">{t`No starred models`}</p>
+                                            <p className="text-muted-foreground mt-1 text-[11.5px] leading-relaxed">
+                                                {t`Click ★ on any model in All models to add it here.`}
+                                            </p>
+                                        </div>
                                     </div>
-                                    <div>
-                                        <p className="text-foreground/80 text-sm font-medium">{t`No starred models`}</p>
-                                        <p className="text-muted-foreground mt-1 text-[11.5px] leading-relaxed">
-                                            {t`Click ★ on any model in All models to add it here.`}
-                                        </p>
-                                    </div>
-                                </div>
-                            ) : (
-                                <>
-                                    <CommandEmpty className="not-empty:size-full">{t`No models found.`}</CommandEmpty>
-                                    <CommandList className="py-1.5">
-                                        {filteredGroupedItems.map((group) => (
-                                            <ModelGroupRenderer
-                                                anchorMode={selectionMode === "parallel" ? anchorMode : null}
-                                                canSignUp={canSignUp}
-                                                group={group}
-                                                infoModelId={infoModelId}
-                                                isAnonymous={isAnonymous}
-                                                isFavorite={isFavorite}
-                                                key={`${activeTab}-${group.value}`}
-                                                onInfo={handleInfo}
-                                                onInfoLeave={scheduleInfoClose}
-                                                parallelMaxReached={isParallelMaxReached}
-                                                parallelSelectedIds={parallelSelectedIds}
-                                                reorder={reorder}
-                                                selectedModelId={selectedModelId}
-                                                selectionMode={selectionMode}
-                                                showGroupLabel={isShowGroupLabels}
-                                                showProviderIcon={activeTab === "starred" || sort !== "default"}
-                                                toggleFavorite={toggleFavorite}
-                                            />
-                                        ))}
-                                    </CommandList>
-                                </>
-                            )}
+                                ) : (
+                                    t`No models found.`
+                                )}
+                            </CommandEmpty>
+                            <CommandList className="py-1.5">
+                                {filteredGroupedItems.map((group) => (
+                                    <ModelGroupRenderer
+                                        anchorMode={selectionMode === "parallel" ? anchorMode : null}
+                                        canSignUp={canSignUp}
+                                        group={group}
+                                        infoModelId={infoModelId}
+                                        isAnonymous={isAnonymous}
+                                        isFavorite={isFavorite}
+                                        key={`${activeTab}-${group.value}`}
+                                        onInfo={handleInfo}
+                                        onInfoLeave={scheduleInfoClose}
+                                        parallelMaxReached={isParallelMaxReached}
+                                        parallelSelectedIds={parallelSelectedIds}
+                                        reorder={reorder}
+                                        selectedModelId={selectedModelId}
+                                        selectionMode={selectionMode}
+                                        showGroupLabel={isShowGroupLabels}
+                                        showProviderIcon={activeTab === "starred" || sort !== "default"}
+                                        toggleFavorite={toggleFavorite}
+                                    />
+                                ))}
+                            </CommandList>
                         </div>
                     </CommandPanel>
 

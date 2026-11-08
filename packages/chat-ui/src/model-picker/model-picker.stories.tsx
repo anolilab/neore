@@ -43,8 +43,6 @@ const meta = {
             </div>
         ),
     ],
-    // Same open axe findings as the web picker: each row's star sits directly in the listbox (aria-required-children).
-    parameters: { a11y: { test: "todo" } },
     title: "Extension/Model picker",
 } satisfies Meta<typeof ModelPicker>;
 

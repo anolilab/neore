@@ -86,7 +86,7 @@ const PropertyRow: FC<{
     label: string;
 }> = ({ children, label }) => (
     <div className="flex items-center justify-between gap-2">
-        <span className="text-muted-foreground shrink-0 text-xs">{label}</span>
+        <span className="shrink-0 text-xs opacity-70">{label}</span>
         <div className="flex items-center gap-1">{children}</div>
     </div>
 );
@@ -211,7 +211,7 @@ const CanvasPropertyPanel: FC<CanvasPropertyPanelProps> = memo(({ canvas, darkMo
             <div
                 className={`flex w-56 flex-col border-l p-3 ${darkMode ? "border-white/10 bg-neutral-900 text-white" : "border-neutral-200 bg-white text-neutral-900"}`}
             >
-                <p className="text-muted-foreground text-center text-xs">{t`Select an object to edit its properties`}</p>
+                <p className="text-center text-xs opacity-70">{t`Select an object to edit its properties`}</p>
             </div>
         );
     }

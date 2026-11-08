@@ -8,9 +8,10 @@ import cn from "@ui/utils/cn";
 import type { LucideIcon } from "lucide-react";
 import { BrainIcon, ChevronDownIcon, DotIcon } from "lucide-react";
 import type { ComponentProps, ReactNode } from "react";
-import { createContext, memo, use, useMemo } from "react";
+import { createContext, memo, use, useId, useMemo } from "react";
 
 interface ChainOfThoughtContextValue {
+    contentId: string;
     isOpen: boolean;
     setIsOpen: (open: boolean) => void;
 }
@@ -40,9 +41,11 @@ export const ChainOfThought = memo(({ children, className, defaultOpen = false, 
         prop: open,
     });
 
+    const contentId = useId();
+
     const chainOfThoughtContext = useMemo(() => {
-        return { isOpen, setIsOpen };
-    }, [isOpen, setIsOpen]);
+        return { contentId, isOpen, setIsOpen };
+    }, [contentId, isOpen, setIsOpen]);
 
     return (
         <ChainOfThoughtContext value={chainOfThoughtContext}>
@@ -57,12 +60,15 @@ export type ChainOfThoughtHeaderProps = ComponentProps<typeof CollapsibleTrigger
 
 export const ChainOfThoughtHeader = memo(({ children, className, ...props }: ChainOfThoughtHeaderProps) => {
     const { t } = useLingui();
-    const { isOpen, setIsOpen } = useChainOfThought();
+    const { contentId, isOpen, setIsOpen } = useChainOfThought();
+    const toggleLabel = isOpen ? t`Collapse chain of thought` : t`Expand chain of thought`;
 
     return (
         <Collapsible onOpenChange={setIsOpen} open={isOpen}>
             <CollapsibleTrigger
-                aria-label={isOpen ? t`Collapse chain of thought` : t`Expand chain of thought`}
+                // The content is unmounted while closed, so the trigger names it only while it is open.
+                aria-controls={isOpen ? contentId : undefined}
+                aria-label={children ? undefined : toggleLabel}
                 className={cn("text-muted-foreground hover:text-foreground flex w-full items-center gap-2 text-sm transition-colors", className)}
                 {...props}
             >
@@ -86,7 +92,7 @@ export const ChainOfThoughtStep = memo(
         const statusStyles = {
             active: "text-foreground",
             complete: "text-muted-foreground",
-            pending: "text-muted-foreground/50",
+            pending: "text-muted-foreground italic",
         };
 
         return (
@@ -127,7 +133,7 @@ export const ChainOfThoughtSearchResult = memo(({ children, className, ...props 
 export type ChainOfThoughtContentProps = ComponentProps<typeof CollapsibleContent>;
 
 export const ChainOfThoughtContent = memo(({ children, className, ...props }: ChainOfThoughtContentProps) => {
-    const { isOpen } = useChainOfThought();
+    const { contentId, isOpen } = useChainOfThought();
 
     return (
         <Collapsible open={isOpen}>
@@ -137,6 +143,7 @@ export const ChainOfThoughtContent = memo(({ children, className, ...props }: Ch
                     "data-[state=closed]:fade-out-0 data-[state=closed]:slide-out-to-top-2 data-[state=open]:slide-in-from-top-2 text-popover-foreground data-[state=closed]:animate-out data-[state=open]:animate-in outline-none",
                     className,
                 )}
+                id={contentId}
                 {...props}
             >
                 {children}

@@ -8,7 +8,7 @@ import { ChevronDownIcon, GlobeIcon } from "lucide-react";
 import type { ComponentProps } from "react";
 import { memo, useState } from "react";
 
-export type SourcesProps = ComponentProps<"div">;
+export type SourcesProps = ComponentProps<typeof Collapsible>;
 
 export const Sources = ({ className, ...props }: SourcesProps) => (
     <Collapsible className={cn("not-prose text-primary-text mb-4 text-xs", className)} {...props} />
@@ -55,7 +55,6 @@ export const SourcesContent = ({ className, ...props }: SourcesContentProps) => 
             "data-[state=closed]:fade-out-0 data-[state=closed]:slide-out-to-top-2 data-[state=open]:slide-in-from-top-2 data-[state=closed]:animate-out data-[state=open]:animate-in outline-none",
             className,
         )}
-        role="list"
         {...props}
     />
 );
@@ -120,7 +119,6 @@ export const Source = ({ children, className, highlighted, href: rawHref, index,
             data-source-index={index}
             href={href}
             rel="noreferrer"
-            role="listitem"
             target="_blank"
             {...props}
         >
@@ -140,7 +138,7 @@ export const Source = ({ children, className, highlighted, href: rawHref, index,
                     )}
                     {href ? <Favicon url={href} /> : <GlobeIcon aria-hidden="true" className="size-4 shrink-0 text-gray-400" />}
                     <span className="block truncate font-medium">{title}</span>
-                    {href && <span className="hidden truncate text-gray-400 sm:block">{extractDomain(href)}</span>}
+                    {href && <span className="text-muted-foreground hidden truncate sm:block">{extractDomain(href)}</span>}
                 </>
             )}
         </a>

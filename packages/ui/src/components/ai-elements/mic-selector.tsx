@@ -132,10 +132,11 @@ export type MicSelectorContentProps = {
 } & ComponentProps<typeof Command>;
 
 export const MicSelectorContent = ({ className, popoverOptions, ...props }: MicSelectorContentProps) => {
+    const { t } = useLingui();
     const { onValueChange, value, width } = use(MicSelectorContext);
 
     return (
-        <PopoverContent className={cn("p-0", className)} style={{ width }} {...popoverOptions}>
+        <PopoverContent aria-label={t`Select microphone`} className={cn("p-0", className)} style={{ width }} {...popoverOptions}>
             <Command onValueChange={onValueChange} value={value} {...props} />
         </PopoverContent>
     );
@@ -159,6 +160,17 @@ export type MicSelectorListProps = Omit<ComponentProps<typeof CommandList>, "chi
 
 export const MicSelectorList = ({ children, ...props }: MicSelectorListProps) => {
     const { data } = use(MicSelectorContext);
+
+    // With no devices the list would hold only the empty message. A role="status" child is not allowed in a listbox
+    // (aria-required-children), so the message renders beside the (empty) list the combobox still controls.
+    if (data.length === 0) {
+        return (
+            <>
+                <CommandList {...props} />
+                <div data-slot="mic-selector-empty-state">{children(data)}</div>
+            </>
+        );
+    }
 
     return <CommandList {...props}>{children(data)}</CommandList>;
 };

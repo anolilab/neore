@@ -1,5 +1,6 @@
 "use client";
 
+import { useLingui } from "@lingui/react/macro";
 import { EyeIcon, EyeOffIcon } from "lucide-react";
 import type { ComponentProps } from "react";
 import { useState } from "react";
@@ -9,6 +10,7 @@ import { Button } from "../button";
 import { Input } from "../input";
 
 const PasswordInput = ({ className, enableToggle, onChange, ...properties }: ComponentProps<typeof Input> & { enableToggle?: boolean }) => {
+    const { t } = useLingui();
     const [disabled, setDisabled] = useState(true);
     const [isVisible, setIsVisible] = useState(false);
 
@@ -27,6 +29,7 @@ const PasswordInput = ({ className, enableToggle, onChange, ...properties }: Com
             {enableToggle && (
                 <>
                     <Button
+                        aria-label={isVisible ? t`Hide password` : t`Show password`}
                         className="absolute top-0 right-0 !bg-transparent"
                         disabled={disabled}
                         onClick={() => {

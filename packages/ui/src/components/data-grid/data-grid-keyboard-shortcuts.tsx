@@ -342,7 +342,7 @@ function DataGridKeyboardShortcutsImpl({ enableSearch = false }: DataGridKeyboar
                     </div>
                 </div>
                 <Separator className="mx-auto data-[orientation=horizontal]:w-[calc(100%-(--spacing(12)))]" />
-                <div className="h-[40vh] overflow-y-auto px-6">
+                <div aria-label={t`Shortcuts`} className="h-[40vh] overflow-y-auto px-6" role="region" tabIndex={0}>
                     {filteredGroups.length === 0 ? (
                         <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
                             <div className="bg-muted text-foreground flex size-10 shrink-0 items-center justify-center rounded-lg">

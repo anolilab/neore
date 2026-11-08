@@ -120,10 +120,13 @@ export const AudioPlayerSeekForwardButton = ({ className, seekOffset = 10, ...pr
 
 export type AudioPlayerTimeDisplayProps = ComponentProps<typeof MediaTimeDisplay>;
 
-export const AudioPlayerTimeDisplay = ({ className, ...props }: AudioPlayerTimeDisplayProps) => (
+// media-chrome labels the toggling time display "playback time" while it shows the time, so the visible text is not
+// in the accessible name (label-content-name-mismatch). Without the toggle it drops its button role; pass
+// `noToggle={false}` to bring the elapsed/remaining toggle back.
+export const AudioPlayerTimeDisplay = ({ className, noToggle = true, ...props }: AudioPlayerTimeDisplayProps) => (
     <ButtonGroupText
         className="bg-transparent"
-        render={<MediaTimeDisplay className={cn("tabular-nums", className)} data-slot="audio-player-time-display" {...props} />}
+        render={<MediaTimeDisplay className={cn("tabular-nums", className)} data-slot="audio-player-time-display" noToggle={noToggle} {...props} />}
     />
 );
 

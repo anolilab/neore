@@ -29,6 +29,7 @@ import { RichTextTaskList, TaskList } from "reactjs-tiptap-editor/tasklist";
 import { RichTextUnderline, TextUnderline } from "reactjs-tiptap-editor/textunderline";
 
 import { BASE_EXTENSIONS, EDITOR_PLACEHOLDER_CLASSES } from "../lib/tiptap-base-extensions";
+import ToolbarItem from "../lib/tiptap-toolbar-item";
 import ToolbarSeparator from "../lib/tiptap-toolbar-separator";
 import cn from "../utils/cn";
 
@@ -124,6 +125,7 @@ export const TiptapEditor = ({
         editable,
         editorProps: {
             attributes: {
+                "aria-label": placeholder ?? t`Start writing...`,
                 class: cn("prose prose-sm dark:prose-invert max-w-none focus:outline-none min-h-[100px] p-3", EDITOR_PLACEHOLDER_CLASSES, editorClassName),
             },
         },
@@ -173,32 +175,60 @@ export const TiptapEditor = ({
 
     return (
         <RichTextProvider editor={editor}>
-            <div className={cn("bg-background overflow-hidden rounded-md border", !editable && "cursor-not-allowed opacity-60", className)}>
+            <div className={cn("bg-background overflow-hidden rounded-md border", !editable && "cursor-not-allowed opacity-70", className)}>
                 {showToolbar && editor && editable && (
                     <div className="bg-muted/30 flex flex-wrap items-center gap-0.5 border-b p-1">
-                        <RichTextUndo />
-                        <RichTextRedo />
+                        <ToolbarItem label={t`Undo`}>
+                            <RichTextUndo />
+                        </ToolbarItem>
+                        <ToolbarItem label={t`Redo`}>
+                            <RichTextRedo />
+                        </ToolbarItem>
 
                         <ToolbarSeparator />
 
-                        <RichTextBold />
-                        <RichTextItalic />
-                        <RichTextUnderline />
-                        <RichTextStrike />
-                        <RichTextCode />
-                        <RichTextColor />
-                        <RichTextHighlight />
+                        <ToolbarItem label={t`Bold`}>
+                            <RichTextBold />
+                        </ToolbarItem>
+                        <ToolbarItem label={t`Italic`}>
+                            <RichTextItalic />
+                        </ToolbarItem>
+                        <ToolbarItem label={t`Underline`}>
+                            <RichTextUnderline />
+                        </ToolbarItem>
+                        <ToolbarItem label={t`Strikethrough`}>
+                            <RichTextStrike />
+                        </ToolbarItem>
+                        <ToolbarItem label={t`Code`}>
+                            <RichTextCode />
+                        </ToolbarItem>
+                        <ToolbarItem label={t`Text color`}>
+                            <RichTextColor />
+                        </ToolbarItem>
+                        <ToolbarItem label={t`Highlight`}>
+                            <RichTextHighlight />
+                        </ToolbarItem>
 
                         <ToolbarSeparator />
 
-                        <RichTextHeading />
+                        <ToolbarItem label={t`Heading`}>
+                            <RichTextHeading />
+                        </ToolbarItem>
 
                         <ToolbarSeparator />
 
-                        <RichTextBulletList />
-                        <RichTextOrderedList />
-                        <RichTextTaskList />
-                        <RichTextBlockquote />
+                        <ToolbarItem label={t`Bulleted list`}>
+                            <RichTextBulletList />
+                        </ToolbarItem>
+                        <ToolbarItem label={t`Numbered list`}>
+                            <RichTextOrderedList />
+                        </ToolbarItem>
+                        <ToolbarItem label={t`Task list`}>
+                            <RichTextTaskList />
+                        </ToolbarItem>
+                        <ToolbarItem label={t`Quote`}>
+                            <RichTextBlockquote />
+                        </ToolbarItem>
                     </div>
                 )}
 

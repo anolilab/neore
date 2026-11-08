@@ -68,7 +68,7 @@ const ThreadItem = ({ isSelected = false, onArchive, onDelete, onPin, onSelect, 
                     <span className="truncate text-sm leading-snug font-medium">{title}</span>
                 </div>
                 <div className="flex items-center gap-1.5">
-                    <span className="text-xs text-gray-400 dark:text-gray-500">{relativeTime}</span>
+                    <span className="text-xs text-gray-600 dark:text-gray-400">{relativeTime}</span>
                     {source && <SourceBadge source={source} />}
                 </div>
             </button>
@@ -80,8 +80,8 @@ const ThreadItem = ({ isSelected = false, onArchive, onDelete, onPin, onSelect, 
                         <button
                             aria-label={isPinned ? t`Unpin thread` : t`Pin thread`}
                             className={cn(
-                                "flex size-6 items-center justify-center rounded text-gray-400 transition-colors",
-                                "hover:bg-gray-200 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-200",
+                                "flex size-6 items-center justify-center rounded text-gray-600 transition-colors dark:text-gray-400",
+                                "hover:bg-gray-200 dark:hover:bg-gray-700 dark:hover:text-gray-200",
                                 isPinned && "text-amber-500 dark:text-amber-400",
                             )}
                             onClick={(event) => {
@@ -96,7 +96,7 @@ const ThreadItem = ({ isSelected = false, onArchive, onDelete, onPin, onSelect, 
                     {onArchive && (
                         <button
                             aria-label={t`Archive thread`}
-                            className="flex size-6 items-center justify-center rounded text-gray-400 transition-colors hover:bg-gray-200 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-200"
+                            className="flex size-6 items-center justify-center rounded text-gray-600 transition-colors hover:bg-gray-200 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200"
                             onClick={(event) => {
                                 event.stopPropagation();
                                 onArchive();
@@ -116,7 +116,7 @@ const ThreadItem = ({ isSelected = false, onArchive, onDelete, onPin, onSelect, 
                     {onDelete && (
                         <button
                             aria-label={t`Delete thread`}
-                            className="flex size-6 items-center justify-center rounded text-gray-400 transition-colors hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-900/40 dark:hover:text-red-400"
+                            className="flex size-6 items-center justify-center rounded text-gray-600 transition-colors hover:bg-red-100 hover:text-red-600 dark:text-gray-400 dark:hover:bg-red-900/40 dark:hover:text-red-400"
                             onClick={(event) => {
                                 event.stopPropagation();
                                 onDelete();

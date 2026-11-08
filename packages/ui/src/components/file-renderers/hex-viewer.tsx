@@ -133,7 +133,7 @@ const getAsciiByteClass = (isHovered: boolean, isPrintable: boolean): string => 
         return "rounded bg-yellow-200 dark:bg-yellow-800";
     }
 
-    return isPrintable ? "text-gray-700 dark:text-gray-300" : "text-gray-400 dark:text-gray-600";
+    return isPrintable ? "text-gray-700 dark:text-gray-300" : "text-gray-600 dark:text-gray-400";
 };
 
 const HexRow: FC<{
@@ -145,7 +145,7 @@ const HexRow: FC<{
 }> = memo(({ bytes, bytesPerRow, hoveredByte, offset, onHoverByte }) => (
     <div className="flex items-center font-mono text-xs leading-5 hover:bg-gray-50 dark:hover:bg-gray-800/30">
         {/* Offset */}
-        <span className="w-20 flex-shrink-0 text-gray-400 select-none dark:text-gray-500">{offsetToHex(offset)}</span>
+        <span className="w-20 flex-shrink-0 text-gray-600 select-none dark:text-gray-400">{offsetToHex(offset)}</span>
 
         {/* Hex bytes */}
         <span className="mr-4 flex-shrink-0">
@@ -156,7 +156,7 @@ const HexRow: FC<{
 
                 return (
                     <span
-                        className={`inline-block w-6 cursor-default text-center ${getHexByteClass(byte, isHovered)}${i === 7 ? "mr-1" : ""}`}
+                        className={`inline-block w-6 cursor-default text-center ${getHexByteClass(byte, isHovered)} ${i === 7 ? "mr-1" : ""}`}
                         key={i}
                         onMouseEnter={() => byte !== undefined && onHoverByte(byteIndex)}
                         onMouseLeave={() => onHoverByte(null)}
@@ -168,7 +168,7 @@ const HexRow: FC<{
         </span>
 
         {/* ASCII */}
-        <span className="border-l border-gray-200 pl-2 text-gray-500 dark:border-gray-700 dark:text-gray-400">
+        <span className="border-l border-gray-200 pl-2 text-gray-600 dark:border-gray-700 dark:text-gray-400">
             {Array.from({ length: bytes.length }, (_, i) => {
                 const byteIndex = offset + i;
                 const byte = bytes[i] ?? 0;
@@ -235,7 +235,7 @@ const HexViewer: FC<HexViewerProps> = memo(({ bytesPerRow = 16, className, data,
     return (
         <div className={`overflow-auto ${className ?? ""}`}>
             {/* Header */}
-            <div className="mb-2 flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+            <div className="mb-2 flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
                 <span>
                     <Plural one="# byte" other="# bytes" value={bytes.length} />
                 </span>
@@ -254,11 +254,11 @@ const HexViewer: FC<HexViewerProps> = memo(({ bytesPerRow = 16, className, data,
             </div>
 
             {/* Column headers */}
-            <div className="mb-1 flex items-center border-b border-gray-200 pb-1 font-mono text-xs text-gray-400 select-none dark:border-gray-700 dark:text-gray-500">
+            <div className="mb-1 flex items-center border-b border-gray-200 pb-1 font-mono text-xs text-gray-600 select-none dark:border-gray-700 dark:text-gray-400">
                 <span className="w-20 flex-shrink-0">{t`Offset`}</span>
                 <span className="mr-4 flex-shrink-0">
                     {Array.from({ length: bytesPerRow }, (_, i) => (
-                        <span className={`inline-block w-6 text-center${i === 7 ? "mr-1" : ""}`} key={i}>
+                        <span className={`inline-block w-6 text-center ${i === 7 ? "mr-1" : ""}`} key={i}>
                             {toHex(i)}
                         </span>
                     ))}
@@ -274,7 +274,7 @@ const HexViewer: FC<HexViewerProps> = memo(({ bytesPerRow = 16, className, data,
             {/* Show more button */}
             {!showAll && totalRows > maxInitialRows && (
                 <div className="mt-2 text-center">
-                    <button className="text-xs text-blue-500 hover:text-blue-700 dark:text-blue-400" onClick={() => setShowAll(true)} type="button">
+                    <button className="text-xs text-blue-700 hover:text-blue-900 dark:text-blue-400" onClick={() => setShowAll(true)} type="button">
                         {t`Show up to ${rowLimit} rows (${byteCount} bytes)`}
                     </button>
                 </div>

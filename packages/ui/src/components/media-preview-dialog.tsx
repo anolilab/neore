@@ -36,6 +36,7 @@ interface MediaPreviewDialogProps {
 }
 
 const MediaPreviewDialog = ({ children, media, onOpenChange, open }: MediaPreviewDialogProps) => {
+    const { t } = useLingui();
     const [isPlaying, setIsPlaying] = useState(false);
     const [wasOpen, setWasOpen] = useState(open);
 
@@ -56,7 +57,12 @@ const MediaPreviewDialog = ({ children, media, onOpenChange, open }: MediaPrevie
     return (
         <MediaPreviewDialogContext value={contextValue}>
             <Dialog onOpenChange={onOpenChange} open={open}>
-                <DialogPopup bottomStickOnMobile={false} className="max-h-[90vh] w-[95vw] max-w-5xl overflow-hidden p-0" showCloseButton>
+                <DialogPopup
+                    aria-label={t`Preview`}
+                    bottomStickOnMobile={false}
+                    className="max-h-[90vh] w-[95vw] max-w-5xl overflow-hidden p-0"
+                    showCloseButton
+                >
                     {children}
                 </DialogPopup>
             </Dialog>

@@ -152,12 +152,31 @@ jobs:
     # The Rust Worker is the one project with a `test` target and no `test:coverage`
     # (cargo test has no v8 coverage), so the coverage run in `test` skips it. Its own
     # job, in parallel: it needs no workspace build and was the tail of `test`.
+    # One job per mode (dark + violet in two shards), so each run stays well inside the runner's limit. Run as one job, the four
+    # modes took longer than the runner allowed and were cut off mid-suite, and the output only
+    # appears at the end, so a cut-off run reports no story at all. `fail-fast: false` lets every
+    # mode report, not just the first to fail.
     storybook:
         name: "Storybook (stories, a11y)"
         if: "needs.files-changed.outputs.packages == 'true'"
         needs: "files-changed"
         runs-on: "ubuntu-24.04"
-        timeout-minutes: 20
+        timeout-minutes: 25
+        strategy:
+            fail-fast: false
+            matrix:
+                # Dark + violet is the largest mode, so it is split in two. Vitest's --shard divides the files of that mode.
+                include:
+                    - mode: "light"
+                      shard: "1/1"
+                    - mode: "dark-violet"
+                      shard: "1/2"
+                    - mode: "dark-violet"
+                      shard: "2/2"
+                    - mode: "mobile"
+                      shard: "1/1"
+                    - mode: "rtl"
+                      shard: "1/1"
         steps:
             - name: "Harden Runner"
               uses: "step-security/harden-runner@46b06cea07f9e64621fdf066ba77ac6915163d43" # v2.22.3
@@ -215,13 +234,22 @@ jobs:
               shell: "bash"
               run: "bash .github/scripts/apt-retry.sh pnpm --filter @neore/web exec playwright install-deps chromium"
 
-            # Every story of the web app, packages/ui and packages/chat-ui, in light, dark and the
-            # violet accent (`apps/web/vitest.storybook.config.ts`). A story fails on a render error,
-            # a failing `play` function or an axe violation; one that cannot meet axe yet is marked
-            # `a11y: { test: "todo" }` in its file, with the reason.
-            - name: "Run the stories (affected)"
+            # Vite's dependency optimizer cache, per job: each mode and shard restores and saves its own, so a
+            # run skips most of the dependency setup it spent its time on.
+            - name: "Cache the Storybook optimizer"
+              uses: "actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9" # v6.1.0
+              with:
+                  path: "apps/web/node_modules/.cache/storybook"
+                  key: "storybook-optimizer-${{ runner.os }}-${{ matrix.mode }}-${{ matrix.shard }}-${{ hashFiles('pnpm-lock.yaml') }}"
+                  restore-keys: "storybook-optimizer-${{ runner.os }}-${{ matrix.mode }}-${{ matrix.shard }}-"
+
+            # Every story of the web app, packages/ui and packages/chat-ui, in one mode of
+            # `apps/web/vitest.storybook.config.ts` (light, dark + violet, phone, right-to-left).
+            # A story fails on a render error, a failing `play` function or an axe violation; one
+            # that cannot meet axe yet is marked `a11y: { test: "todo" }` in its file, with the reason.
+            - name: "Run the stories (${{ matrix.mode }} ${{ matrix.shard }})"
               shell: "bash"
-              run: 'pnpm exec vis affected test:storybook --if-present --base "$VIS_BASE" --head "$VIS_HEAD" --fail-fast'
+              run: 'pnpm --filter @neore/web exec vitest run --config vitest.storybook.config.ts --project "storybook:${{ matrix.mode }}" --shard="${{ matrix.shard }}"'
 
     rust-worker:
         name: "Rust Worker tests"

@@ -43,13 +43,13 @@ interface JsonViewerProps {
 // ---------------------------------------------------------------------------
 
 const TYPE_COLORS = {
-    boolean: "text-purple-600 dark:text-purple-400",
+    boolean: "text-purple-700 dark:text-purple-400",
     bracket: "text-gray-600 dark:text-gray-400",
-    count: "text-gray-400 dark:text-gray-500 text-xs",
-    key: "text-rose-600 dark:text-rose-400",
-    null: "text-gray-500 dark:text-gray-500",
-    number: "text-blue-600 dark:text-blue-400",
-    string: "text-green-600 dark:text-green-400",
+    count: "text-gray-600 dark:text-gray-400 text-xs",
+    key: "text-rose-700 dark:text-rose-400",
+    null: "text-gray-600 dark:text-gray-400",
+    number: "text-blue-700 dark:text-blue-400",
+    string: "text-green-800 dark:text-green-400",
 };
 
 const getValueColor = (value: unknown): string => {
@@ -148,61 +148,55 @@ const JsonNode: FC<{
     const nodeName = typeof keyName === "string" ? keyName : t`Item ${keyName}`;
     const nodeLabel = isArray
         ? // eslint-disable-next-line no-restricted-syntax -- a Lingui plural must be the whole message of `t`
-          t`${plural(itemCount, { one: `${nodeName}: array with # item`, other: `${nodeName}: array with # items` })}`
+          t`${plural(itemCount, { one: `${nodeName}: # item, array`, other: `${nodeName}: # items, array` })}`
         : // eslint-disable-next-line no-restricted-syntax -- a Lingui plural must be the whole message of `t`
-          t`${plural(itemCount, { one: `${nodeName}: object with # item`, other: `${nodeName}: object with # items` })}`;
+          t`${plural(itemCount, { one: `${nodeName}: # item, object`, other: `${nodeName}: # items, object` })}`;
     const moreCount = entries.length - maxItems;
     const openBracket = isArray ? "[" : "{";
     const closeBracket = isArray ? "]" : "}";
 
     return (
         <div>
-            <div
-                aria-expanded={expanded}
-                aria-label={nodeLabel}
-                className="group flex cursor-pointer items-center hover:bg-gray-50 dark:hover:bg-gray-800/50"
-                onClick={() => setExpanded(!expanded)}
-                onKeyDown={(e) => {
-                    if (!(e.key === "Enter" || e.key === " ")) {
-                        return;
-                    }
+            <div className="group flex items-center hover:bg-gray-50 dark:hover:bg-gray-800/50" style={{ paddingLeft: indent }}>
+                {/* The copy button is a sibling of the toggle: a button must not hold another focusable control. */}
+                <div
+                    aria-expanded={expanded}
+                    aria-label={nodeLabel}
+                    className="flex cursor-pointer items-center"
+                    onClick={() => setExpanded(!expanded)}
+                    onKeyDown={(e) => {
+                        if (!(e.key === "Enter" || e.key === " ")) {
+                            return;
+                        }
 
-                    e.preventDefault();
-                    setExpanded(!expanded);
-                }}
-                role="button"
-                style={{ paddingLeft: indent }}
-                tabIndex={0}
-            >
-                {expanded ? (
-                    <ChevronDownIcon aria-hidden="true" className="mr-1 h-3 w-3 flex-shrink-0 text-gray-400" />
-                ) : (
-                    <ChevronRightIcon aria-hidden="true" className="mr-1 h-3 w-3 flex-shrink-0 text-gray-400" />
-                )}
-                {typeof keyName === "string" && <span className={TYPE_COLORS.key}>&quot;{keyName}&quot;</span>}
-                {typeof keyName === "string" && <span className={TYPE_COLORS.bracket}>: </span>}
-                <span className={TYPE_COLORS.bracket}>{openBracket}</span>
-                {!expanded && (
-                    <>
-                        <span className={TYPE_COLORS.count}>
-                            {" "}
-                            <Plural one="# item" other="# items" value={itemCount} />{" "}
-                        </span>
-                        <span className={TYPE_COLORS.bracket}>
-                            {closeBracket}
-                            {comma}
-                        </span>
-                    </>
-                )}
-                <button
-                    aria-label={t`Copy object`}
-                    className="ml-2 opacity-0 transition-opacity group-hover:opacity-100"
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        handleCopy();
+                        e.preventDefault();
+                        setExpanded(!expanded);
                     }}
-                    type="button"
+                    role="button"
+                    tabIndex={0}
                 >
+                    {expanded ? (
+                        <ChevronDownIcon aria-hidden="true" className="mr-1 h-3 w-3 flex-shrink-0 text-gray-400" />
+                    ) : (
+                        <ChevronRightIcon aria-hidden="true" className="mr-1 h-3 w-3 flex-shrink-0 text-gray-400" />
+                    )}
+                    {typeof keyName === "string" && <span className={TYPE_COLORS.key}>&quot;{keyName}&quot;</span>}
+                    {typeof keyName === "string" && <span className={TYPE_COLORS.bracket}>: </span>}
+                    <span className={TYPE_COLORS.bracket}>{openBracket}</span>
+                    {!expanded && (
+                        <>
+                            <span className={TYPE_COLORS.count}>
+                                {" "}
+                                <Plural one="# item" other="# items" value={itemCount} />{" "}
+                            </span>
+                            <span className={TYPE_COLORS.bracket}>
+                                {closeBracket}
+                                {comma}
+                            </span>
+                        </>
+                    )}
+                </div>
+                <button aria-label={t`Copy object`} className="ml-2 opacity-0 transition-opacity group-hover:opacity-100" onClick={handleCopy} type="button">
                     <CopyIcon aria-hidden="true" className={`h-3 w-3 ${copied ? "text-green-500" : "text-gray-400"}`} />
                 </button>
             </div>
@@ -223,7 +217,7 @@ const JsonNode: FC<{
                     ))}
                     {hasMore && (
                         <div style={{ paddingLeft: (depth + 1) * 16 }}>
-                            <button className="text-xs text-blue-500 hover:text-blue-700 dark:text-blue-400" onClick={() => setShowAll(true)} type="button">
+                            <button className="text-xs text-blue-700 hover:text-blue-900 dark:text-blue-400" onClick={() => setShowAll(true)} type="button">
                                 … <Plural one="# more item" other="# more items" value={moreCount} />
                             </button>
                         </div>
