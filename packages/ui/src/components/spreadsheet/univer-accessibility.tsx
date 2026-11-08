@@ -24,6 +24,11 @@ const repairControls = (root: HTMLElement): void => {
             trigger.removeAttribute("aria-expanded");
         } else {
             trigger.setAttribute("role", "button");
+
+            // A button must be a tab stop and respond to Enter and Space, which the keydown listener below provides.
+            if (!trigger.hasAttribute("tabindex")) {
+                trigger.setAttribute("tabindex", "0");
+            }
         }
     }
 
@@ -67,18 +72,46 @@ const repairControls = (root: HTMLElement): void => {
 };
 
 /**
- * Repairs `root` now, and again after each change inside it. Returns the function that stops watching.
+ * Repairs `root` now, and again after each batch of changes inside it. Repairs are coalesced into one per frame, because
+ * Univer re-renders its toolbar as the selection moves. Returns the function that stops watching.
  */
 export const observeUniverAccessibility = (root: HTMLElement): (() => void) => {
     repairControls(root);
 
+    let frame: number | null = null;
+
     const observer = new MutationObserver(() => {
-        repairControls(root);
+        if (frame !== null) {
+            return;
+        }
+
+        frame = requestAnimationFrame(() => {
+            frame = null;
+            repairControls(root);
+        });
     });
 
+    // The repaired triggers are buttons in the accessibility tree, so Enter and Space activate them as a native button would.
+    const onKeyDown = (event: KeyboardEvent) => {
+        const target = event.target instanceof HTMLElement ? event.target : null;
+
+        if ((event.key !== "Enter" && event.key !== " ") || !target || target.tagName === "BUTTON" || target.getAttribute("role") !== "button") {
+            return;
+        }
+
+        event.preventDefault();
+        target.click();
+    };
+
     observer.observe(root, { childList: true, subtree: true });
+    root.addEventListener("keydown", onKeyDown);
 
     return () => {
         observer.disconnect();
+        root.removeEventListener("keydown", onKeyDown);
+
+        if (frame !== null) {
+            cancelAnimationFrame(frame);
+        }
     };
 };

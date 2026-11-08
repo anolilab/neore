@@ -957,7 +957,7 @@ const ModelPicker: FC<ModelPickerProps> = ({
     // The row buttons for star, move and info are pointer-only (they cannot live inside the listbox), so the same
     // actions are bound to Alt+S, Alt+Arrow and Alt+I on the highlighted row, from the search field.
     const handleActionShortcut = useCallback(
-        (event: React.KeyboardEvent) => {
+        (event: React.KeyboardEvent & { preventBaseUIHandler?: () => void }) => {
             if (!event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) {
                 return;
             }
@@ -983,6 +983,8 @@ const ModelPicker: FC<ModelPickerProps> = ({
                 return;
             }
 
+            // Base UI's list navigation runs on the same ArrowUp/ArrowDown keydown; it would move the highlight to a neighbour.
+            event.preventBaseUIHandler?.();
             event.preventDefault();
             event.stopPropagation();
         },

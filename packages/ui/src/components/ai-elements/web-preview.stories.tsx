@@ -4,7 +4,9 @@ import { expect, fn, userEvent, waitFor } from "storybook/test";
 
 import { WebPreview, WebPreviewBody, WebPreviewConsole, WebPreviewNavigation, WebPreviewNavigationButton, WebPreviewUrl } from "./web-preview";
 
-const PAGE = `data:text/html,${encodeURIComponent("<h1 style='font-family:sans-serif'>Hello preview</h1>")}`;
+// The preview only loads http(s) pages, so the sample is a static file that Storybook serves beside itself
+// (`apps/web/.storybook/public`), addressed by its absolute URL.
+const PAGE = new URL("preview-sample.html", globalThis.location.href).href;
 
 const LOGS = [
     { level: "log" as const, message: "Server started", timestamp: new Date(Date.UTC(2026, 10, 5, 12, 0, 0)) },
