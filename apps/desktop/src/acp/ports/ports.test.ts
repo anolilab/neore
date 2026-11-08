@@ -136,10 +136,10 @@ describe("listing ports", () => {
     it("lists what the agent and its tree listen on and nothing outside it", async () => {
         const ports = await new PortsService(new FakeSystem()).list(10);
 
-        expect(ports.map((port) => [port.port, port.pid, port.name])).toEqual([
-            [2000, 10, "agent"],
-            [3000, 30, "node"],
-            [4000, 40, "vite"],
+        expect(ports.map((port) => [port.port, port.pid, port.name, port.agent])).toEqual([
+            [2000, 10, "agent", true],
+            [3000, 30, "node", false],
+            [4000, 40, "vite", false],
         ]);
     });
 
@@ -287,9 +287,21 @@ describe("stopping a server", () => {
             system.table = system.table.map((entry) => (entry.pid === 30 ? { ...entry, ppid: 1 } : entry));
         };
 
+        expect(await stopper(system).stop(10, SERVER_30)).toEqual({ ended: false, reason: STOP_REASON.left });
+        expect(system.signals).not.toContainEqual([30, "SIGKILL"]);
+    });
+
+    it("signals no child that a survivor starts after it has left the agent's tree", async () => {
+        const system = new FakeSystem();
+
+        system.ignoreTerm.add(30);
+        system.onSleep = () => {
+            system.table = [...system.table.map((entry) => (entry.pid === 30 ? { ...entry, ppid: 1 } : entry)), row(32, 30, "late")];
+        };
+
         await stopper(system).stop(10, SERVER_30);
 
-        expect(system.signals).not.toContainEqual([30, "SIGKILL"]);
+        expect(system.signals.map(([pid]) => pid)).not.toContain(32);
     });
 
     it("says a force-kill was sent when only the check after it could not be read", async () => {

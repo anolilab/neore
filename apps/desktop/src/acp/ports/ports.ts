@@ -17,6 +17,8 @@ const READ_ATTEMPTS = 3;
 
 export interface PortView {
     address: string;
+    /** The agent's own socket: listed, but never stopped here, since that would end the session. */
+    agent: boolean;
     name: string;
     pid: number;
     port: number;
@@ -36,6 +38,7 @@ export type StopResult = { ended: true } | { ended: false; reason: string };
 
 export const STOP_REASON = {
     gone: "that server is no longer listening in this session",
+    left: "a process left the agent's processes before it ended, so it was not force-killed",
     refused: "a process could not be signalled (not permitted)",
     survived: "a process was still running after it was force-killed",
     unconfirmed: "it was force-killed, but the process list could not be read to confirm it ended",
@@ -103,7 +106,7 @@ export class PortsService {
 
             if (row !== undefined && !seen.has(key) && stillBelow.get(row.pid) === identity(row)) {
                 seen.add(key);
-                views.push({ address: listener.address, name: row.name, pid: row.pid, port: listener.port, startedAt: row.startedAt });
+                views.push({ address: listener.address, agent: row.pid === agentPid, name: row.name, pid: row.pid, port: listener.port, startedAt: row.startedAt });
             }
         }
 
@@ -139,9 +142,11 @@ export class PortsService {
 
             if (table !== undefined) {
                 const alive = aliveOf(table, signalled);
+                // A child a victim started meanwhile goes down the same way, before its parent is gone; only below a
+                // victim still below the agent, so a victim the system re-parented takes no new signals to its tree.
+                const roots = aliveOf(this.below(table, agentPid), signalled);
 
-                // A child a victim started meanwhile goes down the same way, before its parent is gone.
-                for (const newcomer of this.newcomers(table, alive, signalled, agentPid)) {
+                for (const newcomer of this.newcomers(table, roots, signalled, agentPid)) {
                     refused = !this.send(newcomer, "SIGTERM") || refused;
                     signalled.push(newcomer);
                 }
@@ -216,7 +221,11 @@ export class PortsService {
             return { ended: false, reason: STOP_REASON.refused };
         }
 
-        return aliveOf(after, signalled).length > 0 ? { ended: false, reason: STOP_REASON.survived } : { ended: true };
+        if (aliveOf(this.below(after, agentPid), signalled).length > 0) {
+            return { ended: false, reason: STOP_REASON.survived };
+        }
+
+        return aliveOf(after, signalled).length > 0 ? { ended: false, reason: STOP_REASON.left } : { ended: true };
     }
 
     /** One table read, or undefined when it failed (a slow or failing `ps`). */

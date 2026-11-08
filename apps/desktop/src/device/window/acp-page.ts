@@ -777,15 +777,24 @@ const showPorts = (selected: string | undefined, ports: Awaited<ReturnType<typeo
     $("acp-ports-list").replaceChildren(
         ...ports.length === 0
             ? [item("None.")]
-            : ports.map((port) =>
-                item(
-                    `Port ${String(port.port)} on ${port.address} — ${port.name} (process ${String(port.pid)})`,
-                    button("Stop", `Stop ${port.name} on port ${String(port.port)}`, () => {
-                        guarded(() => stopPort(selected, port));
-                    }),
-                )),
+            : ports.map((port) => {
+                const label = `Port ${String(port.port)} on ${port.address} — ${port.name} (process ${String(port.pid)})`;
+
+                // The agent's own server ends with the session, not from here.
+                return port.agent
+                    ? item(`${label}, the agent itself`)
+                    : item(
+                        label,
+                        button("Stop", `Stop ${port.name} on port ${String(port.port)}`, () => {
+                            guarded(() => stopPort(selected, port));
+                        }),
+                    );
+            }),
     );
 };
+
+/** The processes a stop is running for, until the list is read again: a repeat click on the same row is ignored meanwhile. */
+const stopping = new Set<string>();
 
 /** Ends one listed server, then reads the list again; a stop that did not end says why in the ports status line. */
 const stopPort = async (selected: string | undefined, port: Awaited<ReturnType<typeof globalThis.neoreDevice.acpPorts>>[number]): Promise<void> => {
@@ -794,20 +803,32 @@ const stopPort = async (selected: string | undefined, port: Awaited<ReturnType<t
         return;
     }
 
-    const result = await globalThis.neoreDevice.acpPortStop(selected, { name: port.name, pid: port.pid, startedAt: port.startedAt });
+    const key = JSON.stringify([selected, port.pid, port.startedAt, port.name]);
 
-    // Another session was opened during the stop: its own list is on screen now.
-    if (state.selected !== selected) {
+    if (stopping.has(key)) {
         return;
     }
 
-    portsRead.quiet = 0;
-    await refreshPorts();
+    stopping.add(key);
 
-    if (!result.ended && state.selected === selected) {
-        setPortsStatus(`${port.name} on port ${String(port.port)} did not end: ${result.reason}.`);
-        // The next read redraws the list, which brings the count back instead of leaving this reason up.
-        portsRead.shown = undefined;
+    try {
+        const result = await globalThis.neoreDevice.acpPortStop(selected, { name: port.name, pid: port.pid, startedAt: port.startedAt });
+
+        // Another session was opened during the stop: its own list is on screen now.
+        if (state.selected !== selected) {
+            return;
+        }
+
+        portsRead.quiet = 0;
+        await refreshPorts();
+
+        if (!result.ended && state.selected === selected) {
+            setPortsStatus(`${port.name} on port ${String(port.port)} did not end: ${result.reason}.`);
+            // The next read redraws the list, which brings the count back instead of leaving this reason up.
+            portsRead.shown = undefined;
+        }
+    } finally {
+        stopping.delete(key);
     }
 };
 
