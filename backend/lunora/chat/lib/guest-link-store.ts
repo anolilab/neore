@@ -26,8 +26,8 @@ export const GUEST_MESSAGE_REMOVAL_PAGE = 100;
 
 /**
  * One page of a link's messages, and the link itself once none are left. Returns the link's route hash when the link
- * went, for the caller to remove once the write has gone through (a route write is global and does not roll back), or
- * `undefined` while messages remain: the caller runs again, and the link is never deleted ahead of its messages.
+ * went, for the caller to hand to {@link scheduleGuestLinkRouteDrop}, or `undefined` while messages remain: the caller
+ * runs again, and the link is never deleted ahead of its messages.
  */
 export const deleteGuestLink = async (ctx: Pick<MutationCtx, "db">, link: LinkRow): Promise<string | undefined> => {
     // One past the page tells a link that holds exactly one page (a full one) from one that holds more.
@@ -51,7 +51,7 @@ export const deleteGuestLink = async (ctx: Pick<MutationCtx, "db">, link: LinkRo
 
 /**
  * One batch of the thread's links made at or before `before`, and what guests left on them, minus their routes: the rows
- * go with the caller's write, and the returned hashes are the routes the caller removes once that write has gone through.
+ * go with the caller's write, and the returned hashes are the routes the caller schedules for removal.
  * `done` is false while such rows remain; the caller runs it again. A link made after `before` (once the thread was
  * restored or unlocked) is not the removal's to take, and does not keep the removal going.
  */
@@ -86,9 +86,35 @@ export const removeGuestLinkRows = async (
     return { done: links.length < GUEST_LINK_REMOVAL_CAP, hashes };
 };
 
+/** Attempts of a route removal (`dropGuestLinkRoutesJob`) before it is left to account erasure. */
+export const GUEST_ROUTE_DROP_ATTEMPTS = 5;
+
+/** The wait before retry `attempt` of a route removal: one minute, doubling. */
+export const guestRouteDropDelayMs = (attempt: number): number => 60_000 * 2 ** (attempt - 1);
+
 /**
- * Removes the routes of links whose rows are already gone. A failure is logged, not thrown: a leftover route answers
- * "not active", and the operation that removed the rows (an archive, a trash, a delete, the sweep) must still complete.
+ * Hands the routes of removed links to a job on this shard. A route lives in global storage, which does not roll back with
+ * this shard's write; a scheduled job does (it is dropped with a write that fails), so a route goes only after the rows
+ * it points at are gone for good. The job re-checks that no link row holds the hash before it deletes the route.
+ */
+export const scheduleGuestLinkRouteDrop = async (ctx: Pick<MutationCtx, "scheduler">, linkHashes: string[], attempt = 0): Promise<void> => {
+    if (linkHashes.length === 0) {
+        return;
+    }
+
+    await runAfterOnShard(
+        ctx.scheduler,
+        attempt === 0 ? 0 : guestRouteDropDelayMs(attempt),
+        internal.chat.guest_links.dropGuestLinkRoutesJob,
+        { attempt, linkHashes },
+        currentShard() ?? ROOT_SHARD_KEY,
+    );
+};
+
+/**
+ * Deletes routes right away, for account erasure only: the account's rows go in the same pass and its remaining routes
+ * with `deleteShardRoutesOf`, so a route dropped ahead of a failed batch points at an account that is going anyway. A
+ * failure is logged, not thrown, so the erasure does not stall on it.
  */
 export const dropGuestLinkRoutes = async (ctx: Pick<MutationCtx, "db">, linkHashes: string[]): Promise<void> => {
     for (const linkHash of linkHashes) {
@@ -101,13 +127,17 @@ export const dropGuestLinkRoutes = async (ctx: Pick<MutationCtx, "db">, linkHash
 };
 
 /**
- * One batch of a thread's links made at or before `before` (by default, every link so far), their messages and routes.
- * True once none are left; the caller runs it again otherwise.
+ * One batch of a thread's links made at or before `before` (by default, every link so far) and their messages, with their
+ * routes scheduled for removal once this write commits. True once none are left; the caller runs it again otherwise.
  */
-export const revokeGuestLinksForThread = async (ctx: Pick<MutationCtx, "db" | "now">, threadId: Id<"threads">, before: number = ctx.now): Promise<boolean> => {
+export const revokeGuestLinksForThread = async (
+    ctx: Pick<MutationCtx, "db" | "now" | "scheduler">,
+    threadId: Id<"threads">,
+    before: number = ctx.now,
+): Promise<boolean> => {
     const { done, hashes } = await removeGuestLinkRows(ctx, threadId, before);
 
-    await dropGuestLinkRoutes(ctx, hashes);
+    await scheduleGuestLinkRouteDrop(ctx, hashes);
 
     return done;
 };

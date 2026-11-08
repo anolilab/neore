@@ -526,7 +526,8 @@ async function deletePageForThreadIdHandler(context: MutationContext, args: Dele
         // Here, not above the link batches: this page re-runs once per batch of links.
         await dropQueuedSteersForThread(context, args.threadId);
 
-        // The thread's guest links, what guests left on them and their routes, one batch per call as the file links above.
+        // The thread's guest links and their notes, one batch per call as the file links above;
+        // their routes go in a job that runs once the page commits.
         if (!(await revokeGuestLinksForThread(context, args.threadId))) {
             return { cursor: messages.continueCursor, isDone: false };
         }

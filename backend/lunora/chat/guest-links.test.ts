@@ -36,6 +36,30 @@ vi.mock("../lib/crpc-auth-helpers", async (importOriginal) => {
     };
 });
 
+/** Route deletes still to fail, as a global-storage outage would, and how many were made. */
+const routeFailures = vi.hoisted(() => {
+    return { deletes: 0, left: 0 };
+});
+
+vi.mock("../lib/shard-routes", async (importOriginal) => {
+    const original = await importOriginal<typeof import("../lib/shard-routes")>();
+
+    return {
+        ...original,
+        deleteShardRoute: async (...args: Parameters<typeof original.deleteShardRoute>) => {
+            routeFailures.deletes += 1;
+
+            if (routeFailures.left > 0) {
+                routeFailures.left -= 1;
+
+                throw new Error("global storage unavailable");
+            }
+
+            await original.deleteShardRoute(...args);
+        },
+    };
+});
+
 vi.mock("../lib/rate-limiter", async (importOriginal) => {
     return { ...(await importOriginal<typeof import("../lib/rate-limiter")>()), rateLimitGuard: async () => {} };
 });
@@ -44,6 +68,7 @@ const { default: schema } = await import("../schema");
 const guestLinks = await import("./guest-links");
 const { _deletePageForThreadId, createTemporaryThread, markThreadArchived, softDeleteThread } = await import("../agent/threads");
 const { enableThreadLock } = await import("../agent/thread-lock");
+const { withdrawGuestLinksForThread } = await import("./lib/guest-link-store");
 
 const OWNER = "user-owner";
 
@@ -64,6 +89,27 @@ const seedLink = async (thread: string, linkHash: string, expiresAt: number, mes
         await setShardRoute(ctx, "guest-link", linkHash, OWNER);
     });
 
+/**
+ * Runs the route removals the fake scheduler holds, and the retries they schedule, once each: it cannot resolve a
+ * shard-routed job itself, so each is run here with the args it was given.
+ */
+const runRouteDrops = async () => {
+    const ran = new Set<string>();
+
+    for (let pass = 0; pass < 10; pass += 1) {
+        const due = harness.scheduler.list().filter((job) => "linkHashes" in job.args && !ran.has(job.id));
+
+        if (due.length === 0) {
+            return;
+        }
+
+        for (const job of due) {
+            ran.add(job.id);
+            await harness.run(async (ctx: any) => await ctx.runMutation(guestLinks.dropGuestLinkRoutesJob, job.args));
+        }
+    }
+};
+
 beforeAll(async () => {
     registerModule(registry, "chat_guest_links", guestLinks);
 }, 60_000);
@@ -74,6 +120,8 @@ beforeEach(async () => {
 });
 
 afterEach(() => {
+    routeFailures.deletes = 0;
+    routeFailures.left = 0;
     vi.unstubAllEnvs();
     harness.close();
 });
@@ -100,10 +148,50 @@ describe("withdrawing a link", () => {
         // A full link: exactly one removal page of notes, which one pass finishes.
         await seedLink(threadId, "hash-live", Date.now() + 60_000, 100);
         await withdraw();
+        await runRouteDrops();
 
         expect(await rows("threadGuestLinks")).toHaveLength(0);
         expect(await rows("threadGuestMessages")).toHaveLength(0);
         expect(await rows("shardRoutes")).toHaveLength(0);
+    });
+});
+
+describe("a link's route", () => {
+    it("stays when the write that withdrew the link fails", async () => {
+        await seedLink(threadId, "hash-live", Date.now() + 60_000);
+
+        await expect(
+            harness.run(async (ctx: any) => {
+                await withdrawGuestLinksForThread({ ...ctx, now: Date.now() }, threadId as never);
+
+                throw new Error("a later step of the lock failed");
+            }),
+        ).rejects.toThrow();
+
+        // Global storage keeps what a failed shard write did to it; the harness rolls both back, so the delete is counted.
+        expect(routeFailures.deletes).toBe(0);
+
+        await runRouteDrops();
+
+        expect(await rows("threadGuestLinks")).toHaveLength(1);
+        expect(await rows("shardRoutes")).toHaveLength(1);
+    });
+
+    it("is removed on a retry when its first delete throws", async () => {
+        await seedLink(threadId, "hash-live", Date.now() + 60_000);
+        routeFailures.left = 1;
+        await harness.run(async (ctx: any) => await markThreadArchived({ ...ctx, now: Date.now() }, threadId as never));
+        await runRouteDrops();
+
+        expect(routeFailures.left).toBe(0);
+        expect(await rows("shardRoutes")).toHaveLength(0);
+    });
+
+    it("is kept while a link row with its hash still exists", async () => {
+        await seedLink(threadId, "hash-live", Date.now() + 60_000);
+        await harness.run(async (ctx: any) => await ctx.runMutation(guestLinks.dropGuestLinkRoutesJob, { attempt: 0, linkHashes: ["hash-live"] }));
+
+        expect(await rows("shardRoutes")).toHaveLength(1);
     });
 });
 
@@ -120,6 +208,7 @@ describe("withdrawing a link with more than one page of messages", () => {
         const [job] = harness.scheduler.list();
 
         await harness.run(async (ctx: any) => await ctx.runMutation(guestLinks.continueGuestLinkRemoval, job?.args));
+        await runRouteDrops();
 
         expect(await rows("threadGuestLinks")).toMatchObject([{ linkHash: "hash-new" }]);
         expect(await rows("threadGuestMessages")).toHaveLength(1);
@@ -197,6 +286,8 @@ describe("the sweep", () => {
             }
         }
 
+        await runRouteDrops();
+
         expect(await rows("threadGuestLinks")).toHaveLength(0);
         expect(await rows("threadGuestMessages")).toHaveLength(0);
         expect(await rows("shardRoutes")).toHaveLength(0);
@@ -208,6 +299,7 @@ describe("the sweep", () => {
         await seedLink(threadId, "hash-lapsed", 1);
         await seedLink(otherThread, "hash-live", Date.now() + 60_000, 0);
         await harness.run(async (ctx: any) => await ctx.runMutation(guestLinks.sweepGuestLinks, {}));
+        await runRouteDrops();
 
         expect(await rows("threadGuestLinks")).toMatchObject([{ linkHash: "hash-live" }]);
         expect(await rows("threadGuestMessages")).toHaveLength(0);

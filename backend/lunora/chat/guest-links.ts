@@ -14,11 +14,15 @@ import { v } from "lunorash/server";
 import { internal } from "../_generated/internal";
 import { internalMutation, internalQuery } from "../_generated/server";
 import { currentShard, ROOT_SHARD_KEY } from "../lib/shard-context";
+import { deleteShardRoute } from "../lib/shard-routes";
 import { runAfterOnShard } from "../lib/shard-scheduler";
 import { MAX_LENGTH } from "../lib/validators";
-import { deleteGuestLink, dropGuestLinkRoutes, withdrawGuestLinksForThread } from "./lib/guest-link-store";
+import { deleteGuestLink, GUEST_ROUTE_DROP_ATTEMPTS, scheduleGuestLinkRouteDrop, withdrawGuestLinksForThread } from "./lib/guest-link-store";
 
 const SWEEP_BATCH = 50;
+
+/** The most hashes one route removal takes: a removal batch's links (`GUEST_LINK_REMOVAL_CAP`, `SWEEP_BATCH`). */
+const GUEST_ROUTE_BATCH = 50;
 
 /** Notes per export page. */
 const EXPORT_PAGE = 100;
@@ -90,13 +94,49 @@ export const sweepGuestLinks = internalMutation
             routes.push(hash);
         }
 
-        // Routes are not rolled back with the rows: if this write fails after here, a link keeps its row but answers "not active".
-        await dropGuestLinkRoutes(ctx, routes);
+        // The routes go in a job that runs only once these deletes commit (`scheduleGuestLinkRouteDrop`).
+        await scheduleGuestLinkRouteDrop(ctx, routes);
 
         // A full batch or an unfinished link may have left more behind: carry on now rather than at the shard's next housekeeping.
         if (unfinished || lapsed.length >= SWEEP_BATCH) {
             // Named, not defaulted: the continuation must stay on this owner's shard.
             await runAfterOnShard(ctx.scheduler, 0, internal.chat.guest_links.sweepGuestLinks, {}, currentShard() ?? ROOT_SHARD_KEY);
+        }
+
+        return null;
+    });
+
+/**
+ * Removes the routes of removed links (`scheduleGuestLinkRouteDrop`), after the write that removed them committed. A hash
+ * whose link row still exists keeps its route. A failed delete is tried again later, with a growing wait, up to
+ * `GUEST_ROUTE_DROP_ATTEMPTS` times; after that the route is left to account erasure (`deleteShardRoutesOf`).
+ */
+export const dropGuestLinkRoutesJob = internalMutation
+    .input({ attempt: v.number(), linkHashes: v.array(v.string().max(MAX_LENGTH.short)).max(GUEST_ROUTE_BATCH) })
+    .output(v.null())
+    .mutation(async ({ args, ctx }) => {
+        const failed: string[] = [];
+
+        for (const linkHash of args.linkHashes) {
+            const row = await ctx.db
+                .query("threadGuestLinks")
+                .withIndex("by_linkHash", (q) => q.eq("linkHash", linkHash))
+                .first();
+
+            if (row) {
+                continue;
+            }
+
+            try {
+                await deleteShardRoute(ctx, "guest-link", linkHash);
+            } catch (error) {
+                console.error("[guest-links] Failed to drop the route of a removed link:", error);
+                failed.push(linkHash);
+            }
+        }
+
+        if (failed.length > 0 && args.attempt + 1 < GUEST_ROUTE_DROP_ATTEMPTS) {
+            await scheduleGuestLinkRouteDrop(ctx, failed, args.attempt + 1);
         }
 
         return null;
