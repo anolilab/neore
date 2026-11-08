@@ -145,7 +145,11 @@ const UsageProjectBreakdown: FC<UsageProjectBreakdownProps> = ({ backfilling, da
                         </TableBody>
                     </Table>
                 )}
-                {truncated && <p className="text-muted-foreground mt-2 text-xs">{t`Only part of this period is included.`}</p>}
+                {truncated && (
+                    <p className="text-muted-foreground mt-2 text-xs" role="status">
+                        {t`Only part of this period is included.`}
+                    </p>
+                )}
             </CardContent>
         </Card>
     );
