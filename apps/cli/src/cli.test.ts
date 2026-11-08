@@ -59,12 +59,18 @@ describe("argument parsing", () => {
         });
         expect(parseCommand(["threads"]).command).toBe("threads ls");
         expect(parseCommand([]).command).toBe("help");
+        expect(parseCommand(["thread", "--help"]).command).toBe("help");
+        expect(parseCommand(["chat", "--help", "--wait"]).flags.help).toBe(true);
     });
 
     it("rejects unknown commands, subcommands and flags as usage errors", () => {
         expect(() => parseCommand(["thread", "ls"])).toThrow(UsageError);
         expect(() => parseCommand(["threads", "delete"])).toThrow("threads rm");
         expect(() => parseCommand(["chat", "--no-strem"])).toThrow(UsageError);
+        expect(() => parseCommand(["thread"])).toThrow("thread start");
+        expect(() => parseCommand(["--wait"])).toThrow(UsageError);
+        expect(() => parseCommand(["chat", "hi", "--wait"])).toThrow("`chat` has no --wait: use --no-stream");
+        expect(() => parseCommand(["tasks", "run", "t1", "--wait"])).toThrow("`neore tasks status <id>`");
     });
 
     it("exits 2 on a usage error and 0 on --version", async () => {
@@ -407,9 +413,6 @@ describe("chat end to end against a fake API", () => {
 
             expect(await run(["thread", "start"], context)).toBe(2);
             expect(await run(["thread", "send", "th1"], context)).toBe(2);
-            expect(await run(["thread"], context)).toBe(2);
-            expect(await run(["thread", "start", "hi", "--wiat"], context)).toBe(2);
-            expect(await run(["thread", "--help"], context)).toBe(0);
             expect(await run(["thread", "start", "hi", "-t", "th5"], context)).toBe(2);
             expect(await run(["thread", "start", "hi", "--no-stream"], context)).toBe(2);
 
@@ -419,12 +422,6 @@ describe("chat end to end against a fake API", () => {
             expect(await run(["thread", "send", "th1", "--reasoning"], piped)).toBe(2);
             expect(await run(["thread", "start", "hi", "--skill", "s"], context)).toBe(2);
             expect(context.io.stderr.text()).toContain("`thread` has no --skill");
-            expect(await run(["chat", "--help", "--wait"], context)).toBe(0);
-            expect(await run(["--wait"], context)).toBe(2);
-            expect(await run(["chat", "hi", "--wait"], context)).toBe(2);
-            expect(context.io.stderr.text()).toContain("`chat` has no --wait: use --no-stream");
-            expect(await run(["tasks", "run", "t1", "--wait"], context)).toBe(2);
-            expect(context.io.stderr.text()).toContain("`neore tasks status <id>`");
         });
 
         it("keeps the sign-in exit code", async () => {
