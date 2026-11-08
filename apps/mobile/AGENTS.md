@@ -33,3 +33,13 @@
   pnpm patch on `expo-speech-recognition` that makes iOS fail such a request instead of using the network. Re-check
   that patch on every upgrade of the module. The recognizer is one per app (`createRecognizerLock`): an aborted
   recognition holds it ("draining") until its `end`, heard by an app-wide listener, so a late end never closes a newer press.
+- **Push registration** (`src/notifications/`) — the EXPO push token (`getExpoPushTokenAsync`, project id from
+  `EAS_PROJECT_ID`; Android also needs `google-services.json`, `GOOGLE_SERVICES_JSON`) is registered with the phone's
+  language (`languageTag`: language, script, region only) on every sign-in, token rotation and return to the front
+  (at most once a minute after one that went through, `createForegroundGate`), silently when permission was already
+  given. A token event registers only when the token changed (`createTokenChangeFilter`): fetching the token fires the
+  same event, so registering on every event would loop. The server gives a token to whoever registered it last, so the foreground registration is what takes a phone back
+  after someone else registered its token. The system prompt shows only after the person sends a message
+  (`offerPhonePush`), once per sign-in, and only when the server has push on. The token is never logged. The
+  server sends only while the registering session lives, so sign-out (which revokes it) stops the pushes; a
+  registration still on its way then is refused. Pushes carry only a generic alert and ids.

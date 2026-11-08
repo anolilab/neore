@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { clearLastThread } from "../chat/last-thread-store";
 import { loadConfig } from "../lib/config";
 import { getClient } from "../lib/lunora";
+import { endPhonePushForAccount } from "../notifications/use-phone-push";
 import { getOfflineCache } from "../offline/database";
 import type { AuthStatus } from "./auth-state";
 import { AuthContext } from "./auth-state";
@@ -120,6 +121,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }, [config.appUrl, config.lunoraUrl]);
 
     const signOut = useCallback(async () => {
+        // From here on, no prompt and no registration for the account that is leaving.
+        endPhonePushForAccount();
+
         try {
             // The cache holds this person's chats: it is emptied FIRST and locally, so a sign-out request that fails or
             // hangs offline cannot leave them behind. Then the server is told and the stored grant cleared.
