@@ -4,7 +4,7 @@ import { CardContent } from "@neore/ui/components/card";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check } from "lucide-react";
 import type { FC } from "react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import SettingsCard from "@/components/settings/settings-card";
@@ -26,6 +26,8 @@ type SkippedRow = { setupStepsSkipped?: string[] } | null | undefined;
 
 const SAVE_SCOPE = "setup-steps-skip";
 
+const SETUP_OWNER_MISMATCH = "SETUP_OWNER_MISMATCH";
+
 /** A click carries the account that made it; the server refuses a save whose account is not the one signed in. */
 interface SkipVariables {
     owner: string;
@@ -33,11 +35,10 @@ interface SkipVariables {
     stepId: SetupStepId;
 }
 
-/** The server's refusal of a choice made for another account: the click is not this account's, so there is nothing to say. */
-const isOwnerRefusal = (error: unknown) => {
+const errorCode = (error: unknown) => {
     const { code, data } = error as { code?: string; data?: { code?: string } };
 
-    return code === "FORBIDDEN" || data?.code === "FORBIDDEN";
+    return data?.code ?? code;
 };
 
 /**
@@ -56,6 +57,12 @@ const SetupChecklist: FC<{ serverFormShown: boolean }> = ({ serverFormShown }) =
     const { data: session } = authClient.useSession();
     // Skip and Resume wait for the session: a save is always sent for a known account.
     const signedInId = session?.user?.id;
+    // Read when a save fails, which can be long after the click and after the card re-rendered.
+    const signedInRef = useRef(signedInId);
+
+    useEffect(() => {
+        signedInRef.current = signedInId;
+    }, [signedInId]);
     // The list is live: a computer paired in the desktop app arrives as a push.
     const devicesQuery = useQuery(crpc.devices.functions.listDevices.queryOptions({}));
     const saveStep = crpc.auth.setup_steps.setSetupStepSkipped.mutationOptions();
@@ -82,17 +89,20 @@ const SetupChecklist: FC<{ serverFormShown: boolean }> = ({ serverFormShown }) =
             return { hadRow: Boolean(row), wasSkipped };
         },
         onError: (error, args, context) => {
+            // The click belongs to another account: the server said so, or the client dropped it because the account changed
+            // (a refresh of the same account's token is an ordinary failure). The cache may be theirs now, so it is only re-read.
+            const code = errorCode(error);
+
+            if (code === SETUP_OWNER_MISMATCH || (code === "OFFLINE_IDENTITY_CHANGED" && args.owner !== signedInRef.current)) {
+                return;
+            }
+
             // Only this step goes back to its own previous value; a choice made on another step since stays.
             queryClient.setQueryData<SkippedRow>(settingsKey, (row) => {
                 const list = toggleSkipped(row?.setupStepsSkipped, args.stepId, context?.wasSkipped === true);
 
                 return context?.hadRow === true || list.length > 0 ? { ...row, setupStepsSkipped: list } : null;
             });
-
-            if (isOwnerRefusal(error)) {
-                return;
-            }
-
             setFailedStep(args.stepId);
             toast.error(t`Could not save that choice. Try again.`);
         },

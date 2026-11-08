@@ -9,6 +9,9 @@ import { authMutation, rateLimit } from "../lib/crpc";
 import { saveUserSettings } from "./lib/preference-writes";
 import { capSkippedSteps } from "./lib/setup-step-limits";
 
+/** The code the web card matches to stay silent about a choice that belongs to another account. */
+const SETUP_OWNER_MISMATCH = "SETUP_OWNER_MISMATCH";
+
 /** The new skipped list for one step; ids stored by other versions are kept, the oldest going first when the list would pass its limit. */
 export const applyStepSkip = (stored: ReadonlyArray<string> | undefined, stepId: string, skipped: boolean): string[] => {
     const rest = (stored ?? []).filter((entry) => entry !== stepId);
@@ -29,7 +32,8 @@ export const setSetupStepSkipped = authMutation
         const { userId } = ctx.user;
 
         if (expectedUserId !== undefined && expectedUserId !== userId) {
-            throw new LunoraError("FORBIDDEN", "This choice was made for another account");
+            // Its own code: a ban or a locked organization also answer FORBIDDEN, and those the user is told about.
+            throw new LunoraError("FORBIDDEN", "This choice was made for another account", { data: { code: SETUP_OWNER_MISMATCH } });
         }
 
         const settings = await ctx.db.userSettings.findFirst({ where: { userId } });

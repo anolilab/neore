@@ -16,7 +16,7 @@ const { account, devices, save, server, toastError } = vi.hoisted(() => {
         save: vi.fn(),
         server: {
             failSave: false,
-            refuse: false,
+            error: undefined as Error | undefined,
             failStep: undefined as string | undefined,
             noRow: false,
             reads: 0,
@@ -93,8 +93,8 @@ vi.mock("@/lib/lunora/crpc", () => {
 
                                         await server.hold;
 
-                                        if (server.refuse) {
-                                            throw Object.assign(new Error("another account"), { data: { code: "FORBIDDEN" } });
+                                        if (server.error) {
+                                            throw server.error;
                                         }
 
                                         if (server.failSave || server.failStep === args.stepId) {
@@ -160,14 +160,22 @@ const createGate = () => {
     return { open, promise };
 };
 
+const ownerMismatch = () => Object.assign(new Error("another account"), { data: { code: "SETUP_OWNER_MISMATCH" } });
+
 const renderChecklist = (serverFormShown = true, client = new QueryClient({ defaultOptions: { mutations: { retry: false }, queries: { retry: false } } })) => {
-    const tree = (
+    const tree = () => (
         <QueryClientProvider client={client}>
             <SetupChecklist serverFormShown={serverFormShown} />
         </QueryClientProvider>
     );
 
-    render(tree);
+    const view = render(tree());
+
+    return {
+        reload: () => {
+            view.rerender(tree());
+        },
+    };
 };
 
 describe("<SetupChecklist>", () => {
@@ -178,7 +186,7 @@ describe("<SetupChecklist>", () => {
         devices.hold = undefined;
         account.id = "user-a";
         server.failSave = false;
-        server.refuse = false;
+        server.error = undefined;
         server.failStep = undefined;
         server.noRow = false;
         server.reads = 0;
@@ -302,13 +310,61 @@ describe("<SetupChecklist>", () => {
         expect(screen.getAllByText("(To do)")).toHaveLength(2);
     });
 
-    it("says nothing when the server refuses a choice made for another account, and ends on the stored state", async () => {
+    it("says nothing when the server refuses a choice for another account, leaves the cache to the re-read, then ends on the stored state", async () => {
         const user = userEvent.setup();
+        const saveGate = createGate();
+        const readGate = createGate();
 
-        server.refuse = true;
+        server.error = ownerMismatch();
         server.skipped = ["pair"];
+        server.hold = saveGate.promise;
         renderChecklist();
         await user.click(await screen.findByRole("button", { name: RESkipAddAnSshServer }));
+        // The re-read after the refusal is held, so what shows meanwhile is whatever the card did with its own cache.
+        server.settingsHold = readGate.promise;
+        saveGate.open();
+
+        await waitFor(() => {
+            expect(server.reads).toBe(2);
+        });
+
+        expect(toastError).not.toHaveBeenCalled();
+        expect(screen.getAllByText("(Skipped)")).toHaveLength(2);
+
+        readGate.open();
+
+        await waitFor(() => {
+            expect(screen.getAllByText("(Skipped)")).toHaveLength(1);
+        });
+        expect(screen.queryByText("Could not save that choice. Try again.")).toBeNull();
+    });
+
+    it("tells the user about any other FORBIDDEN, such as a suspended account", async () => {
+        const user = userEvent.setup();
+
+        server.error = Object.assign(new Error("suspended"), { data: { code: "ACCOUNT_SUSPENDED" } });
+        renderChecklist();
+        await user.click(await screen.findByRole("button", { name: RESkipAddAnSshServer }));
+
+        await waitFor(() => {
+            expect(toastError).toHaveBeenCalledTimes(1);
+        });
+        expect(screen.queryByText("(Skipped)")).toBeNull();
+    });
+
+    it("stays silent about a held write dropped for an account change, and says so when the account is the same", async () => {
+        const user = userEvent.setup();
+        const gate = createGate();
+
+        server.error = Object.assign(new Error("identity"), { code: "OFFLINE_IDENTITY_CHANGED" });
+        server.hold = gate.promise;
+
+        const { reload } = renderChecklist();
+
+        await user.click(await screen.findByRole("button", { name: RESkipAddAnSshServer }));
+        account.id = "user-b";
+        reload();
+        gate.open();
 
         await waitFor(() => {
             expect(save).toHaveBeenCalledTimes(1);
@@ -316,11 +372,19 @@ describe("<SetupChecklist>", () => {
         await waitFor(() => {
             expect(server.reads).toBe(2);
         });
-
         expect(toastError).not.toHaveBeenCalled();
-        expect(screen.queryByText("Could not save that choice. Try again.")).toBeNull();
-        expect(screen.getAllByText("(Skipped)")).toHaveLength(1);
-        expect(screen.getAllByText("(To do)")).toHaveLength(2);
+    });
+
+    it("treats a dropped write of the same account, a token refresh while offline, as a failure", async () => {
+        const user = userEvent.setup();
+
+        server.error = Object.assign(new Error("identity"), { code: "OFFLINE_IDENTITY_CHANGED" });
+        renderChecklist();
+        await user.click(await screen.findByRole("button", { name: RESkipAddAnSshServer }));
+
+        await waitFor(() => {
+            expect(toastError).toHaveBeenCalledTimes(1);
+        });
     });
 
     it("keeps Skip and Resume off until the session is known", async () => {
