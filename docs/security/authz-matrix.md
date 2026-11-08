@@ -229,6 +229,7 @@ for a schema table that is neither policed nor listed:
 | `auth_functions.initializeUserSettings` | mutation | authMutation | userSettings | caller-scoped (ctx.user) | ok |
 | `auth_functions.updateAIUserPreferences` | mutation | authMutation | — | identity (self-resolved); own row; BYOK RL | ok |
 | `auth_functions.updateUserSettings` | mutation | authMutation | — | identity (self-resolved); input excludes userId | ok |
+| `auth_setup_steps.setSetupStepSkipped` | mutation | authMutation + RL | userSettings | caller-scoped (ctx.user); one step id, applied to the stored list | ok — new |
 | `auth_invitations.createInvitation` | action | adminAction | — | admin role | ok |
 | `auth_invitations.listInvitations` | action | adminAction | — | admin role | ok |
 | `auth_invitations.pruneInvitations` | action | adminAction | — | admin role | ok |

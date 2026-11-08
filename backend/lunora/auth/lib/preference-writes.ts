@@ -36,7 +36,7 @@ export type AiUserPreferencesPatch = Partial<
 >;
 
 /** The `userSettings` columns other modules set. */
-export type UserSettingsPatch = Partial<Pick<Doc<"userSettings">, "dailyBriefEnabled" | "taskEmailEnabled">>;
+export type UserSettingsPatch = Partial<Pick<Doc<"userSettings">, "dailyBriefEnabled" | "setupStepsSkipped" | "taskEmailEnabled">>;
 
 /**
  * Refuse a write to a setting the caller's organization locks. `organizationId`
