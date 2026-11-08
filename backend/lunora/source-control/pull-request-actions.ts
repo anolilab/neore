@@ -40,9 +40,10 @@ export const editPullRequest = authAction
             throw new LunoraError("BAD_REQUEST", "Nothing to change");
         }
 
+        const title = args.title?.trim();
         const token = await resolveGithubToken(ctx, ctx.user.userId);
         const outcome = await writeToHost(DEVELOP_DRIVER, token, async (request) => {
-            await DEVELOP_DRIVER.editPullRequest(request, args, { body: args.body, title: args.title });
+            await DEVELOP_DRIVER.editPullRequest(request, args, { body: args.body, title });
 
             return {};
         });
@@ -65,6 +66,12 @@ export const requestReviewers = authAction
 
         if (args.logins.length === 0 || args.logins.length > maxReviewers) {
             throw new LunoraError("BAD_REQUEST", `Request between 1 and ${String(maxReviewers)} reviewers at a time`);
+        }
+
+        const badLogin = args.logins.find((login) => !DEVELOP_DRIVER.isReviewerLogin(login));
+
+        if (badLogin !== undefined) {
+            throw new LunoraError("BAD_REQUEST", `"${badLogin}" is not a valid login`);
         }
 
         const token = await resolveGithubToken(ctx, ctx.user.userId);

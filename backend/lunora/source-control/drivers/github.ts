@@ -862,15 +862,7 @@ const pullNodeId = async (request: HostRequest, ref: PullRequestRef): Promise<st
         PULL_ID_QUERY,
         repoParts(ref),
         z.object({ repository: z.object({ pullRequest: z.object({ id: z.string() }).nullable() }).nullable() }),
-    ).catch((error: unknown) => {
-        // A lookup is a read made before any change is sent, so its failure leaves the host unchanged. writeToHost counts a 5xx as an
-        // unconfirmed write, which this read is not.
-        if (error instanceof HostApiError && (error.unconfirmed || error.status >= 500)) {
-            throw new HostApiError(error.message, 0);
-        }
-
-        throw error;
-    });
+    );
 
     return pullRequestOf(data.repository).id;
 };
@@ -1639,7 +1631,20 @@ const confirmedOrUnknown = async <T>(mutation: () => Promise<T>): Promise<T> => 
 
 const editedSchema = z.object({ pullRequest: z.object({ body: z.string().nullable(), id: z.string(), title: z.string() }).nullable() }).nullable();
 
+export const BODY_TOO_LONG_REASON = "This description is too long to edit here; edit it on the host.";
+
 const editPullRequest = async (request: HostRequest, ref: PullRequestRef, edit: PullRequestEdit): Promise<void> => {
+    // The title is compared after the host's own trimming, so a stray space does not read as a change the host did not keep.
+    const title = edit.title?.trim();
+
+    // getPullRequest cuts a long description for display, so an edit built on that cut would overwrite the rest. A change
+    // to the description is refused while the host's current one is longer than what is read.
+    const current = edit.body === undefined ? null : await getPullRequest(request, ref);
+
+    if (current?.bodyTruncated === true) {
+        throw new HostApiError("The description is too long to edit", 422, false, { detail: BODY_TOO_LONG_REASON });
+    }
+
     const pullRequestId = await pullNodeId(request, ref);
     const data = await confirmedOrUnknown(
         async () =>
@@ -1647,7 +1652,7 @@ const editPullRequest = async (request: HostRequest, ref: PullRequestRef, edit: 
                 request,
                 PULL_EDIT_MUTATION,
                 // Only the fields the person changed go in the input: a field left out is not sent at all, so it keeps its value.
-                { input: { pullRequestId, ...(edit.title !== undefined && { title: edit.title }), ...(edit.body !== undefined && { body: edit.body }) } },
+                { input: { pullRequestId, ...(title !== undefined && { title }), ...(edit.body !== undefined && { body: edit.body }) } },
                 z.object({ updatePullRequest: editedSchema.optional() }),
                 "/graphql",
                 { untypedMayHaveRun: true },
@@ -1659,15 +1664,17 @@ const editPullRequest = async (request: HostRequest, ref: PullRequestRef, edit: 
     // (line endings aside): a title or description it changed is not a confirmed edit.
     if (
         pull == null ||
-        (edit.title !== undefined && pull.title !== edit.title) ||
+        (title !== undefined && pull.title.trim() !== title) ||
         (edit.body !== undefined && (pull.body ?? "").replaceAll(CRLF, "\n") !== edit.body.replaceAll(CRLF, "\n"))
     ) {
         throw new HostApiError("The host did not confirm the edit", 0, false, { unconfirmed: true });
     }
 };
 
+const isReviewerLogin = (login: string): boolean => LOGIN.test(login);
+
 const requestReviewers = async (request: HostRequest, ref: PullRequestRef, reviewerLogins: string[]): Promise<void> => {
-    if (reviewerLogins.length === 0 || reviewerLogins.length > MAX_REVIEWERS_PER_CALL || reviewerLogins.some((login) => !LOGIN.test(login))) {
+    if (reviewerLogins.length === 0 || reviewerLogins.length > MAX_REVIEWERS_PER_CALL || reviewerLogins.some((login) => !isReviewerLogin(login))) {
         throw new HostApiError("Not a list of logins", 422);
     }
 
@@ -1723,6 +1730,7 @@ export const githubDriver: HostDriver = {
     getMergeStatus,
     getPullRequest,
     headers: { Accept: "application/vnd.github+json", "User-Agent": "neore-chat", "X-GitHub-Api-Version": "2022-11-28" },
+    isReviewerLogin,
     kind: "github",
     listChecks,
     listCommits,

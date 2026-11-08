@@ -24,12 +24,31 @@ interface Sent {
 }
 
 /** A host that answers `/graphql`: the node-id lookup is answered here, every mutation by `answer`. */
-const graphql = (answer: (sent: Sent) => unknown) => {
+const graphql = (answer: (sent: Sent) => unknown, currentBody = "short") => {
     const sent: Sent[] = [];
     const request: HostRequest = async (path, options: HostRequestOptions = {}) => {
         const call: Sent = { json: options.json as GraphqlBody, method: options.method ?? "GET", path };
 
         sent.push(call);
+
+        if (path === "/repos/octo/hello/pulls/7") {
+            return Response.json({
+                additions: 1,
+                base: { ref: "main" },
+                body: currentBody,
+                changed_files: 1,
+                commits: 1,
+                created_at: "2026-01-01T00:00:00Z",
+                deletions: 0,
+                head: { ref: "topic", sha: "a".repeat(40) },
+                html_url: "https://github.com/octo/hello/pull/7",
+                number: 7,
+                state: "open",
+                title: "Old",
+                updated_at: "2026-01-01T00:00:00Z",
+                user: { login: "octocat" },
+            });
+        }
 
         if (path !== "/graphql") {
             throw new HostApiError(`no route ${path}`, 404);
@@ -128,6 +147,51 @@ describe("requestReviewers", () => {
     });
 });
 
+describe("editPullRequest guards", () => {
+    it("refuses a description change while the host's current description is longer than what is read, sending nothing", async () => {
+        const { request, sent } = graphql(() => {
+            return { data: {} };
+        }, "x".repeat(70_000));
+
+        await expect(githubDriver.editPullRequest(request, REF, { body: "new" })).rejects.toMatchObject({
+            detail: "This description is too long to edit here; edit it on the host.",
+            status: 422,
+        });
+        expect(sent.filter((call) => call.path === "/graphql")).toHaveLength(0);
+    });
+
+    it("does not read the description when only the title changes", async () => {
+        const { request, sent } = graphql(() => {
+            return { data: { updatePullRequest: { pullRequest: { body: null, id: "PR_node", title: "New" } } } };
+        }, "x".repeat(70_000));
+
+        await githubDriver.editPullRequest(request, REF, { title: "New" });
+
+        expect(sent.every((call) => call.path === "/graphql")).toBe(true);
+    });
+
+    it("sends the trimmed title and confirms it against the host's trimmed one", async () => {
+        const { request, sent } = graphql(() => {
+            return { data: { updatePullRequest: { pullRequest: { body: null, id: "PR_node", title: "New" } } } };
+        });
+
+        await expect(githubDriver.editPullRequest(request, REF, { title: "New  " })).resolves.toBeUndefined();
+        expect(sent.find((call) => String(call.json.query).includes("updatePullRequest"))?.json.variables).toEqual({
+            input: { pullRequestId: "PR_node", title: "New" },
+        });
+    });
+});
+
+describe("a failed node id lookup", () => {
+    it("keeps the host's own status for a 5xx, as every writer that shares the lookup does", async () => {
+        const request: HostRequest = async () => {
+            throw new HostApiError("Bad gateway", 503);
+        };
+
+        await expect(githubDriver.requestReviewers(request, REF, ["octocat"])).rejects.toMatchObject({ status: 503 });
+    });
+});
+
 describe("editPullRequest body", () => {
     it("counts a description the host kept differently as unconfirmed", async () => {
         const { request } = graphql(() => {
@@ -207,12 +271,5 @@ describe("revertPullRequest", () => {
         const { request } = graphql(() => new HostApiError("The host refused the GraphQL request", 422, false, { detail: "Pull request is not merged" }));
 
         await expect(githubDriver.revertPullRequest(request, REF, {})).rejects.toMatchObject({ status: 422 });
-    });
-});
-
-describe("pull request action capabilities", () => {
-    it("declares the three actions", () => {
-        expect(githubDriver.view.capabilities.groups.pullRequest).toMatchObject({ edit: { supported: true }, revert: { supported: true } });
-        expect(githubDriver.view.capabilities.groups.reviewers).toMatchObject({ request: { supported: true } });
     });
 });

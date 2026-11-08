@@ -69,6 +69,8 @@ export interface HostDriver {
     getPullRequest: (request: HostRequest, ref: PullRequestRef) => Promise<PullRequestDetail>;
     /** The request headers the host's API wants, besides the token. */
     readonly headers: Record<string, string>;
+    /** Whether `login` has the shape of a reviewer login on this host (not whether the account exists). */
+    isReviewerLogin: (login: string) => boolean;
     readonly kind: HostKind;
     /** One bounded page of the head's checks, or up to `maxPages` of them (`CheckSummary.total` says how many there are). */
     listChecks: (request: HostRequest, ref: PullRequestRef, headSha: string, maxPages?: number) => Promise<CheckSummary>;
