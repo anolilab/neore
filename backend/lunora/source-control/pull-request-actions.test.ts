@@ -74,6 +74,7 @@ describe("pull request actions refuse before reading a token", () => {
     it("an edit that changes nothing", async () => {
         await expect(call(editPullRequest, {})).rejects.toThrow("Nothing to change");
         await expect(call(editPullRequest, { title: " ".repeat(3) })).rejects.toThrow("A title cannot be empty");
+        await expect(call(editPullRequest, { title: "x".repeat(257) })).rejects.toThrow("at most 256 characters");
         expect(resolveToken).not.toHaveBeenCalled();
     });
 
@@ -96,5 +97,9 @@ describe("a valid request", () => {
     it("reads the token and reports a missing connection instead of calling the host", async () => {
         await expect(call(requestReviewers, { logins: ["octocat"] })).resolves.toMatchObject({ status: "not_connected" });
         expect(resolveToken).toHaveBeenCalledTimes(1);
+    });
+
+    it("lets a full-length title with trailing spaces through, since it is sent trimmed", async () => {
+        await expect(call(editPullRequest, { title: `${"x".repeat(256)}  ` })).resolves.toMatchObject({ status: "not_connected" });
     });
 });

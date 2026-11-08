@@ -23,8 +23,14 @@ const vRef = {
     repository: v.string().max(MAX_LENGTH.short),
 };
 
-/** A title the host accepts is at most 256 characters, so a longer one is refused here, before any token is read or host call is made. */
-const vTitle = v.string().max(256);
+/**
+ * A title the host accepts is at most 256 characters once trimmed (it is sent trimmed), so a longer one is refused here,
+ * before any token is read or host call is made. The untrimmed input is bounded too.
+ */
+const vTitle = v
+    .string()
+    .max(MAX_LENGTH.short)
+    .check((value) => value.trim().length <= 256, { message: "A title is at most 256 characters" });
 // GitHub's limit on a description (65,536 characters); the host refuses a longer one, so the check is here too.
 const vBody = v.string().max(65_536);
 
