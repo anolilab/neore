@@ -22810,6 +22810,9 @@
                       "linkToken": {
                         "type": "string"
                       },
+                      "requestId": {
+                        "type": "string"
+                      },
                       "text": {
                         "type": "string"
                       }

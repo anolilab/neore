@@ -449,7 +449,7 @@ export interface InternalApiTypes {
             continueGuestLinkRemoval: FunctionReference<"mutation", { before: number; threadId: Id<"threads"> }, null>;
             dropGuestLinkRoutesJob: FunctionReference<"mutation", { attempt: number; linkHashes: Array<string> }, null>;
             getGuestLinkOwner: FunctionReference<"query", { linkHash: string }, string | null>;
-            holdGuestMessage: FunctionReference<"mutation", { freshGuestHash: string; linkHash: string; presentedGuestHash?: string; text: string }, { messageId: string; minted: boolean; ok: true } | { ok: false; reason: "closed" | "full" | "invalid" | "limited" | "other_browser" | "unsendable" }>;
+            holdGuestMessage: FunctionReference<"mutation", { freshGuestHash: string; linkHash: string; presentedGuestHash?: string; requestHash?: string; requestKey?: string; text: string }, { messageId: string; minted: boolean; ok: true } | { duplicate: true; minted: boolean; ok: true } | { ok: false; reason: "closed" | "full" | "invalid" | "limited" | "other_browser" | "request_reused" | "unsendable" }>;
             isBoundGuest: FunctionReference<"query", { guestHash: string; linkHash: string }, boolean>;
             listGuestLinksForExport: FunctionReference<"query", { cursor: string | null; threadId: Id<"threads"> }, { continueCursor: string | null; isDone: boolean; page: Array<{ createdAt: number; expiresAt: number }> }>;
             listGuestNotesForExport: FunctionReference<"query", { cursor: string | null; threadId: Id<"threads"> }, { continueCursor: string | null; isDone: boolean; page: Array<{ createdAt: number; status: "held" | "sent"; text: string }> }>;

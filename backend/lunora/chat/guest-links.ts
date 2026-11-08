@@ -20,6 +20,7 @@ import { internal } from "../_generated/internal";
 import { internalMutation, internalQuery, type MutationCtx } from "../_generated/server";
 import { refuseHostThread } from "../acp/lib/host-thread";
 import { requireOwnedThread, requireOwnedThreadIgnoringLock } from "../agent/thread-read-access";
+import { claimOnce, GUEST_POST_CLAIM_TTL_MS, GUEST_POST_SCOPE, hasClaim } from "../lib/claim-once";
 import { timingSafeEqual } from "../lib/crypto";
 import { callOnShard } from "../lib/cross-shard";
 import { authMutation, authQuery, publicAction, rateLimit } from "../lib/crpc";
@@ -64,6 +65,8 @@ const vGuestMessageStatus = v.union(v.literal("held"), v.literal("sent"));
 
 const vHoldOutcome = v.union(
     v.object({ messageId: v.string(), minted: v.boolean(), ok: v.literal(true) }),
+    // A retry of a post the shard already wrote: answered as accepted, with no second note and no second charge.
+    v.object({ duplicate: v.literal(true), minted: v.boolean(), ok: v.literal(true) }),
     v.object({
         ok: v.literal(false),
         reason: v.union(
@@ -72,6 +75,7 @@ const vHoldOutcome = v.union(
             v.literal("invalid"),
             v.literal("limited"),
             v.literal("other_browser"),
+            v.literal("request_reused"),
             v.literal("unsendable"),
         ),
     }),
@@ -81,6 +85,12 @@ const vGuestView = v.object({
     expiresAt: v.number(),
     messages: v.array(v.object({ createdAt: v.number(), status: vGuestMessageStatus, text: v.string() })),
 });
+
+/** The shape `newGuestToken` mints: 64 lowercase hex characters. A browser naming its own token must use it. */
+const GUEST_TOKEN_SHAPE = /^[0-9a-f]{64}$/u;
+
+/** A request id the browser picks for one post: 8 to 64 letters, digits or dashes. */
+const REQUEST_ID_SHAPE = /^[A-Za-z0-9-]{8,64}$/u;
 
 const tooLong = (token: string): boolean => token.length === 0 || token.length > GUEST_TOKEN_MAX_LENGTH;
 
@@ -220,16 +230,27 @@ export const getGuestLink = authQuery
 /**
  * Leaves a message on the link. The first post binds the link to this browser and returns its token, once;
  * the browser keeps it and presents it on every later call. Unknown, lapsed and withdrawn links answer alike.
+ *
+ * A browser may name its token before the first post, so a retry of a first post whose reply was lost still binds. The
+ * server checks only its shape: the client must draw it from `crypto.getRandomValues` (32 bytes, as hex), keep it per
+ * link, and never derive it from the link token, or whoever holds the link could post and read as the guest.
  */
 export const postGuestMessage = publicAction
     .input({
         guestToken: v.optional(v.string().max(MAX_LENGTH.short)),
         linkToken: v.string().max(MAX_LENGTH.short),
+        // The browser's id for this one post, reused by its retry after a lost reply: the same id and text write one note.
+        requestId: v.optional(
+            v
+                .string()
+                .max(MAX_LENGTH.short)
+                .check((value) => REQUEST_ID_SHAPE.test(value), { message: "Invalid request id" }),
+        ),
         text: v.string().max(MAX_LENGTH.long),
     })
     .use(rateLimit("guest/message"))
     .output(v.object({ guestToken: v.optional(v.string()) }))
-    .action(async ({ args: { guestToken, linkToken, text }, ctx: context }): Promise<{ guestToken?: string }> => {
+    .action(async ({ args: { guestToken, linkToken, requestId, text }, ctx: context }): Promise<{ guestToken?: string }> => {
         const notActive = new LunoraError("NOT_FOUND", "This link is not active.");
 
         if (tooLong(linkToken) || (guestToken !== undefined && tooLong(guestToken))) {
@@ -257,13 +278,17 @@ export const postGuestMessage = publicAction
 
         // The per-link limit is charged on the owner's shard, after the browser check (`holdGuestMessage`):
         // charged here, posts refused as another browser's would use up the bound guest's allowance.
-        const fresh = newGuestToken();
+        // A browser may name the token it keeps before its first post, so a retry after a lost reply carries the token the
+        // link was bound to. Only a token of the minted shape is taken; anything else gets a minted one.
+        const fresh = guestToken !== undefined && GUEST_TOKEN_SHAPE.test(guestToken) ? guestToken : newGuestToken();
         const outcome = await callOnShard(
             internal.chat.guest_links.holdGuestMessage,
             {
                 freshGuestHash: await hashGuestToken(fresh),
                 linkHash,
                 presentedGuestHash: guestToken === undefined ? undefined : await hashGuestToken(guestToken),
+                requestHash: requestId === undefined ? undefined : await hashGuestToken(`${requestId}\n${clean}`),
+                requestKey: requestId === undefined ? undefined : await hashGuestToken(requestId),
                 text: clean,
             },
             { shardKey: ownerId },
@@ -282,6 +307,9 @@ export const postGuestMessage = publicAction
                 }
                 case "other_browser": {
                     throw new LunoraError("FORBIDDEN", "This link is already in use in another browser.");
+                }
+                case "request_reused": {
+                    throw new LunoraError("BAD_REQUEST", "That request id was already used for a different message.");
                 }
                 case "unsendable": {
                     throw new LunoraError("BAD_REQUEST", unsendableGuestText(text) ?? "This message cannot be left.");
@@ -348,10 +376,12 @@ export const holdGuestMessage = internalMutation
         freshGuestHash: v.string().max(MAX_LENGTH.short),
         linkHash: v.string().max(MAX_LENGTH.short),
         presentedGuestHash: v.optional(v.string().max(MAX_LENGTH.short)),
+        requestHash: v.optional(v.string().max(MAX_LENGTH.short)),
+        requestKey: v.optional(v.string().max(MAX_LENGTH.short)),
         text: v.string().max(MAX_LENGTH.long),
     })
     .output(vHoldOutcome)
-    .mutation(async ({ args: { freshGuestHash, linkHash, presentedGuestHash, text }, ctx }) => {
+    .mutation(async ({ args: { freshGuestHash, linkHash, presentedGuestHash, requestHash, requestKey, text }, ctx }) => {
         const closed = { ok: false, reason: "closed" } as const;
         const link = await ctx.db
             .query("threadGuestLinks")
@@ -393,6 +423,17 @@ export const holdGuestMessage = internalMutation
             return { ok: false, reason: "other_browser" } as const;
         }
 
+        // A request id names one post. Its retry with the same text is answered without a second note or a second charge; the
+        // same id with other text is refused, since it would otherwise write a second note under an id the browser already used.
+        const requestClaim = requestKey === undefined ? undefined : `${link._id}:${requestKey}`;
+        const textClaim = requestClaim === undefined || requestHash === undefined ? undefined : `${link._id}:${requestHash}`;
+
+        if (requestClaim !== undefined && textClaim !== undefined && (await hasClaim(ctx, GUEST_POST_SCOPE, requestClaim))) {
+            return (await hasClaim(ctx, GUEST_POST_SCOPE, textClaim))
+                ? ({ duplicate: true, minted, ok: true } as const)
+                : ({ ok: false, reason: "request_reused" } as const);
+        }
+
         const rows = await ctx.db
             .query("threadGuestMessages")
             .withIndex("by_link", (q) => q.eq("linkId", link._id))
@@ -422,6 +463,11 @@ export const holdGuestMessage = internalMutation
             threadId: link.threadId,
             userId: link.userId,
         });
+
+        if (requestClaim !== undefined && textClaim !== undefined) {
+            await claimOnce(ctx, GUEST_POST_SCOPE, requestClaim, GUEST_POST_CLAIM_TTL_MS, link.userId);
+            await claimOnce(ctx, GUEST_POST_SCOPE, textClaim, GUEST_POST_CLAIM_TTL_MS, link.userId);
+        }
 
         return { messageId: messageId as string, minted, ok: true } as const;
     });
