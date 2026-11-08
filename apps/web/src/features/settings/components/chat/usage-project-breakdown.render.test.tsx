@@ -28,7 +28,10 @@ vi.mock("@/features/settings/hooks/use-usage-today", () => {
     };
 });
 
-vi.mock("@/lib/lunora/crpc", () => {
+vi.mock("@/lib/lunora/crpc", async () => {
+    // A query still waiting for its day reads nothing, as `skipToken` does in the app.
+    const { skipToken } = await vi.importActual<typeof import("@tanstack/react-query")>("@tanstack/react-query");
+
     return {
         useCRPC: () => {
             return {
@@ -37,16 +40,19 @@ vi.mock("@/lib/lunora/crpc", () => {
                         getProjectBreakdown: {
                             queryOptions: (args: unknown) => {
                                 return {
-                                    queryFn: async () => {
-                                        breakdownReads.count += 1;
+                                    queryFn:
+                                        args === skipToken
+                                            ? skipToken
+                                            : async () => {
+                                                  breakdownReads.count += 1;
 
-                                        return {
-                                            noProject: { costMicrodollars: 7, replies: 1, tokens: 1 },
-                                            projects: [{ costMicrodollars: 140, projectKey: "p", replies: 2, title: "Alpha", tokens: 2 }],
-                                            total: { costMicrodollars: 147, replies: 3, tokens: 3 },
-                                            truncated: false,
-                                        };
-                                    },
+                                                  return {
+                                                      noProject: { costMicrodollars: 7, replies: 1, tokens: 1 },
+                                                      projects: [{ costMicrodollars: 140, projectKey: "p", replies: 2, title: "Alpha", tokens: 2 }],
+                                                      total: { costMicrodollars: 147, replies: 3, tokens: 3 },
+                                                      truncated: false,
+                                                  };
+                                              },
                                     queryKey: ["breakdown", args],
                                 };
                             },
@@ -84,6 +90,7 @@ describe("UsageProjectBreakdown", () => {
 
     it("shows an error, not a period in the wrong zone, when the time zone setting fails to load", async () => {
         usageDay.failed = true;
+        breakdownReads.count = 0;
 
         try {
             render(<UsageProjectBreakdown backfilling={false} days={30} />, { wrapper });
@@ -92,6 +99,8 @@ describe("UsageProjectBreakdown", () => {
             const alert = await screen.findByRole("alert");
 
             expect(alert.textContent).toBe("Could not load the project breakdown.");
+            // The breakdown waits for the zone, so a failed settings load reads no usage at all.
+            expect(breakdownReads.count).toBe(0);
             expect(screen.queryByRole("status")).toBeNull();
             expect(screen.queryByText("Alpha")).toBeNull();
         } finally {
