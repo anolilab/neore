@@ -445,6 +445,13 @@ export interface InternalApiTypes {
                 markSpeakerMessages: FunctionReference<"mutation", { agentName: string; messageIds: Array<string>; skillId: string; threadId: string; userId: string }, null>;
             };
         };
+        guest_links: {
+            continueGuestLinkRemoval: FunctionReference<"mutation", { before: number; threadId: Id<"threads"> }, null>;
+            dropGuestLinkRoutesJob: FunctionReference<"mutation", { attempt: number; linkHashes: Array<string> }, null>;
+            listGuestLinksForExport: FunctionReference<"query", { cursor: string | null; threadId: Id<"threads"> }, { continueCursor: string | null; isDone: boolean; page: Array<{ createdAt: number; expiresAt: number }> }>;
+            listGuestNotesForExport: FunctionReference<"query", { cursor: string | null; threadId: Id<"threads"> }, { continueCursor: string | null; isDone: boolean; page: Array<{ createdAt: number; status: "held" | "sent"; text: string }> }>;
+            sweepGuestLinks: FunctionReference<"mutation", {}, null>;
+        };
         mcp_registry: {
             fetchMcpRegistryPage: FunctionReference<"action", { cursor: string | null; search: string | null }, { nextCursor?: string; servers: Array<{ description: string; icon?: string; id: string; remotes: Array<{ headers: Array<{ choices?: Array<string>; description?: string; isRequired: boolean; isSecret: boolean; name: string; placeholder?: string; value?: string }>; protocol: "http" | "sse"; url: string; variables: Array<{ choices?: Array<string>; description?: string; isRequired: boolean; isSecret: boolean; name: string; placeholder?: string; value?: string }> }>; repositoryUrl?: string; title: string; version: string; websiteUrl?: string }> }>;
         };
@@ -699,7 +706,7 @@ export interface InternalApiTypes {
         };
         steps: {
             collectActivityForExport: FunctionReference<"query", { userId: string }, { knowledgeCollections: Array<unknown>; subAgentRuns: Array<unknown>; usageDaily: Array<unknown> }>;
-            collectConversations: FunctionReference<"action", { userId: string }, { contextSummaries: { coveredCount: number; coveredUpToMessageId: string; createdAt: number; kind?: "compact"; summary: string; }[]; messages: { _id: string; createdAt: number; model?: string; order?: number; parentMessageId?: string; role?: string; status?: string; stepOrder?: number; text?: string; tool?: boolean; }[]; thread: { _id: string; activeLeafMessageId?: string; category?: string; createdAt: number; model?: string; summary?: string; tags?: string[]; title?: string; updatedAt?: number; userTags: string[]; }; }[]>;
+            collectConversations: FunctionReference<"action", { userId: string }, { contextSummaries: { coveredCount: number; coveredUpToMessageId: string; createdAt: number; kind?: "compact"; summary: string; }[]; guestLinks: { createdAt: number; expiresAt: number; }[]; guestNotes: { createdAt: number; status: string; text: string; }[]; messages: { _id: string; createdAt: number; model?: string; order?: number; parentMessageId?: string; role?: string; status?: string; stepOrder?: number; text?: string; tool?: boolean; }[]; thread: { _id: string; activeLeafMessageId?: string; category?: string; createdAt: number; model?: string; summary?: string; tags?: string[]; title?: string; updatedAt?: number; userTags: string[]; }; }[]>;
             collectFiles: FunctionReference<"query", { userId: string }, { files: Array<{ _id: Id<"files">; createdAt: number; name: string; size: number; tags?: Array<string>; type: string; updatedAt: number }>; folders: Array<{ _id: Id<"folders">; createdAt: number; name: string; updatedAt: number }> }>;
             collectProfile: FunctionReference<"query", { userId: string }, { createdAt: number; email: string; emailVerified: boolean; id: string; image: string; name: string } | null>;
             collectPrompts: FunctionReference<"query", { userId: string }, { promptHistory: { _id: Id<"promptHistory">; changeType: string; content: string; createdAt: number; promptId: Id<"prompts">; version: number; }[]; prompts: { _id: Id<"prompts">; content: string; createdAt: number; description: string | undefined; isFavorite: boolean | undefined; lastUsedAt: number | undefined; name: string; tags: string[] | undefined; updatedAt: number | undefined; usageCount: number | undefined; }[]; }>;
@@ -863,7 +870,7 @@ export interface InternalApiTypes {
             runShardTick: FunctionReference<"mutation", {}, null>;
         };
         shard_routes: {
-            getRouteOwner: FunctionReference<"query", { kind: "device" | "messenger" | "page-public" | "thread-public" | "thread-share" | "trigger" | "watch"; value: string }, string | null>;
+            getRouteOwner: FunctionReference<"query", { kind: "device" | "guest-link" | "messenger" | "page-public" | "thread-public" | "thread-share" | "trigger" | "watch"; value: string }, string | null>;
         };
         storage_cleanup: {
             deleteObjects: FunctionReference<"action", { keys: Array<string> }, void>;
@@ -1703,6 +1710,13 @@ export const internal: InternalApiTypes = {
                 isGroupStopRequested: { __lunoraRef: "chat_group_functions:isGroupStopRequested" },
                 markSpeakerMessages: { __lunoraRef: "chat_group_functions:markSpeakerMessages" },
             },
+        },
+        guest_links: {
+            continueGuestLinkRemoval: { __lunoraRef: "chat_guest_links:continueGuestLinkRemoval" },
+            dropGuestLinkRoutesJob: { __lunoraRef: "chat_guest_links:dropGuestLinkRoutesJob" },
+            listGuestLinksForExport: { __lunoraRef: "chat_guest_links:listGuestLinksForExport" },
+            listGuestNotesForExport: { __lunoraRef: "chat_guest_links:listGuestNotesForExport" },
+            sweepGuestLinks: { __lunoraRef: "chat_guest_links:sweepGuestLinks" },
         },
         mcp_registry: {
             fetchMcpRegistryPage: { __lunoraRef: "chat_mcp_registry:fetchMcpRegistryPage" },

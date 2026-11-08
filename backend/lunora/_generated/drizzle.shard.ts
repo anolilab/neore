@@ -1522,6 +1522,37 @@ export const threadGoals = sqliteTable("threadGoals", {
     by_status_and_updatedAt: index("by_status_and_updatedAt").on(t.status, t.updatedAt),
 }));
 
+export const threadGuestLinks = sqliteTable("threadGuestLinks", {
+    _id: text("_id").primaryKey(),
+    _creationTime: integer("_creationTime").notNull(),
+    createdAt: real("createdAt").notNull(),
+    expiresAt: real("expiresAt").notNull(),
+    guestHash: text("guestHash"),
+    linkHash: text("linkHash").notNull(),
+    threadId: text("threadId").references((): AnySQLiteColumn => threads._id).notNull(),
+    userId: text("userId").notNull(),
+}, (t) => ({
+    by_thread_expiresAt: index("by_thread_expiresAt").on(t.threadId, t.expiresAt),
+    by_linkHash: index("by_linkHash").on(t.linkHash),
+    by_expiresAt: index("by_expiresAt").on(t.expiresAt),
+    by_userId: index("by_userId").on(t.userId),
+}));
+
+export const threadGuestMessages = sqliteTable("threadGuestMessages", {
+    _id: text("_id").primaryKey(),
+    _creationTime: integer("_creationTime").notNull(),
+    createdAt: real("createdAt").notNull(),
+    linkId: text("linkId").references((): AnySQLiteColumn => threadGuestLinks._id).notNull(),
+    status: text("status", { mode: "json" }).$type<"held" | "sent">().notNull(),
+    text: text("text").notNull(),
+    threadId: text("threadId").references((): AnySQLiteColumn => threads._id).notNull(),
+    userId: text("userId").notNull(),
+}, (t) => ({
+    by_link: index("by_link").on(t.linkId),
+    by_thread: index("by_thread").on(t.threadId),
+    by_userId: index("by_userId").on(t.userId),
+}));
+
 export const threadKnowledge = sqliteTable("threadKnowledge", {
     _id: text("_id").primaryKey(),
     _creationTime: integer("_creationTime").notNull(),

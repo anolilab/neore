@@ -2890,6 +2890,43 @@ export const schema = defineSchema({
                 thread: r.one("threads", { field: "threadId" }),
             };
         }),
+    /**
+     * A guest link for one thread (`chat/guest-links.ts`): what a person without access can use to LEAVE a
+     * message for the owner. It grants no read of the thread. Only the SHA-256 of the link token is stored
+     * (the owner sees the token once, at creation), and `guestHash` is the hash of the one browser's token
+     * that first posted. It lasts 24 hours; revoking, archiving or deleting the thread removes it with its
+     * held messages. Routed from `shardRoutes` (`guest-link`) so an anonymous request finds the owner's shard.
+     */
+    threadGuestLinks: defineTable({
+        createdAt: v.number(),
+        expiresAt: v.number(),
+        guestHash: v.optional(v.string()),
+        linkHash: v.string(),
+        threadId: v.id("threads"),
+        userId: v.string(),
+    })
+        .shardBy("userId")
+        .index("by_thread_expiresAt", ["threadId", "expiresAt"])
+        .index("by_linkHash", ["linkHash"])
+        .index("by_expiresAt", ["expiresAt"])
+        .index("by_userId", ["userId"]),
+    /**
+     * A message a guest left through a link. UNTRUSTED text that waits here: nothing reads it into a model,
+     * a title or a summary. Only the owner's Send hands it to the owner's own client, which sends it through
+     * the ordinary path; `sent` records that, so the guest sees it was taken up. Dismiss deletes the row.
+     */
+    threadGuestMessages: defineTable({
+        createdAt: v.number(),
+        linkId: v.id("threadGuestLinks"),
+        status: v.union(v.literal("held"), v.literal("sent")),
+        text: v.string(),
+        threadId: v.id("threads"),
+        userId: v.string(),
+    })
+        .shardBy("userId")
+        .index("by_link", ["linkId"])
+        .index("by_thread", ["threadId"])
+        .index("by_userId", ["userId"]),
     threadInvites: defineTable({
         acceptedAt: v.optional(v.number()),
         acceptedBy: v.optional(v.string()),

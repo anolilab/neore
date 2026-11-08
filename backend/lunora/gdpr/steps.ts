@@ -183,6 +183,24 @@ export const collectThreadTags = internalQuery
         });
     });
 
+/** Every row of a paged export read: the pages one after another until the last. */
+const readAllPages = async <T>(readPage: (cursor: string | null) => Promise<{ continueCursor: string | null; isDone: boolean; page: T[] }>): Promise<T[]> => {
+    const rows: T[] = [];
+    let cursor: string | null = null;
+
+    for (;;) {
+        const result = await readPage(cursor);
+
+        rows.push(...result.page);
+
+        if (result.isDone) {
+            return rows;
+        }
+
+        cursor = result.continueCursor;
+    }
+};
+
 export const collectConversations = internalAction.input({ userId: v.string() }).action(async ({ args: { userId }, ctx: context }) => {
     // OPTIMIZED: Use paginated approach to handle large datasets safely
     // Process threads in batches to prevent memory exhaustion and timeouts
@@ -197,6 +215,10 @@ export const collectConversations = internalAction.input({ userId: v.string() })
     const conversations: {
         /** The condensed copies of the thread's older turns made while it sat idle (`agent/thread-summaries.ts`). */
         contextSummaries: { coveredCount: number; coveredUpToMessageId: string; createdAt: number; kind?: "compact"; summary: string }[];
+        /** The thread's guest links, with or without notes: when each was made and when it lapses. */
+        guestLinks: { createdAt: number; expiresAt: number }[];
+        /** The notes strangers left through the thread's guest link, held and sent (`chat/guest-links.ts`). */
+        guestNotes: { createdAt: number; status: string; text: string }[];
         messages: {
             _id: string;
             createdAt: number;
@@ -243,6 +265,8 @@ export const collectConversations = internalAction.input({ userId: v.string() })
 
         // Process current batch of threads
         for (const listed of threads.page) {
+            let collected: Omit<(typeof conversations)[number], "guestLinks" | "guestNotes"> | undefined;
+
             try {
                 // A locked chat is listed as its stub (no title, no model, no tags). The export
                 // is the owner's own data-access right, not a view into the chat, so it reads the
@@ -287,9 +311,25 @@ export const collectConversations = internalAction.input({ userId: v.string() })
                     threadId: thread._id as Id<"threads">,
                 });
 
-                conversations.push({ contextSummaries, messages, thread: projectThread(thread, tagNames) });
+                collected = { contextSummaries, messages, thread: projectThread(thread, tagNames) };
             } catch (error) {
                 gdprLogger.error(`Failed to collect messages for thread ${listed._id}:`, error);
+            }
+
+            // Outside the catch above: a failed guest-link or guest-note read fails this export step (the workflow retries it), instead of
+            // shipping an export that silently lacks the notes of a thread it did collect.
+            if (collected) {
+                const threadId = listed._id as Id<"threads">;
+                const guestLinks = await readAllPages(
+                    async (cursor) => await context.runQuery(internal.chat.guest_links.listGuestLinksForExport, { cursor, threadId }),
+                );
+                // A link goes only once its notes have (`deleteGuestLink`), so a thread with no links has no notes to read.
+                const guestNotes =
+                    guestLinks.length === 0
+                        ? []
+                        : await readAllPages(async (cursor) => await context.runQuery(internal.chat.guest_links.listGuestNotesForExport, { cursor, threadId }));
+
+                conversations.push({ ...collected, guestLinks, guestNotes });
             }
         }
 

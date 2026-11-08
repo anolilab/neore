@@ -7,6 +7,7 @@ import { internalAction, internalMutation, internalQuery, type MutationCtx as Mu
 import { query } from "../lib/crpc";
 import { getAuthUserIdentity } from "../auth";
 import { dropQueuedSteersForThread } from "../chat/lib/steer-cleanup";
+import { revokeGuestLinksForThread, withdrawGuestLinksForThread } from "../chat/lib/guest-link-store";
 import { deleteThreadSecrets } from "../chat/lib/secret-requests";
 import { deleteToolApprovalRunsForThread } from "../chat/lib/tool-approval-cleanup";
 import { deleteGoalsForThread, endActiveGoals, hasLiveStream } from "../chat/goals/rows";
@@ -331,6 +332,8 @@ export const markThreadArchived = async (context: MutationContext, threadId: Id<
         status: "archived",
         updatedAt: context.now,
     });
+    // A guest link is for a thread in use: archiving withdraws it and what guests left on it.
+    await withdrawGuestLinksForThread(context, threadId);
 };
 
 export const archiveThread = internalMutation
@@ -519,8 +522,14 @@ async function deletePageForThreadIdHandler(context: MutationContext, args: Dele
             return { cursor: messages.continueCursor, isDone: false };
         }
 
+        // The thread's guest links and their notes, one batch per call as the file links above;
+        // their routes go in a job that runs once the page commits.
+        if (!(await revokeGuestLinksForThread(context, args.threadId))) {
+            return { cursor: messages.continueCursor, isDone: false };
+        }
+
         // Steered messages still waiting on a run of this thread have nobody left to take them.
-        // Here, not above the link batches: this page re-runs once per batch of links.
+        // Here, after every batched removal (file links, guest links): this page re-runs once per batch.
         await dropQueuedSteersForThread(context, args.threadId);
 
         const thread = await context.db.get("threads", args.threadId);
@@ -752,6 +761,7 @@ export const softDeleteThread = internalMutation
         // A coding agent's turn does not outlive the thread it writes into, nor does a goal.
         await endHostThread(ctx, oldThread, ctx.now);
         await endActiveGoals(ctx, args.threadId, "user");
+        await withdrawGuestLinksForThread(ctx, args.threadId);
         const newThread = (await ctx.db.get("threads", args.threadId))!;
 
         // Remove from aggregates when soft deleted
@@ -1220,6 +1230,9 @@ export const createTemporaryThread = internalMutation
         if (thread) {
             await ctx.db.patch("threads", args.threadId, { isTemporary: true });
         }
+
+        // A temporary chat takes no guest posts: a link already given out is withdrawn with its notes, as archiving does.
+        await withdrawGuestLinksForThread(ctx, args.threadId);
 
         return null;
     });
