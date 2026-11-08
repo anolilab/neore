@@ -375,7 +375,7 @@ msgstr "{0, plural, other {再显示 # 个视频}}"
 #. placeholder {0}: unsupportedParams.length
 #. placeholder {1}: unsupportedParams.join(", ")
 #: src/routes/(chat)/chat/$threadId.tsx:86
-#: src/routes/(chat)/chat/index.tsx:202
+#: src/routes/(chat)/chat/index.tsx:201
 msgid "{0, plural, one {Unsupported query parameter} other {Unsupported query parameters}}: {1}"
 msgstr "{0, plural, other {不支持的查询参数}}：{1}"
 
@@ -3891,7 +3891,7 @@ msgstr "助手（无技能）"
 msgid "Assistant replied:"
 msgstr "助手回复："
 
-#: src/features/chat/thread/message-item.tsx:208
+#: src/features/chat/thread/message-item.tsx:209
 #: src/features/chat/thread/streaming-placeholder.tsx:757
 #: src/features/chat/thread/streaming-placeholder.tsx:795
 msgid "Assistant Reply:"
@@ -7649,7 +7649,7 @@ msgstr "已复制到剪贴板"
 
 #: src/components/copy-button.tsx:50
 #: src/features/auth/components/settings/two-factor/backup-codes-dialog.tsx:95
-#: src/features/chat/thread/message-item.tsx:356
+#: src/features/chat/thread/message-item.tsx:357
 #: src/features/prompts/components/prompt-item.tsx:261
 msgid "Copied!"
 msgstr "已复制！"
@@ -7659,7 +7659,7 @@ msgstr "已复制！"
 #: src/features/auth/components/settings/api-key/mcp-config-snippet.tsx:30
 #: src/features/auth/components/settings/two-factor/backup-codes-dialog.tsx:100
 #: src/features/chat/sharing/thread-share-button.tsx:366
-#: src/features/chat/thread/message-item.tsx:356
+#: src/features/chat/thread/message-item.tsx:357
 #: src/features/chat/thread/text-selection-menu.tsx:525
 #: src/features/settings/components/chat/trigger-settings.tsx:766
 #: src/features/skills/components/bundle-import-dialog.tsx:207
@@ -7676,7 +7676,7 @@ msgstr ""
 msgid "Copy as Markdown"
 msgstr "复制为 Markdown"
 
-#: src/features/chat/thread/message-item.tsx:373
+#: src/features/chat/thread/message-item.tsx:374
 msgid "Copy as plain text"
 msgstr ""
 
@@ -7717,6 +7717,11 @@ msgstr "复制对象"
 #: src/features/prompts/components/prompt-item.tsx:266
 msgid "Copy Prompt"
 msgstr "复制提示词"
+
+#: src/features/chat/thread/copy-prompt-link-action.tsx:75
+#: src/features/chat/thread/copy-prompt-link-action.tsx:75
+msgid "Copy prompt link"
+msgstr ""
 
 #: src/features/pages/components/page-share-dialog.tsx:76
 msgid "Copy public link"
@@ -7948,6 +7953,10 @@ msgstr "无法自动复制。邀请链接：{inviteLink}"
 #: src/features/chat/sharing/thread-share-button.tsx:164
 msgid "Could not copy automatically. Public link: {publicLink}"
 msgstr "无法自动复制。公开链接：{publicLink}"
+
+#: src/features/chat/thread/copy-prompt-link-action.tsx:66
+msgid "Could not copy the prompt link. Your browser did not allow access to the clipboard."
+msgstr ""
 
 #: src/features/settings/components/chat/trigger-settings.tsx:640
 #: src/features/skills/components/bundle-import-dialog.tsx:188
@@ -10289,7 +10298,7 @@ msgstr "下载模型"
 msgid "Download as CSV"
 msgstr "下载为 CSV"
 
-#: src/features/chat/thread/message-item.tsx:377
+#: src/features/chat/thread/message-item.tsx:378
 msgid "Download as Markdown"
 msgstr "下载为 Markdown"
 
@@ -10681,7 +10690,7 @@ msgstr "边缘引导生成"
 #: src/features/chat/host/host-composer.tsx:890
 #: src/features/chat/thread-list/group-header.tsx:145
 #: src/features/chat/thread/composer-text-attachment-editor.tsx:799
-#: src/features/chat/thread/message-item.tsx:396
+#: src/features/chat/thread/message-item.tsx:397
 #: src/features/develop/components/draft-comment-card.tsx:51
 #: src/features/pages/components/page-version-panel.tsx:50
 #: src/features/prompts/components/prompt-item.tsx:212
@@ -13978,7 +13987,7 @@ msgstr "复刻"
 msgid "Fork {0} to edit a copy"
 msgstr "复刻 {0} 以编辑副本"
 
-#: src/features/chat/thread/message-item.tsx:406
+#: src/features/chat/thread/message-item.tsx:409
 msgid "Fork conversation"
 msgstr "复刻对话"
 
@@ -14494,7 +14503,7 @@ msgstr "根据描述生成"
 msgid "Generate ideas for a creative writing story"
 msgstr "为创意写作故事构思点子"
 
-#: src/features/chat/thread/message-item.tsx:425
+#: src/features/chat/thread/message-item.tsx:428
 msgid "Generate image"
 msgstr "生成图像"
 
@@ -14520,7 +14529,7 @@ msgstr "生成随机种子"
 msgid "Generate unique business ideas for 2025"
 msgstr "为 2025 年构思独特的商业点子"
 
-#: src/features/chat/thread/message-item.tsx:435
+#: src/features/chat/thread/message-item.tsx:438
 msgid "Generate video"
 msgstr "生成视频"
 
@@ -14533,7 +14542,7 @@ msgstr "生成视频"
 msgid "Generate videos from text or images"
 msgstr "根据文本或图像生成视频"
 
-#: src/features/chat/thread/message-item.tsx:445
+#: src/features/chat/thread/message-item.tsx:448
 msgid "Generate voice"
 msgstr "生成语音"
 
@@ -16664,7 +16673,7 @@ msgstr "密码无效"
 msgid "Invalid password. Please try again."
 msgstr "密码无效，请重试。"
 
-#: src/routes/(chat)/chat/index.tsx:165
+#: src/routes/(chat)/chat/index.tsx:164
 msgid "Invalid thread ID"
 msgstr "对话 ID 无效"
 
@@ -19702,7 +19711,7 @@ msgstr ""
 msgid "More actions for {0}"
 msgstr ""
 
-#: src/features/chat/thread/message-item.tsx:365
+#: src/features/chat/thread/message-item.tsx:366
 msgid "More copy options"
 msgstr ""
 
@@ -23588,7 +23597,7 @@ msgstr "置顶记忆"
 
 #: ../../packages/chat-ui/src/chat/message-item.tsx:144
 #: ../../packages/chat-ui/src/chat/message-item.tsx:193
-#: src/features/chat/thread/message-item.tsx:384
+#: src/features/chat/thread/message-item.tsx:385
 msgid "Pin message"
 msgstr "置顶消息"
 
@@ -24565,6 +24574,14 @@ msgstr "图像生成需要提示词"
 #: src/features/workflow/utils/validate-workflow.ts:74
 msgid "Prompt is required for inpainting"
 msgstr "局部重绘需要提示词"
+
+#: src/features/chat/thread/copy-prompt-link-action.tsx:71
+msgid "Prompt link copied"
+msgstr ""
+
+#: src/features/chat/thread/copy-prompt-link-action.tsx:71
+msgid "Prompt link copied. It names no model, so it opens on the reader's model."
+msgstr ""
 
 #: src/features/prompts/hooks/use-prompt-loader.tsx:105
 msgid "Prompt loaded"
@@ -25548,7 +25565,7 @@ msgid "Refresh installed models"
 msgstr "刷新已安装的模型"
 
 #: ../../packages/chat-ui/src/chat/message-item.tsx:198
-#: src/features/chat/thread/message-item.tsx:390
+#: src/features/chat/thread/message-item.tsx:391
 msgid "Regenerate"
 msgstr "重新生成"
 
@@ -30474,7 +30491,7 @@ msgstr "汇总者（权衡双方）"
 msgid "System default"
 msgstr "系统默认"
 
-#: src/features/chat/thread/message-item.tsx:235
+#: src/features/chat/thread/message-item.tsx:236
 msgid "System message:"
 msgstr "系统消息："
 
@@ -31520,7 +31537,7 @@ msgstr "无法访问 MCP 注册表，因此可能缺少服务器建议。"
 msgid "The MCP Registry is unavailable right now. Showing popular servers instead."
 msgstr "MCP 注册表当前不可用，改为显示热门服务器。"
 
-#: src/features/chat/core/hooks/use-prompt-link-draft.ts:153
+#: src/features/chat/core/hooks/use-prompt-link-draft.ts:160
 msgid "The model in the link is not available. The chat keeps its model."
 msgstr ""
 
@@ -32170,6 +32187,10 @@ msgstr "此记忆已被删除。"
 msgid "This merges the commit {0} into the base branch with “{1}” on {hostLabel}. If the branch has changed since you opened this page, {hostLabel} refuses."
 msgstr ""
 
+#: src/features/chat/thread/copy-prompt-link-action.tsx:48
+msgid "This message has no text to copy as a prompt link."
+msgstr ""
+
 #: src/features/chat/thread/composer-length-notice.tsx:30
 msgid "This message is over the limit of {limit} characters. It is too long to send even as a file. Shorten it."
 msgstr ""
@@ -32180,6 +32201,10 @@ msgstr ""
 
 #: src/features/chat/thread/composer-length-notice.tsx:27
 msgid "This message is over the limit of {limit} characters. Shorten it."
+msgstr ""
+
+#: src/features/chat/thread/copy-prompt-link-action.tsx:57
+msgid "This message is too long to copy as a prompt link."
 msgstr ""
 
 #: src/features/chat/thread/composer-effort-shortcuts.tsx:67
@@ -32351,7 +32376,7 @@ msgstr ""
 msgid "This thread changed since, so this was not applied."
 msgstr ""
 
-#: src/routes/(chat)/chat/index.tsx:170
+#: src/routes/(chat)/chat/index.tsx:169
 msgid "This thread has been deleted"
 msgstr "此对话已被删除"
 
@@ -32490,7 +32515,7 @@ msgstr "对话已设为公开"
 msgid "Thread management"
 msgstr "对话管理"
 
-#: src/routes/(chat)/chat/index.tsx:175
+#: src/routes/(chat)/chat/index.tsx:174
 msgid "Thread not found or you don't have access to it"
 msgstr "未找到对话，或你无权访问"
 
@@ -36157,7 +36182,7 @@ msgstr "你的数据导出已就绪"
 msgid "Your display name for your account"
 msgstr "你账号的显示名称"
 
-#: src/features/chat/core/hooks/use-prompt-link-draft.ts:123
+#: src/features/chat/core/hooks/use-prompt-link-draft.ts:130
 msgid "Your draft is kept. The prompt from the link was not added."
 msgstr ""
 
@@ -36208,7 +36233,7 @@ msgstr "你的位置（例如“New York, USA”“Berlin, Germany”）。"
 msgid "Your message contains inappropriate content that cannot be sent."
 msgstr "你的消息包含不当内容，无法发送。"
 
-#: src/features/chat/thread/message-item.tsx:180
+#: src/features/chat/thread/message-item.tsx:181
 msgid "Your message:"
 msgstr "你的消息："
 

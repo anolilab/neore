@@ -375,7 +375,7 @@ msgstr "{0, plural, one {Afficher # vidéo de plus} other {Afficher # vidéos de
 #. placeholder {0}: unsupportedParams.length
 #. placeholder {1}: unsupportedParams.join(", ")
 #: src/routes/(chat)/chat/$threadId.tsx:86
-#: src/routes/(chat)/chat/index.tsx:202
+#: src/routes/(chat)/chat/index.tsx:201
 msgid "{0, plural, one {Unsupported query parameter} other {Unsupported query parameters}}: {1}"
 msgstr "{0, plural, one {Paramètre de requête non géré} other {Paramètres de requête non gérés}} : {1}"
 
@@ -3891,7 +3891,7 @@ msgstr "Assistant (aucune compétence)"
 msgid "Assistant replied:"
 msgstr "L’assistant a répondu :"
 
-#: src/features/chat/thread/message-item.tsx:208
+#: src/features/chat/thread/message-item.tsx:209
 #: src/features/chat/thread/streaming-placeholder.tsx:757
 #: src/features/chat/thread/streaming-placeholder.tsx:795
 msgid "Assistant Reply:"
@@ -7649,7 +7649,7 @@ msgstr "Copié dans le presse-papiers"
 
 #: src/components/copy-button.tsx:50
 #: src/features/auth/components/settings/two-factor/backup-codes-dialog.tsx:95
-#: src/features/chat/thread/message-item.tsx:356
+#: src/features/chat/thread/message-item.tsx:357
 #: src/features/prompts/components/prompt-item.tsx:261
 msgid "Copied!"
 msgstr "Copié !"
@@ -7659,7 +7659,7 @@ msgstr "Copié !"
 #: src/features/auth/components/settings/api-key/mcp-config-snippet.tsx:30
 #: src/features/auth/components/settings/two-factor/backup-codes-dialog.tsx:100
 #: src/features/chat/sharing/thread-share-button.tsx:366
-#: src/features/chat/thread/message-item.tsx:356
+#: src/features/chat/thread/message-item.tsx:357
 #: src/features/chat/thread/text-selection-menu.tsx:525
 #: src/features/settings/components/chat/trigger-settings.tsx:766
 #: src/features/skills/components/bundle-import-dialog.tsx:207
@@ -7676,7 +7676,7 @@ msgstr ""
 msgid "Copy as Markdown"
 msgstr "Copier en Markdown"
 
-#: src/features/chat/thread/message-item.tsx:373
+#: src/features/chat/thread/message-item.tsx:374
 msgid "Copy as plain text"
 msgstr ""
 
@@ -7717,6 +7717,11 @@ msgstr "Copier l’objet"
 #: src/features/prompts/components/prompt-item.tsx:266
 msgid "Copy Prompt"
 msgstr "Copier le prompt"
+
+#: src/features/chat/thread/copy-prompt-link-action.tsx:75
+#: src/features/chat/thread/copy-prompt-link-action.tsx:75
+msgid "Copy prompt link"
+msgstr ""
 
 #: src/features/pages/components/page-share-dialog.tsx:76
 msgid "Copy public link"
@@ -7948,6 +7953,10 @@ msgstr "Copie automatique impossible. Lien d'invitation : {inviteLink}"
 #: src/features/chat/sharing/thread-share-button.tsx:164
 msgid "Could not copy automatically. Public link: {publicLink}"
 msgstr "Copie automatique impossible. Lien public : {publicLink}"
+
+#: src/features/chat/thread/copy-prompt-link-action.tsx:66
+msgid "Could not copy the prompt link. Your browser did not allow access to the clipboard."
+msgstr ""
 
 #: src/features/settings/components/chat/trigger-settings.tsx:640
 #: src/features/skills/components/bundle-import-dialog.tsx:188
@@ -10289,7 +10298,7 @@ msgstr "Télécharger un modèle"
 msgid "Download as CSV"
 msgstr "Télécharger en CSV"
 
-#: src/features/chat/thread/message-item.tsx:377
+#: src/features/chat/thread/message-item.tsx:378
 msgid "Download as Markdown"
 msgstr "Télécharger au format Markdown"
 
@@ -10681,7 +10690,7 @@ msgstr "Génération guidée par les contours"
 #: src/features/chat/host/host-composer.tsx:890
 #: src/features/chat/thread-list/group-header.tsx:145
 #: src/features/chat/thread/composer-text-attachment-editor.tsx:799
-#: src/features/chat/thread/message-item.tsx:396
+#: src/features/chat/thread/message-item.tsx:397
 #: src/features/develop/components/draft-comment-card.tsx:51
 #: src/features/pages/components/page-version-panel.tsx:50
 #: src/features/prompts/components/prompt-item.tsx:212
@@ -13978,7 +13987,7 @@ msgstr "Dupliquer"
 msgid "Fork {0} to edit a copy"
 msgstr "Dupliquer {0} pour modifier une copie"
 
-#: src/features/chat/thread/message-item.tsx:406
+#: src/features/chat/thread/message-item.tsx:409
 msgid "Fork conversation"
 msgstr "Dupliquer la conversation"
 
@@ -14494,7 +14503,7 @@ msgstr "Générer à partir d’une description"
 msgid "Generate ideas for a creative writing story"
 msgstr "Trouver des idées pour une histoire créative"
 
-#: src/features/chat/thread/message-item.tsx:425
+#: src/features/chat/thread/message-item.tsx:428
 msgid "Generate image"
 msgstr "Générer une image"
 
@@ -14520,7 +14529,7 @@ msgstr "Générer une graine aléatoire"
 msgid "Generate unique business ideas for 2025"
 msgstr "Trouver des idées d’entreprise originales pour 2025"
 
-#: src/features/chat/thread/message-item.tsx:435
+#: src/features/chat/thread/message-item.tsx:438
 msgid "Generate video"
 msgstr "Générer une vidéo"
 
@@ -14533,7 +14542,7 @@ msgstr "Générer une vidéo"
 msgid "Generate videos from text or images"
 msgstr "Générez des vidéos à partir de texte ou d’images"
 
-#: src/features/chat/thread/message-item.tsx:445
+#: src/features/chat/thread/message-item.tsx:448
 msgid "Generate voice"
 msgstr "Générer une voix"
 
@@ -16664,7 +16673,7 @@ msgstr "Mot de passe incorrect"
 msgid "Invalid password. Please try again."
 msgstr "Mot de passe incorrect. Veuillez réessayer."
 
-#: src/routes/(chat)/chat/index.tsx:165
+#: src/routes/(chat)/chat/index.tsx:164
 msgid "Invalid thread ID"
 msgstr "Identifiant de conversation non valide"
 
@@ -19702,7 +19711,7 @@ msgstr ""
 msgid "More actions for {0}"
 msgstr ""
 
-#: src/features/chat/thread/message-item.tsx:365
+#: src/features/chat/thread/message-item.tsx:366
 msgid "More copy options"
 msgstr ""
 
@@ -23588,7 +23597,7 @@ msgstr "Épingler le souvenir"
 
 #: ../../packages/chat-ui/src/chat/message-item.tsx:144
 #: ../../packages/chat-ui/src/chat/message-item.tsx:193
-#: src/features/chat/thread/message-item.tsx:384
+#: src/features/chat/thread/message-item.tsx:385
 msgid "Pin message"
 msgstr "Épingler le message"
 
@@ -24565,6 +24574,14 @@ msgstr "Un prompt est requis pour la génération d’images"
 #: src/features/workflow/utils/validate-workflow.ts:74
 msgid "Prompt is required for inpainting"
 msgstr "Un prompt est requis pour l’inpainting"
+
+#: src/features/chat/thread/copy-prompt-link-action.tsx:71
+msgid "Prompt link copied"
+msgstr ""
+
+#: src/features/chat/thread/copy-prompt-link-action.tsx:71
+msgid "Prompt link copied. It names no model, so it opens on the reader's model."
+msgstr ""
 
 #: src/features/prompts/hooks/use-prompt-loader.tsx:105
 msgid "Prompt loaded"
@@ -25548,7 +25565,7 @@ msgid "Refresh installed models"
 msgstr "Actualiser les modèles installés"
 
 #: ../../packages/chat-ui/src/chat/message-item.tsx:198
-#: src/features/chat/thread/message-item.tsx:390
+#: src/features/chat/thread/message-item.tsx:391
 msgid "Regenerate"
 msgstr "Régénérer"
 
@@ -30474,7 +30491,7 @@ msgstr "Synthétiseur (pèse les deux camps)"
 msgid "System default"
 msgstr "Valeur par défaut du système"
 
-#: src/features/chat/thread/message-item.tsx:235
+#: src/features/chat/thread/message-item.tsx:236
 msgid "System message:"
 msgstr "Message système :"
 
@@ -31520,7 +31537,7 @@ msgstr "Le registre MCP est injoignable, des suggestions de serveurs peuvent don
 msgid "The MCP Registry is unavailable right now. Showing popular servers instead."
 msgstr "Le registre MCP est indisponible pour le moment. Affichage des serveurs populaires à la place."
 
-#: src/features/chat/core/hooks/use-prompt-link-draft.ts:153
+#: src/features/chat/core/hooks/use-prompt-link-draft.ts:160
 msgid "The model in the link is not available. The chat keeps its model."
 msgstr ""
 
@@ -32170,6 +32187,10 @@ msgstr "Ce souvenir a été supprimé depuis."
 msgid "This merges the commit {0} into the base branch with “{1}” on {hostLabel}. If the branch has changed since you opened this page, {hostLabel} refuses."
 msgstr ""
 
+#: src/features/chat/thread/copy-prompt-link-action.tsx:48
+msgid "This message has no text to copy as a prompt link."
+msgstr ""
+
 #: src/features/chat/thread/composer-length-notice.tsx:30
 msgid "This message is over the limit of {limit} characters. It is too long to send even as a file. Shorten it."
 msgstr ""
@@ -32180,6 +32201,10 @@ msgstr ""
 
 #: src/features/chat/thread/composer-length-notice.tsx:27
 msgid "This message is over the limit of {limit} characters. Shorten it."
+msgstr ""
+
+#: src/features/chat/thread/copy-prompt-link-action.tsx:57
+msgid "This message is too long to copy as a prompt link."
 msgstr ""
 
 #: src/features/chat/thread/composer-effort-shortcuts.tsx:67
@@ -32351,7 +32376,7 @@ msgstr ""
 msgid "This thread changed since, so this was not applied."
 msgstr ""
 
-#: src/routes/(chat)/chat/index.tsx:170
+#: src/routes/(chat)/chat/index.tsx:169
 msgid "This thread has been deleted"
 msgstr "Cette conversation a été supprimée"
 
@@ -32490,7 +32515,7 @@ msgstr "Conversation rendue publique"
 msgid "Thread management"
 msgstr "Gestion des conversations"
 
-#: src/routes/(chat)/chat/index.tsx:175
+#: src/routes/(chat)/chat/index.tsx:174
 msgid "Thread not found or you don't have access to it"
 msgstr "Conversation introuvable ou vous n’y avez pas accès"
 
@@ -36157,7 +36182,7 @@ msgstr "Votre exportation de données est prête"
 msgid "Your display name for your account"
 msgstr "Le nom d’affichage de votre compte"
 
-#: src/features/chat/core/hooks/use-prompt-link-draft.ts:123
+#: src/features/chat/core/hooks/use-prompt-link-draft.ts:130
 msgid "Your draft is kept. The prompt from the link was not added."
 msgstr ""
 
@@ -36208,7 +36233,7 @@ msgstr "Votre localisation (ex. : « Paris, France », « Berlin, Allemagne »).
 msgid "Your message contains inappropriate content that cannot be sent."
 msgstr "Votre message contient du contenu inapproprié et ne peut pas être envoyé."
 
-#: src/features/chat/thread/message-item.tsx:180
+#: src/features/chat/thread/message-item.tsx:181
 msgid "Your message:"
 msgstr "Votre message :"
 

@@ -107,6 +107,11 @@ vi.mock("@/lib/lunora/crpc", () => {
     return { useCRPC: () => namespace };
 });
 
+// A user message's copy-link action asks whether the thread is a group chat; these threads are not.
+vi.mock("@/features/chat/group/use-group-chat", () => {
+    return { useGroupChat: () => null };
+});
+
 vi.mock("@/features/chat/goal/use-thread-goal", () => {
     return { useThreadGoal: () => harness.goal };
 });
