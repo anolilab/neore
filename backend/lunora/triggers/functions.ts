@@ -35,6 +35,7 @@ import type { PayloadFilter } from "./filters";
 import { assertValidFilters, evaluateFilters, MAX_FILTER_VALUE_LENGTH, MAX_FILTERS, MAX_PATH_LENGTH, MAX_WEBHOOK_BODY_BYTES } from "./filters";
 import type { WebhookPreset } from "./presets";
 import { compileWebhookPreset } from "./presets";
+import { webhookTemplateProblem } from "./webhook-template";
 import { canBeQuiet } from "./quiet";
 import { resolveTimeZone } from "../memory/reflection-logic";
 import { findNextCronTime, isHourlyOrSlowerCronExpression } from "./schedule";
@@ -382,6 +383,18 @@ const cleanPromptField = <T extends string | undefined>(value: T, label: string)
     return text as T;
 };
 
+/**
+ * A webhook's Input Template is its prompt. A template that could render past the prompt limit with long values would
+ * refuse those deliveries, so it is refused when it is saved (`longestWebhookPrompt` in `webhook-template.ts`).
+ */
+const assertWebhookTemplateFits = (type: string, template: string | undefined): void => {
+    const problem = type === "webhook" && template !== undefined ? webhookTemplateProblem(template) : undefined;
+
+    if (problem !== undefined) {
+        throw new LunoraError("BAD_REQUEST", problem);
+    }
+};
+
 export const createTrigger = authMutation
     .use(rateLimit("triggers/create"))
     .input({
@@ -465,6 +478,11 @@ export const createTrigger = authMutation
         const { filters, webhookSignatureScheme } = webhookSetup(args, triggerType);
         const eventSource = await checkedEventSource(context, args.eventSource, triggerType, userId, now);
 
+        // Checked as stored: removing hidden characters can join a placeholder (`{{pay\u{200B}load}}`) that was not one before.
+        const inputTemplate = cleanPromptField(args.inputTemplate, "The input");
+
+        assertWebhookTemplateFits(triggerType, inputTemplate);
+
         const inserted = await context.db.insert("triggers", {
             botComputer: args.botComputer === true ? true : undefined,
             botId: args.botId as Id<"bots"> | undefined,
@@ -474,7 +492,7 @@ export const createTrigger = authMutation
             enabled: false, // Start disabled — user must explicitly enable
             eventSource,
             filters,
-            inputTemplate: cleanPromptField(args.inputTemplate, "The input"),
+            inputTemplate,
             model: args.model,
             name: args.name,
             quietWhenEmpty: args.quietWhenEmpty === true ? true : undefined,
@@ -648,7 +666,15 @@ export const updateTrigger = authMutation
             patch.timezone = requestedZone;
         }
 
-        if (args.inputTemplate !== undefined) patch.inputTemplate = cleanPromptField(args.inputTemplate, "The input");
+        if (args.inputTemplate !== undefined) {
+            patch.inputTemplate = cleanPromptField(args.inputTemplate, "The input");
+
+            // The settings form sends the stored template back with every edit: one saved before the fit check is
+            // judged only once it is changed, so the trigger can still be renamed or otherwise edited.
+            if (patch.inputTemplate !== trigger.inputTemplate) {
+                assertWebhookTemplateFits(trigger.type, patch.inputTemplate);
+            }
+        }
 
         // Clearing the bot clears its computer and quiet flags too: a routine without a bot has neither.
         const botCleared = args.botId === null;
@@ -682,6 +708,8 @@ export const updateTrigger = authMutation
             ...withoutUndefined(patch),
             // `null` removes the description.
             ...(args.description === null && { description: undefined }),
+            // An empty template removes the stored one; `undefined` leaves it as it is.
+            ...(args.inputTemplate !== undefined && args.inputTemplate.trim() === "" && { inputTemplate: undefined }),
             // `undefined` removes a stale time; enabling recomputes it (`firstRunOf`).
             // Also clears a time a non-schedule trigger stored before this check existed.
             // An event trigger's next check is its own and is never touched here.
@@ -936,11 +964,8 @@ export const testRunTrigger = authAction
         }
 
         const wasEnabled = trigger.enabled === true;
-        // A schedule's or a watcher's input is its template, so only a payload the user typed overrides it (`executeTrigger`).
-        const payload =
-            trigger.type === "schedule" || trigger.type === "event"
-                ? args.testPayload
-                : args.testPayload || trigger.inputTemplate || "Manual test run triggered.";
+        // Every trigger type takes only a payload the user typed: without one, `executeTrigger` builds the input from the template.
+        const payload = args.testPayload;
 
         // The run reads the trigger only when it starts, after this action has returned, so it is told to run a disabled one.
         // `manual`: a quiet routine posts a run the user asked for, whatever the workspace holds.
@@ -1298,6 +1323,25 @@ export const createExecution = internalMutation
         });
 
         return insertedId as Id<"triggerExecutions">;
+    });
+
+/**
+ * A webhook delivery the route refused: the Input Template could not be rendered for it (422), or it was too large to
+ * schedule (413). It is no run, so only the trigger's `lastError` says it, where the owner sees it on the trigger, with
+ * what to change. A run that has already recorded a later `lastTriggeredAt` is newer news: the refusal is not written
+ * over it. A run still going when the refusal lands writes its own outcome when it ends.
+ */
+export const recordRefusedDelivery = internalMutation
+    .input({ reason: v.string().max(MAX_LENGTH.short), refusedAt: v.number(), triggerId: v.id("triggers") })
+    .output(v.null())
+    .mutation(async ({ args: { reason, refusedAt, triggerId }, ctx }) => {
+        const trigger = await ctx.db.get("triggers", triggerId);
+
+        if (trigger && (trigger.lastTriggeredAt ?? -Infinity) <= refusedAt) {
+            await patchRow(ctx.db, "triggers", trigger, { lastError: reason, updatedAt: ctx.now });
+        }
+
+        return null;
     });
 
 /**

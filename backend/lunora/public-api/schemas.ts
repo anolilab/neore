@@ -259,11 +259,10 @@ const zTriggerFields = {
         .max(10)
         .optional()
         .meta({ description: "Webhook triggers only. Replaces the stored set; an empty array clears it." }),
-    inputTemplate: z
-        .string()
-        .max(100_000)
-        .optional()
-        .meta({ description: "Schedule triggers only: the message each run starts with. A webhook trigger is refused this field." }),
+    inputTemplate: z.string().max(100_000).optional().meta({
+        description:
+            "A schedule trigger: the message each run starts with. A webhook trigger: the prompt each delivery runs with, where {{payload}} is the whole body, {{body.path}} a JSON field, {{header.name}} a header and {{query.name}} a query parameter. Headers and the query are not signed, and a credential-looking name is never read. For a webhook, the prompt with every value at its longest (10,000 characters for the body, 2,000 for a field) must fit in 20,000 characters.",
+    }),
     quietWhenEmpty: z.boolean().optional().meta({ description: "Scheduled triggers with a bot only: skip a run that has nothing to report." }),
     systemPrompt: z.string().max(100_000).optional(),
     timezone: z.string().max(200).optional(),

@@ -193,14 +193,16 @@ describe("the dry run", () => {
         expect(entry?.plan).toBeUndefined();
     });
 
-    it("describes a webhook by its filters and blocks an invalid one", () => {
-        const [ok, bad] = plan([
+    it("describes a webhook by its filters and blocks an invalid one, or an Input Template that cannot fit", () => {
+        const [ok, bad, long] = plan([
             { kind: "trigger", trigger: WEBHOOK },
             { kind: "trigger", trigger: { ...WEBHOOK, filters: [{ op: "equals", path: "" }] } },
+            { kind: "trigger", trigger: { ...WEBHOOK, inputTemplate: "{{pay\u{200B}load}}{{pay\u{200B}load}}" } },
         ]);
 
         expect(ok?.view.trigger?.filters).toStrictEqual(['action equals "opened"']);
         expect(bad?.problems.length).toBeGreaterThan(0);
+        expect(long?.problems.join(" ")).toContain("over the limit");
     });
 
     it("keeps trigger creation args free of anything but the whitelist", () => {

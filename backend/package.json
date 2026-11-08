@@ -51,6 +51,7 @@
         "./source-control/types": "./lunora/source-control/types.ts",
         "./triggers/event-limits": "./lunora/triggers/event-sources/types.ts",
         "./triggers/presets": "./lunora/triggers/presets.ts",
+        "./triggers/webhook-template": "./lunora/triggers/webhook-template.ts",
         "./workflow/mentions": "./lunora/workflow/mentions.ts"
     },
     "scripts": {
