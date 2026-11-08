@@ -24,20 +24,28 @@ export const routeOf = (transport: string | undefined, isThisComputer: boolean):
     return isThisComputer ? "this-computer" : "relay";
 };
 
-// Checked in order, against both OpenSSH's wording and the device core's own (`packages/device-core/src/ssh.rs`). ssh ends
-// a refused key with "Connection closed by authenticating user", which must read as a login, not as a closed connection.
+// Checked in order, against both OpenSSH's wording and the device core's own (`packages/device-core/src/ssh.rs`). Each row
+// matches a whole phrase, never a single word, because the text also carries a server name ("authentication.example").
 const CONNECTION_CATEGORIES: ReadonlyArray<readonly [RegExp, MessageDescriptor]> = [
-    // The core's own passphrase channel failed on this computer, whatever its error says ("Permission denied (os error 13)").
-    [/^the passphrase channel failed/iu, msg`connection failed`],
+    // A step on this computer failed, whatever its error says ("Permission denied (os error 13)"): no server refused anything.
+    [/^(?:the passphrase channel failed|ssh-keyscan could not run|the host key could not be saved)/iu, msg`connection failed`],
     // Fixed core wording that ssh never prints, checked before a server name in it can match a login row.
     [/neore-host .* is not installed on/iu, msg`the host software is not installed`],
     [/the software there is out of date/iu, msg`the host software is out of date`],
     [/the host speaks protocol/iu, msg`the host software does not match this app`],
-    [/remote host identification has changed|host key (?:of|for) .* changed|offending .* key/iu, msg`the host key changed`],
-    [/host key verification failed|no matching host key|host key was not trusted|presented no host key/iu, msg`the host key could not be verified`],
-    [/permission denied|refused the login|authenticat|(?:enter|bad|incorrect) passphrase|publickey/iu, msg`login refused`],
-    [/timed out|timeout|did not answer in time/iu, msg`timed out`],
-    [/refused|unreachable|resolve|no route|lost|closed|reset/iu, msg`server not reachable`],
+    [/host software is being upgraded/iu, msg`the host software is being upgraded`],
+    [/remote host identification has changed|host key (?:of|for) .* changed|offending (?:\w+ )?key (?:for ip )?in/iu, msg`the host key changed`],
+    [/host key verification failed|no matching host key|host key was not trusted|offered no usable host key/iu, msg`the host key could not be verified`],
+    // ssh lists the methods it tried ("Permission denied (publickey,password)"); an OS error says "(os error 13)" instead.
+    [
+        /permission denied \((?!os error)|refused the login|closed by authenticating user|authentication failed|too many authentication failures|no more authentication methods|(?:bad|incorrect) passphrase/iu,
+        msg`login refused`,
+    ],
+    [/timed out|did not answer in time/iu, msg`timed out`],
+    [
+        /connection refused|is unreachable|could not resolve|no route to host|connection was lost|connection closed|connection reset|closed by remote host|broken pipe|presented no host key/iu,
+        msg`server not reachable`,
+    ],
 ];
 
 /** The core names the server first ("could not connect to me@login.example.com: …"): only what follows is the cause. */

@@ -6233,7 +6233,7 @@ msgstr "正在点击元素..."
 msgid "Client secret (App password) of the bot's app registration"
 msgstr "机器人应用注册的客户端密钥（应用密码）"
 
-#: src/features/devices/lib/device-diagnostics.ts:88
+#: src/features/devices/lib/device-diagnostics.ts:96
 msgid "Client: {client}"
 msgstr ""
 
@@ -7298,7 +7298,7 @@ msgid "Connection error. Please check your internet connection and try again."
 msgstr "连接错误，请检查网络连接后重试。"
 
 #: src/features/devices/lib/device-diagnostics.ts:31
-#: src/features/devices/lib/device-diagnostics.ts:54
+#: src/features/devices/lib/device-diagnostics.ts:62
 msgid "connection failed"
 msgstr ""
 
@@ -7330,7 +7330,7 @@ msgstr "连接成功"
 msgid "Connection test failed"
 msgstr "连接测试失败"
 
-#: src/features/devices/lib/device-diagnostics.ts:87
+#: src/features/devices/lib/device-diagnostics.ts:95
 msgid "Connection: {name}"
 msgstr ""
 
@@ -17455,7 +17455,7 @@ msgstr "上次确认于 {0}"
 msgid "Last error"
 msgstr "上次错误"
 
-#: src/features/devices/lib/device-diagnostics.ts:91
+#: src/features/devices/lib/device-diagnostics.ts:99
 msgid "Last failure: {failure}"
 msgstr ""
 
@@ -17494,7 +17494,7 @@ msgstr "上次运行"
 msgid "Last seen"
 msgstr ""
 
-#: src/features/devices/lib/device-diagnostics.ts:90
+#: src/features/devices/lib/device-diagnostics.ts:98
 msgid "Last seen: {lastSeen}"
 msgstr ""
 
@@ -18439,7 +18439,7 @@ msgstr "退出登录"
 msgid "Login"
 msgstr "登录"
 
-#: src/features/devices/lib/device-diagnostics.ts:38
+#: src/features/devices/lib/device-diagnostics.ts:42
 msgid "login refused"
 msgstr ""
 
@@ -20495,7 +20495,7 @@ msgstr "中性"
 msgid "Neutral color, blockbuster look"
 msgstr "中性色彩，大片质感"
 
-#: src/features/devices/lib/device-diagnostics.ts:83
+#: src/features/devices/lib/device-diagnostics.ts:91
 msgid "never"
 msgstr ""
 
@@ -21521,7 +21521,7 @@ msgstr "节点类型"
 msgid "Noise Reduction"
 msgstr "降噪"
 
-#: src/features/devices/lib/device-diagnostics.ts:84
+#: src/features/devices/lib/device-diagnostics.ts:92
 msgid "none"
 msgstr ""
 
@@ -25780,11 +25780,11 @@ msgstr "普通用户"
 msgid "Reject"
 msgstr "拒绝"
 
-#: src/features/devices/lib/device-diagnostics.ts:61
+#: src/features/devices/lib/device-diagnostics.ts:69
 msgid "relay (another paired computer)"
 msgstr ""
 
-#: src/features/devices/lib/device-diagnostics.ts:61
+#: src/features/devices/lib/device-diagnostics.ts:69
 msgid "relay (another paired computer): {viaName}"
 msgstr ""
 
@@ -26876,7 +26876,7 @@ msgstr ""
 msgid "Route, track, <0>optimize.</0>"
 msgstr "路由、追踪、<0>优化。</0>"
 
-#: src/features/devices/lib/device-diagnostics.ts:89
+#: src/features/devices/lib/device-diagnostics.ts:97
 msgid "Route: {route}"
 msgstr ""
 
@@ -28176,7 +28176,7 @@ msgstr "服务器错误，请稍后重试。"
 msgid "Server name is required"
 msgstr "请输入服务器名称"
 
-#: src/features/devices/lib/device-diagnostics.ts:40
+#: src/features/devices/lib/device-diagnostics.ts:47
 msgid "server not reachable"
 msgstr ""
 
@@ -29507,11 +29507,11 @@ msgstr ""
 msgid "Sri Lanka"
 msgstr "斯里兰卡"
 
-#: src/features/devices/lib/device-diagnostics.ts:64
+#: src/features/devices/lib/device-diagnostics.ts:72
 msgid "SSH server via a paired computer"
 msgstr ""
 
-#: src/features/devices/lib/device-diagnostics.ts:64
+#: src/features/devices/lib/device-diagnostics.ts:72
 msgid "SSH server via a paired computer: {viaName}"
 msgstr ""
 
@@ -31696,11 +31696,11 @@ msgstr ""
 msgid "The host is limiting requests. Trying again later."
 msgstr ""
 
-#: src/features/devices/lib/device-diagnostics.ts:36
+#: src/features/devices/lib/device-diagnostics.ts:37
 msgid "the host key changed"
 msgstr ""
 
-#: src/features/devices/lib/device-diagnostics.ts:37
+#: src/features/devices/lib/device-diagnostics.ts:38
 msgid "the host key could not be verified"
 msgstr ""
 
@@ -31718,6 +31718,10 @@ msgstr ""
 
 #: src/features/devices/lib/device-diagnostics.ts:35
 msgid "the host software does not match this app"
+msgstr ""
+
+#: src/features/devices/lib/device-diagnostics.ts:36
+msgid "the host software is being upgraded"
 msgstr ""
 
 #: src/features/devices/lib/device-diagnostics.ts:33
@@ -32259,7 +32263,7 @@ msgstr "此集合由你组织中的成员共享给你。你可以将其附加到
 msgid "This command name is reserved"
 msgstr "此命令名称已被保留"
 
-#: src/features/devices/lib/device-diagnostics.ts:67
+#: src/features/devices/lib/device-diagnostics.ts:75
 msgid "this computer"
 msgstr ""
 
@@ -32289,7 +32293,7 @@ msgstr "此计算机已与另一个账户配对。"
 msgid "This computer is paired. Choose which folders to share in the desktop app."
 msgstr "此计算机已配对。请在桌面应用中选择要共享的文件夹。"
 
-#: src/features/devices/lib/device-diagnostics.ts:67
+#: src/features/devices/lib/device-diagnostics.ts:75
 msgid "this computer: {viaName}"
 msgstr ""
 
@@ -32872,7 +32876,7 @@ msgstr "移轴"
 msgid "time zone"
 msgstr ""
 
-#: src/features/devices/lib/device-diagnostics.ts:39
+#: src/features/devices/lib/device-diagnostics.ts:44
 msgid "timed out"
 msgstr ""
 

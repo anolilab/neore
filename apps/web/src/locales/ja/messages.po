@@ -6233,7 +6233,7 @@ msgstr "要素をクリックしています..."
 msgid "Client secret (App password) of the bot's app registration"
 msgstr "ボットのアプリ登録のクライアントシークレット（アプリパスワード）"
 
-#: src/features/devices/lib/device-diagnostics.ts:88
+#: src/features/devices/lib/device-diagnostics.ts:96
 msgid "Client: {client}"
 msgstr ""
 
@@ -7298,7 +7298,7 @@ msgid "Connection error. Please check your internet connection and try again."
 msgstr "接続エラーです。インターネット接続を確認して、もう一度お試しください。"
 
 #: src/features/devices/lib/device-diagnostics.ts:31
-#: src/features/devices/lib/device-diagnostics.ts:54
+#: src/features/devices/lib/device-diagnostics.ts:62
 msgid "connection failed"
 msgstr ""
 
@@ -7330,7 +7330,7 @@ msgstr "接続に成功しました"
 msgid "Connection test failed"
 msgstr "接続テストに失敗しました"
 
-#: src/features/devices/lib/device-diagnostics.ts:87
+#: src/features/devices/lib/device-diagnostics.ts:95
 msgid "Connection: {name}"
 msgstr ""
 
@@ -17455,7 +17455,7 @@ msgstr "最終確認 {0}"
 msgid "Last error"
 msgstr "最新のエラー"
 
-#: src/features/devices/lib/device-diagnostics.ts:91
+#: src/features/devices/lib/device-diagnostics.ts:99
 msgid "Last failure: {failure}"
 msgstr ""
 
@@ -17494,7 +17494,7 @@ msgstr "前回の実行"
 msgid "Last seen"
 msgstr ""
 
-#: src/features/devices/lib/device-diagnostics.ts:90
+#: src/features/devices/lib/device-diagnostics.ts:98
 msgid "Last seen: {lastSeen}"
 msgstr ""
 
@@ -18439,7 +18439,7 @@ msgstr "サインアウト"
 msgid "Login"
 msgstr "サインイン"
 
-#: src/features/devices/lib/device-diagnostics.ts:38
+#: src/features/devices/lib/device-diagnostics.ts:42
 msgid "login refused"
 msgstr ""
 
@@ -20495,7 +20495,7 @@ msgstr "ニュートラル"
 msgid "Neutral color, blockbuster look"
 msgstr "ニュートラルな色、大作映画の雰囲気"
 
-#: src/features/devices/lib/device-diagnostics.ts:83
+#: src/features/devices/lib/device-diagnostics.ts:91
 msgid "never"
 msgstr ""
 
@@ -21521,7 +21521,7 @@ msgstr "ノードの種類"
 msgid "Noise Reduction"
 msgstr "ノイズ除去"
 
-#: src/features/devices/lib/device-diagnostics.ts:84
+#: src/features/devices/lib/device-diagnostics.ts:92
 msgid "none"
 msgstr ""
 
@@ -25780,11 +25780,11 @@ msgstr "一般ユーザー"
 msgid "Reject"
 msgstr "拒否"
 
-#: src/features/devices/lib/device-diagnostics.ts:61
+#: src/features/devices/lib/device-diagnostics.ts:69
 msgid "relay (another paired computer)"
 msgstr ""
 
-#: src/features/devices/lib/device-diagnostics.ts:61
+#: src/features/devices/lib/device-diagnostics.ts:69
 msgid "relay (another paired computer): {viaName}"
 msgstr ""
 
@@ -26876,7 +26876,7 @@ msgstr ""
 msgid "Route, track, <0>optimize.</0>"
 msgstr "ルーティング、追跡、<0>最適化。</0>"
 
-#: src/features/devices/lib/device-diagnostics.ts:89
+#: src/features/devices/lib/device-diagnostics.ts:97
 msgid "Route: {route}"
 msgstr ""
 
@@ -28176,7 +28176,7 @@ msgstr "サーバーエラーです。しばらくしてからもう一度お試
 msgid "Server name is required"
 msgstr "サーバー名は必須です"
 
-#: src/features/devices/lib/device-diagnostics.ts:40
+#: src/features/devices/lib/device-diagnostics.ts:47
 msgid "server not reachable"
 msgstr ""
 
@@ -29507,11 +29507,11 @@ msgstr ""
 msgid "Sri Lanka"
 msgstr "スリランカ"
 
-#: src/features/devices/lib/device-diagnostics.ts:64
+#: src/features/devices/lib/device-diagnostics.ts:72
 msgid "SSH server via a paired computer"
 msgstr ""
 
-#: src/features/devices/lib/device-diagnostics.ts:64
+#: src/features/devices/lib/device-diagnostics.ts:72
 msgid "SSH server via a paired computer: {viaName}"
 msgstr ""
 
@@ -31696,11 +31696,11 @@ msgstr ""
 msgid "The host is limiting requests. Trying again later."
 msgstr ""
 
-#: src/features/devices/lib/device-diagnostics.ts:36
+#: src/features/devices/lib/device-diagnostics.ts:37
 msgid "the host key changed"
 msgstr ""
 
-#: src/features/devices/lib/device-diagnostics.ts:37
+#: src/features/devices/lib/device-diagnostics.ts:38
 msgid "the host key could not be verified"
 msgstr ""
 
@@ -31718,6 +31718,10 @@ msgstr ""
 
 #: src/features/devices/lib/device-diagnostics.ts:35
 msgid "the host software does not match this app"
+msgstr ""
+
+#: src/features/devices/lib/device-diagnostics.ts:36
+msgid "the host software is being upgraded"
 msgstr ""
 
 #: src/features/devices/lib/device-diagnostics.ts:33
@@ -32259,7 +32263,7 @@ msgstr "このコレクションは組織のメンバーから共有されてい
 msgid "This command name is reserved"
 msgstr "このコマンド名は予約されています"
 
-#: src/features/devices/lib/device-diagnostics.ts:67
+#: src/features/devices/lib/device-diagnostics.ts:75
 msgid "this computer"
 msgstr ""
 
@@ -32289,7 +32293,7 @@ msgstr "このコンピューターは別のアカウントとペアリングさ
 msgid "This computer is paired. Choose which folders to share in the desktop app."
 msgstr "このコンピューターはペアリングされました。共有するフォルダーはデスクトップアプリで選択してください。"
 
-#: src/features/devices/lib/device-diagnostics.ts:67
+#: src/features/devices/lib/device-diagnostics.ts:75
 msgid "this computer: {viaName}"
 msgstr ""
 
@@ -32872,7 +32876,7 @@ msgstr "ティルトシフト"
 msgid "time zone"
 msgstr ""
 
-#: src/features/devices/lib/device-diagnostics.ts:39
+#: src/features/devices/lib/device-diagnostics.ts:44
 msgid "timed out"
 msgstr ""
 

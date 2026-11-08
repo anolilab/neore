@@ -106,6 +106,20 @@ describe("connectionFailureCategory", () => {
         expect(category("connect to host box port 22: Connection refused")).toBe("server not reachable");
         expect(category("Banner: token=abcd1234 weird")).toBe("connection failed");
         expect(category("the passphrase channel failed: Permission denied (os error 13)")).toBe("connection failed");
+        expect(category("the host key could not be saved: Permission denied (os error 13)")).toBe("connection failed");
+        expect(category("could not connect to dana@timeout.example:22: ssh: connect to host timeout.example port 22: Connection refused")).toBe(
+            "server not reachable",
+        );
+        expect(category("Reset box's host software is being upgraded; connect again in a moment")).toBe("the host software is being upgraded");
+        expect(category("dana@box:22 presented no host key (is it reachable, and is it running an SSH server?) (gave up after 5 attempts)")).toBe(
+            "server not reachable",
+        );
+        expect(category("Unable to negotiate with offending port 22: no matching host key type found. Their offer: ssh-dss")).toBe(
+            "the host key could not be verified",
+        );
+        expect(category("ssh: connect to host authentication.example port 22: Operation timed out")).toBe("timed out");
+        expect(category("the server offered no usable host key")).toBe("the host key could not be verified");
+        expect(category("dana@box: Permission denied (publickey,password).")).toBe("login refused");
     });
 });
 
