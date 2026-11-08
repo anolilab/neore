@@ -204,6 +204,8 @@ export class AcpManager {
         remote?: { forkSessionId?: string; nativeSessionId?: string; sessionId: string; threadId: string },
     ): Promise<string> {
         requireSupported();
+        // Before anything is closed: a start refused for a sign-out must not end the thread's session either.
+        this.refuseHeld(agentKey);
 
         // The backend ends a thread's session when it starts the next one in that thread (an agent switch, `/clear`): the
         // one this computer still runs for it is closed, or every switch or clear would leave an agent process behind.
@@ -427,11 +429,16 @@ export class AcpManager {
         }
     }
 
-    /** Throws when no session of `agentKey` may start now: its account is changing, or too many agents run. */
-    private refuseStart(agentKey: string): void {
+    private refuseHeld(agentKey: string): void {
         if (this.held.has(agentKey)) {
             throw new Error("that agent is being signed out; start it again once that ends");
         }
+    }
+
+    /** Throws when no session of `agentKey` may start now: its account is changing, or too many agents run. */
+    private refuseStart(agentKey: string): void {
+        // Again: a sign-out can have begun while the superseded sessions were closing.
+        this.refuseHeld(agentKey);
 
         if (this.summaries().filter((session) => session.status !== "ended").length >= MAX_SESSIONS) {
             throw new Error(`at most ${String(MAX_SESSIONS)} agents at once; close one first`);

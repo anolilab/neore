@@ -99,4 +99,17 @@ describe("signing out", () => {
         await expect(signIn.signOut("fake")).rejects.toThrow("already being signed out");
         await expect(signingOut).resolves.toMatchObject({ state: "signed_out" });
     });
+
+    it("refuses a start that would replace a thread's session without ending that session", async () => {
+        const { manager } = setUp({ FAKE_AGENT_AUTH_FILE: authFile });
+        const running = await manager.startSession("fake", "Fake", scratch.work, { sessionId: "session-1", threadId: "thread-1" });
+        let release = (): void => {};
+        const holding = manager.holdingAgent("fake", async () => await new Promise<void>((resolve) => { release = resolve; }));
+
+        await expect(manager.startSession("fake", "Fake", scratch.work, { sessionId: "session-2", threadId: "thread-1" })).rejects.toThrow("being signed out");
+        expect(manager.statusOf(running)).not.toBe("ended");
+        release();
+        await holding;
+        manager.killAll();
+    });
 });

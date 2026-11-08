@@ -53,8 +53,11 @@ const state: {
     selected?: string;
     sessions: SessionSummary[];
     signature: string;
-    /** Each agent's last sign-in check, by key. Not checked since the window opened: absent. */
-    signIn: Record<string, SignInStatus>;
+    /**
+     * Each agent's last sign-in answer, by key, with the agent's configuration when it was asked (`agentConfig`). An answer
+     * for a configuration that changed since (another command, a removed and re-added key) is not shown.
+     */
+    signIn: Record<string, { config: string; status: SignInStatus }>;
     /** Counts sign-in requests per agent: only the answer to the latest one is shown, so a slow check cannot undo a sign-out. */
     signInSerial: Record<string, number>;
     /** Agents being signed out: a check started meanwhile could answer from before the sign-out and replace its result. */
@@ -188,14 +191,29 @@ const signInText = (status: SignInStatus | undefined): string => {
 
 const canSignOut = (status: SignInStatus | undefined): boolean => status?.state === "signed_in" && status.canSignOut;
 
+/** What decides which account an agent reaches: its program and the names of the variables it gets. */
+const agentConfig = (key: string): string => {
+    const agent = state.view.agents.find((candidate) => candidate.key === key);
+
+    return JSON.stringify([agent?.command, agent?.args, agent?.install, agent?.envNames, state.view.envNames]);
+};
+
+/** The agent's last sign-in answer, if it was given for the agent as it is configured now. */
+const signInOf = (key: string): SignInStatus | undefined => {
+    const known = state.signIn[key];
+
+    return known?.config === agentConfig(key) ? known.status : undefined;
+};
+
 const showSignIn = async (key: string, request: Promise<SignInStatus>): Promise<void> => {
     state.signInSerial[key] = (state.signInSerial[key] ?? 0) + 1;
 
     const serial = state.signInSerial[key];
+    const config = agentConfig(key);
     const status = await request;
 
     if (serial === state.signInSerial[key]) {
-        state.signIn[key] = status;
+        state.signIn[key] = { config, status };
         renderAgents();
     }
 };
@@ -345,8 +363,8 @@ const renderAgents = (): void => {
                     }),
                 ),
                 item(
-                    `↳ Account: ${signInText(state.signIn[agent.key])}`,
-                    ...canSignOut(state.signIn[agent.key]) ? [button("Sign out", `Sign ${agent.label} out of its account`, () => signOut(agent.key))] : [],
+                    `↳ Account: ${signInText(signInOf(agent.key))}`,
+                    ...canSignOut(signInOf(agent.key)) ? [button("Sign out", `Sign ${agent.label} out of its account`, () => signOut(agent.key))] : [],
                 ),
                 ...view.consents
                     .filter((consent) => consent.agentKey === agent.key)
