@@ -31,6 +31,7 @@ import { internalAction, internalMutation, internalQuery } from "../_generated/s
 import { authLogger } from "./logger";
 import { callOnShard } from "./cross-shard";
 import schema from "../schema";
+import { dropPushDevicesOf } from "../notifications/push-device-writes";
 
 /** Rows moved per round trip. */
 export const MERGE_PAGE_SIZE = 100;
@@ -79,6 +80,8 @@ export const GLOBAL_USER_TABLES_NOT_REASSIGNED: Readonly<Record<string, string>>
     documentHistory: "an audit trail records who acted; it is not re-attributed",
     member: "a guest joins no organization",
     memberCredits: "a guest joins no organization",
+    pushDevices:
+        "tied to the guest's session, which ends with the guest: the notifications module drops them, and the phone registers again under the new sign-in",
     session: "better-auth's own; the guest's sessions end with the guest",
     teamMember: "a guest joins no team",
     twoFactor: "better-auth's own; a guest has no second factor",
@@ -185,6 +188,9 @@ export const reassignGlobalRows = internalMutation
                 }
             }
         }
+
+        // Through the notifications module's own write surface, never the generic loop above.
+        await dropPushDevicesOf(ctx.db, args.from);
 
         const { page: census } = await ctx.db.shardActivity.findMany({ where: { shardKey: args.from } });
 

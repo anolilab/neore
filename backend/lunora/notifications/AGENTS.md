@@ -25,3 +25,21 @@
   (`userSettings.dailyBriefEnabled`) and scheduled like memory reflection —
   `afterRun` → `noteDailyBriefActivity` → `runAt` local 07:xx — and charged
   via `chargeRound` only when there is something to report.
+- **Phone push registration** (`native-push.ts`, `push-device-writes.ts`) —
+  on only with `EXPO_ACCESS_TOKEN` (a Worker secret; unset = no row).
+    - Tokens are `pushDevices` rows (global, unique `token`, owner-policied, every
+      read `consistency: "primary"`). `registerPushDevice` stamps the caller's
+      sign-in: the app grant's `grantSessionId` (JWT `gsid`, never `sid`:
+      see `auth/AGENTS.md`), else a web `sessionId`; a call without a live one
+      registers nothing. A row another user
+      holds moves to the caller (`systemDb`): the latest registration wins (one
+      that started before the row's last write is refused as superseded). A
+      token is not a secret, so a leaked one can take a phone's pushes until it
+      registers again (accepted: only the generic alert reaches a phone).
+      A registration refused after its write (its session ended, or an account
+      deletion started meanwhile) takes its row back: the registration it
+      replaced is put back only while that sign-in is live (erasure revokes an
+      account's sessions first, so a deleted account fails it). Only Lunora's `kind: "unique"` conflict is a race.
+    - At most 10 per user (`trimPushDevices`). An account merge drops the guest's
+      rows (`dropPushDevicesOf`) instead of moving them: they belong to a session
+      that ends with the guest.

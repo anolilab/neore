@@ -91,7 +91,7 @@ export interface ExtensionGrantStore {
     createSession: (userId: string, meta: { ipAddress?: string; userAgent?: string }) => Promise<{ expiresAt: Date; token: string }>;
     deleteSession: (token: string) => Promise<void>;
     extendSession: (token: string, expiresAt: Date) => Promise<void>;
-    findSession: (token: string) => Promise<null | { session: { expiresAt: Date }; user: ExtensionGrantUser }>;
+    findSession: (token: string) => Promise<null | { session: { expiresAt: Date; id: string }; user: ExtensionGrantUser }>;
     findUser: (userId: string) => Promise<ExtensionGrantUser | null>;
     saveCode: (identifier: string, value: string, expiresAt: Date) => Promise<void>;
     /** Sign a JWT with better-auth's JWKS; `iss`/`aud` are already in the payload. */
@@ -300,6 +300,10 @@ export const mintExtensionAccessToken = async (
         iat: Math.floor(now / 1000),
         ...user,
         aud: input.origin,
+        // The sign-in this token stands for, as `gsid`, NEVER `sid`: it reaches procedures as `grantSessionId`, not
+        // `sessionId`. This session is the exchange's fresh one, with no impersonation mark, so as `sessionId` it would
+        // pass account deletion's freshness and impersonation checks (`src/bearer-identity.ts`).
+        gsid: found.session.id,
         iss: input.origin,
         sub: user.id,
     });
@@ -330,7 +334,7 @@ interface BetterAuthLike {
             createSession: (userId: string, dontRememberMe?: boolean, override?: Record<string, unknown>) => Promise<{ expiresAt: Date; token: string }>;
             createVerificationValue: (data: { expiresAt: Date; identifier: string; value: string }) => Promise<unknown>;
             deleteSession: (token: string) => Promise<void>;
-            findSession: (token: string) => Promise<null | { session: { expiresAt: Date }; user: ExtensionGrantUser }>;
+            findSession: (token: string) => Promise<null | { session: { expiresAt: Date; id: string }; user: ExtensionGrantUser }>;
             findUserById: (userId: string) => Promise<ExtensionGrantUser | null>;
             updateSession: (token: string, session: { expiresAt: Date }) => Promise<unknown>;
         };
