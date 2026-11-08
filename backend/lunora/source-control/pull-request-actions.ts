@@ -107,11 +107,18 @@ export const revertPullRequest = authAction
     .action(async ({ args, ctx }) => {
         requireCapability("pullRequest.revert");
 
+        // Sent trimmed, as an edit's title is; a title of only spaces is refused before the host is asked.
+        const title = args.title?.trim();
+
+        if (title === "") {
+            throw new LunoraError("BAD_REQUEST", "A title cannot be empty");
+        }
+
         const token = await resolveGithubToken(ctx, ctx.user.userId);
         const outcome = await writeToHost(
             DEVELOP_DRIVER,
             token,
-            async (request) => await DEVELOP_DRIVER.revertPullRequest(request, args, { body: args.body, title: args.title }),
+            async (request) => await DEVELOP_DRIVER.revertPullRequest(request, args, { body: args.body, title }),
         );
 
         ctx.log.event("source_control.revert_pull_request", { status: outcome.status });

@@ -122,7 +122,12 @@ describe("requestReviewers", () => {
 
         await githubDriver.requestReviewers(request, REF, ["alice", "bob-2"]);
 
-        const mutation = sent.find((call) => String(call.json.query).includes("requestReviewsByLogin"));
+        // Exactly one write: a duplicate call must fail here.
+        const mutations = sent.filter((call) => String(call.json.query).includes("requestReviewsByLogin"));
+
+        expect(mutations).toHaveLength(1);
+
+        const [mutation] = mutations;
 
         expect(String(mutation?.json.query)).toContain("union: true");
         expect(mutation?.json.variables).toEqual({ logins: ["alice", "bob-2"], pullRequestId: "PR_node" });
@@ -177,7 +182,10 @@ describe("editPullRequest guards", () => {
         });
 
         await expect(githubDriver.editPullRequest(request, REF, { title: "New  " })).resolves.toBeUndefined();
-        expect(sent.find((call) => String(call.json.query).includes("updatePullRequest"))?.json.variables).toEqual({
+        const edits = sent.filter((call) => String(call.json.query).includes("updatePullRequest"));
+
+        expect(edits).toHaveLength(1);
+        expect(edits[0]?.json.variables).toEqual({
             input: { pullRequestId: "PR_node", title: "New" },
         });
     });
@@ -241,7 +249,12 @@ describe("revertPullRequest", () => {
 
         await githubDriver.revertPullRequest(request, REF, { body: "Undoes #7", title: "Revert: the change" });
 
-        const mutation = sent.find((call) => String(call.json.query).includes("revertPullRequest(input"));
+        // Exactly one write: a duplicate call must fail here.
+        const mutations = sent.filter((call) => String(call.json.query).includes("revertPullRequest(input"));
+
+        expect(mutations).toHaveLength(1);
+
+        const [mutation] = mutations;
 
         expect(mutation?.json.variables).toEqual({ body: "Undoes #7", pullRequestId: "PR_node", title: "Revert: the change" });
     });

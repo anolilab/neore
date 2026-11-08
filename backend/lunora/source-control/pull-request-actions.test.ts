@@ -75,6 +75,7 @@ describe("pull request actions refuse before reading a token", () => {
         await expect(call(editPullRequest, {})).rejects.toThrow("Nothing to change");
         await expect(call(editPullRequest, { title: " ".repeat(3) })).rejects.toThrow("A title cannot be empty");
         await expect(call(editPullRequest, { title: "x".repeat(257) })).rejects.toThrow("at most 256 characters");
+        await expect(call(revertPullRequest, { title: " ".repeat(3) })).rejects.toThrow("A title cannot be empty");
         expect(resolveToken).not.toHaveBeenCalled();
     });
 
