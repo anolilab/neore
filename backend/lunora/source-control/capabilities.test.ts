@@ -21,8 +21,10 @@ const KEYS: Record<HostCapabilityKey, true> = {
     "pullRequest.create": true,
     "pullRequest.description": true,
     "pullRequest.diff": true,
+    "pullRequest.edit": true,
     "pullRequest.files": true,
     "pullRequest.guide": true,
+    "pullRequest.revert": true,
     "review.batchedSubmit": true,
     "review.lineComments": true,
     "review.replies": true,
@@ -31,6 +33,7 @@ const KEYS: Record<HostCapabilityKey, true> = {
     "review.verdictComment": true,
     "review.verdictRequestChanges": true,
     "review.viewedMarks": true,
+    "reviewers.request": true,
 };
 
 describe("host capability rules", () => {

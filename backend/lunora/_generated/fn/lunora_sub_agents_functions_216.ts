@@ -2,41 +2,41 @@
 // Run `lunora codegen` to regenerate.
 
 import { DEFER_VALIDATION as DEFER, installCompiledValidatorMap } from "lunorash/values";
-import * as lunora_sub_agents_functions_215 from "../../sub-agents/functions.js";
+import * as lunora_sub_agents_functions_216 from "../../sub-agents/functions.js";
 
 /** Install the precompiled argument parsers before the module is dispatched. */
-installCompiledValidatorMap(lunora_sub_agents_functions_215.attachChildThread.args, (source) => {
+installCompiledValidatorMap(lunora_sub_agents_functions_216.attachChildThread.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["childThreadId"] !== "string") return DEFER;
 if (typeof source["runId"] !== "string") return DEFER;
 return { "childThreadId": source["childThreadId"], "runId": source["runId"] };
 });
-installCompiledValidatorMap(lunora_sub_agents_functions_215.beatRun.args, (source) => {
+installCompiledValidatorMap(lunora_sub_agents_functions_216.beatRun.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["runId"] !== "string") return DEFER;
 return { "runId": source["runId"] };
 });
-installCompiledValidatorMap(lunora_sub_agents_functions_215.cancelRun.args, (source) => {
+installCompiledValidatorMap(lunora_sub_agents_functions_216.cancelRun.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["runId"] !== "string") return DEFER;
 return { "runId": source["runId"] };
 });
-installCompiledValidatorMap(lunora_sub_agents_functions_215.claimRun.args, (source) => {
+installCompiledValidatorMap(lunora_sub_agents_functions_216.claimRun.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["runId"] !== "string") return DEFER;
 return { "runId": source["runId"] };
 });
-installCompiledValidatorMap(lunora_sub_agents_functions_215.getWorker.args, (source) => {
+installCompiledValidatorMap(lunora_sub_agents_functions_216.getWorker.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["workerId"] !== "string") return DEFER;
 return { "workerId": source["workerId"] };
 });
-installCompiledValidatorMap(lunora_sub_agents_functions_215.postResult.args, (source) => {
+installCompiledValidatorMap(lunora_sub_agents_functions_216.postResult.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["attempt"] !== "number" || !Number.isFinite(source["attempt"])) return DEFER;
@@ -50,7 +50,7 @@ __has1 = true;
 if (typeof source["runId"] !== "string") return DEFER;
 return { "attempt": source["attempt"], ...(__has1 ? { "failures": __val1 } : {}), "runId": source["runId"] };
 });
-installCompiledValidatorMap(lunora_sub_agents_functions_215.reapRun.args, (source) => {
+installCompiledValidatorMap(lunora_sub_agents_functions_216.reapRun.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 let __has1 = false;
@@ -63,19 +63,19 @@ __has1 = true;
 if (typeof source["runId"] !== "string") return DEFER;
 return { ...(__has1 ? { "claimedAt": __val1 } : {}), "runId": source["runId"] };
 });
-installCompiledValidatorMap(lunora_sub_agents_functions_215.retryHostRunStart.args, (source) => {
+installCompiledValidatorMap(lunora_sub_agents_functions_216.retryHostRunStart.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["runId"] !== "string") return DEFER;
 return { "runId": source["runId"] };
 });
-installCompiledValidatorMap(lunora_sub_agents_functions_215.shouldRunStop.args, (source) => {
+installCompiledValidatorMap(lunora_sub_agents_functions_216.shouldRunStop.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["runId"] !== "string") return DEFER;
 return { "runId": source["runId"] };
 });
-installCompiledValidatorMap(lunora_sub_agents_functions_215.watchRunBeat.args, (source) => {
+installCompiledValidatorMap(lunora_sub_agents_functions_216.watchRunBeat.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["claimedAt"] !== "number" || !Number.isFinite(source["claimedAt"])) return DEFER;
