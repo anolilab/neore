@@ -18,6 +18,9 @@ const MAX_TITLE = 256;
 /** The most characters a description holds, the bound the backend's edit input checks. */
 const MAX_BODY = 65_536;
 
+/** A textarea reports line breaks as \n; a description from the host may carry \r\n. Compared apart from that, a re-typed original is no change. */
+const normalizeLineEndings = (text: string): string => text.replaceAll("\r\n", "\n");
+
 /**
  * The title and description edit: its button, and the dialog that holds the typed text until the host answers. A refusal keeps
  * the dialog open with its reason; an unconfirmed answer or a saved edit closes it.
@@ -42,7 +45,7 @@ const EditPullRequestAction = ({
     requestNoun: string;
     title: string;
 }) => {
-    const { t } = useLingui();
+    const { i18n, t } = useLingui();
     const titleId = useId();
     const { settled } = useActionFeedback(hostLabel);
     const singleFlight = useSingleFlight();
@@ -67,7 +70,7 @@ const EditPullRequestAction = ({
         // The title is compared as typed: an untouched title with surrounding spaces must not be sent trimmed in a description-only save.
         const change = {
             ...(editing.title !== editing.original.title && { title: editing.title.trim() }),
-            ...(!editing.truncated && editing.body !== editing.original.body && { body: editing.body }),
+            ...(!editing.truncated && normalizeLineEndings(editing.body) !== normalizeLineEndings(editing.original.body) && { body: editing.body }),
         };
 
         onFeedback(null);
@@ -116,7 +119,7 @@ const EditPullRequestAction = ({
                         <DialogTitle>{t`Edit this ${requestNoun}`}</DialogTitle>
                         <DialogDescription>{t`${hostLabel} shows the new title and description to everyone who can see this ${requestNoun}.`}</DialogDescription>
                     </DialogHeader>
-                    <div className="space-y-3 px-6">
+                    <div aria-busy={actions.edit.isPending} className="space-y-3 px-6">
                         <div className="space-y-1">
                             <Label htmlFor={`${titleId}-title`}>{t`Title`}</Label>
                             <Input
@@ -130,8 +133,8 @@ const EditPullRequestAction = ({
                             {titleProblem && (
                                 <p className="text-muted-foreground text-xs" id={`${titleId}-title-note`}>
                                     {titleTooLong
-                                        ? t`A pull request title is at most ${MAX_TITLE} characters.`
-                                        : t`A pull request needs a title. Enter one to save.`}
+                                        ? t`A ${requestNoun} title is at most ${i18n.number(MAX_TITLE)} characters.`
+                                        : t`A ${requestNoun} needs a title. Enter one to save.`}
                                 </p>
                             )}
                         </div>
@@ -153,7 +156,7 @@ const EditPullRequestAction = ({
                             )}
                             {bodyTooLong && (
                                 <p className="text-muted-foreground text-xs" id={`${titleId}-body-note`}>
-                                    {t`A description is at most ${MAX_BODY} characters.`}
+                                    {t`A description is at most ${i18n.number(MAX_BODY)} characters.`}
                                 </p>
                             )}
                         </div>
@@ -166,7 +169,9 @@ const EditPullRequestAction = ({
                     )}
                     <DialogFooter>
                         <DialogClose render={<Button variant="outline" />}>{t`Cancel`}</DialogClose>
-                        <Button disabled={titleProblem || bodyTooLong || actions.edit.isPending} onClick={saveEdit}>{t`Save`}</Button>
+                        <Button disabled={titleProblem || bodyTooLong || actions.edit.isPending} onClick={saveEdit}>
+                            {actions.edit.isPending ? t`Saving…` : t`Save`}
+                        </Button>
                     </DialogFooter>
                 </DialogPopup>
             </Dialog>

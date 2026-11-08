@@ -5,8 +5,8 @@ import { describe, expect, it, vi } from "vitest";
 
 import PullRequestActionsPanel from "./pull-request-actions-panel";
 
-const { edit } = vi.hoisted(() => {
-    return { edit: vi.fn() };
+const { available, edit } = vi.hoisted(() => {
+    return { available: vi.fn(() => true), edit: vi.fn() };
 });
 
 // The unit-test transform does not compile Lingui macros (vi.mock is hoisted).
@@ -17,14 +17,14 @@ vi.mock("@lingui/react/macro", () => {
         Plural: ({ value }: { value: number }) => <>{value}</>,
         Trans: ({ children }: { children: unknown }) => <>{children as never}</>,
         useLingui: () => {
-            return { i18n: { _: (descriptor: { id: string }) => descriptor.id, locale: "en" }, t: text };
+            return { i18n: { _: (descriptor: { id: string }) => descriptor.id, locale: "en", number: String }, t: text };
         },
     };
 });
 
 vi.mock("@neore/backend/source-control/capabilities", () => {
     return {
-        isHostCapabilityAvailable: () => true,
+        isHostCapabilityAvailable: available,
     };
 });
 
@@ -42,7 +42,10 @@ vi.mock("../lib/use-pull-request-actions", async (importOriginal) => {
 vi.mock("../lib/use-review-messages", () => {
     return {
         useReviewMessages: () => {
-            return { edit: String, write: (outcome: { status: string }) => `The host answered ${outcome.status}` };
+            return {
+                edit: String,
+                write: (outcome: { reason?: string | null; status: string }) => `The host answered ${outcome.status}: ${outcome.reason ?? ""}`,
+            };
         },
     };
 });
@@ -65,11 +68,11 @@ const typeInto = (element: HTMLElement, value: string): void => {
 
 const ADDRESS = { number: 7, repository: "octo/hello" } as const;
 
-const renderPanel = (bodyTruncated = false) =>
+const renderPanel = (bodyTruncated = false, body = "The description") =>
     render(
         <PullRequestActionsPanel
             host={{ capabilities: {} as never, label: "GitHub", noun: "pull request" }}
-            pull={{ address: ADDRESS as never, body: "The description", bodyTruncated, title: "Old title" }}
+            pull={{ address: ADDRESS as never, body, bodyTruncated, title: "Old title" }}
         />,
     );
 
@@ -91,7 +94,7 @@ describe("PullRequestActionsPanel edit dialog", () => {
         pressButton(screen.getByRole("button", { name: "Save" }));
 
         // The reason shows in the dialog and on the panel, so the person sees it whichever they look at.
-        expect(await screen.findAllByText("The host answered rejected")).not.toHaveLength(0);
+        expect(await screen.findAllByText("The host answered rejected: Not allowed")).not.toHaveLength(0);
         expect((screen.getByLabelText("Title") as HTMLInputElement).value).toBe("New title");
     });
 
@@ -140,11 +143,39 @@ describe("PullRequestActionsPanel cut-short description", () => {
 
         await typeNewTitle();
 
-        expect((screen.getByLabelText("Description") as HTMLTextAreaElement).readOnly).toBe(true);
+        const description = screen.getByLabelText("Description") as HTMLTextAreaElement;
+
+        expect(description.readOnly).toBe(true);
+        typeInto(description, "Rewritten");
         pressButton(screen.getByRole("button", { name: "Save" }));
 
         await waitFor(() => {
             expect(edit).toHaveBeenLastCalledWith({ title: "New title" });
         });
+    });
+});
+
+describe("PullRequestActionsPanel description comparison", () => {
+    it("does not send a description that only differs by line endings", async () => {
+        edit.mockResolvedValueOnce({ status: "ok" });
+        renderPanel(false, "one\r\ntwo");
+
+        await typeNewTitle();
+        typeInto(screen.getByLabelText("Description"), "one\ntwo");
+        pressButton(screen.getByRole("button", { name: "Save" }));
+
+        await waitFor(() => {
+            expect(edit).toHaveBeenLastCalledWith({ title: "New title" });
+        });
+    });
+});
+
+describe("PullRequestActionsPanel capability", () => {
+    it("does not offer the edit when the host does not declare it", () => {
+        available.mockReturnValue(false);
+        renderPanel();
+
+        expect(screen.queryByRole("button", { name: "Edit title and description" })).toBeNull();
+        available.mockReturnValue(true);
     });
 });

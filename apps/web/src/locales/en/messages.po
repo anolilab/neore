@@ -988,11 +988,11 @@ msgstr "{hostLabel} refused this request."
 msgid "{hostLabel} says this is ready to merge."
 msgstr "{hostLabel} says this is ready to merge."
 
-#: src/features/develop/components/pull-request-edit-action.tsx:151
+#: src/features/develop/components/pull-request-edit-action.tsx:154
 msgid "{hostLabel} shortened this description, so it cannot be edited here. The title can still change."
 msgstr "{hostLabel} shortened this description, so it cannot be edited here. The title can still change."
 
-#: src/features/develop/components/pull-request-edit-action.tsx:117
+#: src/features/develop/components/pull-request-edit-action.tsx:120
 msgid "{hostLabel} shows the new title and description to everyone who can see this {requestNoun}."
 msgstr "{hostLabel} shows the new title and description to everyone who can see this {requestNoun}."
 
@@ -1707,6 +1707,15 @@ msgstr "9:16 ratio"
 msgid "99.99% SLA"
 msgstr "99.99% SLA"
 
+#: src/features/develop/components/pull-request-edit-action.tsx:137
+msgid "A {requestNoun} needs a title. Enter one to save."
+msgstr "A {requestNoun} needs a title. Enter one to save."
+
+#. placeholder {0}: i18n.number(MAX_TITLE)
+#: src/features/develop/components/pull-request-edit-action.tsx:136
+msgid "A {requestNoun} title is at most {0} characters."
+msgstr "A {requestNoun} title is at most {0} characters."
+
 #: src/features/develop/components/watched-repositories.tsx:72
 msgid "a change is waiting to be read"
 msgstr "a change is waiting to be read"
@@ -1731,9 +1740,14 @@ msgstr "A coordinator picks who answers — up to three per message."
 msgid "A dataset is a set of test cases you run against an agent, a model or your knowledge base."
 msgstr "A dataset is a set of test cases you run against an agent, a model or your knowledge base."
 
+#. placeholder {0}: i18n.number(MAX_BODY)
+#: src/features/develop/components/pull-request-edit-action.tsx:159
+msgid "A description is at most {0} characters."
+msgstr "A description is at most {0} characters."
+
 #: src/features/develop/components/pull-request-edit-action.tsx:156
-msgid "A description is at most {MAX_BODY} characters."
-msgstr "A description is at most {MAX_BODY} characters."
+#~ msgid "A description is at most {MAX_BODY} characters."
+#~ msgstr "A description is at most {MAX_BODY} characters."
 
 #: src/features/marketing/components/landing-page.tsx:218
 msgid "A document editor that thinks with you."
@@ -1824,12 +1838,12 @@ msgid "A public http or https address. The first check only records how the page
 msgstr "A public http or https address. The first check only records how the page looks. Only the first 1 MiB of a page is read."
 
 #: src/features/develop/components/pull-request-edit-action.tsx:134
-msgid "A pull request needs a title. Enter one to save."
-msgstr "A pull request needs a title. Enter one to save."
+#~ msgid "A pull request needs a title. Enter one to save."
+#~ msgstr "A pull request needs a title. Enter one to save."
 
 #: src/features/develop/components/pull-request-edit-action.tsx:133
-msgid "A pull request title is at most {MAX_TITLE} characters."
-msgstr "A pull request title is at most {MAX_TITLE} characters."
+#~ msgid "A pull request title is at most {MAX_TITLE} characters."
+#~ msgstr "A pull request title is at most {MAX_TITLE} characters."
 
 #: src/features/notifications/lib/notification-labels.ts:39
 msgid "A question is waiting for you"
@@ -5345,7 +5359,7 @@ msgstr "Canada"
 #: src/features/chat/thread/generation-model-menu.tsx:162
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:227
 #: src/features/develop/components/comment-composer.tsx:62
-#: src/features/develop/components/pull-request-edit-action.tsx:168
+#: src/features/develop/components/pull-request-edit-action.tsx:171
 #: src/features/evals/components/case-form-dialog.tsx:68
 #: src/features/evals/components/dataset-form-dialog.tsx:168
 #: src/features/evals/components/import-cases-dialog.tsx:113
@@ -9918,7 +9932,7 @@ msgid "Describe your workflow... e.g., 'Generate an image from text, upscale it,
 msgstr "Describe your workflow... e.g., 'Generate an image from text, upscale it, then remove the background'"
 
 #: src/components/model-picker/model-picker.tsx:167
-#: src/features/develop/components/pull-request-edit-action.tsx:139
+#: src/features/develop/components/pull-request-edit-action.tsx:142
 #: src/features/develop/components/pull-request-view.tsx:73
 #: src/features/evals/components/dataset-form-dialog.tsx:102
 #: src/features/knowledge/components/collection-dialog.tsx:69
@@ -10997,11 +11011,11 @@ msgstr "Edit task"
 msgid "Edit the reply..."
 msgstr "Edit the reply..."
 
-#: src/features/develop/components/pull-request-edit-action.tsx:116
+#: src/features/develop/components/pull-request-edit-action.tsx:119
 msgid "Edit this {requestNoun}"
 msgstr "Edit this {requestNoun}"
 
-#: src/features/develop/components/pull-request-edit-action.tsx:111
+#: src/features/develop/components/pull-request-edit-action.tsx:114
 msgid "Edit title and description"
 msgstr "Edit title and description"
 
@@ -21678,7 +21692,7 @@ msgid "Not attached:"
 msgstr "Not attached:"
 
 #: src/features/develop/components/pull-request-actions-panel.tsx:65
-#: src/features/develop/components/pull-request-edit-action.tsx:163
+#: src/features/develop/components/pull-request-edit-action.tsx:166
 msgid "Not changed"
 msgstr "Not changed"
 
@@ -27301,7 +27315,7 @@ msgstr "Saudi Arabia"
 #: src/features/chat/thread/edit-composer.tsx:165
 #: src/features/chat/thread/request-secret-prompt.tsx:491
 #: src/features/develop/components/draft-comment-card.tsx:43
-#: src/features/develop/components/pull-request-edit-action.tsx:169
+#: src/features/develop/components/pull-request-edit-action.tsx:173
 #: src/features/knowledge/components/collection-dialog.tsx:100
 #: src/features/settings/components/chat/api-keys-settings.tsx:436
 #: src/features/settings/components/chat/custom-providers-settings.tsx:640
@@ -27427,7 +27441,7 @@ msgstr "Saved — the assistant can use it once, in this reply"
 msgid "Saved as preset"
 msgstr "Saved as preset"
 
-#: src/features/develop/components/pull-request-edit-action.tsx:83
+#: src/features/develop/components/pull-request-edit-action.tsx:86
 msgid "Saved on {hostLabel}."
 msgstr "Saved on {hostLabel}."
 
@@ -27452,6 +27466,7 @@ msgid "Saving..."
 msgstr "Saving..."
 
 #: src/features/canvas/canvas-panel.tsx:243
+#: src/features/develop/components/pull-request-edit-action.tsx:173
 #: src/features/skills/components/skill-builder-dialog.tsx:182
 #: src/features/skills/components/skill-form-dialog.tsx:515
 msgid "Saving…"
@@ -33130,7 +33145,7 @@ msgid "Timezone updated"
 msgstr "Timezone updated"
 
 #: src/features/chat/thread-list/rename-thread-dialog.tsx:148
-#: src/features/develop/components/pull-request-edit-action.tsx:121
+#: src/features/develop/components/pull-request-edit-action.tsx:124
 #: src/features/projects/components/project-form-dialog.tsx:195
 #: src/features/slides/components/slide-editor-dialog.tsx:90
 #: src/features/tasks/components/goal-form-dialog.tsx:88
