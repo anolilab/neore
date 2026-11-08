@@ -202,7 +202,7 @@ const agentConfig = (key: string): string => {
 const accountText = (key: string): string => {
     const pending = state.signInPending.get(key);
 
-    return pending === undefined ? signInText(signInOf(key)) : SIGN_IN_PENDING[pending].row;
+    return pending === undefined ? signInText(signInOf(key)) : SIGN_IN_PENDING[pending];
 };
 
 /** The agent's last sign-in answer, if it was given for the agent as it is configured now. */
@@ -212,10 +212,10 @@ const signInOf = (key: string): SignInStatus | undefined => {
     return known?.config === agentConfig(key) ? known.status : undefined;
 };
 
-/** How the row and the notice name a request that is running. */
-const SIGN_IN_PENDING: Record<SignInRequest, { notice: string; row: string }> = {
-    check: { notice: "being checked", row: "checking…" },
-    signOut: { notice: "being signed out", row: "signing out…" },
+/** How the row names a request that is running. */
+const SIGN_IN_PENDING: Record<SignInRequest, string> = {
+    check: "checking…",
+    signOut: "signing out…",
 };
 
 /**
@@ -236,16 +236,8 @@ const askSignIn = async (key: string, request: SignInRequest, ask: () => Promise
     }
 };
 
-/** True, with a notice, while a sign-in request for `key` runs. */
-const signInBusy = (key: string): boolean => {
-    const pending = state.signInPending.get(key);
-
-    if (pending !== undefined) {
-        $("acp-notice").textContent = `${agentLabel(key)} is ${SIGN_IN_PENDING[pending].notice}; try again once that ends.`;
-    }
-
-    return pending !== undefined;
-};
+/** A sign-in request for `key` is running; its row says which, so a click meanwhile does nothing. */
+const signInBusy = (key: string): boolean => state.signInPending.has(key);
 
 const checkSignIn = (key: string) =>
     guarded(async () => {
