@@ -44,8 +44,14 @@ export const registerPushDevice = authMutation
     .input({ platform: vPlatform, token: vExpoPushToken })
     .output(v.object({ registered: v.boolean() }))
     .mutation(async ({ args, ctx }) => {
-        if (!isPhonePushConfigured(process.env)) {
+        const refuse = (reason: "deleting" | "no_session" | "off") => {
+            ctx.log.event("notifications.register_push_device", { platform: args.platform, refused: reason });
+
             return { registered: false };
+        };
+
+        if (!isPhonePushConfigured(process.env)) {
+            return refuse("off");
         }
 
         const { userId } = ctx.user;
@@ -53,12 +59,12 @@ export const registerPushDevice = authMutation
         const sessionId = identity?.sessionId;
 
         if (typeof sessionId !== "string") {
-            return { registered: false };
+            return refuse("no_session");
         }
 
         // Behind the deletion workflow's push step, a new row would survive erasure.
         if (await isAccountDeletionUnderway(ctx, userId)) {
-            return { registered: false };
+            return refuse("deleting");
         }
 
         const now = Date.now();
@@ -98,7 +104,7 @@ export const registerPushDevice = authMutation
                 await database.delete("pushDevices", written._id);
             }
 
-            return { registered: false };
+            return refuse("deleting");
         }
 
         // Past the cap, the phones not seen for longest go.
@@ -113,13 +119,22 @@ export const registerPushDevice = authMutation
         return { registered: true };
     });
 
-/** Sign-out: this phone stops getting the caller's pushes. Another account's row for the token is left alone. */
+/**
+ * Sign-out: this phone stops getting the caller's pushes. Only the row this sign-in registered goes: another account's
+ * row for the token, or one the same account registered again under a newer sign-in before this release was read, is
+ * left alone.
+ */
 export const unregisterPushDevice = authMutation
-    .use(rateLimit("notifications/push"))
+    .use(rateLimit("notifications/pushRelease"))
     .input({ token: v.string().check((value) => value.length > 0 && value.length <= 200, { message: "Invalid push token" }) })
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
-        const row = await ctx.db.pushDevices.findFirst({ consistency: "primary", where: { token: args.token, userId: ctx.user.userId } });
+        const identity = await ctx.auth.getIdentity();
+        const sessionId = identity?.sessionId;
+        const row =
+            typeof sessionId === "string"
+                ? await ctx.db.pushDevices.findFirst({ consistency: "primary", where: { sessionId, token: args.token, userId: ctx.user.userId } })
+                : undefined;
 
         if (row) {
             await ctx.db.delete("pushDevices", row._id);

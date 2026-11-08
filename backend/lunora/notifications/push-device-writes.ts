@@ -2,10 +2,29 @@
  * The notifications module's write surface for `pushDevices`, for writers outside
  * the module (the account merge) as well as its own procedures.
  */
+import type { Doc } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
 
 /** Phones one user may register; the one not seen for longest is dropped past this. */
 export const MAX_PUSH_DEVICES_PER_USER = 10;
+
+/**
+ * Deletes a row read earlier only if it is still the same registration: the same owner, not seen since. Another
+ * account may have taken the phone over, or the phone registered again, after the first read; that registration
+ * stays. The check and the delete are two statements (the global table offers no conditional delete), so a write
+ * landing between them can still lose its row; the app registers again on its next return to the foreground.
+ */
+const deleteIfUnchanged = async (db: MutationCtx["db"], read: Doc<"pushDevices">): Promise<boolean> => {
+    const current = await db.pushDevices.findFirst({ consistency: "primary", where: { _id: read._id } });
+
+    if (current?.userId !== read.userId || current.lastSeenAt !== read.lastSeenAt) {
+        return false;
+    }
+
+    await db.delete("pushDevices", read._id);
+
+    return true;
+};
 
 /**
  * An account merge: the guest's phones were registered under the guest's session, which ends with the guest, so they
@@ -18,10 +37,10 @@ export const dropPushDevicesOf = async (db: MutationCtx["db"], userId: string): 
         const { page } = await db.pushDevices.findMany({ consistency: "primary", limit: MAX_PUSH_DEVICES_PER_USER * 3, where: { userId } });
 
         for (const device of page) {
-            await db.delete("pushDevices", device._id);
+            if (await deleteIfUnchanged(db, device)) {
+                removed += 1;
+            }
         }
-
-        removed += page.length;
 
         if (page.length < MAX_PUSH_DEVICES_PER_USER * 3) {
             return removed;
@@ -48,10 +67,10 @@ export const trimPushDevices = async (db: MutationCtx["db"], userId: string): Pr
         const excess = page.slice(MAX_PUSH_DEVICES_PER_USER);
 
         for (const device of excess) {
-            await db.delete("pushDevices", device._id);
+            if (await deleteIfUnchanged(db, device)) {
+                removed += 1;
+            }
         }
-
-        removed += excess.length;
 
         if (page.length < MAX_PUSH_DEVICES_PER_USER * 3) {
             return removed;

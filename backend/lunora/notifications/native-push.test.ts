@@ -9,7 +9,7 @@ import { reassignGlobalRows } from "../lib/account-merge";
 import schema from "../schema";
 import { getNativePushConfig, registerPushDevice, unregisterPushDevice } from "./native-push";
 import { collectNotificationsForExport, deleteUserNotifications } from "./gdpr";
-import { MAX_PUSH_DEVICES_PER_USER } from "./push-device-writes";
+import { dropPushDevicesOf, MAX_PUSH_DEVICES_PER_USER, trimPushDevices } from "./push-device-writes";
 
 vi.mock("../lib/crpc-auth-helpers", async (importOriginal) => {
     const sessionFrom = async (context: { auth: { userId?: string | null } }) =>
@@ -119,6 +119,19 @@ describe("phone push tokens", () => {
         expect(await devicesOf(USER)).toHaveLength(0);
     });
 
+    it("leaves a newer sign-in's registration alone when an older sign-in's release arrives late", async () => {
+        const older = sessions[USER]!;
+
+        await call(registerPushDevice, USER, { platform: "ios", token: PHONE });
+        sessions[USER] = await startSession(USER);
+        await call(registerPushDevice, USER, { platform: "ios", token: PHONE });
+
+        sessions[USER] = older;
+        await call(unregisterPushDevice, USER, { token: PHONE });
+
+        expect(await devicesOf(USER)).toHaveLength(1);
+    });
+
     it("keeps the newest phones past the cap", async () => {
         // Seeded straight into the table: the procedure's rate limit allows fewer calls than the cap.
         await harness.run(async (ctx: any) => {
@@ -222,5 +235,61 @@ describe("phone push tokens", () => {
 
         expect(await call(registerPushDevice, USER, { platform: "ios", token: PHONE })).toStrictEqual({ registered: false });
         expect(await devicesOf(USER)).toHaveLength(0);
+    });
+});
+
+describe("pushDevices writes", () => {
+    /** A table whose rows another registration refreshes between the read and the delete. */
+    const racingDb = (rows: { _id: string; lastSeenAt: number; userId: string }[]) => {
+        const deleted: string[] = [];
+
+        return {
+            db: {
+                delete: vi.fn(async (_table: string, id: string) => {
+                    deleted.push(id);
+                }),
+                pushDevices: {
+                    findFirst: vi.fn(async ({ where }: { where: { _id: string } }) => {
+                        const row = rows.find((candidate) => candidate._id === where._id)!;
+
+                        // `r0` registered again (seen later), `r1` was taken over by another account.
+                        if (row._id === "r0") {
+                            return { ...row, lastSeenAt: row.lastSeenAt + 1 };
+                        }
+
+                        return row._id === "r1" ? { ...row, userId: OTHER } : row;
+                    }),
+                    findMany: vi.fn(async () => {
+                        return { page: rows };
+                    }),
+                },
+            },
+            deleted,
+        };
+    };
+
+    it("skips a row that registered again or changed owner after the first read", async () => {
+        const rows = ["r0", "r1", "r2"].map((id, index) => {
+            return { _id: id, lastSeenAt: index, userId: USER };
+        });
+        const { db, deleted } = racingDb(rows);
+
+        expect(await dropPushDevicesOf(db as never, USER)).toBe(1);
+        expect(deleted).toStrictEqual(["r2"]);
+    });
+
+    it("trims past the cap without deleting a phone that registered again meanwhile", async () => {
+        // Newest first, as the trim reads them: the excess is r0 (refreshed since the read) and r1 (taken over).
+        const rows = [
+            ...Array.from({ length: MAX_PUSH_DEVICES_PER_USER }, (_, index) => {
+                return { _id: `keep-${String(index)}`, lastSeenAt: 100 - index, userId: USER };
+            }),
+            { _id: "r0", lastSeenAt: 1, userId: USER },
+            { _id: "r1", lastSeenAt: 0, userId: USER },
+        ];
+        const { db, deleted } = racingDb(rows);
+
+        expect(await trimPushDevices(db as never, USER)).toBe(0);
+        expect(deleted).toHaveLength(0);
     });
 });
