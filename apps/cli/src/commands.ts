@@ -218,7 +218,8 @@ const postThread = async (context: Context, flags: Flags, threadId: string | und
         );
 
         if (flags.json) {
-            printJson(context.io, { messageId: started.messageId, threadId: started.threadId });
+            // `null`, not a missing key, when the answer names no message: the shape stays the same for a JSON caller.
+            printJson(context.io, { messageId: started.messageId ?? null, threadId: started.threadId });
         } else {
             context.io.stdout.write(`${started.threadId}\n`);
         }

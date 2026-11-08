@@ -333,6 +333,13 @@ describe("chat end to end against a fake API", () => {
             expect(bodies).toEqual([{ model: "gpt", prompt: "do it", stream: true }]);
         });
 
+        it("--json keeps messageId as null when the start answer names none", async () => {
+            const { context } = await setup(() => Response.json({ threadId: "th1" }, { status: 202 }));
+
+            expect(await run(["thread", "start", "hi", "--json"], context)).toBe(0);
+            expect(JSON.parse(context.io.stdout.text())).toStrictEqual({ messageId: null, threadId: "th1" });
+        });
+
         it("send posts with the thread id", async () => {
             const { bodies, context } = await setup(() => started("th9"));
 
