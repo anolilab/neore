@@ -315,6 +315,23 @@ describe("recording usage by project", () => {
             { threadAttribution: { projectKey: alpha.projectId }, userId: USER },
             { threadAttribution: {}, userId: OTHER },
         ]);
+
+        // Each forwarded record lands, twice over: a redelivery counts nothing more.
+        for (const job of [...forwarded, ...forwarded]) {
+            await harness.run(async (ctx: any) => await ctx.runMutation(recordReplyUsage, job));
+        }
+
+        for (const userId of [USER, OTHER]) {
+            const counted = await heatmap(userId, "2026-09-25");
+
+            expect(counted.days).toMatchObject([{ costMicrodollars: 100, date: "2026-09-20", replies: 1, tokens: 10 }]);
+            const { skills } = await breakdown(userId, "2026-09-01");
+
+            expect(skills).toMatchObject([{ costMicrodollars: 100, replies: 1, skillKey: DEFAULT_SKILL_KEY }]);
+        }
+
+        expect(await projectTotals(USER)).toStrictEqual({ [alpha.projectId!]: { costMicrodollars: 100, replies: 1, tokens: 10 } });
+        expect(await projectTotals(OTHER)).toStrictEqual({});
     });
 
     it("forwards a shared reply's total at once when its project read fails, and tries the project again", async () => {
