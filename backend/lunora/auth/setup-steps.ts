@@ -3,7 +3,7 @@
  * mutation runs (a shard runs mutations one at a time), so two tabs or devices that skip different steps both keep
  * their choice. A whole-list overwrite from a client's cache could not promise that.
  */
-import { v } from "lunorash/server";
+import { LunoraError, v } from "lunorash/server";
 
 import { authMutation, rateLimit } from "../lib/crpc";
 import { saveUserSettings } from "./lib/preference-writes";
@@ -19,12 +19,19 @@ export const applyStepSkip = (stored: ReadonlyArray<string> | undefined, stepId:
 export const setSetupStepSkipped = authMutation
     .use(rateLimit("settings/update"))
     .input({
+        // The account the click was made as: a write the client held while offline and replayed after a switch is refused.
+        expectedUserId: v.optional(v.string()),
         skipped: v.boolean(),
         stepId: v.union(v.literal("pair"), v.literal("ssh"), v.literal("agent")),
     })
     .output(v.null())
-    .mutation(async ({ args: { skipped, stepId }, ctx }) => {
+    .mutation(async ({ args: { expectedUserId, skipped, stepId }, ctx }) => {
         const { userId } = ctx.user;
+
+        if (expectedUserId !== undefined && expectedUserId !== userId) {
+            throw new LunoraError("FORBIDDEN", "This choice was made for another account");
+        }
+
         const settings = await ctx.db.userSettings.findFirst({ where: { userId } });
 
         await saveUserSettings(

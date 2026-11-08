@@ -4,7 +4,7 @@ import { CardContent } from "@neore/ui/components/card";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check } from "lucide-react";
 import type { FC } from "react";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 
 import SettingsCard from "@/components/settings/settings-card";
@@ -49,12 +49,12 @@ const SetupChecklist: FC<{ serverFormShown: boolean }> = ({ serverFormShown }) =
     const [failedStep, setFailedStep] = useState<SetupStepId | undefined>(undefined);
     const { authClient } = useAuth();
     const { data: session } = authClient.useSession();
-    // Who is signed in right now, read when a queued save runs.
-    const signedInRef = useRef(session?.user?.id);
+    // Who is signed in, read when a save runs. The card can be gone by then, so nothing here belongs to it.
+    const signedIn = async () => {
+        const { data } = await authClient.getSession();
 
-    useEffect(() => {
-        signedInRef.current = session?.user?.id;
-    }, [session?.user?.id]);
+        return data?.user?.id;
+    };
 
     // The list is live: a computer paired in the desktop app arrives as a push.
     const devicesQuery = useQuery(crpc.devices.functions.listDevices.queryOptions({}));
@@ -68,14 +68,14 @@ const SetupChecklist: FC<{ serverFormShown: boolean }> = ({ serverFormShown }) =
         mutationFn: async (args: SkipVariables, context) => {
             const { owner, ...step } = args;
 
-            if (owner !== signedInRef.current) {
+            if (owner !== (await signedIn())) {
                 throw new StaleAccountError();
             }
 
-            return (await saveStep.mutationFn?.(step as never, context)) ?? null;
+            return (await saveStep.mutationFn?.({ ...step, expectedUserId: owner } as never, context)) ?? null;
         },
         onMutate: async (args) => {
-            if (args.owner !== signedInRef.current) {
+            if (args.owner !== (await signedIn())) {
                 return undefined;
             }
 
@@ -93,9 +93,9 @@ const SetupChecklist: FC<{ serverFormShown: boolean }> = ({ serverFormShown }) =
 
             return { hadRow: Boolean(row), wasSkipped };
         },
-        onError: (_error, args, context) => {
+        onError: async (_error, args, context) => {
             // Another account is signed in now: the cache is theirs, so nothing is restored or announced.
-            if (context === undefined || args.owner !== signedInRef.current) {
+            if (context === undefined || args.owner !== (await signedIn())) {
                 return;
             }
 
@@ -110,18 +110,15 @@ const SetupChecklist: FC<{ serverFormShown: boolean }> = ({ serverFormShown }) =
         },
         // Settled, the cache ends on what the server stores, once no later save is still waiting its turn.
         onSettled: async (_data, _error, args) => {
-            if (args.owner === signedInRef.current && queryClient.isMutating({ mutationKey: [SAVE_SCOPE] }) <= 1) {
+            if (args.owner === (await signedIn()) && queryClient.isMutating({ mutationKey: [SAVE_SCOPE] }) <= 1) {
                 await queryClient.invalidateQueries({ queryKey: settingsKey });
             }
         },
     });
     // An account with no settings row answers `null`; only `undefined` means the read has not finished. Until both reads
     // have answered, no step has a status: a skip that is stored but not yet read must not show as "To do".
-    // Cached results from before this mount (another account's, say) are not answers: both reads must have been fetched since.
     const steps =
-        settingsQuery.isFetchedAfterMount && settingsQuery.data !== undefined && devicesQuery.isFetchedAfterMount && devicesQuery.isSuccess
-            ? deriveSetupSteps(devicesQuery.data, settingsQuery.data?.setupStepsSkipped)
-            : undefined;
+        settingsQuery.data !== undefined && devicesQuery.isSuccess ? deriveSetupSteps(devicesQuery.data, settingsQuery.data?.setupStepsSkipped) : undefined;
 
     const copy: Record<SetupStepId, { action: string; description: string; title: string }> = {
         agent: {
@@ -200,7 +197,7 @@ const SetupChecklist: FC<{ serverFormShown: boolean }> = ({ serverFormShown }) =
                                         <Button
                                             disabled={settingsQuery.isError}
                                             onClick={() => {
-                                                setSkipped.mutate({ owner: signedInRef.current, skipped: status === "todo", stepId: id });
+                                                setSkipped.mutate({ owner: session?.user?.id, skipped: status === "todo", stepId: id });
                                             }}
                                             size="sm"
                                             variant="ghost"

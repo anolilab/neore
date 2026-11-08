@@ -32,6 +32,9 @@ vi.mock("@/features/auth/lib/auth-ui-provider", () => {
         useAuth: () => {
             return {
                 authClient: {
+                    getSession: async () => {
+                        return { data: { user: { id: account.id } } };
+                    },
                     useSession: () => {
                         return { data: { user: { id: account.id } } };
                     },
@@ -161,13 +164,8 @@ const renderChecklist = (serverFormShown = true, client = new QueryClient({ defa
             <SetupChecklist serverFormShown={serverFormShown} />
         </QueryClientProvider>
     );
-    const view = render(tree);
 
-    return {
-        reload: () => {
-            view.rerender(tree);
-        },
-    };
+    render(tree);
 };
 
 describe("<SetupChecklist>", () => {
@@ -231,14 +229,14 @@ describe("<SetupChecklist>", () => {
         await user.click(await screen.findByRole("button", { name: RESkipAddAnSshServer }));
 
         expect(await screen.findByText("(Skipped)")).toBeTruthy();
-        expect(save).toHaveBeenCalledWith({ skipped: true, stepId: "ssh" });
+        expect(save).toHaveBeenCalledWith({ expectedUserId: "user-a", skipped: true, stepId: "ssh" });
 
         await user.click(screen.getByRole("button", { name: REResumeAddAnSshServer }));
 
         await waitFor(() => {
             expect(screen.queryByText("(Skipped)")).toBeNull();
         });
-        expect(save).toHaveBeenLastCalledWith({ skipped: false, stepId: "ssh" });
+        expect(save).toHaveBeenLastCalledWith({ expectedUserId: "user-a", skipped: false, stepId: "ssh" });
     });
 
     it("puts the step back and says so when the save fails", async () => {
@@ -301,24 +299,28 @@ describe("<SetupChecklist>", () => {
         expect(screen.getAllByText("(To do)")).toHaveLength(2);
     });
 
-    it("refuses a queued save once another account is signed in, and announces nothing", async () => {
+    it("refuses a queued save once the signed-in account has changed, and announces nothing", async () => {
         const user = userEvent.setup();
         const gate = createGate();
 
+        const client = new QueryClient({ defaultOptions: { mutations: { retry: false }, queries: { retry: false } } });
+
         server.hold = gate.promise;
-
-        const { reload } = renderChecklist();
-
+        renderChecklist(true, client);
         await user.click(await screen.findByRole("button", { name: RESkipAddAnSshServer }));
         await user.click(screen.getByRole("button", { name: RESkipPairAComputer }));
+        // The session changes between the two clicks; the card is not re-rendered.
         account.id = "user-b";
-        reload();
         gate.open();
 
+        // Drained: both saves have settled, the second without being sent.
         await waitFor(() => {
-            expect(save).toHaveBeenCalledTimes(1);
+            expect(client.isMutating()).toBe(0);
         });
-        expect(save).toHaveBeenCalledWith({ skipped: true, stepId: "ssh" });
+
+        expect(save).toHaveBeenCalledTimes(1);
+        expect(save).toHaveBeenCalledWith({ expectedUserId: "user-a", skipped: true, stepId: "ssh" });
+        expect(save).not.toHaveBeenCalledWith(expect.objectContaining({ stepId: "pair" }));
         expect(toastError).not.toHaveBeenCalled();
     });
 
@@ -385,30 +387,17 @@ describe("<SetupChecklist>", () => {
         });
     });
 
-    it("shows no status from results cached before this mount until both reads are fetched again", async () => {
-        const client = new QueryClient({ defaultOptions: { mutations: { retry: false }, queries: { retry: false } } });
-        const settingsGate = createGate();
-        const devicesGate = createGate();
+    it("shows statuses at once when the app shell already cached both reads and nothing refetches them", async () => {
+        // `crpc` queries have an infinite staleTime: a cached read is never fetched again on mount.
+        const client = new QueryClient({ defaultOptions: { mutations: { retry: false }, queries: { retry: false, staleTime: Infinity } } });
 
-        // The previous account's answers, under the same keys.
         client.setQueryData(["getUserSettings"], { setupStepsSkipped: ["ssh"] });
         client.setQueryData(["listDevices"], [{ lastSeenAt: 1 }]);
-        server.settingsHold = settingsGate.promise;
-        devices.hold = devicesGate.promise;
         renderChecklist(true, client);
 
-        expect(screen.getAllByText("(Checking)")).toHaveLength(3);
-        expect(screen.queryByRole("button", { name: RESkip })).toBeNull();
-
-        devicesGate.open();
-        await waitFor(() => {
-            expect(client.getQueryState(["listDevices"])?.fetchStatus).toBe("idle");
-        });
-
-        expect(screen.getAllByText("(Checking)")).toHaveLength(3);
-
-        settingsGate.open();
-
-        expect(await screen.findAllByText("(To do)")).toHaveLength(3);
+        expect(await screen.findByText("(Skipped)")).toBeTruthy();
+        expect(screen.getByText("(Done)")).toBeTruthy();
+        expect(screen.getByText("(To do)")).toBeTruthy();
+        expect(devices.reads).toBe(0);
     });
 });
