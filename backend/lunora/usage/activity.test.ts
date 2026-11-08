@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import schema from "../schema";
 import { forwardReplyUsage, getActivityHeatmap, getSkillBreakdown, getThreadAttribution, recordReplyUsage } from "./activity";
-import { DEFAULT_SKILL_KEY } from "./activity-logic";
+import { DEFAULT_SKILL_KEY, RECORD_RETRY } from "./activity-logic";
 
 const { sessionFrom } = vi.hoisted(() => {
     return {
@@ -23,8 +23,8 @@ const { forwarded, projectReadFails } = vi.hoisted(() => {
 vi.mock("../lib/shard-scheduler", async (importOriginal) => {
     return {
         ...(await importOriginal<typeof import("../lib/shard-scheduler")>()),
-        runAfterOnShard: async (_scheduler: unknown, _delay: number, _target: unknown, args: Record<string, unknown>) => {
-            forwarded.push(args);
+        runAfterOnShard: async (_scheduler: unknown, _delay: number, _target: unknown, args: Record<string, unknown>, _shard: string, retry?: unknown) => {
+            forwarded.push(retry === undefined ? args : { ...args, scheduledWithRetry: retry });
 
             return null;
         },
@@ -337,7 +337,8 @@ describe("recording usage by project", () => {
         // A retry whose read works forwards the reply with its project: a full record, marked as a retry's.
         forwarded.length = 0;
         await forward(true);
-        expect(forwarded).toMatchObject([{ retry: true, threadAttribution: { projectKey: alpha.projectId } }]);
+        // It runs under the retry policy: its access re-check can fail where the reply is counted without its project.
+        expect(forwarded).toMatchObject([{ retry: true, scheduledWithRetry: RECORD_RETRY, threadAttribution: { projectKey: alpha.projectId } }]);
     });
 
     it("counts a shared reply once when the forward retry's record lands before the total record", async () => {

@@ -369,7 +369,10 @@ export const askAside = authAction
                     throw error instanceof ModelFilterRulesUnavailableError ? new LunoraError("BAD_REQUEST", MODEL_FILTER_RULES_UNAVAILABLE_MESSAGE) : error;
                 }),
                 resolveRunModel(ctx, chosen.model, userId),
-                ctx.runQuery(internal.usage.activity.getThreadAttribution, { threadId, userId }),
+                // A failed read refuses the question before it is charged, with a message, not an internal error.
+                ctx.runQuery(internal.usage.activity.getThreadAttribution, { threadId, userId }).catch(() => {
+                    throw new LunoraError("BAD_REQUEST", "This chat could not be read just now. Ask the side question again.");
+                }),
             ]);
             // A thread on the Workers AI default under a region rule asks a default the rules allow.
             const runModelId =

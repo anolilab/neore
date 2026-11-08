@@ -353,7 +353,16 @@ export const forwardReplyUsage = internalMutation
             ...(projectRetry === true && { retry: true }),
         };
 
-        await runAfterOnShard(ctx.scheduler as never, 0, internal.usage.activity.recordReplyUsage, { ...record }, usage.userId);
+        // A retry's record may find the reply counted without its project and re-check access: a read that fails there
+        // throws, so it runs under the same retry policy as the local path's retry.
+        await runAfterOnShard(
+            ctx.scheduler as never,
+            0,
+            internal.usage.activity.recordReplyUsage,
+            { ...record },
+            usage.userId,
+            projectRetry === true ? RECORD_RETRY : undefined,
+        );
 
         return null;
     });

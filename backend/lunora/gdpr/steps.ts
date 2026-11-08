@@ -424,12 +424,15 @@ export const collectActivityForExport = internalQuery
                     task: run.task,
                 };
             }),
-            usageDaily: [...dayAndSkillRows, ...projectRows].map((row) => {
-                // A project row is the day's usage in one project, not one more skill: it names the project instead.
-                const breakdown = row.projectKey === undefined ? { skill: row.skillName ?? row.skillKey } : { project: row.projectKey };
+            // In date order, project rows among the day and skill rows of their day.
+            usageDaily: [...dayAndSkillRows, ...projectRows]
+                .toSorted((a, b) => a.date.localeCompare(b.date))
+                .map((row) => {
+                    // A project row is the day's usage in one project, not one more skill: it names the project instead.
+                    const breakdown = row.projectKey === undefined ? { skill: row.skillName ?? row.skillKey } : { project: row.projectKey };
 
-                return { costMicrodollars: row.costMicrodollars, date: row.date, replies: row.replies, tokens: row.tokens, ...breakdown };
-            }),
+                    return { costMicrodollars: row.costMicrodollars, date: row.date, replies: row.replies, tokens: row.tokens, ...breakdown };
+                }),
         };
     });
 

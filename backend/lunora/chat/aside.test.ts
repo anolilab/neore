@@ -398,6 +398,31 @@ describe("askAside", () => {
         expect(await remainingText(OWNER)).toBe(before);
     });
 
+    it("refuses with a message, and charges nothing, when the thread's project cannot be read", async () => {
+        const key = "usage_activity:getThreadAttribution";
+        const real = registry.get(key);
+        const before = await remainingText(OWNER);
+
+        registry.set(
+            key,
+            internalQuery
+                .input({ threadId: v.string(), userId: v.string() })
+                .output(v.object({}))
+                .query(async () => {
+                    throw new Error("project read failed");
+                }),
+        );
+
+        try {
+            expect(await errorCode(ask())).toBe("BAD_REQUEST");
+        } finally {
+            registry.set(key, real);
+        }
+
+        expect(generateText).not.toHaveBeenCalled();
+        expect(await remainingText(OWNER)).toBe(before);
+    });
+
     it("refuses with its own code once the daily quota is spent, and calls no model", async () => {
         await harness.run(async (ctx: any) => {
             const limiter = createRatelimit("chat/dailyText:free", ctx.db as never);
