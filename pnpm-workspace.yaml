@@ -103,9 +103,10 @@ catalogs:
     # `@better-fetch/fetch` 1.3.3. Taking 1.7.6 here split api-key and passkey
     # into two copies each. Move the four entries (and the `@better-auth/core`
     # override) when `@lunora/auth` does.
-    "@better-auth/api-key": 1.7.18
-    "@better-auth/passkey": 1.7.18
-    better-auth: 1.7.18
+    "@better-auth/api-key": 1.7.16
+    "@better-auth/passkey": 1.7.16
+    better-auth: 1.7.16
+    jose: 6.2.16
   build:
     # Moves WITH wrangler: each vite-plugin release peer-requires the wrangler
     # of its day (1.62.3 wants ^4.145.0) and `vite dev` refuses to start on a
@@ -338,6 +339,8 @@ catalogs:
   mcp:
     "@mcp-ui/client": 7.1.1
     "@modelcontextprotocol/sdk": 1.32.2
+  mobile:
+    "@legendapp/list": 3.7.2
   node:
     "@t3-oss/env-core": 0.13.11
     dotenv: 18.0.9
@@ -787,7 +790,7 @@ overrides:
   # instances, so every plugin passed to `createAuth` stops typechecking. That is
   # exactly what a dependency bump did here: `better-auth`'s core resolved
   # jose 6.2.5 while `@better-auth/api-key`'s resolved 6.2.8. One copy only.
-  jose: 6.2.15
+  jose: 6.2.16
   js-cookie@<=3.0.5: ">=3.0.7"
   js-yaml@<3.14.2: ">=4.1.1"
   js-yaml@>=4.0.0 <4.3.2: ">=4.3.2 <5.0.0"
@@ -925,6 +928,3 @@ patchedDependencies:
   # trims leading whitespace. Drop it once @expo/plist passes a MIME type and Expo's template no longer leads
   # with whitespace; `expo prebuild --platform ios` shows whether it is still needed.
   "@expo/plist@0.10.1": patches/@expo__plist@0.10.1.patch
-catalog:
-  '@legendapp/list': ^3.7.2
-  jose: 6.2.16

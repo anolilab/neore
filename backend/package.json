@@ -99,7 +99,7 @@
         "creem": "catalog:server",
         "e2b": "catalog:ai",
         "hono": "catalog:server",
-        "jose": "catalog:",
+        "jose": "catalog:auth",
         "jsonrepair": "catalog:utils",
         "lunorash": "catalog:lunora",
         "react": "catalog:react",
