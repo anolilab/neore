@@ -1,6 +1,7 @@
 import type { Id } from "@neore/backend/dataModel";
 import { skipToken, useQuery } from "@tanstack/react-query";
 
+import { useThreadPaneState } from "@/features/chat/thread/use-thread-pane-state";
 import useAfterFirstPaint from "@/hooks/use-after-first-paint";
 import { useCRPC } from "@/lib/lunora/crpc";
 
@@ -14,9 +15,8 @@ import { useCRPC } from "@/lib/lunora/crpc";
 const useWorker = (threadId: string | undefined) => {
     const crpc = useCRPC();
     const afterFirstPaint = useAfterFirstPaint();
-    const { data: relationship } = useQuery(
-        crpc.agent.threads.getThreadRelationship.queryOptions(threadId && afterFirstPaint ? { threadId: threadId as Id<"threads"> } : skipToken),
-    );
+    const { data: paneState } = useThreadPaneState(threadId, { enabled: afterFirstPaint });
+    const relationship = paneState?.relationship;
     const { data: worker, isPending } = useQuery(
         crpc.sub_agents.functions.getWorker.queryOptions(
             threadId && relationship?.branchType === "subagent" ? { workerId: threadId as Id<"threads"> } : skipToken,

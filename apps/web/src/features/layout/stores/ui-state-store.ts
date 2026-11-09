@@ -88,6 +88,8 @@ export type UserPreferences = {
     sendBehavior: "enter" | "shiftEnter" | "button";
     showTimestamps: boolean;
     soundEffects: boolean;
+    /** Opt-in, this browser only: open several chats side by side (`features/chat/split`). */
+    splitViewEnabled: boolean;
 };
 
 /** What "Reset to Defaults" restores. */
@@ -209,6 +211,7 @@ const defaultUIState = {
         sendBehavior: "enter" as const,
         showTimestamps: true,
         soundEffects: false,
+        splitViewEnabled: false,
     },
     rightSidebarWidth: RIGHT_SIDEBAR_DEFAULT_WIDTH,
     search: { isOpen: false, query: "", recentSearches: [], type: "threads" as const },

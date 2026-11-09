@@ -11,7 +11,6 @@
  */
 
 import { useLingui } from "@lingui/react/macro";
-import type { Id } from "@neore/backend/dataModel";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@neore/ui/components/tooltip";
 import { skipToken, useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
@@ -20,6 +19,8 @@ import type { FC } from "react";
 
 import useAfterFirstPaint from "@/hooks/use-after-first-paint";
 import { useCRPC } from "@/lib/lunora/crpc";
+
+import { useThreadPaneState } from "./use-thread-pane-state";
 
 interface SubAgentParentBreadcrumbProps {
     className?: string;
@@ -36,9 +37,8 @@ const SubAgentParentBreadcrumb: FC<SubAgentParentBreadcrumbProps> = ({ className
     // Live reads: a one-shot read keeps a relation that arrived after the child opened hidden,
     // and a renamed parent's old title. The parent read stays a skipToken (no subscription)
     // until the relation names a sub-agent parent, so only sub-agent children pay for it.
-    const { data: relationship } = useQuery(
-        crpc.agent.threads.getThreadRelationship.queryOptions(threadId && afterFirstPaint ? { threadId: threadId as Id<"threads"> } : skipToken),
-    );
+    const { data: paneState } = useThreadPaneState(threadId, { enabled: afterFirstPaint });
+    const relationship = paneState?.relationship;
     const parentThreadId = relationship?.branchType === "subagent" ? relationship.parentThreadId : undefined;
     const { data: parent } = useQuery(crpc.chat.functions.getThread.queryOptions(parentThreadId ? { threadId: parentThreadId } : skipToken));
     const title = parentThreadId ? parent?.title : undefined;

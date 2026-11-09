@@ -1,6 +1,7 @@
 import type { PaginationResult } from "lunorash/server";
 import { signDocsForDisplay } from "../agent/display-media";
 import { LunoraError, v } from "lunorash/server";
+import { api } from "../_generated/api";
 
 import type { Id } from "../_generated/dataModel";
 
@@ -22,6 +23,7 @@ import type { Id } from "../_generated/dataModel";
 // output depend on that re-export continuing to exist. Pointing at the
 // declaration site removes the coupling. Values still come from the barrel;
 // only type resolution matters here.
+import { vThreadDocFields as vThreadDocumentFields } from "../agent/validators";
 import type { ThreadDoc } from "../agent/validators";
 import type { UIMessage } from "../agent/ui-messages";
 import { listMessagesByThreadIdHandler, toUIMessages } from "../agent/client";
@@ -29,8 +31,10 @@ import { type StepUsage, sumStepUsage } from "../agent/message-cost";
 import { type RedactedThread, redactThreadForPublicViewer, resolveThreadReadAccess, type ThreadPermission } from "../agent/thread-read-access";
 import { getThreadListDataBatchHandler, threadForViewer } from "../agent/threads";
 import { liteAuthQuery } from "../lib/crpc";
-import { throwThreadLocked } from "../lib/thread-lock";
+import { isThreadLocked, throwThreadLocked } from "../lib/thread-lock";
 import { loadNsfwStatuses, type RedactedUIMessage, redactUIMessagesForPublicViewer } from "./lib/public-thread";
+import { threadGateOutcome } from "./lib/thread-gate";
+import { vGoalStatus, vGoalStopReason, vGoalVerdict } from "./goals/validators";
 import type { ThreadTagColor } from "./tags/logic";
 import { MAX_THREAD_TAGS_PER_USER } from "./tags/logic";
 import { MAX_LENGTH } from "../lib/validators";
@@ -175,6 +179,101 @@ export const getThreadWithData = liteAuthQuery
             thread: threadDocument,
             usage,
         };
+    });
+
+/**
+ * What a split-view pane needs of its chat, in one read: the title, the goal,
+ * the branch relationship and the child threads. Each field is what its own
+ * procedure returns for the same caller and `unlockProof` (`getThread`,
+ * `getThreadGoal`, `agent.threads.getThreadRelationship`, `getChildThreads`),
+ * because it IS that procedure, run in this transaction.
+ *
+ * A locked chat without its proof shows the stub title `getThread` gives and
+ * nothing else (null / []): the goal, the branches and the relationship are
+ * its content. A parent the caller does not own makes `getChildThreads` throw
+ * FORBIDDEN; here that one field is [] and the others are kept.
+ */
+export const getThreadPaneState = liteAuthQuery
+    .input({
+        threadId: v.id("threads"),
+        unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
+    })
+    .output(
+        v.union(
+            v.object({
+                childThreads: v.array(
+                    v.object({
+                        ...vThreadDocumentFields,
+                        branchPoint: v.optional(v.number()),
+                        branchType: v.optional(v.union(v.literal("branch"), v.literal("continuation"), v.literal("comparison"), v.literal("subagent"))),
+                        createdAt: v.number(),
+                    }),
+                ),
+                goal: v.union(
+                    v.object({
+                        costMicrodollars: v.number(),
+                        createdAt: v.number(),
+                        goalId: v.string(),
+                        maxCostMicrodollars: v.number(),
+                        maxRounds: v.number(),
+                        round: v.number(),
+                        startMessageId: v.string(),
+                        status: vGoalStatus,
+                        stopReason: v.optional(vGoalStopReason),
+                        text: v.string(),
+                        verdicts: v.array(vGoalVerdict),
+                    }),
+                    v.null(),
+                ),
+                relationship: v.union(
+                    v.object({
+                        _creationTime: v.number(),
+                        _id: v.id("threadRelationships"),
+                        branchPoint: v.optional(v.number()),
+                        branchType: v.optional(v.union(v.literal("branch"), v.literal("continuation"), v.literal("comparison"), v.literal("subagent"))),
+                        createdAt: v.number(),
+                        parentThreadId: v.id("threads"),
+                        threadId: v.id("threads"),
+                        userId: v.optional(v.string()),
+                    }),
+                    v.null(),
+                ),
+                title: v.optional(v.string()),
+            }),
+            v.null(),
+        ),
+    )
+    .query(async ({ args: { threadId, unlockProof }, ctx: context }) => {
+        const { userId } = context.user;
+        const titled = await context.runQuery(api.chat.functions.getThread, { threadId, unlockProof });
+
+        // The pane closes on a null title read (missing, deleted or unreadable): keep that signal and read nothing else.
+        if (!titled) {
+            return null;
+        }
+
+        const { title } = titled;
+        const thread = await context.db.get("threads", threadId as Id<"threads">);
+        const lockedOut =
+            thread !== null && isThreadLocked(thread) && (await threadGateOutcome(context, { level: "read", threadId, unlockProof, userId })) !== "ok";
+
+        if (lockedOut) {
+            return { childThreads: [], goal: null, relationship: null, ...(title !== undefined && { title }) };
+        }
+
+        const [goal, relationship, childThreads] = await Promise.all([
+            context.runQuery(api.chat.goals.functions.getThreadGoal, { threadId, unlockProof }),
+            context.runQuery(api.agent.threads.getThreadRelationship, { threadId, unlockProof }),
+            context.runQuery(api.chat.functions.getChildThreads, { parentThreadId: threadId, unlockProof }).catch((error: unknown) => {
+                if (error instanceof LunoraError && error.code === "FORBIDDEN") {
+                    return [];
+                }
+
+                throw error;
+            }),
+        ]);
+
+        return { childThreads, goal, relationship, ...(title !== undefined && { title }) };
     });
 
 // Type definitions for thread list composite result

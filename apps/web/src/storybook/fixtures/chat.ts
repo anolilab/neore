@@ -175,6 +175,12 @@ export const chatFixtures = (options: ChatFixtureOptions = {}): LunoraFixture[] 
         lunora(api.chat.sharing.resolveThreadShard, null),
         lunora(api.chat.slides.functions.getGeneratingPresentation, null),
         lunora(api.chat.functions.getFollowupSuggestions, { suggestions: options.suggestions ?? [] }),
+        lunora(api.chat.composite.getThreadPaneState, {
+            childThreads: [],
+            goal: null,
+            relationship: null,
+            title: current.title,
+        }),
         lunora(api.agent.threads.getThreadRelationship, null),
         lunora(api.chat.functions.getChildThreads, []),
         lunora(api.chat.functions.getThreadTemporaryStatus, null),

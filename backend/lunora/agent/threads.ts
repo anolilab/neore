@@ -864,7 +864,7 @@ export const createThreadRelationship = internalMutation
     });
 
 export const getThreadRelationship = query
-    .input({ threadId: v.id("threads") })
+    .input({ threadId: v.id("threads"), unlockProof: v.optional(v.string().max(MAX_LENGTH.short)) })
     .output(
         v.union(
             v.object({
@@ -891,6 +891,15 @@ export const getThreadRelationship = query
 
         if (!thread || thread.userId !== identity.userId) {
             return null;
+        }
+
+        // The parent id and branch point say where a locked chat came from: they need its proof.
+        if (isThreadLocked(thread)) {
+            const access = await resolveThreadReadAccess(ctx, args.threadId, identity.userId, args.unlockProof);
+
+            if (access?.kind !== "full") {
+                return null;
+            }
         }
 
         const relationship = await ctx.db
@@ -1150,9 +1159,9 @@ export const checkThreadAccessBatch = internalQuery
  */
 export const checkThreadAccessBatchHandler = async (
     context: QueryContext,
-    args: { requiredPermission?: ThreadPermission; threadId: Id<"threads">; userId: string },
+    args: { requiredPermission?: ThreadPermission; threadId: Id<"threads">; unlockProof?: string | null; userId: string },
 ) => {
-    const access = await resolveThreadReadAccess(context, args.threadId, args.userId);
+    const access = await resolveThreadReadAccess(context, args.threadId, args.userId, args.unlockProof);
 
     if (access?.kind !== "full" || !meetsThreadPermission(access.permission, args.requiredPermission ?? "read")) {
         return { hasAccess: false as const, permission: null, thread: null };

@@ -56,18 +56,6 @@ if (typeof source["maxPrompts"] !== "number" || !Number.isFinite(source["maxProm
 if (typeof source["userId"] !== "string") return DEFER;
 return { "maxPrompts": source["maxPrompts"], "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_prompts_functions_179.getResolvedVariables.args, (source) => {
-if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
-if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
-let __has1 = false;
-let __val1;
-if (source["threadId"] !== undefined) {
-if (typeof source["threadId"] !== "string") return DEFER;
-__val1 = source["threadId"];
-__has1 = true;
-}
-return { ...(__has1 ? { "threadId": __val1 } : {}) };
-});
 installCompiledValidatorMap(lunora_prompts_functions_179.optimizePrompt.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;

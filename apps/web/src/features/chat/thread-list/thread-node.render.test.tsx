@@ -1,10 +1,17 @@
 // @vitest-environment jsdom
 
 /** The row's hover actions are icon-only buttons; each needs an accessible name of its own. */
-import { render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+// eslint-disable-next-line testing-library/no-manual-cleanup -- vitest runs without globals, so nothing else cleans up between tests
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+import { clearComposerDrafts, saveComposerDraft } from "@/features/chat/split/composer-drafts";
+import { useSplitLayoutStore } from "@/features/chat/split/split-layout-store";
+import { useUIStateStore } from "@/features/layout/stores/ui-state-store";
 
 const LINKED_PULL_REQUESTS = /Linked pull requests/u;
+
+const navigate = vi.hoisted(() => vi.fn());
 
 const linkedPullRequests = vi.hoisted(() => {
     return { count: 0 };
@@ -55,7 +62,7 @@ vi.mock("@tanstack/react-router", () => {
             return { pathname: "/chat" };
         },
         useRouter: () => {
-            return { navigate: () => {}, preloadRoute: async () => {} };
+            return { navigate, preloadRoute: async () => {} };
         },
     };
 });
@@ -259,6 +266,94 @@ describe("ThreadNode", () => {
         } finally {
             vi.mocked(SortableThreadItem).mockImplementation(() => null);
         }
+    });
+
+    describe("when its chat is a split view pane", () => {
+        const setSplit = (enabled: boolean, panes: string[], focus: number) => {
+            useUIStateStore.setState((state) => {
+                return { preferences: { ...state.preferences, splitViewEnabled: enabled } };
+            });
+            useSplitLayoutStore.setState({ layout: { focus, panes, sizes: {} } });
+        };
+
+        afterEach(() => {
+            cleanup();
+            setSplit(false, [], 0);
+            clearComposerDrafts();
+        });
+
+        // eslint-disable-next-line testing-library/no-node-access -- the row root carries the data attribute
+        const rowOf = () => screen.getByText("Quarterly plan").closest("[data-split-open], [role=presentation]");
+
+        it("marks the row and labels the marker, so the state is not colour alone", () => {
+            setSplit(true, ["t1", "t9"], 1);
+            render(<ThreadNode {...baseProps} />);
+
+            expect(screen.getByRole("img", { name: "Open in split view" })).toBeTruthy();
+            expect(rowOf()?.hasAttribute("data-split-open")).toBe(true);
+        });
+
+        it("shows no marker for a chat that is not a pane, or while the split view preference is off", () => {
+            setSplit(true, ["t9"], 0);
+            const { unmount } = render(<ThreadNode {...baseProps} />);
+
+            expect(screen.queryByRole("img", { name: "Open in split view" })).toBeNull();
+            expect(rowOf()?.hasAttribute("data-split-open")).toBe(false);
+            unmount();
+
+            setSplit(false, ["t1"], 0);
+            render(<ThreadNode {...baseProps} />);
+
+            expect(screen.queryByRole("img", { name: "Open in split view" })).toBeNull();
+            expect(rowOf()?.hasAttribute("data-split-open")).toBe(false);
+        });
+
+        it("marks a chat with a parked draft, and only while the split view preference is on", () => {
+            setSplit(true, ["t9"], 0);
+            saveComposerDraft("t1", { composerText: "unsent" });
+            const { unmount } = render(<ThreadNode {...baseProps} />);
+
+            expect(rowOf()?.hasAttribute("data-draft")).toBe(true);
+            expect(screen.getByText("Draft")).toBeTruthy();
+            unmount();
+
+            setSplit(true, ["t9"], 0);
+            clearComposerDrafts();
+            render(<ThreadNode {...baseProps} />);
+
+            expect(rowOf()?.hasAttribute("data-draft")).toBe(false);
+            expect(screen.queryByText("Draft")).toBeNull();
+            cleanup();
+
+            setSplit(false, ["t9"], 0);
+            saveComposerDraft("t1", { composerText: "unsent" });
+            render(<ThreadNode {...baseProps} />);
+
+            expect(rowOf()?.hasAttribute("data-draft")).toBe(false);
+            expect(screen.queryByText("Draft")).toBeNull();
+        });
+
+        it("focuses the pane on a click, and leaves focus alone on a Ctrl-click", () => {
+            setSplit(true, ["t1", "t9"], 1);
+            render(<ThreadNode {...baseProps} />);
+
+            fireEvent.click(screen.getByText("Quarterly plan"), { ctrlKey: true });
+
+            expect(useSplitLayoutStore.getState().layout.focus).toBe(1);
+
+            fireEvent.click(screen.getByText("Quarterly plan"));
+
+            expect(useSplitLayoutStore.getState().layout.focus).toBe(0);
+        });
+
+        it("navigates to a chat that is not the page's, so the split view focuses its pane on the route change", () => {
+            setSplit(true, ["t1", "t9"], 1);
+            render(<ThreadNode {...baseProps} />);
+
+            fireEvent.click(rowOf() as HTMLElement);
+
+            expect(navigate).toHaveBeenCalledWith({ params: { threadId: "t1" }, search: {}, to: "/chat/$threadId" });
+        });
     });
 
     it("flips the expand label and state when the branches are open", () => {

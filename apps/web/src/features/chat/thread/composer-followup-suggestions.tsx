@@ -22,6 +22,8 @@ import { getValidThreadId } from "@/features/chat/core/utils/thread-id";
 import usePromptImprovementStore from "@/features/chat/prompt-improvement/stores/prompt-improvement-store";
 import { useLunoraActionOptions } from "@/lib/lunora/crpc";
 
+import { useIsAtBottom } from "./at-bottom-context";
+
 ("use client");
 
 const FETCH_TIMEOUT_MS = 30_000;
@@ -35,7 +37,7 @@ const ComposerFollowupSuggestions: FC = () => {
     const hasComposerText = useChatUIStore((state) => state.composerText.trim().length > 0);
     const isComposerEmpty = useChatUIStore((state) => state.composerText === "");
     const setComposerText = useChatUIStore((state) => state.setComposerText);
-    const isAtBottom = useChatUIStore((state) => state.isAtBottom);
+    const isAtBottom = useIsAtBottom();
     const isPromptImprovementOpen = usePromptImprovementStore((state) => state.isOpen);
 
     const validThreadId = getValidThreadId(threadId);
