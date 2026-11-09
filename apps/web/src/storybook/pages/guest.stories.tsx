@@ -241,6 +241,18 @@ export const ChatClosedForNow: Story = {
     },
 };
 
+/** A malformed link opened in the same tab after a valid one is shown as incomplete; nothing goes to the earlier link. */
+export const MalformedAfterValid: Story = {
+    play: async ({ canvas }) => {
+        await canvas.findByRole("textbox", { name: "Your message" });
+        globalThis.location.hash = "not-a-link";
+        globalThis.dispatchEvent(new HashChangeEvent("hashchange"));
+
+        await expect(await canvas.findByRole("alert")).toHaveTextContent("This link is not complete");
+        await expect(canvas.queryByRole("textbox", { name: "Your message" })).not.toBeInTheDocument();
+    },
+};
+
 /** A link copied without its fragment carries no token. */
 export const IncompleteLink: Story = {
     beforeEach: atFragment(""),

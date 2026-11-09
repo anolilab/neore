@@ -27,6 +27,8 @@ const subscribeToHash = (onChange: () => void): (() => void) => {
 };
 /** A link token's shape (`newGuestToken` in the backend): 64 lowercase hex characters. */
 const LINK_TOKEN_SHAPE = /^[0-9a-f]{64}$/u;
+/** The root layout's "Skip to content" anchor (`__root.tsx`), the one fragment that is no link. */
+const SKIP_LINK_ANCHOR = "main-content";
 const readHash = (): string => globalThis.location.hash.slice(1);
 const noHashOnServer = (): undefined => undefined;
 
@@ -289,11 +291,14 @@ const GuestPage: FC = () => {
         setLastLinkToken(hash);
     }
 
-    const linkToken = hash === undefined ? undefined : (lastLinkToken ?? hash);
+    // Only the layout's own in-page anchor keeps the link; any other fragment is a link of its own, shown as incomplete if it
+    // is not one, never sent to the link opened before it.
+    const keepsLastLink = hash === SKIP_LINK_ANCHOR && lastLinkToken !== undefined;
+    const linkToken = keepsLastLink ? lastLinkToken : hash;
 
     // An in-page anchor took the link out of the address: put it back, so a reload or a copied address still opens the link.
     useEffect(() => {
-        if (hash === undefined || lastLinkToken === undefined || hash === lastLinkToken) {
+        if (hash !== SKIP_LINK_ANCHOR || lastLinkToken === undefined) {
             return;
         }
 
