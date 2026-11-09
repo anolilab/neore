@@ -8,7 +8,7 @@ import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import SettingsCard from "@/components/settings/settings-card";
-import { useUserSettings } from "@/features/auth/hooks/use-user-settings";
+import { hasPendingSettingsWrites, useUserSettings } from "@/features/auth/hooks/use-user-settings";
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 import { useCRPC } from "@/lib/lunora/crpc";
 
@@ -108,7 +108,8 @@ const SetupChecklist: FC<{ serverFormShown: boolean }> = ({ serverFormShown }) =
         },
         // Settled, the cache ends on what the server stores, once no later save is still waiting its turn.
         onSettled: async () => {
-            if (queryClient.isMutating({ mutationKey: [SAVE_SCOPE] }) <= 1) {
+            // Nor while another settings edit waits: a re-read now would drop its optimistic value before it is sent.
+            if (queryClient.isMutating({ mutationKey: [SAVE_SCOPE] }) <= 1 && !hasPendingSettingsWrites()) {
                 await queryClient.invalidateQueries({ queryKey: settingsKey });
             }
         },

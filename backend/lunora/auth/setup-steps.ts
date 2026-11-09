@@ -6,6 +6,7 @@
 import { LunoraError, v } from "lunorash/server";
 
 import { authMutation, rateLimit } from "../lib/crpc";
+import { MAX_LENGTH } from "../lib/validators";
 import { saveUserSettings } from "./lib/preference-writes";
 import { capSkippedSteps } from "./lib/setup-step-limits";
 
@@ -23,7 +24,7 @@ export const setSetupStepSkipped = authMutation
     .use(rateLimit("settings/update"))
     .input({
         // The account the click was made as: a write the client held while offline and replayed after a switch is refused.
-        expectedUserId: v.optional(v.string()),
+        expectedUserId: v.optional(v.string().max(MAX_LENGTH.id)),
         skipped: v.boolean(),
         stepId: v.union(v.literal("pair"), v.literal("ssh"), v.literal("agent")),
     })

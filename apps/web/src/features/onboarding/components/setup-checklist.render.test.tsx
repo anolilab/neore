@@ -60,6 +60,17 @@ vi.mock("@/components/settings/settings-card", () => {
     };
 });
 
+// Another settings edit queued in this tab (`updateLatest`), switched on per test.
+const otherSettingsWrites = vi.hoisted(() => {
+    return { pending: false };
+});
+
+vi.mock("@/features/auth/hooks/use-user-settings", async (importOriginal) => {
+    const actual = await importOriginal<typeof import("@/features/auth/hooks/use-user-settings")>();
+
+    return { ...actual, hasPendingSettingsWrites: () => otherSettingsWrites.pending };
+});
+
 vi.mock("@/lib/lunora/crpc", () => {
     return {
         useCRPC: () => {
@@ -180,6 +191,7 @@ const renderChecklist = (serverFormShown = true, client = new QueryClient({ defa
 
 describe("<SetupChecklist>", () => {
     beforeEach(() => {
+        otherSettingsWrites.pending = false;
         devices.current = [];
         devices.fail = false;
         devices.reads = 0;
@@ -231,6 +243,31 @@ describe("<SetupChecklist>", () => {
         const link = await screen.findByRole("link", { name: REGoToServers });
 
         expect(link.getAttribute("href")).toBe("#devices-ssh");
+    });
+
+    it("does not re-read the settings while another settings edit is still queued", async () => {
+        const user = userEvent.setup();
+        const saveGate = createGate();
+
+        otherSettingsWrites.pending = true;
+        server.hold = saveGate.promise;
+        renderChecklist();
+        await user.click(await screen.findByRole("button", { name: RESkipAddAnSshServer }));
+
+        await waitFor(() => {
+            expect(save).toHaveBeenCalledTimes(1);
+        });
+
+        // Counted while the save is still held, so a re-read when it settles cannot hide in the baseline.
+        const readsBeforeSettle = server.reads;
+
+        saveGate.open();
+        await new Promise((resolve) => {
+            setTimeout(resolve, 50);
+        });
+
+        expect(server.reads).toBe(readsBeforeSettle);
+        expect(screen.getByText("(Skipped)")).toBeTruthy();
     });
 
     it("skips and resumes a step through the server", async () => {
