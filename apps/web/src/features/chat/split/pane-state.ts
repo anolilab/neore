@@ -116,11 +116,14 @@ const parkModelState = (threadId: string): void => {
     }
 
     saveParkedModelState(threadId, {
+        audioSettings: state.audioSettings,
+        imageSettings: state.imageSettings,
         mode: state.threadModes.get(threadId),
         model: state.selectedModel,
         pendingSettings: ownsModel ? state.pendingSettings : undefined,
         userChangedMode: ownsMode && state.userChangedMode,
         userChangedModel: ownsModel && state.userChangedModel,
+        videoSettings: state.videoSettings,
     });
 
     if (ownsModel) {
@@ -154,6 +157,9 @@ export const syncFocusedModel = ({ isLoaded, mode, model, threadId }: FocusedMod
 
     if (parked) {
         useModelStore.getState().restoreParkedState(threadId, parked);
+    } else if (!describesChat) {
+        // A chat that was never parked has no generation settings of its own: it starts from the defaults, not the previous chat's.
+        useModelStore.getState().resetGenerationSettings();
     }
 
     const state = useModelStore.getState();

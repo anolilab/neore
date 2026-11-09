@@ -18,6 +18,10 @@ export interface ComposerDraft {
 const drafts = new Map<string, ComposerDraft>();
 // Model choices of the chats whose pane is not focused. Not a draft: it shows no mark and a chat without text can hold one.
 const parkedModels = new Map<string, ParkedModelState>();
+// A worker's unsent message, by worker thread. Its composer unmounts when focus moves, so the text waits here.
+const workerDrafts = new Map<string, string>();
+// Counts the clears (sign-out, account switch). A write-back that started before a clear must not land after it.
+const generation = { count: 0 };
 
 /** The thread ids that have a parked draft, so a row or a pane header can show the mark. Replaced on each sync, never mutated. */
 export const useParkedDraftStore = create<{ threadIds: ReadonlySet<string> }>()(() => {
@@ -67,8 +71,24 @@ export const takeComposerDraftState = (threadId: string): ComposerDraft => {
 export const clearComposerDrafts = (): void => {
     drafts.clear();
     parkedModels.clear();
+    workerDrafts.clear();
+    generation.count += 1;
     syncParked();
 };
+
+/** The clears so far. A write-back captures it when it starts and drops itself when the value has moved on. */
+export const draftGeneration = (): number => generation.count;
+
+/** A worker's unsent message, kept while its composer is not shown. Empty text is forgotten. */
+export const saveWorkerDraft = (workerId: string, text: string): void => {
+    if (text === "") {
+        workerDrafts.delete(workerId);
+    } else {
+        workerDrafts.set(workerId, text);
+    }
+};
+
+export const peekWorkerDraft = (workerId: string): string | undefined => workerDrafts.get(workerId);
 
 /** The thread's parked draft, left in place. */
 export const peekComposerDraft = (threadId: string): ComposerDraft | undefined => drafts.get(threadId);

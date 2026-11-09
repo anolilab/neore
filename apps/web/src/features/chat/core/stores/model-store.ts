@@ -70,11 +70,15 @@ export interface PendingSettings {
 
 /** What the split view sets aside for a chat whose pane lost focus: the choices the person made there and has not sent yet. */
 export interface ParkedModelState {
+    /** The generation settings are global; each chat keeps its own choice while another pane has focus. */
+    audioSettings?: AudioGenerationSettings;
+    imageSettings?: ImageGenerationSettings;
     mode?: ComposerMode;
     model?: ModelId;
     pendingSettings?: PendingSettings;
     userChangedMode: boolean;
     userChangedModel: boolean;
+    videoSettings?: VideoGenerationSettings;
 }
 
 // ============================================================================
@@ -401,6 +405,8 @@ export const useModelStore = create<ModelStore>()(
                             }
 
                             return {
+                                audioSettings: parked.audioSettings ?? state.audioSettings,
+                                imageSettings: parked.imageSettings ?? state.imageSettings,
                                 pendingSettings: parked.pendingSettings ?? state.pendingSettings,
                                 selectedModel: parked.userChangedModel && parked.model ? parked.model : state.selectedModel,
                                 // Claimed even when only settings were parked, so the next load keeps them (it drops a composer effort of another chat).
@@ -408,6 +414,7 @@ export const useModelStore = create<ModelStore>()(
                                 threadModes,
                                 ...(parked.userChangedMode && { currentModeThreadId: threadId, userChangedMode: true }),
                                 userChangedModel: parked.userChangedModel,
+                                videoSettings: parked.videoSettings ?? state.videoSettings,
                             };
                         },
                         undefined,

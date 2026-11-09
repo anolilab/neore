@@ -296,6 +296,25 @@ describe("model choices across a pane switch (#9)", () => {
     });
 });
 
+describe("image settings across a pane switch (#8)", () => {
+    it("keeps each chat's image settings with it", () => {
+        syncFocusedModel({ isLoaded: true, mode: "text", model: "model-a", threadId: A });
+        useModelStore.getState().setImageSettings({ quality: "hd" });
+
+        focus(B);
+        syncFocusedModel({ isLoaded: true, mode: "text", model: "model-b", threadId: B });
+
+        expect(useModelStore.getState().imageSettings.quality).not.toBe("hd");
+
+        useModelStore.getState().setImageSettings({ quality: "standard" });
+
+        focus(A);
+        syncFocusedModel({ isLoaded: true, mode: "text", model: "model-a", threadId: A });
+
+        expect(useModelStore.getState().imageSettings.quality).toBe("hd");
+    });
+});
+
 describe("comparison mode (#11)", () => {
     it("leaves the outgoing comparison parent's mode off when focus moves to a chat with a parked pick", () => {
         focus(A);
