@@ -13,6 +13,7 @@ import { useEffect, useId, useRef, useState, useSyncExternalStore } from "react"
 import { useAction } from "@/lib/lunora/crpc";
 
 import { guestPollInterval } from "./guest-poll";
+import type { PendingPost } from "./guest-token";
 import { forgetGuestToken, guestTokenFor, keepGuestToken, keepPendingPost, readPendingPost, rereadGuestToken } from "./guest-token";
 
 /** A guest note's cap (`GUEST_MESSAGE_MAX_CHARS` in the backend). */
@@ -46,12 +47,20 @@ const GuestLinkPage: FC<{ linkToken: string }> = ({ linkToken }) => {
     const [postedAt, setPostedAt] = useState<number>();
     const [ended, setEnded] = useState(false);
     // A post that failed keeps its request id, so sending the same text again cannot store it twice.
-    const pendingRef = useRef<{ requestId: string; text: string } | undefined>(undefined);
+    const pendingRef = useRef<PendingPost | undefined>(undefined);
 
-    // A post sent before a reload, whose reply never came: sending its text again carries the same request id.
+    // A post sent before a reload, whose reply never came, comes back into the field with its request id, so sending it again
+    // is the same request. Nothing is sent before it has been read.
+    const [restored, setRestored] = useState(false);
+
     useEffect(() => {
         void readPendingPost(linkToken).then((pending) => {
-            pendingRef.current ??= pending;
+            if (pending !== undefined && pendingRef.current === undefined) {
+                pendingRef.current = pending;
+                setText((current) => (current === "" ? pending.text : current));
+            }
+
+            setRestored(true);
 
             return undefined;
         });
@@ -100,12 +109,12 @@ const GuestLinkPage: FC<{ linkToken: string }> = ({ linkToken }) => {
         refetchInterval: (query) => guestPollInterval(query.state.data),
     });
     const post = useMutation({
-        mutationFn: async (note: { requestId: string; text: string }) => {
+        mutationFn: async (note: PendingPost) => {
             const guestToken = (await guestTokenFor(linkToken, { create: true })) ?? "";
 
             // Kept before it is sent, so a reload after a lost reply still sends it as this request.
             await keepPendingPost(linkToken, note);
-            await postNote({ guestToken, linkToken, ...note });
+            await postNote({ guestToken, linkToken, requestId: note.requestId, text: note.text });
 
             return guestToken;
         },
@@ -150,6 +159,22 @@ const GuestLinkPage: FC<{ linkToken: string }> = ({ linkToken }) => {
         },
     });
 
+    // A post whose reply was lost but which the notes now show as stored is done: its request id is let go, so the same words
+    // sent again later are a new note, and a field still holding them (restored after a reload) is cleared.
+    useEffect(() => {
+        const pending = pendingRef.current;
+        const stored =
+            pending !== undefined && view.data?.messages.some((note) => note.text === pending.text && note.createdAt >= pending.at - 60_000) === true;
+
+        if (!stored || post.isPending) {
+            return;
+        }
+
+        pendingRef.current = undefined;
+        void keepPendingPost(linkToken, undefined);
+        setText((current) => (current.trim() === pending.text ? "" : current));
+    }, [view.data, post.isPending, linkToken]);
+
     const linkEnded = ended || (postedAt !== undefined && view.isSuccess && view.data === null && view.dataUpdatedAt > postedAt);
     const endedByView = !ended && linkEnded;
 
@@ -170,14 +195,15 @@ const GuestLinkPage: FC<{ linkToken: string }> = ({ linkToken }) => {
         }
 
         if (pendingRef.current?.text !== trimmed) {
-            pendingRef.current = { requestId: globalThis.crypto.randomUUID(), text: trimmed };
+            pendingRef.current = { at: Date.now(), requestId: globalThis.crypto.randomUUID(), text: trimmed };
         }
 
         post.mutate(pendingRef.current);
     };
 
     return (
-        <main className="mx-auto flex w-full max-w-xl flex-col gap-4 p-4">
+        // `main-content`: where the layout's "Skip to content" link goes.
+        <main className="mx-auto flex w-full max-w-xl flex-col gap-4 p-4" id="main-content" tabIndex={-1}>
             {/* The card's title is the page's heading. */}
             <HeadingLevelProvider level={1}>
                 <Card>
@@ -221,7 +247,7 @@ const GuestLinkPage: FC<{ linkToken: string }> = ({ linkToken }) => {
                                         </Button>
                                     </div>
                                 )}
-                                <Button disabled={linkEnded || post.isPending || text.trim() === ""} type="submit">
+                                <Button disabled={!restored || linkEnded || post.isPending || text.trim() === ""} type="submit">
                                     {post.isPending ? t`Sending…` : t`Send to the owner`}
                                 </Button>
                             </form>
@@ -267,9 +293,13 @@ const GuestPage: FC = () => {
 
     // An in-page anchor took the link out of the address: put it back, so a reload or a copied address still opens the link.
     useEffect(() => {
-        if (hash !== undefined && lastLinkToken !== undefined && hash !== lastLinkToken) {
-            globalThis.history.replaceState(globalThis.history.state, "", `#${lastLinkToken}`);
+        if (hash === undefined || lastLinkToken === undefined || hash === lastLinkToken) {
+            return;
         }
+
+        globalThis.history.replaceState(globalThis.history.state, "", `#${lastLinkToken}`);
+        // `replaceState` fires no `hashchange`: without one, a second click on the same anchor would leave it in the address.
+        globalThis.dispatchEvent(new HashChangeEvent("hashchange"));
     }, [hash, lastLinkToken]);
 
     return linkToken === undefined ? null : <GuestLinkPage key={linkToken} linkToken={linkToken} />;

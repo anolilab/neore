@@ -1,8 +1,15 @@
 import { api } from "@neore/backend/api";
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect, userEvent } from "storybook/test";
+import { expect, userEvent, waitFor } from "storybook/test";
 
-import { clearGuestTokenMemory, forgetGuestToken, guestTokenFor, keepGuestToken, keepPendingPost } from "@/features/chat/guest-links/guest-token";
+import {
+    clearGuestTokenMemory,
+    forgetGuestToken,
+    guestTokenFor,
+    keepGuestToken,
+    keepPendingPost,
+    readPendingPost,
+} from "@/features/chat/guest-links/guest-token";
 import { Route as GuestRoute } from "@/routes/(public)/guest";
 import { HOUR, STORY_NOW as NOW } from "@/storybook/clock";
 import { GUEST_LINK_TOKEN, guestAttempts, guestPageFixtures, guestPosts, resetGuestPosts, RETURNING_GUEST_TOKEN } from "@/storybook/fixtures/guest-page";
@@ -69,8 +76,46 @@ export const SkipLinkKeepsTheLink: Story = {
 
         await expect(await canvas.findByText("Waiting for the owner")).toBeVisible();
         await expect(guestPosts[0]?.linkToken).toBe(GUEST_LINK_TOKEN);
-        // The address carries the link again, for a reload or a copy.
+        // The address carries the link again, for a reload or a copy, after a second use of the same anchor too.
         await expect(globalThis.location.hash).toBe(`#${GUEST_LINK_TOKEN}`);
+        globalThis.location.hash = "main-content";
+        globalThis.dispatchEvent(new HashChangeEvent("hashchange"));
+        await waitFor(async () => await expect(globalThis.location.hash).toBe(`#${GUEST_LINK_TOKEN}`));
+        // The skip link has somewhere to go.
+        await expect(globalThis.document.querySelector("main#main-content")).not.toBeNull();
+    },
+};
+
+const RESTORED = { at: NOW, requestId: "restored-request-1", text: "Can we talk tomorrow?" };
+
+/** A post whose reply was lost before a reload comes back into the field, and sending it again is the same request. */
+export const ResumeAfterReload: Story = {
+    beforeEach: async () => {
+        await atFragment(`#${GUEST_LINK_TOKEN}`, { returning: true })();
+        await keepPendingPost(GUEST_LINK_TOKEN, RESTORED);
+    },
+    play: async ({ canvas }) => {
+        await expect(await canvas.findByDisplayValue(RESTORED.text)).toBeVisible();
+        await userEvent.click(canvas.getByRole("button", { name: "Send to the owner" }));
+
+        await expect(await canvas.findByText("Waiting for the owner")).toBeVisible();
+        await expect(guestPosts[0]?.requestId).toBe(RESTORED.requestId);
+    },
+};
+
+/** That post was stored after all: the notes show it, so it is let go and the field is cleared instead of offering it again. */
+export const StoredBeforeReload: Story = {
+    beforeEach: async () => {
+        await atFragment(`#${GUEST_LINK_TOKEN}`, { returning: true })();
+        await keepPendingPost(GUEST_LINK_TOKEN, RESTORED);
+    },
+    parameters: {
+        msw: { handlers: { lunora: lunoraHandlers(...guestPageFixtures({ notes: [{ createdAt: NOW, status: "held", text: RESTORED.text }] })) } },
+    },
+    play: async ({ canvas }) => {
+        await expect(await canvas.findByText("Waiting for the owner")).toBeVisible();
+        await waitFor(async () => await expect(canvas.getByRole("textbox", { name: "Your message" })).toHaveValue(""));
+        await expect(await readPendingPost(GUEST_LINK_TOKEN)).toBeUndefined();
     },
 };
 
