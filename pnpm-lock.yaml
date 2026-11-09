@@ -1332,7 +1332,7 @@ overrides:
   dompurify@<=3.4.12: '>=3.4.13'
   drizzle-orm@<0.45.2: '>=0.45.2'
   effect@<3.20.0: '>=3.20.0'
-  '@effect/platform-node>@effect/platform-node-shared': 4.0.5
+  '@effect/platform-node>@effect/platform-node-shared': 4.1.2
   express-rate-limit@>=8.2.0 <8.2.2: '>=8.2.2'
   express>body-parser: '>=2.4.0'
   fast-uri@<3.1.5: ^3.1.5
@@ -5393,11 +5393,11 @@ packages:
     resolution: {integrity: sha512-eDmlWRMrJNzSUbBOf6Y/qTChd1Ys/o3YY8PK6tRQmwkV2u7z3ZS2cak/YJB07odHMT/Z6HJKoUElR/b0N6bHUw==}
     engines: {node: '>=22'}
 
-  '@effect/platform-node-shared@4.0.5':
-    resolution: {integrity: sha512-a8rCdEkfZBGe9C6bsIjxVZuRp73svIyK5IHwHdDAVsvZXjrbkxusfI+rZ8WlX31RP1mKizwI/E72GQTNfdMWHw==}
-    engines: {node: '>=18.0.0'}
+  '@effect/platform-node-shared@4.1.2':
+    resolution: {integrity: sha512-wSwl9A/G1hcVvF8nLI+YfB3EyOIDvWS6+lsTZBkmgDnPBL7m8YWZF+1HD+mdEsb52SUGfukip46Q3gRwSdk3QA==}
+    engines: {node: '>=22.19.0'}
     peerDependencies:
-      effect: ^4.0.5
+      effect: ^4.1.2
 
   '@effect/platform-node@4.1.2':
     resolution: {integrity: sha512-ye0UjxORdd5Qu3paZ1LljgGOALWHt7muP9VTpjUSCNfcesiB/Hm7wPJIvZeu4gnwpTe5BtEnO1VHngWqjJp8mA==}
@@ -27714,7 +27714,7 @@ snapshots:
 
   '@e2b/dockerfile-utils@0.1.1': {}
 
-  '@effect/platform-node-shared@4.0.5(effect@4.1.2)':
+  '@effect/platform-node-shared@4.1.2(effect@4.1.2)':
     dependencies:
       '@types/ws': 8.18.2
       effect: 4.1.2
@@ -27725,7 +27725,7 @@ snapshots:
 
   '@effect/platform-node@4.1.2(effect@4.1.2)':
     dependencies:
-      '@effect/platform-node-shared': 4.0.5(effect@4.1.2)
+      '@effect/platform-node-shared': 4.1.2(effect@4.1.2)
       effect: 4.1.2
       undici: 8.12.3
     transitivePeerDependencies:

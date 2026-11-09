@@ -745,9 +745,8 @@ overrides:
   dompurify@<=3.4.12: ">=3.4.13"
   drizzle-orm@<0.45.2: ">=0.45.2"
   effect@<3.20.0: ">=3.20.0"
-  # Moves with the `iac` catalog's effect/platform-node: platform-node 4.0.5 asks for
-  # `^4.0.5`, which reuses a 4.1.x shared package that peers on `effect ^4.1`.
-  "@effect/platform-node>@effect/platform-node-shared": 4.0.5
+  # Moves with the `iac` catalog's `@effect/platform-node`: 4.1.2 depends on this package at exactly 4.1.2.
+  "@effect/platform-node>@effect/platform-node-shared": 4.1.2
   express-rate-limit@>=8.2.0 <8.2.2: ">=8.2.2"
   # GHSA-v422-hmwv-36x6. Only `express` pulls a vulnerable copy.
   express>body-parser: ">=2.4.0"
