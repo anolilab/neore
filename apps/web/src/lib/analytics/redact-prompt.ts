@@ -46,11 +46,11 @@ const ENCODED_PROMPT = new RegExp(
  */
 const URL_FRAGMENT = /(https?:\/\/[^\s"#]*)#[^\s"\\]*/giu;
 
-/** A guest link written relative (`href="/guest#<token>"` in an autocaptured chain) loses its fragment too. */
-const GUEST_FRAGMENT = /(\/guest)#[^\s"\\]*/giu;
+/** A guest link written relative (`href="/guest#<token>"`, a query before the fragment too) loses its fragment as well. */
+const GUEST_FRAGMENT = /(\/guest(?:\?[^\s"#\\]*)?)#[^\s"\\]*/giu;
 
-/** A guest link encoded inside another address (a sign-in `redirectTo`): its `%23` fragment goes, at any encoding depth. */
-const ENCODED_GUEST_FRAGMENT = /((?:\/|%(?:25)*2F)guest)%(?:25)*23[^&\s"\\]*/giu;
+/** A guest link encoded inside another address (a sign-in `redirectTo`): its `%23` fragment goes, after a query too, at any encoding depth. */
+const ENCODED_GUEST_FRAGMENT = /((?:\/|%(?:25)*2F)guest(?:%(?:25)*3F[^&\s"\\]*?)?)%(?:25)*23[^&\s"\\]*/giu;
 
 /** Each prompt parameter keeps its name; its value is replaced. Every address loses its fragment. */
 const redactString = (value: string): string =>

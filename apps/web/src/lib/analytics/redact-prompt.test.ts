@@ -49,6 +49,21 @@ describe(redactPromptFromEvent, () => {
         expect(redactPromptFromEvent(pageView({ q: "guest%231 issue" }))?.properties.q).toBe("guest%231 issue");
     });
 
+    it("drops the fragment of a guest link with a query before it, written relative or encoded", () => {
+        const token = "ef".repeat(32);
+        const event = redactPromptFromEvent(
+            pageView({
+                $current_url: `https://app.test/sign-in?redirectTo=%2Fguest%3Futm_source%3Dx%23${token}&y=2`,
+                $elements_chain: `a:href="/guest?utm_source=x#${token}"nth-child="1"`,
+                $referrer: `https://app.test/a?next=%252Fguest%253Fa%253D1%2523${token}`,
+            }),
+        );
+
+        expect(JSON.stringify(event)).not.toContain("efef");
+        expect(event?.properties.$elements_chain).toBe('a:href="/guest?utm_source=x"nth-child="1"');
+        expect(event?.properties.$current_url).toBe("https://app.test/sign-in?redirectTo=%2Fguest%3Futm_source%3Dx&y=2");
+    });
+
     it("ends a dropped fragment at an escaped quote in an autocaptured link, keeping the rest of the chain", () => {
         const event = redactPromptFromEvent(pageView({ $elements_chain: String.raw`a:attr__href="https://app.test/guest#token\"x"nth-child="1"` }));
 
