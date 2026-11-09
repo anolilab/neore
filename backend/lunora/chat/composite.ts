@@ -32,6 +32,7 @@ import { type RedactedThread, redactThreadForPublicViewer, resolveThreadReadAcce
 import { getThreadListDataBatchHandler, readThreadRelationship, threadForViewer } from "../agent/threads";
 import { liteAuthQuery } from "../lib/crpc";
 import { isThreadLocked, throwThreadLocked } from "../lib/thread-lock";
+import { readChildThreads } from "./lib/child-threads";
 import { loadNsfwStatuses, type RedactedUIMessage, redactUIMessagesForPublicViewer } from "./lib/public-thread";
 import { threadGateOutcome } from "./lib/thread-gate";
 import { vGoalStatus, vGoalStopReason, vGoalVerdict } from "./goals/validators";
@@ -265,7 +266,8 @@ export const getThreadPaneState = liteAuthQuery
         const [goal, relationship, childThreads] = await Promise.all([
             context.runQuery(api.chat.goals.functions.getThreadGoal, { threadId, unlockProof }),
             readThreadRelationship(context, userId, threadId as Id<"threads">, unlockProof),
-            context.runQuery(api.chat.functions.getChildThreads, { parentThreadId: threadId, unlockProof }).catch((error: unknown) => {
+            // A plain read, not a query: nesting one more query per child would hit Lunora's depth limit for a parent with many branches.
+            readChildThreads(context, { parentThreadId: threadId as Id<"threads">, unlockProof, userId }).catch((error: unknown) => {
                 if (error instanceof LunoraError && error.code === "FORBIDDEN") {
                     return [];
                 }
