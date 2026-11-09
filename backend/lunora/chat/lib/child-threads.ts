@@ -6,7 +6,6 @@ import { publicThread } from "../../agent/threads";
 import { isThreadLocked } from "../../lib/thread-lock";
 import { threadGateOutcome, threadRowForList } from "./thread-gate";
 
-/** The most branches one parent lists: the relationship read takes this many and no more. */
 const MAX_CHILD_THREADS = 200;
 
 /**
