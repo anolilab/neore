@@ -316,19 +316,24 @@ describe("comparison mode (#11)", () => {
     });
 });
 
+// Every chat reads: the survivor is then the first open pane that is not deleted.
+const readsEvery = async (): Promise<unknown> => {
+    return {};
+};
+
 describe("deleting the routed chat with other panes open (#14)", () => {
-    it("picks the first open pane that survives, for the single and the bulk delete alike", () => {
+    it("picks the first open pane that survives, for the single and the bulk delete alike", async () => {
         openPanes(A, A, B, C);
 
-        expect(survivingPaneAfterDelete([A])).toBe(B);
-        expect(survivingPaneAfterDelete([A, B])).toBe(C);
+        await expect(survivingPaneAfterDelete([A], readsEvery)).resolves.toBe(B);
+        await expect(survivingPaneAfterDelete([A, B], readsEvery)).resolves.toBe(C);
     });
 
-    it("has no survivor when every pane is deleted or the preference is off", () => {
-        expect(survivingPaneAfterDelete([A, B])).toBeUndefined();
+    it("has no survivor when every pane is deleted or the preference is off", async () => {
+        await expect(survivingPaneAfterDelete([A, B], readsEvery)).resolves.toBeUndefined();
 
         setPreference(false);
 
-        expect(survivingPaneAfterDelete([A])).toBeUndefined();
+        await expect(survivingPaneAfterDelete([A], readsEvery)).resolves.toBeUndefined();
     });
 });

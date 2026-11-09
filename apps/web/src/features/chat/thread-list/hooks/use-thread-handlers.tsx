@@ -2,7 +2,7 @@ import { plural } from "@lingui/core/macro";
 import { useLingui } from "@lingui/react/macro";
 import { api } from "@neore/backend/api";
 import type { Doc, Id } from "@neore/backend/dataModel";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useCallback } from "react";
 
@@ -37,6 +37,7 @@ const useThreadHandlers = (setLoadingStates: React.Dispatch<React.SetStateAction
     const { deleteThreadMetadata } = useThreadActions();
     const { clearOptimisticPin, clearOptimisticStatus, removeOptimisticDeletion, setOptimisticPin, setOptimisticStatus } = useOptimisticActions();
     const crpc = useCRPC();
+    const queryClient = useQueryClient();
 
     const lunora = useLunora();
     const { mutateAsync: pinThreadMutation } = useMutation(crpc.chat.functions.pinThread.mutationOptions());
@@ -276,7 +277,9 @@ const useThreadHandlers = (setLoadingStates: React.Dispatch<React.SetStateAction
 
             if (isDeletingCurrentThread) {
                 // With the split view on, the other open panes stay: the route moves to one of them instead of `/chat`.
-                const survivor = survivingPaneAfterDelete(threadIds);
+                const survivor = await survivingPaneAfterDelete(threadIds, (id) =>
+                    queryClient.fetchQuery(crpc.chat.functions.getThread.queryOptions({ threadId: id as Id<"threads"> })),
+                );
 
                 navigate(survivor === undefined ? { replace: true, to: "/chat" } : { params: { threadId: survivor }, replace: true, to: "/chat/$threadId" });
             }
@@ -298,7 +301,7 @@ const useThreadHandlers = (setLoadingStates: React.Dispatch<React.SetStateAction
                     showError(t`Failed to delete threads`);
                 });
         },
-        [deleteThreadsMutation, deleteThreadMetadata, t, currentThreadId, navigate],
+        [deleteThreadsMutation, deleteThreadMetadata, t, currentThreadId, navigate, crpc, queryClient],
     );
 
     return {

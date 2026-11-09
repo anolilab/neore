@@ -73,18 +73,39 @@ export const hydrateSplitLayout = (): Promise<void> => {
     return hydration.pending;
 };
 
+/** Whether the chat reads: a missing chat answers null or fails, and either way it is not a survivor. */
+const readable = async (fetchThread: (threadId: string) => Promise<unknown>, threadId: string): Promise<boolean> => {
+    try {
+        return (await fetchThread(threadId)) != null;
+    } catch {
+        return false;
+    }
+};
+
 /**
- * The chat the route moves to when the routed chat is deleted along with `deletedIds`: the first open pane that survives, so the
- * other panes stay. Undefined when the preference is off or no pane survives; the caller then goes to `/chat`.
+ * The chat the route moves to when the routed chat is deleted along with `deletedIds`: the first open pane whose chat still reads, so
+ * the other panes stay. A chat that `fetchThread` cannot read (deleted elsewhere) is passed over. Undefined when the preference is off
+ * or no pane survives; the caller then goes to `/chat`. Waits for the saved layout first, so a delete before it loads still finds it.
  */
-export const survivingPaneAfterDelete = (deletedIds: Iterable<string>): string | undefined => {
+export const survivingPaneAfterDelete = async (
+    deletedIds: Iterable<string>,
+    fetchThread: (threadId: string) => Promise<unknown>,
+): Promise<string | undefined> => {
     if (useUIStateStore.getState().preferences.splitViewEnabled !== true) {
         return undefined;
     }
 
+    await hydrateSplitLayout();
+
     const deleted = new Set(deletedIds);
 
-    return useSplitLayoutStore.getState().layout.panes.find((id) => !deleted.has(id));
+    for (const id of useSplitLayoutStore.getState().layout.panes) {
+        if (!deleted.has(id) && (await readable(fetchThread, id))) {
+            return id;
+        }
+    }
+
+    return undefined;
 };
 
 /**

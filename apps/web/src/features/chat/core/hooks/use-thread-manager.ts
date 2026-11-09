@@ -170,7 +170,9 @@ export const useThreadManager = (enabled: boolean = true, currentThreadId?: stri
 
         if (isCurrent) {
             // With the split view on, the other open panes stay: the route moves to one of them instead of `/chat`, which has no split view.
-            const survivor = survivingPaneAfterDelete([threadId, ...childBranches]);
+            const survivor = await survivingPaneAfterDelete([threadId, ...childBranches], (id) =>
+                queryClient.fetchQuery(crpc.chat.functions.getThread.queryOptions({ threadId: id as Id<"threads"> })),
+            );
 
             navigate(survivor === undefined ? { replace: true, to: "/chat" } : { params: { threadId: survivor }, replace: true, to: "/chat/$threadId" });
         }
