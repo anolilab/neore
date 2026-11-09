@@ -29,7 +29,7 @@ import type { UIMessage } from "../agent/ui-messages";
 import { listMessagesByThreadIdHandler, toUIMessages } from "../agent/client";
 import { type StepUsage, sumStepUsage } from "../agent/message-cost";
 import { type RedactedThread, redactThreadForPublicViewer, resolveThreadReadAccess, type ThreadPermission } from "../agent/thread-read-access";
-import { getThreadListDataBatchHandler, threadForViewer } from "../agent/threads";
+import { getThreadListDataBatchHandler, readThreadRelationship, threadForViewer } from "../agent/threads";
 import { liteAuthQuery } from "../lib/crpc";
 import { isThreadLocked, throwThreadLocked } from "../lib/thread-lock";
 import { loadNsfwStatuses, type RedactedUIMessage, redactUIMessagesForPublicViewer } from "./lib/public-thread";
@@ -186,7 +186,8 @@ export const getThreadWithData = liteAuthQuery
  * the branch relationship and the child threads. Each field is what its own
  * procedure returns for the same caller and `unlockProof` (`getThread`,
  * `getThreadGoal`, `agent.threads.getThreadRelationship`, `getChildThreads`),
- * because it IS that procedure, run in this transaction.
+ * because it runs the same logic in this transaction (the relationship through
+ * the shared `readThreadRelationship` helper).
  *
  * A locked chat without its proof shows the stub title `getThread` gives and
  * nothing else (null / []): the goal, the branches and the relationship are
@@ -263,7 +264,7 @@ export const getThreadPaneState = liteAuthQuery
 
         const [goal, relationship, childThreads] = await Promise.all([
             context.runQuery(api.chat.goals.functions.getThreadGoal, { threadId, unlockProof }),
-            context.runQuery(api.agent.threads.getThreadRelationship, { threadId, unlockProof }),
+            readThreadRelationship(context, userId, threadId as Id<"threads">, unlockProof),
             context.runQuery(api.chat.functions.getChildThreads, { parentThreadId: threadId, unlockProof }).catch((error: unknown) => {
                 if (error instanceof LunoraError && error.code === "FORBIDDEN") {
                     return [];

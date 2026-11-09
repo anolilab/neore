@@ -863,6 +863,42 @@ export const createThreadRelationship = internalMutation
         return null;
     });
 
+/**
+ * The branch relationship of a thread, for its OWNER only (null for anyone else,
+ * an anonymous caller or a missing thread). A locked chat's parent id and branch
+ * point say where it came from, so they need its proof. Plain function over
+ * `ctx.db` so other modules read it in their own transaction.
+ */
+export const readThreadRelationship = async (
+    ctx: Pick<QueryContext, "db">,
+    userId: string | null | undefined,
+    threadId: Id<"threads">,
+    unlockProof?: string | null,
+) => {
+    if (!userId) {
+        return null;
+    }
+
+    const thread = await ctx.db.get("threads", threadId);
+
+    if (!thread || thread.userId !== userId) {
+        return null;
+    }
+
+    if (isThreadLocked(thread)) {
+        const access = await resolveThreadReadAccess(ctx, threadId, userId, unlockProof);
+
+        if (access?.kind !== "full") {
+            return null;
+        }
+    }
+
+    return ctx.db
+        .query("threadRelationships")
+        .withIndex("by_thread", (q) => q.eq("threadId", threadId))
+        .unique();
+};
+
 export const getThreadRelationship = query
     .input({ threadId: v.id("threads"), unlockProof: v.optional(v.string().max(MAX_LENGTH.short)) })
     .output(
@@ -883,31 +919,7 @@ export const getThreadRelationship = query
     .query(async ({ args, ctx }) => {
         const identity = await getAuthUserIdentity(ctx);
 
-        if (!identity) {
-            return null;
-        }
-
-        const thread = await ctx.db.get("threads", args.threadId);
-
-        if (!thread || thread.userId !== identity.userId) {
-            return null;
-        }
-
-        // The parent id and branch point say where a locked chat came from: they need its proof.
-        if (isThreadLocked(thread)) {
-            const access = await resolveThreadReadAccess(ctx, args.threadId, identity.userId, args.unlockProof);
-
-            if (access?.kind !== "full") {
-                return null;
-            }
-        }
-
-        const relationship = await ctx.db
-            .query("threadRelationships")
-            .withIndex("by_thread", (q) => q.eq("threadId", args.threadId))
-            .unique();
-
-        return relationship;
+        return readThreadRelationship(ctx, identity?.userId, args.threadId, args.unlockProof);
     });
 
 export const getChildThreads = query

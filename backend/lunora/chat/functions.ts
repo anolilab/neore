@@ -2538,10 +2538,12 @@ export const createThreadRelationshipPublic = authMutation
 export const getThreadRelationship = internalQuery
     .input({
         threadId: v.string(),
+        unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
     })
     .query(async ({ args: arguments_, ctx: context }) => {
         const relationship = await context.runQuery(api.agent.threads.getThreadRelationship, {
             threadId: arguments_.threadId as Id<"threads">,
+            unlockProof: arguments_.unlockProof,
         });
 
         return relationship;
@@ -3488,6 +3490,7 @@ export const getFullThreadForExport = authQuery
 
         const threadRelationship = await context.runQuery(internal.chat.functions.getThreadRelationship, {
             threadId,
+            unlockProof,
         });
 
         let allMessages: MessageDoc[];
