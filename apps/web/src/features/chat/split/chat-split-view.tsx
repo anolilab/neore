@@ -205,7 +205,7 @@ const Pane: FC<PaneProps> = ({
             {/* Brighter when focused, in either theme: --muted is darker than --card in light and lighter in dark. */}
             <header
                 className={cn(
-                    "flex h-9 shrink-0 items-center gap-1 px-3",
+                    "flex h-9 shrink-0 items-center gap-1 px-3 pointer-coarse:h-11",
                     isFocused ? "text-foreground dark:bg-muted" : "bg-muted/60 text-muted-foreground dark:bg-transparent",
                 )}
             >
@@ -217,7 +217,7 @@ const Pane: FC<PaneProps> = ({
                 </h2>
                 <TooltipIconButton
                     aria-pressed={isFocused}
-                    className="transition-none"
+                    className="transition-none pointer-coarse:size-11"
                     data-pane-focus=""
                     onClick={focusComposer}
                     tooltip={t`Focus chat: ${title}`}
@@ -225,7 +225,7 @@ const Pane: FC<PaneProps> = ({
                     <CrosshairIcon aria-hidden="true" className="size-4" />
                 </TooltipIconButton>
                 {canClose && (
-                    <TooltipIconButton className="transition-none" onClick={onClose} tooltip={t`Close pane: ${title}`}>
+                    <TooltipIconButton className="transition-none pointer-coarse:size-11" onClick={onClose} tooltip={t`Close pane: ${title}`}>
                         <XIcon aria-hidden="true" className="size-4" />
                     </TooltipIconButton>
                 )}

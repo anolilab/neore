@@ -316,7 +316,16 @@ describe("comparison mode (#11)", () => {
     });
 });
 
-// Every chat reads: the survivor is then the first open pane that is not deleted.
+describe("a document whose pane closes (#12)", () => {
+    it("moves to the focused pane, so the panel shows it and its close control is reachable there", () => {
+        useChatUIStore.getState().openCanvas("doc-1", A);
+
+        useSplitLayoutStore.getState().dispatch({ index: 0, type: "close" });
+
+        expect(useChatUIStore.getState()).toMatchObject({ activeDocumentId: "doc-1", canvasThreadId: B, isCanvasOpen: true });
+    });
+});
+
 const readsEvery = async (): Promise<unknown> => {
     return {};
 };

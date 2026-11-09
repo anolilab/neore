@@ -210,4 +210,11 @@ export const watchPaneFocus = (): (() => void) =>
         }
 
         pruneParkedModelStates(state.layout.panes);
+
+        // A document whose pane has closed moves to the focused pane, so the panel can show it and its close control is reachable.
+        const { canvasThreadId } = useChatUIStore.getState();
+
+        if (canvasThreadId !== null && after !== undefined && !state.layout.panes.includes(canvasThreadId)) {
+            useChatUIStore.setState({ canvasThreadId: after });
+        }
     });
