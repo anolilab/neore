@@ -2,11 +2,12 @@ import { api } from "@neore/backend/api";
 import { SidebarProvider } from "@neore/ui/components/sidebar";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import type { ComponentProps } from "react";
-import { useState } from "react";
-import { expect, spyOn, userEvent, waitFor } from "storybook/test";
+import { useCallback, useState } from "react";
+import { expect, fn, spyOn, userEvent, waitFor, within } from "storybook/test";
 
 import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
 import { chatDefaultOpen, chatSidebarNames, chatSidebarStyle } from "@/features/chat/shell-layout";
+import useCanvasPanel from "@/features/chat/use-canvas-panel";
 import type { ChatMessage } from "@/storybook/fixtures/chat";
 import { assistantMessage, chatFixtures, CONVERSATION, pageOf, STREAM_ID, streamingBody, THREAD_IDS, THREADS, userMessage } from "@/storybook/fixtures/chat";
 import { gatewayModelsHandler } from "@/storybook/fixtures/models";
@@ -29,7 +30,10 @@ const DESKTOP_QUERY = "(min-width: 768px)";
 /** The same query the split view asks, so a play can tell which layout it was given. */
 const isWide = (): boolean => globalThis.matchMedia(DESKTOP_QUERY).matches;
 
-/** Seeds the saved layout the split view reads when it mounts, and starts every story with no parked drafts and an empty composer. */
+/**
+ * Seeds the saved layout the split view reads when it mounts, and starts every story with no parked drafts, an empty composer and
+ * no side panel open (a document left open by one story would show in the next).
+ */
 const seed = (panes: string[], focus = 0): void => {
     const layout = { focus, panes, sizes: {} };
 
@@ -37,6 +41,7 @@ const seed = (panes: string[], focus = 0): void => {
     useSplitLayoutStore.setState({ layout });
     clearComposerDrafts();
     useChatUIStore.getState().clearComposer();
+    useChatUIStore.getState().closeCanvas();
 };
 
 const BY_ID: Record<string, (typeof THREADS)[keyof typeof THREADS]> = Object.fromEntries(Object.values(THREADS).map((thread) => [thread._id, thread]));
@@ -53,6 +58,22 @@ const MESSAGES: Record<string, ChatMessage[]> = {
 };
 
 const ownedAll = (messages: ChatMessage[]): ChatMessage[] => messages.map((message) => ownedBy(message));
+
+const DOCUMENT_ID = "doc-launch-notes";
+/** A text document opened from the main chat: the side panel shows it only while that chat has focus. */
+const LAUNCH_NOTES = {
+    _creationTime: 1,
+    _id: DOCUMENT_ID,
+    content: "# Launch notes\n\nOnboarding, billing and docs go out together.",
+    kind: "text",
+    status: "idle",
+    threadId: THREAD_IDS.main,
+    title: "Launch notes",
+    userId: "user-1",
+    version: 1,
+} as never;
+/** Counts the saves the panel makes: opening a document must not save it. */
+const documentUpdate = fn(() => LAUNCH_NOTES);
 
 /** Per-thread answers on top of the shared chat fixtures; `streaming` names the one thread with a reply on its way. */
 const perThread = (streaming?: string) => [
@@ -73,6 +94,8 @@ const perThread = (streaming?: string) => [
             }) as never,
     ),
     lunora(api.chat.functions.getThreadUIMessages, ({ threadId }) => pageOf(ownedAll(MESSAGES[threadId] ?? CONVERSATION)) as never),
+    lunora(api.agent.documents.getDocument, () => LAUNCH_NOTES),
+    lunora(api.agent.documents.updateDocument, documentUpdate),
     lunora(api.chat.streaming.getActiveStreamForThread, ({ threadId }) =>
         streaming !== undefined && threadId === streaming ? ({ streamId: STREAM_ID } as never) : null,
     ),
@@ -107,6 +130,46 @@ const WithPanelSlot = (args: ComponentProps<typeof ChatSplitView>) => {
                 <ChatSplitView {...args} sidebarSlot={slot} />
             </div>
             <div aria-label="Thread details" data-sidebar-right-wrapper="" ref={setSlot} role="complementary" />
+        </div>
+    );
+};
+
+/**
+ * The page's side panel for the focused pane, wired as the page wires it: the canvas or PDF of the focused chat, in a region to
+ * the right. The page (`assistant.tsx`) is not exported, so the story takes the same hook and resolver; the rule under test
+ * lives in `useCanvasPanel`.
+ */
+const WithCanvasPanel = (args: ComponentProps<typeof ChatSplitView>) => {
+    const focusedThreadId = useSplitLayoutStore((s) => s.layout.panes[s.layout.focus]);
+    // What the page does with a PDF thumbnail: it belongs to the pane it sits in, and that pane takes focus.
+    const resolveOpenThreadId = useCallback((opener: HTMLElement | undefined): string | undefined => {
+        const paneThreadId = opener?.closest<HTMLElement>("[data-pane-thread-id]")?.dataset.paneThreadId;
+
+        if (paneThreadId !== undefined) {
+            useSplitLayoutStore.getState().dispatch({ threadId: paneThreadId, type: "open" });
+        }
+
+        return paneThreadId;
+    }, []);
+    const { isPanelOpen, isParked, keepAlive, label, panel } = useCanvasPanel(focusedThreadId, { resolveOpenThreadId });
+
+    return (
+        <div className="flex h-full">
+            <div className="h-full min-w-0 flex-1">
+                <ChatSplitView {...args} />
+            </div>
+            {isPanelOpen && (
+                <div aria-label={label} className="h-full w-96 shrink-0" role="region">
+                    {panel}
+                </div>
+            )}
+            {/* As the page does: a document open in another pane stays mounted, hidden. */}
+            {isParked && (
+                <div aria-label={label} hidden role="region">
+                    {panel}
+                </div>
+            )}
+            {keepAlive}
         </div>
     );
 };
@@ -304,6 +367,103 @@ export const DraftKeptAcrossFocus: Story = {
             // The stub took focus with it when it went: it lands in the composer, not on the page.
             await waitFor(() => expect(canvas.getByRole("textbox", { name: "Message" })).toHaveFocus());
             await expect(paneAnimations()).toEqual([]);
+        });
+    },
+};
+
+/**
+ * A document opened from the focused chat belongs to that chat: focus moving to another pane hides the side panel, and focus
+ * back to the chat shows the document again, with its content.
+ */
+export const CanvasStaysWithItsChat: Story = {
+    loaders: [async () => seed([THREAD_IDS.main, THREAD_IDS.older])],
+    render: (args) => <WithCanvasPanel {...args} />,
+    play: async ({ canvas, step }) => {
+        documentUpdate.mockClear();
+
+        await step("open a document from the focused chat", async () => {
+            await canvas.findByRole("textbox", { name: "Message" }, PAGE_WAIT);
+            // What a document card's "open" does: the document and the chat it was made in.
+            useChatUIStore.getState().openCanvas(DOCUMENT_ID, THREAD_IDS.main);
+
+            const panel = await canvas.findByRole("region", { name: "Canvas" }, PAGE_WAIT);
+
+            // The editor is a lazy chunk, so its text can arrive after the panel does.
+            await expect(await within(panel).findByText("Onboarding, billing and docs go out together.", undefined, STATE_WAIT)).toBeInTheDocument();
+            // Let the editor finish mounting before judging whether it saved.
+            await new Promise((resolve) => {
+                setTimeout(resolve, 500);
+            });
+            await expect(documentUpdate).not.toHaveBeenCalled();
+        });
+
+        if (!isWide()) {
+            // One chat shows on a phone, so there is no other pane to move focus to.
+            return;
+        }
+
+        await step("focus the other chat: the document stays with its chat", async () => {
+            await userEvent.click(await canvas.findByRole("button", { name: "Focus chat: Rust lifetimes, explained" }));
+            await waitFor(() => expect(canvas.getByRole("region", { name: "Rust lifetimes, explained" })).toHaveAttribute("data-focused"));
+            // Hidden, not gone: the editor stays mounted so edits that are not saved yet survive the trip.
+            await expect(canvas.queryByRole("region", { name: "Canvas" })).not.toBeInTheDocument();
+
+            // A hidden element has no accessible name, so it is found by its label.
+            const parked = canvas.getAllByRole("region", { hidden: true }).find((region) => region.getAttribute("aria-label") === "Canvas");
+
+            await expect(parked).toBeDefined();
+
+            await expect(parked).not.toBeVisible();
+            await expect(within(parked as HTMLElement).getByText("Onboarding, billing and docs go out together.")).toBeInTheDocument();
+        });
+
+        await step("and back: the document is shown again", async () => {
+            await userEvent.click(await canvas.findByRole("button", { name: "Focus chat: Plan the Q1 product launch" }));
+            const panel = await canvas.findByRole("region", { name: "Canvas" }, PAGE_WAIT);
+
+            await expect(await within(panel).findByText("Onboarding, billing and docs go out together.", undefined, STATE_WAIT)).toBeInTheDocument();
+        });
+    },
+};
+
+/** The prompt that opened the route is in the composer once. Moving focus away and back keeps the draft typed over it. */
+export const RoutePromptKeptAcrossFocus: Story = {
+    args: { initialMessage: "Prompt from the home page" },
+    loaders: [async () => seed([THREAD_IDS.main, THREAD_IDS.pinned])],
+    play: async ({ canvas, step }) => {
+        await step("the prompt is in the composer", async () => {
+            const box = await canvas.findByRole("textbox", { name: "Message" }, PAGE_WAIT);
+
+            await waitFor(() => expect(box).toHaveTextContent("Prompt from the home page"));
+        });
+
+        if (!isWide()) {
+            return;
+        }
+
+        await step("replace the prompt with a draft", async () => {
+            const box = await canvas.findByRole("textbox", { name: "Message" }, PAGE_WAIT);
+
+            await userEvent.click(box);
+            await userEvent.clear(box);
+            await userEvent.keyboard("My own draft");
+            await waitFor(() => expect(canvas.getByRole("textbox", { name: "Message" })).toHaveTextContent("My own draft"));
+        });
+
+        await step("focus the other pane and back", async () => {
+            // The other pane shows the stub, as in the draft story.
+            await userEvent.click(await canvas.findByRole("button", { name: "Continue in this chat" }, PAGE_WAIT));
+            const other = await canvas.findByRole("region", { name: /^Weekly team update draft/ }, PAGE_WAIT);
+
+            await waitFor(() => expect(other).toHaveAttribute("data-focused"));
+            await userEvent.click(await canvas.findByRole("button", { name: "Focus chat: Plan the Q1 product launch" }, PAGE_WAIT));
+            // The pane's name ends with "Unsent draft" while its draft is parked, so the match is by prefix.
+            await waitFor(() => expect(canvas.getByRole("region", { name: /^Plan the Q1 product launch/ })).toHaveAttribute("data-focused"));
+        });
+
+        await step("the draft is back, and the prompt is not written over it", async () => {
+            await waitFor(() => expect(canvas.getByRole("textbox", { name: "Message" })).toHaveTextContent("My own draft"));
+            await expect(canvas.getByRole("textbox", { name: "Message" })).not.toHaveTextContent("Prompt from the home page");
         });
     },
 };

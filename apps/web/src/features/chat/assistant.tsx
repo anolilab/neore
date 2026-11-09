@@ -120,7 +120,7 @@ const SplitAssistantContent: FC<{
 
         return paneThreadId;
     }, []);
-    const { isPanelOpen, label: panelLabel, panel } = useCanvasPanel(focusedThreadId, { resolveOpenThreadId });
+    const { isPanelOpen, isParked, keepAlive, label: panelLabel, panel } = useCanvasPanel(focusedThreadId, { resolveOpenThreadId });
 
     return (
         <div className="animate-in fade-in flex h-dvh w-full duration-150">
@@ -148,6 +148,13 @@ const SplitAssistantContent: FC<{
                         </ResizablePanel>
                     )}
                 </ResizablePanelGroup>
+                {/* A document open in another pane stays mounted, hidden, so its unsaved edits are there when focus returns. */}
+                {isParked && (
+                    <div aria-label={panelLabel} hidden role="region">
+                        {panel}
+                    </div>
+                )}
+                {keepAlive}
             </SidebarInset>
             <div
                 aria-label={t`Thread details`}

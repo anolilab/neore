@@ -11,16 +11,15 @@ import { createPortal } from "react-dom";
 
 import TooltipIconButton from "@/features/chat/components/tooltip-icon-button";
 import { ChatProvider, useChatThread } from "@/features/chat/core/context/chat-context";
-import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
-import { useModelStore } from "@/features/chat/core/stores/model-store";
-import ChatSiteHeader from "@/features/chat/header/chat-header";
+import ChatSiteHeader, { LockedChatSiteHeader } from "@/features/chat/header/chat-header";
 import { LockedChatGate } from "@/features/chat/lock/locked-chat-gate";
 import { useThreadShard } from "@/features/chat/sharing/use-thread-shard";
-import ThreadSidebar from "@/features/chat/sidebar/thread-sidebar";
+import ThreadSidebar, { LockedThreadSidebar } from "@/features/chat/sidebar/thread-sidebar";
 import Thread from "@/features/chat/thread/thread";
 import { useThreadPaneState } from "@/features/chat/thread/use-thread-pane-state";
 
-import { saveComposerDraft, setSplitViewMounted, takeComposerDraftState } from "./composer-drafts";
+import { setSplitViewMounted } from "./composer-drafts";
+import { leaveSplitView, restoreLiveComposerFor, syncFocusedModel, watchPaneFocus } from "./pane-state";
 import { MIN_PANE_PX } from "./split-layout";
 import { hydrateSplitLayout, useSplitLayoutStore } from "./split-layout-store";
 import { useChatHasDraft } from "./use-chat-has-draft";
@@ -54,24 +53,17 @@ const useIsDesktop = (): boolean =>
  */
 const FocusModelSync: FC<{ isFocused: boolean }> = ({ isFocused }) => {
     const { thread, threadId } = useChatThread();
-    const selectedModelThreadId = useModelStore((state) => state.selectedModelThreadId);
     const model = thread?.activeAgent?.model ?? thread?.model;
     const mode = thread?.mode;
     const isLoaded = thread !== null && thread !== undefined;
 
     useEffect(() => {
-        if (!(isFocused && threadId && isLoaded)) {
+        if (!(isFocused && threadId)) {
             return;
         }
 
-        const state = useModelStore.getState();
-        const userChanged =
-            (state.userChangedModel && state.selectedModelThreadId === threadId) || (state.userChangedMode && state.currentModeThreadId === threadId);
-
-        if (!userChanged) {
-            state.loadThreadData({ mode, model }, threadId);
-        }
-    }, [isFocused, isLoaded, mode, model, selectedModelThreadId, threadId]);
+        syncFocusedModel({ isLoaded, mode, model, threadId });
+    }, [isFocused, isLoaded, mode, model, threadId]);
 
     return null;
 };
@@ -239,8 +231,17 @@ const Pane: FC<PaneProps> = ({
             </header>
             <div className="relative min-h-0 flex-1">
                 {shardReady && (
-                    <LockedChatGate threadId={threadId}>
-                        <ChatProvider initialThread={initialThread} jwtToken={jwtToken} threadId={threadId}>
+                    <LockedChatGate
+                        // The page keeps its header and its details panel while the focused chat is locked: neither needs the provider.
+                        lockedExtras={
+                            <>
+                                {isFocused && headerSlot && createPortal(<LockedChatSiteHeader />, headerSlot)}
+                                {isFocused && sidebarSlot && createPortal(<LockedThreadSidebar />, sidebarSlot)}
+                            </>
+                        }
+                        threadId={threadId}
+                    >
+                        <ChatProvider initialThread={initialThread} jwtToken={jwtToken} splitPane threadId={threadId}>
                             <FocusModelSync isFocused={isFocused} />
                             {isFocused && headerSlot && createPortal(<ChatSiteHeader threadId={threadId} />, headerSlot)}
                             {isFocused && sidebarSlot && createPortal(<ThreadSidebar threadId={threadId} />, sidebarSlot)}
@@ -296,10 +297,26 @@ const ChatSplitView: FC<ChatSplitViewProps> = ({ headerSlot = null, initialMessa
     // The chat of a pane the person just closed: focus then moves to a surviving pane instead of being lost with the button.
     const closedPaneRef = useRef<{ index: number; threadId: string } | null>(null);
 
+    // Read by the unmount cleanup, which must not close over a render's values.
+    const focusedRef = useRef<string | undefined>(undefined);
+    const routeRef = useRef(routeThreadId);
+    // The focused pane's chat when its draft was last brought back, so a change of focus (or a remount) brings back the next one.
+    const previousFocusedRef = useRef<string | undefined>(undefined);
+
     useEffect(() => {
         setSplitViewMounted(true);
 
-        return () => setSplitViewMounted(false);
+        const unwatch = watchPaneFocus();
+
+        return () => {
+            unwatch();
+
+            leaveSplitView(focusedRef.current, routeRef.current);
+
+            // The next mount starts from its own focus, and brings the parked draft back.
+            previousFocusedRef.current = undefined;
+            setSplitViewMounted(false);
+        };
     }, []);
 
     useEffect(() => {
@@ -343,33 +360,21 @@ const ChatSplitView: FC<ChatSplitViewProps> = ({ headerSlot = null, initialMessa
 
     const focusedThreadId = layout.panes[layout.focus];
 
-    // The composer's draft (text, attachments, references) is one global value: park the outgoing pane's and bring back the
-    // incoming one's. Runs after the new composer has mounted, so nothing the mount does overwrites the restored text.
-    const previousFocused = useRef<string | undefined>(undefined);
-
     useEffect(() => {
-        if (!ready) {
+        focusedRef.current = focusedThreadId;
+        routeRef.current = routeThreadId;
+    });
+
+    // The composer's draft (text, attachments, references) is one global value. The outgoing pane's was parked when focus
+    // moved (`watchPaneFocus`); the incoming one's comes back here, after its composer has mounted, so nothing the mount
+    // does overwrites the restored text. On a remount nothing was outgoing, and the focused pane's parked draft returns too.
+    useEffect(() => {
+        if (!ready || focusedThreadId === undefined || previousFocusedRef.current === focusedThreadId) {
             return;
         }
 
-        const previous = previousFocused.current;
-
-        previousFocused.current = focusedThreadId;
-
-        if (previous === undefined || focusedThreadId === undefined || previous === focusedThreadId) {
-            return;
-        }
-
-        const ui = useChatUIStore.getState();
-
-        saveComposerDraft(previous, {
-            attachedReferences: ui.attachedReferences,
-            composerAttachments: ui.composerAttachments,
-            composerText: ui.composerText,
-        });
-        // `restoreComposer` leaves a composer that has content alone, so the outgoing one is cleared first.
-        ui.clearComposer();
-        ui.restoreComposer(takeComposerDraftState(focusedThreadId));
+        previousFocusedRef.current = focusedThreadId;
+        restoreLiveComposerFor(focusedThreadId);
     }, [focusedThreadId, ready]);
 
     useEffect(() => {

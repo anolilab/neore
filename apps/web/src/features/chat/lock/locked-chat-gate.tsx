@@ -18,7 +18,7 @@ import { ThreadLockDialog } from "./thread-lock-dialog";
  * rebuilt WITH the proof (`withUnlockProof` runs at build time) and a fresh one
  * is fetched: the chat appears on unlock and the prompt returns on relock.
  */
-export const LockedChatGate = ({ children, threadId }: { children: ReactNode; threadId: string }) => {
+export const LockedChatGate = ({ children, lockedExtras, threadId }: { children: ReactNode; lockedExtras?: ReactNode; threadId: string }) => {
     const { t } = useLingui();
     const crpc = useCRPC();
     const headingId = useId();
@@ -69,9 +69,12 @@ export const LockedChatGate = ({ children, threadId }: { children: ReactNode; th
         // and its content stays unmounted.
         if (proof === undefined && relocked && error) {
             return (
-                <section className="flex h-full flex-col items-center justify-center p-6 text-center" role="alert">
-                    <p className="text-destructive text-sm">{error.message}</p>
-                </section>
+                <>
+                    {lockedExtras}
+                    <section className="flex h-full flex-col items-center justify-center p-6 text-center" role="alert">
+                        <p className="text-destructive text-sm">{error.message}</p>
+                    </section>
+                </>
             );
         }
 
@@ -79,26 +82,29 @@ export const LockedChatGate = ({ children, threadId }: { children: ReactNode; th
     }
 
     return (
-        <section aria-labelledby={headingId} className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center">
-            <h2 className="text-lg font-medium" id={headingId}>
-                {t`This chat is locked`}
-            </h2>
-            <p className="text-muted-foreground max-w-md text-sm">{t`Enter its passcode to read it in this browser. Closing the tab or staying idle locks it again.`}</p>
-            <Button onClick={() => setUnlocking(true)} type="button">
-                {t`Unlock chat`}
-            </Button>
-            {unlocking && (
-                <ThreadLockDialog
-                    mode="unlock"
-                    onOpenChange={(open) => {
-                        if (!open) {
-                            setUnlocking(false);
-                        }
-                    }}
-                    open
-                    threadId={threadId}
-                />
-            )}
-        </section>
+        <>
+            {lockedExtras}
+            <section aria-labelledby={headingId} className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center">
+                <h2 className="text-lg font-medium" id={headingId}>
+                    {t`This chat is locked`}
+                </h2>
+                <p className="text-muted-foreground max-w-md text-sm">{t`Enter its passcode to read it in this browser. Closing the tab or staying idle locks it again.`}</p>
+                <Button onClick={() => setUnlocking(true)} type="button">
+                    {t`Unlock chat`}
+                </Button>
+                {unlocking && (
+                    <ThreadLockDialog
+                        mode="unlock"
+                        onOpenChange={(open) => {
+                            if (!open) {
+                                setUnlocking(false);
+                            }
+                        }}
+                        open
+                        threadId={threadId}
+                    />
+                )}
+            </section>
+        </>
     );
 };

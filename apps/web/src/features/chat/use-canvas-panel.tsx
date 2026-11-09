@@ -6,8 +6,9 @@
 import { useLingui } from "@lingui/react/macro";
 import type { OpenPdfPreviewDetail } from "@neore/ui/utils/pdf-preview-event";
 import { OPEN_PDF_PREVIEW_EVENT } from "@neore/ui/utils/pdf-preview-event";
-import type { ReactNode } from "react";
-import { useEffect } from "react";
+import type { FC, ReactNode } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 
 import CanvasPanel from "@/features/canvas/canvas-panel";
 import PdfPreviewPanel from "@/features/canvas/pdf-preview-panel";
@@ -19,11 +20,37 @@ import useBlockedPdfNoticeLifetime, { BLOCKED_PDF_NOTICE_ID } from "./use-blocke
 interface CanvasPanelState {
     /** Whether the panel is open for this chat. */
     isPanelOpen: boolean;
+    /** A document of another pane is open: keep `panel` mounted in a hidden container so its unsaved edits survive. */
+    isParked: boolean;
+    /** Render this once at a stable spot (split view only; null otherwise). It holds the content while `panel` moves. */
+    keepAlive: ReactNode;
     /** The accessible name of the panel region. */
     label: string;
     /** The PDF or canvas to render inside the panel. */
     panel: ReactNode;
 }
+
+const createCanvasHost = (): HTMLDivElement => {
+    const host = document.createElement("div");
+
+    host.className = "h-full";
+
+    return host;
+};
+
+/** Where the moving content element is attached. */
+const CanvasHostSlot: FC<{ host: HTMLElement }> = ({ host }) => {
+    const attach = useCallback(
+        (node: HTMLDivElement | null) => {
+            if (node && host.parentNode !== node) {
+                node.appendChild(host);
+            }
+        },
+        [host],
+    );
+
+    return <div className="h-full" ref={attach} />;
+};
 
 interface CanvasPanelOptions {
     /**
@@ -42,6 +69,9 @@ const useCanvasPanel = (threadId: string | undefined, { resolveOpenThreadId }: C
     // With several chats on one page, a document stays with the chat that opened it while focus moves to another.
     const isDocumentHere = resolveOpenThreadId === undefined || canvasThreadId === null || canvasThreadId === threadId;
     const isPanelOpen = isCanvasOpen && (openedPreview === null ? isDocumentHere : previewFile !== null);
+    // With several chats on one page the content lives in one element that moves between the visible panel and a hidden spot,
+    // so an editor with unsaved edits is not remounted when focus moves to another pane and back.
+    const [host] = useState<HTMLDivElement | null>(() => (resolveOpenThreadId === undefined ? null : createCanvasHost()));
 
     // A chat PDF's thumbnail asks for the side panel; this takes the request (see `packages/ui/src/utils/pdf-preview-event.ts`).
     useEffect(() => {
@@ -87,10 +117,22 @@ const useCanvasPanel = (threadId: string | undefined, { resolveOpenThreadId }: C
         [threadId],
     );
 
+    // A document open in another pane is parked, not closed: its editor may hold edits that are not saved yet.
+    const isParked = isCanvasOpen && openedPreview === null && !isDocumentHere;
+    const content = previewFile ? <PdfPreviewPanel file={previewFile} /> : <CanvasPanel />;
+    const label = previewFile ? t`PDF preview` : t`Canvas`;
+
+    if (!host) {
+        return { isParked: false, isPanelOpen, keepAlive: null, label, panel: content };
+    }
+
     return {
+        isParked,
         isPanelOpen,
-        label: previewFile ? t`PDF preview` : t`Canvas`,
-        panel: previewFile ? <PdfPreviewPanel file={previewFile} /> : <CanvasPanel />,
+        // Rendered by the caller at a spot that never moves; `panel` is where the content shows.
+        keepAlive: isPanelOpen || isParked ? createPortal(content, host) : null,
+        label,
+        panel: <CanvasHostSlot host={host} />,
     };
 };
 
