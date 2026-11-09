@@ -55,7 +55,7 @@ export const useSplitLayoutStore = create<SplitLayoutState>()(
 );
 
 // The read in flight, shared by every caller that arrives before it settles. Cleared on settle, so a failed read can be retried.
-let hydration: Promise<void> | undefined;
+const hydration: { pending?: Promise<void> } = {};
 
 /**
  * Reads the saved layout once. Callers that arrive while the read is pending await the same one, so a later read cannot replace a
@@ -66,11 +66,11 @@ export const hydrateSplitLayout = (): Promise<void> => {
         return Promise.resolve();
     }
 
-    hydration ??= Promise.resolve(useSplitLayoutStore.persist.rehydrate()).finally(() => {
-        hydration = undefined;
+    hydration.pending ??= Promise.resolve(useSplitLayoutStore.persist.rehydrate()).finally(() => {
+        hydration.pending = undefined;
     });
 
-    return hydration;
+    return hydration.pending;
 };
 
 /**

@@ -227,6 +227,12 @@ const initialState = {
     transitioningMessage: null as { text: string; threadId: string } | null,
 };
 
+/**
+ * Whether a document (not a PDF preview) is open in the side panel. Its editor may hold edits that nothing reports yet,
+ * so opening a PDF must not replace it.
+ */
+export const isDocumentOpen = (state: Pick<ChatUIStore, "isCanvasOpen" | "previewFile">): boolean => state.isCanvasOpen && state.previewFile === null;
+
 export const useChatUIStore = create<ChatUIStore>()(
     devtools(
         subscribeWithSelector((set, get) => {
@@ -574,12 +580,6 @@ export const useScrollState = () => {
 
     return { isAtBottom, setIsAtBottom };
 };
-
-/**
- * Whether a document (not a PDF preview) is open in the side panel. Its editor may hold edits that nothing reports yet,
- * so opening a PDF must not replace it.
- */
-export const isDocumentOpen = (state: Pick<ChatUIStore, "isCanvasOpen" | "previewFile">): boolean => state.isCanvasOpen && state.previewFile === null;
 
 /**
  * The side panel across an account switch: a PDF preview (a signed link, nothing unsaved) closes as the switch starts; a
