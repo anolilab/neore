@@ -116,6 +116,9 @@ catalogs:
     "@cloudflare/vite-plugin": 1.67.0
     # wrangler peer-requires ^5.<its workerd date> — 4.145.0 wants ^5.20260930.2.
     # Bump with wrangler.
+    # `packages/client-runtime` declares this as a devDependency though it imports no types from it: without that,
+    # pnpm resolves an older copy for that importer, so its `@lunora/react` peer differs from apps/web's and the
+    # SSR render throws "useLunora must be used inside <LunoraProvider />". Keep it, or re-check that peer hash.
     "@cloudflare/workers-types": 5.20261106.1
     "@crxjs/vite-plugin": 3.0.0
     "@prosopo/vite-plugin-watch-workspace": 2.6.33
