@@ -677,7 +677,7 @@ msgid "{0} tools: {1}"
 msgstr "{0} outils : {1}"
 
 #. placeholder {0}: overview.unreadCount
-#: src/features/home/components/home-page.tsx:212
+#: src/features/home/components/home-page.tsx:217
 msgid "{0} unread"
 msgstr "{0} non lues"
 
@@ -3075,7 +3075,7 @@ msgstr "Toutes les catégories"
 msgid "All changes saved"
 msgstr "Toutes les modifications sont enregistrées"
 
-#: src/features/home/components/home-page.tsx:253
+#: src/features/home/components/home-page.tsx:258
 msgid "All chats"
 msgstr "Toutes les discussions"
 
@@ -6342,7 +6342,7 @@ msgid "clock"
 msgstr "horloge"
 
 #: ../../packages/ui/src/components/ai-elements/artifact.tsx:31
-#: ../../packages/ui/src/components/countdown-toast-card.tsx:178
+#: ../../packages/ui/src/components/countdown-toast-card.tsx:192
 #: ../../packages/ui/src/components/data-grid/data-grid-keyboard-shortcuts.tsx:329
 #: ../../packages/ui/src/components/dialog.tsx:84
 #: ../../packages/ui/src/components/image-editor.tsx:264
@@ -8253,7 +8253,7 @@ msgid "Could not load this"
 msgstr "Impossible de charger ceci"
 
 #: src/features/chat/split/chat-split-view.tsx:238
-#: src/features/chat/thread/thread.tsx:350
+#: src/features/chat/thread/thread.tsx:351
 msgid "Could not load this chat's details."
 msgstr ""
 
@@ -8472,7 +8472,7 @@ msgstr "Impossible d’arrêter le worker."
 msgid "Could not switch the model. Please try again."
 msgstr "Impossible de changer de modèle. Veuillez réessayer."
 
-#: src/features/home/components/home-page.tsx:236
+#: src/features/home/components/home-page.tsx:241
 msgid "Could not turn on the Daily Brief."
 msgstr "Impossible d'activer le Daily Brief."
 
@@ -9044,7 +9044,7 @@ msgstr "Plateforme de messagerie et d’assistance client"
 msgid "Customization"
 msgstr "Personnalisation"
 
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:132
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:133
 msgid "Customize"
 msgstr "Personnaliser"
 
@@ -9113,7 +9113,7 @@ msgstr "Daily Brief"
 msgid "Daily Brief turned off"
 msgstr "Daily Brief désactivé"
 
-#: src/features/home/components/home-page.tsx:237
+#: src/features/home/components/home-page.tsx:242
 #: src/features/notifications/components/notification-settings.tsx:112
 msgid "Daily Brief turned on"
 msgstr "Daily Brief activé"
@@ -13952,8 +13952,8 @@ msgstr "Chemin du filtre"
 msgid "Filter rules updated"
 msgstr "Règles de filtre mises à jour"
 
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:138
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:144
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:139
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:145
 msgid "Filter shortcuts"
 msgstr "Raccourcis de filtre"
 
@@ -14924,7 +14924,7 @@ msgstr "Allemand (Suisse)"
 msgid "Germany"
 msgstr "Allemagne"
 
-#: src/features/home/components/home-page.tsx:229
+#: src/features/home/components/home-page.tsx:234
 msgid "Get a short summary here every morning."
 msgstr "Recevez ici un court résumé chaque matin."
 
@@ -15058,7 +15058,7 @@ msgstr "Aller au premier élément"
 msgid "Go to Home"
 msgstr "Aller à l’accueil"
 
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:84
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:85
 msgid "Go to last item"
 msgstr "Aller au dernier élément"
 
@@ -17298,6 +17298,7 @@ msgid "Judge: {0}"
 msgstr "Juge : {0}"
 
 #: src/features/chat/thread/thread.tsx:110
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:82
 msgid "Jump to my last message"
 msgstr "Aller à mon dernier message"
 
@@ -17390,7 +17391,7 @@ msgstr "Fichier de clé (facultatif, chemin absolu)"
 #: ../../packages/ui/src/components/data-grid/data-grid-keyboard-shortcuts.tsx:333
 #: src/features/chat/signed-out/signed-out-chat.tsx:153
 #: src/features/chat/thread-list/thread-list-header.tsx:146
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:124
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:125
 #: src/features/workflow/components/canvas/workflow-controls.tsx:374
 msgid "Keyboard shortcuts"
 msgstr "Raccourcis clavier"
@@ -17941,7 +17942,7 @@ msgstr "Laisser vide pour utiliser l’entrée du nœud connecté"
 msgid "Leave Organization"
 msgstr "Quitter l’organisation"
 
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:85
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:86
 msgid "Leave selection or navigation"
 msgstr "Quitter la sélection ou la navigation"
 
@@ -20545,7 +20546,7 @@ msgstr "Naviguer → {url}"
 msgid "Navigate between cells"
 msgstr "Naviguer entre les cellules"
 
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:86
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:87
 msgid "Navigate threads"
 msgstr "Parcourir les conversations"
 
@@ -20783,7 +20784,7 @@ msgid "New case"
 msgstr "Nouveau cas"
 
 #: src/components/not-found.tsx:10
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:89
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:90
 msgid "New chat"
 msgstr "Nouveau chat"
 
@@ -20900,7 +20901,7 @@ msgstr "Nouvelle tâche"
 msgid "New task run · earlier messages were not sent to the model"
 msgstr "Nouvelle exécution de la tâche · les messages précédents n'ont pas été envoyés au modèle"
 
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:90
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:91
 msgid "New temporary chat"
 msgstr "Nouveau chat temporaire"
 
@@ -20966,7 +20967,7 @@ msgstr "Branche suivante"
 msgid "next gen"
 msgstr "nouvelle génération"
 
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:91
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:92
 msgid "Next item"
 msgstr "Élément suivant"
 
@@ -21130,7 +21131,7 @@ msgstr "Aucune caméra sélectionnée"
 msgid "No cases yet. Add one by hand, import a CSV or JSONL file, or save a chat turn with \"Save as eval case\"."
 msgstr "Aucun cas pour l’instant. Ajoutez-en un à la main, importez un fichier CSV ou JSONL, ou enregistrez un échange du chat avec « Enregistrer comme cas d’évaluation »."
 
-#: src/features/home/components/home-page.tsx:260
+#: src/features/home/components/home-page.tsx:265
 msgid "No chats yet. Start one above."
 msgstr "Aucune discussion pour l'instant. Commencez-en une ci-dessus."
 
@@ -21350,6 +21351,10 @@ msgstr "Aucun souvenir de ce type."
 msgid "No memories yet. The AI will start learning from your conversations automatically."
 msgstr "Aucun souvenir pour l’instant. L’IA commencera automatiquement à apprendre de vos conversations."
 
+#: src/features/chat/thread/jump-to-last-message.tsx:47
+msgid "No message of yours is loaded in this conversation"
+msgstr ""
+
 #: src/features/chat/thread-list/hierarchical-thread-list.tsx:1131
 msgid "No messages found for"
 msgstr "Aucun message trouvé pour"
@@ -21556,7 +21561,7 @@ msgstr "Aucune feuille trouvée dans le classeur"
 msgid "No shortcuts found"
 msgstr "Aucun raccourci trouvé"
 
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:171
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:172
 msgid "No shortcuts match \"{query}\"."
 msgstr "Aucun raccourci ne correspond à « {query} »."
 
@@ -21667,7 +21672,7 @@ msgstr "Aucun outil."
 msgid "No triggers yet"
 msgstr "Aucun déclencheur pour l’instant"
 
-#: src/features/home/components/home-page.tsx:219
+#: src/features/home/components/home-page.tsx:224
 msgid "No unread notifications."
 msgstr "Aucune notification non lue."
 
@@ -21963,7 +21968,7 @@ msgstr "Notification"
 msgid "Notification workflows, channels, and recipient preferences"
 msgstr "Workflows de notification, canaux et préférences des destinataires"
 
-#: src/features/home/components/home-page.tsx:216
+#: src/features/home/components/home-page.tsx:221
 #: src/features/notifications/components/notification-bell.tsx:72
 #: src/features/notifications/components/notification-bell.tsx:102
 #: src/features/notifications/components/notification-settings.tsx:199
@@ -22547,7 +22552,7 @@ msgstr "Ouvrir le menu"
 msgid "Open messages"
 msgstr "Ouvrir les messages"
 
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:92
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:93
 msgid "Open model picker"
 msgstr "Ouvrir le sélecteur de modèle"
 
@@ -22707,7 +22712,7 @@ msgstr "Ouvrir la conversation du sous-agent"
 msgid "Open the thread list search and focus it ({0})"
 msgstr "Ouvrir la recherche de la liste des fils et y placer le focus ({0})"
 
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:87
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:88
 msgid "Open thread"
 msgstr "Ouvrir la conversation"
 
@@ -24622,7 +24627,7 @@ msgstr "L’export précédent a été annulé"
 msgid "Previous generation high-quality model for complex scenes"
 msgstr "Modèle de haute qualité de génération précédente pour les scènes complexes"
 
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:93
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:94
 msgid "Previous item"
 msgstr "Élément précédent"
 
@@ -25445,7 +25450,7 @@ msgstr "Rayon"
 msgid "rag"
 msgstr "rag"
 
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:83
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:84
 msgid "Raise reasoning effort"
 msgstr "Augmenter l’effort de raisonnement"
 
@@ -25804,7 +25809,7 @@ msgstr "Rebaser et fusionner"
 msgid "Recent"
 msgstr "Récents"
 
-#: src/features/home/components/home-page.tsx:257
+#: src/features/home/components/home-page.tsx:262
 msgid "Recent chats"
 msgstr "Discussions récentes"
 
@@ -28140,7 +28145,7 @@ msgstr "Choisir une voix"
 msgid "Select all"
 msgstr "Tout sélectionner"
 
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:88
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:89
 msgid "Select all (in selection mode)"
 msgstr "Tout sélectionner (en mode sélection)"
 
@@ -28869,7 +28874,7 @@ msgstr "Afficher les modèles installés dans le sélecteur"
 msgid "Show keyboard shortcuts"
 msgstr "Afficher les raccourcis clavier"
 
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:82
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:83
 msgid "Show keyboard shortcuts (outside text fields)"
 msgstr "Afficher les raccourcis clavier (hors champs de texte)"
 
@@ -32185,7 +32190,7 @@ msgstr "Le fichier importé semble vide."
 msgid "The improved prompt will appear here..."
 msgstr "Le prompt amélioré apparaîtra ici..."
 
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:126
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:127
 msgid "The keys you have set now."
 msgstr "Les touches que vous avez définies actuellement."
 
@@ -33485,7 +33490,7 @@ msgstr "Afficher/masquer la palette d’éléments"
 msgid "Toggle interactivity"
 msgstr "Activer ou désactiver l’interactivité"
 
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:94
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:95
 msgid "Toggle left sidebar"
 msgstr "Afficher ou masquer la barre latérale gauche"
 
@@ -33508,7 +33513,7 @@ msgstr "Afficher/masquer le menu"
 msgid "Toggle property panel"
 msgstr "Afficher/masquer le panneau des propriétés"
 
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:95
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:96
 msgid "Toggle right sidebar"
 msgstr "Afficher ou masquer la barre latérale droite"
 
@@ -34063,7 +34068,7 @@ msgstr "Désactiver la fusion automatique ?"
 #~ msgid "Turn off run until done"
 #~ msgstr ""
 
-#: src/features/home/components/home-page.tsx:244
+#: src/features/home/components/home-page.tsx:249
 msgid "Turn on Daily Brief"
 msgstr "Activer le Daily Brief"
 
@@ -34527,7 +34532,7 @@ msgstr "Jusqu’à {until}"
 msgid "Untitled"
 msgstr "Sans titre"
 
-#: src/features/home/components/home-page.tsx:265
+#: src/features/home/components/home-page.tsx:270
 msgid "Untitled chat"
 msgstr "Discussion sans titre"
 

@@ -677,7 +677,7 @@ msgid "{0} tools: {1}"
 msgstr "{0} 個のツール: {1}"
 
 #. placeholder {0}: overview.unreadCount
-#: src/features/home/components/home-page.tsx:212
+#: src/features/home/components/home-page.tsx:217
 msgid "{0} unread"
 msgstr "未読 {0} 件"
 
@@ -3075,7 +3075,7 @@ msgstr "すべてのカテゴリ"
 msgid "All changes saved"
 msgstr "すべての変更を保存しました"
 
-#: src/features/home/components/home-page.tsx:253
+#: src/features/home/components/home-page.tsx:258
 msgid "All chats"
 msgstr "すべてのチャット"
 
@@ -6342,7 +6342,7 @@ msgid "clock"
 msgstr "時計"
 
 #: ../../packages/ui/src/components/ai-elements/artifact.tsx:31
-#: ../../packages/ui/src/components/countdown-toast-card.tsx:178
+#: ../../packages/ui/src/components/countdown-toast-card.tsx:192
 #: ../../packages/ui/src/components/data-grid/data-grid-keyboard-shortcuts.tsx:329
 #: ../../packages/ui/src/components/dialog.tsx:84
 #: ../../packages/ui/src/components/image-editor.tsx:264
@@ -8253,7 +8253,7 @@ msgid "Could not load this"
 msgstr "読み込めませんでした"
 
 #: src/features/chat/split/chat-split-view.tsx:238
-#: src/features/chat/thread/thread.tsx:350
+#: src/features/chat/thread/thread.tsx:351
 msgid "Could not load this chat's details."
 msgstr ""
 
@@ -8472,7 +8472,7 @@ msgstr "ワーカーを停止できませんでした。"
 msgid "Could not switch the model. Please try again."
 msgstr "モデルを切り替えられませんでした。もう一度お試しください。"
 
-#: src/features/home/components/home-page.tsx:236
+#: src/features/home/components/home-page.tsx:241
 msgid "Could not turn on the Daily Brief."
 msgstr "Daily Brief をオンにできませんでした。"
 
@@ -9044,7 +9044,7 @@ msgstr "カスタマーメッセージングとサポートのプラットフォ
 msgid "Customization"
 msgstr "カスタマイズ"
 
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:132
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:133
 msgid "Customize"
 msgstr "カスタマイズ"
 
@@ -9113,7 +9113,7 @@ msgstr "Daily Brief"
 msgid "Daily Brief turned off"
 msgstr "Daily Brief をオフにしました"
 
-#: src/features/home/components/home-page.tsx:237
+#: src/features/home/components/home-page.tsx:242
 #: src/features/notifications/components/notification-settings.tsx:112
 msgid "Daily Brief turned on"
 msgstr "Daily Brief をオンにしました"
@@ -13952,8 +13952,8 @@ msgstr "フィルターのパス"
 msgid "Filter rules updated"
 msgstr "フィルタールールを更新しました"
 
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:138
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:144
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:139
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:145
 msgid "Filter shortcuts"
 msgstr "ショートカットを絞り込む"
 
@@ -14924,7 +14924,7 @@ msgstr "ドイツ語（スイス）"
 msgid "Germany"
 msgstr "ドイツ"
 
-#: src/features/home/components/home-page.tsx:229
+#: src/features/home/components/home-page.tsx:234
 msgid "Get a short summary here every morning."
 msgstr "毎朝ここに短いまとめが届きます。"
 
@@ -15058,7 +15058,7 @@ msgstr "最初の項目に移動"
 msgid "Go to Home"
 msgstr "ホームへ移動"
 
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:84
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:85
 msgid "Go to last item"
 msgstr "最後の項目に移動"
 
@@ -17298,6 +17298,7 @@ msgid "Judge: {0}"
 msgstr "ジャッジ：{0}"
 
 #: src/features/chat/thread/thread.tsx:110
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:82
 msgid "Jump to my last message"
 msgstr "自分の最後のメッセージに移動"
 
@@ -17390,7 +17391,7 @@ msgstr "キーファイル（任意、絶対パス）"
 #: ../../packages/ui/src/components/data-grid/data-grid-keyboard-shortcuts.tsx:333
 #: src/features/chat/signed-out/signed-out-chat.tsx:153
 #: src/features/chat/thread-list/thread-list-header.tsx:146
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:124
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:125
 #: src/features/workflow/components/canvas/workflow-controls.tsx:374
 msgid "Keyboard shortcuts"
 msgstr "キーボードショートカット"
@@ -17941,7 +17942,7 @@ msgstr "接続されたノードの入力を使う場合は空欄のままにし
 msgid "Leave Organization"
 msgstr "組織から退出"
 
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:85
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:86
 msgid "Leave selection or navigation"
 msgstr "選択またはナビゲーションを終了"
 
@@ -20545,7 +20546,7 @@ msgstr "移動 → {url}"
 msgid "Navigate between cells"
 msgstr "セル間を移動"
 
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:86
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:87
 msgid "Navigate threads"
 msgstr "スレッド間を移動"
 
@@ -20783,7 +20784,7 @@ msgid "New case"
 msgstr "新しいケース"
 
 #: src/components/not-found.tsx:10
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:89
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:90
 msgid "New chat"
 msgstr "新しいチャット"
 
@@ -20900,7 +20901,7 @@ msgstr "新しいタスク"
 msgid "New task run · earlier messages were not sent to the model"
 msgstr "新しいタスク実行 · 以前のメッセージはモデルに送信されていません"
 
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:90
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:91
 msgid "New temporary chat"
 msgstr "新しい一時チャット"
 
@@ -20966,7 +20967,7 @@ msgstr "次のブランチ"
 msgid "next gen"
 msgstr "次世代"
 
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:91
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:92
 msgid "Next item"
 msgstr "次の項目"
 
@@ -21130,7 +21131,7 @@ msgstr "カメラが選択されていません"
 msgid "No cases yet. Add one by hand, import a CSV or JSONL file, or save a chat turn with \"Save as eval case\"."
 msgstr "まだケースがありません。手動で追加するか、CSV または JSONL ファイルをインポートするか、チャットのターンを「評価ケースとして保存」で保存してください。"
 
-#: src/features/home/components/home-page.tsx:260
+#: src/features/home/components/home-page.tsx:265
 msgid "No chats yet. Start one above."
 msgstr "まだチャットはありません。上から始めましょう。"
 
@@ -21350,6 +21351,10 @@ msgstr "この種類のメモリはありません。"
 msgid "No memories yet. The AI will start learning from your conversations automatically."
 msgstr "メモリはまだありません。AI は会話から自動的に学習を始めます。"
 
+#: src/features/chat/thread/jump-to-last-message.tsx:47
+msgid "No message of yours is loaded in this conversation"
+msgstr ""
+
 #: src/features/chat/thread-list/hierarchical-thread-list.tsx:1131
 msgid "No messages found for"
 msgstr "次に一致するメッセージは見つかりませんでした："
@@ -21556,7 +21561,7 @@ msgstr "スプレッドシートにシートが見つかりません"
 msgid "No shortcuts found"
 msgstr "ショートカットが見つかりません"
 
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:171
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:172
 msgid "No shortcuts match \"{query}\"."
 msgstr "「{query}」に一致するショートカットはありません。"
 
@@ -21667,7 +21672,7 @@ msgstr "ツールはありません。"
 msgid "No triggers yet"
 msgstr "トリガーはまだありません"
 
-#: src/features/home/components/home-page.tsx:219
+#: src/features/home/components/home-page.tsx:224
 msgid "No unread notifications."
 msgstr "未読の通知はありません。"
 
@@ -21963,7 +21968,7 @@ msgstr "通知"
 msgid "Notification workflows, channels, and recipient preferences"
 msgstr "通知ワークフロー、チャネル、受信者の設定"
 
-#: src/features/home/components/home-page.tsx:216
+#: src/features/home/components/home-page.tsx:221
 #: src/features/notifications/components/notification-bell.tsx:72
 #: src/features/notifications/components/notification-bell.tsx:102
 #: src/features/notifications/components/notification-settings.tsx:199
@@ -22547,7 +22552,7 @@ msgstr "メニューを開く"
 msgid "Open messages"
 msgstr "メッセージを開く"
 
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:92
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:93
 msgid "Open model picker"
 msgstr "モデルピッカーを開く"
 
@@ -22707,7 +22712,7 @@ msgstr "サブエージェントのスレッドを開く"
 msgid "Open the thread list search and focus it ({0})"
 msgstr "スレッドリストの検索を開いてフォーカスする（{0}）"
 
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:87
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:88
 msgid "Open thread"
 msgstr "スレッドを開く"
 
@@ -24622,7 +24627,7 @@ msgstr "前回のエクスポートはキャンセルされました"
 msgid "Previous generation high-quality model for complex scenes"
 msgstr "複雑なシーン向けの旧世代の高品質モデル"
 
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:93
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:94
 msgid "Previous item"
 msgstr "前の項目"
 
@@ -25445,7 +25450,7 @@ msgstr "半径"
 msgid "rag"
 msgstr "rag"
 
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:83
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:84
 msgid "Raise reasoning effort"
 msgstr "推論の強度を上げる"
 
@@ -25804,7 +25809,7 @@ msgstr "リベースしてマージ"
 msgid "Recent"
 msgstr "最近"
 
-#: src/features/home/components/home-page.tsx:257
+#: src/features/home/components/home-page.tsx:262
 msgid "Recent chats"
 msgstr "最近のチャット"
 
@@ -28140,7 +28145,7 @@ msgstr "音声を選択"
 msgid "Select all"
 msgstr "すべて選択"
 
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:88
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:89
 msgid "Select all (in selection mode)"
 msgstr "すべて選択（選択モード時）"
 
@@ -28869,7 +28874,7 @@ msgstr "インストール済みのモデルをモデル選択に表示"
 msgid "Show keyboard shortcuts"
 msgstr "キーボードショートカットを表示"
 
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:82
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:83
 msgid "Show keyboard shortcuts (outside text fields)"
 msgstr "キーボードショートカットを表示（テキストフィールド外）"
 
@@ -32185,7 +32190,7 @@ msgstr "インポートしたファイルは空のようです。"
 msgid "The improved prompt will appear here..."
 msgstr "改善されたプロンプトがここに表示されます..."
 
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:126
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:127
 msgid "The keys you have set now."
 msgstr "現在設定しているキーです。"
 
@@ -33485,7 +33490,7 @@ msgstr "要素パレットの表示を切り替え"
 msgid "Toggle interactivity"
 msgstr "インタラクティブ操作を切り替え"
 
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:94
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:95
 msgid "Toggle left sidebar"
 msgstr "左サイドバーを切り替え"
 
@@ -33508,7 +33513,7 @@ msgstr "メニューの切り替え"
 msgid "Toggle property panel"
 msgstr "プロパティパネルの表示を切り替え"
 
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:95
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:96
 msgid "Toggle right sidebar"
 msgstr "右サイドバーを切り替え"
 
@@ -34063,7 +34068,7 @@ msgstr "自動マージをオフにしますか？"
 #~ msgid "Turn off run until done"
 #~ msgstr ""
 
-#: src/features/home/components/home-page.tsx:244
+#: src/features/home/components/home-page.tsx:249
 msgid "Turn on Daily Brief"
 msgstr "Daily Brief をオンにする"
 
@@ -34527,7 +34532,7 @@ msgstr "{until} まで"
 msgid "Untitled"
 msgstr "無題"
 
-#: src/features/home/components/home-page.tsx:265
+#: src/features/home/components/home-page.tsx:270
 msgid "Untitled chat"
 msgstr "無題のチャット"
 

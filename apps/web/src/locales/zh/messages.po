@@ -677,7 +677,7 @@ msgid "{0} tools: {1}"
 msgstr "{0} 个工具：{1}"
 
 #. placeholder {0}: overview.unreadCount
-#: src/features/home/components/home-page.tsx:212
+#: src/features/home/components/home-page.tsx:217
 msgid "{0} unread"
 msgstr "{0} 条未读"
 
@@ -3075,7 +3075,7 @@ msgstr "所有分类"
 msgid "All changes saved"
 msgstr "所有更改已保存"
 
-#: src/features/home/components/home-page.tsx:253
+#: src/features/home/components/home-page.tsx:258
 msgid "All chats"
 msgstr "全部对话"
 
@@ -6342,7 +6342,7 @@ msgid "clock"
 msgstr "时钟"
 
 #: ../../packages/ui/src/components/ai-elements/artifact.tsx:31
-#: ../../packages/ui/src/components/countdown-toast-card.tsx:178
+#: ../../packages/ui/src/components/countdown-toast-card.tsx:192
 #: ../../packages/ui/src/components/data-grid/data-grid-keyboard-shortcuts.tsx:329
 #: ../../packages/ui/src/components/dialog.tsx:84
 #: ../../packages/ui/src/components/image-editor.tsx:264
@@ -8253,7 +8253,7 @@ msgid "Could not load this"
 msgstr "无法加载此内容"
 
 #: src/features/chat/split/chat-split-view.tsx:238
-#: src/features/chat/thread/thread.tsx:350
+#: src/features/chat/thread/thread.tsx:351
 msgid "Could not load this chat's details."
 msgstr ""
 
@@ -8472,7 +8472,7 @@ msgstr "无法停止工作进程。"
 msgid "Could not switch the model. Please try again."
 msgstr "无法切换模型。请重试。"
 
-#: src/features/home/components/home-page.tsx:236
+#: src/features/home/components/home-page.tsx:241
 msgid "Could not turn on the Daily Brief."
 msgstr "无法开启每日简报。"
 
@@ -9044,7 +9044,7 @@ msgstr "客户消息与支持平台"
 msgid "Customization"
 msgstr "个性化"
 
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:132
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:133
 msgid "Customize"
 msgstr "自定义"
 
@@ -9113,7 +9113,7 @@ msgstr "每日简报"
 msgid "Daily Brief turned off"
 msgstr "每日简报已关闭"
 
-#: src/features/home/components/home-page.tsx:237
+#: src/features/home/components/home-page.tsx:242
 #: src/features/notifications/components/notification-settings.tsx:112
 msgid "Daily Brief turned on"
 msgstr "每日简报已开启"
@@ -13952,8 +13952,8 @@ msgstr "筛选路径"
 msgid "Filter rules updated"
 msgstr "筛选规则已更新"
 
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:138
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:144
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:139
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:145
 msgid "Filter shortcuts"
 msgstr "筛选快捷键"
 
@@ -14924,7 +14924,7 @@ msgstr "德语（瑞士）"
 msgid "Germany"
 msgstr "德国"
 
-#: src/features/home/components/home-page.tsx:229
+#: src/features/home/components/home-page.tsx:234
 msgid "Get a short summary here every morning."
 msgstr "每天早上在这里收到一份简短汇总。"
 
@@ -15058,7 +15058,7 @@ msgstr "转到第一项"
 msgid "Go to Home"
 msgstr "返回首页"
 
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:84
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:85
 msgid "Go to last item"
 msgstr "转到最后一项"
 
@@ -17298,6 +17298,7 @@ msgid "Judge: {0}"
 msgstr "评委：{0}"
 
 #: src/features/chat/thread/thread.tsx:110
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:82
 msgid "Jump to my last message"
 msgstr "跳转到我的上一条消息"
 
@@ -17390,7 +17391,7 @@ msgstr "密钥文件（可选，绝对路径）"
 #: ../../packages/ui/src/components/data-grid/data-grid-keyboard-shortcuts.tsx:333
 #: src/features/chat/signed-out/signed-out-chat.tsx:153
 #: src/features/chat/thread-list/thread-list-header.tsx:146
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:124
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:125
 #: src/features/workflow/components/canvas/workflow-controls.tsx:374
 msgid "Keyboard shortcuts"
 msgstr "键盘快捷键"
@@ -17941,7 +17942,7 @@ msgstr "留空则使用已连接节点的输入"
 msgid "Leave Organization"
 msgstr "离开组织"
 
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:85
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:86
 msgid "Leave selection or navigation"
 msgstr "退出选择或导航"
 
@@ -20545,7 +20546,7 @@ msgstr "导航 → {url}"
 msgid "Navigate between cells"
 msgstr "在单元格之间导航"
 
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:86
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:87
 msgid "Navigate threads"
 msgstr "浏览对话"
 
@@ -20783,7 +20784,7 @@ msgid "New case"
 msgstr "新建用例"
 
 #: src/components/not-found.tsx:10
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:89
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:90
 msgid "New chat"
 msgstr "新聊天"
 
@@ -20900,7 +20901,7 @@ msgstr "新建任务"
 msgid "New task run · earlier messages were not sent to the model"
 msgstr "新的任务运行 · 之前的消息未发送给模型"
 
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:90
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:91
 msgid "New temporary chat"
 msgstr "新建临时聊天"
 
@@ -20966,7 +20967,7 @@ msgstr "下一个分支"
 msgid "next gen"
 msgstr "新一代"
 
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:91
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:92
 msgid "Next item"
 msgstr "下一项"
 
@@ -21130,7 +21131,7 @@ msgstr "未选择相机"
 msgid "No cases yet. Add one by hand, import a CSV or JSONL file, or save a chat turn with \"Save as eval case\"."
 msgstr "还没有用例。手动添加一个、导入 CSV 或 JSONL 文件，或用“保存为评测用例”保存一轮聊天。"
 
-#: src/features/home/components/home-page.tsx:260
+#: src/features/home/components/home-page.tsx:265
 msgid "No chats yet. Start one above."
 msgstr "还没有对话，在上方开始一个吧。"
 
@@ -21350,6 +21351,10 @@ msgstr "没有此类型的记忆。"
 msgid "No memories yet. The AI will start learning from your conversations automatically."
 msgstr "还没有记忆。AI 会自动从你的对话中开始学习。"
 
+#: src/features/chat/thread/jump-to-last-message.tsx:47
+msgid "No message of yours is loaded in this conversation"
+msgstr ""
+
 #: src/features/chat/thread-list/hierarchical-thread-list.tsx:1131
 msgid "No messages found for"
 msgstr "未找到消息："
@@ -21556,7 +21561,7 @@ msgstr "电子表格中未找到工作表"
 msgid "No shortcuts found"
 msgstr "未找到快捷键"
 
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:171
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:172
 msgid "No shortcuts match \"{query}\"."
 msgstr "没有与“{query}”匹配的快捷键。"
 
@@ -21667,7 +21672,7 @@ msgstr "没有工具。"
 msgid "No triggers yet"
 msgstr "还没有触发器"
 
-#: src/features/home/components/home-page.tsx:219
+#: src/features/home/components/home-page.tsx:224
 msgid "No unread notifications."
 msgstr "没有未读通知。"
 
@@ -21963,7 +21968,7 @@ msgstr "通知"
 msgid "Notification workflows, channels, and recipient preferences"
 msgstr "通知工作流、渠道和收件人偏好"
 
-#: src/features/home/components/home-page.tsx:216
+#: src/features/home/components/home-page.tsx:221
 #: src/features/notifications/components/notification-bell.tsx:72
 #: src/features/notifications/components/notification-bell.tsx:102
 #: src/features/notifications/components/notification-settings.tsx:199
@@ -22547,7 +22552,7 @@ msgstr "打开菜单"
 msgid "Open messages"
 msgstr "打开消息"
 
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:92
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:93
 msgid "Open model picker"
 msgstr "打开模型选择器"
 
@@ -22707,7 +22712,7 @@ msgstr "打开子代理的对话"
 msgid "Open the thread list search and focus it ({0})"
 msgstr "打开对话列表搜索并聚焦（{0}）"
 
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:87
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:88
 msgid "Open thread"
 msgstr "打开对话"
 
@@ -24622,7 +24627,7 @@ msgstr "上次导出已取消"
 msgid "Previous generation high-quality model for complex scenes"
 msgstr "适用于复杂场景的上一代高质量模型"
 
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:93
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:94
 msgid "Previous item"
 msgstr "上一项"
 
@@ -25445,7 +25450,7 @@ msgstr "半径"
 msgid "rag"
 msgstr "rag"
 
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:83
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:84
 msgid "Raise reasoning effort"
 msgstr "提高推理强度"
 
@@ -25804,7 +25809,7 @@ msgstr "变基并合并"
 msgid "Recent"
 msgstr "最近"
 
-#: src/features/home/components/home-page.tsx:257
+#: src/features/home/components/home-page.tsx:262
 msgid "Recent chats"
 msgstr "最近的对话"
 
@@ -28140,7 +28145,7 @@ msgstr "选择语音"
 msgid "Select all"
 msgstr "全选"
 
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:88
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:89
 msgid "Select all (in selection mode)"
 msgstr "全选（在选择模式下）"
 
@@ -28869,7 +28874,7 @@ msgstr "在选择器中显示已安装的模型"
 msgid "Show keyboard shortcuts"
 msgstr "显示键盘快捷键"
 
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:82
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:83
 msgid "Show keyboard shortcuts (outside text fields)"
 msgstr "显示键盘快捷键（文本框之外）"
 
@@ -32185,7 +32190,7 @@ msgstr "导入的文件似乎是空的。"
 msgid "The improved prompt will appear here..."
 msgstr "优化后的提示词将显示在这里..."
 
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:126
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:127
 msgid "The keys you have set now."
 msgstr "你当前设置的按键。"
 
@@ -33485,7 +33490,7 @@ msgstr "切换元素面板"
 msgid "Toggle interactivity"
 msgstr "切换交互性"
 
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:94
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:95
 msgid "Toggle left sidebar"
 msgstr "切换左侧边栏"
 
@@ -33508,7 +33513,7 @@ msgstr "切换菜单"
 msgid "Toggle property panel"
 msgstr "切换属性面板"
 
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:95
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:96
 msgid "Toggle right sidebar"
 msgstr "切换右侧边栏"
 
@@ -34063,7 +34068,7 @@ msgstr "要关闭自动合并吗？"
 #~ msgid "Turn off run until done"
 #~ msgstr ""
 
-#: src/features/home/components/home-page.tsx:244
+#: src/features/home/components/home-page.tsx:249
 msgid "Turn on Daily Brief"
 msgstr "开启每日简报"
 
@@ -34527,7 +34532,7 @@ msgstr "截至 {until}"
 msgid "Untitled"
 msgstr "无标题"
 
-#: src/features/home/components/home-page.tsx:265
+#: src/features/home/components/home-page.tsx:270
 msgid "Untitled chat"
 msgstr "未命名对话"
 

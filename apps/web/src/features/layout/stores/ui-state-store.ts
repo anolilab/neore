@@ -62,6 +62,8 @@ export type KeyboardShortcuts = {
     help: string;
     /** Steps the composer's reasoning effort up (`composer.increaseEffort`). Unbound until the user sets it. */
     increaseEffort?: string;
+    /** Scrolls the open thread to the newest prompt you sent, so its reply is in view (`jump-to-last-message.tsx`). */
+    jumpToLastMessage: string;
     lastItem: string;
     newChat: string;
     newTemporaryChat: string;
@@ -105,6 +107,7 @@ export const defaultKeyboardShortcuts: KeyboardShortcuts = {
     firstItem: "home",
     focusSearch: `${platformModifier}+shift+f`,
     help: `${platformModifier}+/`,
+    jumpToLastMessage: `${platformModifier}+shift+j`,
     lastItem: "end",
     newChat: `${platformModifier}+n`,
     newTemporaryChat: `${platformModifier}+shift+n`,

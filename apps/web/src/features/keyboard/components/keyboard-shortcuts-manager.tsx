@@ -82,6 +82,7 @@ const KeyboardShortcutsHandler: React.FC<{
             focusSearch: convertShortcutToHotkeysHook(shortcuts.focusSearch),
             help: convertShortcutToHotkeysHook(shortcuts.help),
             increaseEffort: convertRecordedShortcutToHotkeysHook(shortcuts.increaseEffort),
+            jumpToLastMessage: convertShortcutToHotkeysHook(shortcuts.jumpToLastMessage),
             lastItem: convertShortcutToHotkeysHook(shortcuts.lastItem),
             newChat: convertShortcutToHotkeysHook(shortcuts.newChat),
             newTemporaryChat: convertShortcutToHotkeysHook(shortcuts.newTemporaryChat),
@@ -104,6 +105,7 @@ const KeyboardShortcutsHandler: React.FC<{
         shortcuts.focusSearch,
         shortcuts.help,
         shortcuts.increaseEffort,
+        shortcuts.jumpToLastMessage,
         shortcuts.lastItem,
         shortcuts.newChat,
         shortcuts.newTemporaryChat,
@@ -146,6 +148,18 @@ const KeyboardShortcutsHandler: React.FC<{
 
             event.preventDefault();
             onShortcut?.("copyLastCodeBlock", event);
+        },
+        [onShortcut],
+    );
+
+    const handleJumpToLastMessage = useCallback(
+        (event: KeyboardEvent) => {
+            if (isTextEntryKeystroke(event)) {
+                return;
+            }
+
+            event.preventDefault();
+            onShortcut?.("jumpToLastMessage", event);
         },
         [onShortcut],
     );
@@ -512,6 +526,20 @@ const KeyboardShortcutsHandler: React.FC<{
             preventDefault: (event: KeyboardEvent) => !isTextEntryKeystroke(event),
         },
         [convertedShortcuts.increaseEffort, effortRegistered.increaseEffort, handleIncreaseEffort],
+    );
+
+    useHotkeys(
+        convertedShortcuts.jumpToLastMessage,
+        handleJumpToLastMessage,
+        {
+            description: "Jump to my last message",
+            enabled: !!shortcuts.jumpToLastMessage && typeof shortcuts.jumpToLastMessage === "string",
+            // Like the copy shortcut: a modifier chord works from the composer, a bare key stays with the field.
+            enableOnContentEditable: true,
+            enableOnFormTags: true,
+            preventDefault: (event: KeyboardEvent) => !isTextEntryKeystroke(event),
+        },
+        [convertedShortcuts.jumpToLastMessage, handleJumpToLastMessage],
     );
 
     useHotkeys(
