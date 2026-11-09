@@ -128,11 +128,12 @@ const Pane: FC<PaneProps> = ({
     // A chat shared with the person lives on its owner's shard, and the page only settled the one in the URL.
     const shardReady = useThreadShard(threadId);
     // Read only once the shard is settled: before that a chat on another shard answers not-found, and the provider reads the same key.
-    const { data: paneState } = useThreadPaneState(threadId, { enabled: shardReady });
+    const { data: paneState, isError: paneReadFailed } = useThreadPaneState(threadId, { enabled: shardReady });
     const title = paneState?.title ?? t`Chat`;
     const hasDraft = useChatHasDraft(threadId);
     const suffix = usePaneSuffix(threadId, paneIds);
     // The chat in the URL is the page's own: it is never closed from here, whatever a read says for a moment.
+    // Only a read that answers null closes the pane; a failed read keeps it and says so.
     const isMissing = paneState === null && !isRouteThread;
 
     useEffect(() => {
@@ -230,6 +231,11 @@ const Pane: FC<PaneProps> = ({
                 )}
             </header>
             <div className="relative min-h-0 flex-1">
+                {paneReadFailed && (
+                    <p className="bg-card text-destructive absolute inset-x-0 top-0 z-10 px-3 py-2 text-sm" role="alert">
+                        {t`Could not load this chat's details.`}
+                    </p>
+                )}
                 {shardReady && (
                     <LockedChatGate
                         // The page keeps its header and its details panel while the focused chat is locked: neither needs the provider.

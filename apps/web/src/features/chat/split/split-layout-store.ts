@@ -54,11 +54,23 @@ export const useSplitLayoutStore = create<SplitLayoutState>()(
     ),
 );
 
-/** Reads the saved layout once. A second call finds it loaded and leaves the live layout alone. */
-export const hydrateSplitLayout = async (): Promise<void> => {
-    if (!useSplitLayoutStore.persist.hasHydrated()) {
-        await useSplitLayoutStore.persist.rehydrate();
+// The read in flight, shared by every caller that arrives before it settles. Cleared on settle, so a failed read can be retried.
+let hydration: Promise<void> | undefined;
+
+/**
+ * Reads the saved layout once. Callers that arrive while the read is pending await the same one, so a later read cannot replace a
+ * pane that an earlier caller already opened.
+ */
+export const hydrateSplitLayout = (): Promise<void> => {
+    if (useSplitLayoutStore.persist.hasHydrated()) {
+        return Promise.resolve();
     }
+
+    hydration ??= Promise.resolve(useSplitLayoutStore.persist.rehydrate()).finally(() => {
+        hydration = undefined;
+    });
+
+    return hydration;
 };
 
 /**

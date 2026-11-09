@@ -114,6 +114,8 @@ interface ComposerProps {
     onSubmitOverride?: (text: string, attachments: PendingAttachment[]) => Promise<void>;
     /** Custom placeholder for the text input (e.g. "Ask 2 models anything...") */
     placeholder?: string;
+    /** A split pane's composer remounts on every focus change, so its initial message is written once per chat. */
+    splitPane?: boolean;
 }
 
 type ComposerModeOption = { icon: typeof FileText; id: ComposerMode; label: MessageDescriptor };
@@ -322,6 +324,7 @@ const Composer: FC<ComposerProps> = ({
     minimal = false,
     onSubmitOverride,
     placeholder,
+    splitPane = false,
 }) => {
     const { t } = useLingui();
     const crpc = useCRPC();
@@ -574,22 +577,23 @@ const Composer: FC<ComposerProps> = ({
     }, [isAnonymous, threadId]);
 
     // Set initial message when component mounts or initialMessage changes. A split pane's composer remounts on every focus change,
-    // so the prompt is written only once per chat: a remount must not write it over a draft brought back for the pane.
+    // so there the prompt is written only once per chat: a remount must not write it over a draft brought back for the pane.
+    // Elsewhere the text is written whenever it changes, so the same message can prefill a chat again.
     useEffect(() => {
         if (initialMessage && initialMessage !== lastInitialMessage.current) {
             const ui = useChatUIStore.getState();
             const key = `${threadId ?? ""}\n${initialMessage}`;
 
-            if (ui.appliedInitialMessageKey !== key) {
+            if (!splitPane || ui.appliedInitialMessageKey !== key) {
                 ui.setComposerText(initialMessage);
-                ui.setAppliedInitialMessageKey(key);
             }
 
+            ui.setAppliedInitialMessageKey(key);
             lastInitialMessage.current = initialMessage;
         } else if (!initialMessage) {
             lastInitialMessage.current = undefined;
         }
-    }, [initialMessage, threadId]);
+    }, [initialMessage, splitPane, threadId]);
 
     // Clear submitting state when SSE streaming starts
     useEffect(() => {

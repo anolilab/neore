@@ -119,6 +119,24 @@ describe("the side-panel PDF preview", () => {
         expect(useChatUIStore.getState()).toMatchObject({ activeDocumentId: "doc-1", previewFile: null });
     });
 
+    it("refuses a second chat's document while another chat's document is open, and keeps the first", () => {
+        useChatUIStore.getState().openCanvas("doc-1", "thread-a");
+
+        expect(useChatUIStore.getState().openCanvas("doc-2", "thread-b")).toBe(false);
+        expect(useChatUIStore.getState()).toMatchObject({ activeDocumentId: "doc-1", canvasThreadId: "thread-a" });
+    });
+
+    it("opens a document in the same chat, or once the other chat's document is closed", () => {
+        useChatUIStore.getState().openCanvas("doc-1", "thread-a");
+
+        expect(useChatUIStore.getState().openCanvas("doc-2", "thread-a")).toBe(true);
+
+        useChatUIStore.getState().closeCanvas();
+
+        expect(useChatUIStore.getState().openCanvas("doc-3", "thread-b")).toBe(true);
+        expect(useChatUIStore.getState().activeDocumentId).toBe("doc-3");
+    });
+
     it.each([
         ["closes a PDF as an account switch starts", "pdf", "before", false],
         ["keeps a document with its edits until the switch has gone through", "document", "before", true],

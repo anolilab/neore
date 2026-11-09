@@ -374,7 +374,13 @@ const ThreadContent: FC<ThreadProps> = ({ className, composerActive = true, init
                             {!worker &&
                                 !isWorkerLoading &&
                                 (composerActive ? (
-                                    <Composer animateEntrance={!splitPane} className="w-full" initialMessage={initialMessage} key={threadId} />
+                                    <Composer
+                                        animateEntrance={!splitPane}
+                                        className="w-full"
+                                        initialMessage={initialMessage}
+                                        key={threadId}
+                                        splitPane={splitPane}
+                                    />
                                 ) : (
                                     <ComposerStub onActivate={onActivateComposer} />
                                 ))}

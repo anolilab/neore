@@ -5,6 +5,7 @@
  * Wires canvas state (open/active) and cRPC sheet content into the shared chat-ui component.
  */
 
+import { useLingui } from "@lingui/react/macro";
 import type { Id } from "@neore/backend/dataModel";
 import DocumentArtifactUI from "@neore/chat-ui/chat/document-artifact";
 import { useQuery } from "@tanstack/react-query";
@@ -15,6 +16,7 @@ import { ChatThreadContext } from "@/features/chat/core/context/chat-context-hoo
 import { useCanvasState } from "@/features/chat/core/stores/chat-ui-store";
 import { trackEvent } from "@/lib/analytics";
 import { useCRPC } from "@/lib/lunora/crpc";
+import { showWarning } from "@/lib/toast";
 
 import preloadCodemirrorEditor from "./canvas-preload";
 
@@ -29,10 +31,18 @@ interface DocumentArtifactProps {
 
 const DocumentArtifact: FC<DocumentArtifactProps> = memo(({ className, documentId, kind, language, title, version }) => {
     const { activeDocumentId, openCanvas } = useCanvasState();
+    const { t } = useLingui();
     const crpc = useCRPC();
     // Read without throwing, so the card also renders where no chat provider is mounted. The panel shows only in the chat that opened it.
     const threadId = use(ChatThreadContext)?.threadId;
-    const onOpen = useCallback((id: string) => openCanvas(id, threadId), [openCanvas, threadId]);
+    const onOpen = useCallback(
+        (id: string) => {
+            if (!openCanvas(id, threadId)) {
+                showWarning(t`Close the document open in another chat to view this one.`);
+            }
+        },
+        [openCanvas, t, threadId],
+    );
 
     // Track artifact creation once (when first rendered at version 1)
     const trackedRef = useRef(false);

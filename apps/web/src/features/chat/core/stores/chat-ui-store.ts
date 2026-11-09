@@ -136,7 +136,8 @@ interface ChatUIStore {
     noteComposerHiddenRemoved: (count: number) => void;
 
     // Canvas/Artifact actions
-    openCanvas: (documentId: string, threadId?: string) => void;
+    /** False when the document is open in another chat, which keeps its panel; the caller says so. */
+    openCanvas: (documentId: string, threadId?: string) => boolean;
     openPreviewFile: (file: PreviewFile) => void;
     /** A chat PDF open in the side panel, instead of a document. Cleared when a document opens or the panel closes. */
     previewFile: PreviewFile | null;
@@ -298,6 +299,19 @@ export const useChatUIStore = create<ChatUIStore>()(
 
                 // Canvas/Artifact actions
                 openCanvas: (documentId, threadId) => {
+                    const state = get();
+                    // One editor serves the panel, so a document open in another chat stays put: its editor may hold edits.
+                    const openInOtherChat =
+                        isDocumentOpen(state) &&
+                        state.activeDocumentId !== documentId &&
+                        threadId !== undefined &&
+                        state.canvasThreadId !== null &&
+                        state.canvasThreadId !== threadId;
+
+                    if (openInOtherChat) {
+                        return false;
+                    }
+
                     set({
                         activeDocumentId: documentId,
                         canvasDirty: false,
@@ -308,6 +322,8 @@ export const useChatUIStore = create<ChatUIStore>()(
                         isCanvasOpen: true,
                         previewFile: null,
                     });
+
+                    return true;
                 },
 
                 removeAttachedReference: (id) => {
