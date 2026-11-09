@@ -7,8 +7,8 @@ import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
 import { useModelStore } from "@/features/chat/core/stores/model-store";
 import { useUIStateStore } from "@/features/layout/stores/ui-state-store";
 
-import { clearComposerDrafts, peekComposerDraft, peekParkedModelState, saveComposerDraft, setSplitViewMounted } from "./composer-drafts";
-import { leaveSplitView, parkSettingsFor, restoreComposerFor, restoreLiveComposerFor, syncFocusedModel, watchPaneFocus } from "./pane-state";
+import { clearComposerDrafts, peekComposerDraft, peekParkedModelState, saveComposerDraft, saveParkedModelState, setSplitViewMounted } from "./composer-drafts";
+import { leaveSplitView, parkSettingsFor, restoreComposerFor, restoreLiveComposerFor, restoreTextFor, syncFocusedModel, watchPaneFocus } from "./pane-state";
 import { initialSplitLayout, splitLayoutReducer } from "./split-layout";
 import { survivingPaneAfterDelete, useSplitLayoutStore } from "./split-layout-store";
 
@@ -245,6 +245,13 @@ describe("a failed send (#3, #4, #10)", () => {
 
         expect(peekParkedModelState(A)?.pendingSettings).toEqual({ language: "de", statelessMode: true });
     });
+
+    it("does not hand its draft back once a sign-out has cleared the parked state (#7)", async () => {
+        await sendFromA(() => clearComposerDrafts());
+
+        expect(useChatUIStore.getState().composerText).toBe("");
+        expect(peekComposerDraft(A)).toBeUndefined();
+    });
 });
 
 describe("an upload that finishes after the pane lost focus (#7)", () => {
@@ -293,6 +300,29 @@ describe("model choices across a pane switch (#9)", () => {
         expect(useModelStore.getState().selectedModel).toBe("picked-in-a");
         expect(useModelStore.getState().userChangedModel).toBe(true);
         expect(useModelStore.getState().pendingSettings).toEqual({ customSystemPrompt: "be brief" });
+    });
+});
+
+describe("leaving the split view with a parked model choice (#16)", () => {
+    it("brings the routed chat's parked model choice back when the view goes away", () => {
+        setPreference(false);
+        saveParkedModelState(A, { model: "model-a-parked", userChangedMode: false, userChangedModel: true });
+
+        leaveSplitView(undefined, A);
+
+        expect(useModelStore.getState().selectedModel).toBe("model-a-parked");
+    });
+});
+
+describe("a late failed draft with the split view off (#6)", () => {
+    it("is parked for its chat when the single composer describes another chat", () => {
+        setPreference(false);
+        useModelStore.setState({ selectedModelThreadId: B });
+
+        restoreTextFor(A, "a's prompt");
+
+        expect(useChatUIStore.getState().composerText).toBe("");
+        expect(peekComposerDraft(A)?.composerText).toBe("a's prompt");
     });
 });
 

@@ -27,13 +27,21 @@ import { useSplitLayoutStore } from "./split-layout-store";
  */
 
 /**
- * Whether the chat's state is what the live stores hold. Without the split preference there is one chat and the stores are
- * its own. With it, only the focused pane of a mounted split view is live; on `/chat` no pane owns the composer, so a chat's
- * late write-back is parked instead of landing in the new-chat composer. A new chat (no id) has only the live composer.
+ * Whether the chat's state is what the live stores hold. Without the split preference the one composer belongs to the chat the
+ * model store describes (the provider loads it), so a late write-back for any other chat is parked. With it, only the focused pane
+ * of a mounted split view is live; on `/chat` no pane owns the composer, so a chat's late write-back is parked instead of landing
+ * in the new-chat composer. A new chat (no id) has only the live composer.
  */
 export const isOwnerLive = (ownerId: string | undefined): boolean => {
-    if (ownerId === undefined || useUIStateStore.getState().preferences.splitViewEnabled !== true) {
+    if (ownerId === undefined) {
         return true;
+    }
+
+    if (useUIStateStore.getState().preferences.splitViewEnabled !== true) {
+        // Until the store describes a chat, the one composer is still live for whoever writes to it, as before.
+        const describes = useModelStore.getState().selectedModelThreadId;
+
+        return describes === undefined || describes === ownerId;
     }
 
     if (!useSplitViewMountedStore.getState().mounted) {
@@ -100,6 +108,41 @@ export const restoreLiveComposerFor = (threadId: string): void => {
     }
 
     ui.restoreComposer(takeComposerDraftState(threadId));
+};
+
+/**
+ * Clears what was just sent: the live composer while its chat owns it, else that chat's parked draft. The text can still sit in the
+ * live composer after its chat lost focus (it was typed there before the send), so it is cleared too when it matches.
+ */
+export const clearSentDraft = (ownerId: string | undefined, sentText: string): void => {
+    if (ownerId === undefined || isOwnerLive(ownerId)) {
+        useChatUIStore.getState().clearComposer();
+
+        return;
+    }
+
+    takeComposerDraftState(ownerId);
+
+    if (useChatUIStore.getState().composerText === sentText) {
+        useChatUIStore.getState().clearComposer();
+    }
+};
+
+/** The pending settings a send takes: from the store while its chat is live, else from what was parked for that chat. */
+export const takePendingSettingsFor = (ownerId: string | undefined, fromStore: () => PendingSettings | null): PendingSettings | null => {
+    if (ownerId === undefined || isOwnerLive(ownerId)) {
+        return fromStore();
+    }
+
+    const parked = peekParkedModelState(ownerId);
+
+    if (!parked?.pendingSettings) {
+        return null;
+    }
+
+    saveParkedModelState(ownerId, { ...parked, pendingSettings: undefined });
+
+    return parked.pendingSettings;
 };
 
 /**
@@ -190,11 +233,19 @@ export const leaveSplitView = (focusedThreadId: string | undefined, routeThreadI
     const isPreferenceOff = useUIStateStore.getState().preferences.splitViewEnabled !== true;
 
     if (focusedThreadId !== undefined && !(isPreferenceOff && focusedThreadId === routeThreadId)) {
+        parkModelState(focusedThreadId);
         parkLiveComposer(focusedThreadId);
     }
 
     if (isPreferenceOff && routeThreadId !== undefined) {
         restoreLiveComposerFor(routeThreadId);
+
+        // Restored here, not when the single chat's provider loads: the model choices are back before its composer is first shown.
+        const parked = takeParkedModelState(routeThreadId);
+
+        if (parked) {
+            useModelStore.getState().restoreParkedState(routeThreadId, parked);
+        }
     }
 };
 
