@@ -306,6 +306,8 @@ describe("buildAgentTools quick-check trust", () => {
             .mockResolvedValueOnce(true)
             // No pull request is linked to the thread.
             .mockResolvedValueOnce({ complete: true, links: [] })
+            // The thread's permission mode.
+            .mockResolvedValueOnce(null)
             .mockResolvedValueOnce(trusted);
 
         const { tools } = await buildAgentTools({ runQuery } as unknown as ActionCtx, {
@@ -351,6 +353,8 @@ describe("buildAgentTools quick-check trust", () => {
             .mockResolvedValueOnce({})
             .mockResolvedValueOnce(true)
             .mockResolvedValueOnce({ complete: true, links: [] })
+            // The thread's permission mode.
+            .mockResolvedValueOnce(null)
             .mockResolvedValueOnce([mcpTrustId("files", second)]);
 
         const { tools } = await buildAgentTools({ runQuery } as unknown as ActionCtx, {
@@ -369,13 +373,14 @@ describe("buildAgentTools pull request tools", () => {
     const toolsFor = async (linked: unknown[]): Promise<Record<string, unknown>> => {
         const runQuery = vi.fn();
 
-        // MCP servers, overrides, grants, the quick check's eligibility, then the thread's pull request links.
+        // MCP servers, overrides, grants, the quick check's eligibility, the thread's pull request links, then its permission mode.
         runQuery
             .mockResolvedValueOnce([])
             .mockResolvedValueOnce(overrides)
             .mockResolvedValueOnce({})
             .mockResolvedValueOnce(false)
-            .mockResolvedValueOnce({ complete: true, links: linked });
+            .mockResolvedValueOnce({ complete: true, links: linked })
+            .mockResolvedValueOnce(null);
 
         const { tools } = await buildAgentTools({ runQuery } as unknown as ActionCtx, {
             model: "test-model",
@@ -402,7 +407,8 @@ describe("buildAgentTools pull request tools", () => {
             .mockResolvedValueOnce(overrides)
             .mockResolvedValueOnce({})
             .mockResolvedValueOnce(false)
-            .mockResolvedValueOnce({ complete: true, links: [] });
+            .mockResolvedValueOnce({ complete: true, links: [] })
+            .mockResolvedValueOnce(null);
 
         const { tools } = await buildAgentTools({ runQuery } as unknown as ActionCtx, {
             model: "test-model",

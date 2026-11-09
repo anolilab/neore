@@ -16725,6 +16725,22 @@
                               "order": {
                                 "type": "number"
                               },
+                              "permissionMode": {
+                                "anyOf": [
+                                  {
+                                    "const": "supervised",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "auto",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "full",
+                                    "type": "string"
+                                  }
+                                ]
+                              },
                               "runner": {
                                 "const": "host",
                                 "type": "string"
@@ -19468,6 +19484,22 @@
                       "order": {
                         "type": "number"
                       },
+                      "permissionMode": {
+                        "anyOf": [
+                          {
+                            "const": "supervised",
+                            "type": "string"
+                          },
+                          {
+                            "const": "auto",
+                            "type": "string"
+                          },
+                          {
+                            "const": "full",
+                            "type": "string"
+                          }
+                        ]
+                      },
                       "runner": {
                         "const": "host",
                         "type": "string"
@@ -19995,6 +20027,22 @@
                       "order": {
                         "type": "number"
                       },
+                      "permissionMode": {
+                        "anyOf": [
+                          {
+                            "const": "supervised",
+                            "type": "string"
+                          },
+                          {
+                            "const": "auto",
+                            "type": "string"
+                          },
+                          {
+                            "const": "full",
+                            "type": "string"
+                          }
+                        ]
+                      },
                       "pinnedAt": {
                         "type": "number"
                       },
@@ -20455,6 +20503,22 @@
                       },
                       "order": {
                         "type": "number"
+                      },
+                      "permissionMode": {
+                        "anyOf": [
+                          {
+                            "const": "supervised",
+                            "type": "string"
+                          },
+                          {
+                            "const": "auto",
+                            "type": "string"
+                          },
+                          {
+                            "const": "full",
+                            "type": "string"
+                          }
+                        ]
                       },
                       "pinnedAt": {
                         "type": "number"
@@ -27524,6 +27588,85 @@
         "x-lunora-function-kind": "mutation"
       }
     },
+    "/_lunora/rpc#chat_thread_state:getEffectivePermissionMode": {
+      "post": {
+        "description": "Invoke the `query` `chat_thread_state:getEffectivePermissionMode` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "chat_thread_state:getEffectivePermissionMode",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "threadId": {
+                        "description": "Id<\"threads\">",
+                        "type": "string",
+                        "x-lunora-table": "threads"
+                      }
+                    },
+                    "required": [
+                      "threadId"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "chat_thread_state:getEffectivePermissionMode",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "const": "supervised",
+                      "type": "string"
+                    },
+                    {
+                      "const": "auto",
+                      "type": "string"
+                    },
+                    {
+                      "const": "full",
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "query: chat_thread_state:getEffectivePermissionMode",
+        "tags": [
+          "chat"
+        ],
+        "x-lunora-function-kind": "query"
+      }
+    },
     "/_lunora/rpc#chat_thread_state:markThreadViewed": {
       "post": {
         "description": "Invoke the `mutation` `chat_thread_state:markThreadViewed` over the Lunora RPC envelope (POST /_lunora/rpc).",
@@ -27589,6 +27732,86 @@
           }
         },
         "summary": "mutation: chat_thread_state:markThreadViewed",
+        "tags": [
+          "chat"
+        ],
+        "x-lunora-function-kind": "mutation"
+      }
+    },
+    "/_lunora/rpc#chat_thread_state:setThreadPermissionMode": {
+      "post": {
+        "description": "Invoke the `mutation` `chat_thread_state:setThreadPermissionMode` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "chat_thread_state:setThreadPermissionMode",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "mode": {
+                        "anyOf": [
+                          {
+                            "const": "supervised",
+                            "type": "string"
+                          },
+                          {
+                            "const": "auto",
+                            "type": "string"
+                          },
+                          {
+                            "const": "full",
+                            "type": "string"
+                          }
+                        ]
+                      },
+                      "threadId": {
+                        "description": "Id<\"threads\">",
+                        "type": "string",
+                        "x-lunora-table": "threads"
+                      }
+                    },
+                    "required": [
+                      "mode",
+                      "threadId"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "chat_thread_state:setThreadPermissionMode",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "null"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "mutation: chat_thread_state:setThreadPermissionMode",
         "tags": [
           "chat"
         ],

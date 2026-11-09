@@ -1653,6 +1653,7 @@ export const threads = sqliteTable("threads", {
     order: real("order"),
     organizationId: text("organizationId"),
     parentThreadIds: text("parentThreadIds", { mode: "json" }).$type<Array<string>>(),
+    permissionMode: text("permissionMode", { mode: "json" }).$type<"supervised" | "auto" | "full">(),
     pinnedAt: real("pinnedAt"),
     projectId: text("projectId"),
     publicAccessToken: text("publicAccessToken"),

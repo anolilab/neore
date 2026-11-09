@@ -29,8 +29,9 @@ import { MAX_LENGTH } from "../lib/validators";
 import { LunoraError, v } from "lunorash/server";
 
 import { internal } from "../_generated/internal";
-import type { Id } from "../_generated/dataModel";
+import type { Doc, Id } from "../_generated/dataModel";
 import type { QueryCtx } from "../_generated/server";
+import type { ThreadPermissionMode } from "./lib/thread-permission-mode";
 import { internalMutation, internalQuery } from "../_generated/server";
 import type { AuthMutationCtx } from "../lib/crpc";
 import { saveAiUserPreferences } from "../auth/lib/preference-writes";
@@ -190,6 +191,102 @@ export const getLowRiskApprovalContext = internalQuery
         async ({ args: { permissionKey, threadId, trustId, userId }, ctx }) =>
             await quickCheckAllowed(ctx, threadId, userId, permissionKey === undefined ? undefined : { permissionKey, trustId }),
     );
+
+const modeFor = (thread: Doc<"threads"> | null, userId: string): ThreadPermissionMode | null => {
+    const mode = thread?.permissionMode;
+
+    if (!thread || mode === undefined || thread.runner === "host") {
+        return null;
+    }
+
+    return mode === "full" && thread.userId !== userId ? null : mode;
+};
+
+/** Relationship rows read for one thread when its mode is resolved. */
+const MAX_LINKS_CHECKED = 50;
+
+/** The relationship rows where `threadId` is the child, read up to the bound (`MAX_LINKS_CHECKED`). */
+const linksOf = async (ctx: QueryCtx, threadId: Id<"threads">) =>
+    await ctx.db
+        .query("threadRelationships")
+        .withIndex("by_thread", (q) => q.eq("threadId", threadId))
+        .take(MAX_LINKS_CHECKED);
+
+/**
+ * Whether a thread is a LIVE comparison column: one of its comparison links names a parent row that still exists. Its runs take that
+ * parent's mode, so a mode set on it would never apply (`setThreadPermissionMode` refuses it). A column whose parent is gone has no
+ * parent to take a mode from, so it is not one. A read that reached the bound may hold a live comparison beyond it, so it counts as one
+ * (the same fail-closed rule as `modeOfThread`, which runs such a thread supervised).
+ */
+export const isComparisonColumn = async (ctx: QueryCtx, threadId: Id<"threads">): Promise<boolean> => {
+    const links = await linksOf(ctx, threadId);
+
+    if (links.length >= MAX_LINKS_CHECKED) {
+        return true;
+    }
+
+    const parents = await Promise.all(
+        links.filter((link) => link.branchType === "comparison").map(async (link) => await ctx.db.get("threads", link.parentThreadId)),
+    );
+
+    return parents.some((parent) => parent !== null);
+};
+
+/**
+ * A comparison column is a thread of its own, but the mode is chosen once, on the comparison it belongs to: a column always takes its
+ * comparison parent's mode, whatever mode it holds. The parent's choice therefore reaches the first send and every follow-up alike.
+ */
+export const modeOfThread = async (ctx: QueryCtx, thread: Doc<"threads"> | null, userId: string): Promise<ThreadPermissionMode | null> => {
+    // A host thread has no mode, and a comparison link must not give it one.
+    if (!thread || thread.runner === "host") {
+        return modeFor(thread, userId);
+    }
+
+    // Every link is read, not the first: a child with a comparison link and another link must still take its parent's mode, whichever
+    // is listed first. The rows per child are few; the bound only keeps a runaway row count from being read whole.
+    const links = await linksOf(ctx, thread._id);
+
+    // A read that hit the bound may have cut off links, and a cut-off comparison could be the restrictive one: whatever the rows read
+    // show, the thread cannot be shown to have only the comparison it shows, so it runs supervised.
+    if (links.length >= MAX_LINKS_CHECKED) {
+        return "supervised";
+    }
+
+    const comparisons = links.filter((link) => link.branchType === "comparison");
+
+    // Two comparison links name two parents, and neither one's mode is the column's: fail closed rather than take whichever is listed first.
+    if (new Set(comparisons.map((link) => link.parentThreadId)).size > 1) {
+        return "supervised";
+    }
+
+    const [comparison] = comparisons;
+
+    // A comparison column always runs under its parent's mode, even one it holds of its own: the shared composer changes the parent's,
+    // so a mode saved on the column would otherwise hold while the parent's changes never reach it.
+    if (comparison) {
+        const parent = await ctx.db.get("threads", comparison.parentThreadId);
+
+        if (parent) {
+            return modeFor(parent, userId);
+        }
+
+        // A parent that is gone leaves its link rows behind, so the column has no parent to take a mode from: its own mode applies, and
+        // supervised when it holds none. A collaborator's `full` is the owner's to give, so it counts as none (supervised).
+        return modeFor(thread, userId) ?? "supervised";
+    }
+
+    return modeFor(thread, userId);
+};
+
+/**
+ * The permission mode a run on this thread builds its tools under (`lib/thread-permission-mode.ts`), or `null` for the
+ * default. A host thread has none. In a thread someone else owns only the modes that ask MORE apply: `full` is the
+ * owner's to give, so a collaborator's turn is not run under it.
+ */
+export const getThreadPermissionMode = internalQuery
+    .input({ threadId: v.id("threads"), userId: v.string() })
+    .output(v.union(v.literal("supervised"), v.literal("auto"), v.literal("full"), v.null()))
+    .query(async ({ args: { threadId, userId }, ctx }) => await modeOfThread(ctx, await ctx.db.get("threads", threadId), userId));
 
 /** The servers the user trusts to have their tools put to the quick check, as the run builds its tools. */
 export const getLowRiskTrustedServers = internalQuery
