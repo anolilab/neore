@@ -83,8 +83,6 @@ const seedEndpoint = async (userId: string, type: string) =>
             }),
     );
 
-const GUEST_EDIT_REFUSED = /guest's message cannot be edited/u;
-
 const save = async (userId: string, args: Record<string, unknown>) =>
     await harness.run(
         async (ctx: any) => await saveLocalTurnHandler(ctx, userId, { model: MODEL, outcome: "complete", prompt: "hi", reply: "hello", ...args } as never),
@@ -271,7 +269,7 @@ describe("regenerate and edit on the local path", () => {
         ]);
     });
 
-    it("refuses an edit of a guest's note the owner sent on, which would save it as the owner's words", async () => {
+    it("keeps the guest mark and the note's id on an edit of a guest's note the owner sent on", async () => {
         await seedEndpoint(OWNER, "local-browser");
 
         const first = await save(OWNER, { prompt: "hi", reply: "first answer" });
@@ -281,9 +279,15 @@ describe("regenerate and edit on the local path", () => {
                 await ctx.db.patch("messages", first.userMessageId, { message: { content: [guestTextPart("a guest's words", "note-1")], role: "user" } }),
         );
 
-        await expect(
-            save(OWNER, { branch: { kind: "edit", messageId: first.userMessageId }, prompt: "reworded", reply: "ok", threadId: first.threadId }),
-        ).rejects.toThrow(GUEST_EDIT_REFUSED);
+        const edited = await save(OWNER, {
+            branch: { kind: "edit", messageId: first.userMessageId },
+            prompt: "reworded",
+            reply: "ok",
+            threadId: first.threadId,
+        });
+        const row = await harness.run(async (ctx: any) => await ctx.db.get("messages", edited.userMessageId));
+
+        expect(row.message.content).toStrictEqual([guestTextPart("reworded", "note-1")]);
     });
 
     it.each([

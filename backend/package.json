@@ -35,6 +35,7 @@
         "./chat/tags": "./lunora/chat/tags/logic.ts",
         "./dataModel": "./lunora/_generated/dataModel.ts",
         "./document-limits": "./lunora/lib/document-limits.ts",
+        "./guest-text": "./lunora/lib/guest-text.ts",
         "./ask-user-limits": "./lunora/chat/tools/ask-user-constants.ts",
         "./request-secret-limits": "./lunora/chat/tools/request-secret-constants.ts",
         "./knowledge/citations": "./lunora/knowledge/citations.ts",

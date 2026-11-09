@@ -30,7 +30,7 @@ import { isWorkerThread } from "../sub-agents/functions";
 import { storedRetentionHours } from "../lib/temporary-retention";
 import { MAX_LENGTH } from "../lib/validators";
 import { endActiveGoals, hasLiveStream } from "./goals/rows";
-import { messageCarriesGuestText } from "./lib/attached-text";
+import { guestNoteIdOfMessage, guestTextPart } from "./lib/attached-text";
 import {
     buildLocalPromptMessage,
     buildLocalReplyMessage,
@@ -175,12 +175,11 @@ export const saveLocalTurnHandler = async (ctx: MutationContext, userId: string,
         let promptId = args.branch.messageId;
 
         if (args.branch.kind === "edit") {
-            // A guest's note the owner sent on stays the guest's words; an edit would save it as the owner's.
-            if (messageCarriesGuestText(target?.message as Parameters<typeof messageCarriesGuestText>[0])) {
-                throw new LunoraError("BAD_REQUEST", "A guest's message cannot be edited.");
-            }
+            // An edit of a guest's note the owner sent on is still the guest's words: it keeps the mark, as `/chat/edit` does.
+            const guestNoteId = guestNoteIdOfMessage(target?.message as Parameters<typeof guestNoteIdOfMessage>[0]);
+            const message = guestNoteId === undefined ? userMessage.message : { content: [guestTextPart(prompt, guestNoteId)], role: "user" as const };
 
-            promptId = await saveEditedSiblingHandler(ctx, { message: userMessage.message, originalMessageId: promptId, userId });
+            promptId = await saveEditedSiblingHandler(ctx, { message, originalMessageId: promptId, userId });
         } else {
             // As the gateway's regenerate: the new reply is then the prompt's latest
             // child, and `addMessagesHandler` advances the leaf onto it.

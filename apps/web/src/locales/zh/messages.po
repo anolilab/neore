@@ -17864,7 +17864,7 @@ msgstr "了解更多关于 MCP 的信息"
 msgid "Learning"
 msgstr "学习"
 
-#: src/features/chat/guest-links/guest-page.tsx:213
+#: src/features/chat/guest-links/guest-page.tsx:240
 #: src/routes/(public)/guest.tsx:12
 msgid "Leave a message"
 msgstr "留言"
@@ -18485,7 +18485,7 @@ msgstr "正在加载工作流..."
 msgid "Loading your items…"
 msgstr "正在加载你的项目…"
 
-#: src/features/chat/guest-links/guest-page.tsx:264
+#: src/features/chat/guest-links/guest-page.tsx:291
 msgid "Loading your messages…"
 msgstr "正在加载你的消息…"
 
@@ -26776,8 +26776,8 @@ msgstr "重启 Ollama（{0}）"
 msgid "Restore this version"
 msgstr "恢复此版本"
 
-#: src/features/chat/thread/restore-to-input-action.tsx:21
-#: src/features/chat/thread/restore-to-input-action.tsx:21
+#: src/features/chat/thread/restore-to-input-action.tsx:31
+#: src/features/chat/thread/restore-to-input-action.tsx:31
 msgid "Restore to input"
 msgstr "恢复到输入框"
 
@@ -28394,7 +28394,7 @@ msgstr "用你的账号将此内容发送给机器人："
 msgid "Send to agent"
 msgstr "发送给智能体"
 
-#: src/features/chat/guest-links/guest-page.tsx:253
+#: src/features/chat/guest-links/guest-page.tsx:280
 msgid "Send to the owner"
 msgstr "发送给所有者"
 
@@ -28410,7 +28410,7 @@ msgstr "发送验证码"
 msgid "Sending your message and waiting for the reply"
 msgstr "正在发送你的消息并等待回复"
 
-#: src/features/chat/guest-links/guest-page.tsx:253
+#: src/features/chat/guest-links/guest-page.tsx:280
 #: src/features/chat/thread/streaming-placeholder.tsx:617
 msgid "Sending…"
 msgstr "正在发送…"
@@ -28435,7 +28435,7 @@ msgstr "由无人值守的运行发送"
 msgid "Sent by the lead agent"
 msgstr "由主导智能体发送"
 
-#: src/features/chat/guest-links/guest-page.tsx:270
+#: src/features/chat/guest-links/guest-page.tsx:297
 msgid "Sent by the owner"
 msgstr "所有者已发送"
 
@@ -32132,7 +32132,7 @@ msgstr "无法访问 MCP 注册表，因此可能缺少服务器建议。"
 msgid "The MCP Registry is unavailable right now. Showing popular servers instead."
 msgstr "MCP 注册表当前不可用，改为显示热门服务器。"
 
-#: src/features/chat/guest-links/guest-page.tsx:89
+#: src/features/chat/guest-links/guest-page.tsx:104
 msgid "The message could not be sent. Check your connection and try again."
 msgstr "消息无法发送。请检查网络连接后重试。"
 
@@ -32784,11 +32784,11 @@ msgstr "太短了：至少 {minLength} 个字符。"
 msgid "This is your organization's URL namespace"
 msgstr "这是你的组织的 URL 命名空间"
 
-#: src/features/chat/guest-links/guest-page.tsx:232
+#: src/features/chat/guest-links/guest-page.tsx:259
 msgid "This link has ended."
 msgstr "此链接已失效。"
 
-#: src/features/chat/guest-links/guest-page.tsx:80
+#: src/features/chat/guest-links/guest-page.tsx:95
 msgid "This link is already in use in another browser."
 msgstr "此链接已在另一个浏览器中使用。"
 
@@ -32796,11 +32796,11 @@ msgstr "此链接已在另一个浏览器中使用。"
 msgid "This link is incomplete."
 msgstr "此链接不完整。"
 
-#: src/features/chat/guest-links/guest-page.tsx:257
+#: src/features/chat/guest-links/guest-page.tsx:284
 msgid "This link is not complete. Ask for the full link."
 msgstr "此链接不完整。请索取完整链接。"
 
-#: src/features/chat/guest-links/guest-page.tsx:83
+#: src/features/chat/guest-links/guest-page.tsx:98
 msgid "This link is not taking messages right now. Try again later."
 msgstr "此链接目前不接收消息。请稍后再试。"
 
@@ -32814,7 +32814,7 @@ msgstr "此记忆已被删除。"
 msgid "This merges the commit {0} into the base branch with “{1}” on {hostLabel}. If the branch has changed since you opened this page, {hostLabel} refuses."
 msgstr "这会在 {hostLabel} 上以“{1}”方式将提交 {0} 合并到基础分支。如果自你打开此页面后分支已更改，{hostLabel} 将拒绝。"
 
-#: src/features/chat/guest-links/guest-page.tsx:77
+#: src/features/chat/guest-links/guest-page.tsx:92
 msgid "This message cannot be left. Keep it short, don't start it with / or mention anyone, or try again later."
 msgstr "无法留下此消息。请保持简短，不要以 / 开头或提及任何人，或稍后再试。"
 
@@ -33454,7 +33454,7 @@ msgstr "内容过长，无法按 JSON 检查"
 msgid "too many files"
 msgstr "文件过多"
 
-#: src/features/chat/guest-links/guest-page.tsx:86
+#: src/features/chat/guest-links/guest-page.tsx:101
 msgid "Too many messages. Please try again later."
 msgstr "消息太多。请稍后再试。"
 
@@ -33824,7 +33824,7 @@ msgid "Try adjusting your search terms."
 msgstr "尝试调整搜索词。"
 
 #: src/components/error-component.tsx:40
-#: src/features/chat/guest-links/guest-page.tsx:248
+#: src/features/chat/guest-links/guest-page.tsx:275
 #: src/features/connection/components/offline-screen.tsx:59
 #: src/features/develop/components/files-tab.tsx:275
 #: src/features/develop/components/thread-pull-requests.tsx:169
@@ -35777,7 +35777,7 @@ msgstr "正在等待输出…"
 msgid "Waiting for the agent…"
 msgstr "正在等待智能体…"
 
-#: src/features/chat/guest-links/guest-page.tsx:270
+#: src/features/chat/guest-links/guest-page.tsx:297
 #: src/features/chat/thread/request-secret-prompt.tsx:343
 msgid "Waiting for the owner"
 msgstr "正在等待所有者"
@@ -36906,7 +36906,7 @@ msgstr "你的本地服务器有响应，但拒绝了此网站（CORS）。请�
 msgid "Your location (e.g., \"New York, USA\", \"Berlin, Germany\")."
 msgstr "你的位置（例如“New York, USA”“Berlin, Germany”）。"
 
-#: src/features/chat/guest-links/guest-page.tsx:219
+#: src/features/chat/guest-links/guest-page.tsx:246
 msgid "Your message"
 msgstr "你的消息"
 
@@ -36914,7 +36914,7 @@ msgstr "你的消息"
 msgid "Your message contains inappropriate content that cannot be sent."
 msgstr "你的消息包含不当内容，无法发送。"
 
-#: src/features/chat/guest-links/guest-page.tsx:214
+#: src/features/chat/guest-links/guest-page.tsx:241
 msgid "Your message waits for the owner of this conversation. Nothing happens until they send it."
 msgstr "你的消息正在等待此对话的所有者。在对方发送之前不会有任何操作。"
 
@@ -36922,7 +36922,7 @@ msgstr "你的消息正在等待此对话的所有者。在对方发送之前不
 msgid "Your message:"
 msgstr "你的消息："
 
-#: src/features/chat/guest-links/guest-page.tsx:263
+#: src/features/chat/guest-links/guest-page.tsx:290
 msgid "Your messages"
 msgstr "你的消息"
 
@@ -36938,7 +36938,7 @@ msgstr "你的下一条消息是一个目标。智能体会持续工作，直到
 msgid "Your next message will start a self-destructing chat."
 msgstr "你的下一条消息将开始一个阅后即焚的聊天。"
 
-#: src/features/chat/guest-links/guest-page.tsx:240
+#: src/features/chat/guest-links/guest-page.tsx:267
 msgid "Your notes could not be loaded. They are still there; try again in a moment."
 msgstr "无法加载你的消息。它们仍然存在；请稍后再试。"
 
