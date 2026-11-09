@@ -169,7 +169,7 @@ catalogs:
     # "without" on every run, so `pnpm dedupe --check` (part of `pnpm lint`)
     # could never pass. EXACT: packem 4's `@visulima/packem-share` pins rollup
     # exactly (4.67.4 for packem 4.0.5) — move with packem.
-    rollup: 4.68.0
+    rollup: 4.67.4
     tslib: ^2.9.1
   canvas-spreadsheet:
     "@univerjs/preset-sheets-core": 1.4.0
@@ -225,7 +225,7 @@ catalogs:
     # imports the worker from it as a `?url` asset, and a second pdfjs-dist copy
     # makes the API and the worker disagree ("API version does not match Worker
     # version"). Move with react-pdf.
-    pdfjs-dist: 6.5.438
+    pdfjs-dist: 6.3.289
     react-pdf: 11.0.0
     wavesurfer.js: 8.0.5
   forms:
@@ -367,7 +367,7 @@ catalogs:
     "@visulima/health-check": 6.0.0
     creem: 1.13.0
     cookie-es: 3.1.1
-    hono: 4.13.17
+    hono: 4.13.16
   state:
     zustand: 5.1.0
   style:
