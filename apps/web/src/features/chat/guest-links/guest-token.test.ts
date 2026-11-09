@@ -57,7 +57,7 @@ describe(guestTokenFor, () => {
     });
 
     it("keeps a post not yet confirmed across a reload of the tab, under a digest, until it is confirmed", async () => {
-        const pending = { at: 1000, requestId: "request-1234", text: "Can we talk tomorrow?" };
+        const pending = { requestId: "request-1234", seen: 0, text: "Can we talk tomorrow?" };
 
         await keepPendingPost(LINK, pending);
         expect(await readPendingPost(LINK)).toStrictEqual(pending);

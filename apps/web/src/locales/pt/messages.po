@@ -18487,7 +18487,7 @@ msgstr "Carregando seus itens…"
 
 #: src/features/chat/guest-links/guest-page.tsx:264
 msgid "Loading your messages…"
-msgstr "A carregar as suas mensagens…"
+msgstr "Carregando suas mensagens…"
 
 #: src/features/home/components/home-page.tsx:128
 msgid "Loading your overview…"
@@ -32134,7 +32134,7 @@ msgstr "O MCP Registry está indisponível no momento. Mostrando servidores popu
 
 #: src/features/chat/guest-links/guest-page.tsx:89
 msgid "The message could not be sent. Check your connection and try again."
-msgstr "Não foi possível enviar a mensagem. Verifique a sua ligação e tente novamente."
+msgstr "Não foi possível enviar a mensagem. Verifique sua conexão e tente novamente."
 
 #: src/features/chat/core/hooks/use-prompt-link-draft.ts:160
 msgid "The model in the link is not available. The chat keeps its model."
@@ -32786,11 +32786,11 @@ msgstr "Este é o namespace de URL da sua organização"
 
 #: src/features/chat/guest-links/guest-page.tsx:232
 msgid "This link has ended."
-msgstr "Esta ligação terminou."
+msgstr "Este link foi encerrado."
 
 #: src/features/chat/guest-links/guest-page.tsx:80
 msgid "This link is already in use in another browser."
-msgstr "Esta ligação já está a ser usada noutro navegador."
+msgstr "Este link já está sendo usado em outro navegador."
 
 #: src/routes/dashboard/settings/connectors/callback.tsx:47
 msgid "This link is incomplete."
@@ -32798,11 +32798,11 @@ msgstr "Este link está incompleto."
 
 #: src/features/chat/guest-links/guest-page.tsx:257
 msgid "This link is not complete. Ask for the full link."
-msgstr "Esta ligação está incompleta. Peça a ligação completa."
+msgstr "Este link está incompleto. Peça o link completo."
 
 #: src/features/chat/guest-links/guest-page.tsx:83
 msgid "This link is not taking messages right now. Try again later."
-msgstr "Esta ligação não está a aceitar mensagens de momento. Tente novamente mais tarde."
+msgstr "Este link não está aceitando mensagens no momento. Tente novamente mais tarde."
 
 #: src/features/chat/thread/memory-usage-action.tsx:63
 msgid "This memory has since been deleted."
@@ -33456,7 +33456,7 @@ msgstr "arquivos demais"
 
 #: src/features/chat/guest-links/guest-page.tsx:86
 msgid "Too many messages. Please try again later."
-msgstr "Demasiadas mensagens. Tente novamente mais tarde."
+msgstr "Mensagens demais. Tente novamente mais tarde."
 
 #: src/features/chat/context-reset/use-clear-context.ts:72
 msgid "Too many new contexts in a short while. Try again in a minute."
@@ -36908,7 +36908,7 @@ msgstr "Sua localização (ex.: \"São Paulo, Brasil\", \"Berlim, Alemanha\")."
 
 #: src/features/chat/guest-links/guest-page.tsx:219
 msgid "Your message"
-msgstr "A sua mensagem"
+msgstr "Sua mensagem"
 
 #: src/features/chat/core/context/chat-context.tsx:716
 msgid "Your message contains inappropriate content that cannot be sent."
@@ -36916,7 +36916,7 @@ msgstr "Sua mensagem contém conteúdo impróprio e não pode ser enviada."
 
 #: src/features/chat/guest-links/guest-page.tsx:214
 msgid "Your message waits for the owner of this conversation. Nothing happens until they send it."
-msgstr "A sua mensagem aguarda o proprietário desta conversa. Nada acontece até que ele a envie."
+msgstr "Sua mensagem aguarda o proprietário desta conversa. Nada acontece até que ele a envie."
 
 #: src/features/chat/thread/message-item.tsx:181
 msgid "Your message:"
@@ -36924,7 +36924,7 @@ msgstr "Sua mensagem:"
 
 #: src/features/chat/guest-links/guest-page.tsx:263
 msgid "Your messages"
-msgstr "As suas mensagens"
+msgstr "Suas mensagens"
 
 #: src/features/chat/header/temporary-chat-dropdown.tsx:261
 msgid "Your next chat is temporary. Turn this off in Settings to keep it."
@@ -36940,7 +36940,7 @@ msgstr "Sua próxima mensagem vai iniciar um chat autodestrutivo."
 
 #: src/features/chat/guest-links/guest-page.tsx:240
 msgid "Your notes could not be loaded. They are still there; try again in a moment."
-msgstr "Não foi possível carregar as suas mensagens. Continuam lá; tente novamente daqui a pouco."
+msgstr "Não foi possível carregar suas mensagens. Elas continuam lá; tente novamente em instantes."
 
 #: src/features/home/components/home-page.tsx:134
 msgid "Your overview could not be loaded."

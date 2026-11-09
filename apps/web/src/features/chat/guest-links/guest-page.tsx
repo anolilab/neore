@@ -46,7 +46,11 @@ const GuestLinkPage: FC<{ linkToken: string }> = ({ linkToken }) => {
     const [text, setText] = useState("");
     // When the last post went through: a view fetched after it that answers nothing means the link has ended. A view from
     // before it (nothing left yet, for a new guest) says nothing about the link.
-    const [postedAt, setPostedAt] = useState<number>();
+    // Reads of the view are numbered as they start; the post records the last number it saw. A read that started after an
+    // accepted post and finds nothing means the link has ended. Ordered by these numbers, never by clocks.
+    const readsRef = useRef(0);
+    const postedAfterReadRef = useRef<number | undefined>(undefined);
+    const [endedByRead, setEndedByRead] = useState(false);
     const [ended, setEnded] = useState(false);
     // A post that failed keeps its request id, so sending the same text again cannot store it twice.
     const pendingRef = useRef<PendingPost | undefined>(undefined);
@@ -99,14 +103,23 @@ const GuestLinkPage: FC<{ linkToken: string }> = ({ linkToken }) => {
         }
     };
 
-    const view = useQuery({
-        queryFn: linkToken
-            ? async () => {
-                  const guestToken = await guestTokenFor(linkToken);
+    // A read numbers itself as it starts (`readsRef`), so whether it began after the last accepted post needs no clock.
+    const readGuestView = async () => {
+        readsRef.current += 1;
 
-                  return guestToken === undefined ? null : await readView({ guestToken, linkToken });
-              }
-            : skipToken,
+        const read = readsRef.current;
+        const guestToken = await guestTokenFor(linkToken);
+        const result = guestToken === undefined ? null : await readView({ guestToken, linkToken });
+
+        if (result === null && postedAfterReadRef.current !== undefined && read > postedAfterReadRef.current) {
+            setEndedByRead(true);
+        }
+
+        return result;
+    };
+
+    const view = useQuery({
+        queryFn: linkToken ? readGuestView : skipToken,
         queryKey: ["guest-view", linkToken],
         refetchInterval: (query) => guestPollInterval(query.state.data),
     });
@@ -133,7 +146,7 @@ const GuestLinkPage: FC<{ linkToken: string }> = ({ linkToken }) => {
         onSuccess: (guestToken, note) => {
             pendingRef.current = undefined;
             void keepPendingPost(linkToken, undefined);
-            setPostedAt(Date.now());
+            postedAfterReadRef.current = readsRef.current;
             // A draft typed while the post was on its way stays.
             setText((current) => (current.trim() === note.text ? "" : current));
 
@@ -165,8 +178,7 @@ const GuestLinkPage: FC<{ linkToken: string }> = ({ linkToken }) => {
     // sent again later are a new note, and a field still holding them (restored after a reload) is cleared.
     useEffect(() => {
         const pending = pendingRef.current;
-        const stored =
-            pending !== undefined && view.data?.messages.some((note) => note.text === pending.text && note.createdAt >= pending.at - 60_000) === true;
+        const stored = pending !== undefined && (view.data?.messages.filter((note) => note.text === pending.text).length ?? 0) > pending.seen;
 
         if (!stored || post.isPending) {
             return;
@@ -177,7 +189,7 @@ const GuestLinkPage: FC<{ linkToken: string }> = ({ linkToken }) => {
         setText((current) => (current.trim() === pending.text ? "" : current));
     }, [view.data, post.isPending, linkToken]);
 
-    const linkEnded = ended || (postedAt !== undefined && view.isSuccess && view.data === null && view.dataUpdatedAt > postedAt);
+    const linkEnded = ended || endedByRead;
     const endedByView = !ended && linkEnded;
 
     // A link found ended by a view (a poll after the post) forgets this browser's token, as one found ended by a post does.
@@ -197,7 +209,11 @@ const GuestLinkPage: FC<{ linkToken: string }> = ({ linkToken }) => {
         }
 
         if (pendingRef.current?.text !== trimmed) {
-            pendingRef.current = { at: Date.now(), requestId: globalThis.crypto.randomUUID(), text: trimmed };
+            pendingRef.current = {
+                requestId: globalThis.crypto.randomUUID(),
+                seen: view.data?.messages.filter((note) => note.text === trimmed).length ?? 0,
+                text: trimmed,
+            };
         }
 
         post.mutate(pendingRef.current);

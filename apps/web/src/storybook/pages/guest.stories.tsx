@@ -86,7 +86,7 @@ export const SkipLinkKeepsTheLink: Story = {
     },
 };
 
-const RESTORED = { at: NOW, requestId: "restored-request-1", text: "Can we talk tomorrow?" };
+const RESTORED = { requestId: "restored-request-1", seen: 0, text: "Can we talk tomorrow?" };
 
 /** A post whose reply was lost before a reload comes back into the field, and sending it again is the same request. */
 export const ResumeAfterReload: Story = {
@@ -250,6 +250,27 @@ export const MalformedAfterValid: Story = {
 
         await expect(await canvas.findByRole("alert")).toHaveTextContent("This link is not complete");
         await expect(canvas.queryByRole("textbox", { name: "Your message" })).not.toBeInTheDocument();
+    },
+};
+
+/** The same words as an earlier note, sent again and refused: the earlier note is not this one, so the draft stays. */
+export const RepeatRefused: Story = {
+    beforeEach: atFragment(`#${GUEST_LINK_TOKEN}`, { returning: true }),
+    parameters: {
+        msw: {
+            handlers: {
+                lunora: lunoraHandlers(...guestPageFixtures({ notes: [{ createdAt: NOW, status: "held", text: "Hello?" }], postRefusal: "TOO_MANY_REQUESTS" })),
+            },
+        },
+    },
+    play: async ({ canvas }) => {
+        await expect(await canvas.findByText("Waiting for the owner")).toBeVisible();
+        await userEvent.type(canvas.getByRole("textbox", { name: "Your message" }), "Hello?");
+        await userEvent.click(canvas.getByRole("button", { name: "Send to the owner" }));
+
+        await expect(await canvas.findByRole("alert")).toHaveTextContent("Too many messages");
+        await lunoraAnswered(api.chat.guest_links.getGuestView);
+        await expect(canvas.getByRole("textbox", { name: "Your message" })).toHaveValue("Hello?");
     },
 };
 

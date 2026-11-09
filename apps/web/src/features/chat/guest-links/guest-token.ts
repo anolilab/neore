@@ -93,8 +93,11 @@ const pendingKeyFor = async (linkToken: string): Promise<string> => {
     return PENDING_PREFIX + tokenKey.slice(KEY_PREFIX.length);
 };
 
-/** A post sent but not yet confirmed: its request id, its text, and when it was first sent. */
-export type PendingPost = { at: number; requestId: string; text: string };
+/**
+ * A post sent but not yet confirmed: its request id, its text, and how many of the guest's notes already had that text when
+ * it was sent (`seen`), so a note the notes show beyond that count is this post, whatever the clocks say.
+ */
+export type PendingPost = { requestId: string; seen: number; text: string };
 
 /** A post sent but not yet confirmed (`{ requestId, text }`), kept for this tab across a reload; `undefined` once confirmed. */
 export const keepPendingPost = async (linkToken: string, pending: PendingPost | undefined): Promise<void> => {
@@ -117,9 +120,9 @@ export const readPendingPost = async (linkToken: string): Promise<PendingPost | 
 
     try {
         const parsed: unknown = JSON.parse(globalThis.sessionStorage.getItem(key) ?? "null");
-        const { at, requestId, text } = (parsed ?? {}) as { at?: unknown; requestId?: unknown; text?: unknown };
+        const { requestId, seen, text } = (parsed ?? {}) as { requestId?: unknown; seen?: unknown; text?: unknown };
 
-        return typeof at === "number" && typeof requestId === "string" && typeof text === "string" ? { at, requestId, text } : undefined;
+        return typeof seen === "number" && typeof requestId === "string" && typeof text === "string" ? { requestId, seen, text } : undefined;
     } catch {
         return undefined;
     }
