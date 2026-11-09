@@ -21,6 +21,7 @@ import * as z from "zod";
 import { getLocalizedError } from "@/features/auth/lib/utilities";
 import { ReasoningEffortSelector } from "@/features/chat/model-settings/reasoning-effort-selector";
 import ProjectKnowledgeCollections from "@/features/knowledge/components/project-knowledge-collections";
+import ProjectRepositories from "@/features/projects/components/project-repositories";
 import ProjectUsageSummary from "@/features/projects/components/project-usage-summary";
 import PromptModelSelector from "@/features/prompts/components/prompt-model-selector";
 import useFeatureFlaggedModels from "@/hooks/use-feature-flagged-models";
@@ -386,6 +387,8 @@ const ProjectFormDialog = ({ editingProject, onClose, open }: ProjectFormDialogP
                             {/* Links, saved as they change — only a saved project has an id to link to. */}
                             {editingProject && <ProjectKnowledgeCollections projectId={editingProject._id} />}
                             {editingProject && <ProjectUsageSummary projectId={editingProject._id} />}
+                            {/* Keyed: a draft typed for one project never stays for the next one edited. */}
+                            {editingProject && <ProjectRepositories key={editingProject._id} projectId={editingProject._id} />}
                         </DialogPanel>
                         <DialogFooter>
                             <Button onClick={onClose} type="button" variant="outline">

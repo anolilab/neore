@@ -2045,6 +2045,29 @@ export const schema = defineSchema({
         .index("by_projectId", ["projectId"])
         .index("by_knowledgeFileId", ["knowledgeFileId"]),
 
+    // The repositories a coding-agent run in a project picks from (`projects/repositories.ts`), one row each, so a
+    // change to one never rewrites another or the project. Global, like `projects`: a member reads them from
+    // their own shard. `url` is in `parseRepoUrl` clone form; the default is the row with the latest `defaultAt`.
+    // `userId` and `organizationId` copy the project's, so account deletion and export reach a row by its owner and a
+    // URL lookup stays inside the caller's own and organization's rows. A row with `deletingAt` (and the URL "") is
+    // not a repository: it marks a project delete in progress (`deleteProject`).
+    projectRepositories: defineTable({
+        // Moves on every default-branch save; a save naming an older one is refused (`updateProjectRepo`).
+        branchRevision: v.optional(v.number()),
+        createdAt: v.number(),
+        defaultAt: v.optional(v.number()),
+        defaultBranch: v.optional(v.string()),
+        deletingAt: v.optional(v.number()),
+        organizationId: v.optional(v.string()),
+        projectId: v.id("projects"),
+        url: v.string(),
+        userId: v.optional(v.string()),
+    })
+        .global()
+        .index("by_project_and_url", ["projectId", "url"], { unique: true })
+        .index("by_user_and_url", ["userId", "url"])
+        .index("by_organization_and_url", ["organizationId", "url"]),
+
     projects: defineTable({
         color: v.optional(v.string()),
         context: v.optional(v.string()),

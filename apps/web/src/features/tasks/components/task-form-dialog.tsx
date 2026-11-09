@@ -14,6 +14,7 @@ import { useId, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { ReasoningEffortSelector } from "@/features/chat/model-settings/reasoning-effort-selector";
+import ProjectRepoPicker from "@/features/projects/components/project-repo-picker";
 import PromptModelSelector from "@/features/prompts/components/prompt-model-selector";
 import useFeatureFlaggedModels from "@/hooks/use-feature-flagged-models";
 import { useCRPC } from "@/lib/lunora/crpc";
@@ -295,6 +296,23 @@ const TaskFormDialogBody = ({ defaultGoalId, editingTask, goals, onClose, onSubm
 
                         {isCodingAgent && (
                             <div className="grid gap-4 sm:grid-cols-2">
+                                <ProjectRepoPicker
+                                    branch={values.branch}
+                                    onPick={(repo) => {
+                                        setValues((current) => {
+                                            return { ...current, branch: repo.defaultBranch ?? "", repoUrl: repo.url };
+                                        });
+                                    }}
+                                    paging={{
+                                        failed: projectsFailed,
+                                        hasMore: hasMoreProjects,
+                                        isLoadingMore: isLoadingMoreProjects,
+                                        loadMore: loadMoreProjects,
+                                        retry: retryProjects,
+                                    }}
+                                    projects={projects}
+                                    repoUrl={values.repoUrl}
+                                />
                                 <div className="space-y-2">
                                     <Label htmlFor={ids.repo}>{t`Repository`}</Label>
                                     <Input

@@ -3,6 +3,8 @@ import { LunoraError, v } from "lunorash/server";
 import { PROJECT_SKILL_KEY } from "../usage/activity-logic";
 import { collectAcpSessionPages } from "../acp/gdpr";
 import { collectAllTriggers } from "../triggers/export-pages";
+import { collectAllRepositories } from "../projects/export-pages";
+import { repositoriesReadBudget, triggerReadBudget } from "./read-budget";
 import { internal } from "../_generated/internal";
 import type { Doc, Id } from "../_generated/dataModel";
 import { internalAction, internalQuery } from "../_generated/server";
@@ -418,17 +420,6 @@ const MAX_EXPORT_BYTES = 32 * 1024 * 1024;
 const TRIGGER_EXPORT_BYTES = 8 * 1024 * 1024;
 
 /**
- * The most reading that history may cost. A run is read whole, its webhook body (up to 1 MiB) included, even when the
- * export cuts it, and the export action's queries share one read budget (`ACTION_READ_BYTES`): the trigger history gets
- * what the ACP sessions read before it leave, less a margin for the last page and anything read after.
- */
-const TRIGGER_READ_BYTES = 12 * 1024 * 1024;
-
-/** Lunora's read budget for one request, shared by every query an action runs (`maxReadBytes`). */
-const ACTION_READ_BYTES = 32 * 1024 * 1024;
-const READ_MARGIN_BYTES = 8 * 1024 * 1024;
-
-/**
  * Usage history, sub-agent delegations (their task text and results) and
  * knowledge collections — user data the export used to leave out.
  */
@@ -570,6 +561,9 @@ export const generateExportFile = internalAction
         // same in-flight-replay reason as `threadTags`.
         pages: v.optional(v.any()),
         profile: v.any(),
+        // The repositories of the user's projects, by owner (`projects/gdpr.ts`). Read here, a page per query, unless a
+        // workflow already in flight passes them.
+        projectRepositories: v.optional(v.any()),
         prompts: v.any(),
         // AI guides of pull requests (`source-control/gdpr.ts`). Optional for the same in-flight-replay reason.
         pullRequestGuides: v.optional(v.any()),
@@ -604,9 +598,19 @@ export const generateExportFile = internalAction
                 async (cursor) => await context.runQuery(internal.acp.gdpr.collectAcpSessionsForExport, { cursor, userId: args.userId }),
                 MAX_EXPORT_BYTES,
             ));
-        // What the ACP sessions read is close to what they export: the trigger history reads only from what is left.
-        const acpReadBytes = new TextEncoder().encode(JSON.stringify(acpSessions)).byteLength;
-        const triggerReadBytes = Math.max(0, Math.min(TRIGGER_READ_BYTES, ACTION_READ_BYTES - acpReadBytes - READ_MARGIN_BYTES));
+        // What a section read is close to what it exports. The project repositories share the action's read budget with
+        // the ACP sessions: they cannot be cut short, so a set too large for what is left fails with PAYLOAD_TOO_LARGE
+        // (a floor keeps a small set exportable even past the ACP sessions). The trigger history, which is cut oldest
+        // first, reads only from what is left after both.
+        const readBytes = (value: unknown): number => new TextEncoder().encode(JSON.stringify(value)).byteLength;
+        const acpReadBytes = readBytes(acpSessions);
+        const projectRepositories =
+            args.projectRepositories ??
+            (await collectAllRepositories(
+                async (cursor) => await context.runQuery(internal.projects.gdpr.collectProjectRepositoriesForExport, { cursor, userId: args.userId }),
+                repositoriesReadBudget(acpReadBytes),
+            ));
+        const triggerReadBytes = triggerReadBudget(acpReadBytes + readBytes(projectRepositories));
         const exportData = {
             acpSessions,
             bots: args.bots ?? { bots: [] },
@@ -626,6 +630,7 @@ export const generateExportFile = internalAction
             notifications: args.notifications ?? { notifications: [], pushSubscriptions: [] },
             pages: args.pages ?? { comments: [], favorites: [], grants: [], pages: [] },
             profile: args.profile,
+            projectRepositories,
             prompts: args.prompts,
             pullRequestGuides: args.pullRequestGuides ?? { guides: [] },
             pullRequestThreads: args.pullRequestThreads ?? { links: [] },

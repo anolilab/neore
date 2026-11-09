@@ -58,6 +58,7 @@ import { eraseSystemPromptPresetsForUser } from "../../system-prompts/gdpr";
 import { eraseWorkflowVersionsAndPresenceForProject, eraseWorkflowVersionsAndPresenceForUser } from "../../workflow/gdpr";
 import { eraseSkillRatingRows } from "../../skills/gdpr";
 import { eraseKnowledgeForUser, eraseProjectKnowledgeForProject } from "../../knowledge/gdpr";
+import { eraseProjectRepositories, eraseProjectRepositoriesForUser } from "../../projects/gdpr";
 import { eraseBotsForUser } from "../../bots/gdpr";
 import { eraseTriggersForUser } from "../../triggers/gdpr";
 import { eraseSandboxSessionsForUser } from "../../sandbox/gdpr";
@@ -330,6 +331,11 @@ export const deleteUserWorkflowData = internalMutation
 
         hasMore ||= userVersions.hasMore;
 
+        // Repository rows by owner: also one whose project is already gone (a project delete that failed part way).
+        const ownRepositories = await eraseProjectRepositoriesForUser(context, userId);
+
+        hasMore ||= ownRepositories.hasMore;
+
         const { page: projects } = await context.db.projects.findMany({ where: { userId } });
 
         for (const project of projects) {
@@ -337,8 +343,9 @@ export const deleteUserWorkflowData = internalMutation
             const projectRows = await eraseWorkflowVersionsAndPresenceForProject(context, project._id);
             const executions = await eraseWorkflowExecutionsForProject(context, project._id);
             const knowledge = await eraseProjectKnowledgeForProject(context, project._id);
+            const repositories = await eraseProjectRepositories(context, project._id);
 
-            hasMore ||= projectRows.hasMore || executions.hasMore || knowledge.hasMore;
+            hasMore ||= projectRows.hasMore || executions.hasMore || knowledge.hasMore || repositories.hasMore;
         }
 
         return { hasMore };
