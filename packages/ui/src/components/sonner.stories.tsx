@@ -28,6 +28,17 @@ const meta = {
             <Button onClick={() => toast.loading("Uploading file")} variant="outline">
                 Loading
             </Button>
+            <Button
+                onClick={() =>
+                    toast("Chat archived", {
+                        action: { label: "Undo", onClick: () => undefined },
+                        cancel: { label: "Dismiss", onClick: () => undefined },
+                    })
+                }
+                variant="outline"
+            >
+                Actions
+            </Button>
         </div>
     ),
     title: "UI/Toaster",
@@ -57,6 +68,14 @@ export const Failure: Story = {
     play: async ({ canvas }) => {
         await userEvent.click(canvas.getByRole("button", { name: "Error" }));
         await waitFor(() => expect(screen.getByText("Could not send the message")).toBeInTheDocument());
+    },
+};
+
+export const WithActions: Story = {
+    play: async ({ canvas }) => {
+        await userEvent.click(canvas.getByRole("button", { name: "Actions" }));
+        await waitFor(() => expect(screen.getByRole("button", { name: "Undo" })).toBeInTheDocument());
+        expect(screen.getByRole("button", { name: "Dismiss" })).toBeInTheDocument();
     },
 };
 
