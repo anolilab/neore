@@ -54,6 +54,7 @@ import { getValidThreadId } from "@/features/chat/core/utils/thread-id";
 import ComposerGoal from "@/features/chat/goal/composer-goal";
 import HostComposer from "@/features/chat/host/host-composer";
 import PromptImprovementPanel from "@/features/chat/prompt-improvement/components/prompt-improvement-panel";
+import { restoreLiveComposerFor } from "@/features/chat/split/pane-state";
 import ConnectionBanner from "@/features/connection/components/connection-banner";
 import useFeatureFlaggedModels from "@/hooks/use-feature-flagged-models";
 import { useCRPC } from "@/lib/lunora/crpc";
@@ -594,6 +595,14 @@ const Composer: FC<ComposerProps> = ({
             lastInitialMessage.current = undefined;
         }
     }, [initialMessage, splitPane, threadId]);
+
+    // With the split view off, nothing else brings back a draft that a failed send parked while another chat was open. The
+    // composer mounts once per chat, so the chat's own parked draft is restored here; it never overwrites text already typed.
+    useEffect(() => {
+        if (!splitPane && threadId) {
+            restoreLiveComposerFor(threadId);
+        }
+    }, [splitPane, threadId]);
 
     // Clear submitting state when SSE streaming starts
     useEffect(() => {

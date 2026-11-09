@@ -324,6 +324,18 @@ describe("a late failed draft with the split view off (#6)", () => {
         expect(useChatUIStore.getState().composerText).toBe("");
         expect(peekComposerDraft(A)?.composerText).toBe("a's prompt");
     });
+
+    it("comes back into the composer when its chat is shown again", () => {
+        setPreference(false);
+        useModelStore.setState({ selectedModelThreadId: B });
+        restoreTextFor(A, "a's prompt");
+
+        // Returning to A: the single-chat composer mounts and takes its parked draft back.
+        useModelStore.setState({ selectedModelThreadId: A });
+        restoreLiveComposerFor(A);
+
+        expect(useChatUIStore.getState().composerText).toBe("a's prompt");
+    });
 });
 
 describe("image settings across a pane switch (#8)", () => {

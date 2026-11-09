@@ -667,9 +667,13 @@ const AccountSettings: FC = () => {
                             <Label className="text-base font-medium" htmlFor="split-view">
                                 {t`Split View`}
                             </Label>
-                            <p className="text-muted-foreground text-sm">{t`Open up to three chats side by side. Applies to this browser only.`}</p>
+                            <p
+                                className="text-muted-foreground text-sm"
+                                id="split-view-description"
+                            >{t`Open up to three chats side by side. Applies to this browser only.`}</p>
                         </div>
                         <Switch
+                            aria-describedby="split-view-description"
                             checked={splitViewEnabled}
                             id="split-view"
                             onCheckedChange={(checked) => {

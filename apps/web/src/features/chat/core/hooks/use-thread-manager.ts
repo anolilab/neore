@@ -5,7 +5,9 @@
 
 import { useLingui } from "@lingui/react/macro";
 import type { ThreadDoc } from "@neore/backend/agent";
+import { api } from "@neore/backend/api";
 import type { Id } from "@neore/backend/dataModel";
+import { shardOptionsFor } from "@neore/client-runtime";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useShallow } from "zustand/react/shallow";
@@ -13,7 +15,7 @@ import { useShallow } from "zustand/react/shallow";
 import { survivingPaneAfterDelete } from "@/features/chat/split/split-layout-store";
 import { trackEvent } from "@/lib/analytics";
 import { providerLogger } from "@/lib/logger";
-import { useCRPC } from "@/lib/lunora/crpc";
+import { useCRPC, useLunora } from "@/lib/lunora/crpc";
 
 import type { ThreadMetadata } from "../stores/thread-store";
 import useThreadStore from "../stores/thread-store";
@@ -44,6 +46,7 @@ export const useThreadManager = (enabled: boolean = true, currentThreadId?: stri
     const { t } = useLingui();
     const navigate = useNavigate();
     const crpc = useCRPC();
+    const lunora = useLunora();
     const queryClient = useQueryClient();
 
     const threadMetadata = useThreadStore((state) => state.threadMetadata);
@@ -170,9 +173,12 @@ export const useThreadManager = (enabled: boolean = true, currentThreadId?: stri
 
         if (isCurrent) {
             // With the split view on, the other open panes stay: the route moves to one of them instead of `/chat`, which has no split view.
-            const survivor = await survivingPaneAfterDelete([threadId, ...childBranches], (id) =>
-                queryClient.fetchQuery(crpc.chat.functions.getThread.queryOptions({ threadId: id as Id<"threads"> })),
-            );
+            // A fresh read, not the query cache: a chat deleted or revoked since its last read must not be picked.
+            const survivor = await survivingPaneAfterDelete([threadId, ...childBranches], (id) => {
+                const args = { threadId: id as Id<"threads"> };
+
+                return lunora.query(api.chat.functions.getThread, args, shardOptionsFor(args));
+            });
 
             navigate(survivor === undefined ? { replace: true, to: "/chat" } : { params: { threadId: survivor }, replace: true, to: "/chat/$threadId" });
         }

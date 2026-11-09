@@ -38,8 +38,8 @@ const ThreadOptionsMenu = ({ className, isHostRun, isLocked, label, onOpenChange
         retry: 0,
     });
 
-    // A locked row gets no menu: the server refuses both its rename and its regenerate.
-    if (isLocked) {
+    // A locked row keeps only the split-view item: the server refuses its rename and its regenerate.
+    if (isLocked && !onOpenInSplitView) {
         return null;
     }
 
@@ -69,9 +69,9 @@ const ThreadOptionsMenu = ({ className, isHostRun, isLocked, label, onOpenChange
                     <TooltipContent>{t`Thread options`}</TooltipContent>
                 </Tooltip>
                 <DropdownMenuContent>
-                    <DropdownMenuItem onClick={onRename}>{t`Rename`}</DropdownMenuItem>
+                    {!isLocked && <DropdownMenuItem onClick={onRename}>{t`Rename`}</DropdownMenuItem>}
                     {onOpenInSplitView && <DropdownMenuItem onClick={onOpenInSplitView}>{t`Open in split view`}</DropdownMenuItem>}
-                    {!isHostRun && (
+                    {!isHostRun && !isLocked && (
                         <DropdownMenuItem
                             onClick={() =>
                                 regenerateTitle(

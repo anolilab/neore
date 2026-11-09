@@ -238,6 +238,12 @@ const Pane: FC<PaneProps> = ({
                         {t`Could not load this chat's details.`}
                     </p>
                 )}
+                {!shardReady && (
+                    // A shared chat's shard is still being resolved: say so, since the pane has nothing else to show yet.
+                    <p className="text-muted-foreground p-3 text-sm" role="status">
+                        {t`Loading...`}
+                    </p>
+                )}
                 {shardReady && (
                     <LockedChatGate
                         // The page keeps its header and its details panel while the focused chat is locked: neither needs the provider.
