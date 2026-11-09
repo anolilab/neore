@@ -158,8 +158,6 @@ type Story = StoryObj<typeof meta>;
 
 /** One chat: a pane with its header and the live composer. */
 export const OnePane: Story = {
-    // color-contrast (#548): the code block in this thread inherits #e2e8f0 on the light page, as in the chat page story.
-    parameters: { a11y: { test: "todo" } },
     loaders: [async () => seed([THREAD_IDS.main])],
     play: async ({ canvas }) => {
         await expect(await canvas.findByRole("region", { name: "Plan the Q1 product launch" }, PAGE_WAIT)).toBeInTheDocument();
