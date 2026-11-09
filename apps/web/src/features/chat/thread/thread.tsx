@@ -370,16 +370,19 @@ const ThreadContent: FC<ThreadProps> = ({ className, composerActive = true, init
                                     workerId={worker.workerId}
                                 />
                             )}
-                            {worker && (
-                                <WorkerComposer
-                                    archived={worker.archived}
-                                    busy={worker.state !== "idle" || worker.stopping}
-                                    className="w-full pb-4"
-                                    followUp={worker.followUp}
-                                    key={threadId}
-                                    workerId={worker.workerId}
-                                />
-                            )}
+                            {worker &&
+                                (composerActive ? (
+                                    <WorkerComposer
+                                        archived={worker.archived}
+                                        busy={worker.state !== "idle" || worker.stopping}
+                                        className="w-full pb-4"
+                                        followUp={worker.followUp}
+                                        key={threadId}
+                                        workerId={worker.workerId}
+                                    />
+                                ) : (
+                                    <ComposerStub onActivate={onActivateComposer} />
+                                ))}
                             {!worker &&
                                 !isWorkerLoading &&
                                 (composerActive ? (

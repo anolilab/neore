@@ -35,11 +35,13 @@ interface CanvasPanelOptions {
 
 const useCanvasPanel = (threadId: string | undefined, { resolveOpenThreadId }: CanvasPanelOptions = {}): CanvasPanelState => {
     const { t } = useLingui();
-    const { isCanvasOpen, openPreviewFile, previewFile: openedPreview } = useCanvasState();
+    const { canvasThreadId, isCanvasOpen, openPreviewFile, previewFile: openedPreview } = useCanvasState();
     // A PDF opened in another thread is not this thread's panel.
     const previewFile = openedPreview?.threadId === threadId ? openedPreview : null;
     // Another thread's PDF is a closed panel here: the canvas does not stand in for it while that preview is cleared.
-    const isPanelOpen = isCanvasOpen && (openedPreview === null || previewFile !== null);
+    // With several chats on one page, a document stays with the chat that opened it while focus moves to another.
+    const isDocumentHere = resolveOpenThreadId === undefined || canvasThreadId === null || canvasThreadId === threadId;
+    const isPanelOpen = isCanvasOpen && (openedPreview === null ? isDocumentHere : previewFile !== null);
 
     // A chat PDF's thumbnail asks for the side panel; this takes the request (see `packages/ui/src/utils/pdf-preview-event.ts`).
     useEffect(() => {

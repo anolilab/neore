@@ -10,6 +10,8 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useShallow } from "zustand/react/shallow";
 
+import { useSplitLayoutStore } from "@/features/chat/split/split-layout-store";
+import { useUIStateStore } from "@/features/layout/stores/ui-state-store";
 import { trackEvent } from "@/lib/analytics";
 import { providerLogger } from "@/lib/logger";
 import { useCRPC } from "@/lib/lunora/crpc";
@@ -168,10 +170,14 @@ export const useThreadManager = (enabled: boolean = true, currentThreadId?: stri
         const isCurrent = currentThreadId === threadId;
 
         if (isCurrent) {
-            navigate({
-                replace: true,
-                to: "/chat",
-            });
+            // With the split view on, the other open panes stay: the route moves to one of them instead of `/chat`, which has no split view.
+            const deleted = new Set([threadId, ...childBranches]);
+            const survivor =
+                useUIStateStore.getState().preferences.splitViewEnabled === true
+                    ? useSplitLayoutStore.getState().layout.panes.find((id) => !deleted.has(id))
+                    : undefined;
+
+            navigate(survivor === undefined ? { replace: true, to: "/chat" } : { params: { threadId: survivor }, replace: true, to: "/chat/$threadId" });
         }
 
         // Optimistic deletion - thread disappears instantly from UI

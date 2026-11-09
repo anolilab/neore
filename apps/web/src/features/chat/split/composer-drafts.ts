@@ -21,6 +21,18 @@ export const useParkedDraftStore = create<{ threadIds: ReadonlySet<string> }>()(
     return { threadIds: new Set<string>() };
 });
 
+/**
+ * Whether the split view is on the page. Only then is the focused pane's composer the live one of its chat: on `/chat` with
+ * the preference on, the composer is the new-chat composer, and its text belongs to no pane.
+ */
+export const useSplitViewMountedStore = create<{ mounted: boolean }>()(() => {
+    return { mounted: false };
+});
+
+export const setSplitViewMounted = (mounted: boolean): void => {
+    useSplitViewMountedStore.setState({ mounted });
+};
+
 // Rows select a boolean from the set, so a fresh set that says the same thing re-renders nobody.
 const syncParked = (): void => {
     useParkedDraftStore.setState({ threadIds: new Set(drafts.keys()) });

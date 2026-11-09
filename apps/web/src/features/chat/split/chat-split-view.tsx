@@ -20,7 +20,7 @@ import ThreadSidebar from "@/features/chat/sidebar/thread-sidebar";
 import Thread from "@/features/chat/thread/thread";
 import { useThreadPaneState } from "@/features/chat/thread/use-thread-pane-state";
 
-import { saveComposerDraft, takeComposerDraftState } from "./composer-drafts";
+import { saveComposerDraft, setSplitViewMounted, takeComposerDraftState } from "./composer-drafts";
 import { MIN_PANE_PX } from "./split-layout";
 import { hydrateSplitLayout, useSplitLayoutStore } from "./split-layout-store";
 import { useChatHasDraft } from "./use-chat-has-draft";
@@ -76,6 +76,18 @@ const FocusModelSync: FC<{ isFocused: boolean }> = ({ isFocused }) => {
     return null;
 };
 
+/**
+ * The `#abcd` that tells two panes with the same title apart, or undefined. Reads the titles itself with a selector that answers
+ * a string, so a pane re-renders only when its own suffix changes, not for every title change in the layout.
+ */
+const usePaneSuffix = (threadId: string, paneIds: ReadonlyArray<string>): string | undefined =>
+    useSplitLayoutStore((state) => {
+        const title = state.titles[threadId];
+        const isAmbiguous = title !== undefined && paneIds.some((id) => id !== threadId && state.titles[id] === title);
+
+        return isAmbiguous ? `#${threadId.slice(-4)}` : undefined;
+    });
+
 interface PaneProps {
     canClose: boolean;
     /** Where the focused pane's header goes; the page's header slot. */
@@ -89,10 +101,10 @@ interface PaneProps {
     onFocus: () => void;
     /** The chat does not exist (deleted elsewhere): the pane has nothing to show. */
     onMissing: () => void;
+    /** Every pane's chat, to tell which other pane has the same title. */
+    paneIds: ReadonlyArray<string>;
     /** The right-hand panel: the focused pane renders its chat's details into it, under its own gate and provider. */
     sidebarSlot: HTMLElement | null;
-    /** Set when another pane has the same title, so the two can be told apart. */
-    suffix?: string;
     threadId: string;
 }
 
@@ -111,8 +123,8 @@ const Pane: FC<PaneProps> = ({
     onClose,
     onFocus,
     onMissing,
+    paneIds,
     sidebarSlot,
-    suffix,
     threadId,
 }) => {
     const { t } = useLingui();
@@ -127,6 +139,7 @@ const Pane: FC<PaneProps> = ({
     const { data: paneState } = useThreadPaneState(threadId, { enabled: shardReady });
     const title = paneState?.title ?? t`Chat`;
     const hasDraft = useChatHasDraft(threadId);
+    const suffix = usePaneSuffix(threadId, paneIds);
     // The chat in the URL is the page's own: it is never closed from here, whatever a read says for a moment.
     const isMissing = paneState === null && !isRouteThread;
 
@@ -207,8 +220,15 @@ const Pane: FC<PaneProps> = ({
                 <h2 className="min-w-0 flex-1 truncate text-sm font-medium" id={headingId}>
                     {title}
                     {suffix && <span className="ml-1 font-normal opacity-70">{suffix}</span>}
+                    {hasDraft && <span className="sr-only">{t`Unsent draft`}</span>}
                 </h2>
-                <TooltipIconButton aria-pressed={isFocused} className="transition-none" onClick={focusComposer} tooltip={t`Focus chat: ${title}`}>
+                <TooltipIconButton
+                    aria-pressed={isFocused}
+                    className="transition-none"
+                    data-pane-focus=""
+                    onClick={focusComposer}
+                    tooltip={t`Focus chat: ${title}`}
+                >
                     <CrosshairIcon aria-hidden="true" className="size-4" />
                 </TooltipIconButton>
                 {canClose && (
@@ -255,8 +275,8 @@ interface ChatSplitViewProps {
     initialMessage?: string;
     initialThread?: PaneProps["initialThread"];
     jwtToken: string;
-    /** The chat in the URL. It is shown (focused, or in place of the focused pane) whenever it changes. */
-    routeThreadId: string;
+    /** The chat in the URL. It is shown (focused, or in place of the focused pane) whenever it changes. Absent on `/chat`. */
+    routeThreadId?: string;
     /** Where the right-hand panel goes; the page's panel wrapper. */
     sidebarSlot: HTMLElement | null;
 }
@@ -267,12 +287,20 @@ interface ChatSplitViewProps {
  */
 const ChatSplitView: FC<ChatSplitViewProps> = ({ headerSlot = null, initialMessage, initialThread, jwtToken, routeThreadId, sidebarSlot }) => {
     const { t } = useLingui();
-    const titles = useSplitLayoutStore((state) => state.titles);
     const layout = useSplitLayoutStore((state) => state.layout);
     const dispatch = useSplitLayoutStore((state) => state.dispatch);
     const isDesktop = useIsDesktop();
     const [ready, setReady] = useState(false);
     const lastRouteThreadId = useRef(routeThreadId);
+    const containerRef = useRef<HTMLDivElement>(null);
+    // The chat of a pane the person just closed: focus then moves to a surviving pane instead of being lost with the button.
+    const closedPaneRef = useRef<{ index: number; threadId: string } | null>(null);
+
+    useEffect(() => {
+        setSplitViewMounted(true);
+
+        return () => setSplitViewMounted(false);
+    }, []);
 
     useEffect(() => {
         let cancelled = false;
@@ -284,7 +312,11 @@ const ChatSplitView: FC<ChatSplitViewProps> = ({ headerSlot = null, initialMessa
             }
 
             dispatch({ isValid: (id) => isLunoraId(id), type: "prune" });
-            dispatch({ threadId: routeThreadId, type: "show" });
+
+            if (routeThreadId !== undefined) {
+                dispatch({ threadId: routeThreadId, type: "show" });
+            }
+
             setReady(true);
         };
 
@@ -303,7 +335,10 @@ const ChatSplitView: FC<ChatSplitViewProps> = ({ headerSlot = null, initialMessa
         }
 
         lastRouteThreadId.current = routeThreadId;
-        dispatch({ threadId: routeThreadId, type: "show" });
+
+        if (routeThreadId !== undefined) {
+            dispatch({ threadId: routeThreadId, type: "show" });
+        }
     }, [dispatch, ready, routeThreadId]);
 
     const focusedThreadId = layout.panes[layout.focus];
@@ -337,6 +372,28 @@ const ChatSplitView: FC<ChatSplitViewProps> = ({ headerSlot = null, initialMessa
         ui.restoreComposer(takeComposerDraftState(focusedThreadId));
     }, [focusedThreadId, ready]);
 
+    useEffect(() => {
+        const closed = closedPaneRef.current;
+
+        if (!closed || layout.panes.includes(closed.threadId)) {
+            return undefined;
+        }
+
+        closedPaneRef.current = null;
+
+        // The pane that took the closed one's place, or the one before it, is its neighbour; otherwise the first.
+        const isNeighbour = layout.focus === closed.index || layout.focus === closed.index - 1;
+        const target = isNeighbour ? layout.panes[layout.focus] : layout.panes[0];
+        const frame = requestAnimationFrame(() => {
+            const panes = containerRef.current?.querySelectorAll<HTMLElement>("[data-pane-thread-id]") ?? [];
+            const pane = [...panes].find((node) => node.dataset.paneThreadId === target) ?? panes[0];
+
+            pane?.querySelector<HTMLElement>("[data-pane-focus]")?.focus();
+        });
+
+        return () => cancelAnimationFrame(frame);
+    }, [layout.focus, layout.panes]);
+
     if (!ready || layout.panes.length === 0) {
         return <div className="h-full" />;
     }
@@ -348,35 +405,33 @@ const ChatSplitView: FC<ChatSplitViewProps> = ({ headerSlot = null, initialMessa
             dispatch({ index, type: "close" });
         }
     };
-    const renderPane = (threadId: string, index: number) => {
-        const title = titles[threadId];
-        const isAmbiguous = title !== undefined && layout.panes.filter((id) => titles[id] === title).length > 1;
-
-        return (
-            <Pane
-                canClose={layout.panes.length > 1}
-                headerSlot={headerSlot}
-                initialMessage={threadId === routeThreadId ? initialMessage : undefined}
-                initialThread={threadId === routeThreadId ? initialThread : undefined}
-                isFocused={index === layout.focus}
-                isRouteThread={threadId === routeThreadId}
-                jwtToken={jwtToken}
-                key={threadId}
-                onClose={() => dispatch({ index, type: "close" })}
-                onFocus={() => dispatch({ index, type: "focus" })}
-                onMissing={() => closeThread(threadId)}
-                sidebarSlot={sidebarSlot}
-                suffix={isAmbiguous ? `#${threadId.slice(-4)}` : undefined}
-                threadId={threadId}
-            />
-        );
-    };
+    const renderPane = (threadId: string, index: number) => (
+        <Pane
+            canClose={layout.panes.length > 1}
+            headerSlot={headerSlot}
+            initialMessage={threadId === routeThreadId ? initialMessage : undefined}
+            initialThread={threadId === routeThreadId ? initialThread : undefined}
+            isFocused={index === layout.focus}
+            isRouteThread={threadId === routeThreadId}
+            jwtToken={jwtToken}
+            key={threadId}
+            onClose={() => {
+                closedPaneRef.current = { index, threadId };
+                dispatch({ index, type: "close" });
+            }}
+            onFocus={() => dispatch({ index, type: "focus" })}
+            onMissing={() => closeThread(threadId)}
+            paneIds={layout.panes}
+            sidebarSlot={sidebarSlot}
+            threadId={threadId}
+        />
+    );
 
     if (!isDesktop) {
         const focusedPane = layout.panes[layout.focus] as string;
 
         return (
-            <div className="h-full min-h-0 p-2 pt-0" data-split-view="">
+            <div className="h-full min-h-0 p-2 pt-0" data-split-view="" ref={containerRef}>
                 {renderPane(focusedPane, layout.focus)}
             </div>
         );
@@ -386,7 +441,7 @@ const ChatSplitView: FC<ChatSplitViewProps> = ({ headerSlot = null, initialMessa
     const minWidth = layout.panes.length * MIN_PANE_PX + (layout.panes.length - 1) * GAP_PX;
 
     return (
-        <div className="h-full min-h-0 overflow-x-auto p-2 pt-0" data-split-view="">
+        <div className="h-full min-h-0 overflow-x-auto p-2 pt-0" data-split-view="" ref={containerRef}>
             <ResizablePanelGroup
                 className="h-full"
                 defaultLayout={hasSizes ? layout.sizes : undefined}

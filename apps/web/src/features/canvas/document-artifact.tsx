@@ -9,8 +9,9 @@ import type { Id } from "@neore/backend/dataModel";
 import DocumentArtifactUI from "@neore/chat-ui/chat/document-artifact";
 import { useQuery } from "@tanstack/react-query";
 import type { FC } from "react";
-import { memo, useEffect, useRef } from "react";
+import { memo, use, useCallback, useEffect, useRef } from "react";
 
+import { ChatThreadContext } from "@/features/chat/core/context/chat-context-hooks";
 import { useCanvasState } from "@/features/chat/core/stores/chat-ui-store";
 import { trackEvent } from "@/lib/analytics";
 import { useCRPC } from "@/lib/lunora/crpc";
@@ -29,6 +30,9 @@ interface DocumentArtifactProps {
 const DocumentArtifact: FC<DocumentArtifactProps> = memo(({ className, documentId, kind, language, title, version }) => {
     const { activeDocumentId, openCanvas } = useCanvasState();
     const crpc = useCRPC();
+    // Read without throwing, so the card also renders where no chat provider is mounted. The panel shows only in the chat that opened it.
+    const threadId = use(ChatThreadContext)?.threadId;
+    const onOpen = useCallback((id: string) => openCanvas(id, threadId), [openCanvas, threadId]);
 
     // Track artifact creation once (when first rendered at version 1)
     const trackedRef = useRef(false);
@@ -56,7 +60,7 @@ const DocumentArtifact: FC<DocumentArtifactProps> = memo(({ className, documentI
             isActive={activeDocumentId === documentId}
             kind={kind}
             language={language}
-            onOpen={openCanvas}
+            onOpen={onOpen}
             onPreload={preloadCodemirrorEditor}
             sheetContent={kind === "sheet" ? document?.content : undefined}
             title={title}

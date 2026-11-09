@@ -97,6 +97,8 @@ interface ChatUIStore {
 
     canvasEditMode: "edit" | "preview";
     canvasHistoryVersions: [number, number] | null;
+    /** The chat that opened the open document; the panel shows only there. Unset when the opener did not say. */
+    canvasThreadId: string | null;
 
     canvasViewMode: "editor" | "history";
 
@@ -131,7 +133,7 @@ interface ChatUIStore {
     noteComposerHiddenRemoved: (count: number) => void;
 
     // Canvas/Artifact actions
-    openCanvas: (documentId: string) => void;
+    openCanvas: (documentId: string, threadId?: string) => void;
     openPreviewFile: (file: PreviewFile) => void;
     /** A chat PDF open in the side panel, instead of a document. Cleared when a document opens or the panel closes. */
     previewFile: PreviewFile | null;
@@ -201,6 +203,7 @@ const initialState = {
     canvasDirty: false,
     canvasEditMode: "edit" as "edit" | "preview",
     canvasHistoryVersions: null as [number, number] | null,
+    canvasThreadId: null as string | null,
     canvasViewMode: "editor" as "editor" | "history",
     composerAttachments: [] as PendingAttachment[],
     composerBannedContent: null as { message: string; words: string[] } | null,
@@ -282,19 +285,20 @@ export const useChatUIStore = create<ChatUIStore>()(
                 },
 
                 closeCanvas: () => {
-                    set({ canvasDirty: false, isCanvasOpen: false, previewFile: null });
+                    set({ canvasDirty: false, canvasThreadId: null, isCanvasOpen: false, previewFile: null });
                 },
                 openPreviewFile: (file) => {
                     set({ isCanvasOpen: true, previewFile: file });
                 },
 
                 // Canvas/Artifact actions
-                openCanvas: (documentId) => {
+                openCanvas: (documentId, threadId) => {
                     set({
                         activeDocumentId: documentId,
                         canvasDirty: false,
                         canvasEditMode: "edit",
                         canvasHistoryVersions: null,
+                        canvasThreadId: threadId ?? null,
                         canvasViewMode: "editor",
                         isCanvasOpen: true,
                         previewFile: null,
@@ -574,6 +578,7 @@ export const useCanvasState = () => {
     const canvasDirty = useChatUIStore((state) => state.canvasDirty);
     const canvasViewMode = useChatUIStore((state) => state.canvasViewMode);
     const canvasHistoryVersions = useChatUIStore((state) => state.canvasHistoryVersions);
+    const canvasThreadId = useChatUIStore((state) => state.canvasThreadId);
     const openCanvas = useChatUIStore((state) => state.openCanvas);
     const closeCanvas = useChatUIStore((state) => state.closeCanvas);
     const setActiveDocumentId = useChatUIStore((state) => state.setActiveDocumentId);
@@ -589,6 +594,7 @@ export const useCanvasState = () => {
         previewFile,
         canvasEditMode,
         canvasHistoryVersions,
+        canvasThreadId,
         canvasViewMode,
         closeCanvas,
         isCanvasOpen,

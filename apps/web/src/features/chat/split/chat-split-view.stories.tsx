@@ -299,7 +299,7 @@ export const DraftKeptAcrossFocus: Story = {
 
         await step("and back", async () => {
             await userEvent.click(await canvas.findByRole("button", { name: "Continue in this chat" }));
-            await waitFor(() => expect(canvas.getByRole("region", { name: "Weekly team update draft" })).toHaveAttribute("data-focused"));
+            await waitFor(() => expect(canvas.getByRole("region", { name: /^Weekly team update draft/ })).toHaveAttribute("data-focused"));
             await waitFor(() => expect(canvas.getByRole("textbox", { name: "Message" })).toHaveTextContent("Remind everyone about Friday"));
             // The stub took focus with it when it went: it lands in the composer, not on the page.
             await waitFor(() => expect(canvas.getByRole("textbox", { name: "Message" })).toHaveFocus());
