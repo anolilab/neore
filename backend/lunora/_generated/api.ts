@@ -149,7 +149,7 @@ export interface ApiTypes {
             setOrganizationPolicy: FunctionReference<"mutation", { document: string }, { revision: number }>;
         };
         setup_steps: {
-            setSetupStepSkipped: FunctionReference<"mutation", { skipped: boolean; stepId: "pair" | "ssh" | "agent" }, null>;
+            setSetupStepSkipped: FunctionReference<"mutation", { expectedUserId?: string; skipped: boolean; stepId: "pair" | "ssh" | "agent" }, null>;
         };
         team: {
             addTeamMember: FunctionReference<"mutation", { teamId: string; userId: string }, void>;
