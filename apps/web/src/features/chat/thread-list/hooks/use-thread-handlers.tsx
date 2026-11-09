@@ -9,7 +9,7 @@ import { useCallback } from "react";
 
 import { useThreadManager } from "@/features/chat/core/hooks/use-thread-manager";
 import { useOptimisticActions, useThreadActions } from "@/features/chat/core/stores/thread-store-hooks";
-import { survivingPaneAfterDelete } from "@/features/chat/split/split-layout-store";
+import { routeIsOn, survivingPaneAfterDelete } from "@/features/chat/split/split-layout-store";
 import type { DownloadFormat } from "@/lib/download";
 import { handleDownload } from "@/lib/download";
 import { ValidationError } from "@/lib/errors";
@@ -276,15 +276,23 @@ const useThreadHandlers = (setLoadingStates: React.Dispatch<React.SetStateAction
             const isDeletingCurrentThread = currentThreadId && threadIds.includes(currentThreadId);
 
             if (isDeletingCurrentThread) {
+                // The delete below does not wait for this: the survivor is read, then the route moves only if it still shows a deleted chat.
                 // With the split view on, the other open panes stay: the route moves to one of them instead of `/chat`.
-                // A fresh read, not the query cache: a chat deleted or revoked since its last read must not be picked.
-                const survivor = await survivingPaneAfterDelete(threadIds, (id) => {
-                    const args = { threadId: id as Id<"threads"> };
+                void (async () => {
+                    const survivor = await survivingPaneAfterDelete(threadIds, (id) => {
+                        const args = { threadId: id as Id<"threads"> };
 
-                    return lunora.query(api.chat.functions.getThread, args, shardOptionsFor(args));
-                });
+                        return lunora.query(api.chat.functions.getThread, args, shardOptionsFor(args));
+                    });
 
-                navigate(survivor === undefined ? { replace: true, to: "/chat" } : { params: { threadId: survivor }, replace: true, to: "/chat/$threadId" });
+                    if (!routeIsOn(threadIds)) {
+                        return;
+                    }
+
+                    navigate(
+                        survivor === undefined ? { replace: true, to: "/chat" } : { params: { threadId: survivor }, replace: true, to: "/chat/$threadId" },
+                    );
+                })();
             }
 
             for (const id of threadIds) {

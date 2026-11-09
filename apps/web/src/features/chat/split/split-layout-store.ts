@@ -98,15 +98,15 @@ export const survivingPaneAfterDelete = async (
     await hydrateSplitLayout();
 
     const deleted = new Set(deletedIds);
+    const candidates = useSplitLayoutStore.getState().layout.panes.filter((id) => !deleted.has(id));
+    // Read in parallel: the first candidate, in pane order, that reads wins.
+    const reads = await Promise.all(candidates.map((id) => readable(fetchThread, id)));
 
-    for (const id of useSplitLayoutStore.getState().layout.panes) {
-        if (!deleted.has(id) && (await readable(fetchThread, id))) {
-            return id;
-        }
-    }
-
-    return undefined;
+    return candidates[reads.indexOf(true)];
 };
+
+/** Whether the address names one of these chats: a delete that has moved the route on must not move it again. */
+export const routeIsOn = (threadIds: ReadonlyArray<string>): boolean => globalThis.location.pathname.split("/").some((part) => threadIds.includes(part));
 
 /**
  * Opens a chat as a new pane. `"focused"` when it was already open, `"full"` when every pane is taken (nothing changes).
