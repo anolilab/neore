@@ -7,7 +7,15 @@ import type { Dispatch, RefObject, SetStateAction } from "react";
 
 import { goalForMessage, useGoalComposer } from "@/features/chat/goal/goal-store";
 import { draftGeneration } from "@/features/chat/split/composer-drafts";
-import { clearSentDraft, isOwnerLive, parkSettingsFor, restoreComposerFor, restoreTextFor, takePendingSettingsFor } from "@/features/chat/split/pane-state";
+import {
+    clearSentDraft,
+    isOwnerLive,
+    paneFocusEpoch,
+    parkSettingsFor,
+    restoreComposerFor,
+    restoreTextFor,
+    takePendingSettingsFor,
+} from "@/features/chat/split/pane-state";
 import type useLocalModelTurn from "@/features/local-models/hooks/use-local-model-turn";
 import type { UIMessage } from "@/lib/agent";
 import { trackEvent } from "@/lib/analytics";
@@ -113,6 +121,7 @@ export const runSendMessage = async (env: SendMessageEnv, rawText: string, attac
     // Read now, before the auth wait: the wait can end after focus has moved to another pane, and this send is still this chat's.
     // A write-back is dropped when a sign-out or an account switch cleared the parked state since (the generation has moved on).
     const generationAtStart = draftGeneration();
+    const focusAtStart = paneFocusEpoch();
     const sameSession = (): boolean => draftGeneration() === generationAtStart;
     const { attachedReferences } = useChatUIStore.getState();
     const modelAtStart = useModelStore.getState();
@@ -192,7 +201,7 @@ export const runSendMessage = async (env: SendMessageEnv, rawText: string, attac
 
         const pendingSettings = isCreatingNewThread ? takePendingSettingsFor(owner, getPendingSettingsFromStore) : null;
 
-        clearSentDraft(owner, text);
+        clearSentDraft(owner, text, focusAtStart);
         useChatUIStore.getState().setIsSubmitting(false);
         trackEvent("message_sent", { attachment_count: 0, has_attachments: false, model, thread_mode: "text" });
 
@@ -348,7 +357,7 @@ export const runSendMessage = async (env: SendMessageEnv, rawText: string, attac
 
         // Clear composer and show thinking state immediately — before the network round-trip
         // so the UI feels instant and non-frozen while the server processes the request
-        clearSentDraft(owner, text);
+        clearSentDraft(owner, text, focusAtStart);
         useChatUIStore.getState().setIsSubmitting(false);
         setIsRegenerating(true);
 

@@ -34,6 +34,28 @@ const hasPane = (layout: SplitLayout, index: number): boolean => Number.isSafeIn
 const withoutSize = (sizes: Record<string, number>, threadId: string): Record<string, number> =>
     Object.fromEntries(Object.entries(sizes).filter(([id]) => id !== threadId));
 
+/**
+ * The widths once `threadId` joins: the open panes keep their proportions and give up room for it. Without a saved width for every
+ * open pane there is nothing to keep, so none is set and the panes share the space equally.
+ */
+const sizesWithRoom = (layout: SplitLayout, threadId: string): Record<string, number> => {
+    const count = layout.panes.length;
+
+    if (count === 0 || layout.panes.some((id) => layout.sizes[id] === undefined)) {
+        return {};
+    }
+
+    const total = layout.panes.reduce((sum, id) => sum + (layout.sizes[id] ?? 0), 0);
+    const share = (100 * count) / (count + 1);
+    const sizes: Record<string, number> = { [threadId]: 100 / (count + 1) };
+
+    for (const id of layout.panes) {
+        sizes[id] = ((layout.sizes[id] ?? 0) / total) * share;
+    }
+
+    return sizes;
+};
+
 /** Adds the chat as a new pane and focuses it; a chat that is already open is only focused. Refuses past `MAX_PANES`. */
 const open = (layout: SplitLayout, threadId: string): SplitLayout => {
     const existing = layout.panes.indexOf(threadId);
@@ -46,7 +68,7 @@ const open = (layout: SplitLayout, threadId: string): SplitLayout => {
         return layout;
     }
 
-    return { ...layout, focus: layout.panes.length, panes: [...layout.panes, threadId], sizes: {} };
+    return { ...layout, focus: layout.panes.length, panes: [...layout.panes, threadId], sizes: sizesWithRoom(layout, threadId) };
 };
 
 /** The chat the page is on: focused when open, else it takes the place of the focused pane (or the first pane). */

@@ -127,10 +127,13 @@ export const takeParkedModelState = (threadId: string): ParkedModelState | undef
     return state;
 };
 
-/** Forgets the model state of every chat that is not in `keep` (a pane that closed). */
+/**
+ * Forgets the model state of every chat that is neither in `keep` (an open pane) nor has a parked draft. A closed chat's draft can
+ * still be reopened, and its unsent model choices come back with it.
+ */
 export const pruneParkedModelStates = (keep: ReadonlyArray<string>): void => {
     for (const threadId of parkedModels.keys()) {
-        if (!keep.includes(threadId)) {
+        if (!keep.includes(threadId) && !drafts.has(threadId)) {
             parkedModels.delete(threadId);
         }
     }

@@ -271,3 +271,22 @@ describe("composer drafts", () => {
         expect(parked()).toEqual([]);
     });
 });
+
+describe("opening a pane keeps the widths already chosen (#6)", () => {
+    it("rebalances the open panes' widths to make room, keeping their proportions", () => {
+        const layout: SplitLayout = { focus: 1, panes: ["a", "b"], sizes: { a: 60, b: 40 } };
+
+        const next = splitLayoutReducer(layout, { threadId: "c", type: "open" });
+
+        expect(next.sizes.a).toBeCloseTo(40);
+        expect(next.sizes.b).toBeCloseTo(26.67, 1);
+        expect(next.sizes.c).toBeCloseTo(33.33, 1);
+        expect((next.sizes.a ?? 0) / (next.sizes.b ?? 1)).toBeCloseTo(60 / 40);
+    });
+
+    it("sets no widths when an open pane has none, so the panes share the space", () => {
+        const layout: SplitLayout = { focus: 0, panes: ["a", "b"], sizes: { a: 60 } };
+
+        expect(splitLayoutReducer(layout, { threadId: "c", type: "open" }).sizes).toEqual({});
+    });
+});

@@ -243,7 +243,7 @@ export const TwoPanes: Story = {
         if (wide) {
             await expect(await canvas.findByRole("region", { name: "Weekly team update draft" }, PAGE_WAIT)).toBeInTheDocument();
             await expect(await canvas.findByRole("button", { name: "Continue in this chat" })).toBeInTheDocument();
-            await expect(canvas.getByRole("separator", { name: "Resize chats" })).toBeInTheDocument();
+            await expect(canvas.getByRole("separator", { name: "Resize chats 1 and 2" })).toBeInTheDocument();
 
             // Cards 8px apart with no line between, and a 36px header (mirrored panes in RTL: sort by position).
             const [left, right] = [
@@ -308,7 +308,7 @@ export const CappedAtThreePanes: Story = {
             await expect(canvas.queryByRole("region", { name: "Rust lifetimes, explained" })).not.toBeInTheDocument();
             await expect(canvas.getByRole("region", { name: "Weekly team update draft" })).toBeInTheDocument();
             await expect(canvas.getAllByRole("button", { name: "Continue in this chat" })).toHaveLength(2);
-            await expect(canvas.getAllByRole("separator", { name: "Resize chats" })).toHaveLength(2);
+            await expect(canvas.getAllByRole("separator", { name: /^Resize chats/ })).toHaveLength(2);
         }
     },
 };
@@ -347,7 +347,7 @@ export const NarrowViewport: Story = {
         await expect(await canvas.findByRole("region", { name: "Plan the Q1 product launch" }, PAGE_WAIT)).toBeInTheDocument();
         await expect(await canvas.findAllByRole("textbox", { name: "Message" }, PAGE_WAIT)).toHaveLength(1);
         await expect(canvas.queryByRole("region", { name: "Weekly team update draft" })).not.toBeInTheDocument();
-        await expect(canvas.queryByRole("separator", { name: "Resize chats" })).not.toBeInTheDocument();
+        await expect(canvas.queryByRole("separator", { name: /^Resize chats/ })).not.toBeInTheDocument();
     },
 };
 

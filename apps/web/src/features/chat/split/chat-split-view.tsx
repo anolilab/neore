@@ -30,6 +30,8 @@ const DESKTOP_QUERY = "(min-width: 768px)";
 const GAP_PX = 8;
 /** How many frames to wait for the composer's editor (it loads lazily) before giving up on moving focus into it. */
 const FOCUS_FRAMES = 60;
+/** The composer's input: the chat editor, or a worker's textarea (which has no textbox role). */
+const COMPOSER_INPUT = '[role="textbox"], textarea[data-focus-area="composer"]';
 
 const subscribeDesktop = (notify: () => void): (() => void) => {
     const media = globalThis.matchMedia(DESKTOP_QUERY);
@@ -154,7 +156,7 @@ const Pane: FC<PaneProps> = ({
         let frame = 0;
         let frames = 0;
         const focusEditor = () => {
-            const editor = paneRef.current?.querySelector<HTMLElement>('[role="textbox"]');
+            const editor = paneRef.current?.querySelector<HTMLElement>(COMPOSER_INPUT);
 
             if (editor) {
                 editor.focus();
@@ -188,7 +190,7 @@ const Pane: FC<PaneProps> = ({
             return;
         }
 
-        paneRef.current?.querySelector<HTMLElement>('[role="textbox"]')?.focus();
+        paneRef.current?.querySelector<HTMLElement>(COMPOSER_INPUT)?.focus();
     };
 
     return (
@@ -459,11 +461,16 @@ const ChatSplitView: FC<ChatSplitViewProps> = ({ headerSlot = null, initialMessa
                 onLayoutChanged={(sizes) => dispatch({ sizes, type: "resize" })}
                 style={{ minWidth }}
             >
-                {layout.panes.map((threadId, index) => (
-                    <PaneSlot index={index} key={threadId} label={t`Resize chats`} threadId={threadId}>
-                        {renderPane(threadId, index)}
-                    </PaneSlot>
-                ))}
+                {layout.panes.map((threadId, index) => {
+                    // The divider before this pane sits between the chats at positions `index` and `next` (1-based).
+                    const next = index + 1;
+
+                    return (
+                        <PaneSlot index={index} key={threadId} label={t`Resize chats ${index} and ${next}`} threadId={threadId}>
+                            {renderPane(threadId, index)}
+                        </PaneSlot>
+                    );
+                })}
             </ResizablePanelGroup>
         </div>
     );

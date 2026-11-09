@@ -4,6 +4,7 @@ import { plural } from "@lingui/core/macro";
 import { useLingui } from "@lingui/react/macro";
 import { api } from "@neore/backend/api";
 import type { Doc, Id } from "@neore/backend/dataModel";
+import { useUnlockProof } from "@neore/client-runtime";
 import { Badge } from "@neore/ui/components/badge";
 import { Button } from "@neore/ui/components/button";
 import { Input } from "@neore/ui/components/input";
@@ -100,7 +101,11 @@ const PromptsSidebarTab = ({ threadId }: PromptsSidebarTabProps) => {
 
     // Query resolved variables (includes user defaults + thread overrides).
     // `threadId` is the `/chat/$threadId` route param, passed down as a plain string.
-    const { data: resolvedVariables } = useQuery(crpc.prompts.functions.getResolvedVariables.queryOptions({ threadId: threadId as Id<"threads"> | undefined }));
+    // A locked chat's own variable values come back only with its unlock proof.
+    const unlockProof = useUnlockProof(threadId);
+    const { data: resolvedVariables } = useQuery(
+        crpc.prompts.functions.getResolvedVariables.queryOptions({ threadId: threadId as Id<"threads"> | undefined, unlockProof }),
+    );
 
     // Build a map of variable values including auto-populated ones
     const variableValues = useMemo(() => {

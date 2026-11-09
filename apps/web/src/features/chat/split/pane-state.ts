@@ -19,6 +19,11 @@ import {
 } from "./composer-drafts";
 import { useSplitLayoutStore } from "./split-layout-store";
 
+// Counts the moments the live composer changes hands (a pane takes focus, split view is left). A send captures it when it starts.
+const focusEpoch = { count: 0 };
+
+export const paneFocusEpoch = (): number => focusEpoch.count;
+
 /**
  * State that belongs to one chat but lives in a global store (the composer's draft, the picked model and the pending settings).
  * With the split view on, only the focused pane's chat owns the live store; every other chat's is parked in `composer-drafts`.
@@ -111,20 +116,19 @@ export const restoreLiveComposerFor = (threadId: string): void => {
 };
 
 /**
- * Clears what was just sent: the live composer while its chat owns it, else that chat's parked draft. The text can still sit in the
- * live composer after its chat lost focus (it was typed there before the send), so it is cleared too when it matches.
+ * Clears what was just sent. The live composer is cleared while focus has not moved since the send started (it is the composer the
+ * send came from), or when the sending chat owns it again and it still holds the sent text. It is never cleared while another pane
+ * has focus: that pane's text is there. A parked draft of the sending chat is always taken.
  */
-export const clearSentDraft = (ownerId: string | undefined, sentText: string): void => {
-    if (ownerId === undefined || isOwnerLive(ownerId)) {
-        useChatUIStore.getState().clearComposer();
+export const clearSentDraft = (ownerId: string | undefined, sentText: string, focusAtStart: number): void => {
+    const ownsLive = ownerId === undefined || isOwnerLive(ownerId);
 
-        return;
+    if (focusEpoch.count === focusAtStart || (ownsLive && useChatUIStore.getState().composerText === sentText)) {
+        useChatUIStore.getState().clearComposer();
     }
 
-    takeComposerDraftState(ownerId);
-
-    if (useChatUIStore.getState().composerText === sentText) {
-        useChatUIStore.getState().clearComposer();
+    if (ownerId !== undefined && !ownsLive) {
+        takeComposerDraftState(ownerId);
     }
 };
 
@@ -232,6 +236,9 @@ export const syncFocusedModel = ({ isLoaded, mode, model, threadId }: FocusedMod
 export const leaveSplitView = (focusedThreadId: string | undefined, routeThreadId: string | undefined): void => {
     const isPreferenceOff = useUIStateStore.getState().preferences.splitViewEnabled !== true;
 
+    // The live composer changes hands below: a send that started before this must not clear what comes next.
+    focusEpoch.count += 1;
+
     if (focusedThreadId !== undefined && !(isPreferenceOff && focusedThreadId === routeThreadId)) {
         parkModelState(focusedThreadId);
         parkLiveComposer(focusedThreadId);
@@ -260,6 +267,7 @@ export const watchPaneFocus = (): (() => void) =>
         const after = state.layout.panes[state.layout.focus];
 
         if (before !== undefined && before !== after) {
+            focusEpoch.count += 1;
             parkModelState(before);
             parkLiveComposer(before);
             // The outgoing chat's comparison is not the incoming one's: its own parent turns comparison back on when it has focus.
