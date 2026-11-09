@@ -14,7 +14,7 @@ import { gatewayModelsHandler } from "@/storybook/fixtures/models";
 import { ownedBy } from "@/storybook/fixtures/owner";
 import { shellFixtures } from "@/storybook/fixtures/shell";
 import { userFixtures } from "@/storybook/fixtures/user";
-import { lunora, lunoraHandlers } from "@/storybook/lunora";
+import { lunora, lunoraError, lunoraHandlers } from "@/storybook/lunora";
 
 import ChatSplitView from "./chat-split-view";
 import { clearComposerDrafts } from "./composer-drafts";
@@ -258,6 +258,33 @@ export const TwoPanes: Story = {
             // A phone shows the focused chat alone.
             await expect(canvas.queryByRole("button", { name: "Continue in this chat" })).not.toBeInTheDocument();
         }
+    },
+};
+
+/**
+ * The pane-state read fails in every pane: each visible pane says so, and no pane closes. The composer does not depend on that read.
+ */
+export const PaneReadFails: Story = {
+    loaders: [async () => seed([THREAD_IDS.main, THREAD_IDS.pinned])],
+    parameters: {
+        msw: {
+            handlers: {
+                ...handlers(),
+                lunora: lunoraHandlers(
+                    ...userFixtures(),
+                    ...shellFixtures(),
+                    ...chatFixtures(),
+                    ...perThread(),
+                    lunoraError(api.chat.composite.getThreadPaneState, "INTERNAL", "Read failed", 500),
+                ),
+            },
+        },
+    },
+    play: async ({ canvas }) => {
+        // Each pane reads on its own, so the second alert can arrive after the first: wait for the count, not one match.
+        await waitFor(() => expect(canvas.getAllByText("Could not load this chat's details.")).toHaveLength(isWide() ? 2 : 1), PAGE_WAIT);
+        await expect(await canvas.findAllByRole("textbox", { name: "Message" }, PAGE_WAIT)).toHaveLength(1);
+        await expect(useSplitLayoutStore.getState().layout.panes).toEqual([THREAD_IDS.main, THREAD_IDS.pinned]);
     },
 };
 

@@ -212,7 +212,7 @@ const Pane: FC<PaneProps> = ({
                 {hasDraft && <span aria-hidden="true" className="border-muted-foreground size-2 shrink-0 rounded-full border-[1.5px] border-dashed" />}
                 <h2 className="min-w-0 flex-1 truncate text-sm font-medium" id={headingId}>
                     {title}
-                    {suffix && <span className="ml-1 font-normal opacity-70">{suffix}</span>}
+                    {suffix && <span className="ml-1 font-normal">{suffix}</span>}
                     {hasDraft && <span className="sr-only">{t`Unsent draft`}</span>}
                 </h2>
                 <TooltipIconButton

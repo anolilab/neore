@@ -157,7 +157,7 @@ const ThreadContent: FC<ThreadProps> = ({ className, composerActive = true, init
     }, [hasUnseen, lastReplyAt, markThreadViewed, threadId]);
     // A comparison parent needs its children at once; any other thread reads them after first paint,
     // to learn whether it has workers to list.
-    const { data: paneState } = useThreadPaneState(threadId, { enabled: isMultiChatThread || (!isNewThread && afterFirstPaint) });
+    const { data: paneState, isError: paneReadFailed } = useThreadPaneState(threadId, { enabled: isMultiChatThread || (!isNewThread && afterFirstPaint) });
     const childThreads = paneState?.childThreads;
     const hasWorkers = childThreads?.some((child) => child.branchType === "subagent") === true;
 
@@ -339,7 +339,12 @@ const ThreadContent: FC<ThreadProps> = ({ className, composerActive = true, init
                         {/* Footer with composer */}
                         <div className="sticky bottom-0 mx-auto flex w-full max-w-(--thread-max-width) flex-col items-center justify-end rounded-t-lg bg-inherit">
                             <ScrollToBottomButton canJumpToPrompt={composerMode === "text"} className="z-10" onClick={handleScrollToBottom} />
-                            {/* Error display */}
+                            {/* Error display. In split view the focused pane shows the same failed read, so it is not announced twice. */}
+                            {paneReadFailed && !splitPane && (
+                                <p className="text-destructive mb-3 w-full text-sm" role="alert">
+                                    {t`Could not load this chat's details.`}
+                                </p>
+                            )}
                             <ChatError className="mb-3 w-full" />
                             <ForwardSelectionBar threadId={threadId} />
                             {/* Full-featured composer with model selector, language selector, slash commands */}
