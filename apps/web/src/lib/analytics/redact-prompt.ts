@@ -4,7 +4,7 @@ import type { CaptureResult } from "posthog-js";
  * A prompt link (`/chat?prompt=…`) carries a person's text in its address, and the page view PostHog captures names that address
  * before the chat removes the parameter. Every event passes through `redactPromptFromEvent` (`before_send`), which replaces the
  * value of any `prompt` parameter in the event's strings: a page URL, a referrer, and a link nested once-encoded in another
- * parameter, as a sign-in page's `redirectTo` nests the page it returns to.
+ * parameter, as a sign-in page's `redirectTo` nests the page it returns to. It also drops every address's fragment.
  */
 
 const REDACTED = "redacted";
@@ -39,11 +39,27 @@ const ENCODED_PROMPT = new RegExp(
     "giu",
 );
 
-/** Each prompt parameter keeps its name; its value is replaced. */
+/**
+ * The fragment of an absolute address, up to a quote, a backslash (an escaped quote in an autocaptured chain) or white space. A guest link carries its bearer token there
+ * (`/guest#<token>`), and PostHog names `location.href` in page views, `$set`/`$set_once` and error reports alike, so no
+ * fragment of any address leaves the browser.
+ */
+const URL_FRAGMENT = /(https?:\/\/[^\s"#]*)#[^\s"\\]*/giu;
+
+/** A guest link written relative (`href="/guest#<token>"`, a query before the fragment too) loses its fragment as well. */
+const GUEST_FRAGMENT = /(\/guest(?:\?[^\s"#\\]*)?)#[^\s"\\]*/giu;
+
+/** A guest link encoded inside another address (a sign-in `redirectTo`): its `%23` fragment goes, after a query too, at any encoding depth. */
+const ENCODED_GUEST_FRAGMENT = /((?:\/|%(?:25)*2F)guest(?:%(?:25)*3F[^&\s"\\]*?)?)%(?:25)*23[^&\s"\\]*/giu;
+
+/** Each prompt parameter keeps its name; its value is replaced. Every address loses its fragment. */
 const redactString = (value: string): string =>
     value
         .replaceAll(PLAIN_PROMPT, (_match: string, name: string) => `${name}${REDACTED}`)
-        .replaceAll(ENCODED_PROMPT, (_match: string, name: string) => `${name}${REDACTED}`);
+        .replaceAll(ENCODED_PROMPT, (_match: string, name: string) => `${name}${REDACTED}`)
+        .replaceAll(URL_FRAGMENT, (_match: string, address: string) => address)
+        .replaceAll(GUEST_FRAGMENT, (_match: string, path: string) => path)
+        .replaceAll(ENCODED_GUEST_FRAGMENT, (_match: string, path: string) => path);
 
 const isPlainObject = (value: unknown): value is Record<string, unknown> => {
     if (value === null || typeof value !== "object") {
