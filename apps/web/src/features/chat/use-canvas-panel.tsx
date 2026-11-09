@@ -4,6 +4,7 @@
  */
 
 import { useLingui } from "@lingui/react/macro";
+import { onUnlockExpired } from "@neore/client-runtime";
 import type { OpenPdfPreviewDetail } from "@neore/ui/utils/pdf-preview-event";
 import { OPEN_PDF_PREVIEW_EVENT } from "@neore/ui/utils/pdf-preview-event";
 import type { FC, ReactNode } from "react";
@@ -104,6 +105,20 @@ const useCanvasPanel = (threadId: string | undefined, { resolveOpenThreadId }: C
     }, [openPreviewFile, resolveOpenThreadId, t, threadId]);
 
     useBlockedPdfNoticeLifetime();
+
+    // A chat that is locked again (its unlock proof forgotten) takes its document and PDF with it: the content is not kept, mounted or
+    // hidden, for a chat the person can no longer read. Closing drops the panel and its retained content together.
+    useEffect(
+        () =>
+            onUnlockExpired((relockedId) => {
+                const { canvasThreadId: documentThreadId, closeCanvas, previewFile: opened } = useChatUIStore.getState();
+
+                if (relockedId === documentThreadId || relockedId === opened?.threadId) {
+                    closeCanvas();
+                }
+            }),
+        [],
+    );
 
     // A PDF belongs to the thread it was opened in: leaving that thread closes its preview, so it does not come back on return.
     useEffect(

@@ -1,4 +1,5 @@
 import { api } from "@neore/backend/api";
+import { forgetUnlockProof, rememberUnlockProof } from "@neore/client-runtime";
 import { SidebarProvider } from "@neore/ui/components/sidebar";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import type { ComponentProps } from "react";
@@ -402,6 +403,32 @@ export const DraftKeptAcrossFocus: Story = {
  * A document opened from the focused chat belongs to that chat: focus moving to another pane hides the side panel, and focus
  * back to the chat shows the document again, with its content.
  */
+/** A chat locked again takes its document with it: no panel, no hidden copy, and the document's text is nowhere in the page. */
+export const CanvasClosesWhenItsChatLocks: Story = {
+    loaders: [async () => seed([THREAD_IDS.main, THREAD_IDS.older])],
+    render: (args) => <WithCanvasPanel {...args} />,
+    play: async ({ canvas, step }) => {
+        await step("open a document in the chat", async () => {
+            await canvas.findByRole("textbox", { name: "Message" }, PAGE_WAIT);
+            useChatUIStore.getState().openCanvas(DOCUMENT_ID, THREAD_IDS.main);
+
+            const panel = await canvas.findByRole("region", { name: "Canvas" }, PAGE_WAIT);
+
+            await expect(await within(panel).findByText("Onboarding, billing and docs go out together.", undefined, STATE_WAIT)).toBeInTheDocument();
+        });
+
+        await step("lock the chat: the panel, the hidden copy and the text all go", async () => {
+            // A relock is announced only for a chat that was unlocked, so the story unlocks it first.
+            rememberUnlockProof(THREAD_IDS.main, "storybook-proof", Date.now() + 60_000);
+            forgetUnlockProof(THREAD_IDS.main);
+
+            await waitFor(() => expect(useChatUIStore.getState().isCanvasOpen).toBe(false), PAGE_WAIT);
+            await expect(canvas.queryByRole("region", { name: "Canvas", hidden: true })).not.toBeInTheDocument();
+            await expect(document.body.textContent ?? "").not.toContain("Onboarding, billing and docs go out together.");
+        });
+    },
+};
+
 export const CanvasStaysWithItsChat: Story = {
     loaders: [async () => seed([THREAD_IDS.main, THREAD_IDS.older])],
     render: (args) => <WithCanvasPanel {...args} />,
