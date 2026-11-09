@@ -12,7 +12,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useShallow } from "zustand/react/shallow";
 
-import { survivingPaneAfterDelete } from "@/features/chat/split/split-layout-store";
+import { routeIsOn, survivingPaneAfterDelete } from "@/features/chat/split/split-layout-store";
 import { trackEvent } from "@/lib/analytics";
 import { providerLogger } from "@/lib/logger";
 import { useCRPC, useLunora } from "@/lib/lunora/crpc";
@@ -172,15 +172,23 @@ export const useThreadManager = (enabled: boolean = true, currentThreadId?: stri
         const isCurrent = currentThreadId === threadId;
 
         if (isCurrent) {
-            // With the split view on, the other open panes stay: the route moves to one of them instead of `/chat`, which has no split view.
-            // A fresh read, not the query cache: a chat deleted or revoked since its last read must not be picked.
-            const survivor = await survivingPaneAfterDelete([threadId, ...childBranches], (id) => {
-                const args = { threadId: id as Id<"threads"> };
+            // The delete below does not wait for this: the survivor is read, then the route moves only if it still shows a deleted chat.
+            // With the split view on, the other open panes stay: the route moves to one of them instead of `/chat`.
+            const deleted = [threadId, ...childBranches];
 
-                return lunora.query(api.chat.functions.getThread, args, shardOptionsFor(args));
-            });
+            void (async () => {
+                const survivor = await survivingPaneAfterDelete(deleted, (id) => {
+                    const args = { threadId: id as Id<"threads"> };
 
-            navigate(survivor === undefined ? { replace: true, to: "/chat" } : { params: { threadId: survivor }, replace: true, to: "/chat/$threadId" });
+                    return lunora.query(api.chat.functions.getThread, args, shardOptionsFor(args));
+                });
+
+                if (!routeIsOn(deleted)) {
+                    return;
+                }
+
+                navigate(survivor === undefined ? { replace: true, to: "/chat" } : { params: { threadId: survivor }, replace: true, to: "/chat/$threadId" });
+            })();
         }
 
         // Optimistic deletion - thread disappears instantly from UI

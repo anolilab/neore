@@ -299,7 +299,8 @@ const ThreadContent: FC<ThreadProps> = ({ className, composerActive = true, init
             )}
             <div
                 className={cn("relative h-[calc(100%-40px)]", className)}
-                data-find-in-thread-host={composerMode === "text" && !isNewThread ? "" : undefined}
+                // Only the focused pane hosts find: the find lookup takes the first host in the page, and the find bar is in this pane too.
+                data-find-in-thread-host={composerActive && composerMode === "text" && !isNewThread ? "" : undefined}
                 style={{ "--thread-max-width": maxWidth } as React.CSSProperties}
             >
                 {composerActive && composerMode === "text" && !isNewThread && <ThreadFindBar key={threadId} />}
