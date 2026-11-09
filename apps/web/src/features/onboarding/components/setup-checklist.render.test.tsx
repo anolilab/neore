@@ -15,6 +15,7 @@ const { account, devices, save, server, toastError } = vi.hoisted(() => {
         devices: { current: [] as unknown[], fail: false, hold: undefined as Promise<undefined> | undefined, reads: 0 },
         save: vi.fn(),
         server: {
+            failOnce: false,
             failSave: false,
             error: undefined as Error | undefined,
             failStep: undefined as string | undefined,
@@ -108,6 +109,11 @@ vi.mock("@/lib/lunora/crpc", () => {
                                             throw server.error;
                                         }
 
+                                        if (server.failOnce) {
+                                            server.failOnce = false;
+                                            throw new Error("down");
+                                        }
+
                                         if (server.failSave || server.failStep === args.stepId) {
                                             throw new Error("down");
                                         }
@@ -198,6 +204,7 @@ describe("<SetupChecklist>", () => {
         devices.hold = undefined;
         account.id = "user-a";
         server.failSave = false;
+        server.failOnce = false;
         server.error = undefined;
         server.failStep = undefined;
         server.noRow = false;
@@ -326,6 +333,26 @@ describe("<SetupChecklist>", () => {
         await user.click(screen.getByRole("button", { name: "Retry the device check" }));
 
         expect(await screen.findAllByText("(To do)")).toHaveLength(3);
+    });
+
+    it("clears a step's failure once a later save of that step goes through", async () => {
+        const user = userEvent.setup();
+        const saveGate = createGate();
+
+        // Both clicks are made before the first save answers; that one fails, the second goes through.
+        server.failOnce = true;
+        server.hold = saveGate.promise;
+        renderChecklist();
+        await user.click(await screen.findByRole("button", { name: RESkipAddAnSshServer }));
+        await user.click(await screen.findByRole("button", { name: REResumeAddAnSshServer }));
+        saveGate.open();
+
+        await waitFor(() => {
+            expect(save).toHaveBeenCalledTimes(2);
+        });
+        await waitFor(() => {
+            expect(screen.queryByText("Could not save that choice. Try again.")).toBeNull();
+        });
     });
 
     it("ends on the stored state when the same step fails to save twice", async () => {

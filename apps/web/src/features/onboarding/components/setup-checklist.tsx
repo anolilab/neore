@@ -80,31 +80,27 @@ const SetupChecklist: FC<{ serverFormShown: boolean }> = ({ serverFormShown }) =
             await queryClient.cancelQueries({ queryKey: settingsKey });
 
             // An account with no settings row reads `null`: the click still shows, and an error puts the null back.
-            const row = queryClient.getQueryData<SkippedRow>(settingsKey);
-            const wasSkipped = row?.setupStepsSkipped?.includes(args.stepId) === true;
-            const patched: SkippedRow = { ...row, setupStepsSkipped: toggleSkipped(row?.setupStepsSkipped, args.stepId, args.skipped) };
-
-            queryClient.setQueryData<SkippedRow>(settingsKey, () => patched);
-
-            return { hadRow: Boolean(row), wasSkipped };
+            queryClient.setQueryData<SkippedRow>(settingsKey, (row) => {
+                return { ...row, setupStepsSkipped: toggleSkipped(row?.setupStepsSkipped, args.stepId, args.skipped) };
+            });
         },
-        onError: (error, args, context) => {
+        // A failed save is never undone by hand: the cache may hold another account's row or another edit by now, so
+        // `onSettled` reads it again and the step ends on what the server stores.
+        onError: (error, args) => {
             // The click belongs to another account: the server said so, or the client dropped it because the account changed
-            // (a refresh of the same account's token is an ordinary failure). The cache may be theirs now, so it is only re-read.
+            // (a refresh of the same account's token is an ordinary failure). Nothing is said to whoever is signed in now.
             const code = errorCode(error);
 
             if (code === SETUP_OWNER_MISMATCH || (code === "OFFLINE_IDENTITY_CHANGED" && args.owner !== signedInRef.current)) {
                 return;
             }
 
-            // Only this step goes back to its own previous value; a choice made on another step since stays.
-            queryClient.setQueryData<SkippedRow>(settingsKey, (row) => {
-                const list = toggleSkipped(row?.setupStepsSkipped, args.stepId, context?.wasSkipped === true);
-
-                return context?.hadRow === true || list.length > 0 ? { ...row, setupStepsSkipped: list } : null;
-            });
             setFailedStep(args.stepId);
             toast.error(t`Could not save that choice. Try again.`);
+        },
+        // A later save of the same step that went through clears the message an earlier failure left beside it.
+        onSuccess: (_data, args) => {
+            setFailedStep((step) => (step === args.stepId ? undefined : step));
         },
         // Settled, the cache ends on what the server stores, once no later save is still waiting its turn.
         onSettled: async () => {
