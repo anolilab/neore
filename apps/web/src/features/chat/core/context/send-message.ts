@@ -271,7 +271,6 @@ export const runSendMessage = async (env: SendMessageEnv, rawText: string, attac
 
         // Build request body — always include model, mode, and language
         // so the backend can persist them on the thread
-        // Generation settings, as they were when the send started
         const imageSettings = currentMode === "image" ? modelAtStart.imageSettings : undefined;
         const videoSettings = currentMode === "video" ? modelAtStart.videoSettings : undefined;
 
