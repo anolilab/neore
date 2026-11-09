@@ -13,6 +13,7 @@ import { create } from "zustand";
 import { devtools, subscribeWithSelector } from "zustand/middleware";
 
 import type { ReferenceSelection } from "@/features/chat/components/reference-picker/types";
+import { updateParkedAttachment } from "@/features/chat/split/composer-drafts";
 
 /**
  * Batching utility for high-frequency updates
@@ -87,6 +88,8 @@ interface ChatUIStore {
 
     addAttachment: (file: File) => string; // Returns attachment ID
     addEditAttachment: (file: File) => string;
+    /** The prompt last written into a composer, keyed by chat and text, so a composer that remounts does not write it again. */
+    appliedInitialMessageKey: string | null;
 
     /**
      * Reference images attached to the next outgoing message. Ordered — index
@@ -147,6 +150,7 @@ interface ChatUIStore {
     setActiveDocumentId: (documentId: string | null) => void;
     // Right sidebar tab actions
     setActiveRightSidebarTab: (tab: string) => void;
+    setAppliedInitialMessageKey: (key: string | null) => void;
     setAttachedReferences: (references: ReferenceSelection[]) => void;
 
     setCanvasDirty: (dirty: boolean) => void;
@@ -198,6 +202,7 @@ const getAttachmentType = (file: File): "image" | "file" | "document" => {
 
 const initialState = {
     activeDocumentId: null as string | null,
+    appliedInitialMessageKey: null as string | null,
     activeRightSidebarTab: "summary",
     attachedReferences: [] as ReferenceSelection[],
     canvasDirty: false,
@@ -353,6 +358,10 @@ export const useChatUIStore = create<ChatUIStore>()(
                     set({ activeDocumentId: documentId, canvasDirty: false });
                 },
 
+                setAppliedInitialMessageKey: (key) => {
+                    set({ appliedInitialMessageKey: key });
+                },
+
                 // Right sidebar tab actions
                 setActiveRightSidebarTab: (tab) => {
                     set({ activeRightSidebarTab: tab });
@@ -458,6 +467,11 @@ export const useChatUIStore = create<ChatUIStore>()(
                 },
 
                 updateAttachment: (id, updates) => {
+                    // An upload that outlives its pane's focus finishes into the draft parked for that chat.
+                    if (get().composerAttachments.every((a) => a.id !== id) && updateParkedAttachment(id, updates)) {
+                        return;
+                    }
+
                     set((state) => {
                         return {
                             composerAttachments: state.composerAttachments.map((a) => (a.id === id ? { ...a, ...updates } : a)),

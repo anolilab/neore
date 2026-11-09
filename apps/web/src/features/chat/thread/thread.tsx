@@ -59,6 +59,7 @@ import ThreadShortcutsListener from "./thread-shortcuts-listener";
 import type { ThreadViewportRef } from "./thread-viewport";
 import ThreadViewport from "./thread-viewport";
 import ThreadWelcome from "./thread-welcome";
+import { useComparisonModelSync } from "./use-comparison-model-sync";
 import { useThreadPaneState } from "./use-thread-pane-state";
 
 interface ThreadProps {
@@ -192,22 +193,9 @@ const ThreadContent: FC<ThreadProps> = ({ className, composerActive = true, init
         return branches;
     }, [isComparisonThread, childThreads]);
 
-    // Sync comparison state to model picker when navigating to/from a comparison parent.
-    // loadThreadData (in chat-context) clears comparisonMode on every thread switch.
-    // This effect re-enables it once getChildThreads resolves and we confirm comparison.
-    const setSelectedModelsForComparison = useModelStore((state) => state.setSelectedModelsForComparison);
-    const setComparisonMode = useModelStore((state) => state.setComparisonMode);
-
-    useEffect(() => {
-        if (!(isComparisonThread && comparisonBranches.length > 0)) {
-            return;
-        }
-
-        const models = comparisonBranches.map((b) => b.model);
-
-        setSelectedModelsForComparison(models);
-        setComparisonMode(true);
-    }, [isComparisonThread, comparisonBranches, setSelectedModelsForComparison, setComparisonMode]);
+    // Sync comparison state to the model picker when this is the comparison parent whose composer is live.
+    // A background pane leaves the shared model store alone; focus brings it back, after the focused pane's load.
+    useComparisonModelSync({ active: composerActive, branches: comparisonBranches });
 
     // Comparison hook for fan-out sends on the parent thread
     const { sendToExistingChildren } = useComparisonChat({ jwtToken });

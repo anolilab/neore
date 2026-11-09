@@ -2,6 +2,7 @@ import { create } from "zustand";
 
 import type { ReferenceSelection } from "@/features/chat/components/reference-picker/types";
 import type { PendingAttachment } from "@/features/chat/core/stores/chat-ui-store";
+import type { ParkedModelState } from "@/features/chat/core/stores/model-store";
 
 /**
  * Unsent composer state by thread, for the split view. The composer's draft (text, attachments, references) is one global
@@ -15,6 +16,8 @@ export interface ComposerDraft {
 }
 
 const drafts = new Map<string, ComposerDraft>();
+// Model choices of the chats whose pane is not focused. Not a draft: it shows no mark and a chat without text can hold one.
+const parkedModels = new Map<string, ParkedModelState>();
 
 /** The thread ids that have a parked draft, so a row or a pane header can show the mark. Replaced on each sync, never mutated. */
 export const useParkedDraftStore = create<{ threadIds: ReadonlySet<string> }>()(() => {
@@ -63,5 +66,52 @@ export const takeComposerDraftState = (threadId: string): ComposerDraft => {
 
 export const clearComposerDrafts = (): void => {
     drafts.clear();
+    parkedModels.clear();
     syncParked();
+};
+
+/** The thread's parked draft, left in place. */
+export const peekComposerDraft = (threadId: string): ComposerDraft | undefined => drafts.get(threadId);
+
+export const hasDraftContent = (draft: Partial<ComposerDraft> | undefined): boolean =>
+    draft !== undefined && ((draft.composerText ?? "") !== "" || (draft.composerAttachments?.length ?? 0) > 0 || (draft.attachedReferences?.length ?? 0) > 0);
+
+/**
+ * Patches an attachment that is not in the live composer because its chat's draft was parked while it uploaded.
+ * Returns whether a parked draft held it.
+ */
+export const updateParkedAttachment = (id: string, updates: Partial<PendingAttachment>): boolean => {
+    for (const [threadId, draft] of drafts) {
+        if (draft.composerAttachments.some((a) => a.id === id)) {
+            drafts.set(threadId, { ...draft, composerAttachments: draft.composerAttachments.map((a) => (a.id === id ? { ...a, ...updates } : a)) });
+
+            return true;
+        }
+    }
+
+    return false;
+};
+
+export const saveParkedModelState = (threadId: string, state: ParkedModelState): void => {
+    parkedModels.set(threadId, state);
+};
+
+export const peekParkedModelState = (threadId: string): ParkedModelState | undefined => parkedModels.get(threadId);
+
+/** The thread's parked model state, removed on the way out. */
+export const takeParkedModelState = (threadId: string): ParkedModelState | undefined => {
+    const state = parkedModels.get(threadId);
+
+    parkedModels.delete(threadId);
+
+    return state;
+};
+
+/** Forgets the model state of every chat that is not in `keep` (a pane that closed). */
+export const pruneParkedModelStates = (keep: ReadonlyArray<string>): void => {
+    for (const threadId of parkedModels.keys()) {
+        if (!keep.includes(threadId)) {
+            parkedModels.delete(threadId);
+        }
+    }
 };

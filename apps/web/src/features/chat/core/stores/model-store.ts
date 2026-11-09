@@ -68,6 +68,15 @@ export interface PendingSettings {
     statelessMode?: boolean;
 }
 
+/** What the split view sets aside for a chat whose pane lost focus: the choices the person made there and has not sent yet. */
+export interface ParkedModelState {
+    mode?: ComposerMode;
+    model?: ModelId;
+    pendingSettings?: PendingSettings;
+    userChangedMode: boolean;
+    userChangedModel: boolean;
+}
+
 // ============================================================================
 // State Interface (data only)
 // ============================================================================
@@ -123,11 +132,13 @@ interface ModelStoreActions {
     getPendingSettings: () => PendingSettings | null;
     isModelSelectedForComparison: (model: ModelId) => boolean;
     isThreadFixed: (threadId: string) => boolean;
-    loadThreadData: (threadData: ThreadData, threadId: string) => void;
+    loadThreadData: (threadData: ThreadData, threadId: string, options?: { keepComparison?: boolean }) => void;
     markModelAsUserChanged: () => void;
     markThreadAsFixed: (threadId: string) => void;
     resetForNewThread: (threadId: string | undefined, defaultModel?: ModelId) => void;
     resetGenerationSettings: () => void;
+    /** Makes the store describe `threadId` again with the choices set aside when its pane lost focus. */
+    restoreParkedState: (threadId: string, parked: ParkedModelState) => void;
     setActiveFilters: (filters: Set<ModelFilterCapability> | ((previous: Set<ModelFilterCapability>) => Set<ModelFilterCapability>)) => void;
     setActualDefaultModel: (model: ModelId) => void;
     setAudioSettings: (settings: Partial<AudioGenerationSettings>) => void;
@@ -291,7 +302,7 @@ export const useModelStore = create<ModelStore>()(
                 // ----------------------------------------------------------------
                 // Thread Data Loading - single source of truth for thread switch
                 // ----------------------------------------------------------------
-                loadThreadData: (threadData, threadId) => {
+                loadThreadData: (threadData, threadId, options) => {
                     set(
                         (state) => {
                             const model = threadData.model || state.actualDefaultModel;
@@ -303,16 +314,18 @@ export const useModelStore = create<ModelStore>()(
                             // A composer effort (the effort shortcuts) belongs to the thread it was set on:
                             // switching threads must not carry it into the next send.
                             const pendingSettings = state.selectedModelThreadId === threadId ? state.pendingSettings : withoutEffort(state.pendingSettings);
+                            // A reload of the chat the store already describes keeps its comparison; the split view asks for this.
+                            const keepComparison = options?.keepComparison === true;
 
                             return {
                                 pendingSettings,
                                 // Reset comparison state on every thread switch.
                                 // thread.tsx will re-enable it via useEffect if the new thread
                                 // turns out to be a comparison parent (has comparison children).
-                                comparisonMode: false,
+                                comparisonMode: keepComparison ? state.comparisonMode : false,
                                 currentModeThreadId: threadId,
                                 selectedModel: model,
-                                selectedModelsForComparison: [],
+                                selectedModelsForComparison: keepComparison ? state.selectedModelsForComparison : [],
                                 selectedModelThreadId: threadId,
                                 threadModes: newThreadModes,
                                 userChangedMode: false,
@@ -375,6 +388,30 @@ export const useModelStore = create<ModelStore>()(
                         },
                         undefined,
                         "resetGenerationSettings",
+                    );
+                },
+
+                restoreParkedState: (threadId, parked) => {
+                    set(
+                        (state) => {
+                            const threadModes = new Map(state.threadModes);
+
+                            if (parked.mode) {
+                                threadModes.set(threadId, parked.mode);
+                            }
+
+                            return {
+                                pendingSettings: parked.pendingSettings ?? state.pendingSettings,
+                                selectedModel: parked.userChangedModel && parked.model ? parked.model : state.selectedModel,
+                                // Claimed even when only settings were parked, so the next load keeps them (it drops a composer effort of another chat).
+                                selectedModelThreadId: threadId,
+                                threadModes,
+                                ...(parked.userChangedMode && { currentModeThreadId: threadId, userChangedMode: true }),
+                                userChangedModel: parked.userChangedModel,
+                            };
+                        },
+                        undefined,
+                        "restoreParkedState",
                     );
                 },
 

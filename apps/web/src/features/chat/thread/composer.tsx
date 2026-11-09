@@ -573,15 +573,23 @@ const Composer: FC<ComposerProps> = ({
         }
     }, [isAnonymous, threadId]);
 
-    // Set initial message when component mounts or initialMessage changes
+    // Set initial message when component mounts or initialMessage changes. A split pane's composer remounts on every focus change,
+    // so the prompt is written only once per chat: a remount must not write it over a draft brought back for the pane.
     useEffect(() => {
         if (initialMessage && initialMessage !== lastInitialMessage.current) {
-            useChatUIStore.getState().setComposerText(initialMessage);
+            const ui = useChatUIStore.getState();
+            const key = `${threadId ?? ""}\n${initialMessage}`;
+
+            if (ui.appliedInitialMessageKey !== key) {
+                ui.setComposerText(initialMessage);
+                ui.setAppliedInitialMessageKey(key);
+            }
+
             lastInitialMessage.current = initialMessage;
         } else if (!initialMessage) {
             lastInitialMessage.current = undefined;
         }
-    }, [initialMessage]);
+    }, [initialMessage, threadId]);
 
     // Clear submitting state when SSE streaming starts
     useEffect(() => {

@@ -94,6 +94,12 @@ interface ChatProviderProps {
     model?: ModelId;
     /** Optional callback when an error occurs */
     onError?: (error: AppError) => void;
+
+    /**
+     * This provider is one pane of the split view. The model store describes the focused pane's chat only, so a pane's provider
+     * never loads its chat into it; the split view does that for the focused pane.
+     */
+    splitPane?: boolean;
     threadId?: string;
 }
 
@@ -112,7 +118,7 @@ const capabilities: ThreadCapabilities = {
     speak: globalThis.window !== undefined && "speechSynthesis" in globalThis,
 };
 
-export const ChatProvider = ({ children, initialThread, jwtToken, model: modelProp, onError, threadId }: ChatProviderProps) => {
+export const ChatProvider = ({ children, initialThread, jwtToken, model: modelProp, onError, splitPane = false, threadId }: ChatProviderProps) => {
     const lunora = useLunora();
     const crpc = useCRPC();
     const queryClient = useQueryClient();
@@ -301,7 +307,7 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
     // Use useLayoutEffect to run synchronously after render but before browser paint.
     // ALWAYS load data (even if empty) to reset stale state from previous threads.
     useLayoutEffect(() => {
-        if (!threadId || threadId === previousThreadIdRef.current) {
+        if (splitPane || !threadId || threadId === previousThreadIdRef.current) {
             return;
         }
 
@@ -312,7 +318,7 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
 
         modelStore.loadThreadData(threadDataForStore, threadId);
         previousThreadIdRef.current = threadId;
-    }, [threadId, initialThread, modelStore]);
+    }, [threadId, initialThread, modelStore, splitPane]);
 
     const { data: threadData } = useQuery({
         // `threadId` is the `/chat/$threadId` route param handed to `ChatProvider`, so
@@ -354,7 +360,7 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
     const threadMode = thread?.mode;
 
     useEffect(() => {
-        if (!(threadId && hasThread)) {
+        if (splitPane || !(threadId && hasThread)) {
             return;
         }
 
@@ -368,7 +374,7 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
 
             loadThreadData(threadDataForStore, threadId);
         }
-    }, [threadId, hasThread, threadModel, threadMode, loadThreadData]);
+    }, [threadId, hasThread, threadModel, threadMode, loadThreadData, splitPane]);
 
     // Model: use thread data or user selection from store
     const model = useMemo((): string => {

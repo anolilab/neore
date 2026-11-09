@@ -8,6 +8,7 @@ import { useCallback } from "react";
 
 import { useThreadManager } from "@/features/chat/core/hooks/use-thread-manager";
 import { useOptimisticActions, useThreadActions } from "@/features/chat/core/stores/thread-store-hooks";
+import { survivingPaneAfterDelete } from "@/features/chat/split/split-layout-store";
 import type { DownloadFormat } from "@/lib/download";
 import { handleDownload } from "@/lib/download";
 import { ValidationError } from "@/lib/errors";
@@ -274,10 +275,10 @@ const useThreadHandlers = (setLoadingStates: React.Dispatch<React.SetStateAction
             const isDeletingCurrentThread = currentThreadId && threadIds.includes(currentThreadId);
 
             if (isDeletingCurrentThread) {
-                navigate({
-                    replace: true,
-                    to: "/chat",
-                });
+                // With the split view on, the other open panes stay: the route moves to one of them instead of `/chat`.
+                const survivor = survivingPaneAfterDelete(threadIds);
+
+                navigate(survivor === undefined ? { replace: true, to: "/chat" } : { params: { threadId: survivor }, replace: true, to: "/chat/$threadId" });
             }
 
             for (const id of threadIds) {

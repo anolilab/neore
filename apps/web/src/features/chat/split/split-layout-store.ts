@@ -3,6 +3,8 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
+import { useUIStateStore } from "@/features/layout/stores/ui-state-store";
+
 import type { SplitAction, SplitLayout } from "./split-layout";
 import { initialSplitLayout, parseSplitLayout, splitLayoutReducer } from "./split-layout";
 
@@ -57,6 +59,20 @@ export const hydrateSplitLayout = async (): Promise<void> => {
     if (!useSplitLayoutStore.persist.hasHydrated()) {
         await useSplitLayoutStore.persist.rehydrate();
     }
+};
+
+/**
+ * The chat the route moves to when the routed chat is deleted along with `deletedIds`: the first open pane that survives, so the
+ * other panes stay. Undefined when the preference is off or no pane survives; the caller then goes to `/chat`.
+ */
+export const survivingPaneAfterDelete = (deletedIds: Iterable<string>): string | undefined => {
+    if (useUIStateStore.getState().preferences.splitViewEnabled !== true) {
+        return undefined;
+    }
+
+    const deleted = new Set(deletedIds);
+
+    return useSplitLayoutStore.getState().layout.panes.find((id) => !deleted.has(id));
 };
 
 /**
