@@ -200,7 +200,7 @@ const DefaultAssistantMessage: FC<AssistantMessageRendererProps> = ({ actionBar,
     return (
         <Message
             className={cn(
-                "relative grid w-full max-w-(--thread-max-width) grid-cols-[auto_auto_1fr] grid-rows-[auto_1fr] gap-y-2",
+                "relative grid w-full max-w-(--thread-max-width) grid-cols-[auto_auto_minmax(0,1fr)] grid-rows-[auto_1fr] gap-y-2",
                 isLast ? "pb-0" : "pb-(--density-message-gap)",
             )}
             from="assistant"

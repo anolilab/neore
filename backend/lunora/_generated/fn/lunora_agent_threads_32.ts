@@ -206,12 +206,6 @@ if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(
 if (typeof source["threadId"] !== "string") return DEFER;
 return { "threadId": source["threadId"] };
 });
-installCompiledValidatorMap(lunora_agent_threads_32.getThreadRelationship.args, (source) => {
-if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
-if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
-if (typeof source["threadId"] !== "string") return DEFER;
-return { "threadId": source["threadId"] };
-});
 installCompiledValidatorMap(lunora_agent_threads_32.listAllThreadRelationships.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;

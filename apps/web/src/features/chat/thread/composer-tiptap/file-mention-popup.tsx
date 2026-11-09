@@ -26,7 +26,7 @@ import { createPortal } from "react-dom";
 
 import useAllThreadsData from "@/features/chat/core/hooks/use-all-threads-data";
 import { SpeakerAvatar } from "@/features/chat/group/speaker-label";
-import { useRouteGroupChat } from "@/features/chat/group/use-group-chat";
+import { useGroupChat } from "@/features/chat/group/use-group-chat";
 import { useCRPC } from "@/lib/lunora/crpc";
 
 import type { ChatReference } from "../chat-reference";
@@ -124,7 +124,7 @@ const FileMentionPopup: FC<FileMentionPopupProps> = ({
     }, [vaultFiles, activeQuery]);
 
     // Group chat: participants that can be @mentioned, filtered like the files.
-    const groupChat = useRouteGroupChat();
+    const groupChat = useGroupChat(currentThreadId);
     const filteredParticipants = useMemo(() => {
         const query = activeQuery.toLowerCase();
         const available = (groupChat?.participants ?? []).filter((p) => p.available && p.slug);

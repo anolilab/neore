@@ -299,6 +299,19 @@
 }
 
 /*
+ * Typography's `pre` colour assumes a dark code background. A streamdown code block has its own
+ * highlighter background, so its text colour comes from the same light and dark tokens as the tokens in it.
+ * Kept outside @layer base: the typography plugin's rules are unlayered and would win over a layered rule.
+ */
+[data-streamdown="code-block-body"] pre {
+    color: var(--sdm-fg, inherit);
+}
+
+html.dark [data-streamdown="code-block-body"] pre {
+    color: var(--shiki-dark, var(--sdm-fg, inherit));
+}
+
+/*
  * reactjs-tiptap-editor wraps its content in `.reactjs-tiptap-editor` and colours it with
  * `hsl(var(--background))` / `hsl(var(--foreground))`. Our tokens are complete colours, so those
  * declarations are invalid, and the editor text stays dark on a dark page (table cells fail contrast).

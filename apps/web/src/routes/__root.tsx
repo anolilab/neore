@@ -30,6 +30,7 @@ import LoginPromptHost from "@/features/auth/components/auth/login-prompt-host";
 import { AuthQueryProvider } from "@/features/auth/lib/auth-query-provider";
 import AuthUIProviderTanstack from "@/features/auth/lib/tanstack/auth-ui-provider-tanstack";
 import { closeSidePanelForSessionSwitch } from "@/features/chat/core/stores/chat-ui-store";
+import { clearComposerDrafts } from "@/features/chat/split/composer-drafts";
 import ConnectionProvider from "@/features/connection/components/connection-provider";
 import OfflineScreen from "@/features/connection/components/offline-screen";
 import { useUIStateStore } from "@/features/layout/stores/ui-state-store";
@@ -281,6 +282,8 @@ const AuthRecovery = ({ children }: { children: ReactNode }) => {
             queryClient.clear();
             // The side panel's document or PDF was the ended session's: whoever signs in next, without a reload, must not find it.
             closeSidePanelForSessionSwitch("after");
+            // Parked drafts and model choices (split view) are the ended session's too.
+            clearComposerDrafts();
             // An expired session skips both sign-out handlers, so the dock badge is cleared here.
             void setNativeBadge(0);
         }
@@ -411,6 +414,10 @@ const RootComponent = () => {
     // starts; a document, whose editor may hold unsaved edits, only once the switch has gone through, so a failed one keeps them.
     const closeSidePanel = useCallback((phase: "after" | "before") => {
         closeSidePanelForSessionSwitch(phase);
+
+        if (phase === "after") {
+            clearComposerDrafts();
+        }
     }, []);
 
     const handleSessionChange = useCallback(async () => {

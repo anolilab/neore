@@ -50,14 +50,17 @@ import { DEFAULT_PAGINATION_OPTS } from "@/features/chat/core/constants/query-op
 import { usePromptQueueStore } from "@/features/chat/core/stores/prompt-queue-store";
 import type { ThreadLockMode } from "@/features/chat/lock/thread-lock-dialog";
 import { ThreadLockDialog } from "@/features/chat/lock/thread-lock-dialog";
+import { openThreadInSplitView, useSplitLayoutStore } from "@/features/chat/split/split-layout-store";
+import { useChatHasDraft } from "@/features/chat/split/use-chat-has-draft";
 import { THREAD_CATEGORY_LABELS } from "@/features/chat/tags/thread-categories";
 import ThreadTagChips from "@/features/chat/tags/thread-tag-chips";
 import ThreadTagsMenu from "@/features/chat/tags/thread-tags-menu";
 import { usePullRequestCount } from "@/features/develop/components/pull-request-counts";
+import { useUIStateStore } from "@/features/layout/stores/ui-state-store";
 import { useHasOpened } from "@/hooks/use-has-opened";
 import { createLunoraQueryOptions, useCRPC, useLunora } from "@/lib/lunora/crpc";
 import { openThreadWindow, supportsThreadWindows } from "@/lib/native/bridge";
-import { showError } from "@/lib/toast";
+import { showError, showWarning } from "@/lib/toast";
 
 import useCanHover from "./hooks/use-can-hover";
 import { useThreadStateActions } from "./hooks/use-thread-state-actions";
@@ -282,6 +285,29 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
     const isTransitioningRef = useRef(false);
 
     const urlThreadId = location.pathname.match(CHAT_THREAD_PATH_RE)?.[1];
+    const splitViewEnabled = useUIStateStore((state) => state.preferences.splitViewEnabled === true);
+    // A boolean selector, so a row re-renders only when its own chat enters or leaves the panes.
+    const isOpenInSplit = useSplitLayoutStore((state) => splitViewEnabled && state.layout.panes.includes(node.threadId));
+    // Unsent text only matters where panes park it; with the split view off the single chat is untouched.
+    const hasDraft = useChatHasDraft(node.threadId) && splitViewEnabled;
+    // On a page with no chat open there is no split view to add a pane to: the chat opens as the page's own, then.
+    const handleOpenInSplitView = useCallback(() => {
+        const open = async () => {
+            const result = await openThreadInSplitView(node.threadId);
+
+            if (result === "full") {
+                showWarning(t`Split view is full. Close a chat first.`);
+
+                return;
+            }
+
+            if (urlThreadId === undefined) {
+                await router.navigate({ params: { threadId: node.threadId }, search: {}, to: "/chat/$threadId" });
+            }
+        };
+
+        void open();
+    }, [node.threadId, router, t, urlThreadId]);
     const isOnDefaultRoute = location.pathname === "/chat" || location.pathname === "/chat/";
 
     const isActive = isOnDefaultRoute
@@ -435,7 +461,13 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
 
     const content = (
         <div
-            className="group/action-item relative flex items-center gap-2 overflow-hidden rounded-lg px-2.5 py-(--density-row-py)"
+            // An outline takes no room, so the row does not shift when the mark comes and goes.
+            className={cn(
+                "group/action-item relative flex items-center gap-2 overflow-hidden rounded-lg px-2.5 py-(--density-row-py)",
+                hasDraft && "outline-muted-foreground/60 outline-1 -outline-offset-1 outline-dashed",
+            )}
+            data-draft={hasDraft ? "" : undefined}
+            data-split-open={isOpenInSplit ? "" : undefined}
             onClick={(e) => {
                 if (isSelectionMode) {
                     return;
@@ -447,6 +479,12 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                 }
 
                 e.stopPropagation();
+
+                // A chat that is already a pane takes focus at once. The page's own chat needs this: its row is "active", so the click
+                // below would do nothing, and the route never changes for the split view to react to. Cmd/Ctrl-click keeps its meaning.
+                if (isOpenInSplit && !e.metaKey && !e.ctrlKey) {
+                    useSplitLayoutStore.getState().dispatch({ threadId: node.threadId, type: "show" });
+                }
 
                 // The title is a link and navigates by itself.
                 if ((e.target as HTMLElement).closest("a")) {
@@ -564,9 +602,18 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                                     {displayTitle}
                                 </Link>
                             )}
+                            {isOpenInSplit && (
+                                <span
+                                    aria-label={t`Open in split view`}
+                                    className="bg-muted-foreground/60 inline-block size-1.5 shrink-0 rounded-full"
+                                    data-split-marker=""
+                                    role="img"
+                                />
+                            )}
                             {needsYou !== undefined && (
                                 <span className={cn("shrink-0 text-xs", NEEDS_YOU_TEXT_CLASS)}>{needsYou === "approval" ? t`Approval` : t`Question`}</span>
                             )}
+                            {hasDraft && <span className="text-muted-foreground shrink-0 text-xs">{t`Draft`}</span>}
                             {linkedPullRequests > 0 && (
                                 <span
                                     aria-label={t`Linked pull requests: ${linkedPullRequests}`}
@@ -664,6 +711,7 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                 isLocked={isLocked}
                 label={displayTitle}
                 onOpenChange={(open) => setOptionsMenuThreadId(open ? node.threadId : null)}
+                onOpenInSplitView={splitViewEnabled ? handleOpenInSplitView : undefined}
                 onRename={() => setRenameThreadId(node.threadId)}
                 open={isOptionsMenuOpen && !canHover}
                 threadId={node.threadId}
@@ -914,6 +962,7 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                     isLocked={isLocked}
                     label={displayTitle}
                     onOpenChange={(open) => setOptionsMenuThreadId(open ? node.threadId : null)}
+                    onOpenInSplitView={splitViewEnabled ? handleOpenInSplitView : undefined}
                     onRename={() => setRenameThreadId(node.threadId)}
                     open={isOptionsMenuOpen && canHover}
                     threadId={node.threadId}

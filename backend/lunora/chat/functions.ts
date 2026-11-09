@@ -61,6 +61,7 @@ import {
 } from "../agent/thread-read-access";
 import { publicThread, threadForViewer } from "../agent/threads";
 import { isThreadLocked, throwThreadLocked } from "../lib/thread-lock";
+import { readChildThreads } from "./lib/child-threads";
 import { lockedAfterCreation, threadGateOutcome, threadRowForList, throwUnlessGranted, type ThreadGateOutcome } from "./lib/thread-gate";
 import { vMessageDoc, vThreadDoc, vThreadDocFields as vThreadDocumentFields } from "../agent/validators";
 import { paginatedOf } from "../lib/output-validators";
@@ -2538,10 +2539,12 @@ export const createThreadRelationshipPublic = authMutation
 export const getThreadRelationship = internalQuery
     .input({
         threadId: v.string(),
+        unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
     })
     .query(async ({ args: arguments_, ctx: context }) => {
         const relationship = await context.runQuery(api.agent.threads.getThreadRelationship, {
             threadId: arguments_.threadId as Id<"threads">,
+            unlockProof: arguments_.unlockProof,
         });
 
         return relationship;
@@ -2564,54 +2567,7 @@ export const getChildThreads = authQuery
             }),
         ),
     )
-    .query(async ({ args: input, ctx }) => {
-        const { parentThreadId, unlockProof } = input;
-        const { userId } = ctx.user;
-
-        const thread = await ctx.runQuery(internal.agent.threads.getThreadInternal, { threadId: parentThreadId as Id<"threads"> });
-
-        if (thread && thread.userId && thread.userId !== userId) {
-            throw new LunoraError("FORBIDDEN", "Access denied");
-        }
-
-        // A locked parent's branches are its content: without its proof, none are listed.
-        if (thread && isThreadLocked(thread) && (await threadGateOutcome(ctx, { level: "read", threadId: parentThreadId, unlockProof, userId })) !== "ok") {
-            return [];
-        }
-
-        const relationships = await ctx.runQuery(api.agent.threads.getChildThreads, {
-            parentThreadId: parentThreadId as Id<"threads">,
-        });
-
-        const relationshipsArray = relationships;
-
-        const threadPromises = relationshipsArray.map((relationship) =>
-            ctx.runQuery(internal.agent.threads.getThreadInternal, {
-                threadId: relationship.threadId,
-            }),
-        );
-        const threads = await Promise.all(threadPromises);
-
-        const childThreads = relationshipsArray
-            .map((relationship, index) => {
-                const innerThread = threads[index];
-
-                // A relationship row is not a read grant: only the caller's own children.
-                if (!innerThread || innerThread.userId !== userId) {
-                    return null;
-                }
-
-                return {
-                    ...threadRowForList(innerThread),
-                    branchPoint: relationship.branchPoint,
-                    branchType: relationship.branchType,
-                    createdAt: relationship.createdAt,
-                };
-            })
-            .filter((item): item is NonNullable<typeof item> => item !== null);
-
-        return childThreads;
-    });
+    .query(async ({ args: input, ctx }) => readChildThreads(ctx, { ...input, userId: ctx.user.userId }));
 
 export const deleteThreadRelationship = internalMutation
     .input({
@@ -3488,6 +3444,7 @@ export const getFullThreadForExport = authQuery
 
         const threadRelationship = await context.runQuery(internal.chat.functions.getThreadRelationship, {
             threadId,
+            unlockProof,
         });
 
         let allMessages: MessageDoc[];

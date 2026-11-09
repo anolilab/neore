@@ -18,7 +18,8 @@ import type { ReactNode } from "react";
 import { useCallback, useEffect, useImperativeHandle, useLayoutEffect, useRef } from "react";
 
 import { useChatIsStreaming, useChatMessages } from "@/features/chat/core/context/chat-context";
-import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
+
+import { useSetIsAtBottom } from "./at-bottom-context";
 
 interface ThreadViewportProps {
     children: ReactNode;
@@ -64,7 +65,7 @@ const ScrollBar = ({ className, orientation = "vertical", ...props }: ScrollArea
  */
 const ThreadViewport = ({ children, className, ref }: ThreadViewportProps & { ref?: React.RefObject<ThreadViewportRef | null> }) => {
     const viewportRef = useRef<HTMLDivElement>(null);
-    const setIsAtBottom = useChatUIStore((state) => state.setIsAtBottom);
+    const setIsAtBottom = useSetIsAtBottom();
     const { loadMore, messages, messagesReady, messagesStatus } = useChatMessages();
     const { activeStreamId } = useChatIsStreaming();
 

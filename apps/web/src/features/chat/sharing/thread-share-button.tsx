@@ -1,6 +1,7 @@
 import { Field } from "@base-ui/react/field";
 import { useLingui } from "@lingui/react/macro";
 import type { Id } from "@neore/backend/dataModel";
+import { useUnlockProof } from "@neore/client-runtime";
 import { Avatar, AvatarFallback, AvatarImage } from "@neore/ui/components/avatar";
 import { Badge } from "@neore/ui/components/badge";
 import { Button } from "@neore/ui/components/button";
@@ -45,8 +46,14 @@ const ThreadShareButton: React.FC<ThreadShareButtonProperties> = ({ classes, thr
     const actualThreadId = getValidThreadId(threadId);
     const canShare = !!actualThreadId;
 
-    const { data: threadAccess } = useQuery(crpc.chat.sharing.getThreadAccess.queryOptions(actualThreadId ? { threadId: actualThreadId } : skipToken));
-    const { data: threadInvites } = useQuery(crpc.chat.sharing.getThreadInvites.queryOptions(actualThreadId ? { threadId: actualThreadId } : skipToken));
+    // Read with the unlock proof: an unlocked chat's owner is granted access, and the reads refresh on unlock or relock.
+    const unlockProof = useUnlockProof(actualThreadId);
+    const { data: threadAccess } = useQuery(
+        crpc.chat.sharing.getThreadAccess.queryOptions(actualThreadId ? { threadId: actualThreadId, unlockProof } : skipToken),
+    );
+    const { data: threadInvites } = useQuery(
+        crpc.chat.sharing.getThreadInvites.queryOptions(actualThreadId ? { threadId: actualThreadId, unlockProof } : skipToken),
+    );
 
     const { mutateAsync: createInviteMutation } = useMutation(crpc.chat.sharing.createThreadInvite.mutationOptions());
     const { mutateAsync: revokeInviteMutation } = useMutation(crpc.chat.sharing.revokeThreadInvite.mutationOptions());

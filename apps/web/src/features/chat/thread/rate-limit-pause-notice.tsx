@@ -11,6 +11,7 @@
  */
 
 import { Trans, useLingui } from "@lingui/react/macro";
+import { useUnlockProof } from "@neore/client-runtime";
 import { Button } from "@neore/ui/components/button";
 import cn from "@neore/ui/utils/cn";
 import { skipToken, useMutation, useQuery } from "@tanstack/react-query";
@@ -130,7 +131,8 @@ export const RateLimitPauseNotice: FC<RateLimitPauseNoticeProps> = ({ className,
     const { isPending: isRetrying, mutate: retryNow } = useMutation(crpc.chat.rate_limit_retry.retryRateLimitedRun.mutationOptions());
     const { isPending: isStopping, mutate: stop } = useMutation(crpc.chat.functions.abortThreadStream.mutationOptions());
     // The viewer's own permission on the thread; unknown until it loads, and then the buttons stay away.
-    const { data: access } = useQuery(crpc.chat.sharing.getThreadAccess.queryOptions(threadId ? { threadId: threadId as never } : skipToken));
+    const unlockProof = useUnlockProof(threadId);
+    const { data: access } = useQuery(crpc.chat.sharing.getThreadAccess.queryOptions(threadId ? { threadId: threadId as never, unlockProof } : skipToken));
     const canControl = access?.permission === "write" || access?.permission === "admin";
 
     return (

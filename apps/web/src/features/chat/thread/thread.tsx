@@ -14,7 +14,7 @@ import { plural } from "@lingui/core/macro";
 import { useLingui } from "@lingui/react/macro";
 import type { Id } from "@neore/backend/dataModel";
 import cn from "@neore/ui/utils/cn";
-import { skipToken, useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import clsx from "clsx";
 import { ArrowDownIcon, CornerLeftUpIcon } from "lucide-react";
 import type { FC } from "react";
@@ -27,7 +27,6 @@ import TooltipIconButton from "@/features/chat/components/tooltip-icon-button";
 import { useChatActions, useChatIsEmpty, useChatIsStreaming, useChatMessages, useChatThread } from "@/features/chat/core/context/chat-context";
 import useComparisonChat from "@/features/chat/core/hooks/use-comparison-chat";
 import type { PendingAttachment } from "@/features/chat/core/stores/chat-ui-store";
-import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
 import type { ComposerMode } from "@/features/chat/core/stores/model-store";
 import { useModelStore } from "@/features/chat/core/stores/model-store";
 import ForwardSelectionBar from "@/features/chat/forward/forward-selection-bar";
@@ -40,11 +39,13 @@ import useWorker from "@/features/sub-agents/hooks/use-worker";
 import useAfterFirstPaint from "@/hooks/use-after-first-paint";
 import { useCRPC } from "@/lib/lunora/crpc";
 
+import { AtBottomProvider, useIsAtBottom } from "./at-bottom-context";
 import ChatError from "./chat-error";
 import type { ComparisonBranch } from "./comparison-view";
 import ComparisonView from "./comparison-view";
 import Composer from "./composer";
 import ComposerEffortShortcuts from "./composer-effort-shortcuts";
+import ComposerStub from "./composer-stub";
 import CopyLastCodeBlockListener from "./copy-last-code-block";
 import EditComposer from "./edit-composer";
 import ThreadFindBar from "./find/thread-find-bar";
@@ -58,11 +59,25 @@ import ThreadShortcutsListener from "./thread-shortcuts-listener";
 import type { ThreadViewportRef } from "./thread-viewport";
 import ThreadViewport from "./thread-viewport";
 import ThreadWelcome from "./thread-welcome";
+import { useComparisonModelSync } from "./use-comparison-model-sync";
+import { useThreadPaneState } from "./use-thread-pane-state";
 
 interface ThreadProps {
     className?: string;
+
+    /**
+     * Whether this thread owns the live composer and the global shortcuts. The split view mounts several threads at once and
+     * only the focused one sets this; the others show a one-line stub. Always true outside it.
+     */
+    composerActive?: boolean;
     initialMessage?: string;
     maxWidth?: string;
+
+    /** Asks the split view to focus this thread (the stub's click or Enter). */
+    onActivateComposer?: () => void;
+
+    /** This thread is a pane of the split view, so its shortcuts act on its own chat rather than the one in the URL. */
+    splitPane?: boolean;
 }
 
 const FLOATING_BUTTON_CLASS = cn("rounded-full shadow-md", "bg-background hover:bg-accent border", "transition-all duration-200");
@@ -73,7 +88,7 @@ const FLOATING_BUTTON_CLASS = cn("rounded-full shadow-md", "bg-background hover:
  * newest prompt: in a busy thread the answer to it is usually right below it, far up by now.
  */
 const ScrollToBottomButton: FC<{ canJumpToPrompt: boolean; className?: string; onClick: () => void }> = ({ canJumpToPrompt, className, onClick }) => {
-    const isAtBottom = useChatUIStore((state) => state.isAtBottom);
+    const isAtBottom = useIsAtBottom();
     const { messages } = useChatMessages();
     const { threadId } = useChatThread();
     const { t } = useLingui();
@@ -108,7 +123,7 @@ const ScrollToBottomButton: FC<{ canJumpToPrompt: boolean; className?: string; o
  * Main Thread component
  * Uses ThreadViewport with custom scroll management.
  */
-const Thread: FC<ThreadProps> = ({ className, initialMessage, maxWidth = "65ch" }) => {
+const ThreadContent: FC<ThreadProps> = ({ className, composerActive = true, initialMessage, maxWidth = "65ch", onActivateComposer, splitPane = false }) => {
     const { t } = useLingui();
     const viewportRef = useRef<ThreadViewportRef>(null);
     const userSettings = useUserSettings();
@@ -142,11 +157,8 @@ const Thread: FC<ThreadProps> = ({ className, initialMessage, maxWidth = "65ch" 
     }, [hasUnseen, lastReplyAt, markThreadViewed, threadId]);
     // A comparison parent needs its children at once; any other thread reads them after first paint,
     // to learn whether it has workers to list.
-    const { data: childThreads } = useQuery(
-        crpc.chat.functions.getChildThreads.queryOptions(
-            threadId && (isMultiChatThread || (!isNewThread && afterFirstPaint)) ? { parentThreadId: threadId as Id<"threads"> } : skipToken,
-        ),
-    );
+    const { data: paneState, isError: paneReadFailed } = useThreadPaneState(threadId, { enabled: isMultiChatThread || (!isNewThread && afterFirstPaint) });
+    const childThreads = paneState?.childThreads;
     const hasWorkers = childThreads?.some((child) => child.branchType === "subagent") === true;
 
     // A comparison parent is flagged on its own thread document.
@@ -181,22 +193,9 @@ const Thread: FC<ThreadProps> = ({ className, initialMessage, maxWidth = "65ch" 
         return branches;
     }, [isComparisonThread, childThreads]);
 
-    // Sync comparison state to model picker when navigating to/from a comparison parent.
-    // loadThreadData (in chat-context) clears comparisonMode on every thread switch.
-    // This effect re-enables it once getChildThreads resolves and we confirm comparison.
-    const setSelectedModelsForComparison = useModelStore((state) => state.setSelectedModelsForComparison);
-    const setComparisonMode = useModelStore((state) => state.setComparisonMode);
-
-    useEffect(() => {
-        if (!(isComparisonThread && comparisonBranches.length > 0)) {
-            return;
-        }
-
-        const models = comparisonBranches.map((b) => b.model);
-
-        setSelectedModelsForComparison(models);
-        setComparisonMode(true);
-    }, [isComparisonThread, comparisonBranches, setSelectedModelsForComparison, setComparisonMode]);
+    // Sync comparison state to the model picker when this is the comparison parent whose composer is live.
+    // A background pane leaves the shared model store alone; focus brings it back, after the focused pane's load.
+    useComparisonModelSync({ active: composerActive, branches: comparisonBranches });
 
     // Comparison hook for fan-out sends on the parent thread
     const { sendToExistingChildren } = useComparisonChat({ jwtToken });
@@ -244,9 +243,13 @@ const Thread: FC<ThreadProps> = ({ className, initialMessage, maxWidth = "65ch" 
 
         return (
             <>
-                <TextSelectionMenu isTextModel={composerMode === "text"} threadId={threadId} />
-                <ComposerEffortShortcuts />
-                <ThreadShortcutsListener isOwner={isOwner} model={thread?.model} status={thread?.status} />
+                {composerActive && (
+                    <>
+                        <TextSelectionMenu isTextModel={composerMode === "text"} threadId={threadId} />
+                        <ComposerEffortShortcuts />
+                        <ThreadShortcutsListener isOwner={isOwner} model={thread?.model} status={thread?.status} threadId={splitPane ? threadId : undefined} />
+                    </>
+                )}
                 <div className={cn("relative flex h-[calc(100%-40px)]", className)}>
                     {/* Columns — each scrolls independently, divided by borders */}
                     <ComparisonView branches={comparisonBranches} className="min-h-0 flex-1" />
@@ -254,13 +257,18 @@ const Thread: FC<ThreadProps> = ({ className, initialMessage, maxWidth = "65ch" 
                     {/* Shared composer — syncs input to all child threads */}
                     <div className="absolute right-0 bottom-0 left-0 mx-auto flex shrink-0 flex-col items-center rounded-t-lg bg-inherit px-4 pt-3 pb-4">
                         <ChatError className="mb-3 w-full max-w-3xl" />
-                        <Composer
-                            className="w-full max-w-3xl"
-                            key={threadId}
-                            minimal
-                            onSubmitOverride={handleComparisonParentSubmit}
-                            placeholder={comparisonPlaceholder}
-                        />
+                        {composerActive ? (
+                            <Composer
+                                animateEntrance={!splitPane}
+                                className="w-full max-w-3xl"
+                                key={threadId}
+                                minimal
+                                onSubmitOverride={handleComparisonParentSubmit}
+                                placeholder={comparisonPlaceholder}
+                            />
+                        ) : (
+                            <ComposerStub className="max-w-3xl" onActivate={onActivateComposer} />
+                        )}
                     </div>
                 </div>
             </>
@@ -280,17 +288,21 @@ const Thread: FC<ThreadProps> = ({ className, initialMessage, maxWidth = "65ch" 
     // ─── Normal thread layout ─────────────────────────────────────────────────
     return (
         <>
-            <TextSelectionMenu isTextModel={composerMode === "text"} threadId={threadId} />
-            <ComposerEffortShortcuts />
-            <CopyLastCodeBlockListener />
-            <ThreadShortcutsListener isOwner={isOwner} model={thread?.model} status={thread?.status} />
-            <AskAsideShortcutListener />
+            {composerActive && (
+                <>
+                    <TextSelectionMenu isTextModel={composerMode === "text"} threadId={threadId} />
+                    <ComposerEffortShortcuts />
+                    <CopyLastCodeBlockListener />
+                    <ThreadShortcutsListener isOwner={isOwner} model={thread?.model} status={thread?.status} threadId={splitPane ? threadId : undefined} />
+                    <AskAsideShortcutListener />
+                </>
+            )}
             <div
                 className={cn("relative h-[calc(100%-40px)]", className)}
                 data-find-in-thread-host={composerMode === "text" && !isNewThread ? "" : undefined}
                 style={{ "--thread-max-width": maxWidth } as React.CSSProperties}
             >
-                {composerMode === "text" && !isNewThread && <ThreadFindBar key={threadId} />}
+                {composerActive && composerMode === "text" && !isNewThread && <ThreadFindBar key={threadId} />}
                 <ThreadViewport className="flex h-full flex-col items-center bg-inherit px-4 pt-2" ref={viewportRef}>
                     {!isNewThread && <SubAgentParentBreadcrumb className="w-full max-w-(--thread-max-width)" threadId={threadId} />}
                     <div
@@ -327,7 +339,12 @@ const Thread: FC<ThreadProps> = ({ className, initialMessage, maxWidth = "65ch" 
                         {/* Footer with composer */}
                         <div className="sticky bottom-0 mx-auto flex w-full max-w-(--thread-max-width) flex-col items-center justify-end rounded-t-lg bg-inherit">
                             <ScrollToBottomButton canJumpToPrompt={composerMode === "text"} className="z-10" onClick={handleScrollToBottom} />
-                            {/* Error display */}
+                            {/* Error display. In split view the focused pane shows the same failed read, so it is not announced twice. */}
+                            {paneReadFailed && !splitPane && (
+                                <p className="text-destructive mb-3 w-full text-sm" role="alert">
+                                    {t`Could not load this chat's details.`}
+                                </p>
+                            )}
                             <ChatError className="mb-3 w-full" />
                             <ForwardSelectionBar threadId={threadId} />
                             {/* Full-featured composer with model selector, language selector, slash commands */}
@@ -346,17 +363,32 @@ const Thread: FC<ThreadProps> = ({ className, initialMessage, maxWidth = "65ch" 
                                     workerId={worker.workerId}
                                 />
                             )}
-                            {worker && (
-                                <WorkerComposer
-                                    archived={worker.archived}
-                                    busy={worker.state !== "idle" || worker.stopping}
-                                    className="w-full pb-4"
-                                    followUp={worker.followUp}
-                                    key={threadId}
-                                    workerId={worker.workerId}
-                                />
-                            )}
-                            {!worker && !isWorkerLoading && <Composer className="w-full" initialMessage={initialMessage} key={threadId} />}
+                            {worker &&
+                                (composerActive ? (
+                                    <WorkerComposer
+                                        archived={worker.archived}
+                                        busy={worker.state !== "idle" || worker.stopping}
+                                        className="w-full pb-4"
+                                        followUp={worker.followUp}
+                                        key={threadId}
+                                        workerId={worker.workerId}
+                                    />
+                                ) : (
+                                    <ComposerStub onActivate={onActivateComposer} />
+                                ))}
+                            {!worker &&
+                                !isWorkerLoading &&
+                                (composerActive ? (
+                                    <Composer
+                                        animateEntrance={!splitPane}
+                                        className="w-full"
+                                        initialMessage={initialMessage}
+                                        key={threadId}
+                                        splitPane={splitPane}
+                                    />
+                                ) : (
+                                    <ComposerStub onActivate={onActivateComposer} />
+                                ))}
                         </div>
                     </div>
                 </ThreadViewport>
@@ -364,6 +396,12 @@ const Thread: FC<ThreadProps> = ({ className, initialMessage, maxWidth = "65ch" 
         </>
     );
 };
+
+const Thread: FC<ThreadProps> = (props) => (
+    <AtBottomProvider>
+        <ThreadContent {...props} />
+    </AtBottomProvider>
+);
 
 Thread.displayName = "Thread";
 

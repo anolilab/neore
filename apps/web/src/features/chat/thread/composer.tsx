@@ -54,6 +54,7 @@ import { getValidThreadId } from "@/features/chat/core/utils/thread-id";
 import ComposerGoal from "@/features/chat/goal/composer-goal";
 import HostComposer from "@/features/chat/host/host-composer";
 import PromptImprovementPanel from "@/features/chat/prompt-improvement/components/prompt-improvement-panel";
+import { restoreLiveComposerFor } from "@/features/chat/split/pane-state";
 import ConnectionBanner from "@/features/connection/components/connection-banner";
 import useFeatureFlaggedModels from "@/hooks/use-feature-flagged-models";
 import { useCRPC } from "@/lib/lunora/crpc";
@@ -98,6 +99,8 @@ const ComposerVideoSettings = lazy(() => import("./composer-video-settings"));
 const ComposerAudioSettings = lazy(() => import("./composer-audio-settings"));
 
 interface ComposerProps {
+    /** Plays the entrance animation when the composer mounts. The split view turns it off so moving focus does not replay it. */
+    animateEntrance?: boolean;
     className?: string;
     /** Compact mode - hides bottom toolbar for minimal appearance (used by sticky bar) */
     compact?: boolean;
@@ -112,6 +115,8 @@ interface ComposerProps {
     onSubmitOverride?: (text: string, attachments: PendingAttachment[]) => Promise<void>;
     /** Custom placeholder for the text input (e.g. "Ask 2 models anything...") */
     placeholder?: string;
+    /** A split pane's composer remounts on every focus change, so its initial message is written once per chat. */
+    splitPane?: boolean;
 }
 
 type ComposerModeOption = { icon: typeof FileText; id: ComposerMode; label: MessageDescriptor };
@@ -312,7 +317,16 @@ const ComposerInputWrapper: FC<{
     );
 };
 
-const Composer: FC<ComposerProps> = ({ className, compact = false, initialMessage, minimal = false, onSubmitOverride, placeholder }) => {
+const Composer: FC<ComposerProps> = ({
+    animateEntrance = true,
+    className,
+    compact = false,
+    initialMessage,
+    minimal = false,
+    onSubmitOverride,
+    placeholder,
+    splitPane = false,
+}) => {
     const { t } = useLingui();
     const crpc = useCRPC();
     const queryClient = useQueryClient();
@@ -563,15 +577,32 @@ const Composer: FC<ComposerProps> = ({ className, compact = false, initialMessag
         }
     }, [isAnonymous, threadId]);
 
-    // Set initial message when component mounts or initialMessage changes
+    // Set initial message when component mounts or initialMessage changes. A split pane's composer remounts on every focus change,
+    // so there the prompt is written only once per chat: a remount must not write it over a draft brought back for the pane.
+    // Elsewhere the text is written whenever it changes, so the same message can prefill a chat again.
     useEffect(() => {
         if (initialMessage && initialMessage !== lastInitialMessage.current) {
-            useChatUIStore.getState().setComposerText(initialMessage);
+            const ui = useChatUIStore.getState();
+            const key = `${threadId ?? ""}\n${initialMessage}`;
+
+            if (!splitPane || ui.appliedInitialMessageKey !== key) {
+                ui.setComposerText(initialMessage);
+            }
+
+            ui.setAppliedInitialMessageKey(key);
             lastInitialMessage.current = initialMessage;
         } else if (!initialMessage) {
             lastInitialMessage.current = undefined;
         }
-    }, [initialMessage]);
+    }, [initialMessage, splitPane, threadId]);
+
+    // With the split view off, nothing else brings back a draft that a failed send parked while another chat was open. The
+    // composer mounts once per chat, so the chat's own parked draft is restored here; it never overwrites text already typed.
+    useEffect(() => {
+        if (!splitPane && threadId) {
+            restoreLiveComposerFor(threadId);
+        }
+    }, [splitPane, threadId]);
 
     // Clear submitting state when SSE streaming starts
     useEffect(() => {
@@ -655,7 +686,7 @@ const Composer: FC<ComposerProps> = ({ className, compact = false, initialMessag
                 )}
 
                 {/* Mode-specific content above composer with animations */}
-                <AnimatePresence mode="popLayout">
+                <AnimatePresence initial={animateEntrance} mode="popLayout">
                     {composerMode === "text" && !isDrawOpen && (
                         <m.div
                             animate={{ opacity: 1, y: 0 }}
@@ -715,12 +746,13 @@ const Composer: FC<ComposerProps> = ({ className, compact = false, initialMessag
 
                 {/* Main composer using ComposerBase */}
                 <ComposerBase
+                    animateEntrance={animateEntrance}
                     bottomToolbar={
                         <>
                             <ComposerModelSelector />
 
                             {/* Search mode - only for text mode */}
-                            <AnimatePresence mode="popLayout">
+                            <AnimatePresence initial={animateEntrance} mode="popLayout">
                                 {composerMode === "text" && (
                                     <m.div
                                         animate={{ opacity: 1, scale: 1 }}
@@ -734,7 +766,7 @@ const Composer: FC<ComposerProps> = ({ className, compact = false, initialMessag
                                 )}
                             </AnimatePresence>
                             {/* Research depth - only when a search mode is active */}
-                            <AnimatePresence mode="popLayout">
+                            <AnimatePresence initial={animateEntrance} mode="popLayout">
                                 {composerMode === "text" && searchMode !== "chat" && (
                                     <m.div
                                         animate={{ opacity: 1, scale: 1 }}
@@ -750,7 +782,7 @@ const Composer: FC<ComposerProps> = ({ className, compact = false, initialMessag
                             {/* Run until done - a goal needs an account and a text message */}
                             {composerMode === "text" && !isAnonymous && <ComposerGoal disabled={isSSEStreaming} />}
                             {/* MCP server selector - only for text mode */}
-                            <AnimatePresence mode="popLayout">
+                            <AnimatePresence initial={animateEntrance} mode="popLayout">
                                 {composerMode === "text" && (
                                     <m.div
                                         animate={{ opacity: 1, scale: 1 }}
@@ -764,7 +796,7 @@ const Composer: FC<ComposerProps> = ({ className, compact = false, initialMessag
                                 )}
                             </AnimatePresence>
                             {/* Reference images picker - only for image models that support reference inputs */}
-                            <AnimatePresence mode="popLayout">
+                            <AnimatePresence initial={animateEntrance} mode="popLayout">
                                 {composerMode === "image" && maxReferenceImages > 0 && (
                                     <m.div
                                         animate={{ opacity: 1, scale: 1 }}
@@ -791,7 +823,13 @@ const Composer: FC<ComposerProps> = ({ className, compact = false, initialMessag
                         ) : undefined
                     }
                     mode={composerMode}
-                    modeSettings={composerMode === "text" ? null : <AnimatePresence mode="wait">{renderModeSettings()}</AnimatePresence>}
+                    modeSettings={
+                        composerMode === "text" ? null : (
+                            <AnimatePresence initial={animateEntrance} mode="wait">
+                                {renderModeSettings()}
+                            </AnimatePresence>
+                        )
+                    }
                 >
                     <ComposerInputWrapper
                         compact={compact}

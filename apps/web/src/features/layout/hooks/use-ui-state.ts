@@ -92,6 +92,7 @@ type UserPreferencesHookReturn = UserPreferences & {
     setSendBehavior: (sendBehavior: UserPreferences["sendBehavior"]) => void;
     setShowTimestamps: (showTimestamps: boolean) => void;
     setSoundEffects: (soundEffects: boolean) => void;
+    setSplitViewEnabled: (splitViewEnabled: boolean) => void;
     setTemporaryChatRetentionHours: (hours: number) => void;
     setUserPreferences: (preferences: Partial<UserPreferences>) => void;
     temporaryChatRetentionHours: number;
@@ -284,6 +285,7 @@ export const useUserPreferences = (): UserPreferencesHookReturn => {
             sendBehavior: isSendBehavior(storedSendBehavior) ? storedSendBehavior : uiPreferences.sendBehavior,
             showTimestamps: uiPreferences.showTimestamps,
             soundEffects: uiPreferences.soundEffects,
+            splitViewEnabled: uiPreferences.splitViewEnabled === true,
         };
     }, [uiPreferences, userSettings]);
 
@@ -320,6 +322,7 @@ export const useUserPreferences = (): UserPreferencesHookReturn => {
         },
         setShowTimestamps: (showTimestamps: boolean) => setUserPreferencesAction({ showTimestamps }),
         setSoundEffects: (soundEffects: boolean) => setUserPreferencesAction({ soundEffects }),
+        setSplitViewEnabled: (splitViewEnabled: boolean) => setUserPreferencesAction({ splitViewEnabled }),
         setTemporaryChatRetentionHours: (hours: number) => {
             updateUserSettings({ temporaryChatRetentionHours: hours });
         },
@@ -334,6 +337,10 @@ export const useUserPreferences = (): UserPreferencesHookReturn => {
 
             if ("soundEffects" in prefs) {
                 clientSide.soundEffects = prefs.soundEffects;
+            }
+
+            if ("splitViewEnabled" in prefs) {
+                clientSide.splitViewEnabled = prefs.splitViewEnabled;
             }
 
             if ("hidePersonalInfo" in prefs) {

@@ -40,22 +40,23 @@ vi.mock("@/lib/lunora/crpc", () => {
     return {
         useCRPC: () => {
             return {
-                agent: {
-                    threads: {
-                        getThreadRelationship: {
+                chat: {
+                    composite: {
+                        getThreadPaneState: {
                             queryOptions: (args: unknown, options?: { live?: boolean }) => {
                                 const queryKey = ["relationship", args];
+                                const read = () => {
+                                    return { relationship: harness.relationship };
+                                };
 
                                 if (args !== skipToken && options?.live !== false) {
-                                    harness.liveReads.set(JSON.stringify(queryKey), { key: queryKey, read: () => harness.relationship });
+                                    harness.liveReads.set(JSON.stringify(queryKey), { key: queryKey, read });
                                 }
 
-                                return { queryFn: args === skipToken ? skipToken : async () => harness.relationship, queryKey };
+                                return { queryFn: args === skipToken ? skipToken : async () => read(), queryKey };
                             },
                         },
                     },
-                },
-                chat: {
                     functions: {
                         getThread: {
                             queryOptions: (args: typeof skipToken | { threadId: string }, options?: { live?: boolean }) => {

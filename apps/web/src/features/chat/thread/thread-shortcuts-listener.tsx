@@ -16,6 +16,8 @@ interface ThreadShortcutsListenerProperties {
     model?: string;
     /** The open thread's stored status. A pending archive change in the optimistic map takes precedence. */
     status?: string;
+    /** The chat the shortcuts act on. Absent means the chat in the URL; the split view names its focused pane's chat, since the URL stays put. */
+    threadId?: string;
 }
 
 /**
@@ -23,9 +25,10 @@ interface ThreadShortcutsListenerProperties {
  * confirms (`use-keyboard-shortcut-handler.ts`). Renders only the confirmation dialog. Mounted by the thread view, which
  * owns the open thread's document, in both its normal and its comparison layout.
  */
-const ThreadShortcutsListener: FC<ThreadShortcutsListenerProperties> = ({ isOwner = false, model, status }) => {
+const ThreadShortcutsListener: FC<ThreadShortcutsListenerProperties> = ({ isOwner = false, model, status, threadId }) => {
     const { t } = useLingui();
-    const currentThreadId = useCurrentThreadId();
+    const urlThreadId = useCurrentThreadId();
+    const currentThreadId = threadId ?? urlThreadId;
     const optimisticStatuses = useOptimisticStatuses();
     const currentModel = useCurrentModel();
     const { handleDeleteThread, updateThread } = useThreadHandlers(() => {}, currentThreadId);

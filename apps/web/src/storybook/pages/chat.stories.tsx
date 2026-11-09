@@ -1,6 +1,8 @@
+import { api } from "@neore/backend/api";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, waitFor } from "storybook/test";
 
+import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
 import { Route as ThreadRoute } from "@/routes/(chat)/chat/$threadId";
 import { Route as ChatIndexRoute } from "@/routes/(chat)/chat/index";
 import { Route as ChatLayoutRoute } from "@/routes/(chat)/route";
@@ -9,7 +11,7 @@ import { assistantMessage, chatFixtures, CONVERSATION, streamingBody, THREAD_IDS
 import { gatewayModelsHandler } from "@/storybook/fixtures/models";
 import { shellFixtures } from "@/storybook/fixtures/shell";
 import { userFixtures } from "@/storybook/fixtures/user";
-import { lunoraHandlers, lunoraIdle } from "@/storybook/lunora";
+import { lunoraError, lunoraHandlers, lunoraIdle } from "@/storybook/lunora";
 import { StoryPage } from "@/storybook/page";
 
 // Page data arrives after the route loads; under a loaded machine that can outlast the 1 s default of `find*`.
@@ -66,14 +68,54 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Thread: Story = {
-    // color-contrast (#548): a code token inherits #e2e8f0 on the light page; the source is not found yet.
-    parameters: { a11y: { test: "todo" } },
     play: async ({ canvas }) => {
         // Named (it had no accessible name before these stories); its fade-in can outlast the query.
         await expect(await canvas.findByRole("textbox", { name: "Message" }, PAGE_WAIT)).toBeInTheDocument();
         // The composer's controls had no accessible name before these stories (#548).
         await expect(await canvas.findAllByRole("button", { name: "Model: Claude Sonnet 4.5" }, PAGE_WAIT)).not.toHaveLength(0);
         await expect(await canvas.findAllByRole("combobox", { name: "Response language: English (US)" }, PAGE_WAIT)).not.toHaveLength(0);
+    },
+};
+
+const ROUTE_PROMPT = "Draft the launch email";
+
+/**
+ * The route prompt is written into the composer even when this exact text was applied to the chat before. On the single-chat page
+ * the composer does not remount per focus, so the once-per-chat guard that keeps a split pane's draft must not apply here.
+ */
+export const RoutePromptWrittenAgain: Story = {
+    args: { url: `/chat/${THREAD_IDS.main}?initialMessage=${encodeURIComponent(ROUTE_PROMPT)}` },
+    loaders: [
+        () => {
+            useChatUIStore.getState().clearComposer();
+            useChatUIStore.getState().setAppliedInitialMessageKey(`${THREAD_IDS.main}\n${ROUTE_PROMPT}`);
+        },
+    ],
+    play: async ({ canvas }) => {
+        await waitFor(() => expect(canvas.getByRole("textbox", { name: "Message" })).toHaveTextContent(ROUTE_PROMPT), PAGE_WAIT);
+    },
+};
+
+/** The pane-state read fails: the page says so, and the chat stays usable (its messages and composer do not depend on that read). */
+export const PaneStateReadFails: Story = {
+    parameters: {
+        msw: {
+            handlers: {
+                gateway: gatewayModelsHandler(),
+                lunora: lunoraHandlers(
+                    ...userFixtures(),
+                    ...shellFixtures(),
+                    ...chatFixtures(),
+                    lunoraError(api.chat.composite.getThreadPaneState, "INTERNAL", "Read failed", 500),
+                ),
+            },
+        },
+    },
+    play: async ({ canvas }) => {
+        // The thread reads its pane state only after first paint has settled (`useAfterFirstPaint`: browser idle, then 3 s),
+        // so the alert arrives later than the page itself.
+        await expect(await canvas.findByText("Could not load this chat's details.", undefined, STATE_WAIT)).toBeInTheDocument();
+        await expect(await canvas.findByRole("textbox", { name: "Message" }, PAGE_WAIT)).toBeInTheDocument();
     },
 };
 
