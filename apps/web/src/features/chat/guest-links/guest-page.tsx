@@ -7,8 +7,9 @@ import { HeadingLevelProvider } from "@neore/ui/components/heading";
 import { Label } from "@neore/ui/components/label";
 import { Textarea } from "@neore/ui/components/textarea";
 import { skipToken, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useRouter } from "@tanstack/react-router";
 import type { FC, FormEvent } from "react";
-import { useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useId, useMemo, useRef, useState, useSyncExternalStore } from "react";
 
 import { useAction } from "@/lib/lunora/crpc";
 
@@ -19,12 +20,22 @@ import { forgetGuestToken, guestTokenFor, keepGuestToken, keepPendingPost, readP
 /** A guest note's cap (`GUEST_MESSAGE_MAX_CHARS` in the backend). */
 const MAX_CHARS = 2000;
 
-/** The URL fragment, the only place a guest link carries its token; `undefined` on the server, where there is none. */
-const subscribeToHash = (onChange: () => void): (() => void) => {
-    globalThis.addEventListener("hashchange", onChange);
+/**
+ * The URL fragment, the only place a guest link carries its token; `undefined` on the server, where there is none. Watched
+ * through `hashchange` and the router's own history, whose `pushState`/`replaceState` fire no `hashchange`.
+ */
+const hashSubscriber =
+    (history: { subscribe: (listener: () => void) => () => void }) =>
+    (onChange: () => void): (() => void) => {
+        globalThis.addEventListener("hashchange", onChange);
 
-    return () => globalThis.removeEventListener("hashchange", onChange);
-};
+        const unsubscribe = history.subscribe(onChange);
+
+        return () => {
+            globalThis.removeEventListener("hashchange", onChange);
+            unsubscribe();
+        };
+    };
 /** A link token's shape (`newGuestToken` in the backend): 64 lowercase hex characters. */
 const LINK_TOKEN_SHAPE = /^[0-9a-f]{64}$/u;
 /** The root layout's "Skip to content" anchor (`__root.tsx`), the one fragment that is no link. */
@@ -299,6 +310,8 @@ const GuestLinkPage: FC<{ linkToken: string }> = ({ linkToken }) => {
  * thread is shown. Another link opened in the same tab starts afresh (keyed by its token).
  */
 const GuestPage: FC = () => {
+    const { history } = useRouter();
+    const subscribeToHash = useMemo(() => hashSubscriber(history), [history]);
     const hash = useSyncExternalStore(subscribeToHash, readHash, noHashOnServer);
     // The last link token this page read: an in-page anchor (the "Skip to content" link's `#main-content`) is no link.
     const [lastLinkToken, setLastLinkToken] = useState<string>();
