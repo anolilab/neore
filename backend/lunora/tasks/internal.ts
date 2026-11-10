@@ -224,7 +224,7 @@ const escalateStuckTasks = async (ctx: MutationCtx, now: number): Promise<void> 
                         userId: task.userId,
                     });
                 } catch (error) {
-                    console.warn("[tasks] Failed to write a stuck-task notice; it is retried:", error);
+                    ctx.log.event("tasks.stuck_notice_failed", { days, error: error instanceof Error ? error.name : "unknown", taskId: task._id });
                     await recheckStuckTask(ctx, task, now + STUCK_RETRY_MS);
 
                     continue;

@@ -39,6 +39,26 @@ vi.mock("../projects/functions", () => {
     return { readableProject: found, writableProject: found };
 });
 
+// A test sets `failing` to make the stuck-task notice write throw, as an inbox write or a schedule can.
+const { noticeWrites } = vi.hoisted(() => {
+    return { noticeWrites: { failing: false } };
+});
+
+vi.mock("../notifications/notify", async (importOriginal) => {
+    const actual = await importOriginal<typeof import("../notifications/notify")>();
+
+    return {
+        ...actual,
+        notify: async (ctx: unknown, input: Parameters<typeof actual.notify>[1]) => {
+            if (noticeWrites.failing && input.type === "task_stuck") {
+                throw new Error("inbox unavailable");
+            }
+
+            return await actual.notify(ctx as never, input);
+        },
+    };
+});
+
 vi.mock("../auth/lib/better-auth-queries", async (importOriginal) => {
     return {
         ...(await importOriginal<typeof import("../auth/lib/better-auth-queries")>()),
@@ -917,6 +937,32 @@ describe("stuck blocked tasks", () => {
         const task = await getTask(taskId);
 
         expect(task.stuckCheckAt).toBe(T0 + 6 * DAY);
+    });
+
+    it("sends the notice again when its write fails, instead of counting the level as sent", async () => {
+        const dependency = await insertTask({ status: "todo", title: "First" });
+        const taskId = await insertTask({ dependsOn: [dependency], status: "blocked", stuckCheckAt: T0 + 2 * DAY, title: "Waiting", updatedAt: T0 });
+
+        try {
+            noticeWrites.failing = true;
+            await sweepAt(T0 + 2 * DAY);
+        } finally {
+            noticeWrites.failing = false;
+        }
+
+        expect(await stuckNotices()).toStrictEqual([]);
+
+        const failed = await getTask(taskId);
+
+        expect(failed.stuckNotice).toBeUndefined();
+
+        await sweepAt(T0 + 2 * DAY + 60 * 60_000);
+
+        expect(await stuckNotices()).toStrictEqual([{ outcome: undefined, title: "Waiting", type: "task_stuck" }]);
+
+        const retried = await getTask(taskId);
+
+        expect(retried.stuckNotice).toStrictEqual({ days: 2, since: T0 });
     });
 
     it("asks once more at 7 idle days, and not again within that episode", async () => {
