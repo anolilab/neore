@@ -270,14 +270,16 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
 
     // A teammate's access per connection (`connectors/access.ts`). A write tool its level does not allow is not offered to the
     // model at all, and a connection set to none offers nothing. Fails closed: when the settings cannot be read, no connector
-    // tool is offered, never one the teammate may not use. A run with no thread has no teammate and keeps every tool.
+    // tool is offered, never one the teammate may not use. The thread that governs the run is its own thread, or the one a group
+    // participant's permissions come from. A run with neither has no teammate and keeps every tool.
     // Read only when a connector's tool is in the set, so a run without one makes no extra query.
+    const accessThreadId = threadId ?? permissionModeThreadId;
     const hasConnectorTools = Object.keys(candidates).some((name) => mcpResult.descriptors.get(name)?.connectorSlug !== undefined);
     const connectorAccess =
-        !hasConnectorTools || threadId === undefined
+        !hasConnectorTools || accessThreadId === undefined
             ? []
             : await ctx
-                  .runQuery(internal.connectors.access.listThreadConnectorAccess, { threadId: threadId as Id<"threads">, userId })
+                  .runQuery(internal.connectors.access.listThreadConnectorAccess, { threadId: accessThreadId as Id<"threads">, userId })
                   .catch((error: unknown) => {
                       toolsLogger.warn("[TOOLS] Teammate connector access unavailable:", error);
 
