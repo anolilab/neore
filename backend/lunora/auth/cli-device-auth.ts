@@ -188,6 +188,19 @@ const keyBodySchema = z.object({
     device_code: z.string().max(256),
 });
 
+/** Best effort: if the row cannot be restored, the person starts a new code. */
+const restoreClaimedCode = async (
+    adapter: { create: (input: { data: Record<string, unknown>; forceAllowId?: boolean; model: string }) => Promise<unknown> },
+    claimed: { id?: unknown; userId?: unknown },
+    cause: unknown,
+): Promise<void> => {
+    try {
+        await adapter.create({ data: { ...claimed }, forceAllowId: true, model: "deviceCode" });
+    } catch (error) {
+        authLogger.error("[auth] could not restore a device code after a failed key count", { cause, deviceCodeId: claimed.id, error, userId: claimed.userId });
+    }
+};
+
 const redeemKey = (options: CliDeviceAuthOptions) =>
     createAuthEndpoint("/device/key", { body: keyBodySchema, metadata: { noStore: true }, method: "POST" }, async (ctx) => {
         const { claimedDeviceCode, user } = await redeemDeviceCode({
@@ -237,7 +250,33 @@ const redeemKey = (options: CliDeviceAuthOptions) =>
         // definite refusal below (the CLI prints it and stops). The code stays spent, because nothing will poll
         // it again after that answer. Two racing mints can both withdraw; neither can leave the person over
         // the cap, and the person starts a new code once a key is revoked.
-        const total = await ctx.context.adapter.count({ model: "apikey", where: [{ field: "referenceId", value: user.id }] });
+        let total: number;
+
+        try {
+            total = await ctx.context.adapter.count({ model: "apikey", where: [{ field: "referenceId", value: user.id }] });
+        } catch (error) {
+            // The mint went through but the key was never revealed. Withdraw it, and give the code back only once
+            // the delete is confirmed: if the delete fails the key may be live, so the code stays spent and the
+            // person starts over, since restoring it would let the next poll mint a second live key.
+            const isWithdrawn = await ctx.context.adapter
+                .delete({ model: "apikey", where: [{ field: "id", value: minted.id }] })
+                .then(() => true)
+                .catch((deleteError: unknown) => {
+                    authLogger.error("[auth] a CLI device key could not be withdrawn after a failed key count and must be revoked", {
+                        apiKeyId: minted.id,
+                        error: deleteError,
+                        userId: user.id,
+                    });
+
+                    return false;
+                });
+
+            if (isWithdrawn) {
+                await restoreClaimedCode(ctx.context.adapter, claimedDeviceCode, error);
+            }
+
+            throw error;
+        }
 
         if (total > MAX_API_KEYS_PER_USER) {
             await ctx.context.adapter.delete({ model: "apikey", where: [{ field: "id", value: minted.id }] });
