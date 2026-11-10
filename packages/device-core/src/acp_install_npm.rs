@@ -35,7 +35,7 @@ use sha2::{Digest, Sha256, Sha512};
 
 use crate::acp::{validate_agent, AcpAgent, AcpInstall, AcpView, EnvVars};
 use crate::acp_install::{
-    create_private_dir, safe_relative, sha256_reader, validate_provenance, INSTALLING_DIR,
+    create_private_dir, run_id, safe_relative, sha256_reader, validate_provenance, INSTALLING_DIR,
     UNPACKED_DIR,
 };
 use crate::engine::{now_ms, DeviceState, Event};
@@ -704,7 +704,6 @@ fn reserve_stage(install_root: &Path, staged: &Path) -> Result<(PathBuf, PathBuf
 
     let not_staged = "the download is not in a staging folder";
     let stage_dir = staged.parent().ok_or(not_staged)?;
-    let name = stage_dir.file_name().ok_or(not_staged)?;
     let file = staged.file_name().ok_or(not_staged)?;
     let holding = install_root.join(INSTALLING_DIR);
 
@@ -720,9 +719,12 @@ fn reserve_stage(install_root: &Path, staged: &Path) -> Result<(PathBuf, PathBuf
 
     fs::create_dir_all(&holding).map_err(|error| error.to_string())?;
 
+    // Named with this run's id, like the trash: the sweep of the folder at start-up deletes the entries of other
+    // runs only, so it never takes an install that is going on now (in this state or in another over the same
+    // folder: the id belongs to the process).
     let reserved = holding.join(format!(
         "{}-{}",
-        name.to_string_lossy(),
+        run_id(),
         RESERVED.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
     ));
 

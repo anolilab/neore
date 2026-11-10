@@ -6,6 +6,7 @@ use std::path::PathBuf;
 
 use crate::acp::EnvVars;
 use crate::acp_install::commit_tests::Scratch;
+use crate::acp_install::sweep_trash;
 
 const PACKAGE: &str = "fixture-agent";
 const PROGRAM: &str = "console.log('hello');\n";
@@ -1521,7 +1522,13 @@ fn a_reserved_download_is_not_swept_as_stale_and_is_cleared_when_the_state_start
     state.acp_install_stage().unwrap();
     assert!(archive.is_file(), "the sweep of old staging left it alone");
 
-    // Starting the state means no install is running: what is still reserved is abandoned.
+    // Starting the state in a later run means no install is running: what is still reserved is abandoned.
+    let reserved = {
+        let earlier = reserved.with_file_name("99999999.1-0");
+
+        fs::rename(&reserved, &earlier).unwrap();
+        earlier
+    };
     let _fresh = DeviceState::new(&dir, Box::new(|_| {}));
     let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
 
@@ -1691,4 +1698,31 @@ fn a_manifest_by_another_case_or_a_folded_name_cannot_stand_in_for_it() {
         assert!(error.contains(reason), "{what}: {error}");
         assert!(!log.exists(), "npm must not run for {what}");
     }
+}
+
+#[test]
+fn the_sweep_of_reserved_downloads_spares_this_runs_and_clears_other_runs() {
+    let (state, dir) = state("reserved-run-id");
+    let (node, npm, _) = fake_tools(&dir);
+    let bytes = tarball(&manifest(), &[]);
+    let request = request(&state, &node, &npm, &bytes, integrity(&bytes));
+    let staged = state.staged_archive(&request.archive).unwrap();
+    let (archive, reserved) = reserve_stage(&state.install_root(), &staged).unwrap();
+    let holding = reserved.parent().unwrap();
+    let earlier = holding.join("99999999.1-0");
+
+    assert!(reserved
+        .file_name()
+        .unwrap()
+        .to_string_lossy()
+        .starts_with(&format!("{}-", run_id())));
+
+    fs::create_dir_all(earlier.join("unpacked")).unwrap();
+    sweep_trash(holding.to_path_buf()).unwrap().join().unwrap();
+
+    assert!(
+        archive.is_file(),
+        "this run's reservation survives the sweep"
+    );
+    assert!(!earlier.exists(), "another run's is cleared");
 }

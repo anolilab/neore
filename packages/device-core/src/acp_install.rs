@@ -669,7 +669,7 @@ fn remove_entry(path: &Path) {
 
 /// Names this run in the trash: the pid alone is reused by the operating system, so a crashed run's tree would be
 /// taken for a live one's. The start time in nanoseconds makes it unique per run.
-fn run_id() -> &'static str {
+pub(crate) fn run_id() -> &'static str {
     static ID: std::sync::OnceLock<String> = std::sync::OnceLock::new();
 
     ID.get_or_init(|| {
