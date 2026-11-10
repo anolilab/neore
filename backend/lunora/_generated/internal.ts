@@ -543,7 +543,7 @@ export interface InternalApiTypes {
             getLowRiskTrustedServers: FunctionReference<"query", { userId: string }, Array<string>>;
             getPendingToolApproval: FunctionReference<"query", { approvalId: string; threadId: string; userId: string }, { toolName: string | null } | null>;
             getThreadPermissionMode: FunctionReference<"query", { threadId: Id<"threads">; userId: string }, "supervised" | "auto" | "full" | null>;
-            getThreadPermissionModeForApp: FunctionReference<"query", { threadId: string; userId: string }, { allowed: boolean; mode: "supervised" | "auto" | "full" | null }>;
+            getThreadPermissionModeForApp: FunctionReference<"query", { threadId: string; userId: string }, { allowed: boolean; connectorAccess: Array<{ connectorSlug: string; level: "read_only" | "read_write" | "none" }>; mode: "supervised" | "auto" | "full" | null }>;
             getToolPermissionGrantsQuery: FunctionReference<"query", { userId: string }, Record<string, number>>;
             getToolPermissionsQuery: FunctionReference<"query", { userId: string }, Record<string, "auto" | "ask" | "off">>;
             pruneExpiredToolPermissionGrants: FunctionReference<"mutation", {}, null>;
@@ -623,6 +623,10 @@ export interface InternalApiTypes {
         };
     };
     connectors: {
+        access: {
+            listThreadConnectorAccess: FunctionReference<"query", { threadId: Id<"threads">; userId: string }, Array<{ connectorSlug: string; level: "read_only" | "read_write" | "none" }>>;
+            listUserConnectorAccessForSlug: FunctionReference<"query", { connectorSlug: string; userId: string }, Array<{ level: "read_only" | "read_write" | "none" }>>;
+        };
         seed: {
             seed: FunctionReference<"mutation", {}, { inserted: number; updated: number }>;
         };
@@ -1923,6 +1927,10 @@ export const internal: InternalApiTypes = {
         },
     },
     connectors: {
+        access: {
+            listThreadConnectorAccess: { __lunoraRef: "connectors_access:listThreadConnectorAccess" },
+            listUserConnectorAccessForSlug: { __lunoraRef: "connectors_access:listUserConnectorAccessForSlug" },
+        },
         seed: {
             seed: { __lunoraRef: "connectors_seed:seed" },
         },

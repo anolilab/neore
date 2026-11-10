@@ -3,6 +3,7 @@ import type { HttpActionCtx } from "lunorash/server";
 
 import { internal } from "../../_generated/internal";
 import { getCurrentUserInternal } from "../../auth/lib/helper";
+import { type ConnectorAccessLevel, levelOfConnection, strictestLevel, toolOfferedAt } from "../../connectors/access-levels";
 import { findUserMcpServer } from "../../connectors/lib/user-mcp-servers";
 import { callOnShard } from "../../lib/cross-shard";
 import { toolsLogger } from "../../lib/logger";
@@ -94,7 +95,13 @@ const descriptorFor = (config: MCPServerConfig, toolName: string): ToolDescripto
  * `full` is not passed on. It turns `ask` defaults into `auto`, which is the model's turn to take; an app iframe is not a turn, and
  * the proxy cannot ask anyone, so a tool that needs approval stays refused here under `full` too.
  */
-const threadModeFor = async (context: HttpActionCtx, userId: string, threadId: string): Promise<ThreadPermissionMode | undefined | "denied"> => {
+/** What an app call reads from its thread: the mode it runs under, and the teammate's connection levels (`connectors/access.ts`). */
+interface ThreadAppAccess {
+    connectorAccess: { connectorSlug: string; level: ConnectorAccessLevel }[];
+    mode: ThreadPermissionMode | undefined;
+}
+
+const threadModeFor = async (context: HttpActionCtx, userId: string, threadId: string): Promise<ThreadAppAccess | "denied"> => {
     // A shared thread's row lives on its OWNER's shard, not the caller's (the servers and credentials stay on the caller's). The
     // query re-checks the caller's grant there, so crossing only moves where the thread is read.
     const found = await (async () => {
@@ -115,7 +122,32 @@ const threadModeFor = async (context: HttpActionCtx, userId: string, threadId: s
         return "denied";
     }
 
-    return found.mode === "full" ? undefined : (found.mode ?? undefined);
+    return { connectorAccess: found.connectorAccess, mode: found.mode === "full" ? undefined : (found.mode ?? undefined) };
+};
+
+/**
+ * The level the call's connection has for its teammate: the thread's, or, for a call that names no thread, the strictest any of the
+ * caller's teammates has on it. Fails closed: a lookup that fails is `none`, never the default.
+ */
+const connectorLevelFor = async (
+    context: HttpActionCtx,
+    userId: string,
+    thread: ThreadAppAccess | undefined,
+    connectorSlug: string,
+): Promise<ConnectorAccessLevel> => {
+    if (thread) {
+        return levelOfConnection(thread.connectorAccess, connectorSlug);
+    }
+
+    try {
+        const rows = await context.runQuery(internal.connectors.access.listUserConnectorAccessForSlug, { connectorSlug, userId });
+
+        return strictestLevel(rows.map((row) => row.level));
+    } catch (error: unknown) {
+        toolsLogger.warn("[MCP] Connector access lookup failed for an app call; denied:", error, { connectorSlug, userId });
+
+        return "none";
+    }
 };
 
 const annotatedToolMode = async (
@@ -343,10 +375,20 @@ export const callMCPToolFromAppHttpAction = async (context: HttpActionCtx, reque
     // The app's call runs under the thread's mode, as the model's calls do: the proxy is no way around a supervised thread. A call
     // that names no thread (a client built before the thread was sent) has no thread mode, so it gets the default: a read-only tool
     // runs, and one that would ask is refused, since no person is there to answer it. Rejecting it would break every such client.
-    const threadMode = threadId ? await threadModeFor(context, user._id, threadId) : undefined;
+    const thread = threadId ? await threadModeFor(context, user._id, threadId) : undefined;
 
-    if (threadMode === "denied") {
+    if (thread === "denied") {
         return Response.json({ error: "This chat is not available to you" }, { status: 403 });
+    }
+
+    const threadMode = thread?.mode;
+
+    // The teammate's access to this connection. `none` runs nothing; `read_only` runs only what the server marks read only, checked
+    // against its own list inside the connection below. A server the user added alone has no connection, so no access applies.
+    const access = serverConfig.connectorSlug ? await connectorLevelFor(context, user._id, thread, serverConfig.connectorSlug) : undefined;
+
+    if (access === "none") {
+        return Response.json({ error: `Your teammate's access to ${serverConfig.name} is set to none` }, { status: 403 });
     }
 
     const overrides = (await context.runQuery(internal.chat.tool_permissions.getToolPermissionsQuery, { userId: user._id })) as ToolPermissionOverrides;
@@ -360,6 +402,10 @@ export const callMCPToolFromAppHttpAction = async (context: HttpActionCtx, reque
 
     try {
         const outcome = await withServerClient(serverConfig, async (client) => {
+            if (access === "read_only" && !toolOfferedAt(access, await readToolAnnotations(client, toolName))) {
+                return { refused: `Tool "${toolName}" can change data, and your teammate's access to ${serverConfig.name} is read only` };
+            }
+
             const refused = chosen ? null : refusalFor(await annotatedToolMode(client, descriptor, toolName, threadMode), toolName);
 
             if (refused) {
