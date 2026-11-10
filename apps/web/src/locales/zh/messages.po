@@ -1234,7 +1234,7 @@ msgstr "已将 {name} 移出星标"
 msgid "{name} resumed"
 msgstr "{name} 已恢复"
 
-#: src/features/sub-agents/components/sub-agent-approvals.tsx:58
+#: src/features/sub-agents/components/sub-agent-approvals.tsx:57
 msgid "{name} wants to run \"{tool}\""
 msgstr "{name} 想要运行“{tool}”"
 
@@ -3270,11 +3270,11 @@ msgstr ""
 msgid "All Users"
 msgstr "所有用户"
 
-#: src/features/chat/thread/tool-approval.tsx:172
+#: src/features/chat/thread/tool-approval.tsx:175
 msgid "Allow \"{tool}\" from {server}?"
 msgstr "允许来自 {server} 的“{tool}”吗？"
 
-#: src/features/chat/thread/tool-approval.tsx:172
+#: src/features/chat/thread/tool-approval.tsx:175
 msgid "Allow \"{tool}\"?"
 msgstr "允许“{tool}”吗？"
 
@@ -3282,19 +3282,19 @@ msgstr "允许“{tool}”吗？"
 msgid "Allow \"delete_files\" from the drafts server?"
 msgstr ""
 
-#: src/features/chat/thread/tool-approval.tsx:140
+#: src/features/chat/thread/tool-approval.tsx:143
 msgid "Allow {tool} for 1 hour"
 msgstr "允许 {tool} 1 小时"
 
-#: src/features/chat/thread/tool-approval.tsx:144
+#: src/features/chat/thread/tool-approval.tsx:147
 msgid "Allow {tool} for today"
 msgstr "允许 {tool} 今天"
 
-#: src/features/chat/thread/tool-approval.tsx:142
+#: src/features/chat/thread/tool-approval.tsx:145
 msgid "Allow for 1 hour"
 msgstr "允许 1 小时"
 
-#: src/features/chat/thread/tool-approval.tsx:146
+#: src/features/chat/thread/tool-approval.tsx:149
 msgid "Allow for today"
 msgstr "允许今天"
 
@@ -3345,12 +3345,12 @@ msgstr "已关联到此对话。"
 msgid "Also viewing"
 msgstr "同时在看"
 
-#: src/features/chat/thread/tool-approval.tsx:136
+#: src/features/chat/thread/tool-approval.tsx:139
 #: src/features/marketing/use-cases/visuals/approvals-visual.tsx:35
 msgid "Always allow"
 msgstr "始终允许"
 
-#: src/features/chat/thread/tool-approval.tsx:134
+#: src/features/chat/thread/tool-approval.tsx:137
 msgid "Always allow {tool}"
 msgstr "始终允许 {tool}"
 
@@ -3789,14 +3789,14 @@ msgid "Approvals in Neore: a tool you set to Ask stops before it runs, and you d
 msgstr ""
 
 #: src/features/auth/components/device-approval.tsx:242
-#: src/features/chat/thread/tool-approval.tsx:128
+#: src/features/chat/thread/tool-approval.tsx:131
 #: src/features/develop/components/review-panel.tsx:64
 #: src/features/marketing/use-cases/visuals/approvals-visual.tsx:32
 #: src/features/tasks/components/task-detail-dialog.tsx:104
 msgid "Approve"
 msgstr "批准"
 
-#: src/features/chat/thread/tool-approval.tsx:126
+#: src/features/chat/thread/tool-approval.tsx:129
 msgid "Approve {tool} once"
 msgstr "批准一次 {tool}"
 
@@ -3820,7 +3820,7 @@ msgstr ""
 msgid "Approved"
 msgstr ""
 
-#: src/features/chat/thread/tool-approval.tsx:86
+#: src/features/chat/thread/tool-approval.tsx:88
 #: src/features/marketing/use-cases/visuals/approvals-visual.tsx:23
 msgid "Approved — running tool"
 msgstr "已批准——正在运行工具"
@@ -8585,7 +8585,7 @@ msgid "Could not send your answer."
 msgstr "无法发送你的回答。"
 
 #: src/features/chat/thread/ask-user-prompt.tsx:116
-#: src/features/chat/thread/tool-approval.tsx:75
+#: src/features/chat/thread/tool-approval.tsx:77
 msgid "Could not send your answer. Please try again."
 msgstr "无法发送你的答复，请重试。"
 
@@ -10054,7 +10054,7 @@ msgstr "最看重极致 AI 能力和精细推理的高要求任务"
 msgid "Denied"
 msgstr "已拒绝"
 
-#: src/features/chat/thread/tool-approval.tsx:84
+#: src/features/chat/thread/tool-approval.tsx:86
 msgid "Denied — continuing without it"
 msgstr "已拒绝——在不使用它的情况下继续"
 
@@ -10075,12 +10075,12 @@ msgid "Density updated"
 msgstr "密度已更新"
 
 #: src/features/auth/components/device-approval.tsx:233
-#: src/features/chat/thread/tool-approval.tsx:132
+#: src/features/chat/thread/tool-approval.tsx:135
 #: src/features/marketing/use-cases/visuals/approvals-visual.tsx:34
 msgid "Deny"
 msgstr "拒绝"
 
-#: src/features/chat/thread/tool-approval.tsx:130
+#: src/features/chat/thread/tool-approval.tsx:133
 msgid "Deny {tool}"
 msgstr "拒绝 {tool}"
 
@@ -29461,7 +29461,7 @@ msgstr "显示时间戳"
 msgid "Show up to {rowLimit} rows ({byteCount} bytes)"
 msgstr "最多显示 {rowLimit} 行（{byteCount} 字节）"
 
-#: src/features/chat/thread/tool-approval.tsx:117
+#: src/features/chat/thread/tool-approval.tsx:120
 msgid "Show what it will send"
 msgstr "显示将要发送的内容"
 
@@ -36603,7 +36603,7 @@ msgstr "正在等待所有者"
 msgid "Waiting for the owner to answer"
 msgstr "正在等待所有者回答"
 
-#: src/features/chat/thread/tool-approval.tsx:81
+#: src/features/chat/thread/tool-approval.tsx:83
 msgid "Waiting for the owner to approve"
 msgstr "正在等待所有者批准"
 
@@ -36631,7 +36631,7 @@ msgstr "正在“{0}”中等待你的回答"
 
 #: src/features/chat/thread-list/thread-node.tsx:634
 #: src/features/chat/thread-list/thread-node.tsx:641
-#: src/features/chat/thread/tool-approval.tsx:81
+#: src/features/chat/thread/tool-approval.tsx:83
 #: src/features/home/components/home-page.tsx:114
 #: src/features/marketing/use-cases/visuals/approvals-visual.tsx:20
 #: src/features/sub-agents/components/sub-agent-tool-view.tsx:57

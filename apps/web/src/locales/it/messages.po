@@ -1234,7 +1234,7 @@ msgstr "{name} rimosso dai preferiti"
 msgid "{name} resumed"
 msgstr "{name} ripreso"
 
-#: src/features/sub-agents/components/sub-agent-approvals.tsx:58
+#: src/features/sub-agents/components/sub-agent-approvals.tsx:57
 msgid "{name} wants to run \"{tool}\""
 msgstr "{name} vuole eseguire \"{tool}\""
 
@@ -3270,11 +3270,11 @@ msgstr ""
 msgid "All Users"
 msgstr "Tutti gli utenti"
 
-#: src/features/chat/thread/tool-approval.tsx:172
+#: src/features/chat/thread/tool-approval.tsx:175
 msgid "Allow \"{tool}\" from {server}?"
 msgstr "Consentire \"{tool}\" da {server}?"
 
-#: src/features/chat/thread/tool-approval.tsx:172
+#: src/features/chat/thread/tool-approval.tsx:175
 msgid "Allow \"{tool}\"?"
 msgstr "Consentire \"{tool}\"?"
 
@@ -3282,19 +3282,19 @@ msgstr "Consentire \"{tool}\"?"
 msgid "Allow \"delete_files\" from the drafts server?"
 msgstr ""
 
-#: src/features/chat/thread/tool-approval.tsx:140
+#: src/features/chat/thread/tool-approval.tsx:143
 msgid "Allow {tool} for 1 hour"
 msgstr "Consenti {tool} per 1 ora"
 
-#: src/features/chat/thread/tool-approval.tsx:144
+#: src/features/chat/thread/tool-approval.tsx:147
 msgid "Allow {tool} for today"
 msgstr "Consenti {tool} per oggi"
 
-#: src/features/chat/thread/tool-approval.tsx:142
+#: src/features/chat/thread/tool-approval.tsx:145
 msgid "Allow for 1 hour"
 msgstr "Consenti per 1 ora"
 
-#: src/features/chat/thread/tool-approval.tsx:146
+#: src/features/chat/thread/tool-approval.tsx:149
 msgid "Allow for today"
 msgstr "Consenti per oggi"
 
@@ -3345,12 +3345,12 @@ msgstr "Già collegata a questo thread."
 msgid "Also viewing"
 msgstr "Stanno visualizzando anche"
 
-#: src/features/chat/thread/tool-approval.tsx:136
+#: src/features/chat/thread/tool-approval.tsx:139
 #: src/features/marketing/use-cases/visuals/approvals-visual.tsx:35
 msgid "Always allow"
 msgstr "Consenti sempre"
 
-#: src/features/chat/thread/tool-approval.tsx:134
+#: src/features/chat/thread/tool-approval.tsx:137
 msgid "Always allow {tool}"
 msgstr "Consenti sempre {tool}"
 
@@ -3789,14 +3789,14 @@ msgid "Approvals in Neore: a tool you set to Ask stops before it runs, and you d
 msgstr ""
 
 #: src/features/auth/components/device-approval.tsx:242
-#: src/features/chat/thread/tool-approval.tsx:128
+#: src/features/chat/thread/tool-approval.tsx:131
 #: src/features/develop/components/review-panel.tsx:64
 #: src/features/marketing/use-cases/visuals/approvals-visual.tsx:32
 #: src/features/tasks/components/task-detail-dialog.tsx:104
 msgid "Approve"
 msgstr "Approva"
 
-#: src/features/chat/thread/tool-approval.tsx:126
+#: src/features/chat/thread/tool-approval.tsx:129
 msgid "Approve {tool} once"
 msgstr "Approva {tool} una volta"
 
@@ -3820,7 +3820,7 @@ msgstr ""
 msgid "Approved"
 msgstr ""
 
-#: src/features/chat/thread/tool-approval.tsx:86
+#: src/features/chat/thread/tool-approval.tsx:88
 #: src/features/marketing/use-cases/visuals/approvals-visual.tsx:23
 msgid "Approved — running tool"
 msgstr "Approvato: esecuzione dello strumento"
@@ -8585,7 +8585,7 @@ msgid "Could not send your answer."
 msgstr "Impossibile inviare la tua risposta."
 
 #: src/features/chat/thread/ask-user-prompt.tsx:116
-#: src/features/chat/thread/tool-approval.tsx:75
+#: src/features/chat/thread/tool-approval.tsx:77
 msgid "Could not send your answer. Please try again."
 msgstr "Impossibile inviare la tua risposta. Riprova."
 
@@ -10054,7 +10054,7 @@ msgstr "Attività impegnative in cui contano soprattutto la massima capacità de
 msgid "Denied"
 msgstr "Negato"
 
-#: src/features/chat/thread/tool-approval.tsx:84
+#: src/features/chat/thread/tool-approval.tsx:86
 msgid "Denied — continuing without it"
 msgstr "Rifiutato: si prosegue senza"
 
@@ -10075,12 +10075,12 @@ msgid "Density updated"
 msgstr "Densità aggiornata"
 
 #: src/features/auth/components/device-approval.tsx:233
-#: src/features/chat/thread/tool-approval.tsx:132
+#: src/features/chat/thread/tool-approval.tsx:135
 #: src/features/marketing/use-cases/visuals/approvals-visual.tsx:34
 msgid "Deny"
 msgstr "Rifiuta"
 
-#: src/features/chat/thread/tool-approval.tsx:130
+#: src/features/chat/thread/tool-approval.tsx:133
 msgid "Deny {tool}"
 msgstr "Rifiuta {tool}"
 
@@ -29461,7 +29461,7 @@ msgstr "Mostra orari"
 msgid "Show up to {rowLimit} rows ({byteCount} bytes)"
 msgstr "Mostra fino a {rowLimit} righe ({byteCount} byte)"
 
-#: src/features/chat/thread/tool-approval.tsx:117
+#: src/features/chat/thread/tool-approval.tsx:120
 msgid "Show what it will send"
 msgstr "Mostra cosa invierà"
 
@@ -36603,7 +36603,7 @@ msgstr "In attesa del proprietario"
 msgid "Waiting for the owner to answer"
 msgstr "In attesa della risposta del proprietario"
 
-#: src/features/chat/thread/tool-approval.tsx:81
+#: src/features/chat/thread/tool-approval.tsx:83
 msgid "Waiting for the owner to approve"
 msgstr "In attesa dell'approvazione del proprietario"
 
@@ -36631,7 +36631,7 @@ msgstr "In attesa della tua risposta in {0}"
 
 #: src/features/chat/thread-list/thread-node.tsx:634
 #: src/features/chat/thread-list/thread-node.tsx:641
-#: src/features/chat/thread/tool-approval.tsx:81
+#: src/features/chat/thread/tool-approval.tsx:83
 #: src/features/home/components/home-page.tsx:114
 #: src/features/marketing/use-cases/visuals/approvals-visual.tsx:20
 #: src/features/sub-agents/components/sub-agent-tool-view.tsx:57

@@ -1,7 +1,7 @@
 import type { ArgsOf, ReturnOf } from "@lunora/react";
 import { api } from "@neore/backend/api";
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect, screen, userEvent, waitFor } from "storybook/test";
+import { expect, screen, userEvent, waitFor, within } from "storybook/test";
 
 import { userFixtures } from "@/storybook/fixtures/user";
 import type { LunoraFixture } from "@/storybook/lunora";
@@ -22,14 +22,8 @@ const REQUEST: Request = {
     runId: RUN_ID,
     server: "Files",
     skillSlug: "tidy",
-    task: "Tidy up the files",
     toolName: "delete",
 };
-
-/** Another sub-agent's request in the same conversation: shown on that sub-agent's card, never on this one. */
-const OTHER_RUN: Request = { ...REQUEST, approvalId: "approval-other", runId: "run-2" as Request["runId"], skillSlug: "other", toolName: "move" };
-
-const ALLOWED_FOR_A_PERIOD = /for 1 hour|for today/i;
 
 /** What the answers sent, to check they go to the child's thread. */
 const answers: ArgsOf<typeof api.chat.tool_permissions.respondToToolApproval>[] = [];
@@ -37,7 +31,7 @@ const answers: ArgsOf<typeof api.chat.tool_permissions.respondToToolApproval>[] 
 const handlers = (...fixtures: LunoraFixture[]) =>
     lunoraHandlers(
         ...userFixtures(),
-        lunora(api.sub_agents.functions.listSubAgentApprovals, [REQUEST, OTHER_RUN]),
+        lunora(api.sub_agents.functions.listSubAgentApprovals, [REQUEST]),
         lunora(api.chat.tool_permissions.respondToToolApproval, (args) => {
             answers.push(args);
 
@@ -49,13 +43,6 @@ const handlers = (...fixtures: LunoraFixture[]) =>
 const meta = {
     args: { parentThreadId: "thread-parent", runId: RUN_ID },
     component: SubAgentApprovals,
-    decorators: [
-        (Story) => (
-            <div className="w-[36rem]">
-                <Story />
-            </div>
-        ),
-    ],
     parameters: { layout: "padded", msw: { handlers: { lunora: handlers() } } },
     title: "Chat/Sub-agents/Approval in the parent",
 } satisfies Meta<typeof SubAgentApprovals>;
@@ -64,19 +51,20 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
+const ALLOWED_FOR_A_PERIOD = /for 1 hour|for today/iu;
+
 /** The sub-agent waits: its request names it, the tool and the server, and offers allow once, deny and always allow, never an allow for a period. */
 export const Waiting: Story = {
     play: async ({ canvas }) => {
         const card = await canvas.findByRole("group", { name: '/tidy wants to run "delete"' });
 
         await expect(card).toHaveTextContent("Waiting for your approval");
-        await expect(canvas.getByText("Files")).toBeVisible();
+        await expect(within(card).getByText("Files")).toBeVisible();
         await expect(canvas.getByRole("button", { name: "Approve delete once" })).toBeEnabled();
         await expect(canvas.getByRole("button", { name: "Deny delete" })).toBeEnabled();
         await expect(canvas.getByRole("button", { name: "Always allow delete" })).toBeEnabled();
         // The claim refuses a timed allow for a sub-agent's request, so the card does not offer one.
         await expect(canvas.queryByRole("button", { name: ALLOWED_FOR_A_PERIOD })).not.toBeInTheDocument();
-        await expect(canvas.queryByRole("group", { name: /\/other wants to run/u })).not.toBeInTheDocument();
     },
 };
 
@@ -112,8 +100,8 @@ export const Refused: Story = {
         });
         await waitFor(async () => {
             await expect(canvas.getByRole("button", { name: "Deny delete" })).toBeEnabled();
+            await expect(canvas.getByRole("group", { name: '/tidy wants to run "delete"' })).toHaveTextContent("Waiting for your approval");
         });
-        await expect(canvas.getByRole("group", { name: '/tidy wants to run "delete"' })).toHaveTextContent("Waiting for your approval");
     },
 };
 

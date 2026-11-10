@@ -13,9 +13,6 @@
  *
  * Only the thread owner can answer: the tool runs with the owner's MCP servers
  * and keys. Anyone else sees the request read-only.
- *
- * {@link ToolApprovalCard} is the card itself, also shown in a parent conversation
- * for a sub-agent's request (`features/sub-agents`).
  */
 
 import { useLingui } from "@lingui/react/macro";
@@ -42,18 +39,18 @@ export interface ToolApprovalCardProps {
     approvalId: string | undefined;
     /** "Allow for 1 hour" / "for today": not for a device tool (approved again on the device), nor a sub-agent's request (refused). */
     canAllowForAPeriod: boolean;
-    /** The question the card asks, naming the tool. */
     heading: string;
     input: unknown;
     isOwner: boolean;
+    /** The MCP server the tool comes from, when the heading does not name it. */
+    server?: string | null;
     /** The thread the request is recorded on: the answer is checked on that thread's latest turn. */
     threadId: string | undefined;
-    /** The tool's name, for the buttons' accessible names. */
     tool: string;
 }
 
 /** The request and its answers, for a tool call in this thread or a sub-agent's. */
-export const ToolApprovalCard: FC<ToolApprovalCardProps> = ({ approvalId, canAllowForAPeriod, heading, input, isOwner, threadId, tool }) => {
+export const ToolApprovalCard: FC<ToolApprovalCardProps> = ({ approvalId, canAllowForAPeriod, heading, input, isOwner, server, threadId, tool }) => {
     const { t } = useLingui();
     const crpc = useCRPC();
     const headingId = useId();
@@ -106,6 +103,7 @@ export const ToolApprovalCard: FC<ToolApprovalCardProps> = ({ approvalId, canAll
                     <p className="text-sm font-medium text-amber-900 dark:text-amber-100" id={headingId}>
                         {heading}
                     </p>
+                    {server && <p className="text-xs text-amber-800 dark:text-amber-200">{server}</p>}
                     <p className="text-xs text-amber-800 dark:text-amber-200" role="status">
                         {statusText}
                     </p>

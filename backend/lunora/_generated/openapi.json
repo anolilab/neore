@@ -56302,9 +56302,6 @@
                           }
                         ]
                       },
-                      "task": {
-                        "type": "string"
-                      },
                       "toolName": {
                         "anyOf": [
                           {
@@ -56324,7 +56321,6 @@
                       "runId",
                       "server",
                       "skillSlug",
-                      "task",
                       "toolName"
                     ],
                     "type": "object"

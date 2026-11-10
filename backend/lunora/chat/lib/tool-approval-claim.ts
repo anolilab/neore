@@ -59,51 +59,84 @@ export const findPendingApprovalOnLatestTurn = async (
     return request && { toolName: request.toolName };
 };
 
-/** The same lookup as `findPendingApprovalOnLatestTurn`, with the call's id and arguments too: what a pending request shows a reader. */
-export const findPendingRequestOnLatestTurn = async (
-    ctx: Pick<QueryCtx, "db">,
+/** An unanswered request on a thread's latest assistant turn: the call's id, tool and arguments. */
+export interface PendingToolRequest {
+    input: unknown;
+    toolCallId: string | null;
+    toolName: string | null;
+}
+
+/**
+ * The thread's newest rows, newest first, as far back as the latest-turn check looks: on a branched thread, the end of
+ * the path the user is on. A query that admitted several threads passes a `reader` keyed on this one.
+ */
+export const latestTurnRows = async (
+    reader: Pick<QueryCtx, "db">,
     threadId: Id<"threads">,
-    approvalId: string,
-): Promise<{ input: unknown; toolCallId: string | null; toolName: string | null } | undefined> => {
-    const thread = await ctx.db.get("threads", threadId);
-    // A branched thread's latest turn is the end of the path the user is on;
-    // the newest rows in storage order may belong to a sibling branch.
-    const recent = thread?.activeLeafMessageId
-        ? await loadActivePathTail(ctx, threadId, thread.activeLeafMessageId, LATEST_MESSAGE_WINDOW)
-        : await ctx.db
+    activeLeafMessageId: string | undefined,
+): Promise<Doc<"messages">[]> =>
+    activeLeafMessageId
+        ? await loadActivePathTail(reader, threadId, activeLeafMessageId, LATEST_MESSAGE_WINDOW)
+        : await reader.db
               .query("messages")
               .withIndex("by_threadId_order_stepOrder", (q) => q.eq("threadId", threadId))
               .order("desc")
               .take(LATEST_MESSAGE_WINDOW);
 
-    for (const message of recent) {
-        const role = roleOf(message);
-        const parts = partsOf(message);
+/** The requests in an assistant message's `parts` that `answered` does not hold, by approval id, each with its call. */
+const unansweredRequests = (parts: ReadonlyArray<StoredPart>, answered: ReadonlySet<string>): Map<string, PendingToolRequest> => {
+    const open = new Map<string, PendingToolRequest>();
 
-        if (role === "tool") {
-            if (parts.some((p) => p.type === "tool-approval-response" && p.approvalId === approvalId)) {
-                return undefined;
-            }
-
+    for (const request of parts) {
+        if (request.type !== "tool-approval-request" || request.approvalId === undefined || answered.has(request.approvalId)) {
             continue;
-        }
-
-        if (role !== "assistant") {
-            return undefined;
-        }
-
-        const request = parts.find((p) => p.type === "tool-approval-request" && p.approvalId === approvalId);
-
-        if (!request) {
-            return undefined;
         }
 
         const call = parts.find((p) => p.type === "tool-call" && p.toolCallId === request.toolCallId);
 
-        return { input: call?.input, toolCallId: call?.toolCallId ?? null, toolName: call?.toolName ?? null };
+        open.set(request.approvalId, { input: call?.input, toolCallId: call?.toolCallId ?? null, toolName: call?.toolName ?? null });
     }
 
-    return undefined;
+    return open;
+};
+
+/**
+ * The unanswered requests of the latest assistant turn in `recent` (newest first), by approval id. Tool messages newer
+ * than that turn answer requests; a newer user message (or none in the window) means the conversation moved on.
+ */
+export const openRequestsOfLatestTurn = (recent: ReadonlyArray<Doc<"messages">>): Map<string, PendingToolRequest> => {
+    const answered = new Set<string>();
+
+    for (const message of recent) {
+        const role = roleOf(message);
+
+        if (role === "assistant") {
+            return unansweredRequests(partsOf(message), answered);
+        }
+
+        if (role !== "tool") {
+            return new Map();
+        }
+
+        for (const part of partsOf(message)) {
+            if (part.type === "tool-approval-response" && part.approvalId !== undefined) {
+                answered.add(part.approvalId);
+            }
+        }
+    }
+
+    return new Map();
+};
+
+/** The same lookup as `findPendingApprovalOnLatestTurn`, with the call's id and arguments too: what a pending request shows a reader. */
+export const findPendingRequestOnLatestTurn = async (
+    ctx: Pick<QueryCtx, "db">,
+    threadId: Id<"threads">,
+    approvalId: string,
+): Promise<PendingToolRequest | undefined> => {
+    const thread = await ctx.db.get("threads", threadId);
+
+    return openRequestsOfLatestTurn(await latestTurnRows(ctx, threadId, thread?.activeLeafMessageId)).get(approvalId);
 };
 
 /** Owner, or a non-expired `write`/`admin` grant. */

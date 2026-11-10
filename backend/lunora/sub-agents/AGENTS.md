@@ -50,7 +50,8 @@
   error.
 - **The parent conversation shows a waiting child's requests** (`listSubAgentApprovals`, the card's `SubAgentApprovals`):
   the parent's owner only (NOT_FOUND otherwise, a locked parent needs its proof), bounded, with a locked child left out
-  (its owner unlocks the child to answer). The card answers through `respondToToolApproval` on the child's thread, so the
+  (its owner unlocks the child to answer). It admits the parent and every child, so it reads each child's latest turn
+  through a reader keyed on that child (`admittedThreadMessages`): the guarded `ctx.db` would hand it the parent's rows. The card answers through `respondToToolApproval` on the child's thread, so the
   claim above decides, and it offers no allow for a period.
 - **A one-shot child of the owner's own turn pauses on an `ask` tool** (`pauseForApproval` → `headlessCanAsk`, only
   when `originOfRun(dispatchedBy) === "lead"`): a chain a trigger, task, messenger reply or outside agent started drops

@@ -19,10 +19,12 @@ shared facade, since `lunora/notify.ts` makes a fresh memory store per ctx),
 The ORM-facade reads and
 `agent/admitted-thread-db.ts` stay, as ordinary code, not as a workaround).
 
-**Not filed yet (owner to decide):** in `lunoraTest` (`@lunora/server@alpha.273`), `rls()` ignores a range on the second
-index field of `messages` (read policy: `OR` of `{ userId }` and `{ threadId: { in } }`); the owner-policy `threadGuestLinks`
-honours it. Once a request admitted two or more threads it drops the `threadId` range too, so a read returns every admitted
-thread's rows (`listSubAgentApprovals`' test orders around it). `findSentNote` reads through `admittedThreadDb`;
+**Not filed yet (owner to decide):** `rls()` (`@lunora/server@alpha.273`) ignores a range on the second index field of
+`messages` (read policy: `OR` of `{ userId }` and `{ threadId: { in } }`); the owner-policy `threadGuestLinks` honours it.
+Once a request admitted two or more threads it drops the `threadId` range too, so a read returns every admitted thread's
+rows. `lunoraTest` runs the production engine (`createShardCtxDb` from `@lunora/shard-engine` with this middleware), so
+this is not test-only: a procedure that admits several threads reads each one's messages through a reader keyed on it
+(`admittedThreadDb`, `admittedThreadMessages`; `findSentNote`, `listSubAgentApprovals`).
 `agent/messages.ts#pinFollowingRowParent` is exposed.
 
 **Not filed yet (owner to decide): seed the identity store from SSR.** `@lunora/react`'s `useAuth` / `useAuthState`

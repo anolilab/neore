@@ -24,3 +24,14 @@ export const admittedThreadDb = (context: { db: QueryCtx["db"] }, threadId: stri
     // anything else).
     return readerForAdmittedThread(context, threadId) as unknown as QueryCtx["db"];
 };
+
+/**
+ * ONE admitted thread's messages as a `{ db }` for the latest-turn check and the branch walk (`query` + `db.messages`).
+ * A request that admitted several threads needs it: the guarded `ctx.db` drops the read's own `threadId` range
+ * (docs/agents/lunora-upstream.md). Throws for a thread not admitted, as `readerForAdmittedThread` does.
+ */
+export const admittedThreadMessages = (context: { db: QueryCtx["db"] }, threadId: string): Pick<QueryCtx, "db"> => {
+    const reader = readerForAdmittedThread(context, threadId);
+
+    return { db: { messages: reader.table("messages"), query: reader.query } as unknown as QueryCtx["db"] };
+};
