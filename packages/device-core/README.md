@@ -218,3 +218,9 @@ write to the folder while the agent is starting (a known limit).
 An install, a removal and a prune of old versions run one at a time (`lock_installs`). Deleting an install or a
 staging folder renames it into `acp-agents/.trash` under that lock and deletes it on a thread; trash names carry a
 per-run id, and the sweep at the next install stage removes the entries of other runs only.
+
+`acp_install_npm` (addon only; no desktop caller yet) installs a downloaded tarball: its SHA-512 must equal the
+package index's integrity before and after npm runs, npm runs with `--ignore-scripts` and a scrubbed environment by
+the absolute `node` and `npm` the desktop found (refused if either resolves elsewhere than when the person
+confirmed), the installed package must be the pinned name and version, and its program (a JavaScript file, picked
+like `npx` would) must be inside it. The agent is recorded to run `node <program>`.

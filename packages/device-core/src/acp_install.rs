@@ -37,7 +37,7 @@ use crate::hmac::to_hex;
 const INSTALL_DIR: &str = "acp-agents";
 const STAGING_DIR: &str = ".staging";
 const TRASH_DIR: &str = ".trash";
-const UNPACKED_DIR: &str = "unpacked";
+pub(crate) const UNPACKED_DIR: &str = "unpacked";
 const MAX_UNPACKED_BYTES: u64 = 2 * 1024 * 1024 * 1024;
 const MAX_ENTRIES: usize = 20_000;
 /// All of a registry entry's variables together (names and values), so that starting the agent cannot fail on the
@@ -93,7 +93,7 @@ fn valid_version(version: &str) -> bool {
 }
 
 /// `path` as a relative path of plain names. `.` is dropped; an absolute path, a drive prefix or `..` is refused.
-fn safe_relative(path: &Path) -> Result<PathBuf, String> {
+pub(crate) fn safe_relative(path: &Path) -> Result<PathBuf, String> {
     let mut clean = PathBuf::new();
 
     for component in path.components() {
@@ -124,7 +124,7 @@ fn validate(request: &InstallRequest) -> Result<(), String> {
 
 /// The registry-supplied text every install shares: a plain version, bounded publisher and source, and variables
 /// that pass the checks of a typed one.
-fn validate_provenance(
+pub(crate) fn validate_provenance(
     version: &str,
     publisher: &str,
     source: &str,
@@ -227,7 +227,7 @@ impl DeviceState {
     }
 
     /// The archive's canonical path, which must be a file directly inside one folder made by `acp_install_stage`.
-    fn staged_archive(&self, archive: &str) -> Result<PathBuf, String> {
+    pub(crate) fn staged_archive(&self, archive: &str) -> Result<PathBuf, String> {
         let staging = self.install_root().join(STAGING_DIR);
         let staging = fs::canonicalize(&staging)
             .map_err(|_| "no download was staged: start the install again".to_owned())?;
@@ -325,7 +325,7 @@ impl DeviceState {
     /// Moves the verified `unpacked` folder to `final_dir` (`<data dir>/acp-agents/<key>/<version>`) and records
     /// `agent` with its pin. A failure leaves the agent, and any earlier install of the same version, as it was.
     /// Installing over an installed key drops its folder approvals unless it is the same program.
-    fn commit_install(
+    pub(crate) fn commit_install(
         &self,
         agent: &mut AcpAgent,
         unpacked: &Path,
@@ -612,7 +612,7 @@ fn already_registered(key: &str) -> String {
     format!("an agent with the key “{key}” is already registered by hand: remove it first")
 }
 
-fn create_private_dir(dir: &Path) -> Result<(), String> {
+pub(crate) fn create_private_dir(dir: &Path) -> Result<(), String> {
     #[cfg(unix)]
     {
         use std::os::unix::fs::DirBuilderExt;
