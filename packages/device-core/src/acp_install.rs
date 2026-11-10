@@ -672,14 +672,15 @@ fn run_id() -> &'static str {
 }
 
 /// Deletes what an earlier run left in `trash`, in the background. Entries are named `<run id>-<n>`; this run's
-/// own are being deleted by the thread that made them.
-pub(crate) fn sweep_trash(trash: PathBuf) {
+/// own are being deleted by the thread that made them. Returns that thread (none when the trash is not swept) so a
+/// test can wait for it.
+pub(crate) fn sweep_trash(trash: PathBuf) -> Option<std::thread::JoinHandle<()>> {
     // The trash is ours only while it is a real folder: through a link the sweep would delete what it points at.
     if fs::symlink_metadata(&trash).map_or(true, |meta| !meta.is_dir()) {
-        return;
+        return None;
     }
 
-    std::thread::spawn(move || {
+    Some(std::thread::spawn(move || {
         let own = format!("{}-", run_id());
         let Ok(entries) = fs::read_dir(&trash) else {
             return;
@@ -690,7 +691,7 @@ pub(crate) fn sweep_trash(trash: PathBuf) {
                 remove_entry(&entry.path());
             }
         }
-    });
+    }))
 }
 
 pub(crate) fn sha256_reader(file: &mut fs::File) -> Result<String, String> {

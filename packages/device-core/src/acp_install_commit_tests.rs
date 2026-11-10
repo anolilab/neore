@@ -251,7 +251,7 @@ fn starting_an_install_leaves_clearing_old_trash_to_a_thread() {
 #[cfg(unix)]
 #[test]
 fn a_trash_folder_that_is_a_link_is_not_swept() {
-    let (state, dir) = state("trash-link");
+    let (_, dir) = state("trash-link");
     let outside = dir.join("outside");
     let precious = outside.join("99999999.1-0");
 
@@ -259,10 +259,12 @@ fn a_trash_folder_that_is_a_link_is_not_swept() {
     fs::write(precious.join("keep"), "x").unwrap();
     fs::create_dir_all(dir.join("acp-agents")).unwrap();
     std::os::unix::fs::symlink(&outside, dir.join("acp-agents/.trash")).unwrap();
-    state.acp_install_stage().unwrap();
 
-    // The sweep is a thread; give it ample time to have done damage if it were going to.
-    std::thread::sleep(Duration::from_millis(500));
+    // Wait for the sweep itself, so it has finished whatever it was going to do before the check.
+    if let Some(sweep) = sweep_trash(dir.join("acp-agents/.trash")) {
+        sweep.join().unwrap();
+    }
+
     assert!(
         precious.join("keep").exists(),
         "nothing behind the link is removed"
