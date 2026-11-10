@@ -11,6 +11,7 @@ import schema from "../schema";
 import { selectableTextModels } from "../skills/builder-logic";
 import { ANONYMOUS_TASKS_MESSAGE } from "./account";
 import { cancelTask, createTask, reviewTask, runTask, updateTask } from "./functions";
+import { checkDueTasks } from "./internal";
 import { MAX_RECURRING_TASKS_PER_USER } from "./logic";
 
 // `user` is a `.global()` (D1) table the in-memory harness cannot write: the
@@ -353,6 +354,7 @@ describe("cancelling a failed task", () => {
                     maxRepairRounds: 2,
                     recurring: false,
                     status: "failed",
+                    stuckCheckAt: 1,
                     title: "Broke",
                     updatedAt: 1,
                     userId: USER,
@@ -365,5 +367,16 @@ describe("cancelling a failed task", () => {
 
         expect(row.status).toBe("todo");
         expect(row.updatedAt).not.toBe(1);
+
+        // The stuck sweep runs with the check that was due: a task that is no longer failed or blocked must not be notified.
+        await harness.run(async (ctx: any) => await ctx.runMutation(checkDueTasks, {}));
+
+        const notices: any[] = await harness.run(async (ctx: any) => {
+            const rows = await ctx.db.query("notifications").collect();
+
+            return rows.filter((notice: any) => notice.type === "task_stuck" && notice.userId === USER);
+        });
+
+        expect(notices).toStrictEqual([]);
     });
 });
