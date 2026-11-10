@@ -34292,6 +34292,10 @@
                                 "type": "string"
                               },
                               {
+                                "const": "task_stuck",
+                                "type": "string"
+                              },
+                              {
                                 "const": "tool_approval",
                                 "type": "string"
                               },
@@ -37990,6 +37994,10 @@
                             "anyOf": [
                               {
                                 "const": "task",
+                                "type": "string"
+                              },
+                              {
+                                "const": "task_stuck",
                                 "type": "string"
                               },
                               {

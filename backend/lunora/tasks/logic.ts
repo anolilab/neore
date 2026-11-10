@@ -576,6 +576,62 @@ export const recurrenceSkipReason = (status: TaskStatus): TaskSkipReason | undef
     return status === "blocked" ? "blocked" : "still_running";
 };
 
+// ─── Stuck tasks ─────────────────────────────────────────────────────────────
+
+/** Idle days at which the owner is told a task is stuck. Each level fires once per stuck episode. */
+export const STUCK_NOTICE_DAYS = [2, 7] as const;
+
+const DAY_MS = 24 * 60 * 60_000;
+
+/**
+ * Statuses the stuck ladder covers: `blocked` (waiting on dependencies that nothing moves on its own) and `failed`
+ * (nothing retries it). `queued` and `running` are failed by the stale sweep within an hour, `todo` is a task the
+ * owner has not started, and `needs_review` waits on the owner.
+ */
+export const STUCK_CHECK_STATUSES = ["blocked", "failed"] as const;
+
+/** How long a stuck-check waits when the owner must decide first, before it looks again. */
+export const STUCK_OWNER_RECHECK_MS = DAY_MS;
+
+/** The first stuck check of an episode: the first notice level after `at`, the moment the task last moved. */
+export const firstStuckCheckAt = (at: number): number => at + STUCK_NOTICE_DAYS[0] * DAY_MS;
+
+/**
+ * When the sweep next looks at a task after this one: the next notice level of its episode that is still ahead, or
+ * `undefined` once the episode has nothing left to send. `sentNow` is a level the sweep just sent.
+ */
+export const nextStuckCheckAt = (
+    task: { stuckNotice?: { days: number; since: number }; updatedAt: number },
+    sentNow: number | undefined,
+    now: number,
+): number | undefined => {
+    const sent = sentNow ?? (task.stuckNotice?.since === task.updatedAt ? task.stuckNotice.days : 0);
+    const days = STUCK_NOTICE_DAYS.find((level) => level > sent && task.updatedAt + level * DAY_MS > now);
+
+    return days === undefined ? undefined : task.updatedAt + days * DAY_MS;
+};
+
+/** A task waiting on a dependency the owner must decide on (`needs_review`) is not stuck: the owner has the next move. */
+export const waitsOnOwnerDecision = (dependsOn: ReadonlyArray<string>, statusById: ReadonlyMap<string, TaskStatus>): boolean =>
+    dependsOn.some((id) => statusById.get(id) === "needs_review");
+
+/**
+ * The stuck notice to send now, as its level in days, or `undefined`. `updatedAt` is the episode's start: any progress
+ * moves it, which opens a new episode. `stuckNotice` holds the last level sent and the episode it was sent in; a notice
+ * from an earlier episode does not count. A sweep that was down for a week sends only the 7-day notice, the highest level reached.
+ */
+export const stuckNoticeDue = (
+    task: { stuckNotice?: { days: number; since: number }; updatedAt: number },
+    now: number,
+): (typeof STUCK_NOTICE_DAYS)[number] | undefined => {
+    const idleMs = now - task.updatedAt;
+    const sent = task.stuckNotice?.since === task.updatedAt ? task.stuckNotice.days : 0;
+    // Ascending, so the last match is the highest level reached.
+    const reached = STUCK_NOTICE_DAYS.filter((days) => idleMs >= days * DAY_MS && days > sent);
+
+    return reached.at(-1);
+};
+
 // ─── Where a run goes ────────────────────────────────────────────────────────
 
 export type TaskRunDestination = "continue_thread" | "fresh_context" | "new_thread";

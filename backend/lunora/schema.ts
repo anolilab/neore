@@ -2790,6 +2790,10 @@ export const schema = defineSchema({
         runDestination: v.optional(vTaskRunDestination),
         skillId: v.optional(v.id("skills")),
         status: vTaskStatus,
+        // When the stuck sweep next looks at this task; unset once its episode has no notice left (`tasks/AGENTS.md`).
+        stuckCheckAt: v.optional(v.number()),
+        // The last stuck notice sent (2 or 7 idle days) and the episode it was sent in (`updatedAt` when that began).
+        stuckNotice: v.optional(v.object({ days: v.number(), since: v.number() })),
         successCriteria: v.optional(v.string()),
         title: v.string(),
         updatedAt: v.number(),
@@ -2799,7 +2803,8 @@ export const schema = defineSchema({
         .index("by_user_and_status", ["userId", "status"])
         .index("by_user_and_goal", ["userId", "goalId"])
         .index("by_recurring_and_nextRunAt", ["recurring", "nextRunAt"])
-        .index("by_status_and_updatedAt", ["status", "updatedAt"]),
+        .index("by_status_and_updatedAt", ["status", "updatedAt"])
+        .index("by_status_and_stuckCheckAt", ["status", "stuckCheckAt"]),
 
     team: defineTable({
         createdAt: v.number(),

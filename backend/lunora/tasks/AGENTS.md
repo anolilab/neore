@@ -48,6 +48,17 @@ recurring tasks. State machine and idempotency are explained at the top of `inte
 - Only `completeRound` reaching `done` sends a success notification (`notifyTaskRound`); an error, a
   `needs_review` result and the stale sweep send a failure, and a decision in `reviewTask` sends none.
 
+## STUCK TASKS: 2 AND 7 DAYS
+
+- A `blocked` or `failed` task that makes no progress gets the owner's notice at 2 and 7 idle days, once each per
+  episode (`escalateStuckTasks`, `stuckNoticeDue`). An episode starts at `updatedAt`.
+- Reads go through the index `by_status_and_stuckCheckAt`, so a task is read only when its `stuckCheckAt` is due.
+  **Every write that sets `updatedAt` on a task also sets `stuckCheckAt`** (`firstStuckCheckAt`): `startTask`,
+  `failedTaskPatch`, `reviewTask`'s reject, `promoteDependents`, the edit and goal-detach paths. Forget it and the
+  task is never looked at again.
+- A blocked task waiting on a `needs_review` dependency is re-checked daily and not notified.
+- The notice carries the title only (`task_stuck`); never put instructions, errors or results in its body.
+
 ## WHERE A RUN GOES, AND ITS EFFORT
 
 - `tasks.runDestination` (recurring tasks only; unset = `new_thread`): `new_thread` each run, `continue_thread`

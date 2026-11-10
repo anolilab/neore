@@ -51,6 +51,12 @@ import {
     isPassingFallback,
     pickRunThread,
     recurrenceSkipReason,
+    firstStuckCheckAt,
+    nextStuckCheckAt,
+    STUCK_CHECK_STATUSES,
+    STUCK_OWNER_RECHECK_MS,
+    stuckNoticeDue,
+    waitsOnOwnerDecision,
 } from "./logic";
 import { vTaskRunNoticeReason, vTaskRunOrigin, vVerdict } from "./validators";
 import { vCodingAgentAssignment } from "../coding-agents/validators";
@@ -122,7 +128,12 @@ export const startTask = async (
     }
 
     if (target === "blocked") {
-        await patchById(ctx.db, "tasks", task._id, { activeCycle: undefined, status: "blocked", updatedAt: now });
+        await patchById(ctx.db, "tasks", task._id, {
+            activeCycle: undefined,
+            status: "blocked",
+            stuckCheckAt: firstStuckCheckAt(now),
+            updatedAt: now,
+        });
 
         return "blocked";
     }
@@ -144,6 +155,62 @@ export const promoteDependents = async (ctx: MutationCtx, completed: Doc<"tasks"
     for (const task of tasks) {
         if (unblocked.has(task._id as string)) {
             await queueCycle(ctx, task, "dependency", now);
+        } else if (task.status === "blocked" && task.dependsOn.includes(completed._id)) {
+            // Still waiting on another dependency, but this one moved: progress, so the stuck clock restarts.
+            await patchById(ctx.db, "tasks", task._id, { stuckCheckAt: firstStuckCheckAt(now), updatedAt: now });
+        }
+    }
+};
+
+/**
+ * Asks the owner, once per level and stuck episode, about a blocked or failed task that has made no progress for 2 or
+ * 7 days (`STUCK_NOTICE_DAYS`). Only tasks whose `stuckCheckAt` has come due are read, so a task whose notices are
+ * out costs nothing until its episode changes. A blocked task waiting on a dependency that needs the owner's review
+ * is looked at again daily. Writes the notice state without touching `updatedAt`, so the notice is not progress.
+ */
+const escalateStuckTasks = async (ctx: MutationCtx, now: number): Promise<void> => {
+    const statusesByUser = new Map<string, Map<string, TaskStatus>>();
+
+    for (const status of STUCK_CHECK_STATUSES) {
+        const due = await ctx.db
+            .query("tasks")
+            .withIndex("by_status_and_stuckCheckAt", (q) => q.eq("status", status).lte("stuckCheckAt", now))
+            .take(SWEEP_BATCH);
+
+        for (const task of due) {
+            let statusById = statusesByUser.get(task.userId);
+
+            if (!statusById) {
+                statusById = statusMap(await loadUserTasks(ctx, task.userId));
+                statusesByUser.set(task.userId, statusById);
+            }
+
+            if (task.status === "blocked" && waitsOnOwnerDecision(task.dependsOn, statusById)) {
+                await patchById(ctx.db, "tasks", task._id, { stuckCheckAt: now + STUCK_OWNER_RECHECK_MS });
+
+                continue;
+            }
+
+            const days = stuckNoticeDue(task, now);
+
+            await patchById(ctx.db, "tasks", task._id, {
+                stuckCheckAt: nextStuckCheckAt(task, days, now),
+                ...(days !== undefined && { stuckNotice: { days, since: task.updatedAt } }),
+            });
+
+            if (days === undefined) {
+                continue;
+            }
+
+            // The subject only: the notice names the task and carries no instructions, errors or results, so the lock screen
+            // shows nothing more than the title (`notifications/AGENTS.md`).
+            await notifyQuietly(ctx, {
+                dedupeKey: `task-stuck:${task._id}:${task.updatedAt}:${days}`,
+                link: "/tasks",
+                title: task.title,
+                type: "task_stuck",
+                userId: task.userId,
+            });
         }
     }
 };
@@ -171,6 +238,7 @@ const failedTaskPatch = (lastError: string, now: number) => {
         lastError,
         resultSummary: undefined,
         status: "failed" as const,
+        stuckCheckAt: firstStuckCheckAt(now),
         updatedAt: now,
     };
 };
@@ -737,6 +805,8 @@ export const checkDueTasks = internalMutation
                 await failStaleTask(task, STALE_MESSAGE[status]);
             }
         }
+
+        await escalateStuckTasks(ctx, now);
 
         const due = pickFairRecurrences(
             await ctx.db

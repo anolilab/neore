@@ -17,11 +17,14 @@ import {
     MIN_RECURRENCE_INTERVAL_MS,
     nextRecurrenceAt,
     parseVerifierOutput,
+    nextStuckCheckAt,
     pickFairRecurrences,
     pickRunThread,
     resolveTaskModel,
     shouldRecurNow,
+    stuckNoticeDue,
     validateParent,
+    waitsOnOwnerDecision,
 } from "./logic";
 
 const graphOf = (edges: Record<string, string[]>): Map<string, string[]> => new Map(Object.entries(edges));
@@ -450,6 +453,67 @@ describe(pickRunThread, () => {
             fallback: "thread_busy",
             freshContext: false,
         });
+    });
+});
+
+describe(stuckNoticeDue, () => {
+    const DAY = 24 * 60 * 60_000;
+    const SINCE = 1_000_000;
+
+    it("asks at 2 idle days, not before", () => {
+        expect(stuckNoticeDue({ updatedAt: SINCE }, SINCE + 2 * DAY - 1)).toBeUndefined();
+        expect(stuckNoticeDue({ updatedAt: SINCE }, SINCE + 2 * DAY)).toBe(2);
+    });
+
+    it("asks once more at 7 idle days, after the 2-day notice of the same episode", () => {
+        expect(stuckNoticeDue({ stuckNotice: { days: 2, since: SINCE }, updatedAt: SINCE }, SINCE + 6 * DAY)).toBeUndefined();
+        expect(stuckNoticeDue({ stuckNotice: { days: 2, since: SINCE }, updatedAt: SINCE }, SINCE + 7 * DAY)).toBe(7);
+    });
+
+    it("sends nothing more once the 7-day notice of the episode is out", () => {
+        expect(stuckNoticeDue({ stuckNotice: { days: 7, since: SINCE }, updatedAt: SINCE }, SINCE + 30 * DAY)).toBeUndefined();
+    });
+
+    it("ignores a notice from an earlier episode, so progress reopens the ladder", () => {
+        expect(stuckNoticeDue({ stuckNotice: { days: 7, since: SINCE }, updatedAt: SINCE + 10 * DAY }, SINCE + 12 * DAY)).toBe(2);
+    });
+
+    it("sends only the highest level when the sweep was down for a week", () => {
+        expect(stuckNoticeDue({ updatedAt: SINCE }, SINCE + 8 * DAY)).toBe(7);
+    });
+});
+
+describe(nextStuckCheckAt, () => {
+    const DAY = 24 * 60 * 60_000;
+    const SINCE = 1_000_000;
+
+    it("looks again at the 7-day level after the 2-day notice of the episode", () => {
+        expect(nextStuckCheckAt({ stuckNotice: { days: 2, since: SINCE }, updatedAt: SINCE }, 2, SINCE + 2 * DAY)).toBe(SINCE + 7 * DAY);
+    });
+
+    it("looks at the 2-day level first for a fresh episode", () => {
+        expect(nextStuckCheckAt({ updatedAt: SINCE }, undefined, SINCE)).toBe(SINCE + 2 * DAY);
+    });
+
+    it("is done once the 7-day notice is out", () => {
+        expect(nextStuckCheckAt({ stuckNotice: { days: 7, since: SINCE }, updatedAt: SINCE }, 7, SINCE + 7 * DAY)).toBeUndefined();
+    });
+
+    it("ignores an earlier episode's notice when it computes the next look", () => {
+        expect(nextStuckCheckAt({ stuckNotice: { days: 7, since: SINCE }, updatedAt: SINCE + DAY }, undefined, SINCE + 2 * DAY)).toBe(SINCE + 3 * DAY);
+    });
+});
+
+describe("stuck task owner decision", () => {
+    it("treats only a task blocked on a needs_review dependency as waiting on the owner", () => {
+        const statuses = new Map<string, TaskStatus>([
+            ["a", "needs_review"],
+            ["b", "failed"],
+        ]);
+
+        expect(waitsOnOwnerDecision(["a"], statuses)).toBe(true);
+        expect(waitsOnOwnerDecision(["b"], statuses)).toBe(false);
+        expect(waitsOnOwnerDecision(["b", "a"], statuses)).toBe(true);
     });
 });
 

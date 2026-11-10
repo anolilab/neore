@@ -12,6 +12,7 @@ export type NotificationType =
     | "secret_request"
     | "sub_agent"
     | "task"
+    | "task_stuck"
     | "tool_approval"
     | "trigger"
     | "usage_alert";
@@ -64,6 +65,9 @@ const useNotificationHeadline = (): ((notification: NotificationLike) => string)
                 }
                 case "task": {
                     return failed ? t`Task failed` : t`Task finished`;
+                }
+                case "task_stuck": {
+                    return t`A task is stuck`;
                 }
                 case "tool_approval": {
                     return t`A tool call needs your approval`;

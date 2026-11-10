@@ -35,6 +35,7 @@ import {
     MAX_RECURRING_TASKS_PER_USER,
     MAX_REPAIR_ROUNDS_LIMIT,
     MAX_TASKS_PER_USER,
+    firstStuckCheckAt,
     nextRecurrenceAt,
     TASK_CRITERIA_MAX,
     TASK_EFFORT_MAX,
@@ -605,7 +606,7 @@ export const deleteGoal = authMutation
             .take(MAX_TASKS_PER_USER);
         const { now } = ctx;
 
-        await Promise.all(tasks.map((task) => patchRow(ctx.db, "tasks", task, { goalId: undefined, updatedAt: now })));
+        await Promise.all(tasks.map((task) => patchRow(ctx.db, "tasks", task, { goalId: undefined, stuckCheckAt: firstStuckCheckAt(now), updatedAt: now })));
         await ctx.db.delete("goals", args.goalId);
 
         ctx.log.event("tasks.delete_goal", { detachedTaskCount: tasks.length, goalId: args.goalId });
@@ -727,6 +728,7 @@ export const updateTask = authMutation
             recurring: definition.recurring,
             runDestination: definition.runDestination,
             skillId: definition.skillId,
+            stuckCheckAt: firstStuckCheckAt(now),
             successCriteria: definition.successCriteria,
             title: definition.title,
             updatedAt: now,
@@ -787,7 +789,7 @@ export const deleteTask = authMutation
                 continue;
             }
 
-            await patchRow(ctx.db, "tasks", other, { ...patch, updatedAt: now });
+            await patchRow(ctx.db, "tasks", other, { ...patch, stuckCheckAt: firstStuckCheckAt(now), updatedAt: now });
 
             if (patch.dependsOn && other.status === "blocked" && areDependenciesDone(patch.dependsOn, statusById)) {
                 await queueCycle(ctx, other, "dependency", now);
@@ -886,7 +888,12 @@ export const reviewTask = authMutation
         }
 
         if (args.decision === "reject") {
-            await ctx.db.patch("tasks", task._id, { lastError: "Rejected in review", status: "failed", updatedAt: now });
+            await ctx.db.patch("tasks", task._id, {
+                lastError: "Rejected in review",
+                status: "failed",
+                stuckCheckAt: firstStuckCheckAt(now),
+                updatedAt: now,
+            });
 
             ctx.log.event("tasks.review_task", { decision: args.decision, taskId: task._id });
 
