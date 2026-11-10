@@ -84,9 +84,11 @@ const CountdownToastCard = ({
         };
 
         const remaining = () => remainingMs - (runningSince === null ? 0 : performance.now() - runningSince);
-        // Focus moves after focusout/focusin fire, so re-check once the focus change has settled.
+        // During focusin the new element already has focus, so the pause starts at once. During focusout it does not
+        // yet, so resuming waits one task.
         let focusTimer: ReturnType<typeof globalThis.setTimeout> | undefined;
-        const onFocusChange = () => {
+        const onFocusIn = () => sync();
+        const onFocusOut = () => {
             globalThis.clearTimeout(focusTimer);
             focusTimer = globalThis.setTimeout(sync, 0);
         };
@@ -101,8 +103,8 @@ const CountdownToastCard = ({
 
         toastElement?.addEventListener("pointerenter", onPointerEnter);
         toastElement?.addEventListener("pointerleave", onPointerLeave);
-        toastElement?.addEventListener("focusin", onFocusChange);
-        toastElement?.addEventListener("focusout", onFocusChange);
+        toastElement?.addEventListener("focusin", onFocusIn);
+        toastElement?.addEventListener("focusout", onFocusOut);
         document.addEventListener("visibilitychange", sync);
 
         sync();
@@ -127,8 +129,8 @@ const CountdownToastCard = ({
             globalThis.clearTimeout(focusTimer);
             toastElement?.removeEventListener("pointerenter", onPointerEnter);
             toastElement?.removeEventListener("pointerleave", onPointerLeave);
-            toastElement?.removeEventListener("focusin", onFocusChange);
-            toastElement?.removeEventListener("focusout", onFocusChange);
+            toastElement?.removeEventListener("focusin", onFocusIn);
+            toastElement?.removeEventListener("focusout", onFocusOut);
             document.removeEventListener("visibilitychange", sync);
         };
     }, [duration, id]);
