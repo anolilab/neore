@@ -220,7 +220,8 @@ const waitOf = async (ctx: MutationCtx, dependsOn: ReadonlyArray<string>): Promi
         }
     }
 
-    return { owner, slot };
+    // A chain longer than the search reads may still end in an owner's review past the limit: that is not ruled out, so the task waits.
+    return { owner: owner || queue.length > 0, slot };
 };
 
 /**

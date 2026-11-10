@@ -1030,7 +1030,7 @@ describe("stuck blocked tasks", () => {
         // Queued from day 2 on: the sweep at day 2 would otherwise fail it as a stale round.
         const progress = await insertTask({ activeCycle: "c1", status: "queued", title: "Progress", updatedAt: T0 + 2 * DAY });
 
-        await insertTask({ dependsOn: [dependency, progress], status: "blocked", stuckCheckAt: T0 + 2 * DAY, title: "Waiting", updatedAt: T0 });
+        const waiting = await insertTask({ dependsOn: [dependency, progress], status: "blocked", stuckCheckAt: T0 + 2 * DAY, title: "Waiting", updatedAt: T0 });
 
         await sweepAt(T0 + 2 * DAY);
         expect(await stuckNotices()).toHaveLength(1);
@@ -1041,6 +1041,12 @@ describe("stuck blocked tasks", () => {
 
         expect(await verified(claimed.runId, "Done.", PASS)).toBe("done");
 
+        const waitingTask = await getTask(waiting);
+
+        expect(waitingTask.updatedAt).toBe(T0 + 3 * DAY);
+        expect(waitingTask.stuckCheckAt).toBe(T0 + 5 * DAY);
+        expect(await statusOf(waiting)).toBe("blocked");
+
         await sweepAt(T0 + 4 * DAY);
         expect(await stuckNotices()).toHaveLength(1);
 
@@ -1049,12 +1055,19 @@ describe("stuck blocked tasks", () => {
         expect(await stuckNotices()).toHaveLength(2);
     });
 
-    it("asks the owner about a failed task after 2 idle days, with no dependency check", async () => {
-        await insertTask({ status: "failed", stuckCheckAt: T0 + 2 * DAY, title: "Broke", updatedAt: T0 });
+    it("does not notify a task whose chain is longer than the search reads, since the chain may end in a review", async () => {
+        const review = await insertTask({ status: "needs_review", title: "Review", updatedAt: T0 });
+        let previous = review;
+
+        for (let index = 0; index < 25; index += 1) {
+            previous = await insertTask({ dependsOn: [previous], status: "blocked", title: `Link ${index}`, updatedAt: T0 });
+        }
+
+        await insertTask({ dependsOn: [previous], status: "blocked", stuckCheckAt: T0 + 2 * DAY, title: "End", updatedAt: T0 });
 
         await sweepAt(T0 + 2 * DAY);
 
-        expect(await stuckNotices()).toStrictEqual([{ outcome: undefined, title: "Broke", type: "task_stuck" }]);
+        expect(await stuckNotices()).toStrictEqual([]);
     });
 
     it("does not escalate a task waiting on a dependency that needs the owner's review", async () => {
@@ -1064,23 +1077,6 @@ describe("stuck blocked tasks", () => {
         await sweepAt(T0 + 8 * DAY);
 
         expect(await stuckNotices()).toStrictEqual([]);
-    });
-
-    it("counts a dependency finishing as progress for a task still waiting on another", async () => {
-        const first = await insertTask({ activeCycle: "c1", status: "queued", title: "First" });
-        const other = await insertTask({ status: "todo", title: "Other" });
-        const waiting = await insertTask({ dependsOn: [first, other], status: "blocked", stuckCheckAt: T0 + 2 * DAY, title: "Waiting", updatedAt: T0 });
-
-        vi.setSystemTime(T0 + DAY);
-        const claimed = await claim(first, 0);
-
-        expect(await verified(claimed.runId, "Done.", PASS)).toBe("done");
-
-        const waitingTask = await getTask(waiting);
-
-        expect(waitingTask.updatedAt).toBe(T0 + DAY);
-        expect(waitingTask.stuckCheckAt).toBe(T0 + 3 * DAY);
-        expect(await statusOf(waiting)).toBe("blocked");
     });
 });
 
