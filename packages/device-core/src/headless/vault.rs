@@ -15,6 +15,7 @@ use zeroize::{Zeroize, Zeroizing};
 const SERVICE: &str = "dev.neore.host";
 const PROBE_ACCOUNT: &str = "probe";
 const FILE_NAME: &str = "host.json";
+const LOCK_NAME: &str = "vault.lock";
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
@@ -236,8 +237,11 @@ impl<'a> Vault<'a> {
 
     /// Where a secret would go right now: the keychain if it round-trips a value, else the file. Announced with the
     /// code, so the owner sees the choice before approving. The probe entry is removed. An error when neither can
-    /// hold it, so a pairing stops before a code is shown that `save` could only refuse.
+    /// hold it, or when the folder the pairing would be saved in is not one the vault accepts (created owner-only if
+    /// missing, its parent checked), so a pairing stops before a code is shown that `save` could only refuse.
     pub fn probe(&self) -> Result<Storage, String> {
+        ensure_private_dir(&self.dir)?;
+
         let value = "neore-host-probe";
         let works = self.keychain.set(PROBE_ACCOUNT, value).is_ok()
             && self.keychain.get(PROBE_ACCOUNT).ok().flatten().as_deref() == Some(value);
@@ -250,7 +254,13 @@ impl<'a> Vault<'a> {
     /// Stores the pairing where `storage` says: the place [`probe`](Self::probe) announced before the owner approved.
     /// It never switches to the other one, because the owner approved THAT choice. When it cannot hold the secret
     /// there, an error: the secret is not kept anywhere, and nothing of it is left behind.
+    ///
+    /// Under the vault's lock, so a second `save` or an `unpair` cannot interleave with this one. The record goes
+    /// first and the keychain second: a crash between them leaves a record whose secret is missing, which `load`
+    /// reports and `forget` clears, where the other order would leave a secret nothing points to.
     pub fn save(&self, pairing: &NewPairing<'_>, storage: Storage) -> Result<(), String> {
+        let _lock = Lock::acquire(&self.dir)?;
+
         // Saving over a pairing would leave its keychain entry behind with nothing pointing to it.
         if fs::symlink_metadata(self.file()).is_ok() {
             return Err(format!(
@@ -270,15 +280,14 @@ impl<'a> Vault<'a> {
 
         match storage {
             Storage::Keychain => {
+                write_private(&self.dir, &self.file(), &record)?;
+
                 let account = account_of(pairing.backend, pairing.device_id);
 
-                self.keychain
-                    .set(&account, pairing.secret)
-                    .map_err(|reason| format!("the keychain refused the secret ({reason})"))?;
-
-                write_private(&self.dir, &self.file(), &record).inspect_err(|_| {
-                    let _ = self.keychain.delete(&account);
-                })
+                match self.keychain.set(&account, pairing.secret) {
+                    Ok(()) => Ok(()),
+                    Err(reason) => Err(self.undo_keychain_save(&account, &reason)),
+                }
             }
             Storage::File => {
                 record.secret = pairing.secret.to_owned();
@@ -289,24 +298,43 @@ impl<'a> Vault<'a> {
         }
     }
 
+    /// The keychain refused the secret after the record was written: take the record back, and the entry in case
+    /// the refusal came after it was stored. What cannot be undone is named, so the person can remove it by hand.
+    fn undo_keychain_save(&self, account: &str, reason: &str) -> String {
+        let mut message = format!("the keychain refused the secret ({reason})");
+
+        if let Err(error) = fs::remove_file(self.file()) {
+            message.push_str(&format!(
+                "; {} could not be removed ({error}): remove it by hand",
+                self.file().display()
+            ));
+        }
+
+        if let Err(error) = self.keychain.delete(account) {
+            message.push_str(&format!(
+                "; the keychain entry (service {SERVICE}, account {account}) could not be removed ({error}): remove it by hand if it exists"
+            ));
+        }
+
+        message
+    }
+
     /// The pairing and its secret. `Ok(None)` when this machine is not paired.
     pub fn load(&self) -> Result<Option<Loaded>, String> {
+        let Some(_lock) = Lock::acquire_existing(&self.dir)? else {
+            return Ok(None);
+        };
+
         let path = self.file();
-
-        refuse_untrusted_dir(&self.dir)?;
-        refuse_untrusted_record(&path)?;
-
-        let text = match fs::read_to_string(&path) {
-            Ok(text) => Zeroizing::new(text),
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
-            Err(error) => return Err(format!("{} could not be read: {error}", path.display())),
+        let Some((text, mode)) = read_trusted(&path)? else {
+            return Ok(None);
         };
         let record: Record = serde_json::from_str(&text)
             .map_err(|_| format!("{} is not a pairing record", path.display()))?;
 
         let secret = match record.storage {
             Storage::File => {
-                refuse_shared_file(&path)?;
+                refuse_shared_mode(&path, mode)?;
 
                 if record.secret.is_empty() {
                     return Err(format!("{} holds no secret", path.display()));
@@ -332,28 +360,37 @@ impl<'a> Vault<'a> {
     /// The record alone, without the secret: what `unpair` needs to name and remove a pairing even when the keychain
     /// cannot be read. `Ok(None)` when this machine is not paired.
     pub fn record(&self) -> Result<Option<Record>, String> {
+        let Some(_lock) = Lock::acquire_existing(&self.dir)? else {
+            return Ok(None);
+        };
+
+        self.record_locked()
+    }
+
+    fn record_locked(&self) -> Result<Option<Record>, String> {
         let path = self.file();
 
-        refuse_untrusted_dir(&self.dir)?;
-        refuse_untrusted_record(&path)?;
-
-        match fs::read_to_string(&path).map(Zeroizing::new) {
-            Ok(text) => serde_json::from_str(&text).map(Some).map_err(|_| {
+        match read_trusted(&path)? {
+            Some((text, _)) => serde_json::from_str(&text).map(Some).map_err(|_| {
                 format!(
                     "{} is not a pairing record; remove it by hand",
                     path.display()
                 )
             }),
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
-            Err(error) => Err(format!("{} could not be read: {error}", path.display())),
+            None => Ok(None),
         }
     }
 
     /// Forgets the pairing on this machine (the owner removes the device in the web app). The keychain entry goes
     /// first, and the record only once it is gone: a keychain that cannot be reached (locked) is an error that keeps
-    /// the record, so `unpair` can be run again, instead of leaving a secret nothing on disk points to.
+    /// the record, so `unpair` can be run again, instead of leaving a secret nothing on disk points to. Under the
+    /// vault's lock, so it cannot interleave with a `save`.
     pub fn forget(&self) -> Result<(), String> {
-        if let Some(record) = self.record()? {
+        let Some(_lock) = Lock::acquire_existing(&self.dir)? else {
+            return Ok(());
+        };
+
+        if let Some(record) = self.record_locked()? {
             if record.storage == Storage::Keychain {
                 self.keychain
                     .delete(&account_of(&record.backend, &record.device_id))
@@ -373,6 +410,52 @@ impl<'a> Vault<'a> {
         }
 
         Ok(())
+    }
+}
+
+/// Held while the vault changes or reads the pairing, so `save`, `forget` and `load` of two commands never
+/// interleave. An operating-system lock on a file in the vault folder: it goes with the process, so a crash
+/// leaves nothing stale. A lock that is held is refused rather than waited for.
+struct Lock {
+    _file: fs::File,
+}
+
+impl Lock {
+    /// Creates the (owner-only) folder if it is missing, and the lock with it.
+    fn acquire(dir: &Path) -> Result<Self, String> {
+        ensure_private_dir(dir)?;
+
+        let path = dir.join(LOCK_NAME);
+        let mut options = fs::OpenOptions::new();
+
+        options.write(true).create(true).truncate(false);
+
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::OpenOptionsExt;
+
+            options.mode(0o600);
+        }
+
+        let file = options
+            .open(&path)
+            .map_err(|error| format!("{} could not be opened: {error}", path.display()))?;
+
+        file.try_lock().map_err(|_| {
+            "another neore-host command is changing this pairing; wait for it to finish and try again"
+                .to_owned()
+        })?;
+
+        Ok(Lock { _file: file })
+    }
+
+    /// `None` when there is no folder, so nothing is paired and nothing needs holding.
+    fn acquire_existing(dir: &Path) -> Result<Option<Self>, String> {
+        match fs::symlink_metadata(dir) {
+            Ok(_) => Self::acquire(dir).map(Some),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
+            Err(error) => Err(format!("{} could not be read: {error}", dir.display())),
+        }
     }
 }
 
@@ -433,44 +516,73 @@ fn refuse_untrusted_dir(_dir: &Path) -> Result<(), String> {
     Ok(())
 }
 
-/// The record is a file of this user, not a link to somewhere else.
+/// Opens the record without following a link, checks the OPENED file (a plain file of this user), and reads from that
+/// same handle, so the path cannot be swapped between the check and the read. Returns the text and the file's mode.
+/// `Ok(None)` when there is no record.
 #[cfg(unix)]
-fn refuse_untrusted_record(path: &Path) -> Result<(), String> {
-    use std::os::unix::fs::MetadataExt;
+fn read_trusted(path: &Path) -> Result<Option<(Zeroizing<String>, u32)>, String> {
+    read_trusted_with(path, || {})
+}
 
-    match fs::symlink_metadata(path) {
-        Ok(metadata) => {
-            // SAFETY: `geteuid` takes no arguments and cannot fail.
-            let me = unsafe { libc::geteuid() };
+/// [`read_trusted`] with a hook between the open and the check, so a swap at that moment can be tested.
+#[cfg(unix)]
+fn read_trusted_with(
+    path: &Path,
+    between: impl FnOnce(),
+) -> Result<Option<(Zeroizing<String>, u32)>, String> {
+    use std::io::Read;
+    use std::os::unix::fs::{MetadataExt, OpenOptionsExt, PermissionsExt};
 
-            if !metadata.is_file() || metadata.uid() != me {
-                return Err(format!(
-                    "{} must be a plain file of yours (not a link, not another user's)",
-                    path.display()
-                ));
-            }
+    let not_plain = || {
+        format!(
+            "{} must be a plain file of yours (not a link, not another user's)",
+            path.display()
+        )
+    };
+    let mut file = match fs::OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_NOFOLLOW)
+        .open(path)
+    {
+        Ok(file) => file,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(error) if error.raw_os_error() == Some(libc::ELOOP) => return Err(not_plain()),
+        Err(error) => return Err(format!("{} could not be read: {error}", path.display())),
+    };
 
-            Ok(())
-        }
-        Err(_) => Ok(()),
+    between();
+
+    let metadata = file
+        .metadata()
+        .map_err(|error| format!("{} could not be read: {error}", path.display()))?;
+
+    // SAFETY: `geteuid` takes no arguments and cannot fail.
+    let me = unsafe { libc::geteuid() };
+
+    if !metadata.is_file() || metadata.uid() != me {
+        return Err(not_plain());
     }
+
+    let mut text = Zeroizing::new(String::new());
+
+    file.read_to_string(&mut text)
+        .map_err(|error| format!("{} could not be read: {error}", path.display()))?;
+
+    Ok(Some((text, metadata.permissions().mode())))
 }
 
 #[cfg(not(unix))]
-fn refuse_untrusted_record(_path: &Path) -> Result<(), String> {
-    Ok(())
+fn read_trusted(path: &Path) -> Result<Option<(Zeroizing<String>, u32)>, String> {
+    match fs::read_to_string(path) {
+        Ok(text) => Ok(Some((Zeroizing::new(text), 0))),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
+        Err(error) => Err(format!("{} could not be read: {error}", path.display())),
+    }
 }
 
 /// A secret file that others can read is not a secret any more.
 #[cfg(unix)]
-fn refuse_shared_file(path: &Path) -> Result<(), String> {
-    use std::os::unix::fs::PermissionsExt;
-
-    let mode = fs::metadata(path)
-        .map_err(|error| error.to_string())?
-        .permissions()
-        .mode();
-
+fn refuse_shared_mode(path: &Path, mode: u32) -> Result<(), String> {
     if mode & 0o077 != 0 {
         return Err(format!(
             "{} holds the device secret and is readable by others (mode {:o}); run chmod 600 on it, or remove the device in the web app and pair again",
@@ -483,7 +595,7 @@ fn refuse_shared_file(path: &Path) -> Result<(), String> {
 }
 
 #[cfg(not(unix))]
-fn refuse_shared_file(_path: &Path) -> Result<(), String> {
+fn refuse_shared_mode(_path: &Path, _mode: u32) -> Result<(), String> {
     Ok(())
 }
 
@@ -572,7 +684,18 @@ fn replace_file_with(
         let _ = fs::remove_file(&temporary);
 
         error.to_string()
-    })
+    })?;
+
+    // The rename is in the folder's entry: sync it so the record survives a crash right after. Best effort, because
+    // a folder cannot be opened for syncing on every system and the record itself is already whole.
+    #[cfg(unix)]
+    if let Some(dir) = path.parent() {
+        if let Ok(dir) = fs::File::open(dir) {
+            let _ = dir.sync_all();
+        }
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]

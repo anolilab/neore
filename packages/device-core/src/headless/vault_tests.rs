@@ -11,10 +11,16 @@ struct FakeKeychain {
     broken: bool,
     /// Deleting fails (a locked secret service) while reading and writing work.
     stuck_delete: bool,
+    /// Runs at the start of every `set`, to look at (or change) the world at the moment the secret is stored.
+    on_set: Option<Box<dyn Fn()>>,
 }
 
 impl Keychain for FakeKeychain {
     fn set(&self, account: &str, secret: &str) -> Result<(), String> {
+        if let Some(hook) = &self.on_set {
+            hook();
+        }
+
         if self.broken {
             return Err("no secret service on the session bus".into());
         }
@@ -281,8 +287,14 @@ fn a_file_pairing_is_a_0600_file_in_a_0700_folder() {
 
     assert_eq!(loaded.secret, SECRET);
     assert_eq!(loaded.record.storage, Storage::File);
-    // No half-written temporary is left beside it.
-    assert_eq!(fs::read_dir(&dir).unwrap().count(), 1);
+    // No half-written temporary is left beside it (the lock file is the vault's own).
+    let names: Vec<_> = fs::read_dir(&dir)
+        .unwrap()
+        .map(|entry| entry.unwrap().file_name())
+        .filter(|name| name != LOCK_NAME)
+        .collect();
+
+    assert_eq!(names, vec![std::ffi::OsString::from("host.json")]);
 }
 
 #[cfg(unix)]
@@ -366,6 +378,14 @@ fn forget_removes_the_keychain_secret_even_when_it_cannot_be_read() {
 fn a_write_that_cannot_start_leaves_the_existing_record_whole() {
     use std::os::unix::fs::PermissionsExt;
 
+    // A superuser ignores the mode, so the write cannot be made to fail: say so, rather than pass without asserting.
+    // SAFETY: `geteuid` takes no arguments and cannot fail.
+    if unsafe { libc::geteuid() } == 0 {
+        eprintln!("skipped: running as root, which can write into a read-only folder");
+
+        return;
+    }
+
     let keychain = FakeKeychain::default();
     let dir = scratch("interrupted");
     let vault = Vault::new(dir.to_path_buf(), &keychain);
@@ -381,11 +401,8 @@ fn a_write_that_cannot_start_leaves_the_existing_record_whole() {
 
     fs::set_permissions(&dir, fs::Permissions::from_mode(0o700)).unwrap();
 
-    // (A superuser ignores the mode; then the write succeeded and there is nothing to preserve.)
-    if result.is_err() {
-        assert_eq!(fs::read(dir.join("host.json")).unwrap(), before);
-    }
-
+    assert!(result.is_err());
+    assert_eq!(fs::read(dir.join("host.json")).unwrap(), before);
     assert!(!dir.join("host.json.tmp").exists());
 }
 
@@ -567,4 +584,204 @@ fn a_folder_whose_parent_others_can_write_in_is_refused_unless_it_is_sticky() {
     fs::set_permissions(&*parent, fs::Permissions::from_mode(0o1777)).unwrap();
 
     assert_eq!(vault.load().unwrap(), None);
+}
+
+#[test]
+fn a_second_command_is_refused_while_one_holds_the_pairing() {
+    let dir = scratch("locked");
+    let keychain = FakeKeychain::default();
+    let vault = Vault::new(dir.to_path_buf(), &keychain);
+
+    vault.save(&pairing("device-1"), Storage::Keychain).unwrap();
+
+    let held = Lock::acquire(&dir).unwrap();
+
+    for error in [
+        vault
+            .save(&pairing("device-2"), Storage::Keychain)
+            .unwrap_err(),
+        vault.forget().unwrap_err(),
+        vault.load().unwrap_err(),
+    ] {
+        assert!(error.contains("another neore-host command"), "{error}");
+    }
+
+    // Nothing the refused commands tried got through.
+    assert_eq!(keychain.entries.borrow().len(), 1);
+
+    drop(held);
+
+    assert_eq!(vault.load().unwrap().unwrap().record.device_id, "device-1");
+    vault.forget().unwrap();
+}
+
+#[test]
+fn probe_refuses_a_folder_the_save_would_refuse() {
+    let keychain = FakeKeychain::default();
+    let blocker = scratch("probe-blocked");
+
+    fs::create_dir_all(&*blocker).unwrap();
+    fs::write(blocker.join("file"), "x").unwrap();
+
+    // A file where the folder should be.
+    assert!(Vault::new(blocker.join("file").join("inside"), &keychain)
+        .probe()
+        .is_err());
+    assert!(keychain.entries.borrow().is_empty());
+}
+
+#[cfg(unix)]
+#[test]
+fn probe_refuses_a_folder_others_can_enter_or_whose_parent_they_can_write_in() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let keychain = FakeKeychain::default();
+    let open = scratch("probe-open");
+
+    fs::create_dir_all(&*open).unwrap();
+    fs::set_permissions(&*open, fs::Permissions::from_mode(0o755)).unwrap();
+
+    assert!(Vault::new(open.to_path_buf(), &keychain)
+        .probe()
+        .unwrap_err()
+        .contains("others can enter"));
+
+    let parent = scratch("probe-parent");
+    let child = parent.join("host");
+
+    fs::create_dir_all(&child).unwrap();
+    fs::set_permissions(&child, fs::Permissions::from_mode(0o700)).unwrap();
+    fs::set_permissions(&*parent, fs::Permissions::from_mode(0o777)).unwrap();
+
+    assert!(Vault::new(child, &keychain)
+        .probe()
+        .unwrap_err()
+        .contains("is writable by others"));
+}
+
+#[test]
+fn the_record_is_written_before_the_secret_so_a_crash_cannot_strand_a_secret() {
+    let dir = scratch("order");
+    let seen = Rc::new(std::cell::Cell::new(false));
+    let keychain = FakeKeychain {
+        on_set: Some(Box::new({
+            let seen = Rc::clone(&seen);
+            let record = dir.join("host.json");
+
+            move || seen.set(record.exists())
+        })),
+        ..FakeKeychain::default()
+    };
+    let vault = Vault::new(dir.to_path_buf(), &keychain);
+
+    vault.save(&pairing("device-1"), Storage::Keychain).unwrap();
+
+    assert!(seen.get(), "the secret was stored before the record");
+}
+
+#[test]
+fn a_record_without_its_secret_is_reported_by_load_and_cleared_by_forget() {
+    let dir = scratch("crashed");
+    let keychain = FakeKeychain::default();
+    let vault = Vault::new(dir.to_path_buf(), &keychain);
+    let record = Record {
+        account: String::new(),
+        backend: "https://neore.ai".into(),
+        device_id: "device-1".into(),
+        name: "build-box".into(),
+        secret: String::new(),
+        storage: Storage::Keychain,
+    };
+
+    // What a crash between the record and the keychain write leaves behind.
+    write_private(&dir, &dir.join("host.json"), &record).unwrap();
+
+    assert!(vault
+        .load()
+        .unwrap_err()
+        .contains("no longer holds its secret"));
+
+    vault.forget().unwrap();
+
+    assert_eq!(vault.load().unwrap(), None);
+    assert!(!dir.join("host.json").exists());
+}
+
+#[test]
+fn a_keychain_that_refuses_the_secret_takes_the_record_back() {
+    let dir = scratch("refused");
+    let keychain = FakeKeychain {
+        broken: true,
+        ..FakeKeychain::default()
+    };
+    let vault = Vault::new(dir.to_path_buf(), &keychain);
+
+    assert!(vault
+        .save(&pairing("device-1"), Storage::Keychain)
+        .unwrap_err()
+        .contains("keychain refused"));
+    assert!(!dir.join("host.json").exists());
+}
+
+#[test]
+fn a_cleanup_that_cannot_finish_names_what_to_remove_by_hand() {
+    let dir = scratch("stranded");
+    let keychain = FakeKeychain {
+        broken: true,
+        stuck_delete: true,
+        on_set: Some(Box::new({
+            let record = dir.join("host.json");
+
+            // The record cannot be removed: a folder stands where the file was.
+            move || {
+                let _ = fs::remove_file(&record);
+                let _ = fs::create_dir_all(&record);
+            }
+        })),
+        ..FakeKeychain::default()
+    };
+    let vault = Vault::new(dir.to_path_buf(), &keychain);
+    let error = vault
+        .save(&pairing("device-1"), Storage::Keychain)
+        .unwrap_err();
+
+    assert!(error.contains(SERVICE), "{error}");
+    assert!(
+        error.contains(&account_of("https://neore.ai", "device-1")),
+        "{error}"
+    );
+    assert!(error.contains("host.json"), "{error}");
+    assert!(error.contains("by hand"), "{error}");
+}
+
+#[cfg(unix)]
+#[test]
+fn the_record_that_is_read_is_the_one_that_was_checked_even_if_the_path_is_swapped() {
+    let dir = scratch("swap");
+    let keychain = FakeKeychain {
+        broken: true,
+        ..FakeKeychain::default()
+    };
+    let vault = Vault::new(dir.to_path_buf(), &keychain);
+
+    vault.save(&pairing("device-1"), Storage::File).unwrap();
+
+    let path = dir.join("host.json");
+    let elsewhere = dir.join("attacker.json");
+
+    fs::write(&elsewhere, "attacker").unwrap();
+
+    // Between the open and the read, the path is pointed somewhere else.
+    let (text, _) = read_trusted_with(&path, || {
+        fs::remove_file(&path).unwrap();
+        std::os::unix::fs::symlink(&elsewhere, &path).unwrap();
+    })
+    .unwrap()
+    .unwrap();
+
+    assert!(text.contains("device-1"));
+    assert!(!text.contains("attacker"));
+
+    // And a record that is a link when it is opened is refused.
+    assert!(read_trusted(&path).unwrap_err().contains("plain file"));
 }
