@@ -71,6 +71,7 @@ import { shouldNoteBriefActivity } from "../../notifications/daily-brief-logic";
 import { buildKnowledgeCitations, type KnowledgeSource } from "../../knowledge/citations";
 import type { ReplySkill } from "../../usage/activity-logic";
 import { type DispatchOrigin, stopWhenRequested } from "../../sub-agents/logic";
+import { findRepeatedCallLoop } from "./repeated-call-guard";
 
 /** Registry providers carry an `internal-` prefix the provider-keyed options do not. */
 export const INTERNAL_PREFIX_RE = /^internal-/;
@@ -1292,7 +1293,11 @@ export const resumeApprovedRun = async (
         });
 
         streamTextArgs.abortSignal = stopping.signal;
-        streamTextArgs.stopWhen = stopWhenStopped(ctx, streamId, maxSteps);
+        // The repeated-call guard ends a looping turn here too, not only in the chat runner (`execute.ts`).
+        streamTextArgs.stopWhen = [
+            ...stopWhenStopped(ctx, streamId, maxSteps),
+            ({ steps }: { steps: Parameters<typeof findRepeatedCallLoop>[0] }) => findRepeatedCallLoop(steps) !== undefined,
+        ];
 
         // A sub-agent child is also stopped from its run (a parent's Stop, `cancelRun`, the reaper), not only from its own
         // stream, as its headless loop is. A failed read is not a stop.
