@@ -36,6 +36,18 @@ const meta = {
             >
                 Destructive
             </Button>
+            <Button
+                onClick={() =>
+                    countdownToast({
+                        action: { label: "Undo", onClick: onUndo },
+                        duration: 1500,
+                        title: "Expires",
+                    })
+                }
+                variant="outline"
+            >
+                Expires
+            </Button>
         </div>
     ),
     title: "UI/Countdown toast",
@@ -44,6 +56,17 @@ const meta = {
 export default meta;
 
 type Story = StoryObj<typeof meta>;
+
+export const Expires: Story = {
+    play: async ({ args, canvas }) => {
+        await userEvent.click(canvas.getByRole("button", { name: "Expires" }));
+        // Earlier stories' countdown toasts never close by themselves, so follow this toast's own element.
+        const toast = (await screen.findByText("Expires", { selector: "p" })).closest("[data-sonner-toast]");
+        // Nothing clicks Undo here, so the toast must close on its own once its 1.5 s duration runs out.
+        await waitFor(() => expect(toast).not.toBeInTheDocument(), { timeout: 5000 });
+        expect(args.onUndo).not.toHaveBeenCalled();
+    },
+};
 
 export const Neutral: Story = {
     play: async ({ args, canvas }) => {

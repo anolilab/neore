@@ -64,6 +64,15 @@ const CountdownToastCard = ({
         let last = performance.now();
         let wasPaused = false;
 
+        // A browser can freeze the interval while the tab is hidden, so no tick reports that time. Restart the
+        // reference when the tab is visible again, so the hidden time is not counted.
+        const onVisibilityChange = () => {
+            if (!document.hidden) {
+                last = performance.now();
+            }
+        };
+        document.addEventListener("visibilitychange", onVisibilityChange);
+
         const timer = window.setInterval(() => {
             const now = performance.now();
             const paused =
@@ -87,7 +96,10 @@ const CountdownToastCard = ({
             setSeconds(Math.ceil(remainingMs / 1000));
         }, TICK_MS);
 
-        return () => window.clearInterval(timer);
+        return () => {
+            window.clearInterval(timer);
+            document.removeEventListener("visibilitychange", onVisibilityChange);
+        };
     }, [duration, id]);
 
     const destructive = tone === "destructive";
@@ -97,8 +109,8 @@ const CountdownToastCard = ({
         toast.dismiss(id);
     };
 
+    // `font-normal`: sonner's title wrapper is semibold, and the footer and description inherit from it.
     return (
-        // `font-normal`: sonner's title wrapper is semibold and the footer and description inherit it.
         <div className={cn(toastSurfaceClass, "relative w-full overflow-hidden font-normal", destructive && "border-destructive/40")} ref={ref}>
             <div className="flex items-start gap-3 p-4 pe-9">
                 <span aria-hidden="true" className={cn(toastIconClass, destructive && "bg-destructive/10 text-destructive")}>
