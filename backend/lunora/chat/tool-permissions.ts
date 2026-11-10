@@ -31,6 +31,7 @@ import { LunoraError, v } from "lunorash/server";
 import { internal } from "../_generated/internal";
 import type { Doc, Id } from "../_generated/dataModel";
 import type { QueryCtx } from "../_generated/server";
+import { resolveThreadReadAccess } from "../agent/thread-read-access";
 import type { ThreadPermissionMode } from "./lib/thread-permission-mode";
 import { internalMutation, internalQuery } from "../_generated/server";
 import type { AuthMutationCtx } from "../lib/crpc";
@@ -260,6 +261,51 @@ export const modeOfThread = async (ctx: QueryCtx, thread: Doc<"threads"> | null,
     return modeFor(parent ?? thread, userId);
 };
 
+/** The continuation hops a computer's thread is walked back through before the walk gives up. */
+const MAX_CONTINUATION_HOPS = 8;
+
+/**
+ * The mode a cloud thread taking over from `thread` inherits. A computer's thread has no mode of its own (`modeOfThread`), so it is read
+ * from the cloud thread it was switched from: the nearest cloud thread up its continuation links. A round trip through a computer then
+ * keeps the mode the owner set. A chain too long to walk, one with two origins, or one whose origin is gone inherits nothing (the defaults): no mode can be shown to apply.
+ */
+export const modeInheritedFrom = async (ctx: QueryCtx, thread: Doc<"threads">, userId: string): Promise<ThreadPermissionMode | null> => {
+    let current: Doc<"threads"> | null = thread;
+    let hops = 0;
+
+    while (current?.runner === "host") {
+        if (hops >= MAX_CONTINUATION_HOPS) {
+            return null;
+        }
+
+        hops += 1;
+
+        const links = await linksOf(ctx, current._id);
+        const continuations = links.filter((link) => link.branchType === "continuation");
+
+        // Two origins leave no one origin to take a mode from, and a read that reached the bound may hide a second one: fail closed rather
+        // than take whichever is listed first.
+        if (links.length >= MAX_LINKS_CHECKED || new Set(continuations.map((link) => link.parentThreadId)).size > 1) {
+            return null;
+        }
+
+        const [continuation] = continuations;
+
+        if (!continuation) {
+            return null;
+        }
+
+        current = await ctx.db.get("threads", continuation.parentThreadId);
+
+        // An origin that is gone or in the trash gives nothing, as a comparison parent does (`isLive`).
+        if (!isLive(current)) {
+            return null;
+        }
+    }
+
+    return await modeOfThread(ctx, current, userId);
+};
+
 /**
  * The permission mode a run on this thread builds its tools under (`lib/thread-permission-mode.ts`), or `null` for the
  * default. A host thread has none. In a thread someone else owns only the modes that ask MORE apply: `full` is the
@@ -269,6 +315,31 @@ export const getThreadPermissionMode = internalQuery
     .input({ threadId: v.id("threads"), userId: v.string() })
     .output(v.union(v.literal("supervised"), v.literal("auto"), v.literal("full"), v.null()))
     .query(async ({ args: { threadId, userId }, ctx }) => await modeOfThread(ctx, await ctx.db.get("threads", threadId), userId));
+
+export const threadModeForApp = async (ctx: QueryCtx, threadId: string, userId: string): Promise<{ allowed: boolean; mode: ThreadPermissionMode | null }> => {
+    const access = await resolveThreadReadAccess(ctx, threadId as Id<"threads">, userId);
+
+    if (access?.kind !== "full" && access?.kind !== "locked") {
+        return { allowed: false, mode: null };
+    }
+
+    return { allowed: true, mode: await modeOfThread(ctx, access.thread, userId) };
+};
+
+/**
+ * The mode of the thread an MCP App is shown in, with whether the caller may reach that thread at all. The content read gate is
+ * not applied: the app was already rendered, and a passcode-locked chat's owner (no unlock proof here) is who it belongs to.
+ * `allowed` is the owner, or someone with a live grant; a locked thread is the owner's alone.
+ */
+export const getThreadPermissionModeForApp = internalQuery
+    .input({ threadId: v.string().max(MAX_LENGTH.id), userId: v.string() })
+    .output(
+        v.object({
+            allowed: v.boolean(),
+            mode: v.union(v.literal("supervised"), v.literal("auto"), v.literal("full"), v.null()),
+        }),
+    )
+    .query(async ({ args: { threadId, userId }, ctx }) => await threadModeForApp(ctx, threadId, userId));
 
 /** The servers the user trusts to have their tools put to the quick check, as the run builds its tools. */
 export const getLowRiskTrustedServers = internalQuery

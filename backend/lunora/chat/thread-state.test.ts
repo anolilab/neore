@@ -10,6 +10,7 @@ import schema from "../schema";
 import { isSnoozeInRange, SNOOZE_MAX_MS } from "./lib/thread-state-logic";
 import { COMPARISON_COLUMN_MODE_CODE } from "./lib/thread-permission-mode";
 import { getEffectivePermissionMode, markThreadViewed, setThreadPermissionMode, snoozeThread, unsnoozeThread } from "./thread-state";
+import { threadModeForApp } from "./tool-permissions";
 
 const OWNER = "user-owner";
 const GRANTEE = "user-grantee";
@@ -417,5 +418,38 @@ describe("who can read the state", () => {
         for (const key of ["awaitingInput", "lastReplyAt", "lastViewedAt", "snoozeChosenAt", "snoozedUntil"]) {
             expect(key in asGrantee).toBe(false);
         }
+    });
+});
+
+describe("threadModeForApp", () => {
+    const readFor = async (userId: string) => await harness.run(async (context: any) => await threadModeForApp(context, threadId, userId));
+
+    beforeEach(async () => {
+        await harness.run(async (context: any) => {
+            await context.db.patch("threads", threadId, { permissionMode: "supervised" });
+        });
+    });
+
+    it("answers the owner of a locked chat, a grantee of an open one, and nobody else; a grantee never gets the owner's full", async () => {
+        await harness.run(async (context: any) => {
+            await context.db.insert("threadAccess", { grantedAt: 0, grantedBy: OWNER, permission: "write", threadId, userId: GRANTEE });
+        });
+
+        expect(await readFor(GRANTEE)).toStrictEqual({ allowed: true, mode: "supervised" });
+        expect(await readFor(STRANGER)).toStrictEqual({ allowed: false, mode: null });
+
+        // An open chat whose owner chose full: the grantee gets the defaults, never the owner's full.
+        await harness.run(async (context: any) => {
+            await context.db.patch("threads", threadId, { permissionMode: "full" });
+        });
+
+        expect(await readFor(GRANTEE)).toStrictEqual({ allowed: true, mode: null });
+
+        await harness.run(async (context: any) => {
+            await context.db.patch("threads", threadId, { lockedAt: 2 });
+        });
+
+        expect(await readFor(OWNER)).toStrictEqual({ allowed: true, mode: "full" });
+        expect(await readFor(GRANTEE)).toStrictEqual({ allowed: false, mode: null });
     });
 });
