@@ -216,31 +216,38 @@ const linksOf = async (ctx: QueryCtx, threadId: Id<"threads">) =>
 const isLive = (parent: Doc<"threads"> | null): parent is Doc<"threads"> => parent !== null && parent.deleted !== true;
 
 /**
- * Whether a thread runs under a comparison parent's mode, the same test `modeOfThread` makes: its links fit in one read, name one
- * comparison parent, and that parent still exists and is not trashed. A mode set on such a column would never apply, so
- * `setThreadPermissionMode` refuses it; any other thread runs under its own stored mode, which its owner can set.
+ * The live comparison parent whose mode a thread runs under, or `null` when no parent can be shown to decide it: its links do not fit in
+ * one read, they name no comparison parent or several, or the one parent is gone or trashed (its link rows outlive it). The setter's
+ * guard and the resolver both read it, so a thread the setter refuses is exactly one that runs under a parent's mode.
  */
-export const isComparisonColumn = async (ctx: QueryCtx, threadId: Id<"threads">): Promise<boolean> => {
+const comparisonParentOf = async (ctx: QueryCtx, threadId: Id<"threads">): Promise<Doc<"threads"> | null> => {
+    // Every link is read, not the first: a child with a comparison link and another link must still find its parent, whichever is listed
+    // first. The rows per child are few; the bound only keeps a runaway row count from being read whole.
     const links = await linksOf(ctx, threadId);
 
     if (links.length >= MAX_LINKS_CHECKED) {
-        return false;
+        return null;
     }
 
     const parentIds = new Set(links.filter((link) => link.branchType === "comparison").map((link) => link.parentThreadId));
 
     if (parentIds.size !== 1) {
-        return false;
+        return null;
     }
 
     const [parentId] = parentIds;
+    const parent = await ctx.db.get("threads", parentId as Id<"threads">);
 
-    return isLive(await ctx.db.get("threads", parentId as Id<"threads">));
+    return isLive(parent) ? parent : null;
 };
 
+/** Whether a thread runs under a comparison parent's mode. A mode set on such a column would never apply, so `setThreadPermissionMode` refuses it. */
+export const isComparisonColumn = async (ctx: QueryCtx, threadId: Id<"threads">): Promise<boolean> => (await comparisonParentOf(ctx, threadId)) !== null;
+
 /**
- * A comparison column is a thread of its own, but the mode is chosen once, on the comparison it belongs to: a column always takes its
- * comparison parent's mode, whatever mode it holds. The parent's choice therefore reaches the first send and every follow-up alike.
+ * A comparison column is a thread of its own, but the mode is chosen once, on the comparison it belongs to: a column with a live parent runs
+ * under that parent's mode, whatever mode it holds, so the shared composer's choice reaches every send. Any other thread, a column whose
+ * parent cannot decide included, runs under its own stored mode (none stored: the defaults, as for any thread without a mode).
  */
 export const modeOfThread = async (ctx: QueryCtx, thread: Doc<"threads"> | null, userId: string): Promise<ThreadPermissionMode | null> => {
     // A host thread has no mode, and a comparison link must not give it one.
@@ -248,40 +255,9 @@ export const modeOfThread = async (ctx: QueryCtx, thread: Doc<"threads"> | null,
         return modeFor(thread, userId);
     }
 
-    // Every link is read, not the first: a child with a comparison link and another link must still take its parent's mode, whichever
-    // is listed first. The rows per child are few; the bound only keeps a runaway row count from being read whole.
-    const links = await linksOf(ctx, thread._id);
+    const parent = await comparisonParentOf(ctx, thread._id);
 
-    // A read that hit the bound may have cut off links, so no parent can be shown to be the one: the thread's own stored mode applies
-    // (none stored: the defaults, as for any thread without a mode).
-    if (links.length >= MAX_LINKS_CHECKED) {
-        return modeFor(thread, userId);
-    }
-
-    const comparisons = links.filter((link) => link.branchType === "comparison");
-
-    // Two comparison links name two parents, and neither one's mode is the column's: the thread's own stored mode applies rather than
-    // whichever parent is listed first.
-    if (new Set(comparisons.map((link) => link.parentThreadId)).size > 1) {
-        return modeFor(thread, userId);
-    }
-
-    const [comparison] = comparisons;
-
-    // A comparison column always runs under its parent's mode, even one it holds of its own: the shared composer changes the parent's,
-    // so a mode saved on the column would otherwise hold while the parent's changes never reach it.
-    if (comparison) {
-        const parent = await ctx.db.get("threads", comparison.parentThreadId);
-
-        if (isLive(parent)) {
-            return modeFor(parent, userId);
-        }
-
-        // A parent that is gone or trashed leaves its link rows behind, so the column has no parent to take a mode from: its own stored
-        // mode applies (none stored: the defaults).
-    }
-
-    return modeFor(thread, userId);
+    return modeFor(parent ?? thread, userId);
 };
 
 /**

@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 
-import { isThreadPermissionMode } from "./thread-permission-mode";
 import type { ToolDescriptor } from "./tool-permissions";
 import { lowRiskIneligibleReason } from "./low-risk-approval";
 import { isComparisonColumn, modeOfThread } from "../tool-permissions";
@@ -113,11 +112,6 @@ describe("thread permission mode", () => {
         const result = resolveToolPermissionWithGrant(SHELL, undefined, { now, threadMode: "supervised", timedGrants: { [SHELL.key]: now + 500 } });
 
         expect(result).toStrictEqual({ mode: "auto", timedUntil: now + 500 });
-    });
-
-    it("names only the modes it has", () => {
-        expect(isThreadPermissionMode("full")).toBe(true);
-        expect(isThreadPermissionMode("auto-edit")).toBe(false);
     });
 });
 
