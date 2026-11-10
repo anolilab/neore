@@ -141,6 +141,7 @@ export const loadPushNotification = internalQuery
         v.union(
             v.null(),
             v.object({
+                approvalId: v.optional(v.string()),
                 body: v.optional(v.string()),
                 link: v.optional(v.string()),
                 outcome: v.optional(v.union(v.literal("success"), v.literal("failure"))),
@@ -161,6 +162,7 @@ export const loadPushNotification = internalQuery
 
         return {
             title: shown.title,
+            ...(notification.approvalId !== undefined && { approvalId: notification.approvalId }),
             type: shown.type,
             ...(shown.body !== undefined && { body: shown.body }),
             ...(shown.link !== undefined && { link: shown.link }),

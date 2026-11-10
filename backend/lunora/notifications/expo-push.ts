@@ -19,6 +19,8 @@ const TIMEOUT_MS = 10_000;
 
 export interface ExpoMessage {
     body?: string;
+    /** The phone's action set for this message (for a tool approval: approve and deny). */
+    categoryId?: string;
     /** Opaque ids only. */
     data: Record<string, string>;
     priority: "high" | "normal";

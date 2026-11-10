@@ -974,8 +974,8 @@ export interface InternalApiTypes {
             writeDailyBrief: FunctionReference<"mutation", { localDay: string; summary: string; userId: string }, null>;
         };
         functions: {
-            createNotification: FunctionReference<"mutation", { body?: string; dedupeKey?: string; emailOutcome?: boolean; link?: string; outcome?: "success" | "failure"; title: string; type: "task" | "tool_approval" | "ask_user" | "secret_request" | "trigger" | "coding_agent" | "eval" | "sub_agent" | "chat_import" | "data_export" | "daily_brief" | "usage_alert" | "review_request"; userId: string }, null>;
-            createNotifications: FunctionReference<"mutation", { notifications: Array<{ body?: string; dedupeKey?: string; emailOutcome?: boolean; link?: string; outcome?: "success" | "failure"; title: string; type: "task" | "tool_approval" | "ask_user" | "secret_request" | "trigger" | "coding_agent" | "eval" | "sub_agent" | "chat_import" | "data_export" | "daily_brief" | "usage_alert" | "review_request"; userId: string }> }, null>;
+            createNotification: FunctionReference<"mutation", { approvalId?: string; body?: string; dedupeKey?: string; emailOutcome?: boolean; link?: string; outcome?: "success" | "failure"; title: string; type: "task" | "tool_approval" | "ask_user" | "secret_request" | "trigger" | "coding_agent" | "eval" | "sub_agent" | "chat_import" | "data_export" | "daily_brief" | "usage_alert" | "review_request"; userId: string }, null>;
+            createNotifications: FunctionReference<"mutation", { notifications: Array<{ approvalId?: string; body?: string; dedupeKey?: string; emailOutcome?: boolean; link?: string; outcome?: "success" | "failure"; title: string; type: "task" | "tool_approval" | "ask_user" | "secret_request" | "trigger" | "coding_agent" | "eval" | "sub_agent" | "chat_import" | "data_export" | "daily_brief" | "usage_alert" | "review_request"; userId: string }> }, null>;
             pruneOldNotifications: FunctionReference<"mutation", {}, null>;
         };
         gdpr: {
@@ -986,6 +986,7 @@ export interface InternalApiTypes {
             redactLockedLinks: FunctionReference<"mutation", { cursor?: string; threadId: Id<"threads">; userId: string }, null>;
         };
         phone_content: {
+            loadApprovalForPush: FunctionReference<"query", { approvalId: string; threadId: string; userId: string }, null | { teammate: string; tool: string }>;
             loadPhonePushContent: FunctionReference<"query", { notificationId: Id<"notifications">; userId: string }, null | { generic: true } | { body: string; threadId: string; title: string }>;
             readThreadLockState: FunctionReference<"query", { threadId: string; userId: string }, "locked" | "missing" | "open">;
         };
@@ -996,7 +997,7 @@ export interface InternalApiTypes {
             sendPhonePush: FunctionReference<"action", { notificationId: Id<"notifications">; userId: string }, null>;
         };
         push: {
-            loadPushNotification: FunctionReference<"query", { notificationId: Id<"notifications">; userId: string }, null | { body?: string; link?: string; outcome?: "success" | "failure"; title: string; type: string }>;
+            loadPushNotification: FunctionReference<"query", { notificationId: Id<"notifications">; userId: string }, null | { approvalId?: string; body?: string; link?: string; outcome?: "success" | "failure"; title: string; type: string }>;
             sendPushForNotification: FunctionReference<"action", { notificationId: Id<"notifications">; userId: string }, null>;
         };
         task_email: {
@@ -2289,6 +2290,7 @@ export const internal: InternalApiTypes = {
             redactLockedLinks: { __lunoraRef: "notifications_locked_redact:redactLockedLinks" },
         },
         phone_content: {
+            loadApprovalForPush: { __lunoraRef: "notifications_phone_content:loadApprovalForPush" },
             loadPhonePushContent: { __lunoraRef: "notifications_phone_content:loadPhonePushContent" },
             readThreadLockState: { __lunoraRef: "notifications_phone_content:readThreadLockState" },
         },

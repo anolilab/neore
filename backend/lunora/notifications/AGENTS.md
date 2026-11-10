@@ -47,6 +47,11 @@
   ever leaves us**: every phone gets the same placeholder (`push-text.ts`,
   in the language the phone reported at registration, English without one; never
   `userSettings.language`, which is the AI-reply language) with only `notificationId`/`threadId` as data.
+    - **Exception: a tool approval** that carries its `approvalId` (`notification.approvalId`) is pushed with the tool's
+      name as the title and the teammate's (`thread.agentName`) as the body, plus the `tool_approval` action set
+      (approve, deny) and the approval id in `data`. Never its arguments. Sent only while the approval is still pending
+      on its chat (`approvalPushNames`): not for an answered one, a locked or foreign chat, a question or a secret
+      request. Its answer goes through `respondToToolApproval`, as the in-app card's does.
     - A phone is sent to only while the session that registered it exists and has
       not expired; an ended one is dropped at the next send.
     - Otherwise a row is deleted only on `DeviceNotRegistered`, in the send's

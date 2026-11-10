@@ -65,6 +65,8 @@ export const remindPendingApprovals = async (ctx: MutationCtx, now: number): Pro
         // A thread that is gone or deleted, or a question, gets no push, but its rows are still marked so the sweep moves on.
         if (!answeredInChat && thread && thread.deleted !== true) {
             await notifyQuietly(ctx, {
+                // The phone's approve and deny act on this approval, as on the first push (`notifications/phone-delivery.ts`).
+                approvalId: first.approvalId,
                 dedupeKey: `tool_approval_reminder:${first.threadId}:${first.createdAt}`,
                 link: `/chat/${first.threadId}`,
                 title: thread.title ?? "Chat",

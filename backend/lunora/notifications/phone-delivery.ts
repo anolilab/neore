@@ -109,7 +109,18 @@ export const recordPushDeliveries = internalMutation
         return null;
     });
 
+/** The phone's action set for a tool approval: approve and deny, answered on the phone through the chat's own approval path. */
+export const TOOL_APPROVAL_CATEGORY = "tool_approval";
+
+/** Longest tool name a lock screen shows; a longer one is cut. */
+const APPROVAL_TITLE_MAX = 100;
+
 export interface PhonePushMessage {
+    /**
+     * A tool approval still pending on its chat. The lock screen shows the tool's name and the teammate's name, and nothing
+     * else of the request: never its arguments.
+     */
+    approval?: { approvalId: string; teammate: string; tool: string };
     notificationId: string;
     /** The chat a tap opens, when the notification is about one. */
     threadId?: string;
@@ -118,10 +129,28 @@ export interface PhonePushMessage {
 
 /**
  * The message for one phone: the same generic alert on both platforms, in the phone's language. Nothing about the
- * notification itself leaves us, only its ids in `data`.
+ * notification itself leaves us, only its ids in `data`. A tool approval is the one exception: its alert names the tool
+ * and the teammate, and carries the approval's id for the phone's approve and deny actions.
  */
 export const phoneMessage = (device: { language?: string; platform: PhonePlatform; token: string }, message: PhonePushMessage): ExpoMessage => {
-    const data = { notificationId: message.notificationId, ...(message.threadId !== undefined && { threadId: message.threadId }) };
+    const data = {
+        notificationId: message.notificationId,
+        ...(message.threadId !== undefined && { threadId: message.threadId }),
+        ...(message.approval && { approvalId: message.approval.approvalId }),
+    };
+
+    if (message.approval) {
+        return {
+            body: message.approval.teammate,
+            categoryId: TOOL_APPROVAL_CATEGORY,
+            data,
+            priority: message.urgency,
+            sound: "default",
+            title: message.approval.tool.slice(0, APPROVAL_TITLE_MAX),
+            to: device.token,
+            ttl: PUSH_TTL_SECONDS,
+        };
+    }
 
     return {
         body: phonePlaceholderBody(device.language),
@@ -241,10 +270,33 @@ export const sendPhonePush = internalAction
         }
 
         const threadId = threadIdOfLink(notification.link);
+        let approval: PhonePushMessage["approval"];
+
+        // A tool approval that names its approval gets the approve and deny alert, and only while it is still pending on its
+        // chat: an answered one, a locked chat or a foreign one gets no push. Any other notification, including one queued
+        // before approvals carried their id, keeps the generic alert.
+        if (notification.type === "tool_approval" && notification.approvalId !== undefined) {
+            if (threadId === undefined) {
+                return null;
+            }
+
+            const found = await ctx.runQuery(internal.notifications.phone_content.loadApprovalForPush, {
+                approvalId: notification.approvalId,
+                threadId,
+                userId: args.userId,
+            });
+
+            if (!found) {
+                return null;
+            }
+
+            approval = { approvalId: notification.approvalId, teammate: found.teammate, tool: found.tool };
+        }
 
         await deliverToPhones(ctx, args.userId, {
             notificationId: args.notificationId,
             urgency: pushUrgency(notification.type),
+            ...(approval && { approval }),
             ...(threadId !== undefined && { threadId }),
         });
 

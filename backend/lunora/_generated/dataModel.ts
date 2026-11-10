@@ -1003,6 +1003,7 @@ export interface Doc_nodeExecutions {
 export interface Doc_notifications {
     _id: Id<"notifications">;
     _creationTime: number;
+    approvalId?: string;
     body?: string;
     dedupeKey?: string;
     emailOutcome?: boolean;
@@ -4109,6 +4110,7 @@ export interface Insert_nodeExecutions {
 export interface Insert_notifications {
     _id?: Id<"notifications">;
     _creationTime?: number;
+    approvalId?: string;
     body?: string;
     dedupeKey?: string;
     emailOutcome?: boolean;
