@@ -32,7 +32,10 @@ export const RoutinesVisual = () => {
                     />
                 ))}
                 {/* The layer is as wide as the track, so moving it by 100% of its own width crosses the whole track. */}
-                <m.div className="absolute inset-y-0 left-0 w-full" {...loop([0, 1], { opacity: [1, 1], x: ["0%", "100%"] }, { opacity: 0, x: "0%" }, reduce)}>
+                <m.div
+                    className="absolute inset-y-0 left-0 w-full"
+                    {...loop([0, 1], { opacity: [1, 1], x: ["0%", "100%"] }, { opacity: 1, x: "100%" }, reduce)}
+                >
                     <div className="absolute top-1/2 left-0 size-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white shadow-[0_0_0_4px_rgba(255,255,255,0.12)]" />
                 </m.div>
             </div>
