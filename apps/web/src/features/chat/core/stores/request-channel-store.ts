@@ -23,7 +23,8 @@ interface RequestChannelState<T> {
 
 export interface RequestChannel<T> {
     /** Delivers any pending request now, then every later one; returns the unsubscribe function. */
-    consume: (handler: (payload: T) => void) => () => void;
+    /** `accepts` leaves a request this consumer should not take pending for another consumer. */
+    consume: (handler: (payload: T) => void, accepts?: (payload: T) => boolean) => () => void;
     request: (payload: T) => void;
     store: UseBoundStore<StoreApi<RequestChannelState<T>>>;
 }
@@ -47,11 +48,12 @@ export const createRequestChannel = <T>(): RequestChannel<T> => {
         };
     });
 
-    const consume = (handler: (payload: T) => void): (() => void) => {
+    const consume = (handler: (payload: T) => void, accepts?: (payload: T) => boolean): (() => void) => {
         const drain = () => {
             const { pending, take } = store.getState();
 
-            if (pending) {
+            // A request this consumer does not accept stays pending, for a consumer that does (a split pane's own thread).
+            if (pending && (accepts?.(pending.payload) ?? true)) {
                 handler(take() as T);
             }
         };
