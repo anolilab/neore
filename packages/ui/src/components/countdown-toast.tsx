@@ -151,7 +151,7 @@ const CountdownToastCard = ({
             <div
                 aria-hidden="true"
                 className={cn(
-                    "border-t px-4 py-2 text-center text-sm",
+                    "border-t px-4 py-2 text-center text-sm tabular-nums",
                     destructive ? "border-destructive/20 bg-destructive/10 text-destructive" : "border-border bg-muted/50 text-muted-foreground",
                 )}
             >
