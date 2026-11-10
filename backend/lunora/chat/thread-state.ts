@@ -134,6 +134,8 @@ export const setThreadPermissionMode = authMutation
 
         if (thread.permissionMode !== mode) {
             await patchThread(context.db, thread._id, { permissionMode: mode });
+            // Who changed which thread's default tool permissions, and from what: kept in the request log for a later investigation.
+            context.log.event("chat.thread_permission_mode_changed", { from: thread.permissionMode ?? "auto", threadId: thread._id, to: mode });
         }
 
         return null;
@@ -141,8 +143,8 @@ export const setThreadPermissionMode = authMutation
 
 /**
  * The mode the owner's runs on this thread use (`modeOfThread`). A comparison column whose parent still exists runs under that parent's
- * mode, whatever mode the column holds. A column whose parent is gone runs under its own mode, or supervised when it holds none. Any
- * other thread runs under its own mode, Auto when it holds none. Owner-only; the composer shows it, so an opened comparison column does
+ * mode, whatever mode the column holds. Any other thread, a column whose parent is gone or trashed included, runs under its own
+ * mode, Auto when it holds none. Owner-only; the composer shows it, so an opened comparison column does
  * not read Auto while its runs use the parent's mode.
  */
 export const getEffectivePermissionMode = authQuery

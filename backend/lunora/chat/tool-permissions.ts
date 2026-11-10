@@ -216,23 +216,26 @@ const linksOf = async (ctx: QueryCtx, threadId: Id<"threads">) =>
 const isLive = (parent: Doc<"threads"> | null): parent is Doc<"threads"> => parent !== null && parent.deleted !== true;
 
 /**
- * Whether a thread is a LIVE comparison column: one of its comparison links names a parent row that still exists and is not trashed. Its runs take that
- * parent's mode, so a mode set on it would never apply (`setThreadPermissionMode` refuses it). A column whose parent is gone has no
- * parent to take a mode from, so it is not one. A read that reached the bound may hold a live comparison beyond it, so it counts as one
- * (the setter refuses it; `modeOfThread` runs such a thread under its own stored mode).
+ * Whether a thread runs under a comparison parent's mode, the same test `modeOfThread` makes: its links fit in one read, name one
+ * comparison parent, and that parent still exists and is not trashed. A mode set on such a column would never apply, so
+ * `setThreadPermissionMode` refuses it; any other thread runs under its own stored mode, which its owner can set.
  */
 export const isComparisonColumn = async (ctx: QueryCtx, threadId: Id<"threads">): Promise<boolean> => {
     const links = await linksOf(ctx, threadId);
 
     if (links.length >= MAX_LINKS_CHECKED) {
-        return true;
+        return false;
     }
 
-    const parents = await Promise.all(
-        links.filter((link) => link.branchType === "comparison").map(async (link) => await ctx.db.get("threads", link.parentThreadId)),
-    );
+    const parentIds = new Set(links.filter((link) => link.branchType === "comparison").map((link) => link.parentThreadId));
 
-    return parents.some((parent) => isLive(parent));
+    if (parentIds.size !== 1) {
+        return false;
+    }
+
+    const [parentId] = parentIds;
+
+    return isLive(await ctx.db.get("threads", parentId as Id<"threads">));
 };
 
 /**

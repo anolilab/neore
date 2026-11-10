@@ -189,7 +189,10 @@ describe("modeOfThread", () => {
             expect(await modeOf(links, { ...own, permissionMode: "full" }, "u2")).toBeNull();
         }
 
-        await expect(isComparisonColumn({ db: databaseWith([...bounded, comparison("parent")]) } as never, "child" as never)).resolves.toBe(true);
+        // The setter refuses exactly the threads `modeOfThread` runs under a parent's mode: one live comparison parent, links in one read.
+        await expect(isComparisonColumn({ db: databaseWith([comparison("parent")]) } as never, "child" as never)).resolves.toBe(true);
+        await expect(isComparisonColumn({ db: databaseWith([...bounded, comparison("parent")]) } as never, "child" as never)).resolves.toBe(false);
+        await expect(isComparisonColumn({ db: databaseWith([comparison("full"), comparison("parent")]) } as never, "child" as never)).resolves.toBe(false);
         await expect(isComparisonColumn({ db: databaseWith([comparison("trashed")]) } as never, "child" as never)).resolves.toBe(false);
     });
 });

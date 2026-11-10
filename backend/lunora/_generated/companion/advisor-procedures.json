@@ -14827,7 +14827,7 @@
     },
     {
       "callsMail": false,
-      "emitsEvent": false,
+      "emitsEvent": true,
       "fanOut": false,
       "handlesErrors": false,
       "reachesOutbound": false,
