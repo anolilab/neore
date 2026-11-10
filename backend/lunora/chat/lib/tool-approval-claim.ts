@@ -123,6 +123,12 @@ export const APPROVAL_ABANDONED_BY = "abandoned";
 /** `error.data.code` of the refusal to answer such a request; the card words it. */
 export const TOOL_REQUEST_ABANDONED = "TOOL_REQUEST_ABANDONED";
 
+/** `resolvedBy` of a request closed because the sub-agent run that waited on it ended (`sub-agents/functions.ts`). */
+export const SUB_AGENT_RUN_ENDED_BY = "run-ended";
+
+/** `error.data.code` of the refusal to answer a sub-agent's request while the sub-agent is still working. */
+export const SUB_AGENT_STILL_WORKING = "SUB_AGENT_STILL_WORKING";
+
 export const claimToolApproval = async (
     ctx: Pick<MutationCtx, "db">,
     args: { approvalId: string; callerId: string; decision: ToolApprovalDecision; threadId: Id<"threads">; unlockProof?: string | null },
@@ -179,6 +185,11 @@ export const claimToolApproval = async (
         });
     }
 
+    // Closed because the sub-agent run that waited on it ended, not by an answer: said as such.
+    if (run.status === "denied" && run.resolvedBy === SUB_AGENT_RUN_ENDED_BY) {
+        throw new LunoraError("CONFLICT", "This sub-agent has already ended");
+    }
+
     if (run.status !== "pending") {
         return { kind: "already-resolved", status: run.status, streamId: run.streamId ?? null };
     }
@@ -187,6 +198,28 @@ export const claimToolApproval = async (
 
     if (!pending) {
         throw new LunoraError("CONFLICT", "This tool request is no longer pending");
+    }
+
+    // A sub-agent's request is answered only while its run waits on it. Its continuation puts the run back to running in this
+    // transaction (`resumeClaimedRun`), so a second answer to the same run, or one sent before the run starts waiting, is
+    // refused here and its request stays open, instead of being consumed by a continuation that cannot run it.
+    if (run.config.subAgentRunId !== undefined) {
+        // A sub-agent child runs headless, and a headless run never reads a time-boxed allow: it would be ignored.
+        if (decision === "hour" || decision === "today") {
+            throw new LunoraError("BAD_REQUEST", "A sub-agent's request can be allowed once or always, or denied");
+        }
+
+        const subAgentRun = await ctx.db.get("subAgentRuns", run.config.subAgentRunId);
+
+        if (subAgentRun?.status === "queued" || subAgentRun?.status === "running") {
+            throw new LunoraError("CONFLICT", "The sub-agent is still working on another request. This one closes when its run ends", {
+                data: { code: SUB_AGENT_STILL_WORKING },
+            });
+        }
+
+        if (subAgentRun?.status !== "awaiting") {
+            throw new LunoraError("CONFLICT", "This sub-agent has already ended");
+        }
     }
 
     await ctx.db.patch("toolApprovalRuns", run._id, {

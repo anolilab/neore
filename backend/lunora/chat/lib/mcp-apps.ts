@@ -4,11 +4,15 @@ import type { HttpActionCtx } from "lunorash/server";
 import { internal } from "../../_generated/internal";
 import { getCurrentUserInternal } from "../../auth/lib/helper";
 import { findUserMcpServer } from "../../connectors/lib/user-mcp-servers";
+import { callOnShard } from "../../lib/cross-shard";
+import { toolsLogger } from "../../lib/logger";
 import { checkRateLimit } from "../../lib/rate-limiter";
+import { threadShardFor } from "../../lib/thread-shard";
 import { isSafeUrl } from "../tools/utilities";
 import { renewBearer, retryOnUnauthorized } from "./mcp-auth-retry";
 import type { MCPServerConfig } from "./mcp-tools";
 import { headersToRecord } from "./mcp-tools";
+import type { ThreadPermissionMode } from "./thread-permission-mode";
 import type { ToolAnnotationHints, ToolDescriptor, ToolPermissionMode, ToolPermissionOverrides } from "./tool-permissions";
 import { isToolPermissionMode, resolveToolPermission, toolPermissionKey } from "./tool-permissions";
 
@@ -83,10 +87,46 @@ const descriptorFor = (config: MCPServerConfig, toolName: string): ToolDescripto
         ? { key: toolPermissionKey("connector", toolName, config.connectorSlug), source: "connector" }
         : { key: toolPermissionKey("mcp", toolName, config.name), source: "mcp" };
 
-const annotatedToolMode = async (client: SDKClient, descriptor: ToolDescriptor, toolName: string): Promise<ToolPermissionMode> => {
+/**
+ * The mode of the thread an app is shown in, read for the caller. `denied` when the caller cannot reach that thread. A read that
+ * fails is `denied` too: the proxy cannot tell the thread's mode, and the automatic defaults are not the safe guess.
+ *
+ * `full` is not passed on. It turns `ask` defaults into `auto`, which is the model's turn to take; an app iframe is not a turn, and
+ * the proxy cannot ask anyone, so a tool that needs approval stays refused here under `full` too.
+ */
+const threadModeFor = async (context: HttpActionCtx, userId: string, threadId: string): Promise<ThreadPermissionMode | undefined | "denied"> => {
+    // A shared thread's row lives on its OWNER's shard, not the caller's (the servers and credentials stay on the caller's). The
+    // query re-checks the caller's grant there, so crossing only moves where the thread is read.
+    const found = await (async () => {
+        const args = { threadId, userId };
+        const shardKey = await threadShardFor(context, userId, threadId);
+
+        return shardKey === userId
+            ? await context.runQuery(internal.chat.tool_permissions.getThreadPermissionModeForApp, args)
+            : await callOnShard(internal.chat.tool_permissions.getThreadPermissionModeForApp, args, { shardKey });
+    })().catch((error: unknown) => {
+        // Denied as before, but recorded: a failure here would otherwise read as a refused chat, with nothing left for an operator to find.
+        toolsLogger.warn("[MCP] Thread permission mode lookup failed for an app call; denied:", error, { threadId, userId });
+
+        return null;
+    });
+
+    if (!found?.allowed) {
+        return "denied";
+    }
+
+    return found.mode === "full" ? undefined : (found.mode ?? undefined);
+};
+
+const annotatedToolMode = async (
+    client: SDKClient,
+    descriptor: ToolDescriptor,
+    toolName: string,
+    threadMode: ThreadPermissionMode | undefined,
+): Promise<ToolPermissionMode> => {
     const annotations = await readToolAnnotations(client, toolName);
 
-    return resolveToolPermission({ ...descriptor, ...(annotations && { annotations }) }, undefined);
+    return resolveToolPermission({ ...descriptor, ...(annotations && { annotations }) }, undefined, { threadMode });
 };
 
 /**
@@ -280,7 +320,7 @@ export const callMCPToolFromAppHttpAction = async (context: HttpActionCtx, reque
 
     if (rateLimited) return rateLimited;
 
-    let body: { arguments?: Record<string, JSONValue>; serverName?: string; toolName?: string };
+    let body: { arguments?: Record<string, JSONValue>; serverName?: string; threadId?: string; toolName?: string };
 
     try {
         body = (await request.json()) as typeof body;
@@ -288,7 +328,7 @@ export const callMCPToolFromAppHttpAction = async (context: HttpActionCtx, reque
         return Response.json({ error: "Invalid JSON body" }, { status: 400 });
     }
 
-    const { arguments: toolArgs = {}, serverName, toolName } = body;
+    const { arguments: toolArgs = {}, serverName, threadId, toolName } = body;
 
     if (!serverName || !toolName) {
         return Response.json({ error: "Missing serverName or toolName" }, { status: 400 });
@@ -300,9 +340,18 @@ export const callMCPToolFromAppHttpAction = async (context: HttpActionCtx, reque
         return Response.json({ error: `MCP server "${serverName}" not found` }, { status: 404 });
     }
 
+    // The app's call runs under the thread's mode, as the model's calls do: the proxy is no way around a supervised thread. A call
+    // that names no thread (a client built before the thread was sent) has no thread mode, so it gets the default: a read-only tool
+    // runs, and one that would ask is refused, since no person is there to answer it. Rejecting it would break every such client.
+    const threadMode = threadId ? await threadModeFor(context, user._id, threadId) : undefined;
+
+    if (threadMode === "denied") {
+        return Response.json({ error: "This chat is not available to you" }, { status: 403 });
+    }
+
     const overrides = (await context.runQuery(internal.chat.tool_permissions.getToolPermissionsQuery, { userId: user._id })) as ToolPermissionOverrides;
     const descriptor = descriptorFor(serverConfig, toolName);
-    const chosen = isToolPermissionMode(overrides[descriptor.key]) ? resolveToolPermission(descriptor, overrides) : undefined;
+    const chosen = isToolPermissionMode(overrides[descriptor.key]) ? resolveToolPermission(descriptor, overrides, { threadMode }) : undefined;
     const refusedUpFront = chosen && refusalFor(chosen, toolName);
 
     if (refusedUpFront) {
@@ -311,7 +360,7 @@ export const callMCPToolFromAppHttpAction = async (context: HttpActionCtx, reque
 
     try {
         const outcome = await withServerClient(serverConfig, async (client) => {
-            const refused = chosen ? null : refusalFor(await annotatedToolMode(client, descriptor, toolName), toolName);
+            const refused = chosen ? null : refusalFor(await annotatedToolMode(client, descriptor, toolName, threadMode), toolName);
 
             if (refused) {
                 return { refused };

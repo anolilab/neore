@@ -198,3 +198,23 @@ The list (`egress::DEPENDENCY_HOSTS`; `cargo test egress` fails if this table an
 `objects` entries come from the tools' documented defaults and were not exercised.
 
 SSH servers (`neore-host`) keep the on/off shell-network switch; the tiers are not offered for them yet.
+
+## npm registry agents
+
+An agent installed from an npm package records a hash of its installed folder in the pin (`tree_sha256`: raw file
+names, contents, executable bits, links that stay inside; a link that resolves to nothing is refused).
+`acp_install_npm.rs#verify_installed_tree`, called by `acp_spawn_plan`, re-hashes it before every start and also
+refuses when a `node_modules` exists in `acp-agents/<key>/`, `acp-agents/` or the app's data folder. Folders above the
+data folder are not checked. The Node binary is neither hashed nor pinned.
+
+Only an agent whose pin records a tree hash gets this check. A binary install, or an agent added by hand, has none.
+Editing an installed agent's interpreter, or adding, changing or removing a `NODE_*` or code-loading variable, drops
+the pin (the files stay): the agent then starts as an ordinary one, without the check. Editing the arguments after
+the pinned program keeps it.
+
+The check reads files after a type check, so it guards against changes made at rest, not against someone who can
+write to the folder while the agent is starting (a known limit).
+
+An install, a removal and a prune of old versions run one at a time (`lock_installs`). Deleting an install or a
+staging folder renames it into `acp-agents/.trash` under that lock and deletes it on a thread; trash names carry a
+per-run id, and the sweep at the next install stage removes the entries of other runs only.

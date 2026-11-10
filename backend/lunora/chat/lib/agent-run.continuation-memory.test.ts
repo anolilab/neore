@@ -36,8 +36,16 @@ const pausedAgain = {
 };
 
 /** Runs a steerable continuation that takes one steer (unless `steered` is off), and returns the scheduled jobs and recorded snapshots. */
-const resume = async (config: ToolRunConfig, savedMessages: unknown[], memoryEnabled = true, steered = true, steps: unknown[] = []) => {
+const resume = async (
+    config: ToolRunConfig,
+    savedMessages: unknown[],
+    memoryEnabled = true,
+    steered = true,
+    steps: unknown[] = [],
+    failPreferences = false,
+) => {
     const runAfter = vi.fn(async () => "job");
+    let preferenceReads = 0;
     const runMutation = vi.fn(async (ref: unknown) =>
         ref === internal.chat.steering.deliverSteers && steered ? { messageId: "steer-1", text: "actually, vegetarian" } : null,
     );
@@ -47,6 +55,13 @@ const resume = async (config: ToolRunConfig, savedMessages: unknown[], memoryEna
         }
 
         if (ref === internal.auth.functions.getUserPreferencesQuery) {
+            preferenceReads += 1;
+
+            // The read before the run goes through; the one in the bookkeeping after the reply fails.
+            if (failPreferences && preferenceReads > 1) {
+                throw new Error("preferences read failed");
+            }
+
             return { memoryEnabled, timezone: "Europe/Berlin" };
         }
 
@@ -75,7 +90,7 @@ const resume = async (config: ToolRunConfig, savedMessages: unknown[], memoryEna
 
     const ctx: Record<string, unknown> = { runMutation, runQuery, scheduler: { runAfter } };
 
-    await resumeApprovedRun(
+    const outcome = await resumeApprovedRun(
         ctx as never,
         { approvalId: "approval-1", approved: true, config, streamId: "stream-1", threadId: "thread-1", userId: "owner-1" },
         { steerable: true },
@@ -83,7 +98,7 @@ const resume = async (config: ToolRunConfig, savedMessages: unknown[], memoryEna
 
     const jobs = (ref: unknown) => runAfter.mock.calls.filter((call) => (call as unknown[])[1] === ref).map((call) => (call as unknown[])[2]);
 
-    return { ctx, jobs, runMutation };
+    return { ctx, jobs, outcome, runMutation };
 };
 
 /** What `runStreamingAgent` records when a run ends at a pause: `afterRun` over the prompt and the steers so far. */
@@ -126,6 +141,18 @@ describe("a run that pauses on a tool approval", () => {
 });
 
 describe("a tool-approval continuation", () => {
+    it("builds its tools for the person who started the turn, not the owner it resumes as, so a collaborator's turn never gets `full`", async () => {
+        await resume({ ...BASE_CONFIG, startedBy: "collaborator-1" }, [reply]);
+
+        expect(vi.mocked(buildAgentTools).mock.calls[0]?.[1]).toMatchObject({ permissionModeUserId: "collaborator-1", userId: "owner-1" });
+    });
+
+    it("names nobody for a snapshot that does not say who started the turn", async () => {
+        await resume(BASE_CONFIG, [reply]);
+
+        expect(vi.mocked(buildAgentTools).mock.calls[0]?.[1]).toMatchObject({ permissionModeUserId: "" });
+    });
+
     it("extracts only the steers it took after the pause, leaving the prompt and earlier steers to the pause", async () => {
         const { jobs } = await resume({ ...BASE_CONFIG, memory: CARRIED }, [reply]);
         const extractions = jobs(internal.memory.extract.extractMemories);
@@ -155,6 +182,12 @@ describe("a tool-approval continuation", () => {
         expect(jobs0(quiet)).toHaveLength(0);
         expect(jobs0(await resume(BASE_CONFIG, [reply]))).toHaveLength(0);
         expect(jobs0(await resume({ ...BASE_CONFIG, memory: CARRIED }, [reply], false))).toHaveLength(0);
+    });
+
+    it("still returns its pause when the bookkeeping after the reply fails, so a run that waits again is not failed", async () => {
+        const { outcome } = await resume({ ...BASE_CONFIG, memory: CARRIED }, [pausedAgain], true, true, [], true);
+
+        expect(outcome).toMatchObject({ paused: true, stopped: false });
     });
 
     it("extracts nothing when it pauses again with no text yet, and hands the next approval the same snapshot", async () => {

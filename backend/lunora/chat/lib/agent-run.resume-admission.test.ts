@@ -6,6 +6,7 @@
 import { describe, expect, it, vi } from "vitest";
 import z from "zod/v4";
 
+import { internal } from "../../_generated/internal";
 import { createTool } from "../../agent/client/create-tool";
 
 import { buildAgentTools } from "./agent-tools";
@@ -139,6 +140,36 @@ describe("a headless pause's continuation", () => {
 
         expect(await lastStep({ stepsLeft: 1, subAgentRunId: "run-1" })).toStrictEqual(["plain"]);
         expect(await lastStep({ stepsLeft: 1 })).toBeUndefined();
+    });
+
+    it("stops a sub-agent child's continuation at its next step once its run is stopped, and only a sub-agent child's", async () => {
+        const stopsAfterAStep = async (config: Record<string, unknown>) => {
+            const approveToolCall = vi.fn(async () => {
+                throw new Error("stop here");
+            });
+
+            vi.mocked(getAgent).mockResolvedValue({ approveToolCall, options: {} } as never);
+
+            // The run was stopped (a parent's Stop, `cancelRun`, the reaper): `shouldRunStop` answers yes.
+            const runQuery = vi.fn(async (reference: unknown) => (reference === internal.sub_agents.functions.shouldRunStop ? true : { toolName: null }));
+
+            await resumeApprovedRun({ runQuery } as never, {
+                approvalId: "approval-1",
+                approved: true,
+                config: { ...(CONFIG as object), stepsLeft: 3, ...config } as never,
+                streamId: "stream-1",
+                threadId: "thread-1",
+                userId: "owner-1",
+            }).catch(() => undefined);
+
+            const { stopWhen } = (approveToolCall.mock.calls[0] as unknown[])[3] as { stopWhen: ((step: { steps: unknown[] }) => Promise<boolean>)[] };
+            const verdicts = await Promise.all(stopWhen.map(async (condition) => await condition({ steps: [{}] })));
+
+            return verdicts.includes(true);
+        };
+
+        expect(await stopsAfterAStep({ subAgentRunId: "run-1" })).toBe(true);
+        expect(await stopsAfterAStep({})).toBe(false);
     });
 
     it("gives an interactive continuation its full budget, whatever stepsLeft its snapshot holds", async () => {

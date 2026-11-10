@@ -29,8 +29,10 @@ import { MAX_LENGTH } from "../lib/validators";
 import { LunoraError, v } from "lunorash/server";
 
 import { internal } from "../_generated/internal";
-import type { Id } from "../_generated/dataModel";
+import type { Doc, Id } from "../_generated/dataModel";
 import type { QueryCtx } from "../_generated/server";
+import { resolveThreadReadAccess } from "../agent/thread-read-access";
+import type { ThreadPermissionMode } from "./lib/thread-permission-mode";
 import { internalMutation, internalQuery } from "../_generated/server";
 import type { AuthMutationCtx } from "../lib/crpc";
 import { saveAiUserPreferences } from "../auth/lib/preference-writes";
@@ -190,6 +192,154 @@ export const getLowRiskApprovalContext = internalQuery
         async ({ args: { permissionKey, threadId, trustId, userId }, ctx }) =>
             await quickCheckAllowed(ctx, threadId, userId, permissionKey === undefined ? undefined : { permissionKey, trustId }),
     );
+
+const modeFor = (thread: Doc<"threads"> | null, userId: string): ThreadPermissionMode | null => {
+    const mode = thread?.permissionMode;
+
+    if (!thread || mode === undefined || thread.runner === "host") {
+        return null;
+    }
+
+    return mode === "full" && thread.userId !== userId ? null : mode;
+};
+
+/** Relationship rows read for one thread when its mode is resolved. */
+const MAX_LINKS_CHECKED = 50;
+
+/** The relationship rows where `threadId` is the child, read up to the bound (`MAX_LINKS_CHECKED`). */
+const linksOf = async (ctx: QueryCtx, threadId: Id<"threads">) =>
+    await ctx.db
+        .query("threadRelationships")
+        .withIndex("by_thread", (q) => q.eq("threadId", threadId))
+        .take(MAX_LINKS_CHECKED);
+
+/** A parent that is gone, or in the trash, gives a column nothing to take a mode from. */
+const isLive = (parent: Doc<"threads"> | null): parent is Doc<"threads"> => parent !== null && parent.deleted !== true;
+
+/**
+ * The live comparison parent whose mode a thread runs under, or `null` when no parent can be shown to decide it: its links do not fit in
+ * one read, they name no comparison parent or several, or the one parent is gone or trashed (its link rows outlive it). The setter's
+ * guard and the resolver both read it, so a thread the setter refuses is exactly one that runs under a parent's mode.
+ */
+const comparisonParentOf = async (ctx: QueryCtx, threadId: Id<"threads">): Promise<Doc<"threads"> | null> => {
+    // Every link is read, not the first: a child with a comparison link and another link must still find its parent, whichever is listed
+    // first. The rows per child are few; the bound only keeps a runaway row count from being read whole.
+    const links = await linksOf(ctx, threadId);
+
+    if (links.length >= MAX_LINKS_CHECKED) {
+        return null;
+    }
+
+    const parentIds = new Set(links.filter((link) => link.branchType === "comparison").map((link) => link.parentThreadId));
+
+    if (parentIds.size !== 1) {
+        return null;
+    }
+
+    const [parentId] = parentIds;
+    const parent = await ctx.db.get("threads", parentId as Id<"threads">);
+
+    return isLive(parent) ? parent : null;
+};
+
+/** Whether a thread runs under a comparison parent's mode. A mode set on such a column would never apply, so `setThreadPermissionMode` refuses it. */
+export const isComparisonColumn = async (ctx: QueryCtx, threadId: Id<"threads">): Promise<boolean> => (await comparisonParentOf(ctx, threadId)) !== null;
+
+/**
+ * A comparison column is a thread of its own, but the mode is chosen once, on the comparison it belongs to: a column with a live parent runs
+ * under that parent's mode, whatever mode it holds, so the shared composer's choice reaches every send. Any other thread, a column whose
+ * parent cannot decide included, runs under its own stored mode (none stored: the defaults, as for any thread without a mode).
+ */
+export const modeOfThread = async (ctx: QueryCtx, thread: Doc<"threads"> | null, userId: string): Promise<ThreadPermissionMode | null> => {
+    // A host thread has no mode, and a comparison link must not give it one.
+    if (!thread || thread.runner === "host") {
+        return modeFor(thread, userId);
+    }
+
+    const parent = await comparisonParentOf(ctx, thread._id);
+
+    return modeFor(parent ?? thread, userId);
+};
+
+/** The continuation hops a computer's thread is walked back through before the walk gives up. */
+const MAX_CONTINUATION_HOPS = 8;
+
+/**
+ * The mode a cloud thread taking over from `thread` inherits. A computer's thread has no mode of its own (`modeOfThread`), so it is read
+ * from the cloud thread it was switched from: the nearest cloud thread up its continuation links. A round trip through a computer then
+ * keeps the mode the owner set. A chain too long to walk, one with two origins, or one whose origin is gone inherits nothing (the defaults): no mode can be shown to apply.
+ */
+export const modeInheritedFrom = async (ctx: QueryCtx, thread: Doc<"threads">, userId: string): Promise<ThreadPermissionMode | null> => {
+    let current: Doc<"threads"> | null = thread;
+    let hops = 0;
+
+    while (current?.runner === "host") {
+        if (hops >= MAX_CONTINUATION_HOPS) {
+            return null;
+        }
+
+        hops += 1;
+
+        const links = await linksOf(ctx, current._id);
+        const continuations = links.filter((link) => link.branchType === "continuation");
+
+        // Two origins leave no one origin to take a mode from, and a read that reached the bound may hide a second one: fail closed rather
+        // than take whichever is listed first.
+        if (links.length >= MAX_LINKS_CHECKED || new Set(continuations.map((link) => link.parentThreadId)).size > 1) {
+            return null;
+        }
+
+        const [continuation] = continuations;
+
+        if (!continuation) {
+            return null;
+        }
+
+        current = await ctx.db.get("threads", continuation.parentThreadId);
+
+        // An origin that is gone or in the trash gives nothing, as a comparison parent does (`isLive`).
+        if (!isLive(current)) {
+            return null;
+        }
+    }
+
+    return await modeOfThread(ctx, current, userId);
+};
+
+/**
+ * The permission mode a run on this thread builds its tools under (`lib/thread-permission-mode.ts`), or `null` for the
+ * default. A host thread has none. In a thread someone else owns only the modes that ask MORE apply: `full` is the
+ * owner's to give, so a collaborator's turn is not run under it.
+ */
+export const getThreadPermissionMode = internalQuery
+    .input({ threadId: v.id("threads"), userId: v.string() })
+    .output(v.union(v.literal("supervised"), v.literal("auto"), v.literal("full"), v.null()))
+    .query(async ({ args: { threadId, userId }, ctx }) => await modeOfThread(ctx, await ctx.db.get("threads", threadId), userId));
+
+export const threadModeForApp = async (ctx: QueryCtx, threadId: string, userId: string): Promise<{ allowed: boolean; mode: ThreadPermissionMode | null }> => {
+    const access = await resolveThreadReadAccess(ctx, threadId as Id<"threads">, userId);
+
+    if (access?.kind !== "full" && access?.kind !== "locked") {
+        return { allowed: false, mode: null };
+    }
+
+    return { allowed: true, mode: await modeOfThread(ctx, access.thread, userId) };
+};
+
+/**
+ * The mode of the thread an MCP App is shown in, with whether the caller may reach that thread at all. The content read gate is
+ * not applied: the app was already rendered, and a passcode-locked chat's owner (no unlock proof here) is who it belongs to.
+ * `allowed` is the owner, or someone with a live grant; a locked thread is the owner's alone.
+ */
+export const getThreadPermissionModeForApp = internalQuery
+    .input({ threadId: v.string().max(MAX_LENGTH.id), userId: v.string() })
+    .output(
+        v.object({
+            allowed: v.boolean(),
+            mode: v.union(v.literal("supervised"), v.literal("auto"), v.literal("full"), v.null()),
+        }),
+    )
+    .query(async ({ args: { threadId, userId }, ctx }) => await threadModeForApp(ctx, threadId, userId));
 
 /** The servers the user trusts to have their tools put to the quick check, as the run builds its tools. */
 export const getLowRiskTrustedServers = internalQuery
@@ -562,7 +712,8 @@ export const recordPendingToolApprovals = internalMutation
 
         await purgeExpiredToolApprovalRunsForUser(ctx, ownerId, createdAt);
 
-        if (awaitingInput && thread) {
+        // A question the owner was asked in this thread stays the thing it waits on: an approval does not overwrite it.
+        if (awaitingInput && thread && thread.awaitingInput !== "question") {
             await patchThread(ctx.db, thread._id, { awaitingInput });
         }
 

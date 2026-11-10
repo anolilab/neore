@@ -20,9 +20,11 @@ import { v } from "lunorash/server";
 
 import { internal } from "../_generated/internal";
 import type { Id } from "../_generated/dataModel";
+import type { ActionCtx } from "../_generated/server";
 import { internalAction } from "../_generated/server";
 import { autoCompactBeforeReply } from "../agent/thread-compaction";
 import { streamLogger } from "../lib/logger";
+import { COMPLETION_MESSAGE_IDS_MAX } from "../sub-agents/logic";
 import { findSkillCommand, parseSkillCommand, resolveReasoningEffort, resolveSkillModel } from "../skills/slash-command";
 import { handOffToGoalReview, noteGoalPaused, otherGoalHoldsThread } from "./goals/execute";
 import { GOAL_CONTINUATION_AGENT } from "./goals/shared";
@@ -946,9 +948,70 @@ export const runStreamingAgent = internalAction
         },
     );
 
+export type SubAgentEnd = { error: string; kind: "failed" } | { kind: "paused" } | { kind: "succeeded"; messageIds: string[] };
+
+/** Delay of a settlement handed to the scheduler after its write in the action failed. */
+const SETTLE_RETRY_DELAY_MS = 30_000;
+
+/**
+ * A sub-agent child's continuation hands its end back to the run the snapshot names: paused again, the run waits on
+ * the new request; ended, the run ends once, and its answer reaches the parent. Both writes are idempotent, so a failed
+ * one is scheduled again: dropped, the run's reaper would fail a child that finished, or close a request that was just made. Returns whether a paused run now waits (a scheduled retry counts as waiting).
+ */
+export const settleSubAgentRun = async (
+    ctx: Pick<ActionCtx, "runMutation" | "scheduler">,
+    runId: Id<"subAgentRuns"> | undefined,
+    end: SubAgentEnd,
+    /** The deadline the resume this continuation runs under set (`continuingRun`): every write is bound to it. */
+    resumedWith?: number,
+): Promise<boolean> => {
+    if (runId === undefined) {
+        return false;
+    }
+
+    // Bound to the resume this continuation runs under, so neither a retried write nor a late one acts on a run that waited
+    // again or was answered since: a pause never re-opens it, an end never ends it.
+    const bound = { ...(resumedWith !== undefined && { resumedWith }), runId };
+    const completion = {
+        ...(end.kind === "succeeded" && end.messageIds.length > 0 && { messageIds: end.messageIds.slice(-COMPLETION_MESSAGE_IDS_MAX) }),
+        outcome: end.kind === "failed" ? { error: end.error.slice(0, MAX_LENGTH.short), kind: "failed" as const } : { kind: "succeeded" as const },
+        ...bound,
+    };
+    const pauseArgs = bound;
+
+    try {
+        if (end.kind === "paused") {
+            return await ctx.runMutation(internal.sub_agents.functions.awaitApproval, pauseArgs);
+        }
+
+        await ctx.runMutation(internal.sub_agents.functions.completeResumedRun, completion);
+
+        return false;
+    } catch (error) {
+        streamLogger.error(`[ToolApproval] Could not hand the continuation's end to sub-agent run ${runId}; scheduling it:`, error);
+    }
+
+    try {
+        if (end.kind === "paused") {
+            await ctx.scheduler.runAfter(SETTLE_RETRY_DELAY_MS, internal.sub_agents.functions.awaitApproval, pauseArgs);
+
+            return true;
+        }
+
+        await ctx.scheduler.runAfter(SETTLE_RETRY_DELAY_MS, internal.sub_agents.functions.completeResumedRun, completion);
+    } catch (error) {
+        streamLogger.error(`[ToolApproval] Could not schedule the end of sub-agent run ${runId}:`, error);
+    }
+
+    return false;
+};
+
 /**
  * Resume a run that paused on a tool-approval request, once
  * `respondToToolApproval` has claimed the snapshot and opened `streamId`.
+ *
+ * A sub-agent child's pause (`config.subAgentRunId`) puts its run back to `running` first and hands the run its end
+ * ({@link settleSubAgentRun}), so the answer is posted to the parent once.
  */
 export const continueAfterToolApproval = internalAction
     .input({
@@ -975,13 +1038,45 @@ export const continueAfterToolApproval = internalAction
             return;
         }
 
+        const { subAgentRunId } = config;
+        // The resume this continuation runs under, and whether its end was handed to the run: a later failure must not
+        // end a run that this continuation already left waiting again.
+        let subAgentResume: number | null | undefined;
+        let settled = false;
+
         try {
+            // The claim put the run back to running (`resumeClaimedRun`); it is no longer running when it ended since.
+            subAgentResume =
+                subAgentRunId === undefined ? undefined : await ctx.runQuery(internal.sub_agents.functions.continuingRun, { runId: subAgentRunId });
+
+            if (subAgentResume === null) {
+                // The run ended while it waited (a stop, a reap): its tool does not run for a run that is over.
+                streamLogger.warn(`[ToolApproval] Sub-agent run ${subAgentRunId} is no longer awaiting — not resumed`);
+
+                await failRun(ctx, {
+                    safeMessage: "This sub-agent has already ended.",
+                    streamId,
+                    threadId,
+                    threadStatus: "active",
+                });
+
+                return;
+            }
+
             // A locked chat resumes only under a stream started after its lock (`streamRunThread`).
             // Checked AFTER the claim, inside the try: a refusal or a failed read must close the
             // claimed stream and leave the thread out of `running`, not strand both.
             if (!(await ctx.runQuery(internal.chat.streaming.streamRunThread, { streamId: streamId as Id<"persistentStreams">, userId }))) {
                 streamLogger.warn(`[ToolApproval] Stream ${streamId} belongs to a locked or unreachable chat — not resumed`);
 
+                // The run's end first: a failure closing the stream must not leave the run `running` until its reaper.
+                await settleSubAgentRun(
+                    ctx,
+                    subAgentRunId,
+                    { error: "The sub-agent's conversation can no longer continue.", kind: "failed" },
+                    subAgentResume ?? undefined,
+                );
+                settled = true;
                 await failRun(ctx, {
                     safeMessage: "This chat can no longer continue the response.",
                     streamId,
@@ -1017,6 +1112,20 @@ export const continueAfterToolApproval = internalAction
                 { admittedRun: true, steerable: true },
             );
 
+            let subAgentEnd: SubAgentEnd = { kind: "succeeded", messageIds: resumed.messageIds ?? [] };
+
+            if (resumed.paused) {
+                subAgentEnd = { kind: "paused" };
+            } else if (resumed.stopped) {
+                subAgentEnd = { error: "This sub-agent was stopped.", kind: "failed" };
+            }
+
+            const waiting = await settleSubAgentRun(ctx, subAgentRunId, subAgentEnd, subAgentResume ?? undefined);
+
+            settled = true;
+            // A run that ended while this continuation paused again had its new requests closed: the child does not wait on them.
+            const awaitingInput = subAgentRunId !== undefined && resumed.paused && !waiting ? undefined : resumed.awaitingInput;
+
             // The run a goal was waiting on ended here, once nothing more is pending (see `runStreamingAgent`).
             if (resumed.paused) {
                 await noteGoalPaused(ctx, threadId);
@@ -1027,7 +1136,12 @@ export const continueAfterToolApproval = internalAction
                 return;
             }
 
-            await setThreadStatus(ctx, threadId, "active", { awaitingInput: resumed.awaitingInput, replied: !resumed.paused && !resumed.stopped });
+            // A sub-agent's child thread is not read as a new reply: its run's own reply is delivered to the parent, as before.
+            await setThreadStatus(ctx, threadId, "active", {
+                awaitingInput,
+                ...(subAgentRunId !== undefined && { keepQuestion: true }),
+                replied: subAgentRunId === undefined && !resumed.paused && !resumed.stopped,
+            });
 
             if (resumed.stopped) {
                 await ctx.runMutation(internal.agent.threads.endStoppedPause, { threadId: threadId as Id<"threads"> });
@@ -1041,6 +1155,16 @@ export const continueAfterToolApproval = internalAction
                 ? "This tool request is no longer pending."
                 : "An error occurred while continuing the response. Please try again.";
 
-            await failRun(ctx, { safeMessage, streamId, threadId, threadStatus: "active" });
+            // A failure closing the stream must not skip the run's end below.
+            try {
+                await failRun(ctx, { safeMessage, streamId, threadId, threadStatus: "active" });
+            } catch (cleanupError) {
+                streamLogger.error(`[ToolApproval] Could not close the failed stream ${streamId}:`, cleanupError);
+            }
+
+            // A run this continuation already handed its end to (one that waits again) is not ended by a later failure.
+            if (!settled) {
+                await settleSubAgentRun(ctx, subAgentRunId, { error: safeMessage, kind: "failed" }, subAgentResume ?? undefined);
+            }
         }
     });

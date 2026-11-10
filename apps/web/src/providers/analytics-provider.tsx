@@ -1,5 +1,5 @@
 import { useEffectivePermissions } from "@c15t/react";
-import type { PostHogInterface } from "posthog-js";
+import type { PostHogConfig, PostHogInterface } from "posthog-js";
 import { posthog } from "posthog-js";
 import { PostHogProvider } from "posthog-js/react";
 import type { FC, PropsWithChildren } from "react";
@@ -42,6 +42,19 @@ export const PostHogConsentSync: FC = () => {
 
     return null;
 };
+
+/** PostHog's options that do not depend on the session. */
+export const POSTHOG_OPTIONS = {
+    // A prompt link's text, and every address's fragment, never leave the browser in an event (`lib/analytics/redact-prompt.ts`).
+    before_send: redactPromptFromEvent,
+    capture_pageview: true,
+    // PostHog will not set any cookies until the user has given consent
+    cookieless_mode: "on_reject",
+    // A guest link carries its bearer token in the fragment (`/guest#<token>`): PostHog keeps no address's fragment, not in
+    // the cookie or storage it writes (`$initial_person_info`, session properties) nor in an event. `before_send` stays the backstop.
+    disable_capture_url_hashes: true,
+    person_profiles: "always",
+} as const satisfies Partial<PostHogConfig>;
 
 /** PostHog's `loaded` callback: applies the consent state that arrived before `posthog.init` finished. */
 export const onPostHogLoaded = (ph: PostHogInterface): void => {
@@ -100,13 +113,8 @@ const AnalyticsProvider: FC<PropsWithChildren> = ({ children }) => {
                           isIdentifiedID: false,
                       }
                     : undefined,
-            // A prompt link's text never leaves the browser in an event's URLs (`lib/analytics/redact-prompt.ts`).
-            before_send: redactPromptFromEvent,
-            capture_pageview: true,
-            // PostHog will not set any cookies until the user has given consent
-            cookieless_mode: "on_reject",
+            ...POSTHOG_OPTIONS,
             loaded: onPostHogLoaded,
-            person_profiles: "always",
         });
     }, []);
 

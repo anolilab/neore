@@ -21,6 +21,7 @@ import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as chatWorkflowRouteRouteImport } from './routes/(chat)/workflow/route'
 import { Route as publicIndexRouteImport } from './routes/(public)/index'
 import { Route as publicDatenschutzRouteImport } from './routes/(public)/datenschutz'
+import { Route as publicGuestRouteImport } from './routes/(public)/guest'
 import { Route as publicImpressumRouteImport } from './routes/(public)/impressum'
 import { Route as ShortcutDevelopRouteImport } from './routes/_shortcut/develop'
 import { Route as ShortcutEvalsRouteImport } from './routes/_shortcut/evals'
@@ -38,6 +39,7 @@ import { Route as AdminUsersRouteImport } from './routes/admin/users'
 import { Route as ApiScribeTokenRouteImport } from './routes/api/scribe-token'
 import { Route as AuthCallbackRouteImport } from './routes/auth/callback'
 import { Route as AuthConvertAccountRouteImport } from './routes/auth/convert-account'
+import { Route as AuthDeviceRouteImport } from './routes/auth/device'
 import { Route as AuthExtensionRouteImport } from './routes/auth/extension'
 import { Route as AuthForgotPasswordRouteImport } from './routes/auth/forgot-password'
 import { Route as AuthRecoverAccountRouteImport } from './routes/auth/recover-account'
@@ -154,6 +156,11 @@ const publicDatenschutzRoute = publicDatenschutzRouteImport.update({
   path: '/datenschutz',
   getParentRoute: () => rootRouteImport,
 } as any)
+const publicGuestRoute = publicGuestRouteImport.update({
+  id: '/(public)/guest',
+  path: '/guest',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const publicImpressumRoute = publicImpressumRouteImport.update({
   id: '/(public)/impressum',
   path: '/impressum',
@@ -237,6 +244,11 @@ const AuthCallbackRoute = AuthCallbackRouteImport.update({
 const AuthConvertAccountRoute = AuthConvertAccountRouteImport.update({
   id: '/convert-account',
   path: '/convert-account',
+  getParentRoute: () => AuthRouteRoute,
+} as any)
+const AuthDeviceRoute = AuthDeviceRouteImport.update({
+  id: '/device',
+  path: '/device',
   getParentRoute: () => AuthRouteRoute,
 } as any)
 const AuthExtensionRoute = AuthExtensionRouteImport.update({
@@ -562,6 +574,7 @@ export interface FileRoutesByFullPath {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/workflow': typeof chatWorkflowRouteRouteWithChildren
   '/datenschutz': typeof publicDatenschutzRoute
+  '/guest': typeof publicGuestRoute
   '/impressum': typeof publicImpressumRoute
   '/develop': typeof ShortcutDevelopRoute
   '/evals': typeof ShortcutEvalsRoute
@@ -578,6 +591,7 @@ export interface FileRoutesByFullPath {
   '/api/scribe-token': typeof ApiScribeTokenRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/auth/convert-account': typeof AuthConvertAccountRoute
+  '/auth/device': typeof AuthDeviceRoute
   '/auth/extension': typeof AuthExtensionRoute
   '/auth/forgot-password': typeof AuthForgotPasswordRoute
   '/auth/recover-account': typeof AuthRecoverAccountRoute
@@ -644,6 +658,7 @@ export interface FileRoutesByTo {
   '/robots.txt': typeof RobotsDottxtRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/datenschutz': typeof publicDatenschutzRoute
+  '/guest': typeof publicGuestRoute
   '/impressum': typeof publicImpressumRoute
   '/develop': typeof ShortcutDevelopRoute
   '/evals': typeof ShortcutEvalsRoute
@@ -658,6 +673,7 @@ export interface FileRoutesByTo {
   '/api/scribe-token': typeof ApiScribeTokenRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/auth/convert-account': typeof AuthConvertAccountRoute
+  '/auth/device': typeof AuthDeviceRoute
   '/auth/extension': typeof AuthExtensionRoute
   '/auth/forgot-password': typeof AuthForgotPasswordRoute
   '/auth/recover-account': typeof AuthRecoverAccountRoute
@@ -730,6 +746,7 @@ export interface FileRoutesById {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/(chat)/workflow': typeof chatWorkflowRouteRouteWithChildren
   '/(public)/datenschutz': typeof publicDatenschutzRoute
+  '/(public)/guest': typeof publicGuestRoute
   '/(public)/impressum': typeof publicImpressumRoute
   '/_shortcut/develop': typeof ShortcutDevelopRoute
   '/_shortcut/evals': typeof ShortcutEvalsRoute
@@ -746,6 +763,7 @@ export interface FileRoutesById {
   '/api/scribe-token': typeof ApiScribeTokenRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/auth/convert-account': typeof AuthConvertAccountRoute
+  '/auth/device': typeof AuthDeviceRoute
   '/auth/extension': typeof AuthExtensionRoute
   '/auth/forgot-password': typeof AuthForgotPasswordRoute
   '/auth/recover-account': typeof AuthRecoverAccountRoute
@@ -819,6 +837,7 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/workflow'
     | '/datenschutz'
+    | '/guest'
     | '/impressum'
     | '/develop'
     | '/evals'
@@ -835,6 +854,7 @@ export interface FileRouteTypes {
     | '/api/scribe-token'
     | '/auth/callback'
     | '/auth/convert-account'
+    | '/auth/device'
     | '/auth/extension'
     | '/auth/forgot-password'
     | '/auth/recover-account'
@@ -901,6 +921,7 @@ export interface FileRouteTypes {
     | '/robots.txt'
     | '/sitemap.xml'
     | '/datenschutz'
+    | '/guest'
     | '/impressum'
     | '/develop'
     | '/evals'
@@ -915,6 +936,7 @@ export interface FileRouteTypes {
     | '/api/scribe-token'
     | '/auth/callback'
     | '/auth/convert-account'
+    | '/auth/device'
     | '/auth/extension'
     | '/auth/forgot-password'
     | '/auth/recover-account'
@@ -986,6 +1008,7 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/(chat)/workflow'
     | '/(public)/datenschutz'
+    | '/(public)/guest'
     | '/(public)/impressum'
     | '/_shortcut/develop'
     | '/_shortcut/evals'
@@ -1002,6 +1025,7 @@ export interface FileRouteTypes {
     | '/api/scribe-token'
     | '/auth/callback'
     | '/auth/convert-account'
+    | '/auth/device'
     | '/auth/extension'
     | '/auth/forgot-password'
     | '/auth/recover-account'
@@ -1074,6 +1098,7 @@ export interface RootRouteChildren {
   RobotsDottxtRoute: typeof RobotsDottxtRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   publicDatenschutzRoute: typeof publicDatenschutzRoute
+  publicGuestRoute: typeof publicGuestRoute
   publicImpressumRoute: typeof publicImpressumRoute
   ApiScribeTokenRoute: typeof ApiScribeTokenRoute
   publicIndexRoute: typeof publicIndexRoute
@@ -1173,6 +1198,13 @@ declare module '@tanstack/react-router' {
       path: '/datenschutz'
       fullPath: '/datenschutz'
       preLoaderRoute: typeof publicDatenschutzRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/(public)/guest': {
+      id: '/(public)/guest'
+      path: '/guest'
+      fullPath: '/guest'
+      preLoaderRoute: typeof publicGuestRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/(public)/impressum': {
@@ -1292,6 +1324,13 @@ declare module '@tanstack/react-router' {
       path: '/convert-account'
       fullPath: '/auth/convert-account'
       preLoaderRoute: typeof AuthConvertAccountRouteImport
+      parentRoute: typeof AuthRouteRoute
+    }
+    '/auth/device': {
+      id: '/auth/device'
+      path: '/device'
+      fullPath: '/auth/device'
+      preLoaderRoute: typeof AuthDeviceRouteImport
       parentRoute: typeof AuthRouteRoute
     }
     '/auth/extension': {
@@ -1766,6 +1805,7 @@ const AdminRouteRouteWithChildren = AdminRouteRoute._addFileChildren(
 interface AuthRouteRouteChildren {
   AuthCallbackRoute: typeof AuthCallbackRoute
   AuthConvertAccountRoute: typeof AuthConvertAccountRoute
+  AuthDeviceRoute: typeof AuthDeviceRoute
   AuthExtensionRoute: typeof AuthExtensionRoute
   AuthForgotPasswordRoute: typeof AuthForgotPasswordRoute
   AuthRecoverAccountRoute: typeof AuthRecoverAccountRoute
@@ -1781,6 +1821,7 @@ interface AuthRouteRouteChildren {
 const AuthRouteRouteChildren: AuthRouteRouteChildren = {
   AuthCallbackRoute: AuthCallbackRoute,
   AuthConvertAccountRoute: AuthConvertAccountRoute,
+  AuthDeviceRoute: AuthDeviceRoute,
   AuthExtensionRoute: AuthExtensionRoute,
   AuthForgotPasswordRoute: AuthForgotPasswordRoute,
   AuthRecoverAccountRoute: AuthRecoverAccountRoute,
@@ -1931,6 +1972,7 @@ const rootRouteChildren: RootRouteChildren = {
   RobotsDottxtRoute: RobotsDottxtRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   publicDatenschutzRoute: publicDatenschutzRoute,
+  publicGuestRoute: publicGuestRoute,
   publicImpressumRoute: publicImpressumRoute,
   ApiScribeTokenRoute: ApiScribeTokenRoute,
   publicIndexRoute: publicIndexRoute,

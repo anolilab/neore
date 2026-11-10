@@ -45,6 +45,7 @@ export type ThreadPatch = Partial<
         | "lastCompressionStartedAt"
         | "lastReplyAt"
         | "model"
+        | "permissionMode"
         | "status"
         | "tagIds"
         | "updatedAt"

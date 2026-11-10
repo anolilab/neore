@@ -7,6 +7,7 @@ export default defineModule({
         "account",
         "aiUserPreferences",
         "apikey",
+        "deviceCode",
         "gatewayUsageDeductions",
         "invitation",
         "jwks",

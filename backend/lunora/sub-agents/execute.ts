@@ -14,6 +14,10 @@
  * stops, and its own `completeRun` then finds the run already ended. Enqueued from the parent run's shard —
  * the owner's — so the child thread, its messages and the post-back all live
  * there.
+ *
+ * A one-shot child below the depth cap that needs a tool its owner set to `ask` stops on the request instead of
+ * losing the tool: the run waits (`awaiting`), its owner answers on the child's thread, and the answer's continuation
+ * (`continueAfterToolApproval`) ends the run and posts its answer, once.
  */
 import { DEFAULT_CHAT_MODEL } from "@neore/ai/constants";
 import { MODEL_LOOKUP } from "@neore/ai/models";
@@ -39,6 +43,9 @@ import {
 
 /** A failure this run raised itself, whose message is written for the user. */
 class SubAgentRunError extends Error {}
+
+/** Delay of a first wait handed to the scheduler after its write in the action failed. */
+const AWAIT_RETRY_DELAY_MS = 30_000;
 
 export const runSubAgent = internalAction.input({ runId: v.id("subAgentRuns") }).action(async ({ args: { runId }, ctx }) => {
     const claim = await ctx.runMutation(internal.sub_agents.functions.claimRun, { runId });
@@ -105,11 +112,11 @@ export const runSubAgent = internalAction.input({ runId: v.id("subAgentRuns") })
             await assertCanRun();
         }
 
-        const { text } = await runHeadlessAgent(ctx, {
+        const { paused, text } = await runHeadlessAgent(ctx, {
             // The parent's `delegateToSubAgent` call only ran past its permission
             // check (approved, or set to `auto`), so that consent carries into
             // this child and nesting stays reachable. At the depth cap the
-            // grant is withheld, so a default `ask` removes the tool there.
+            // grant is withheld, and the tools with it (`withheldTools` below).
             ...(canNest(claim.depth) && { approvedTools: [SUB_AGENT_TOOL_NAME, MESSAGE_WORKER_TOOL_NAME] }),
             beforeThread: assertCanRun,
             keepThreadStatus: worker !== undefined,
@@ -130,6 +137,13 @@ export const runSubAgent = internalAction.input({ runId: v.id("subAgentRuns") })
             },
             // A nested dispatch carries what reached this run, so an unattended chain is not read as the lead's own.
             origin: originOfRun(claim.dispatchedBy),
+            // A one-shot child of the owner's own turn keeps the tools its owner set to `ask` and pauses on them; the owner
+            // answers on the child's thread. A worker's are removed, as before, and so are those of a chain a trigger, a
+            // task, a messenger reply or an outside agent started: nobody of that chain is there to answer, as for its
+            // parent run. The depth cap limits delegation only: a child there keeps its other `ask` tools, but the dispatch
+            // tools are withheld rather than left to ask for a nesting that would be refused.
+            ...(claim.mode !== "worker" && originOfRun(claim.dispatchedBy) === "lead" && { pauseForApproval: { subAgentRunId: runId } }),
+            ...(!canNest(claim.depth) && { withheldTools: [SUB_AGENT_TOOL_NAME, MESSAGE_WORKER_TOOL_NAME] }),
             personalization: "full",
             // A message the user typed into the worker's thread is the prompt as written.
             prompt: worker && claim.clientId !== undefined ? claim.task : buildSubAgentPrompt(claim.task),
@@ -152,6 +166,20 @@ export const runSubAgent = internalAction.input({ runId: v.id("subAgentRuns") })
                 }),
             userId,
         });
+
+        // Stopped on an approval request: the run waits, and the answer's continuation ends it (`chat/execute.ts`). Bound to
+        // the first pause (0: never resumed), so a write landing after the owner already answered does not wait again.
+        if (paused) {
+            try {
+                await ctx.runMutation(internal.sub_agents.functions.awaitApproval, { resumedWith: 0, runId });
+            } catch (error) {
+                // The requests are recorded: the wait is scheduled again, bound the same way, rather than failing the run.
+                console.error(`[SubAgent] Run ${runId}: could not record its wait; scheduling it:`, error);
+                await ctx.scheduler.runAfter(AWAIT_RETRY_DELAY_MS, internal.sub_agents.functions.awaitApproval, { resumedWith: 0, runId });
+            }
+
+            return;
+        }
 
         await ctx.runMutation(internal.sub_agents.functions.completeRun, { outcome: { kind: "succeeded", result: text }, runId });
     } catch (error) {

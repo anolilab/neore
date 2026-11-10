@@ -48,8 +48,8 @@ const SubAgentToolView: FC<{ part: ToolPart }> = ({ part }) => {
     const output = part.state === "output-available" ? (part.output as { error?: string } | undefined) : undefined;
 
     const statusLabels: Record<RunStatus, string> = {
-        // Waiting on an approval its owner answers in the sub-agent's own thread (linked below).
-        awaiting: t`Working`,
+        // Waiting on an approval its owner answers in the sub-agent's own thread (linked below): the owner has to act.
+        awaiting: t`Waiting for your approval`,
         cancelled: t`Stopped`,
         failed: t`Failed`,
         queued: t`Queued`,
@@ -73,6 +73,7 @@ const SubAgentToolView: FC<{ part: ToolPart }> = ({ part }) => {
     }
 
     const isStarting = !run && notice === undefined;
+    // A run waiting on its owner is not busy: it shows no spinner.
     const isActive = isStarting || run?.status === "queued" || run?.status === "running";
     let statusLabel = t`Not started`;
 
@@ -88,7 +89,11 @@ const SubAgentToolView: FC<{ part: ToolPart }> = ({ part }) => {
         <div aria-labelledby={headingId} className="my-2 rounded-lg border p-3 text-sm" role="group">
             <div className="flex items-start gap-2">
                 {isActive ? (
-                    <Loader2 aria-hidden="true" className="text-muted-foreground mt-0.5 size-4 shrink-0 animate-spin motion-reduce:animate-none" />
+                    <Loader2
+                        aria-hidden="true"
+                        className="text-muted-foreground mt-0.5 size-4 shrink-0 animate-spin motion-reduce:animate-none"
+                        data-testid="sub-agent-spinner"
+                    />
                 ) : (
                     <Bot aria-hidden="true" className="text-muted-foreground mt-0.5 size-4 shrink-0" />
                 )}

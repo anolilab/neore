@@ -282,10 +282,13 @@ describe("chat end to end against a fake API", () => {
         return {
             configFile: join(directory, "config.json"),
             fetch: fetchImpl,
+            hostname: "devbox",
             io: ioFor(),
+            now: () => 0,
             readFile: async () => new Uint8Array(),
             readLine: async () => null,
             readStdin: async () => null,
+            sleep: async () => {},
             stdinIsTTY: true,
         };
     };
@@ -595,5 +598,37 @@ describe("chat end to end against a fake API", () => {
 
         expect(await run(["login", "--api-url", "https://api.test", "--key", "nk_bad"], context)).toBe(EXIT.auth);
         expect(await readConfig(join(directory, "config.json"))).toEqual({});
+    });
+
+    describe("login without a terminal", () => {
+        it.each([["login"], ["login", "--device"]])("`neore %j` with no API URL names --api-url instead of waiting for input", async (...args) => {
+            const calls: string[] = [];
+            const context = {
+                ...contextWith((async (url: string) => {
+                    calls.push(url);
+
+                    return Response.json({});
+                }) as unknown as typeof fetch),
+                readLine: async () => await new Promise<string | null>(() => {}),
+                readStdin: async () => await new Promise<string | null>(() => {}),
+                stdinIsTTY: false,
+            };
+
+            expect(await run(args, context)).toBe(EXIT.usage);
+            expect(context.io.stderr.text()).toContain("--api-url");
+            expect(context.io.stderr.text()).toContain("NEORE_API_URL");
+            expect(calls).toEqual([]);
+        });
+
+        it("still reads a piped key when --api-url is given", async () => {
+            const context = {
+                ...contextWith((async () => Response.json({ scopes: ["threads:read"], userId: "u1" })) as unknown as typeof fetch),
+                readStdin: async () => "nk_piped\n",
+                stdinIsTTY: false,
+            };
+
+            expect(await run(["login", "--api-url", "https://api.test"], context)).toBe(EXIT.ok);
+            expect(await readConfig(join(directory, "config.json"))).toEqual({ apiKey: "nk_piped", apiUrl: "https://api.test" });
+        });
     });
 });

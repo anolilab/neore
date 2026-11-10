@@ -15,8 +15,15 @@ return { "childThreadId": source["childThreadId"], "runId": source["runId"] };
 installCompiledValidatorMap(lunora_sub_agents_functions_217.awaitApproval.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
+let __has1 = false;
+let __val1;
+if (source["resumedWith"] !== undefined) {
+if (typeof source["resumedWith"] !== "number" || !Number.isFinite(source["resumedWith"])) return DEFER;
+__val1 = source["resumedWith"];
+__has1 = true;
+}
 if (typeof source["runId"] !== "string") return DEFER;
-return { "runId": source["runId"] };
+return { ...(__has1 ? { "resumedWith": __val1 } : {}), "runId": source["runId"] };
 });
 installCompiledValidatorMap(lunora_sub_agents_functions_217.beatRun.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
@@ -31,6 +38,12 @@ if (typeof source["runId"] !== "string") return DEFER;
 return { "runId": source["runId"] };
 });
 installCompiledValidatorMap(lunora_sub_agents_functions_217.claimRun.args, (source) => {
+if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
+if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
+if (typeof source["runId"] !== "string") return DEFER;
+return { "runId": source["runId"] };
+});
+installCompiledValidatorMap(lunora_sub_agents_functions_217.continuingRun.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["runId"] !== "string") return DEFER;
@@ -54,7 +67,14 @@ __val1 = source["failures"];
 __has1 = true;
 }
 if (typeof source["runId"] !== "string") return DEFER;
-return { "attempt": source["attempt"], ...(__has1 ? { "failures": __val1 } : {}), "runId": source["runId"] };
+let __has2 = false;
+let __val2;
+if (source["waits"] !== undefined) {
+if (typeof source["waits"] !== "number" || !Number.isFinite(source["waits"])) return DEFER;
+__val2 = source["waits"];
+__has2 = true;
+}
+return { "attempt": source["attempt"], ...(__has1 ? { "failures": __val1 } : {}), "runId": source["runId"], ...(__has2 ? { "waits": __val2 } : {}) };
 });
 installCompiledValidatorMap(lunora_sub_agents_functions_217.reapRun.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;

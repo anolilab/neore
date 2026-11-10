@@ -19,6 +19,7 @@
         "@tanstack/react-query": "catalog:tanstack"
     },
     "devDependencies": {
+        "@cloudflare/workers-types": "catalog:build",
         "@types/react": "catalog:types",
         "react": "catalog:react",
         "typescript": "catalog:tsc",

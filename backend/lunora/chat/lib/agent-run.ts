@@ -70,7 +70,7 @@ import { runAfterOnShard } from "../../lib/shard-scheduler";
 import { shouldNoteBriefActivity } from "../../notifications/daily-brief-logic";
 import { buildKnowledgeCitations, type KnowledgeSource } from "../../knowledge/citations";
 import type { ReplySkill } from "../../usage/activity-logic";
-import type { DispatchOrigin } from "../../sub-agents/logic";
+import { type DispatchOrigin, stopWhenRequested } from "../../sub-agents/logic";
 
 /** Registry providers carry an `internal-` prefix the provider-keyed options do not. */
 export const INTERNAL_PREFIX_RE = /^internal-/;
@@ -1133,7 +1133,7 @@ export const resumeApprovedRun = async (
         keepOpenUnlessPaused?: boolean;
         steerable?: boolean;
     } = {},
-): Promise<{ awaitingInput?: AwaitingInput; lastMessageId: string | undefined; paused: boolean; stopped: boolean }> => {
+): Promise<{ awaitingInput?: AwaitingInput; lastMessageId: string | undefined; messageIds?: string[]; paused: boolean; stopped: boolean }> => {
     const { answer, answerFileIds, answers, approvalId, approved, config, denyReason, streamId, threadId, userId } = args;
     const { customProvider } = await resolveRunModel(ctx, config.model, userId);
     // A sub-agent child is not interactive: no person is in its chat, so it resumes with the refusals its paused run had
@@ -1153,6 +1153,8 @@ export const resumeApprovedRun = async (
             mcpProgress: toolProgressSink(ctx, streamId),
             model: config.model,
             origin: config.dispatchOrigin,
+            // The run resumes as the owner; the mode is the one the person who started the turn gets (none named: nobody's `full`).
+            permissionModeUserId: config.startedBy ?? "",
             searchMode: config.searchMode as SearchMode,
             snapshot: { mcpServerNames: config.mcpServerNames, toolNames: config.toolNames },
             threadId,
@@ -1291,6 +1293,24 @@ export const resumeApprovedRun = async (
 
         streamTextArgs.abortSignal = stopping.signal;
         streamTextArgs.stopWhen = stopWhenStopped(ctx, streamId, maxSteps);
+
+        // A sub-agent child is also stopped from its run (a parent's Stop, `cancelRun`, the reaper), not only from its own
+        // stream, as its headless loop is. A failed read is not a stop.
+        if (subAgentChild && config.subAgentRunId !== undefined) {
+            const { subAgentRunId } = config;
+
+            streamTextArgs.stopWhen = [
+                ...(streamTextArgs.stopWhen as unknown[]),
+                stopWhenRequested(
+                    async () =>
+                        await ctx.runQuery(internal.sub_agents.functions.shouldRunStop, { runId: subAgentRunId }).catch((error: unknown) => {
+                            streamLogger.warn(`[AgentRun] Sub-agent run ${subAgentRunId}: could not check for a stop request:`, error);
+
+                            return false;
+                        }),
+                ),
+            ];
+        }
 
         if (answerFiles) {
             // Every step of the continuation reads the files, so a tool call inside it does not cost the model the
@@ -1437,9 +1457,15 @@ export const resumeApprovedRun = async (
             return await stoppedAt(error);
         }
 
-        await recordRun(true);
+        // Bookkeeping after the reply (memory, the summary): a failure here is logged and never changes how the run ended,
+        // so a run that paused again still returns its pause (a sub-agent child then waits, rather than being failed).
+        try {
+            await recordRun(true);
+        } catch (recordError) {
+            streamLogger.error(`[AgentRun] Could not record the continuation of ${threadId}:`, recordError);
+        }
 
-        return { awaitingInput, lastMessageId: messageIds.at(-1), paused, stopped: false };
+        return { awaitingInput, lastMessageId: messageIds.at(-1), messageIds, paused, stopped: false };
     } catch (error) {
         if (started) {
             await stampSavedToolCallsQuietly(ctx, {
@@ -1468,6 +1494,8 @@ export interface RunOutcome {
     awaitingInput?: AwaitingInput;
     /** The run failed in place: its thread wakes if it was snoozed (`agent/table-writes.ts#patchThread`). */
     failed?: boolean;
+    /** A `"question"` the thread waits on is not overwritten by an `"approval"` (a sub-agent child's pause). */
+    keepQuestion?: boolean;
     replied?: boolean;
 }
 
@@ -1481,6 +1509,7 @@ export const setThreadStatus = async (
 
     await ctx.runMutation(internal.agent.threads.updateThread, {
         ...(outcome.failed === true && { failed: true }),
+        ...(outcome.keepQuestion === true && { keepQuestion: true }),
         patch: {
             status,
             updatedAt: now,
