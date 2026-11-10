@@ -460,6 +460,9 @@ export interface InternalApiTypes {
             releaseGuestNoteSend: FunctionReference<"mutation", { claimedAt: number; messageId: Id<"threadGuestMessages"> }, null>;
             sweepGuestLinks: FunctionReference<"mutation", {}, null>;
         };
+        loop_stop: {
+            appendLoopStopNotice: FunctionReference<"mutation", { notice: string; threadId: Id<"threads">; userId: string }, boolean>;
+        };
         mcp_registry: {
             fetchMcpRegistryPage: FunctionReference<"action", { cursor: string | null; search: string | null }, { nextCursor?: string; servers: Array<{ description: string; icon?: string; id: string; remotes: Array<{ headers: Array<{ choices?: Array<string>; description?: string; isRequired: boolean; isSecret: boolean; name: string; placeholder?: string; value?: string }>; protocol: "http" | "sse"; url: string; variables: Array<{ choices?: Array<string>; description?: string; isRequired: boolean; isSecret: boolean; name: string; placeholder?: string; value?: string }> }>; repositoryUrl?: string; title: string; version: string; websiteUrl?: string }> }>;
         };
@@ -1759,6 +1762,9 @@ export const internal: InternalApiTypes = {
             recordGuestNoteSent: { __lunoraRef: "chat_guest_links:recordGuestNoteSent" },
             releaseGuestNoteSend: { __lunoraRef: "chat_guest_links:releaseGuestNoteSend" },
             sweepGuestLinks: { __lunoraRef: "chat_guest_links:sweepGuestLinks" },
+        },
+        loop_stop: {
+            appendLoopStopNotice: { __lunoraRef: "chat_loop_stop:appendLoopStopNotice" },
         },
         mcp_registry: {
             fetchMcpRegistryPage: { __lunoraRef: "chat_mcp_registry:fetchMcpRegistryPage" },

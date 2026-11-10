@@ -1,0 +1,108 @@
+import { describe, expect, it } from "vitest";
+
+import { ALTERNATING_CALL_WINDOW, findRepeatedCallLoop, loopNoticeText, REPEATED_CALL_LIMIT } from "./repeated-call-guard";
+
+type Call = [string, unknown];
+
+const BRACE = /[{}]/;
+
+/** One finished step making these calls, in order. */
+const step = (...calls: Call[]) => {
+    return {
+        toolCalls: calls.map(([toolName, input]) => {
+            return { input, toolName };
+        }),
+    };
+};
+
+/** One call per step, the usual shape of a turn. */
+const steps = (...calls: Call[]) => calls.map((call) => step(call));
+
+describe("findRepeatedCallLoop", () => {
+    it("has a three-call repeat limit and a six-call alternation window", () => {
+        expect(REPEATED_CALL_LIMIT).toBe(3);
+        expect(ALTERNATING_CALL_WINDOW).toBe(6);
+    });
+
+    it("ends the turn on the third identical call in a row", () => {
+        const found = findRepeatedCallLoop(steps(["search", { q: "x" }], ["search", { q: "x" }], ["search", { q: "x" }]));
+
+        expect(found).toEqual({ count: 3, kind: "repeat", toolName: "search" });
+    });
+
+    it("does not end the turn on two identical calls", () => {
+        expect(findRepeatedCallLoop(steps(["search", { q: "x" }], ["search", { q: "x" }]))).toBeUndefined();
+    });
+
+    it("counts identical calls made inside one step", () => {
+        const found = findRepeatedCallLoop([step(["read", { path: "a" }], ["read", { path: "a" }], ["read", { path: "a" }])]);
+
+        expect(found).toEqual({ count: 3, kind: "repeat", toolName: "read" });
+    });
+
+    it("treats the same arguments in another key order as the same call", () => {
+        const reversed = JSON.parse('{"to": 2, "from": 1}') as unknown;
+        const found = findRepeatedCallLoop(steps(["move", { from: 1, to: 2 }], ["move", reversed], ["move", { from: 1, to: 2 }]));
+
+        expect(found).toEqual({ count: 3, kind: "repeat", toolName: "move" });
+    });
+
+    it("does not end the turn when the arguments change on each call", () => {
+        const found = findRepeatedCallLoop(steps(["search", { q: "a" }], ["search", { q: "b" }], ["search", { q: "c" }], ["search", { q: "d" }]));
+
+        expect(found).toBeUndefined();
+    });
+
+    it("does not end the turn when a repeat was broken by another call", () => {
+        const found = findRepeatedCallLoop(steps(["search", { q: "x" }], ["search", { q: "x" }], ["open", {}], ["search", { q: "x" }]));
+
+        expect(found).toBeUndefined();
+    });
+
+    it("ends the turn on an A-B-A-B-A-B cycle over six calls", () => {
+        const found = findRepeatedCallLoop(
+            steps(["read", { id: 1 }], ["write", { id: 1 }], ["read", { id: 1 }], ["write", { id: 1 }], ["read", { id: 1 }], ["write", { id: 1 }]),
+        );
+
+        expect(found).toEqual({ kind: "alternate", toolNames: ["read", "write"] });
+    });
+
+    it("does not end the turn on a cycle that is still five calls long", () => {
+        const found = findRepeatedCallLoop(steps(["read", {}], ["write", {}], ["read", {}], ["write", {}], ["read", {}]));
+
+        expect(found).toBeUndefined();
+    });
+
+    it("does not end the turn on an alternation whose arguments change", () => {
+        const found = findRepeatedCallLoop(
+            steps(["read", { id: 1 }], ["write", { id: 1 }], ["read", { id: 2 }], ["write", { id: 2 }], ["read", { id: 3 }], ["write", { id: 3 }]),
+        );
+
+        expect(found).toBeUndefined();
+    });
+
+    it("ends the turn once the latest six calls alternate, after earlier varied calls", () => {
+        const found = findRepeatedCallLoop(steps(["open", {}], ["read", {}], ["write", {}], ["read", {}], ["write", {}], ["read", {}], ["write", {}]));
+
+        expect(found).toEqual({ kind: "alternate", toolNames: ["read", "write"] });
+    });
+
+    it("ignores steps with no tool calls", () => {
+        expect(findRepeatedCallLoop([{ toolCalls: [] }, {}])).toBeUndefined();
+    });
+});
+
+describe("loopNoticeText", () => {
+    it("names the repeated tool and its count, never its arguments", () => {
+        const text = loopNoticeText({ count: 3, kind: "repeat", toolName: "search" });
+
+        expect(text).toContain('"search" was called 3 times');
+        expect(text).not.toMatch(BRACE);
+    });
+
+    it("names both tools of an alternation", () => {
+        const text = loopNoticeText({ kind: "alternate", toolNames: ["read", "write"] });
+
+        expect(text).toContain('"read" and "write" kept alternating');
+    });
+});

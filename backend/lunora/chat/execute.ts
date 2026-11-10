@@ -56,6 +56,7 @@ import {
 import { buildAgentTools } from "./lib/agent-tools";
 import { chargeCompactionCall } from "./lib/compaction-quota";
 import { getMaxSteps, getModelContextWindow } from "./lib/auto-continue";
+import { findRepeatedCallLoop, type LoopFinding, loopNoticeText } from "./lib/repeated-call-guard";
 import { RUN_BEAT_MS } from "./lib/interrupted-run";
 import { createToolRunMarker } from "./lib/mark-tool-runs";
 import { isRunReplaced } from "./lib/run-epoch";
@@ -681,13 +682,16 @@ export const runStreamingAgent = internalAction
                 };
                 // The steps this invocation finished: a pause carries the count to its resume.
                 const stepsFinished = { count: 0 };
+                // The loop the repeated-call guard ended the turn on: its closing line is written once the run has ended.
+                const loopStop: { finding?: LoopFinding } = {};
 
                 streamTextArgs.stopWhen = [
                     ...stopWhenStopped(ctx, streamId, maxSteps),
-                    ({ steps }: { steps: ReadonlyArray<unknown> }) => {
+                    ({ steps }: { steps: Parameters<typeof findRepeatedCallLoop>[0] }) => {
                         stepsFinished.count = steps.length;
+                        loopStop.finding = findRepeatedCallLoop(steps);
 
-                        return false;
+                        return loopStop.finding !== undefined;
                     },
                 ];
 
@@ -813,6 +817,15 @@ export const runStreamingAgent = internalAction
 
                 // Wait for the agent to save the final message
                 await result.consumeStream();
+
+                // A turn the repeated-call guard ended closes with a line that names the loop. A failed write never fails the run.
+                if (loopStop.finding) {
+                    await ctx
+                        .runMutation(internal.chat.loop_stop.appendLoopStopNotice, { notice: loopNoticeText(loopStop.finding), threadId, userId })
+                        .catch((error: unknown) => {
+                            streamLogger.warn("[BgAgent] Could not write the repeated-call notice:", error);
+                        });
+                }
 
                 // No token counts here: awaiting `totalUsage` on the live path could
                 // reject or stall a run that otherwise finished; a log line must not.
