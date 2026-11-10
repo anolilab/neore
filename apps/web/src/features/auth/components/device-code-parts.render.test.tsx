@@ -33,7 +33,7 @@ describe("DeviceCodeDetails", () => {
     it("puts the code in a named list, described by the instruction to compare it with the terminal", () => {
         render(<DeviceCodeDetails code="ABCD-EFGH" hostname="devbox" />);
 
-        const list = screen.getByLabelText("Sign-in request");
+        const list = screen.getByRole("group", { name: "Sign-in request" });
 
         expect(list.textContent).toContain("ABCD-EFGH");
         expect(list.textContent).toContain("devbox");
@@ -67,6 +67,16 @@ describe("DeviceCodeForm", () => {
         expect(screen.queryByRole("alert")).toBeNull();
 
         fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+        expect(onCode).toHaveBeenCalledWith("ABCDEFGH");
+    });
+
+    it("takes the code out of a pasted approval link instead of cutting it", () => {
+        const onCode = vi.fn();
+
+        render(<DeviceCodeForm onCode={onCode} />);
+        fireEvent.change(screen.getByLabelText("Code"), { target: { value: "https://app.neore.test/auth/device?user_code=ABCD-EFGH" } });
+        fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+
         expect(onCode).toHaveBeenCalledWith("ABCDEFGH");
     });
 

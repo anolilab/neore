@@ -3682,16 +3682,20 @@ msgstr "审批"
 msgid "Approval"
 msgstr "审批"
 
+#: src/features/auth/components/device-approval.tsx:197
 #: src/features/chat/thread/tool-approval.tsx:121
 #: src/features/develop/components/review-panel.tsx:64
 #: src/features/tasks/components/task-detail-dialog.tsx:104
-#: src/routes/auth/device.tsx:191
 msgid "Approve"
 msgstr "批准"
 
 #: src/features/chat/thread/tool-approval.tsx:119
 msgid "Approve {tool} once"
 msgstr "批准一次 {tool}"
+
+#: src/features/auth/components/device-approval.tsx:106
+msgid "Approved"
+msgstr ""
 
 #: src/features/chat/thread/tool-approval.tsx:79
 msgid "Approved — running tool"
@@ -3705,11 +3709,7 @@ msgstr "已批准且不是草稿。不检查分支保护。"
 msgid "Approved automatically — low risk"
 msgstr "已自动批准——低风险"
 
-#: src/routes/auth/device.tsx:109
-msgid "Approved. Return to your terminal: the command line is signed in. You can close this tab."
-msgstr ""
-
-#: src/routes/auth/device.tsx:96
+#: src/features/auth/components/device-approval.tsx:104
 msgid "Approving…"
 msgstr ""
 
@@ -5902,7 +5902,7 @@ msgstr ""
 msgid "Checking image safety..."
 msgstr "正在检查图片安全性..."
 
-#: src/routes/auth/device.tsx:279
+#: src/features/auth/components/device-approval.tsx:315
 msgid "Checking the code…"
 msgstr ""
 
@@ -6450,8 +6450,8 @@ msgstr "Cloudflare Workers AI 模型在 Cloudflare 有可用容量的任何地�
 #: ../../packages/chat-ui/src/chat/document-artifact.tsx:40
 #: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:307
 #: ../../packages/ui/src/components/tiptap-editor.tsx:202
-#: src/features/auth/components/device-code-parts.tsx:23
-#: src/features/auth/components/device-code-parts.tsx:56
+#: src/features/auth/components/device-code-parts.tsx:33
+#: src/features/auth/components/device-code-parts.tsx:66
 #: src/features/canvas/canvas-panel.tsx:754
 #: src/features/chat/thread/composer-search-mode.tsx:56
 #: src/features/code/components/code-workspace.tsx:219
@@ -7095,7 +7095,7 @@ msgstr "压缩的透视"
 msgid "Compressing context..."
 msgstr "正在压缩上下文..."
 
-#: src/features/auth/components/device-code-parts.tsx:52
+#: src/features/auth/components/device-code-parts.tsx:62
 #: src/features/settings/components/chat/bots-settings.tsx:140
 msgid "Computer"
 msgstr "电脑"
@@ -7608,7 +7608,7 @@ msgid "Context-aware generation"
 msgstr "上下文感知生成"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-paste-dialog.tsx:131
-#: src/features/auth/components/device-code-parts.tsx:107
+#: src/features/auth/components/device-code-parts.tsx:118
 #: src/features/chat/host/host-composer.tsx:800
 #: src/features/skills/components/skill-builder-dialog.tsx:328
 msgid "Continue"
@@ -9849,6 +9849,7 @@ msgstr "需要 Z.AI 最强大前沿 GLM 模型的高要求任务"
 msgid "Demanding tasks where maximum AI capability and refined reasoning matter most"
 msgstr "最看重极致 AI 能力和精细推理的高要求任务"
 
+#: src/features/auth/components/device-approval.tsx:107
 #: src/features/devices/components/devices-settings.tsx:384
 msgid "Denied"
 msgstr "已拒绝"
@@ -9860,10 +9861,6 @@ msgstr "已拒绝——在不使用它的情况下继续"
 #: src/features/devices/components/device-tool-call.tsx:198
 msgid "Denied on {device}"
 msgstr "已在 {device} 上拒绝"
-
-#: src/routes/auth/device.tsx:110
-msgid "Denied. The command line was not signed in. You can close this tab."
-msgstr ""
 
 #: src/features/chat/core/utils/language-utilities.ts:346
 msgid "Denmark"
@@ -9877,8 +9874,8 @@ msgstr "密度"
 msgid "Density updated"
 msgstr "密度已更新"
 
+#: src/features/auth/components/device-approval.tsx:188
 #: src/features/chat/thread/tool-approval.tsx:125
-#: src/routes/auth/device.tsx:182
 msgid "Deny"
 msgstr "拒绝"
 
@@ -9891,7 +9888,7 @@ msgstr "拒绝 {tool}"
 msgid "Deny Data Collection"
 msgstr "拒绝数据收集"
 
-#: src/routes/auth/device.tsx:96
+#: src/features/auth/components/device-approval.tsx:104
 msgid "Denying…"
 msgstr ""
 
@@ -11600,7 +11597,7 @@ msgstr "放大表格"
 msgid "enter"
 msgstr "回车"
 
-#: src/routes/auth/device.tsx:86
+#: src/features/auth/components/device-approval.tsx:82
 msgid "Enter a different code"
 msgstr ""
 
@@ -11698,7 +11695,7 @@ msgstr "输入文本..."
 msgid "Enter the API key"
 msgstr "请输入 API 密钥"
 
-#: src/features/auth/components/device-code-parts.tsx:21
+#: src/features/auth/components/device-code-parts.tsx:31
 msgid "Enter the code that `neore login --device` shows in your terminal, then choose Continue."
 msgstr ""
 
@@ -18570,12 +18567,12 @@ msgid "Loading..."
 msgstr "正在加载..."
 
 #: ../../packages/chat-ui/src/chat/message-content.tsx:332
+#: src/features/auth/components/device-approval.tsx:279
 #: src/features/chat/thread/memory-usage-action.tsx:46
 #: src/features/chat/thread/request-secret-prompt.tsx:479
 #: src/features/code/components/code-workspace.tsx:90
 #: src/features/pages/components/public-page-view.tsx:66
 #: src/features/settings/components/chat/bots-settings.tsx:158
-#: src/routes/auth/device.tsx:250
 #: src/routes/auth/extension.tsx:66
 msgid "Loading…"
 msgstr "正在加载…"
@@ -22313,7 +22310,7 @@ msgstr "只能比较{0}模型。清除选择以切换类型。"
 msgid "Only 3B activated per token for efficiency"
 msgstr "每个 token 仅激活 3B 参数，高效节能"
 
-#: src/features/auth/components/device-code-parts.tsx:61
+#: src/features/auth/components/device-code-parts.tsx:72
 msgid "Only continue if you started this just now by running `neore login --device`, and the code above matches the one in your terminal."
 msgstr ""
 
@@ -27010,6 +27007,10 @@ msgstr "返回首页"
 msgid "Return to home"
 msgstr "返回首页"
 
+#: src/features/auth/components/device-approval.tsx:106
+msgid "Return to your terminal: the command line is signed in. You can close this tab."
+msgstr ""
+
 #: src/features/develop/components/pull-request-revert-action.tsx:54
 msgid "Revert"
 msgstr "撤销"
@@ -29003,10 +29004,10 @@ msgstr "右侧边栏"
 #: src/components/settings/settings-modal.tsx:163
 #: src/features/auth/components/auth/auth-card.tsx:493
 #: src/features/auth/components/auth/forms/sign-in-form.tsx:415
+#: src/features/auth/components/device-approval.tsx:291
 #: src/features/layout/components/nav-user.tsx:237
 #: src/features/marketing/components/landing-page.tsx:1058
 #: src/features/settings/components/chat/mcp/server-list.tsx:127
-#: src/routes/auth/device.tsx:262
 #: src/routes/auth/extension.tsx:78
 msgid "Sign in"
 msgstr "登录"
@@ -29030,12 +29031,14 @@ msgstr "请重新登录后再发送。"
 msgid "Sign in on another site?"
 msgstr "要在另一个网站登录吗？"
 
-#: src/features/auth/components/device-code-parts.tsx:93
-#: src/routes/auth/device.tsx:294
+#: src/features/auth/components/device-approval.tsx:72
+#: src/features/auth/components/device-approval.tsx:205
+#: src/features/auth/components/device-code-parts.tsx:104
+#: src/routes/auth/device.tsx:39
 msgid "Sign in the command line"
 msgstr ""
 
-#: src/routes/auth/device.tsx:160
+#: src/features/auth/components/device-approval.tsx:169
 msgid "Sign in the command line?"
 msgstr ""
 
@@ -29142,7 +29145,7 @@ msgstr "注册以解锁所有模型"
 msgid "Sign-in expired"
 msgstr "登录已过期"
 
-#: src/features/auth/components/device-code-parts.tsx:50
+#: src/features/auth/components/device-code-parts.tsx:59
 msgid "Sign-in request"
 msgstr ""
 
@@ -31760,7 +31763,7 @@ msgstr "那台电脑正忙。请稍后重试。"
 msgid "That computer is not online."
 msgstr "那台电脑不在线。"
 
-#: src/routes/auth/device.tsx:150
+#: src/features/auth/components/device-approval.tsx:140
 msgid "That did not go through. Try again."
 msgstr ""
 
@@ -31925,11 +31928,11 @@ msgstr "聊天智能体使用其工具处理任务，并可选择遵循某个技
 msgid "The chat's state could not be read, so queued messages wait."
 msgstr "无法读取聊天状态，因此排队的消息等待中。"
 
-#: src/routes/auth/device.tsx:77
+#: src/features/auth/components/device-approval.tsx:66
 msgid "The code could not be checked right now. Try again in a moment."
 msgstr ""
 
-#: src/features/auth/components/device-code-parts.tsx:104
+#: src/features/auth/components/device-code-parts.tsx:115
 msgid "The code must contain the letters and digits shown in your terminal."
 msgstr ""
 
@@ -31937,8 +31940,12 @@ msgstr ""
 msgid "The coding agent could not start."
 msgstr "编程智能体无法启动。"
 
-#: src/routes/auth/device.tsx:162
+#: src/features/auth/components/device-approval.tsx:171
 msgid "The command line on the computer below will be signed in as {email}, with read-only access to your chats, skills, tasks, knowledge and memories through the API. It gets its own API key, which you can revoke in Settings."
+msgstr ""
+
+#: src/features/auth/components/device-approval.tsx:107
+msgid "The command line was not signed in. You can close this tab."
 msgstr ""
 
 #: src/features/evals/components/model-comparison.tsx:62
@@ -32700,19 +32707,19 @@ msgstr "此聊天已锁定。请解锁后再发送。"
 msgid "This chat is too long to compact."
 msgstr "此聊天过长，无法压缩。"
 
-#: src/routes/auth/device.tsx:126
+#: src/features/auth/components/device-approval.tsx:206
 msgid "This code has already been answered."
 msgstr ""
 
-#: src/routes/auth/device.tsx:72
+#: src/features/auth/components/device-approval.tsx:60
 msgid "This code has expired. Run `neore login --device` again to get a new one."
 msgstr ""
 
-#: src/routes/auth/device.tsx:74
+#: src/features/auth/components/device-approval.tsx:62
 msgid "This code is not valid, or it was already used. Run `neore login --device` again to get a new one."
 msgstr ""
 
-#: src/routes/auth/device.tsx:118
+#: src/features/auth/components/device-approval.tsx:64
 msgid "This code was opened with a different account. Sign in with that account, or run `neore login --device` again."
 msgstr ""
 
@@ -33571,8 +33578,8 @@ msgstr "文件过大，无法附加：{0}。请缩小文件后重新附加。"
 msgid "Too long to check as JSON"
 msgstr "内容过长，无法按 JSON 检查"
 
-#: src/routes/auth/device.tsx:76
-#: src/routes/auth/device.tsx:150
+#: src/features/auth/components/device-approval.tsx:65
+#: src/features/auth/components/device-approval.tsx:140
 msgid "Too many attempts. Wait a few seconds, then try again."
 msgstr ""
 
@@ -33954,13 +33961,14 @@ msgid "Try adjusting your search terms."
 msgstr "尝试调整搜索词。"
 
 #: src/components/error-component.tsx:40
+#: src/features/auth/components/device-approval.tsx:78
+#: src/features/auth/components/device-approval.tsx:270
 #: src/features/chat/guest-links/guest-page.tsx:275
 #: src/features/connection/components/offline-screen.tsx:59
 #: src/features/develop/components/files-tab.tsx:275
 #: src/features/develop/components/thread-pull-requests.tsx:169
 #: src/features/home/components/home-page.tsx:144
 #: src/features/tasks/components/task-form-dialog.tsx:440
-#: src/routes/auth/device.tsx:241
 msgid "Try again"
 msgstr "重试"
 
@@ -34373,7 +34381,7 @@ msgstr "独特的语言建模方法"
 msgid "United States"
 msgstr "美国"
 
-#: src/features/auth/components/device-code-parts.tsx:53
+#: src/features/auth/components/device-code-parts.tsx:63
 msgid "unknown"
 msgstr ""
 
@@ -35979,7 +35987,7 @@ msgstr "仅监视此部分（可选）"
 msgid "Watched repositories"
 msgstr "已监视的仓库"
 
-#: src/routes/auth/device.tsx:232
+#: src/features/auth/components/device-approval.tsx:261
 msgid "We could not check that you are signed in. Try again in a moment."
 msgstr ""
 
@@ -36478,10 +36486,11 @@ msgstr "正在处理 {0}…"
 msgid "Working toward the goal: round {nextRound} of {0}"
 msgstr "正在朝目标努力：第 {nextRound}/{0} 轮"
 
+#: src/features/auth/components/device-approval.tsx:188
+#: src/features/auth/components/device-approval.tsx:197
 #: src/features/chat/thread/streaming-placeholder.tsx:631
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:167
 #: src/features/pages/components/page-agent-dialog.tsx:46
-#: src/routes/auth/device.tsx:191
 msgid "Working…"
 msgstr "正在处理…"
 
@@ -36697,7 +36706,7 @@ msgstr "你添加文档的速度过快。请稍候再试。"
 msgid "You are browsing as a guest. Sign in with your account to connect the extension."
 msgstr "你正在以访客身份浏览。请登录你的账号以连接扩展。"
 
-#: src/routes/auth/device.tsx:260
+#: src/features/auth/components/device-approval.tsx:289
 msgid "You are browsing as a guest. Sign in with your account to sign in the command line."
 msgstr ""
 
@@ -36721,7 +36730,7 @@ msgstr "你已离线。网络恢复后，Neore 将重新连接。"
 msgid "You are sending too fast. Wait a moment."
 msgstr "你发送得太快了。请稍等片刻。"
 
-#: src/routes/auth/device.tsx:73
+#: src/features/auth/components/device-approval.tsx:61
 msgid "You are signed in as another person (an admin session). Sign in as yourself to sign in the command line."
 msgstr ""
 
@@ -36909,7 +36918,7 @@ msgstr "你的 {label} 登录已过期。请重新连接以继续读取。"
 msgid "Your {label} sign-in has expired. Connect it again."
 msgstr "你的 {label} 登录已过期。请重新连接。"
 
-#: src/routes/auth/device.tsx:75
+#: src/features/auth/components/device-approval.tsx:63
 msgid "Your account already has the maximum number of API keys, so the command line was not signed in. Revoke one in Settings, then run `neore login --device` again."
 msgstr ""
 

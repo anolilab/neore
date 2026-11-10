@@ -5,8 +5,21 @@ import { Label } from "@neore/ui/components/label";
 import type { ChangeEvent, FormEvent } from "react";
 import { useState } from "react";
 
-/** The server ignores case, spaces and dashes; so does the form. */
-export const normalizeCode = (value: string): string => value.replaceAll(/[^a-z0-9]/giu, "").toUpperCase();
+const MAX_CODE_LENGTH = 16;
+
+/**
+ * The server ignores case, spaces and dashes; so does the form. A pasted approval link
+ * (`.../auth/device?user_code=ABCD-EFGH`) is reduced to its code first, and only then cut to a sane length.
+ */
+export const normalizeCode = (value: string): string => {
+    const text = value.trim();
+    const fromLink = URL.canParse(text) ? new URL(text).searchParams.get("user_code") : null;
+
+    return (fromLink ?? text)
+        .replaceAll(/[^a-z0-9]/giu, "")
+        .toUpperCase()
+        .slice(0, MAX_CODE_LENGTH);
+};
 
 /**
  * The code field of the CLI approval page: required (so Continue stays usable and native validation names the
@@ -28,7 +41,6 @@ export const DeviceCodeField = ({ isInvalid = false, onChange, value }: { isInva
                 autoComplete="off"
                 autoCorrect="off"
                 id="device-code"
-                maxLength={16}
                 onChange={(event: ChangeEvent<HTMLInputElement>) => onChange(event.target.value)}
                 required
                 spellCheck={false}
@@ -47,16 +59,18 @@ export const DeviceCodeDetails = ({ code, hostname }: { code: string; hostname: 
 
     return (
         <>
-            <dl aria-describedby="device-code-check" aria-label={t`Sign-in request`} className="flex flex-col gap-1 rounded-md bg-gray-100 p-3 text-sm">
-                <div className="flex justify-between gap-4">
-                    <dt className="text-gray-600">{t`Computer`}</dt>
-                    <dd className="font-medium break-all">{hostname ?? t`unknown`}</dd>
-                </div>
-                <div className="flex justify-between gap-4">
-                    <dt className="text-gray-600">{t`Code`}</dt>
-                    <dd className="font-mono font-medium">{code}</dd>
-                </div>
-            </dl>
+            <div aria-describedby="device-code-check" aria-label={t`Sign-in request`} role="group">
+                <dl className="flex flex-col gap-1 rounded-md bg-gray-100 p-3 text-sm">
+                    <div className="flex justify-between gap-4">
+                        <dt className="text-gray-600">{t`Computer`}</dt>
+                        <dd className="font-medium break-all">{hostname ?? t`unknown`}</dd>
+                    </div>
+                    <div className="flex justify-between gap-4">
+                        <dt className="text-gray-600">{t`Code`}</dt>
+                        <dd className="font-mono font-medium">{code}</dd>
+                    </div>
+                </dl>
+            </div>
             <p className="text-center text-sm text-gray-700" id="device-code-check">
                 {t`Only continue if you started this just now by running \`neore login --device\`, and the code above matches the one in your terminal.`}
             </p>

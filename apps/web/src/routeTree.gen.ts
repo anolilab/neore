@@ -551,11 +551,11 @@ const DashboardSettingsConnectorsMessengerRoute =
   } as any)
 
 export interface FileRoutesByFullPath {
-  '/': typeof publicIndexRoute
   '/admin': typeof AdminRouteRouteWithChildren
   '/auth': typeof AuthRouteRouteWithChildren
   '/dashboard': typeof DashboardRouteRouteWithChildren
   '/docs': typeof DocsRouteRouteWithChildren
+  '/': typeof publicIndexRoute
   '/download': typeof DownloadRoute
   '/robots.txt': typeof RobotsDottxtRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
@@ -637,8 +637,8 @@ export interface FileRoutesByFullPath {
   '/dashboard/settings/connectors/': typeof DashboardSettingsConnectorsIndexRoute
 }
 export interface FileRoutesByTo {
-  '/': typeof publicIndexRoute
   '/auth': typeof AuthRouteRouteWithChildren
+  '/': typeof publicIndexRoute
   '/download': typeof DownloadRoute
   '/robots.txt': typeof RobotsDottxtRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
@@ -808,11 +808,11 @@ export interface FileRoutesById {
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
-    | '/'
     | '/admin'
     | '/auth'
     | '/dashboard'
     | '/docs'
+    | '/'
     | '/download'
     | '/robots.txt'
     | '/sitemap.xml'
@@ -894,8 +894,8 @@ export interface FileRouteTypes {
     | '/dashboard/settings/connectors/'
   fileRoutesByTo: FileRoutesByTo
   to:
-    | '/'
     | '/auth'
+    | '/'
     | '/download'
     | '/robots.txt'
     | '/sitemap.xml'
@@ -1092,7 +1092,7 @@ declare module '@tanstack/react-router' {
     '/(chat)': {
       id: '/(chat)'
       path: ''
-      fullPath: '/'
+      fullPath: ''
       preLoaderRoute: typeof chatRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
