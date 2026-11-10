@@ -165,37 +165,36 @@ const useComparisonChat = ({ jwtToken, parentThreadId }: UseComparisonChatOption
                         ...temporaryFields,
                     });
 
-                    // Create relationship to parent and send message in parallel —
-                    // both only need childThreadId which is already resolved (async-parallel).
-                    const [, response] = await Promise.all([
-                        createRelationshipMutation({
-                            branchPoint: 0,
-                            branchType: "comparison",
-                            // Both ids are widened to `string` here: the parent may come
-                            // from the `parentThreadId` prop and `createThreadMutation`
-                            // returns the new thread's id, so re-apply the brand.
-                            parentThreadId: comparisonParentId! as Id<"threads">,
-                            threadId: childThreadId as Id<"threads">,
+                    // The link comes first: a comparison column takes its parent's permission mode through it, and the run reads
+                    // the mode when it starts.
+                    await createRelationshipMutation({
+                        branchPoint: 0,
+                        branchType: "comparison",
+                        // Both ids are widened to `string` here: the parent may come
+                        // from the `parentThreadId` prop and `createThreadMutation`
+                        // returns the new thread's id, so re-apply the brand.
+                        parentThreadId: comparisonParentId! as Id<"threads">,
+                        threadId: childThreadId as Id<"threads">,
+                    });
+
+                    const response = await fetch(CHAT_STREAM_URL, {
+                        body: JSON.stringify({
+                            customSystemPrompt: pendingSettings?.customSystemPrompt,
+                            enabledFeatures: pendingSettings?.enabledFeatures,
+                            fileIds,
+                            language: pendingSettings?.language,
+                            model,
+                            prompt: text,
+                            reasoningEffort,
+                            statelessMode: pendingSettings?.statelessMode,
+                            threadId: childThreadId,
                         }),
-                        fetch(CHAT_STREAM_URL, {
-                            body: JSON.stringify({
-                                customSystemPrompt: pendingSettings?.customSystemPrompt,
-                                enabledFeatures: pendingSettings?.enabledFeatures,
-                                fileIds,
-                                language: pendingSettings?.language,
-                                model,
-                                prompt: text,
-                                reasoningEffort,
-                                statelessMode: pendingSettings?.statelessMode,
-                                threadId: childThreadId,
-                            }),
-                            headers: {
-                                "Content-Type": "application/json",
-                                ...authHeader,
-                            },
-                            method: "POST",
-                        }),
-                    ]);
+                        headers: {
+                            "Content-Type": "application/json",
+                            ...authHeader,
+                        },
+                        method: "POST",
+                    });
 
                     if (!response.ok) {
                         const errorData = await response.json().catch(() => {

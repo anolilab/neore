@@ -98,7 +98,7 @@ msgstr "({0} z {MAX_PARTICIPANTS}, co najmniej {MIN_PARTICIPANTS})"
 msgid "({jobFailed} failed)"
 msgstr "(nieudane: {jobFailed})"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:275
+#: src/features/chat/thread/composer-prompt-queue.tsx:286
 msgid "(attachments only)"
 msgstr "(tylko załączniki)"
 
@@ -807,7 +807,7 @@ msgstr "{count, plural, one {Wybrano # wiadomość} few {Wybrano # wiadomości} 
 msgid "{count, plural, one {# of {maxReferenceImages} reference attached} other {# of {maxReferenceImages} references attached}}"
 msgstr "{count, plural, one {Dołączono # z {maxReferenceImages} odniesień} few {Dołączono # z {maxReferenceImages} odniesień} many {Dołączono # z {maxReferenceImages} odniesień} other {Dołączono # z {maxReferenceImages} odniesień}}"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:583
+#: src/features/chat/thread/composer-prompt-queue.tsx:607
 msgid "{count, plural, one {# steering — the reply reads it at its next step} other {# steering — the reply reads them at its next step}}"
 msgstr "{count, plural, one {# wskazówka — odpowiedź odczyta ją w następnym kroku} few {# wskazówki — odpowiedź odczyta je w następnym kroku} many {# wskazówek — odpowiedź odczyta je w następnym kroku} other {# wskazówki — odpowiedź odczyta je w następnym kroku}}"
 
@@ -827,13 +827,17 @@ msgstr "{count, plural, one {Użyto # źródła} few {Użyto # źródeł} many {
 msgid "{count} characters now."
 msgstr "Teraz znaków: {count}."
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:580
+#: src/features/chat/thread/composer-prompt-queue.tsx:604
 msgid "{count} queued"
 msgstr "W kolejce: {count}"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:580
+#: src/features/chat/thread/composer-prompt-queue.tsx:604
 msgid "{count} queued — sends when the current reply finishes"
 msgstr "W kolejce: {count} — wyśle się, gdy bieżąca odpowiedź się zakończy"
+
+#: src/features/chat/thread/composer-prompt-queue.tsx:612
+msgid "{count} queued — waiting for the permission mode to save"
+msgstr ""
 
 #: src/features/settings/components/chat/usage-activity-heatmap.tsx:102
 msgid "{date}: {replies}, {cost}"
@@ -853,7 +857,7 @@ msgstr "{days} dni"
 msgid "{days}d ago"
 msgstr "{days} d temu"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:316
+#: src/features/chat/thread/composer-prompt-queue.tsx:327
 msgid "{droppedCount, plural, one {# attachment removed on reload} other {# attachments removed on reload}}"
 msgstr "{droppedCount, plural, one {Usunięto # załącznik po przeładowaniu} few {Usunięto # załączniki po przeładowaniu} many {Usunięto # załączników po przeładowaniu} other {Usunięto # załącznika po przeładowaniu}}"
 
@@ -1133,11 +1137,11 @@ msgstr "{minutes} min temu"
 msgid "{minutes}m remaining"
 msgstr "Pozostało {minutes} min"
 
-#: src/features/chat/thread/composer.tsx:232
+#: src/features/chat/thread/composer.tsx:233
 msgid "{modeLabel} mode — click to change"
 msgstr "Tryb {modeLabel} — kliknij, aby zmienić"
 
-#: src/features/chat/thread/thread.tsx:242
+#: src/features/chat/thread/thread.tsx:246
 msgid "{modelCount, plural, one {Ask # model anything...} other {Ask # models anything...}}"
 msgstr "{modelCount, plural, one {Zapytaj # model o cokolwiek...} few {Zapytaj # modele o cokolwiek...} many {Zapytaj # modeli o cokolwiek...} other {Zapytaj # modelu o cokolwiek...}}"
 
@@ -3541,6 +3545,10 @@ msgstr "Każdy, kto ma link, może czytać tę stronę. Komentarze nigdy nie są
 msgid "Anyone with the link can view this thread"
 msgstr "Każdy, kto ma link, może wyświetlić ten wątek"
 
+#: src/features/chat/thread/composer-permission-mode.tsx:44
+msgid "Anything that is not a plain lookup asks first"
+msgstr ""
+
 #: src/features/marketing/data/models-data.ts:1377
 msgid "Apache 2.0 licensed for open deployment"
 msgstr "Licencja Apache 2.0 do otwartego wdrażania"
@@ -3925,7 +3933,7 @@ msgstr "Zadaj pytanie poboczne"
 msgid "Ask a side question without interrupting the reply"
 msgstr "Zadaj pytanie poboczne bez przerywania odpowiedzi"
 
-#: src/features/chat/thread/thread.tsx:242
+#: src/features/chat/thread/thread.tsx:246
 msgid "Ask all models anything..."
 msgstr "Zapytaj wszystkie modele o cokolwiek..."
 
@@ -3937,7 +3945,7 @@ msgstr "Zapytaj o cokolwiek, aby rozpocząć nowy czat…"
 msgid "Ask GPT-4, Claude, and Gemini the same question. Run the same prompt across FLUX, Imagen, and Stable Diffusion. Pick the winner — not the default."
 msgstr "Zadaj to samo pytanie GPT-4, Claude i Gemini. Uruchom ten sam prompt w FLUX, Imagen i Stable Diffusion. Wybierz zwycięzcę — nie domyślną opcję."
 
-#: src/features/chat/thread/composer.tsx:268
+#: src/features/chat/thread/composer.tsx:269
 msgid "Ask me anything..."
 msgstr "Zapytaj o cokolwiek..."
 
@@ -4037,7 +4045,7 @@ msgstr "Załącznik (ukryty)"
 msgid "Attachment only"
 msgstr "Tylko załącznik"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:310
+#: src/features/chat/thread/composer-prompt-queue.tsx:321
 msgid "Attachments:"
 msgstr "Załączniki:"
 
@@ -4057,7 +4065,7 @@ msgstr "Auckland"
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:705
 #: src/components/model-picker/model-picker.tsx:1175
 #: src/features/chat/sidebar/usage-card.tsx:131
-#: src/features/chat/thread/composer.tsx:129
+#: src/features/chat/thread/composer.tsx:130
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:85
 #: src/features/workflow/components/gallery/gallery-card.tsx:25
 #: src/features/workflow/components/gallery/publish-dialog.tsx:31
@@ -4119,6 +4127,7 @@ msgstr "auto"
 #: src/features/chat/thread/composer-image-settings.tsx:52
 #: src/features/chat/thread/composer-image-settings.tsx:192
 #: src/features/chat/thread/composer-model-selector.tsx:122
+#: src/features/chat/thread/composer-permission-mode.tsx:36
 #: src/features/chat/thread/composer-video-settings.tsx:24
 #: src/features/chat/thread/media-gallery-view.tsx:64
 #: src/features/chat/thread/media-gallery-view.tsx:501
@@ -8039,7 +8048,7 @@ msgstr "Nie udało się dołączyć czatu"
 msgid "could not be saved"
 msgstr "nie udało się zapisać"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:241
+#: src/features/chat/thread/composer-prompt-queue.tsx:252
 msgid "Could not cancel the message. It is still queued."
 msgstr "Nie udało się anulować wiadomości. Nadal czeka w kolejce."
 
@@ -8059,6 +8068,10 @@ msgstr "Nie udało się zmienić powiadomień push. Spróbuj ponownie."
 #: src/features/chat/model-settings/use-model-combobox.ts:307
 msgid "Could not change the model. Please try again."
 msgstr "Nie udało się zmienić modelu. Spróbuj ponownie."
+
+#: src/features/chat/thread/composer-permission-mode.tsx:155
+msgid "Could not change the permission mode. Please try again."
+msgstr ""
 
 #: src/features/devices/components/device-scope.tsx:46
 msgid "Could not change where this device is offered."
@@ -8222,7 +8235,7 @@ msgid "Could not load this"
 msgstr "Nie udało się tego wczytać"
 
 #: src/features/chat/split/chat-split-view.tsx:238
-#: src/features/chat/thread/thread.tsx:346
+#: src/features/chat/thread/thread.tsx:350
 msgid "Could not load this chat's details."
 msgstr ""
 
@@ -9225,7 +9238,7 @@ msgstr "Rundy debaty"
 msgid "Debates for {0} rounds."
 msgstr "Debata przez {0} rund."
 
-#: src/features/chat/thread/composer.tsx:274
+#: src/features/chat/thread/composer.tsx:275
 msgid "Debug an error or review my code..."
 msgstr "Zdebuguj błąd lub przejrzyj mój kod..."
 
@@ -10593,7 +10606,7 @@ msgstr "Szkic"
 msgid "Draft a cover letter for a software engineering position"
 msgstr "Napisz list motywacyjny na stanowisko inżyniera oprogramowania"
 
-#: src/features/chat/thread/composer.tsx:272
+#: src/features/chat/thread/composer.tsx:273
 msgid "Draft an email, report, or essay..."
 msgstr "Napisz e-mail, raport lub esej..."
 
@@ -12025,6 +12038,10 @@ msgstr "Każde żądanie musi być podpisane. Wyślij <0>X-Neore-Timestamp</0> (
 msgid "Every Sunday at midnight"
 msgstr "W każdą niedzielę o północy"
 
+#: src/features/chat/thread/composer-permission-mode.tsx:43
+msgid "Every tool runs without asking, except those that need your answer"
+msgstr ""
+
 #: src/features/marketing/data/models-data.ts:225
 msgid "everyday"
 msgstr "codzienny"
@@ -12349,7 +12366,7 @@ msgstr "Wygasa: {expiresAt}"
 msgid "Expiring soon"
 msgstr "Wkrótce wygasa"
 
-#: src/features/chat/thread/composer.tsx:275
+#: src/features/chat/thread/composer.tsx:276
 msgid "Explain a concept in simple terms..."
 msgstr "Wyjaśnij pojęcie prostymi słowami..."
 
@@ -14538,6 +14555,7 @@ msgid "Full 1080p high-definition video output"
 msgstr "Pełne wideo w wysokiej rozdzielczości 1080p"
 
 #: src/features/auth/components/settings/api-key/api-key-scope-picker.tsx:77
+#: src/features/chat/thread/composer-permission-mode.tsx:37
 msgid "Full access"
 msgstr "Pełny dostęp"
 
@@ -14706,7 +14724,7 @@ msgstr "Wygeneruj obraz z promptu tekstowego i powiększ go 4x"
 msgid "Generate an image of a cozy reading nook with warm lighting and plants."
 msgstr "Wygeneruj obraz przytulnego kącika do czytania z ciepłym światłem i roślinami."
 
-#: src/features/chat/thread/composer.tsx:277
+#: src/features/chat/thread/composer.tsx:278
 msgid "Generate an image or video..."
 msgstr "Wygeneruj obraz lub wideo..."
 
@@ -16149,7 +16167,7 @@ msgstr "ilustracja"
 #: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:341
 #: src/components/model-picker/model-picker.tsx:1149
 #: src/features/chat/sidebar/usage-card.tsx:129
-#: src/features/chat/thread/composer.tsx:127
+#: src/features/chat/thread/composer.tsx:128
 #: src/features/marketing/components/landing-footer.tsx:165
 #: src/features/settings/components/chat/default-models-settings.tsx:282
 #: src/features/settings/components/chat/models-settings.tsx:41
@@ -17247,7 +17265,7 @@ msgstr "Ocena sędziego"
 msgid "Judge: {0}"
 msgstr "Sędzia: {0}"
 
-#: src/features/chat/thread/thread.tsx:109
+#: src/features/chat/thread/thread.tsx:110
 msgid "Jump to my last message"
 msgstr "Przejdź do mojej ostatniej wiadomości"
 
@@ -19738,7 +19756,7 @@ msgid "Mobile app icon"
 msgstr "Ikona aplikacji mobilnej"
 
 #: src/features/chat/host/host-options.tsx:32
-#: src/features/chat/thread/composer.tsx:221
+#: src/features/chat/thread/composer.tsx:222
 #: src/features/workflow/components/nodes/image-node.tsx:45
 #: src/features/workflow/components/nodes/node-expand-modal.tsx:132
 #: src/features/workflow/components/nodes/text-node.tsx:123
@@ -20136,11 +20154,11 @@ msgstr "Przejdź o stronę w dół"
 msgid "Move out one level"
 msgstr "Przesuń o poziom wyżej"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:330
+#: src/features/chat/thread/composer-prompt-queue.tsx:341
 msgid "Move queued message {position} down"
 msgstr "Przenieś wiadomość w kolejce {position} w dół"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:320
+#: src/features/chat/thread/composer-prompt-queue.tsx:331
 msgid "Move queued message {position} up"
 msgstr "Przenieś wiadomość w kolejce {position} w górę"
 
@@ -20207,8 +20225,8 @@ msgid "Moved selected node {0}. New position, x: {x}, y: {y}"
 msgstr "Przesunięto zaznaczony węzeł {0}. Nowa pozycja, x: {x}, y: {y}"
 
 #. placeholder {0}: to + 1
-#: src/features/chat/thread/composer-prompt-queue.tsx:530
-#: src/features/chat/thread/composer-prompt-queue.tsx:557
+#: src/features/chat/thread/composer-prompt-queue.tsx:554
+#: src/features/chat/thread/composer-prompt-queue.tsx:581
 msgid "Moved to position {0}"
 msgstr "Przeniesiono na pozycję {0}"
 
@@ -20568,7 +20586,7 @@ msgstr "Neore (ze znacznikiem czasu)"
 msgid "Neore {0}"
 msgstr "Neore {0}"
 
-#: src/features/chat/thread/composer.tsx:685
+#: src/features/chat/thread/composer.tsx:688
 msgid "Neore can make mistakes. Check important information."
 msgstr "Neore może popełniać błędy. Sprawdzaj ważne informacje."
 
@@ -20929,7 +20947,7 @@ msgstr "Następne dopasowanie"
 msgid "Next option"
 msgstr "Następna opcja"
 
-#: src/features/chat/thread/composer.tsx:238
+#: src/features/chat/thread/composer.tsx:239
 msgid "Next output mode"
 msgstr "Następny tryb wyjścia"
 
@@ -21466,7 +21484,7 @@ msgstr "Brak odpowiedzi zarejestrowanych w tym okresie."
 msgid "No resolved comments."
 msgstr "Brak rozwiązanych komentarzy."
 
-#: src/features/chat/thread/comparison-view.tsx:63
+#: src/features/chat/thread/comparison-view.tsx:67
 msgid "No response yet"
 msgstr "Nie ma jeszcze odpowiedzi"
 
@@ -22393,7 +22411,7 @@ msgstr "Otwarcie"
 msgid "Open {filename}"
 msgstr "Otwórz {filename}"
 
-#: src/features/chat/thread/comparison-view.tsx:140
+#: src/features/chat/thread/comparison-view.tsx:151
 msgid "Open {modelName} in full thread"
 msgstr "Otwórz {modelName} w pełnym wątku"
 
@@ -23294,7 +23312,7 @@ msgstr "Pliki wyjściowe"
 msgid "Output Format"
 msgstr "Format wyjściowy"
 
-#: src/features/chat/thread/composer.tsx:249
+#: src/features/chat/thread/composer.tsx:250
 msgid "Output Mode"
 msgstr "Tryb wyjścia"
 
@@ -23813,6 +23831,15 @@ msgstr "Trwale usuń swoje konto i wszystkie powiązane dane"
 msgid "Permission Level"
 msgstr "Poziom uprawnień"
 
+#: src/features/chat/thread/composer-permission-mode.tsx:64
+msgid "Permission mode"
+msgstr ""
+
+#. placeholder {0}: labels[mode]
+#: src/features/chat/thread/composer-permission-mode.tsx:52
+msgid "Permission mode: {0}"
+msgstr ""
+
 #: src/features/chat/host/host-composer.tsx:765
 msgid "Permission requests from the agent"
 msgstr "Prośby agenta o uprawnienia"
@@ -24047,7 +24074,7 @@ msgstr "Symbole zastępcze: {PAYLOAD_TOKEN} wstawia całą treść jako surowy t
 msgid "plan"
 msgstr "plan"
 
-#: src/features/chat/thread/composer.tsx:271
+#: src/features/chat/thread/composer.tsx:272
 msgid "Plan a project or brainstorm ideas..."
 msgstr "Zaplanuj projekt lub wymyśl pomysły..."
 
@@ -24571,7 +24598,7 @@ msgstr "Poprzednie dopasowanie"
 msgid "Previous option"
 msgstr "Poprzednia opcja"
 
-#: src/features/chat/thread/composer.tsx:204
+#: src/features/chat/thread/composer.tsx:205
 msgid "Previous output mode"
 msgstr "Poprzedni tryb wyjścia"
 
@@ -25264,7 +25291,7 @@ msgid "Queued"
 msgstr "W kolejce"
 
 #: src/features/chat/host/host-composer.tsx:343
-#: src/features/chat/thread/composer-prompt-queue.tsx:597
+#: src/features/chat/thread/composer-prompt-queue.tsx:626
 msgid "Queued messages"
 msgstr "Wiadomości w kolejce"
 
@@ -26337,7 +26364,7 @@ msgstr "Usunąć dostawcę?"
 msgid "Remove queued message {0}"
 msgstr "Usuń wiadomość w kolejce {0}"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:340
+#: src/features/chat/thread/composer-prompt-queue.tsx:351
 msgid "Remove queued message {position}"
 msgstr "Usuń wiadomość z kolejki {position}"
 
@@ -26637,7 +26664,7 @@ msgstr "Badanie"
 msgid "Research a topic"
 msgstr "Zbadaj temat"
 
-#: src/features/chat/thread/composer.tsx:273
+#: src/features/chat/thread/composer.tsx:274
 msgid "Research a topic in depth..."
 msgstr "Zbadaj temat dogłębnie..."
 
@@ -27699,7 +27726,7 @@ msgstr "Przewiń o stronę kolumn w lewo"
 msgid "Scroll right one page of columns"
 msgstr "Przewiń o stronę kolumn w prawo"
 
-#: src/features/chat/thread/thread.tsx:115
+#: src/features/chat/thread/thread.tsx:116
 msgid "Scroll to bottom"
 msgstr "Przewiń na dół"
 
@@ -28296,7 +28323,7 @@ msgstr "Wyślij"
 msgid "Send <0>X-Hub-Signature-256: sha256=<hex></0>, the HMAC-SHA256 of the raw request body keyed with the secret (the format GitHub webhooks use). This signature has no timestamp, so each one is accepted only once, for as long as the trigger exists; a delivery that did not run can be redelivered. Requests with the neore headers are rejected."
 msgstr "Wyślij <0>X-Hub-Signature-256: sha256=<hex></0>, czyli HMAC-SHA256 surowej treści żądania z użyciem sekretu jako klucza (format używany przez webhooki GitHub). Ten podpis nie ma znacznika czasu, więc każdy jest akceptowany tylko raz, dopóki istnieje wyzwalacz; dostarczenie, które się nie uruchomiło, można dostarczyć ponownie. Żądania z nagłówkami neore są odrzucane."
 
-#: src/features/chat/thread/comparison-view.tsx:64
+#: src/features/chat/thread/comparison-view.tsx:68
 msgid "Send a message below to start"
 msgstr "Wyślij wiadomość poniżej, aby zacząć"
 
@@ -28365,7 +28392,7 @@ msgid "Send messages to the AI bot via Telegram. Conversations appear as threads
 msgstr "Wysyłaj wiadomości do bota AI przez Telegram. Rozmowy pojawiają się jako wątki na liście czatów."
 
 #: src/features/chat/host/host-composer.tsx:865
-#: src/features/chat/thread/composer-prompt-queue.tsx:616
+#: src/features/chat/thread/composer-prompt-queue.tsx:645
 msgid "Send next"
 msgstr "Wyślij następną"
 
@@ -30193,7 +30220,7 @@ msgstr "Pokieruj — bieżąca odpowiedź odczyta to w następnym kroku"
 msgid "Steer the reply"
 msgstr "Pokieruj odpowiedzią"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:301
+#: src/features/chat/thread/composer-prompt-queue.tsx:312
 msgid "Steering:"
 msgstr "Wskazówki:"
 
@@ -30841,7 +30868,7 @@ msgstr "Podsumowuj długie czaty"
 msgid "Summarise my notes in three bullets."
 msgstr "Podsumuj moje notatki w trzech punktach."
 
-#: src/features/chat/thread/composer.tsx:270
+#: src/features/chat/thread/composer.tsx:271
 msgid "Summarize a document or URL..."
 msgstr "Podsumuj dokument lub URL..."
 
@@ -30897,6 +30924,10 @@ msgstr "Znakomite generowanie i refaktoryzacja kodu w wielu plikach"
 #: src/features/marketing/data/models-data.ts:145
 msgid "Superior understanding of complex visual concepts"
 msgstr "Znakomite rozumienie złożonych koncepcji wizualnych"
+
+#: src/features/chat/thread/composer-permission-mode.tsx:38
+msgid "Supervised"
+msgstr ""
 
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:343
 msgid "Supported formats: ChatGPT export (conversations.json), Google Gemini (Takeout ZIP), Claude.ai export, a Neore data export (.json), Claude Code or Codex CLI session files (.jsonl)."
@@ -31500,7 +31531,7 @@ msgstr "tekst"
 #: ../../packages/ui/src/components/canvas-editor/canvas-property-panel.tsx:351
 #: src/components/model-picker/model-picker.tsx:1136
 #: src/features/chat/sidebar/usage-card.tsx:128
-#: src/features/chat/thread/composer.tsx:126
+#: src/features/chat/thread/composer.tsx:127
 #: src/features/marketing/components/landing-footer.tsx:164
 #: src/features/settings/components/chat/default-models-settings.tsx:238
 #: src/features/settings/components/chat/models-settings.tsx:45
@@ -33480,7 +33511,7 @@ msgstr "Zbyt wiele wierszy do podglądu · Kliknij, aby pobrać"
 msgid "Too many wrong attempts. Try again in {0} min."
 msgstr "Zbyt wiele błędnych prób. Spróbuj ponownie za {0} min."
 
-#: ../../packages/chat-ui/src/chat/mcp-app-view.tsx:102
+#: ../../packages/chat-ui/src/chat/mcp-app-view.tsx:105
 msgid "Tool call failed"
 msgstr "Wywołanie narzędzia nie powiodło się"
 
@@ -33511,6 +33542,10 @@ msgstr "Klucze dostawców narzędzi"
 #: src/features/workflow/components/nodes/node-top-toolbar.tsx:447
 msgid "Tools"
 msgstr "Narzędzia"
+
+#: src/features/chat/thread/composer-permission-mode.tsx:42
+msgid "Tools run on their own settings; a quick check can clear low-risk calls"
+msgstr ""
 
 #: src/features/skills/components/skill-form-dialog.tsx:440
 msgid "Tools the assistant must not use while this skill runs."
@@ -33664,7 +33699,7 @@ msgstr "Przekształcony obraz"
 msgid "Translate"
 msgstr "Przetłumacz"
 
-#: src/features/chat/thread/composer.tsx:276
+#: src/features/chat/thread/composer.tsx:277
 msgid "Translate text to another language..."
 msgstr "Przetłumacz tekst na inny język..."
 
@@ -35302,7 +35337,7 @@ msgstr "wideo"
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:691
 #: src/components/model-picker/model-picker.tsx:1162
 #: src/features/chat/sidebar/usage-card.tsx:130
-#: src/features/chat/thread/composer.tsx:128
+#: src/features/chat/thread/composer.tsx:129
 #: src/features/marketing/components/landing-footer.tsx:166
 #: src/features/settings/components/chat/default-models-settings.tsx:324
 #: src/features/settings/components/chat/models-settings.tsx:46
@@ -36385,7 +36420,7 @@ msgstr "Pisz długie teksty obok czatu"
 msgid "Write long-form content in a side-by-side canvas editor. Go from chat to finished document without switching tools."
 msgstr "Twórz długie treści w edytorze kanwy obok czatu. Przejdź od rozmowy do gotowego dokumentu bez zmieniania narzędzi."
 
-#: src/features/chat/thread/composer.tsx:269
+#: src/features/chat/thread/composer.tsx:270
 msgid "Write some code for me..."
 msgstr "Napisz dla mnie kod..."
 
