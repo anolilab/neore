@@ -237,10 +237,10 @@ const MessageList: FC<MessageListProps> = memo(({ className, editComposerCompone
 
     // Jump-to-message. Refs hold the latest plan/messages so the listener is attached once.
     const virtualizerRef = useRef<Virtualizer<HTMLElement, Element> | null>(null);
-    const jumpStateRef = useRef({ messages, plan });
+    const jumpStateRef = useRef({ messages, plan, threadId });
 
     useLayoutEffect(() => {
-        jumpStateRef.current = { messages, plan };
+        jumpStateRef.current = { messages, plan, threadId };
     });
 
     const handleVirtualizer = useCallback((virtualizer: Virtualizer<HTMLElement, Element> | null) => {
@@ -312,11 +312,12 @@ const MessageList: FC<MessageListProps> = memo(({ className, editComposerCompone
         jumpContextRef.current = { loadMore, notFound: () => showInfo(t`That message could not be found in this conversation.`) };
     });
 
+    const requestJump = useCallback(({ focus, messageId, position, threadId: targetThreadId }: ScrollToMessageDetail) => {
+        pendingJumpRef.current = { focus, messageId, pagesLoaded: 0, position, threadId: targetThreadId };
+        setJumpRequest((value) => value + 1);
+    }, []);
+
     useEffect(() => {
-        const request = ({ focus, messageId, position, threadId: targetThreadId }: ScrollToMessageDetail) => {
-            pendingJumpRef.current = { focus, messageId, pagesLoaded: 0, position, threadId: targetThreadId };
-            setJumpRequest((value) => value + 1);
-        };
         const readHash = (): PendingJump | undefined => {
             const messageId = parseMessageHash(globalThis.location.hash);
 
@@ -326,7 +327,7 @@ const MessageList: FC<MessageListProps> = memo(({ className, editComposerCompone
             const pending = readHash();
 
             if (pending) {
-                request(pending);
+                requestJump(pending);
             }
         };
 
@@ -334,14 +335,22 @@ const MessageList: FC<MessageListProps> = memo(({ className, editComposerCompone
         pendingJumpRef.current = readHash();
         globalThis.addEventListener("hashchange", handleHash);
 
-        // Takes a request made before this list mounted as well as every later one.
-        const unsubscribe = scrollToMessageChannel.consume(request);
-
         return () => {
             globalThis.removeEventListener("hashchange", handleHash);
-            unsubscribe();
         };
-    }, []);
+    }, [requestJump]);
+
+    // Takes a request made before this list mounted as well as every later one. A request for another thread is left for the list
+    // that shows it, so a split pane that is not focused cannot take the focused pane's jump. The channel only redelivers on a store
+    // change, so a thread change re-subscribes: a request this list rejected while the previous thread showed is taken then.
+    useEffect(() => {
+        const unsubscribe = scrollToMessageChannel.consume(
+            requestJump,
+            (payload) => payload.threadId === undefined || payload.threadId === jumpStateRef.current.threadId,
+        );
+
+        return unsubscribe;
+    }, [requestJump, threadId]);
 
     useEffect(() => {
         const pending = pendingJumpRef.current;

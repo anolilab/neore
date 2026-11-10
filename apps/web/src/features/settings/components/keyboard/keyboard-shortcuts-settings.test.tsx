@@ -124,11 +124,14 @@ describe("KeyboardShortcutsSettings", () => {
     });
 
     it("refuses Save when an action takes the jump's chord, though the jump is not in the form", async () => {
+        act(() => {
+            useUIStateStore.setState({ keyboardShortcuts: { ...defaultKeyboardShortcuts, jumpToLastMessage: "ctrl+shift+l" } });
+        });
         renderSettings();
 
         fireEvent.click(screen.getByRole("button", { name: "Record New Chat" }));
-        fireEvent.keyDown(document, { ctrlKey: true, key: "j", shiftKey: true });
-        fireEvent.keyUp(document, { ctrlKey: true, key: "j", shiftKey: true });
+        fireEvent.keyDown(document, { ctrlKey: true, key: "l", shiftKey: true });
+        fireEvent.keyUp(document, { ctrlKey: true, key: "l", shiftKey: true });
 
         // Save stays disabled before any recording, so the message is what shows the rule fired.
         // findByText throws when the message is absent, so the bare await is the assertion.
