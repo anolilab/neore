@@ -2285,3 +2285,133 @@ fn what_npm_left_running_is_stopped_when_it_exits_whatever_the_status() {
         assert!(gone, "the helper outlived npm (exit {code})");
     }
 }
+
+/// Runs `acp_spawn_plan("fixture", folder)` while `change` is applied between the check of the files and the
+/// building of the plan, the way a person's click would land during a slow hash.
+fn plan_with_a_change_during_the_hash(
+    state: &DeviceState,
+    folder: Option<&str>,
+    change: impl FnOnce(&DeviceState),
+) -> Result<crate::acp::SpawnPlan, String> {
+    use std::sync::{mpsc, Arc, Mutex};
+
+    let (hashed_tx, hashed_rx) = mpsc::channel::<()>();
+    let (go_tx, go_rx) = mpsc::channel::<()>();
+    let go_rx = Mutex::new(go_rx);
+
+    crate::acp_install::tests_hook::set_after_hash(
+        "fixture",
+        Arc::new(move || {
+            let _ = hashed_tx.send(());
+            let _ = go_rx.lock().unwrap().recv_timeout(Duration::from_secs(30));
+        }),
+    );
+
+    let result = std::thread::scope(|scope| {
+        let plan = scope.spawn(|| state.acp_spawn_plan("fixture", folder));
+
+        hashed_rx.recv_timeout(Duration::from_secs(30)).unwrap();
+        change(state);
+        go_tx.send(()).unwrap();
+
+        plan.join().unwrap()
+    });
+
+    crate::acp_install::tests_hook::clear_after_hash();
+
+    result
+}
+
+#[test]
+fn a_plan_is_built_from_the_settings_as_they_are_after_the_check_not_before() {
+    let (state, dir) = state("plan-race");
+    let node = fake_node(&dir);
+    let project = dir.join("project");
+
+    seed_install(&state, &dir, &node);
+
+    let folder = project.to_string_lossy().into_owned();
+    let grant = |state: &DeviceState| {
+        state
+            .acp_update(
+                serde_json::from_value(json!({
+                    "op": "grant", "agentKey": "fixture", "folder": folder,
+                }))
+                .unwrap(),
+            )
+            .unwrap();
+    };
+
+    fs::create_dir_all(&project).unwrap();
+    grant(&state);
+
+    // Nothing changes: the plan is built.
+    assert!(plan_with_a_change_during_the_hash(&state, Some(&folder), |_| {}).is_ok());
+
+    // The folder's approval is withdrawn during the check.
+    let error = plan_with_a_change_during_the_hash(&state, Some(&folder), |state| {
+        let consent = state.acp_view().consents.remove(0);
+
+        state
+            .acp_update(
+                serde_json::from_value(json!({
+                    "op": "revoke", "agentKey": "fixture", "folderId": consent.folder_id,
+                }))
+                .unwrap(),
+            )
+            .unwrap();
+    })
+    .unwrap_err();
+
+    assert!(
+        error.contains("settings changed while it was being checked"),
+        "{error}"
+    );
+
+    // The agent is removed during the check.
+    grant(&state);
+
+    let error = plan_with_a_change_during_the_hash(&state, Some(&folder), |state| {
+        state
+            .acp_update(
+                serde_json::from_value(json!({ "op": "removeAgent", "key": "fixture" })).unwrap(),
+            )
+            .unwrap();
+    })
+    .unwrap_err();
+
+    assert!(
+        error.contains("settings changed while it was being checked"),
+        "{error}"
+    );
+
+    // The agent's command is changed during the check (which also drops its pin).
+    let (state, dir) = self::state("plan-race-command");
+    let node = fake_node(&dir);
+    let agent = seed_install(&state, &dir, &node);
+    let error = plan_with_a_change_during_the_hash(&state, None, |state| {
+        save_agent(state, "/bin/sh", agent.args.clone()).unwrap();
+    })
+    .unwrap_err();
+
+    assert!(
+        error.contains("settings changed while it was being checked"),
+        "{error}"
+    );
+
+    // A folder that was never approved still gets the plain refusal.
+    let (state, dir) = self::state("plan-race-unapproved");
+    let node = fake_node(&dir);
+
+    seed_install(&state, &dir, &node);
+
+    let other = dir.join("other");
+
+    fs::create_dir_all(&other).unwrap();
+
+    let error = state
+        .acp_spawn_plan("fixture", Some(&other.to_string_lossy()))
+        .unwrap_err();
+
+    assert!(error.contains("is not approved for that folder"), "{error}");
+}
