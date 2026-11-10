@@ -400,6 +400,41 @@ describe("pairing a headless machine by code", () => {
         expect(await statusOf(harness, code.device_code)).toBe(200);
     });
 
+    it("tells the page, at approval, when the account has no room for the machine, using the redemption's own check", async () => {
+        const checked: string[] = [];
+        const harness = build({
+            precheck: async (_userId, codeId) => {
+                checked.push(codeId);
+
+                throw Object.assign(new Error("At most 10 devices can be paired. Remove one first."), {
+                    code: "BAD_REQUEST",
+                    data: { code: DEVICE_LIMIT_CODE },
+                });
+            },
+        });
+        const owner = await signUp(harness);
+        const code = await requestHostCode(harness);
+        const { approved } = await approve(harness, owner.cookie, code.user_code);
+
+        expect(approved.response.status).toBe(403);
+        expect(approved.body["error"]).toBe("device_limit");
+        expect(checked).toHaveLength(1);
+        expect(checked[0]?.length).toBeGreaterThan(0);
+    });
+
+    it("lets a machine code be approved when the approval-time check fails for another reason", async () => {
+        const harness = build({
+            precheck: async () => {
+                throw new Error("shard unavailable");
+            },
+        });
+        const owner = await signUp(harness);
+        const code = await requestHostCode(harness);
+        const { approved } = await approve(harness, owner.cookie, code.user_code);
+
+        expect(approved.response.status).toBe(200);
+    });
+
     it("does not let a guest's lookup bind a code, so the owner can still approve it", async () => {
         const harness = build();
         const cookie = await guest(harness);

@@ -38,6 +38,7 @@ const { MAX_DEVICES_PER_USER, MAX_OPEN_CALLS_PER_DEVICE, MIN_DEVICE_PROTOCOL } =
 const { createAcpCall } = await import("./lib/acp-call");
 const { ACP_CLAIM_WINDOW_MS, DEVICE_CLAIM_WINDOW_MS } = await import("./lib/constants");
 const { claimWindowMs, isAcpTool, OPEN_CALL_PAGE } = await import("./lib/state");
+const { isDeviceInScope } = await import("./lib/scope");
 
 type Harness = ReturnType<typeof lunoraTest>;
 
@@ -1357,6 +1358,48 @@ describe("a headless machine paired by code", () => {
         expect(await revocations()).toHaveLength(0);
     });
 
+    it("starts with no chats, so it is out of scope for every thread until the person picks projects", async () => {
+        const headless = await pairHeadless(ownerId);
+        const project = await insertProject(ownerId);
+        const [row] = await deviceRows();
+
+        expect(row?.projectIds).toEqual([]);
+        expect(isDeviceInScope({ projectIds: row?.projectIds as never }, project as never)).toBe(false);
+        expect(isDeviceInScope({ projectIds: row?.projectIds as never }, undefined)).toBe(false);
+
+        // A desktop keeps today's default: unset, offered in any chat.
+        const desktop = await as(ownerId).mutation(functions.registerDevice as never, { name: "Mac", platform: "macos" } as never);
+
+        const rows = await deviceRows();
+
+        expect(rows.find((device) => device._id === (desktop as { deviceId: string }).deviceId)?.projectIds).toBeUndefined();
+        expect(headless.deviceId).toBe(row?._id);
+    });
+
+    it("is refused a call from any chat until the person picks projects for it", async () => {
+        const headless = await pairHeadless(ownerId);
+
+        await as(ownerId).mutation(functions.updateDeviceManifest as never, (await signManifest(headless.deviceId, headless.secret)) as never);
+
+        const threadId = await insertThread(ownerId);
+
+        expect(await createCall({ deviceId: headless.deviceId, threadId, userId: ownerId })).toEqual({ error: "ineligible" });
+
+        await setScope(ownerId, headless.deviceId);
+
+        expect(await createCall({ deviceId: headless.deviceId, threadId, userId: ownerId })).toHaveProperty("callId");
+    });
+
+    it("keeps a scope the person set when a retry of the same code finds the device", async () => {
+        const first = await pairHeadless(ownerId, "build-box", "code-keeps-scope");
+        const project = await insertProject(ownerId);
+
+        await setScope(ownerId, first.deviceId, [project]);
+        await pairHeadless(ownerId, "build-box", "code-keeps-scope");
+
+        expect(await scopeOf()).toEqual([project]);
+    });
+
     it("is registered once per redeemed code: a retry after a lost reply gets the same device and secret", async () => {
         const first = await pairHeadless(ownerId, "build-box", "code-lost-reply");
         const retried = await pairHeadless(ownerId, "build-box", "code-lost-reply");
@@ -1467,6 +1510,8 @@ describe("a headless machine paired by code", () => {
         const headless = await pairHeadless(ownerId);
         const foreign = await register(ownerId);
 
+        // A new machine starts out of scope everywhere; the person offers it to all chats.
+        await setScope(ownerId, headless.deviceId);
         await as(ownerId).mutation(functions.updateDeviceManifest as never, (await signManifest(headless.deviceId, headless.secret)) as never);
 
         const created = await createCall({ deviceId: headless.deviceId, threadId: await insertThread(ownerId), userId: ownerId });
