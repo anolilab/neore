@@ -11,6 +11,8 @@ const PUBLIC_ROUTES: { changefreq: string; path: string; priority: string }[] = 
     { changefreq: "monthly", path: "/use-cases/routines", priority: "0.6" },
     { changefreq: "monthly", path: "/use-cases/approvals", priority: "0.6" },
     { changefreq: "monthly", path: "/use-cases/messaging", priority: "0.6" },
+    { changefreq: "monthly", path: "/use-cases/group-chats", priority: "0.6" },
+    { changefreq: "monthly", path: "/use-cases/memory", priority: "0.6" },
     { changefreq: "monthly", path: "/auth/sign-in", priority: "0.8" },
     { changefreq: "monthly", path: "/auth/sign-up", priority: "0.8" },
     { changefreq: "monthly", path: "/auth/forgot-password", priority: "0.4" },
