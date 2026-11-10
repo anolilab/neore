@@ -8,20 +8,25 @@ import { basename, extname } from "node:path";
 import type { Flags, ParsedCommand } from "./args";
 import { limitFlag, requireArgument, UsageError } from "./args";
 import { ApiError, hintFor, NeoreClient, stripTrailingSlashes } from "./client";
-import type { CliConfig } from "./config";
 import { deleteConfig, insecurePermissions, readConfig, resolveCredentials, writeConfig } from "./config";
+import { assertSecureBaseUrl, formatUserCode, pollForKey, requestDeviceCode, revokeIssuedKey } from "./device-login";
 import type { Io } from "./render";
 import { formatDate, formatTable, paint, printJson, renderStream, shouldUseColor } from "./render";
 
 export interface Context {
     configFile: string;
     fetch: typeof fetch;
+    /** What this machine calls itself; sent with a sign-in code so the person approving can recognise it. */
+    hostname: string;
     io: Io;
+    /** Epoch ms; injected so the sign-in poll runs without real time in tests. */
+    now: () => number;
     readFile: (path: string) => Promise<Uint8Array>;
     /** One line of user input, or `null` at EOF. `secret` suppresses echo. */
     readLine: (prompt: string, options?: { secret?: boolean }) => Promise<string | null>;
     /** All of stdin, when it is piped; `null` when it is a terminal. */
     readStdin: () => Promise<string | null>;
+    sleep: (ms: number) => Promise<void>;
     stdinIsTTY: boolean;
 }
 
@@ -383,7 +388,31 @@ export const chat = async (context: Context, { args, flags }: ParsedCommand): Pr
 
 // ─── Account ────────────────────────────────────────────────────────────────
 
+/** Show the code, then wait for the person to approve it elsewhere. Resolves with the new key. */
+const deviceLogin = async (context: Context, apiUrl: string): Promise<string> => {
+    const code = await requestDeviceCode(context, apiUrl, context.hostname);
+    const minutes = Math.max(1, Math.round((code.expiresAtMs - context.now()) / 60_000));
+
+    context.io.stderr.write(
+        [
+            "To sign in, open this page in a browser on any device and sign in to your account:",
+            `  ${code.verificationUri}`,
+            "Then enter this code:",
+            `  ${formatUserCode(code.userCode)}`,
+            `Or open this link, which has the code filled in: ${code.verificationUriComplete}`,
+            `Waiting for approval (the code expires in ${String(minutes)} minutes; Ctrl-C cancels)...`,
+            "",
+        ].join("\n"),
+    );
+
+    return pollForKey(context, apiUrl, code);
+};
+
 export const login = async (context: Context, { flags }: ParsedCommand): Promise<void> => {
+    if (flags.device && flags.key !== undefined) {
+        throw new UsageError("--device signs in by code; it does not take a key.");
+    }
+
     const existing = await readConfig(context.configFile);
     const apiUrl = (
         flags["api-url"] ??
@@ -397,7 +426,11 @@ export const login = async (context: Context, { flags }: ParsedCommand): Promise
         throw new UsageError("An absolute API URL is required (--api-url).");
     }
 
-    let apiKey = flags.key?.trim();
+    if (flags.device) {
+        assertSecureBaseUrl(apiUrl);
+    }
+
+    let apiKey = flags.device ? await deviceLogin(context, apiUrl) : flags.key?.trim();
 
     if (!apiKey) {
         const entered = context.stdinIsTTY ? await context.readLine("Paste your API key: ", { secret: true }) : await context.readStdin();
@@ -409,11 +442,27 @@ export const login = async (context: Context, { flags }: ParsedCommand): Promise
         throw new UsageError("No API key given. Create one in Settings → API keys.");
     }
 
-    // Verify BEFORE saving, so a typo never replaces a working key.
-    const me = await new NeoreClient({ apiKey, baseUrl: apiUrl, fetch: context.fetch }).request<{ scopes: string[]; userId: string }>("GET", "/me");
-    const config: CliConfig = { apiKey, apiUrl };
+    // Verify BEFORE saving, so a typo never replaces a working key. A device sign-in has spent its code by now,
+    // so when the check or the save fails the key it was just issued is revoked (best effort) instead of left
+    // active and unused, where retries would stack toward the key limit.
+    let me: { scopes: string[]; userId: string };
 
-    await writeConfig(config, context.configFile);
+    try {
+        me = await new NeoreClient({ apiKey, baseUrl: apiUrl, fetch: context.fetch }).request<{ scopes: string[]; userId: string }>("GET", "/me");
+        await writeConfig({ apiKey, apiUrl }, context.configFile);
+    } catch (error) {
+        if (flags.device) {
+            const isRevoked = await revokeIssuedKey(context, apiUrl, apiKey);
+
+            context.io.stderr.write(
+                isRevoked
+                    ? "The new key could not be checked or saved, so it was revoked and nothing was changed. Run `neore login --device` again.\n"
+                    : "The new key could not be checked or saved and could not be revoked from here: revoke it in Settings -> API keys, then run `neore login --device` again.\n",
+            );
+        }
+
+        throw error;
+    }
 
     if (flags.json) {
         printJson(context.io, { apiUrl, configFile: context.configFile, scopes: me.scopes });

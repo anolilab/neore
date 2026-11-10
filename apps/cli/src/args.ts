@@ -13,6 +13,7 @@ export const OPTIONS = {
     criteria: { type: "string" },
     cron: { type: "string" },
     cursor: { type: "string" },
+    device: { type: "boolean" },
     help: { short: "h", type: "boolean" },
     input: { short: "i", type: "string" },
     instructions: { type: "string" },
