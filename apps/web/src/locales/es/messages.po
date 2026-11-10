@@ -5902,7 +5902,7 @@ msgstr ""
 msgid "Checking image safety..."
 msgstr "Comprobando la seguridad de la imagen..."
 
-#: src/features/auth/components/device-approval.tsx:335
+#: src/features/auth/components/device-approval.tsx:345
 msgid "Checking the code…"
 msgstr ""
 
@@ -18567,7 +18567,7 @@ msgid "Loading..."
 msgstr "Cargando..."
 
 #: ../../packages/chat-ui/src/chat/message-content.tsx:332
-#: src/features/auth/components/device-approval.tsx:295
+#: src/features/auth/components/device-approval.tsx:296
 #: src/features/chat/thread/memory-usage-action.tsx:46
 #: src/features/chat/thread/request-secret-prompt.tsx:479
 #: src/features/code/components/code-workspace.tsx:90
@@ -29004,7 +29004,7 @@ msgstr "Barra lateral derecha"
 #: src/components/settings/settings-modal.tsx:163
 #: src/features/auth/components/auth/auth-card.tsx:493
 #: src/features/auth/components/auth/forms/sign-in-form.tsx:415
-#: src/features/auth/components/device-approval.tsx:309
+#: src/features/auth/components/device-approval.tsx:310
 #: src/features/layout/components/nav-user.tsx:237
 #: src/features/marketing/components/landing-page.tsx:1058
 #: src/features/settings/components/chat/mcp/server-list.tsx:127
@@ -29033,12 +29033,12 @@ msgstr "¿Iniciar sesión en otro sitio?"
 
 #: src/features/auth/components/device-approval.tsx:72
 #: src/features/auth/components/device-approval.tsx:210
-#: src/features/auth/components/device-approval.tsx:273
-#: src/features/auth/components/device-approval.tsx:293
-#: src/features/auth/components/device-approval.tsx:306
-#: src/features/auth/components/device-approval.tsx:333
+#: src/features/auth/components/device-approval.tsx:274
+#: src/features/auth/components/device-approval.tsx:294
+#: src/features/auth/components/device-approval.tsx:307
+#: src/features/auth/components/device-approval.tsx:343
 #: src/features/auth/components/device-code-parts.tsx:120
-#: src/routes/auth/device.tsx:40
+#: src/routes/auth/device.tsx:38
 msgid "Sign in the command line"
 msgstr ""
 
@@ -33967,7 +33967,7 @@ msgstr "Prueba a ajustar los términos de búsqueda."
 
 #: src/components/error-component.tsx:40
 #: src/features/auth/components/device-approval.tsx:78
-#: src/features/auth/components/device-approval.tsx:284
+#: src/features/auth/components/device-approval.tsx:285
 #: src/features/chat/guest-links/guest-page.tsx:275
 #: src/features/connection/components/offline-screen.tsx:59
 #: src/features/develop/components/files-tab.tsx:275
@@ -35992,7 +35992,7 @@ msgstr "Vigilar solo esta parte (opcional)"
 msgid "Watched repositories"
 msgstr "Repositorios vigilados"
 
-#: src/features/auth/components/device-approval.tsx:275
+#: src/features/auth/components/device-approval.tsx:276
 msgid "We could not check that you are signed in. Try again in a moment."
 msgstr ""
 
@@ -36711,7 +36711,7 @@ msgstr "Estás añadiendo documentos demasiado rápido. Espera un momento e int�
 msgid "You are browsing as a guest. Sign in with your account to connect the extension."
 msgstr "Estás navegando como invitado. Inicia sesión con tu cuenta para conectar la extensión."
 
-#: src/features/auth/components/device-approval.tsx:307
+#: src/features/auth/components/device-approval.tsx:308
 msgid "You are browsing as a guest. Sign in with your account to sign in the command line."
 msgstr ""
 

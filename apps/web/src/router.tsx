@@ -14,6 +14,7 @@ import NotFound from "@/components/not-found";
 import { createIdentityProbeFetch } from "@/lib/auth/shared-session";
 import env from "@/lib/env";
 import { deLocalizeUrl, localizeUrl } from "@/lib/intl/client";
+import { parseSearch, stringifySearch } from "@/lib/search-params";
 import AnalyticsProvider from "@/providers/analytics-provider";
 
 import routerWithLingui from "./lib/intl/router-plugin";
@@ -88,12 +89,14 @@ export const getRouter = (): ReturnType<typeof createTanstackRouter> => {
         defaultPreloadStaleTime: 0,
         defaultStructuralSharing: true,
         defaultViewTransition: true,
+        parseSearch,
         rewrite: {
             input: deLocalizeUrl,
             output: localizeUrl,
         },
         routeTree,
         scrollRestoration: false,
+        stringifySearch,
         ...(nonce && { ssr: { nonce } }),
         Wrap: ({ children }: { children: ReactNode }) => (
             <GlobalErrorBoundaryProvider>

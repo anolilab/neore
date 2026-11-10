@@ -220,7 +220,7 @@ const Review = ({ email, lookup, onRefresh, userCode }: ReviewProps) => {
         liveText = busyMessages[pending];
     } else if (decision) {
         liveText = `${outcomes[decision].title}. ${outcomes[decision].detail}`;
-    } else if (!problem && lookup.status !== "pending") {
+    } else if (!problem && lookup.isMine && lookup.status !== "pending") {
         liveText = t`This code has already been answered.`;
     }
 
@@ -240,6 +240,7 @@ export const DeviceApproval = ({ onCode, rawCode }: { onCode: (code: string) => 
     const { data, error: sessionError, isPending, refetch } = useAuthenticate();
     const { isAnonymous } = useIsAnonymous();
     const userId = data?.user?.id;
+    const isRereading = useRef(false);
 
     // Opening the code while signed in claims it for this account, so it runs once per code and account.
     const {
@@ -319,6 +320,15 @@ export const DeviceApproval = ({ onCode, rawCode }: { onCode: (code: string) => 
     if (lookupError) {
         return (
             <ProblemMessage
+                headingRef={(node) => {
+                    // A failed re-read after Approve or Deny replaces the buttons that had focus.
+                    if (!node || !isRereading.current) {
+                        return;
+                    }
+
+                    isRereading.current = false;
+                    node.focus();
+                }}
                 onRetry={() => {
                     refetchLookup().catch(() => undefined);
                 }}
@@ -339,7 +349,11 @@ export const DeviceApproval = ({ onCode, rawCode }: { onCode: (code: string) => 
     }
 
     const refresh = async (): Promise<Lookup["status"] | undefined> => {
+        isRereading.current = true;
+
         const refreshed = await refetchLookup();
+
+        isRereading.current = refreshed.isError;
 
         return refreshed.data?.status;
     };

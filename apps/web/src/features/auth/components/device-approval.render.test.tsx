@@ -163,6 +163,29 @@ describe("DeviceApproval", () => {
         });
     });
 
+    it("moves focus to the problem when the re-read after a processed answer fails", async () => {
+        fetchMock
+            .mockResolvedValueOnce({ data: pending, error: null })
+            .mockResolvedValueOnce(failure("invalid_request", 400))
+            .mockResolvedValueOnce(failure("", 503));
+        mount();
+        fireEvent.click(await screen.findByRole("button", { name: "Approve" }));
+
+        await screen.findByRole("button", { name: "Try again" });
+
+        expect(screen.getByRole("heading", { level: 1 }).matches(":focus")).toBe(true);
+    });
+
+    it("does not announce 'already answered' for a code opened by another account", async () => {
+        fetchMock.mockResolvedValueOnce({ data: { hostname: "devbox", status: "approved" }, error: null });
+        mount();
+
+        const alert = await screen.findByRole("alert");
+
+        expect(alert.textContent).toContain("different account");
+        expect(screen.getByRole("status").textContent).toBe("");
+    });
+
     it("keeps the page heading while the code is being checked", async () => {
         fetchMock.mockReturnValueOnce(new Promise<void>(() => {}));
         mount();

@@ -1,5 +1,5 @@
 import { msg } from "@lingui/core/macro";
-import { createFileRoute, useLocation } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 
 import { DeviceApproval } from "@/features/auth/components/device-approval";
 import { seo } from "@/lib/seo";
@@ -7,9 +7,8 @@ import { seo } from "@/lib/seo";
 /**
  * Approve a sign-in started by `neore login --device`; the page itself is `DeviceApproval`.
  *
- * The code is read from the address as written: the router JSON-parses search values, which turns a code like
- * `23456789` into a number and `2E345678` into `Infinity`, and its `searchStr` is rebuilt from those parsed values.
- * The location subscription only re-renders the page when the address changes.
+ * A code that reads as a plain number (`23456789`) still arrives as one, so the search is turned back into text here;
+ * codes like `2E345678` are kept as written by the router's `parseSearch` (`lib/search-params.ts`).
  */
 interface DeviceSearch {
     user_code?: string;
@@ -17,8 +16,7 @@ interface DeviceSearch {
 
 const DeviceRoute = () => {
     const navigate = Route.useNavigate();
-    const searchString = useLocation({ select: (location) => location.searchStr });
-    const rawCode = new URLSearchParams(globalThis.location === undefined ? searchString : globalThis.location.search).get("user_code") ?? undefined;
+    const { user_code: rawCode } = Route.useSearch();
 
     return (
         <DeviceApproval
