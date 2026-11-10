@@ -5860,6 +5860,100 @@
       "relations": {},
       "shardMode": "shardBy:userId"
     },
+    "deviceCode": {
+      "commitOrdered": false,
+      "fields": {
+        "clientId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "deviceCode": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "expiresAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "hostname": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "lastPolledAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "pollingInterval": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "scope": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "status": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "userCode": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "userId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        }
+      },
+      "indexes": {
+        "deviceCode": {
+          "fields": [
+            "deviceCode"
+          ],
+          "unique": false
+        },
+        "expiresAt": {
+          "fields": [
+            "expiresAt"
+          ],
+          "unique": false
+        },
+        "userCode": {
+          "fields": [
+            "userCode"
+          ],
+          "unique": false
+        },
+        "userId": {
+          "fields": [
+            "userId"
+          ],
+          "unique": false
+        }
+      },
+      "memory": false,
+      "relations": {},
+      "shardMode": "global:d1"
+    },
     "devices": {
       "commitOrdered": false,
       "fields": {
