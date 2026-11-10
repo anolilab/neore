@@ -238,7 +238,9 @@ describe("a sub-agent child's continuation", () => {
         newerResume?: boolean;
         /** The deadline this run's resume set, and a request of the run open on the child's latest turn. */
         pausedAgainAt?: number;
-        resumed?: { paused: boolean; stopped: boolean };
+        /** The owner was asked a question in the child thread while the continuation ran. */
+        questionMeanwhile?: boolean;
+        resumed?: { awaitingInput?: "approval"; paused: boolean; stopped: boolean };
         status?: "cancelled";
     }) => {
         const harness = lunoraTest(schema as never);
@@ -305,6 +307,10 @@ describe("a sub-agent child's continuation", () => {
                 const { resumed } = options;
 
                 vi.mocked(resumeApprovedRun).mockImplementationOnce(async () => {
+                    if (options.questionMeanwhile) {
+                        await harness.run(async (ctx: any) => await ctx.db.patch("threads", ids.threadId as never, { awaitingInput: "question" }));
+                    }
+
                     if (options.newerResume && options.pausedAgainAt !== undefined) {
                         await harness.run(async (ctx: any) => await ctx.db.patch("subAgentRuns", runId, { reapAt: (options.pausedAgainAt ?? 0) + 1 }));
                     }
@@ -328,8 +334,13 @@ describe("a sub-agent child's continuation", () => {
             return await harness.run(async (ctx: any) => {
                 const row = await ctx.db.get("subAgentRuns", runId);
                 const approvals = await ctx.db.query("toolApprovalRuns").collect();
+                const child = await ctx.db.get("threads", ids.threadId as never);
 
-                return { ...row, openRequests: approvals.filter((approval: { status: string }) => approval.status === "pending").length };
+                return {
+                    ...row,
+                    childAwaitingInput: child?.awaitingInput,
+                    openRequests: approvals.filter((approval: { status: string }) => approval.status === "pending").length,
+                };
             });
         } finally {
             harness.close();
@@ -372,6 +383,16 @@ describe("a sub-agent child's continuation", () => {
         } finally {
             vi.mocked(failRun).mockRestore();
         }
+    });
+
+    it("leaves a question the owner was asked in the child as what it waits on when the continuation pauses again", async () => {
+        expect(
+            await resumeChild({
+                pausedAgainAt: Date.now() + 60 * 60_000,
+                questionMeanwhile: true,
+                resumed: { awaitingInput: "approval", paused: true, stopped: false },
+            }),
+        ).toMatchObject({ childAwaitingInput: "question", status: "awaiting" });
     });
 
     it("hands a pause back to the run's wait, and schedules an end whose write failed", async () => {

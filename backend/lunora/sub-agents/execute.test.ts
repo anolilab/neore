@@ -12,7 +12,12 @@ import { admitWorkerRun } from "./functions";
 import { WORKER_SYSTEM } from "./logic";
 
 const { contexts, probe, registry, runs } = vi.hoisted(() => {
-    return { contexts: [] as string[][], probe: { on: false }, registry: new Map<string, unknown>(), runs: [] as Record<string, any>[] };
+    return {
+        contexts: [] as string[][],
+        probe: { on: false, pause: undefined as ((options: Record<string, any>) => Promise<void>) | undefined },
+        registry: new Map<string, unknown>(),
+        runs: [] as Record<string, any>[],
+    };
 });
 
 vi.mock("../_generated/api", async (importOriginal) => registeredApi(await importOriginal(), registry));
@@ -24,6 +29,13 @@ vi.mock("../chat/lib/headless-run", () => {
             runs.push(options);
 
             const text = `reply ${String(runs.length)}`;
+
+            // A run that stopped on an approval request.
+            if (probe.pause) {
+                await probe.pause(options);
+
+                return { paused: true, text, threadId: options.thread.threadId };
+            }
 
             if (probe.on) {
                 // What the agent reads as history, then what a real run saves into the thread.
@@ -67,6 +79,7 @@ beforeEach(async () => {
     runs.length = 0;
     contexts.length = 0;
     probe.on = false;
+    probe.pause = undefined;
     harness = lunoraTest(schema as never);
     userId = (await harness.run(
         async (ctx: any) => await ctx.db.insert("user", { createdAt: 0, email: "u@example.com", emailVerified: true, name: "U", updatedAt: 0 }),
@@ -146,5 +159,111 @@ describe("a worker's runs", () => {
         await execute(first._id);
 
         expect(runs).toHaveLength(1);
+    });
+});
+
+describe("whether a child may pause for its owner", () => {
+    /** A one-shot run as the claim finds it, run once, and the options its headless run got. */
+    const oneShot = async (fields: Record<string, unknown>) => {
+        const runId = (await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("subAgentRuns", {
+                    createdAt: Date.now(),
+                    depth: 1,
+                    parentThreadId: leadId,
+                    status: "queued",
+                    task: "Tidy up",
+                    toolCallId: "call-1",
+                    updatedAt: Date.now(),
+                    userId,
+                    ...fields,
+                }),
+        )) as string;
+
+        await execute(runId);
+
+        return runs.at(-1)!;
+    };
+
+    it("pauses a one-shot child of the owner's own turn, and withholds the dispatch tools at the depth cap", async () => {
+        expect(await oneShot({})).toMatchObject({ pauseForApproval: { subAgentRunId: expect.any(String) } });
+        expect(runs.at(-1)).not.toHaveProperty("withheldTools");
+        expect(await oneShot({ depth: 2 })).toMatchObject({ withheldTools: ["delegateToSubAgent", "messageWorker"] });
+    });
+
+    it("never pauses a child an unattended chain started, nor a worker", async () => {
+        for (const dispatchedBy of ["trigger", "messenger", "outside_agent"]) {
+            expect(await oneShot({ dispatchedBy })).not.toHaveProperty("pauseForApproval");
+        }
+
+        const worker = await dispatch({ toolCallId: "call-w" });
+
+        await execute(worker._id);
+        expect(runs.at(-1)).not.toHaveProperty("pauseForApproval");
+    });
+});
+
+describe("a one-shot child that pauses", () => {
+    it("does not wait again when its owner answered before the run recorded its wait", async () => {
+        const runId = (await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("subAgentRuns", {
+                    createdAt: Date.now(),
+                    depth: 1,
+                    parentThreadId: leadId,
+                    status: "queued",
+                    task: "Tidy up",
+                    toolCallId: "call-1",
+                    updatedAt: Date.now(),
+                    userId,
+                }),
+        )) as string;
+
+        // The pause's request is recorded and already answered: the answer resumed the run (a deadline of its own), and a
+        // sibling request of the same step is still open on the child's latest turn.
+        probe.pause = async () =>
+            await harness.run(async (ctx: any) => {
+                const childId = await ctx.db.insert("threads", { status: "active", title: "Sub-agent: Tidy up", userId });
+
+                await ctx.db.patch("subAgentRuns", runId, { childThreadId: childId, reapAt: Date.now() + 60_000, status: "running" });
+                await ctx.db.insert("messages", {
+                    message: {
+                        content: [
+                            { input: {}, toolCallId: "call-2", toolName: "mcp_Files__delete", type: "tool-call" },
+                            { approvalId: "approval-2", toolCallId: "call-2", type: "tool-approval-request" },
+                        ],
+                        role: "assistant",
+                    },
+                    order: 0,
+                    status: "success",
+                    stepOrder: 1,
+                    threadId: childId,
+                    tool: true,
+                    userId,
+                });
+                await ctx.db.insert("toolApprovalRuns", {
+                    approvalId: "approval-2",
+                    config: {
+                        autoMediaEnrichment: false,
+                        mcpServerNames: [],
+                        model: "test-model",
+                        researchDepth: "balanced",
+                        searchMode: "web",
+                        shouldAutoContinue: true,
+                        subAgentRunId: runId,
+                        toolNames: [],
+                    },
+                    createdAt: Date.now(),
+                    status: "pending",
+                    threadId: childId,
+                    userId,
+                });
+            });
+
+        await execute(runId);
+
+        const run = await harness.run(async (ctx: any) => await ctx.db.get("subAgentRuns", runId));
+
+        expect(run.status).toBe("running");
     });
 });

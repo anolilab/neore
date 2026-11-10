@@ -267,6 +267,8 @@ export const updateThread = internalMutation
     .input({
         /** The run failed in place: a snoozed thread wakes in this same write (`patchThread`). */
         failed: v.optional(v.boolean()),
+        /** A question the thread waits on stays what it waits on: an approval does not overwrite it (a sub-agent's pause). */
+        keepQuestion: v.optional(v.boolean()),
         patch: v.object({ ...vThreadPatchFields }),
         threadId: v.id("threads"),
     })
@@ -276,8 +278,11 @@ export const updateThread = internalMutation
 
         assert(oldThread, `Thread ${args.threadId} not found`);
 
+        const { awaitingInput, ...rest } = args.patch;
+        const keptQuestion = args.keepQuestion === true && awaitingInput === "approval" && oldThread.awaitingInput === "question";
+
         // The run-state rules (a pause ending, a pause or failure waking a snooze) live in `patchThread`.
-        await patchThread(ctx.db, args.threadId, args.patch, { failed: args.failed });
+        await patchThread(ctx.db, args.threadId, keptQuestion ? rest : args.patch, { failed: args.failed });
 
         const newThread = (await ctx.db.get("threads", args.threadId))!;
 

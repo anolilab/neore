@@ -1494,6 +1494,8 @@ export interface RunOutcome {
     awaitingInput?: AwaitingInput;
     /** The run failed in place: its thread wakes if it was snoozed (`agent/table-writes.ts#patchThread`). */
     failed?: boolean;
+    /** A `"question"` the thread waits on is not overwritten by an `"approval"` (a sub-agent child's pause). */
+    keepQuestion?: boolean;
     replied?: boolean;
 }
 
@@ -1507,6 +1509,7 @@ export const setThreadStatus = async (
 
     await ctx.runMutation(internal.agent.threads.updateThread, {
         ...(outcome.failed === true && { failed: true }),
+        ...(outcome.keepQuestion === true && { keepQuestion: true }),
         patch: {
             status,
             updatedAt: now,

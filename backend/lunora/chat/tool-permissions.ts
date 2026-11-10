@@ -712,7 +712,8 @@ export const recordPendingToolApprovals = internalMutation
 
         await purgeExpiredToolApprovalRunsForUser(ctx, ownerId, createdAt);
 
-        if (awaitingInput && thread) {
+        // A question the owner was asked in this thread stays the thing it waits on: an approval does not overwrite it.
+        if (awaitingInput && thread && thread.awaitingInput !== "question") {
             await patchThread(ctx.db, thread._id, { awaitingInput });
         }
 

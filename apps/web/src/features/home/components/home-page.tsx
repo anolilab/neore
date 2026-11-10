@@ -105,6 +105,14 @@ const HomeComposer: FC = () => {
  */
 const HomePage: FC = () => {
     const { i18n, t } = useLingui();
+    // A sub-agent waiting on its owner's approval says so: the owner has to act, not wait.
+    const subAgentMeta = (status: "awaiting" | "queued" | "running"): string => {
+        if (status === "queued") {
+            return t`Queued`;
+        }
+
+        return status === "awaiting" ? t`Waiting for your approval` : t`Running`;
+    };
     const crpc = useCRPC();
     const { data: overview, isError, isFetching, isLoading, refetch } = useQuery(crpc.home.overview.getHomeOverview.queryOptions({}));
     const { markRead } = useNotificationInbox({ enabled: false });
@@ -189,7 +197,12 @@ const HomePage: FC = () => {
                                     </Row>
                                 ))}
                                 {overview.subAgents.map((run) => (
-                                    <Row key={run._id} meta={run.status === "queued" ? t`Queued` : t`Running`} to={`/chat/${run.parentThreadId}`}>
+                                    <Row
+                                        key={run._id}
+                                        meta={subAgentMeta(run.status)}
+                                        // A waiting run is answered in its own thread; a running one is followed from its parent's.
+                                        to={`/chat/${run.status === "awaiting" && run.childThreadId ? run.childThreadId : run.parentThreadId}`}
+                                    >
                                         <Workflow aria-hidden="true" className="mr-2 inline size-3.5" />
                                         {run.task}
                                     </Row>
