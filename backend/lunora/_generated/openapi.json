@@ -29771,6 +29771,90 @@
         "x-lunora-function-kind": "mutation"
       }
     },
+    "/_lunora/rpc#connectors_access:setTeammateConnectorAccess": {
+      "post": {
+        "description": "Invoke the `mutation` `connectors_access:setTeammateConnectorAccess` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "connectors_access:setTeammateConnectorAccess",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "botId": {
+                        "description": "Id<\"bots\">",
+                        "type": "string",
+                        "x-lunora-table": "bots"
+                      },
+                      "connectorSlug": {
+                        "type": "string"
+                      },
+                      "level": {
+                        "anyOf": [
+                          {
+                            "const": "read_only",
+                            "type": "string"
+                          },
+                          {
+                            "const": "read_write",
+                            "type": "string"
+                          },
+                          {
+                            "const": "none",
+                            "type": "string"
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "botId",
+                      "connectorSlug",
+                      "level"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "connectors_access:setTeammateConnectorAccess",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "null"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "mutation: connectors_access:setTeammateConnectorAccess",
+        "tags": [
+          "connectors"
+        ],
+        "x-lunora-function-kind": "mutation"
+      }
+    },
     "/_lunora/rpc#connectors_mcp_servers:listMcpServerSignIns": {
       "post": {
         "description": "Invoke the `query` `connectors_mcp_servers:listMcpServerSignIns` over the Lunora RPC envelope (POST /_lunora/rpc).",

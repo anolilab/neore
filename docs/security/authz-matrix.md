@@ -411,6 +411,7 @@ for a schema table that is neither policed nor listed:
 | `connectors_mcp_servers.listMcpServerSignIns` | query | authQuery | — | caller-scoped (ctx.user) | ok |
 | `connectors_mcp_servers.signOutMcpServer` | action | authAction + RL | — | caller-scoped (ctx.user) | ok |
 | `connectors_mcp_servers.startMcpServerOAuth` | action | authAction + RL | — | caller-scoped (ctx.user) | ok |
+| `connectors_access.setTeammateConnectorAccess` | mutation | authMutation | — | owner-checked: the teammate must be one of the caller's bots | ok |
 | `connectors_oauth.completeConnectorOAuth` | action | authAction + RL | — | caller-scoped (ctx.user) | ok |
 | `connectors_oauth.startConnectorOAuth` | action | authAction + RL | — | state bound to ctx.user | ok |
 | `connectors_user_connectors.disconnectConnector` | action | authAction + RL | userConnectors | owner helper | ok |

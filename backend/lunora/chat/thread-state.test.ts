@@ -435,21 +435,21 @@ describe("threadModeForApp", () => {
             await context.db.insert("threadAccess", { grantedAt: 0, grantedBy: OWNER, permission: "write", threadId, userId: GRANTEE });
         });
 
-        expect(await readFor(GRANTEE)).toStrictEqual({ allowed: true, mode: "supervised" });
-        expect(await readFor(STRANGER)).toStrictEqual({ allowed: false, mode: null });
+        expect(await readFor(GRANTEE)).toStrictEqual({ allowed: true, connectorAccess: [], mode: "supervised" });
+        expect(await readFor(STRANGER)).toStrictEqual({ allowed: false, connectorAccess: [], mode: null });
 
         // An open chat whose owner chose full: the grantee gets the defaults, never the owner's full.
         await harness.run(async (context: any) => {
             await context.db.patch("threads", threadId, { permissionMode: "full" });
         });
 
-        expect(await readFor(GRANTEE)).toStrictEqual({ allowed: true, mode: null });
+        expect(await readFor(GRANTEE)).toStrictEqual({ allowed: true, connectorAccess: [], mode: null });
 
         await harness.run(async (context: any) => {
             await context.db.patch("threads", threadId, { lockedAt: 2 });
         });
 
-        expect(await readFor(OWNER)).toStrictEqual({ allowed: true, mode: "full" });
-        expect(await readFor(GRANTEE)).toStrictEqual({ allowed: false, mode: null });
+        expect(await readFor(OWNER)).toStrictEqual({ allowed: true, connectorAccess: [], mode: "full" });
+        expect(await readFor(GRANTEE)).toStrictEqual({ allowed: false, connectorAccess: [], mode: null });
     });
 });

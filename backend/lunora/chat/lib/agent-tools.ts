@@ -13,6 +13,7 @@ import type { LanguageModel, ToolSet } from "ai";
 import { internal } from "../../_generated/internal";
 import type { Id } from "../../_generated/dataModel";
 import type { ActionCtx } from "../../_generated/server";
+import { levelOfConnection, toolOfferedAt } from "../../connectors/access-levels";
 import { getConnectorMcpServers, withMcpServerGrants } from "../../connectors/lib/grant-runtime";
 import { toolsLogger } from "../../lib/logger";
 import type { DeviceToolsResult } from "./device-tools";
@@ -266,6 +267,40 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
 
         candidates = Object.fromEntries(Object.entries(candidates).filter(([name]) => !disabled.has(name)));
     }
+
+    // A teammate's access per connection (`connectors/access.ts`). A write tool its level does not allow is not offered to the
+    // model at all, and a connection set to none offers nothing. Fails closed: when the settings cannot be read, no connector
+    // tool is offered, never one the teammate may not use. The thread that governs the run is its own thread, or the one a group
+    // participant's permissions come from. A run with neither has no teammate and keeps every tool.
+    // Read only when a connector's tool is in the set, so a run without one makes no extra query.
+    const accessThreadId = threadId ?? permissionModeThreadId;
+    const hasConnectorTools = Object.keys(candidates).some((name) => mcpResult.descriptors.get(name)?.connectorSlug !== undefined);
+    const connectorAccess =
+        !hasConnectorTools || accessThreadId === undefined
+            ? []
+            : await ctx
+                  .runQuery(internal.connectors.access.listThreadConnectorAccess, { threadId: accessThreadId as Id<"threads">, userId })
+                  .catch((error: unknown) => {
+                      toolsLogger.warn("[TOOLS] Teammate connector access unavailable:", error);
+
+                      return null;
+                  });
+
+    candidates = Object.fromEntries(
+        Object.entries(candidates).filter(([name]) => {
+            const mcp = mcpResult.descriptors.get(name);
+
+            if (!mcp?.connectorSlug) {
+                return true;
+            }
+
+            if (connectorAccess === null) {
+                return false;
+            }
+
+            return toolOfferedAt(levelOfConnection(connectorAccess, mcp.connectorSlug), mcp.annotations);
+        }),
+    );
 
     // A server counts as trusted by what it is (name AND url), so one whose url changed has lost it.
     const trusted = quickCheckOn

@@ -248,6 +248,23 @@ describe("buildAgentTools connector tools", () => {
         };
     });
 
+    it("applies a group participant's connector access, from the thread its permissions come from", async () => {
+        const runQuery = vi.fn(async (_ref: unknown, args: Record<string, unknown>) =>
+            "threadId" in args ? [{ connectorSlug: "notion", level: "read_only" }] : [],
+        );
+
+        const { tools } = await buildAgentTools({ runQuery } as unknown as ActionCtx, {
+            model: "test-model",
+            permissionModeThreadId: "owner-thread",
+            searchMode: "web",
+            userId: "user",
+        });
+
+        expect(Object.keys(tools)).toContain("mcp_Notion__search");
+        expect(Object.keys(tools)).not.toContain("mcp_Notion__create_page");
+        expect(runQuery).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ threadId: "owner-thread" }));
+    });
+
     it("connects to connected connectors alongside the user's MCP servers", async () => {
         await buildAgentTools(fakeCtx(), { model: "test-model", searchMode: "web", userId: "user" });
 

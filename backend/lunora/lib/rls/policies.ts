@@ -224,6 +224,7 @@ const OWNER_TABLES = [
     "tasks",
     "temporaryThreads",
     "threadGoals",
+    "teammateConnectorAccess",
     "threadGuestLinks",
     "threadGuestMessages",
     "threadPasscodes",
