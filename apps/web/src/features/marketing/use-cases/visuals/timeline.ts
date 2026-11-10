@@ -1,5 +1,7 @@
 import { useReducedMotion } from "motion/react";
 
+import { usePlaying } from "./visual-playback";
+
 /** Length of one loop of a use-case visual, in seconds. Every visual loops within this. */
 const LOOP_SECONDS = 6;
 /** Share of the loop a fade takes to rise (or fall). */
@@ -26,5 +28,12 @@ export const loop = (times: number[], values: Values, rest: Rest, reduce: boolea
 export const fade = (from: number, to: number, reduce: boolean, rest = 1) =>
     loop([0, from, from + FADE, to, to + FADE, 1], { opacity: [0, 0, 1, 1, 0, 0] }, { opacity: rest }, reduce);
 
-/** Whether the person asked for less motion. Read once per render so the loop stops in place. */
-export const useReduce = (): boolean => useReducedMotion() === true;
+/**
+ * Whether a visual holds still: the person asked for less motion, or the visual is off screen. Read once per render, so
+ * the loop stops in place and rests on its final frame.
+ */
+export const useReduce = (): boolean => {
+    const playing = usePlaying();
+
+    return useReducedMotion() === true || !playing;
+};

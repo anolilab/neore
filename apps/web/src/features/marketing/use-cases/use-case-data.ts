@@ -33,7 +33,7 @@ export const USE_CASES: UseCase[] = [
         slug: "routines",
         steps: [
             msg`Describe the task, the result you expect, and when it repeats: daily, weekly, or a cron expression in UTC.`,
-            msg`Each minute the scheduler looks for due tasks and starts one run for the current slot. After an outage it starts one catch-up run, not a burst of missed runs.`,
+            msg`Each minute the scheduler starts the due runs for the current slot, oldest first. A sweep takes a limited number, so the rest start in a later minute. After an outage it starts one catch-up run, not a burst of missed runs.`,
             msg`The run goes where you chose: a new chat each time, the same chat as before, or the same chat with a fresh context.`,
             msg`A verifier model judges the answer. A pass counts as done, an unclear answer waits for your review, and an empty answer is recorded as an error.`,
             msg`You get a notification with the result, or with the reason the run failed.`,
@@ -49,7 +49,7 @@ export const USE_CASES: UseCase[] = [
             msg`An opt-in quick check can approve clearly read-only calls from servers you mark as trusted. It is off by default.`,
         ],
         eyebrow: msg`Approvals`,
-        seoDescription: msg`Approvals in Neore: the agent stops before a tool that changes things or reaches outside the chat, and you decide with the exact input in front of you.`,
+        seoDescription: msg`Approvals in Neore: a tool you set to Ask stops before it runs, and you decide with the exact input in front of you.`,
         seoTitle: msg`Approvals — the agent asks before a risky action`,
         slug: "approvals",
         steps: [
@@ -59,7 +59,7 @@ export const USE_CASES: UseCase[] = [
             msg`Approve runs the call once and the reply continues from its result. Deny sends a denial back to the model, which carries on without that tool.`,
             msg`The request is saved with the message, so the card is still there after a reload.`,
         ],
-        summary: msg`Tools that change things or reach outside the chat stop and wait for your decision. You see what the tool will do before it runs, then choose to allow it once, for an hour, for the day, or always.`,
+        summary: msg`Tools you set to Ask stop and wait for your decision. You see what the tool will send before it runs, then choose to allow it once, for an hour, for the day, or always. Tools set to Auto run without a card.`,
         title: msg`The agent asks before a risky action`,
     },
     {
@@ -80,7 +80,7 @@ export const USE_CASES: UseCase[] = [
             msg`Each message is checked for freshness and duplicates, rate limited per sender, then handed to the agent.`,
             msg`The reply goes back to the same chat. Files are fetched when the reply is made, with a 20 MB limit and a list of allowed types.`,
         ],
-        summary: msg`Connect a bot you own to a messaging app and message your agent from your phone. Those messages go through the same checks as the web app and land in the same chat history.`,
+        summary: msg`Connect a bot you own to a messaging app and message your agent from your phone. Messages from the app have their own pairing and rate-limit checks, then land in the same chat history as your web chats.`,
         title: msg`Talk to your agent from Telegram, WhatsApp, Slack or Discord`,
     },
     {

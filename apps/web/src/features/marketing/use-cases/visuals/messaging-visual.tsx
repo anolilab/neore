@@ -1,5 +1,5 @@
 import { useLingui } from "@lingui/react/macro";
-import { motion } from "motion/react";
+import { m } from "motion/react";
 
 import { fade, loop, useReduce } from "./timeline";
 import { VisualFrame } from "./visual-frame";
@@ -20,27 +20,30 @@ export const MessagingVisual = () => {
                 ))}
             </div>
 
-            <motion.div className="max-w-[85%] self-start rounded-2xl rounded-tl-sm bg-white/10 px-3 py-2 text-sm text-white" {...fade(0.06, 0.9, reduce)}>
+            <m.div className="max-w-[85%] self-start rounded-2xl rounded-tl-sm bg-white/10 px-3 py-2 text-sm text-white" {...fade(0.06, 0.9, reduce)}>
                 {t`Summarise my notes from today`}
-            </motion.div>
+            </m.div>
 
             <div className="relative mx-auto h-10 w-px bg-white/15">
-                <motion.span
-                    className="absolute left-1/2 size-2 -translate-x-1/2 rounded-full bg-white"
+                {/* The layer is as tall as the track, so moving it by a percentage of its own height crosses the track. */}
+                <m.div
+                    className="absolute inset-x-0 top-0 h-full"
                     {...loop(
                         [0, 0.2, 0.24, 0.44, 0.48, 1],
-                        { top: ["0%", "0%", "0%", "100%", "100%", "100%"], opacity: [0, 0, 1, 1, 0, 0] },
-                        { top: "100%", opacity: 0 },
+                        { opacity: [0, 0, 1, 1, 0, 0], y: ["0%", "0%", "0%", "100%", "100%", "100%"] },
+                        { opacity: 0, y: "100%" },
                         reduce,
                     )}
-                />
+                >
+                    <div className="absolute top-0 left-1/2 size-2 -translate-x-1/2 rounded-full bg-white" />
+                </m.div>
             </div>
 
             <div className="mx-auto rounded-full bg-white px-3 py-1 text-xs font-medium text-black">{t`Neore agent`}</div>
 
-            <motion.div className="max-w-[85%] self-end rounded-2xl rounded-tr-sm bg-white/10 px-3 py-2 text-sm text-white" {...fade(0.5, 0.9, reduce)}>
+            <m.div className="max-w-[85%] self-end rounded-2xl rounded-tr-sm bg-white/10 px-3 py-2 text-sm text-white" {...fade(0.5, 0.9, reduce)}>
                 {t`Here is a summary, with the open items first.`}
-            </motion.div>
+            </m.div>
         </VisualFrame>
     );
 };

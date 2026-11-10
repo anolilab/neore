@@ -5,6 +5,7 @@ import LandingFooter from "../components/landing-footer";
 import Navbar from "../components/navbar-menu";
 import type { UseCase } from "./use-case-data";
 import { USE_CASE_VISUALS } from "./use-case-visuals";
+import { VisualPlayback } from "./visuals/visual-playback";
 
 /** One use-case page: what the job is, the steps the agent takes, the controls, and one animated visual. */
 export const UseCasePage = ({ useCase }: { useCase: UseCase }) => {
@@ -48,7 +49,9 @@ export const UseCasePage = ({ useCase }: { useCase: UseCase }) => {
                     </section>
 
                     <div className="lg:sticky lg:top-28">
-                        <Visual />
+                        <VisualPlayback>
+                            <Visual />
+                        </VisualPlayback>
                     </div>
                 </div>
 
