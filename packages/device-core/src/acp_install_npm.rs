@@ -79,22 +79,29 @@ fn link_stays_inside(root: &Path, link: &Path, target: &Path) -> bool {
     }
 }
 
-fn walk(root: &Path, dir: &Path, hasher: &mut Sha256, entries: &mut usize) -> Result<(), String> {
-    let mut names = fs::read_dir(dir)
-        .map_err(|error| error.to_string())?
-        .map(|entry| entry.map(|entry| entry.file_name()))
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(|error| error.to_string())?;
+fn walk(
+    root: &Path,
+    dir: &Path,
+    hasher: &mut Sha256,
+    entries: &mut usize,
+    limit: usize,
+) -> Result<(), String> {
+    let mut names = Vec::new();
+
+    // Counted while the folder is read: a folder with millions of names is refused before they are all held.
+    for entry in fs::read_dir(dir).map_err(|error| error.to_string())? {
+        *entries += 1;
+
+        if *entries > limit {
+            return Err("the installed folder holds too many entries".into());
+        }
+
+        names.push(entry.map_err(|error| error.to_string())?.file_name());
+    }
 
     names.sort();
 
     for name in names {
-        *entries += 1;
-
-        if *entries > MAX_TREE_ENTRIES {
-            return Err("the installed folder holds too many entries".into());
-        }
-
         let path = dir.join(&name);
         let meta = fs::symlink_metadata(&path).map_err(|error| error.to_string())?;
         let relative_path = path.strip_prefix(root).map_err(|error| error.to_string())?;
@@ -116,7 +123,7 @@ fn walk(root: &Path, dir: &Path, hasher: &mut Sha256, entries: &mut usize) -> Re
             put(hasher, b'L', &[&raw, &raw_bytes(&target)]);
         } else if kind.is_dir() {
             put(hasher, b'D', &[&raw]);
-            walk(root, &path, hasher, entries)?;
+            walk(root, &path, hasher, entries, limit)?;
         } else if kind.is_file() {
             #[cfg(unix)]
             let executable = {
@@ -152,7 +159,7 @@ fn walk(root: &Path, dir: &Path, hasher: &mut Sha256, entries: &mut usize) -> Re
 pub(crate) fn tree_hash(root: &Path) -> Result<String, String> {
     let mut hasher = Sha256::new();
 
-    walk(root, root, &mut hasher, &mut 0)?;
+    walk(root, root, &mut hasher, &mut 0, MAX_TREE_ENTRIES)?;
 
     Ok(to_hex(&hasher.finalize()))
 }
@@ -179,13 +186,22 @@ impl DeviceState {
             ));
         }
 
-        // Node looks for modules in every `node_modules` above the program too. The two such folders inside our
-        // own install root are never made by an install, so one that exists is planted: refuse. Folders above the
-        // app's data folder (the person's home, their projects) are theirs and are not checked; see the consent text.
-        for outside in [
-            self.install_root().join(&agent.key).join("node_modules"),
-            self.install_root().join("node_modules"),
-        ] {
+        // Node looks for modules in every `node_modules` above the program too. Those in the agent's folder, the
+        // install root and the app's data folder are never made by an install, so one that exists is planted:
+        // refuse. Folders above the data folder (the person's home, their projects) are theirs and are not checked;
+        // see the consent text.
+        let data_dir = self.data_dir();
+
+        for outside in
+            self.install_root()
+                .join(&agent.key)
+                .ancestors()
+                .scan(false, |done, folder| {
+                    let last = std::mem::replace(done, folder == data_dir);
+
+                    (!last).then(|| folder.join("node_modules"))
+                })
+        {
             if fs::symlink_metadata(&outside).is_ok() {
                 self.audit(json!({
                     "at": now_ms(), "decision": "refused", "detail": format!("{} {}: unexpected node_modules next to the install", agent.label, pin.version),

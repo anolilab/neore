@@ -558,6 +558,10 @@ impl DeviceState {
                     if removed && changes_program(&name) {
                         drop_path_consents(settings, agent_key.as_deref());
                     }
+
+                    if removed && changes_node(&name) {
+                        drop_tree_pins(settings, agent_key.as_deref());
+                    }
                 }
             }
 

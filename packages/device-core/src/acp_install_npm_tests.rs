@@ -194,6 +194,7 @@ fn a_node_modules_folder_planted_next_to_the_install_refuses_the_start() {
     for planted in [
         dir.join("acp-agents/fixture/node_modules"),
         dir.join("acp-agents/node_modules"),
+        dir.join("node_modules"),
     ] {
         fs::create_dir_all(&planted).unwrap();
 
@@ -395,4 +396,74 @@ fn removing_an_agent_whose_pin_was_cleared_still_deletes_its_folder() {
         !dir.join("acp-agents/fixture").exists(),
         "removal deletes them"
     );
+}
+
+#[test]
+fn a_folder_with_too_many_names_is_refused_before_any_of_them_is_looked_at() {
+    let (_, dir) = state("many-names");
+    let root = dir.join("tree");
+
+    fs::create_dir_all(&root).unwrap();
+    // Sorts first and would fail on its own if it were looked at: the count must come before that.
+    std::os::unix::fs::symlink("/etc/hosts", root.join("a-out")).unwrap();
+
+    for name in ["b", "c", "d", "e"] {
+        fs::write(root.join(name), "x").unwrap();
+    }
+
+    let error = walk(&root, &root, &mut Sha256::new(), &mut 0, 4).unwrap_err();
+
+    assert!(error.contains("too many entries"), "{error}");
+    assert!(walk(&root, &root, &mut Sha256::new(), &mut 0, 5)
+        .unwrap_err()
+        .contains("outside the package"));
+}
+
+#[test]
+fn removing_a_node_variable_drops_the_pin_too() {
+    for scope in [Some("fixture"), None] {
+        let (state, dir) = state(&format!("env-remove-{}", scope.is_some()));
+        let node = fake_node(&dir);
+
+        seed_install(&state, &dir, &node);
+
+        let update = |op: serde_json::Value| {
+            state
+                .acp_update(serde_json::from_value(op).unwrap())
+                .unwrap()
+        };
+
+        update(json!({ "op": "setEnv", "agentKey": scope, "name": "FIXTURE_TOKEN", "value": "x" }));
+        update(
+            json!({ "op": "setEnv", "agentKey": scope, "name": "NODE_PATH", "value": "/tmp/m" }),
+        );
+
+        // Setting it dropped the pin; install a fresh one to see what removing does on its own.
+        state
+            .change_settings(|settings| {
+                settings.acp_agents[0].install = Some(AcpInstall {
+                    index_integrity: Some("sha512-index".into()),
+                    publisher: "Example Inc.".into(),
+                    sha256: "0".repeat(64),
+                    source: "https://registry.npmjs.org/x".into(),
+                    tree_sha256: Some(tree_hash(&installed(&dir)).unwrap()),
+                    version: "1.0.0".into(),
+                });
+
+                Ok(())
+            })
+            .unwrap();
+
+        update(json!({ "op": "removeEnv", "agentKey": scope, "name": "FIXTURE_TOKEN" }));
+        assert!(
+            state.acp_view().agents[0].install.is_some(),
+            "an unrelated variable keeps the pin"
+        );
+
+        update(json!({ "op": "removeEnv", "agentKey": scope, "name": "NODE_PATH" }));
+        assert!(
+            state.acp_view().agents[0].install.is_none(),
+            "removing NODE_PATH drops the pin"
+        );
+    }
 }
