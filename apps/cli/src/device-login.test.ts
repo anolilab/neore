@@ -1,4 +1,4 @@
-import { mkdtemp, rm, stat } from "node:fs/promises";
+import { chmod, mkdtemp, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -20,7 +20,7 @@ const GRANT = {
     verification_uri_complete: "https://app.test/auth/device?user_code=ABCDEFGH",
 };
 
-const oauth = (error: string, status = 400) => Response.json({ error, error_description: "why" }, { status });
+const oauth = (error: string, status = 400, description = "why") => Response.json({ error, error_description: description }, { status });
 
 describe("neore login --device", () => {
     let directory: string;
@@ -39,12 +39,17 @@ describe("neore login --device", () => {
     const setup = (routes: Record<string, Response[]>, options: { clockStepMs?: number } = {}) => {
         const calls: { body: unknown; path: string }[] = [];
         const sleeps: number[] = [];
+        const redirects: (string | undefined)[] = [];
         let clock = 0;
         const stdout: string[] = [];
         const stderr: string[] = [];
 
         const fetchImpl = (async (url: string, init: RequestInit) => {
             const { pathname } = new URL(url);
+
+            if (pathname.startsWith("/api/auth/")) {
+                redirects.push(init.redirect);
+            }
 
             calls.push({ body: typeof init.body === "string" ? JSON.parse(init.body) : undefined, path: pathname });
 
@@ -89,7 +94,7 @@ describe("neore login --device", () => {
             stdinIsTTY: true,
         };
 
-        return { calls, context, sleeps, stderr: () => stderr.join(""), stdout: () => stdout.join("") };
+        return { calls, context, redirects, sleeps, stderr: () => stderr.join(""), stdout: () => stdout.join("") };
     };
 
     const grant = Response.json(GRANT);
@@ -109,11 +114,56 @@ describe("neore login --device", () => {
         expect(api.stderr()).toContain("ABCD-EFGH");
         expect(api.stderr()).not.toContain("dc-secret");
         expect(api.sleeps).toEqual([5000, 5000, 10_000]);
+        expect(api.stderr()).toContain("Signing in to api.test");
+        expect(api.stderr()).not.toContain("previous key");
+        // The code, poll and revoke bodies carry secrets, so none of them may follow a redirect.
+        expect(api.redirects).toEqual(["error", "error", "error", "error"]);
+        expect(api.stdout() + api.stderr()).not.toContain("nk_new");
         expect(await readConfig(configFile)).toEqual({ apiKey: "nk_new", apiUrl: API });
 
         const { mode } = await stat(configFile);
 
         expect(mode & 0o777).toBe(0o600);
+    });
+
+    it("keeps the poll interval when the server has an outage, and clamps a hostile interval and lifetime", async () => {
+        const outage = setup({
+            "/api/auth/device/code": [grant],
+            "/api/auth/device/key": [Response.json({}, { status: 503 }), Response.json({ api_key: "nk_new" })],
+            "/api/v1/me": [me],
+        });
+
+        expect(await run(["login", "--device", "--api-url", API], outage.context)).toBe(EXIT.ok);
+        expect(outage.sleeps).toEqual([5000, 5000]);
+
+        const hostile = setup(
+            {
+                "/api/auth/device/code": [Response.json({ ...GRANT, expires_in: 1e9, interval: 1e9 })],
+                "/api/auth/device/key": [oauth("slow_down"), oauth("authorization_pending")],
+            },
+            { clockStepMs: 600_000 },
+        );
+
+        expect(await run(["login", "--device", "--api-url", API], hostile.context)).toBe(EXIT.error);
+        expect(hostile.stderr()).toContain("expired");
+        expect(hostile.sleeps.length).toBeLessThanOrEqual(7);
+        expect(new Set(hostile.sleeps)).toEqual(new Set([60_000]));
+    });
+
+    it("notes that the previous key is still valid after replacing it", async () => {
+        await writeFile(configFile, JSON.stringify({ apiKey: "nk_old", apiUrl: API }));
+
+        const api = setup({ "/api/auth/device/code": [grant], "/api/auth/device/key": [Response.json({ api_key: "nk_new" })], "/api/v1/me": [me] });
+
+        expect(await run(["login", "--device", "--api-url", API], api.context)).toBe(EXIT.ok);
+        expect(api.stderr()).toContain("previous key is still valid");
+        expect(await readConfig(configFile)).toEqual({ apiKey: "nk_new", apiUrl: API });
+    });
+
+    it("accepts http only for localhost", async () => {
+        const local = setup({ "/api/auth/device/code": [grant], "/api/auth/device/key": [Response.json({ api_key: "nk_new" })], "/api/v1/me": [me] });
+
+        expect(await run(["login", "--device", "--api-url", "http://localhost:8788"], local.context)).toBe(EXIT.ok);
     });
 
     it("ends with the reason when the code is denied or already used", async () => {
@@ -127,6 +177,12 @@ describe("neore login --device", () => {
         expect(await run(["login", "--device", "--api-url", API], used.context)).toBe(EXIT.error);
         expect(used.stderr()).toContain("already used");
         expect(await readConfig(configFile)).toEqual({});
+
+        const hostile = setup({ "/api/auth/device/code": [grant], "/api/auth/device/key": [oauth("access_denied", 403, "no\u{1B}[2Jpe")] });
+
+        expect(await run(["login", "--device", "--api-url", API], hostile.context)).toBe(EXIT.error);
+        expect(hostile.stderr()).toContain("no[2Jpe");
+        expect(hostile.stderr()).not.toContain("\u{1B}");
     });
 
     it("stops when the code's lifetime runs out while waiting", async () => {
@@ -154,6 +210,27 @@ describe("neore login --device", () => {
         expect(api.calls.at(-1)).toEqual({ body: { api_key: "nk_new" }, path: "/api/auth/device/revoke" });
         expect(api.stderr()).toContain("was revoked");
         expect(await readConfig(configFile)).toEqual({});
+    });
+
+    it("revokes the issued key when it cannot be saved, and leaves the old config alone", async () => {
+        await writeFile(configFile, JSON.stringify({ apiKey: "nk_old", apiUrl: API }));
+        await chmod(directory, 0o500);
+
+        try {
+            const api = setup({
+                "/api/auth/device/code": [grant],
+                "/api/auth/device/key": [Response.json({ api_key: "nk_new" })],
+                "/api/auth/device/revoke": [Response.json({ revoked: true })],
+                "/api/v1/me": [me],
+            });
+
+            expect(await run(["login", "--device", "--api-url", API], api.context)).toBe(EXIT.error);
+            expect(api.calls.at(-1)).toEqual({ body: { api_key: "nk_new" }, path: "/api/auth/device/revoke" });
+            expect(api.stderr()).toContain("was revoked");
+            expect(await readConfig(configFile)).toEqual({ apiKey: "nk_old", apiUrl: API });
+        } finally {
+            await chmod(directory, 0o700);
+        }
     });
 
     it("tells the person to revoke the key in Settings when the revoke fails too", async () => {

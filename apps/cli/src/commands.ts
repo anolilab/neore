@@ -405,6 +405,8 @@ const deviceLogin = async (context: Context, apiUrl: string): Promise<string> =>
         ].join("\n"),
     );
 
+    context.io.stderr.write(`Signing in to ${new URL(apiUrl).host}\n`);
+
     return pollForKey(context, apiUrl, code);
 };
 
@@ -430,6 +432,7 @@ export const login = async (context: Context, { flags }: ParsedCommand): Promise
         assertSecureBaseUrl(apiUrl);
     }
 
+    const replaced = existing.apiKey;
     let apiKey = flags.device ? await deviceLogin(context, apiUrl) : flags.key?.trim();
 
     if (!apiKey) {
@@ -462,6 +465,13 @@ export const login = async (context: Context, { flags }: ParsedCommand): Promise
         }
 
         throw error;
+    }
+
+    // Each device sign-in mints a new year-long key, and the server only revokes one issued in the last 30 minutes.
+    const isDevice = Boolean(flags.device);
+
+    if (isDevice && replaced && replaced !== apiKey && existing.apiUrl === apiUrl) {
+        context.io.stderr.write("Your previous key is still valid; revoke it in Settings -> API keys if nothing else uses it.\n");
     }
 
     if (flags.json) {

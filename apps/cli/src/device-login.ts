@@ -30,7 +30,10 @@ const SLOW_DOWN_STEP_MS = 5000;
 /** Consecutive transport, 5xx and 429 answers tolerated while polling. */
 const MAX_CONSECUTIVE_FAILURES = 5;
 
+/** The poll interval stays in 1-60 s and a code is waited on for at most an hour, whatever the server says. */
 const MIN_INTERVAL_MS = 1000;
+const MAX_INTERVAL_MS = 60_000;
+const MAX_LIFETIME_MS = 60 * 60 * 1000;
 
 /** What a flow needs from the outside; injected so tests run without real time or network. */
 export interface DeviceFlowDependencies {
@@ -71,7 +74,8 @@ const readJson = async (response: Response): Promise<Body> => {
     }
 };
 
-const describe = (body: Body): string => (typeof body["error_description"] === "string" ? body["error_description"] : "");
+/** The server's text, written to a terminal: control characters (ESC included) are dropped. */
+const describe = (body: Body): string => (typeof body["error_description"] === "string" ? body["error_description"].replaceAll(/\p{Cc}/gu, "") : "");
 
 const post = async (dependencies: DeviceFlowDependencies, baseUrl: string, path: string, body: unknown): Promise<Response> => {
     try {
@@ -139,8 +143,8 @@ export const requestDeviceCode = async (dependencies: DeviceFlowDependencies, ba
 
     return {
         deviceCode,
-        expiresAtMs: dependencies.now() + expiresIn * 1000,
-        intervalMs: Math.max(MIN_INTERVAL_MS, (interval ?? 5) * 1000),
+        expiresAtMs: dependencies.now() + Math.min(expiresIn * 1000, MAX_LIFETIME_MS),
+        intervalMs: Math.min(MAX_INTERVAL_MS, Math.max(MIN_INTERVAL_MS, (interval ?? 5) * 1000)),
         userCode,
         verificationUri: uri,
         verificationUriComplete: typeof complete === "string" ? complete : uri,
@@ -231,7 +235,7 @@ export const pollForKey = async (dependencies: DeviceFlowDependencies, baseUrl: 
 
             // Only a 429 means "slower"; raising the interval for an outage would slow every later poll.
             if (response.status === 429) {
-                intervalMs += SLOW_DOWN_STEP_MS;
+                intervalMs = Math.min(MAX_INTERVAL_MS, intervalMs + SLOW_DOWN_STEP_MS);
             }
 
             continue;
@@ -246,7 +250,7 @@ export const pollForKey = async (dependencies: DeviceFlowDependencies, baseUrl: 
         }
 
         if (outcome === "slow_down") {
-            intervalMs += SLOW_DOWN_STEP_MS;
+            intervalMs = Math.min(MAX_INTERVAL_MS, intervalMs + SLOW_DOWN_STEP_MS);
         }
     }
 };
