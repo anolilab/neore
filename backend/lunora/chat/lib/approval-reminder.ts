@@ -87,6 +87,8 @@ export const remindPendingApprovals = async (ctx: MutationCtx, now: number): Pro
 
         if (thread && live && actionable !== undefined) {
             const notified = await notifyQuietly(ctx, {
+                // The phone's approve and deny act on this approval, as on the first push (`notifications/phone-delivery.ts`).
+                approvalId: actionable.approvalId,
                 dedupeKey: `tool_approval_reminder:${first.threadId}:${first.createdAt}`,
                 link: `/chat/${first.threadId}`,
                 title: thread.title ?? "Chat",

@@ -771,6 +771,8 @@ export const recordPendingToolApprovals = internalMutation
                 title: thread?.title ?? "Chat",
                 type,
                 userId: ownerId,
+                // The phone's approve and deny act on this approval (`notifications/phone-delivery.ts`).
+                ...(type === "tool_approval" && { approvalId: first }),
             });
         }
 
