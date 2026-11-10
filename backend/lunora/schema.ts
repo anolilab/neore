@@ -3279,6 +3279,8 @@ export const schema = defineSchema({
         approvalId: v.string(),
         config: vToolRunConfig,
         createdAt: v.number(),
+        // When the one reminder push for this pending request went out (`lib/approval-reminder.ts`). Absent until it does.
+        reminderSentAt: v.optional(v.number()),
         resolvedAt: v.optional(v.number()),
         resolvedBy: v.optional(v.string()),
         // Whether the request is a `requestSecret` card (false: a plain approval or a question). Absent on rows written before it

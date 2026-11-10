@@ -1979,6 +1979,7 @@ export interface Doc_toolApprovalRuns {
     approvalId: string;
     config: { autoMediaEnrichment: boolean; contextFromOrder?: number; dispatchOrigin?: "outside_agent" | "trigger" | "messenger"; group?: { baseModel: string; isAnonymous: boolean; organizationId?: string; queue: Array<string>; skillId: string; spokenSkillIds: Array<string>; step?: { role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }; steps?: Array<{ role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }>; turnStartedAt: number }; headlessApproved?: Array<string>; instructions?: string; mcpServerNames: Array<string>; mcpToolFingerprints?: Record<string, string>; memory?: { botId?: string }; model: string; promptMessageId?: string; reasoningEffort?: number; replyKey?: string; researchDepth: "speed" | "balanced" | "thorough"; searchMode: string; shouldAutoContinue: boolean; startedBy?: string; stepsLeft?: number; subAgentRunId?: Id<"subAgentRuns">; toolNames: Array<string>; toolPermissionKeys?: Record<string, string>; untrustedContext?: boolean };
     createdAt: number;
+    reminderSentAt?: number;
     resolvedAt?: number;
     resolvedBy?: string;
     secretRequest?: boolean;
@@ -5086,6 +5087,7 @@ export interface Insert_toolApprovalRuns {
     approvalId: string;
     config: { autoMediaEnrichment: boolean; contextFromOrder?: number; dispatchOrigin?: "outside_agent" | "trigger" | "messenger"; group?: { baseModel: string; isAnonymous: boolean; organizationId?: string; queue: Array<string>; skillId: string; spokenSkillIds: Array<string>; step?: { role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }; steps?: Array<{ role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }>; turnStartedAt: number }; headlessApproved?: Array<string>; instructions?: string; mcpServerNames: Array<string>; mcpToolFingerprints?: Record<string, string>; memory?: { botId?: string }; model: string; promptMessageId?: string; reasoningEffort?: number; replyKey?: string; researchDepth: "speed" | "balanced" | "thorough"; searchMode: string; shouldAutoContinue: boolean; startedBy?: string; stepsLeft?: number; subAgentRunId?: Id<"subAgentRuns">; toolNames: Array<string>; toolPermissionKeys?: Record<string, string>; untrustedContext?: boolean };
     createdAt: number;
+    reminderSentAt?: number;
     resolvedAt?: number;
     resolvedBy?: string;
     secretRequest?: boolean;
