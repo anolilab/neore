@@ -220,7 +220,8 @@ const waitOf = async (ctx: MutationCtx, dependsOn: ReadonlyArray<string>): Promi
         }
     }
 
-    return { owner, slot };
+    // A queued ID already read adds nothing: the chain is unresolved only while an unread ID is left, past the limit.
+    return { owner: owner || queue.some((id) => !seen.has(id)), slot };
 };
 
 /**
