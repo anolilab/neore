@@ -1245,6 +1245,11 @@ export const searchThreadsByTitleAndSummary = query
 // Temporary threads functions
 export const createTemporaryThread = internalMutation
     .input({
+        /**
+         * The organization the chat was started in. A temporary chat is not filed under it (it stays off that organization's
+         * list), so it is kept on the thread for the permission cap alone (`threads.capOrganizationId`).
+         */
+        capOrganizationId: v.optional(v.string().max(MAX_LENGTH.id)),
         expiresAt: v.number(),
         retentionHours: v.optional(v.number()),
         threadId: v.id("threads"),
@@ -1259,7 +1264,7 @@ export const createTemporaryThread = internalMutation
 /** A thread made temporary, in the caller's transaction (`createThreadWithInitialMessage` creates one as temporary). */
 export const insertTemporaryThread = async (
     ctx: MutationContext,
-    args: { expiresAt: number; retentionHours?: number; threadId: Id<"threads"> },
+    args: { capOrganizationId?: string; expiresAt: number; retentionHours?: number; threadId: Id<"threads"> },
 ): Promise<void> => {
     const thread = await ctx.db.get("threads", args.threadId);
 
@@ -1272,7 +1277,7 @@ export const insertTemporaryThread = async (
 
     // Denormalize isTemporary onto thread for efficient filtering
     if (thread) {
-        await ctx.db.patch("threads", args.threadId, { isTemporary: true });
+        await ctx.db.patch("threads", args.threadId, { isTemporary: true, ...(args.capOrganizationId && { capOrganizationId: args.capOrganizationId }) });
     }
 
     // A temporary chat takes no guest posts: a link already given out is withdrawn with its notes, as archiving does.

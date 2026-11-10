@@ -693,6 +693,8 @@ export const vThreadDocFields = {
     awaitingInput: v.optional(v.union(v.literal("approval"), v.literal("question"))),
     // Written once by `chat/functions.ts#createThread`, which checks the bot belongs to the caller.
     botId: v.optional(v.string()),
+    // Written only by `agent/threads.ts#createTemporaryThread`: a temporary chat's organization, for its cap alone.
+    capOrganizationId: v.optional(v.string()),
     contextResetMessageId: v.optional(v.string()),
     createdAt: v.optional(v.number()),
     // Written only by a hard delete's first page (`agent/threads.ts`): the thread is going, so not a create or patch field.

@@ -604,6 +604,8 @@ export const createThread = authMutation
                 const expiresAt = context.now + retentionHoursToUse! * 60 * 60 * 1000;
 
                 await context.runMutation(internal.agent.threads.createTemporaryThread, {
+                    // Not filed under it, but capped by it (`threads.capOrganizationId`).
+                    ...(organizationId && { capOrganizationId: organizationId }),
                     expiresAt,
                     retentionHours: retentionHoursToUse!,
                     threadId: threadId as Id<"threads">,
@@ -714,7 +716,13 @@ export const createThreadWithInitialMessage = internalMutation
                     .unique();
                 const hours = retentionHours ?? storedRetentionHours(userSettings?.temporaryChatRetentionHours);
 
-                await insertTemporaryThread(context, { expiresAt: context.now + hours * 60 * 60 * 1000, retentionHours: hours, threadId });
+                await insertTemporaryThread(context, {
+                    // Not filed under it, but capped by it (`threads.capOrganizationId`).
+                    ...(organizationId && { capOrganizationId: organizationId }),
+                    expiresAt: context.now + hours * 60 * 60 * 1000,
+                    retentionHours: hours,
+                    threadId,
+                });
             }
 
             const messageId = await savePromptInTransaction(context, {

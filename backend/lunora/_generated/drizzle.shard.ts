@@ -1658,6 +1658,7 @@ export const threads = sqliteTable("threads", {
     autoModel: integer("autoModel", { mode: "boolean" }),
     awaitingInput: text("awaitingInput", { mode: "json" }).$type<"approval" | "question">(),
     botId: text("botId").references((): AnySQLiteColumn => bots._id),
+    capOrganizationId: text("capOrganizationId"),
     category: text("category"),
     contextResetMessageId: text("contextResetMessageId"),
     createdAt: real("createdAt"),

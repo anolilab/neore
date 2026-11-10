@@ -16638,6 +16638,9 @@
                               "botId": {
                                 "type": "string"
                               },
+                              "capOrganizationId": {
+                                "type": "string"
+                              },
                               "contextResetMessageId": {
                                 "type": "string"
                               },
@@ -19398,6 +19401,9 @@
                         ]
                       },
                       "botId": {
+                        "type": "string"
+                      },
+                      "capOrganizationId": {
                         "type": "string"
                       },
                       "contextResetMessageId": {

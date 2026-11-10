@@ -1930,6 +1930,7 @@ export interface Doc_threads {
     autoModel?: boolean;
     awaitingInput?: "approval" | "question";
     botId?: Id<"bots">;
+    capOrganizationId?: string;
     category?: string;
     contextResetMessageId?: string;
     createdAt?: number;
@@ -5146,6 +5147,7 @@ export interface Insert_threads {
     autoModel?: boolean;
     awaitingInput?: "approval" | "question";
     botId?: Id<"bots">;
+    capOrganizationId?: string;
     category?: string;
     contextResetMessageId?: string;
     createdAt?: number;

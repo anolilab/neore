@@ -3166,6 +3166,11 @@ export const schema = defineSchema({
         // The bot this chat was started with. Set once at creation; its
         // instructions are read live on each run (`chat/lib/agent-run.ts`).
         botId: v.optional(v.id("bots")),
+        // The organization a temporary chat was started in, kept for its permission cap only
+        // (`chat/lib/run-permission-cap.ts`). A temporary chat is never filed under `organizationId`, so it stays off that
+        // organization's list, but a later turn sent from another space must not lift the cap it started under.
+        // Written only by `agent/threads.ts#createTemporaryThread`.
+        capOrganizationId: v.optional(v.string()),
         category: v.optional(v.string()),
         // The newest context reset on the ACTIVE path, kept by `syncActiveAgent` and the clear writers so a reply reads it in
         // one lookup (`agent/context-reset.ts#resetForTip`). "" = none on the path; unset = not known (walk the path).
