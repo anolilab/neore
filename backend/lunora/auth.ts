@@ -677,14 +677,9 @@ export const buildAuth = (env: AuthEnv): ReturnType<typeof createAuth> => {
 
     cached = createAuth({
         ...buildAuthOptions({
-            // A machine that pairs itself by code is registered on its owner's shard.
-            hostPairing: {
-                precheck: async (userId, codeId) => {
-                    await shard.call(internal.devices.internal.checkHeadlessPairing, { codeId, userId }, { shardKey: userId });
-                },
-                register: async ({ codeId, name, platform, userId }) =>
-                    await shard.call(internal.devices.internal.registerHeadlessDevice, { codeId, name, platform, userId }, { shardKey: userId }),
-            },
+            // `hostPairing` is deliberately NOT wired here: the approval page words every code as a read-only CLI
+            // sign-in, so a machine code would be consent-phishing. Wire `checkHeadlessPairing` and
+            // `registerHeadlessDevice` (on the account's shard) once the page shows machine-specific consent.
             // Queued, not run here: moving a guest's rows takes a round trip per
             // table and page, too long to hold the sign-up request. The job runs
             // on the NEW user's shard (`lib/account-merge.ts#runGuestMerge`). A

@@ -119,7 +119,10 @@ export interface HostPairingOptions {
 }
 
 export interface CliDeviceAuthOptions {
-    /** Enables `client_id: "neore-host"` codes and `POST /device/host`. Without it a host code is refused at issue. */
+    /**
+     * Enables `client_id: "neore-host"` codes and `POST /device/host`. Without it a host code is refused at issue and
+     * the route does not exist. Production leaves it off until the approval page shows machine-specific consent.
+     */
     hostPairing?: HostPairingOptions;
     /** Mints a read-only public-API key for `userId`. Called once per redeemed code. */
     mintApiKey: (input: { expiresInSeconds: number; name: string; userId: string }) => Promise<MintedCliKey>;
