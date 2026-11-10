@@ -191,13 +191,13 @@ const keyBodySchema = z.object({
 /** Best effort: if the row cannot be restored, the person starts a new code. */
 const restoreClaimedCode = async (
     adapter: { create: (input: { data: Record<string, unknown>; forceAllowId?: boolean; model: string }) => Promise<unknown> },
-    claimed: object,
+    claimed: { id?: unknown; userId?: unknown },
     cause: unknown,
 ): Promise<void> => {
     try {
         await adapter.create({ data: { ...claimed }, forceAllowId: true, model: "deviceCode" });
     } catch (error) {
-        authLogger.error("[auth] could not restore a device code after a failed key count", { cause, error });
+        authLogger.error("[auth] could not restore a device code after a failed key count", { cause, deviceCodeId: claimed.id, error, userId: claimed.userId });
     }
 };
 
