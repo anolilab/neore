@@ -33515,7 +33515,7 @@ msgstr "Demasiadas filas para previsualizar · Haz clic para descargar"
 msgid "Too many wrong attempts. Try again in {0} min."
 msgstr "Demasiados intentos fallidos. Inténtalo de nuevo en {0} min."
 
-#: ../../packages/chat-ui/src/chat/mcp-app-view.tsx:105
+#: ../../packages/chat-ui/src/chat/mcp-app-view.tsx:101
 msgid "Tool call failed"
 msgstr "La llamada a la herramienta falló"
 

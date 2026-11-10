@@ -33515,7 +33515,7 @@ msgstr "行数が多すぎてプレビューできません · クリックし�
 msgid "Too many wrong attempts. Try again in {0} min."
 msgstr "間違いが多すぎます。{0} 分後にもう一度お試しください。"
 
-#: ../../packages/chat-ui/src/chat/mcp-app-view.tsx:105
+#: ../../packages/chat-ui/src/chat/mcp-app-view.tsx:101
 msgid "Tool call failed"
 msgstr "ツールの呼び出しに失敗しました"
 

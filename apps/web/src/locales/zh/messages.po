@@ -33515,7 +33515,7 @@ msgstr "行数过多，无法预览 · 点击下载"
 msgid "Too many wrong attempts. Try again in {0} min."
 msgstr "错误尝试次数过多。请在 {0} 分钟后重试。"
 
-#: ../../packages/chat-ui/src/chat/mcp-app-view.tsx:105
+#: ../../packages/chat-ui/src/chat/mcp-app-view.tsx:101
 msgid "Tool call failed"
 msgstr "工具调用失败"
 

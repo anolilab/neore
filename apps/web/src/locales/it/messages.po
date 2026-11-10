@@ -33515,7 +33515,7 @@ msgstr "Troppe righe per l’anteprima · Clic per scaricare"
 msgid "Too many wrong attempts. Try again in {0} min."
 msgstr "Troppi tentativi errati. Riprova tra {0} min."
 
-#: ../../packages/chat-ui/src/chat/mcp-app-view.tsx:105
+#: ../../packages/chat-ui/src/chat/mcp-app-view.tsx:101
 msgid "Tool call failed"
 msgstr "Chiamata allo strumento non riuscita"
 

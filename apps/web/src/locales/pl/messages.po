@@ -33515,7 +33515,7 @@ msgstr "Zbyt wiele wierszy do podglądu · Kliknij, aby pobrać"
 msgid "Too many wrong attempts. Try again in {0} min."
 msgstr "Zbyt wiele błędnych prób. Spróbuj ponownie za {0} min."
 
-#: ../../packages/chat-ui/src/chat/mcp-app-view.tsx:105
+#: ../../packages/chat-ui/src/chat/mcp-app-view.tsx:101
 msgid "Tool call failed"
 msgstr "Wywołanie narzędzia nie powiodło się"
 
