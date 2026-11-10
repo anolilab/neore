@@ -4,32 +4,10 @@ use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 use crate::acp::EnvVars;
+use crate::acp_install::commit_tests::Scratch;
 
 const PACKAGE: &str = "fixture-agent";
 const PROGRAM: &str = "console.log('hello');\n";
-
-/// A scratch folder that is removed when it goes out of scope, whether the test passed or not.
-struct Scratch(PathBuf);
-
-impl std::ops::Deref for Scratch {
-    type Target = Path;
-
-    fn deref(&self) -> &Path {
-        &self.0
-    }
-}
-
-impl AsRef<Path> for Scratch {
-    fn as_ref(&self) -> &Path {
-        &self.0
-    }
-}
-
-impl Drop for Scratch {
-    fn drop(&mut self) {
-        let _ = fs::remove_dir_all(&self.0);
-    }
-}
 
 /// The state over a fresh folder under the system temp folder.
 fn state(name: &str) -> (DeviceState, Scratch) {
