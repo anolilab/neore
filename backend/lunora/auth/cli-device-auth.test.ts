@@ -454,6 +454,86 @@ describe("device-code sign-in for the CLI", () => {
         expect(await errorOf(poll(harness, code.device_code))).toBe("invalid_grant");
     });
 
+    /** A harness whose key-count right after the mint fails once, and whose key delete fails when `deleteFails`. */
+    const buildWithFailingCount = (deleteFails: boolean) => {
+        const holder: { harness?: Harness } = {};
+        let isArmed = true;
+        const harness = build(async (input) => {
+            const live = holder.harness as Harness;
+            const context = await live.auth.$context;
+
+            if (isArmed) {
+                isArmed = false;
+
+                const count = context.adapter.count.bind(context.adapter);
+                const remove = context.adapter.delete.bind(context.adapter);
+
+                context.adapter.count = (async () => {
+                    context.adapter.count = count;
+
+                    throw new Error("adapter unavailable");
+                }) as typeof context.adapter.count;
+
+                if (deleteFails) {
+                    context.adapter.delete = (async () => {
+                        context.adapter.delete = remove;
+
+                        throw new Error("delete unavailable");
+                    }) as typeof context.adapter.delete;
+                }
+            }
+
+            return await (live.auth.api as unknown as ApiKeyAuthApi).createApiKey({
+                body: {
+                    expiresIn: input.expiresInSeconds,
+                    name: input.name,
+                    permissions: DEFAULT_API_SCOPES as Record<string, string[]>,
+                    userId: input.userId,
+                },
+            });
+        });
+
+        holder.harness = harness;
+
+        return harness;
+    };
+
+    it("withdraws the minted key and gives the code back when the count after the mint fails", async () => {
+        const harness = buildWithFailingCount(false);
+        const person = await signUp(harness);
+        const code = await requestCode(harness);
+
+        await approve(harness, person.cookie, code.user_code);
+        later();
+
+        expect(await statusOf(poll(harness, code.device_code))).toBeGreaterThanOrEqual(500);
+        expect(await rowsOf(harness, "apikey")).toHaveLength(0);
+        expect(await rowsOf(harness, "deviceCode")).toHaveLength(1);
+        later();
+
+        const retried = await poll(harness, code.device_code);
+
+        expect(retried.response.status).toBe(200);
+        expect(await rowsOf(harness, "apikey")).toHaveLength(1);
+        expect(await rowsOf(harness, "deviceCode")).toHaveLength(0);
+    });
+
+    it("keeps the code spent when the minted key cannot be withdrawn, so a second live key is never minted", async () => {
+        const harness = buildWithFailingCount(true);
+        const person = await signUp(harness);
+        const code = await requestCode(harness);
+
+        await approve(harness, person.cookie, code.user_code);
+        later();
+
+        expect(await statusOf(poll(harness, code.device_code))).toBeGreaterThanOrEqual(500);
+        expect(await rowsOf(harness, "apikey")).toHaveLength(1);
+        expect(await rowsOf(harness, "deviceCode")).toHaveLength(0);
+        later();
+        expect(await errorOf(poll(harness, code.device_code))).toBe("invalid_grant");
+        expect(await rowsOf(harness, "apikey")).toHaveLength(1);
+    });
+
     it("refuses to open, approve or deny a code from an impersonated session", async () => {
         const harness = build();
         const person = await signUp(harness);
