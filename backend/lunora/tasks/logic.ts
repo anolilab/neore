@@ -593,6 +593,9 @@ export const STUCK_CHECK_STATUSES = ["blocked", "failed"] as const;
 /** How long a stuck-check waits when the owner must decide first, before it looks again. */
 export const STUCK_OWNER_RECHECK_MS = DAY_MS;
 
+/** How long a notice that failed to write waits before it is sent again. */
+export const STUCK_RETRY_MS = 60 * 60_000;
+
 /** The first stuck check of an episode: the first notice level after `at`, the moment the task last moved. */
 export const firstStuckCheckAt = (at: number): number => at + STUCK_NOTICE_DAYS[0] * DAY_MS;
 

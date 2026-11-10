@@ -853,6 +853,14 @@ describe("stuck blocked tasks", () => {
         return rows.filter((row) => row.type === "task_stuck");
     };
 
+    /** The stored body of each stuck notice: `inbox()` drops the body, so the privacy check reads it here. */
+    const stuckNoticeBodies = async (): Promise<unknown[]> =>
+        await harness.run(async (ctx: any) => {
+            const rows = await ctx.db.query("notifications").collect();
+
+            return rows.filter((row: any) => row.type === "task_stuck").map((row: any) => row.body);
+        });
+
     const sweepAt = async (at: number): Promise<void> => {
         vi.setSystemTime(at);
         await runInternal(checkDueTasks, {});
@@ -869,6 +877,7 @@ describe("stuck blocked tasks", () => {
         await sweepAt(T0 + 3 * DAY);
 
         expect(await stuckNotices()).toStrictEqual([{ outcome: undefined, title: "Waiting", type: "task_stuck" }]);
+        expect(await stuckNoticeBodies()).toStrictEqual([undefined]);
         const task = await getTask(taskId);
 
         expect(task.stuckNotice).toStrictEqual({ days: 2, since: T0 });
@@ -876,6 +885,38 @@ describe("stuck blocked tasks", () => {
         // The notice is not progress: the idle clock keeps running from the last real change.
         expect(task.updatedAt).toBe(T0);
         expect(task.status).toBe("blocked");
+    });
+
+    it("finds a due task behind more rows than one sweep reads, when those rows have no check armed", async () => {
+        for (let index = 0; index < 30; index += 1) {
+            await insertTask({ dependsOn: ["missing"], status: "blocked", title: `Idle ${index}`, updatedAt: T0 });
+        }
+
+        await insertTask({ dependsOn: ["missing"], status: "blocked", stuckCheckAt: T0 + 2 * DAY, title: "Due", updatedAt: T0 });
+
+        await sweepAt(T0 + 2 * DAY);
+
+        expect(await stuckNotices()).toStrictEqual([{ outcome: undefined, title: "Due", type: "task_stuck" }]);
+    });
+
+    it("leaves a failed recurring task to its next slot, and checks it again after that slot", async () => {
+        const taskId = await insertTask({
+            lastError: "boom",
+            nextRunAt: T0 + 5 * DAY,
+            recurring: true,
+            status: "failed",
+            stuckCheckAt: T0 + 2 * DAY,
+            title: "Weekly",
+            updatedAt: T0,
+        });
+
+        await sweepAt(T0 + 2 * DAY);
+
+        expect(await stuckNotices()).toStrictEqual([]);
+
+        const task = await getTask(taskId);
+
+        expect(task.stuckCheckAt).toBe(T0 + 6 * DAY);
     });
 
     it("asks once more at 7 idle days, and not again within that episode", async () => {

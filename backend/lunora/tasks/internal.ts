@@ -27,7 +27,8 @@ import type { MutationCtx, QueryCtx } from "../_generated/server";
 import { internalMutation, internalQuery } from "../_generated/server";
 import { isAccountDeletionUnderway } from "../gdpr/deletion-guard";
 import { enqueueJob } from "../lib/job-queue";
-import { notifyQuietly } from "../notifications/notify";
+import { notify, notifyQuietly } from "../notifications/notify";
+import { noteShardDue } from "../lib/shard-housekeeping";
 import { patchById, withoutUndefined } from "../lib/patch";
 import type { SkillContext } from "../skills/executor";
 import { prepareSkillInvocation } from "../skills/executor";
@@ -55,6 +56,7 @@ import {
     nextStuckCheckAt,
     STUCK_CHECK_STATUSES,
     STUCK_OWNER_RECHECK_MS,
+    STUCK_RETRY_MS,
     stuckNoticeDue,
     waitsOnOwnerDecision,
 } from "./logic";
@@ -134,6 +136,7 @@ export const startTask = async (
             stuckCheckAt: firstStuckCheckAt(now),
             updatedAt: now,
         });
+        await noteShardDue(ctx, firstStuckCheckAt(now), task.userId);
 
         return "blocked";
     }
@@ -158,6 +161,7 @@ export const promoteDependents = async (ctx: MutationCtx, completed: Doc<"tasks"
         } else if (task.status === "blocked" && task.dependsOn.includes(completed._id)) {
             // Still waiting on another dependency, but this one moved: progress, so the stuck clock restarts.
             await patchById(ctx.db, "tasks", task._id, { stuckCheckAt: firstStuckCheckAt(now), updatedAt: now });
+            await noteShardDue(ctx, firstStuckCheckAt(now), task.userId);
         }
     }
 };
@@ -170,49 +174,82 @@ export const promoteDependents = async (ctx: MutationCtx, completed: Doc<"tasks"
  */
 const escalateStuckTasks = async (ctx: MutationCtx, now: number): Promise<void> => {
     const statusesByUser = new Map<string, Map<string, TaskStatus>>();
+    // Read only for a blocked task: a failed one needs no dependency check, and loading every owner's tasks for it is wasted.
+    const statusesOf = async (userId: string): Promise<Map<string, TaskStatus>> => {
+        const cached = statusesByUser.get(userId);
+
+        if (cached) {
+            return cached;
+        }
+
+        const statusById = statusMap(await loadUserTasks(ctx, userId));
+
+        statusesByUser.set(userId, statusById);
+
+        return statusById;
+    };
 
     for (const status of STUCK_CHECK_STATUSES) {
+        // `gt(0)` leaves out a row with no check armed: an unset `stuckCheckAt` sorts first, and would fill the batch.
         const due = await ctx.db
             .query("tasks")
-            .withIndex("by_status_and_stuckCheckAt", (q) => q.eq("status", status).lte("stuckCheckAt", now))
+            .withIndex("by_status_and_stuckCheckAt", (q) => q.eq("status", status).gt("stuckCheckAt", 0).lte("stuckCheckAt", now))
             .take(SWEEP_BATCH);
 
         for (const task of due) {
-            let statusById = statusesByUser.get(task.userId);
+            // A failed recurring task runs again at its next slot, so the owner has nothing to decide yet: look after that slot.
+            if (task.status === "failed" && task.recurring && task.nextRunAt !== undefined) {
+                await recheckStuckTask(ctx, task, Math.max(task.nextRunAt, now) + STUCK_OWNER_RECHECK_MS);
 
-            if (!statusById) {
-                statusById = statusMap(await loadUserTasks(ctx, task.userId));
-                statusesByUser.set(task.userId, statusById);
+                continue;
             }
 
-            if (task.status === "blocked" && waitsOnOwnerDecision(task.dependsOn, statusById)) {
-                await patchById(ctx.db, "tasks", task._id, { stuckCheckAt: now + STUCK_OWNER_RECHECK_MS });
+            if (task.status === "blocked" && waitsOnOwnerDecision(task.dependsOn, await statusesOf(task.userId))) {
+                await recheckStuckTask(ctx, task, now + STUCK_OWNER_RECHECK_MS);
 
                 continue;
             }
 
             const days = stuckNoticeDue(task, now);
 
+            if (days !== undefined) {
+                // The notice is written before its level is recorded, so a write that fails is sent again, not lost.
+                try {
+                    // The subject only: the notice names the task and carries no instructions, errors or results, so the
+                    // lock screen shows nothing more than the title (`notifications/AGENTS.md`).
+                    await notify(ctx, {
+                        dedupeKey: `task-stuck:${task._id}:${task.updatedAt}:${days}`,
+                        link: "/tasks",
+                        title: task.title,
+                        type: "task_stuck",
+                        userId: task.userId,
+                    });
+                } catch (error) {
+                    console.warn("[tasks] Failed to write a stuck-task notice; it is retried:", error);
+                    await recheckStuckTask(ctx, task, now + STUCK_RETRY_MS);
+
+                    continue;
+                }
+            }
+
+            const next = nextStuckCheckAt(task, days, now);
+
             await patchById(ctx.db, "tasks", task._id, {
-                stuckCheckAt: nextStuckCheckAt(task, days, now),
+                stuckCheckAt: next,
                 ...(days !== undefined && { stuckNotice: { days, since: task.updatedAt } }),
             });
 
-            if (days === undefined) {
-                continue;
+            if (next !== undefined) {
+                await noteShardDue(ctx, next, task.userId);
             }
-
-            // The subject only: the notice names the task and carries no instructions, errors or results, so the lock screen
-            // shows nothing more than the title (`notifications/AGENTS.md`).
-            await notifyQuietly(ctx, {
-                dedupeKey: `task-stuck:${task._id}:${task.updatedAt}:${days}`,
-                link: "/tasks",
-                title: task.title,
-                type: "task_stuck",
-                userId: task.userId,
-            });
         }
     }
+};
+
+/** Sets when the sweep next looks at a stuck task, and arms its shard for that moment. */
+const recheckStuckTask = async (ctx: MutationCtx, task: Doc<"tasks">, at: number): Promise<void> => {
+    await patchById(ctx.db, "tasks", task._id, { stuckCheckAt: at });
+    await noteShardDue(ctx, at, task.userId);
 };
 
 const summarise = (answer: string | undefined): string | undefined => {
@@ -246,6 +283,7 @@ const failedTaskPatch = (lastError: string, now: number) => {
 /** Ends a cycle before its round runs, with `lastError` saying why. No `taskRuns` row: nothing ran. */
 const refuseRound = async (ctx: MutationCtx, task: Doc<"tasks">, lastError: string): Promise<void> => {
     await patchById(ctx.db, "tasks", task._id, failedTaskPatch(lastError, Date.now()));
+    await noteShardDue(ctx, firstStuckCheckAt(Date.now()), task.userId);
 };
 
 const vClaim = v.union(
@@ -618,6 +656,7 @@ export const completeRound = internalMutation
 
             await ctx.db.patch("taskRuns", run._id, { ...runResult, error, status: "error" });
             await patchById(ctx.db, "tasks", task._id, { ...failedTaskPatch(error, now), lastRunThreadId });
+            await noteShardDue(ctx, firstStuckCheckAt(now), task.userId);
             await notifyTaskRound(ctx, task, run, "failure", error, args.threadId ?? run.threadId);
 
             return "failed";
@@ -781,6 +820,7 @@ export const checkDueTasks = internalMutation
             }
 
             await patchById(ctx.db, "tasks", task._id, failedTaskPatch(message, now));
+            await noteShardDue(ctx, firstStuckCheckAt(now), task.userId);
             // The inbox keeps the trace: a recurring task's catch-up may start in this same sweep, which clears
             // `lastError`, and a round that never started has no run row to show it.
             await notifyQuietly(ctx, {

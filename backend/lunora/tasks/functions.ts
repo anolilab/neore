@@ -607,6 +607,7 @@ export const deleteGoal = authMutation
         const { now } = ctx;
 
         await Promise.all(tasks.map((task) => patchRow(ctx.db, "tasks", task, { goalId: undefined, stuckCheckAt: firstStuckCheckAt(now), updatedAt: now })));
+        await noteShardDue(ctx, firstStuckCheckAt(now), userId);
         await ctx.db.delete("goals", args.goalId);
 
         ctx.log.event("tasks.delete_goal", { detachedTaskCount: tasks.length, goalId: args.goalId });
@@ -790,6 +791,7 @@ export const deleteTask = authMutation
             }
 
             await patchRow(ctx.db, "tasks", other, { ...patch, stuckCheckAt: firstStuckCheckAt(now), updatedAt: now });
+            await noteShardDue(ctx, firstStuckCheckAt(now), other.userId);
 
             if (patch.dependsOn && other.status === "blocked" && areDependenciesDone(patch.dependsOn, statusById)) {
                 await queueCycle(ctx, other, "dependency", now);
@@ -894,6 +896,7 @@ export const reviewTask = authMutation
                 stuckCheckAt: firstStuckCheckAt(now),
                 updatedAt: now,
             });
+            await noteShardDue(ctx, firstStuckCheckAt(now), task.userId);
 
             ctx.log.event("tasks.review_task", { decision: args.decision, taskId: task._id });
 
