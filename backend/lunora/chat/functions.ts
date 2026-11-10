@@ -1256,6 +1256,7 @@ export const getThreadsWithTemporaryFilter = internalQuery
                     multiChat: v.optional(v.boolean()),
                     order: v.optional(v.number()),
                     organizationId: v.optional(v.string()),
+                    permissionMode: v.optional(v.union(v.literal("supervised"), v.literal("auto"), v.literal("full"))),
                     pinnedAt: v.optional(v.number()),
                     projectId: v.optional(v.string()),
                     publicAccessToken: v.optional(v.string()),
@@ -2859,6 +2860,7 @@ export const getPinnedThreads = authQuery
                 lockedAt: v.optional(v.number()),
                 model: v.optional(v.string()),
                 order: v.optional(v.number()),
+                permissionMode: v.optional(v.union(v.literal("supervised"), v.literal("auto"), v.literal("full"))),
                 pinnedAt: v.optional(v.number()),
                 projectId: v.optional(v.string()),
                 publicAccessToken: v.optional(v.string()),
@@ -2936,6 +2938,7 @@ export const getThreadOrders = authQuery
                 isPublic: v.optional(v.boolean()),
                 model: v.optional(v.string()),
                 order: v.optional(v.number()),
+                permissionMode: v.optional(v.union(v.literal("supervised"), v.literal("auto"), v.literal("full"))),
                 pinnedAt: v.optional(v.number()),
                 projectId: v.optional(v.string()),
                 publicAccessToken: v.optional(v.string()),
@@ -3561,6 +3564,22 @@ export const branchThread = authAction
             userId,
         });
         const newThreadId: string = newThread._id;
+
+        // A branch keeps the mode its source thread STORES (never one inferred from a comparison parent): a stricter mode must not
+        // drop to the defaults. Only the owner branches, so the owner's `full` stays the owner's.
+        try {
+            if (parentThread.permissionMode) {
+                await context.runMutation(internal.chat.thread_state.copyThreadPermissionMode, {
+                    mode: parentThread.permissionMode,
+                    threadId: newThreadId,
+                });
+            }
+        } catch (error) {
+            // Nothing has been copied into the branch yet: without this it would stay as an empty chat the user never asked for.
+            await context.runMutation(internal.agent.threads.deleteAllForThreadIdAsync, { threadId: newThreadId as Id<"threads"> });
+
+            throw error;
+        }
 
         // A fork of a bot chat stays that bot's chat: its runs need the bot's persona and scoped memory.
         if (branchName || parentThread.botId) {
