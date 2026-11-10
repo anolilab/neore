@@ -473,8 +473,9 @@ export const runChatStart = async (
         return Response.json({ error: "Invalid pageContext" }, { status: 400 });
     }
 
-    // A held note is a send of its own: never a regeneration, which would answer some other prompt.
-    if (body.guestMessageId !== undefined && (!isValidDocumentIdFormat(body.guestMessageId) || body.regenerate)) {
+    // A held note is a send of its own: never a regeneration, which would answer some other prompt, nor a goal, whose rounds
+    // would carry the guest's words as the owner's.
+    if (body.guestMessageId !== undefined && (!isValidDocumentIdFormat(body.guestMessageId) || body.regenerate || body.goal !== undefined)) {
         return Response.json({ error: "Invalid guestMessageId" }, { status: 400 });
     }
 
@@ -584,8 +585,13 @@ const runChatStartOnShard = async (
                   userId,
               });
 
-    if (guestNote === null || (guestNote && (guestNote.threadId !== validThreadId || contentType !== "text" || unsendableGuestText(guestNote.text)))) {
-        return Response.json({ error: "That guest note cannot be sent in this chat." }, { status: 400 });
+    if (guestNote === null || (guestNote && (guestNote.threadId !== validThreadId || unsendableGuestText(guestNote.text)))) {
+        return Response.json({ error: "GUEST_NOTE_NOT_SENDABLE", message: "That guest note cannot be sent in this chat." }, { status: 400 });
+    }
+
+    // The chat's model makes images or video: the note can still go once a text model is picked, so this refusal is its own.
+    if (guestNote && contentType !== "text") {
+        return Response.json({ error: "GUEST_NOTE_NEEDS_TEXT_MODEL", message: "Switch to a text model to send this message." }, { status: 400 });
     }
 
     // Build message content
@@ -817,7 +823,7 @@ const runChatStartOnShard = async (
         : undefined;
 
     if (guestSend === null) {
-        return Response.json({ error: "That guest note was already sent." }, { status: 409 });
+        return Response.json({ error: "GUEST_NOTE_ALREADY_SENT", message: "That guest note was already sent." }, { status: 409 });
     }
 
     // Never throws: a failed release must not hide why the send failed. The lease settles the send later.

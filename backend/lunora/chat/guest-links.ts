@@ -146,19 +146,21 @@ export const createGuestLink = authMutation
         // As the withdrawal paths: an archived, trashed, temporary or locked thread holds no link. A locked one must not
         // either way, since changing its passcode re-stamps `lockedAt` without withdrawing links.
         if (thread.deleted === true || thread.isTemporary === true || thread.status === "archived" || isThreadLocked(thread)) {
-            throw new LunoraError("BAD_REQUEST", "This chat cannot be given a guest link.");
+            throw new LunoraError("BAD_REQUEST", "This chat cannot be given a guest link.", { data: { code: "GUEST_LINK_NOT_ALLOWED" } });
         }
 
         refuseHostThread(thread, "given a guest link");
 
         // A worker's conversation takes turns only through a dispatch, so a note left in it could never be sent.
         if (await isWorkerThread(context, threadId)) {
-            throw new LunoraError("BAD_REQUEST", "A worker's conversation cannot be given a guest link.");
+            throw new LunoraError("BAD_REQUEST", "A worker's conversation cannot be given a guest link.", { data: { code: "GUEST_LINK_NOT_ALLOWED" } });
         }
 
         // A new link replaces the old one and everything on it, so notes still waiting are not dropped silently.
         if (discardWaiting !== true && (await hasWaitingNotes(context, threadId))) {
-            throw new LunoraError("BAD_REQUEST", "Deal with the waiting guest messages first, or discard them to make a new link.");
+            throw new LunoraError("BAD_REQUEST", "Deal with the waiting guest messages first, or discard them to make a new link.", {
+                data: { code: "GUEST_NOTES_WAITING" },
+            });
         }
 
         // A few batches cover any thread a guest can fill (a link holds at most `GUEST_MAX_ROWS_PER_LINK` notes). Past that the
@@ -242,7 +244,7 @@ const reviewableNote = async (context: Pick<QueryCtx, "db" | "now">, messageId: 
     const row = await context.db.get("threadGuestMessages", messageId);
 
     if (!row || row.userId !== userId) {
-        throw new LunoraError("NOT_FOUND", "That message is no longer waiting.");
+        throw new LunoraError("NOT_FOUND", "That message is no longer waiting.", { data: { code: "GUEST_NOTE_GONE" } });
     }
 
     await requireOwnedThread(context, row.threadId, userId, unlockProof);
@@ -250,7 +252,7 @@ const reviewableNote = async (context: Pick<QueryCtx, "db" | "now">, messageId: 
     const link = await context.db.get("threadGuestLinks", row.linkId);
 
     if (!link || link.expiresAt <= context.now) {
-        throw new LunoraError("NOT_FOUND", "That guest link has ended.");
+        throw new LunoraError("NOT_FOUND", "That guest link has ended.", { data: { code: "GUEST_LINK_ENDED" } });
     }
 
     return row;
@@ -341,7 +343,7 @@ const reviewedAfterSettle = async (context: MutationCtx, userId: string, message
     const row = (await context.db.get("threadGuestMessages", messageId))!;
 
     if (row.status === "held" && (await sendUnderWay(context, messageId))) {
-        throw new LunoraError("BAD_REQUEST", "That message is being sent.");
+        throw new LunoraError("BAD_REQUEST", "That message is being sent.", { data: { code: "GUEST_NOTE_BEING_SENT" } });
     }
 
     return row;

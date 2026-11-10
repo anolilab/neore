@@ -71,6 +71,7 @@ const NOT_ACTIVE = /not active/u;
 const NO_LONGER_WAITING = /no longer waiting/u;
 const LOCKED = /chat is locked/u;
 const BEING_SENT = /being sent/u;
+const REFUSED_LINK_CODE = /^(GUEST_LINK_NOT_ALLOWED|THREAD_LOCKED)$/u;
 const REUSED_REQUEST = /already used for a different message/u;
 const LIMITED = /Too many messages on this link/u;
 const MINTED_TOKEN = /^[0-9a-f]{64}$/u;
@@ -177,7 +178,8 @@ describe("creating a link", () => {
     ])("is refused on a %s thread", async (_label, patch) => {
         await harness.run(async (ctx: any) => await ctx.db.patch("threads", threadId, patch));
 
-        await expect(createLink()).rejects.toBeDefined();
+        // A code of its own (a locked chat answers with the lock's), so the owner's panel says why in the app's words.
+        await expect(createLink()).rejects.toMatchObject({ data: { code: expect.stringMatching(REFUSED_LINK_CODE) } });
         expect(await rows("threadGuestLinks")).toHaveLength(0);
     });
 
@@ -185,7 +187,7 @@ describe("creating a link", () => {
         const { linkToken } = await createLink();
 
         await hold(linkToken, "waiting");
-        await expect(createLink()).rejects.toBeDefined();
+        await expect(createLink()).rejects.toMatchObject({ data: { code: "GUEST_NOTES_WAITING" } });
         const { linkToken: newToken } = (await asOwner().mutation(guestLinks.createGuestLink as never, { discardWaiting: true, threadId } as never)) as {
             linkToken: string;
         };
@@ -365,6 +367,7 @@ describe("reviewing a held note", () => {
             async (ctx: any) => await ctx.db.insert("threadAccess", { grantedAt: 0, grantedBy: OWNER, permission: "admin", threadId, userId: "user-admin" }),
         );
         await expect(review(name, "user-stranger")(messageId)).rejects.toThrow(NO_LONGER_WAITING);
+        await expect(review(name, "user-stranger")(messageId)).rejects.toMatchObject({ data: { code: "GUEST_NOTE_GONE" } });
         await expect(review(name, "user-admin")(messageId)).rejects.toThrow(NO_LONGER_WAITING);
         await harness.run(async (ctx: any) => await ctx.db.patch("threads", threadId, { lockedAt: NOW }));
         await expect(review(name)(messageId)).rejects.toThrow(LOCKED);
@@ -392,6 +395,7 @@ describe("reviewing a held note", () => {
 
         await takeSend(messageId);
         await expect(review("sendHeldGuestMessage")(messageId)).rejects.toThrow(BEING_SENT);
+        await expect(review("sendHeldGuestMessage")(messageId)).rejects.toMatchObject({ data: { code: "GUEST_NOTE_BEING_SENT" } });
 
         vi.setSystemTime(NOW + GUEST_SEND_LEASE_MS + 1);
 

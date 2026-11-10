@@ -137,8 +137,10 @@ const HANDLERS: Record<string, (args: any) => Promise<unknown>> = {
     "chat_streaming:createStreamWithMessage": async () => "stream-1",
 };
 
-const fakeContext = (): any => {
-    const call = async (reference: { __lunoraRef: string }, args: unknown) => await (HANDLERS[reference.__lunoraRef]?.(args) ?? null);
+/** `extra` answers more references, for a test that must reach a check the others never do. */
+const fakeContext = (extra: typeof HANDLERS = {}): any => {
+    const handlers = { ...HANDLERS, ...extra };
+    const call = async (reference: { __lunoraRef: string }, args: unknown) => await (handlers[reference.__lunoraRef]?.(args) ?? null);
 
     return { auth: { getIdentity: async () => null }, runMutation: call, runQuery: call };
 };
@@ -202,9 +204,11 @@ describe("/chat/start with a held guest note", () => {
             },
         ],
     ])("stores one message, charges once and marks the note sent when it is sent %s", async (_label, sendTwice) => {
-        const statuses = (await sendTwice()).map((response) => response.status).toSorted((x, y) => x - y);
+        const responses = (await sendTwice()).toSorted((x, y) => x.status - y.status);
 
-        expect(statuses).toStrictEqual([200, 409]);
+        expect(responses.map((response) => response.status)).toStrictEqual([200, 409]);
+        // Its own code: a 409 of another kind (a host-run thread's) must not read as "already sent".
+        expect(await responses[1]?.json()).toMatchObject({ error: "GUEST_NOTE_ALREADY_SENT" });
         expect(saved.prompts).toHaveLength(1);
         expect(saved.charges).toBe(1);
         expect(await noteStatus()).toBe("sent");
@@ -224,7 +228,43 @@ describe("/chat/start with a held guest note", () => {
         const response = await runChatStart(fakeContext(), { guestMessageId: noteId, model: MODEL, prompt: "x", threadId: otherThread } as never, "secret");
 
         expect(response.status).toBe(400);
+        expect(await response.json()).toMatchObject({ error: "GUEST_NOTE_NOT_SENDABLE" });
         expect(saved.prompts).toHaveLength(0);
+    });
+
+    it("refuses a note sent to an image model with its own code, so the client keeps it to send once a text model is picked", async () => {
+        const response = await runChatStart(
+            fakeContext(),
+            { guestMessageId: noteId, model: "google/gemini-2.5-flash-image", prompt: "x", threadId } as never,
+            "secret",
+        );
+
+        expect(response.status).toBe(400);
+        expect(await response.json()).toMatchObject({ error: "GUEST_NOTE_NEEDS_TEXT_MODEL" });
+        expect(saved.prompts).toHaveLength(0);
+        expect(await noteStatus()).toBe("held");
+    });
+
+    it("refuses a note sent as a goal, whose rounds would carry the guest's words as the owner's", async () => {
+        // The thread reads as the owner's, so the later goal-ownership check lets the goal through: only the note's own
+        // refusal stops it, before the note's send is claimed and before any charge.
+        const ownThread = {
+            "agent_threads:getThreadInternal": async () => await run(async (ctx) => await ctx.db.get("threads", threadId)),
+            "chat_goals_internal:startGoal": async () => {
+                return { goalId: "goal-1", ok: true };
+            },
+        };
+        const response = await runChatStart(
+            fakeContext(ownThread),
+            { goal: { text: "please call me back" }, guestMessageId: noteId, model: MODEL, prompt: "x", threadId } as never,
+            "secret",
+        );
+
+        expect(response.status).toBe(400);
+        expect(saved.prompts).toHaveLength(0);
+        expect(saved.charges).toBe(0);
+        expect(await run(async (ctx) => await claimRow(ctx, GUEST_SEND_SCOPE, noteId))).toBeNull();
+        expect(await noteStatus()).toBe("held");
     });
 
     it("refuses a second send of the same note and saves nothing more", async () => {
