@@ -13,7 +13,7 @@ export const MemoryVisual = () => {
             label={t`Memory. A new preference is saved as a memory, then a later question uses two saved memories, which are listed as memories used.`}
         >
             <div className="flex flex-col gap-2">
-                <span className="text-[11px] font-medium tracking-wider text-white/40 uppercase">{t`Saved memories`}</span>
+                <span className="text-[11px] font-medium text-white/40 uppercase">{t`Saved memories`}</span>
                 <div className="flex flex-wrap gap-2">
                     <span className="rounded-full border border-white/15 px-2.5 py-1 text-xs text-white/80">{t`Prefers metric units`}</span>
                     <span className="rounded-full border border-white/15 px-2.5 py-1 text-xs text-white/80">{t`Working on a mobile app`}</span>

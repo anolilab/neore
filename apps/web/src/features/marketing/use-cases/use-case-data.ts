@@ -86,7 +86,7 @@ export const USE_CASES: UseCase[] = [
     {
         controls: [
             msg`Each participant runs with its own instructions, model and tools, and each speaker's usage is recorded on its own.`,
-            msg`A turn never has more than three speakers, and a debate stops after at most three rounds.`,
+            msg`A routed or mentioned turn has at most three speakers. A parallel turn has up to four answers and a synthesis, and a debate runs up to three rounds.`,
             msg`Parallel means independent, not simultaneous: replies still come one after another, and no speaker sees the others' answers to the same message.`,
             msg`A tool that needs your approval pauses the turn with a card. Only the owner answers, and the queued speakers continue afterwards.`,
         ],
@@ -97,7 +97,7 @@ export const USE_CASES: UseCase[] = [
         steps: [
             msg`Create a group chat with its participants. Each one gets its own instructions, model and tools. Templates include a code review panel and a pros and cons debate.`,
             msg`Choose how turns are handed out: supervisor (a routing step picks who speaks), round-robin, mention-only, parallel, or debate.`,
-            msg`For each message from you, the chat decides who answers, up to three speakers.`,
+            msg`For each message from you, the chat decides who answers. A routed or mentioned turn has at most three speakers.`,
             msg`Each speaker runs as a full agent reply in the same thread, and a marker shows who is talking.`,
             msg`In a debate, the pro and contra roles argue for up to three rounds, and a synthesizer role writes the outcome.`,
         ],

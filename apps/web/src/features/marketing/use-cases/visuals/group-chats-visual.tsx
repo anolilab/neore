@@ -14,7 +14,7 @@ export const GroupChatsVisual = () => {
         >
             <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-white/50">
                 <span>{t`Code review panel`}</span>
-                <span>{t`3 speakers per turn`}</span>
+                <span>{t`Parallel replies`}</span>
             </div>
 
             <motion.div className="max-w-[85%] self-end rounded-2xl rounded-tr-sm bg-white/15 px-3 py-2 text-sm text-white" {...fade(0.04, 0.94, reduce)}>
