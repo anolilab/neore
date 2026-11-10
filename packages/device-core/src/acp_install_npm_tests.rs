@@ -1354,7 +1354,10 @@ fn a_tool_rewritten_with_the_same_size_and_its_modification_time_restored_is_ref
     let before = fs::metadata(&node).unwrap().modified().unwrap();
     let mut content = fs::read(&node).unwrap();
 
-    // Same length, other bytes, then `touch -r`.
+    // Same length, other bytes, then `touch -r`. Linux stamps ctime from a coarse clock (one tick, up to 10 ms), so a
+    // rewrite in the same tick as the confirmation would keep it; a real swap comes long after the person confirmed.
+    std::thread::sleep(std::time::Duration::from_millis(50));
+
     let last = content.len() - 2;
 
     content[last] = b'#';
