@@ -1107,8 +1107,8 @@ catalogs:
       specifier: ^3.3.0
       version: 3.3.0
     reactjs-tiptap-editor:
-      specifier: 1.0.48
-      version: 1.0.48
+      specifier: 1.0.46
+      version: 1.0.46
   tsc:
     tsrs:
       specifier: 0.23.0-ts7.1.0-beta
@@ -3188,7 +3188,7 @@ importers:
         version: 4.21.0(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       reactjs-tiptap-editor:
         specifier: catalog:tiptap
-        version: 1.0.48(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(immer@11.1.21)(prosemirror-model@1.25.12)(prosemirror-state@1.4.4)(prosemirror-view@1.42.6)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(typescript@6.0.3)
+        version: 1.0.46(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(immer@11.1.21)(prosemirror-model@1.25.12)(prosemirror-state@1.4.4)(prosemirror-view@1.42.6)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(typescript@6.0.3)
       read-excel-file:
         specifier: catalog:canvas-spreadsheet
         version: 9.3.14
@@ -20693,10 +20693,6 @@ packages:
   jszip@3.10.2:
     resolution: {integrity: sha512-3l+rb15IOWtUhU0H5MFqES/T6Kh7abYwjosBey/vD6hDt8zoEffkSC5Ws5SGtgVw3gBx2NEbhTeSW1+kWkpyTQ==}
 
-  katex@0.18.10:
-    resolution: {integrity: sha512-/B6p9eY9DX7aHBfpkHdpirDTZ5QH9xTwL9y837PWuzuv41O5jFdqNQwVQEQsimY0/iVNkwBY4+4hMfhQ7d4Dbw==}
-    hasBin: true
-
   katex@0.19.1:
     resolution: {integrity: sha512-jG8uKntjSEcm2EpQOh0XturpPuuC9r3Sq5HLHdsFdWZT27E672SF19QEi+of0/YeOy15lDgRhKvr5614uRrEfA==}
     hasBin: true
@@ -23072,8 +23068,8 @@ packages:
     peerDependencies:
       react: '>=18'
 
-  reactjs-tiptap-editor@1.0.48:
-    resolution: {integrity: sha512-5fV9SaugpMgV67gsgKkQYj5OqJ3Fx37gGq1Yh+kftdT9QTp4DYpUQR9fWkkOtTk1uR9dj7TIrWOPkWZU4ijbFQ==}
+  reactjs-tiptap-editor@1.0.46:
+    resolution: {integrity: sha512-8Oj3+J8J7x1PsiwrC9erhciXqj6AC49ELpfmAefRM1K4CRACJ2T1cFaSQCzaLR/0cFp4pHv67u2nHImRdA3vtQ==}
     engines: {node: ^20.19.0 || >=22.12.0}
     peerDependencies:
       react: ^18.0.0 || ^19.0.0
@@ -45306,10 +45302,6 @@ snapshots:
       readable-stream: 2.3.8
       setimmediate: 1.0.5
 
-  katex@0.18.10:
-    dependencies:
-      commander: 15.0.0
-
   katex@0.19.1:
     dependencies:
       commander: 15.0.0
@@ -48513,7 +48505,7 @@ snapshots:
       alien-signals: 3.2.1
       react: 19.3.1
 
-  reactjs-tiptap-editor@1.0.48(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(immer@11.1.21)(prosemirror-model@1.25.12)(prosemirror-state@1.4.4)(prosemirror-view@1.42.6)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(typescript@6.0.3):
+  reactjs-tiptap-editor@1.0.46(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(immer@11.1.21)(prosemirror-model@1.25.12)(prosemirror-state@1.4.4)(prosemirror-view@1.42.6)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(typescript@6.0.3):
     dependencies:
       '@excalidraw/excalidraw': 0.18.1(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(immer@11.1.21)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       '@floating-ui/dom': 1.8.0
@@ -48580,7 +48572,7 @@ snapshots:
       docx: 9.15.3
       easydrawer: 0.0.15
       frimousse: 0.3.0(react@19.3.1)(typescript@6.0.3)
-      katex: 0.18.10
+      katex: 0.19.1
       lodash-es: 4.18.1
       lucide-react: 1.70.0(@types/react@19.3.0)(react@19.3.1)
       mammoth: 1.13.0
