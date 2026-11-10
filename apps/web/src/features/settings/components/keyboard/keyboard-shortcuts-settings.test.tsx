@@ -124,6 +124,9 @@ describe("KeyboardShortcutsSettings", () => {
     });
 
     it("refuses Save when an action takes the jump's chord, though the jump is not in the form", async () => {
+        act(() => {
+            useUIStateStore.setState({ keyboardShortcuts: { ...defaultKeyboardShortcuts, jumpToLastMessage: "ctrl+shift+l" } });
+        });
         renderSettings();
 
         fireEvent.click(screen.getByRole("button", { name: "Record New Chat" }));

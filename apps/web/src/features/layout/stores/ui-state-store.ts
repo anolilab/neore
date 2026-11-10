@@ -107,8 +107,9 @@ export const defaultKeyboardShortcuts: KeyboardShortcuts = {
     firstItem: "home",
     focusSearch: `${platformModifier}+shift+f`,
     help: `${platformModifier}+/`,
-    // Shift+ArrowUp selects text in the composer, and Ctrl+Shift+J opens the devtools console in common browsers: neither is used.
-    jumpToLastMessage: `${platformModifier}+shift+l`,
+    // No default chord. Shift+ArrowUp selects text in the composer, Ctrl+Shift+J opens devtools, and Ctrl+Shift+L is Edge's paste-and-go;
+    // browsers reserve nearly every Ctrl+Shift letter. The jump button still works, and a chord can be set in Settings.
+    jumpToLastMessage: "",
     lastItem: "end",
     newChat: `${platformModifier}+n`,
     newTemporaryChat: `${platformModifier}+shift+n`,
@@ -199,9 +200,9 @@ export const mergeKeyboardShortcuts = (saved: Partial<KeyboardShortcuts> | undef
     // A binding on F6 or Shift+F6 is cleared: those keys move focus, and a saved action on them would run as well.
     const merged = withoutFocusAreaKeys({ ...defaultKeyboardShortcuts, ...saved });
 
-    // The thread actions and the jump are newer than many saved sets. A saved binding already on one of their default chords would
-    // make both fire, so the new action stays unbound there; a binding the user saved for it is theirs and stays.
-    for (const key of ["archiveThread", "deleteThread", "jumpToLastMessage"] as const) {
+    // The thread actions are newer than many saved sets. A saved binding already on one of their default chords would make both
+    // fire, so the new action stays unbound there; a binding the user saved for it is theirs and stays.
+    for (const key of ["archiveThread", "deleteThread"] as const) {
         const takenBySaved = Object.values(saved ?? {}).includes(defaultKeyboardShortcuts[key]);
 
         if (saved?.[key] === undefined && takenBySaved) {

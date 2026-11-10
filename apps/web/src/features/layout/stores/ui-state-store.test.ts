@@ -26,15 +26,13 @@ describe("thread action defaults against saved bindings", () => {
         expect(mergeKeyboardShortcuts({ newChat: "ctrl+j" }).archiveThread).toBe(defaultKeyboardShortcuts.archiveThread);
     });
 
-    it("leaves the jump unbound when a saved action already has its chord, so the chord runs one action", () => {
-        const merged = mergeKeyboardShortcuts({ newChat: defaultKeyboardShortcuts.jumpToLastMessage });
-
-        expect(merged.jumpToLastMessage).toBe("");
-        expect(merged.newChat).toBe(defaultKeyboardShortcuts.jumpToLastMessage);
+    it("starts the jump unbound, since browsers reserve every Ctrl+Shift letter it could take", () => {
+        expect(defaultKeyboardShortcuts.jumpToLastMessage).toBe("");
+        expect(mergeKeyboardShortcuts(undefined).jumpToLastMessage).toBe("");
     });
 
     it("keeps a jump binding the person saved, even one on a chord another action holds", () => {
-        const merged = mergeKeyboardShortcuts({ jumpToLastMessage: "ctrl+shift+k", newChat: defaultKeyboardShortcuts.jumpToLastMessage });
+        const merged = mergeKeyboardShortcuts({ jumpToLastMessage: "ctrl+shift+k", newChat: "ctrl+shift+k" });
 
         expect(merged.jumpToLastMessage).toBe("ctrl+shift+k");
     });
@@ -58,12 +56,12 @@ describe("thread action defaults against saved bindings", () => {
         expect(mergeKeyboardShortcuts(migrated.keyboardShortcuts).deleteThread).toBe("ctrl+d");
     });
 
-    it("drops the jump's retired Ctrl+Shift+J default from a set saved before version 2, so the new chord applies", () => {
+    it("drops the jump's retired Ctrl+Shift+J default from a set saved before version 2, so the jump starts unbound", () => {
         const migrated = migrateUIState({ keyboardShortcuts: { jumpToLastMessage: "ctrl+shift+j" } }, 1) as {
             keyboardShortcuts: Record<string, string>;
         };
 
-        expect(mergeKeyboardShortcuts(migrated.keyboardShortcuts).jumpToLastMessage).toBe(defaultKeyboardShortcuts.jumpToLastMessage);
+        expect(mergeKeyboardShortcuts(migrated.keyboardShortcuts).jumpToLastMessage).toBe("");
     });
 
     it("keeps a jump binding on Ctrl+Shift+J that the person saved from version 2 on", () => {
