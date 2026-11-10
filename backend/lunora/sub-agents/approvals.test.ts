@@ -294,6 +294,15 @@ describe("answering a waiting child's request", () => {
         expect(continuations()).toHaveLength(1);
     });
 
+    it("leaves a question the owner was asked in the child's own chat as what it waits on when the owner answers the run", async () => {
+        await run(async (context) => await context.db.patch("threads", childId, { awaitingInput: "question" }));
+        await answer(APPROVAL_ID, "approve");
+
+        const child = await run(async (context) => await context.db.get("threads", childId));
+
+        expect(child).toMatchObject({ awaitingInput: "question", status: "running" });
+    });
+
     it("resumes with a denial, writing no permission", async () => {
         await answer(APPROVAL_ID, "deny");
 

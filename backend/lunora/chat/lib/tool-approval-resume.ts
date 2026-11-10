@@ -80,7 +80,11 @@ export const resumeClaimedRun = async (ctx: MutationCtx, args: ResumeClaimedRunA
     });
 
     // In this transaction, not scheduled: a late write would wipe the `awaitingInput` of a continuation that paused again.
-    await patchThread(ctx.db, threadId, { status: "running", updatedAt: ctx.now });
+    // A sub-agent's answer leaves a question the owner was asked in the child's own chat as what the thread waits on.
+    const thread = config.subAgentRunId === undefined ? null : await ctx.db.get("threads", threadId);
+    const keepsQuestion = thread?.awaitingInput === "question";
+
+    await patchThread(ctx.db, threadId, { status: "running", updatedAt: ctx.now, ...(keepsQuestion && { awaitingInput: "question" as const }) });
 
     return streamId;
 };
