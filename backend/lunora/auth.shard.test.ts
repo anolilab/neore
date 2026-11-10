@@ -72,4 +72,63 @@ describe("auth hook shard placement", { timeout: 30_000 }, () => {
 
         expect(names).toStrictEqual(["user-a"]);
     });
+
+    it("does not issue or redeem a headless machine's code while the approval page cannot word it", async () => {
+        const { betterAuth } = await import("better-auth");
+        const { memoryAdapter } = await import("better-auth/adapters/memory");
+        const { buildAuth } = await import("./auth");
+        const built = buildAuth({ AUTH_SECRET: "test-secret-not-the-default", DB: {} as never, SHARD: fakeShardNamespace([]) as never }) as unknown as {
+            plugins: { id: string }[];
+        };
+        // The production device-code plugins, as `buildAuth` wires them.
+        const auth = betterAuth({
+            baseURL: "http://localhost:3000",
+            database: memoryAdapter({ deviceCode: [], rateLimit: [], session: [], user: [], verification: [] }),
+            plugins: built.plugins.filter(({ id }) => id === "device-authorization" || id === "neore-cli-device-key") as never,
+            rateLimit: { enabled: false },
+            secret: "a-test-secret-that-is-long-enough-for-better-auth",
+            telemetry: { enabled: false },
+        });
+        const post = async (path: string, body: unknown) =>
+            await auth.handler(
+                new Request(`http://localhost:3000/api/auth${path}`, {
+                    body: JSON.stringify(body),
+                    headers: { "content-type": "application/json", origin: "http://localhost:3000" },
+                    method: "POST",
+                }),
+            );
+
+        const host = await post("/device/code", { client_id: "neore-host", hostname: "box", platform: "linux", storage: "file" });
+
+        expect(host.status).toBe(400);
+        const refusal = (await host.json()) as { error: string };
+        const pairing = await post("/device/host", { client_id: "neore-host", device_code: "x" });
+        // The CLI's own sign-in still issues.
+        const cli = await post("/device/code", { client_id: "neore-cli", hostname: "box" });
+
+        expect(refusal.error).toBe("invalid_client");
+        expect(pairing.status).toBe(404);
+        expect(cli.status).toBe(200);
+    });
+
+    it("keeps the device-limit marker of a refusal that crosses the shard call", async () => {
+        const { createShardClient } = await import("lunorash/runtime");
+        const { LunoraError, toErrorBody } = await import("lunorash/errors");
+        const { DEVICE_LIMIT_CODE } = await import("./devices/lib/constants");
+        // What the shard answers for a thrown LunoraError (`errorToResponse` in @lunora/do builds the same body).
+        const refusal = new LunoraError("BAD_REQUEST", "At most 10 devices can be paired. Remove one first.", { data: { code: DEVICE_LIMIT_CODE } });
+        const { body, status } = toErrorBody(refusal, { encodeData: (data: unknown) => data });
+        const namespace = {
+            get: () => {
+                return { fetch: async () => Response.json({ error: body }, { status }) };
+            },
+            idFromName: (name: string) => name,
+        };
+
+        const caught = await createShardClient(namespace as never)
+            .call("devices/internal:checkHeadlessPairing", {}, { shardKey: "user-a" })
+            .catch((error: unknown) => error as { code?: string; data?: { code?: string } });
+
+        expect(caught).toMatchObject({ code: "BAD_REQUEST", data: { code: DEVICE_LIMIT_CODE } });
+    });
 });

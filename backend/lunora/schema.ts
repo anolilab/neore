@@ -704,9 +704,12 @@ export const schema = defineSchema({
         expiresAt: v.number(),
         hostname: v.optional(v.string()),
         lastPolledAt: v.optional(v.number()),
+        // A host code (`neore-host`) also names the machine's platform and where it keeps the device secret.
+        platform: v.optional(v.string()),
         pollingInterval: v.optional(v.number()),
         scope: v.optional(v.string()),
         status: v.string(),
+        storage: v.optional(v.string()),
         userCode: v.string(),
         userId: v.optional(v.string()),
     })
@@ -717,6 +720,17 @@ export const schema = defineSchema({
         .index("expiresAt", ["expiresAt"])
         .index("userCode", ["userCode"], { unique: true })
         .index("userId", ["userId"]),
+    // A pairing code whose device was revoked (`revokeDevice`): `registerHeadlessDevice` refuses it, so a machine
+    // still holding the code cannot pair again. On the owner's shard, written in the revoking mutation, so a
+    // registration and a revocation of the same code are serialised. Swept after the code can no longer be presented.
+    devicePairingRevocations: defineTable({
+        codeId: v.string(),
+        revokedAt: v.number(),
+        userId: v.string(),
+    })
+        .shardBy("userId")
+        .index("by_userId_codeId", ["userId", "codeId"])
+        .index("by_revokedAt", ["revokedAt"]),
     // A paired install of the desktop shell (`devices/`, `apps/desktop`). The
     // secret signs calls and verifies results; it is removed on revoke, so a
     // revoked row can sign nothing. `manifest` is the device's verified tools.
@@ -736,6 +750,9 @@ export const schema = defineSchema({
         manifest: v.optional(v.array(vDeviceManifestTool)),
         manifestIssuedAt: v.optional(v.number()),
         name: v.string(),
+        // A machine that paired itself by code: the id of the code it redeemed, so a retried registration of the same
+        // code (the first reply was lost) finds this device instead of making a second one.
+        pairedByCode: v.optional(v.string()),
         platform: vDevicePlatform,
         // Where the device's tools are offered (`devices/lib/scope.ts`): unset = any of the
         // owner's chats, a list = only threads of those projects (empty = nowhere).

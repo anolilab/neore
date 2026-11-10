@@ -177,6 +177,7 @@ const OWNER_TABLES = [
     "dailyBriefState",
     "deviceCalls",
     "deviceCode",
+    "devicePairingRevocations",
     "devices",
     "documentVersions",
     "embeddings_1024",

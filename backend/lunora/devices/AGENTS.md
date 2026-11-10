@@ -11,3 +11,8 @@
   `device_<tag>__<tool>` runtime name, `@neore/chat-ui/utils/device-tool-name`)
   subscribes to `getDeviceCallByToolCall` ONLY while the tool part is in
   flight; a finished call reads its outcome from the tool output's `status`.
+- **A machine paired by code** (`registerHeadlessDevice`) is found again by
+  `pairedByCode`, because the auth route puts the code back after any answer
+  that may be lost. Whether a code may still pair lives on the owner's shard
+  (`devicePairingRevocations`, written by `revokeDevice`), never on the global
+  `deviceCode` row: the two stores do not commit together.

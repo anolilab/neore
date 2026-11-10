@@ -50,14 +50,16 @@ export const deleteUserDevices = internalMutation
     .input({ userId: v.string() })
     .output(v.object({ hasMore: v.boolean() }))
     .mutation(async ({ args: { userId }, ctx }) => {
-        const [devices, calls] = await Promise.all([
+        const [devices, calls, revocations] = await Promise.all([
             ctx.db.devices.findMany({ limit: BATCH, where: { userId } }),
             ctx.db.deviceCalls.findMany({ limit: BATCH, where: { userId } }),
+            ctx.db.devicePairingRevocations.findMany({ limit: BATCH, where: { userId } }),
         ]);
 
         await Promise.all([
             ...devices.page.map(async (row) => await ctx.db.delete("devices", row._id)),
             ...calls.page.map(async (row) => await ctx.db.delete("deviceCalls", row._id)),
+            ...revocations.page.map(async (row) => await ctx.db.delete("devicePairingRevocations", row._id)),
         ]);
 
         // The host ingest finds a device's owner through its route (`registerDevice`); it must not outlive the device.
@@ -65,5 +67,5 @@ export const deleteUserDevices = internalMutation
             await deleteShardRoute(ctx, "device", device._id as string);
         }
 
-        return { hasMore: devices.page.length >= BATCH || calls.page.length >= BATCH };
+        return { hasMore: devices.page.length >= BATCH || calls.page.length >= BATCH || revocations.page.length >= BATCH };
     });

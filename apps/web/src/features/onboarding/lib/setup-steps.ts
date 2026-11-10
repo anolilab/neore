@@ -8,7 +8,7 @@ export interface SetupDevice {
     acpOffers?: ReadonlyArray<unknown>;
     /** Set once the desktop app has reported in, which only a confirmed device does. */
     lastSeenAt?: number;
-    transport?: "ssh";
+    transport?: "headless" | "ssh";
 }
 
 /**
