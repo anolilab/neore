@@ -1010,7 +1010,7 @@ export interface Doc_notifications {
     link?: string;
     outcome?: "success" | "failure";
     title: string;
-    type: "task" | "tool_approval" | "ask_user" | "secret_request" | "trigger" | "coding_agent" | "eval" | "sub_agent" | "chat_import" | "data_export" | "daily_brief" | "usage_alert" | "review_request";
+    type: "task" | "task_stuck" | "tool_approval" | "ask_user" | "secret_request" | "trigger" | "coding_agent" | "eval" | "sub_agent" | "chat_import" | "data_export" | "daily_brief" | "usage_alert" | "review_request";
     userId: string;
     createdAt: number;
     readAt?: number;
@@ -1716,6 +1716,7 @@ export interface Doc_tasks {
     runDestination?: "new_thread" | "continue_thread" | "fresh_context";
     skillId?: Id<"skills">;
     status: "todo" | "queued" | "running" | "needs_review" | "done" | "failed" | "blocked";
+    stuckNotice?: { days: number; since: number };
     successCriteria?: string;
     title: string;
     updatedAt: number;
@@ -4117,7 +4118,7 @@ export interface Insert_notifications {
     link?: string;
     outcome?: "success" | "failure";
     title: string;
-    type: "task" | "tool_approval" | "ask_user" | "secret_request" | "trigger" | "coding_agent" | "eval" | "sub_agent" | "chat_import" | "data_export" | "daily_brief" | "usage_alert" | "review_request";
+    type: "task" | "task_stuck" | "tool_approval" | "ask_user" | "secret_request" | "trigger" | "coding_agent" | "eval" | "sub_agent" | "chat_import" | "data_export" | "daily_brief" | "usage_alert" | "review_request";
     userId: string;
     createdAt: number;
     readAt?: number;
@@ -4823,6 +4824,7 @@ export interface Insert_tasks {
     runDestination?: "new_thread" | "continue_thread" | "fresh_context";
     skillId?: Id<"skills">;
     status: "todo" | "queued" | "running" | "needs_review" | "done" | "failed" | "blocked";
+    stuckNotice?: { days: number; since: number };
     successCriteria?: string;
     title: string;
     updatedAt: number;

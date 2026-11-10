@@ -51,6 +51,9 @@ import {
     isPassingFallback,
     pickRunThread,
     recurrenceSkipReason,
+    STUCK_NOTICE_DAYS,
+    stuckNoticeDue,
+    waitsOnOwnerDecision,
 } from "./logic";
 import { vTaskRunNoticeReason, vTaskRunOrigin, vVerdict } from "./validators";
 import { vCodingAgentAssignment } from "../coding-agents/validators";
@@ -144,7 +147,53 @@ export const promoteDependents = async (ctx: MutationCtx, completed: Doc<"tasks"
     for (const task of tasks) {
         if (unblocked.has(task._id as string)) {
             await queueCycle(ctx, task, "dependency", now);
+        } else if (task.status === "blocked" && task.dependsOn.includes(completed._id)) {
+            // Still waiting on another dependency, but this one moved: progress, so the stuck clock restarts.
+            await patchById(ctx.db, "tasks", task._id, { updatedAt: now });
         }
+    }
+};
+
+/**
+ * Asks the owner, once per level and stuck episode, about a blocked task that has made no progress for 2 or 7 days
+ * (`STUCK_NOTICE_DAYS`). A task waiting on a dependency that needs the owner's review is left alone. Writes the
+ * notice state without touching `updatedAt`, so the notice itself is not progress.
+ */
+const escalateStuckTasks = async (ctx: MutationCtx, now: number): Promise<void> => {
+    const idle = await ctx.db
+        .query("tasks")
+        .withIndex("by_status_and_updatedAt", (q) => q.eq("status", "blocked").lte("updatedAt", now - STUCK_NOTICE_DAYS[0] * 24 * 60 * 60_000))
+        .take(SWEEP_BATCH);
+    const statusesByUser = new Map<string, Map<string, TaskStatus>>();
+
+    for (const task of idle) {
+        let statusById = statusesByUser.get(task.userId);
+
+        if (!statusById) {
+            statusById = statusMap(await loadUserTasks(ctx, task.userId));
+            statusesByUser.set(task.userId, statusById);
+        }
+
+        if (waitsOnOwnerDecision(task.dependsOn, statusById)) {
+            continue;
+        }
+
+        const days = stuckNoticeDue(task, now);
+
+        if (days === undefined) {
+            continue;
+        }
+
+        await patchById(ctx.db, "tasks", task._id, { stuckNotice: { days, since: task.updatedAt } });
+        // The subject only: the notice names the task and carries no instructions, errors or results, so the lock screen shows
+        // nothing more than the title (`notifications/AGENTS.md`).
+        await notifyQuietly(ctx, {
+            dedupeKey: `task-stuck:${task._id}:${task.updatedAt}:${days}`,
+            link: "/tasks",
+            title: task.title,
+            type: "task_stuck",
+            userId: task.userId,
+        });
     }
 };
 
@@ -737,6 +786,8 @@ export const checkDueTasks = internalMutation
                 await failStaleTask(task, STALE_MESSAGE[status]);
             }
         }
+
+        await escalateStuckTasks(ctx, now);
 
         const due = pickFairRecurrences(
             await ctx.db

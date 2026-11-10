@@ -7,6 +7,7 @@ import { v } from "lunorash/server";
  */
 export const vNotificationType = v.union(
     v.literal("task"),
+    v.literal("task_stuck"),
     v.literal("tool_approval"),
     v.literal("ask_user"),
     v.literal("secret_request"),

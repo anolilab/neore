@@ -2790,6 +2790,8 @@ export const schema = defineSchema({
         runDestination: v.optional(vTaskRunDestination),
         skillId: v.optional(v.id("skills")),
         status: vTaskStatus,
+        // The last stuck notice sent (2 or 7 idle days) and the episode it was sent in (`updatedAt` when that began).
+        stuckNotice: v.optional(v.object({ days: v.number(), since: v.number() })),
         successCriteria: v.optional(v.string()),
         title: v.string(),
         updatedAt: v.number(),

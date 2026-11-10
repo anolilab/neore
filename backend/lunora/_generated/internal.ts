@@ -974,8 +974,8 @@ export interface InternalApiTypes {
             writeDailyBrief: FunctionReference<"mutation", { localDay: string; summary: string; userId: string }, null>;
         };
         functions: {
-            createNotification: FunctionReference<"mutation", { approvalId?: string; body?: string; dedupeKey?: string; emailOutcome?: boolean; link?: string; outcome?: "success" | "failure"; title: string; type: "task" | "tool_approval" | "ask_user" | "secret_request" | "trigger" | "coding_agent" | "eval" | "sub_agent" | "chat_import" | "data_export" | "daily_brief" | "usage_alert" | "review_request"; userId: string }, null>;
-            createNotifications: FunctionReference<"mutation", { notifications: Array<{ approvalId?: string; body?: string; dedupeKey?: string; emailOutcome?: boolean; link?: string; outcome?: "success" | "failure"; title: string; type: "task" | "tool_approval" | "ask_user" | "secret_request" | "trigger" | "coding_agent" | "eval" | "sub_agent" | "chat_import" | "data_export" | "daily_brief" | "usage_alert" | "review_request"; userId: string }> }, null>;
+            createNotification: FunctionReference<"mutation", { approvalId?: string; body?: string; dedupeKey?: string; emailOutcome?: boolean; link?: string; outcome?: "success" | "failure"; title: string; type: "task" | "task_stuck" | "tool_approval" | "ask_user" | "secret_request" | "trigger" | "coding_agent" | "eval" | "sub_agent" | "chat_import" | "data_export" | "daily_brief" | "usage_alert" | "review_request"; userId: string }, null>;
+            createNotifications: FunctionReference<"mutation", { notifications: Array<{ approvalId?: string; body?: string; dedupeKey?: string; emailOutcome?: boolean; link?: string; outcome?: "success" | "failure"; title: string; type: "task" | "task_stuck" | "tool_approval" | "ask_user" | "secret_request" | "trigger" | "coding_agent" | "eval" | "sub_agent" | "chat_import" | "data_export" | "daily_brief" | "usage_alert" | "review_request"; userId: string }> }, null>;
             pruneOldNotifications: FunctionReference<"mutation", {}, null>;
         };
         gdpr: {

@@ -576,6 +576,41 @@ export const recurrenceSkipReason = (status: TaskStatus): TaskSkipReason | undef
     return status === "blocked" ? "blocked" : "still_running";
 };
 
+// ─── Stuck tasks ─────────────────────────────────────────────────────────────
+
+/** Idle days at which the owner is told a task is stuck. Each level fires once per stuck episode. */
+export const STUCK_NOTICE_DAYS = [2, 7] as const;
+
+const DAY_MS = 24 * 60 * 60_000;
+
+/**
+ * Statuses that count as stuck when they sit still. `blocked` is the only one: it waits on dependencies that
+ * nothing moves on its own. `queued` and `running` are failed by the stale sweep within an hour, `todo` is
+ * a task the owner has not started, `needs_review` waits on the owner, and `failed` was already reported.
+ */
+export const isStuckStatus = (status: TaskStatus): boolean => status === "blocked";
+
+/** A task waiting on a dependency the owner must decide on (`needs_review`) is not stuck: the owner has the next move. */
+export const waitsOnOwnerDecision = (dependsOn: ReadonlyArray<string>, statusById: ReadonlyMap<string, TaskStatus>): boolean =>
+    dependsOn.some((id) => statusById.get(id) === "needs_review");
+
+/**
+ * The stuck notice to send now, as its level in days, or `undefined`. `updatedAt` is the episode's start: any progress
+ * moves it, which opens a new episode. `notice` is the last level sent and the episode it was sent in; a notice from an
+ * earlier episode does not count. A sweep that was down for a week sends only the 7-day notice, the highest level reached.
+ */
+export const stuckNoticeDue = (
+    task: { notice?: { days: number; since: number }; updatedAt: number },
+    now: number,
+): (typeof STUCK_NOTICE_DAYS)[number] | undefined => {
+    const idleMs = now - task.updatedAt;
+    const sent = task.notice?.since === task.updatedAt ? task.notice.days : 0;
+    // Ascending, so the last match is the highest level reached.
+    const reached = STUCK_NOTICE_DAYS.filter((days) => idleMs >= days * DAY_MS && days > sent);
+
+    return reached.at(-1);
+};
+
 // ─── Where a run goes ────────────────────────────────────────────────────────
 
 export type TaskRunDestination = "continue_thread" | "fresh_context" | "new_thread";
