@@ -40,3 +40,12 @@
   run that ended while recording them, or whose requests a later message moved past. Once a run has waited the beat watch
   stops (its continuation does not beat); `reapOverdueWaits` in `shardSweeps()` reaps an `awaiting` run whose reaper
   was lost (`by_status_and_reapAt`).
+- **The owner answers a waiting run on the CHILD's thread** (`respondToToolApproval`, inert until pausing is on):
+  `claimToolApproval` refuses while the run is queued/running (`SUB_AGENT_STILL_WORKING`), once it ended (also for a
+  request it closed, `SUB_AGENT_RUN_ENDED_BY`), and refuses `hour`/`today` (a headless child never reads timed grants).
+  `resumeClaimedRun` → `resumeRunForAnswer` flips the run to `running` in the claim's transaction, before the stream and
+  the job. The continuation stops at its next step once the run stops (`shouldRunStop` in its `stopWhen`) and hands its end back
+  (`settleSubAgentRun`): every write is bound to the resume it runs under (`resumedWith` = that resume's `reapAt`), so a
+  further pause waits again and an end finishes the run once (`completeResumedRun`) only while that resume is current;
+  a failed write is scheduled again, bound the same way. A continuation that already settled is not ended by a later
+  error.
