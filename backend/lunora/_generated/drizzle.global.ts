@@ -190,9 +190,9 @@ export const deviceCode = sqliteTable("deviceCode", {
     userCode: text("userCode").notNull(),
     userId: text("userId"),
 }, (t) => ({
-    deviceCode: index("deviceCode").on(t.deviceCode),
+    deviceCode: uniqueIndex("deviceCode").on(t.deviceCode),
     expiresAt: index("expiresAt").on(t.expiresAt),
-    userCode: index("userCode").on(t.userCode),
+    userCode: uniqueIndex("userCode").on(t.userCode),
     userId: index("userId").on(t.userId),
 }));
 

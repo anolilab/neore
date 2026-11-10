@@ -278,6 +278,11 @@ export const AUTH_RATE_LIMIT_CUSTOM_RULES: Record<string, false | { max: number;
     // The poll route therefore gets a BURST ceiling (120 requests, every gap under 100 ms): a CLI polling
     // every 5 s never nears it, a loop of invented codes does. The plugin's per-CODE interval bounds a real code.
     "/device/key": { max: 120, window: 0.1 },
+    // Opening a code (the approval page's lookup) replaces the plugin's own rule, 5 per 30 minutes with a window
+    // that only resets after a quiet gap: a reload, a mistyped code or a shared address would lock the page out for
+    // the code's whole life. A burst ceiling instead: 20 requests with every gap under 2 s cuts off a guessing
+    // loop and no person.
+    "/device": { max: 20, window: 2 },
     // Issuing a code: a person runs `login` rarely. The ceiling is high enough for a shared address to
     // sign in a whole office (the table is cleaned of lapsed codes on every issue), and low enough to stop a loop.
     "/device/code": { max: 60, window: 60 },

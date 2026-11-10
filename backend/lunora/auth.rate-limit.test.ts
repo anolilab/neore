@@ -228,6 +228,32 @@ describe("CLI device sign-in rate limits", () => {
         await after.body?.cancel();
     });
 
+    it("lets a person open and reload the approval lookup without a lockout, and cuts off a tight loop of guesses", async () => {
+        vi.useFakeTimers({ toFake: ["Date"] });
+        vi.setSystemTime(new Date("2026-11-03T18:00:00Z"));
+
+        const auth = buildDeviceAuth();
+        const lookup = (ip: string) => request("/device?user_code=ABCDEFGH", ip);
+        const person = nextIp();
+        const reloads: number[] = [];
+
+        for (let index = 0; index < 40; index += 1) {
+            const response = await auth.handler(lookup(person));
+
+            reloads.push(response.status);
+            await response.body?.cancel();
+            vi.setSystemTime(Date.now() + 3000);
+        }
+
+        expect(reloads).not.toContain(429);
+
+        const attacker = nextIp();
+        const loop = await statuses(auth, 30, () => lookup(attacker));
+
+        expect(loop.slice(0, 20)).not.toContain(429);
+        expect(loop.slice(20).every((status) => status === 429)).toBe(true);
+    });
+
     it("limits issuing codes to 60 a minute per address", async () => {
         const auth = buildDeviceAuth();
         const ip = nextIp();

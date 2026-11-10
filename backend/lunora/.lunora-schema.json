@@ -5929,7 +5929,7 @@
           "fields": [
             "deviceCode"
           ],
-          "unique": false
+          "unique": true
         },
         "expiresAt": {
           "fields": [
@@ -5941,7 +5941,7 @@
           "fields": [
             "userCode"
           ],
-          "unique": false
+          "unique": true
         },
         "userId": {
           "fields": [

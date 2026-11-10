@@ -5,7 +5,7 @@
  */
 import { betterAuth } from "better-auth";
 import { memoryAdapter } from "better-auth/adapters/memory";
-import { anonymous } from "better-auth/plugins";
+import { admin, anonymous } from "better-auth/plugins";
 import { apiKey } from "@better-auth/api-key";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -31,6 +31,7 @@ const build = (mint?: (input: { expiresInSeconds: number; name: string; userId: 
         plugins: [
             apiKey(API_KEY_OPTIONS),
             anonymous(),
+            admin(),
             ...cliDeviceAuth({
                 mintApiKey: async (input): Promise<MintedCliKey> => {
                     if (mint) {
@@ -255,6 +256,7 @@ describe("device-code sign-in for the CLI", () => {
         const results = await Promise.all([poll(harness, code.device_code), poll(harness, code.device_code)]);
 
         expect(results.filter((result) => result.response.status === 200)).toHaveLength(1);
+        expect(results.map((result) => result.body["error"]).filter(Boolean)).toEqual(["invalid_grant"]);
         expect(await rowsOf(harness, "apikey")).toHaveLength(1);
     });
 
@@ -436,16 +438,9 @@ describe("device-code sign-in for the CLI", () => {
         expect(await rowsOf(harness, "apikey")).toHaveLength(0);
     });
 
-    it("puts the code back after a failed key mint so the next poll finishes the sign-in", async () => {
-        let failures = 1;
+    it("keeps the code spent after a failed key mint, so a key that may exist is never minted twice", async () => {
         const harness = build(async () => {
-            if (failures > 0) {
-                failures -= 1;
-
-                throw new Error("key store unavailable");
-            }
-
-            return { expiresAt: null, id: "key-1", key: "nk_retry" };
+            throw new Error("key store unavailable");
         });
         const person = await signUp(harness);
         const code = await requestCode(harness);
@@ -454,13 +449,23 @@ describe("device-code sign-in for the CLI", () => {
         later();
 
         expect(await statusOf(poll(harness, code.device_code))).toBeGreaterThanOrEqual(500);
-        expect(await rowsOf(harness, "deviceCode")).toHaveLength(1);
-        later();
-
-        const retried = await poll(harness, code.device_code);
-
-        expect(retried.body["api_key"]).toBe("nk_retry");
         expect(await rowsOf(harness, "deviceCode")).toHaveLength(0);
+        later();
+        expect(await errorOf(poll(harness, code.device_code))).toBe("invalid_grant");
+    });
+
+    it("refuses to open, approve or deny a code from an impersonated session", async () => {
+        const harness = build();
+        const person = await signUp(harness);
+        const code = await requestCode(harness);
+        const context = await harness.auth.$context;
+
+        await context.adapter.updateMany({ model: "session", update: { impersonatedBy: "an-admin" }, where: [{ field: "userId", value: person.userId }] });
+
+        expect(await statusOf(call(harness, `/device?user_code=${code.user_code}`, { cookie: person.cookie }))).toBe(403);
+        expect(await statusOf(call(harness, "/device/approve", { body: { userCode: code.user_code }, cookie: person.cookie }))).toBe(403);
+        expect(await statusOf(call(harness, "/device/deny", { body: { userCode: code.user_code }, cookie: person.cookie }))).toBe(403);
+        expect(await errorOf(poll(harness, code.device_code))).toBe("authorization_pending");
     });
 });
 
@@ -489,6 +494,24 @@ describe("revoking a key the CLI was just issued", () => {
 
         expect(revoked.response.status).toBe(200);
         expect(await namesOf(rowsOf<{ name: string }>(harness, "apikey"))).toEqual(["Settings key"]);
+    });
+
+    it("refuses a key from this flow once it is older than a code's lifetime", async () => {
+        const harness = build();
+        const person = await signUp(harness);
+        const code = await requestCode(harness);
+
+        await approve(harness, person.cookie, code.user_code);
+        later();
+
+        const issued = await poll(harness, code.device_code);
+
+        later(31 * 60 * 1000);
+
+        const refused = await call(harness, "/device/revoke", { body: { api_key: String(issued.body["api_key"]) } });
+
+        expect(refused.response.status).toBe(400);
+        expect(await rowsOf(harness, "apikey")).toHaveLength(1);
     });
 });
 

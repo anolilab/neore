@@ -18,7 +18,8 @@
  *   (same polling interval, expiry, denial and atomic claim) and then mints the
  *   key. The key is minted only AFTER the claim succeeded, so two concurrent
  *   polls cannot produce two keys; it is returned once, in that response. If
- *   the mint itself fails, the claimed row is put back so the next poll retries.
+ *   the mint itself fails, the code stays spent (the key row may exist even when the call failed, so
+ *   giving the code back could mint a second key) and the CLI starts over with a new code.
  *   A response lost in transit cannot be replayed (the key is never stored in
  *   the clear); the stranded key shows in Settings and can be revoked there.
  *   The per-person key cap is checked before the claim and again after the
@@ -53,6 +54,9 @@ const KEY_NAME_PREFIX = "Neore CLI on ";
 export const CLI_KEY_LIFETIME_DAYS = 365;
 
 const DAY_SECONDS = 24 * 60 * 60;
+
+/** The plugin's default code lifetime (30 minutes); a key older than this was not issued by a live sign-in. */
+const CODE_LIFETIME_MS = 30 * 60 * 1000;
 
 const MAX_STORED_HOSTNAME_LENGTH = 64;
 
@@ -134,6 +138,7 @@ const GUARDED_PATHS = new Set(["/device", "/device/approve", "/device/deny"]);
 /**
  * Guests are disposable and uninvited; a long-lived credential for one outlives both properties. A guest also
  * must not be able to open (claim) or deny a code, which would keep the intended account from approving it.
+ * A session an admin opened to act as someone else (impersonation) is refused for the same reason as a guest's.
  */
 const refuseGuestApproval = {
     handler: createAuthMiddleware(async (ctx) => {
@@ -141,6 +146,11 @@ const refuseGuestApproval = {
 
         if ((session?.user as { isAnonymous?: boolean } | undefined)?.isAnonymous === true) {
             throw oauthError("FORBIDDEN", "access_denied", "Create an account to sign in the CLI.");
+        }
+
+        // An admin acting as someone must not hand out a long-lived key in that person's name.
+        if ((session?.session as { impersonatedBy?: string | null } | undefined)?.impersonatedBy) {
+            throw oauthError("FORBIDDEN", "access_denied", "Sign in as yourself to sign in the CLI.");
         }
     }),
     matcher: (context: { path?: string }) => GUARDED_PATHS.has(context.path ?? ""),
@@ -178,19 +188,6 @@ const keyBodySchema = z.object({
     device_code: z.string().max(256),
 });
 
-/** Best effort: if the row cannot be restored, the person starts a new code, as before. */
-const restoreClaimedCode = async (
-    adapter: { create: (input: { data: Record<string, unknown>; forceAllowId?: boolean; model: string }) => Promise<unknown> },
-    claimed: object,
-    cause: unknown,
-): Promise<void> => {
-    try {
-        await adapter.create({ data: { ...claimed }, forceAllowId: true, model: "deviceCode" });
-    } catch (error) {
-        authLogger.error("[auth] could not restore a device code after a failed key mint", { cause, error });
-    }
-};
-
 const redeemKey = (options: CliDeviceAuthOptions) =>
     createAuthEndpoint("/device/key", { body: keyBodySchema, metadata: { noStore: true }, method: "POST" }, async (ctx) => {
         const { claimedDeviceCode, user } = await redeemDeviceCode({
@@ -226,17 +223,13 @@ const redeemKey = (options: CliDeviceAuthOptions) =>
             },
         });
         const { hostname } = claimedDeviceCode as { hostname?: string };
-        let minted: MintedCliKey;
-
-        try {
-            minted = await options.mintApiKey({ expiresInSeconds: CLI_KEY_LIFETIME_DAYS * DAY_SECONDS, name: cliKeyName(hostname ?? ""), userId: user.id });
-        } catch (error) {
-            // The claim is spent and no key exists: put the code back so the CLI's next poll can finish the
-            // sign-in. Minting stays AFTER the claim, so two polls still cannot mint two keys.
-            await restoreClaimedCode(ctx.context.adapter, claimedDeviceCode, error);
-
-            throw error;
-        }
+        // A mint that throws may still have written the key row, so the code is not given back: the CLI
+        // starts over with a new one, and a stranded key shows in Settings.
+        const minted: MintedCliKey = await options.mintApiKey({
+            expiresInSeconds: CLI_KEY_LIFETIME_DAYS * DAY_SECONDS,
+            name: cliKeyName(hostname ?? ""),
+            userId: user.id,
+        });
 
         // The cap is counted before the claim and cannot be reserved (the adapter has no transaction across
         // the count and the insert), so it is counted again once the key exists: if concurrent redemptions
@@ -270,16 +263,22 @@ const revokeBodySchema = z.object({ api_key: z.string().max(256) });
 /**
  * The CLI withdraws a key it was just issued when it could not check or save it, so retries do not stack toward
  * the key limit. The credential is the key itself (whoever holds it could already use it, and this only deletes
- * it), and only a key this flow minted (named by `cliKeyName`) can be deleted here; every refusal answers the same.
+ * it), and only a key this flow minted (named by `cliKeyName`) and issued within a code's lifetime can be deleted
+ * here, so it stays "a key just issued" and never a way to delete an old one; every refusal answers the same.
  */
 const revokeKey = (options: CliDeviceAuthOptions) =>
     createAuthEndpoint("/device/revoke", { body: revokeBodySchema, metadata: { noStore: true }, method: "POST" }, async (ctx) => {
         const verified = await options.verifyApiKey(ctx.body.api_key).catch(() => null);
         const row = verified
-            ? await ctx.context.adapter.findOne<{ name?: string | null }>({ model: "apikey", where: [{ field: "id", value: verified.id }] })
+            ? await ctx.context.adapter.findOne<{ createdAt?: Date | number | string | null; name?: string | null }>({
+                  model: "apikey",
+                  where: [{ field: "id", value: verified.id }],
+              })
             : null;
 
-        if (!verified || !row || typeof row.name !== "string" || !row.name.startsWith(KEY_NAME_PREFIX)) {
+        const age = row?.createdAt ? Date.now() - new Date(row.createdAt).getTime() : Infinity;
+
+        if (!verified || !row || typeof row.name !== "string" || !row.name.startsWith(KEY_NAME_PREFIX) || age > CODE_LIFETIME_MS) {
             throw oauthError("BAD_REQUEST", "invalid_grant", "Invalid key");
         }
 

@@ -712,10 +712,10 @@ export const schema = defineSchema({
     })
         .externallyManaged()
         .global()
-        .index("deviceCode", ["deviceCode"])
+        .index("deviceCode", ["deviceCode"], { unique: true })
         // The cleanup at every issue deletes the lapsed codes by this column.
         .index("expiresAt", ["expiresAt"])
-        .index("userCode", ["userCode"])
+        .index("userCode", ["userCode"], { unique: true })
         .index("userId", ["userId"]),
     // A paired install of the desktop shell (`devices/`, `apps/desktop`). The
     // secret signs calls and verifies results; it is removed on revoke, so a
