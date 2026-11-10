@@ -34,11 +34,20 @@ type MembershipCheck = (organizationId: string) => Promise<boolean>;
 const mayReadProject = async (project: Pick<Doc<"projects">, "organizationId" | "userId">, userId: string, isMember: MembershipCheck): Promise<boolean> =>
     project.userId === userId || (Boolean(project.organizationId) && (await isMember(project.organizationId!)));
 
-/** The project when the caller owns it or belongs to its organization, else `null` (also for a missing one). */
-export const readableProject = async (context: QueryCtx | MutationCtx, projectId: Id<"projects">, userId: string): Promise<Doc<"projects"> | null> => {
+/**
+ * The project when the caller owns it or belongs to its organization, else `null` (also for a missing one). `primary`
+ * decides on the authoritative row, for a change a lagging D1 replica must not authorize (a project moved meanwhile).
+ */
+export const readableProject = async (
+    context: QueryCtx | MutationCtx,
+    projectId: Id<"projects">,
+    userId: string,
+    { primary = false } = {},
+): Promise<Doc<"projects"> | null> => {
+    const consistency = primary ? { consistency: "primary" as const } : {};
     // Decide on the row's owner and organization past RLS: a project of a member's
     // NON-active organization is invisible to the guarded `ctx.db` until the org is admitted.
-    const found = await systemDb(context).projects.findFirst({ where: { _id: projectId } });
+    const found = await systemDb(context).projects.findFirst({ where: { _id: projectId }, ...consistency });
 
     const isMember: MembershipCheck = async (organizationId) => (await getMemberByOrganizationAndUser(context, organizationId, userId)) !== null;
 
@@ -51,7 +60,7 @@ export const readableProject = async (context: QueryCtx | MutationCtx, projectId
         admitOrganization(context, found.organizationId!);
     }
 
-    return await context.db.projects.findFirst({ where: { _id: projectId } });
+    return await context.db.projects.findFirst({ where: { _id: projectId }, ...consistency });
 };
 
 /** Ids one `in` read binds: D1 takes at most 100 parameters a statement, and the read binds others beside them. */
@@ -288,7 +297,7 @@ export const updateProject = authMutation
 /** The project when the caller may change its repositories: the owner, or any member for an organization project nobody owns (as `updateProject`). */
 const editableProject = async (context: MutationCtx, projectId: Id<"projects">, userId: string): Promise<Doc<"projects">> => {
     // A member can read the project, so is told it is not theirs to change, not that it is missing.
-    const project = await readableProject(context, projectId, userId);
+    const project = await readableProject(context, projectId, userId, { primary: true });
 
     if (!project) {
         throw new LunoraError("NOT_FOUND", "Project not found");

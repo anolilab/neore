@@ -68,7 +68,7 @@ vi.mock("../lib/rls/scope", async (importOriginal) => {
     return {
         ...original,
         systemDb: (context: any) => {
-            const db = original.systemDb(context);
+            const db: any = original.systemDb(context);
             const findFirst = async (query: { consistency?: string }) => {
                 const run = query.consistency === "primary" ? meanwhile.run : undefined;
 
@@ -114,6 +114,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+    delete meanwhile.run;
     harness.close();
 });
 
@@ -318,9 +319,31 @@ describe("project repositories", () => {
 
         await expect(add(MEMBER, projectId, "acme/web")).rejects.toMatchObject({ code: "NOT_FOUND" });
 
-        const rows = await harness.run(async (ctx: any) => (await ctx.db.projectRepositories.findMany({ where: { projectId } })).page);
+        const rows = await harness.run(async (ctx: any) => {
+            const { page } = await ctx.db.projectRepositories.findMany({ where: { projectId } });
+
+            return page;
+        });
 
         expect(rows).toStrictEqual([]);
+    });
+
+    it("keeps an owner's add that races a move, stamped with the organization the project moved to", async () => {
+        const projectId = await projectOf({ organizationId: "org-1", userId: OWNER });
+
+        meanwhile.run = async (db) => {
+            await db.patch("projects", projectId, { organizationId: "org-2" });
+        };
+
+        await add(OWNER, projectId, "acme/web");
+
+        const rows = await harness.run(async (ctx: any) => {
+            const { page } = await ctx.db.projectRepositories.findMany({ where: { projectId } });
+
+            return page;
+        });
+
+        expect(rows.map((row: { organizationId?: string }) => row.organizationId)).toStrictEqual(["org-2"]);
     });
 
     it("moves a project's repositories with it when the project changes organization", async () => {
