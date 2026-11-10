@@ -14,7 +14,7 @@ import schema from "../schema";
 import { internal } from "../_generated/internal";
 import { continueAfterToolApproval, settleSubAgentRun } from "./execute";
 import { noteGoalPaused } from "./goals/execute";
-import { resumeApprovedRun } from "./lib/agent-run";
+import { failRun, resumeApprovedRun } from "./lib/agent-run";
 
 const registry = vi.hoisted(() => new Map<string, unknown>());
 
@@ -30,8 +30,11 @@ vi.mock("./goals/execute", async (importOriginal) => {
 });
 
 vi.mock("./lib/agent-run", async (importOriginal) => {
+    const original = await importOriginal<typeof import("./lib/agent-run")>();
+
     return {
-        ...(await importOriginal<typeof import("./lib/agent-run")>()),
+        ...original,
+        failRun: vi.fn(original.failRun),
         resumeApprovedRun: vi.fn(async () => {
             return { lastMessageId: undefined, paused: false, stopped: false };
         }),
@@ -228,6 +231,8 @@ describe("a sub-agent child's continuation", () => {
     const resumeChild = async (options: {
         /** The step after the continuation's settlement throws (`noteGoalPaused`). */
         failAfterSettling?: boolean;
+        /** The continuation throws, and closing its stream (`failRun`) throws too. */
+        failWithCleanup?: boolean;
         lockedAt?: number;
         /** A newer answer resumes the run while this continuation runs: it sets another deadline. */
         newerResume?: boolean;
@@ -290,7 +295,13 @@ describe("a sub-agent child's continuation", () => {
                 vi.mocked(noteGoalPaused).mockRejectedValueOnce(new Error("goal write failed"));
             }
 
-            if (options.resumed) {
+            if (options.failWithCleanup) {
+                vi.mocked(failRun).mockRejectedValue(new Error("stream write failed"));
+            }
+
+            if (options.failWithCleanup && !options.lockedAt) {
+                vi.mocked(resumeApprovedRun).mockRejectedValueOnce(new Error("model call failed"));
+            } else if (options.resumed) {
                 const { resumed } = options;
 
                 vi.mocked(resumeApprovedRun).mockImplementationOnce(async () => {
@@ -349,6 +360,18 @@ describe("a sub-agent child's continuation", () => {
         expect(
             await resumeChild({ failAfterSettling: true, pausedAgainAt: Date.now() + 60 * 60_000, resumed: { paused: true, stopped: false } }),
         ).toMatchObject({ openRequests: 1, status: "awaiting" });
+    });
+
+    it("ends the run as failed when closing a failed continuation's stream throws too", async () => {
+        try {
+            expect(await resumeChild({ failWithCleanup: true })).toMatchObject({ status: "failed" });
+            expect(await resumeChild({ failWithCleanup: true, lockedAt: Date.now() + 60_000 })).toMatchObject({
+                error: "The sub-agent's conversation can no longer continue.",
+                status: "failed",
+            });
+        } finally {
+            vi.mocked(failRun).mockRestore();
+        }
     });
 
     it("hands a pause back to the run's wait, and schedules an end whose write failed", async () => {

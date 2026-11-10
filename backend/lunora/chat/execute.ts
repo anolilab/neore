@@ -1069,18 +1069,20 @@ export const continueAfterToolApproval = internalAction
             if (!(await ctx.runQuery(internal.chat.streaming.streamRunThread, { streamId: streamId as Id<"persistentStreams">, userId }))) {
                 streamLogger.warn(`[ToolApproval] Stream ${streamId} belongs to a locked or unreachable chat — not resumed`);
 
-                await failRun(ctx, {
-                    safeMessage: "This chat can no longer continue the response.",
-                    streamId,
-                    threadId,
-                    threadStatus: "active",
-                });
+                // The run's end first: a failure closing the stream must not leave the run `running` until its reaper.
                 await settleSubAgentRun(
                     ctx,
                     subAgentRunId,
                     { error: "The sub-agent's conversation can no longer continue.", kind: "failed" },
                     subAgentResume ?? undefined,
                 );
+                settled = true;
+                await failRun(ctx, {
+                    safeMessage: "This chat can no longer continue the response.",
+                    streamId,
+                    threadId,
+                    threadStatus: "active",
+                });
 
                 return;
             }
@@ -1152,7 +1154,12 @@ export const continueAfterToolApproval = internalAction
                 ? "This tool request is no longer pending."
                 : "An error occurred while continuing the response. Please try again.";
 
-            await failRun(ctx, { safeMessage, streamId, threadId, threadStatus: "active" });
+            // A failure closing the stream must not skip the run's end below.
+            try {
+                await failRun(ctx, { safeMessage, streamId, threadId, threadStatus: "active" });
+            } catch (cleanupError) {
+                streamLogger.error(`[ToolApproval] Could not close the failed stream ${streamId}:`, cleanupError);
+            }
 
             // A run this continuation already handed its end to (one that waits again) is not ended by a later failure.
             if (!settled) {
