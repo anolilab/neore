@@ -255,9 +255,11 @@ impl DeviceState {
             command,
             env: EnvVars(request.env.clone()),
             install: Some(AcpInstall {
+                index_integrity: None,
                 publisher: request.publisher.clone(),
                 sha256: actual,
                 source: request.source.clone(),
+                tree_sha256: None,
                 version: request.version.clone(),
             }),
             key: request.key.clone(),
@@ -457,7 +459,7 @@ fn prune_other_versions(key_dir: &Path, keep: &str) {
     }
 }
 
-fn sha256_reader(file: &mut fs::File) -> Result<String, String> {
+pub(crate) fn sha256_reader(file: &mut fs::File) -> Result<String, String> {
     let mut hasher = Sha256::new();
     let mut buffer = vec![0_u8; 64 * 1024];
 

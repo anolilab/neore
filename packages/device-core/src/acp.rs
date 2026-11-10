@@ -74,12 +74,54 @@ pub struct AcpAgent {
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct AcpInstall {
+    /// The package index's hash (npm `dist.integrity`, `sha512-<base64>`) the download was verified against. Set
+    /// only on an npm install: the trust is the index's, taken when the person confirmed, not the publisher's.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub index_integrity: Option<String>,
     pub publisher: String,
     /// SHA-256 of the archive that was verified, lowercase hex.
     pub sha256: String,
     /// The archive's URL, as the registry gave it.
     pub source: String,
+    /// SHA-256 over every file, folder and link of the installed folder, recorded after the install. An agent
+    /// that has one is hashed again before each start and refused when it differs. npm installs only.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tree_sha256: Option<String>,
     pub version: String,
+}
+
+/// Whether `before` is an npm install (it has a recorded tree) that `command` and `args` still run: the same
+/// interpreter it was installed to run with and the same pinned program, the first argument of
+/// `node <program> <arguments>`. The arguments after the program are the person's to change.
+fn keeps_program_pin(before: &AcpAgent, command: &str, args: &[String]) -> bool {
+    before
+        .install
+        .as_ref()
+        .is_some_and(|pin| pin.tree_sha256.is_some())
+        && before.command == command
+        && !args.is_empty()
+        && before.args.first() == args.first()
+}
+
+/// Whether a variable of this name changes what an installed npm agent runs: anything that loads code, and every
+/// `NODE_*` setting (`NODE_OPTIONS` with `--require` or `--import`, `NODE_PATH`).
+fn changes_node(name: &str) -> bool {
+    changes_program(name) || name.to_ascii_uppercase().starts_with("NODE_")
+}
+
+/// Drops the pin of the npm agents a changed variable reaches (`agent_key`, or all of them for a global one): they
+/// no longer run what was hashed at install. The files stay; the agent is an ordinary one from now on.
+fn drop_tree_pins(settings: &mut crate::store::Settings, agent_key: Option<&str>) {
+    for agent in &mut settings.acp_agents {
+        if agent_key.is_none_or(|key| agent.key == key)
+            && agent
+                .install
+                .as_ref()
+                .is_some_and(|pin| pin.tree_sha256.is_some())
+        {
+            agent.install = None;
+        }
+    }
 }
 
 /// The user's approval of one agent in one folder, given in the local window and nowhere else.
@@ -378,12 +420,17 @@ impl DeviceState {
                         .acp_agents
                         .iter()
                         .position(|agent| agent.key == key);
+
                     let agent = AcpAgent {
                         // The pin describes the installed command: a different one is no longer that.
                         install: existing
                             .filter(|&i| {
-                                settings.acp_agents[i].command == command
-                                    && settings.acp_agents[i].args == args
+                                let before = &settings.acp_agents[i];
+
+                                // An npm install may change the arguments after its pinned program, which is
+                                // still hashed at every start; another interpreter is not what was installed.
+                                (before.command == command && before.args == args)
+                                    || keeps_program_pin(before, &command, &args)
                             })
                             .and_then(|i| settings.acp_agents[i].install.clone()),
                         args,
@@ -409,8 +456,11 @@ impl DeviceState {
                             // still points inside them (other arguments, or another program of the same download).
                             if settings.acp_agents[i].install.is_some()
                                 && agent.install.is_none()
-                                && !Path::new(&agent.command)
-                                    .starts_with(install_root.join(&agent.key))
+                                && !std::iter::once(&agent.command)
+                                    .chain(&agent.args)
+                                    .any(|part| {
+                                        Path::new(part).starts_with(install_root.join(&agent.key))
+                                    })
                             {
                                 uninstall = Some(agent.key.clone());
                             }
@@ -424,10 +474,10 @@ impl DeviceState {
                     }
                 }
                 AcpUpdate::RemoveAgent { key } => {
-                    if settings
-                        .acp_agents
-                        .iter()
-                        .any(|agent| agent.key == key && agent.install.is_some())
+                    // Pinned or not: an edit that moved the program but left a path into the folder in a later
+                    // argument cleared the pin and kept the files, and nothing else would ever delete them.
+                    if settings.acp_agents.iter().any(|agent| agent.key == key)
+                        && fs::symlink_metadata(install_root.join(&key)).is_ok()
                     {
                         uninstall = Some(key.clone());
                     }
@@ -485,12 +535,18 @@ impl DeviceState {
                         return Err(format!("at most {MAX_ENV_VARS} variables"));
                     }
 
-                    let moved = changes_program(&name) && scope.0.get(&name) != Some(&value);
+                    let changed = scope.0.get(&name) != Some(&value);
+                    let moved = changes_program(&name) && changed;
+                    let node = changes_node(&name) && changed;
 
                     scope.0.insert(name, value);
 
                     if moved {
                         drop_path_consents(settings, agent_key.as_deref());
+                    }
+
+                    if node {
+                        drop_tree_pins(settings, agent_key.as_deref());
                     }
                 }
                 AcpUpdate::RemoveEnv { agent_key, name } => {
@@ -501,6 +557,10 @@ impl DeviceState {
 
                     if removed && changes_program(&name) {
                         drop_path_consents(settings, agent_key.as_deref());
+                    }
+
+                    if removed && changes_node(&name) {
+                        drop_tree_pins(settings, agent_key.as_deref());
                     }
                 }
             }
@@ -531,6 +591,12 @@ impl DeviceState {
             .iter()
             .find(|agent| agent.key == agent_key)
             .ok_or("that agent is not registered")?;
+
+        // An agent run through a package manager is checked against what was recorded at install, every time.
+        if let Some(pin) = &agent.install {
+            self.verify_installed_tree(agent, pin)?;
+        }
+
         let cwd: PathBuf = match folder {
             Some(folder) => {
                 let canonical = validate_roots(&[folder.to_owned()])?
