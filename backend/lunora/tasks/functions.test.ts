@@ -10,7 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import schema from "../schema";
 import { selectableTextModels } from "../skills/builder-logic";
 import { ANONYMOUS_TASKS_MESSAGE } from "./account";
-import { createTask, reviewTask, runTask, updateTask } from "./functions";
+import { cancelTask, createTask, reviewTask, runTask, updateTask } from "./functions";
 import { MAX_RECURRING_TASKS_PER_USER } from "./logic";
 
 // `user` is a `.global()` (D1) table the in-memory harness cannot write: the
@@ -337,5 +337,33 @@ describe("review decisions and waiting dependents", () => {
 
         expect(dependent.updatedAt).toBe(retriedAt);
         expect(dependent.stuckCheckAt).toBe(retriedAt + 2 * DAY);
+    });
+});
+
+describe("cancelling a failed task", () => {
+    it("moves a failed task to todo, a status the stuck ladder never reads, so cancelling sends no push", async () => {
+        const taskId = await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("tasks", {
+                    attemptCount: 0,
+                    createdAt: 1,
+                    dependsOn: [],
+                    instructions: "x",
+                    lastError: "boom",
+                    maxRepairRounds: 2,
+                    recurring: false,
+                    status: "failed",
+                    title: "Broke",
+                    updatedAt: 1,
+                    userId: USER,
+                }),
+        );
+
+        await as(USER).mutation(cancelTask as never, { taskId } as never);
+
+        const row: any = await harness.run(async (ctx: any) => await ctx.db.get("tasks", taskId));
+
+        expect(row.status).toBe("todo");
+        expect(row.updatedAt).not.toBe(1);
     });
 });
