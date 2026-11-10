@@ -18,7 +18,7 @@ import { LunoraError, v } from "lunorash/server";
 import type { Doc, Id } from "../_generated/dataModel";
 import { internal } from "../_generated/internal";
 import { internalMutation, internalQuery, type MutationCtx, type QueryCtx } from "../_generated/server";
-import { refuseHostThread } from "../acp/lib/host-thread";
+import { isHostRunThread } from "../acp/lib/host-thread";
 import { admittedThreadDb } from "../agent/admitted-thread-db";
 import { requireOwnedThread, requireOwnedThreadIgnoringLock } from "../agent/thread-read-access";
 import {
@@ -149,7 +149,12 @@ export const createGuestLink = authMutation
             throw new LunoraError("BAD_REQUEST", "This chat cannot be given a guest link.", { data: { code: "GUEST_LINK_NOT_ALLOWED" } });
         }
 
-        refuseHostThread(thread, "given a guest link");
+        // A coding-agent thread runs on the owner's computer, never from a guest's note: refused with the same code.
+        if (isHostRunThread(thread)) {
+            throw new LunoraError("BAD_REQUEST", "A coding-agent thread runs on your computer and cannot be given a guest link.", {
+                data: { code: "GUEST_LINK_NOT_ALLOWED" },
+            });
+        }
 
         // A worker's conversation takes turns only through a dispatch, so a note left in it could never be sent.
         if (await isWorkerThread(context, threadId)) {

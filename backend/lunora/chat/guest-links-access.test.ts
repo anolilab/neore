@@ -71,7 +71,6 @@ const NOT_ACTIVE = /not active/u;
 const NO_LONGER_WAITING = /no longer waiting/u;
 const LOCKED = /chat is locked/u;
 const BEING_SENT = /being sent/u;
-const REFUSED_LINK_CODE = /^(GUEST_LINK_NOT_ALLOWED|THREAD_LOCKED)$/u;
 const REUSED_REQUEST = /already used for a different message/u;
 const LIMITED = /Too many messages on this link/u;
 const MINTED_TOKEN = /^[0-9a-f]{64}$/u;
@@ -171,15 +170,16 @@ describe("creating a link", () => {
     });
 
     it.each([
-        ["locked", { lockedAt: NOW }],
-        ["archived", { status: "archived" }],
-        ["trashed", { deleted: true, deletedAt: NOW }],
-        ["temporary", { isTemporary: true }],
-    ])("is refused on a %s thread", async (_label, patch) => {
+        ["locked", { lockedAt: NOW }, "THREAD_LOCKED"],
+        ["archived", { status: "archived" }, "GUEST_LINK_NOT_ALLOWED"],
+        ["trashed", { deleted: true, deletedAt: NOW }, "GUEST_LINK_NOT_ALLOWED"],
+        ["temporary", { isTemporary: true }, "GUEST_LINK_NOT_ALLOWED"],
+        ["host-run", { runner: "host" }, "GUEST_LINK_NOT_ALLOWED"],
+    ])("is refused on a %s thread", async (_label, patch, code) => {
         await harness.run(async (ctx: any) => await ctx.db.patch("threads", threadId, patch));
 
         // A code of its own (a locked chat answers with the lock's), so the owner's panel says why in the app's words.
-        await expect(createLink()).rejects.toMatchObject({ data: { code: expect.stringMatching(REFUSED_LINK_CODE) } });
+        await expect(createLink()).rejects.toMatchObject({ data: { code } });
         expect(await rows("threadGuestLinks")).toHaveLength(0);
     });
 
