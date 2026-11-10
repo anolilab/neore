@@ -106,6 +106,19 @@ const keyboardShortcutSchema = z
                 context.issues.push({ code: "custom", input: context.value, message: DUPLICATE_SHORTCUT_MESSAGE, path: [key] });
             }
         }
+
+        // The jump is bound outside this form but runs on its chord like any other, so no action in the form may take that chord.
+        const jumpValue = runtime.jumpToLastMessage;
+
+        if (jumpValue && isValidShortcut(jumpValue)) {
+            const jumpIdentities = new Set<string>([shortcutIdentity(jumpValue), shortcutIdentity(jumpValue.replace(CTRL_MODIFIER, "meta"))]);
+
+            for (const [key, value] of Object.entries(context.value)) {
+                if (value && isValidShortcut(value) && jumpIdentities.has(shortcutIdentity(value))) {
+                    context.issues.push({ code: "custom", input: context.value, message: DUPLICATE_SHORTCUT_MESSAGE, path: [key] });
+                }
+            }
+        }
     });
 
 type KeyboardShortcutForm = z.infer<typeof keyboardShortcutSchema>;

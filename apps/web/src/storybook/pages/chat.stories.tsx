@@ -1,12 +1,14 @@
 import { api } from "@neore/backend/api";
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect, waitFor } from "storybook/test";
+import { expect, userEvent, waitFor } from "storybook/test";
 
 import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
+import { useUIStateStore } from "@/features/layout/stores/ui-state-store";
 import { Route as ThreadRoute } from "@/routes/(chat)/chat/$threadId";
 import { Route as ChatIndexRoute } from "@/routes/(chat)/chat/index";
 import { Route as ChatLayoutRoute } from "@/routes/(chat)/route";
 import { ago, MINUTE } from "@/storybook/clock";
+import type { ChatMessage } from "@/storybook/fixtures/chat";
 import { assistantMessage, chatFixtures, CONVERSATION, streamingBody, THREAD_IDS, userMessage } from "@/storybook/fixtures/chat";
 import { gatewayModelsHandler } from "@/storybook/fixtures/models";
 import { shellFixtures } from "@/storybook/fixtures/shell";
@@ -258,5 +260,83 @@ export const FreeUser: Story = {
     parameters: {
         msw: { handlers: { lunora: lunoraHandlers(...userFixtures(), ...shellFixtures({ tier: "free" }), ...chatFixtures()) } },
         persona: "free",
+    },
+};
+
+const LONG_PROMPT = "What is the rollback plan if the billing migration fails halfway?";
+const LONG_REPLY = Array.from(
+    { length: 4 },
+    (_, line) => `Paragraph ${String(line + 1)}. ${"Lorem ipsum dolor sit amet, consectetur adipiscing elit. ".repeat(6)}`,
+).join("\n\n");
+
+/** Fourteen exchanges, then the person's last question, then three long replies: the question sits far above the bottom. */
+const LONG_THREAD: ChatMessage[] = [
+    ...Array.from({ length: 14 }, (_, index) => [
+        userMessage(`Earlier question ${String(index + 1)}`, index * 2),
+        assistantMessage(LONG_REPLY, index * 2 + 1),
+    ]).flat(),
+    userMessage(LONG_PROMPT, 28),
+    assistantMessage(LONG_REPLY, 29),
+    assistantMessage(LONG_REPLY, 30),
+    assistantMessage(LONG_REPLY, 31),
+];
+
+/**
+ * A long run of replies after the person's last question. Scrolled up, the control beside scroll-to-bottom jumps back to that
+ * question, and the `jumpToLastMessage` shortcut does the same from the keyboard.
+ */
+export const JumpToLastMessage: Story = {
+    parameters: {
+        msw: { handlers: { lunora: lunoraHandlers(...userFixtures(), ...shellFixtures(), ...chatFixtures({ messages: LONG_THREAD })) } },
+    },
+    play: async ({ canvas }) => {
+        await settle(canvas);
+
+        const scroller = document.querySelector<HTMLElement>('[data-slot="scroll-area-viewport"]');
+
+        if (!scroller) {
+            throw new Error("The thread has no scroll viewport");
+        }
+
+        const prompt = await canvas.findByText(LONG_PROMPT, undefined, PAGE_WAIT);
+        const row = prompt.closest<HTMLElement>('[role="listitem"]');
+
+        if (!row) {
+            throw new Error("The prompt is not in a message row");
+        }
+
+        // The prompt's row is centred in the viewport (what the jump scrolls to), or not.
+        const isCentred = (): boolean => {
+            const box = scroller.getBoundingClientRect();
+            const rect = row.getBoundingClientRect();
+            const centre = rect.top + rect.height / 2;
+
+            return centre >= box.top && centre <= box.bottom;
+        };
+
+        // Scrolled up past the question, the way a long run of replies leaves it. The control shows only away from the bottom.
+        scroller.scrollTop = 0;
+        await waitFor(() => {
+            expect(isCentred()).toBe(false);
+        }, STATE_WAIT);
+
+        await userEvent.click(await canvas.findByRole("button", { name: "Jump to my last message" }, STATE_WAIT));
+        await waitFor(() => {
+            expect(isCentred()).toBe(true);
+        }, STATE_WAIT);
+
+        // The jump starts unbound, so this story binds the chord a person would set in Settings (Ctrl here, where the platform modifier
+        // is Ctrl). Back up again; the shortcut brings the question back. A real key sequence, not one synthetic keydown, so the keyup
+        // and focus that a person's press also produces are exercised.
+        useUIStateStore.getState().setKeyboardShortcuts({ jumpToLastMessage: "ctrl+shift+l" });
+        scroller.scrollTop = 0;
+        await waitFor(() => {
+            expect(isCentred()).toBe(false);
+        }, STATE_WAIT);
+
+        await userEvent.keyboard("{Control>}{Shift>}l{/Shift}{/Control}");
+        await waitFor(() => {
+            expect(isCentred()).toBe(true);
+        }, STATE_WAIT);
     },
 };

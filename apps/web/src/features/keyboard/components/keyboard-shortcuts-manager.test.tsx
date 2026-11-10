@@ -158,6 +158,36 @@ describe("KeyboardShortcutsManager", () => {
         expect(notPrevented).toBe(false);
     });
 
+    it("still runs a modifier chord jump binding from the composer", () => {
+        const onShortcut = vi.fn();
+
+        render(
+            <KeyboardShortcutsManager onShortcut={onShortcut} shortcuts={{ jumpToLastMessage: "ctrl+shift+j" }}>
+                <textarea aria-label="composer" />
+            </KeyboardShortcutsManager>,
+        );
+
+        const notPrevented = fireEvent.keyDown(screen.getByLabelText("composer"), { code: "KeyJ", ctrlKey: true, key: "J", shiftKey: true });
+
+        expect(onShortcut).toHaveBeenCalledWith("jumpToLastMessage", expect.anything());
+        expect(notPrevented).toBe(false);
+    });
+
+    it("leaves a bare-key jump binding to the field it is typed into", () => {
+        const onShortcut = vi.fn();
+
+        render(
+            <KeyboardShortcutsManager onShortcut={onShortcut} shortcuts={{ jumpToLastMessage: "j" }}>
+                <textarea aria-label="composer" />
+            </KeyboardShortcutsManager>,
+        );
+
+        const notPrevented = fireEvent.keyDown(screen.getByLabelText("composer"), { code: "KeyJ", key: "j" });
+
+        expect(onShortcut).not.toHaveBeenCalledWith("jumpToLastMessage", expect.anything());
+        expect(notPrevented).toBe(true);
+    });
+
     it("opens the model picker from the composer on a modifier chord", () => {
         const onShortcut = vi.fn();
 

@@ -78,6 +78,18 @@ export const DEVICE_POLL_MAX_MS = 2000;
 /** Projects one device can be limited to. */
 export const MAX_DEVICE_SCOPE_PROJECTS = 50;
 
+/** The `data.code` of the refusal for an account that holds as many devices as it may; the pairing route tells the machine to wait on it. */
+export const DEVICE_LIMIT_CODE = "DEVICE_LIMIT";
+
+/** The `data.code` of the refusal for a pairing code whose device was revoked: final, the code never pairs again. */
+export const PAIRING_REVOKED_CODE = "PAIRING_REVOKED";
+
+/**
+ * How long a revoked pairing code is remembered. A code lives 30 minutes (`auth/cli-device-auth.ts`), and a restored
+ * code keeps its expiry, so after this no poll can present it again; the margin covers clock skew between stores.
+ */
+export const PAIRING_REVOCATION_RETENTION_MS = 2 * 60 * 60_000;
+
 /** Longest `appVersion` the backend keeps; a longer or malformed value is ignored and never fails the manifest update. */
 export const MAX_APP_VERSION_LENGTH = 40;
 

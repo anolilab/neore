@@ -273,6 +273,17 @@ export const deviceCalls = sqliteTable("deviceCalls", {
     by_createdAt: index("by_createdAt").on(t.createdAt),
 }));
 
+export const devicePairingRevocations = sqliteTable("devicePairingRevocations", {
+    _id: text("_id").primaryKey(),
+    _creationTime: integer("_creationTime").notNull(),
+    codeId: text("codeId").notNull(),
+    revokedAt: real("revokedAt").notNull(),
+    userId: text("userId").notNull(),
+}, (t) => ({
+    by_userId_codeId: index("by_userId_codeId").on(t.userId, t.codeId),
+    by_revokedAt: index("by_revokedAt").on(t.revokedAt),
+}));
+
 export const devices = sqliteTable("devices", {
     _id: text("_id").primaryKey(),
     _creationTime: integer("_creationTime").notNull(),
@@ -285,10 +296,11 @@ export const devices = sqliteTable("devices", {
     manifest: text("manifest", { mode: "json" }).$type<Array<{ description: string; inputSchema?: unknown; kind: "fs" | "shell" | "mcp"; name: string; readOnly: boolean }>>(),
     manifestIssuedAt: real("manifestIssuedAt"),
     name: text("name").notNull(),
+    pairedByCode: text("pairedByCode"),
     platform: text("platform", { mode: "json" }).$type<"macos" | "windows" | "linux">().notNull(),
     projectIds: text("projectIds", { mode: "json" }).$type<Array<Id<"projects">>>(),
     revokedAt: real("revokedAt"),
-    transport: text("transport"),
+    transport: text("transport", { mode: "json" }).$type<"ssh" | "headless">(),
     userId: text("userId").notNull(),
     viaDeviceId: text("viaDeviceId").references((): AnySQLiteColumn => devices._id),
 }, (t) => ({

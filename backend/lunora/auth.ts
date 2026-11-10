@@ -27,6 +27,7 @@ import { createShardClient } from "lunorash/runtime";
 import { internal } from "./_generated/internal";
 import type { Id } from "./_generated/dataModel";
 import { clientGrantCookie } from "./auth/client-grant-cookie";
+import type { HostPairingOptions } from "./auth/cli-device-auth";
 import { cliDeviceAuth } from "./auth/cli-device-auth";
 import { guestConversion } from "./auth/guest-conversion";
 import { deletedOrganizationOf, queueOrganizationBillingCancel } from "./billing/gdpr";
@@ -200,6 +201,8 @@ const passkeyRelyingParty = (): { origin: string | null; rpID: string } => {
  */
 /** Callbacks `buildAuthOptions` wires into plugins; `buildAuth` supplies them from the Worker env. */
 interface AuthOptionHooks {
+    /** A headless machine pairing itself by code (`auth/cli-device-auth.ts`); both run on the account's shard. */
+    hostPairing?: HostPairingOptions;
     /** An anonymous user converted to a real account (a NEW user). See `lib/account-merge.ts`. */
     onGuestConverted?: (guestId: string, userId: string) => Promise<void>;
 }
@@ -278,6 +281,8 @@ export const AUTH_RATE_LIMIT_CUSTOM_RULES: Record<string, false | { max: number;
     // The poll route therefore gets a BURST ceiling (120 requests, every gap under 100 ms): a CLI polling
     // every 5 s never nears it, a loop of invented codes does. The plugin's per-CODE interval bounds a real code.
     "/device/key": { max: 120, window: 0.1 },
+    // A headless machine pairing (`neore-host pair`) polls this exactly as the CLI polls `/device/key`: same reasoning, same ceiling.
+    "/device/host": { max: 120, window: 0.1 },
     // Opening a code (the approval page's lookup) replaces the plugin's own rule, 5 per 30 minutes with a window
     // that only resets after a quiet gap: a reload, a mistyped code or a shared address would lock the page out for
     // the code's whole life. A burst ceiling instead: 20 requests with every gap under 2 s cuts off a guessing
@@ -366,6 +371,9 @@ export const buildAuthOptions = (hooks: AuthOptionHooks = {}): BetterAuthOptions
             apiKey(API_KEY_OPTIONS),
             // `neore login --device`: signs the CLI in by code, answered with a read-only API key.
             ...cliDeviceAuth({
+                // `neore-host pair`: a headless machine pairs itself as a device of the approving account. The
+                // device row lives on that account's shard, so both steps cross to it.
+                ...(hooks.hostPairing && { hostPairing: hooks.hostPairing }),
                 mintApiKey: async ({ expiresInSeconds, name, userId }) =>
                     await (getAuth().api as unknown as ApiKeyAuthApi).createApiKey({
                         body: { expiresIn: expiresInSeconds, name, permissions: DEFAULT_API_SCOPES as Record<string, string[]>, userId },
@@ -669,6 +677,16 @@ export const buildAuth = (env: AuthEnv): ReturnType<typeof createAuth> => {
 
     cached = createAuth({
         ...buildAuthOptions({
+            // A machine that pairs itself by code is registered on its owner's shard. BOTH steps carry
+            // `{ shardKey: userId }`: a revocation (`devicePairingRevocations`) only stops a registration that
+            // runs on the same shard as the revoke.
+            hostPairing: {
+                precheck: async (userId, codeId) => {
+                    await shard.call(internal.devices.internal.checkHeadlessPairing, { codeId, userId }, { shardKey: userId });
+                },
+                register: async ({ codeId, name, platform, userId }) =>
+                    await shard.call(internal.devices.internal.registerHeadlessDevice, { codeId, name, platform, userId }, { shardKey: userId }),
+            },
             // Queued, not run here: moving a guest's rows takes a round trip per
             // table and page, too long to hold the sign-up request. The job runs
             // on the NEW user's shard (`lib/account-merge.ts#runGuestMerge`). A

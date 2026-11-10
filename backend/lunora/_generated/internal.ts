@@ -446,11 +446,11 @@ export interface InternalApiTypes {
             };
         };
         guest_links: {
-            claimGuestNoteSend: FunctionReference<"mutation", { messageId: Id<"threadGuestMessages">; userId: string }, number | null>;
+            claimGuestNoteSend: FunctionReference<"mutation", { messageId: Id<"threadGuestMessages">; userId: string }, { fence: number } | { refused: "being-sent" | "ended" | "missing" | "sent" }>;
             continueGuestLinkRemoval: FunctionReference<"mutation", { before: number; threadId: Id<"threads"> }, null>;
             dropGuestLinkRoutesJob: FunctionReference<"mutation", { attempt: number; linkHashes: Array<string> }, null>;
             getGuestLinkOwner: FunctionReference<"query", { linkHash: string }, string | null>;
-            getGuestNoteForSend: FunctionReference<"query", { messageId: Id<"threadGuestMessages">; userId: string }, { text: string; threadId: string } | null>;
+            getGuestNoteForSend: FunctionReference<"query", { messageId: Id<"threadGuestMessages">; userId: string }, { text: string; threadId: string } | { refused: "being-sent" | "ended" | "missing" | "sent" }>;
             holdGuestMessage: FunctionReference<"mutation", { freshGuestHash: string; linkHash: string; presentedGuestHash?: string; requestHash?: string; requestKey?: string; text: string }, { messageId: string; minted: boolean; ok: true } | { duplicate: true; minted: boolean; ok: true } | { ok: false; reason: "closed" | "full" | "invalid" | "limited" | "other_browser" | "request_reused" | "unsendable" }>;
             isBoundGuest: FunctionReference<"query", { guestHash: string; linkHash: string }, boolean>;
             listGuestLinksForExport: FunctionReference<"query", { cursor: string | null; threadId: Id<"threads"> }, { continueCursor: string | null; isDone: boolean; page: Array<{ createdAt: number; expiresAt: number }> }>;
@@ -658,10 +658,12 @@ export interface InternalApiTypes {
             deleteUserDevices: FunctionReference<"mutation", { userId: string }, { hasMore: boolean }>;
         };
         internal: {
+            checkHeadlessPairing: FunctionReference<"query", { codeId?: string; userId: string }, null>;
             createDeviceCall: FunctionReference<"mutation", { deviceId: Id<"devices">; input: string; taintedBy: Array<"web" | "knowledge" | "mcp" | "device" | "files">; threadId: Id<"threads">; toolCallId?: string; toolName: string; userId: string }, { callId: string } | { error: "busy" | "ineligible" | "input_too_large" | "offline" | "outdated" | "rate_limited" }>;
             expireDeviceCall: FunctionReference<"mutation", { callId: Id<"deviceCalls">; reason: string }, null | { createdAt: number; deadline: number; error?: string; exitCode?: number; output?: string; status: "pending" | "claimed" | "completed" | "failed" | "denied" | "expired"; truncated?: boolean }>;
             getDeviceCallState: FunctionReference<"query", { callId: Id<"deviceCalls"> }, null | { createdAt: number; deadline: number; error?: string; exitCode?: number; output?: string; status: "pending" | "claimed" | "completed" | "failed" | "denied" | "expired"; truncated?: boolean }>;
             getDeviceToolContext: FunctionReference<"query", { now: number; threadId: Id<"threads">; userId: string }, null | { devices: Array<{ deviceId: string; name: string; tools: Array<{ description: string; inputSchema?: unknown; kind: "fs" | "shell" | "mcp"; name: string; readOnly: boolean }> }>; taintedBy: Array<"web" | "knowledge" | "mcp" | "device" | "files"> }>;
+            registerHeadlessDevice: FunctionReference<"mutation", { codeId: string; name: string; platform: "macos" | "windows" | "linux"; userId: string }, { deviceId: string; secret: string }>;
             sweepDeviceCalls: FunctionReference<"mutation", {}, null>;
         };
     };
@@ -1956,10 +1958,12 @@ export const internal: InternalApiTypes = {
             deleteUserDevices: { __lunoraRef: "devices_gdpr:deleteUserDevices" },
         },
         internal: {
+            checkHeadlessPairing: { __lunoraRef: "devices_internal:checkHeadlessPairing" },
             createDeviceCall: { __lunoraRef: "devices_internal:createDeviceCall" },
             expireDeviceCall: { __lunoraRef: "devices_internal:expireDeviceCall" },
             getDeviceCallState: { __lunoraRef: "devices_internal:getDeviceCallState" },
             getDeviceToolContext: { __lunoraRef: "devices_internal:getDeviceToolContext" },
+            registerHeadlessDevice: { __lunoraRef: "devices_internal:registerHeadlessDevice" },
             sweepDeviceCalls: { __lunoraRef: "devices_internal:sweepDeviceCalls" },
         },
     },

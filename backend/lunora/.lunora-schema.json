@@ -5893,6 +5893,12 @@
           "optional": true,
           "unique": false
         },
+        "platform": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "pollingInterval": {
           "kind": "number",
           "nullable": false,
@@ -5909,6 +5915,12 @@
           "kind": "string",
           "nullable": false,
           "optional": false,
+          "unique": false
+        },
+        "storage": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
           "unique": false
         },
         "userCode": {
@@ -5953,6 +5965,47 @@
       "memory": false,
       "relations": {},
       "shardMode": "global:d1"
+    },
+    "devicePairingRevocations": {
+      "commitOrdered": false,
+      "fields": {
+        "codeId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "revokedAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "userId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        }
+      },
+      "indexes": {
+        "by_revokedAt": {
+          "fields": [
+            "revokedAt"
+          ],
+          "unique": false
+        },
+        "by_userId_codeId": {
+          "fields": [
+            "userId",
+            "codeId"
+          ],
+          "unique": false
+        }
+      },
+      "memory": false,
+      "relations": {},
+      "shardMode": "shardBy:userId"
     },
     "devices": {
       "commitOrdered": false,
@@ -6108,6 +6161,12 @@
           "optional": false,
           "unique": false
         },
+        "pairedByCode": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "platform": {
           "kind": "union",
           "nullable": false,
@@ -6157,11 +6216,26 @@
           "unique": false
         },
         "transport": {
-          "kind": "literal",
+          "kind": "union",
           "nullable": false,
           "optional": true,
           "unique": false,
-          "literal": "\"ssh\""
+          "members": [
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"headless\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"ssh\""
+            }
+          ]
         },
         "userId": {
           "kind": "string",

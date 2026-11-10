@@ -5,7 +5,7 @@ import { DeviceApproval } from "@/features/auth/components/device-approval";
 import { seo } from "@/lib/seo";
 
 /**
- * Approve a sign-in started by `neore login --device`; the page itself is `DeviceApproval`.
+ * Approve a code from `neore login --device` or `neore-host pair`; the page itself is `DeviceApproval`.
  *
  * A code that reads as a plain number (`23456789`) still arrives as one, so the search is turned back into text here;
  * codes like `2E345678` are kept as written by the router's `parseSearch` (`lib/search-params.ts`).
@@ -35,7 +35,7 @@ export const Route = createFileRoute("/auth/device")({
     },
     head: ({ match }) => {
         return {
-            meta: seo({ noIndex: true, title: match.context.i18n._(msg`Sign in the command line`) }),
+            meta: seo({ noIndex: true, title: match.context.i18n._(msg`Approve a code`) }),
         };
     },
 });

@@ -37,7 +37,9 @@ use crate::hmac::to_hex;
 const INSTALL_DIR: &str = "acp-agents";
 const STAGING_DIR: &str = ".staging";
 const TRASH_DIR: &str = ".trash";
-const UNPACKED_DIR: &str = "unpacked";
+/// Where a download being installed is kept: not under the staging folder, whose old entries are swept as abandoned.
+pub(crate) const INSTALLING_DIR: &str = ".installing";
+pub(crate) const UNPACKED_DIR: &str = "unpacked";
 const MAX_UNPACKED_BYTES: u64 = 2 * 1024 * 1024 * 1024;
 const MAX_ENTRIES: usize = 20_000;
 /// All of a registry entry's variables together (names and values), so that starting the agent cannot fail on the
@@ -93,7 +95,7 @@ fn valid_version(version: &str) -> bool {
 }
 
 /// `path` as a relative path of plain names. `.` is dropped; an absolute path, a drive prefix or `..` is refused.
-fn safe_relative(path: &Path) -> Result<PathBuf, String> {
+pub(crate) fn safe_relative(path: &Path) -> Result<PathBuf, String> {
     let mut clean = PathBuf::new();
 
     for component in path.components() {
@@ -124,7 +126,7 @@ fn validate(request: &InstallRequest) -> Result<(), String> {
 
 /// The registry-supplied text every install shares: a plain version, bounded publisher and source, and variables
 /// that pass the checks of a typed one.
-fn validate_provenance(
+pub(crate) fn validate_provenance(
     version: &str,
     publisher: &str,
     source: &str,
@@ -227,7 +229,7 @@ impl DeviceState {
     }
 
     /// The archive's canonical path, which must be a file directly inside one folder made by `acp_install_stage`.
-    fn staged_archive(&self, archive: &str) -> Result<PathBuf, String> {
+    pub(crate) fn staged_archive(&self, archive: &str) -> Result<PathBuf, String> {
         let staging = self.install_root().join(STAGING_DIR);
         let staging = fs::canonicalize(&staging)
             .map_err(|_| "no download was staged: start the install again".to_owned())?;
@@ -325,7 +327,7 @@ impl DeviceState {
     /// Moves the verified `unpacked` folder to `final_dir` (`<data dir>/acp-agents/<key>/<version>`) and records
     /// `agent` with its pin. A failure leaves the agent, and any earlier install of the same version, as it was.
     /// Installing over an installed key drops its folder approvals unless it is the same program.
-    fn commit_install(
+    pub(crate) fn commit_install(
         &self,
         agent: &mut AcpAgent,
         unpacked: &Path,
@@ -405,8 +407,16 @@ impl DeviceState {
                         // A launch variable that changed (a registry one the new version adds, drops or sets
                         // differently) is not the program the folders were approved for.
                         || before.env != agent.env
-                        || before.install.as_ref().map(|pin| &pin.sha256)
-                            != agent.install.as_ref().map(|pin| &pin.sha256)
+                        // The same archive can install different dependency code (registry ranges resolve again), so
+                        // an npm install's folder hash counts too. A binary install has none.
+                        || before
+                            .install
+                            .as_ref()
+                            .map(|pin| (&pin.sha256, &pin.tree_sha256))
+                            != agent
+                                .install
+                                .as_ref()
+                                .map(|pin| (&pin.sha256, &pin.tree_sha256))
                     {
                         settings.acp_consents.retain(|c| c.agent_key != agent.key);
                     }
@@ -596,6 +606,33 @@ pub(crate) mod tests_hook {
         }
     }
 
+    type PlanHook = std::sync::Arc<dyn Fn() + Send + Sync>;
+
+    static PLAN_HOOK: Mutex<Option<(String, PlanHook)>> = Mutex::new(None);
+
+    /// Runs `hook` in `acp_spawn_plan` of `key`, after the installed files were checked and before the plan is
+    /// built, where the person's settings can change under a slow check.
+    #[cfg(unix)]
+    pub(crate) fn set_after_hash(key: &str, hook: PlanHook) {
+        *PLAN_HOOK.lock().unwrap() = Some((key.to_owned(), hook));
+    }
+
+    #[cfg(unix)]
+    pub(crate) fn clear_after_hash() {
+        *PLAN_HOOK.lock().unwrap() = None;
+    }
+
+    pub(crate) fn after_hash(key: &str) {
+        let hook = match PLAN_HOOK.lock().unwrap().as_ref() {
+            Some((hooked, hook)) if hooked == key => Some(std::sync::Arc::clone(hook)),
+            _ => None,
+        };
+
+        if let Some(hook) = hook {
+            hook();
+        }
+    }
+
     pub(super) fn after_rename(key: &str) {
         let hook = match HOOK.lock().unwrap().as_ref() {
             Some((hooked, hook)) if hooked == key => Some(std::sync::Arc::clone(hook)),
@@ -612,7 +649,7 @@ fn already_registered(key: &str) -> String {
     format!("an agent with the key “{key}” is already registered by hand: remove it first")
 }
 
-fn create_private_dir(dir: &Path) -> Result<(), String> {
+pub(crate) fn create_private_dir(dir: &Path) -> Result<(), String> {
     #[cfg(unix)]
     {
         use std::os::unix::fs::DirBuilderExt;
@@ -659,7 +696,7 @@ fn remove_entry(path: &Path) {
 
 /// Names this run in the trash: the pid alone is reused by the operating system, so a crashed run's tree would be
 /// taken for a live one's. The start time in nanoseconds makes it unique per run.
-fn run_id() -> &'static str {
+pub(crate) fn run_id() -> &'static str {
     static ID: std::sync::OnceLock<String> = std::sync::OnceLock::new();
 
     ID.get_or_init(|| {

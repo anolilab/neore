@@ -110,6 +110,11 @@ const useKeyboardShortcutHandler = (): ((action: keyof KeyboardShortcuts, event:
                     globalThis.dispatchEvent(new CustomEvent("composer.increaseEffort"));
                     break;
                 }
+                case "jumpToLastMessage": {
+                    // The open thread's listener owns the messages and the scroll (`jump-to-last-message.tsx`).
+                    globalThis.dispatchEvent(new CustomEvent("jumpToLastMessage"));
+                    break;
+                }
                 case "lastItem": {
                     // Navigate to last item
                     const items = focusableItems();

@@ -15,10 +15,10 @@
  */
 import { LunoraError, v } from "lunorash/server";
 
-import type { Id } from "../_generated/dataModel";
+import type { Doc, Id } from "../_generated/dataModel";
 import { internal } from "../_generated/internal";
 import { internalMutation, internalQuery, type MutationCtx, type QueryCtx } from "../_generated/server";
-import { refuseHostThread } from "../acp/lib/host-thread";
+import { isHostRunThread } from "../acp/lib/host-thread";
 import { admittedThreadDb } from "../agent/admitted-thread-db";
 import { requireOwnedThread, requireOwnedThreadIgnoringLock } from "../agent/thread-read-access";
 import {
@@ -146,19 +146,26 @@ export const createGuestLink = authMutation
         // As the withdrawal paths: an archived, trashed, temporary or locked thread holds no link. A locked one must not
         // either way, since changing its passcode re-stamps `lockedAt` without withdrawing links.
         if (thread.deleted === true || thread.isTemporary === true || thread.status === "archived" || isThreadLocked(thread)) {
-            throw new LunoraError("BAD_REQUEST", "This chat cannot be given a guest link.");
+            throw new LunoraError("BAD_REQUEST", "This chat cannot be given a guest link.", { data: { code: "GUEST_LINK_NOT_ALLOWED" } });
         }
 
-        refuseHostThread(thread, "given a guest link");
+        // A coding-agent thread runs on the owner's computer, never from a guest's note: refused with the same code.
+        if (isHostRunThread(thread)) {
+            throw new LunoraError("BAD_REQUEST", "A coding-agent thread runs on your computer and cannot be given a guest link.", {
+                data: { code: "GUEST_LINK_NOT_ALLOWED" },
+            });
+        }
 
         // A worker's conversation takes turns only through a dispatch, so a note left in it could never be sent.
         if (await isWorkerThread(context, threadId)) {
-            throw new LunoraError("BAD_REQUEST", "A worker's conversation cannot be given a guest link.");
+            throw new LunoraError("BAD_REQUEST", "A worker's conversation cannot be given a guest link.", { data: { code: "GUEST_LINK_NOT_ALLOWED" } });
         }
 
         // A new link replaces the old one and everything on it, so notes still waiting are not dropped silently.
         if (discardWaiting !== true && (await hasWaitingNotes(context, threadId))) {
-            throw new LunoraError("BAD_REQUEST", "Deal with the waiting guest messages first, or discard them to make a new link.");
+            throw new LunoraError("BAD_REQUEST", "Deal with the waiting guest messages first, or discard them to make a new link.", {
+                data: { code: "GUEST_NOTES_WAITING" },
+            });
         }
 
         // A few batches cover any thread a guest can fill (a link holds at most `GUEST_MAX_ROWS_PER_LINK` notes). Past that the
@@ -242,7 +249,7 @@ const reviewableNote = async (context: Pick<QueryCtx, "db" | "now">, messageId: 
     const row = await context.db.get("threadGuestMessages", messageId);
 
     if (!row || row.userId !== userId) {
-        throw new LunoraError("NOT_FOUND", "That message is no longer waiting.");
+        throw new LunoraError("NOT_FOUND", "That message is no longer waiting.", { data: { code: "GUEST_NOTE_GONE" } });
     }
 
     await requireOwnedThread(context, row.threadId, userId, unlockProof);
@@ -250,7 +257,7 @@ const reviewableNote = async (context: Pick<QueryCtx, "db" | "now">, messageId: 
     const link = await context.db.get("threadGuestLinks", row.linkId);
 
     if (!link || link.expiresAt <= context.now) {
-        throw new LunoraError("NOT_FOUND", "That guest link has ended.");
+        throw new LunoraError("NOT_FOUND", "That guest link has ended.", { data: { code: "GUEST_LINK_ENDED" } });
     }
 
     return row;
@@ -341,7 +348,7 @@ const reviewedAfterSettle = async (context: MutationCtx, userId: string, message
     const row = (await context.db.get("threadGuestMessages", messageId))!;
 
     if (row.status === "held" && (await sendUnderWay(context, messageId))) {
-        throw new LunoraError("BAD_REQUEST", "That message is being sent.");
+        throw new LunoraError("BAD_REQUEST", "That message is being sent.", { data: { code: "GUEST_NOTE_BEING_SENT" } });
     }
 
     return row;
@@ -525,43 +532,70 @@ export const getGuestView = publicAction
 // Internal: on the owner's shard
 // ---------------------------------------------------------------------------
 
-/** A note `/chat/start` may send for `userId`: theirs, held, on a live link, its send not yet taken. */
-const sendableNote = async (ctx: Pick<QueryCtx, "db" | "now">, messageId: Id<"threadGuestMessages">, userId: string) => {
-    const row = await ctx.db.get("threadGuestMessages", messageId);
-    const link = row ? await ctx.db.get("threadGuestLinks", row.linkId) : null;
+/** Why `/chat/start` cannot send a note: gone or not the caller's, sent already, its send taken, or its link ended. */
+type NoteRefusal = "being-sent" | "ended" | "missing" | "sent";
 
-    return row && row.userId === userId && row.status === "held" && link && link.expiresAt > ctx.now && !(await sendUnderWay(ctx, messageId)) ? row : null;
+/** A note `/chat/start` may send for `userId` (theirs, held, on a live link, its send not yet taken), or why it may not. */
+const noteForSend = async (
+    ctx: Pick<QueryCtx, "db" | "now">,
+    messageId: Id<"threadGuestMessages">,
+    userId: string,
+): Promise<{ refused: NoteRefusal } | { row: Doc<"threadGuestMessages"> }> => {
+    const row = await ctx.db.get("threadGuestMessages", messageId);
+
+    if (!row || row.userId !== userId) {
+        return { refused: "missing" };
+    }
+
+    if (row.status !== "held") {
+        return { refused: "sent" };
+    }
+
+    const link = await ctx.db.get("threadGuestLinks", row.linkId);
+
+    if (!link || link.expiresAt <= ctx.now) {
+        return { refused: "ended" };
+    }
+
+    return (await sendUnderWay(ctx, messageId)) ? { refused: "being-sent" } : { row };
 };
 
-/** `/chat/start`'s read of a note it is asked to send: its text and the chat it was left in, or `null`. */
+const vNoteRefusal = v.object({ refused: v.union(v.literal("being-sent"), v.literal("ended"), v.literal("missing"), v.literal("sent")) });
+
+/** `/chat/start`'s read of a note it is asked to send: its text and the chat it was left in, or why it cannot go. */
 export const getGuestNoteForSend = internalQuery
     .input({ messageId: v.id("threadGuestMessages"), userId: v.string().max(MAX_LENGTH.id) })
-    .output(v.union(v.object({ text: v.string(), threadId: v.string() }), v.null()))
+    .output(v.union(v.object({ text: v.string(), threadId: v.string() }), vNoteRefusal))
     .query(async ({ args, ctx }) => {
-        const row = await sendableNote(ctx, args.messageId, args.userId);
+        const note = await noteForSend(ctx, args.messageId, args.userId);
 
-        return row ? { text: row.text, threadId: row.threadId as string } : null;
+        return "refused" in note ? note : { text: note.row.text, threadId: note.row.threadId as string };
     });
 
-/** Takes the note's send for `/chat/start`: one winner however often it is sent. Its fence, or `null` when it cannot be sent. */
+/** Takes the note's send for `/chat/start`: one winner however often it is sent. Its fence, or why it cannot be sent. */
 export const claimGuestNoteSend = internalMutation
     .input({ messageId: v.id("threadGuestMessages"), userId: v.string().max(MAX_LENGTH.id) })
-    .output(v.union(v.number(), v.null()))
+    .output(v.union(v.object({ fence: v.number() }), vNoteRefusal))
     .mutation(async ({ args, ctx }) => {
         // Only the note's owner reaches the settle: marked sent when its message was saved after all, freed otherwise.
-        const note = await ctx.db.get("threadGuestMessages", args.messageId);
+        const owned = await ctx.db.get("threadGuestMessages", args.messageId);
 
-        if (note?.userId !== args.userId) {
-            return null;
+        if (owned?.userId !== args.userId) {
+            return { refused: "missing" as const };
         }
 
         await settleSend(ctx, args.messageId);
 
-        if (!(await sendableNote(ctx, args.messageId, args.userId))) {
-            return null;
+        const note = await noteForSend(ctx, args.messageId, args.userId);
+
+        if ("refused" in note) {
+            return note;
         }
 
-        return await claimFence(ctx, GUEST_SEND_SCOPE, args.messageId, { ttlMs: GUEST_SEND_CLAIM_TTL_MS, userId: args.userId });
+        const fence = await claimFence(ctx, GUEST_SEND_SCOPE, args.messageId, { ttlMs: GUEST_SEND_CLAIM_TTL_MS, userId: args.userId });
+
+        // Another send took it in the meantime.
+        return fence === null ? { refused: "being-sent" as const } : { fence };
     });
 
 /** The note is saved as `savedMessageId`: one write records it on the send that still holds the claim and marks the note sent. */

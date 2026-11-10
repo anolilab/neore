@@ -48,7 +48,7 @@ interface DeviceView {
     projectIds?: string[];
     toolNames: string[];
     /** `ssh`: a server this desktop reaches over SSH and speaks for. */
-    transport?: "ssh";
+    transport?: "headless" | "ssh";
     /** The computer reported a protocol older than the backend serves: it gets no calls until it is updated. */
     updateRequired?: boolean;
     viaDeviceId?: string;
