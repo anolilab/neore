@@ -107,7 +107,8 @@ export const defaultKeyboardShortcuts: KeyboardShortcuts = {
     firstItem: "home",
     focusSearch: `${platformModifier}+shift+f`,
     help: `${platformModifier}+/`,
-    jumpToLastMessage: `${platformModifier}+shift+j`,
+    // Ctrl+Shift+J is the devtools console in common browsers and never reaches the page; Shift+ArrowUp is free to web pages.
+    jumpToLastMessage: `${platformModifier}+shift+arrowup`,
     lastItem: "end",
     newChat: `${platformModifier}+n`,
     newTemporaryChat: `${platformModifier}+shift+n`,
