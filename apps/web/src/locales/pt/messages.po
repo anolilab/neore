@@ -6342,6 +6342,7 @@ msgid "clock"
 msgstr "relógio"
 
 #: ../../packages/ui/src/components/ai-elements/artifact.tsx:31
+#: ../../packages/ui/src/components/countdown-toast-card.tsx:149
 #: ../../packages/ui/src/components/data-grid/data-grid-keyboard-shortcuts.tsx:329
 #: ../../packages/ui/src/components/dialog.tsx:84
 #: ../../packages/ui/src/components/image-editor.tsx:264
@@ -32970,6 +32971,10 @@ msgstr "Esta mensagem excede o limite de {limit} caracteres. Encurte-a."
 #: src/features/chat/thread/copy-prompt-link-action.tsx:60
 msgid "This message is too long to copy as a prompt link."
 msgstr "Esta mensagem é longa demais para copiar como link de prompt."
+
+#: ../../packages/ui/src/components/countdown-toast-card.tsx:56
+msgid "This message will close in {value, plural, one {# second} other {# seconds}}"
+msgstr ""
 
 #: src/features/chat/thread/composer-effort-shortcuts.tsx:67
 msgid "This model has no reasoning effort"
