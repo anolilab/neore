@@ -1,6 +1,6 @@
 import { api } from "@neore/backend/api";
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect, fireEvent, userEvent, waitFor } from "storybook/test";
+import { expect, userEvent, waitFor } from "storybook/test";
 
 import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
 import { Route as ThreadRoute } from "@/routes/(chat)/chat/$threadId";
@@ -324,13 +324,14 @@ export const JumpToLastMessage: Story = {
             expect(isCentred()).toBe(true);
         }, STATE_WAIT);
 
-        // Back up again; the shortcut (Ctrl+Shift+J here, where the platform modifier is Ctrl) brings the question back.
+        // Back up again; the shortcut (Ctrl+Shift+ArrowUp here, where the platform modifier is Ctrl) brings the question back. A real
+        // key sequence, not one synthetic keydown, so the keyup and focus that a person's press also produces are exercised.
         scroller.scrollTop = 0;
         await waitFor(() => {
             expect(isCentred()).toBe(false);
         }, STATE_WAIT);
 
-        fireEvent.keyDown(document.activeElement ?? document.body, { code: "KeyJ", ctrlKey: true, key: "J", shiftKey: true });
+        await userEvent.keyboard("{Control>}{Shift>}{ArrowUp}{/Shift}{/Control}");
         await waitFor(() => {
             expect(isCentred()).toBe(true);
         }, STATE_WAIT);
