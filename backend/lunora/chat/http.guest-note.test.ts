@@ -284,6 +284,18 @@ describe("/chat/start with a held guest note", () => {
         expect(saved.prompts).toHaveLength(1);
     });
 
+    it("refuses a note another send holds as being sent, not as already sent, and keeps it waiting", async () => {
+        expect(await run(async (ctx) => await ctx.runMutation(claimGuestNoteSend, { messageId: noteId, userId: OWNER }))).toHaveProperty("fence");
+
+        const response = await sendNote();
+
+        expect(response.status).toBe(409);
+        expect(await response.json()).toMatchObject({ error: "GUEST_NOTE_BEING_SENT" });
+        expect(saved.prompts).toHaveLength(0);
+        expect(saved.charges).toBe(0);
+        expect(await noteStatus()).toBe("held");
+    });
+
     it("refuses a note whose link ended between its lookup and its claim as an ended link, not as sent", async () => {
         const lookupThenEnd = {
             "chat_guest_links:getGuestNoteForSend": async (args: any) => {
