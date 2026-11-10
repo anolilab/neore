@@ -4281,7 +4281,7 @@ export interface Caller {
             getLowRiskTrustedServers: (args: { userId: string }) => Promise<Array<string>>;
             getPendingToolApproval: (args: { approvalId: string; threadId: string; userId: string }) => Promise<{ toolName: string | null } | null>;
             getThreadPermissionMode: (args: { threadId: Id<"threads">; userId: string }) => Promise<"supervised" | "auto" | "full" | null>;
-            getThreadPermissionModeForApp: (args: { threadId: string; userId: string }) => Promise<{ allowed: boolean; connectorAccess: Array<{ connectorSlug: string; level: "read_only" | "read_write" | "none" }>; mode: "supervised" | "auto" | "full" | null }>;
+            getThreadPermissionModeForApp: (args: { threadId: string; userId: string }) => Promise<{ allowed: boolean; connectorAccess: Array<{ connectorSlug: string; level: "read_only" | "read_write" | "none" }>; mode: "supervised" | "auto" | "full" | null; organizationId: string | null }>;
             getToolPermissionGrantsQuery: (args: { userId: string }) => Promise<Record<string, number>>;
             getToolPermissionSettings: (args?: {}) => Promise<{ autoApproveLowRisk: boolean; builtIn: Array<{ available: boolean; category: string; defaultMode: "auto" | "ask" | "off"; key: string; name: string }>; grants: Record<string, number>; lowRiskTrustedServers: Array<string>; overrides: Record<string, "auto" | "ask" | "off"> }>;
             getToolPermissionsQuery: (args: { userId: string }) => Promise<Record<string, "auto" | "ask" | "off">>;

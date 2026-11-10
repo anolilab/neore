@@ -24,11 +24,14 @@ const state = vi.hoisted(() => {
         overrides: {} as Record<string, string>,
         seenTokens: [] as string[],
         shard: "alice",
-        thread: { allowed: true, mode: null } as {
+        thread: { allowed: true, mode: null, organizationId: null } as {
             allowed: boolean;
             connectorAccess?: { connectorSlug: string; level: string }[];
             mode: string | null;
+            organizationId?: string | null;
         },
+        /** The cap of the organization the chat is filed in (its policy); read only for a chat that names one. */
+        threadCap: "auto" as "auto" | "ask" | "off",
         unresolved: undefined as "session" | "unavailable" | undefined,
     };
 });
@@ -59,7 +62,7 @@ vi.mock("../../lib/cross-shard", () => {
         callOnShard: async (_ref: unknown, _args: unknown, options: { shardKey: string }) => {
             state.crossed.push(options.shardKey);
 
-            return { connectorAccess: [], ...state.thread };
+            return { connectorAccess: [], organizationId: null, ...state.thread };
         },
     };
 });
@@ -145,6 +148,10 @@ const context = {
             return { connectorAccess: [], ...state.thread };
         }
 
+        if (ref.__lunoraRef === "auth_organization_policy:getPermissionCapQuery") {
+            return state.threadCap;
+        }
+
         if (ref.__lunoraRef === "connectors_access:listUserConnectorAccessForSlug") {
             if (state.accessFails) {
                 throw new Error("access unavailable");
@@ -196,7 +203,8 @@ beforeEach(() => {
     state.crossed = [];
     state.overrides = {};
     state.shard = "alice";
-    state.thread = { allowed: true, mode: null };
+    state.thread = { allowed: true, mode: null, organizationId: null };
+    state.threadCap = "auto";
     state.seenTokens = [];
     state.access = [];
     state.accessFails = false;
@@ -397,7 +405,7 @@ describe("MCP Apps proxy with an OAuth grant", () => {
     it("refuses a collaborator the owner's shard does not admit", async () => {
         oauthConfig("fresh");
         state.shard = "owner";
-        state.thread = { allowed: false, mode: null };
+        state.thread = { allowed: false, mode: null, organizationId: null };
 
         const response = await callMCPToolFromAppHttpAction(context, post({ arguments: {}, serverName: "Notion", toolName: "search" }));
 
@@ -429,6 +437,33 @@ describe("MCP Apps proxy with an OAuth grant", () => {
         expect(JSON.stringify(await response.json())).toContain("needs your approval");
     });
 
+    it("caps a call by the organization of the chat it is shown in, even when the caller's own space would allow it", async () => {
+        const oauth = oauthConfig("fresh");
+
+        // The caller has switched to the personal space (`auto`), but the chat is filed in an organization capped at `ask`.
+        state.thread = { allowed: true, mode: null, organizationId: "org-thread" };
+        state.threadCap = "ask";
+        state.overrides = { "connector:notion:search": "auto" };
+
+        const response = await callMCPToolFromAppHttpAction(context, post({ arguments: {}, serverName: "Notion", toolName: "search" }));
+
+        expect(response.status).toBe(403);
+        await expect(response.json()).resolves.toMatchObject({ error: expect.stringContaining("organization's tool policy") });
+        expect(state.connects).toBe(0);
+        expect(oauth.refresh).not.toHaveBeenCalled();
+    });
+
+    it("keeps the session's cap when it is the stricter one, for a chat in the personal space", async () => {
+        oauthConfig("fresh");
+        state.cap = "ask";
+        state.overrides = { "connector:notion:search": "auto" };
+
+        const response = await callMCPToolFromAppHttpAction(context, post({ arguments: {}, serverName: "Notion", toolName: "search" }));
+
+        expect(response.status).toBe(403);
+        expect(state.connects).toBe(0);
+    });
+
     it("runs a read-only tool that names no thread, as the default does, and still refuses one that would ask", async () => {
         // The older clients: a call with no thread must not lose the read-only tools they always ran.
         oauthConfig("fresh");
@@ -444,7 +479,7 @@ describe("MCP Apps proxy with an OAuth grant", () => {
         // The route runs on the caller's shard (`onCallerShard`), which is the owner's shard for the owner's own thread: no cross-shard call.
         oauthConfig("fresh");
         state.shard = "alice";
-        state.thread = { allowed: true, mode: "auto" };
+        state.thread = { allowed: true, mode: "auto", organizationId: null };
 
         const response = await callMCPToolFromAppHttpAction(context, post({ arguments: {}, serverName: "Notion", toolName: "search" }));
 
@@ -454,7 +489,7 @@ describe("MCP Apps proxy with an OAuth grant", () => {
 
     it("refuses a thread the caller cannot reach", async () => {
         oauthConfig("fresh");
-        state.thread = { allowed: false, mode: null };
+        state.thread = { allowed: false, mode: null, organizationId: null };
 
         const response = await callMCPToolFromAppHttpAction(context, post({ arguments: {}, serverName: "Notion", toolName: "search" }));
 
@@ -463,7 +498,7 @@ describe("MCP Apps proxy with an OAuth grant", () => {
 
     it("applies a supervised thread's mode: a server's read-only hint no longer runs unasked, a tool the user allowed still does", async () => {
         oauthConfig("fresh");
-        state.thread = { allowed: true, mode: "supervised" };
+        state.thread = { allowed: true, mode: "supervised", organizationId: null };
         state.overrides = { "connector:notion:create_page": "auto" };
 
         const lookup = await callMCPToolFromAppHttpAction(context, post({ arguments: {}, serverName: "Notion", toolName: "search" }));
@@ -557,7 +592,7 @@ describe("MCP Apps proxy with an OAuth grant", () => {
 
     it("keeps a tool that needs approval refused under full access: an iframe is not the model's turn", async () => {
         oauthConfig("fresh");
-        state.thread = { allowed: true, mode: "full" };
+        state.thread = { allowed: true, mode: "full", organizationId: null };
 
         // Unannotated: the default is `ask`, which `full` would lift to `auto` for the model's own calls.
         const response = await callMCPToolFromAppHttpAction(context, post({ arguments: {}, serverName: "Notion", toolName: "create_page" }));

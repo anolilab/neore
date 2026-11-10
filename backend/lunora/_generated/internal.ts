@@ -565,7 +565,7 @@ export interface InternalApiTypes {
             getLowRiskTrustedServers: FunctionReference<"query", { userId: string }, Array<string>>;
             getPendingToolApproval: FunctionReference<"query", { approvalId: string; threadId: string; userId: string }, { toolName: string | null } | null>;
             getThreadPermissionMode: FunctionReference<"query", { threadId: Id<"threads">; userId: string }, "supervised" | "auto" | "full" | null>;
-            getThreadPermissionModeForApp: FunctionReference<"query", { threadId: string; userId: string }, { allowed: boolean; connectorAccess: Array<{ connectorSlug: string; level: "read_only" | "read_write" | "none" }>; mode: "supervised" | "auto" | "full" | null }>;
+            getThreadPermissionModeForApp: FunctionReference<"query", { threadId: string; userId: string }, { allowed: boolean; connectorAccess: Array<{ connectorSlug: string; level: "read_only" | "read_write" | "none" }>; mode: "supervised" | "auto" | "full" | null; organizationId: string | null }>;
             getToolPermissionGrantsQuery: FunctionReference<"query", { userId: string }, Record<string, number>>;
             getToolPermissionsQuery: FunctionReference<"query", { userId: string }, Record<string, "auto" | "ask" | "off">>;
             pruneExpiredToolPermissionGrants: FunctionReference<"mutation", {}, null>;
