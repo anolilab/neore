@@ -163,23 +163,33 @@ describe("modeOfThread", () => {
         expect(await modeOf([comparison("parent")], { _id: "host", runner: "host", userId: "u1" })).toBeNull();
     });
 
-    it("keeps the owner's full access from a collaborator, and runs an orphaned column on its own mode or supervised", async () => {
+    it("keeps the owner's full access from a collaborator", async () => {
         expect(await modeOf([], threads.full as never)).toBe("full");
         expect(await modeOf([], threads.full as never, "u2")).toBeNull();
-        expect(await modeOf([comparison("gone")], { _id: "child", permissionMode: "auto", userId: "u1" })).toBe("auto");
-        expect(await modeOf([comparison("gone")])).toBe("supervised");
-        expect(await modeOf([comparison("gone")], threads.full as never, "u2")).toBe("supervised");
     });
 
-    it("fails closed on two comparison parents, and on link rows that reach the read bound", async () => {
-        expect(await modeOf([comparison("full"), comparison("parent")])).toBe("supervised");
-
+    it("falls back to the thread's own stored mode, or none, when no single parent can be shown to apply", async () => {
+        const own = { _id: "child", permissionMode: "auto", userId: "u1" };
         // 50 is the read bound (`MAX_LINKS_CHECKED`): a comparison past it would be unseen.
         const bounded = Array.from({ length: 50 }, () => {
             return { ...other };
         });
 
-        expect(await modeOf([comparison("full"), ...bounded.slice(1)])).toBe("supervised");
+        // A parent that is gone, or in the trash.
+        threads.trashed = { _id: "trashed", deleted: true, permissionMode: "supervised", userId: "u1" };
+
+        for (const links of [
+            [comparison("gone")],
+            [comparison("trashed")],
+            [comparison("full"), comparison("parent")],
+            [comparison("full"), ...bounded.slice(1)],
+        ]) {
+            expect(await modeOf(links)).toBeNull();
+            expect(await modeOf(links, own)).toBe("auto");
+            expect(await modeOf(links, { ...own, permissionMode: "full" }, "u2")).toBeNull();
+        }
+
         await expect(isComparisonColumn({ db: databaseWith([...bounded, comparison("parent")]) } as never, "child" as never)).resolves.toBe(true);
+        await expect(isComparisonColumn({ db: databaseWith([comparison("trashed")]) } as never, "child" as never)).resolves.toBe(false);
     });
 });

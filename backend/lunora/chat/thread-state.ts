@@ -113,6 +113,11 @@ export const setThreadPermissionMode = authMutation
     })
     .output(v.null())
     .mutation(async ({ args: { mode, threadId }, ctx: context }) => {
+        // `full` lets the owner's tools run unasked: an admin acting as the owner must not widen what the owner's runs may do.
+        if (context.user.impersonatedBy) {
+            throw new LunoraError("FORBIDDEN", "The permission mode cannot be changed while impersonating");
+        }
+
         const thread = await requireOwnedThreadIgnoringLock(context, threadId, context.user.userId);
 
         if (thread.runner === "host") {

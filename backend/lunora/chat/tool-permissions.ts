@@ -212,11 +212,14 @@ const linksOf = async (ctx: QueryCtx, threadId: Id<"threads">) =>
         .withIndex("by_thread", (q) => q.eq("threadId", threadId))
         .take(MAX_LINKS_CHECKED);
 
+/** A parent that is gone, or in the trash, gives a column nothing to take a mode from. */
+const isLive = (parent: Doc<"threads"> | null): parent is Doc<"threads"> => parent !== null && parent.deleted !== true;
+
 /**
- * Whether a thread is a LIVE comparison column: one of its comparison links names a parent row that still exists. Its runs take that
+ * Whether a thread is a LIVE comparison column: one of its comparison links names a parent row that still exists and is not trashed. Its runs take that
  * parent's mode, so a mode set on it would never apply (`setThreadPermissionMode` refuses it). A column whose parent is gone has no
  * parent to take a mode from, so it is not one. A read that reached the bound may hold a live comparison beyond it, so it counts as one
- * (the same fail-closed rule as `modeOfThread`, which runs such a thread supervised).
+ * (the setter refuses it; `modeOfThread` runs such a thread under its own stored mode).
  */
 export const isComparisonColumn = async (ctx: QueryCtx, threadId: Id<"threads">): Promise<boolean> => {
     const links = await linksOf(ctx, threadId);
@@ -229,7 +232,7 @@ export const isComparisonColumn = async (ctx: QueryCtx, threadId: Id<"threads">)
         links.filter((link) => link.branchType === "comparison").map(async (link) => await ctx.db.get("threads", link.parentThreadId)),
     );
 
-    return parents.some((parent) => parent !== null);
+    return parents.some((parent) => isLive(parent));
 };
 
 /**
@@ -246,17 +249,18 @@ export const modeOfThread = async (ctx: QueryCtx, thread: Doc<"threads"> | null,
     // is listed first. The rows per child are few; the bound only keeps a runaway row count from being read whole.
     const links = await linksOf(ctx, thread._id);
 
-    // A read that hit the bound may have cut off links, and a cut-off comparison could be the restrictive one: whatever the rows read
-    // show, the thread cannot be shown to have only the comparison it shows, so it runs supervised.
+    // A read that hit the bound may have cut off links, so no parent can be shown to be the one: the thread's own stored mode applies
+    // (none stored: the defaults, as for any thread without a mode).
     if (links.length >= MAX_LINKS_CHECKED) {
-        return "supervised";
+        return modeFor(thread, userId);
     }
 
     const comparisons = links.filter((link) => link.branchType === "comparison");
 
-    // Two comparison links name two parents, and neither one's mode is the column's: fail closed rather than take whichever is listed first.
+    // Two comparison links name two parents, and neither one's mode is the column's: the thread's own stored mode applies rather than
+    // whichever parent is listed first.
     if (new Set(comparisons.map((link) => link.parentThreadId)).size > 1) {
-        return "supervised";
+        return modeFor(thread, userId);
     }
 
     const [comparison] = comparisons;
@@ -266,13 +270,12 @@ export const modeOfThread = async (ctx: QueryCtx, thread: Doc<"threads"> | null,
     if (comparison) {
         const parent = await ctx.db.get("threads", comparison.parentThreadId);
 
-        if (parent) {
+        if (isLive(parent)) {
             return modeFor(parent, userId);
         }
 
-        // A parent that is gone leaves its link rows behind, so the column has no parent to take a mode from: its own mode applies, and
-        // supervised when it holds none. A collaborator's `full` is the owner's to give, so it counts as none (supervised).
-        return modeFor(thread, userId) ?? "supervised";
+        // A parent that is gone or trashed leaves its link rows behind, so the column has no parent to take a mode from: its own stored
+        // mode applies (none stored: the defaults).
     }
 
     return modeFor(thread, userId);

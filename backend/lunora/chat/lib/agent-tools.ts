@@ -196,8 +196,8 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
 
                       return [];
                   }),
-        // A headless run ignores the thread's mode, so it does not read it. A failed read falls back to the restrictive mode: a
-        // read that fails must not restore the automatic defaults for tools the thread's mode would ask about.
+        // A headless run ignores the thread's mode, so it does not read it. A failed read fails closed (supervised) even for a
+        // thread with no stored mode: the read cannot tell, and restoring the automatic defaults could undo a mode the owner chose.
         headless || modeThreadId === undefined
             ? null
             : ctx

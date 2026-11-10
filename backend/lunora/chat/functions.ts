@@ -3565,16 +3565,12 @@ export const branchThread = authAction
         });
         const newThreadId: string = newThread._id;
 
-        // A branch keeps the mode its source runs under (`modeOfThread`): a stricter mode must not drop to the defaults.
+        // A branch keeps the mode its source thread STORES (never one inferred from a comparison parent): a stricter mode must not
+        // drop to the defaults. Only the owner branches, so the owner's `full` stays the owner's.
         try {
-            const sourceMode = await context.runQuery(internal.chat.tool_permissions.getThreadPermissionMode, {
-                threadId: parentThread._id as Id<"threads">,
-                userId,
-            });
-
-            if (sourceMode) {
+            if (parentThread.permissionMode) {
                 await context.runMutation(internal.chat.thread_state.copyThreadPermissionMode, {
-                    mode: sourceMode,
+                    mode: parentThread.permissionMode,
                     threadId: newThreadId,
                 });
             }
