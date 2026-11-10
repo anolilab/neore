@@ -246,7 +246,9 @@ describe("permission mode control", () => {
 
         const button = (await screen.findByRole("button", { name: "Permission mode: Supervised" })) as HTMLButtonElement;
 
-        expect(button.disabled).toBe(true);
+        // Read-only but focusable, so a keyboard user can reach the note.
+        expect(button.disabled).toBe(false);
+        expect(button.getAttribute("aria-disabled")).toBe("true");
         expect(screen.getByText("This comparison's mode applies to every column. Change it on the comparison.")).toBeTruthy();
     });
 
@@ -271,7 +273,9 @@ describe("permission mode control", () => {
 
         const button = (await screen.findByRole("button", { name: "Permission mode: Auto" })) as HTMLButtonElement;
 
-        expect(button.disabled).toBe(true);
+        // Read-only but focusable, so a keyboard user can reach the note.
+        expect(button.disabled).toBe(false);
+        expect(button.getAttribute("aria-disabled")).toBe("true");
     });
 
     it("is hidden while an admin impersonates the owner", async () => {

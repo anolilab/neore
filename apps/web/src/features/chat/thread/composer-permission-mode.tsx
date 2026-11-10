@@ -50,28 +50,39 @@ export const ComposerPermissionMode: FC<ComposerPermissionModeProps> = ({ disabl
     };
 
     const noteId = useId();
+    const buttonClass =
+        "bg-sidebar border-border dark:border-sidebar-border/15 hover:bg-accent/50 dark:hover:bg-sidebar-accent/30 text-foreground h-11 gap-1 px-2 sm:h-7 dark:text-white";
+
+    // Read-only with a reason (a comparison column): no menu, and `aria-disabled` rather than `disabled`, so a keyboard user can still
+    // focus the control and hear why it cannot be changed here.
+    if (note) {
+        return (
+            <Button
+                aria-describedby={noteId}
+                aria-disabled="true"
+                aria-label={t`Permission mode: ${labels[mode]}`}
+                className={buttonClass}
+                title={note}
+                variant="outline"
+            >
+                <ShieldCheck aria-hidden="true" className="size-3 shrink-0" />
+                <span className="hidden sm:inline">{labels[mode]}</span>
+                <span className="sr-only" id={noteId}>
+                    {note}
+                </span>
+            </Button>
+        );
+    }
 
     return (
         <DropdownMenu>
             <DropdownMenuTrigger
                 render={
-                    <Button
-                        aria-describedby={note ? noteId : undefined}
-                        aria-label={t`Permission mode: ${labels[mode]}`}
-                        className="bg-sidebar border-border dark:border-sidebar-border/15 hover:bg-accent/50 dark:hover:bg-sidebar-accent/30 text-foreground h-11 gap-1 px-2 sm:h-7 dark:text-white"
-                        disabled={disabled}
-                        variant="outline"
-                    >
+                    <Button aria-label={t`Permission mode: ${labels[mode]}`} className={buttonClass} disabled={disabled} variant="outline">
                         <ShieldCheck aria-hidden="true" className="size-3 shrink-0" />
                         <span className="hidden sm:inline">{labels[mode]}</span>
-                        {note && (
-                            <span className="sr-only" id={noteId}>
-                                {note}
-                            </span>
-                        )}
                     </Button>
                 }
-                title={note}
             />
             <DropdownMenuContent align="start" className="w-72" side="top">
                 <DropdownMenuRadioGroup
@@ -179,7 +190,7 @@ const ComposerThreadPermissionMode: FC = () => {
 
     return (
         <ComposerPermissionMode
-            disabled={isRunning || pending !== undefined || isColumn}
+            disabled={isRunning || pending !== undefined}
             mode={shown}
             note={isColumn ? t`This comparison's mode applies to every column. Change it on the comparison.` : undefined}
             onModeChange={(mode) => {
