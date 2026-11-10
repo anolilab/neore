@@ -414,6 +414,9 @@ export interface ApiTypes {
         };
     };
     connectors: {
+        access: {
+            setTeammateConnectorAccess: FunctionReference<"mutation", { botId: Id<"bots">; connectorSlug: string; level: "read_only" | "read_write" | "none" }, null>;
+        };
         mcp_servers: {
             listMcpServerSignIns: FunctionReference<"query", {}, Array<{ accountLabel?: string; hasRefreshToken: boolean; lastError?: string; scopes: Array<string>; serverName: string; serverUrl: string; status: "connected" | "disconnected" | "expired" | "error"; tokenExpiresAt?: number }>>;
             signOutMcpServer: FunctionReference<"action", { serverName: string }, { revoked: boolean; signedOut: boolean }>;
@@ -1321,6 +1324,9 @@ export const api: ApiTypes = {
         },
     },
     connectors: {
+        access: {
+            setTeammateConnectorAccess: { __lunoraRef: "connectors_access:setTeammateConnectorAccess" },
+        },
         mcp_servers: {
             listMcpServerSignIns: { __lunoraRef: "connectors_mcp_servers:listMcpServerSignIns" },
             signOutMcpServer: { __lunoraRef: "connectors_mcp_servers:signOutMcpServer" },

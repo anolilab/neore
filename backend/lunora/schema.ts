@@ -2821,6 +2821,21 @@ export const schema = defineSchema({
         .index("name", ["name"])
         .triggers((t) => auditTriggersFor(t, "team", AUDIT_TABLES["team"]!)),
 
+    // A teammate's access to one connection (`connectors/access.ts`). No row means the default, read and write. Owned by the
+    // connectors module; erased with the user (`connectors/gdpr.ts`).
+    teammateConnectorAccess: defineTable({
+        botId: v.id("bots"),
+        connectorSlug: v.string().max(200),
+        level: v.union(v.literal("read_only"), v.literal("read_write"), v.literal("none")),
+        updatedAt: v.number(),
+        userId: v.string(),
+    })
+        .shardBy("userId")
+        .index("by_botId_connectorSlug", ["botId", "connectorSlug"])
+        // The app proxy's check for a call that names no thread: every teammate's setting for one connection (`access.ts`).
+        .index("by_userId_connectorSlug", ["userId", "connectorSlug"])
+        .index("by_userId", ["userId"]),
+
     teamMember: defineTable({
         createdAt: v.optional(v.number()),
         // SHA-256 of `[teamId, userId]`, written by better-auth 1.7.3 as its
@@ -2927,7 +2942,6 @@ export const schema = defineSchema({
         .shardBy("userId")
         .index("by_threadId", ["threadId"])
         .index("by_userId", ["userId"]),
-
     threadGoals: defineTable({
         // The highest round whose review has been claimed (`chat/goals/internal.ts#claimGoalRound`):
         // the review job is queued at least once, and only the delivery that claims a round reviews it.
@@ -3000,6 +3014,7 @@ export const schema = defineSchema({
         .index("by_link", ["linkId"])
         .index("by_thread", ["threadId"])
         .index("by_userId", ["userId"]),
+
     threadInvites: defineTable({
         acceptedAt: v.optional(v.number()),
         acceptedBy: v.optional(v.string()),
@@ -3482,7 +3497,6 @@ export const schema = defineSchema({
         .index("by_user_reply", ["userId", "replyKey"])
         // The prune, which serves a whole shard.
         .index("by_recordedAt", ["recordedAt"]),
-
     user: defineTable({
         banExpires: v.optional(v.number()),
         banned: v.optional(v.boolean()),
