@@ -35,6 +35,7 @@ import { isThreadLocked, throwThreadLocked } from "../lib/thread-lock";
 import { readChildThreads } from "./lib/child-threads";
 import { loadNsfwStatuses, type RedactedUIMessage, redactUIMessagesForPublicViewer } from "./lib/public-thread";
 import { threadGateOutcome } from "./lib/thread-gate";
+import { toolResultRowIds, trimToolOutputs } from "./tool-output-trim";
 import { vGoalStatus, vGoalStopReason, vGoalVerdict } from "./goals/validators";
 import type { ThreadTagColor } from "./tags/logic";
 import { MAX_THREAD_TAGS_PER_USER } from "./tags/logic";
@@ -136,14 +137,16 @@ export const getThreadWithData = liteAuthQuery
             context.db.followupSuggestions.findFirst({ orderBy: [{ _creationTime: "asc" }], where: { threadId } }),
         ]);
 
+        // `Doc<"messages">[]` vs the parameter's wire shape: `toUIMessages`
+        // is typed against rows whose branded ids have been widened to
+        // `string` by an output validator, and these come straight from the
+        // DB. Same mismatch as the GDPR export projections — not a real
+        // incompatibility, but the two shapes are structurally distinct.
+        // The first load of a thread: a large tool result the page does not paint is fetched on expand (`getToolOutput`).
+        const uiPage = toUIMessages((await signDocsForDisplay(context, rawMessages.page as never)) as never);
         const messages: PaginationResult<UIMessage> = {
             ...rawMessages,
-            // `Doc<"messages">[]` vs the parameter's wire shape: `toUIMessages`
-            // is typed against rows whose branded ids have been widened to
-            // `string` by an output validator, and these come straight from the
-            // DB. Same mismatch as the GDPR export projections — not a real
-            // incompatibility, but the two shapes are structurally distinct.
-            page: toUIMessages((await signDocsForDisplay(context, rawMessages.page as never)) as never),
+            page: access.kind === "full" ? trimToolOutputs(uiPage, threadId, toolResultRowIds(rawMessages.page)) : uiPage,
         };
 
         const summed = sumStepUsage(usageMessages.page.map((message) => message.usage as StepUsage | undefined));

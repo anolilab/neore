@@ -1,0 +1,69 @@
+# Measures what a thread load and a live reply send, and uploads the result for
+# `thread-transfer-report.yml`. It runs on every pull request and every push to `main`:
+# the `main` runs are the baseline a pull request is compared with, so none can be skipped
+# by a path filter.
+name: "Thread transfer"
+
+on: # yamllint disable-line rule:truthy
+    pull_request:
+        types: ["opened", "synchronize", "reopened"]
+    push:
+        branches: ["main"]
+
+concurrency:
+    group: "${{ github.workflow }}-${{ github.ref }}"
+    cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+    contents: "read"
+
+jobs:
+    measure:
+        name: "Measure thread transfer"
+        runs-on: "ubuntu-24.04"
+        timeout-minutes: 30
+        steps:
+            - name: "Harden Runner"
+              uses: "step-security/harden-runner@46b06cea07f9e64621fdf066ba77ac6915163d43" # v2.22.3
+              with:
+                  egress-policy: "audit"
+
+            - name: "Git checkout"
+              uses: "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1" # v7.0.1
+              with:
+                  persist-credentials: false
+
+            - name: "Setup resources and environment"
+              uses: "anolilab/workflows/step/setup@1f3a7f7e561f7690fe19dea5d2ed225def53c908" # v26.0.6
+              with:
+                  enable-nx-cache: "false"
+                  node-version: "24.22.1"
+                  npm-version: "11"
+
+            - name: "Build workspace packages"
+              run: "pnpm run build:packages"
+
+            - name: "Measure the thread snapshot (backend)"
+              env:
+                  NEORE_TRANSFER_BUDGET_DIR: "${{ runner.temp }}/thread-transfer-parts"
+              run: "pnpm --filter @neore/backend exec vitest run lunora/chat/transfer-budget.test.ts"
+
+            # A breached ceiling fails its test after the part file is written. These steps still run, so the report shows the numbers; the job stays failed.
+            - name: "Measure the live reply (gateway)"
+              if: "${{ !cancelled() }}"
+              env:
+                  NEORE_TRANSFER_BUDGET_DIR: "${{ runner.temp }}/thread-transfer-parts"
+              run: "pnpm --filter llm-gateway exec vitest run src/__tests__/transfer-budget.test.ts"
+
+            - name: "Assemble the result"
+              if: "${{ !cancelled() }}"
+              run: 'node .github/scripts/thread-transfer-report.cjs assemble "$RUNNER_TEMP/thread-transfer-parts" "$RUNNER_TEMP/thread-transfer-result.json"'
+
+            - name: "Upload thread transfer result"
+              if: "${{ !cancelled() }}"
+              uses: "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a" # v7.0.1
+              with:
+                  name: "thread-transfer-results"
+                  path: "${{ runner.temp }}/thread-transfer-result.json"
+                  if-no-files-found: "error"
+                  retention-days: 30

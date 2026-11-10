@@ -692,6 +692,7 @@ export const ROUTES: ReadonlyArray<RouteDefinition> = [
         handler: async (input) => {
             const page = await notFoundIfLocked(() =>
                 input.ctx.runQuery(api.chat.functions.getThreadUIMessages, {
+                    fullToolOutputs: true,
                     paginationOpts: { cursor: decodeNativeCursor(input.query["cursor"]), numItems: parseLimit(input.query["limit"]) },
                     threadId: idParameter(input, "threadId") as Id<"threads">,
                 }),
