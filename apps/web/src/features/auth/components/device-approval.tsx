@@ -124,7 +124,7 @@ const Review = ({ email, lookup, onRefresh, userCode }: ReviewProps) => {
     const outcomes: Record<Decision, { detail: string; title: string }> = isHost
         ? {
               approved: {
-                  detail: t`Return to your terminal: the machine is paired. Choose projects for it in Settings, or it won't be used in any chat. You can close this tab.`,
+                  detail: t`Return to the machine: it finishes pairing on its next check and says so in its terminal. Then choose projects for it in Settings, or the assistant won't use it in any chat. You can close this tab.`,
                   title: t`Approved`,
               },
               denied: { detail: t`The machine was not paired. You can close this tab.`, title: t`Denied` },
@@ -204,7 +204,7 @@ const Review = ({ email, lookup, onRefresh, userCode }: ReviewProps) => {
                 {isHost ? (
                     <>
                         <p className="text-center text-sm text-gray-700">
-                            {t`The machine below will become a device of ${email}. The assistant can run tools on it in your chats until you revoke it in Settings. It won't be used in any chat until you choose projects for it in Settings. Its device secret goes only to that machine, never to this page.`}
+                            {t`The machine below will become a device of ${email}. Until you revoke it in Settings, the assistant can run tools on it in the chats of the projects you choose for it there, and you can start coding agents on it yourself. The assistant won't use it in any chat until you choose projects. Its device secret goes only to that machine, never to this page.`}
                         </p>
                         <MachineCodeDetails code={formatCode(userCode)} hostname={lookup.hostname} platform={lookup.platform} storage={lookup.storage} />
                     </>

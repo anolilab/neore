@@ -89,9 +89,10 @@ describe("DeviceApproval", () => {
         const page = document.body.textContent ?? "";
 
         expect(page).toContain("neore-host pair");
-        expect(page).toContain("tools on it in your chats");
+        expect(page).toContain("tools on it in the chats of the projects you choose");
         expect(page).toContain("Its device secret goes only to that machine, never to this page.");
-        expect(page).toContain("It won't be used in any chat until you choose projects for it in Settings.");
+        expect(page).toContain("The assistant won't use it in any chat until you choose projects.");
+        expect(page).toContain("you can start coding agents on it yourself");
         expect(page).not.toMatch(API_KEY_WORDING);
     });
 
@@ -151,8 +152,10 @@ describe("DeviceApproval", () => {
 
         const live = screen.getByRole("status").textContent ?? "";
 
-        expect(live).toContain("the machine is paired");
-        expect(live).toContain("Choose projects for it in Settings");
+        // Approval is recorded here; the machine registers on its next poll, which can still fail.
+        expect(live).toContain("it finishes pairing on its next check");
+        expect(live).not.toContain("is paired");
+        expect(live).toContain("choose projects for it in Settings");
         expect(live).not.toContain("command line");
     });
 
