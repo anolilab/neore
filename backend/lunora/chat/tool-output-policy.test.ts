@@ -22,8 +22,15 @@ const blockNames = (source: string, startPattern: RegExp, keyPattern: RegExp): s
     return [...source.slice(start, end).matchAll(keyPattern)].map((match) => match[1] as string);
 };
 
+// A tool entry in a registry object literal: four spaces, then its name and a colon.
+const TOOL_KEY = /^\s{4}(\w+):/gmu;
+const TOOL_VIEWS_START = /const TOOL_VIEWS/u;
+const TOOL_WIDGETS_START = /const TOOL_WIDGETS/u;
+
 const big = "x".repeat(TOOL_OUTPUT_INLINE_BYTES + 1);
-const part = (type: string, extra: Record<string, unknown> = {}) => ({ state: "output-available", type, ...extra });
+const part = (type: string, extra: Record<string, unknown> = {}) => {
+    return { state: "output-available", type, ...extra };
+};
 
 describe("tool output policy", () => {
     it("keeps the output of a tool whose own view reads it, whatever its size", () => {
@@ -52,7 +59,7 @@ describe("tool output policy", () => {
         const message = { id: "m1", parts: [{ input: {}, output: big, state: "output-available", toolCallId: "call-1", type: "tool-docs_search" }] };
 
         const [trimmed] = trimToolOutputs([message] as never, "thread-1", ids);
-        const [trimmedPart] = (trimmed as { parts: Array<Record<string, unknown>> }).parts;
+        const [trimmedPart] = (trimmed as { parts: Record<string, unknown>[] }).parts;
 
         expect(trimmedPart).toMatchObject({
             outputRef: { messageId: "row-result", threadId: "thread-1", toolCallId: "call-1" },
@@ -70,8 +77,8 @@ describe("tool output policy", () => {
 
     it("names every tool a renderer reads output for, so a new view cannot silently lose its output", () => {
         // Names are read from the renderers' own registries and sets, so adding a view there fails this test until the policy lists it.
-        const viewNames = blockNames(repoFile("apps/web/src/features/chat/thread/message-content.tsx"), /const TOOL_VIEWS/u, /^\s{4}(\w+):/gmu);
-        const widgetNames = blockNames(repoFile("apps/web/src/features/chat/thread/widgets/index.tsx"), /const TOOL_WIDGETS/u, /^\s{4}(\w+):/gmu);
+        const viewNames = blockNames(repoFile("apps/web/src/features/chat/thread/message-content.tsx"), TOOL_VIEWS_START, TOOL_KEY);
+        const widgetNames = blockNames(repoFile("apps/web/src/features/chat/thread/widgets/index.tsx"), TOOL_WIDGETS_START, TOOL_KEY);
         const chatUiTypes = [...repoFile("packages/chat-ui/src/chat/message-content.tsx").matchAll(/"tool-(\w+)"/gu)].map((match) => match[1] as string);
         const sandboxTypes = [...repoFile("packages/chat-ui/src/utils/sandbox-files.ts").matchAll(/"tool-(\w+)"/gu)].map((match) => match[1] as string);
 

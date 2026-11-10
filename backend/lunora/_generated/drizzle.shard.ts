@@ -921,7 +921,7 @@ export const notifications = sqliteTable("notifications", {
     link: text("link"),
     outcome: text("outcome", { mode: "json" }).$type<"success" | "failure">(),
     title: text("title").notNull(),
-    type: text("type", { mode: "json" }).$type<"task" | "tool_approval" | "ask_user" | "secret_request" | "trigger" | "coding_agent" | "eval" | "sub_agent" | "chat_import" | "data_export" | "daily_brief" | "usage_alert" | "review_request">().notNull(),
+    type: text("type", { mode: "json" }).$type<"task" | "task_stuck" | "tool_approval" | "ask_user" | "secret_request" | "trigger" | "coding_agent" | "eval" | "sub_agent" | "chat_import" | "data_export" | "daily_brief" | "usage_alert" | "review_request">().notNull(),
     userId: text("userId").notNull(),
     createdAt: real("createdAt").notNull(),
     readAt: real("readAt"),
@@ -1468,6 +1468,8 @@ export const tasks = sqliteTable("tasks", {
     runDestination: text("runDestination", { mode: "json" }).$type<"new_thread" | "continue_thread" | "fresh_context">(),
     skillId: text("skillId"),
     status: text("status", { mode: "json" }).$type<"todo" | "queued" | "running" | "needs_review" | "done" | "failed" | "blocked">().notNull(),
+    stuckCheckAt: real("stuckCheckAt"),
+    stuckNotice: text("stuckNotice", { mode: "json" }).$type<{ days: number; since: number }>(),
     successCriteria: text("successCriteria"),
     title: text("title").notNull(),
     updatedAt: real("updatedAt").notNull(),
@@ -1477,6 +1479,7 @@ export const tasks = sqliteTable("tasks", {
     by_user_and_goal: index("by_user_and_goal").on(t.userId, t.goalId),
     by_recurring_and_nextRunAt: index("by_recurring_and_nextRunAt").on(t.recurring, t.nextRunAt),
     by_status_and_updatedAt: index("by_status_and_updatedAt").on(t.status, t.updatedAt),
+    by_status_and_stuckCheckAt: index("by_status_and_stuckCheckAt").on(t.status, t.stuckCheckAt),
 }));
 
 export const temporaryThreads = sqliteTable("temporaryThreads", {

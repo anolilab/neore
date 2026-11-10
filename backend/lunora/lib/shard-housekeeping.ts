@@ -263,7 +263,19 @@ export const runShardTick = internalMutation
                 .withIndex("by_nextPollAt", (q) => q.gt("nextPollAt", 0))
                 .first(),
         ]);
-        const candidates = [trigger?.nextTriggerAt, task?.nextRunAt, repoPoll?.nextPollAt].filter((at): at is number => at !== undefined);
+        // The earliest stuck check of a blocked or failed task (`tasks/AGENTS.md`). Without it, a tick that re-arms the shard
+        // drops the wake-up a stuck transition set, and the notice waits for the daily housekeeping instead.
+        const stuckChecks = await Promise.all(
+            (["blocked", "failed"] as const).map((status) =>
+                ctx.db
+                    .query("tasks")
+                    .withIndex("by_status_and_stuckCheckAt", (q) => q.eq("status", status).gt("stuckCheckAt", 0))
+                    .first(),
+            ),
+        );
+        const candidates = [trigger?.nextTriggerAt, task?.nextRunAt, repoPoll?.nextPollAt, ...stuckChecks.map((row) => row?.stuckCheckAt)].filter(
+            (at): at is number => at !== undefined,
+        );
 
         // The dispatch cleared this shard's due time; a reap that failed never recorded the next expiry, so try again.
         if (!reaped) {

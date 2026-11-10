@@ -39,6 +39,26 @@ vi.mock("../projects/functions", () => {
     return { readableProject: found, writableProject: found };
 });
 
+// A test sets `failing` to make the stuck-task notice write throw, as an inbox write or a schedule can.
+const { noticeWrites } = vi.hoisted(() => {
+    return { noticeWrites: { failing: false } };
+});
+
+vi.mock("../notifications/notify", async (importOriginal) => {
+    const actual = await importOriginal<typeof import("../notifications/notify")>();
+
+    return {
+        ...actual,
+        notify: async (ctx: unknown, input: Parameters<typeof actual.notify>[1]) => {
+            if (noticeWrites.failing && input.type === "task_stuck") {
+                throw new Error("inbox unavailable");
+            }
+
+            return await actual.notify(ctx as never, input);
+        },
+    };
+});
+
 vi.mock("../auth/lib/better-auth-queries", async (importOriginal) => {
     return {
         ...(await importOriginal<typeof import("../auth/lib/better-auth-queries")>()),
@@ -832,6 +852,235 @@ describe("claim refusals", () => {
 
             expect(await claim(taskId, 0, `c${String(index)}`)).not.toBeNull();
         }
+    });
+});
+
+describe("stuck blocked tasks", () => {
+    const DAY = 24 * 60 * 60_000;
+    const T0 = Date.UTC(2026, 10, 6, 12, 30);
+
+    beforeEach(() => {
+        vi.useFakeTimers({ now: T0, toFake: ["Date"] });
+    });
+
+    afterEach(() => {
+        vi.useRealTimers();
+    });
+
+    const stuckNotices = async (): Promise<{ outcome?: string; title: string; type: string }[]> => {
+        const rows = await inbox();
+
+        return rows.filter((row) => row.type === "task_stuck");
+    };
+
+    /** The stored body of each stuck notice: `inbox()` drops the body, so the privacy check reads it here. */
+    const stuckNoticeBodies = async (): Promise<unknown[]> =>
+        await harness.run(async (ctx: any) => {
+            const rows = await ctx.db.query("notifications").collect();
+
+            return rows.filter((row: any) => row.type === "task_stuck").map((row: any) => row.body);
+        });
+
+    const sweepAt = async (at: number): Promise<void> => {
+        vi.setSystemTime(at);
+        await runInternal(checkDueTasks, {});
+    };
+
+    it("asks the owner once at 2 idle days, in the inbox, and names the task only", async () => {
+        const dependency = await insertTask({ status: "todo", title: "First" });
+        const taskId = await insertTask({ dependsOn: [dependency], status: "blocked", stuckCheckAt: T0 + 2 * DAY, title: "Waiting", updatedAt: T0 });
+
+        await sweepAt(T0 + 2 * DAY - 1);
+        expect(await stuckNotices()).toStrictEqual([]);
+
+        await sweepAt(T0 + 2 * DAY);
+        await sweepAt(T0 + 3 * DAY);
+
+        expect(await stuckNotices()).toStrictEqual([{ outcome: undefined, title: "Waiting", type: "task_stuck" }]);
+        expect(await stuckNoticeBodies()).toStrictEqual([undefined]);
+        const task = await getTask(taskId);
+
+        expect(task.stuckNotice).toStrictEqual({ days: 2, since: T0 });
+        expect(task.stuckCheckAt).toBe(T0 + 7 * DAY);
+        // The notice is not progress: the idle clock keeps running from the last real change.
+        expect(task.updatedAt).toBe(T0);
+        expect(task.status).toBe("blocked");
+    });
+
+    it("finds a due task behind more rows than one sweep reads, when those rows have no check armed", async () => {
+        for (let index = 0; index < 30; index += 1) {
+            await insertTask({ dependsOn: ["missing"], status: "blocked", title: `Idle ${index}`, updatedAt: T0 });
+        }
+
+        await insertTask({ dependsOn: ["missing"], status: "blocked", stuckCheckAt: T0 + 2 * DAY, title: "Due", updatedAt: T0 });
+
+        await sweepAt(T0 + 2 * DAY);
+
+        expect(await stuckNotices()).toStrictEqual([{ outcome: undefined, title: "Due", type: "task_stuck" }]);
+    });
+
+    it("leaves a failed recurring task to its next slot, and checks it again after that slot", async () => {
+        const taskId = await insertTask({
+            lastError: "boom",
+            nextRunAt: T0 + 5 * DAY,
+            recurring: true,
+            status: "failed",
+            stuckCheckAt: T0 + 2 * DAY,
+            title: "Weekly",
+            updatedAt: T0,
+        });
+
+        await sweepAt(T0 + 2 * DAY);
+
+        expect(await stuckNotices()).toStrictEqual([]);
+
+        const task = await getTask(taskId);
+
+        expect(task.stuckCheckAt).toBe(T0 + 6 * DAY);
+    });
+
+    it("sends the notice again when its write fails, instead of counting the level as sent", async () => {
+        const dependency = await insertTask({ status: "todo", title: "First" });
+        const taskId = await insertTask({ dependsOn: [dependency], status: "blocked", stuckCheckAt: T0 + 2 * DAY, title: "Waiting", updatedAt: T0 });
+
+        try {
+            noticeWrites.failing = true;
+            await sweepAt(T0 + 2 * DAY);
+        } finally {
+            noticeWrites.failing = false;
+        }
+
+        expect(await stuckNotices()).toStrictEqual([]);
+
+        const failed = await getTask(taskId);
+
+        expect(failed.stuckNotice).toBeUndefined();
+
+        await sweepAt(T0 + 2 * DAY + 60 * 60_000);
+
+        expect(await stuckNotices()).toStrictEqual([{ outcome: undefined, title: "Waiting", type: "task_stuck" }]);
+
+        const retried = await getTask(taskId);
+
+        expect(retried.stuckNotice).toStrictEqual({ days: 2, since: T0 });
+    });
+
+    it("does not notify a blocked task whose only open dependency is a failed recurring task on its schedule", async () => {
+        const weekly = await insertTask({
+            lastError: "boom",
+            nextRunAt: T0 + 5 * DAY,
+            recurring: true,
+            status: "failed",
+            title: "Weekly",
+            updatedAt: T0,
+        });
+        const taskId = await insertTask({ dependsOn: [weekly], status: "blocked", stuckCheckAt: T0 + 2 * DAY, title: "Waiting", updatedAt: T0 });
+
+        await sweepAt(T0 + 2 * DAY);
+
+        expect(await stuckNotices()).toStrictEqual([]);
+
+        const task = await getTask(taskId);
+
+        expect(task.stuckCheckAt).toBe(T0 + 6 * DAY);
+    });
+
+    it("does not notify a task that waits, through a blocked task, on the owner's review", async () => {
+        const review = await insertTask({ status: "needs_review", title: "Review", updatedAt: T0 });
+        const middle = await insertTask({ dependsOn: [review], status: "blocked", title: "Middle", updatedAt: T0 });
+        const taskId = await insertTask({ dependsOn: [middle], status: "blocked", stuckCheckAt: T0 + 2 * DAY, title: "Waiting", updatedAt: T0 });
+
+        await sweepAt(T0 + 2 * DAY);
+
+        expect(await stuckNotices()).toStrictEqual([]);
+
+        const waiting = await getTask(taskId);
+
+        expect(waiting.stuckCheckAt).toBe(T0 + 3 * DAY);
+    });
+
+    it("asks the owner about a failed task once, not about each task waiting behind it", async () => {
+        const failed = await insertTask({ lastError: "boom", status: "failed", stuckCheckAt: T0 + 2 * DAY, title: "Broken", updatedAt: T0 });
+
+        await insertTask({ dependsOn: [failed], status: "blocked", stuckCheckAt: T0 + 2 * DAY, title: "Behind one", updatedAt: T0 });
+        await insertTask({ dependsOn: [failed], status: "blocked", stuckCheckAt: T0 + 2 * DAY, title: "Behind two", updatedAt: T0 });
+
+        await sweepAt(T0 + 2 * DAY);
+
+        expect(await stuckNotices()).toStrictEqual([{ outcome: undefined, title: "Broken", type: "task_stuck" }]);
+    });
+
+    it("asks once more at 7 idle days, and not again within that episode", async () => {
+        const dependency = await insertTask({ status: "todo", title: "First" });
+
+        await insertTask({ dependsOn: [dependency], status: "blocked", stuckCheckAt: T0 + 2 * DAY, title: "Waiting", updatedAt: T0 });
+
+        await sweepAt(T0 + 2 * DAY);
+        await sweepAt(T0 + 6 * DAY);
+        expect(await stuckNotices()).toHaveLength(1);
+
+        await sweepAt(T0 + 7 * DAY);
+        await sweepAt(T0 + 30 * DAY);
+
+        expect(await stuckNotices()).toHaveLength(2);
+    });
+
+    it("restarts the ladder after progress, so a later stall escalates again", async () => {
+        const dependency = await insertTask({ status: "todo", title: "First" });
+        // Queued from day 2 on: the sweep at day 2 would otherwise fail it as a stale round.
+        const progress = await insertTask({ activeCycle: "c1", status: "queued", title: "Progress", updatedAt: T0 + 2 * DAY });
+
+        await insertTask({ dependsOn: [dependency, progress], status: "blocked", stuckCheckAt: T0 + 2 * DAY, title: "Waiting", updatedAt: T0 });
+
+        await sweepAt(T0 + 2 * DAY);
+        expect(await stuckNotices()).toHaveLength(1);
+
+        // One of its dependencies finishes while the other is still open: progress, so the ladder restarts.
+        vi.setSystemTime(T0 + 3 * DAY);
+        const claimed = await claim(progress, 0);
+
+        expect(await verified(claimed.runId, "Done.", PASS)).toBe("done");
+
+        await sweepAt(T0 + 4 * DAY);
+        expect(await stuckNotices()).toHaveLength(1);
+
+        await sweepAt(T0 + 5 * DAY);
+
+        expect(await stuckNotices()).toHaveLength(2);
+    });
+
+    it("asks the owner about a failed task after 2 idle days, with no dependency check", async () => {
+        await insertTask({ status: "failed", stuckCheckAt: T0 + 2 * DAY, title: "Broke", updatedAt: T0 });
+
+        await sweepAt(T0 + 2 * DAY);
+
+        expect(await stuckNotices()).toStrictEqual([{ outcome: undefined, title: "Broke", type: "task_stuck" }]);
+    });
+
+    it("does not escalate a task waiting on a dependency that needs the owner's review", async () => {
+        const dependency = await insertTask({ status: "needs_review", title: "Review me" });
+
+        await insertTask({ dependsOn: [dependency], status: "blocked", stuckCheckAt: T0 + 2 * DAY, title: "Waiting", updatedAt: T0 });
+        await sweepAt(T0 + 8 * DAY);
+
+        expect(await stuckNotices()).toStrictEqual([]);
+    });
+
+    it("counts a dependency finishing as progress for a task still waiting on another", async () => {
+        const first = await insertTask({ activeCycle: "c1", status: "queued", title: "First" });
+        const other = await insertTask({ status: "todo", title: "Other" });
+        const waiting = await insertTask({ dependsOn: [first, other], status: "blocked", stuckCheckAt: T0 + 2 * DAY, title: "Waiting", updatedAt: T0 });
+
+        vi.setSystemTime(T0 + DAY);
+        const claimed = await claim(first, 0);
+
+        expect(await verified(claimed.runId, "Done.", PASS)).toBe("done");
+
+        const waitingTask = await getTask(waiting);
+
+        expect(waitingTask.updatedAt).toBe(T0 + DAY);
+        expect(waitingTask.stuckCheckAt).toBe(T0 + 3 * DAY);
+        expect(await statusOf(waiting)).toBe("blocked");
     });
 });
 

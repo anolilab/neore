@@ -12,7 +12,7 @@ export const toolResultRowIds = (rows: ReadonlyArray<{ _id: string; message?: un
             continue;
         }
 
-        for (const part of content as Array<{ toolCallId?: unknown; type?: unknown }>) {
+        for (const part of content as { toolCallId?: unknown; type?: unknown }[]) {
             if (part?.type === "tool-result" && typeof part.toolCallId === "string") {
                 ids.set(part.toolCallId, row._id);
             }
@@ -42,7 +42,7 @@ export const trimToolOutputs = (messages: UIMessage[], threadId: string, rowIdBy
 
             const ref: ToolOutputRef = { messageId, threadId, toolCallId: tool.toolCallId };
 
-            return { ...tool, outputRef: ref, output: undefined } as unknown as typeof part;
+            return { ...tool, output: undefined, outputRef: ref } as unknown as typeof part;
         });
 
         return changed ? { ...message, parts } : message;

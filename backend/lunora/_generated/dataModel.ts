@@ -1009,7 +1009,7 @@ export interface Doc_notifications {
     link?: string;
     outcome?: "success" | "failure";
     title: string;
-    type: "task" | "tool_approval" | "ask_user" | "secret_request" | "trigger" | "coding_agent" | "eval" | "sub_agent" | "chat_import" | "data_export" | "daily_brief" | "usage_alert" | "review_request";
+    type: "task" | "task_stuck" | "tool_approval" | "ask_user" | "secret_request" | "trigger" | "coding_agent" | "eval" | "sub_agent" | "chat_import" | "data_export" | "daily_brief" | "usage_alert" | "review_request";
     userId: string;
     createdAt: number;
     readAt?: number;
@@ -1715,6 +1715,8 @@ export interface Doc_tasks {
     runDestination?: "new_thread" | "continue_thread" | "fresh_context";
     skillId?: Id<"skills">;
     status: "todo" | "queued" | "running" | "needs_review" | "done" | "failed" | "blocked";
+    stuckCheckAt?: number;
+    stuckNotice?: { days: number; since: number };
     successCriteria?: string;
     title: string;
     updatedAt: number;
@@ -2612,7 +2614,7 @@ export interface IndexNamesByTable {
     subAgentRuns: "by_parentThreadId_and_status" | "by_childThreadId" | "by_childThreadId_and_status" | "by_status_and_reapAt" | "by_user_and_status" | "by_user_and_toolCallId" | "by_user_and_createdAt" | "by_createdAt";
     systemPromptPresets: "by_userId_modelId";
     taskRuns: "by_task_and_startedAt" | "by_cycle_and_round" | "by_user";
-    tasks: "by_user_and_status" | "by_user_and_goal" | "by_recurring_and_nextRunAt" | "by_status_and_updatedAt";
+    tasks: "by_user_and_status" | "by_user_and_goal" | "by_recurring_and_nextRunAt" | "by_status_and_updatedAt" | "by_status_and_stuckCheckAt";
     team: "organizationId" | "name";
     teamMember: "userId" | "teamId_userId" | "teamId_role" | "membershipKey";
     teamSettings: "teamId" | "organizationId";
@@ -4114,7 +4116,7 @@ export interface Insert_notifications {
     link?: string;
     outcome?: "success" | "failure";
     title: string;
-    type: "task" | "tool_approval" | "ask_user" | "secret_request" | "trigger" | "coding_agent" | "eval" | "sub_agent" | "chat_import" | "data_export" | "daily_brief" | "usage_alert" | "review_request";
+    type: "task" | "task_stuck" | "tool_approval" | "ask_user" | "secret_request" | "trigger" | "coding_agent" | "eval" | "sub_agent" | "chat_import" | "data_export" | "daily_brief" | "usage_alert" | "review_request";
     userId: string;
     createdAt: number;
     readAt?: number;
@@ -4820,6 +4822,8 @@ export interface Insert_tasks {
     runDestination?: "new_thread" | "continue_thread" | "fresh_context";
     skillId?: Id<"skills">;
     status: "todo" | "queued" | "running" | "needs_review" | "done" | "failed" | "blocked";
+    stuckCheckAt?: number;
+    stuckNotice?: { days: number; since: number };
     successCriteria?: string;
     title: string;
     updatedAt: number;

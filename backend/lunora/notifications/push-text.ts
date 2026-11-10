@@ -15,6 +15,7 @@ const HEADLINES: Record<string, { failure?: string; success: string }> = {
     secret_request: { success: "The assistant is asking for a secret" },
     sub_agent: { failure: "Sub-agent failed", success: "Sub-agent finished" },
     task: { failure: "Task failed", success: "Task finished" },
+    task_stuck: { success: "A task is stuck" },
     tool_approval: { success: "A tool call needs your approval" },
     trigger: { failure: "Trigger run failed", success: "Trigger run finished" },
     usage_alert: { success: "A usage alert was triggered" },
