@@ -514,22 +514,21 @@ export const runChatStart = async (
     );
 };
 
-/** `/chat/start`'s answer when a held guest note cannot go: each reason its own code, so the owner is told why. */
-const guestNoteRefused = (reason: "being-sent" | "ended" | "missing" | "sent"): Response => {
-    switch (reason) {
-        case "being-sent": {
-            return Response.json({ error: "GUEST_NOTE_BEING_SENT", message: "That guest note is being sent." }, { status: 409 });
-        }
-        case "ended": {
-            return Response.json({ error: "GUEST_LINK_ENDED", message: "That guest note's link has ended." }, { status: 400 });
-        }
-        case "sent": {
-            return Response.json({ error: "GUEST_NOTE_ALREADY_SENT", message: "That guest note was already sent." }, { status: 409 });
-        }
-        default: {
-            return Response.json({ error: "GUEST_NOTE_NOT_SENDABLE", message: "That guest note cannot be sent in this chat." }, { status: 400 });
-        }
-    }
+/**
+ * `/chat/start`'s answer when a held guest note cannot go: each reason its own code, so the owner is told why. A
+ * `Record` over the reasons, so a new reason fails the type check until it has its own answer.
+ */
+const GUEST_NOTE_REFUSALS: Record<"being-sent" | "ended" | "missing" | "sent", { error: string; message: string; status: 400 | 409 }> = {
+    "being-sent": { error: "GUEST_NOTE_BEING_SENT", message: "That guest note is being sent.", status: 409 },
+    ended: { error: "GUEST_LINK_ENDED", message: "That guest note's link has ended.", status: 400 },
+    missing: { error: "GUEST_NOTE_NOT_SENDABLE", message: "That guest note cannot be sent in this chat.", status: 400 },
+    sent: { error: "GUEST_NOTE_ALREADY_SENT", message: "That guest note was already sent.", status: 409 },
+};
+
+const guestNoteRefused = (reason: keyof typeof GUEST_NOTE_REFUSALS): Response => {
+    const { error, message, status } = GUEST_NOTE_REFUSALS[reason];
+
+    return Response.json({ error, message }, { status });
 };
 
 const runChatStartOnShard = async (
