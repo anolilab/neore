@@ -172,6 +172,12 @@ describe("CLI device sign-in rate limits", () => {
             database: memoryAdapter({ account: [], deviceCode: [], rateLimit: [], session: [], user: [], verification: [] }),
             plugins: [
                 ...cliDeviceAuth({
+                    hostPairing: {
+                        precheck: async () => undefined,
+                        register: async () => {
+                            return { deviceId: "d", secret: "s" };
+                        },
+                    },
                     mintApiKey: async () => {
                         return { id: "k", key: "nk_x" };
                     },
@@ -223,6 +229,27 @@ describe("CLI device sign-in rate limits", () => {
         vi.setSystemTime(Date.now() + 150);
 
         const after = await auth.handler(poll(ip));
+
+        expect(after.status).not.toBe(429);
+        await after.body?.cancel();
+    });
+
+    it("gives a headless machine's pairing poll the same burst ceiling as the CLI's, and no lasting lockout", async () => {
+        vi.useFakeTimers({ toFake: ["Date"] });
+        vi.setSystemTime(new Date("2026-11-03T17:00:00Z"));
+
+        const auth = buildDeviceAuth();
+        const ip = nextIp();
+        const hostPoll = () =>
+            request("/device/host", ip, { body: JSON.stringify({ client_id: "neore-host", device_code: "not-a-real-code" }), method: "POST" });
+        const result = await statuses(auth, 130, hostPoll);
+
+        expect(result.slice(0, 120)).not.toContain(429);
+        expect(result.slice(120).every((status) => status === 429)).toBe(true);
+
+        vi.setSystemTime(Date.now() + 150);
+
+        const after = await auth.handler(hostPoll());
 
         expect(after.status).not.toBe(429);
         await after.body?.cancel();

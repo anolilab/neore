@@ -72,4 +72,25 @@ describe("auth hook shard placement", { timeout: 30_000 }, () => {
 
         expect(names).toStrictEqual(["user-a"]);
     });
+
+    it("keeps the device-limit marker of a refusal that crosses the shard call", async () => {
+        const { createShardClient } = await import("lunorash/runtime");
+        const { LunoraError, toErrorBody } = await import("lunorash/errors");
+        const { DEVICE_LIMIT_CODE } = await import("./devices/lib/constants");
+        // What the shard answers for a thrown LunoraError (`errorToResponse` in @lunora/do builds the same body).
+        const refusal = new LunoraError("BAD_REQUEST", "At most 10 devices can be paired. Remove one first.", { data: { code: DEVICE_LIMIT_CODE } });
+        const { body, status } = toErrorBody(refusal, { encodeData: (data: unknown) => data });
+        const namespace = {
+            get: () => {
+                return { fetch: async () => Response.json({ error: body }, { status }) };
+            },
+            idFromName: (name: string) => name,
+        };
+
+        const caught = await createShardClient(namespace as never)
+            .call("devices/internal:checkHeadlessPairing", {}, { shardKey: "user-a" })
+            .catch((error: unknown) => error as { code?: string; data?: { code?: string } });
+
+        expect(caught).toMatchObject({ code: "BAD_REQUEST", data: { code: DEVICE_LIMIT_CODE } });
+    });
 });

@@ -78,6 +78,9 @@ export const DEVICE_POLL_MAX_MS = 2000;
 /** Projects one device can be limited to. */
 export const MAX_DEVICE_SCOPE_PROJECTS = 50;
 
+/** The `data.code` of the refusal for an account that holds as many devices as it may; the pairing route tells the machine to wait on it. */
+export const DEVICE_LIMIT_CODE = "DEVICE_LIMIT";
+
 /** Longest `appVersion` the backend keeps; a longer or malformed value is ignored and never fails the manifest update. */
 export const MAX_APP_VERSION_LENGTH = 40;
 

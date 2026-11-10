@@ -400,9 +400,11 @@ export interface Doc_deviceCode {
     expiresAt: number;
     hostname?: string;
     lastPolledAt?: number;
+    platform?: string;
     pollingInterval?: number;
     scope?: string;
     status: string;
+    storage?: string;
     userCode: string;
     userId?: string;
 }
@@ -419,10 +421,11 @@ export interface Doc_devices {
     manifest?: Array<{ description: string; inputSchema?: unknown; kind: "fs" | "shell" | "mcp"; name: string; readOnly: boolean }>;
     manifestIssuedAt?: number;
     name: string;
+    pairedByCode?: string;
     platform: "macos" | "windows" | "linux";
     projectIds?: Array<Id<"projects">>;
     revokedAt?: number;
-    transport?: "ssh";
+    transport?: "ssh" | "headless";
     userId: string;
     viaDeviceId?: Id<"devices">;
 }
@@ -3489,9 +3492,11 @@ export interface Insert_deviceCode {
     expiresAt: number;
     hostname?: string;
     lastPolledAt?: number;
+    platform?: string;
     pollingInterval?: number;
     scope?: string;
     status: string;
+    storage?: string;
     userCode: string;
     userId?: string;
 }
@@ -3508,10 +3513,11 @@ export interface Insert_devices {
     manifest?: Array<{ description: string; inputSchema?: unknown; kind: "fs" | "shell" | "mcp"; name: string; readOnly: boolean }>;
     manifestIssuedAt?: number;
     name: string;
+    pairedByCode?: string;
     platform: "macos" | "windows" | "linux";
     projectIds?: Array<Id<"projects">>;
     revokedAt?: number;
-    transport?: "ssh";
+    transport?: "ssh" | "headless";
     userId: string;
     viaDeviceId?: Id<"devices">;
 }

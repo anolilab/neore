@@ -704,9 +704,12 @@ export const schema = defineSchema({
         expiresAt: v.number(),
         hostname: v.optional(v.string()),
         lastPolledAt: v.optional(v.number()),
+        // A host code (`neore-host`) also names the machine's platform and where it keeps the device secret.
+        platform: v.optional(v.string()),
         pollingInterval: v.optional(v.number()),
         scope: v.optional(v.string()),
         status: v.string(),
+        storage: v.optional(v.string()),
         userCode: v.string(),
         userId: v.optional(v.string()),
     })
@@ -736,6 +739,9 @@ export const schema = defineSchema({
         manifest: v.optional(v.array(vDeviceManifestTool)),
         manifestIssuedAt: v.optional(v.number()),
         name: v.string(),
+        // A machine that paired itself by code: the id of the code it redeemed, so a retried registration of the same
+        // code (the first reply was lost) finds this device instead of making a second one.
+        pairedByCode: v.optional(v.string()),
         platform: vDevicePlatform,
         // Where the device's tools are offered (`devices/lib/scope.ts`): unset = any of the
         // owner's chats, a list = only threads of those projects (empty = nowhere).
