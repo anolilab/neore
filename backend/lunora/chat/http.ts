@@ -473,9 +473,14 @@ export const runChatStart = async (
         return Response.json({ error: "Invalid pageContext" }, { status: 400 });
     }
 
-    // A held note is a send of its own: never a regeneration, which would answer some other prompt.
+    // A held note is a send of its own: never a regeneration, which would answer some other prompt, nor a goal, whose rounds
+    // would carry the guest's words as the owner's.
     if (body.guestMessageId !== undefined && (!isValidDocumentIdFormat(body.guestMessageId) || body.regenerate)) {
         return Response.json({ error: "Invalid guestMessageId" }, { status: 400 });
+    }
+
+    if (body.guestMessageId !== undefined && body.goal !== undefined) {
+        return Response.json({ error: "GUEST_NOTE_AS_GOAL", message: "A guest's message cannot be sent as a goal." }, { status: 400 });
     }
 
     // Auth: extract user from the forwarded JWT
@@ -507,6 +512,23 @@ export const runChatStart = async (
         shardKey,
         async (shardCtx) => await runChatStartOnShard(shardCtx, body, signingSecret, { origin, pageContext, user, userId }),
     );
+};
+
+/**
+ * `/chat/start`'s answer when a held guest note cannot go: each reason its own code, so the owner is told why. A
+ * `Record` over the reasons, so a new reason fails the type check until it has its own answer.
+ */
+const GUEST_NOTE_REFUSALS: Record<"being-sent" | "ended" | "missing" | "sent", { error: string; message: string; status: 400 | 409 }> = {
+    "being-sent": { error: "GUEST_NOTE_BEING_SENT", message: "That guest note is being sent.", status: 409 },
+    ended: { error: "GUEST_LINK_ENDED", message: "That guest note's link has ended.", status: 400 },
+    missing: { error: "GUEST_NOTE_NOT_SENDABLE", message: "That guest note cannot be sent in this chat.", status: 400 },
+    sent: { error: "GUEST_NOTE_ALREADY_SENT", message: "That guest note was already sent.", status: 409 },
+};
+
+const guestNoteRefused = (reason: keyof typeof GUEST_NOTE_REFUSALS): Response => {
+    const { error, message, status } = GUEST_NOTE_REFUSALS[reason];
+
+    return Response.json({ error, message }, { status });
 };
 
 const runChatStartOnShard = async (
@@ -584,8 +606,17 @@ const runChatStartOnShard = async (
                   userId,
               });
 
-    if (guestNote === null || (guestNote && (guestNote.threadId !== validThreadId || contentType !== "text" || unsendableGuestText(guestNote.text)))) {
-        return Response.json({ error: "That guest note cannot be sent in this chat." }, { status: 400 });
+    if (guestNote && "refused" in guestNote) {
+        return guestNoteRefused(guestNote.refused);
+    }
+
+    if (guestNote && (guestNote.threadId !== validThreadId || unsendableGuestText(guestNote.text))) {
+        return guestNoteRefused("missing");
+    }
+
+    // The chat's model makes images or video: the note can still go once a text model is picked, so this refusal is its own.
+    if (guestNote && contentType !== "text") {
+        return Response.json({ error: "GUEST_NOTE_NEEDS_TEXT_MODEL", message: "Switch to a text model to send this message." }, { status: 400 });
     }
 
     // Build message content
@@ -809,16 +840,18 @@ const runChatStartOnShard = async (
     // because that route can be called again for the same prompt; a charge here
     // would count the prompt, not the generations.
     // A held note's send is taken before the charge, so one concurrent send wins and only it is charged (`settleSend` after).
-    const guestSend = guestNote
+    const guestClaim = guestNote
         ? await context.runMutation(internal.chat.guest_links.claimGuestNoteSend, {
               messageId: body.guestMessageId as Id<"threadGuestMessages">,
               userId,
           })
         : undefined;
 
-    if (guestSend === null) {
-        return Response.json({ error: "That guest note was already sent." }, { status: 409 });
+    if (guestClaim && "refused" in guestClaim) {
+        return guestNoteRefused(guestClaim.refused);
     }
+
+    const guestSend = guestClaim?.fence;
 
     // Never throws: a failed release must not hide why the send failed. The lease settles the send later.
     const releaseGuestSend = async (): Promise<void> => {

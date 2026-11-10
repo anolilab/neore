@@ -170,14 +170,16 @@ describe("creating a link", () => {
     });
 
     it.each([
-        ["locked", { lockedAt: NOW }],
-        ["archived", { status: "archived" }],
-        ["trashed", { deleted: true, deletedAt: NOW }],
-        ["temporary", { isTemporary: true }],
-    ])("is refused on a %s thread", async (_label, patch) => {
+        ["locked", { lockedAt: NOW }, "THREAD_LOCKED"],
+        ["archived", { status: "archived" }, "GUEST_LINK_NOT_ALLOWED"],
+        ["trashed", { deleted: true, deletedAt: NOW }, "GUEST_LINK_NOT_ALLOWED"],
+        ["temporary", { isTemporary: true }, "GUEST_LINK_NOT_ALLOWED"],
+        ["host-run", { runner: "host" }, "GUEST_LINK_NOT_ALLOWED"],
+    ])("is refused on a %s thread", async (_label, patch, code) => {
         await harness.run(async (ctx: any) => await ctx.db.patch("threads", threadId, patch));
 
-        await expect(createLink()).rejects.toBeDefined();
+        // A code of its own (a locked chat answers with the lock's), so the owner's panel says why in the app's words.
+        await expect(createLink()).rejects.toMatchObject({ data: { code } });
         expect(await rows("threadGuestLinks")).toHaveLength(0);
     });
 
@@ -185,7 +187,7 @@ describe("creating a link", () => {
         const { linkToken } = await createLink();
 
         await hold(linkToken, "waiting");
-        await expect(createLink()).rejects.toBeDefined();
+        await expect(createLink()).rejects.toMatchObject({ data: { code: "GUEST_NOTES_WAITING" } });
         const { linkToken: newToken } = (await asOwner().mutation(guestLinks.createGuestLink as never, { discardWaiting: true, threadId } as never)) as {
             linkToken: string;
         };
@@ -349,14 +351,31 @@ describe("reviewing a held note", () => {
         async (messageId: string) =>
             await harness.withIdentity({ userId } as never).mutation(guestLinks[name] as never, { messageId } as never);
     const PROCEDURES = ["sendHeldGuestMessage", "dismissHeldGuestMessage"] as const;
-    const takeSend = async (messageId: string) =>
-        (await harness.run(async (ctx: any) => await ctx.runMutation(guestLinks.claimGuestNoteSend, { messageId, userId: OWNER }))) as number | null;
+    /** The send's fence, or why it could not be taken (`/chat/start` maps each reason to its own code). */
+    const takeSend = async (messageId: string) => {
+        const claim = (await harness.run(async (ctx: any) => await ctx.runMutation(guestLinks.claimGuestNoteSend, { messageId, userId: OWNER }))) as
+            | { fence: number }
+            | { refused: string };
+
+        return "fence" in claim ? claim.fence : claim.refused;
+    };
 
     const heldNote = async () => {
         const { linkToken } = await createLink();
 
         return (await hold(linkToken, "please call me back")).messageId!;
     };
+
+    it.each(PROCEDURES)("%s answers a held note whose link has lapsed as an ended link", async (name) => {
+        const messageId = await heldNote();
+
+        await harness.run(async (ctx: any) => {
+            const note = await ctx.db.get("threadGuestMessages", messageId);
+
+            await ctx.db.patch("threadGuestLinks", note.linkId, { expiresAt: 1 });
+        });
+        await expect(review(name)(messageId)).rejects.toMatchObject({ data: { code: "GUEST_LINK_ENDED" } });
+    });
 
     it.each(PROCEDURES)("%s is refused to a stranger, an admin grantee, and on a locked chat without its proof", async (name) => {
         const messageId = await heldNote();
@@ -365,6 +384,7 @@ describe("reviewing a held note", () => {
             async (ctx: any) => await ctx.db.insert("threadAccess", { grantedAt: 0, grantedBy: OWNER, permission: "admin", threadId, userId: "user-admin" }),
         );
         await expect(review(name, "user-stranger")(messageId)).rejects.toThrow(NO_LONGER_WAITING);
+        await expect(review(name, "user-stranger")(messageId)).rejects.toMatchObject({ data: { code: "GUEST_NOTE_GONE" } });
         await expect(review(name, "user-admin")(messageId)).rejects.toThrow(NO_LONGER_WAITING);
         await harness.run(async (ctx: any) => await ctx.db.patch("threads", threadId, { lockedAt: NOW }));
         await expect(review(name)(messageId)).rejects.toThrow(LOCKED);
@@ -379,7 +399,7 @@ describe("reviewing a held note", () => {
         // What `/chat/start` does around its save: take the send, then record the stored message.
         const claimedAt = await takeSend(messageId);
 
-        expect(await takeSend(messageId)).toBeNull();
+        expect(await takeSend(messageId)).toBe("being-sent");
         await harness.run(async (ctx: any) => await ctx.runMutation(guestLinks.recordGuestNoteSent, { claimedAt, messageId, savedMessageId: "saved-1" }));
 
         expect(await rows("threadGuestMessages")).toMatchObject([{ status: "sent" }]);
@@ -392,6 +412,7 @@ describe("reviewing a held note", () => {
 
         await takeSend(messageId);
         await expect(review("sendHeldGuestMessage")(messageId)).rejects.toThrow(BEING_SENT);
+        await expect(review("sendHeldGuestMessage")(messageId)).rejects.toMatchObject({ data: { code: "GUEST_NOTE_BEING_SENT" } });
 
         vi.setSystemTime(NOW + GUEST_SEND_LEASE_MS + 1);
 
