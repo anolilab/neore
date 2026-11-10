@@ -28,6 +28,7 @@ use std::fs;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
+use std::time::{Duration, Instant};
 
 use serde::Deserialize;
 use serde_json::{json, Value};
@@ -44,6 +45,36 @@ use crate::hmac::to_hex;
 const MAX_TREE_ENTRIES: usize = 200_000;
 const TARBALL: &str = "package.tgz";
 const HOME_DIR: &str = "home";
+/// How often the staging folder is measured while npm runs, in 100 ms polls.
+const STAGE_CHECK_EVERY: u32 = 5;
+/// Variables the install passes on: a proxy and certificate settings decide whether the network is reachable behind
+/// a corporate proxy. None of them names a program to run. Everything else is left out.
+const PASSED_ENV: [&str; 7] = [
+    "HTTPS_PROXY",
+    "HTTP_PROXY",
+    "NO_PROXY",
+    "https_proxy",
+    "http_proxy",
+    "no_proxy",
+    "NODE_EXTRA_CA_CERTS",
+];
+
+const OVER_BUDGET: &str =
+    "the package needs more disk space than an agent may use. Nothing was installed";
+
+/// What one install may take: the download, the staging folder while npm fills it (the package, its dependencies
+/// and npm's cache) and the time npm may run. Tests pass smaller ones.
+struct Limits {
+    tarball_bytes: u64,
+    stage_bytes: u64,
+    npm_timeout: Duration,
+}
+
+const LIMITS: Limits = Limits {
+    tarball_bytes: 256 * 1024 * 1024,
+    stage_bytes: 2 * 1024 * 1024 * 1024,
+    npm_timeout: Duration::from_secs(10 * 60),
+};
 
 /// A path's bytes as the file system holds them (Unix); elsewhere its text.
 fn raw_bytes(path: &Path) -> Vec<u8> {
@@ -571,12 +602,18 @@ fn is_node_shebang(line: &str) -> bool {
 }
 
 /// Runs `npm install --ignore-scripts` of `tarball` into `prefix`, with an environment built from nothing.
+///
+/// npm is stopped, with everything it started, when it runs past `limits.npm_timeout` or when the staging folder
+/// `stage` grows past `limits.stage_bytes`. This runs outside the install lock (`lock_installs` is taken only to
+/// commit), so a hung npm holds nothing but its own reserved download.
 fn run_npm(
     node: &Path,
     npm: &Path,
     prefix: &Path,
     tarball: &Path,
     home: &Path,
+    stage: &Path,
+    limits: &Limits,
 ) -> Result<(), String> {
     let log = home.join("npm.log");
     let out = fs::File::create(&log).map_err(|error| error.to_string())?;
@@ -636,19 +673,122 @@ fn run_npm(
         .stdout(out)
         .stderr(err);
 
-    let status = spawn_retrying_busy(&mut command)
-        .map_err(|error| format!("npm could not be started: {error}"))?
-        .wait()
-        .map_err(|error| error.to_string())?;
+    // Its own process group, so what npm starts (a git checkout, a download helper) goes with it.
+    #[cfg(unix)]
+    std::os::unix::process::CommandExt::process_group(&mut command, 0);
 
-    if status.success() {
-        return Ok(());
+    for name in PASSED_ENV {
+        if let Some(value) = std::env::var_os(name) {
+            command.env(name, value);
+        }
     }
 
-    Err(format!(
-        "npm could not install the package ({}). Nothing was installed",
-        tail(&log)
-    ))
+    let mut child = spawn_retrying_busy(&mut command)
+        .map_err(|error| format!("npm could not be started: {error}"))?;
+    let deadline = Instant::now() + limits.npm_timeout;
+    let mut until_check = STAGE_CHECK_EVERY;
+
+    loop {
+        until_check -= 1;
+
+        // A package and its dependencies can expand far beyond the tarball that was verified: stop npm while it
+        // runs, not after it has filled the disk.
+        if until_check == 0 {
+            until_check = STAGE_CHECK_EVERY;
+
+            if stage_over(stage, limits.stage_bytes) {
+                stop_npm(&mut child);
+
+                return Err(OVER_BUDGET.into());
+            }
+        }
+
+        let waited = match child.try_wait() {
+            Ok(waited) => waited,
+            Err(error) => {
+                // npm may still be running, with its helpers: stop and reap the group before giving up.
+                stop_npm(&mut child);
+
+                return Err(error.to_string());
+            }
+        };
+
+        match waited {
+            Some(status) if status.success() => {
+                // npm can finish, or grow in its last moments, between two measurements.
+                if stage_over(stage, limits.stage_bytes) {
+                    return Err(OVER_BUDGET.into());
+                }
+
+                return Ok(());
+            }
+            Some(_) => {
+                return Err(format!(
+                    "npm could not install the package ({}). Nothing was installed",
+                    tail(&log)
+                ))
+            }
+            None if Instant::now() >= deadline => {
+                stop_npm(&mut child);
+
+                return Err(
+                    "npm took too long to install the package. Nothing was installed".into(),
+                );
+            }
+            None => std::thread::sleep(Duration::from_millis(100)),
+        }
+    }
+}
+
+/// Kills npm and everything it started: they share the process group `run_npm` made for it.
+fn stop_npm(child: &mut std::process::Child) {
+    #[cfg(unix)]
+    {
+        // SAFETY: plain syscall with no memory arguments; the group is the one `run_npm` made for this child.
+        unsafe {
+            libc::kill(-(child.id() as libc::pid_t), libc::SIGKILL);
+        }
+    }
+
+    let _ = child.kill();
+    let _ = child.wait();
+}
+
+/// True when `dir` holds more than `limit` bytes (links are not followed; a tree too large to count is over).
+fn stage_over(dir: &Path, limit: u64) -> bool {
+    fn add(limit: u64, dir: &Path, bytes: &mut u64, entries: &mut usize) -> bool {
+        let Ok(read) = fs::read_dir(dir) else {
+            return false;
+        };
+
+        for entry in read.flatten() {
+            *entries += 1;
+
+            if *entries > MAX_TREE_ENTRIES {
+                return true;
+            }
+
+            let Ok(meta) = fs::symlink_metadata(entry.path()) else {
+                continue;
+            };
+
+            if meta.is_dir() {
+                if add(limit, &entry.path(), bytes, entries) {
+                    return true;
+                }
+            } else {
+                *bytes += meta.len();
+            }
+
+            if *bytes > limit {
+                return true;
+            }
+        }
+
+        false
+    }
+
+    add(limit, dir, &mut 0, &mut 0)
 }
 
 /// Starts `command`, trying again a few times when the system says the program file is still open for writing
@@ -675,8 +815,28 @@ fn spawn_retrying_busy(command: &mut Command) -> std::io::Result<std::process::C
     }
 }
 
+fn too_large(size: u64, limits: &Limits) -> String {
+    format!(
+        "the download is {} MiB, more than an agent may be ({} MiB). Nothing was installed",
+        size / (1024 * 1024),
+        limits.tarball_bytes / (1024 * 1024)
+    )
+}
+
+/// [`digests`] of at most `limits.tarball_bytes` of `reader`; a longer stream is refused.
+fn bounded_digests(reader: impl Read, limits: &Limits) -> Result<(String, String), String> {
+    let mut bounded = reader.take(limits.tarball_bytes + 1);
+    let hashes = digests(&mut bounded)?;
+
+    if bounded.limit() == 0 {
+        return Err(too_large(limits.tarball_bytes + 1, limits));
+    }
+
+    Ok(hashes)
+}
+
 /// The tarball's SHA-512 as an SRI string, and its SHA-256 as hex, from one pass over one open handle.
-fn digests(file: &mut fs::File) -> Result<(String, String), String> {
+fn digests(file: &mut impl Read) -> Result<(String, String), String> {
     let (mut sha512, mut sha256) = (Sha512::new(), Sha256::new());
     let mut buffer = vec![0_u8; 64 * 1024];
 
@@ -742,10 +902,18 @@ fn reserve_stage(install_root: &Path, staged: &Path) -> Result<(PathBuf, PathBuf
 impl DeviceState {
     /// Verifies, installs and registers `request`. Any refusal leaves no file behind.
     pub fn acp_install_npm(&self, request: NpmInstallRequest) -> Result<AcpView, String> {
+        self.acp_install_npm_within(request, &LIMITS)
+    }
+
+    fn acp_install_npm_within(
+        &self,
+        request: NpmInstallRequest,
+        limits: &Limits,
+    ) -> Result<AcpView, String> {
         let (node, npm) = validate(&request)?;
         let staged = self.staged_archive(&request.archive)?;
         let (staged, stage_dir) = reserve_stage(&self.install_root(), &staged)?;
-        let result = self.install_npm_staged(&request, &node, &npm, &staged, &stage_dir);
+        let result = self.install_npm_staged(&request, &node, &npm, &staged, &stage_dir, limits);
 
         // npm's cache and anything half-installed go whatever happened; a successful install already moved its
         // folder out. Moved to the trash and deleted on a thread: a failed install can be a very large tree. Only
@@ -762,9 +930,18 @@ impl DeviceState {
         npm: &Path,
         archive: &Path,
         stage_dir: &Path,
+        limits: &Limits,
     ) -> Result<AcpView, String> {
-        let mut file = fs::File::open(archive).map_err(|error| error.to_string())?;
-        let (integrity, sha256) = digests(&mut file)?;
+        // One open handle: its size is checked, and what is read through it is bounded as well, so a file that
+        // grows after the check is still stopped.
+        let file = fs::File::open(archive).map_err(|error| error.to_string())?;
+        let size = file.metadata().map_err(|error| error.to_string())?.len();
+
+        if size > limits.tarball_bytes {
+            return Err(too_large(size, limits));
+        }
+
+        let (integrity, sha256) = bounded_digests(file, limits)?;
 
         if integrity != request.integrity {
             self.audit(json!({
@@ -786,7 +963,7 @@ impl DeviceState {
         create_private_dir(&prefix)?;
         create_private_dir(&home)?;
         refuse_unverified_dependencies(&package_manifest(&tarball)?)?;
-        run_npm(node, npm, &prefix, &tarball, &home)?;
+        run_npm(node, npm, &prefix, &tarball, &home, stage_dir, limits)?;
 
         // npm opened the tarball by name. The bytes on disk must match the index's hash after npm ran as well as
         // before: what npm read is then the tarball that was checked. Another process of the same user that can
