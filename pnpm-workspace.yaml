@@ -465,7 +465,9 @@ catalogs:
     "@tiptap/react": 3.33.0
     "@tiptap/starter-kit": 3.33.0
     lowlight: ^3.3.0
-    reactjs-tiptap-editor: 1.0.48
+    # Held at 1.0.46: 1.0.48 bundles its own React (`lib/react-*.js`, `lib/jsx-runtime-*.js`), so its hooks run on a second
+    # React with no renderer and every editor story fails with "Cannot read properties of null (reading 'useId')".
+    reactjs-tiptap-editor: 1.0.46
   tsc:
     # Held at 6.x: @visulima/packem-rollup imports named exports from "typescript"
     # (formatDiagnostics, transpileDeclaration, sys). TS 7 ships CJS in a shape Node
