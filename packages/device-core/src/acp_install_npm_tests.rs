@@ -1117,6 +1117,17 @@ fn dependencies_from_the_package_index_are_allowed() {
 /// Set on the child process of `only_the_variables_npm_needs_reach_it`, which has the extra variables.
 const ENV_CHILD: &str = "NEORE_NPM_ENV_CHILD";
 
+/// The proxy and certificate settings the parent of `npm_env_child` gives it, and npm must get.
+const PROXY_SETTINGS: [(&str, &str); 7] = [
+    ("HTTPS_PROXY", "http://proxy.example:3128"),
+    ("HTTP_PROXY", "http://proxy.example:3128"),
+    ("NO_PROXY", "localhost,.internal"),
+    ("https_proxy", "http://proxy.example:3128"),
+    ("http_proxy", "http://proxy.example:3128"),
+    ("no_proxy", "localhost,.internal"),
+    ("NODE_EXTRA_CA_CERTS", "/etc/corp/ca.pem"),
+];
+
 /// Runs only as the child of `only_the_variables_npm_needs_reach_it`: the process environment is never changed
 /// in the test run itself, where other tests run at the same time.
 #[test]
@@ -1150,6 +1161,14 @@ fn npm_env_child() {
         "npm_config_userconfig",
         "npm_config_globalconfig",
         "npm_config_ignore_scripts",
+        // Proxy and certificate settings, which the parent of this test sets.
+        "HTTPS_PROXY",
+        "HTTP_PROXY",
+        "NO_PROXY",
+        "https_proxy",
+        "http_proxy",
+        "no_proxy",
+        "NODE_EXTRA_CA_CERTS",
         // Set by the shell that runs the script, not passed in.
         "PWD",
         "OLDPWD",
@@ -1165,6 +1184,16 @@ fn npm_env_child() {
     }
 
     assert!(names.contains(&"npm_config_ignore_scripts".to_owned()));
+
+    let seen = fs::read_to_string(&env_log).unwrap();
+
+    for (name, value) in PROXY_SETTINGS {
+        assert!(
+            seen.lines().any(|line| line == format!("{name}={value}")),
+            "{name} did not reach npm"
+        );
+    }
+
     println!("npm-env-checked");
 }
 
@@ -1174,9 +1203,17 @@ fn only_the_variables_npm_needs_reach_it() {
         "{}::npm_env_child",
         module_path!().trim_start_matches("device_core::")
     );
-    let output = Command::new(std::env::current_exe().unwrap())
+    let mut command = Command::new(std::env::current_exe().unwrap());
+
+    command
         .args([test.as_str(), "--exact", "--nocapture", "--test-threads=1"])
-        .env(ENV_CHILD, "1")
+        .env(ENV_CHILD, "1");
+
+    for (name, value) in PROXY_SETTINGS {
+        command.env(name, value);
+    }
+
+    let output = command
         .env("NODE_OPTIONS", "--require /tmp/evil.js")
         .env("npm_config_foo", "bar")
         .env("NEORE_TEST_SECRET", "hunter2")
@@ -1725,4 +1762,526 @@ fn the_sweep_of_reserved_downloads_spares_this_runs_and_clears_other_runs() {
         "this run's reservation survives the sweep"
     );
     assert!(!earlier.exists(), "another run's is cleared");
+}
+
+/// Nothing is left reserved in `acp-agents/.installing` once a call has refused.
+fn nothing_is_reserved(dir: &Path) -> bool {
+    fs::read_dir(dir.join("acp-agents").join(INSTALLING_DIR))
+        .is_ok_and(|mut entries| entries.next().is_none())
+}
+
+#[test]
+fn a_download_over_the_size_limit_is_refused_before_it_is_read_and_cleaned_up() {
+    let (state, dir) = state("tarball-cap");
+    let (node, npm, log) = fake_tools(&dir);
+    let bytes = tarball(&manifest(), &[]);
+    let limits = Limits {
+        tarball_bytes: bytes.len() as u64 - 1,
+        ..LIMITS
+    };
+    let error = state
+        .acp_install_npm_within(
+            request(&state, &node, &npm, &bytes, integrity(&bytes)),
+            &limits,
+        )
+        .unwrap_err();
+
+    assert!(error.contains("more than an agent may be"), "{error}");
+    assert!(!log.exists(), "npm did not run");
+    assert!(nothing_is_reserved(&dir));
+    assert!(state.acp_view().agents.is_empty());
+
+    // The limit itself is allowed.
+    let limits = Limits {
+        tarball_bytes: bytes.len() as u64,
+        ..LIMITS
+    };
+
+    state
+        .acp_install_npm_within(
+            request(&state, &node, &npm, &bytes, integrity(&bytes)),
+            &limits,
+        )
+        .unwrap();
+}
+
+#[test]
+fn what_is_read_of_a_download_is_bounded_even_when_it_grows_after_the_size_check() {
+    let limits = Limits {
+        tarball_bytes: 10,
+        ..LIMITS
+    };
+
+    assert!(bounded_digests(std::io::Cursor::new(vec![0_u8; 10]), &limits).is_ok());
+    assert!(
+        bounded_digests(std::io::Cursor::new(vec![0_u8; 11]), &limits)
+            .unwrap_err()
+            .contains("more than an agent may be")
+    );
+}
+
+#[test]
+fn an_install_that_outgrows_the_staging_budget_is_stopped_while_it_runs() {
+    let (state, dir) = state("stage-budget");
+    let (node, npm, _) = fake_tools(&dir);
+    let bytes = tarball(&manifest(), &[]);
+    let mut script = fs::read_to_string(&npm).unwrap();
+
+    // npm unpacks, then keeps writing: far more than the verified tarball, and it would go on for a minute.
+    script.push_str("head -c 300000 /dev/zero > \"$prefix/big.bin\"\nsleep 60\n");
+    fs::write(&npm, script).unwrap();
+
+    let limits = Limits {
+        stage_bytes: 100_000,
+        ..LIMITS
+    };
+    let error = state
+        .acp_install_npm_within(
+            request(&state, &node, &npm, &bytes, integrity(&bytes)),
+            &limits,
+        )
+        .unwrap_err();
+
+    assert!(
+        error.contains("more disk space than an agent may use"),
+        "{error}"
+    );
+    assert!(!installed(&dir).exists());
+    assert!(nothing_is_reserved(&dir));
+    assert!(state.acp_view().agents.is_empty());
+}
+
+#[test]
+fn an_npm_that_writes_past_the_budget_and_exits_at_once_is_still_refused() {
+    let (state, dir) = state("stage-budget-fast");
+    let (node, npm, _) = fake_tools(&dir);
+    let bytes = tarball(&manifest(), &[]);
+    let mut script = fs::read_to_string(&npm).unwrap();
+
+    // Done before the first measurement could have seen it.
+    script.push_str("head -c 300000 /dev/zero > \"$prefix/big.bin\"\n");
+    fs::write(&npm, script).unwrap();
+
+    let limits = Limits {
+        stage_bytes: 100_000,
+        ..LIMITS
+    };
+    let error = state
+        .acp_install_npm_within(
+            request(&state, &node, &npm, &bytes, integrity(&bytes)),
+            &limits,
+        )
+        .unwrap_err();
+
+    assert!(
+        error.contains("more disk space than an agent may use"),
+        "{error}"
+    );
+    assert!(!installed(&dir).exists());
+    assert!(nothing_is_reserved(&dir));
+}
+
+#[test]
+fn a_small_staging_folder_is_within_budget() {
+    let (_, dir) = state("budget-small");
+
+    fs::write(dir.join("a"), vec![0_u8; 4096]).unwrap();
+    assert!(!stage_over(&dir, 10_000));
+}
+
+#[test]
+fn a_staging_folder_past_the_limit_is_over_budget_wherever_the_bytes_are() {
+    let (_, dir) = state("budget-nested");
+    let tree = dir.join("tree");
+    let nested = tree.join("cache/deep");
+
+    fs::create_dir_all(&nested).unwrap();
+    fs::write(tree.join("a"), vec![0_u8; 600]).unwrap();
+    assert!(!stage_over(&tree, 1000), "600 bytes fit in 1000");
+
+    // The rest sits two folders down, as npm's cache does.
+    fs::write(nested.join("b"), vec![0_u8; 600]).unwrap();
+    assert!(stage_over(&tree, 1000), "1200 bytes do not");
+    assert!(!stage_over(&tree, 1200), "the limit itself is allowed");
+}
+
+#[test]
+fn an_npm_past_its_deadline_is_stopped() {
+    let (_, dir) = state("timeout");
+    let (node, npm, _) = fake_tools(&dir);
+    let (prefix, home) = (dir.join("prefix"), dir.join("home"));
+
+    fs::create_dir_all(&prefix).unwrap();
+    fs::create_dir_all(&home).unwrap();
+    fs::write(&npm, "#!/usr/bin/env node\nsleep 60\n").unwrap();
+
+    // A deadline already past when npm is first looked at.
+    let limits = Limits {
+        npm_timeout: Duration::ZERO,
+        ..LIMITS
+    };
+    let error = run_npm(
+        &node,
+        &npm,
+        &prefix,
+        &dir.join("package.tgz"),
+        &home,
+        &dir,
+        &limits,
+    )
+    .unwrap_err();
+
+    assert!(error.contains("took too long"), "{error}");
+}
+
+/// Whether the process is gone: not there at all, or a zombie that only waits to be reaped (its parent was killed
+/// with it, and where nothing adopts orphans it stays).
+fn process_is_gone(pid: i32) -> bool {
+    // SAFETY: plain syscall with no memory arguments; signal 0 only checks that the process exists.
+    if unsafe { libc::kill(pid, 0) } != 0 {
+        return true;
+    }
+
+    Command::new("ps")
+        .args(["-o", "stat=", "-p", &pid.to_string()])
+        .output()
+        .is_ok_and(|output| {
+            let state = String::from_utf8_lossy(&output.stdout);
+
+            state.trim().is_empty() || state.trim().starts_with('Z')
+        })
+}
+
+#[test]
+fn stopping_npm_kills_what_npm_started_too() {
+    let (state, dir) = state("group-kill");
+    let (node, npm, _) = fake_tools(&dir);
+    let pid_file = dir.join("helper.pid");
+    let bytes = tarball(&manifest(), &[]);
+    let mut script = fs::read_to_string(&npm).unwrap();
+
+    // A helper that would outlive its parent unless the whole group is signalled, with its pid written before npm
+    // writes past the budget (the stop only happens after that).
+    script.push_str(&format!(
+        "sleep 60 &\necho $! > '{}'\nhead -c 300000 /dev/zero > \"$prefix/big.bin\"\nwait\n",
+        pid_file.display()
+    ));
+    fs::write(&npm, script).unwrap();
+
+    let limits = Limits {
+        stage_bytes: 100_000,
+        ..LIMITS
+    };
+
+    assert!(state
+        .acp_install_npm_within(
+            request(&state, &node, &npm, &bytes, integrity(&bytes)),
+            &limits,
+        )
+        .is_err());
+
+    let pid: i32 = fs::read_to_string(&pid_file)
+        .unwrap()
+        .trim()
+        .parse()
+        .unwrap();
+
+    // The kernel needs a moment to deliver the signal.
+    let gone = (0..50).any(|_| {
+        std::thread::sleep(Duration::from_millis(100));
+
+        process_is_gone(pid)
+    });
+
+    assert!(gone, "the helper npm started is still running");
+}
+
+#[test]
+fn a_multi_call_node_shim_is_recorded_by_the_name_it_runs_under() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let (state, dir) = state("node-shim");
+    let (real, npm, _) = fake_tools(&dir);
+    let shim = dir.join("version-shim");
+    let link = dir.join("bin-node/node");
+
+    // Decides what to be from the name it was started as, as mise and Volta shims do: as `node` it runs the script
+    // it is given, or reports itself when it has none.
+    fs::write(
+        &shim,
+        "#!/bin/sh\ncase \"$(basename \"$0\")\" in node) if [ $# -eq 0 ]; then echo node-ok; else exec /bin/sh \"$@\"; fi ;; *) echo shim-needs-a-name >&2; exit 3 ;; esac\n",
+    )
+    .unwrap();
+    fs::set_permissions(&shim, fs::Permissions::from_mode(0o755)).unwrap();
+    fs::remove_file(&real).unwrap();
+    fs::create_dir_all(link.parent().unwrap()).unwrap();
+    std::os::unix::fs::symlink(&shim, &link).unwrap();
+
+    let bytes = tarball(&manifest(), &[]);
+    let view = state
+        .acp_install_npm(request(&state, &link, &npm, &bytes, integrity(&bytes)))
+        .unwrap();
+    let output = Command::new(&view.agents[0].command).output().unwrap();
+
+    assert!(output.status.success(), "the recorded command runs as node");
+    assert_eq!(String::from_utf8_lossy(&output.stdout).trim(), "node-ok");
+}
+
+/// Whether the file `npm` names, links followed, is one node can run: what the installer needs to run it.
+fn npm_runs_under_node(npm: &Path) -> bool {
+    fs::canonicalize(npm).is_ok_and(|resolved| runs_under_node(&resolved))
+}
+
+#[test]
+fn an_npm_that_is_a_launcher_is_not_a_real_tool() {
+    let (_, dir) = state("npm-launcher");
+    let shim = dir.join("npm");
+    let script = dir.join("npm-cli.js");
+    let linked = dir.join("bin-npm");
+
+    fs::write(&shim, "#!/bin/sh\nexec volta run npm \"$@\"\n").unwrap();
+    fs::write(&script, "console.log('npm');\n").unwrap();
+    std::os::unix::fs::symlink(&script, &linked).unwrap();
+
+    assert!(!npm_runs_under_node(&shim));
+    assert!(npm_runs_under_node(&script));
+    assert!(npm_runs_under_node(&linked), "a link to the script counts");
+}
+
+/// A real `node` and `npm` from the PATH, or `None`. `NEORE_REQUIRE_NPM=1` turns a missing one, or an npm that
+/// is a launcher, into a failure.
+fn real_tools() -> Option<(PathBuf, PathBuf)> {
+    let find = |name: &str| {
+        std::env::split_paths(&std::env::var_os("PATH").unwrap_or_default())
+            .map(|dir| dir.join(name))
+            .find(|path| path.is_file())
+    };
+
+    choose_real_tools(
+        find("node"),
+        find("npm"),
+        std::env::var_os("NEORE_REQUIRE_NPM").is_some(),
+    )
+}
+
+fn choose_real_tools(
+    node: Option<PathBuf>,
+    npm: Option<PathBuf>,
+    required: bool,
+) -> Option<(PathBuf, PathBuf)> {
+    let unusable = match (&node, &npm) {
+        (Some(_), Some(npm)) if npm_runs_under_node(npm) => None,
+        (Some(_), Some(_)) => Some(
+            "npm on PATH is a launcher (a version-manager shim or a native program), not a JavaScript file",
+        ),
+        _ => Some("node and npm were not found on PATH"),
+    };
+
+    match (unusable, node, npm) {
+        (None, Some(node), Some(npm)) => Some((node, npm)),
+        (reason, _, _) => {
+            let reason = reason.unwrap_or("node and npm were not found on PATH");
+
+            assert!(!required, "NEORE_REQUIRE_NPM is set but {reason}");
+            eprintln!("skipped: {reason}");
+
+            None
+        }
+    }
+}
+
+#[test]
+fn a_required_npm_that_is_a_launcher_fails_instead_of_skipping() {
+    let (_, dir) = state("require-npm");
+    let node = dir.join("node");
+    let shim = dir.join("npm");
+
+    fs::write(&node, "#!/bin/sh\n").unwrap();
+    fs::write(&shim, "#!/bin/sh\nexec volta run npm \"$@\"\n").unwrap();
+
+    assert!(choose_real_tools(Some(node.clone()), Some(shim.clone()), false).is_none());
+    assert!(
+        std::panic::catch_unwind(|| choose_real_tools(Some(node), Some(shim), true)).is_err(),
+        "a required npm must not be skipped"
+    );
+    assert!(std::panic::catch_unwind(|| choose_real_tools(None, None, true)).is_err());
+}
+
+fn marker_package(marker: &Path) -> Vec<u8> {
+    let script = format!(
+        "require('fs').writeFileSync({}, 'ran');\n",
+        serde_json::to_string(&marker.to_string_lossy()).unwrap()
+    );
+    let manifest = json!({
+        "name": PACKAGE, "version": "1.0.0", "bin": { PACKAGE: "cli.js" },
+        "scripts": {
+            "preinstall": "node marker.js", "install": "node marker.js",
+            "postinstall": "node marker.js", "prepare": "node marker.js"
+        }
+    });
+
+    tarball(&manifest, &[("marker.js", &script)])
+}
+
+#[test]
+fn no_lifecycle_script_runs_during_an_install() {
+    let Some((node, npm)) = real_tools() else {
+        return;
+    };
+    let (state, dir) = state("scripts");
+    let marker = dir.join("script-ran");
+    let bytes = marker_package(&marker);
+
+    // The control: the same package, installed by npm without the flag, does run its script. Without this the
+    // assertion below could pass for a fixture whose scripts never run.
+    let control = dir.join("control");
+
+    fs::create_dir_all(&control).unwrap();
+
+    let tgz = control.join("package.tgz");
+
+    fs::write(&tgz, &bytes).unwrap();
+
+    let status = Command::new(&npm)
+        .args([
+            "install",
+            "--no-audit",
+            "--no-fund",
+            "--no-package-lock",
+            "--prefix",
+        ])
+        .arg(&control)
+        .arg(&tgz)
+        .env_clear()
+        .env("npm_config_ignore_scripts", "false")
+        .env("npm_config_userconfig", control.join("userrc"))
+        .env("npm_config_globalconfig", control.join("globalrc"))
+        .env(
+            "PATH",
+            format!("{}:/usr/bin:/bin", node.parent().unwrap().display()),
+        )
+        .env("HOME", &control)
+        .env("npm_config_cache", control.join("cache"))
+        .output()
+        .unwrap();
+
+    assert!(
+        status.status.success(),
+        "{}",
+        String::from_utf8_lossy(&status.stderr)
+    );
+    assert!(
+        marker.exists(),
+        "the control install should have run the fixture's scripts"
+    );
+    fs::remove_file(&marker).unwrap();
+
+    let view = state
+        .acp_install_npm(request(&state, &node, &npm, &bytes, integrity(&bytes)))
+        .unwrap();
+
+    assert_eq!(view.agents.len(), 1);
+    assert!(
+        !marker.exists(),
+        "a lifecycle script ran during the install"
+    );
+    assert!(state.acp_spawn_plan("fixture", None).is_ok());
+}
+
+#[test]
+fn a_real_npm_install_runs_the_package_with_the_pinned_node() {
+    let Some((node, npm)) = real_tools() else {
+        return;
+    };
+    let (state, dir) = state("real");
+    let bytes = tarball(&manifest(), &[]);
+    let view = state
+        .acp_install_npm(request(&state, &node, &npm, &bytes, integrity(&bytes)))
+        .unwrap();
+    let agent = &view.agents[0];
+    let output = Command::new(&agent.command)
+        .args(&agent.args[..1])
+        .output()
+        .unwrap();
+
+    assert_eq!(String::from_utf8_lossy(&output.stdout).trim(), "hello");
+    assert!(installed(&dir)
+        .join("node_modules")
+        .join(PACKAGE)
+        .join("cli.js")
+        .is_file());
+}
+
+#[test]
+fn an_unreadable_part_of_the_staging_folder_counts_as_over_budget() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let (_, dir) = state("budget-unreadable");
+    let tree = dir.join("tree");
+    let hidden = tree.join("hidden");
+
+    fs::create_dir_all(&hidden).unwrap();
+    fs::write(hidden.join("big"), vec![0_u8; 5000]).unwrap();
+    assert!(!stage_over(&tree, 10_000), "readable and small");
+
+    fs::set_permissions(&hidden, fs::Permissions::from_mode(0o000)).unwrap();
+
+    let readable_anyway = fs::read_dir(&hidden).is_ok();
+    let over = stage_over(&tree, 10_000);
+
+    fs::set_permissions(&hidden, fs::Permissions::from_mode(0o700)).unwrap();
+
+    if readable_anyway {
+        eprintln!("skipped: this user can read a folder with no permissions (root)");
+
+        return;
+    }
+
+    assert!(over, "what cannot be counted must not pass the cap");
+}
+
+#[test]
+fn what_npm_left_running_is_stopped_when_it_exits_whatever_the_status() {
+    for code in [0, 1] {
+        let (_, dir) = state(&format!("helper-left-{code}"));
+        let (node, npm, _) = fake_tools(&dir);
+        let pid_file = dir.join("helper.pid");
+        let (prefix, home) = (dir.join("prefix"), dir.join("home"));
+
+        fs::create_dir_all(&prefix).unwrap();
+        fs::create_dir_all(&home).unwrap();
+        fs::write(
+            &npm,
+            format!(
+                "#!/usr/bin/env node\nsleep 60 &\necho $! > '{}'\nexit {code}\n",
+                pid_file.display()
+            ),
+        )
+        .unwrap();
+
+        let result = run_npm(
+            &node,
+            &npm,
+            &prefix,
+            &dir.join("package.tgz"),
+            &home,
+            &dir,
+            &LIMITS,
+        );
+
+        assert_eq!(result.is_ok(), code == 0, "{result:?}");
+
+        let pid: i32 = fs::read_to_string(&pid_file)
+            .unwrap()
+            .trim()
+            .parse()
+            .unwrap();
+        let gone = (0..50).any(|_| {
+            std::thread::sleep(Duration::from_millis(100));
+
+            process_is_gone(pid)
+        });
+
+        assert!(gone, "the helper outlived npm (exit {code})");
+    }
 }
