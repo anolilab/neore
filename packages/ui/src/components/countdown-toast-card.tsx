@@ -62,7 +62,8 @@ const CountdownToastCard = ({
         let hovered = false;
         let remainingMs = duration;
         // When the clock last started running, or null while paused. Only running time is ever subtracted.
-        let runningSince: number | null = performance.now();
+        // Starts null: the first sync below decides, so a toast mounted in a hidden tab starts paused.
+        let runningSince: number | null = null;
 
         const isPaused = () =>
             hovered || toastElement?.dataset.expanded === "true" || document.hidden || (toastElement?.contains(document.activeElement) ?? false);
@@ -103,6 +104,8 @@ const CountdownToastCard = ({
         toastElement?.addEventListener("focusin", onFocusChange);
         toastElement?.addEventListener("focusout", onFocusChange);
         document.addEventListener("visibilitychange", sync);
+
+        sync();
 
         const timer = globalThis.setInterval(() => {
             sync();
