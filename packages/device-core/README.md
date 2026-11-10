@@ -214,3 +214,7 @@ the pinned program keeps it.
 
 The check reads files after a type check, so it guards against changes made at rest, not against someone who can
 write to the folder while the agent is starting (a known limit).
+
+An install, a removal and a prune of old versions run one at a time (`lock_installs`). Deleting an install or a
+staging folder renames it into `acp-agents/.trash` under that lock and deletes it on a thread; trash names carry a
+per-run id, and the sweep at the next install stage removes the entries of other runs only.
