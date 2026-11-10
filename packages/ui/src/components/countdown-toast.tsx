@@ -19,7 +19,7 @@ interface CountdownToastOptions {
     title: string;
     description?: string;
     tone?: CountdownToastTone;
-    /** Milliseconds until the toast dismisses itself. Defaults to 5 seconds. */
+    /** Milliseconds until the toast dismisses itself. Defaults to 10 seconds. */
     duration?: number;
     action?: CountdownToastAction;
     cancel?: CountdownToastAction;
@@ -27,7 +27,7 @@ interface CountdownToastOptions {
     countdownLabel?: (seconds: number) => string;
 }
 
-const DEFAULT_DURATION = 5000;
+const DEFAULT_DURATION = 10_000;
 const TICK_MS = 250;
 
 interface CountdownToastCardProps extends CountdownToastOptions {

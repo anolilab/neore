@@ -14,6 +14,7 @@ const meta = {
                         action: { label: "Undo", onClick: onUndo },
                         cancel: { label: "Dismiss", onClick: () => undefined },
                         description: "This message will close in 5 seconds.",
+                        duration: 5000,
                         title: "Changes saved",
                     })
                 }
@@ -28,6 +29,7 @@ const meta = {
                         countdownLabel: (seconds) => `Permanently deleted in ${seconds} seconds`,
                         cancel: { label: "Dismiss", onClick: () => undefined },
                         description: "INV-2026-0412 moved to trash.",
+                        duration: 5000,
                         title: "Invoice deleted",
                         tone: "destructive",
                     })
