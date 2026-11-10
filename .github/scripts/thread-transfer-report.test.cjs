@@ -21,11 +21,14 @@ function snapshotPart(overrides = {}) {
     };
 }
 
-function streamPart() {
+const LIVE_SCENARIO = { id: "thread-transfer-live-v1", measuredToolCalls: 20, replyChunkChars: 100, replyChunks: 60 };
+
+function streamPart({ observed = {}, ceiling = {}, scenario = LIVE_SCENARIO } = {}) {
     return {
         schemaVersion: 1,
-        observed: { liveStreamWireBytes: 2_000, liveStreamDecodedBytes: 9_000, liveStreamMessages: 40 },
-        ceiling: { liveStreamWireBytes: 2_500, liveStreamDecodedBytes: 11_000, liveStreamMessages: 50 },
+        scenario,
+        observed: { liveStreamWireBytes: 2_000, liveStreamDecodedBytes: 9_000, liveStreamMessages: 40, ...observed },
+        ceiling: { liveStreamWireBytes: 2_500, liveStreamDecodedBytes: 11_000, liveStreamMessages: 50, ...ceiling },
     };
 }
 
@@ -38,6 +41,7 @@ test("validates the fixed result schema", () => {
     assert.throws(() => validateResult({ ...result(), injectedMarkdown: "@everyone" }), /unexpected fields/);
     assert.throws(() => validateResult({ ...result(), observed: { ...result().observed, totalWireBytes: "lots" } }), /non-negative safe integer/);
     assert.throws(() => validateResult({ ...result(), scenario: { ...SCENARIO, id: "other" } }), /scenario.id is not supported/);
+    assert.throws(() => validateResult({ ...result(), liveScenario: { ...LIVE_SCENARIO, id: "other" } }), /scenario.id is not supported/);
 });
 
 test("assembles both halves and budgets the total as the sum of the wire budgets", () => {
@@ -89,6 +93,35 @@ test("reports a ceiling change against a comparable baseline", () => {
 
     assert.match(body, /This PR changes transfer ceilings/);
     assert.match(body, /Live stream lines: 50 → 60/);
+});
+
+test("judges the PR against the baseline's ceilings, so a PR cannot pass by raising its own", () => {
+    const baseline = assemble(snapshotPart(), streamPart());
+    const current = assemble(snapshotPart(), streamPart({ observed: { liveStreamMessages: 60 }, ceiling: { liveStreamMessages: 100 } }));
+
+    const body = renderComment({
+        current,
+        baseline,
+        baselineRun: { matchesBase: true, sha: "1111111", url: "https://example.test/run/0" },
+        currentRun: { sha: "abcdef1234", conclusion: "success", url: "https://example.test/run/1" },
+    });
+
+    assert.match(body, /One or more thread transfer ceilings were exceeded/);
+});
+
+test("does not call a run comparable when the live reply workload changed", () => {
+    const baseline = assemble(snapshotPart(), streamPart());
+    const current = assemble(snapshotPart(), streamPart({ scenario: { ...LIVE_SCENARIO, measuredToolCalls: 40 } }));
+
+    const body = renderComment({
+        current,
+        baseline,
+        baselineRun: { matchesBase: true, sha: "1111111", url: "https://example.test/run/0" },
+        currentRun: { sha: "abcdef1234", conclusion: "success", url: "https://example.test/run/1" },
+    });
+
+    assert.match(body, /measured workload changed/);
+    assert.match(body, /\| Live stream lines \| — \| 40 \| — \|/);
 });
 
 function fakeGithub({ pull, sourceArtifacts, baseRuns, recentRuns, artifactsByRun }) {

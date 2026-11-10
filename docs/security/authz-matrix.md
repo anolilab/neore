@@ -317,6 +317,7 @@ for a schema table that is neither policed nor listed:
 | `chat_functions.getThreads` | query | authQuery | — | caller-scoped (ctx.user) | ok |
 | `chat_functions.getThreadTemporaryStatus` | query | liteAuthQuery | threads | row.userId == caller | ok |
 | `chat_functions.getThreadUIMessages` | query | liteAuthQuery | threads | thread access (owner/grant) | ok |
+| `chat_functions.getToolOutput` | query | liteAuthQuery | threads | full access only (owner/grant, not redacted or locked); row must belong to the thread | ok |
 | `chat_functions.listMCPToolsMeta` | action | authAction + RL | — | caller-scoped (ctx.user) | **fixed** (medium) — SSRF guard on saved server URLs |
 | `chat_functions.makeThreadTemporary` | mutation | authMutation + RL | threads | row.userId == caller | ok |
 | `chat_functions.pinThread` | mutation | authMutation + RL | threads | row.userId == caller | ok |

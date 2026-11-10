@@ -20798,6 +20798,9 @@
                 "properties": {
                   "args": {
                     "properties": {
+                      "fullToolOutputs": {
+                        "type": "boolean"
+                      },
                       "model": {
                         "type": "string"
                       },

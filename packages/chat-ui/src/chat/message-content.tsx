@@ -245,7 +245,8 @@ const makeDefaultToolCall = (
                         {part.output === undefined && part.outputRef && (
                             <div>
                                 <span className="text-xs font-semibold uppercase opacity-80 dark:opacity-100">{t`Output:`}</span>
-                                <TrimmedToolOutput outputRef={part.outputRef} />
+                                {/* Keyed by the ref: a live update that swaps the part must not show the previous output. */}
+                                <TrimmedToolOutput key={`${part.outputRef.messageId}:${part.outputRef.toolCallId}`} outputRef={part.outputRef} />
                             </div>
                         )}
                         {part.errorText && (

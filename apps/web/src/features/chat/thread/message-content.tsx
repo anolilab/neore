@@ -154,7 +154,11 @@ const MessageContent: FC<MessageContentProps> = memo(({ className, isStreaming, 
                 threadId: ref.threadId as Id<"threads">,
                 toolCallId: ref.toolCallId,
             });
-            const { output } = await queryClient.fetchQuery({ ...crpc.chat.functions.getToolOutput.queryOptions(args, { live: false }), staleTime: Infinity });
+            // The output can hold signed links, which stay valid at least 12 hours (`backend/lunora/lib/storage-ref.ts`); refetch within the hour.
+            const { output } = await queryClient.fetchQuery({
+                ...crpc.chat.functions.getToolOutput.queryOptions(args, { live: false }),
+                staleTime: 60 * 60 * 1000,
+            });
 
             return output;
         },

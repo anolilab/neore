@@ -175,6 +175,18 @@ msgstr "(non disponibile)"
 msgid "(valid until {pairingValidUntil})"
 msgstr "(valido fino al {pairingValidUntil})"
 
+#: ../../packages/chat-ui/src/chat/tool-output-loader.tsx:63
+msgid "Loading output..."
+msgstr "Caricamento dell'output..."
+
+#: ../../packages/chat-ui/src/chat/tool-output-loader.tsx:70
+msgid "Output could not be loaded."
+msgstr "Impossibile caricare l'output."
+
+#: ../../packages/chat-ui/src/chat/tool-output-loader.tsx:53
+msgid "Output is not loaded in this view."
+msgstr "L'output non è caricato in questa vista."
+
 #. placeholder {0}: model.activeDays
 #: src/features/settings/components/chat/usage-activity-heatmap.tsx:110
 msgid "{0, plural, one {# active day} other {# active days}}"

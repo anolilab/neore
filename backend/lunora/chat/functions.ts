@@ -923,6 +923,8 @@ export const getThreadMessages = authQuery
  */
 export const getThreadUIMessages = liteAuthQuery
     .input({
+        /** Keep every tool output in the page. The public API asks for it; the app leaves large ones to `getToolOutput`. */
+        fullToolOutputs: v.optional(v.boolean()),
         model: v.optional(v.string().max(MAX_LENGTH.short)),
         paginationOpts: v.object({
             cursor: v.union(v.string().max(MAX_LENGTH.cursor), v.null()),
@@ -933,7 +935,7 @@ export const getThreadUIMessages = liteAuthQuery
         threadId: v.id("threads"),
         unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
     })
-    .query(async ({ args: { paginationOpts, threadId, unlockProof }, ctx: context }): Promise<PaginationResult<UIMessage>> => {
+    .query(async ({ args: { fullToolOutputs, paginationOpts, threadId, unlockProof }, ctx: context }): Promise<PaginationResult<UIMessage>> => {
         const { userId } = context.user;
 
         // Cap numItems to prevent large fetches, ensure at least 1 (paginate rejects 0)
@@ -991,7 +993,8 @@ export const getThreadUIMessages = liteAuthQuery
         const displayDocs = await signDocsForDisplay(context, rawMessages.page as unknown as MessageDoc[]);
         const branchedMessages = withBranchInfo(toUIMessages(displayDocs), pathPage?.branches);
         // A large tool result the page does not paint is fetched on expand (`getToolOutput`). A redacted view drops tool parts anyway.
-        const uiMessages = access.kind === "full" ? trimToolOutputs(branchedMessages, threadId, toolResultRowIds(rawMessages.page)) : branchedMessages;
+        const uiMessages =
+            access.kind === "full" && !fullToolOutputs ? trimToolOutputs(branchedMessages, threadId, toolResultRowIds(rawMessages.page)) : branchedMessages;
 
         const fileMap = await loadNsfwStatuses(context, uiMessages);
 
@@ -1063,13 +1066,15 @@ export const getToolOutput = liteAuthQuery
         }
 
         const row = await context.db.get("messages", messageId);
-        const content = (row?.message as { content?: unknown } | undefined)?.content;
 
-        if (!row || row.threadId !== threadId || !Array.isArray(content)) {
+        if (!row || row.threadId !== threadId || !Array.isArray((row.message as { content?: unknown } | undefined)?.content)) {
             return throwThreadNotFound(threadId);
         }
 
-        const result = (content as Array<{ output?: unknown; toolCallId?: unknown; type?: unknown }>).find(
+        // Signed the way the page signs its rows, so a storage reference in this output resolves the same way.
+        const [signed] = await signDocsForDisplay(context, [row as unknown as MessageDoc]);
+        const content = (signed?.message as { content?: unknown } | undefined)?.content;
+        const result = (content as { output?: unknown; toolCallId?: unknown; type?: unknown }[] | undefined)?.find(
             (part) => part?.type === "tool-result" && part.toolCallId === toolCallId,
         );
 

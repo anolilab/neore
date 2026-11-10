@@ -5,6 +5,7 @@ const ARTIFACT_NAME = "thread-transfer-results";
 const RESULT_FILE = "thread-transfer-result.json";
 const COMMENT_MARKER = "<!-- neore-thread-transfer-report -->";
 const SCENARIO_ID = "thread-transfer-v1";
+const LIVE_SCENARIO_ID = "thread-transfer-live-v1";
 
 // The two halves are measured by separate test files and merged by `assemble`.
 const PART_FILES = { snapshot: "snapshot.json", stream: "stream.json" };
@@ -12,6 +13,7 @@ const SNAPSHOT_KEYS = ["snapshotWireBytes", "snapshotDecodedBytes"];
 const STREAM_KEYS = ["liveStreamWireBytes", "liveStreamDecodedBytes", "liveStreamMessages"];
 const OBSERVED_KEYS = ["totalWireBytes", ...SNAPSHOT_KEYS, ...STREAM_KEYS];
 const SCENARIO_KEYS = ["id", "historyTurns", "historyToolCallsPerTurn", "historyToolResultBytes", "measuredToolCalls", "measuredToolResultBytes"];
+const LIVE_SCENARIO_KEYS = ["id", "measuredToolCalls", "replyChunks", "replyChunkChars"];
 const MAX_RESULT_BYTES = 64 * 1_024;
 
 function resultShaMarker(sha) {
@@ -49,6 +51,16 @@ function validateScenario(scenario) {
     }
 }
 
+function validateLiveScenario(scenario) {
+    assertExactKeys(scenario, LIVE_SCENARIO_KEYS, "stream part scenario");
+    if (scenario.id !== LIVE_SCENARIO_ID) {
+        throw new Error("stream part scenario.id is not supported");
+    }
+    for (const key of LIVE_SCENARIO_KEYS.slice(1)) {
+        assertMetric(scenario[key], `stream part scenario.${key}`);
+    }
+}
+
 function validateMetrics(value, keys, label) {
     assertExactKeys(value, keys, label);
     for (const key of keys) {
@@ -57,11 +69,12 @@ function validateMetrics(value, keys, label) {
 }
 
 function validateResult(value) {
-    assertExactKeys(value, ["schemaVersion", "scenario", "observed", "ceiling"], "result");
+    assertExactKeys(value, ["schemaVersion", "scenario", "liveScenario", "observed", "ceiling"], "result");
     if (value.schemaVersion !== 1) {
         throw new Error("result.schemaVersion must be 1");
     }
     validateScenario(value.scenario);
+    validateLiveScenario(value.liveScenario);
     validateMetrics(value.observed, OBSERVED_KEYS, "result.observed");
     validateMetrics(value.ceiling, OBSERVED_KEYS, "result.ceiling");
     return value;
@@ -79,10 +92,11 @@ function validateSnapshotPart(value) {
 }
 
 function validateStreamPart(value) {
-    assertExactKeys(value, ["schemaVersion", "observed", "ceiling"], "stream part");
+    assertExactKeys(value, ["schemaVersion", "scenario", "observed", "ceiling"], "stream part");
     if (value.schemaVersion !== 1) {
         throw new Error("stream part schemaVersion must be 1");
     }
+    validateLiveScenario(value.scenario);
     validateMetrics(value.observed, STREAM_KEYS, "stream part observed");
     validateMetrics(value.ceiling, STREAM_KEYS, "stream part ceiling");
     return value;
@@ -120,7 +134,7 @@ function assemble(snapshot, stream) {
         ...snapshotPart.ceiling,
         ...streamPart.ceiling,
     };
-    return validateResult({ schemaVersion: 1, scenario: snapshotPart.scenario, observed, ceiling });
+    return validateResult({ schemaVersion: 1, scenario: snapshotPart.scenario, liveScenario: streamPart.scenario, observed, ceiling });
 }
 
 function assembleFromDirectory(directory) {
@@ -153,6 +167,10 @@ function sameScenario(left, right) {
     return SCENARIO_KEYS.every((key) => left[key] === right[key]);
 }
 
+function sameLiveScenario(left, right) {
+    return LIVE_SCENARIO_KEYS.every((key) => left[key] === right[key]);
+}
+
 const METRICS = [
     { key: "totalWireBytes", label: "Total thread wire (gzip)", kind: "bytes" },
     { key: "snapshotWireBytes", label: "Thread snapshot wire (gzip)", kind: "bytes" },
@@ -165,14 +183,17 @@ const METRICS = [
 function renderComment(input) {
     const current = input.current;
     const baseline = input.baseline;
-    const comparable = baseline !== undefined && sameScenario(current.scenario, baseline.scenario);
+    const comparable =
+        baseline !== undefined && sameScenario(current.scenario, baseline.scenario) && sameLiveScenario(current.liveScenario, baseline.liveScenario);
+    // The verdict uses the ceilings the `main` run enforced, so a PR cannot pass by raising its own. Without a baseline, the PR's are the only ones.
+    const enforced = baseline ? baseline.ceiling : current.ceiling;
     const rows = [];
     const ceilingChanges = [];
     let failed = false;
 
     for (const metric of METRICS) {
         const observed = current.observed[metric.key];
-        const ceiling = current.ceiling[metric.key];
+        const ceiling = enforced[metric.key];
         const baselineObserved = comparable ? baseline.observed[metric.key] : undefined;
         const pass = observed <= ceiling;
         failed ||= !pass;
@@ -180,8 +201,10 @@ function renderComment(input) {
             `| ${metric.label} | ${baselineObserved === undefined ? "—" : formatValue(baselineObserved, metric.kind)} | ${formatValue(observed, metric.kind)} | ${formatImpact(observed, baselineObserved, metric.kind)} | ${formatValue(ceiling, metric.kind)} | ${pass ? "✅" : "❌"} |`,
         );
 
-        if (comparable && baseline.ceiling[metric.key] !== ceiling) {
-            ceilingChanges.push(`- ${metric.label}: ${formatValue(baseline.ceiling[metric.key], metric.kind)} → ${formatValue(ceiling, metric.kind)}`);
+        if (comparable && baseline.ceiling[metric.key] !== current.ceiling[metric.key]) {
+            ceilingChanges.push(
+                `- ${metric.label}: ${formatValue(baseline.ceiling[metric.key], metric.kind)} → ${formatValue(current.ceiling[metric.key], metric.kind)}`,
+            );
         }
     }
 
@@ -189,9 +212,13 @@ function renderComment(input) {
     const currentLink = `[\`${input.currentRun.sha.slice(0, 7)}\`](${input.currentRun.url})`;
     const notices = [];
     if (!baseline) {
-        notices.push("> ℹ️ No successful `main` baseline artifact is available yet. This run establishes the initial measurement.");
+        notices.push(
+            "> ℹ️ No successful `main` baseline artifact is available yet. This run establishes the initial measurement, and its ceilings are the ones this PR declares.",
+        );
     } else if (!comparable) {
-        notices.push("> ⚠️ The thread fixture changed, so impact percentages are not directly comparable to the `main` baseline.");
+        notices.push(
+            "> ⚠️ The measured workload changed (thread fixture or live reply), so impact percentages are not directly comparable to the `main` baseline.",
+        );
     } else if (!input.baselineRun.matchesBase) {
         notices.push("> ℹ️ The exact PR base did not have a successful artifact. Baseline uses the latest successful `main` measurement shown below.");
     }
@@ -207,7 +234,7 @@ function renderComment(input) {
         failed ? "❌ One or more thread transfer ceilings were exceeded." : "✅ Thread transfer remains within every enforced ceiling.",
         ...(notices.length > 0 ? ["", ...notices] : []),
         "",
-        "| Metric | Main baseline | This PR | Impact | PR ceiling | |",
+        "| Metric | Main baseline | This PR | Impact | Ceiling | |",
         "| --- | ---: | ---: | ---: | ---: | --- |",
         ...rows,
         "",
@@ -218,11 +245,13 @@ function renderComment(input) {
         "",
         `${current.scenario.historyTurns} historical turns, ${current.scenario.historyToolCallsPerTurn} tool calls per turn, ${formatBytes(current.scenario.historyToolResultBytes)} retained tool results per historical turn, and a ${formatBytes(current.scenario.measuredToolResultBytes)} retained result in the measured turn (${current.scenario.measuredToolCalls} tool calls).`,
         "",
+        `The live reply: ${current.liveScenario.measuredToolCalls} tool progress reports and ${current.liveScenario.replyChunks} text chunks of up to ${current.liveScenario.replyChunkChars} characters each.`,
+        "",
         "Wire is the gzip of each body. Decoded is the body as sent. Live stream lines are the NDJSON lines the gateway relays for one reply.",
         "",
         "</details>",
         "",
-        "_Updated in place by a trusted workflow. PR artifacts are strictly validated and never executed._",
+        "_Updated in place by a trusted workflow. The measurements are the PR run's own output, validated but not independently verified. The ceilings are the `main` baseline's where one exists._",
     ].join("\n");
 }
 

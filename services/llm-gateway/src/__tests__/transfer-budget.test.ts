@@ -4,8 +4,8 @@
  * the fixture chunks in the shape the backend writes them (text deltas and tool progress).
  *
  * A live turn does not carry tool results: they are stored with the thread and reach the
- * client through the snapshot. So the fixture streams the reply text and twenty progress
- * reports for the turn's tool calls.
+ * client through the snapshot. So the fixture streams the reply text and one progress report
+ * per write for the turn's tool calls, with the fields `ToolProgressChunk` carries.
  *
  * Decoded is the relayed body; wire is its gzip. Lines are NDJSON lines. The result is written
  * to `NEORE_TRANSFER_BUDGET_DIR/stream.json` only when that variable is set (the
@@ -26,22 +26,32 @@ const CHUNKS_PER_POLL = 25;
 const MEASURED_TOOL_CALLS = 20;
 const REPLY_CHUNKS = 60;
 const REPLY_CHUNK_CHARS = 100;
+const LIVE_SCENARIO_ID = "thread-transfer-live-v1";
 
 // Ceilings: the measured value plus about 25% headroom. Raise one only with a reason in the PR.
 const CEILING = {
-    liveStreamDecodedBytes: 11_000,
+    liveStreamDecodedBytes: 12_500,
     liveStreamMessages: 100,
-    liveStreamWireBytes: 550,
+    liveStreamWireBytes: 650,
 };
 
 /** The chunks one turn writes, in the order the backend writes them. */
 const measuredTurnChunks = (): Record<string, unknown>[] => {
-    const progress = Array.from({ length: MEASURED_TOOL_CALLS }, (_, call) => ({
-        toolProgress: { message: `searching the index for lookup ${String(call)}`, step: call, tool: "docs_search", total: MEASURED_TOOL_CALLS },
-    }));
-    const text = Array.from({ length: REPLY_CHUNKS }, (_, index) => ({
-        text: `${String(index).padStart(3, "0")} ${"lorem ipsum dolor sit amet ".repeat(4)}`.slice(0, REPLY_CHUNK_CHARS),
-    }));
+    const progress = Array.from({ length: MEASURED_TOOL_CALLS }, (_, call) => {
+        return {
+            toolProgress: {
+                message: `searching the index for lookup ${String(call)}`,
+                progress: call,
+                serverName: "docs",
+                toolCallId: `call-${String(call)}`,
+                toolName: "docs_search",
+                total: MEASURED_TOOL_CALLS,
+            },
+        };
+    });
+    const text = Array.from({ length: REPLY_CHUNKS }, (_, index) => {
+        return { text: `${String(index).padStart(3, "0")} ${"lorem ipsum dolor sit amet ".repeat(4)}`.slice(0, REPLY_CHUNK_CHARS) };
+    });
 
     return [...progress, ...text];
 };
@@ -93,7 +103,21 @@ describe("live reply transfer", () => {
             mkdirSync(process.env.NEORE_TRANSFER_BUDGET_DIR, { recursive: true });
             writeFileSync(
                 join(process.env.NEORE_TRANSFER_BUDGET_DIR, "stream.json"),
-                `${JSON.stringify({ ceiling: CEILING, observed, schemaVersion: 1 }, null, 2)}\n`,
+                `${JSON.stringify(
+                    {
+                        ceiling: CEILING,
+                        observed,
+                        scenario: {
+                            id: LIVE_SCENARIO_ID,
+                            measuredToolCalls: MEASURED_TOOL_CALLS,
+                            replyChunkChars: REPLY_CHUNK_CHARS,
+                            replyChunks: REPLY_CHUNKS,
+                        },
+                        schemaVersion: 1,
+                    },
+                    null,
+                    2,
+                )}\n`,
             );
         }
 

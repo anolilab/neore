@@ -146,6 +146,8 @@ const seedTurn = async (context: any, threadId: string, turn: number, calls: num
     });
 };
 
+const TOOL_PART_JSON = /"type":"tool-/u;
+
 describe("thread snapshot transfer", () => {
     it("keeps the first thread page within its decoded and wire ceilings", async () => {
         const harness = lunoraTest(schema as never);
@@ -193,12 +195,12 @@ describe("thread snapshot transfer", () => {
 
         // A page without tool parts would measure a text-only thread, so the fixture cannot go that way silently.
         expect(page.page.length).toBeGreaterThan(0);
-        expect(body.toString()).toMatch(/"type":"tool-/);
+        expect(body.toString()).toMatch(TOOL_PART_JSON);
         expect(observed.snapshotWireBytes).toBeLessThanOrEqual(CEILING.snapshotWireBytes);
         expect(observed.snapshotDecodedBytes).toBeLessThanOrEqual(CEILING.snapshotDecodedBytes);
 
         // The page leaves its large results out and points at them; each must come back whole through `getToolOutput`.
-        const refs = (page.page as Array<{ parts: Array<{ outputRef?: { messageId: string; threadId: string; toolCallId: string } }> }>).flatMap((message) =>
+        const refs = (page.page as { parts: { outputRef?: { messageId: string; threadId: string; toolCallId: string } }[] }[]).flatMap((message) =>
             message.parts.flatMap((part) => (part.outputRef ? [part.outputRef] : [])),
         );
 
@@ -216,5 +218,33 @@ describe("thread snapshot transfer", () => {
 
             expect(full.output).toHaveLength(MEASURED_TOOL_RESULT_BYTES);
         }
+    });
+
+    it("keeps every tool output inline when the caller asks for full outputs (the public API's read)", async () => {
+        const harness = lunoraTest(schema as never);
+        const order = { value: 0 };
+
+        const threadId = await harness.run(async (context: any) => {
+            const id = await context.db.insert("threads", { model: "m", status: "active", title: "full outputs", userId: OWNER });
+
+            await seedTurn(context, id, 0, MEASURED_TOOL_CALLS, MEASURED_TOOL_RESULT_BYTES, order);
+
+            return id;
+        });
+
+        const page = (await harness.withIdentity({ userId: OWNER }).query(
+            getThreadUIMessages as never,
+            {
+                fullToolOutputs: true,
+                paginationOpts: { cursor: null, numItems: CLIENT_PAGE_ITEMS },
+                threadId,
+            } as never,
+        )) as { page: { parts: { output?: unknown; outputRef?: unknown; type: string }[] }[] };
+
+        const parts = page.page.flatMap((message) => message.parts.filter((part) => part.type.startsWith("tool-")));
+
+        expect(parts.length).toBeGreaterThan(0);
+        expect(parts.some((part) => part.outputRef !== undefined)).toBe(false);
+        expect(parts.some((part) => typeof part.output === "string" && part.output.length === MEASURED_TOOL_RESULT_BYTES)).toBe(true);
     });
 });

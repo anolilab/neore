@@ -1,6 +1,6 @@
 import { useLingui } from "@lingui/react/macro";
 import type { FC } from "react";
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, use, useEffect, useState } from "react";
 
 import type { ToolOutputRef } from "../types/message";
 
@@ -17,13 +17,13 @@ type LoadState = { output: unknown; status: "loaded" } | { status: "error" } | {
 /** The output of a tool result the page left out, fetched when the tool view is expanded. */
 export const TrimmedToolOutput: FC<{ outputRef: ToolOutputRef }> = ({ outputRef }) => {
     const { t } = useLingui();
-    const load = useContext(ToolOutputLoaderContext);
+    const load = use(ToolOutputLoaderContext);
     const [state, setState] = useState<LoadState>({ status: "loading" });
     const { messageId, threadId, toolCallId } = outputRef;
 
     useEffect(() => {
         if (!load) {
-            return;
+            return undefined;
         }
 
         let active = true;
@@ -33,7 +33,8 @@ export const TrimmedToolOutput: FC<{ outputRef: ToolOutputRef }> = ({ outputRef 
                 const output = await load({ messageId, threadId, toolCallId });
 
                 if (active) {
-                    setState({ output, status: "loaded" });
+                    // A result the server no longer holds comes back without an output: that is not an empty result.
+                    setState(output === undefined ? { status: "error" } : { output, status: "loaded" });
                 }
             } catch {
                 if (active) {
@@ -42,7 +43,7 @@ export const TrimmedToolOutput: FC<{ outputRef: ToolOutputRef }> = ({ outputRef 
             }
         };
 
-        void run();
+        run();
 
         return () => {
             active = false;
@@ -54,11 +55,19 @@ export const TrimmedToolOutput: FC<{ outputRef: ToolOutputRef }> = ({ outputRef 
     }
 
     if (state.status === "loading") {
-        return <p className="text-xs opacity-80 dark:opacity-100">{t`Loading output...`}</p>;
+        return (
+            <p className="text-xs opacity-80 dark:opacity-100" role="status">
+                {t`Loading output...`}
+            </p>
+        );
     }
 
     if (state.status === "error") {
-        return <p className="text-xs text-red-700 dark:text-red-400">{t`Output could not be loaded.`}</p>;
+        return (
+            <p className="text-xs text-red-700 dark:text-red-400" role="alert">
+                {t`Output could not be loaded.`}
+            </p>
+        );
     }
 
     return (

@@ -48,16 +48,20 @@ jobs:
                   NEORE_TRANSFER_BUDGET_DIR: "${{ runner.temp }}/thread-transfer-parts"
               run: "pnpm --filter @neore/backend exec vitest run lunora/chat/transfer-budget.test.ts"
 
+            # A breached ceiling fails its test after the part file is written. These steps still run, so the report shows the numbers; the job stays failed.
             - name: "Measure the live reply (gateway)"
+              if: "${{ !cancelled() }}"
               env:
                   NEORE_TRANSFER_BUDGET_DIR: "${{ runner.temp }}/thread-transfer-parts"
               run: "pnpm --filter llm-gateway exec vitest run src/__tests__/transfer-budget.test.ts"
 
             - name: "Assemble the result"
+              if: "${{ !cancelled() }}"
               run: 'node .github/scripts/thread-transfer-report.cjs assemble "$RUNNER_TEMP/thread-transfer-parts" "$RUNNER_TEMP/thread-transfer-result.json"'
 
             - name: "Upload thread transfer result"
-              uses: "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a" # v7
+              if: "${{ !cancelled() }}"
+              uses: "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a" # v7.0.1
               with:
                   name: "thread-transfer-results"
                   path: "${{ runner.temp }}/thread-transfer-result.json"
