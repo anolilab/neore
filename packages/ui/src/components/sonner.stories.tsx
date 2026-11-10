@@ -95,9 +95,11 @@ export const ChangesSaved: Story = {
     play: async ({ canvas }) => {
         await userEvent.click(canvas.getByRole("button", { name: "Changes saved" }));
         // Earlier stories' toasts stay on the shared Toaster, so scope the checks to this toast.
-        const toast = (await screen.findByText("This message will close in 5 seconds.")).closest("[data-sonner-toast]");
-        await waitFor(() => expect(within(toast as HTMLElement).getByRole("button", { name: "Undo" })).toBeVisible());
-        expect(within(toast as HTMLElement).getByRole("button", { name: "Dismiss" })).toBeVisible();
+        const description = await screen.findByText("This message will close in 5 seconds.");
+        const toastElement = description.closest("[data-sonner-toast]") as HTMLElement;
+
+        await waitFor(() => expect(within(toastElement).getByRole("button", { name: "Undo" })).toBeVisible());
+        expect(within(toastElement).getByRole("button", { name: "Dismiss" })).toBeVisible();
     },
 };
 

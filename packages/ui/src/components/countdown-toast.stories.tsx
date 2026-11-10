@@ -26,8 +26,8 @@ const meta = {
                 onClick={() =>
                     countdownToast({
                         action: { label: "Undo", onClick: onUndo },
-                        countdownLabel: (seconds) => `Permanently deleted in ${seconds} seconds`,
                         cancel: { label: "Dismiss", onClick: () => undefined },
+                        countdownLabel: (seconds) => `Permanently deleted in ${seconds} seconds`,
                         description: "INV-2026-0412 moved to trash.",
                         duration: 5000,
                         title: "Invoice deleted",
@@ -63,9 +63,11 @@ export const Expires: Story = {
     play: async ({ args, canvas }) => {
         await userEvent.click(canvas.getByRole("button", { name: "Expires" }));
         // Earlier stories' countdown toasts never close by themselves, so follow this toast's own element.
-        const toast = (await screen.findByText("Expires", { selector: "p" })).closest("[data-sonner-toast]");
+        const title = await screen.findByText("Expires", { selector: "p" });
+        const expiring = title.closest("[data-sonner-toast]");
+
         // Nothing clicks Undo here, so the toast must close on its own once its 1.5 s duration runs out.
-        await waitFor(() => expect(toast).not.toBeInTheDocument(), { timeout: 5000 });
+        await waitFor(() => expect(expiring).not.toBeInTheDocument(), { timeout: 5000 });
         expect(args.onUndo).not.toHaveBeenCalled();
     },
 };
