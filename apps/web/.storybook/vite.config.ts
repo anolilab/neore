@@ -115,7 +115,9 @@ export default defineConfig({
             "@ui": join(appRoot, "../../packages/ui/src"),
             "~": join(appRoot, "src"),
         },
-        dedupe: ["react", "react-dom", "react/jsx-runtime"],
+        // `@lunora/react` resolves under several peer variants (the app, `@neore/client-runtime`, the backend's studio): a
+        // production build keeps each as its own module, so a provider and its hook can read two different contexts.
+        dedupe: ["react", "react-dom", "react/jsx-runtime", "@lunora/react"],
     },
     root: appRoot,
 });
