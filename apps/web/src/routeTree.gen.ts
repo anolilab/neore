@@ -39,6 +39,7 @@ import { Route as AdminUsersRouteImport } from './routes/admin/users'
 import { Route as ApiScribeTokenRouteImport } from './routes/api/scribe-token'
 import { Route as AuthCallbackRouteImport } from './routes/auth/callback'
 import { Route as AuthConvertAccountRouteImport } from './routes/auth/convert-account'
+import { Route as AuthDeviceRouteImport } from './routes/auth/device'
 import { Route as AuthExtensionRouteImport } from './routes/auth/extension'
 import { Route as AuthForgotPasswordRouteImport } from './routes/auth/forgot-password'
 import { Route as AuthRecoverAccountRouteImport } from './routes/auth/recover-account'
@@ -241,6 +242,11 @@ const AuthCallbackRoute = AuthCallbackRouteImport.update({
 const AuthConvertAccountRoute = AuthConvertAccountRouteImport.update({
   id: '/convert-account',
   path: '/convert-account',
+  getParentRoute: () => AuthRouteRoute,
+} as any)
+const AuthDeviceRoute = AuthDeviceRouteImport.update({
+  id: '/device',
+  path: '/device',
   getParentRoute: () => AuthRouteRoute,
 } as any)
 const AuthExtensionRoute = AuthExtensionRouteImport.update({
@@ -545,11 +551,11 @@ const DashboardSettingsConnectorsMessengerRoute =
   } as any)
 
 export interface FileRoutesByFullPath {
+  '/': typeof publicIndexRoute
   '/admin': typeof AdminRouteRouteWithChildren
   '/auth': typeof AuthRouteRouteWithChildren
   '/dashboard': typeof DashboardRouteRouteWithChildren
   '/docs': typeof DocsRouteRouteWithChildren
-  '/': typeof publicIndexRoute
   '/download': typeof DownloadRoute
   '/robots.txt': typeof RobotsDottxtRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
@@ -572,6 +578,7 @@ export interface FileRoutesByFullPath {
   '/api/scribe-token': typeof ApiScribeTokenRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/auth/convert-account': typeof AuthConvertAccountRoute
+  '/auth/device': typeof AuthDeviceRoute
   '/auth/extension': typeof AuthExtensionRoute
   '/auth/forgot-password': typeof AuthForgotPasswordRoute
   '/auth/recover-account': typeof AuthRecoverAccountRoute
@@ -630,8 +637,8 @@ export interface FileRoutesByFullPath {
   '/dashboard/settings/connectors/': typeof DashboardSettingsConnectorsIndexRoute
 }
 export interface FileRoutesByTo {
-  '/auth': typeof AuthRouteRouteWithChildren
   '/': typeof publicIndexRoute
+  '/auth': typeof AuthRouteRouteWithChildren
   '/download': typeof DownloadRoute
   '/robots.txt': typeof RobotsDottxtRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
@@ -651,6 +658,7 @@ export interface FileRoutesByTo {
   '/api/scribe-token': typeof ApiScribeTokenRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/auth/convert-account': typeof AuthConvertAccountRoute
+  '/auth/device': typeof AuthDeviceRoute
   '/auth/extension': typeof AuthExtensionRoute
   '/auth/forgot-password': typeof AuthForgotPasswordRoute
   '/auth/recover-account': typeof AuthRecoverAccountRoute
@@ -738,6 +746,7 @@ export interface FileRoutesById {
   '/api/scribe-token': typeof ApiScribeTokenRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/auth/convert-account': typeof AuthConvertAccountRoute
+  '/auth/device': typeof AuthDeviceRoute
   '/auth/extension': typeof AuthExtensionRoute
   '/auth/forgot-password': typeof AuthForgotPasswordRoute
   '/auth/recover-account': typeof AuthRecoverAccountRoute
@@ -799,11 +808,11 @@ export interface FileRoutesById {
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
+    | '/'
     | '/admin'
     | '/auth'
     | '/dashboard'
     | '/docs'
-    | '/'
     | '/download'
     | '/robots.txt'
     | '/sitemap.xml'
@@ -826,6 +835,7 @@ export interface FileRouteTypes {
     | '/api/scribe-token'
     | '/auth/callback'
     | '/auth/convert-account'
+    | '/auth/device'
     | '/auth/extension'
     | '/auth/forgot-password'
     | '/auth/recover-account'
@@ -884,8 +894,8 @@ export interface FileRouteTypes {
     | '/dashboard/settings/connectors/'
   fileRoutesByTo: FileRoutesByTo
   to:
-    | '/auth'
     | '/'
+    | '/auth'
     | '/download'
     | '/robots.txt'
     | '/sitemap.xml'
@@ -905,6 +915,7 @@ export interface FileRouteTypes {
     | '/api/scribe-token'
     | '/auth/callback'
     | '/auth/convert-account'
+    | '/auth/device'
     | '/auth/extension'
     | '/auth/forgot-password'
     | '/auth/recover-account'
@@ -991,6 +1002,7 @@ export interface FileRouteTypes {
     | '/api/scribe-token'
     | '/auth/callback'
     | '/auth/convert-account'
+    | '/auth/device'
     | '/auth/extension'
     | '/auth/forgot-password'
     | '/auth/recover-account'
@@ -1080,7 +1092,7 @@ declare module '@tanstack/react-router' {
     '/(chat)': {
       id: '/(chat)'
       path: ''
-      fullPath: ''
+      fullPath: '/'
       preLoaderRoute: typeof chatRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
@@ -1285,6 +1297,13 @@ declare module '@tanstack/react-router' {
       path: '/convert-account'
       fullPath: '/auth/convert-account'
       preLoaderRoute: typeof AuthConvertAccountRouteImport
+      parentRoute: typeof AuthRouteRoute
+    }
+    '/auth/device': {
+      id: '/auth/device'
+      path: '/device'
+      fullPath: '/auth/device'
+      preLoaderRoute: typeof AuthDeviceRouteImport
       parentRoute: typeof AuthRouteRoute
     }
     '/auth/extension': {
@@ -1745,6 +1764,7 @@ const AdminRouteRouteWithChildren = AdminRouteRoute._addFileChildren(
 interface AuthRouteRouteChildren {
   AuthCallbackRoute: typeof AuthCallbackRoute
   AuthConvertAccountRoute: typeof AuthConvertAccountRoute
+  AuthDeviceRoute: typeof AuthDeviceRoute
   AuthExtensionRoute: typeof AuthExtensionRoute
   AuthForgotPasswordRoute: typeof AuthForgotPasswordRoute
   AuthRecoverAccountRoute: typeof AuthRecoverAccountRoute
@@ -1760,6 +1780,7 @@ interface AuthRouteRouteChildren {
 const AuthRouteRouteChildren: AuthRouteRouteChildren = {
   AuthCallbackRoute: AuthCallbackRoute,
   AuthConvertAccountRoute: AuthConvertAccountRoute,
+  AuthDeviceRoute: AuthDeviceRoute,
   AuthExtensionRoute: AuthExtensionRoute,
   AuthForgotPasswordRoute: AuthForgotPasswordRoute,
   AuthRecoverAccountRoute: AuthRecoverAccountRoute,

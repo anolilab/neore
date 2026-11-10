@@ -3685,6 +3685,7 @@ msgstr "Genehmigung"
 #: src/features/chat/thread/tool-approval.tsx:121
 #: src/features/develop/components/review-panel.tsx:64
 #: src/features/tasks/components/task-detail-dialog.tsx:104
+#: src/routes/auth/device.tsx:191
 msgid "Approve"
 msgstr "Genehmigen"
 
@@ -3703,6 +3704,14 @@ msgstr "Genehmigt und kein Entwurf. Der Branch-Schutz wird nicht geprüft."
 #: src/features/chat/thread/tool-auto-approval.tsx:19
 msgid "Approved automatically — low risk"
 msgstr "Automatisch genehmigt – geringes Risiko"
+
+#: src/routes/auth/device.tsx:109
+msgid "Approved. Return to your terminal: the command line is signed in. You can close this tab."
+msgstr ""
+
+#: src/routes/auth/device.tsx:96
+msgid "Approving…"
+msgstr ""
 
 #: src/features/settings/components/chat/api-keys-settings.tsx:246
 msgid "AppSecret from the same page"
@@ -5893,6 +5902,10 @@ msgstr ""
 msgid "Checking image safety..."
 msgstr "Bildsicherheit wird geprüft..."
 
+#: src/routes/auth/device.tsx:279
+msgid "Checking the code…"
+msgstr ""
+
 #: src/features/chat/host/host-composer.tsx:1007
 msgid "Checking whether a message sent now interrupts the reply or waits behind it."
 msgstr "Es wird geprüft, ob eine jetzt gesendete Nachricht die Antwort unterbricht oder dahinter wartet."
@@ -6437,6 +6450,8 @@ msgstr "Cloudflare-Workers-AI-Modelle laufen dort, wo Cloudflare gerade Kapazit�
 #: ../../packages/chat-ui/src/chat/document-artifact.tsx:40
 #: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:307
 #: ../../packages/ui/src/components/tiptap-editor.tsx:202
+#: src/features/auth/components/device-code-parts.tsx:23
+#: src/features/auth/components/device-code-parts.tsx:56
 #: src/features/canvas/canvas-panel.tsx:754
 #: src/features/chat/thread/composer-search-mode.tsx:56
 #: src/features/code/components/code-workspace.tsx:219
@@ -7080,6 +7095,7 @@ msgstr "Komprimierte Perspektive"
 msgid "Compressing context..."
 msgstr "Kontext wird komprimiert..."
 
+#: src/features/auth/components/device-code-parts.tsx:52
 #: src/features/settings/components/chat/bots-settings.tsx:140
 msgid "Computer"
 msgstr "Computer"
@@ -7592,6 +7608,7 @@ msgid "Context-aware generation"
 msgstr "Kontextbewusste Generierung"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-paste-dialog.tsx:131
+#: src/features/auth/components/device-code-parts.tsx:107
 #: src/features/chat/host/host-composer.tsx:800
 #: src/features/skills/components/skill-builder-dialog.tsx:328
 msgid "Continue"
@@ -8069,7 +8086,7 @@ msgstr "Push-Benachrichtigungen konnten nicht geändert werden. Versuch es erneu
 msgid "Could not change the model. Please try again."
 msgstr "Das Modell konnte nicht geändert werden. Bitte versuche es erneut."
 
-#: src/features/chat/thread/composer-permission-mode.tsx:185
+#: src/features/chat/thread/composer-permission-mode.tsx:202
 msgid "Could not change the permission mode. Please try again."
 msgstr ""
 
@@ -9844,6 +9861,10 @@ msgstr "Abgelehnt – es geht ohne weiter"
 msgid "Denied on {device}"
 msgstr "{device}: abgelehnt"
 
+#: src/routes/auth/device.tsx:110
+msgid "Denied. The command line was not signed in. You can close this tab."
+msgstr ""
+
 #: src/features/chat/core/utils/language-utilities.ts:346
 msgid "Denmark"
 msgstr "Dänemark"
@@ -9857,6 +9878,7 @@ msgid "Density updated"
 msgstr "Dichte aktualisiert"
 
 #: src/features/chat/thread/tool-approval.tsx:125
+#: src/routes/auth/device.tsx:182
 msgid "Deny"
 msgstr "Ablehnen"
 
@@ -9868,6 +9890,10 @@ msgstr "{tool} ablehnen"
 #: src/features/settings/components/chat/model-filter-settings.tsx:397
 msgid "Deny Data Collection"
 msgstr "Datenerfassung verweigern"
+
+#: src/routes/auth/device.tsx:96
+msgid "Denying…"
+msgstr ""
 
 #: src/features/chat/thread/widgets/flight-widget.tsx:142
 msgid "Depart:"
@@ -11574,6 +11600,10 @@ msgstr "Tabelle vergrößern"
 msgid "enter"
 msgstr "Enter"
 
+#: src/routes/auth/device.tsx:86
+msgid "Enter a different code"
+msgstr ""
+
 #: src/features/local-models/components/ollama-model-manager.tsx:106
 msgid "Enter a model name such as llama3.2 or qwen3:8b"
 msgstr "Gib einen Modellnamen wie llama3.2 oder qwen3:8b ein"
@@ -11667,6 +11697,10 @@ msgstr "Text eingeben..."
 #: src/features/settings/components/chat/native-providers-settings.tsx:151
 msgid "Enter the API key"
 msgstr "Gib den API-Schlüssel ein"
+
+#: src/features/auth/components/device-code-parts.tsx:21
+msgid "Enter the code that `neore login --device` shows in your terminal, then choose Continue."
+msgstr ""
 
 #: src/features/settings/components/chat/custom-providers-settings.tsx:113
 msgid "Enter the endpoint URL first"
@@ -18541,6 +18575,7 @@ msgstr "Wird geladen..."
 #: src/features/code/components/code-workspace.tsx:90
 #: src/features/pages/components/public-page-view.tsx:66
 #: src/features/settings/components/chat/bots-settings.tsx:158
+#: src/routes/auth/device.tsx:250
 #: src/routes/auth/extension.tsx:66
 msgid "Loading…"
 msgstr "Wird geladen…"
@@ -22278,6 +22313,10 @@ msgstr "Nur {0}-Modelle können verglichen werden. Auswahl löschen, um Typen zu
 msgid "Only 3B activated per token for efficiency"
 msgstr "Nur 3B aktivierte Parameter pro Token für mehr Effizienz"
 
+#: src/features/auth/components/device-code-parts.tsx:61
+msgid "Only continue if you started this just now by running `neore login --device`, and the code above matches the one in your terminal."
+msgstr ""
+
 #: src/features/evals/components/run-comparison.tsx:54
 msgid "Only in one run"
 msgstr "Nur in einem Durchlauf"
@@ -23831,12 +23870,13 @@ msgstr "Dein Konto und alle damit verbundenen Daten dauerhaft löschen"
 msgid "Permission Level"
 msgstr "Berechtigungsstufe"
 
-#: src/features/chat/thread/composer-permission-mode.tsx:78
+#: src/features/chat/thread/composer-permission-mode.tsx:89
 msgid "Permission mode"
 msgstr ""
 
 #. placeholder {0}: labels[mode]
-#: src/features/chat/thread/composer-permission-mode.tsx:60
+#: src/features/chat/thread/composer-permission-mode.tsx:63
+#: src/features/chat/thread/composer-permission-mode.tsx:81
 msgid "Permission mode: {0}"
 msgstr ""
 
@@ -28966,6 +29006,7 @@ msgstr "Rechte Seitenleiste"
 #: src/features/layout/components/nav-user.tsx:237
 #: src/features/marketing/components/landing-page.tsx:1058
 #: src/features/settings/components/chat/mcp/server-list.tsx:127
+#: src/routes/auth/device.tsx:262
 #: src/routes/auth/extension.tsx:78
 msgid "Sign in"
 msgstr "Anmelden"
@@ -28988,6 +29029,15 @@ msgstr "Melde dich erneut an, um zu senden."
 #: src/features/settings/components/chat/mcp-settings.tsx:486
 msgid "Sign in on another site?"
 msgstr "Auf einer anderen Website anmelden?"
+
+#: src/features/auth/components/device-code-parts.tsx:93
+#: src/routes/auth/device.tsx:294
+msgid "Sign in the command line"
+msgstr ""
+
+#: src/routes/auth/device.tsx:160
+msgid "Sign in the command line?"
+msgstr ""
 
 #: src/features/develop/components/failure-notice.tsx:18
 msgid "Sign in to {label} again"
@@ -29091,6 +29141,10 @@ msgstr "Registriere dich, um alle Modelle freizuschalten"
 #: src/features/settings/components/chat/mcp/server-list.tsx:98
 msgid "Sign-in expired"
 msgstr "Anmeldung abgelaufen"
+
+#: src/features/auth/components/device-code-parts.tsx:50
+msgid "Sign-in request"
+msgstr ""
 
 #: src/features/layout/components/nav-user.tsx:292
 msgid "Sign-out failed. Please try again."
@@ -31706,6 +31760,10 @@ msgstr "Dieser Computer ist ausgelastet. Versuche es gleich noch einmal."
 msgid "That computer is not online."
 msgstr "Dieser Computer ist nicht online."
 
+#: src/routes/auth/device.tsx:150
+msgid "That did not go through. Try again."
+msgstr ""
+
 #: src/features/develop/components/guide-tab.tsx:145
 msgid "That did not work. Try again."
 msgstr "Das hat nicht funktioniert. Versuche es erneut."
@@ -31867,9 +31925,21 @@ msgstr "Der Chat-Agent erledigt die Aufgabe mit seinen Tools und folgt optional 
 msgid "The chat's state could not be read, so queued messages wait."
 msgstr "Der Chat-Status konnte nicht gelesen werden, daher warten die wartenden Nachrichten."
 
+#: src/routes/auth/device.tsx:77
+msgid "The code could not be checked right now. Try again in a moment."
+msgstr ""
+
+#: src/features/auth/components/device-code-parts.tsx:104
+msgid "The code must contain the letters and digits shown in your terminal."
+msgstr ""
+
 #: src/features/coding-agents/components/coding-agent-tool-view.tsx:41
 msgid "The coding agent could not start."
 msgstr "Der Coding-Agent konnte nicht starten."
+
+#: src/routes/auth/device.tsx:162
+msgid "The command line on the computer below will be signed in as {email}, with read-only access to your chats, skills, tasks, knowledge and memories through the API. It gets its own API key, which you can revoke in Settings."
+msgstr ""
 
 #: src/features/evals/components/model-comparison.tsx:62
 msgid "The comparison could not be loaded."
@@ -32630,6 +32700,22 @@ msgstr "Dieser Chat ist gesperrt. Entsperre ihn, um zu senden."
 msgid "This chat is too long to compact."
 msgstr "Dieser Chat ist zu lang zum Komprimieren."
 
+#: src/routes/auth/device.tsx:126
+msgid "This code has already been answered."
+msgstr ""
+
+#: src/routes/auth/device.tsx:72
+msgid "This code has expired. Run `neore login --device` again to get a new one."
+msgstr ""
+
+#: src/routes/auth/device.tsx:74
+msgid "This code is not valid, or it was already used. Run `neore login --device` again to get a new one."
+msgstr ""
+
+#: src/routes/auth/device.tsx:118
+msgid "This code was opened with a different account. Sign in with that account, or run `neore login --device` again."
+msgstr ""
+
 #: src/features/settings/components/knowledge/knowledge-base-settings.tsx:294
 msgid "This collection is shared with you by a member of your organization. You can attach it to chats and projects; only its owner can change its files."
 msgstr "Diese Sammlung wurde von einem Mitglied deiner Organisation mit dir geteilt. Du kannst sie an Chats und Projekte anhängen; nur ihre Eigentümerin oder ihr Eigentümer kann ihre Dateien ändern."
@@ -32638,7 +32724,7 @@ msgstr "Diese Sammlung wurde von einem Mitglied deiner Organisation mit dir gete
 msgid "This command name is reserved"
 msgstr "Dieser Befehlsname ist reserviert"
 
-#: src/features/chat/thread/composer-permission-mode.tsx:181
+#: src/features/chat/thread/composer-permission-mode.tsx:198
 msgid "This comparison's mode applies to every column. Change it on the comparison."
 msgstr ""
 
@@ -33485,6 +33571,11 @@ msgstr "Zu groß zum Anhängen: {0}. Verkleinere die Datei und hänge sie erneut
 msgid "Too long to check as JSON"
 msgstr "Zu lang für die JSON-Prüfung"
 
+#: src/routes/auth/device.tsx:76
+#: src/routes/auth/device.tsx:150
+msgid "Too many attempts. Wait a few seconds, then try again."
+msgstr ""
+
 #: src/features/chat/thread/sandbox-files.tsx:282
 msgid "too many files"
 msgstr "zu viele Dateien"
@@ -33869,6 +33960,7 @@ msgstr "Versuche, deine Suchbegriffe anzupassen."
 #: src/features/develop/components/thread-pull-requests.tsx:169
 #: src/features/home/components/home-page.tsx:144
 #: src/features/tasks/components/task-form-dialog.tsx:440
+#: src/routes/auth/device.tsx:241
 msgid "Try again"
 msgstr "Erneut versuchen"
 
@@ -34280,6 +34372,10 @@ msgstr "Einzigartiger Ansatz für Sprachmodellierung"
 #: src/features/settings/components/chat/model-filter-settings.tsx:29
 msgid "United States"
 msgstr "Vereinigte Staaten"
+
+#: src/features/auth/components/device-code-parts.tsx:53
+msgid "unknown"
+msgstr ""
 
 #: src/features/admin/components/user-sessions-dialog.tsx:74
 #: src/features/admin/components/user-sessions-dialog.tsx:118
@@ -35883,6 +35979,10 @@ msgstr "Nur diesen Teil beobachten (optional)"
 msgid "Watched repositories"
 msgstr "Beobachtete Repositories"
 
+#: src/routes/auth/device.tsx:232
+msgid "We could not check that you are signed in. Try again in a moment."
+msgstr ""
+
 #: src/features/chat/core/context/chat-context.tsx:719
 msgid "We could not confirm your session in time. Your message is still in the composer. Please try sending it again."
 msgstr "Wir konnten deine Sitzung nicht rechtzeitig bestätigen. Deine Nachricht ist noch im Eingabefeld. Bitte versuche erneut, sie zu senden."
@@ -36381,6 +36481,7 @@ msgstr "Arbeit am Ziel: Runde {nextRound} von {0}"
 #: src/features/chat/thread/streaming-placeholder.tsx:631
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:167
 #: src/features/pages/components/page-agent-dialog.tsx:46
+#: src/routes/auth/device.tsx:191
 msgid "Working…"
 msgstr "Wird bearbeitet…"
 
@@ -36596,6 +36697,10 @@ msgstr "Du fügst zu schnell Dokumente hinzu. Warte einen Moment und versuche es
 msgid "You are browsing as a guest. Sign in with your account to connect the extension."
 msgstr "Du bist als Gast unterwegs. Melde dich mit deinem Konto an, um die Erweiterung zu verbinden."
 
+#: src/routes/auth/device.tsx:260
+msgid "You are browsing as a guest. Sign in with your account to sign in the command line."
+msgstr ""
+
 #: src/features/admin/components/impersonation-banner.tsx:55
 msgid "You are currently impersonating a user"
 msgstr "Du nimmst gerade die Identität eines Benutzers an"
@@ -36615,6 +36720,10 @@ msgstr "Du bist offline. Neore verbindet sich wieder, sobald das Netzwerk verfü
 #: src/features/chat/host/host-send-errors.ts:18
 msgid "You are sending too fast. Wait a moment."
 msgstr "Du sendest zu schnell. Warte einen Moment."
+
+#: src/routes/auth/device.tsx:73
+msgid "You are signed in as another person (an admin session). Sign in as yourself to sign in the command line."
+msgstr ""
 
 #: src/features/develop/components/watched-repositories.tsx:163
 msgid "You are watching as many repositories as is allowed."
@@ -36799,6 +36908,10 @@ msgstr "Deine Anmeldung bei {label} ist abgelaufen. Verbinde sie erneut, um weit
 #: src/features/develop/lib/use-review-messages.ts:21
 msgid "Your {label} sign-in has expired. Connect it again."
 msgstr "Deine Anmeldung bei {label} ist abgelaufen. Verbinde sie erneut."
+
+#: src/routes/auth/device.tsx:75
+msgid "Your account already has the maximum number of API keys, so the command line was not signed in. Revoke one in Settings, then run `neore login --device` again."
+msgstr ""
 
 #: src/features/auth/components/settings/account/delete-account-card.tsx:56
 msgid "Your account and all associated data are being deleted. This cannot be cancelled."
