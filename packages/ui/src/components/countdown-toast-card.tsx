@@ -109,6 +109,14 @@ const CountdownToastCard = ({
 
         sync();
 
+        // Sonner expands the whole stack when any toast is hovered, and it sets data-expanded on each toast when it
+        // renders. Watching the attribute runs sync at that moment, not on the next tick.
+        const expandedObserver = new MutationObserver(sync);
+
+        if (toastElement) {
+            expandedObserver.observe(toastElement, { attributeFilter: ["data-expanded"], attributes: true });
+        }
+
         const timer = globalThis.setInterval(() => {
             sync();
 
@@ -132,6 +140,7 @@ const CountdownToastCard = ({
             toastElement?.removeEventListener("focusin", onFocusIn);
             toastElement?.removeEventListener("focusout", onFocusOut);
             document.removeEventListener("visibilitychange", sync);
+            expandedObserver.disconnect();
         };
     }, [duration, id]);
 
