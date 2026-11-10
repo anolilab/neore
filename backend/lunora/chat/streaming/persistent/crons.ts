@@ -2,6 +2,7 @@ import type { Id } from "../../../_generated/dataModel";
 import { internalMutation } from "../../../_generated/server";
 import { expireHostStream } from "../../../acp/lib/reap";
 import { patchRow } from "../../../lib/patch";
+import { remindPendingApprovals } from "../../lib/approval-reminder";
 import { recordPausedRunUsage } from "../../lib/pause-usage";
 import { type SteerEntry, withoutQueuedText } from "../../lib/steer-queue";
 import { purgeExpiredToolApprovalRuns } from "../../lib/tool-approval-cleanup";
@@ -63,4 +64,7 @@ export const cleanupExpiredStreams = internalMutation.input({}).mutation(async (
     if (purgedApprovals > 0) {
         console.log(`Purged ${purgedApprovals} expired tool-approval snapshot(s)`);
     }
+
+    // The reminder for an approval left unanswered four hours (`lib/approval-reminder.ts`), in the same bounded tick.
+    await remindPendingApprovals(ctx, now);
 });
