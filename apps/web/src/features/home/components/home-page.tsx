@@ -197,7 +197,12 @@ const HomePage: FC = () => {
                                     </Row>
                                 ))}
                                 {overview.subAgents.map((run) => (
-                                    <Row key={run._id} meta={subAgentMeta(run.status)} to={`/chat/${run.parentThreadId}`}>
+                                    <Row
+                                        key={run._id}
+                                        meta={subAgentMeta(run.status)}
+                                        // A waiting run is answered in its own thread; a running one is followed from its parent's.
+                                        to={`/chat/${run.status === "awaiting" && run.childThreadId ? run.childThreadId : run.parentThreadId}`}
+                                    >
                                         <Workflow aria-hidden="true" className="mr-2 inline size-3.5" />
                                         {run.task}
                                     </Row>

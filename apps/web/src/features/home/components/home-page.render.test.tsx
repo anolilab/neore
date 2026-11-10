@@ -6,6 +6,7 @@
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import type { ReactNode } from "react";
 import { createElement } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -55,7 +56,11 @@ vi.mock("@/lib/lunora/crpc", () => {
 });
 
 vi.mock("@tanstack/react-router", () => {
-    return { Link: ({ children }: { children: unknown }) => children, useNavigate: () => vi.fn() };
+    // A plain anchor, so a row's destination can be read.
+    return {
+        Link: ({ children, to }: { children: ReactNode; to: string }) => <a href={to}>{children}</a>,
+        useNavigate: () => vi.fn(),
+    };
 });
 
 vi.mock("@/features/notifications/hooks/use-notification-inbox", () => {
@@ -84,6 +89,9 @@ afterEach(() => {
     harness.shouldFail = true;
 });
 
+const WAITING_ROW = /Delete the old files/u;
+const RUNNING_ROW = /Sort the inbox/u;
+
 describe("home page sub-agents", () => {
     it("shows a sub-agent waiting on its owner's approval as waiting, not running", async () => {
         harness.shouldFail = false;
@@ -95,14 +103,20 @@ describe("home page sub-agents", () => {
             recentThreads: [],
             reviews: [],
             runningTasks: [],
-            subAgents: [{ _id: "run-1", createdAt: 1, parentThreadId: "thread-1", status: "awaiting", task: "Delete the old files" }],
+            subAgents: [
+                { _id: "run-1", childThreadId: "child-1", createdAt: 1, parentThreadId: "thread-1", status: "awaiting", task: "Delete the old files" },
+                { _id: "run-2", childThreadId: "child-2", createdAt: 2, parentThreadId: "thread-2", status: "running", task: "Sort the inbox" },
+            ],
             unreadCount: 0,
         };
         mount();
 
-        await screen.findByText("Delete the old files");
+        const waiting = await screen.findByRole("link", { name: WAITING_ROW });
 
         expect(screen.getByText("Waiting for your approval")).toBeTruthy();
+        // The approval is answered in the sub-agent's own thread; a running one is followed from its parent's.
+        expect(waiting.getAttribute("href")).toBe("/chat/child-1");
+        expect(screen.getByRole("link", { name: RUNNING_ROW }).getAttribute("href")).toBe("/chat/thread-2");
     });
 });
 
