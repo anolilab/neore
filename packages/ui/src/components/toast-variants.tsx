@@ -14,6 +14,8 @@ const toastDescriptionClass = "text-sm leading-5 text-muted-foreground";
 const toastCloseButtonClass =
     "absolute end-2 top-2 flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors outline-none hover:bg-muted hover:text-popover-foreground focus-visible:ring-2 focus-visible:ring-ring";
 
-const toastTextButtonClass = "min-h-6 rounded-sm text-sm underline-offset-4 outline-none focus-visible:ring-2 focus-visible:ring-ring";
+// 24px is the WCAG 2.5.8 minimum; touch screens get 44px, and the press shows as a dimmed button.
+const toastTextButtonClass =
+    "min-h-6 pointer-coarse:min-h-11 rounded-sm text-sm underline-offset-4 outline-none focus-visible:ring-2 focus-visible:ring-ring active:opacity-70";
 
 export { toastCloseButtonClass, toastDescriptionClass, toastIconClass, toastSurfaceClass, toastTextButtonClass, toastTitleClass };

@@ -6342,7 +6342,7 @@ msgid "clock"
 msgstr "时钟"
 
 #: ../../packages/ui/src/components/ai-elements/artifact.tsx:31
-#: ../../packages/ui/src/components/countdown-toast-card.tsx:149
+#: ../../packages/ui/src/components/countdown-toast-card.tsx:178
 #: ../../packages/ui/src/components/data-grid/data-grid-keyboard-shortcuts.tsx:329
 #: ../../packages/ui/src/components/dialog.tsx:84
 #: ../../packages/ui/src/components/image-editor.tsx:264
@@ -32974,7 +32974,7 @@ msgstr "此消息过长，无法复制为提示词链接。"
 
 #: ../../packages/ui/src/components/countdown-toast-card.tsx:56
 msgid "This message will close in {value, plural, one {# second} other {# seconds}}"
-msgstr ""
+msgstr "此消息将在 {value, plural, other {# 秒}} 后关闭"
 
 #: src/features/chat/thread/composer-effort-shortcuts.tsx:67
 msgid "This model has no reasoning effort"

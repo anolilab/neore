@@ -56,48 +56,77 @@ const CountdownToastCard = ({
     const label = countdownLabel ?? ((value: number) => t`This message will close in ${plural(value, { one: "# second", other: "# seconds" })}`);
 
     useEffect(() => {
-        // Sonner's <li>, which holds this card. It is the focus target, and it is what sonner marks `data-expanded`
-        // while the toaster is hovered (sonner 2 behaviour; check it on upgrade).
+        // Sonner's <li>, which holds this card. It is the focus target and the pointer target, and sonner marks it
+        // `data-expanded` while the toaster is hovered (sonner 2 behaviour; check it on upgrade).
         const toastElement = ref.current?.closest<HTMLElement>("[data-sonner-toast]");
+        let hovered = false;
         let remainingMs = duration;
-        let last = performance.now();
-        let wasPaused = false;
+        // When the clock last started running, or null while paused. Only running time is ever subtracted.
+        let runningSince: number | null = performance.now();
 
-        // A browser can freeze the interval while the tab is hidden, so no tick reports that time. Restart the
-        // reference when the tab is visible again, so the hidden time is not counted.
-        const onVisibilityChange = () => {
-            if (!document.hidden) {
-                last = performance.now();
+        const isPaused = () =>
+            hovered || toastElement?.dataset.expanded === "true" || document.hidden || (toastElement?.contains(document.activeElement) ?? false);
+
+        // Settles the clock to the current state. Pauses are applied at the moment they start, so a short
+        // hover or focus is counted exactly, and a hidden tab is never counted.
+        const sync = () => {
+            const now = performance.now();
+
+            if (isPaused()) {
+                if (runningSince !== null) {
+                    remainingMs -= now - runningSince;
+                    runningSince = null;
+                }
+            } else if (runningSince === null) {
+                runningSince = now;
             }
         };
 
-        document.addEventListener("visibilitychange", onVisibilityChange);
+        const remaining = () => remainingMs - (runningSince === null ? 0 : performance.now() - runningSince);
+        // Focus moves after focusout/focusin fire, so re-check once the focus change has settled.
+        let focusTimer: ReturnType<typeof globalThis.setTimeout> | undefined;
+        const onFocusChange = () => {
+            globalThis.clearTimeout(focusTimer);
+            focusTimer = globalThis.setTimeout(sync, 0);
+        };
+        const onPointerEnter = () => {
+            hovered = true;
+            sync();
+        };
+        const onPointerLeave = () => {
+            hovered = false;
+            sync();
+        };
+
+        toastElement?.addEventListener("pointerenter", onPointerEnter);
+        toastElement?.addEventListener("pointerleave", onPointerLeave);
+        toastElement?.addEventListener("focusin", onFocusChange);
+        toastElement?.addEventListener("focusout", onFocusChange);
+        document.addEventListener("visibilitychange", sync);
 
         const timer = globalThis.setInterval(() => {
-            const now = performance.now();
-            const paused = toastElement?.dataset.expanded === "true" || document.hidden || (toastElement?.contains(document.activeElement) ?? false);
+            sync();
 
-            // The first tick after a pause would count everything since the last paused tick, hidden time included.
-            if (!paused && !wasPaused) {
-                remainingMs -= now - last;
-            }
+            const left = remaining();
 
-            wasPaused = paused;
-            last = now;
-
-            if (remainingMs <= 0) {
+            if (left <= 0) {
                 globalThis.clearInterval(timer);
                 toast.dismiss(id);
 
                 return;
             }
 
-            setSeconds(Math.ceil(remainingMs / 1000));
+            setSeconds(Math.ceil(left / 1000));
         }, TICK_MS);
 
         return () => {
             globalThis.clearInterval(timer);
-            document.removeEventListener("visibilitychange", onVisibilityChange);
+            globalThis.clearTimeout(focusTimer);
+            toastElement?.removeEventListener("pointerenter", onPointerEnter);
+            toastElement?.removeEventListener("pointerleave", onPointerLeave);
+            toastElement?.removeEventListener("focusin", onFocusChange);
+            toastElement?.removeEventListener("focusout", onFocusChange);
+            document.removeEventListener("visibilitychange", sync);
         };
     }, [duration, id]);
 

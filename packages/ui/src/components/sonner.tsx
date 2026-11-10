@@ -30,7 +30,7 @@ const Toaster = ({ ...props }: ToasterProps) => {
                     actionButton: `ms-11 inline-flex h-auto items-center p-0 font-semibold text-popover-foreground hover:underline group-[:not([data-type])]/toast:ms-0 [[data-cancel]+&]:ms-0 ${toastTextButtonClass}`,
                     cancelButton: `ms-11 inline-flex h-auto items-center p-0 font-medium text-muted-foreground hover:text-popover-foreground group-[:not([data-type])]/toast:ms-0 ${toastTextButtonClass}`,
                     // `!` because sonner's dark-theme rule paints this button, and it outranks a plain class.
-                    closeButton: `${toastCloseButtonClass} !bg-transparent !text-muted-foreground hover:!bg-muted hover:!text-popover-foreground [&>svg]:size-4`,
+                    closeButton: `${toastCloseButtonClass} bg-transparent! text-muted-foreground! hover:bg-muted! hover:text-popover-foreground! [&>svg]:size-4`,
                     content: "flex min-w-0 grow basis-[calc(100%_-_2.75rem)] flex-col gap-0.5 pe-9",
                     description: toastDescriptionClass,
                     error: "border-destructive/40",
