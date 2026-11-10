@@ -58,6 +58,22 @@ describe("thread action defaults against saved bindings", () => {
         expect(mergeKeyboardShortcuts(migrated.keyboardShortcuts).deleteThread).toBe("ctrl+d");
     });
 
+    it("drops the jump's retired Ctrl+Shift+J default from a set saved before version 2, so the new chord applies", () => {
+        const migrated = migrateUIState({ keyboardShortcuts: { jumpToLastMessage: "ctrl+shift+j" } }, 1) as {
+            keyboardShortcuts: Record<string, string>;
+        };
+
+        expect(mergeKeyboardShortcuts(migrated.keyboardShortcuts).jumpToLastMessage).toBe(defaultKeyboardShortcuts.jumpToLastMessage);
+    });
+
+    it("keeps a jump binding on Ctrl+Shift+J that the person saved from version 2 on", () => {
+        const migrated = migrateUIState({ keyboardShortcuts: { jumpToLastMessage: "ctrl+shift+j" } }, UI_STATE_VERSION) as {
+            keyboardShortcuts: Record<string, string>;
+        };
+
+        expect(mergeKeyboardShortcuts(migrated.keyboardShortcuts).jumpToLastMessage).toBe("ctrl+shift+j");
+    });
+
     it("keeps a binding the user saved for the thread action itself", () => {
         expect(mergeKeyboardShortcuts({ archiveThread: "ctrl+j" }).archiveThread).toBe("ctrl+j");
     });

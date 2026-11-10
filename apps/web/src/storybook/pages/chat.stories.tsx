@@ -324,14 +324,14 @@ export const JumpToLastMessage: Story = {
             expect(isCentred()).toBe(true);
         }, STATE_WAIT);
 
-        // Back up again; the shortcut (Ctrl+Shift+ArrowUp here, where the platform modifier is Ctrl) brings the question back. A real
+        // Back up again; the shortcut (Ctrl+Shift+L here, where the platform modifier is Ctrl) brings the question back. A real
         // key sequence, not one synthetic keydown, so the keyup and focus that a person's press also produces are exercised.
         scroller.scrollTop = 0;
         await waitFor(() => {
             expect(isCentred()).toBe(false);
         }, STATE_WAIT);
 
-        await userEvent.keyboard("{Control>}{Shift>}{ArrowUp}{/Shift}{/Control}");
+        await userEvent.keyboard("{Control>}{Shift>}l{/Shift}{/Control}");
         await waitFor(() => {
             expect(isCentred()).toBe(true);
         }, STATE_WAIT);
