@@ -24,9 +24,11 @@ import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { ArrowUpRight, Sparkles } from "lucide-react";
 import type { FC } from "react";
-import { useMemo } from "react";
+import { use, useMemo } from "react";
 
 import { useUserSettings } from "@/features/auth/hooks/use-user-settings";
+import { ChatThreadContext } from "@/features/chat/core/context/chat-context-hooks";
+import type { ThreadData } from "@/features/chat/core/context/chat-context-types";
 import useFeatureFlaggedModels from "@/hooks/use-feature-flagged-models";
 import type { UIMessage } from "@/lib/agent";
 import { useUIMessages } from "@/lib/agent";
@@ -40,6 +42,8 @@ export interface ComparisonBranch {
     isLoading: boolean;
     messages: UIMessage[];
     model: string;
+    /** The column's own thread document: its lock and owner are the column's, never its comparison parent's. */
+    thread?: ThreadData | null;
     threadId: string;
 }
 
@@ -122,6 +126,13 @@ const ModelColumn: FC<{
 
     const isEmpty = turns.length === 0 && !isStreaming;
 
+    // The column's messages belong to the child thread, not to the comparison the page is on: an MCP app in one calls the backend
+    // as the child, so its mode and access are the child's. Its lock state too: the ask-user prompt reads it from the thread.
+    const parentThreadContext = use(ChatThreadContext);
+    const columnThreadContext = useMemo(() => {
+        return { isNewThread: false, ...parentThreadContext, model: branch.model, thread: branch.thread ?? null, threadId: branch.threadId };
+    }, [parentThreadContext, branch.model, branch.thread, branch.threadId]);
+
     return (
         <div className={cn("flex min-w-0 flex-1 flex-col", !isLast && "border-border border-r")}>
             {/* ── Column header ─────────────────────────────────────────── */}
@@ -158,7 +169,9 @@ const ModelColumn: FC<{
                         {/* Assistant response — full markdown */}
                         {assistant && (
                             <div className="prose prose-sm dark:prose-invert max-w-none px-6 py-4">
-                                <MessageContent message={assistant} />
+                                <ChatThreadContext value={columnThreadContext}>
+                                    <MessageContent message={assistant} />
+                                </ChatThreadContext>
                             </div>
                         )}
                     </div>

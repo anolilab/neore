@@ -25,6 +25,7 @@ import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 import AskAsideShortcutListener from "@/features/chat/aside/ask-aside-shortcut-listener";
 import TooltipIconButton from "@/features/chat/components/tooltip-icon-button";
 import { useChatActions, useChatIsEmpty, useChatIsStreaming, useChatMessages, useChatThread } from "@/features/chat/core/context/chat-context";
+import type { ThreadData } from "@/features/chat/core/context/chat-context-types";
 import useComparisonChat from "@/features/chat/core/hooks/use-comparison-chat";
 import type { PendingAttachment } from "@/features/chat/core/stores/chat-ui-store";
 import type { ComposerMode } from "@/features/chat/core/stores/model-store";
@@ -186,6 +187,9 @@ const ThreadContent: FC<ThreadProps> = ({ className, composerActive = true, init
                 isLoading: false,
                 messages: [],
                 model: child.model || "unknown",
+                // The child's own document: its lock state is the column's, which the parent's does not reflect. The same
+                // generated type drops the thread fields, so the cast restates what the read returns (`threadRowForList`).
+                thread: child as unknown as ThreadData,
                 threadId: child._id,
             });
         }

@@ -67,6 +67,7 @@ import ComposerInput from "./composer-input";
 import ComposerLanguageSelector from "./composer-language-selector";
 import ComposerMCPSelector from "./composer-mcp-selector";
 import ComposerModelSelector from "./composer-model-selector";
+import ComposerThreadPermissionMode, { usePermissionModeSaving } from "./composer-permission-mode";
 import ComposerReferencesButton from "./composer-references-button";
 import ComposerResearchDepth from "./composer-research-depth";
 import ComposerSearchMode from "./composer-search-mode";
@@ -338,6 +339,8 @@ const Composer: FC<ComposerProps> = ({
     }, []);
     const { isNewThread, threadId } = useChatThread();
     const validThreadId = getValidThreadId(threadId);
+    // A message sent while the mode is being saved would run under the old mode, so the input waits for the save.
+    const modeSaving = usePermissionModeSaving(validThreadId);
     const isEmpty = useChatIsEmpty();
     const { isStreaming, sseStreamState } = useChatIsStreaming();
     // Disable input while SSE streaming is in progress to prevent message loss
@@ -750,6 +753,7 @@ const Composer: FC<ComposerProps> = ({
                     bottomToolbar={
                         <>
                             <ComposerModelSelector />
+                            {composerMode === "text" && <ComposerThreadPermissionMode />}
 
                             {/* Search mode - only for text mode */}
                             <AnimatePresence initial={animateEntrance} mode="popLayout">
@@ -836,7 +840,7 @@ const Composer: FC<ComposerProps> = ({
                         // The thread composer stays editable while a turn streams —
                         // submitting then QUEUES (see ComposerPromptQueue). The
                         // comparison fan-out has no queue, so it still locks.
-                        disabled={isSSEStreaming && !!onSubmitOverride}
+                        disabled={(isSSEStreaming && !!onSubmitOverride) || modeSaving}
                         inputRef={composerInputRef}
                         onOpenDraw={compact ? undefined : () => setIsDrawOpen(true)}
                         onSubmit={() => {}}
