@@ -22,6 +22,7 @@ import { internal } from "../_generated/internal";
 import type { Id } from "../_generated/dataModel";
 import { isHostRunThread } from "../acp/lib/host-thread";
 import { verifyStreamToken } from "../chat/streaming/persistent/stream-token";
+import type { ToolOutputRef } from "../chat/tool-output-policy";
 import { isSelectableTextModel } from "../skills/builder-logic";
 import { PublicApiError } from "./errors";
 import type { ApiKeyIdentity } from "./identity";
@@ -697,12 +698,41 @@ export const ROUTES: ReadonlyArray<RouteDefinition> = [
                 }),
             );
 
+            // The thread page leaves a large tool result out and points at it; the API carries every part, so each one is read back here.
+            const hydrated = await Promise.all(
+                page.page.map(async (message) => {
+                    const parts = await Promise.all(
+                        message.parts.map(async (part) => {
+                            const ref = (part as { outputRef?: ToolOutputRef }).outputRef;
+
+                            if (!ref) {
+                                return part;
+                            }
+
+                            const { output } = await input.ctx.runQuery(api.chat.functions.getToolOutput, {
+                                messageId: ref.messageId as Id<"messages">,
+                                threadId: ref.threadId as Id<"threads">,
+                                toolCallId: ref.toolCallId,
+                            });
+                            const restored: Record<string, unknown> = { ...part };
+
+                            delete restored["outputRef"];
+                            restored["output"] = output;
+
+                            return restored as typeof part;
+                        }),
+                    );
+
+                    return { ...message, parts };
+                }),
+            );
+
             return {
                 data: {
                     // Pages are fetched newest-first but `toUIMessages` returns each
                     // page oldest-first; sort so the whole list reads newest-first.
                     // An agent-switch or context-reset divider is a marker for the app's thread view, not a turn of the conversation.
-                    data: page.page
+                    data: hydrated
                         .filter((message) => message.parts.every((part) => part.type !== "data-agentSwitch" && part.type !== "data-contextReset"))
                         .toSorted((a, b) => b.order - a.order || b.stepOrder - a.stepOrder)
                         .map((message) => {

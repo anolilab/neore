@@ -39,6 +39,7 @@ import { toolImageSource } from "../utils/tool-image-source";
 import PageContextChip from "./page-context-chip";
 import PdfPart from "./pdf-part";
 import ToolGroup from "./tool-group";
+import { TrimmedToolOutput } from "./tool-output-loader";
 import type { ToolGroupSegment } from "./turn-summary";
 import { segmentTurn } from "./turn-summary";
 
@@ -239,6 +240,12 @@ const makeDefaultToolCall = (
                                 <pre className="mt-1 overflow-x-auto font-mono text-xs whitespace-pre-wrap">
                                     {String(typeof part.output === "string" ? part.output : JSON.stringify(part.output, null, 2))}
                                 </pre>
+                            </div>
+                        )}
+                        {part.output === undefined && part.outputRef && (
+                            <div>
+                                <span className="text-xs font-semibold uppercase opacity-80 dark:opacity-100">{t`Output:`}</span>
+                                <TrimmedToolOutput outputRef={part.outputRef} />
                             </div>
                         )}
                         {part.errorText && (

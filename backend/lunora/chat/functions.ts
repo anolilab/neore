@@ -94,6 +94,7 @@ import { holdTtlFrom } from "../lib/claim-once";
 import { sha256Hex } from "../lib/crypto";
 import { capTitlePrompt } from "./lib/first-user-prompt";
 import { getMessageFileIds, loadNsfwStatuses, redactUIMessagesForPublicViewer } from "./lib/public-thread";
+import { toolResultRowIds, trimToolOutputs } from "./tool-output-trim";
 import { buildReasoningProviderOptions } from "./lib/reasoning-options";
 import {
     buildFalReferenceImageInput,
@@ -988,7 +989,9 @@ export const getThreadUIMessages = liteAuthQuery
         // validators. Same runtime value, so re-brand rather than re-validate.
         // Stored media is persisted as references; sign it for display now.
         const displayDocs = await signDocsForDisplay(context, rawMessages.page as unknown as MessageDoc[]);
-        const uiMessages = withBranchInfo(toUIMessages(displayDocs), pathPage?.branches);
+        const branchedMessages = withBranchInfo(toUIMessages(displayDocs), pathPage?.branches);
+        // A large tool result the page does not paint is fetched on expand (`getToolOutput`). A redacted view drops tool parts anyway.
+        const uiMessages = access.kind === "full" ? trimToolOutputs(branchedMessages, threadId, toolResultRowIds(rawMessages.page)) : branchedMessages;
 
         const fileMap = await loadNsfwStatuses(context, uiMessages);
 
@@ -1032,6 +1035,54 @@ export const getThreadUIMessages = liteAuthQuery
             ...rawMessages,
             page: uiMessages,
         };
+    });
+
+/**
+ * The output of one tool result that `getThreadUIMessages` left out of the page. Full access
+ * only: a redacted view never gets it, a locked thread needs its proof, and the row must belong
+ * to this thread and hold a result for this tool call.
+ */
+export const getToolOutput = liteAuthQuery
+    .input({
+        messageId: v.id("messages"),
+        threadId: v.id("threads"),
+        toolCallId: v.string().max(MAX_LENGTH.short),
+        unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
+    })
+    .output(v.object({ output: v.optional(v.any()) }))
+    .query(async ({ args: { messageId, threadId, toolCallId, unlockProof }, ctx: context }) => {
+        const { userId } = context.user;
+        const access = await resolveThreadReadAccess(context, threadId, userId, unlockProof);
+
+        if (access?.kind === "locked") {
+            return throwThreadLocked();
+        }
+
+        if (access?.kind !== "full") {
+            return access ? throwUnauthorized("Access denied to this thread") : throwThreadNotFound(threadId);
+        }
+
+        const row = await context.db.get("messages", messageId);
+        const content = (row?.message as { content?: unknown } | undefined)?.content;
+
+        if (!row || row.threadId !== threadId || !Array.isArray(content)) {
+            return throwThreadNotFound(threadId);
+        }
+
+        const result = (content as Array<{ output?: unknown; toolCallId?: unknown; type?: unknown }>).find(
+            (part) => part?.type === "tool-result" && part.toolCallId === toolCallId,
+        );
+
+        if (!result) {
+            return {};
+        }
+
+        // Unwrapped the way `toUIMessages` unwraps a result, so the page and this read agree.
+        const raw = result.output;
+        const output =
+            raw !== null && typeof raw === "object" && typeof (raw as { type?: unknown }).type === "string" ? (raw as { value?: unknown }).value : raw;
+
+        return { output };
     });
 
 /**

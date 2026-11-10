@@ -6,11 +6,15 @@
  */
 
 import { useLingui } from "@lingui/react/macro";
+import type { Id } from "@neore/backend/dataModel";
 import MessageContentUI from "@neore/chat-ui/chat/message-content";
-import type { ChatMessage, SandboxOutputs, ToolPart } from "@neore/chat-ui/types";
+import { ToolOutputLoaderProvider } from "@neore/chat-ui/chat/tool-output-loader";
+import type { ChatMessage, SandboxOutputs, ToolOutputRef, ToolPart } from "@neore/chat-ui/types";
 import { resolveMcpToolName } from "@neore/chat-ui/utils/mcp-tool-name";
+import { withUnlockProof } from "@neore/client-runtime";
 import { FetchableOriginsProvider } from "@neore/ui/components/file-renderers/fetchable-origins-provider";
 import { originsOf } from "@neore/ui/hooks/use-fetchable-origins";
+import { useQueryClient } from "@tanstack/react-query";
 import type { FC } from "react";
 import { lazy, memo, Suspense, useCallback, useMemo } from "react";
 
@@ -20,6 +24,7 @@ import ToolAutoApproval from "@/features/chat/thread/tool-auto-approval";
 import TOOL_WIDGETS from "@/features/chat/thread/widgets";
 import KnowledgeSourceGroup from "@/features/knowledge/components/knowledge-source-group";
 import type { UIMessage } from "@/lib/agent";
+import { useCRPC } from "@/lib/lunora/crpc";
 
 /**
  * The origins a file preview may fetch besides the app's own: the backend's,
@@ -139,6 +144,22 @@ const MessageContent: FC<MessageContentProps> = memo(({ className, isStreaming, 
     const toolMeta = useMCPToolMeta(message.parts.some((part: UIMessage["parts"][number]) => resolveMcpToolName(part) !== null));
     // Stable per locale, so the memoized chat-ui renderer is not re-rendered for it.
     const citationLabel = useCallback((index: number) => t`Source ${index}`, [t]);
+    const crpc = useCRPC();
+    const queryClient = useQueryClient();
+    // A tool output the thread page left out, fetched on expand through the same access gate as the page.
+    const loadToolOutput = useCallback(
+        async (ref: ToolOutputRef) => {
+            const args = withUnlockProof({
+                messageId: ref.messageId as Id<"messages">,
+                threadId: ref.threadId as Id<"threads">,
+                toolCallId: ref.toolCallId,
+            });
+            const { output } = await queryClient.fetchQuery({ ...crpc.chat.functions.getToolOutput.queryOptions(args, { live: false }), staleTime: Infinity });
+
+            return output;
+        },
+        [crpc, queryClient],
+    );
     const components = useMemo(() => {
         return {
             DeviceToolCall,
@@ -157,14 +178,16 @@ const MessageContent: FC<MessageContentProps> = memo(({ className, isStreaming, 
 
     return (
         <FetchableOriginsProvider origins={FETCHABLE_ORIGINS}>
-            <MessageContentUI
-                citationLabel={citationLabel}
-                className={className}
-                components={components}
-                isStreaming={isStreaming}
-                message={message as unknown as ChatMessage}
-            />
-            <LinkPreviewSlot isStreaming={isStreaming} message={message} />
+            <ToolOutputLoaderProvider value={loadToolOutput}>
+                <MessageContentUI
+                    citationLabel={citationLabel}
+                    className={className}
+                    components={components}
+                    isStreaming={isStreaming}
+                    message={message as unknown as ChatMessage}
+                />
+                <LinkPreviewSlot isStreaming={isStreaming} message={message} />
+            </ToolOutputLoaderProvider>
         </FetchableOriginsProvider>
     );
 });

@@ -39,10 +39,19 @@ export interface ToolPart {
     errorText?: string;
     input?: unknown;
     output?: unknown;
+    /** Set when the page left a large output out: `output` is then absent until the view fetches it on expand. */
+    outputRef?: ToolOutputRef;
     state?: "approval-requested" | "approval-responded" | "input-available" | "input-streaming" | "output-available" | "output-denied" | "output-error";
     toolCallId: string;
     /** "tool-{toolName}" */
     type: string;
+}
+
+/** Where a left-out tool output lives, so the view can fetch it back. */
+export interface ToolOutputRef {
+    messageId: string;
+    threadId: string;
+    toolCallId: string;
 }
 
 export interface SourceUrlPart {

@@ -20891,6 +20891,86 @@
         "x-lunora-function-kind": "query"
       }
     },
+    "/_lunora/rpc#chat_functions:getToolOutput": {
+      "post": {
+        "description": "Invoke the `query` `chat_functions:getToolOutput` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "chat_functions:getToolOutput",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "messageId": {
+                        "description": "Id<\"messages\">",
+                        "type": "string",
+                        "x-lunora-table": "messages"
+                      },
+                      "threadId": {
+                        "description": "Id<\"threads\">",
+                        "type": "string",
+                        "x-lunora-table": "threads"
+                      },
+                      "toolCallId": {
+                        "type": "string"
+                      },
+                      "unlockProof": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "messageId",
+                      "threadId",
+                      "toolCallId"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "chat_functions:getToolOutput",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "output": {}
+                  },
+                  "required": [],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "query: chat_functions:getToolOutput",
+        "tags": [
+          "chat"
+        ],
+        "x-lunora-function-kind": "query"
+      }
+    },
     "/_lunora/rpc#chat_functions:listMCPToolsMeta": {
       "post": {
         "description": "Invoke the `action` `chat_functions:listMCPToolsMeta` over the Lunora RPC envelope (POST /_lunora/rpc).",
