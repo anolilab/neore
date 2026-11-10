@@ -1483,6 +1483,20 @@ export const tasks = sqliteTable("tasks", {
     by_status_and_stuckCheckAt: index("by_status_and_stuckCheckAt").on(t.status, t.stuckCheckAt),
 }));
 
+export const teammateConnectorAccess = sqliteTable("teammateConnectorAccess", {
+    _id: text("_id").primaryKey(),
+    _creationTime: integer("_creationTime").notNull(),
+    botId: text("botId").references((): AnySQLiteColumn => bots._id).notNull(),
+    connectorSlug: text("connectorSlug").notNull(),
+    level: text("level", { mode: "json" }).$type<"read_only" | "read_write" | "none">().notNull(),
+    updatedAt: real("updatedAt").notNull(),
+    userId: text("userId").notNull(),
+}, (t) => ({
+    by_botId_connectorSlug: index("by_botId_connectorSlug").on(t.botId, t.connectorSlug),
+    by_userId_connectorSlug: index("by_userId_connectorSlug").on(t.userId, t.connectorSlug),
+    by_userId: index("by_userId").on(t.userId),
+}));
+
 export const temporaryThreads = sqliteTable("temporaryThreads", {
     _id: text("_id").primaryKey(),
     _creationTime: integer("_creationTime").notNull(),

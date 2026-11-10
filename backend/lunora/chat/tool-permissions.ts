@@ -25,6 +25,7 @@
  *    deny) the call via `approveToolCall` / `denyToolCall`, and pipes the
  *    continuation into `persistentChunks` exactly like the original run.
  */
+import { threadConnectorAccess, vAccessLevel } from "../connectors/access";
 import { MAX_LENGTH } from "../lib/validators";
 import { LunoraError, v } from "lunorash/server";
 
@@ -318,14 +319,35 @@ export const getThreadPermissionMode = internalQuery
     .output(v.union(v.literal("supervised"), v.literal("auto"), v.literal("full"), v.null()))
     .query(async ({ args: { threadId, userId }, ctx }) => await modeOfThread(ctx, await ctx.db.get("threads", threadId), userId));
 
-export const threadModeForApp = async (ctx: QueryCtx, threadId: string, userId: string): Promise<{ allowed: boolean; mode: ThreadPermissionMode | null }> => {
+/**
+ * The mode of the thread an app call runs under, and the connection levels of the teammate it belongs to. The levels are read
+ * with the thread's OWNER, so a shared chat is held to the owner's settings, not the caller's.
+ */
+export const threadModeForApp = async (
+    ctx: QueryCtx,
+    threadId: string,
+    userId: string,
+): Promise<{
+    allowed: boolean;
+    connectorAccess: { connectorSlug: string; level: "none" | "read_only" | "read_write" }[];
+    mode: ThreadPermissionMode | null;
+}> => {
     const access = await resolveThreadReadAccess(ctx, threadId as Id<"threads">, userId);
 
     if (access?.kind !== "full" && access?.kind !== "locked") {
-        return { allowed: false, mode: null };
+        return { allowed: false, connectorAccess: [], mode: null };
     }
 
-    return { allowed: true, mode: await modeOfThread(ctx, access.thread, userId) };
+    // A thread with no owner on record is not reachable through an app call: the same refusal as a thread that is not there.
+    const owner = access.thread.userId;
+
+    if (owner === undefined) {
+        return { allowed: false, connectorAccess: [], mode: null };
+    }
+
+    const connectorAccess = await threadConnectorAccess(ctx, { threadId: access.thread._id, userId: owner });
+
+    return { allowed: true, connectorAccess, mode: await modeOfThread(ctx, access.thread, userId) };
 };
 
 /**
@@ -338,6 +360,7 @@ export const getThreadPermissionModeForApp = internalQuery
     .output(
         v.object({
             allowed: v.boolean(),
+            connectorAccess: v.array(v.object({ connectorSlug: v.string(), level: vAccessLevel })),
             mode: v.union(v.literal("supervised"), v.literal("auto"), v.literal("full"), v.null()),
         }),
     )

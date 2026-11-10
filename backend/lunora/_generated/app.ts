@@ -760,6 +760,7 @@ class AppBuilder<Env extends object> {
             ["taskRuns", { mode: { field: "userId", kind: "shardBy" } }],
             ["tasks", { mode: { field: "userId", kind: "shardBy" } }],
             ["team", { mode: { kind: "global" } }],
+            ["teammateConnectorAccess", { mode: { field: "userId", kind: "shardBy" } }],
             ["teamMember", { mode: { kind: "global" } }],
             ["teamSettings", { mode: { kind: "global" } }],
             ["temporaryThreads", { mode: { field: "userId", kind: "shardBy" } }],
