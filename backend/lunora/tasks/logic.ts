@@ -614,10 +614,6 @@ export const nextStuckCheckAt = (
     return days === undefined ? undefined : task.updatedAt + days * DAY_MS;
 };
 
-/** A task waiting on a dependency the owner must decide on (`needs_review`) is not stuck: the owner has the next move. */
-export const waitsOnOwnerDecision = (dependsOn: ReadonlyArray<string>, statusById: ReadonlyMap<string, TaskStatus>): boolean =>
-    dependsOn.some((id) => statusById.get(id) === "needs_review");
-
 /**
  * The stuck notice to send now, as its level in days, or `undefined`. `updatedAt` is the episode's start: any progress
  * moves it, which opens a new episode. `stuckNotice` holds the last level sent and the episode it was sent in; a notice

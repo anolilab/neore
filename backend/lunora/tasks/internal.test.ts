@@ -985,6 +985,31 @@ describe("stuck blocked tasks", () => {
         expect(task.stuckCheckAt).toBe(T0 + 6 * DAY);
     });
 
+    it("does not notify a task that waits, through a blocked task, on the owner's review", async () => {
+        const review = await insertTask({ status: "needs_review", title: "Review", updatedAt: T0 });
+        const middle = await insertTask({ dependsOn: [review], status: "blocked", title: "Middle", updatedAt: T0 });
+        const taskId = await insertTask({ dependsOn: [middle], status: "blocked", stuckCheckAt: T0 + 2 * DAY, title: "Waiting", updatedAt: T0 });
+
+        await sweepAt(T0 + 2 * DAY);
+
+        expect(await stuckNotices()).toStrictEqual([]);
+
+        const waiting = await getTask(taskId);
+
+        expect(waiting.stuckCheckAt).toBe(T0 + 3 * DAY);
+    });
+
+    it("asks the owner about a failed task once, not about each task waiting behind it", async () => {
+        const failed = await insertTask({ lastError: "boom", status: "failed", stuckCheckAt: T0 + 2 * DAY, title: "Broken", updatedAt: T0 });
+
+        await insertTask({ dependsOn: [failed], status: "blocked", stuckCheckAt: T0 + 2 * DAY, title: "Behind one", updatedAt: T0 });
+        await insertTask({ dependsOn: [failed], status: "blocked", stuckCheckAt: T0 + 2 * DAY, title: "Behind two", updatedAt: T0 });
+
+        await sweepAt(T0 + 2 * DAY);
+
+        expect(await stuckNotices()).toStrictEqual([{ outcome: undefined, title: "Broken", type: "task_stuck" }]);
+    });
+
     it("asks once more at 7 idle days, and not again within that episode", async () => {
         const dependency = await insertTask({ status: "todo", title: "First" });
 

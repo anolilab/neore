@@ -24,7 +24,6 @@ import {
     shouldRecurNow,
     stuckNoticeDue,
     validateParent,
-    waitsOnOwnerDecision,
 } from "./logic";
 
 const graphOf = (edges: Record<string, string[]>): Map<string, string[]> => new Map(Object.entries(edges));
@@ -501,19 +500,6 @@ describe(nextStuckCheckAt, () => {
 
     it("ignores an earlier episode's notice when it computes the next look", () => {
         expect(nextStuckCheckAt({ stuckNotice: { days: 7, since: SINCE }, updatedAt: SINCE + DAY }, undefined, SINCE + 2 * DAY)).toBe(SINCE + 3 * DAY);
-    });
-});
-
-describe("stuck task owner decision", () => {
-    it("treats only a task blocked on a needs_review dependency as waiting on the owner", () => {
-        const statuses = new Map<string, TaskStatus>([
-            ["a", "needs_review"],
-            ["b", "failed"],
-        ]);
-
-        expect(waitsOnOwnerDecision(["a"], statuses)).toBe(true);
-        expect(waitsOnOwnerDecision(["b"], statuses)).toBe(false);
-        expect(waitsOnOwnerDecision(["b", "a"], statuses)).toBe(true);
     });
 });
 

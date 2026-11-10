@@ -52,7 +52,7 @@ recurring tasks. State machine and idempotency are explained at the top of `inte
 
 - A `blocked` or `failed` task with no progress gets the owner's notice at 2 and 7 idle days, once per level and episode (`escalateStuckTasks`).
 - Only tasks whose `stuckCheckAt` is due are read (index `by_status_and_stuckCheckAt`, `gt(0)`). **A write that moves a task into or keeps it in `blocked`/`failed` and sets `updatedAt` also sets `stuckCheckAt` (`firstStuckCheckAt`) and calls `noteShardDue`**, or the task is never looked at, or waits for housekeeping.
-- A blocked task waiting on a `needs_review` dependency is re-checked daily, not notified; rejecting that review restarts its clock. A failed recurring task is re-checked after its next slot, which runs it again.
+- A blocked task waiting, through its dependencies, on a `needs_review` or failed task is re-checked daily, not notified (`waitOf`); rejecting or retrying that review restarts its clock. A failed recurring task is re-checked after its next slot.
 - A notice is written before its level is recorded; a failed write is retried in an hour. The notice carries the title only (`task_stuck`).
 
 ## WHERE A RUN GOES, AND ITS EFFORT

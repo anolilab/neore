@@ -861,11 +861,6 @@ export const cancelTask = authMutation
     });
 
 /**
- * The human in the loop, for a task the verifier would not pass:
- * approve (done — and dependents unblock), reject (failed), or retry with a
- * note the next run is given.
- */
-/**
  * A review decision (reject or retry) on `task` ends the wait of the blocked tasks that depend on it. Their stuck clock
  * restarts here, so the time spent awaiting the owner's decision is not counted as idle time (`tasks/AGENTS.md`).
  */
@@ -879,6 +874,11 @@ const restartDependentsClock = async (ctx: MutationCtx, task: Doc<"tasks">, now:
     }
 };
 
+/**
+ * The human in the loop, for a task the verifier would not pass:
+ * approve (done — and dependents unblock), reject (failed), or retry with a
+ * note the next run is given.
+ */
 export const reviewTask = authMutation
     .use(rateLimit("tasks/run"))
     .input({

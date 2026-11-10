@@ -13,18 +13,15 @@ export const TOOL_OUTPUT_INLINE_BYTES = 4096;
 
 /** Tool names (without the `tool-` prefix) whose view reads `output` on first render. */
 export const FIRST_PAINT_TOOL_NAMES: ReadonlySet<string> = new Set([
-    // Own cards and questions
     "askUser",
     "browser",
     "codeExecution",
-    // Result widgets
     "coinData",
     "coinDataByContract",
     "createDocument",
     "createPresentation",
     "currencyConverter",
     "deepResearch",
-    // Sub-agent and coding-agent views
     "delegateToCodingAgent",
     "delegateToSubAgent",
     "findPlace",

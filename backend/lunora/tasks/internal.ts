@@ -58,7 +58,6 @@ import {
     STUCK_OWNER_RECHECK_MS,
     STUCK_RETRY_MS,
     stuckNoticeDue,
-    waitsOnOwnerDecision,
 } from "./logic";
 import { vTaskRunNoticeReason, vTaskRunOrigin, vVerdict } from "./validators";
 import { vCodingAgentAssignment } from "../coding-agents/validators";
@@ -166,28 +165,72 @@ export const promoteDependents = async (ctx: MutationCtx, completed: Doc<"tasks"
     }
 };
 
+/** Most tasks read when following a blocked task's dependencies to what it waits on. */
+const WAIT_SCAN_MAX = 20;
+
+/**
+ * What a blocked task waits on, followed through its dependencies and the blocked tasks between them (at most
+ * `WAIT_SCAN_MAX` tasks are read). `owner` when the chain ends in a `needs_review` task or a failed task that nothing
+ * retries; `slot` when it ends in a failed recurring task, which the schedule runs again at that time.
+ */
+const waitOf = async (ctx: MutationCtx, dependsOn: ReadonlyArray<string>): Promise<{ owner: boolean; slot?: number }> => {
+    const seen = new Set<string>();
+    const queue = [...dependsOn];
+    let owner = false;
+    let slot: number | undefined;
+
+    while (queue.length > 0 && seen.size < WAIT_SCAN_MAX) {
+        const id = queue.shift() as string;
+
+        if (seen.has(id)) {
+            continue;
+        }
+
+        seen.add(id);
+
+        const dependency = await ctx.db.get("tasks", id as Id<"tasks">);
+
+        if (!dependency) {
+            continue;
+        }
+
+        switch (dependency.status) {
+            case "blocked": {
+                queue.push(...dependency.dependsOn);
+
+                break;
+            }
+            case "failed": {
+                if (dependency.recurring && dependency.nextRunAt !== undefined) {
+                    slot = Math.max(slot ?? 0, dependency.nextRunAt);
+                } else {
+                    owner = true;
+                }
+
+                break;
+            }
+            case "needs_review": {
+                owner = true;
+
+                break;
+            }
+            default: {
+                break;
+            }
+        }
+    }
+
+    return { owner, slot };
+};
+
 /**
  * Asks the owner, once per level and stuck episode, about a blocked or failed task that has made no progress for 2 or
  * 7 days (`STUCK_NOTICE_DAYS`). Only tasks whose `stuckCheckAt` has come due are read, so a task whose notices are
- * out costs nothing until its episode changes. A blocked task waiting on a dependency that needs the owner's review
- * is looked at again daily. Writes the notice state without touching `updatedAt`, so the notice is not progress.
+ * out costs nothing until its episode changes. A blocked task waiting, through its dependencies, on the owner's review
+ * or on a failed task is looked at again daily, so the owner is asked once about the task that needs them, not about
+ * every task behind it. Writes the notice state without touching `updatedAt`, so the notice is not progress.
  */
 const escalateStuckTasks = async (ctx: MutationCtx, now: number): Promise<void> => {
-    // Only a blocked task's own dependencies are read, so the cost is bounded by its `dependsOn`, not its owner's task list.
-    const dependenciesOf = async (dependsOn: ReadonlyArray<string>): Promise<Doc<"tasks">[]> => {
-        const found: Doc<"tasks">[] = [];
-
-        for (const id of dependsOn) {
-            const dependency = await ctx.db.get("tasks", id as Id<"tasks">);
-
-            if (dependency) {
-                found.push(dependency);
-            }
-        }
-
-        return found;
-    };
-
     for (const status of STUCK_CHECK_STATUSES) {
         // `gt(0)` leaves out a row with no check armed: an unset `stuckCheckAt` sorts first, and would fill the batch.
         const due = await ctx.db
@@ -204,22 +247,16 @@ const escalateStuckTasks = async (ctx: MutationCtx, now: number): Promise<void> 
             }
 
             if (task.status === "blocked") {
-                const dependencies = await dependenciesOf(task.dependsOn);
-                const statusById = new Map(dependencies.map((dependency) => [dependency._id as string, dependency.status] as const));
+                const wait = await waitOf(ctx, task.dependsOn);
 
-                if (waitsOnOwnerDecision(task.dependsOn, statusById)) {
+                if (wait.owner) {
                     await recheckStuckTask(ctx, task, now + STUCK_OWNER_RECHECK_MS);
 
                     continue;
                 }
 
-                // A failed recurring dependency runs again at its next slot, so the wait is on the schedule, not the owner.
-                const slots = dependencies
-                    .filter((dependency) => dependency.status === "failed" && dependency.recurring && dependency.nextRunAt !== undefined)
-                    .map((dependency) => dependency.nextRunAt as number);
-
-                if (slots.length > 0) {
-                    await recheckStuckTask(ctx, task, Math.max(...slots, now) + STUCK_OWNER_RECHECK_MS);
+                if (wait.slot !== undefined) {
+                    await recheckStuckTask(ctx, task, Math.max(wait.slot, now) + STUCK_OWNER_RECHECK_MS);
 
                     continue;
                 }
@@ -240,7 +277,12 @@ const escalateStuckTasks = async (ctx: MutationCtx, now: number): Promise<void> 
                         userId: task.userId,
                     });
                 } catch (error) {
-                    ctx.log.event("tasks.stuck_notice_failed", { days, error: error instanceof Error ? error.name : "unknown", taskId: task._id });
+                    ctx.log.event("tasks.stuck_notice_failed", {
+                        days,
+                        error: error instanceof Error ? error.name : "unknown",
+                        reason: error instanceof Error ? error.message : "unknown",
+                        taskId: task._id,
+                    });
                     await recheckStuckTask(ctx, task, now + STUCK_RETRY_MS);
 
                     continue;
