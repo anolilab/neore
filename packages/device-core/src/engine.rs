@@ -161,6 +161,12 @@ impl DeviceState {
 
         // Deletions an earlier run was cut short of (the app quit while a removed agent's folder was being deleted).
         crate::acp_install::sweep_trash(data_dir.join("acp-agents").join(".trash"));
+        // No install is running as the state starts: what an earlier run left reserved is abandoned.
+        crate::acp_install::sweep_trash(
+            data_dir
+                .join("acp-agents")
+                .join(crate::acp_install::INSTALLING_DIR),
+        );
 
         DeviceState {
             acp_permissions: AcpPermissions::default(),
