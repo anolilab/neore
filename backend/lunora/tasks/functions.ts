@@ -735,6 +735,9 @@ export const updateTask = authMutation
             updatedAt: now,
         });
 
+        // An edit restarts the stuck clock, so an idle shard must wake for the new check.
+        await noteShardDue(ctx, firstStuckCheckAt(now), userId);
+
         if (nextRunAt !== undefined) {
             await noteShardDue(ctx, nextRunAt, userId);
         }
@@ -897,6 +900,16 @@ export const reviewTask = authMutation
                 updatedAt: now,
             });
             await noteShardDue(ctx, firstStuckCheckAt(now), task.userId);
+
+            // The dependents were waiting on this review, not on the owner's inactivity: their stuck clock restarts here, so
+            // the wait is not counted as idle time (`tasks/AGENTS.md`).
+            const owned = await loadUserTasks(ctx, task.userId);
+            const dependents = owned.filter((other) => other.status === "blocked" && other.dependsOn.includes(task._id));
+
+            for (const dependent of dependents) {
+                await patchRow(ctx.db, "tasks", dependent, { stuckCheckAt: firstStuckCheckAt(now), updatedAt: now });
+                await noteShardDue(ctx, firstStuckCheckAt(now), dependent.userId);
+            }
 
             ctx.log.event("tasks.review_task", { decision: args.decision, taskId: task._id });
 

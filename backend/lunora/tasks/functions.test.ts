@@ -10,7 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import schema from "../schema";
 import { selectableTextModels } from "../skills/builder-logic";
 import { ANONYMOUS_TASKS_MESSAGE } from "./account";
-import { createTask, runTask, updateTask } from "./functions";
+import { createTask, reviewTask, runTask, updateTask } from "./functions";
 import { MAX_RECURRING_TASKS_PER_USER } from "./logic";
 
 // `user` is a `.global()` (D1) table the in-memory harness cannot write: the
@@ -250,5 +250,47 @@ describe("recurring tasks", () => {
         await markSkipped();
         await as(USER).mutation(updateTask as never, definition({ taskId }) as never);
         expect(await skipOf()).toStrictEqual([undefined, undefined]);
+    });
+});
+
+describe("review decisions and waiting dependents", () => {
+    const DAY = 24 * 60 * 60_000;
+    const T0 = Date.UTC(2026, 10, 1, 9);
+
+    afterEach(() => {
+        vi.useRealTimers();
+    });
+
+    it("restarts a dependent's stuck clock when its review dependency is rejected", async () => {
+        const row = (overrides: Record<string, unknown>) => {
+            return {
+                attemptCount: 0,
+                createdAt: 1,
+                dependsOn: [],
+                instructions: "x",
+                maxRepairRounds: 2,
+                recurring: false,
+                status: "todo",
+                title: "t",
+                updatedAt: T0,
+                userId: USER,
+                ...overrides,
+            };
+        };
+        const review = await harness.run(async (ctx: any) => await ctx.db.insert("tasks", row({ status: "needs_review", title: "Review" })));
+        const waiting = await harness.run(
+            async (ctx: any) => await ctx.db.insert("tasks", row({ dependsOn: [review], status: "blocked", stuckCheckAt: T0 + 2 * DAY, title: "Waiting" })),
+        );
+
+        // Five idle days later the owner rejects the review: the wait was theirs, not idle time for the dependent.
+        const rejectedAt = T0 + 5 * DAY;
+
+        vi.useFakeTimers({ now: rejectedAt, toFake: ["Date"] });
+        await as(USER).mutation(reviewTask as never, { decision: "reject", taskId: review } as never);
+
+        const dependent: any = await harness.run(async (ctx: any) => await ctx.db.get("tasks", waiting));
+
+        expect(dependent.updatedAt).toBe(rejectedAt);
+        expect(dependent.stuckCheckAt).toBe(rejectedAt + 2 * DAY);
     });
 });

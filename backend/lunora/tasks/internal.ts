@@ -173,18 +173,17 @@ export const promoteDependents = async (ctx: MutationCtx, completed: Doc<"tasks"
  * is looked at again daily. Writes the notice state without touching `updatedAt`, so the notice is not progress.
  */
 const escalateStuckTasks = async (ctx: MutationCtx, now: number): Promise<void> => {
-    const statusesByUser = new Map<string, Map<string, TaskStatus>>();
-    // Read only for a blocked task: a failed one needs no dependency check, and loading every owner's tasks for it is wasted.
-    const statusesOf = async (userId: string): Promise<Map<string, TaskStatus>> => {
-        const cached = statusesByUser.get(userId);
+    // Only a blocked task's own dependencies are read, so the cost is bounded by its `dependsOn`, not its owner's task list.
+    const dependencyStatuses = async (dependsOn: ReadonlyArray<string>): Promise<Map<string, TaskStatus>> => {
+        const statusById = new Map<string, TaskStatus>();
 
-        if (cached) {
-            return cached;
+        for (const id of dependsOn) {
+            const dependency = await ctx.db.get("tasks", id as Id<"tasks">);
+
+            if (dependency) {
+                statusById.set(id, dependency.status);
+            }
         }
-
-        const statusById = statusMap(await loadUserTasks(ctx, userId));
-
-        statusesByUser.set(userId, statusById);
 
         return statusById;
     };
@@ -204,7 +203,7 @@ const escalateStuckTasks = async (ctx: MutationCtx, now: number): Promise<void> 
                 continue;
             }
 
-            if (task.status === "blocked" && waitsOnOwnerDecision(task.dependsOn, await statusesOf(task.userId))) {
+            if (task.status === "blocked" && waitsOnOwnerDecision(task.dependsOn, await dependencyStatuses(task.dependsOn))) {
                 await recheckStuckTask(ctx, task, now + STUCK_OWNER_RECHECK_MS);
 
                 continue;
