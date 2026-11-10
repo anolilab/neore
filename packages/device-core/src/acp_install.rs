@@ -37,6 +37,8 @@ use crate::hmac::to_hex;
 const INSTALL_DIR: &str = "acp-agents";
 const STAGING_DIR: &str = ".staging";
 const TRASH_DIR: &str = ".trash";
+/// Where a download being installed is kept: not under the staging folder, whose old entries are swept as abandoned.
+pub(crate) const INSTALLING_DIR: &str = ".installing";
 pub(crate) const UNPACKED_DIR: &str = "unpacked";
 const MAX_UNPACKED_BYTES: u64 = 2 * 1024 * 1024 * 1024;
 const MAX_ENTRIES: usize = 20_000;
@@ -405,8 +407,16 @@ impl DeviceState {
                         // A launch variable that changed (a registry one the new version adds, drops or sets
                         // differently) is not the program the folders were approved for.
                         || before.env != agent.env
-                        || before.install.as_ref().map(|pin| &pin.sha256)
-                            != agent.install.as_ref().map(|pin| &pin.sha256)
+                        // The same archive can install different dependency code (registry ranges resolve again), so
+                        // an npm install's folder hash counts too. A binary install has none.
+                        || before
+                            .install
+                            .as_ref()
+                            .map(|pin| (&pin.sha256, &pin.tree_sha256))
+                            != agent
+                                .install
+                                .as_ref()
+                                .map(|pin| (&pin.sha256, &pin.tree_sha256))
                     {
                         settings.acp_consents.retain(|c| c.agent_key != agent.key);
                     }

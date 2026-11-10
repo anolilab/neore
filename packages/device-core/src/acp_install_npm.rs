@@ -35,7 +35,8 @@ use sha2::{Digest, Sha256, Sha512};
 
 use crate::acp::{validate_agent, AcpAgent, AcpInstall, AcpView, EnvVars};
 use crate::acp_install::{
-    create_private_dir, safe_relative, sha256_reader, validate_provenance, UNPACKED_DIR,
+    create_private_dir, safe_relative, sha256_reader, validate_provenance, INSTALLING_DIR,
+    UNPACKED_DIR,
 };
 use crate::engine::{now_ms, DeviceState, Event};
 use crate::hmac::to_hex;
@@ -372,7 +373,21 @@ fn package_manifest(tarball: &Path) -> Result<Value, String> {
             .path()
             .map_err(|error| error.to_string())?
             .into_owned();
-        // `./package/package.json` and `package/package.json` are the same entry.
+        // Extraction strips a leading `/` and walks `..`, so such an entry can land on the file that was checked
+        // under a name that does not look like it. No tarball of a package has one.
+        if path.components().any(|part| {
+            matches!(
+                part,
+                std::path::Component::RootDir
+                    | std::path::Component::Prefix(_)
+                    | std::path::Component::ParentDir
+            )
+        }) {
+            return Err("the download holds an entry with an absolute path or a `..`. Nothing was installed".into());
+        }
+
+        // `./package/package.json` and `package/package.json` are the same entry (as is `package/./package.json`,
+        // which `components` already reads without the dot).
         let names: Vec<_> = path
             .components()
             .filter(|part| !matches!(part, std::path::Component::CurDir))
@@ -381,11 +396,19 @@ fn package_manifest(tarball: &Path) -> Result<Value, String> {
             continue;
         };
 
-        if name.as_os_str() == "npm-shrinkwrap.json" {
+        // A case-insensitive file system (macOS) reads `PACKAGE.JSON` as `package.json`, and folds more than case
+        // (`ſ` is `s`). Real packages keep ASCII names at their top level, so anything else is refused outright,
+        // and the two names below are matched whatever their case.
+        let Some(name) = name.as_os_str().to_str().filter(|text| text.is_ascii()) else {
+            return Err("the download holds a top-level file whose name is not plain ASCII. Nothing was installed".into());
+        };
+        let name = name.to_ascii_lowercase();
+
+        if name == "npm-shrinkwrap.json" {
             return Err("the package ships an npm-shrinkwrap.json, whose addresses cannot be checked. Nothing was installed".into());
         }
 
-        if name.as_os_str() != "package.json" {
+        if name != "package.json" {
             continue;
         }
 
@@ -501,9 +524,9 @@ fn tail(path: &Path) -> String {
     String::from_utf8_lossy(&text[start..]).trim().to_owned()
 }
 
-/// Whether `node <script>` can run `script`: a JavaScript file by name, or one whose first line is a `node` shebang.
-/// Anything else (a shell script, a native executable) npm could run through its `.bin` link, but the recorded
-/// command is `node <script>`.
+/// Whether `node <script>` can run `script`: a JavaScript file by name, or one whose first line is a shebang for
+/// node. Anything else (a shell script, a native executable) npm could run through its `.bin` link, but the
+/// recorded command is `node <script>`.
 fn runs_under_node(script: &Path) -> bool {
     if script
         .extension()
@@ -522,7 +545,29 @@ fn runs_under_node(script: &Path) -> bool {
         .next()
         .unwrap_or(&[]);
 
-    first.starts_with(b"#!") && String::from_utf8_lossy(first).contains("node")
+    is_node_shebang(&String::from_utf8_lossy(first))
+}
+
+/// Whether a first line is `#!` for node: the interpreter's file name is `node`, or it is `env` and the first
+/// argument that is not an option (`-S` and its like) is `node`. A line that only mentions node somewhere, as
+/// `#!/bin/sh # node` does, is not.
+fn is_node_shebang(line: &str) -> bool {
+    let Some(line) = line.trim().strip_prefix("#!") else {
+        return false;
+    };
+    let mut words = line.split_whitespace();
+    let Some(interpreter) = words.next() else {
+        return false;
+    };
+
+    match Path::new(interpreter)
+        .file_name()
+        .and_then(|name| name.to_str())
+    {
+        Some("node") => true,
+        Some("env") => words.find(|word| !word.starts_with('-')) == Some("node"),
+        _ => false,
+    }
 }
 
 /// Runs `npm install --ignore-scripts` of `tarball` into `prefix`, with an environment built from nothing.
@@ -650,30 +695,44 @@ fn digests(file: &mut fs::File) -> Result<(String, String), String> {
     }
 }
 
-/// Takes the staging folder of `staged` for this call alone, by renaming it to a name no other call has: two calls
-/// that resolved the same download cannot both install it or delete each other's working folder. Returns the
-/// archive's new path and the reserved folder.
-fn reserve_stage(staged: &Path) -> Result<(PathBuf, PathBuf), String> {
+/// Takes the staging folder of `staged` for this call alone, by renaming it into `acp-agents/.installing` under a
+/// name no other call has: two calls that resolved the same download cannot both install it or delete each other's
+/// working folder. That folder is outside `.staging`, whose entries older than a day are swept as abandoned, so a long
+/// install is not deleted under its own feet. Returns the archive's new path and the reserved folder.
+fn reserve_stage(install_root: &Path, staged: &Path) -> Result<(PathBuf, PathBuf), String> {
     static RESERVED: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
 
-    let stage_dir = staged
-        .parent()
-        .ok_or("the download is not in a staging folder")?;
-    let name = stage_dir
-        .file_name()
-        .ok_or("the download is not in a staging folder")?;
-    let reserved = stage_dir.with_file_name(format!(
-        "{}.installing-{}",
+    let not_staged = "the download is not in a staging folder";
+    let stage_dir = staged.parent().ok_or(not_staged)?;
+    let name = stage_dir.file_name().ok_or(not_staged)?;
+    let file = staged.file_name().ok_or(not_staged)?;
+    let holding = install_root.join(INSTALLING_DIR);
+
+    // A folder already reserved by a call is that call's alone: it is never taken or renamed again.
+    if stage_dir.parent() == Some(holding.as_path()) {
+        return Err("this download is already being installed".into());
+    }
+
+    // A real folder under app data: through a link the reserved folders would land somewhere else.
+    if fs::symlink_metadata(&holding).is_ok_and(|meta| !meta.is_dir()) {
+        return Err("the folder for downloads being installed is not a plain folder".into());
+    }
+
+    fs::create_dir_all(&holding).map_err(|error| error.to_string())?;
+
+    let reserved = holding.join(format!(
+        "{}-{}",
         name.to_string_lossy(),
         RESERVED.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
     ));
 
-    fs::rename(stage_dir, &reserved)
-        .map_err(|_| "this download is already being installed".to_owned())?;
-
-    let file = staged
-        .file_name()
-        .ok_or("the download is not in a staging folder")?;
+    fs::rename(stage_dir, &reserved).map_err(|error| {
+        if error.kind() == std::io::ErrorKind::NotFound {
+            "this download is already being installed".to_owned()
+        } else {
+            format!("the download could not be set aside for the install: {error}")
+        }
+    })?;
 
     Ok((reserved.join(file), reserved))
 }
@@ -683,7 +742,7 @@ impl DeviceState {
     pub fn acp_install_npm(&self, request: NpmInstallRequest) -> Result<AcpView, String> {
         let (node, npm) = validate(&request)?;
         let staged = self.staged_archive(&request.archive)?;
-        let (staged, stage_dir) = reserve_stage(&staged)?;
+        let (staged, stage_dir) = reserve_stage(&self.install_root(), &staged)?;
         let result = self.install_npm_staged(&request, &node, &npm, &staged, &stage_dir);
 
         // npm's cache and anything half-installed go whatever happened; a successful install already moved its

@@ -1348,26 +1348,46 @@ fn a_second_package_json_or_a_shrinkwrap_cannot_hide_dependencies() {
 
 #[test]
 fn a_tool_rewritten_with_the_same_size_and_its_modification_time_restored_is_refused() {
+    use std::os::unix::fs::MetadataExt;
+
     let (state, dir) = state("touch-r");
     let (node, npm, _) = fake_tools(&dir);
     let confirmed = request_for(&state, &node, &npm, "1.0.0");
-    let before = fs::metadata(&node).unwrap().modified().unwrap();
+    let meta = fs::metadata(&node).unwrap();
+    let (before, confirmed_ctime) = (meta.modified().unwrap(), (meta.ctime(), meta.ctime_nsec()));
     let mut content = fs::read(&node).unwrap();
-
-    // Same length, other bytes, then `touch -r`. Linux stamps ctime from a coarse clock (one tick, up to 10 ms), so a
-    // rewrite in the same tick as the confirmation would keep it; a real swap comes long after the person confirmed.
-    std::thread::sleep(std::time::Duration::from_millis(50));
-
     let last = content.len() - 2;
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
+    let mut toggle = false;
 
-    content[last] = b'#';
-    fs::write(&node, &content).unwrap();
-    fs::OpenOptions::new()
-        .write(true)
-        .open(&node)
-        .unwrap()
-        .set_modified(before)
-        .unwrap();
+    // Same length, other bytes, then `touch -r`. The file system stamps ctime from a coarse clock (up to one tick,
+    // 10 ms or more), so a rewrite in the tick of the confirmation keeps it. Rewrite until ctime has moved; a real
+    // swap comes long after the person confirmed.
+    loop {
+        content[last] = if toggle { b'#' } else { b'!' };
+        toggle = !toggle;
+        fs::write(&node, &content).unwrap();
+        fs::OpenOptions::new()
+            .write(true)
+            .open(&node)
+            .unwrap()
+            .set_modified(before)
+            .unwrap();
+
+        let now = fs::metadata(&node).unwrap();
+
+        if (now.ctime(), now.ctime_nsec()) != confirmed_ctime {
+            break;
+        }
+
+        if std::time::Instant::now() >= deadline {
+            eprintln!("skipped: this file system's change time did not advance in 2 s");
+
+            return;
+        }
+
+        std::thread::sleep(std::time::Duration::from_millis(10));
+    }
 
     let error = state.acp_install_npm(confirmed).unwrap_err();
 
@@ -1431,16 +1451,244 @@ fn a_download_can_be_reserved_by_one_call_only() {
     let staged = state.staged_archive(&request.archive).unwrap();
 
     // Two calls that both resolved the download before either took it.
-    let (archive, reserved) = reserve_stage(&staged).unwrap();
+    let (archive, reserved) = reserve_stage(&state.install_root(), &staged).unwrap();
 
     assert!(archive.is_file() && reserved.is_dir());
     assert!(!staged.exists(), "the download moved with its folder");
-    assert!(reserve_stage(&staged)
+    assert!(reserve_stage(&state.install_root(), &staged)
         .unwrap_err()
         .contains("already being installed"));
     assert!(archive.is_file(), "the first call's folder is untouched");
 
+    // A folder a call has reserved cannot be taken again by another, by either way in.
+    assert!(reserve_stage(&state.install_root(), &archive)
+        .unwrap_err()
+        .contains("already being installed"));
+    assert!(state.staged_archive(&archive.to_string_lossy()).is_err());
+    assert!(archive.is_file(), "the reservation is untouched");
+
     // The full call on the same request finds nothing to take.
     assert!(state.acp_install_npm(request).is_err());
     assert!(archive.is_file(), "and did not delete it");
+}
+
+#[test]
+fn a_reservation_that_fails_for_another_reason_says_so() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let (state, dir) = state("reserve-denied");
+    let (node, npm, _) = fake_tools(&dir);
+    let bytes = tarball(&manifest(), &[]);
+    let request = request(&state, &node, &npm, &bytes, integrity(&bytes));
+    let staged = state.staged_archive(&request.archive).unwrap();
+    let holding = dir.join("acp-agents").join(INSTALLING_DIR);
+
+    fs::create_dir_all(&holding).unwrap();
+    fs::set_permissions(&holding, fs::Permissions::from_mode(0o500)).unwrap();
+
+    // A root user can write there anyway; the case cannot arise and the test has nothing to say.
+    let writable = fs::write(holding.join("probe"), "x").is_ok();
+    let result = reserve_stage(&state.install_root(), &staged);
+
+    fs::set_permissions(&holding, fs::Permissions::from_mode(0o700)).unwrap();
+
+    if writable {
+        return;
+    }
+
+    let error = result.unwrap_err();
+
+    assert!(error.contains("could not be set aside"), "{error}");
+    assert!(!error.contains("already being installed"), "{error}");
+}
+
+#[test]
+fn a_reserved_download_is_not_swept_as_stale_and_is_cleared_when_the_state_starts() {
+    let (state, dir) = state("reserved-sweep");
+    let (node, npm, _) = fake_tools(&dir);
+    let bytes = tarball(&manifest(), &[]);
+    let request = request(&state, &node, &npm, &bytes, integrity(&bytes));
+    let staged = state.staged_archive(&request.archive).unwrap();
+    let (archive, reserved) = reserve_stage(&state.install_root(), &staged).unwrap();
+
+    // Older than the day after which an abandoned staging folder is removed.
+    let old = std::time::SystemTime::now() - std::time::Duration::from_secs(25 * 60 * 60);
+
+    fs::File::open(&reserved)
+        .unwrap()
+        .set_modified(old)
+        .unwrap();
+    state.acp_install_stage().unwrap();
+    assert!(archive.is_file(), "the sweep of old staging left it alone");
+
+    // Starting the state means no install is running: what is still reserved is abandoned.
+    let _fresh = DeviceState::new(&dir, Box::new(|_| {}));
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
+
+    while reserved.exists() && std::time::Instant::now() < deadline {
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    }
+
+    assert!(!reserved.exists(), "cleared at start");
+}
+
+#[test]
+fn a_reinstall_keeps_approvals_only_for_the_same_installed_tree() {
+    let (state, dir) = state("reinstall-approvals");
+    let (node, npm, _) = fake_tools(&dir);
+    let project = dir.join("project");
+    let bytes = tarball(&manifest(), &[]);
+    let install = |state: &DeviceState| {
+        state
+            .acp_install_npm(request(state, &node, &npm, &bytes, integrity(&bytes)))
+            .unwrap()
+    };
+
+    fs::create_dir_all(&project).unwrap();
+    install(&state);
+    state
+        .acp_update(
+            serde_json::from_value(json!({
+                "op": "grant", "agentKey": "fixture", "folder": project.to_string_lossy(),
+            }))
+            .unwrap(),
+        )
+        .unwrap();
+    assert_eq!(state.acp_view().consents.len(), 1);
+
+    // The same tarball and the same installed files: still the program that was approved.
+    install(&state);
+    assert_eq!(state.acp_view().consents.len(), 1, "unchanged keeps them");
+
+    // The same tarball, but npm resolved a dependency to other code this time.
+    let mut script = fs::read_to_string(&npm).unwrap();
+
+    script.push_str("echo 'resolved differently' > \"$prefix/node_modules/dep.js\"\n");
+    fs::write(&npm, script).unwrap();
+
+    let view = install(&state);
+
+    assert!(view.consents.is_empty(), "a different tree drops them");
+}
+
+#[test]
+fn only_a_node_shebang_makes_a_program_node_can_run() {
+    for (line, expected) in [
+        ("#!/usr/bin/env node", true),
+        ("#!/usr/bin/env -S node --flag", true),
+        ("#!/usr/local/bin/node", true),
+        ("#!/usr/bin/node --harmony", true),
+        ("#!/bin/sh # node", false),
+        ("#!/bin/sh", false),
+        ("#!/usr/bin/env sh", false),
+        ("#!/usr/bin/env bash -c node", false),
+        ("#!/usr/bin/python3 node", false),
+        ("#!/usr/bin/nodejs", false),
+        ("// node", false),
+        ("", false),
+    ] {
+        assert_eq!(is_node_shebang(line), expected, "{line}");
+    }
+
+    let (_, dir) = state("shebang-file");
+    let fake = dir.join("run");
+
+    fs::write(&fake, "#!/bin/sh # node\necho hi\n").unwrap();
+    assert!(!runs_under_node(&fake));
+    fs::write(&fake, "#!/usr/bin/env node\nconsole.log(1)\n").unwrap();
+    assert!(runs_under_node(&fake));
+}
+
+#[test]
+fn an_entry_with_an_absolute_path_or_a_dot_dot_cannot_stand_in_for_the_manifest() {
+    let (state, dir) = state("odd-paths");
+    let (node, npm, log) = fake_tools(&dir);
+    let clean = manifest().to_string();
+    let evil = json!({
+        "name": PACKAGE, "version": "1.0.0", "bin": "cli.js",
+        "dependencies": { "left": "github:example/left" },
+    })
+    .to_string();
+
+    for (what, second, reason) in [
+        (
+            "an absolute path",
+            "/package/package.json",
+            "absolute path or a `..`",
+        ),
+        (
+            "a dot-dot",
+            "package/../package/package.json",
+            "absolute path or a `..`",
+        ),
+        (
+            "a dot in the middle",
+            "package/./package.json",
+            "more than one package.json",
+        ),
+    ] {
+        let bytes = raw_tarball(&[
+            ("package/package.json", clean.as_str()),
+            (second, evil.as_str()),
+        ]);
+        let error = state
+            .acp_install_npm(request(&state, &node, &npm, &bytes, integrity(&bytes)))
+            .unwrap_err();
+
+        assert!(error.contains(reason), "{what}: {error}");
+        assert!(!log.exists(), "npm must not run for {what}");
+    }
+}
+
+#[test]
+fn a_manifest_by_another_case_or_a_folded_name_cannot_stand_in_for_it() {
+    let (state, dir) = state("folded-names");
+    let (node, npm, log) = fake_tools(&dir);
+    let clean = manifest().to_string();
+    let evil = json!({
+        "name": PACKAGE, "version": "1.0.0", "bin": "cli.js",
+        "dependencies": { "left": "github:example/left" },
+    })
+    .to_string();
+
+    for (what, second, text, reason) in [
+        (
+            "upper case",
+            "package/PACKAGE.JSON",
+            evil.as_str(),
+            "more than one package.json",
+        ),
+        (
+            "mixed case",
+            "package/Package.Json",
+            evil.as_str(),
+            "more than one package.json",
+        ),
+        (
+            "shrinkwrap in capitals",
+            "package/NPM-SHRINKWRAP.JSON",
+            "{}",
+            "npm-shrinkwrap.json",
+        ),
+        (
+            "a long s",
+            "package/packa\u{17f}e.json",
+            evil.as_str(),
+            "not plain ASCII",
+        ),
+        (
+            "a folded shrinkwrap",
+            "package/npm-\u{17f}hrinkwrap.json",
+            "{}",
+            "not plain ASCII",
+        ),
+    ] {
+        let bytes = raw_tarball(&[("package/package.json", clean.as_str()), (second, text)]);
+        let error = state
+            .acp_install_npm(request(&state, &node, &npm, &bytes, integrity(&bytes)))
+            .unwrap_err();
+
+        assert!(error.contains(reason), "{what}: {error}");
+        assert!(!log.exists(), "npm must not run for {what}");
+    }
 }
