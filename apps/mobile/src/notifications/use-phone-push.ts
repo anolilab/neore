@@ -1,9 +1,12 @@
+import { api } from "@neore/backend/api";
+import type { Id } from "@neore/backend/dataModel";
 import { addPushTokenListener } from "expo-notifications";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { AppState } from "react-native";
 
 import { useAuth } from "../auth/auth-state";
 import { getClient } from "../lib/lunora";
+import { listenForApprovalTaps } from "./approval-actions";
 import { backendPushServer, configurePhoneNotifications, deviceLocale, devicePushPlatform, pushRegistrations } from "./phone-push";
 import { createForegroundGate, createPromptOffer, createTokenChangeFilter, registerPhoneForPush } from "./push-registration";
 
@@ -93,9 +96,37 @@ export const usePhonePush = (): void => {
     const { hasToken, status, user } = useAuth();
     const userId = status === "signed-in" && hasToken ? user?.id : undefined;
 
+    // The setup, the approval category included, that a phone's first registration waits for: an alert that arrives as the
+    // phone registers must already carry its approve and deny actions.
+    const setup = useRef<Promise<void>>(Promise.resolve());
+
     useEffect(() => {
-        quietly("Could not set up notifications.", configurePhoneNotifications);
+        setup.current = quietly("Could not set up notifications.", configurePhoneNotifications);
     }, []);
+
+    useEffect(() => {
+        if (userId === undefined) {
+            return undefined;
+        }
+
+        // A tap on an approval alert answers it as the signed-in account, through the procedure the chat's own card uses.
+        // Offline it is refused, never queued (`onlineOnly`). Once that account's sign-out has begun, no tap is answered.
+        const subscription = listenForApprovalTaps(async (answer) => {
+            if (signedIn.account?.isCurrent !== true) {
+                return;
+            }
+
+            await getClient().mutation(
+                api.chat.tool_permissions.respondToToolApproval,
+                { approvalId: answer.approvalId, decision: answer.decision, threadId: answer.threadId as Id<"threads"> },
+                { onlineOnly: true },
+            );
+        });
+
+        return () => {
+            subscription.remove();
+        };
+    }, [userId]);
 
     useEffect(() => {
         if (userId === undefined) {
@@ -118,7 +149,11 @@ export const usePhonePush = (): void => {
         pushRegistrations.open();
         signedIn.account = account;
         promptOffer.begin(userId);
-        foreground.run(registerSilently);
+        foreground.run(async () => {
+            await setup.current;
+
+            return await registerSilently();
+        });
 
         const tokenSubscription = addPushTokenListener(({ data }) => {
             if (typeof data === "string" && isRotation(data)) {
