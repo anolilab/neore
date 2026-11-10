@@ -27,7 +27,7 @@ const meta = {
                     countdownToast({
                         action: { label: "Undo", onClick: onUndo },
                         cancel: { label: "Dismiss", onClick: () => undefined },
-                        countdownLabel: (seconds) => `Permanently deleted in ${seconds} seconds`,
+                        countdownLabel: (seconds) => `Permanently deleted in ${seconds} ${seconds === 1 ? "second" : "seconds"}`,
                         description: "INV-2026-0412 moved to trash.",
                         duration: 5000,
                         title: "Invoice deleted",

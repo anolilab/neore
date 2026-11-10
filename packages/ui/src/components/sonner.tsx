@@ -36,6 +36,7 @@ const Toaster = ({ ...props }: ToasterProps) => {
                     error: "border-destructive/40",
                     icon: `${toastIconClass} relative self-start group-data-[type=error]/toast:bg-destructive/10 group-data-[type=error]/toast:text-destructive group-data-[type=info]/toast:bg-info/10 group-data-[type=info]/toast:text-info-foreground group-data-[type=success]/toast:bg-success/10 group-data-[type=success]/toast:text-success-foreground group-data-[type=warning]/toast:bg-warning/10 group-data-[type=warning]/toast:text-warning-foreground`,
                     title: toastTitleClass,
+                    // `invisible` as well as `opacity-0`: opacity alone leaves a collapsed toast's buttons in the tab order.
                     toast: `group/toast relative flex w-(--width) flex-wrap items-start gap-x-3 gap-y-2 p-4 data-[expanded=false]:data-[front=false]:*:opacity-0 data-[expanded=false]:data-[front=false]:*:invisible ${toastSurfaceClass}`,
                 },
                 unstyled: true,
