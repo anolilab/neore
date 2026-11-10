@@ -63,6 +63,7 @@ import { buildAgentTools } from "../lib/agent-tools";
 import { getMaxSteps } from "../lib/auto-continue";
 import getAgent from "../lib/get-agent";
 import { closeMCPClients } from "../lib/mcp-tools";
+import { findRepeatedCallLoop } from "../lib/repeated-call-guard";
 import { pipeToPersistentChunks, type PipedStream, stopWhenStopped, toolProgressSink } from "../lib/persist-stream";
 import type { SearchMode } from "../lib/tool-builder";
 import type { ToolRunConfig } from "../lib/tool-run-config";
@@ -363,7 +364,11 @@ const runSpeaker = async (
         const stopping = new AbortController();
 
         streamTextArgs.abortSignal = stopping.signal;
-        streamTextArgs.stopWhen = stopWhenStopped(ctx, turn.streamId, getMaxSteps(turn.shouldAutoContinue));
+        // The repeated-call guard ends a looping group turn too (`chat/execute.ts` has the chat runner's notice).
+        streamTextArgs.stopWhen = [
+            ...stopWhenStopped(ctx, turn.streamId, getMaxSteps(turn.shouldAutoContinue)),
+            ({ steps }: { steps: Parameters<typeof findRepeatedCallLoop>[0] }) => findRepeatedCallLoop(steps) !== undefined,
+        ];
 
         // Admitted by the stream this turn runs on (`streamRunThread`): the context is read without a proof.
         const result = await agent.streamText(ctx, { threadId: turn.threadId, userId: turn.userId }, streamTextArgs as never, {
