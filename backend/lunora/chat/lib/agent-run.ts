@@ -1457,7 +1457,13 @@ export const resumeApprovedRun = async (
             return await stoppedAt(error);
         }
 
-        await recordRun(true);
+        // Bookkeeping after the reply (memory, the summary): a failure here is logged and never changes how the run ended,
+        // so a run that paused again still returns its pause (a sub-agent child then waits, rather than being failed).
+        try {
+            await recordRun(true);
+        } catch (recordError) {
+            streamLogger.error(`[AgentRun] Could not record the continuation of ${threadId}:`, recordError);
+        }
 
         return { awaitingInput, lastMessageId: messageIds.at(-1), messageIds, paused, stopped: false };
     } catch (error) {
