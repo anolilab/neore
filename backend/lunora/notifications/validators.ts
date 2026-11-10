@@ -29,6 +29,8 @@ export const MAX_NOTIFICATIONS_PER_BATCH = 50;
 
 /** The fields a writer supplies, spread into the table's doc fields (see `schema.ts`). */
 export const notificationInputFields = {
+    /** The tool approval this notification asks about, when it is one (`tool_approval`): the phone's approve and deny act on it. */
+    approvalId: v.optional(v.string()),
     body: v.optional(v.string()),
     dedupeKey: v.optional(v.string()),
     /** Mail this outcome to the owner if they opted in. Only a new success is mailed. */

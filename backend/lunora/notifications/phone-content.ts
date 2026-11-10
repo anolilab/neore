@@ -4,11 +4,21 @@
  */
 import { v } from "lunorash/server";
 
+import { findPendingRequestOnLatestTurn } from "../chat/lib/tool-approval-claim";
+import { ASK_USER_TOOL_NAME } from "../chat/tools/ask-user-constants";
+import { REQUEST_SECRET_TOOL_NAME } from "../chat/tools/request-secret-constants";
 import type { Id } from "../_generated/dataModel";
-import { internalQuery } from "../_generated/server";
+import { internalQuery, type QueryCtx } from "../_generated/server";
 import { resolveThreadReadAccess } from "../agent/thread-read-access";
+import { isThreadLocked } from "../lib/thread-lock";
 import { linksToLockedThread, threadIdOfLink } from "./locked-link";
 import { pushHeadline } from "./push-text";
+
+/** The teammate an approval push names when its chat has no teammate of its own. */
+const DEFAULT_TEAMMATE = "Neore";
+
+/** The tool a push names when the approval's call cannot be read back. */
+const DEFAULT_TOOL = "A tool";
 
 /**
  * What a phone shows for a push it got with only the notification id (`push-content-http.ts`): the owner's own
@@ -67,4 +77,60 @@ export const readThreadLockState = internalQuery
         }
 
         return "open" as const;
+    });
+
+/**
+ * The names a tool approval's push shows on a phone: the tool and the teammate, read where the chat lives. `null` when the
+ * approval is no longer pending on its chat (answered, or the conversation moved on), the chat is locked or deleted, or the
+ * caller does not own it: no push is sent for any of them.
+ */
+export const approvalPushNames = async (
+    ctx: Pick<QueryCtx, "db">,
+    args: { approvalId: string; threadId: string; userId: string },
+): Promise<{ teammate: string; tool: string } | null> => {
+    const thread = await ctx.db.get("threads", args.threadId as Id<"threads">);
+
+    if (!thread || thread.userId !== args.userId || thread.deleted === true || isThreadLocked(thread) || thread.status === "archived") {
+        return null;
+    }
+
+    // The request must still be answerable: its approval row belongs to this chat and owner, and is pending. A request that a
+    // claim, an abandon or a purge settled can still sit in the message history, and must not reach the phone with its controls.
+    const [run] = await ctx.db
+        .query("toolApprovalRuns")
+        .withIndex("by_approvalId", (q) => q.eq("approvalId", args.approvalId))
+        .take(1);
+
+    if (!run || run.threadId !== args.threadId || run.userId !== args.userId || run.status !== "pending") {
+        return null;
+    }
+
+    const request = await findPendingRequestOnLatestTurn(ctx, thread._id, args.approvalId);
+
+    // A question and a secret request are answered with text or a value, not approved: the in-app card does the same.
+    if (!request || request.toolName === ASK_USER_TOOL_NAME || request.toolName === REQUEST_SECRET_TOOL_NAME) {
+        return null;
+    }
+
+    // The teammate is the thread's bot, when it has one; a plain chat is named for the app.
+    const bot = thread.botId ? await ctx.db.get("bots", thread.botId) : null;
+
+    return { teammate: bot?.name ?? DEFAULT_TEAMMATE, tool: request.toolName ?? DEFAULT_TOOL };
+};
+
+/**
+ * What the phone job reads for a tool approval: its names, `{ locked: true }` for the caller's own locked chat (the job then sends
+ * the generic alert, which never names the tool), or `null` when the approval is answered, foreign or gone (no push at all).
+ */
+export const loadApprovalForPush = internalQuery
+    .input({ approvalId: v.string(), threadId: v.string(), userId: v.string() })
+    .output(v.union(v.null(), v.object({ locked: v.literal(true) }), v.object({ teammate: v.string(), tool: v.string() })))
+    .query(async ({ args, ctx }) => {
+        const thread = await ctx.db.get("threads", args.threadId as Id<"threads">);
+
+        if (thread && thread.userId === args.userId && thread.deleted !== true && isThreadLocked(thread)) {
+            return { locked: true as const };
+        }
+
+        return await approvalPushNames(ctx, args);
     });

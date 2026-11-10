@@ -56,8 +56,9 @@ export const collectNotificationsForExport = internalQuery
         ]);
 
         return {
-            notifications: notifications.page.map(({ _id, body, createdAt, link, outcome, readAt, title, type }) => {
-                return { _id, body, createdAt, link, outcome, readAt, title, type };
+            notifications: notifications.page.map(({ _id, approvalId, body, createdAt, link, outcome, readAt, title, type }) => {
+                // The approval a tool-approval notification asks about, so an export keeps the link to it.
+                return { _id, body, createdAt, link, outcome, readAt, title, type, ...(approvalId !== undefined && { approvalId }) };
             }),
             outcomeEmails: outbox.page.map(({ _id, attempts, createdAt, link, sentAt, status, title }) => {
                 return { _id, attempts, createdAt, link, sentAt, status, title };
