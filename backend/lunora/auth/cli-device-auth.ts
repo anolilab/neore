@@ -221,48 +221,80 @@ const refuseGuestApproval = {
     matcher: (context: { path?: string }) => GUARDED_PATHS.has(context.path ?? ""),
 };
 
-/** Whether the code being approved is a CLI sign-in (it mints an API key). A headless machine's code mints a device. */
-const isCliCode = async (ctx: { body?: unknown; context: { adapter: { findOne: (input: never) => Promise<unknown> } } }): Promise<boolean> => {
+/** The code being approved, by the user code in the request. */
+const approvedCodeOf = async (ctx: { body?: unknown; context: { adapter: { findOne: (input: never) => Promise<unknown> } } }) => {
     const raw = (ctx.body as { userCode?: unknown } | undefined)?.userCode;
 
     if (typeof raw !== "string") {
-        return true;
+        return null;
     }
 
-    const row = (await ctx.context.adapter.findOne({
+    return (await ctx.context.adapter.findOne({
         model: "deviceCode",
         where: [{ field: "userCode", value: raw.replaceAll(/[^a-z0-9]/giu, "").toUpperCase() }],
-    } as never)) as { clientId?: string } | null;
-
-    return row?.clientId !== HOST_CLIENT_ID;
+    } as never)) as { clientId?: string; id?: string } | null;
 };
 
 /**
- * Approval by an account already at the key cap: the approval itself goes through (the code becomes approved),
- * and the page is told it cannot finish, so it does not report a sign-in that will not happen. The CLI that is
- * polling then gets the redemption-time refusal on its next poll, ends at once with the reason, and does not wait
- * out the 30 minutes of the code.
+ * Approval by an account already at its cap: the approval itself goes through (the code becomes approved),
+ * and the page is told it cannot finish, so it does not report a sign-in or pairing that will not happen. The
+ * machine that is polling then gets the redemption-time refusal on its next poll, ends at once with the reason,
+ * and does not wait out the 30 minutes of the code. A CLI code is held to the API key cap; a machine code mints a
+ * device, so it is held to the device cap instead, checked by the same shard call the redemption makes (which
+ * lets a retry's own device through).
  */
-const reportKeyLimitAtApproval = {
-    handler: createAuthMiddleware(async (ctx) => {
-        if (ctx.context.returned instanceof APIError) {
-            return;
+const reportLimitAtApproval = (hostPairing: HostPairingOptions | undefined) => {
+    return {
+        handler: createAuthMiddleware(async (ctx) => {
+            if (ctx.context.returned instanceof APIError) {
+                return;
+            }
+
+            const session = await getSessionFromCtx(ctx);
+
+            if (!session?.user.id) {
+                return;
+            }
+
+            const code = await approvedCodeOf(ctx);
+
+            if (code?.clientId === HOST_CLIENT_ID) {
+                await reportDeviceLimit(hostPairing, session.user.id, String(code.id ?? ""));
+
+                return;
+            }
+
+            await reportKeyLimit(ctx, session.user.id);
+        }),
+        matcher: (context: { path?: string }) => context.path === "/device/approve",
+    };
+};
+
+/** Throws `device_limit` when the account has no room for the machine; any other answer is the redemption's to give. */
+const reportDeviceLimit = async (hostPairing: HostPairingOptions | undefined, userId: string, codeId: string): Promise<void> => {
+    try {
+        await hostPairing?.precheck(userId, codeId);
+    } catch (error) {
+        if (isDeviceLimit(error) && error instanceof Error) {
+            throw oauthError("FORBIDDEN", "device_limit", error.message);
         }
 
-        const session = await getSessionFromCtx(ctx);
-
-        // A host code mints a device, not a key: the key cap does not apply to it.
-        if (!session?.user.id || !(await isCliCode(ctx))) {
-            return;
+        // The approval is already saved and the machine's poll checks again before the code is spent: note it, no more.
+        if (refusalCode(error) === undefined) {
+            authLogger.warn("[auth] the device check at a machine code's approval failed", { error });
         }
+    }
+};
 
-        const keys = await ctx.context.adapter.count({ model: "apikey", where: [{ field: "referenceId", value: session.user.id }] });
+const reportKeyLimit = async (
+    ctx: { context: { adapter: { count: (input: { model: string; where: { field: string; value: string }[] }) => Promise<number> } } },
+    userId: string,
+): Promise<void> => {
+    const keys = await ctx.context.adapter.count({ model: "apikey", where: [{ field: "referenceId", value: userId }] });
 
-        if (keys >= MAX_API_KEYS_PER_USER) {
-            throw oauthError("FORBIDDEN", "key_limit", keyLimitMessage);
-        }
-    }),
-    matcher: (context: { path?: string }) => context.path === "/device/approve",
+    if (keys >= MAX_API_KEYS_PER_USER) {
+        throw oauthError("FORBIDDEN", "key_limit", keyLimitMessage);
+    }
 };
 
 const keyBodySchema = z.object({
@@ -554,7 +586,7 @@ export const cliDeviceAuth = (options: CliDeviceAuthOptions): BetterAuthPlugin[]
                 revokeCliDeviceKey: revokeKey(options),
                 ...(options.hostPairing && { redeemHostDevice: redeemHost(options.hostPairing) }),
             },
-            hooks: { after: [reportKeyLimitAtApproval], before: [refuseGuestApproval] },
+            hooks: { after: [reportLimitAtApproval(options.hostPairing)], before: [refuseGuestApproval] },
             id: "neore-cli-device-key",
         } satisfies BetterAuthPlugin,
     ];

@@ -1,5 +1,5 @@
 /** What the CLI approval page tells the person when a lookup, approval or denial fails. */
-export type DeviceProblem = "expired" | "impersonating" | "invalid" | "keyLimit" | "rateLimited" | "unavailable";
+export type DeviceProblem = "deviceLimit" | "expired" | "impersonating" | "invalid" | "keyLimit" | "rateLimited" | "unavailable";
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null;
 
@@ -41,6 +41,10 @@ export const problemOf = (failure: unknown): DeviceProblem => {
 
     if (code === "expired_token") {
         return "expired";
+    }
+
+    if (code === "device_limit") {
+        return "deviceLimit";
     }
 
     if (code === "key_limit") {

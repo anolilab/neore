@@ -415,6 +415,9 @@ export const registerHeadlessDevice = internalMutation
             name: args.name,
             pairedByCode: args.codeId,
             platform: args.platform,
+            // A new machine starts with no chats: the person picks its projects in Settings. Only a first registration
+            // sets this; a retry returns the device above untouched, so a scope the person has changed since stays.
+            projectIds: [],
             transport: "headless",
             userId: args.userId,
         });

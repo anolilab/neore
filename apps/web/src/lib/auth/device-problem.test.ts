@@ -14,6 +14,7 @@ describe("problemOf", () => {
 
     it("names the key limit and an invalid code", () => {
         expect(problemOf({ error: "key_limit", status: 403 })).toBe("keyLimit");
+        expect(problemOf({ error: "device_limit", status: 403 })).toBe("deviceLimit");
         expect(problemOf({ error: "invalid_request", status: 400 })).toBe("invalid");
         expect(problemOf({ error: "invalid_grant", status: 400 })).toBe("invalid");
     });
