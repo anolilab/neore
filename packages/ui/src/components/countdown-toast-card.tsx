@@ -103,9 +103,13 @@ const CountdownToastCard = ({
 
     const destructive = tone === "destructive";
 
+    // `finally`: a throwing handler still leaves the toast dismissed, so it does not stay on screen.
     const runAndDismiss = (button: CountdownToastAction) => () => {
-        button.onClick();
-        toast.dismiss(id);
+        try {
+            button.onClick();
+        } finally {
+            toast.dismiss(id);
+        }
     };
 
     // `font-normal`: sonner's title wrapper is semibold, and the footer and description inherit from it.
