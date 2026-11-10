@@ -1,7 +1,7 @@
 import type { MessageDescriptor } from "@lingui/core";
 import { msg } from "@lingui/core/macro";
 
-export type UseCaseSlug = "approvals" | "messaging" | "routines";
+export type UseCaseSlug = "approvals" | "group-chats" | "memory" | "messaging" | "routines";
 
 export interface UseCase {
     /** Where the person stays in control: choices, limits and the points that wait for them. */
@@ -82,6 +82,48 @@ export const USE_CASES: UseCase[] = [
         ],
         summary: msg`Connect a bot you own to a messaging app and message your agent from your phone. Those messages go through the same checks as the web app and land in the same chat history.`,
         title: msg`Talk to your agent from Telegram, WhatsApp, Slack or Discord`,
+    },
+    {
+        controls: [
+            msg`Each participant runs with its own instructions, model and tools, and each speaker's usage is recorded on its own.`,
+            msg`A routed or mentioned turn has at most three speakers. A parallel turn has up to four answers and a synthesis, and a debate runs up to three rounds.`,
+            msg`Parallel means independent, not simultaneous: replies still come one after another, and no speaker sees the others' answers to the same message.`,
+            msg`A tool that needs your approval pauses the turn with a card. Only the owner answers, and the queued speakers continue afterwards.`,
+        ],
+        eyebrow: msg`Group chats`,
+        seoDescription: msg`Group chats in Neore: several agents with their own roles answer in one thread. Run a review panel, a debate, or a round-robin, with a cap on speakers per turn.`,
+        seoTitle: msg`Group chats — several agents in one thread`,
+        slug: "group-chats",
+        steps: [
+            msg`Create a group chat with its participants. Each one gets its own instructions, model and tools. Templates include a code review panel and a pros and cons debate.`,
+            msg`Choose how turns are handed out: supervisor (a routing step picks who speaks), round-robin, mention-only, parallel, or debate.`,
+            msg`For each message from you, the chat decides who answers. A routed or mentioned turn has at most three speakers.`,
+            msg`Each speaker runs as a full agent reply in the same thread, and a marker shows who is talking.`,
+            msg`In a debate, the pro and contra roles argue for up to three rounds, and a synthesizer role writes the outcome.`,
+        ],
+        summary: msg`Put several agents with their own roles in one thread. A review panel can check a change from security and performance angles, and a debate can argue both sides before a synthesis.`,
+        title: msg`Several agents in one chat`,
+    },
+    {
+        controls: [
+            msg`Memory is off until you turn it on. Temporary chats and locked chats are never mined for memories.`,
+            msg`Pin a memory to keep it from fading, merging or being promoted. Only activity memories fade on their own.`,
+            msg`Edit or delete any memory. Clear all asks for confirmation first.`,
+            msg`Each reply shows a "Memories used" list, so you can see exactly what it was given.`,
+        ],
+        eyebrow: msg`Memory`,
+        seoDescription: msg`Memory in Neore: the agent keeps useful facts about you across chats, you can see and edit each one, and it is off until you turn it on.`,
+        seoTitle: msg`Memory — what the agent keeps across chats`,
+        slug: "memory",
+        steps: [
+            msg`After a reply, a fast check decides whether the exchange could hold a fact about you. Most turns, like a thank you, are skipped.`,
+            msg`Candidate facts are saved with a type: identity, preference, context, activity or experience. Near-duplicates are merged.`,
+            msg`Before each reply, the memories most relevant to the message are added to the prompt, weighted by relevance, confidence, importance and recency.`,
+            msg`When a new fact conflicts with an old one, the old memory is updated, superseded, or the new fact is ignored.`,
+            msg`Once a night, for users active that day, a reflection pass merges duplicates and promotes repeated facts.`,
+        ],
+        summary: msg`The agent keeps the facts you share and uses them in later chats, such as your preferred units or the project you are on. You can see, edit, pin or delete every memory.`,
+        title: msg`Memory the agent keeps across chats`,
     },
 ];
 
