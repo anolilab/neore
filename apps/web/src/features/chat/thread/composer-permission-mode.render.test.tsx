@@ -23,6 +23,7 @@ const SUPERVISED_PATTERN = /Supervised/;
 const state = vi.hoisted(() => {
     return {
         effective: null as string | null,
+        effectiveHold: undefined as Promise<void> | undefined,
         impersonating: false,
         isOwner: true,
         // What the access read needs from a locked chat: it answers the owner only with this proof.
@@ -99,7 +100,11 @@ vi.mock("@/lib/lunora/crpc", () => {
                             queryKey: (args: unknown) => ["effective", args],
                             queryOptions: () => {
                                 return {
-                                    queryFn: async () => state.effective,
+                                    queryFn: async () => {
+                                        await state.effectiveHold;
+
+                                        return state.effective;
+                                    },
                                     queryKey: ["effective", state.isOwner],
                                 };
                             },
@@ -141,6 +146,7 @@ beforeEach(() => {
     );
     state.isOwner = true;
     state.impersonating = false;
+    state.effectiveHold = undefined;
     state.lockedProof = undefined;
     state.relationship = null;
     state.thread = { _id: "t1", permissionMode: "full" };
@@ -247,13 +253,25 @@ describe("permission mode control", () => {
     it("shows nothing for a column until its effective mode is known", async () => {
         state.thread = { _id: "t1", permissionMode: "full" };
         state.relationship = { branchType: "comparison" };
-        state.effective = null;
+        // The read never answers in this test.
+        state.effectiveHold = new Promise<void>(() => {});
         const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
 
         renderControl(client);
 
-        await waitFor(() => expect(client.getQueryState(["effective", true])?.status).toBe("success"));
+        await waitFor(() => expect(client.getQueryState(["access", true])?.status).toBe("success"));
         expect(screen.queryByRole("button")).toBeNull();
+    });
+
+    it("shows Auto, read-only, for a column whose comparison never chose a mode", async () => {
+        state.thread = { _id: "t1", permissionMode: "full" };
+        state.relationship = { branchType: "comparison" };
+        state.effective = null;
+        renderControl();
+
+        const button = (await screen.findByRole("button", { name: "Permission mode: Auto" })) as HTMLButtonElement;
+
+        expect(button.disabled).toBe(true);
     });
 
     it("is hidden while an admin impersonates the owner", async () => {

@@ -120,7 +120,8 @@ const ComposerThreadPermissionMode: FC = () => {
         crpc.agent.threads.getThreadRelationship.queryOptions(threadId && access?.isOwner === true ? { threadId: threadId as never, unlockProof } : skipToken),
     );
     // The mode the owner's runs use here (`modeOfThread`): a comparison column with a live parent runs under that parent's mode, whatever it holds.
-    const { data: effective } = useQuery(
+    // `undefined` while it loads; `null` is an answer: the defaults (Auto).
+    const { data: effective, isSuccess: effectiveKnown } = useQuery(
         // Owner-only: asked for once the ownership answer says so, so a shared viewer sends no request the server would refuse.
         crpc.chat.thread_state.getEffectivePermissionMode.queryOptions(threadId && access?.isOwner === true ? { threadId: threadId as never } : skipToken),
     );
@@ -164,14 +165,16 @@ const ComposerThreadPermissionMode: FC = () => {
     }
 
     const isColumn = relationship?.branchType === "comparison";
-    const ownMode: ThreadPermissionMode = isMode(thread.permissionMode) ? thread.permissionMode : "auto";
 
     // Until it is known whether this is a column and what its runs use, the stored mode could be the wrong one to show.
-    if (relationship === undefined || (isColumn && !isMode(effective))) {
+    if (relationship === undefined || (isColumn && !effectiveKnown)) {
         return null;
     }
 
-    const stored: ThreadPermissionMode = isMode(effective) ? effective : ownMode;
+    // What the runs use when the server names no mode: the defaults (Auto) for a column, whose parent never chose one, and the
+    // thread's own stored mode otherwise.
+    const fallback: ThreadPermissionMode = !isColumn && isMode(thread.permissionMode) ? thread.permissionMode : "auto";
+    const stored: ThreadPermissionMode = isMode(effective) ? effective : fallback;
     const shown = pending ?? stored;
 
     return (
