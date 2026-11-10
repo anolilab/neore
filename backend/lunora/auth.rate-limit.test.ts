@@ -175,6 +175,7 @@ describe("CLI device sign-in rate limits", () => {
                     mintApiKey: async () => {
                         return { id: "k", key: "nk_x" };
                     },
+                    verifyApiKey: async () => null,
                 }),
             ],
             rateLimit: { customRules: AUTH_RATE_LIMIT_CUSTOM_RULES },

@@ -365,6 +365,11 @@ export const buildAuthOptions = (hooks: AuthOptionHooks = {}): BetterAuthOptions
                     await (getAuth().api as unknown as ApiKeyAuthApi).createApiKey({
                         body: { expiresIn: expiresInSeconds, name, permissions: DEFAULT_API_SCOPES as Record<string, string[]>, userId },
                     }),
+                verifyApiKey: async (key) => {
+                    const result = await (getAuth().api as unknown as ApiKeyAuthApi).verifyApiKey({ body: { key } });
+
+                    return result.valid && result.key ? { id: result.key.id, referenceId: result.key.referenceId } : null;
+                },
             }),
             anonymous({
                 // Converting creates a NEW user, and the guest's rows live on the

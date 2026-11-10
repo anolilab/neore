@@ -10,7 +10,7 @@ import { apiKey } from "@better-auth/api-key";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { API_KEY_OPTIONS } from "../auth";
-import type { ApiKeyAuthApi } from "../public-api/identity";
+import type { ApiKeyAuthApi, ApiKeyVerification } from "../public-api/identity";
 import { DEFAULT_API_SCOPES } from "../public-api/scopes";
 import type { MintedCliKey } from "./cli-device-auth";
 import { MAX_API_KEYS_PER_USER } from "./api-key-limits";
@@ -42,6 +42,11 @@ const build = (mint?: (input: { expiresInSeconds: number; name: string; userId: 
                     return await (auth.api as unknown as ApiKeyAuthApi).createApiKey({
                         body: { expiresIn: expiresInSeconds, name, permissions: DEFAULT_API_SCOPES as Record<string, string[]>, userId },
                     });
+                },
+                verifyApiKey: async (key): Promise<{ id: string; referenceId: string } | null> => {
+                    const result: ApiKeyVerification = await (auth.api as unknown as ApiKeyAuthApi).verifyApiKey({ body: { key } });
+
+                    return result.valid && result.key ? { id: result.key.id, referenceId: result.key.referenceId } : null;
                 },
             }),
         ],
@@ -456,6 +461,34 @@ describe("device-code sign-in for the CLI", () => {
 
         expect(retried.body["api_key"]).toBe("nk_retry");
         expect(await rowsOf(harness, "deviceCode")).toHaveLength(0);
+    });
+});
+
+describe("revoking a key the CLI was just issued", () => {
+    it("deletes a key this flow minted, and refuses any other key without saying which", async () => {
+        const harness = build();
+        const person = await signUp(harness);
+        const code = await requestCode(harness);
+
+        await approve(harness, person.cookie, code.user_code);
+        later();
+
+        const issued = await poll(harness, code.device_code);
+        const foreign = await (harness.auth.api as unknown as ApiKeyAuthApi).createApiKey({
+            body: { name: "Settings key", permissions: DEFAULT_API_SCOPES as Record<string, string[]>, userId: person.userId },
+        });
+
+        const refused = await call(harness, "/device/revoke", { body: { api_key: foreign.key } });
+        const invalid = await call(harness, "/device/revoke", { body: { api_key: "nk_not_a_key" } });
+
+        expect(refused.response.status).toBe(400);
+        expect(invalid.body).toEqual(refused.body);
+        expect(await rowsOf(harness, "apikey")).toHaveLength(2);
+
+        const revoked = await call(harness, "/device/revoke", { body: { api_key: String(issued.body["api_key"]) } });
+
+        expect(revoked.response.status).toBe(200);
+        expect(await namesOf(rowsOf<{ name: string }>(harness, "apikey"))).toEqual(["Settings key"]);
     });
 });
 
