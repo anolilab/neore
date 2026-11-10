@@ -475,8 +475,12 @@ export const runChatStart = async (
 
     // A held note is a send of its own: never a regeneration, which would answer some other prompt, nor a goal, whose rounds
     // would carry the guest's words as the owner's.
-    if (body.guestMessageId !== undefined && (!isValidDocumentIdFormat(body.guestMessageId) || body.regenerate || body.goal !== undefined)) {
+    if (body.guestMessageId !== undefined && (!isValidDocumentIdFormat(body.guestMessageId) || body.regenerate)) {
         return Response.json({ error: "Invalid guestMessageId" }, { status: 400 });
+    }
+
+    if (body.guestMessageId !== undefined && body.goal !== undefined) {
+        return Response.json({ error: "GUEST_NOTE_AS_GOAL", message: "A guest's message cannot be sent as a goal." }, { status: 400 });
     }
 
     // Auth: extract user from the forwarded JWT
@@ -508,6 +512,24 @@ export const runChatStart = async (
         shardKey,
         async (shardCtx) => await runChatStartOnShard(shardCtx, body, signingSecret, { origin, pageContext, user, userId }),
     );
+};
+
+/** `/chat/start`'s answer when a held guest note cannot go: each reason its own code, so the owner is told why. */
+const guestNoteRefused = (reason: "being-sent" | "ended" | "missing" | "sent"): Response => {
+    switch (reason) {
+        case "being-sent": {
+            return Response.json({ error: "GUEST_NOTE_BEING_SENT", message: "That guest note is being sent." }, { status: 409 });
+        }
+        case "ended": {
+            return Response.json({ error: "GUEST_LINK_ENDED", message: "That guest note's link has ended." }, { status: 400 });
+        }
+        case "sent": {
+            return Response.json({ error: "GUEST_NOTE_ALREADY_SENT", message: "That guest note was already sent." }, { status: 409 });
+        }
+        default: {
+            return Response.json({ error: "GUEST_NOTE_NOT_SENDABLE", message: "That guest note cannot be sent in this chat." }, { status: 400 });
+        }
+    }
 };
 
 const runChatStartOnShard = async (
@@ -585,8 +607,12 @@ const runChatStartOnShard = async (
                   userId,
               });
 
-    if (guestNote === null || (guestNote && (guestNote.threadId !== validThreadId || unsendableGuestText(guestNote.text)))) {
-        return Response.json({ error: "GUEST_NOTE_NOT_SENDABLE", message: "That guest note cannot be sent in this chat." }, { status: 400 });
+    if (guestNote && "refused" in guestNote) {
+        return guestNoteRefused(guestNote.refused);
+    }
+
+    if (guestNote && (guestNote.threadId !== validThreadId || unsendableGuestText(guestNote.text))) {
+        return guestNoteRefused("missing");
     }
 
     // The chat's model makes images or video: the note can still go once a text model is picked, so this refusal is its own.
@@ -815,16 +841,18 @@ const runChatStartOnShard = async (
     // because that route can be called again for the same prompt; a charge here
     // would count the prompt, not the generations.
     // A held note's send is taken before the charge, so one concurrent send wins and only it is charged (`settleSend` after).
-    const guestSend = guestNote
+    const guestClaim = guestNote
         ? await context.runMutation(internal.chat.guest_links.claimGuestNoteSend, {
               messageId: body.guestMessageId as Id<"threadGuestMessages">,
               userId,
           })
         : undefined;
 
-    if (guestSend === null) {
-        return Response.json({ error: "GUEST_NOTE_ALREADY_SENT", message: "That guest note was already sent." }, { status: 409 });
+    if (guestClaim && "refused" in guestClaim) {
+        return guestNoteRefused(guestClaim.refused);
     }
+
+    const guestSend = guestClaim?.fence;
 
     // Never throws: a failed release must not hide why the send failed. The lease settles the send later.
     const releaseGuestSend = async (): Promise<void> => {

@@ -351,14 +351,31 @@ describe("reviewing a held note", () => {
         async (messageId: string) =>
             await harness.withIdentity({ userId } as never).mutation(guestLinks[name] as never, { messageId } as never);
     const PROCEDURES = ["sendHeldGuestMessage", "dismissHeldGuestMessage"] as const;
-    const takeSend = async (messageId: string) =>
-        (await harness.run(async (ctx: any) => await ctx.runMutation(guestLinks.claimGuestNoteSend, { messageId, userId: OWNER }))) as number | null;
+    /** The send's fence, or why it could not be taken (`/chat/start` maps each reason to its own code). */
+    const takeSend = async (messageId: string) => {
+        const claim = (await harness.run(async (ctx: any) => await ctx.runMutation(guestLinks.claimGuestNoteSend, { messageId, userId: OWNER }))) as
+            | { fence: number }
+            | { refused: string };
+
+        return "fence" in claim ? claim.fence : claim.refused;
+    };
 
     const heldNote = async () => {
         const { linkToken } = await createLink();
 
         return (await hold(linkToken, "please call me back")).messageId!;
     };
+
+    it.each(PROCEDURES)("%s answers a held note whose link has lapsed as an ended link", async (name) => {
+        const messageId = await heldNote();
+
+        await harness.run(async (ctx: any) => {
+            const note = await ctx.db.get("threadGuestMessages", messageId);
+
+            await ctx.db.patch("threadGuestLinks", note.linkId, { expiresAt: 1 });
+        });
+        await expect(review(name)(messageId)).rejects.toMatchObject({ data: { code: "GUEST_LINK_ENDED" } });
+    });
 
     it.each(PROCEDURES)("%s is refused to a stranger, an admin grantee, and on a locked chat without its proof", async (name) => {
         const messageId = await heldNote();
@@ -382,7 +399,7 @@ describe("reviewing a held note", () => {
         // What `/chat/start` does around its save: take the send, then record the stored message.
         const claimedAt = await takeSend(messageId);
 
-        expect(await takeSend(messageId)).toBeNull();
+        expect(await takeSend(messageId)).toBe("being-sent");
         await harness.run(async (ctx: any) => await ctx.runMutation(guestLinks.recordGuestNoteSent, { claimedAt, messageId, savedMessageId: "saved-1" }));
 
         expect(await rows("threadGuestMessages")).toMatchObject([{ status: "sent" }]);
