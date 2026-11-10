@@ -8,9 +8,9 @@ const countdownToast = (options: CountdownToastOptions) =>
     toast.custom((id) => <CountdownToastCard {...options} id={id} />, {
         classNames: {
             // The card supplies its own padding, and `!pe-0` cancels the Toaster's content padding that sonner still applies.
-            content: "!pe-0",
+            content: "pe-0!",
             // Focus ring for the outer <li> (the card is not focusable itself). `!shadow-none` would hide sonner's own ring.
-            toast: "!border-0 !bg-transparent !p-0 !shadow-none focus-visible:!shadow-[0_0_0_2px_var(--ring)]",
+            toast: "border-0! bg-transparent! p-0! shadow-none! focus-visible:shadow-[0_0_0_2px_var(--ring)]!",
         },
         duration: Infinity,
     });

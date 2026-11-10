@@ -6342,7 +6342,7 @@ msgid "clock"
 msgstr "reloj"
 
 #: ../../packages/ui/src/components/ai-elements/artifact.tsx:31
-#: ../../packages/ui/src/components/countdown-toast-card.tsx:149
+#: ../../packages/ui/src/components/countdown-toast-card.tsx:178
 #: ../../packages/ui/src/components/data-grid/data-grid-keyboard-shortcuts.tsx:329
 #: ../../packages/ui/src/components/dialog.tsx:84
 #: ../../packages/ui/src/components/image-editor.tsx:264
@@ -32974,7 +32974,7 @@ msgstr "Este mensaje es demasiado largo para copiarlo como enlace de prompt."
 
 #: ../../packages/ui/src/components/countdown-toast-card.tsx:56
 msgid "This message will close in {value, plural, one {# second} other {# seconds}}"
-msgstr ""
+msgstr "Este mensaje se cerrará en {value, plural, one {# segundo} other {# segundos}}"
 
 #: src/features/chat/thread/composer-effort-shortcuts.tsx:67
 msgid "This model has no reasoning effort"
