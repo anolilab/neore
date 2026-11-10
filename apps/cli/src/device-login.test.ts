@@ -160,6 +160,15 @@ describe("neore login --device", () => {
         expect(await readConfig(configFile)).toEqual({ apiKey: "nk_new", apiUrl: API });
     });
 
+    it("notes the previous key when the saved URL names the same server differently", async () => {
+        await writeFile(configFile, JSON.stringify({ apiKey: "nk_old", apiUrl: "https://API.test/" }));
+
+        const api = setup({ "/api/auth/device/code": [grant], "/api/auth/device/key": [Response.json({ api_key: "nk_new" })], "/api/v1/me": [me] });
+
+        expect(await run(["login", "--device", "--api-url", API], api.context)).toBe(EXIT.ok);
+        expect(api.stderr()).toContain("previous key is still valid");
+    });
+
     it("accepts http only for localhost", async () => {
         const local = setup({ "/api/auth/device/code": [grant], "/api/auth/device/key": [Response.json({ api_key: "nk_new" })], "/api/v1/me": [me] });
 
@@ -212,7 +221,22 @@ describe("neore login --device", () => {
         expect(await readConfig(configFile)).toEqual({});
     });
 
-    it("revokes the issued key when it cannot be saved, and leaves the old config alone", async () => {
+    it("checks the issued key once, without retries, before revoking it", async () => {
+        const api = setup({
+            "/api/auth/device/code": [grant],
+            "/api/auth/device/key": [Response.json({ api_key: "nk_new" })],
+            "/api/auth/device/revoke": [Response.json({ revoked: true })],
+            "/api/v1/me": [Response.json({ error: { code: "service_unavailable", message: "down" } }, { status: 503 })],
+        });
+
+        await run(["login", "--device", "--api-url", API], api.context);
+
+        expect(api.calls.filter((call) => call.path === "/api/v1/me")).toHaveLength(1);
+        expect(api.calls.at(-1)?.path).toBe("/api/auth/device/revoke");
+    });
+
+    // Root ignores directory modes, so the save would not fail there.
+    it.skipIf(process.getuid?.() === 0)("revokes the issued key when it cannot be saved, and leaves the old config alone", async () => {
         await writeFile(configFile, JSON.stringify({ apiKey: "nk_old", apiUrl: API }));
         await chmod(directory, 0o500);
 
@@ -258,10 +282,17 @@ describe("neore login --device", () => {
         expect(insecure.calls).toEqual([]);
     });
 
-    it("rejects a sign-in code with terminal control characters", async () => {
-        const api = setup({ "/api/auth/device/code": [Response.json({ ...GRANT, user_code: "AB\u{1B}[2JCD" })] });
+    it.each([
+        ["an escape sequence in the code", { user_code: "AB\u{1B}[2JCD" }],
+        ["a line break in the link", { verification_uri: "https://app.test/auth/device\nApproved. Nothing to do." }],
+        ["a tab in the prefilled link", { verification_uri_complete: "https://app.test/auth/device?user_code=ABCDEFGH\tok" }],
+    ])("rejects a sign-in request with %s", async (_name, change) => {
+        const api = setup({ "/api/auth/device/code": [Response.json({ ...GRANT, ...change })] });
 
         expect(await run(["login", "--device", "--api-url", API], api.context)).toBe(EXIT.error);
-        expect(api.stderr()).not.toContain("\u{1B}");
+
+        for (const injected of ["\u{1B}", "Approved.", "\tok"]) {
+            expect(api.stderr()).not.toContain(injected);
+        }
     });
 });

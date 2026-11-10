@@ -22,7 +22,7 @@ const REVOKE_PATH = "/api/auth/device/revoke";
 /** The one client id the backend accepts for the CLI. */
 const CLIENT_ID = "neore-cli";
 
-const REQUEST_TIMEOUT_MS = 15_000;
+export const REQUEST_TIMEOUT_MS = 15_000;
 
 /** RFC 8628 3.5: after `slow_down`, wait this much longer from then on. */
 const SLOW_DOWN_STEP_MS = 5000;
@@ -96,8 +96,8 @@ const post = async (dependencies: DeviceFlowDependencies, baseUrl: string, path:
     }
 };
 
-/** ESC and the other control characters: what a terminal escape sequence is made of. */
-const CONTROL = /(?![\t\n])\p{Cc}/u;
+/** ESC, line breaks and the other control characters: each printed value must stay on its own line, unescaped. */
+const CONTROL = /\p{Cc}/u;
 
 const isSeconds = (value: unknown): value is number => typeof value === "number" && Number.isFinite(value) && value > 0;
 

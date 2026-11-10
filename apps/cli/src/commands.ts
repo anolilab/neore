@@ -9,7 +9,7 @@ import type { Flags, ParsedCommand } from "./args";
 import { limitFlag, requireArgument, UsageError } from "./args";
 import { ApiError, hintFor, NeoreClient, stripTrailingSlashes } from "./client";
 import { deleteConfig, insecurePermissions, readConfig, resolveCredentials, writeConfig } from "./config";
-import { assertSecureBaseUrl, formatUserCode, pollForKey, requestDeviceCode, revokeIssuedKey } from "./device-login";
+import { assertSecureBaseUrl, formatUserCode, pollForKey, REQUEST_TIMEOUT_MS, requestDeviceCode, revokeIssuedKey } from "./device-login";
 import type { Io } from "./render";
 import { formatDate, formatTable, paint, printJson, renderStream, shouldUseColor } from "./render";
 
@@ -410,6 +410,10 @@ const deviceLogin = async (context: Context, apiUrl: string): Promise<string> =>
     return pollForKey(context, apiUrl, code);
 };
 
+/** `https://API.test/` and `https://api.test` name the same server. */
+const isSameServer = (left: string, right: string): boolean =>
+    URL.canParse(left) && URL.canParse(right) && stripTrailingSlashes(new URL(left).href) === stripTrailingSlashes(new URL(right).href);
+
 export const login = async (context: Context, { flags }: ParsedCommand): Promise<void> => {
     if (flags.device && flags.key !== undefined) {
         throw new UsageError("--device signs in by code; it does not take a key.");
@@ -451,7 +455,10 @@ export const login = async (context: Context, { flags }: ParsedCommand): Promise
     let me: { scopes: string[]; userId: string };
 
     try {
-        me = await new NeoreClient({ apiKey, baseUrl: apiUrl, fetch: context.fetch }).request<{ scopes: string[]; userId: string }>("GET", "/me");
+        // A device key that fails the check is revoked below, so the check gets the device flow's time limit, not minutes of retries.
+        const client = new NeoreClient({ apiKey, baseUrl: apiUrl, fetch: context.fetch, ...(flags.device && { retries: 0, timeoutMs: REQUEST_TIMEOUT_MS }) });
+
+        me = await client.request<{ scopes: string[]; userId: string }>("GET", "/me");
         await writeConfig({ apiKey, apiUrl }, context.configFile);
     } catch (error) {
         if (flags.device) {
@@ -470,7 +477,7 @@ export const login = async (context: Context, { flags }: ParsedCommand): Promise
     // Each device sign-in mints a new year-long key, and the server only revokes one issued in the last 30 minutes.
     const isDevice = Boolean(flags.device);
 
-    if (isDevice && replaced && replaced !== apiKey && existing.apiUrl === apiUrl) {
+    if (isDevice && replaced && replaced !== apiKey && existing.apiUrl !== undefined && isSameServer(existing.apiUrl, apiUrl)) {
         context.io.stderr.write("Your previous key is still valid; revoke it in Settings -> API keys if nothing else uses it.\n");
     }
 
