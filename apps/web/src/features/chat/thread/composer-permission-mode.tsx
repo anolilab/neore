@@ -142,18 +142,21 @@ const ComposerThreadPermissionMode: FC = () => {
         mutationKey: permissionModeSaveKey(threadId ?? ""),
         // The menu reads the mode from the cached thread: the saved mode must show before the save reads as settled, so the selection
         // does not fall back to the old stored mode for a moment. TanStack awaits this before it reports the save as done.
-        onSuccess: async () => {
-            await queryClient.invalidateQueries({ queryKey: crpc.chat.functions.getThread.queryKey({ threadId: threadId as never }) });
-            await queryClient.invalidateQueries({
-                queryKey: crpc.chat.thread_state.getEffectivePermissionMode.queryKey({ threadId: threadId as never }),
-            });
+        // Both handlers use the thread the save was for (its variables), not the chat shown when it settles: the user may have moved on.
+        onSuccess: async (_data, variables) => {
+            const saved = variables.threadId as never;
+
+            await queryClient.invalidateQueries({ queryKey: crpc.chat.functions.getThread.queryKey({ threadId: saved }) });
+            await queryClient.invalidateQueries({ queryKey: crpc.chat.thread_state.getEffectivePermissionMode.queryKey({ threadId: saved }) });
         },
         // Runs before the save stops reading as in flight, so the queue sees the failure before it may release a held prompt: a prompt
         // held for a save that did not land would otherwise go out under the stored mode. A refused save on a comparison column changed
         // nothing, so it holds nothing: only a save that failed after it was sent does.
-        onError: (error) => {
-            if (threadId && !isComparisonRefusal(error) && (usePromptQueueStore.getState().queues[threadId]?.items.length ?? 0) > 0) {
-                usePromptQueueStore.getState().setPaused(threadId, true);
+        onError: (error, variables) => {
+            const saved = variables.threadId as string;
+
+            if (!isComparisonRefusal(error) && (usePromptQueueStore.getState().queues[saved]?.items.length ?? 0) > 0) {
+                usePromptQueueStore.getState().setPaused(saved, true);
             }
         },
     });
