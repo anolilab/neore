@@ -3710,7 +3710,7 @@ msgstr "approval"
 msgid "Approval"
 msgstr "Approval"
 
-#: src/features/auth/components/device-approval.tsx:197
+#: src/features/auth/components/device-approval.tsx:202
 #: src/features/chat/thread/tool-approval.tsx:121
 #: src/features/develop/components/review-panel.tsx:64
 #: src/features/tasks/components/task-detail-dialog.tsx:104
@@ -3721,7 +3721,7 @@ msgstr "Approve"
 msgid "Approve {tool} once"
 msgstr "Approve {tool} once"
 
-#: src/features/auth/components/device-approval.tsx:106
+#: src/features/auth/components/device-approval.tsx:107
 msgid "Approved"
 msgstr "Approved"
 
@@ -3737,7 +3737,7 @@ msgstr "Approved and not a draft. Branch protection is not checked."
 msgid "Approved automatically — low risk"
 msgstr "Approved automatically — low risk"
 
-#: src/features/auth/components/device-approval.tsx:104
+#: src/features/auth/components/device-approval.tsx:105
 msgid "Approving…"
 msgstr "Approving…"
 
@@ -5930,7 +5930,7 @@ msgstr "Checking"
 msgid "Checking image safety..."
 msgstr "Checking image safety..."
 
-#: src/features/auth/components/device-approval.tsx:315
+#: src/features/auth/components/device-approval.tsx:335
 msgid "Checking the code…"
 msgstr "Checking the code…"
 
@@ -6478,8 +6478,8 @@ msgstr "Cloudflare Workers AI models run wherever Cloudflare has capacity, so an
 #: ../../packages/chat-ui/src/chat/document-artifact.tsx:40
 #: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:307
 #: ../../packages/ui/src/components/tiptap-editor.tsx:202
-#: src/features/auth/components/device-code-parts.tsx:33
-#: src/features/auth/components/device-code-parts.tsx:66
+#: src/features/auth/components/device-code-parts.tsx:46
+#: src/features/auth/components/device-code-parts.tsx:80
 #: src/features/canvas/canvas-panel.tsx:754
 #: src/features/chat/thread/composer-search-mode.tsx:56
 #: src/features/code/components/code-workspace.tsx:219
@@ -7123,7 +7123,7 @@ msgstr "Compressed perspective"
 msgid "Compressing context..."
 msgstr "Compressing context..."
 
-#: src/features/auth/components/device-code-parts.tsx:62
+#: src/features/auth/components/device-code-parts.tsx:76
 #: src/features/settings/components/chat/bots-settings.tsx:140
 msgid "Computer"
 msgstr "Computer"
@@ -7640,7 +7640,7 @@ msgid "Context-aware generation"
 msgstr "Context-aware generation"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-paste-dialog.tsx:131
-#: src/features/auth/components/device-code-parts.tsx:118
+#: src/features/auth/components/device-code-parts.tsx:135
 #: src/features/chat/host/host-composer.tsx:800
 #: src/features/skills/components/skill-builder-dialog.tsx:328
 msgid "Continue"
@@ -9885,7 +9885,7 @@ msgstr "Demanding tasks requiring Z.AI's most powerful and capable frontier GLM 
 msgid "Demanding tasks where maximum AI capability and refined reasoning matter most"
 msgstr "Demanding tasks where maximum AI capability and refined reasoning matter most"
 
-#: src/features/auth/components/device-approval.tsx:107
+#: src/features/auth/components/device-approval.tsx:108
 #: src/features/devices/components/devices-settings.tsx:384
 msgid "Denied"
 msgstr "Denied"
@@ -9910,7 +9910,7 @@ msgstr "Density"
 msgid "Density updated"
 msgstr "Density updated"
 
-#: src/features/auth/components/device-approval.tsx:188
+#: src/features/auth/components/device-approval.tsx:193
 #: src/features/chat/thread/tool-approval.tsx:125
 msgid "Deny"
 msgstr "Deny"
@@ -9924,7 +9924,7 @@ msgstr "Deny {tool}"
 msgid "Deny Data Collection"
 msgstr "Deny Data Collection"
 
-#: src/features/auth/components/device-approval.tsx:104
+#: src/features/auth/components/device-approval.tsx:105
 msgid "Denying…"
 msgstr "Denying…"
 
@@ -11731,7 +11731,7 @@ msgstr "Enter text..."
 msgid "Enter the API key"
 msgstr "Enter the API key"
 
-#: src/features/auth/components/device-code-parts.tsx:31
+#: src/features/auth/components/device-code-parts.tsx:44
 msgid "Enter the code that `neore login --device` shows in your terminal, then choose Continue."
 msgstr "Enter the code that `neore login --device` shows in your terminal, then choose Continue."
 
@@ -18614,7 +18614,7 @@ msgid "Loading..."
 msgstr "Loading..."
 
 #: ../../packages/chat-ui/src/chat/message-content.tsx:332
-#: src/features/auth/components/device-approval.tsx:279
+#: src/features/auth/components/device-approval.tsx:295
 #: src/features/chat/thread/memory-usage-action.tsx:46
 #: src/features/chat/thread/request-secret-prompt.tsx:479
 #: src/features/code/components/code-workspace.tsx:90
@@ -22357,7 +22357,7 @@ msgstr "Only {0} models can be compared. Clear selection to switch types."
 msgid "Only 3B activated per token for efficiency"
 msgstr "Only 3B activated per token for efficiency"
 
-#: src/features/auth/components/device-code-parts.tsx:72
+#: src/features/auth/components/device-code-parts.tsx:86
 msgid "Only continue if you started this just now by running `neore login --device`, and the code above matches the one in your terminal."
 msgstr "Only continue if you started this just now by running `neore login --device`, and the code above matches the one in your terminal."
 
@@ -27067,7 +27067,7 @@ msgstr "Return home"
 msgid "Return to home"
 msgstr "Return to home"
 
-#: src/features/auth/components/device-approval.tsx:106
+#: src/features/auth/components/device-approval.tsx:107
 msgid "Return to your terminal: the command line is signed in. You can close this tab."
 msgstr "Return to your terminal: the command line is signed in. You can close this tab."
 
@@ -29078,7 +29078,7 @@ msgstr "Sidebar Right"
 #: src/components/settings/settings-modal.tsx:163
 #: src/features/auth/components/auth/auth-card.tsx:493
 #: src/features/auth/components/auth/forms/sign-in-form.tsx:415
-#: src/features/auth/components/device-approval.tsx:291
+#: src/features/auth/components/device-approval.tsx:309
 #: src/features/layout/components/nav-user.tsx:237
 #: src/features/marketing/components/landing-page.tsx:1058
 #: src/features/settings/components/chat/mcp/server-list.tsx:127
@@ -29106,13 +29106,17 @@ msgid "Sign in on another site?"
 msgstr "Sign in on another site?"
 
 #: src/features/auth/components/device-approval.tsx:72
-#: src/features/auth/components/device-approval.tsx:205
-#: src/features/auth/components/device-code-parts.tsx:104
-#: src/routes/auth/device.tsx:39
+#: src/features/auth/components/device-approval.tsx:210
+#: src/features/auth/components/device-approval.tsx:273
+#: src/features/auth/components/device-approval.tsx:293
+#: src/features/auth/components/device-approval.tsx:306
+#: src/features/auth/components/device-approval.tsx:333
+#: src/features/auth/components/device-code-parts.tsx:120
+#: src/routes/auth/device.tsx:40
 msgid "Sign in the command line"
 msgstr "Sign in the command line"
 
-#: src/features/auth/components/device-approval.tsx:169
+#: src/features/auth/components/device-approval.tsx:174
 msgid "Sign in the command line?"
 msgstr "Sign in the command line?"
 
@@ -29219,7 +29223,7 @@ msgstr "Sign up to unlock all models"
 msgid "Sign-in expired"
 msgstr "Sign-in expired"
 
-#: src/features/auth/components/device-code-parts.tsx:59
+#: src/features/auth/components/device-code-parts.tsx:73
 msgid "Sign-in request"
 msgstr "Sign-in request"
 
@@ -31837,7 +31841,7 @@ msgstr "That computer is busy. Try again in a moment."
 msgid "That computer is not online."
 msgstr "That computer is not online."
 
-#: src/features/auth/components/device-approval.tsx:140
+#: src/features/auth/components/device-approval.tsx:145
 msgid "That did not go through. Try again."
 msgstr "That did not go through. Try again."
 
@@ -32006,7 +32010,7 @@ msgstr "The chat's state could not be read, so queued messages wait."
 msgid "The code could not be checked right now. Try again in a moment."
 msgstr "The code could not be checked right now. Try again in a moment."
 
-#: src/features/auth/components/device-code-parts.tsx:115
+#: src/features/auth/components/device-code-parts.tsx:132
 msgid "The code must contain the letters and digits shown in your terminal."
 msgstr "The code must contain the letters and digits shown in your terminal."
 
@@ -32014,11 +32018,11 @@ msgstr "The code must contain the letters and digits shown in your terminal."
 msgid "The coding agent could not start."
 msgstr "The coding agent could not start."
 
-#: src/features/auth/components/device-approval.tsx:171
+#: src/features/auth/components/device-approval.tsx:176
 msgid "The command line on the computer below will be signed in as {email}, with read-only access to your chats, skills, tasks, knowledge and memories through the API. It gets its own API key, which you can revoke in Settings."
 msgstr "The command line on the computer below will be signed in as {email}, with read-only access to your chats, skills, tasks, knowledge and memories through the API. It gets its own API key, which you can revoke in Settings."
 
-#: src/features/auth/components/device-approval.tsx:107
+#: src/features/auth/components/device-approval.tsx:108
 msgid "The command line was not signed in. You can close this tab."
 msgstr "The command line was not signed in. You can close this tab."
 
@@ -32797,7 +32801,8 @@ msgstr "This chat is locked. Unlock it to send."
 msgid "This chat is too long to compact."
 msgstr "This chat is too long to compact."
 
-#: src/features/auth/components/device-approval.tsx:206
+#: src/features/auth/components/device-approval.tsx:211
+#: src/features/auth/components/device-approval.tsx:224
 msgid "This code has already been answered."
 msgstr "This code has already been answered."
 
@@ -33703,7 +33708,7 @@ msgid "Too long to check as JSON"
 msgstr "Too long to check as JSON"
 
 #: src/features/auth/components/device-approval.tsx:65
-#: src/features/auth/components/device-approval.tsx:140
+#: src/features/auth/components/device-approval.tsx:145
 msgid "Too many attempts. Wait a few seconds, then try again."
 msgstr "Too many attempts. Wait a few seconds, then try again."
 
@@ -34086,7 +34091,7 @@ msgstr "Try adjusting your search terms."
 
 #: src/components/error-component.tsx:40
 #: src/features/auth/components/device-approval.tsx:78
-#: src/features/auth/components/device-approval.tsx:270
+#: src/features/auth/components/device-approval.tsx:284
 #: src/features/chat/guest-links/guest-page.tsx:275
 #: src/features/connection/components/offline-screen.tsx:59
 #: src/features/develop/components/files-tab.tsx:275
@@ -34505,7 +34510,7 @@ msgstr "Unique approach to language modeling"
 msgid "United States"
 msgstr "United States"
 
-#: src/features/auth/components/device-code-parts.tsx:63
+#: src/features/auth/components/device-code-parts.tsx:77
 msgid "unknown"
 msgstr "unknown"
 
@@ -36111,7 +36116,7 @@ msgstr "Watch only this part (optional)"
 msgid "Watched repositories"
 msgstr "Watched repositories"
 
-#: src/features/auth/components/device-approval.tsx:261
+#: src/features/auth/components/device-approval.tsx:275
 msgid "We could not check that you are signed in. Try again in a moment."
 msgstr "We could not check that you are signed in. Try again in a moment."
 
@@ -36610,8 +36615,8 @@ msgstr "Working on {0}…"
 msgid "Working toward the goal: round {nextRound} of {0}"
 msgstr "Working toward the goal: round {nextRound} of {0}"
 
-#: src/features/auth/components/device-approval.tsx:188
-#: src/features/auth/components/device-approval.tsx:197
+#: src/features/auth/components/device-approval.tsx:193
+#: src/features/auth/components/device-approval.tsx:202
 #: src/features/chat/thread/streaming-placeholder.tsx:631
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:167
 #: src/features/pages/components/page-agent-dialog.tsx:46
@@ -36830,7 +36835,7 @@ msgstr "You are adding documents too quickly. Wait a moment and try again."
 msgid "You are browsing as a guest. Sign in with your account to connect the extension."
 msgstr "You are browsing as a guest. Sign in with your account to connect the extension."
 
-#: src/features/auth/components/device-approval.tsx:289
+#: src/features/auth/components/device-approval.tsx:307
 msgid "You are browsing as a guest. Sign in with your account to sign in the command line."
 msgstr "You are browsing as a guest. Sign in with your account to sign in the command line."
 

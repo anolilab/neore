@@ -54,7 +54,7 @@ const Heading = ({ children, headingRef }: { children: ReactNode; headingRef?: R
     </h1>
 );
 
-const ProblemMessage = ({ onRetry, problem }: { onRetry?: () => void; problem: Problem }) => {
+const ProblemMessage = ({ headingRef, onRetry, problem }: { headingRef?: Ref<HTMLHeadingElement>; onRetry?: () => void; problem: Problem }) => {
     const { t } = useLingui();
     const messages: Record<Problem, string> = {
         expired: t`This code has expired. Run \`neore login --device\` again to get a new one.`,
@@ -69,7 +69,7 @@ const ProblemMessage = ({ onRetry, problem }: { onRetry?: () => void; problem: P
 
     return (
         <div className="flex flex-col gap-4 text-center">
-            <Heading>{t`Sign in the command line`}</Heading>
+            <Heading headingRef={headingRef}>{t`Sign in the command line`}</Heading>
             <p className="text-sm text-red-600" role="alert">
                 {messages[problem]}
             </p>
@@ -100,6 +100,7 @@ const Review = ({ email, lookup, onRefresh, userCode }: ReviewProps) => {
     const [problem, setProblem] = useState<Problem>();
     const [decision, setDecision] = useState<Decision>();
     const resultHeading = useRef<HTMLHeadingElement>(null);
+    const hasActed = useRef(false);
     const isBusy = pending !== undefined;
     const busyMessages: Record<Decision, string> = { approved: t`Approving…`, denied: t`Denying…` };
     const outcomes: Record<Decision, { detail: string; title: string }> = {
@@ -107,14 +108,15 @@ const Review = ({ email, lookup, onRefresh, userCode }: ReviewProps) => {
         denied: { detail: t`The command line was not signed in. You can close this tab.`, title: t`Denied` },
     };
 
-    // The result replaces the buttons that had focus, so focus goes to it.
+    // Whatever replaces the buttons that had focus (the outcome, a refusal, "already answered") takes focus.
     useEffect(() => {
-        if (decision) {
+        if (hasActed.current) {
             resultHeading.current?.focus();
         }
-    }, [decision]);
+    }, [decision, problem, lookup.status]);
 
     const decide = async (next: Decision) => {
+        hasActed.current = true;
         setError(undefined);
         setPending(next);
 
@@ -122,8 +124,6 @@ const Review = ({ email, lookup, onRefresh, userCode }: ReviewProps) => {
         const result = await authClient
             .$fetch(next === "approved" ? "/device/approve" : "/device/deny", { body: { userCode }, method: "POST" })
             .catch(() => null);
-
-        setPending(undefined);
 
         let reason: Problem | undefined = result?.error ? problemOf(result.error) : undefined;
 
@@ -136,11 +136,16 @@ const Review = ({ email, lookup, onRefresh, userCode }: ReviewProps) => {
             reason = "notMine";
         }
 
+        // The buttons stay disabled until the re-read below settles, so a second decision cannot overlap it.
+        const status = reason === "invalid" ? await onRefresh() : undefined;
+
+        setPending(undefined);
+
         if (reason === "unavailable" || reason === "rateLimited") {
             setError(reason === "rateLimited" ? t`Too many attempts. Wait a few seconds, then try again.` : t`That did not go through. Try again.`);
         } else if (reason === "invalid") {
             // Already processed (a retry after the answer got through) is not the same as invalid: look again.
-            if ((await onRefresh()) === "pending") {
+            if (status === "pending") {
                 setProblem(reason);
             }
         } else if (reason) {
@@ -153,7 +158,7 @@ const Review = ({ email, lookup, onRefresh, userCode }: ReviewProps) => {
     let body: ReactNode;
 
     if (problem) {
-        body = <ProblemMessage problem={problem} />;
+        body = <ProblemMessage headingRef={resultHeading} problem={problem} />;
     } else if (decision) {
         body = (
             <div className="flex flex-col gap-4 text-center">
@@ -202,7 +207,7 @@ const Review = ({ email, lookup, onRefresh, userCode }: ReviewProps) => {
     } else {
         body = (
             <div className="flex flex-col gap-4 text-center">
-                <Heading>{t`Sign in the command line`}</Heading>
+                <Heading headingRef={resultHeading}>{t`Sign in the command line`}</Heading>
                 <p className="text-sm text-gray-700">{t`This code has already been answered.`}</p>
             </div>
         );
@@ -215,6 +220,8 @@ const Review = ({ email, lookup, onRefresh, userCode }: ReviewProps) => {
         liveText = busyMessages[pending];
     } else if (decision) {
         liveText = `${outcomes[decision].title}. ${outcomes[decision].detail}`;
+    } else if (!problem && lookup.status !== "pending") {
+        liveText = t`This code has already been answered.`;
     }
 
     return (
@@ -263,6 +270,7 @@ export const DeviceApproval = ({ onCode, rawCode }: { onCode: (code: string) => 
     if (sessionError && !data?.user) {
         return (
             <div className="flex flex-col gap-4 text-center">
+                <Heading>{t`Sign in the command line`}</Heading>
                 <p className="text-sm text-red-600" role="alert">
                     {t`We could not check that you are signed in. Try again in a moment.`}
                 </p>
@@ -281,9 +289,12 @@ export const DeviceApproval = ({ onCode, rawCode }: { onCode: (code: string) => 
 
     if (isPending || !data?.user) {
         return (
-            <p className="text-center text-sm text-gray-600" role="status">
-                {t`Loading…`}
-            </p>
+            <div className="flex flex-col gap-4">
+                <Heading>{t`Sign in the command line`}</Heading>
+                <p className="text-center text-sm text-gray-600" role="status">
+                    {t`Loading…`}
+                </p>
+            </div>
         );
     }
 
@@ -292,6 +303,7 @@ export const DeviceApproval = ({ onCode, rawCode }: { onCode: (code: string) => 
 
         return (
             <div className="flex flex-col gap-4 text-center">
+                <Heading>{t`Sign in the command line`}</Heading>
                 <p className="text-sm text-gray-700">{t`You are browsing as a guest. Sign in with your account to sign in the command line.`}</p>
                 <a className="text-sm font-medium underline underline-offset-4" href={`/auth/sign-in?redirectTo=${encodeURIComponent(here)}`}>
                     {t`Sign in`}
@@ -317,9 +329,12 @@ export const DeviceApproval = ({ onCode, rawCode }: { onCode: (code: string) => 
 
     if (!lookup) {
         return (
-            <p className="text-center text-sm text-gray-600" role="status">
-                {t`Checking the code…`}
-            </p>
+            <div className="flex flex-col gap-4">
+                <Heading>{t`Sign in the command line`}</Heading>
+                <p className="text-center text-sm text-gray-600" role="status">
+                    {t`Checking the code…`}
+                </p>
+            </div>
         );
     }
 

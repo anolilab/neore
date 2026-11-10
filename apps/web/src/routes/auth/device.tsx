@@ -7,8 +7,9 @@ import { seo } from "@/lib/seo";
 /**
  * Approve a sign-in started by `neore login --device`; the page itself is `DeviceApproval`.
  *
- * The code is read from the raw query string: the router JSON-parses search values, which turns a code like
- * `23456789` into a number and `2E345678` into `Infinity`.
+ * The code is read from the address as written: the router JSON-parses search values, which turns a code like
+ * `23456789` into a number and `2E345678` into `Infinity`, and its `searchStr` is rebuilt from those parsed values.
+ * The location subscription only re-renders the page when the address changes.
  */
 interface DeviceSearch {
     user_code?: string;
@@ -17,7 +18,7 @@ interface DeviceSearch {
 const DeviceRoute = () => {
     const navigate = Route.useNavigate();
     const searchString = useLocation({ select: (location) => location.searchStr });
-    const rawCode = new URLSearchParams(searchString).get("user_code") ?? undefined;
+    const rawCode = new URLSearchParams(globalThis.location === undefined ? searchString : globalThis.location.search).get("user_code") ?? undefined;
 
     return (
         <DeviceApproval

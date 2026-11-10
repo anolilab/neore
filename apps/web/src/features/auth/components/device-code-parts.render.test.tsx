@@ -53,6 +53,7 @@ describe("DeviceCodeForm", () => {
         fireEvent.click(screen.getByRole("button", { name: "Continue" }));
 
         expect(screen.getByRole("alert").textContent).toContain("letters and digits");
+        expect(screen.getByLabelText("Code").matches(":focus")).toBe(true);
         expect(onCode).not.toHaveBeenCalled();
     });
 

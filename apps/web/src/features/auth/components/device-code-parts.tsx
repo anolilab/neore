@@ -2,8 +2,8 @@ import { useLingui } from "@lingui/react/macro";
 import { Button } from "@neore/ui/components/button";
 import { Input } from "@neore/ui/components/input";
 import { Label } from "@neore/ui/components/label";
-import type { ChangeEvent, FormEvent } from "react";
-import { useState } from "react";
+import type { ChangeEvent, FormEvent, Ref } from "react";
+import { useRef, useState } from "react";
 
 const MAX_CODE_LENGTH = 16;
 
@@ -25,7 +25,17 @@ export const normalizeCode = (value: string): string => {
  * The code field of the CLI approval page: required (so Continue stays usable and native validation names the
  * field) and described by the instruction that says what to type and where it comes from.
  */
-export const DeviceCodeField = ({ isInvalid = false, onChange, value }: { isInvalid?: boolean; onChange: (value: string) => void; value: string }) => {
+export const DeviceCodeField = ({
+    inputRef,
+    isInvalid = false,
+    onChange,
+    value,
+}: {
+    inputRef?: Ref<HTMLInputElement>;
+    isInvalid?: boolean;
+    onChange: (value: string) => void;
+    value: string;
+}) => {
     const { t } = useLingui();
 
     return (
@@ -42,6 +52,7 @@ export const DeviceCodeField = ({ isInvalid = false, onChange, value }: { isInva
                 autoCorrect="off"
                 id="device-code"
                 onChange={(event: ChangeEvent<HTMLInputElement>) => onChange(event.target.value)}
+                ref={inputRef}
                 required
                 spellCheck={false}
                 value={value}
@@ -86,6 +97,7 @@ export const DeviceCodeForm = ({ onCode }: { onCode: (code: string) => void }) =
     const { t } = useLingui();
     const [typed, setTyped] = useState("");
     const [hasError, setHasError] = useState(false);
+    const field = useRef<HTMLInputElement>(null);
 
     const submit = (event: FormEvent) => {
         event.preventDefault();
@@ -94,6 +106,7 @@ export const DeviceCodeForm = ({ onCode }: { onCode: (code: string) => void }) =
 
         if (code.length === 0) {
             setHasError(true);
+            field.current?.focus();
 
             return;
         }
@@ -106,6 +119,7 @@ export const DeviceCodeForm = ({ onCode }: { onCode: (code: string) => void }) =
         <form className="flex flex-col gap-4" noValidate onSubmit={submit}>
             <h1 className="text-center text-xl font-semibold">{t`Sign in the command line`}</h1>
             <DeviceCodeField
+                inputRef={field}
                 isInvalid={hasError}
                 onChange={(value) => {
                     setTyped(value);

@@ -120,6 +120,7 @@ describe("DeviceApproval", () => {
         const alert = await screen.findByRole("alert");
 
         expect(alert.textContent).toContain("different account");
+        expect(screen.getByRole("heading", { level: 1 }).matches(":focus")).toBe(true);
     });
 
     it("looks again when the answer was already processed, and says so", async () => {
@@ -130,8 +131,44 @@ describe("DeviceApproval", () => {
         mount();
         fireEvent.click(await screen.findByRole("button", { name: "Approve" }));
 
-        expect(await screen.findByText("This code has already been answered.")).toBeTruthy();
+        const heading = await screen.findByRole("heading", { level: 1, name: "Sign in the command line" });
+
+        expect(heading.matches(":focus")).toBe(true);
+        expect(screen.getByRole("status").textContent).toBe("This code has already been answered.");
         expect(paths()).toEqual(["GET /device", "POST /device/approve", "GET /device"]);
+    });
+
+    it("keeps both buttons disabled while it looks again after a processed answer", async () => {
+        let finishLookup: (value: unknown) => void = () => {};
+        // The tsconfig lib predates `Promise.withResolvers`.
+        // eslint-disable-next-line unicorn/prefer-promise-with-resolvers
+        const heldLookup = new Promise((resolve) => {
+            finishLookup = resolve;
+        });
+
+        fetchMock.mockResolvedValueOnce({ data: pending, error: null }).mockResolvedValueOnce(failure("invalid_request", 400)).mockReturnValueOnce(heldLookup);
+        mount();
+        fireEvent.click(await screen.findByRole("button", { name: "Approve" }));
+        await vi.waitFor(() => {
+            expect(paths()).toEqual(["GET /device", "POST /device/approve", "GET /device"]);
+        });
+
+        expect(screen.getByRole("button", { name: "Working…" }).hasAttribute("disabled")).toBe(true);
+        expect(screen.getByRole("button", { name: "Deny" }).hasAttribute("disabled")).toBe(true);
+
+        finishLookup({ data: { ...pending, status: "approved" }, error: null });
+
+        await vi.waitFor(() => {
+            expect(screen.getByRole("status").textContent).toBe("This code has already been answered.");
+        });
+    });
+
+    it("keeps the page heading while the code is being checked", async () => {
+        fetchMock.mockReturnValueOnce(new Promise<void>(() => {}));
+        mount();
+
+        expect(await screen.findByRole("status")).toBeTruthy();
+        expect(screen.getByRole("heading", { level: 1, name: "Sign in the command line" })).toBeTruthy();
     });
 
     it("offers to try a rate-limited lookup again", async () => {
