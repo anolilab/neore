@@ -18,7 +18,8 @@ import { DELETION_MARKER_URL } from "./repositories";
 
 /** A project's repositories, one batch; with `keepMarker`, a delete's marker stays until the delete is done. */
 export const eraseProjectRepositories = async (ctx: MutationCtx, projectId: Id<"projects">, { keepMarker = false } = {}): Promise<BatchResult> => {
-    const { page: rows } = await ctx.db.projectRepositories.findMany({ limit: BATCH, where: { projectId } });
+    // From the primary, as every erasure read here: a lagging replica's empty page would end the erasure with rows left.
+    const { page: rows } = await ctx.db.projectRepositories.findMany({ consistency: "primary", limit: BATCH, where: { projectId } });
     const erased = keepMarker ? rows.filter((row) => row.url !== DELETION_MARKER_URL) : rows;
 
     await Promise.all(erased.map((row) => ctx.db.delete("projectRepositories", row._id)));
@@ -28,7 +29,7 @@ export const eraseProjectRepositories = async (ctx: MutationCtx, projectId: Id<"
 
 /** Every repository row of the user's projects, one batch, whether or not the project still exists. */
 export const eraseProjectRepositoriesForUser = async (ctx: MutationCtx, userId: string): Promise<BatchResult> => {
-    const { page: rows } = await ctx.db.projectRepositories.findMany({ limit: BATCH, where: { userId } });
+    const { page: rows } = await ctx.db.projectRepositories.findMany({ consistency: "primary", limit: BATCH, where: { userId } });
 
     await Promise.all(rows.map((row) => ctx.db.delete("projectRepositories", row._id)));
 

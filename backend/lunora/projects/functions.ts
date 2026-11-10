@@ -464,17 +464,25 @@ export const addProjectRepo = authMutation
         // Gone, or a delete under way (its marker, written before it erases anything): either way the row goes.
         const current = await systemDb(context).projects.findFirst({ consistency: "primary", where: { _id: projectId } });
         const projectGone = !current || (await deleteUnderway(context, projectId));
+        // Moved to another organization since it was authorized above: decide again on the project as it is now, so a
+        // member of the organization it left cannot add to it.
+        const moved = !!current && (current.organizationId ?? "") !== (project.organizationId ?? "");
+        const lostAccess =
+            moved &&
+            (current.userId
+                ? current.userId !== context.user.userId
+                : !current.organizationId || (await getMemberByOrganizationAndUser(context, current.organizationId, context.user.userId)) === null);
 
-        if (projectGone || overCap) {
+        if (projectGone || lostAccess || overCap) {
             await takeBack(context, id);
 
-            throw projectGone
+            throw projectGone || lostAccess
                 ? new LunoraError("NOT_FOUND", "Project not found")
                 : refused(new ProjectRepoError("url", "limit", `A project can list at most ${String(MAX_PROJECT_REPOSITORIES)} repositories`));
         }
 
-        // A project moved to another organization since it was read here: `updateProject` re-stamped the rows it saw.
-        if (current && (current.organizationId ?? "") !== (project.organizationId ?? "")) {
+        // Still the caller's to change after a move: `updateProject` re-stamped the rows it saw, this one is stamped here.
+        if (moved) {
             await context.db.patch("projectRepositories", id, { organizationId: current.organizationId ?? "" });
         }
 

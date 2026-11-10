@@ -57,6 +57,34 @@ vi.mock("../lib/crpc-auth-helpers", async (importOriginal) => {
     };
 });
 
+// Runs once just before the add re-reads its project from the primary, inside that mutation: a change made meanwhile.
+const { meanwhile } = vi.hoisted(() => {
+    return { meanwhile: {} as { run?: (db: any) => Promise<void> } };
+});
+
+vi.mock("../lib/rls/scope", async (importOriginal) => {
+    const original = await importOriginal<typeof import("../lib/rls/scope")>();
+
+    return {
+        ...original,
+        systemDb: (context: any) => {
+            const db = original.systemDb(context);
+            const findFirst = async (query: { consistency?: string }) => {
+                const run = query.consistency === "primary" ? meanwhile.run : undefined;
+
+                if (run) {
+                    delete meanwhile.run;
+                    await run(db);
+                }
+
+                return await db.projects.findFirst(query);
+            };
+
+            return new Proxy(db, { get: (target, key) => (key === "projects" ? { ...target.projects, findFirst } : target[key]) });
+        },
+    };
+});
+
 vi.mock("../lib/audit-triggers", async (importOriginal) => {
     return {
         ...(await importOriginal<typeof import("../lib/audit-triggers")>()),
@@ -275,6 +303,24 @@ describe("project repositories", () => {
         });
 
         await expect(add(OWNER, projectId, "acme/web")).resolves.toBeTypeOf("string");
+    });
+
+    it("refuses an add when the project moved to an organization the member is not in, and keeps no row", async () => {
+        const projectId = await projectOf({ organizationId: "org-1" });
+
+        await harness.run(async (ctx: any) => {
+            await ctx.db.insert("member", { createdAt: 1, organizationId: "org-1", role: "member", userId: MEMBER });
+        });
+        // The move lands after the member's access was checked, before the add checks its row.
+        meanwhile.run = async (db) => {
+            await db.patch("projects", projectId, { organizationId: "org-2" });
+        };
+
+        await expect(add(MEMBER, projectId, "acme/web")).rejects.toMatchObject({ code: "NOT_FOUND" });
+
+        const rows = await harness.run(async (ctx: any) => (await ctx.db.projectRepositories.findMany({ where: { projectId } })).page);
+
+        expect(rows).toStrictEqual([]);
     });
 
     it("moves a project's repositories with it when the project changes organization", async () => {
