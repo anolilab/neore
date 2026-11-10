@@ -79,6 +79,7 @@ const KeyboardShortcutsSheet = ({ shortcuts }: { shortcuts: Partial<KeyboardShor
         firstItem: t`Go to first item`,
         focusSearch: t`Search threads`,
         help: t`Show keyboard shortcuts`,
+        jumpToLastMessage: t`Jump to my last message`,
         helpKey: t`Show keyboard shortcuts (outside text fields)`,
         increaseEffort: t`Raise reasoning effort`,
         lastItem: t`Go to last item`,

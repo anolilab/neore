@@ -50,9 +50,9 @@ import ComposerStub from "./composer-stub";
 import CopyLastCodeBlockListener from "./copy-last-code-block";
 import EditComposer from "./edit-composer";
 import ThreadFindBar from "./find/thread-find-bar";
+import JumpToLastMessageListener, { jumpTargetId } from "./jump-to-last-message";
 import MediaGalleryView from "./media-gallery-view";
 import MessageList, { scrollToMessage } from "./message-list";
-import { lastPromptId } from "./minimap-items";
 import SubAgentParentBreadcrumb from "./sub-agent-parent-breadcrumb";
 import TextSelectionMenu from "./text-selection-menu";
 import ThreadMinimap from "./thread-minimap";
@@ -99,7 +99,7 @@ const ScrollToBottomButton: FC<{ canJumpToPrompt: boolean; className?: string; o
     }
 
     // The media gallery has no message list to scroll, so the jump would do nothing there.
-    const promptId = canJumpToPrompt ? lastPromptId(messages) : undefined;
+    const promptId = canJumpToPrompt ? jumpTargetId(messages) : undefined;
 
     return (
         <div className={cn("absolute -top-14 flex gap-2", className)}>
@@ -297,6 +297,7 @@ const ThreadContent: FC<ThreadProps> = ({ className, composerActive = true, init
                     <TextSelectionMenu isTextModel={composerMode === "text"} threadId={threadId} />
                     <ComposerEffortShortcuts />
                     <CopyLastCodeBlockListener />
+                    {composerMode === "text" && <JumpToLastMessageListener />}
                     <ThreadShortcutsListener isOwner={isOwner} model={thread?.model} status={thread?.status} threadId={splitPane ? threadId : undefined} />
                     <AskAsideShortcutListener />
                 </>

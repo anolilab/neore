@@ -62,6 +62,8 @@ export type KeyboardShortcuts = {
     help: string;
     /** Steps the composer's reasoning effort up (`composer.increaseEffort`). Unbound until the user sets it. */
     increaseEffort?: string;
+    /** Scrolls the open thread to the newest prompt you sent, so its reply is in view (`jump-to-last-message.tsx`). */
+    jumpToLastMessage: string;
     lastItem: string;
     newChat: string;
     newTemporaryChat: string;
@@ -105,6 +107,7 @@ export const defaultKeyboardShortcuts: KeyboardShortcuts = {
     firstItem: "home",
     focusSearch: `${platformModifier}+shift+f`,
     help: `${platformModifier}+/`,
+    jumpToLastMessage: `${platformModifier}+shift+j`,
     lastItem: "end",
     newChat: `${platformModifier}+n`,
     newTemporaryChat: `${platformModifier}+shift+n`,
@@ -165,9 +168,9 @@ export const mergeKeyboardShortcuts = (saved: Partial<KeyboardShortcuts> | undef
     // A binding on F6 or Shift+F6 is cleared: those keys move focus, and a saved action on them would run as well.
     const merged = withoutFocusAreaKeys({ ...defaultKeyboardShortcuts, ...saved });
 
-    // The thread actions are newer than many saved sets. A saved binding already on one of their default chords would make
-    // both fire, so the new action stays unbound there; a binding the user saved for it is theirs and stays.
-    for (const key of ["archiveThread", "deleteThread"] as const) {
+    // The thread actions and the jump are newer than many saved sets. A saved binding already on one of their default chords would
+    // make both fire, so the new action stays unbound there; a binding the user saved for it is theirs and stays.
+    for (const key of ["archiveThread", "deleteThread", "jumpToLastMessage"] as const) {
         const takenBySaved = Object.values(saved ?? {}).includes(defaultKeyboardShortcuts[key]);
 
         if (saved?.[key] === undefined && takenBySaved) {

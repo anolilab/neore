@@ -22,6 +22,7 @@ export const SHORTCUT_ENTRIES: ReadonlyArray<ShortcutEntry> = [
     { action: "newChat", group: "chat", id: "newChat" },
     { action: "newTemporaryChat", group: "chat", id: "newTemporaryChat" },
     { action: "findInThread", group: "chat", id: "findInThread" },
+    { action: "jumpToLastMessage", group: "chat", id: "jumpToLastMessage" },
     { action: "openModelPicker", group: "chat", id: "openModelPicker" },
     { action: "copyLastCodeBlock", group: "chat", id: "copyLastCodeBlock" },
     { action: "archiveThread", group: "chat", id: "archiveThread" },

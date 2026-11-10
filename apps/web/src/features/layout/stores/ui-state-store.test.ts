@@ -26,6 +26,19 @@ describe("thread action defaults against saved bindings", () => {
         expect(mergeKeyboardShortcuts({ newChat: "ctrl+j" }).archiveThread).toBe(defaultKeyboardShortcuts.archiveThread);
     });
 
+    it("leaves the jump unbound when a saved action already has its chord, so the chord runs one action", () => {
+        const merged = mergeKeyboardShortcuts({ newChat: defaultKeyboardShortcuts.jumpToLastMessage });
+
+        expect(merged.jumpToLastMessage).toBe("");
+        expect(merged.newChat).toBe(defaultKeyboardShortcuts.jumpToLastMessage);
+    });
+
+    it("keeps a jump binding the person saved, even one on a chord another action holds", () => {
+        const merged = mergeKeyboardShortcuts({ jumpToLastMessage: "ctrl+shift+k", newChat: defaultKeyboardShortcuts.jumpToLastMessage });
+
+        expect(merged.jumpToLastMessage).toBe("ctrl+shift+k");
+    });
+
     it("drops the thread actions' old defaults from a set saved before version 1, so the new defaults apply", () => {
         const migrated = migrateUIState({ keyboardShortcuts: { archiveThread: "ctrl+a", deleteThread: "ctrl+d", newChat: "ctrl+j" } }, 0) as {
             keyboardShortcuts: Record<string, string>;
