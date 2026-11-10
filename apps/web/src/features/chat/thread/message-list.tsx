@@ -237,10 +237,10 @@ const MessageList: FC<MessageListProps> = memo(({ className, editComposerCompone
 
     // Jump-to-message. Refs hold the latest plan/messages so the listener is attached once.
     const virtualizerRef = useRef<Virtualizer<HTMLElement, Element> | null>(null);
-    const jumpStateRef = useRef({ messages, plan });
+    const jumpStateRef = useRef({ messages, plan, threadId });
 
     useLayoutEffect(() => {
-        jumpStateRef.current = { messages, plan };
+        jumpStateRef.current = { messages, plan, threadId };
     });
 
     const handleVirtualizer = useCallback((virtualizer: Virtualizer<HTMLElement, Element> | null) => {
@@ -334,8 +334,12 @@ const MessageList: FC<MessageListProps> = memo(({ className, editComposerCompone
         pendingJumpRef.current = readHash();
         globalThis.addEventListener("hashchange", handleHash);
 
-        // Takes a request made before this list mounted as well as every later one.
-        const unsubscribe = scrollToMessageChannel.consume(request);
+        // Takes a request made before this list mounted as well as every later one. A request for another thread is left for the
+        // list that shows it, so a split pane that is not focused cannot take the focused pane's jump.
+        const unsubscribe = scrollToMessageChannel.consume(
+            request,
+            (payload) => payload.threadId === undefined || payload.threadId === jumpStateRef.current.threadId,
+        );
 
         return () => {
             globalThis.removeEventListener("hashchange", handleHash);
