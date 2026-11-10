@@ -202,11 +202,15 @@ SSH servers (`neore-host`) keep the on/off shell-network switch; the tiers are n
 ## npm registry agents
 
 An agent installed from an npm package records a hash of its installed folder in the pin (`tree_sha256`: raw file
-names, contents, executable bits, links that stay inside). `acp_install_npm.rs#verify_installed_tree`, called by
-`acp_spawn_plan`, re-hashes it before every start and also refuses when a `node_modules` exists in
-`acp-agents/<key>/` or `acp-agents/`. Folders above the app's data folder are not checked. The Node binary is
-neither hashed nor pinned.
+names, contents, executable bits, links that stay inside; a link that resolves to nothing is refused).
+`acp_install_npm.rs#verify_installed_tree`, called by `acp_spawn_plan`, re-hashes it before every start and also
+refuses when a `node_modules` exists in `acp-agents/<key>/`, `acp-agents/` or the app's data folder. Folders above the
+data folder are not checked. The Node binary is neither hashed nor pinned.
+
+Only an agent whose pin records a tree hash gets this check. A binary install, or an agent added by hand, has none.
+Editing an installed agent's interpreter, or adding, changing or removing a `NODE_*` or code-loading variable, drops
+the pin (the files stay): the agent then starts as an ordinary one, without the check. Editing the arguments after
+the pinned program keeps it.
 
 The check reads files after a type check, so it guards against changes made at rest, not against someone who can
-write to the folder while the agent is starting (a known limit). A different interpreter, or a `NODE_*` or
-code-loading variable added or changed, drops the pin: the agent is then an ordinary one.
+write to the folder while the agent is starting (a known limit).

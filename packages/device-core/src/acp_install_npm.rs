@@ -74,8 +74,9 @@ fn link_stays_inside(root: &Path, link: &Path, target: &Path) -> bool {
 
     match (fs::canonicalize(link), fs::canonicalize(root)) {
         (Ok(resolved), Ok(root)) => resolved.starts_with(root),
-        (Err(_), _) => true,
-        (_, Err(_)) => false,
+        // A link that resolves to nothing could be made to point outside later, and what it then reached would run
+        // without changing the hash. npm does not leave one in an install.
+        (Err(_), _) | (_, Err(_)) => false,
     }
 }
 
@@ -180,8 +181,13 @@ impl DeviceState {
         // The interpreter is the person's own Node, not part of the hashed files. When an upgrade or a version
         // manager removed it, say so rather than letting the start fail with an operating-system error.
         if !fs::metadata(&agent.command).is_ok_and(|meta| meta.is_file()) {
+            self.audit(json!({
+                "at": now_ms(), "decision": "refused", "detail": format!("{} {}: the interpreter it was installed to run with is gone", agent.label, pin.version),
+                "status": "refused", "tool": "acp_start",
+            }));
+
             return Err(format!(
-                "{} {} was installed to run with {}, which is gone. Reinstall it from the registry, or edit its command to the full path of the Node.js that is here now.",
+                "{} {} was installed to run with {}, which is gone. Reinstall it from the registry, or edit its command to the full path of the Node.js that is here now (changing the interpreter removes the install checks: the pin is dropped and the files stay).",
                 agent.label, pin.version, agent.command
             ));
         }

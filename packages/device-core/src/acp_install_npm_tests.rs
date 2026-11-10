@@ -8,8 +8,31 @@ use crate::acp::EnvVars;
 const PACKAGE: &str = "fixture-agent";
 const PROGRAM: &str = "console.log('hello');\n";
 
+/// A scratch folder that is removed when it goes out of scope, whether the test passed or not.
+struct Scratch(PathBuf);
+
+impl std::ops::Deref for Scratch {
+    type Target = Path;
+
+    fn deref(&self) -> &Path {
+        &self.0
+    }
+}
+
+impl AsRef<Path> for Scratch {
+    fn as_ref(&self) -> &Path {
+        &self.0
+    }
+}
+
+impl Drop for Scratch {
+    fn drop(&mut self) {
+        let _ = fs::remove_dir_all(&self.0);
+    }
+}
+
 /// The state over a fresh folder under the system temp folder.
-fn state(name: &str) -> (DeviceState, PathBuf) {
+fn state(name: &str) -> (DeviceState, Scratch) {
     crate::store::test_keychain::install();
 
     let dir = std::env::temp_dir().join(format!("neore-acp-npm-{name}-{}", std::process::id()));
@@ -17,7 +40,7 @@ fn state(name: &str) -> (DeviceState, PathBuf) {
     let _ = fs::remove_dir_all(&dir);
     fs::create_dir_all(&dir).unwrap();
 
-    (DeviceState::new(&dir, Box::new(|_| {})), dir)
+    (DeviceState::new(&dir, Box::new(|_| {})), Scratch(dir))
 }
 
 /// A stand-in `node`: a file at an absolute path, which is all the start-up check looks at.
@@ -178,8 +201,17 @@ fn a_node_that_is_gone_stops_the_start_with_a_message_that_names_it() {
     let error = state.acp_spawn_plan("fixture", None).unwrap_err();
 
     assert!(
-        error.contains("which is gone") && error.contains("Reinstall"),
+        error.contains("which is gone")
+            && error.contains("Reinstall")
+            && error.contains("removes the install checks"),
         "{error}"
+    );
+    assert!(
+        state
+            .audit_tail()
+            .join("\n")
+            .contains("the interpreter it was installed to run with is gone"),
+        "the refusal is audited"
     );
 }
 
@@ -466,4 +498,43 @@ fn removing_a_node_variable_drops_the_pin_too() {
             "removing NODE_PATH drops the pin"
         );
     }
+}
+
+#[test]
+fn a_link_that_resolves_to_nothing_is_refused_however_it_is_built() {
+    let (_, dir) = state("dangling");
+    let root = dir.join("tree");
+
+    fs::create_dir_all(root.join("lib")).unwrap();
+    fs::write(root.join("cli.js"), "x").unwrap();
+    assert!(tree_hash(&root).is_ok());
+
+    // Out of the tree, to somewhere that does not exist yet.
+    std::os::unix::fs::symlink("../../later.js", root.join("lib/out")).unwrap();
+    assert!(tree_hash(&root).is_err(), "dangling and outside");
+    fs::remove_file(root.join("lib/out")).unwrap();
+
+    // Inside by its names, but through a link in the tree that climbs out of it.
+    std::os::unix::fs::symlink("..", root.join("lib/up")).unwrap();
+    std::os::unix::fs::symlink("lib/up/../later.js", root.join("through")).unwrap();
+    assert!(
+        tree_hash(&root).is_err(),
+        "dangling through an in-tree link"
+    );
+    fs::remove_file(root.join("through")).unwrap();
+
+    // Inside and missing is just as unverifiable.
+    std::os::unix::fs::symlink("missing.js", root.join("gone")).unwrap();
+    assert!(tree_hash(&root).is_err(), "dangling inside");
+}
+
+#[test]
+fn the_scratch_folder_is_removed_when_the_test_is_done() {
+    let (state, dir) = state("scratch");
+    let path = dir.to_path_buf();
+
+    assert!(path.exists());
+    drop(state);
+    drop(dir);
+    assert!(!path.exists());
 }
