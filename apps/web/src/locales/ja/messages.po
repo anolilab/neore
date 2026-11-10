@@ -3545,7 +3545,7 @@ msgstr "リンクを知っている人は誰でもこのページを閲覧でき
 msgid "Anyone with the link can view this thread"
 msgstr "リンクを知っている人は誰でもこのスレッドを閲覧できます"
 
-#: src/features/chat/thread/composer-permission-mode.tsx:44
+#: src/features/chat/thread/composer-permission-mode.tsx:49
 msgid "Anything that is not a plain lookup asks first"
 msgstr ""
 
@@ -4127,7 +4127,7 @@ msgstr "自動"
 #: src/features/chat/thread/composer-image-settings.tsx:52
 #: src/features/chat/thread/composer-image-settings.tsx:192
 #: src/features/chat/thread/composer-model-selector.tsx:122
-#: src/features/chat/thread/composer-permission-mode.tsx:36
+#: src/features/chat/thread/composer-permission-mode.tsx:41
 #: src/features/chat/thread/composer-video-settings.tsx:24
 #: src/features/chat/thread/media-gallery-view.tsx:64
 #: src/features/chat/thread/media-gallery-view.tsx:501
@@ -8069,7 +8069,7 @@ msgstr "プッシュ通知を変更できませんでした。もう一度お試
 msgid "Could not change the model. Please try again."
 msgstr "モデルを変更できませんでした。もう一度お試しください。"
 
-#: src/features/chat/thread/composer-permission-mode.tsx:155
+#: src/features/chat/thread/composer-permission-mode.tsx:185
 msgid "Could not change the permission mode. Please try again."
 msgstr ""
 
@@ -12038,7 +12038,7 @@ msgstr "すべてのリクエストに署名が必要です。<0>X-Neore-Timesta
 msgid "Every Sunday at midnight"
 msgstr "毎週日曜日の午前 0 時"
 
-#: src/features/chat/thread/composer-permission-mode.tsx:43
+#: src/features/chat/thread/composer-permission-mode.tsx:48
 msgid "Every tool runs without asking, except those that need your answer"
 msgstr ""
 
@@ -14555,7 +14555,7 @@ msgid "Full 1080p high-definition video output"
 msgstr "フル 1080p の高精細動画出力"
 
 #: src/features/auth/components/settings/api-key/api-key-scope-picker.tsx:77
-#: src/features/chat/thread/composer-permission-mode.tsx:37
+#: src/features/chat/thread/composer-permission-mode.tsx:42
 msgid "Full access"
 msgstr "フルアクセス"
 
@@ -23831,12 +23831,12 @@ msgstr "アカウントと関連するすべてのデータを完全に削除し
 msgid "Permission Level"
 msgstr "権限レベル"
 
-#: src/features/chat/thread/composer-permission-mode.tsx:64
+#: src/features/chat/thread/composer-permission-mode.tsx:78
 msgid "Permission mode"
 msgstr ""
 
 #. placeholder {0}: labels[mode]
-#: src/features/chat/thread/composer-permission-mode.tsx:52
+#: src/features/chat/thread/composer-permission-mode.tsx:60
 msgid "Permission mode: {0}"
 msgstr ""
 
@@ -30925,7 +30925,7 @@ msgstr "複数ファイルにまたがる優れたコード生成とリファク
 msgid "Superior understanding of complex visual concepts"
 msgstr "複雑な視覚的コンセプトへの優れた理解"
 
-#: src/features/chat/thread/composer-permission-mode.tsx:38
+#: src/features/chat/thread/composer-permission-mode.tsx:43
 msgid "Supervised"
 msgstr ""
 
@@ -32638,6 +32638,10 @@ msgstr "このコレクションは組織のメンバーから共有されてい
 msgid "This command name is reserved"
 msgstr "このコマンド名は予約されています"
 
+#: src/features/chat/thread/composer-permission-mode.tsx:181
+msgid "This comparison's mode applies to every column. Change it on the comparison."
+msgstr ""
+
 #: src/features/devices/lib/device-diagnostics.ts:75
 msgid "this computer"
 msgstr "このコンピュータ"
@@ -33543,7 +33547,7 @@ msgstr "ツールプロバイダーキー"
 msgid "Tools"
 msgstr "ツール"
 
-#: src/features/chat/thread/composer-permission-mode.tsx:42
+#: src/features/chat/thread/composer-permission-mode.tsx:47
 msgid "Tools run on their own settings; a quick check can clear low-risk calls"
 msgstr ""
 

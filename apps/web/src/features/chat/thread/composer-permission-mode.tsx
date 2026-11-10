@@ -3,12 +3,15 @@
 import { useLingui } from "@lingui/react/macro";
 import type { ThreadPermissionMode } from "@neore/backend/chat/permission-mode";
 import { COMPARISON_COLUMN_MODE_CODE, isThreadPermissionMode, THREAD_PERMISSION_MODES } from "@neore/backend/chat/permission-mode";
+import { useUnlockProof } from "@neore/client-runtime";
 import { Button } from "@neore/ui/components/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger } from "@neore/ui/components/dropdown-menu";
 import { skipToken, useIsMutating, useMutation, useMutationState, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ShieldCheck } from "lucide-react";
 import type { FC } from "react";
+import { useId } from "react";
 
+import { useIsImpersonating } from "@/features/admin/hooks/use-admin";
 import { useChatIsRunning, useChatThread } from "@/features/chat/core/context/chat-context";
 import { usePromptQueueStore } from "@/features/chat/core/stores/prompt-queue-store";
 import { useCRPC } from "@/lib/lunora/crpc";
@@ -25,11 +28,13 @@ const isMode = isThreadPermissionMode;
 interface ComposerPermissionModeProps {
     disabled?: boolean;
     mode: ThreadPermissionMode;
+    /** Why the control cannot be changed here, shown with the mode. */
+    note?: string;
     onModeChange: (mode: ThreadPermissionMode) => void;
 }
 
 /** The control itself: a menu of the three modes, each with a one-line description. */
-export const ComposerPermissionMode: FC<ComposerPermissionModeProps> = ({ disabled, mode, onModeChange }) => {
+export const ComposerPermissionMode: FC<ComposerPermissionModeProps> = ({ disabled, mode, note, onModeChange }) => {
     const { t } = useLingui();
 
     const labels: Record<ThreadPermissionMode, string> = {
@@ -44,11 +49,14 @@ export const ComposerPermissionMode: FC<ComposerPermissionModeProps> = ({ disabl
         supervised: t`Anything that is not a plain lookup asks first`,
     };
 
+    const noteId = useId();
+
     return (
         <DropdownMenu>
             <DropdownMenuTrigger
                 render={
                     <Button
+                        aria-describedby={note ? noteId : undefined}
                         aria-label={t`Permission mode: ${labels[mode]}`}
                         className="bg-sidebar border-border dark:border-sidebar-border/15 hover:bg-accent/50 dark:hover:bg-sidebar-accent/30 text-foreground h-11 gap-1 px-2 sm:h-7 dark:text-white"
                         disabled={disabled}
@@ -56,8 +64,14 @@ export const ComposerPermissionMode: FC<ComposerPermissionModeProps> = ({ disabl
                     >
                         <ShieldCheck aria-hidden="true" className="size-3 shrink-0" />
                         <span className="hidden sm:inline">{labels[mode]}</span>
+                        {note && (
+                            <span className="sr-only" id={noteId}>
+                                {note}
+                            </span>
+                        )}
                     </Button>
                 }
+                title={note}
             />
             <DropdownMenuContent align="start" className="w-72" side="top">
                 <DropdownMenuRadioGroup
@@ -97,7 +111,14 @@ const ComposerThreadPermissionMode: FC = () => {
     const { thread, threadId } = useChatThread();
     const crpc = useCRPC();
     const isRunning = useChatIsRunning();
-    const { data: access } = useQuery(crpc.chat.sharing.getThreadAccess.queryOptions(threadId ? { threadId: threadId as never } : skipToken));
+    // A passcode-locked chat answers its owner only with the unlock proof, as the model selector sends it.
+    const unlockProof = useUnlockProof(threadId);
+    const { data: access } = useQuery(crpc.chat.sharing.getThreadAccess.queryOptions(threadId ? { threadId: threadId as never, unlockProof } : skipToken));
+    const { data: impersonation } = useIsImpersonating();
+    // Whether this thread is a comparison column: its parent's mode decides, so the control only shows it.
+    const { data: relationship } = useQuery(
+        crpc.agent.threads.getThreadRelationship.queryOptions(threadId && access?.isOwner === true ? { threadId: threadId as never, unlockProof } : skipToken),
+    );
     // The mode the owner's runs use here (`modeOfThread`): a comparison column with a live parent runs under that parent's mode, whatever it holds.
     const { data: effective } = useQuery(
         // Owner-only: asked for once the ownership answer says so, so a shared viewer sends no request the server would refuse.
@@ -119,7 +140,7 @@ const ComposerThreadPermissionMode: FC = () => {
         // held for a save that did not land would otherwise go out under the stored mode. A refused save on a comparison column changed
         // nothing, so it holds nothing: only a save that failed after it was sent does.
         onError: (error) => {
-            if (threadId && !isComparisonRefusal(error)) {
+            if (threadId && !isComparisonRefusal(error) && (usePromptQueueStore.getState().queues[threadId]?.items.length ?? 0) > 0) {
                 usePromptQueueStore.getState().setPaused(threadId, true);
             }
         },
@@ -137,18 +158,27 @@ const ComposerThreadPermissionMode: FC = () => {
     // always carries it. The model is no sign: an imported chat has none, and its owner still gets the menu.
     const lockedStub = Boolean(thread?.lockedAt) && thread?.userId === undefined;
 
-    if (!threadId || !thread || lockedStub || thread.runner === "host" || access?.isOwner !== true) {
+    // An admin acting as the owner may not change what the owner's runs are allowed to do.
+    if (!threadId || !thread || lockedStub || thread.runner === "host" || access?.isOwner !== true || impersonation?.isImpersonating === true) {
         return null;
     }
 
-    const ownMode: ThreadPermissionMode = isMode(thread?.permissionMode) ? thread.permissionMode : "auto";
+    const isColumn = relationship?.branchType === "comparison";
+    const ownMode: ThreadPermissionMode = isMode(thread.permissionMode) ? thread.permissionMode : "auto";
+
+    // Until it is known whether this is a column and what its runs use, the stored mode could be the wrong one to show.
+    if (relationship === undefined || (isColumn && !isMode(effective))) {
+        return null;
+    }
+
     const stored: ThreadPermissionMode = isMode(effective) ? effective : ownMode;
     const shown = pending ?? stored;
 
     return (
         <ComposerPermissionMode
-            disabled={isRunning}
+            disabled={isRunning || pending !== undefined || isColumn}
             mode={shown}
+            note={isColumn ? t`This comparison's mode applies to every column. Change it on the comparison.` : undefined}
             onModeChange={(mode) => {
                 mutateAsync({ mode, threadId: threadId as never })
                     .catch((error: unknown) => {

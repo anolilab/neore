@@ -3545,7 +3545,7 @@ msgstr "任何拥有链接的人都可以阅读此页面。评论永远不会显
 msgid "Anyone with the link can view this thread"
 msgstr "任何拥有链接的人都可以查看此对话"
 
-#: src/features/chat/thread/composer-permission-mode.tsx:44
+#: src/features/chat/thread/composer-permission-mode.tsx:49
 msgid "Anything that is not a plain lookup asks first"
 msgstr ""
 
@@ -4127,7 +4127,7 @@ msgstr "自动"
 #: src/features/chat/thread/composer-image-settings.tsx:52
 #: src/features/chat/thread/composer-image-settings.tsx:192
 #: src/features/chat/thread/composer-model-selector.tsx:122
-#: src/features/chat/thread/composer-permission-mode.tsx:36
+#: src/features/chat/thread/composer-permission-mode.tsx:41
 #: src/features/chat/thread/composer-video-settings.tsx:24
 #: src/features/chat/thread/media-gallery-view.tsx:64
 #: src/features/chat/thread/media-gallery-view.tsx:501
@@ -8069,7 +8069,7 @@ msgstr "无法更改推送通知，请重试。"
 msgid "Could not change the model. Please try again."
 msgstr "无法更改模型。请重试。"
 
-#: src/features/chat/thread/composer-permission-mode.tsx:155
+#: src/features/chat/thread/composer-permission-mode.tsx:185
 msgid "Could not change the permission mode. Please try again."
 msgstr ""
 
@@ -12038,7 +12038,7 @@ msgstr "每个请求都必须签名。请发送 <0>X-Neore-Timestamp</0>（当�
 msgid "Every Sunday at midnight"
 msgstr "每周日午夜"
 
-#: src/features/chat/thread/composer-permission-mode.tsx:43
+#: src/features/chat/thread/composer-permission-mode.tsx:48
 msgid "Every tool runs without asking, except those that need your answer"
 msgstr ""
 
@@ -14555,7 +14555,7 @@ msgid "Full 1080p high-definition video output"
 msgstr "完整 1080p 高清视频输出"
 
 #: src/features/auth/components/settings/api-key/api-key-scope-picker.tsx:77
-#: src/features/chat/thread/composer-permission-mode.tsx:37
+#: src/features/chat/thread/composer-permission-mode.tsx:42
 msgid "Full access"
 msgstr "完全访问"
 
@@ -23831,12 +23831,12 @@ msgstr "永久删除你的账号及所有相关数据"
 msgid "Permission Level"
 msgstr "权限级别"
 
-#: src/features/chat/thread/composer-permission-mode.tsx:64
+#: src/features/chat/thread/composer-permission-mode.tsx:78
 msgid "Permission mode"
 msgstr ""
 
 #. placeholder {0}: labels[mode]
-#: src/features/chat/thread/composer-permission-mode.tsx:52
+#: src/features/chat/thread/composer-permission-mode.tsx:60
 msgid "Permission mode: {0}"
 msgstr ""
 
@@ -30925,7 +30925,7 @@ msgstr "出众的多文件代码生成与重构"
 msgid "Superior understanding of complex visual concepts"
 msgstr "对复杂视觉概念的理解出众"
 
-#: src/features/chat/thread/composer-permission-mode.tsx:38
+#: src/features/chat/thread/composer-permission-mode.tsx:43
 msgid "Supervised"
 msgstr ""
 
@@ -32638,6 +32638,10 @@ msgstr "此集合由你组织中的成员共享给你。你可以将其附加到
 msgid "This command name is reserved"
 msgstr "此命令名称已被保留"
 
+#: src/features/chat/thread/composer-permission-mode.tsx:181
+msgid "This comparison's mode applies to every column. Change it on the comparison."
+msgstr ""
+
 #: src/features/devices/lib/device-diagnostics.ts:75
 msgid "this computer"
 msgstr "这台电脑"
@@ -33543,7 +33547,7 @@ msgstr "工具提供商密钥"
 msgid "Tools"
 msgstr "工具"
 
-#: src/features/chat/thread/composer-permission-mode.tsx:42
+#: src/features/chat/thread/composer-permission-mode.tsx:47
 msgid "Tools run on their own settings; a quick check can clear low-risk calls"
 msgstr ""
 

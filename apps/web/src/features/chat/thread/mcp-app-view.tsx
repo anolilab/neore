@@ -18,7 +18,7 @@ const McpAppView: FC<McpAppViewProps> = (props) => {
     // Read without the provider's guard: a view outside a chat has no thread, and its calls then carry none.
     const thread = use(ChatThreadContext);
 
-    return <McpAppViewUI lunoraSiteUrl={env.VITE_LUNORA_URL} threadId={thread?.threadId} {...props} />;
+    return <McpAppViewUI lunoraSiteUrl={env.VITE_LUNORA_URL} {...props} threadId={thread?.threadId} />;
 };
 
 McpAppView.displayName = "McpAppView";

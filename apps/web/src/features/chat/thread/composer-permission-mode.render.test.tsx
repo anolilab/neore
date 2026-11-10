@@ -23,7 +23,11 @@ const SUPERVISED_PATTERN = /Supervised/;
 const state = vi.hoisted(() => {
     return {
         effective: null as string | null,
+        impersonating: false,
         isOwner: true,
+        // What the access read needs from a locked chat: it answers the owner only with this proof.
+        lockedProof: undefined as string | undefined,
+        relationship: null as { branchType: string } | null,
         save: vi.fn(async (_input: unknown) => null),
         thread: { _id: "t1", permissionMode: "full" } as {
             _id: string;
@@ -36,6 +40,16 @@ const state = vi.hoisted(() => {
     };
 });
 
+vi.mock("@neore/client-runtime", () => {
+    return { useUnlockProof: () => "proof-1" };
+});
+vi.mock("@/features/admin/hooks/use-admin", () => {
+    return {
+        useIsImpersonating: () => {
+            return { data: { isImpersonating: state.impersonating } };
+        },
+    };
+});
 vi.mock("@/features/chat/core/context/chat-context", () => {
     return {
         useChatIsRunning: () => false,
@@ -48,6 +62,15 @@ vi.mock("@/lib/lunora/crpc", () => {
     return {
         useCRPC: () => {
             return {
+                agent: {
+                    threads: {
+                        getThreadRelationship: {
+                            queryOptions: () => {
+                                return { queryFn: async () => state.relationship, queryKey: ["relationship", state.relationship] };
+                            },
+                        },
+                    },
+                },
                 chat: {
                     functions: {
                         getThread: {
@@ -56,9 +79,14 @@ vi.mock("@/lib/lunora/crpc", () => {
                     },
                     sharing: {
                         getThreadAccess: {
-                            queryOptions: () => {
+                            queryOptions: (input: { unlockProof?: string }) => {
                                 return {
                                     queryFn: async () => {
+                                        // A locked chat refuses its owner without the proof, as the backend does.
+                                        if (state.lockedProof !== undefined && input.unlockProof !== state.lockedProof) {
+                                            throw new Error("FORBIDDEN");
+                                        }
+
                                         return { isOwner: state.isOwner };
                                     },
                                     queryKey: ["access", state.isOwner],
@@ -112,6 +140,9 @@ beforeEach(() => {
         },
     );
     state.isOwner = true;
+    state.impersonating = false;
+    state.lockedProof = undefined;
+    state.relationship = null;
     state.thread = { _id: "t1", permissionMode: "full" };
     state.save.mockClear();
     state.effective = null;
@@ -155,6 +186,7 @@ describe("permission mode control", () => {
 
     it("shows the menu for an unlocked chat that is locked and has no stored mode", async () => {
         state.thread = { _id: "t1", lockedAt: 1, model: "m", userId: "owner" };
+        state.lockedProof = "proof-1";
         renderControl();
 
         expect(await screen.findByRole("button", { name: "Permission mode: Auto" })).toBeTruthy();
@@ -200,12 +232,64 @@ describe("permission mode control", () => {
         expect(await screen.findByText("saving")).toBeTruthy();
     });
 
-    it("shows the mode a comparison column runs under, when the column has none of its own", async () => {
-        state.thread = { _id: "t1" };
+    it("shows the mode a comparison column runs under, read-only with a note, and never its own stored mode", async () => {
+        state.thread = { _id: "t1", permissionMode: "full" };
+        state.relationship = { branchType: "comparison" };
         state.effective = "supervised";
         renderControl();
 
-        expect(await screen.findByRole("button", { name: "Permission mode: Supervised" })).toBeTruthy();
+        const button = (await screen.findByRole("button", { name: "Permission mode: Supervised" })) as HTMLButtonElement;
+
+        expect(button.disabled).toBe(true);
+        expect(screen.getByText("This comparison's mode applies to every column. Change it on the comparison.")).toBeTruthy();
+    });
+
+    it("shows nothing for a column until its effective mode is known", async () => {
+        state.thread = { _id: "t1", permissionMode: "full" };
+        state.relationship = { branchType: "comparison" };
+        state.effective = null;
+        const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+
+        renderControl(client);
+
+        await waitFor(() => expect(client.getQueryState(["effective", true])?.status).toBe("success"));
+        expect(screen.queryByRole("button")).toBeNull();
+    });
+
+    it("is hidden while an admin impersonates the owner", async () => {
+        state.impersonating = true;
+        const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+
+        renderControl(client);
+
+        await waitFor(() => expect(client.getQueryState(["access", true])?.status).toBe("success"));
+        expect(screen.queryByRole("button")).toBeNull();
+    });
+
+    it("cannot be changed again while a save is in flight", async () => {
+        state.save.mockImplementationOnce(() => new Promise<null>(() => {}));
+        renderControl();
+
+        fireEvent.click(await screen.findByRole("button", { name: "Permission mode: Full access" }));
+        fireEvent.click(screen.getByRole("menuitemradio", { name: SUPERVISED_PATTERN }));
+
+        const button = (await screen.findByRole("button", { name: "Permission mode: Supervised" })) as HTMLButtonElement;
+
+        expect(button.disabled).toBe(true);
+    });
+
+    it("does not pause an empty queue when the save fails", async () => {
+        state.save.mockImplementationOnce(async () => {
+            throw new Error("save refused");
+        });
+        usePromptQueueStore.getState().hydrate("t1");
+
+        renderControl();
+        fireEvent.click(await screen.findByRole("button", { name: "Permission mode: Full access" }));
+        fireEvent.click(screen.getByRole("menuitemradio", { name: SUPERVISED_PATTERN }));
+
+        await waitFor(() => expect(showError).toHaveBeenCalled());
+        expect(usePromptQueueStore.getState().queues.t1?.paused).not.toBe(true);
     });
 
     it("offers the three modes with a description and writes the chosen one", async () => {

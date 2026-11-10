@@ -21,6 +21,7 @@ import { memo, useCallback } from "react";
 
 import type { ToolPart } from "../types/message";
 import cn from "../utils/cn";
+import { mcpToolCallBody } from "./mcp-tool-call";
 
 type OnReadResource = NonNullable<AppRendererProps["onReadResource"]>;
 type OnCallTool = NonNullable<AppRendererProps["onCallTool"]>;
@@ -68,12 +69,7 @@ const McpAppView = memo<McpAppViewProps>(({ lunoraSiteUrl, part, resourceUri, se
     const onCallTool = useCallback<OnCallTool>(
         async (params) => {
             const response = await fetch(`${lunoraSiteUrl}/mcp/tool`, {
-                body: JSON.stringify({
-                    arguments: params.arguments ?? {},
-                    serverName,
-                    ...(threadId !== undefined && { threadId }),
-                    toolName: params.name,
-                }),
+                body: mcpToolCallBody({ arguments: params.arguments, serverName, threadId, toolName: params.name }),
                 credentials: "include",
                 headers: { "Content-Type": "application/json" },
                 method: "POST",

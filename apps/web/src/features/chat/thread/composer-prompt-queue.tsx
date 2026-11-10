@@ -608,7 +608,7 @@ const ComposerPromptQueue: FC = () => {
     }
 
     // "Send next" is disabled while the permission mode saves: say why, and that the queue moves on once it has.
-    if (modeSaving && !isStreaming) {
+    if (modeSaving && !isStreaming && !queue.paused) {
         statusText = t`${count} queued — waiting for the permission mode to save`;
     }
 

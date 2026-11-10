@@ -362,11 +362,9 @@ describe("composer prompt queue", () => {
         expect(screen.queryByText(MOVED_TO)).toBeNull();
     });
 
-    it("says why Send next is unavailable while the mode saves, and returns to queued once it has", async () => {
+    it("says why Send next is unavailable while the mode saves, and sends the queue once it has", async () => {
         chat.error = undefined;
         usePromptQueueStore.getState().enqueue(chat.threadId, { attachments: [], text: "queued" });
-        // Held, so the queue stays put once the save ends: this checks the text, not a send.
-        usePromptQueueStore.getState().setPaused(chat.threadId, true);
 
         const view = render(<ComposerPromptQueue />);
         const status = () => screen.getAllByRole("status")[0]!;
@@ -384,8 +382,17 @@ describe("composer prompt queue", () => {
         chat.saving = false;
         view.rerender(<ComposerPromptQueue />);
 
-        expect(status().textContent).toBe("1 queued");
-        expect(sendNext().disabled).toBe(false);
-        expect(chat.sendMessage).not.toHaveBeenCalled();
+        // The queue moves on once the save has ended, which is what the waiting text promised.
+        await vi.waitFor(() => expect(chat.sendMessage).toHaveBeenCalledWith("queued", []));
+    });
+
+    it("does not promise a send after the save when the queue is held", () => {
+        usePromptQueueStore.getState().enqueue(chat.threadId, { attachments: [], text: "queued" });
+        usePromptQueueStore.getState().setPaused(chat.threadId, true);
+        chat.saving = true;
+
+        render(<ComposerPromptQueue />);
+
+        expect(screen.getAllByRole("status")[0]?.textContent).toBe("1 queued");
     });
 });

@@ -3545,7 +3545,7 @@ msgstr "Qualquer pessoa com o link pode ler esta página. Os comentários nunca 
 msgid "Anyone with the link can view this thread"
 msgstr "Qualquer pessoa com o link pode ver esta conversa"
 
-#: src/features/chat/thread/composer-permission-mode.tsx:44
+#: src/features/chat/thread/composer-permission-mode.tsx:49
 msgid "Anything that is not a plain lookup asks first"
 msgstr ""
 
@@ -4127,7 +4127,7 @@ msgstr "automático"
 #: src/features/chat/thread/composer-image-settings.tsx:52
 #: src/features/chat/thread/composer-image-settings.tsx:192
 #: src/features/chat/thread/composer-model-selector.tsx:122
-#: src/features/chat/thread/composer-permission-mode.tsx:36
+#: src/features/chat/thread/composer-permission-mode.tsx:41
 #: src/features/chat/thread/composer-video-settings.tsx:24
 #: src/features/chat/thread/media-gallery-view.tsx:64
 #: src/features/chat/thread/media-gallery-view.tsx:501
@@ -8069,7 +8069,7 @@ msgstr "Não foi possível alterar as notificações push. Tente novamente."
 msgid "Could not change the model. Please try again."
 msgstr "Não foi possível alterar o modelo. Tente novamente."
 
-#: src/features/chat/thread/composer-permission-mode.tsx:155
+#: src/features/chat/thread/composer-permission-mode.tsx:185
 msgid "Could not change the permission mode. Please try again."
 msgstr ""
 
@@ -12038,7 +12038,7 @@ msgstr "Toda solicitação deve ser assinada. Envie <0>X-Neore-Timestamp</0> (a 
 msgid "Every Sunday at midnight"
 msgstr "Todo domingo à meia-noite"
 
-#: src/features/chat/thread/composer-permission-mode.tsx:43
+#: src/features/chat/thread/composer-permission-mode.tsx:48
 msgid "Every tool runs without asking, except those that need your answer"
 msgstr ""
 
@@ -14555,7 +14555,7 @@ msgid "Full 1080p high-definition video output"
 msgstr "Vídeo em alta definição Full HD 1080p"
 
 #: src/features/auth/components/settings/api-key/api-key-scope-picker.tsx:77
-#: src/features/chat/thread/composer-permission-mode.tsx:37
+#: src/features/chat/thread/composer-permission-mode.tsx:42
 msgid "Full access"
 msgstr "Acesso total"
 
@@ -23831,12 +23831,12 @@ msgstr "Excluir permanentemente sua conta e todos os dados associados"
 msgid "Permission Level"
 msgstr "Nível de permissão"
 
-#: src/features/chat/thread/composer-permission-mode.tsx:64
+#: src/features/chat/thread/composer-permission-mode.tsx:78
 msgid "Permission mode"
 msgstr ""
 
 #. placeholder {0}: labels[mode]
-#: src/features/chat/thread/composer-permission-mode.tsx:52
+#: src/features/chat/thread/composer-permission-mode.tsx:60
 msgid "Permission mode: {0}"
 msgstr ""
 
@@ -30925,7 +30925,7 @@ msgstr "Geração e refatoração de código em vários arquivos superiores"
 msgid "Superior understanding of complex visual concepts"
 msgstr "Compreensão superior de conceitos visuais complexos"
 
-#: src/features/chat/thread/composer-permission-mode.tsx:38
+#: src/features/chat/thread/composer-permission-mode.tsx:43
 msgid "Supervised"
 msgstr ""
 
@@ -32638,6 +32638,10 @@ msgstr "Esta coleção foi compartilhada com você por um membro da sua organiza
 msgid "This command name is reserved"
 msgstr "Este nome de comando é reservado"
 
+#: src/features/chat/thread/composer-permission-mode.tsx:181
+msgid "This comparison's mode applies to every column. Change it on the comparison."
+msgstr ""
+
 #: src/features/devices/lib/device-diagnostics.ts:75
 msgid "this computer"
 msgstr "este computador"
@@ -33543,7 +33547,7 @@ msgstr "Chaves de provedores de ferramentas"
 msgid "Tools"
 msgstr "Ferramentas"
 
-#: src/features/chat/thread/composer-permission-mode.tsx:42
+#: src/features/chat/thread/composer-permission-mode.tsx:47
 msgid "Tools run on their own settings; a quick check can clear low-risk calls"
 msgstr ""
 
