@@ -1,9 +1,12 @@
+import { api } from "@neore/backend/api";
+import type { Id } from "@neore/backend/dataModel";
 import { addPushTokenListener } from "expo-notifications";
 import { useEffect } from "react";
 import { AppState } from "react-native";
 
 import { useAuth } from "../auth/auth-state";
 import { getClient } from "../lib/lunora";
+import { listenForApprovalTaps } from "./approval-actions";
 import { backendPushServer, configurePhoneNotifications, deviceLocale, devicePushPlatform, pushRegistrations } from "./phone-push";
 import { createForegroundGate, createPromptOffer, createTokenChangeFilter, registerPhoneForPush } from "./push-registration";
 
@@ -96,6 +99,26 @@ export const usePhonePush = (): void => {
     useEffect(() => {
         quietly("Could not set up notifications.", configurePhoneNotifications);
     }, []);
+
+    useEffect(() => {
+        if (userId === undefined) {
+            return undefined;
+        }
+
+        // A tap on an approval alert answers it as the signed-in account, through the procedure the chat's own card uses.
+        // Offline it is refused, never queued (`onlineOnly`).
+        const subscription = listenForApprovalTaps(async (answer) => {
+            await getClient().mutation(
+                api.chat.tool_permissions.respondToToolApproval,
+                { approvalId: answer.approvalId, decision: answer.decision, threadId: answer.threadId as Id<"threads"> },
+                { onlineOnly: true },
+            );
+        });
+
+        return () => {
+            subscription.remove();
+        };
+    }, [userId]);
 
     useEffect(() => {
         if (userId === undefined) {

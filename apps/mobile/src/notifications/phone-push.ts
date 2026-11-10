@@ -16,6 +16,7 @@ import {
 } from "expo-notifications";
 import { Platform } from "react-native";
 
+import { registerApprovalActions } from "./approval-actions";
 import type { PushPlatform, PushServer } from "./push-registration";
 import { createPendingWork, languageTag, onceItWorks } from "./push-registration";
 
@@ -117,6 +118,9 @@ export const configurePhoneNotifications = onceItWorks(async () => {
             return { shouldPlaySound: false, shouldSetBadge: false, shouldShowBanner: true, shouldShowList: true };
         },
     });
+
+    // Before any alert can arrive with its approve and deny actions.
+    await registerApprovalActions();
 
     if (Platform.OS === "android") {
         await setNotificationChannelAsync(ANDROID_CHANNEL_ID, { importance: AndroidImportance.HIGH, name: channelName(deviceLocale()) });
