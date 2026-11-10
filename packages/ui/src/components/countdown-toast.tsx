@@ -6,6 +6,8 @@ import { toast } from "sonner";
 
 import cn from "@ui/utils/cn";
 
+import { toastCloseButtonClass, toastDescriptionClass, toastIconClass, toastSurfaceClass, toastTextButtonClass, toastTitleClass } from "./toast-variants";
+
 type CountdownToastTone = "neutral" | "destructive";
 
 interface CountdownToastAction {
@@ -27,8 +29,6 @@ interface CountdownToastOptions {
 
 const DEFAULT_DURATION = 5000;
 const TICK_MS = 250;
-
-const textButtonClass = "rounded-sm text-sm underline-offset-4 outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
 interface CountdownToastCardProps extends CountdownToastOptions {
     id: number | string;
@@ -57,18 +57,24 @@ const CountdownToastCard = ({
     const label = countdownLabel ?? ((value: number) => t`This message will close in ${plural(value, { one: "# second", other: "# seconds" })}`);
 
     useEffect(() => {
+        // Sonner's <li>, which holds this card. It is the focus target, and it is what sonner marks `data-expanded`
+        // while the toaster is hovered (sonner 2 behaviour; check it on upgrade).
+        const toastElement = ref.current?.closest<HTMLElement>("[data-sonner-toast]");
         let remainingMs = duration;
         let last = performance.now();
+        let wasPaused = false;
 
         const timer = window.setInterval(() => {
             const now = performance.now();
-            const expanded = ref.current?.closest("[data-sonner-toast]")?.getAttribute("data-expanded") === "true";
-            const paused = expanded || document.hidden || (ref.current?.contains(document.activeElement) ?? false);
+            const paused =
+                toastElement?.getAttribute("data-expanded") === "true" || document.hidden || (toastElement?.contains(document.activeElement) ?? false);
 
-            if (!paused) {
+            // The first tick after a pause would count everything since the last paused tick, hidden time included.
+            if (!paused && !wasPaused) {
                 remainingMs -= now - last;
             }
 
+            wasPaused = paused;
             last = now;
 
             if (remainingMs <= 0) {
@@ -92,31 +98,20 @@ const CountdownToastCard = ({
     };
 
     return (
-        <div
-            className={cn(
-                "relative w-full overflow-hidden rounded-lg border bg-popover text-popover-foreground shadow-md",
-                destructive ? "border-destructive/40" : "border-border",
-            )}
-            ref={ref}
-        >
+        // `font-normal`: sonner's title wrapper is semibold and the footer and description inherit it.
+        <div className={cn(toastSurfaceClass, "relative w-full overflow-hidden font-normal", destructive && "border-destructive/40")} ref={ref}>
             <div className="flex items-start gap-3 p-4 pe-9">
-                <span
-                    aria-hidden="true"
-                    className={cn(
-                        "flex size-8 shrink-0 items-center justify-center rounded-md",
-                        destructive ? "bg-destructive/10 text-destructive" : "bg-muted text-muted-foreground",
-                    )}
-                >
+                <span aria-hidden="true" className={cn(toastIconClass, destructive && "bg-destructive/10 text-destructive")}>
                     <InfoIcon className="size-4" />
                 </span>
                 <div className="flex min-w-0 flex-col gap-0.5">
-                    <p className="text-sm leading-5 font-semibold">{title}</p>
-                    {description ? <p className="text-muted-foreground text-sm leading-5">{description}</p> : null}
+                    <p className={toastTitleClass}>{title}</p>
+                    {description ? <p className={toastDescriptionClass}>{description}</p> : null}
                     {cancel || action ? (
                         <div className="mt-1 flex items-center gap-3">
                             {cancel ? (
                                 <button
-                                    className={cn(textButtonClass, "font-medium text-muted-foreground hover:text-popover-foreground")}
+                                    className={cn(toastTextButtonClass, "font-medium text-muted-foreground hover:text-popover-foreground")}
                                     onClick={runAndDismiss(cancel)}
                                     type="button"
                                 >
@@ -125,7 +120,7 @@ const CountdownToastCard = ({
                             ) : null}
                             {action ? (
                                 <button
-                                    className={cn(textButtonClass, "font-semibold text-popover-foreground hover:underline")}
+                                    className={cn(toastTextButtonClass, "font-semibold text-popover-foreground hover:underline")}
                                     onClick={runAndDismiss(action)}
                                     type="button"
                                 >
@@ -136,12 +131,7 @@ const CountdownToastCard = ({
                     ) : null}
                 </div>
             </div>
-            <button
-                aria-label={t`Close`}
-                className="text-muted-foreground hover:bg-muted hover:text-popover-foreground focus-visible:ring-ring absolute end-2 top-2 flex size-7 items-center justify-center rounded-md transition-colors outline-none focus-visible:ring-2"
-                onClick={() => toast.dismiss(id)}
-                type="button"
-            >
+            <button aria-label={t`Close`} className={toastCloseButtonClass} onClick={() => toast.dismiss(id)} type="button">
                 <XIcon aria-hidden="true" className="size-4" />
             </button>
             {/* Read once, when the toast appears. The ticking footer below is hidden from assistive tech. */}
@@ -162,7 +152,12 @@ const CountdownToastCard = ({
 /** Shows a toast whose footer counts down to its dismissal. */
 const countdownToast = (options: CountdownToastOptions) =>
     toast.custom((id) => <CountdownToastCard {...options} id={id} />, {
-        classNames: { toast: "!border-0 !bg-transparent !p-0 !shadow-none" },
+        classNames: {
+            // The card supplies its own padding, and `!pe-0` cancels the Toaster's content padding that sonner still applies.
+            content: "!pe-0",
+            // Focus ring for the outer <li> (the card is not focusable itself). `!shadow-none` would hide sonner's own ring.
+            toast: "!border-0 !bg-transparent !p-0 !shadow-none focus-visible:!shadow-[0_0_0_2px_var(--ring)]",
+        },
         duration: Infinity,
     });
 

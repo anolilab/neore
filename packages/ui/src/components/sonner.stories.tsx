@@ -74,8 +74,8 @@ export const Failure: Story = {
 export const WithActions: Story = {
     play: async ({ canvas }) => {
         await userEvent.click(canvas.getByRole("button", { name: "Actions" }));
-        await waitFor(() => expect(screen.getByRole("button", { name: "Undo" })).toBeInTheDocument());
-        expect(screen.getByRole("button", { name: "Dismiss" })).toBeInTheDocument();
+        await waitFor(() => expect(screen.getByRole("button", { name: "Undo" })).toBeVisible());
+        expect(screen.getByRole("button", { name: "Dismiss" })).toBeVisible();
     },
 };
 
