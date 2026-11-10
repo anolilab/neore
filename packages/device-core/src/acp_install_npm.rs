@@ -714,19 +714,23 @@ fn run_npm(
         };
 
         match waited {
-            Some(status) if status.success() => {
+            Some(status) => {
+                // npm is done, but what it started may not be: stop the group before going on, whatever the status.
+                stop_npm(&mut child);
+
+                if !status.success() {
+                    return Err(format!(
+                        "npm could not install the package ({}). Nothing was installed",
+                        tail(&log)
+                    ));
+                }
+
                 // npm can finish, or grow in its last moments, between two measurements.
                 if stage_over(stage, limits.stage_bytes) {
                     return Err(OVER_BUDGET.into());
                 }
 
                 return Ok(());
-            }
-            Some(_) => {
-                return Err(format!(
-                    "npm could not install the package ({}). Nothing was installed",
-                    tail(&log)
-                ))
             }
             None if Instant::now() >= deadline => {
                 stop_npm(&mut child);
@@ -740,7 +744,9 @@ fn run_npm(
     }
 }
 
-/// Kills npm and everything it started: they share the process group `run_npm` made for it.
+/// Kills npm and everything it started, and reaps it. On Unix they share the process group `run_npm` made for npm;
+/// a group that is already empty answers `ESRCH`, which is fine. On Windows the tree under npm's process goes with
+/// `taskkill /T`, run by its absolute path so no `PATH` lookup decides what runs.
 fn stop_npm(child: &mut std::process::Child) {
     #[cfg(unix)]
     {
@@ -749,27 +755,51 @@ fn stop_npm(child: &mut std::process::Child) {
             libc::kill(-(child.id() as libc::pid_t), libc::SIGKILL);
         }
     }
+    #[cfg(windows)]
+    {
+        let root = std::env::var_os("SystemRoot").unwrap_or_else(|| "C:\\Windows".into());
+        let taskkill = Path::new(&root).join("System32").join("taskkill.exe");
+
+        let _ = Command::new(taskkill)
+            .args(["/T", "/F", "/PID"])
+            .arg(child.id().to_string())
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status();
+    }
 
     let _ = child.kill();
     let _ = child.wait();
 }
 
-/// True when `dir` holds more than `limit` bytes (links are not followed; a tree too large to count is over).
+/// True when `dir` holds more than `limit` bytes (links are not followed). A tree that cannot be counted is over: too
+/// many entries, or a folder or entry that cannot be read. Only a name that vanished while it was being read is not,
+/// since npm removes its temporary folders as it goes.
 fn stage_over(dir: &Path, limit: u64) -> bool {
     fn add(limit: u64, dir: &Path, bytes: &mut u64, entries: &mut usize) -> bool {
-        let Ok(read) = fs::read_dir(dir) else {
-            return false;
+        let read = match fs::read_dir(dir) {
+            Ok(read) => read,
+            Err(error) => return error.kind() != std::io::ErrorKind::NotFound,
         };
 
-        for entry in read.flatten() {
+        for entry in read {
+            let entry = match entry {
+                Ok(entry) => entry,
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => continue,
+                Err(_) => return true,
+            };
+
             *entries += 1;
 
             if *entries > MAX_TREE_ENTRIES {
                 return true;
             }
 
-            let Ok(meta) = fs::symlink_metadata(entry.path()) else {
-                continue;
+            let meta = match fs::symlink_metadata(entry.path()) {
+                Ok(meta) => meta,
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => continue,
+                Err(_) => return true,
             };
 
             if meta.is_dir() {

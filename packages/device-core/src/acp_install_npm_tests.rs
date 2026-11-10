@@ -2048,7 +2048,8 @@ fn an_npm_that_is_a_launcher_is_not_a_real_tool() {
     assert!(npm_runs_under_node(&linked), "a link to the script counts");
 }
 
-/// A real `node` and `npm` from the PATH, or `None`. `NEORE_REQUIRE_NPM=1` turns a missing one into a failure.
+/// A real `node` and `npm` from the PATH, or `None`. `NEORE_REQUIRE_NPM=1` turns a missing one, or an npm that
+/// is a launcher, into a failure.
 fn real_tools() -> Option<(PathBuf, PathBuf)> {
     let find = |name: &str| {
         std::env::split_paths(&std::env::var_os("PATH").unwrap_or_default())
@@ -2056,25 +2057,54 @@ fn real_tools() -> Option<(PathBuf, PathBuf)> {
             .find(|path| path.is_file())
     };
 
-    match (find("node"), find("npm")) {
-        (Some(_), Some(npm)) if !npm_runs_under_node(&npm) => {
-            eprintln!(
-                "skipped: npm on PATH is a launcher (a version-manager shim or a native program), not a JavaScript file"
-            );
+    choose_real_tools(
+        find("node"),
+        find("npm"),
+        std::env::var_os("NEORE_REQUIRE_NPM").is_some(),
+    )
+}
 
-            None
-        }
-        (Some(node), Some(npm)) => Some((node, npm)),
-        _ => {
-            assert!(
-                std::env::var_os("NEORE_REQUIRE_NPM").is_none(),
-                "NEORE_REQUIRE_NPM is set but node and npm were not found on PATH"
-            );
-            eprintln!("skipped: node and npm are not on PATH");
+fn choose_real_tools(
+    node: Option<PathBuf>,
+    npm: Option<PathBuf>,
+    required: bool,
+) -> Option<(PathBuf, PathBuf)> {
+    let unusable = match (&node, &npm) {
+        (Some(_), Some(npm)) if npm_runs_under_node(npm) => None,
+        (Some(_), Some(_)) => Some(
+            "npm on PATH is a launcher (a version-manager shim or a native program), not a JavaScript file",
+        ),
+        _ => Some("node and npm were not found on PATH"),
+    };
+
+    match (unusable, node, npm) {
+        (None, Some(node), Some(npm)) => Some((node, npm)),
+        (reason, _, _) => {
+            let reason = reason.unwrap_or("node and npm were not found on PATH");
+
+            assert!(!required, "NEORE_REQUIRE_NPM is set but {reason}");
+            eprintln!("skipped: {reason}");
 
             None
         }
     }
+}
+
+#[test]
+fn a_required_npm_that_is_a_launcher_fails_instead_of_skipping() {
+    let (_, dir) = state("require-npm");
+    let node = dir.join("node");
+    let shim = dir.join("npm");
+
+    fs::write(&node, "#!/bin/sh\n").unwrap();
+    fs::write(&shim, "#!/bin/sh\nexec volta run npm \"$@\"\n").unwrap();
+
+    assert!(choose_real_tools(Some(node.clone()), Some(shim.clone()), false).is_none());
+    assert!(
+        std::panic::catch_unwind(|| choose_real_tools(Some(node), Some(shim), true)).is_err(),
+        "a required npm must not be skipped"
+    );
+    assert!(std::panic::catch_unwind(|| choose_real_tools(None, None, true)).is_err());
 }
 
 fn marker_package(marker: &Path) -> Vec<u8> {
@@ -2180,4 +2210,78 @@ fn a_real_npm_install_runs_the_package_with_the_pinned_node() {
         .join(PACKAGE)
         .join("cli.js")
         .is_file());
+}
+
+#[test]
+fn an_unreadable_part_of_the_staging_folder_counts_as_over_budget() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let (_, dir) = state("budget-unreadable");
+    let tree = dir.join("tree");
+    let hidden = tree.join("hidden");
+
+    fs::create_dir_all(&hidden).unwrap();
+    fs::write(hidden.join("big"), vec![0_u8; 5000]).unwrap();
+    assert!(!stage_over(&tree, 10_000), "readable and small");
+
+    fs::set_permissions(&hidden, fs::Permissions::from_mode(0o000)).unwrap();
+
+    let readable_anyway = fs::read_dir(&hidden).is_ok();
+    let over = stage_over(&tree, 10_000);
+
+    fs::set_permissions(&hidden, fs::Permissions::from_mode(0o700)).unwrap();
+
+    if readable_anyway {
+        eprintln!("skipped: this user can read a folder with no permissions (root)");
+
+        return;
+    }
+
+    assert!(over, "what cannot be counted must not pass the cap");
+}
+
+#[test]
+fn what_npm_left_running_is_stopped_when_it_exits_whatever_the_status() {
+    for code in [0, 1] {
+        let (_, dir) = state(&format!("helper-left-{code}"));
+        let (node, npm, _) = fake_tools(&dir);
+        let pid_file = dir.join("helper.pid");
+        let (prefix, home) = (dir.join("prefix"), dir.join("home"));
+
+        fs::create_dir_all(&prefix).unwrap();
+        fs::create_dir_all(&home).unwrap();
+        fs::write(
+            &npm,
+            format!(
+                "#!/usr/bin/env node\nsleep 60 &\necho $! > '{}'\nexit {code}\n",
+                pid_file.display()
+            ),
+        )
+        .unwrap();
+
+        let result = run_npm(
+            &node,
+            &npm,
+            &prefix,
+            &dir.join("package.tgz"),
+            &home,
+            &dir,
+            &LIMITS,
+        );
+
+        assert_eq!(result.is_ok(), code == 0, "{result:?}");
+
+        let pid: i32 = fs::read_to_string(&pid_file)
+            .unwrap()
+            .trim()
+            .parse()
+            .unwrap();
+        let gone = (0..50).any(|_| {
+            std::thread::sleep(Duration::from_millis(100));
+
+            process_is_gone(pid)
+        });
+
+        assert!(gone, "the helper outlived npm (exit {code})");
+    }
 }
