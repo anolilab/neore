@@ -13,7 +13,8 @@ const meta = {
                     countdownToast({
                         action: { label: "Undo", onClick: onUndo },
                         cancel: { label: "Dismiss", onClick: () => undefined },
-                        title: "Chat archived",
+                        description: "This message will close in 5 seconds.",
+                        title: "Changes saved",
                     })
                 }
                 variant="outline"
