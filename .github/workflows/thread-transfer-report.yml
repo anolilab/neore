@@ -20,9 +20,11 @@ jobs:
             actions: "read"
             contents: "read"
             pull-requests: "write"
+        # A publish runs to its end, and a newer run for the same pull request waits behind it, then checks the head.
+        # So an older report cannot land after a newer one, even when the run has no pull request number.
         concurrency:
-            group: "thread-transfer-report-${{ github.event.workflow_run.pull_requests[0].number || github.event.workflow_run.id }}"
-            cancel-in-progress: true
+            group: "thread-transfer-report-${{ github.event.workflow_run.pull_requests[0].number || github.event.workflow_run.head_branch }}"
+            cancel-in-progress: false
         steps:
             # workflow_run has a write-capable token even for fork PRs. Only load the
             # publisher from the trusted default branch and never execute PR code.

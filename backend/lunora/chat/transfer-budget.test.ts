@@ -18,6 +18,7 @@ import { lunoraTest } from "@lunora/testing";
 import { describe, expect, it, vi } from "vitest";
 
 import schema from "../schema";
+import { getThreadWithData } from "./composite";
 import { getThreadUIMessages, getToolOutput } from "./functions";
 
 const { sessionFrom } = vi.hoisted(() => {
@@ -54,8 +55,8 @@ const MEASURED_TOOL_RESULT_BYTES = 55_000;
 
 // Ceilings: the measured value plus about 25% headroom. Raise one only with a reason in the PR.
 const CEILING = {
-    snapshotDecodedBytes: 4000,
-    snapshotWireBytes: 1000,
+    snapshotDecodedBytes: 2700,
+    snapshotWireBytes: 950,
 };
 
 const scenario = {
@@ -171,15 +172,17 @@ describe("thread snapshot transfer", () => {
             return id;
         });
 
-        const page = (await harness.withIdentity({ userId: OWNER }).query(
-            getThreadUIMessages as never,
+        // The first load of a thread: the same call and page size the app's route makes, serialized whole.
+        const response = (await harness.withIdentity({ userId: OWNER }).query(
+            getThreadWithData as never,
             {
-                paginationOpts: { cursor: null, numItems: CLIENT_PAGE_ITEMS },
+                messageOpts: { cursor: null, numItems: CLIENT_PAGE_ITEMS },
                 threadId,
             } as never,
-        )) as { page: unknown[] };
+        )) as { messages: { page: unknown[] } };
+        const page = response.messages;
 
-        const body = Buffer.from(JSON.stringify(page));
+        const body = Buffer.from(JSON.stringify(response));
         const observed = {
             snapshotDecodedBytes: body.byteLength,
             snapshotWireBytes: gzipSync(body).byteLength,
