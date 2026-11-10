@@ -690,6 +690,33 @@ export const schema = defineSchema({
         .index("by_userId_createdAt", ["userId", "createdAt"])
         .index("by_status_deadline", ["status", "deadline"])
         .index("by_createdAt", ["createdAt"]),
+    /**
+     * better-auth `deviceAuthorization` plugin: one row per CLI sign-in code
+     * (`auth/cli-device-auth.ts`). Short-lived (30 minutes) and deleted when the
+     * code is redeemed, denied, or polled after it expired; issuing a new code
+     * also clears the lapsed ones. Hand-maintained like the other auth tables,
+     * so `auth.schema.test.ts` checks it. `hostname` is our own column (what the
+     * requesting machine calls itself, reduced to host-name characters).
+     */
+    deviceCode: defineTable({
+        clientId: v.optional(v.string()),
+        deviceCode: v.string(),
+        expiresAt: v.number(),
+        hostname: v.optional(v.string()),
+        lastPolledAt: v.optional(v.number()),
+        pollingInterval: v.optional(v.number()),
+        scope: v.optional(v.string()),
+        status: v.string(),
+        userCode: v.string(),
+        userId: v.optional(v.string()),
+    })
+        .externallyManaged()
+        .global()
+        .index("deviceCode", ["deviceCode"], { unique: true })
+        // The cleanup at every issue deletes the lapsed codes by this column.
+        .index("expiresAt", ["expiresAt"])
+        .index("userCode", ["userCode"], { unique: true })
+        .index("userId", ["userId"]),
     // A paired install of the desktop shell (`devices/`, `apps/desktop`). The
     // secret signs calls and verifies results; it is removed on revoke, so a
     // revoked row can sign nothing. `manifest` is the device's verified tools.
