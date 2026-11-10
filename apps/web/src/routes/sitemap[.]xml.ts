@@ -7,6 +7,10 @@ const TRAILING_SLASH_RE = /\/$/;
 /** Public routes indexed in the sitemap. Authenticated routes are excluded. */
 const PUBLIC_ROUTES: { changefreq: string; path: string; priority: string }[] = [
     { changefreq: "weekly", path: "/", priority: "1.0" },
+    { changefreq: "monthly", path: "/use-cases", priority: "0.7" },
+    { changefreq: "monthly", path: "/use-cases/routines", priority: "0.6" },
+    { changefreq: "monthly", path: "/use-cases/approvals", priority: "0.6" },
+    { changefreq: "monthly", path: "/use-cases/messaging", priority: "0.6" },
     { changefreq: "monthly", path: "/auth/sign-in", priority: "0.8" },
     { changefreq: "monthly", path: "/auth/sign-up", priority: "0.8" },
     { changefreq: "monthly", path: "/auth/forgot-password", priority: "0.4" },

@@ -60,6 +60,8 @@ import { Route as publicModelsModelSlugRouteImport } from './routes/(public)/mod
 import { Route as publicPTokenRouteImport } from './routes/(public)/p/$token'
 import { Route as publicThreadTokenRouteImport } from './routes/(public)/thread/$token'
 import { Route as publicTutorialsIndexRouteImport } from './routes/(public)/tutorials/index'
+import { Route as publicUseCasesIndexRouteImport } from './routes/(public)/use-cases/index'
+import { Route as publicUseCasesUseCaseSlugRouteImport } from './routes/(public)/use-cases/$useCaseSlug'
 import { Route as ShortcutCodeIndexRouteImport } from './routes/_shortcut/code/index'
 import { Route as ShortcutPagesIndexRouteImport } from './routes/_shortcut/pages/index'
 import { Route as ShortcutPagesPageIdRouteImport } from './routes/_shortcut/pages/$pageId'
@@ -347,6 +349,17 @@ const publicTutorialsIndexRoute = publicTutorialsIndexRouteImport.update({
   path: '/tutorials/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const publicUseCasesIndexRoute = publicUseCasesIndexRouteImport.update({
+  id: '/(public)/use-cases/',
+  path: '/use-cases/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const publicUseCasesUseCaseSlugRoute =
+  publicUseCasesUseCaseSlugRouteImport.update({
+    id: '/(public)/use-cases/$useCaseSlug',
+    path: '/use-cases/$useCaseSlug',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ShortcutCodeIndexRoute = ShortcutCodeIndexRouteImport.update({
   id: '/code/',
   path: '/code/',
@@ -583,6 +596,7 @@ export interface FileRoutesByFullPath {
   '/models/$modelSlug': typeof publicModelsModelSlugRoute
   '/p/$token': typeof publicPTokenRoute
   '/thread/$token': typeof publicThreadTokenRoute
+  '/use-cases/$useCaseSlug': typeof publicUseCasesUseCaseSlugRoute
   '/pages/$pageId': typeof ShortcutPagesPageIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/auth/two-factor/otp': typeof AuthTwoFactorOtpRoute
@@ -592,6 +606,7 @@ export interface FileRoutesByFullPath {
   '/gateway/': typeof publicGatewayIndexRoute
   '/models/': typeof publicModelsIndexRoute
   '/tutorials/': typeof publicTutorialsIndexRoute
+  '/use-cases/': typeof publicUseCasesIndexRoute
   '/code/': typeof ShortcutCodeIndexRoute
   '/pages/': typeof ShortcutPagesIndexRoute
   '/admin/gateway/': typeof AdminGatewayIndexRoute
@@ -661,6 +676,7 @@ export interface FileRoutesByTo {
   '/models/$modelSlug': typeof publicModelsModelSlugRoute
   '/p/$token': typeof publicPTokenRoute
   '/thread/$token': typeof publicThreadTokenRoute
+  '/use-cases/$useCaseSlug': typeof publicUseCasesUseCaseSlugRoute
   '/pages/$pageId': typeof ShortcutPagesPageIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/auth/two-factor/otp': typeof AuthTwoFactorOtpRoute
@@ -670,6 +686,7 @@ export interface FileRoutesByTo {
   '/gateway': typeof publicGatewayIndexRoute
   '/models': typeof publicModelsIndexRoute
   '/tutorials': typeof publicTutorialsIndexRoute
+  '/use-cases': typeof publicUseCasesIndexRoute
   '/code': typeof ShortcutCodeIndexRoute
   '/pages': typeof ShortcutPagesIndexRoute
   '/admin/gateway': typeof AdminGatewayIndexRoute
@@ -748,6 +765,7 @@ export interface FileRoutesById {
   '/(public)/models/$modelSlug': typeof publicModelsModelSlugRoute
   '/(public)/p/$token': typeof publicPTokenRoute
   '/(public)/thread/$token': typeof publicThreadTokenRoute
+  '/(public)/use-cases/$useCaseSlug': typeof publicUseCasesUseCaseSlugRoute
   '/_shortcut/pages/$pageId': typeof ShortcutPagesPageIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/auth/two-factor/otp': typeof AuthTwoFactorOtpRoute
@@ -757,6 +775,7 @@ export interface FileRoutesById {
   '/(public)/gateway/': typeof publicGatewayIndexRoute
   '/(public)/models/': typeof publicModelsIndexRoute
   '/(public)/tutorials/': typeof publicTutorialsIndexRoute
+  '/(public)/use-cases/': typeof publicUseCasesIndexRoute
   '/_shortcut/code/': typeof ShortcutCodeIndexRoute
   '/_shortcut/pages/': typeof ShortcutPagesIndexRoute
   '/admin/gateway/': typeof AdminGatewayIndexRoute
@@ -834,6 +853,7 @@ export interface FileRouteTypes {
     | '/models/$modelSlug'
     | '/p/$token'
     | '/thread/$token'
+    | '/use-cases/$useCaseSlug'
     | '/pages/$pageId'
     | '/api/auth/$'
     | '/auth/two-factor/otp'
@@ -843,6 +863,7 @@ export interface FileRouteTypes {
     | '/gateway/'
     | '/models/'
     | '/tutorials/'
+    | '/use-cases/'
     | '/code/'
     | '/pages/'
     | '/admin/gateway/'
@@ -912,6 +933,7 @@ export interface FileRouteTypes {
     | '/models/$modelSlug'
     | '/p/$token'
     | '/thread/$token'
+    | '/use-cases/$useCaseSlug'
     | '/pages/$pageId'
     | '/api/auth/$'
     | '/auth/two-factor/otp'
@@ -921,6 +943,7 @@ export interface FileRouteTypes {
     | '/gateway'
     | '/models'
     | '/tutorials'
+    | '/use-cases'
     | '/code'
     | '/pages'
     | '/admin/gateway'
@@ -998,6 +1021,7 @@ export interface FileRouteTypes {
     | '/(public)/models/$modelSlug'
     | '/(public)/p/$token'
     | '/(public)/thread/$token'
+    | '/(public)/use-cases/$useCaseSlug'
     | '/_shortcut/pages/$pageId'
     | '/api/auth/$'
     | '/auth/two-factor/otp'
@@ -1007,6 +1031,7 @@ export interface FileRouteTypes {
     | '/(public)/gateway/'
     | '/(public)/models/'
     | '/(public)/tutorials/'
+    | '/(public)/use-cases/'
     | '/_shortcut/code/'
     | '/_shortcut/pages/'
     | '/admin/gateway/'
@@ -1056,10 +1081,12 @@ export interface RootRouteChildren {
   publicModelsModelSlugRoute: typeof publicModelsModelSlugRoute
   publicPTokenRoute: typeof publicPTokenRoute
   publicThreadTokenRoute: typeof publicThreadTokenRoute
+  publicUseCasesUseCaseSlugRoute: typeof publicUseCasesUseCaseSlugRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
   publicGatewayIndexRoute: typeof publicGatewayIndexRoute
   publicModelsIndexRoute: typeof publicModelsIndexRoute
   publicTutorialsIndexRoute: typeof publicTutorialsIndexRoute
+  publicUseCasesIndexRoute: typeof publicUseCasesIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -1419,6 +1446,20 @@ declare module '@tanstack/react-router' {
       path: '/tutorials'
       fullPath: '/tutorials/'
       preLoaderRoute: typeof publicTutorialsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/(public)/use-cases/': {
+      id: '/(public)/use-cases/'
+      path: '/use-cases'
+      fullPath: '/use-cases/'
+      preLoaderRoute: typeof publicUseCasesIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/(public)/use-cases/$useCaseSlug': {
+      id: '/(public)/use-cases/$useCaseSlug'
+      path: '/use-cases/$useCaseSlug'
+      fullPath: '/use-cases/$useCaseSlug'
+      preLoaderRoute: typeof publicUseCasesUseCaseSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_shortcut/code/': {
@@ -1897,10 +1938,12 @@ const rootRouteChildren: RootRouteChildren = {
   publicModelsModelSlugRoute: publicModelsModelSlugRoute,
   publicPTokenRoute: publicPTokenRoute,
   publicThreadTokenRoute: publicThreadTokenRoute,
+  publicUseCasesUseCaseSlugRoute: publicUseCasesUseCaseSlugRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
   publicGatewayIndexRoute: publicGatewayIndexRoute,
   publicModelsIndexRoute: publicModelsIndexRoute,
   publicTutorialsIndexRoute: publicTutorialsIndexRoute,
+  publicUseCasesIndexRoute: publicUseCasesIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
