@@ -13,6 +13,8 @@ const state = vi.hoisted(() => {
         /** The thread's owner; anyone else editing in it is a stranger. */
         owner: "user-a",
         saved: [] as { message: { content: { text?: string; type: string }[] } }[],
+        /** The thread keeps no memory (`statelessMode`): its reply saves the prompt again from plain text. */
+        stateless: false,
     };
 });
 
@@ -74,7 +76,7 @@ const context = () =>
             }
 
             if (name.includes("getThreadInternal")) {
-                return { model: "openai/gpt-4.1-mini", userId: state.owner };
+                return { model: "openai/gpt-4.1-mini", statelessMode: state.stateless, userId: state.owner };
             }
 
             if (name.includes("gateThreadAction")) {
@@ -104,6 +106,7 @@ beforeEach(() => {
     state.enqueued = [];
     state.saved = [];
     state.guestRow = false;
+    state.stateless = false;
     state.owner = "user-a";
 });
 
@@ -146,13 +149,24 @@ describe("editMessageHttpAction hidden characters", () => {
         expect(state.charges).toBe(0);
     });
 
-    it("refuses an edit of a guest's note the owner sent on, which would save it as the owner's words", async () => {
+    it("keeps the guest mark and the note's id on an edit of a guest's note the owner sent on", async () => {
         state.guestRow = true;
+
+        const response = await edit("reworded");
+
+        expect(response.status).toBe(200);
+        expect(state.saved[0]?.message.content).toStrictEqual([guestTextPart("reworded", "note-1")]);
+    });
+
+    it("refuses an edit of a guest's note in a stateless chat, whose reply would save an untagged copy of it", async () => {
+        state.guestRow = true;
+        state.stateless = true;
 
         const response = await edit("reworded");
 
         expect(response.status).toBe(400);
         expect(state.saved).toStrictEqual([]);
+        expect(state.enqueued).toStrictEqual([]);
         expect(state.charges).toBe(0);
     });
 
