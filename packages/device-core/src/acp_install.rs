@@ -606,6 +606,33 @@ pub(crate) mod tests_hook {
         }
     }
 
+    type PlanHook = std::sync::Arc<dyn Fn() + Send + Sync>;
+
+    static PLAN_HOOK: Mutex<Option<(String, PlanHook)>> = Mutex::new(None);
+
+    /// Runs `hook` in `acp_spawn_plan` of `key`, after the installed files were checked and before the plan is
+    /// built, where the person's settings can change under a slow check.
+    #[cfg(unix)]
+    pub(crate) fn set_after_hash(key: &str, hook: PlanHook) {
+        *PLAN_HOOK.lock().unwrap() = Some((key.to_owned(), hook));
+    }
+
+    #[cfg(unix)]
+    pub(crate) fn clear_after_hash() {
+        *PLAN_HOOK.lock().unwrap() = None;
+    }
+
+    pub(crate) fn after_hash(key: &str) {
+        let hook = match PLAN_HOOK.lock().unwrap().as_ref() {
+            Some((hooked, hook)) if hooked == key => Some(std::sync::Arc::clone(hook)),
+            _ => None,
+        };
+
+        if let Some(hook) = hook {
+            hook();
+        }
+    }
+
     pub(super) fn after_rename(key: &str) {
         let hook = match HOOK.lock().unwrap().as_ref() {
             Some((hooked, hook)) if hooked == key => Some(std::sync::Arc::clone(hook)),

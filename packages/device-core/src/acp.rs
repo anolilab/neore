@@ -590,16 +590,38 @@ impl DeviceState {
         agent_key: &str,
         folder: Option<&str>,
     ) -> Result<SpawnPlan, String> {
-        let settings = self.settings();
-        let agent = settings
+        let before = self.settings();
+        let hashed = before
             .acp_agents
             .iter()
             .find(|agent| agent.key == agent_key)
             .ok_or("that agent is not registered")?;
 
-        // An agent run through a package manager is checked against what was recorded at install, every time.
-        if let Some(pin) = &agent.install {
-            self.verify_installed_tree(agent, pin)?;
+        // An agent run through a package manager is checked against what was recorded at install, every time. That
+        // can take long, and the settings lock is not held for it: the person may change things meanwhile.
+        if let Some(pin) = &hashed.install {
+            self.verify_installed_tree(hashed, pin)?;
+        }
+
+        #[cfg(test)]
+        crate::acp_install::tests_hook::after_hash(agent_key);
+
+        // The plan is built from the settings as they are now, not as they were before the check: an agent that was
+        // removed, re-pointed or re-pinned, or a folder whose approval was withdrawn, must not start from a copy
+        // that has gone stale.
+        let settings = self.settings();
+        let changed = || "The agent's settings changed while it was being checked; start it again.";
+        let agent = settings
+            .acp_agents
+            .iter()
+            .find(|agent| agent.key == agent_key)
+            .ok_or_else(changed)?;
+
+        if agent.command != hashed.command
+            || agent.args != hashed.args
+            || agent.install != hashed.install
+        {
+            return Err(changed().into());
         }
 
         let cwd: PathBuf = match folder {
@@ -607,17 +629,22 @@ impl DeviceState {
                 let canonical = validate_roots(&[folder.to_owned()])?
                     .pop()
                     .ok_or("choose a folder")?;
+                let approved = |consents: &[AcpConsent]| {
+                    consents
+                        .iter()
+                        .any(|c| c.agent_key == agent_key && c.folder_path == canonical)
+                };
 
                 // Checked before anything starts: a valid request for a pair the user did not approve is refused.
-                if !settings
-                    .acp_consents
-                    .iter()
-                    .any(|c| c.agent_key == agent_key && c.folder_path == canonical)
-                {
-                    return Err(format!(
-                        "{} is not approved for that folder. Approve it in this window first",
-                        agent.label
-                    ));
+                if !approved(&settings.acp_consents) {
+                    return Err(if approved(&before.acp_consents) {
+                        changed().into()
+                    } else {
+                        format!(
+                            "{} is not approved for that folder. Approve it in this window first",
+                            agent.label
+                        )
+                    });
                 }
 
                 PathBuf::from(canonical)
