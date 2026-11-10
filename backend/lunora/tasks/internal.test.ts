@@ -1055,6 +1055,23 @@ describe("stuck blocked tasks", () => {
         expect(await stuckNotices()).toHaveLength(2);
     });
 
+    it("notifies a task whose twenty direct dependencies include one that a blocked dependency points back to", async () => {
+        const others: string[] = [];
+
+        for (let index = 1; index < 20; index += 1) {
+            others.push(await insertTask({ status: "todo", title: `Done ${index}` }));
+        }
+
+        // Its blocked dependency points back to one the search has already read: nothing unread is left to wait on.
+        const blocked = await insertTask({ dependsOn: [others[0]!], status: "blocked", title: "Middle", updatedAt: T0 });
+
+        await insertTask({ dependsOn: [blocked, ...others], status: "blocked", stuckCheckAt: T0 + 2 * DAY, title: "Root", updatedAt: T0 });
+
+        await sweepAt(T0 + 2 * DAY);
+
+        expect(await stuckNotices()).toStrictEqual([{ outcome: undefined, title: "Root", type: "task_stuck" }]);
+    });
+
     it("does not notify a task whose chain is longer than the search reads, since the chain may end in a review", async () => {
         const review = await insertTask({ status: "needs_review", title: "Review", updatedAt: T0 });
         let previous = review;

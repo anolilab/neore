@@ -220,8 +220,8 @@ const waitOf = async (ctx: MutationCtx, dependsOn: ReadonlyArray<string>): Promi
         }
     }
 
-    // A chain longer than the search reads may still end in an owner's review past the limit: that is not ruled out, so the task waits.
-    return { owner: owner || queue.length > 0, slot };
+    // A queued ID already read adds nothing: the chain is unresolved only while an unread ID is left, past the limit.
+    return { owner: owner || queue.some((id) => !seen.has(id)), slot };
 };
 
 /**
