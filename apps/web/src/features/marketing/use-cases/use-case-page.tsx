@@ -23,7 +23,7 @@ export const UseCasePage = ({ useCase }: { useCase: UseCase }) => {
                 </a>
 
                 <header className="mt-8 max-w-3xl">
-                    <p className="text-xs font-medium tracking-wider text-white/40 uppercase">{i18n._(useCase.eyebrow)}</p>
+                    <p className="text-xs font-medium tracking-wider text-white/60 uppercase">{i18n._(useCase.eyebrow)}</p>
                     <h1 className="mt-3 text-4xl font-bold tracking-tight text-balance sm:text-5xl">{i18n._(useCase.title)}</h1>
                     <p className="mt-5 text-lg leading-relaxed text-white/60">{i18n._(useCase.summary)}</p>
                 </header>

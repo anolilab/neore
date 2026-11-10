@@ -27,7 +27,7 @@ export const UseCasesIndexPage = () => {
                                 className="group flex h-full flex-col gap-3 rounded-2xl border border-white/10 bg-white/[0.03] p-6 transition-colors hover:border-white/20 hover:bg-white/[0.06]"
                                 href={`/use-cases/${useCase.slug}`}
                             >
-                                <span className="text-xs font-medium tracking-wider text-white/40 uppercase">{i18n._(useCase.eyebrow)}</span>
+                                <span className="text-xs font-medium tracking-wider text-white/60 uppercase">{i18n._(useCase.eyebrow)}</span>
                                 <h2 className="text-lg font-semibold text-white">{i18n._(useCase.title)}</h2>
                                 <p className="text-sm leading-relaxed text-white/60">{i18n._(useCase.summary)}</p>
                                 <span className="mt-auto inline-flex items-center gap-2 pt-2 text-sm text-white/50 transition-colors group-hover:text-white">

@@ -35,8 +35,8 @@ export const USE_CASES: UseCase[] = [
             msg`Describe the task, the result you expect, and when it repeats: daily, weekly, or a cron expression in UTC.`,
             msg`Each minute the scheduler starts the due runs for the current slot, oldest first. A sweep takes a limited number, so the rest start in a later minute. After an outage it starts one catch-up run, not a burst of missed runs.`,
             msg`The run goes where you chose: a new chat each time, the same chat as before, or the same chat with a fresh context.`,
-            msg`A verifier model judges the answer. A pass counts as done, an unclear answer waits for your review, and an empty answer is recorded as an error.`,
-            msg`You get a notification with the result, or with the reason the run failed.`,
+            msg`A verifier model judges the answer. A pass counts as done. A failed check is retried automatically while repair rounds remain, then goes to your review. If the verifier cannot run, the run goes to your review.`,
+            msg`You get a notification when a run finishes, needs your review or fails. A finished run links to its chat, and a run that needs review links to the tasks board.`,
         ],
         summary: msg`Set a task once with a repeat schedule, and the agent runs it on time in the background. A second model checks each answer before it counts as done, and you get the result as a notification.`,
         title: msg`Routines that run while you are away`,
@@ -45,7 +45,7 @@ export const USE_CASES: UseCase[] = [
         controls: [
             msg`Per tool, choose Ask, Auto or Off. Off blocks the tool, and Auto runs it without a card.`,
             msg`Always allow sets Auto for that one tool. Allow for 1 hour and Allow for today are time-boxed and lapse on their own.`,
-            msg`An approved call to an external (MCP) server runs only if that tool's definition has not changed since you approved it. If it changed, the call is denied and the reason is shown.`,
+            msg`An approved call to an external (MCP) server runs only if that tool's name, input schema and annotations are unchanged since you approved it. If they changed, the call does not run. The model is told, and a new call asks you again.`,
             msg`An opt-in quick check can approve clearly read-only calls from servers you mark as trusted. It is off by default.`,
         ],
         eyebrow: msg`Approvals`,
@@ -108,11 +108,11 @@ export const USE_CASES: UseCase[] = [
         controls: [
             msg`Memory is off until you turn it on. Temporary chats and locked chats are never mined for memories.`,
             msg`Pin a memory to keep it from fading, merging or being promoted. Only activity memories fade on their own.`,
-            msg`Edit or delete any memory. Clear all asks for confirmation first.`,
-            msg`Each reply shows a "Memories used" list, so you can see exactly what it was given.`,
+            msg`Edit or delete the memories listed in settings. Clear all asks for confirmation first.`,
+            msg`A reply that used memories shows a "Memories used" list, so you can see exactly what it was given.`,
         ],
         eyebrow: msg`Memory`,
-        seoDescription: msg`Memory in Neore: the agent keeps useful facts about you across chats, you can see and edit each one, and it is off until you turn it on.`,
+        seoDescription: msg`Memory in Neore: the agent keeps useful facts about you across chats, you can review and edit them in settings, and it is off until you turn it on.`,
         seoTitle: msg`Memory — what the agent keeps across chats`,
         slug: "memory",
         steps: [
@@ -122,7 +122,7 @@ export const USE_CASES: UseCase[] = [
             msg`When a new fact conflicts with an old one, the old memory is updated, superseded, or the new fact is ignored.`,
             msg`Once a night, for users active that day, a reflection pass merges duplicates and promotes repeated facts.`,
         ],
-        summary: msg`The agent keeps the facts you share and uses them in later chats, such as your preferred units or the project you are on. You can see, edit, pin or delete every memory.`,
+        summary: msg`The agent keeps the facts you share and uses them in later chats, such as your preferred units or the project you are on. You can see, edit, pin or delete the memories listed in settings.`,
         title: msg`Memory the agent keeps across chats`,
     },
 ];
