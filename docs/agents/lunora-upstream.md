@@ -21,7 +21,9 @@ The ORM-facade reads and
 
 **Not filed yet (owner to decide):** in `lunoraTest` (`@lunora/server@alpha.273`), `rls()` ignores a range on the second
 index field of `messages` (read policy: `OR` of `{ userId }` and `{ threadId: { in } }`); the owner-policy `threadGuestLinks`
-honours it. `findSentNote` reads through `admittedThreadDb`; `agent/messages.ts#pinFollowingRowParent` is exposed.
+honours it. Once a request admitted two or more threads it drops the `threadId` range too, so a read returns every admitted
+thread's rows (`listSubAgentApprovals`' test orders around it). `findSentNote` reads through `admittedThreadDb`;
+`agent/messages.ts#pinFollowingRowParent` is exposed.
 
 **Not filed yet (owner to decide): seed the identity store from SSR.** `@lunora/react`'s `useAuth` / `useAuthState`
 read `"loading"` on the server and while hydrating (`getServerSnapshot`), and on the client until `getCurrentUser()`

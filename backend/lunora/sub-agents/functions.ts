@@ -69,6 +69,7 @@ import { MAX_LENGTH } from "../lib/validators";
 import { RUN_STALE_MS, RUN_WATCH_RETRY } from "../chat/lib/interrupted-run";
 import { HOST_SESSION_BUSY_RETRY_MS, HOST_START_MAX_ATTEMPTS, hostRunActivity, hostStartRetryDelayMs, sendHostRunTurn } from "./host-runs";
 
+import { admitOwnedThread, requireOwnedThread } from "../agent/thread-read-access";
 import { isThreadLocked, LOCKED_THREAD_TITLE } from "../lib/thread-lock";
 import {
     beatWatchDecision,
@@ -1971,6 +1972,131 @@ export const getRunByToolCall = authQuery
             status: run.status,
             task: run.task,
         };
+    });
+
+/** Waiting runs read per parent conversation: at most `SUB_AGENT_MAX_CONCURRENT` go at once, so this is far past real. */
+const AWAITING_RUNS_READ = 10;
+
+/** Requests listed per parent conversation at most: each costs a read of its child's latest turn. */
+const SUB_AGENT_APPROVALS_LISTED_MAX = 10;
+
+/** Characters of a request's tool input sent to the card: approving runs the whole call, and the card says how much is cut. */
+const SUB_AGENT_APPROVAL_INPUT_MAX = 4000;
+
+const SUB_AGENT_TASK_LABEL_MAX = 200;
+
+/** The server and the bare tool name of an MCP tool's permission key (`mcp:<server>:<tool>`), or `null` for any other tool. */
+const mcpNamesOfPermissionKey = (key: string | undefined): { server: string; tool: string } | null => {
+    if (!key?.startsWith("mcp:")) {
+        return null;
+    }
+
+    const rest = key.slice("mcp:".length);
+    const separator = rest.lastIndexOf(":");
+
+    return separator > 0 ? { server: rest.slice(0, separator), tool: rest.slice(separator + 1) } : null;
+};
+
+const vSubAgentApproval = v.object({
+    approvalId: v.string(),
+    childThreadId: v.id("threads"),
+    input: v.string(),
+    omittedCharacters: v.number(),
+    runId: v.id("subAgentRuns"),
+    server: v.union(v.string(), v.null()),
+    skillSlug: v.union(v.string(), v.null()),
+    task: v.string(),
+    toolName: v.union(v.string(), v.null()),
+});
+
+type SubAgentApproval = Infer<typeof vSubAgentApproval>;
+
+/** What the parent's card shows of one open request: the tool input is cut, and the card says by how much. */
+const approvalView = (
+    run: RunDoc,
+    childThreadId: Id<"threads">,
+    row: Doc<"toolApprovalRuns">,
+    request: { input: unknown; toolName: string | null },
+): SubAgentApproval => {
+    const input = typeof request.input === "string" ? request.input : JSON.stringify(request.input ?? null, null, 2);
+    const mcp = mcpNamesOfPermissionKey(request.toolName === null ? undefined : row.config.toolPermissionKeys?.[request.toolName]);
+
+    return {
+        approvalId: row.approvalId,
+        childThreadId,
+        input: input.slice(0, SUB_AGENT_APPROVAL_INPUT_MAX),
+        omittedCharacters: Math.max(0, input.length - SUB_AGENT_APPROVAL_INPUT_MAX),
+        runId: run._id,
+        server: mcp?.server ?? null,
+        skillSlug: run.skillSlug ?? null,
+        task: run.task.split("\n", 1)[0]?.slice(0, SUB_AGENT_TASK_LABEL_MAX) ?? "",
+        toolName: mcp?.tool ?? request.toolName,
+    };
+};
+
+/** Up to `room` open requests of one waiting run, on its child's latest turn; none for a child that is not the caller's or is locked. */
+const openRequestsOfRun = async (ctx: QueryCtx, run: RunDoc, userId: string, room: number): Promise<SubAgentApproval[]> => {
+    if (room <= 0 || run.userId !== userId || run.childThreadId === undefined) {
+        return [];
+    }
+
+    const child = await ctx.db.get("threads", run.childThreadId as Id<"threads">);
+
+    if (!child || child.deleted === true || child.userId !== userId || isThreadLocked(child)) {
+        return [];
+    }
+
+    // Proven the caller's own above: its rows (and a grantee's replies in it) are theirs to read through it.
+    admitOwnedThread(ctx, child, userId);
+
+    const { rows } = await pendingApprovalRows(ctx, child._id);
+    const requests: SubAgentApproval[] = [];
+
+    for (const row of rows) {
+        if (requests.length >= room) {
+            break;
+        }
+
+        // Only a request still open on the child's latest turn: the one an answer would be checked against.
+        const request =
+            row.userId === userId && row.config.subAgentRunId === run._id ? await findPendingRequestOnLatestTurn(ctx, child._id, row.approvalId) : undefined;
+
+        if (request) {
+            requests.push(approvalView(run, child._id, row, request));
+        }
+    }
+
+    return requests;
+};
+
+/**
+ * The open approval requests of the sub-agents waiting in a conversation, for the cards in that (parent) conversation.
+ * Its owner only: a stranger's parent answers NOT_FOUND, a locked parent asks for its unlock proof, and a locked child's
+ * requests stay out (its owner unlocks the child to answer). The answer goes through `respondToToolApproval` on the
+ * child thread, so the claim there decides it.
+ */
+export const listSubAgentApprovals = authQuery
+    .input({ parentThreadId: v.id("threads"), unlockProof: v.optional(v.string().max(MAX_LENGTH.short)) })
+    .output(v.array(vSubAgentApproval))
+    .query(async ({ args, ctx }) => {
+        const { userId } = ctx.user;
+        const parent = await requireOwnedThread(ctx, args.parentThreadId, userId, args.unlockProof);
+
+        if (parent.deleted === true) {
+            throw new LunoraError("NOT_FOUND", "Thread not found");
+        }
+
+        const runs = await ctx.db
+            .query("subAgentRuns")
+            .withIndex("by_parentThreadId_and_status", (q) => q.eq("parentThreadId", parent._id).eq("status", "awaiting"))
+            .take(AWAITING_RUNS_READ);
+        const approvals: SubAgentApproval[] = [];
+
+        for (const run of runs) {
+            approvals.push(...(await openRequestsOfRun(ctx, run, userId, SUB_AGENT_APPROVALS_LISTED_MAX - approvals.length)));
+        }
+
+        return approvals;
     });
 
 /**

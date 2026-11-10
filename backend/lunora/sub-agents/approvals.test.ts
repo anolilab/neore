@@ -16,6 +16,7 @@ import schema from "../schema";
 import {
     cancelSubAgentRunsForStop,
     completeResumedRun,
+    listSubAgentApprovals,
     markRunAwaiting,
     postRunResult,
     reapOverdueWaits,
@@ -107,6 +108,8 @@ const pendingRequests = async (): Promise<any[]> =>
 const answer = async (approvalId: string, decision: string): Promise<unknown> =>
     await as(OWNER).mutation(respondToToolApproval as never, { approvalId, decision, threadId: childId } as never);
 const continuations = () => jobsQueueMessages.filter((message) => message.body.functionPath.includes("continueAfterToolApproval"));
+const listed = async (userId = OWNER, threadId = parentId): Promise<any[]> =>
+    (await as(userId).query(listSubAgentApprovals as never, { parentThreadId: threadId } as never)) as any[];
 const runStatus = async (): Promise<string> => {
     const row = await runRow();
 
@@ -551,5 +554,175 @@ describe("a child that waited on a request", () => {
         const rowsAfter = await childRows();
 
         expect(JSON.stringify(rowsAfter.at(-1)?.message)).toContain("The grandchild's answer.");
+    });
+});
+
+describe("a waiting child's requests in its parent conversation", () => {
+    it("lists nothing while the child runs, then each request with its tool, server and input once it waits", async () => {
+        expect(await listed()).toStrictEqual([]);
+
+        await run(async (context) => await markRunAwaiting(context, runId));
+
+        const requests = await listed();
+
+        expect(requests.map((request) => request.approvalId).toSorted((left: string, right: string) => left.localeCompare(right))).toStrictEqual([
+            APPROVAL_ID,
+            SIBLING_ID,
+        ]);
+        expect(requests.find((request) => request.approvalId === APPROVAL_ID)).toStrictEqual({
+            approvalId: APPROVAL_ID,
+            childThreadId: childId,
+            input: JSON.stringify({ path: "/tmp/old.txt" }, null, 2),
+            omittedCharacters: 0,
+            runId,
+            server: "Files",
+            skillSlug: null,
+            task: "Tidy up the files",
+            toolName: "delete",
+        });
+    });
+
+    it("answers the parent's owner alone: a stranger's read is NOT_FOUND, a locked parent needs its unlock, a locked child is left out", async () => {
+        await run(async (context) => await markRunAwaiting(context, runId));
+
+        await expect(listed(STRANGER)).rejects.toThrow(NOT_FOUND);
+
+        await run(async (context) => await context.db.patch("threads", childId as Id<"threads">, { lockedAt: Date.now() }));
+        expect(await listed()).toStrictEqual([]);
+
+        await run(async (context) => await context.db.patch("threads", parentId as Id<"threads">, { lockedAt: Date.now() }));
+        await expect(listed()).rejects.toMatchObject({ data: { code: THREAD_LOCKED_CODE } });
+    });
+
+    it("leaves out another run's request and one the child's latest turn has moved past", async () => {
+        await run(async (context) => {
+            const [row] = await context.db
+                .query("toolApprovalRuns")
+                .withIndex("by_approvalId", (q: any) => q.eq("approvalId", SIBLING_ID))
+                .collect();
+
+            await context.db.patch("toolApprovalRuns", row._id, { config: { ...CONFIG(), subAgentRunId: undefined } });
+            await context.db.insert("toolApprovalRuns", {
+                approvalId: "approval-old",
+                config: CONFIG(),
+                createdAt: Date.now(),
+                status: "pending",
+                threadId: childId,
+                userId: OWNER,
+            });
+        });
+        await run(async (context) => await markRunAwaiting(context, runId));
+
+        const requests = await listed();
+
+        expect(requests.map((request) => request.approvalId)).toStrictEqual([APPROVAL_ID]);
+    });
+
+    it("is bounded: ten requests at most across its waiting sub-agents, and a long input cut with the count of what it left out", async () => {
+        const ids = Array.from({ length: 12 }, (_, index) => `approval-many-${String(index)}`);
+        const long = "x".repeat(5000);
+
+        await run(async (context) => {
+            await context.db.insert("messages", {
+                message: {
+                    content: ids.flatMap((approvalId, index) => [
+                        { input: index === ids.length - 1 ? long : { index }, toolCallId: `call-many-${String(index)}`, toolName: TOOL, type: "tool-call" },
+                        { approvalId, toolCallId: `call-many-${String(index)}`, type: "tool-approval-request" },
+                    ]),
+                    role: "assistant",
+                },
+                order: 2,
+                status: "success",
+                stepOrder: 0,
+                threadId: childId,
+                tool: true,
+                userId: OWNER,
+            });
+
+            for (const approvalId of ids) {
+                await context.db.insert("toolApprovalRuns", {
+                    approvalId,
+                    config: CONFIG(),
+                    createdAt: Date.now(),
+                    status: "pending",
+                    threadId: childId,
+                    userId: OWNER,
+                });
+            }
+        });
+        await run(async (context) => await markRunAwaiting(context, runId));
+        // A second waiting sub-agent in the same conversation: the cap holds across runs, not per run. Its request is the
+        // newest message of all: `lunoraTest`'s row policy drops the `threadId` range once several threads are admitted
+        // (docs/agents/lunora-upstream.md), so the read of this child's latest turn sees every admitted thread's rows.
+        await run(async (context) => {
+            const now = Date.now();
+            const otherChild = await context.db.insert("threads", { status: "active", title: "Sub-agent: other", userId: OWNER });
+            const otherRun = await context.db.insert("subAgentRuns", {
+                childThreadId: otherChild,
+                createdAt: now,
+                depth: 1,
+                parentThreadId: parentId,
+                startedAt: now,
+                status: "awaiting",
+                task: "Something else",
+                toolCallId: "call-parent-2",
+                updatedAt: now,
+                userId: OWNER,
+            });
+
+            await context.db.insert("messages", {
+                message: {
+                    content: [
+                        { input: {}, toolCallId: "call-other", toolName: TOOL, type: "tool-call" },
+                        { approvalId: "approval-other", toolCallId: "call-other", type: "tool-approval-request" },
+                    ],
+                    role: "assistant",
+                },
+                order: 3,
+                status: "success",
+                stepOrder: 0,
+                threadId: otherChild,
+                tool: true,
+                userId: OWNER,
+            });
+            await context.db.insert("toolApprovalRuns", {
+                approvalId: "approval-other",
+                config: { ...CONFIG(), subAgentRunId: otherRun },
+                createdAt: now,
+                status: "pending",
+                threadId: otherChild,
+                userId: OWNER,
+            });
+        });
+
+        const requests = await listed();
+        const newest = requests.find((request) => request.approvalId === "approval-many-11");
+
+        expect(requests).toHaveLength(10);
+        expect(newest.input).toHaveLength(4000);
+        expect(newest.omittedCharacters).toBe(1000);
+    });
+
+    it("is answered from the parent through the child's own claim, which resumes the run once and takes the request off the list", async () => {
+        await run(async (context) => await markRunAwaiting(context, runId));
+
+        const requests = await listed();
+        const request = requests.find((row) => row.approvalId === APPROVAL_ID);
+
+        await expect(
+            as(OWNER).mutation(respondToToolApproval as never, { approvalId: request.approvalId, decision: "today", threadId: request.childThreadId } as never),
+        ).rejects.toThrow(ONCE_OR_ALWAYS);
+        expect(await runStatus()).toBe("awaiting");
+
+        expect(
+            await as(OWNER).mutation(
+                respondToToolApproval as never,
+                { approvalId: request.approvalId, decision: "deny", threadId: request.childThreadId } as never,
+            ),
+        ).toMatchObject({ alreadyResolved: false });
+        expect(continuations()).toHaveLength(1);
+        expect(continuations()[0]!.body.args).toMatchObject({ approved: false, threadId: childId });
+        expect(await runStatus()).toBe("running");
+        expect(await listed()).toStrictEqual([]);
     });
 });
