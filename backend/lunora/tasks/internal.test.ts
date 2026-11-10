@@ -965,6 +965,26 @@ describe("stuck blocked tasks", () => {
         expect(retried.stuckNotice).toStrictEqual({ days: 2, since: T0 });
     });
 
+    it("does not notify a blocked task whose only open dependency is a failed recurring task on its schedule", async () => {
+        const weekly = await insertTask({
+            lastError: "boom",
+            nextRunAt: T0 + 5 * DAY,
+            recurring: true,
+            status: "failed",
+            title: "Weekly",
+            updatedAt: T0,
+        });
+        const taskId = await insertTask({ dependsOn: [weekly], status: "blocked", stuckCheckAt: T0 + 2 * DAY, title: "Waiting", updatedAt: T0 });
+
+        await sweepAt(T0 + 2 * DAY);
+
+        expect(await stuckNotices()).toStrictEqual([]);
+
+        const task = await getTask(taskId);
+
+        expect(task.stuckCheckAt).toBe(T0 + 6 * DAY);
+    });
+
     it("asks once more at 7 idle days, and not again within that episode", async () => {
         const dependency = await insertTask({ status: "todo", title: "First" });
 

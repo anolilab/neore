@@ -865,6 +865,20 @@ export const cancelTask = authMutation
  * approve (done — and dependents unblock), reject (failed), or retry with a
  * note the next run is given.
  */
+/**
+ * A review decision (reject or retry) on `task` ends the wait of the blocked tasks that depend on it. Their stuck clock
+ * restarts here, so the time spent awaiting the owner's decision is not counted as idle time (`tasks/AGENTS.md`).
+ */
+const restartDependentsClock = async (ctx: MutationCtx, task: Doc<"tasks">, now: number): Promise<void> => {
+    const owned = await loadUserTasks(ctx, task.userId);
+    const dependents = owned.filter((other) => other.status === "blocked" && other.dependsOn.includes(task._id));
+
+    for (const dependent of dependents) {
+        await patchRow(ctx.db, "tasks", dependent, { stuckCheckAt: firstStuckCheckAt(now), updatedAt: now });
+        await noteShardDue(ctx, firstStuckCheckAt(now), dependent.userId);
+    }
+};
+
 export const reviewTask = authMutation
     .use(rateLimit("tasks/run"))
     .input({
@@ -901,15 +915,7 @@ export const reviewTask = authMutation
             });
             await noteShardDue(ctx, firstStuckCheckAt(now), task.userId);
 
-            // The dependents were waiting on this review, not on the owner's inactivity: their stuck clock restarts here, so
-            // the wait is not counted as idle time (`tasks/AGENTS.md`).
-            const owned = await loadUserTasks(ctx, task.userId);
-            const dependents = owned.filter((other) => other.status === "blocked" && other.dependsOn.includes(task._id));
-
-            for (const dependent of dependents) {
-                await patchRow(ctx.db, "tasks", dependent, { stuckCheckAt: firstStuckCheckAt(now), updatedAt: now });
-                await noteShardDue(ctx, firstStuckCheckAt(now), dependent.userId);
-            }
+            await restartDependentsClock(ctx, task, now);
 
             ctx.log.event("tasks.review_task", { decision: args.decision, taskId: task._id });
 
@@ -923,6 +929,8 @@ export const reviewTask = authMutation
         await patchById(ctx.db, "tasks", task._id, { reviewNote });
 
         const landed = await startTask(ctx, task, "retry", statusMap(await loadUserTasks(ctx, userId)), now);
+
+        await restartDependentsClock(ctx, task, now);
 
         ctx.log.event("tasks.review_task", { decision: args.decision, taskId: task._id });
 

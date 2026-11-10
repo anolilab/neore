@@ -293,4 +293,49 @@ describe("review decisions and waiting dependents", () => {
         expect(dependent.updatedAt).toBe(rejectedAt);
         expect(dependent.stuckCheckAt).toBe(rejectedAt + 2 * DAY);
     });
+
+    it("restarts a dependent's stuck clock when its review dependency is retried", async () => {
+        const review = await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("tasks", {
+                    attemptCount: 0,
+                    createdAt: 1,
+                    dependsOn: [],
+                    instructions: "x",
+                    maxRepairRounds: 2,
+                    recurring: false,
+                    status: "needs_review",
+                    title: "Review",
+                    updatedAt: T0,
+                    userId: USER,
+                }),
+        );
+        const waiting = await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("tasks", {
+                    attemptCount: 0,
+                    createdAt: 1,
+                    dependsOn: [review],
+                    instructions: "x",
+                    maxRepairRounds: 2,
+                    recurring: false,
+                    status: "blocked",
+                    stuckCheckAt: T0 + 2 * DAY,
+                    title: "Waiting",
+                    updatedAt: T0,
+                    userId: USER,
+                }),
+        );
+
+        // Five idle days later the owner retries the review: the dependent waited for that decision, not for its own idleness.
+        const retriedAt = T0 + 5 * DAY;
+
+        vi.useFakeTimers({ now: retriedAt, toFake: ["Date"] });
+        await as(USER).mutation(reviewTask as never, { decision: "retry", taskId: review } as never);
+
+        const dependent: any = await harness.run(async (ctx: any) => await ctx.db.get("tasks", waiting));
+
+        expect(dependent.updatedAt).toBe(retriedAt);
+        expect(dependent.stuckCheckAt).toBe(retriedAt + 2 * DAY);
+    });
 });

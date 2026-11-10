@@ -174,18 +174,18 @@ export const promoteDependents = async (ctx: MutationCtx, completed: Doc<"tasks"
  */
 const escalateStuckTasks = async (ctx: MutationCtx, now: number): Promise<void> => {
     // Only a blocked task's own dependencies are read, so the cost is bounded by its `dependsOn`, not its owner's task list.
-    const dependencyStatuses = async (dependsOn: ReadonlyArray<string>): Promise<Map<string, TaskStatus>> => {
-        const statusById = new Map<string, TaskStatus>();
+    const dependenciesOf = async (dependsOn: ReadonlyArray<string>): Promise<Doc<"tasks">[]> => {
+        const found: Doc<"tasks">[] = [];
 
         for (const id of dependsOn) {
             const dependency = await ctx.db.get("tasks", id as Id<"tasks">);
 
             if (dependency) {
-                statusById.set(id, dependency.status);
+                found.push(dependency);
             }
         }
 
-        return statusById;
+        return found;
     };
 
     for (const status of STUCK_CHECK_STATUSES) {
@@ -203,10 +203,26 @@ const escalateStuckTasks = async (ctx: MutationCtx, now: number): Promise<void> 
                 continue;
             }
 
-            if (task.status === "blocked" && waitsOnOwnerDecision(task.dependsOn, await dependencyStatuses(task.dependsOn))) {
-                await recheckStuckTask(ctx, task, now + STUCK_OWNER_RECHECK_MS);
+            if (task.status === "blocked") {
+                const dependencies = await dependenciesOf(task.dependsOn);
+                const statusById = new Map(dependencies.map((dependency) => [dependency._id as string, dependency.status] as const));
 
-                continue;
+                if (waitsOnOwnerDecision(task.dependsOn, statusById)) {
+                    await recheckStuckTask(ctx, task, now + STUCK_OWNER_RECHECK_MS);
+
+                    continue;
+                }
+
+                // A failed recurring dependency runs again at its next slot, so the wait is on the schedule, not the owner.
+                const slots = dependencies
+                    .filter((dependency) => dependency.status === "failed" && dependency.recurring && dependency.nextRunAt !== undefined)
+                    .map((dependency) => dependency.nextRunAt as number);
+
+                if (slots.length > 0) {
+                    await recheckStuckTask(ctx, task, Math.max(...slots, now) + STUCK_OWNER_RECHECK_MS);
+
+                    continue;
+                }
             }
 
             const days = stuckNoticeDue(task, now);
