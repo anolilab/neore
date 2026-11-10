@@ -134,11 +134,19 @@ fn fake_tools(dir: &Path) -> (PathBuf, PathBuf, PathBuf) {
     let npm = dir.join("npm");
     let log = dir.join("npm-args.log");
 
-    fs::write(&node, "#!/bin/sh\n").unwrap();
+    // Stands in for node: records how it was started, then runs its first argument as a script.
+    fs::write(
+        &node,
+        format!(
+            "#!/bin/sh\nprintf '%s\\n' \"$@\" > '{}'\nexec /bin/sh \"$@\"\n",
+            dir.join("node-argv.log").display()
+        ),
+    )
+    .unwrap();
     fs::write(
         &npm,
         format!(
-            "#!/bin/sh\necho \"$@\" > '{}'\nfor last; do :; done\nprefix=''\nwhile [ $# -gt 0 ]; do [ \"$1\" = --prefix ] && prefix=\"$2\"; shift; done\nmkdir -p \"$prefix/node_modules/{PACKAGE}\"\ntar xzf \"$last\" -C \"$prefix/node_modules/{PACKAGE}\" --strip-components=1\n",
+            "#!/usr/bin/env node\necho \"$@\" > '{}'\nfor last; do :; done\nprefix=''\nwhile [ $# -gt 0 ]; do [ \"$1\" = --prefix ] && prefix=\"$2\"; shift; done\nmkdir -p \"$prefix/node_modules/{PACKAGE}\"\ntar xzf \"$last\" -C \"$prefix/node_modules/{PACKAGE}\" --strip-components=1\n",
             log.display()
         ),
     )
@@ -984,7 +992,11 @@ fn an_npm_that_fails_installs_nothing_and_says_why() {
     let (node, npm, _) = fake_tools(&dir);
     let bytes = tarball(&manifest(), &[]);
 
-    fs::write(&npm, "#!/bin/sh\necho registry unreachable >&2\nexit 1\n").unwrap();
+    fs::write(
+        &npm,
+        "#!/usr/bin/env node\necho registry unreachable >&2\nexit 1\n",
+    )
+    .unwrap();
 
     let error = state
         .acp_install_npm(request(&state, &node, &npm, &bytes, integrity(&bytes)))
@@ -1178,18 +1190,10 @@ fn only_the_variables_npm_needs_reach_it() {
     );
 }
 
-#[test]
-fn a_program_reached_through_a_link_out_of_the_package_is_refused() {
-    let (state, dir) = state("bin-link-out");
-    let (node, npm, _) = fake_tools(&dir);
-    let outside = dir.join("outside");
-
-    fs::create_dir_all(&outside).unwrap();
-    fs::write(outside.join("cli.js"), "console.log('outside');\n").unwrap();
-
-    // `lib` is a link to a folder outside the package, and the program is a regular file inside it.
+/// A package whose `lib` is a link to `target`, with a `package.json` whose bin is `bin`.
+fn tarball_with_lib_link(bin: &str, target: &Path) -> Vec<u8> {
     let mut builder = tar::Builder::new(Vec::new());
-    let manifest = json!({ "name": PACKAGE, "version": "1.0.0", "bin": "lib/cli.js" }).to_string();
+    let manifest = json!({ "name": PACKAGE, "version": "1.0.0", "bin": bin }).to_string();
     let mut file = tar::Header::new_gnu();
 
     file.set_size(manifest.len() as u64);
@@ -1206,20 +1210,54 @@ fn a_program_reached_through_a_link_out_of_the_package_is_refused() {
     link.set_mode(0o777);
     link.set_cksum();
     builder
-        .append_link(&mut link, "package/lib", &outside)
+        .append_link(&mut link, "package/lib", target)
         .unwrap();
 
     let mut gz = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::default());
 
     gz.write_all(&builder.into_inner().unwrap()).unwrap();
+    gz.finish().unwrap()
+}
 
-    let bytes = gz.finish().unwrap();
+#[test]
+fn a_program_reached_through_a_link_out_of_the_package_is_refused() {
+    let (state, dir) = state("bin-link-out");
+    let (node, npm, _) = fake_tools(&dir);
+    let outside = dir.join("outside");
+
+    fs::create_dir_all(&outside).unwrap();
+    fs::write(outside.join("cli.js"), "console.log('outside');\n").unwrap();
+
+    // `lib` is a link to a folder outside the package, and the program is a regular file inside it.
+    let bytes = tarball_with_lib_link("lib/cli.js", &outside);
     let error = state
         .acp_install_npm(request(&state, &node, &npm, &bytes, integrity(&bytes)))
         .unwrap_err();
 
     assert!(error.contains("not a file inside it"), "{error}");
     assert!(!installed(&dir).exists());
+}
+
+#[test]
+fn a_program_reached_through_a_link_to_a_sibling_package_is_refused() {
+    let (state, dir) = state("bin-link-sibling");
+    let (node, npm, _) = fake_tools(&dir);
+    let mut script = fs::read_to_string(&npm).unwrap();
+
+    // npm also installed another package next to this one, as it does for a dependency.
+    script.push_str(
+        "mkdir -p \"$prefix/node_modules/other-pkg\"\necho \"console.log('other');\" > \"$prefix/node_modules/other-pkg/cli.js\"\n",
+    );
+    fs::write(&npm, script).unwrap();
+
+    // `lib` leads from this package to that one, inside `node_modules` but outside the package.
+    let bytes = tarball_with_lib_link("lib/cli.js", Path::new("../other-pkg"));
+    let error = state
+        .acp_install_npm(request(&state, &node, &npm, &bytes, integrity(&bytes)))
+        .unwrap_err();
+
+    assert!(error.contains("not a file inside it"), "{error}");
+    assert!(state.acp_view().agents.is_empty());
 }
 
 /// A tarball from `(path, text)` entries, paths as given (no `package/` added), repeats allowed.
@@ -1334,4 +1372,72 @@ fn a_tool_rewritten_with_the_same_size_and_its_modification_time_restored_is_ref
         error.contains("is not the file it was when you confirmed"),
         "{error}"
     );
+}
+
+#[test]
+fn npm_runs_under_the_confirmed_node_whatever_its_own_shebang_names() {
+    let (state, dir) = state("npm-shebang");
+    let (node, npm, _) = fake_tools(&dir);
+    let mut script = fs::read_to_string(&npm).unwrap();
+    let bytes = tarball(&manifest(), &[]);
+
+    // A launcher that names another interpreter by an absolute path, which no PATH decides.
+    script = script.replacen(
+        "#!/usr/bin/env node",
+        "#!/opt/not-the-confirmed/bin/node",
+        1,
+    );
+    fs::write(&npm, script).unwrap();
+    state
+        .acp_install_npm(request(&state, &node, &npm, &bytes, integrity(&bytes)))
+        .unwrap();
+
+    let argv = fs::read_to_string(dir.join("node-argv.log")).unwrap();
+
+    assert!(
+        argv.lines().next().unwrap().ends_with("npm"),
+        "the confirmed node was started on npm's file first: {argv}"
+    );
+    assert!(argv.contains("--ignore-scripts"), "{argv}");
+}
+
+#[test]
+fn an_npm_that_node_cannot_run_is_refused_not_executed() {
+    let (state, dir) = state("npm-native");
+    let (node, npm, log) = fake_tools(&dir);
+    let bytes = tarball(&manifest(), &[]);
+
+    fs::write(&npm, "#!/bin/sh\necho native shim > /dev/null\n").unwrap();
+
+    let error = state
+        .acp_install_npm(request(&state, &node, &npm, &bytes, integrity(&bytes)))
+        .unwrap_err();
+
+    assert!(error.contains("npm is not a JavaScript file"), "{error}");
+    assert!(!log.exists());
+    assert!(!dir.join("node-argv.log").exists(), "node did not run");
+    assert!(state.acp_view().agents.is_empty());
+}
+
+#[test]
+fn a_download_can_be_reserved_by_one_call_only() {
+    let (state, dir) = state("reserve");
+    let (node, npm, _) = fake_tools(&dir);
+    let bytes = tarball(&manifest(), &[]);
+    let request = request(&state, &node, &npm, &bytes, integrity(&bytes));
+    let staged = state.staged_archive(&request.archive).unwrap();
+
+    // Two calls that both resolved the download before either took it.
+    let (archive, reserved) = reserve_stage(&staged).unwrap();
+
+    assert!(archive.is_file() && reserved.is_dir());
+    assert!(!staged.exists(), "the download moved with its folder");
+    assert!(reserve_stage(&staged)
+        .unwrap_err()
+        .contains("already being installed"));
+    assert!(archive.is_file(), "the first call's folder is untouched");
+
+    // The full call on the same request finds nothing to take.
+    assert!(state.acp_install_npm(request).is_err());
+    assert!(archive.is_file(), "and did not delete it");
 }

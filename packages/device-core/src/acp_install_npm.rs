@@ -552,9 +552,19 @@ fn run_npm(
     dirs.extend(["/usr/bin", "/bin"].map(PathBuf::from));
 
     let path = std::env::join_paths(dirs).map_err(|error| error.to_string())?;
-    let mut command = Command::new(npm);
+    // npm is usually a link to its `npm-cli.js`, and a launcher script can name its own interpreter by an absolute
+    // path, which no `PATH` decides. So the confirmed node runs npm's real file, and that file has to be one node
+    // can run.
+    let entry = fs::canonicalize(npm).map_err(|error| error.to_string())?;
+
+    if !runs_under_node(&entry) {
+        return Err("npm is not a JavaScript file that Node can run (it may be a native program or a shell script), so Neore cannot run it with the Node.js you confirmed. Nothing was installed".into());
+    }
+
+    let mut command = Command::new(node);
 
     command
+        .arg(&entry)
         .args([
             "install",
             "--ignore-scripts",
@@ -640,19 +650,45 @@ fn digests(file: &mut fs::File) -> Result<(String, String), String> {
     }
 }
 
+/// Takes the staging folder of `staged` for this call alone, by renaming it to a name no other call has: two calls
+/// that resolved the same download cannot both install it or delete each other's working folder. Returns the
+/// archive's new path and the reserved folder.
+fn reserve_stage(staged: &Path) -> Result<(PathBuf, PathBuf), String> {
+    static RESERVED: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+    let stage_dir = staged
+        .parent()
+        .ok_or("the download is not in a staging folder")?;
+    let name = stage_dir
+        .file_name()
+        .ok_or("the download is not in a staging folder")?;
+    let reserved = stage_dir.with_file_name(format!(
+        "{}.installing-{}",
+        name.to_string_lossy(),
+        RESERVED.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+    ));
+
+    fs::rename(stage_dir, &reserved)
+        .map_err(|_| "this download is already being installed".to_owned())?;
+
+    let file = staged
+        .file_name()
+        .ok_or("the download is not in a staging folder")?;
+
+    Ok((reserved.join(file), reserved))
+}
+
 impl DeviceState {
     /// Verifies, installs and registers `request`. Any refusal leaves no file behind.
     pub fn acp_install_npm(&self, request: NpmInstallRequest) -> Result<AcpView, String> {
         let (node, npm) = validate(&request)?;
         let staged = self.staged_archive(&request.archive)?;
-        let stage_dir = staged
-            .parent()
-            .ok_or("the download is not in a staging folder")?
-            .to_path_buf();
+        let (staged, stage_dir) = reserve_stage(&staged)?;
         let result = self.install_npm_staged(&request, &node, &npm, &staged, &stage_dir);
 
         // npm's cache and anything half-installed go whatever happened; a successful install already moved its
-        // folder out. Moved to the trash and deleted on a thread: a failed install can be a very large tree.
+        // folder out. Moved to the trash and deleted on a thread: a failed install can be a very large tree. Only
+        // the folder this call reserved: another call's is not ours to delete.
         self.discard(&stage_dir);
 
         result
@@ -722,10 +758,12 @@ impl DeviceState {
 
         let relative = safe_relative(Path::new(&pick_bin(&manifest, &request.package)?))?;
         let script = package_dir.join(&relative);
+        // Inside THIS package, not just the prefix: a link to a sibling under `node_modules` would otherwise run
+        // another package's file and record where the link led.
         let inside = fs::canonicalize(&script)
             .ok()
-            .zip(fs::canonicalize(&prefix).ok())
-            .is_some_and(|(script, prefix)| script.starts_with(prefix));
+            .zip(fs::canonicalize(&package_dir).ok())
+            .is_some_and(|(script, package)| script.starts_with(package));
 
         if relative.as_os_str().is_empty()
             || !inside
