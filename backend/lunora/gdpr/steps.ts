@@ -561,9 +561,6 @@ export const generateExportFile = internalAction
         // same in-flight-replay reason as `threadTags`.
         pages: v.optional(v.any()),
         profile: v.any(),
-        // The repositories of the user's projects, by owner (`projects/gdpr.ts`). Read here, a page per query, unless a
-        // workflow already in flight passes them.
-        projectRepositories: v.optional(v.any()),
         prompts: v.any(),
         // AI guides of pull requests (`source-control/gdpr.ts`). Optional for the same in-flight-replay reason.
         pullRequestGuides: v.optional(v.any()),
@@ -598,19 +595,22 @@ export const generateExportFile = internalAction
                 async (cursor) => await context.runQuery(internal.acp.gdpr.collectAcpSessionsForExport, { cursor, userId: args.userId }),
                 MAX_EXPORT_BYTES,
             ));
-        // What a section read is close to what it exports. The project repositories share the action's read budget with
-        // the ACP sessions: they cannot be cut short, so a set too large for what is left fails with PAYLOAD_TOO_LARGE
-        // (a floor keeps a small set exportable even past the ACP sessions). The trigger history, which is cut oldest
-        // first, reads only from what is left after both.
+        // The project repositories share the action's read budget with the ACP sessions. Their rows cannot be cut short,
+        // so a set too large for what is left fails with PAYLOAD_TOO_LARGE (a floor keeps a small set exportable even past
+        // the ACP sessions); their projects' details past the budget are marked as left out. The trigger history, which
+        // is cut oldest first, reads only from what is left after both.
         const readBytes = (value: unknown): number => new TextEncoder().encode(JSON.stringify(value)).byteLength;
         const acpReadBytes = readBytes(acpSessions);
-        const projectRepositories =
-            args.projectRepositories ??
-            (await collectAllRepositories(
-                async (cursor) => await context.runQuery(internal.projects.gdpr.collectProjectRepositoriesForExport, { cursor, userId: args.userId }),
-                repositoriesReadBudget(acpReadBytes),
-            ));
-        const triggerReadBytes = triggerReadBudget(acpReadBytes + readBytes(projectRepositories));
+        // The user's repository rows with their projects' details (`projects/gdpr.ts`), read here a page per query.
+        const repositories = await collectAllRepositories(
+            async (cursor) => await context.runQuery(internal.projects.gdpr.collectProjectRepositoriesForExport, { cursor, userId: args.userId }),
+            async (projectId) =>
+                await context.runQuery(internal.projects.gdpr.collectProjectDetailsForExport, { projectId: projectId as Id<"projects">, userId: args.userId }),
+            repositoriesReadBudget(acpReadBytes),
+        );
+        const projectRepositories = { projectRepositories: repositories.projectRepositories };
+        // The projects read for their details count too: a row is read whole, however little of it is exported.
+        const triggerReadBytes = triggerReadBudget(acpReadBytes + repositories.readBytes);
         const exportData = {
             acpSessions,
             bots: args.bots ?? { bots: [] },

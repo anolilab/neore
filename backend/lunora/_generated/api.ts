@@ -629,17 +629,23 @@ export interface ApiTypes {
     };
     projects: {
         functions: {
+            addProjectRepo: FunctionReference<"mutation", { defaultBranch?: string; projectId: Id<"projects">; url: string }, string>;
             createProject: FunctionReference<"mutation", { color?: string; context?: string; defaultEnabledFeatures?: Array<string>; defaultModel?: string; defaultReasoningEffort?: number; description?: string; icon?: string; organizationId?: string; title: string }, string>;
             deleteProject: FunctionReference<"mutation", { moveThreadsToProjectId?: string; projectId: Id<"projects"> }, { success: boolean }>;
+            findRepoProject: FunctionReference<"query", { url: string }, { projectId: string; title: string } | null>;
             getProject: FunctionReference<"query", { projectId: Id<"projects"> }, import("./dataModel.js").Doc_projects | null>;
             listPinnedProjects: FunctionReference<"query", { organizationId?: string }, Array<{ color?: string; context?: string; defaultEnabledFeatures?: Array<string>; defaultModel?: string; defaultReasoningEffort?: number; description?: string; forkedFromId?: string; galleryCategory?: string; galleryFeatured?: boolean; galleryForkCount?: number; galleryPublishedAt?: number; galleryTags?: Array<string>; galleryViewCount?: number; icon?: string; isPublic?: boolean; order?: number; organizationId?: string; pinnedAt?: number; projectType?: "chat" | "workflow"; publicAccessToken?: string; title: string; userId?: string; workflowContent?: { edges: Array<{ id: string; source: string; sourceHandle?: string | null; target: string; targetHandle?: string | null; type?: string }>; nodes: Array<{ data?: unknown; id: string; position: { x: number; y: number }; type: string }>; viewport?: { x: number; y: number; zoom: number } }; _creationTime: number; _id: string; createdAt: number; updatedAt?: number }>>;
+            listProjectRepos: FunctionReference<"query", { projectId: Id<"projects"> }, Array<{ defaultBranch?: string; id: string; isDefault: boolean; revision: number; url: string }>>;
             listProjects: FunctionReference<"query", { organizationId?: string; paginationOpts: { cursor: string | null; endCursor?: string | null; id?: number; numItems: number } }, { continueCursor: string | null; isDone: boolean; page: Array<{ color?: string; context?: string; defaultEnabledFeatures?: Array<string>; defaultModel?: string; defaultReasoningEffort?: number; description?: string; forkedFromId?: string; galleryCategory?: string; galleryFeatured?: boolean; galleryForkCount?: number; galleryPublishedAt?: number; galleryTags?: Array<string>; galleryViewCount?: number; icon?: string; isPublic?: boolean; order?: number; organizationId?: string; pinnedAt?: number; projectType?: "chat" | "workflow"; publicAccessToken?: string; title: string; userId?: string; workflowContent?: { edges: Array<{ id: string; source: string; sourceHandle?: string | null; target: string; targetHandle?: string | null; type?: string }>; nodes: Array<{ data?: unknown; id: string; position: { x: number; y: number }; type: string }>; viewport?: { x: number; y: number; zoom: number } }; _creationTime: number; _id: string; createdAt: number; updatedAt?: number }>; pageStatus?: "SplitRecommended" | "SplitRequired" | null; splitCursor?: string | null }>;
             listThreadsByProject: FunctionReference<"query", { paginationOpts: { cursor: string | null; endCursor?: string | null; id?: number; numItems: number }; projectId: Id<"projects"> }, { pageStatus?: "SplitRecommended" | "SplitRequired" | null | undefined; splitCursor?: string | null | undefined; } & { continueCursor: string | null; isDone: boolean; page: ({ activeAgent?: ({} & { kind: "model"; model: string; }) | undefined; activeLeafMessageId?: string | undefined; awaitingInput?: "approval" | "question" | undefined; botId?: string | undefined; contextResetMessageId?: string | undefined; createdAt?: number | undefined; groupChat?: ({ debateRounds?: number | undefined; stopRequestedAt?: number | undefined; synthesizerSkillId?: string | undefined; } & { mode: "supervisor" | "round-robin" | "mention-only" | "parallel" | "debate"; participants: ({} & { addedAt: number; skillId: string; })[]; }) | undefined; hasContextReset?: boolean | undefined; hasHandoff?: boolean | undefined; lastReplyAt?: number | undefined; lastUserMessageAt?: number | undefined; lastViewedAt?: number | undefined; lockedAt?: number | undefined; order?: number | undefined; permissionMode?: "full" | "supervised" | "auto" | undefined; runner?: "host" | undefined; snoozeChosenAt?: number | undefined; snoozedUntil?: number | undefined; summaryEpoch?: number | undefined; summaryPathTooLongAt?: number | undefined; tagIds?: string[] | undefined; workerPolicy?: ({ maxDispatchesPerHour?: number | undefined; } & { allowedSources: ("user" | "lead" | "outside_agent" | "trigger" | "messenger")[]; hostDispatch: "ask"; }) | undefined; autoModel?: boolean | undefined; category?: string | undefined; createdBy?: string | undefined; customSystemPrompt?: string | undefined; deleted?: boolean | undefined; deletedAt?: number | undefined; dictationLanguage?: string | undefined; enabledFeatures?: string[] | undefined; externalThreadId?: string | undefined; isPublic?: boolean | undefined; isTemporary?: boolean | undefined; language?: string | undefined; lastCompressionStartedAt?: number | undefined; messengerConnectionId?: string | undefined; mode?: "text" | "image" | "video" | undefined; model?: string | undefined; multiChat?: boolean | undefined; organizationId?: string | undefined; parentThreadIds?: string[] | undefined; pinnedAt?: number | undefined; projectId?: string | undefined; publicAccessToken?: string | undefined; reasoningEffort?: number | undefined; source?: string | undefined; statelessMode?: boolean | undefined; summary?: string | undefined; tags?: string[] | undefined; teamId?: string | undefined; title?: string | undefined; updatedAt?: number | undefined; userId?: string | undefined; } & { _creationTime: number; _id: string; status: "running" | "error" | "active" | "archived" | "abort" | "finish"; })[]; }>;
             moveThreadToProject: FunctionReference<"mutation", { projectId?: Id<"projects">; threadId: Id<"threads">; unlockProof?: string }, { success: boolean }>;
             pinProject: FunctionReference<"mutation", { projectId: Id<"projects"> }, { success: boolean }>;
+            removeProjectRepo: FunctionReference<"mutation", { repoId: Id<"projectRepositories"> }, null>;
+            setDefaultProjectRepo: FunctionReference<"mutation", { repoId: Id<"projectRepositories"> }, null>;
             unpinProject: FunctionReference<"mutation", { projectId: Id<"projects"> }, { success: boolean }>;
             updateProject: FunctionReference<"mutation", { patch: { color?: string | null; context?: string; defaultEnabledFeatures?: Array<string>; defaultModel?: string; defaultReasoningEffort?: number; description?: string; icon?: string | null; organizationId?: string; title?: string }; projectId: Id<"projects"> }, string>;
             updateProjectOrder: FunctionReference<"mutation", { projectOrders: Array<{ order: number; projectId: string }> }, { success: boolean }>;
+            updateProjectRepo: FunctionReference<"mutation", { defaultBranch?: string; repoId: Id<"projectRepositories">; revision: number }, number>;
         };
     };
     prompts: {
@@ -902,7 +908,7 @@ export interface ApiTypes {
             updateGalleryMeta: FunctionReference<"mutation", { category?: "image" | "text" | "video" | "audio" | "automation"; description?: string; projectId: Id<"projects">; tags?: Array<string> }, { success: boolean }>;
         };
         generate: {
-            generateWorkflowFromPrompt: FunctionReference<"action", { prompt: string }, { edges: { sourceHandle: string; targetHandle: string; type: "animated"; id: string; source: string; target: string; }[]; nodes: { data: { [x: string]: unknown; label: string; description?: string | undefined; }; id: string; position: { x: number; y: number; }; type: "text" | "output" | "image" | "file" | "code" | "branch" | "video" | "audio" | "img2img" | "inpaint" | "outpaint" | "transcription" | "upscale" | "ai" | "background-removal" | "image-to-video"; }[]; viewport: { x: number; y: number; zoom: number; }; }>;
+            generateWorkflowFromPrompt: FunctionReference<"action", { prompt: string }, { edges: { sourceHandle: string; targetHandle: string; type: "animated"; id: string; source: string; target: string; }[]; nodes: { data: { [x: string]: unknown; label: string; description?: string | undefined; }; id: string; position: { x: number; y: number; }; type: "text" | "output" | "image" | "file" | "code" | "branch" | "video" | "audio" | "img2img" | "upscale" | "inpaint" | "outpaint" | "transcription" | "ai" | "background-removal" | "image-to-video"; }[]; viewport: { x: number; y: number; zoom: number; }; }>;
         };
         presence: {
             checkNodeLock: FunctionReference<"query", { nodeId: string; projectId: Id<"projects"> }, { locked: boolean; lockedBy: string | null; lockerColor: string | null }>;
@@ -1539,17 +1545,23 @@ export const api: ApiTypes = {
     },
     projects: {
         functions: {
+            addProjectRepo: { __lunoraRef: "projects_functions:addProjectRepo" },
             createProject: { __lunoraRef: "projects_functions:createProject" },
             deleteProject: { __lunoraRef: "projects_functions:deleteProject" },
+            findRepoProject: { __lunoraRef: "projects_functions:findRepoProject" },
             getProject: { __lunoraRef: "projects_functions:getProject" },
             listPinnedProjects: { __lunoraRef: "projects_functions:listPinnedProjects" },
+            listProjectRepos: { __lunoraRef: "projects_functions:listProjectRepos" },
             listProjects: { __lunoraRef: "projects_functions:listProjects" },
             listThreadsByProject: { __lunoraRef: "projects_functions:listThreadsByProject" },
             moveThreadToProject: { __lunoraRef: "projects_functions:moveThreadToProject" },
             pinProject: { __lunoraRef: "projects_functions:pinProject" },
+            removeProjectRepo: { __lunoraRef: "projects_functions:removeProjectRepo" },
+            setDefaultProjectRepo: { __lunoraRef: "projects_functions:setDefaultProjectRepo" },
             unpinProject: { __lunoraRef: "projects_functions:unpinProject" },
             updateProject: { __lunoraRef: "projects_functions:updateProject" },
             updateProjectOrder: { __lunoraRef: "projects_functions:updateProjectOrder" },
+            updateProjectRepo: { __lunoraRef: "projects_functions:updateProjectRepo" },
         },
     },
     prompts: {

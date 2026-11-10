@@ -48,7 +48,8 @@ export const eraseOrganizationRepositories = internalMutation
     .input({ cursor: v.optional(v.string().max(MAX_LENGTH.cursor)), organizationId: v.string().max(MAX_LENGTH.id) })
     .output(v.null())
     .mutation(async ({ args: { cursor, organizationId }, ctx }) => {
-        const page = await ctx.db.projectRepositories.findMany({ cursor: cursor ?? null, limit: BATCH, where: { organizationId } });
+        // From the primary: a replica's stale copy could still show a row under this organization after its project moved.
+        const page = await ctx.db.projectRepositories.findMany({ consistency: "primary", cursor: cursor ?? null, limit: BATCH, where: { organizationId } });
 
         await Promise.all(page.page.filter((row) => isOrganizationOwned(row)).map((row) => ctx.db.delete("projectRepositories", row._id)));
 
@@ -79,7 +80,8 @@ export const sweepOrphanedOrganizationRepositories = internalMutation
     .input({ cursor: v.optional(v.string().max(MAX_LENGTH.cursor)) })
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
-        const page = await ctx.db.projectRepositories.findMany({ cursor: args.cursor ?? null, limit: ORPHAN_SWEEP_PAGE_SIZE });
+        // From the primary, like the organization read below: no stale `organizationId` decides a delete.
+        const page = await ctx.db.projectRepositories.findMany({ consistency: "primary", cursor: args.cursor ?? null, limit: ORPHAN_SWEEP_PAGE_SIZE });
         const gone = new Map<string, boolean>();
         let deleted = 0;
 
@@ -92,7 +94,11 @@ export const sweepOrphanedOrganizationRepositories = internalMutation
 
             if (!gone.has(organizationId)) {
                 try {
-                    const organization = await ctx.db.organization.findFirst({ where: { _id: ctx.db.asId("organization", organizationId) } });
+                    // From the primary: a lagging replica that has not seen a new organization yet must not read as "deleted".
+                    const organization = await ctx.db.organization.findFirst({
+                        consistency: "primary",
+                        where: { _id: ctx.db.asId("organization", organizationId) },
+                    });
 
                     gone.set(organizationId, organization === null);
                 } catch (error) {
@@ -139,4 +145,25 @@ export const collectProjectRepositoriesForExport = internalQuery
             });
 
         return { cursor: result.isDone ? null : result.continueCursor, projectRepositories };
+    });
+
+/**
+ * A project's details for the export, next to its repositories: its title and whether it is shared (`isPublic`), never the share
+ * token (`pages/gdpr.ts` drops a page's the same way). `readBytes` is what reading the whole row cost, `context` and
+ * workflow included, so the export can count it against its read budget. `null` for a project that is gone or not
+ * the user's.
+ */
+export const collectProjectDetailsForExport = internalQuery
+    .input({ projectId: v.id("projects"), userId: v.string().max(MAX_LENGTH.id) })
+    .output(v.object({ project: v.union(v.object({ sharingEnabled: v.boolean(), title: v.string() }), v.null()), readBytes: v.number() }))
+    .query(async ({ args: { projectId, userId }, ctx }) => {
+        const project = await ctx.db.projects.findFirst({ where: { _id: projectId } });
+        const readBytes = project ? new TextEncoder().encode(JSON.stringify(project)).byteLength : 0;
+
+        if (!project || project.userId !== userId) {
+            return { project: null, readBytes };
+        }
+
+        // Shared while it is public: unpublishing keeps the token (so a re-publish keeps its link) but clears `isPublic`.
+        return { project: { sharingEnabled: project.isPublic === true, title: project.title }, readBytes };
     });

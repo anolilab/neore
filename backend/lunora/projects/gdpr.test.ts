@@ -7,20 +7,25 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import schema from "../schema";
 import { collectAllRepositories } from "./export-pages";
-import { collectProjectRepositoriesForExport } from "./gdpr";
+import { collectProjectDetailsForExport, collectProjectRepositoriesForExport } from "./gdpr";
 
 const A = "user-a";
+const SHARE_TOKENS = /share-token|old-token/u;
 const B = "user-b";
 
 let harness: ReturnType<typeof lunoraTest>;
 
-const exportFor = async (userId: string): Promise<{ pages: number; projectRepositories: unknown[] }> => {
+const exportFor = async (userId: string, maxBytes = Infinity): Promise<{ pages: number; projectRepositories: unknown[] }> => {
     let pages = 0;
-    const { projectRepositories } = await collectAllRepositories(async (cursor) => {
-        pages += 1;
+    const { projectRepositories } = await collectAllRepositories(
+        async (cursor) => {
+            pages += 1;
 
-        return await harness.run((async (ctx: any) => await ctx.runQuery(collectProjectRepositoriesForExport, { cursor, userId })) as never);
-    }, Infinity);
+            return await harness.run((async (ctx: any) => await ctx.runQuery(collectProjectRepositoriesForExport, { cursor, userId })) as never);
+        },
+        async (projectId) => await harness.run((async (ctx: any) => await ctx.runQuery(collectProjectDetailsForExport, { projectId, userId })) as never),
+        maxBytes,
+    );
 
     return { pages, projectRepositories };
 };
@@ -42,7 +47,47 @@ describe("project repositories in the GDPR export", () => {
 
         const { projectRepositories } = await exportFor(A);
 
-        expect(projectRepositories).toMatchObject([{ defaultBranch: "main", url: "https://github.com/o/r.git" }]);
+        expect(projectRepositories).toMatchObject([{ defaultBranch: "main", project: null, url: "https://github.com/o/r.git" }]);
+    });
+
+    it("puts each repository's project details next to it: the title and whether sharing is on, never the share token", async () => {
+        await harness.run((async (ctx: any) => {
+            const projectId = await ctx.db.insert("projects", { createdAt: 1, isPublic: true, publicAccessToken: "share-token", title: "Web", userId: A });
+            // Unpublished: the token stays for a later re-publish, but the project is not shared.
+            const unpublished = await ctx.db.insert("projects", { createdAt: 1, isPublic: false, publicAccessToken: "old-token", title: "Draft", userId: A });
+
+            await ctx.db.insert("projectRepositories", { createdAt: 1, projectId, url: "https://github.com/o/web.git", userId: A });
+            await ctx.db.insert("projectRepositories", { createdAt: 2, projectId, url: "https://github.com/o/api.git", userId: A });
+            await ctx.db.insert("projectRepositories", { createdAt: 3, projectId: unpublished, url: "https://github.com/o/draft.git", userId: A });
+        }) as never);
+
+        const { projectRepositories } = await exportFor(A);
+        const byUrl = (projectRepositories as { url: string }[]).toSorted((left, right) => left.url.localeCompare(right.url));
+
+        expect(byUrl).toMatchObject([
+            { project: { sharingEnabled: true, title: "Web" }, url: "https://github.com/o/api.git" },
+            { project: { sharingEnabled: false, title: "Draft" }, url: "https://github.com/o/draft.git" },
+            { project: { sharingEnabled: true, title: "Web" }, url: "https://github.com/o/web.git" },
+        ]);
+        expect(JSON.stringify(projectRepositories)).not.toMatch(SHARE_TOKENS);
+    });
+
+    it("marks a project's details as left out once its reads pass the budget, and still exports every repository", async () => {
+        await harness.run((async (ctx: any) => {
+            for (const title of ["First", "Second"]) {
+                const projectId = await ctx.db.insert("projects", { context: "x".repeat(5000), createdAt: 1, title, userId: A });
+
+                await ctx.db.insert("projectRepositories", { createdAt: 1, projectId, url: `https://github.com/o/${title}.git`, userId: A });
+            }
+        }) as never);
+
+        // Room for the rows and the first project's read (about 5 KB), which uses up the rest: the second is not read.
+        const { projectRepositories } = await exportFor(A, 3000);
+
+        // Whichever project is read first gets its details; the other is marked, and both repositories are exported.
+        expect(projectRepositories).toHaveLength(2);
+        expect(projectRepositories.filter((row) => "title" in (row as { project: object }).project)).toHaveLength(1);
+        expect(projectRepositories.filter((row) => "detailsOmitted" in (row as { project: object }).project)).toHaveLength(1);
     });
 
     it("pages past one page (230 rows over 3 pages of 100) and reports done only after the last", async () => {
@@ -65,6 +110,14 @@ describe("project repositories in the GDPR export", () => {
             return { cursor: "next", projectRepositories: [{ url: "x".repeat(500) }] };
         };
 
-        await expect(collectAllRepositories(async () => page(), 1000)).rejects.toMatchObject({ code: "PAYLOAD_TOO_LARGE" });
+        await expect(
+            collectAllRepositories(
+                async () => page(),
+                async () => {
+                    return { project: null, readBytes: 0 };
+                },
+                1000,
+            ),
+        ).rejects.toMatchObject({ code: "PAYLOAD_TOO_LARGE" });
     });
 });

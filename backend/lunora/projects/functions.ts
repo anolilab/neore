@@ -544,7 +544,8 @@ export const setDefaultProjectRepo = authMutation
     .mutation(async ({ args, ctx: context }) => {
         const repo = await editableRepo(context, args.repoId as Id<"projectRepositories">, context.user.userId);
 
-        const rows = await repoRows(context, repo.projectId);
+        // From the primary: a pick a lagging replica has not seen yet would otherwise be stamped over, not after.
+        const rows = await repoRows(context, repo.projectId, { primary: true });
         const latest = Math.max(0, ...rows.map((row) => row.defaultAt ?? 0));
 
         await context.db.patch("projectRepositories", repo._id, { defaultAt: Math.max(context.now, latest + 1) });
