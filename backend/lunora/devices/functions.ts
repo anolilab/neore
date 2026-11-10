@@ -265,17 +265,14 @@ export const revokeDevice = authMutation
         const { page: owned } = await ctx.db.devices.findMany({ limit: MAX_DEVICES_PER_USER, where: { userId } });
         const hosts = owned.filter((other) => other.viaDeviceId === device._id);
 
-        // A machine that paired itself by code and lost the reply gets its code back (`auth/cli-device-auth.ts`). Revoking
-        // its stray device must not let the code pair again, so a code that is still waiting is denied.
-        if (device.pairedByCode !== undefined) {
-            const code = await ctx.db.deviceCode.findFirst({ where: { _id: ctx.db.asId("deviceCode", device.pairedByCode) } });
-
-            if (code) {
-                await patchRow(ctx.db, "deviceCode", code, { status: "denied" });
-            }
-        }
-
         for (const revoked of [device, ...hosts]) {
+            // A machine that paired itself by code may still hold the code (a lost reply puts it back,
+            // `auth/cli-device-auth.ts`). Remembered here, on this shard and in this mutation, so the code cannot
+            // register a device again: `registerHeadlessDevice` runs on the same shard and refuses it.
+            if (revoked.pairedByCode !== undefined) {
+                await ctx.db.insert("devicePairingRevocations", { codeId: revoked.pairedByCode, revokedAt: ctx.now, userId });
+            }
+
             await expireOpenCalls(ctx, revoked._id, "The device was removed");
             await endHostSessionsOfDevice(ctx, revoked._id, ctx.now);
             await deleteShardRoute(ctx, "device", revoked._id as string);

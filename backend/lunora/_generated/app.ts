@@ -671,6 +671,7 @@ class AppBuilder<Env extends object> {
             ["dailyBriefState", { mode: { field: "userId", kind: "shardBy" } }],
             ["deviceCalls", { mode: { field: "userId", kind: "shardBy" } }],
             ["deviceCode", { mode: { kind: "global" } }],
+            ["devicePairingRevocations", { mode: { field: "userId", kind: "shardBy" } }],
             ["devices", { mode: { field: "userId", kind: "shardBy" } }],
             ["documentHistory", { mode: { kind: "global" } }],
             ["documents", { mode: { field: "userId", kind: "shardBy" } }],

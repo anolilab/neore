@@ -273,6 +273,17 @@ export const deviceCalls = sqliteTable("deviceCalls", {
     by_createdAt: index("by_createdAt").on(t.createdAt),
 }));
 
+export const devicePairingRevocations = sqliteTable("devicePairingRevocations", {
+    _id: text("_id").primaryKey(),
+    _creationTime: integer("_creationTime").notNull(),
+    codeId: text("codeId").notNull(),
+    revokedAt: real("revokedAt").notNull(),
+    userId: text("userId").notNull(),
+}, (t) => ({
+    by_userId_codeId: index("by_userId_codeId").on(t.userId, t.codeId),
+    by_revokedAt: index("by_revokedAt").on(t.revokedAt),
+}));
+
 export const devices = sqliteTable("devices", {
     _id: text("_id").primaryKey(),
     _creationTime: integer("_creationTime").notNull(),

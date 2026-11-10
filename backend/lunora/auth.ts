@@ -679,7 +679,8 @@ export const buildAuth = (env: AuthEnv): ReturnType<typeof createAuth> => {
         ...buildAuthOptions({
             // `hostPairing` is deliberately NOT wired here: the approval page words every code as a read-only CLI
             // sign-in, so a machine code would be consent-phishing. Wire `checkHeadlessPairing` and
-            // `registerHeadlessDevice` (on the account's shard) once the page shows machine-specific consent.
+            // `registerHeadlessDevice` once the page shows machine-specific consent, BOTH with `{ shardKey: userId }`:
+            // a revocation (`devicePairingRevocations`) only stops a registration that runs on the same shard.
             // Queued, not run here: moving a guest's rows takes a round trip per
             // table and page, too long to hold the sign-up request. The job runs
             // on the NEW user's shard (`lib/account-merge.ts#runGuestMerge`). A

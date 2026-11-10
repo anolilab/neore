@@ -5966,6 +5966,47 @@
       "relations": {},
       "shardMode": "global:d1"
     },
+    "devicePairingRevocations": {
+      "commitOrdered": false,
+      "fields": {
+        "codeId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "revokedAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "userId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        }
+      },
+      "indexes": {
+        "by_revokedAt": {
+          "fields": [
+            "revokedAt"
+          ],
+          "unique": false
+        },
+        "by_userId_codeId": {
+          "fields": [
+            "userId",
+            "codeId"
+          ],
+          "unique": false
+        }
+      },
+      "memory": false,
+      "relations": {},
+      "shardMode": "shardBy:userId"
+    },
     "devices": {
       "commitOrdered": false,
       "fields": {

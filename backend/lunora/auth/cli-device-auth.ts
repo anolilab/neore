@@ -274,12 +274,12 @@ const keyBodySchema = z.object({
 const restoreClaimedCode = async (
     adapter: { create: (input: { data: Record<string, unknown>; forceAllowId?: boolean; model: string }) => Promise<unknown> },
     claimed: { id?: unknown; userId?: unknown },
-    cause: unknown,
+    cause?: unknown,
 ): Promise<void> => {
     try {
         await adapter.create({ data: { ...claimed }, forceAllowId: true, model: "deviceCode" });
     } catch (error) {
-        authLogger.error("[auth] could not restore a device code after a failed redemption", {
+        authLogger.error("[auth] could not restore a redeemed device code", {
             cause,
             deviceCodeId: claimed.id,
             error,
@@ -432,9 +432,10 @@ const hostBodySchema = z.object({
 });
 
 /**
- * Redeems an approved host code: the machine that asked receives its device id and secret, ONCE, in this
- * response. The device is registered only AFTER the plugin's atomic claim, so two racing polls cannot register
- * two devices; the secret never passes through the approving browser.
+ * Redeems an approved host code: the machine that asked receives its device id and secret in this response. The
+ * device is registered only AFTER the plugin's atomic claim, so two racing polls cannot register two devices; the
+ * secret never passes through the approving browser. Until the code expires, a later poll with the same device code
+ * gets the same device again (a lost reply), unless the device was revoked.
  */
 const redeemHost = (options: HostPairingOptions) =>
     createAuthEndpoint("/device/host", { body: hostBodySchema, metadata: { noStore: true }, method: "POST" }, async (ctx) => {
@@ -481,14 +482,20 @@ const redeemHost = (options: HostPairingOptions) =>
             const refusal = refusalOrRetryable(error);
 
             // A failure of ours, or a full account (`device_limit`, which tells the machine to wait): put the code back so
-            // the machine's next poll finishes the pairing, as with a failed key mint. Only a final refusal leaves it spent.
-            // A retry within the code's life returns the same device's secret again: intended, the machine never received it.
+            // the machine's next poll finishes the pairing, as with a failed key mint. Only a final refusal (a revoked
+            // pairing among them) leaves it spent. Whether a failure of ours committed the device is the shard's to
+            // know: the next registration finds it, or refuses it if it was revoked meanwhile.
             if (refusalCode(error) === undefined || isDeviceLimit(error)) {
                 await restoreClaimedCode(ctx.context.adapter, claimedDeviceCode, error);
             }
 
             throw refusal;
         }
+
+        // Put back after a success too: if this reply is lost on its way, the machine's next poll gets the same device
+        // and secret instead of `invalid_grant` and a device nobody holds. Only the holder of the device code can poll,
+        // only until the code expires, and revoking the device in Settings ends it (`devicePairingRevocations`).
+        await restoreClaimedCode(ctx.context.adapter, claimedDeviceCode);
 
         ctx.setHeader("Cache-Control", "no-store");
         ctx.setHeader("Pragma", "no-cache");

@@ -33,6 +33,7 @@ const functions = await import("./functions");
 const internals = await import("./internal");
 const { signDevicePayload, verifyDevicePayload } = await import("./lib/signing");
 const gdpr = await import("./gdpr");
+const { PAIRING_REVOCATION_RETENTION_MS, PAIRING_REVOKED_CODE } = await import("./lib/constants");
 const { MAX_DEVICES_PER_USER, MAX_OPEN_CALLS_PER_DEVICE, MIN_DEVICE_PROTOCOL } = await import("./lib/constants");
 const { createAcpCall } = await import("./lib/acp-call");
 const { ACP_CLAIM_WINDOW_MS, DEVICE_CLAIM_WINDOW_MS } = await import("./lib/constants");
@@ -1291,26 +1292,69 @@ describe("a headless machine paired by code", () => {
         expect(list[0]).not.toHaveProperty("viaDeviceId");
     });
 
-    it("denies a code that is still waiting when the device it made is revoked, so the code cannot pair again", async () => {
-        // The reply was lost, so the code was put back; the person then removes the stray device.
+    it("refuses a code whose device was revoked, for good, and leaves the code's own row alone", async () => {
         const codeId = (await harness.run(
             async (ctx: any) =>
                 await ctx.db.insert("deviceCode", {
                     clientId: "neore-host",
-                    deviceCode: "waiting-device-code",
+                    deviceCode: "revoked-device-code",
                     expiresAt: Date.now() + 60_000,
                     status: "approved",
-                    userCode: "WAITCODE",
+                    userCode: "REVOKEDC",
                     userId: ownerId,
                 }),
         )) as string;
-        const stray = await pairHeadless(ownerId, "build-box", codeId);
+        const paired = await pairHeadless(ownerId, "build-box", codeId);
 
-        await as(ownerId).mutation(functions.revokeDevice as never, { deviceId: stray.deviceId } as never);
+        await as(ownerId).mutation(functions.revokeDevice as never, { deviceId: paired.deviceId } as never);
 
+        // A machine still holding the code (its reply was lost, so the code was put back) cannot pair again.
+        await expect(pairHeadless(ownerId, "build-box", codeId)).rejects.toMatchObject({ code: "FORBIDDEN", data: { code: PAIRING_REVOKED_CODE } });
+        // The check before the code is spent refuses it too, so the machine stops instead of waiting.
+        await expect(harness.run(async (ctx: any) => await ctx.runQuery(internals.checkHeadlessPairing, { codeId, userId: ownerId }))).rejects.toMatchObject({
+            data: { code: PAIRING_REVOKED_CODE },
+        });
+        expect((await as(ownerId).query(functions.listDevices as never, {} as never)) as unknown[]).toHaveLength(0);
+
+        // The revocation lives on the owner's shard; the global code row is not written.
         const row = (await harness.run(async (ctx: any) => await ctx.db.get("deviceCode", codeId))) as { status: string };
 
-        expect(row.status).toBe("denied");
+        expect(row.status).toBe("approved");
+    });
+
+    it("forgets a revoked code once no machine could present it, and with the account", async () => {
+        const paired = await pairHeadless(ownerId, "build-box", "code-forgotten");
+
+        await as(ownerId).mutation(functions.revokeDevice as never, { deviceId: paired.deviceId } as never);
+
+        const revocations = async () =>
+            (
+                (await harness.run(async (ctx: any) => await ctx.db.devicePairingRevocations.findMany({ limit: 10, where: { userId: ownerId } }))) as {
+                    page: { codeId: string }[];
+                }
+            ).page;
+
+        expect(await revocations()).toMatchObject([{ codeId: "code-forgotten" }]);
+
+        // One remembered long enough ago that its code has expired, beside the fresh one.
+        await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("devicePairingRevocations", {
+                    codeId: "code-lapsed",
+                    revokedAt: Date.now() - PAIRING_REVOCATION_RETENTION_MS - 1000,
+                    userId: ownerId,
+                }),
+        );
+        await harness.run(async (ctx: any) => await ctx.runMutation(internals.sweepDeviceCalls, {}));
+
+        expect(await revocations()).toMatchObject([{ codeId: "code-forgotten" }]);
+
+        const again = await pairHeadless(ownerId, "build-box", "code-erased");
+
+        await as(ownerId).mutation(functions.revokeDevice as never, { deviceId: again.deviceId } as never);
+        await harness.run(async (ctx: any) => await ctx.runMutation(gdpr.deleteUserDevices, { userId: ownerId }));
+
+        expect(await revocations()).toHaveLength(0);
     });
 
     it("is registered once per redeemed code: a retry after a lost reply gets the same device and secret", async () => {

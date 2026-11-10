@@ -720,6 +720,17 @@ export const schema = defineSchema({
         .index("expiresAt", ["expiresAt"])
         .index("userCode", ["userCode"], { unique: true })
         .index("userId", ["userId"]),
+    // A pairing code whose device was revoked (`revokeDevice`): `registerHeadlessDevice` refuses it, so a machine
+    // still holding the code cannot pair again. On the owner's shard, written in the revoking mutation, so a
+    // registration and a revocation of the same code are serialised. Swept after the code can no longer be presented.
+    devicePairingRevocations: defineTable({
+        codeId: v.string(),
+        revokedAt: v.number(),
+        userId: v.string(),
+    })
+        .shardBy("userId")
+        .index("by_userId_codeId", ["userId", "codeId"])
+        .index("by_revokedAt", ["revokedAt"]),
     // A paired install of the desktop shell (`devices/`, `apps/desktop`). The
     // secret signs calls and verifies results; it is removed on revoke, so a
     // revoked row can sign nothing. `manifest` is the device's verified tools.

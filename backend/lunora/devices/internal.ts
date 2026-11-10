@@ -15,7 +15,15 @@ import { threadHandoffTaint, threadSummaryTaint } from "../agent/thread-summary-
 import { decryptKey } from "../lib/encryption";
 import { checkRateLimit } from "../lib/rate-limiter";
 import { MAX_LENGTH } from "../lib/validators";
-import { DEVICE_CALL_DEADLINE_MS, DEVICE_CALL_RETENTION_MS, MAX_DEVICE_INPUT_BYTES, MAX_DEVICES_PER_USER, MAX_OPEN_CALLS_PER_DEVICE } from "./lib/constants";
+import {
+    DEVICE_CALL_DEADLINE_MS,
+    DEVICE_CALL_RETENTION_MS,
+    MAX_DEVICE_INPUT_BYTES,
+    MAX_DEVICES_PER_USER,
+    MAX_OPEN_CALLS_PER_DEVICE,
+    PAIRING_REVOCATION_RETENTION_MS,
+    PAIRING_REVOKED_CODE,
+} from "./lib/constants";
 import { isDeviceInScope, resolveThreadProject } from "./lib/scope";
 import { signDevicePayload, utf8Length } from "./lib/signing";
 import { assertRoomForDevice, insertDevice } from "./lib/register";
@@ -304,8 +312,27 @@ export const sweepDeviceCalls = internalMutation
 
         await Promise.all(old.map(async (call) => await ctx.db.delete("deviceCalls", call._id)));
 
+        // A revoked pairing code is remembered only while a machine could still present it.
+        const { page: lapsed } = await ctx.db.devicePairingRevocations.findMany({
+            limit: SWEEP_BATCH,
+            where: { revokedAt: { lt: now - PAIRING_REVOCATION_RETENTION_MS } },
+        });
+
+        await Promise.all(lapsed.map(async (row) => await ctx.db.delete("devicePairingRevocations", row._id)));
+
         return null;
     });
+
+/** Refuses a pairing code whose device was revoked: final, so the machine stops and the code never pairs again. */
+const assertPairingNotRevoked = async (ctx: Pick<QueryCtx, "db">, userId: string, codeId: string): Promise<void> => {
+    const revoked = await ctx.db.devicePairingRevocations.findFirst({ where: { codeId, userId } });
+
+    if (revoked) {
+        throw new LunoraError("FORBIDDEN", "This machine's pairing was revoked in Settings. Pair it again with a new code.", {
+            data: { code: PAIRING_REVOKED_CODE },
+        });
+    }
+};
 
 /** The device already registered for this redeemed code, if any. */
 const findDeviceForCode = async (ctx: Pick<QueryCtx, "db">, userId: string, codeId: string) => {
@@ -338,10 +365,15 @@ export const checkHeadlessPairing = internalQuery
         // The account checks come first, always: a retry must not be handed a secret after deletion began.
         await assertAccountMayPair(ctx, args.userId);
 
-        // A retried poll of a code whose device already exists is finishing that pairing: its own device must not
-        // count against the cap (`registerHeadlessDevice` hands it back).
-        if (args.codeId !== undefined && (await findDeviceForCode(ctx, args.userId, args.codeId))) {
-            return null;
+        if (args.codeId !== undefined) {
+            // Refused before the code is spent, so a machine whose device was revoked stops instead of waiting.
+            await assertPairingNotRevoked(ctx, args.userId, args.codeId);
+
+            // A retried poll of a code whose device already exists is finishing that pairing: its own device must not
+            // count against the cap (`registerHeadlessDevice` hands it back).
+            if (await findDeviceForCode(ctx, args.userId, args.codeId)) {
+                return null;
+            }
         }
 
         await assertRoomForDevice(ctx, args.userId);
@@ -351,10 +383,11 @@ export const checkHeadlessPairing = internalQuery
 
 /**
  * Registers the machine that redeemed an approved pairing code as a device of the approving account. The secret is
- * returned to the code redemption, which hands it to that machine in its response. Idempotent per redeemed code: if
- * the first reply was lost (a timeout after this committed) the redemption retries with the same `codeId` and gets
- * the device and secret it already made, not a second device. Only the redemption route calls this, after the
- * plugin's one-time claim of the code (a retry first puts the code back).
+ * returned to the code redemption, which hands it to that machine in its response. Idempotent per redeemed code: the
+ * redemption puts the code back after every answer it could not be sure arrived (and after a success, for a reply lost
+ * on the way to the machine), and a poll with the same `codeId` gets the device and secret already made, not a second
+ * device. A code whose device was revoked is refused for good. Only the redemption route calls this, after the
+ * plugin's one-time claim of the code.
  */
 export const registerHeadlessDevice = internalMutation
     .input({
@@ -366,6 +399,9 @@ export const registerHeadlessDevice = internalMutation
     .output(v.object({ deviceId: v.string(), secret: v.string() }))
     .mutation(async ({ args, ctx }) => {
         await assertAccountMayPair(ctx, args.userId);
+        // Checked in this mutation, on the shard `revokeDevice` writes to: a revocation and a registration of the same
+        // code cannot interleave, so a revoked device is never made again under its code.
+        await assertPairingNotRevoked(ctx, args.userId, args.codeId);
 
         const existing = await findDeviceForCode(ctx, args.userId, args.codeId);
 

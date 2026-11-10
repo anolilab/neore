@@ -1,8 +1,9 @@
 /**
  * A headless machine pairs itself by code (`neore-host pair`), end to end through better-auth's real handler with its
- * in-memory store. The device registration is a recording fake here; `devices/functions.test.ts` drives the real one
- * on the harness.
+ * in-memory store. The device registration is a fake that keeps the real one's contract (one device per code id, a
+ * revoked code refused); `devices/functions.test.ts` drives the real one on the harness.
  */
+import { LunoraError } from "lunorash/server";
 import { betterAuth } from "better-auth";
 import { memoryAdapter } from "better-auth/adapters/memory";
 import { admin, anonymous } from "better-auth/plugins";
@@ -12,7 +13,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { API_KEY_OPTIONS } from "../auth";
 import type { ApiKeyAuthApi } from "../public-api/identity";
 import { DEFAULT_API_SCOPES } from "../public-api/scopes";
-import { DEVICE_LIMIT_CODE } from "../devices/lib/constants";
+import { DEVICE_LIMIT_CODE, PAIRING_REVOKED_CODE } from "../devices/lib/constants";
 import { MAX_API_KEYS_PER_USER } from "./api-key-limits";
 import type { MintedCliKey } from "./cli-device-auth";
 import { CLI_CLIENT_ID, cliDeviceAuth, HOST_CLIENT_ID } from "./cli-device-auth";
@@ -28,9 +29,20 @@ interface Registration {
     userId: string;
 }
 
-const build = (options: { precheck?: (userId: string, codeId: string) => Promise<void>; register?: () => Promise<void>; withHostPairing?: boolean } = {}) => {
+const build = (
+    options: {
+        /** Runs after the device is made, as a reply lost after the shard committed. */
+        afterCommit?: () => Promise<void>;
+        precheck?: (userId: string, codeId: string) => Promise<void>;
+        register?: () => Promise<void>;
+        withHostPairing?: boolean;
+    } = {},
+) => {
     const registrations: Registration[] = [];
     const attempts: string[] = [];
+    // The shard's view: the device each code made, and the codes whose device was revoked.
+    const devices = new Map<string, string>();
+    const revoked = new Set<string>();
     const database = memoryAdapter({ account: [], apikey: [], deviceCode: [], rateLimit: [], session: [], user: [], verification: [] });
     const auth = betterAuth({
         baseURL: BASE_URL,
@@ -43,13 +55,36 @@ const build = (options: { precheck?: (userId: string, codeId: string) => Promise
             ...cliDeviceAuth({
                 ...(options.withHostPairing !== false && {
                     hostPairing: {
-                        precheck: options.precheck ?? (async () => undefined),
+                        // As `checkHeadlessPairing` does first: a revoked code is refused before it is spent.
+                        precheck:
+                            options.precheck ??
+                            (async (_userId, codeId) => {
+                                if (revoked.has(codeId)) {
+                                    throw new LunoraError("FORBIDDEN", "This machine's pairing was revoked in Settings.", {
+                                        data: { code: PAIRING_REVOKED_CODE },
+                                    });
+                                }
+                            }),
                         register: async (input) => {
                             attempts.push(input.codeId);
-                            await options.register?.();
-                            registrations.push(input);
 
-                            return { deviceId: `device-${String(registrations.length)}`, secret: SECRET };
+                            if (revoked.has(input.codeId)) {
+                                throw new LunoraError("FORBIDDEN", "This machine's pairing was revoked in Settings.", { data: { code: PAIRING_REVOKED_CODE } });
+                            }
+
+                            await options.register?.();
+
+                            let deviceId = devices.get(input.codeId);
+
+                            if (deviceId === undefined) {
+                                registrations.push(input);
+                                deviceId = `device-${String(registrations.length)}`;
+                                devices.set(input.codeId, deviceId);
+                            }
+
+                            await options.afterCommit?.();
+
+                            return { deviceId, secret: SECRET };
                         },
                     },
                 }),
@@ -65,7 +100,13 @@ const build = (options: { precheck?: (userId: string, codeId: string) => Promise
         telemetry: { enabled: false },
     });
 
-    return { attempts, auth, registrations };
+    /** What `revokeDevice` does on the shard: the device goes, and its code is remembered as revoked. */
+    const revoke = (codeId: string): void => {
+        devices.delete(codeId);
+        revoked.add(codeId);
+    };
+
+    return { attempts, auth, registrations, revoke };
 };
 
 type Harness = ReturnType<typeof build>;
@@ -190,7 +231,27 @@ describe("pairing a headless machine by code", () => {
         expect(harness.registrations).toEqual([{ codeId: expect.any(String), name: "build-box.lan", platform: "linux", userId: owner.userId }]);
     });
 
-    it("registers once however many times the code is redeemed", async () => {
+    it("hands a later poll the same device after a success, so a reply lost on its way does not strand the machine", async () => {
+        const harness = build();
+        const owner = await signUp(harness);
+        const code = await requestHostCode(harness);
+
+        await approve(harness, owner.cookie, code.user_code);
+        vi.setSystemTime(Date.now() + 6000);
+
+        const first = await redeem(harness, code.device_code);
+
+        vi.setSystemTime(Date.now() + 6000);
+
+        const again = await redeem(harness, code.device_code);
+
+        expect(first.response.status).toBe(200);
+        expect(again.response.status).toBe(200);
+        expect(again.body).toMatchObject({ device_id: first.body["device_id"], secret: SECRET });
+        expect(harness.registrations).toHaveLength(1);
+    });
+
+    it("refuses for good a code whose device was revoked after it paired", async () => {
         const harness = build();
         const owner = await signUp(harness);
         const code = await requestHostCode(harness);
@@ -199,12 +260,44 @@ describe("pairing a headless machine by code", () => {
         vi.setSystemTime(Date.now() + 6000);
 
         expect(await statusOf(harness, code.device_code)).toBe(200);
+        harness.revoke(harness.attempts[0] ?? "");
         vi.setSystemTime(Date.now() + 6000);
 
-        const again = await redeem(harness, code.device_code);
+        const refused = await redeem(harness, code.device_code);
 
-        expect(again.response.status).toBe(400);
-        expect(again.body["error"]).toBe("invalid_grant");
+        expect(refused.response.status).toBe(403);
+        expect(refused.body["error"]).toBe("access_denied");
+        vi.setSystemTime(Date.now() + 6000);
+        // Refused before the claim, every time, until the code expires: the machine stops, nothing is registered.
+        expect(await errorOf(harness, code.device_code)).toBe("access_denied");
+        expect(harness.registrations).toHaveLength(1);
+    });
+
+    it("refuses the next poll when a device that committed before its reply was lost is revoked", async () => {
+        let lost = true;
+        const harness = build({
+            afterCommit: async () => {
+                if (!lost) {
+                    return;
+                }
+
+                lost = false;
+
+                throw new Error("timed out after commit");
+            },
+        });
+        const owner = await signUp(harness);
+        const code = await requestHostCode(harness);
+
+        await approve(harness, owner.cookie, code.user_code);
+        vi.setSystemTime(Date.now() + 6000);
+
+        expect(await statusOf(harness, code.device_code)).toBe(500);
+        // The person sees the device the machine never heard about, and revokes it.
+        harness.revoke(harness.attempts[0] ?? "");
+        vi.setSystemTime(Date.now() + 6000);
+
+        expect(await errorOf(harness, code.device_code)).toBe("access_denied");
         expect(harness.registrations).toHaveLength(1);
     });
 
@@ -586,6 +679,21 @@ describe("pairing a headless machine by code", () => {
 
         expect(body["error"]).toBe("expired_token");
         expect(harness.registrations).toHaveLength(0);
+    });
+
+    it("expires a code put back after a success on its original schedule", async () => {
+        const harness = build();
+        const owner = await signUp(harness);
+        const code = await requestHostCode(harness);
+
+        await approve(harness, owner.cookie, code.user_code);
+        vi.setSystemTime(Date.now() + 6000);
+
+        expect(await statusOf(harness, code.device_code)).toBe(200);
+        vi.setSystemTime(Date.now() + 31 * 60_000);
+
+        expect(await errorOf(harness, code.device_code)).toBe("expired_token");
+        expect(harness.registrations).toHaveLength(1);
     });
 
     it("answers a denied code with access_denied and registers nothing", async () => {
