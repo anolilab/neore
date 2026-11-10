@@ -45,5 +45,7 @@
   request it closed, `SUB_AGENT_RUN_ENDED_BY`), and refuses `hour`/`today` (a headless child never reads timed grants).
   `resumeClaimedRun` → `resumeRunForAnswer` flips the run to `running` in the claim's transaction, before the stream and
   the job. The continuation stops at its next step once the run stops (`shouldRunStop` in its `stopWhen`) and hands its end back
-  (`settleSubAgentRun`): a further pause waits again only for the resume that paused (`resumedWith` = its `reapAt`), an
-  end finishes the run once (`completeResumedRun`), and a failed write is scheduled again.
+  (`settleSubAgentRun`): every write is bound to the resume it runs under (`resumedWith` = that resume's `reapAt`), so a
+  further pause waits again and an end finishes the run once (`completeResumedRun`) only while that resume is current;
+  a failed write is scheduled again, bound the same way. A continuation that already settled is not ended by a later
+  error.

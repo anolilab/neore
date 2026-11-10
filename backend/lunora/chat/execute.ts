@@ -948,7 +948,7 @@ export const runStreamingAgent = internalAction
         },
     );
 
-export type SubAgentEnd = { error: string; kind: "failed" } | { kind: "paused"; resumedWith?: number } | { kind: "succeeded"; messageIds: string[] };
+export type SubAgentEnd = { error: string; kind: "failed" } | { kind: "paused" } | { kind: "succeeded"; messageIds: string[] };
 
 /** Delay of a settlement handed to the scheduler after its write in the action failed. */
 const SETTLE_RETRY_DELAY_MS = 30_000;
@@ -962,18 +962,22 @@ export const settleSubAgentRun = async (
     ctx: Pick<ActionCtx, "runMutation" | "scheduler">,
     runId: Id<"subAgentRuns"> | undefined,
     end: SubAgentEnd,
+    /** The deadline the resume this continuation runs under set (`continuingRun`): every write is bound to it. */
+    resumedWith?: number,
 ): Promise<boolean> => {
     if (runId === undefined) {
         return false;
     }
 
+    // Bound to the resume this continuation runs under, so neither a retried write nor a late one acts on a run that waited
+    // again or was answered since: a pause never re-opens it, an end never ends it.
+    const bound = { ...(resumedWith !== undefined && { resumedWith }), runId };
     const completion = {
         ...(end.kind === "succeeded" && end.messageIds.length > 0 && { messageIds: end.messageIds.slice(-COMPLETION_MESSAGE_IDS_MAX) }),
         outcome: end.kind === "failed" ? { error: end.error.slice(0, MAX_LENGTH.short), kind: "failed" as const } : { kind: "succeeded" as const },
-        runId,
+        ...bound,
     };
-    // Bound to the resume that paused, so a retried write never re-opens a run answered since.
-    const pauseArgs = { ...(end.kind === "paused" && end.resumedWith !== undefined && { resumedWith: end.resumedWith }), runId };
+    const pauseArgs = bound;
 
     try {
         if (end.kind === "paused") {
@@ -1035,10 +1039,14 @@ export const continueAfterToolApproval = internalAction
         }
 
         const { subAgentRunId } = config;
+        // The resume this continuation runs under, and whether its end was handed to the run: a later failure must not
+        // end a run that this continuation already left waiting again.
+        let subAgentResume: number | null | undefined;
+        let settled = false;
 
         try {
             // The claim put the run back to running (`resumeClaimedRun`); it is no longer running when it ended since.
-            const subAgentResume =
+            subAgentResume =
                 subAgentRunId === undefined ? undefined : await ctx.runQuery(internal.sub_agents.functions.continuingRun, { runId: subAgentRunId });
 
             if (subAgentResume === null) {
@@ -1067,7 +1075,12 @@ export const continueAfterToolApproval = internalAction
                     threadId,
                     threadStatus: "active",
                 });
-                await settleSubAgentRun(ctx, subAgentRunId, { error: "The sub-agent's conversation can no longer continue.", kind: "failed" });
+                await settleSubAgentRun(
+                    ctx,
+                    subAgentRunId,
+                    { error: "The sub-agent's conversation can no longer continue.", kind: "failed" },
+                    subAgentResume ?? undefined,
+                );
 
                 return;
             }
@@ -1100,12 +1113,14 @@ export const continueAfterToolApproval = internalAction
             let subAgentEnd: SubAgentEnd = { kind: "succeeded", messageIds: resumed.messageIds ?? [] };
 
             if (resumed.paused) {
-                subAgentEnd = { kind: "paused", ...(subAgentResume !== undefined && { resumedWith: subAgentResume }) };
+                subAgentEnd = { kind: "paused" };
             } else if (resumed.stopped) {
                 subAgentEnd = { error: "This sub-agent was stopped.", kind: "failed" };
             }
 
-            const waiting = await settleSubAgentRun(ctx, subAgentRunId, subAgentEnd);
+            const waiting = await settleSubAgentRun(ctx, subAgentRunId, subAgentEnd, subAgentResume ?? undefined);
+
+            settled = true;
             // A run that ended while this continuation paused again had its new requests closed: the child does not wait on them.
             const awaitingInput = subAgentRunId !== undefined && resumed.paused && !waiting ? undefined : resumed.awaitingInput;
 
@@ -1138,6 +1153,10 @@ export const continueAfterToolApproval = internalAction
                 : "An error occurred while continuing the response. Please try again.";
 
             await failRun(ctx, { safeMessage, streamId, threadId, threadStatus: "active" });
-            await settleSubAgentRun(ctx, subAgentRunId, { error: safeMessage, kind: "failed" });
+
+            // A run this continuation already handed its end to (one that waits again) is not ended by a later failure.
+            if (!settled) {
+                await settleSubAgentRun(ctx, subAgentRunId, { error: safeMessage, kind: "failed" }, subAgentResume ?? undefined);
+            }
         }
     });

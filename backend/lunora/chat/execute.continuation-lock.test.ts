@@ -13,6 +13,7 @@ import { registeredApi, registerModule } from "../../test/registered-api";
 import schema from "../schema";
 import { internal } from "../_generated/internal";
 import { continueAfterToolApproval, settleSubAgentRun } from "./execute";
+import { noteGoalPaused } from "./goals/execute";
 import { resumeApprovedRun } from "./lib/agent-run";
 
 const registry = vi.hoisted(() => new Map<string, unknown>());
@@ -21,6 +22,13 @@ vi.mock("../_generated/api", async (importOriginal) => registeredApi(await impor
 vi.mock("../_generated/internal", async (importOriginal) => registeredApi(await importOriginal(), registry));
 
 // The resume itself is the model run; the test is about the lock gate and the stream's end state.
+// The real one, unless a test makes the step after a continuation's settlement fail.
+vi.mock("./goals/execute", async (importOriginal) => {
+    const original = await importOriginal<typeof import("./goals/execute")>();
+
+    return { ...original, noteGoalPaused: vi.fn(original.noteGoalPaused) };
+});
+
 vi.mock("./lib/agent-run", async (importOriginal) => {
     return {
         ...(await importOriginal<typeof import("./lib/agent-run")>()),
@@ -218,6 +226,8 @@ describe("continueAfterToolApproval and the pause it answered", () => {
 describe("a sub-agent child's continuation", () => {
     /** A paused child thread with its run, resumed with `resumed` (or refused at its lock), and the run row after it. */
     const resumeChild = async (options: {
+        /** The step after the continuation's settlement throws (`noteGoalPaused`). */
+        failAfterSettling?: boolean;
         lockedAt?: number;
         /** A newer answer resumes the run while this continuation runs: it sets another deadline. */
         newerResume?: boolean;
@@ -276,6 +286,10 @@ describe("a sub-agent child's continuation", () => {
                 });
             }
 
+            if (options.failAfterSettling) {
+                vi.mocked(noteGoalPaused).mockRejectedValueOnce(new Error("goal write failed"));
+            }
+
             if (options.resumed) {
                 const { resumed } = options;
 
@@ -300,7 +314,12 @@ describe("a sub-agent child's continuation", () => {
                     }),
             );
 
-            return await harness.run(async (ctx: any) => await ctx.db.get("subAgentRuns", runId));
+            return await harness.run(async (ctx: any) => {
+                const row = await ctx.db.get("subAgentRuns", runId);
+                const approvals = await ctx.db.query("toolApprovalRuns").collect();
+
+                return { ...row, openRequests: approvals.filter((approval: { status: string }) => approval.status === "pending").length };
+            });
         } finally {
             harness.close();
         }
@@ -326,12 +345,20 @@ describe("a sub-agent child's continuation", () => {
         expect(await resumeChild({ ...pausedAgain, newerResume: true })).toMatchObject({ status: "running" });
     });
 
+    it("leaves a run that waits again waiting, with its request open, when a later step of the continuation fails", async () => {
+        expect(
+            await resumeChild({ failAfterSettling: true, pausedAgainAt: Date.now() + 60 * 60_000, resumed: { paused: true, stopped: false } }),
+        ).toMatchObject({ openRequests: 1, status: "awaiting" });
+    });
+
     it("hands a pause back to the run's wait, and schedules an end whose write failed", async () => {
         const runId = "run-1" as never;
+        // The deadline the resume this continuation runs under set: every write, and its retry, is bound to it.
+        const resumedWith = 42;
         const paused = { runMutation: vi.fn(async () => true), scheduler: { runAfter: vi.fn(async () => "job") } };
 
-        expect(await settleSubAgentRun(paused as never, runId, { kind: "paused" })).toBe(true);
-        expect(paused.runMutation).toHaveBeenCalledWith(internal.sub_agents.functions.awaitApproval, { runId });
+        expect(await settleSubAgentRun(paused as never, runId, { kind: "paused" }, resumedWith)).toBe(true);
+        expect(paused.runMutation).toHaveBeenCalledWith(internal.sub_agents.functions.awaitApproval, { resumedWith, runId });
 
         const failing = {
             runMutation: vi.fn(async () => {
@@ -339,14 +366,12 @@ describe("a sub-agent child's continuation", () => {
             }),
             scheduler: { runAfter: vi.fn(async () => "job") },
         };
+        const completion = { messageIds: ["m1"], outcome: { kind: "succeeded" }, resumedWith, runId };
 
-        expect(await settleSubAgentRun(failing as never, runId, { kind: "succeeded", messageIds: ["m1"] })).toBe(false);
-        expect(failing.scheduler.runAfter).toHaveBeenCalledWith(expect.any(Number), internal.sub_agents.functions.completeResumedRun, {
-            messageIds: ["m1"],
-            outcome: { kind: "succeeded" },
-            runId,
-        });
-        expect(await settleSubAgentRun(failing as never, runId, { kind: "paused" })).toBe(true);
-        expect(failing.scheduler.runAfter).toHaveBeenCalledWith(expect.any(Number), internal.sub_agents.functions.awaitApproval, { runId });
+        expect(await settleSubAgentRun(failing as never, runId, { kind: "succeeded", messageIds: ["m1"] }, resumedWith)).toBe(false);
+        expect(failing.runMutation).toHaveBeenCalledWith(internal.sub_agents.functions.completeResumedRun, completion);
+        expect(failing.scheduler.runAfter).toHaveBeenCalledWith(expect.any(Number), internal.sub_agents.functions.completeResumedRun, completion);
+        expect(await settleSubAgentRun(failing as never, runId, { kind: "paused" }, resumedWith)).toBe(true);
+        expect(failing.scheduler.runAfter).toHaveBeenCalledWith(expect.any(Number), internal.sub_agents.functions.awaitApproval, { resumedWith, runId });
     });
 });

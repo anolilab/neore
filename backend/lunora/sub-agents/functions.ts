@@ -1578,10 +1578,21 @@ export const completeResumedRun = internalMutation
             v.array(v.string().max(MAX_LENGTH.id)).check((ids) => ids.length <= COMPLETION_MESSAGE_IDS_MAX, { message: "Too many message ids" }),
         ),
         outcome: v.union(v.object({ error: v.string().max(MAX_LENGTH.short), kind: v.literal("failed") }), v.object({ kind: v.literal("succeeded") })),
+        // The deadline the resume this continuation ran under set (`continuingRun`): a run that waits again, or that a
+        // newer answer resumed since, is not this continuation's to end.
+        resumedWith: v.optional(v.number()),
         runId: v.id("subAgentRuns"),
     })
     .output(v.boolean())
     .mutation(async ({ args, ctx }) => {
+        if (args.resumedWith !== undefined) {
+            const current = await ctx.db.get("subAgentRuns", args.runId);
+
+            if (current?.status !== "running" || (current.reapAt ?? 0) !== args.resumedWith) {
+                return false;
+            }
+        }
+
         if (args.outcome.kind === "failed") {
             return await finishRunFromLoop(ctx, args.runId, args.outcome);
         }

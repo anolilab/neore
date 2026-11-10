@@ -318,6 +318,19 @@ describe("answering a waiting child's request", () => {
         expect(await runStatus()).toBe("awaiting");
     });
 
+    it("ends a run only for the resume it is still running under", async () => {
+        await answer(APPROVAL_ID, "approve");
+
+        const { reapAt } = await runRow();
+        const failed = { outcome: { error: "boom", kind: "failed" }, runId };
+
+        // A write for an older resume, or one the run waits again since, ends nothing.
+        expect(await internalCall(completeResumedRun, { ...failed, resumedWith: reapAt - 1 })).toBe(false);
+        expect(await runStatus()).toBe("running");
+        expect(await internalCall(completeResumedRun, { ...failed, resumedWith: reapAt })).toBe(true);
+        expect(await runStatus()).toBe("failed");
+    });
+
     it("does not wait again on a retried write for a pause its owner answered since", async () => {
         await answer(APPROVAL_ID, "approve");
 
