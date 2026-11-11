@@ -14,6 +14,7 @@ import { parseBundleMarkdown } from "../skills/bundle-format";
 import { planFor } from "../skills/bundle";
 import type { BundleOps } from "../skills/bundle-plan";
 import { assertSelectionImportable, BundleImportError, runBundleImport } from "../skills/bundle-plan";
+import { entryHash } from "./entry-hash";
 import { bodyHash, markerFor } from "./logic";
 
 /** Ten minutes: the longest a claimed install may run before another attempt may start. */
@@ -25,7 +26,7 @@ const vKind = v.union(v.literal("skill"), v.literal("trigger"), v.literal("group
 const organizationRefusal = "Organization plugin installs are not available yet";
 
 /** Refuses a file that is not a plugin, or whose body no longer matches its header. Returns the hash of the body. */
-const checkPluginFile = async (markdown: string) => {
+export const checkPluginFile = async (markdown: string) => {
     const parsed = parseBundleMarkdown(markdown);
 
     if (!parsed.ok) {
@@ -106,6 +107,7 @@ export const installPlugin = authAction
         try {
             const { entries } = await planFor(ctx, args.markdown, undefined);
             const selected = new Set(entries.map((entry) => entry.key));
+            const hashByKey = new Map(await Promise.all(entries.map(async (entry) => [entry.key, await entryHash(entry)] as const)));
 
             assertSelectionImportable(entries, selected);
 
@@ -121,7 +123,14 @@ export const installPlugin = authAction
 
             /** One child: its intent is recorded first, then the create runs with the marker, then its link is set. */
             const linked = async <T extends { id: string }>(kind: "group" | "skill" | "trigger", key: string, create: (intentId: string) => Promise<T>) => {
-                const intentId = await ctx.runMutation(internal.plugins.install_steps.recordIntent, { entryKey: key, generation, installId, kind, userId });
+                const intentId = await ctx.runMutation(internal.plugins.install_steps.recordIntent, {
+                    contentHash: hashByKey.get(key) ?? "",
+                    entryKey: key,
+                    generation,
+                    installId,
+                    kind,
+                    userId,
+                });
                 const created = await create(intentId);
 
                 await ctx.runMutation(internal.plugins.install_steps.recordCreated, { generation, installId, intentId, itemId: created.id });

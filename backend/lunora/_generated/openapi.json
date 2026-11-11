@@ -41606,6 +41606,131 @@
         "x-lunora-function-kind": "mutation"
       }
     },
+    "/_lunora/rpc#plugins_update:previewUpdate": {
+      "post": {
+        "description": "Invoke the `action` `plugins_update:previewUpdate` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "plugins_update:previewUpdate",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "markdown": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "markdown"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "plugins_update:previewUpdate",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "downgrade": {
+                      "type": "boolean"
+                    },
+                    "installedVersion": {
+                      "type": "string"
+                    },
+                    "plan": {
+                      "items": {
+                        "properties": {
+                          "action": {
+                            "anyOf": [
+                              {
+                                "const": "create",
+                                "type": "string"
+                              },
+                              {
+                                "const": "delete",
+                                "type": "string"
+                              },
+                              {
+                                "const": "detach",
+                                "type": "string"
+                              },
+                              {
+                                "const": "keep-edited",
+                                "type": "string"
+                              },
+                              {
+                                "const": "report-group",
+                                "type": "string"
+                              },
+                              {
+                                "const": "same",
+                                "type": "string"
+                              },
+                              {
+                                "const": "update",
+                                "type": "string"
+                              }
+                            ]
+                          },
+                          "entryKey": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "action",
+                          "entryKey"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "targetVersion": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "downgrade",
+                    "installedVersion",
+                    "plan",
+                    "targetVersion"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "action: plugins_update:previewUpdate",
+        "tags": [
+          "plugins"
+        ],
+        "x-lunora-function-kind": "action"
+      }
+    },
     "/_lunora/rpc#projects_functions:addProjectRepo": {
       "post": {
         "description": "Invoke the `mutation` `projects_functions:addProjectRepo` over the Lunora RPC envelope (POST /_lunora/rpc).",

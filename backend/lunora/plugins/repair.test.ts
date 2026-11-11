@@ -34,7 +34,8 @@ describe("repair", () => {
         );
 
         const intentId = await run(
-            async (context) => await context.runMutation(recordIntent, { entryKey: "skill:analyst", generation, installId, kind: "skill", userId: OWNER }),
+            async (context) =>
+                await context.runMutation(recordIntent, { contentHash: HASH, entryKey: "skill:analyst", generation, installId, kind: "skill", userId: OWNER }),
         );
 
         // The crash: the skill is created with its marker, and the process dies before the link is written.
@@ -72,7 +73,10 @@ describe("repair", () => {
             async (context) => await context.runMutation(createInstallRow, { contentHash: HASH, pluginSlug: SLUG, userId: OWNER, version: "1.0.0" }),
         );
 
-        await run(async (context) => await context.runMutation(recordIntent, { entryKey: "skill:ghost", generation, installId, kind: "skill", userId: OWNER }));
+        await run(
+            async (context) =>
+                await context.runMutation(recordIntent, { contentHash: HASH, entryKey: "skill:ghost", generation, installId, kind: "skill", userId: OWNER }),
+        );
         await run(async (context) => await context.runMutation(markNeedsRepair, { generation, installId }));
 
         const result = await run(async (context) => await repairRows(context, OWNER, SLUG));
