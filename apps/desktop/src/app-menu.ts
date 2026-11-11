@@ -49,7 +49,10 @@ export const buildAppMenuTemplate = ({ appName, isPackaged, onCommand, onOpenDoc
         {
             label: "File",
             submenu: [
-                { accelerator: "CmdOrCtrl+N", click: () => onCommand("new-chat"), label: "New Chat" },
+                // The site binds ⌘N / Ctrl+N itself (a shortcut the user can change), so the menu only shows it: the keystroke
+                // still reaches the page on Windows and Linux. The option does nothing on macOS, where the page gets a key
+                // equivalent first and the menu only what it leaves unhandled.
+                { accelerator: "CmdOrCtrl+N", click: () => onCommand("new-chat"), label: "New Chat", registerAccelerator: false },
                 separator,
                 // Elsewhere there is no app menu, so Settings and Quit live here.
                 ...isMac ? [{ role: "close" } as const] : [settings, separator, { role: "close" } as const, { role: "quit" } as const],
@@ -84,7 +87,8 @@ export const buildAppMenuTemplate = ({ appName, isPackaged, onCommand, onOpenDoc
         {
             // `role: "window"` lets macOS list the open windows in it.
             role: "window",
-            submenu: [{ role: "minimize" }, { role: "zoom" }, ...isMac ? [separator, { role: "front" } as const] : [{ role: "close" } as const]],
+            // `zoom` and `front` are macOS roles.
+            submenu: [{ role: "minimize" }, ...isMac ? [{ role: "zoom" } as const, separator, { role: "front" } as const] : [{ role: "close" } as const]],
         },
     );
 

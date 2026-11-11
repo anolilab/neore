@@ -64,9 +64,16 @@ if (siteOrigin !== undefined && document.location.origin === siteOrigin) {
         /** A deep link's text for the composer, which is not sent. Pair with `takePendingDraft`. */
         onDraft: (handler: () => void): () => void => listen(CHANNEL.draft, () => handler()),
         onFiles: (handler: () => void): () => void => listen(CHANNEL.files, () => handler()),
-        /** The application menu's New Chat and Settings… items. Exposed only with the `menu-commands` capability. */
+        /** The application menu's New Chat and Settings… items; subscribing tells the main process this page listens. */
         onMenuCommand: capabilities.includes("menu-commands")
-            ? (handler: (command: MenuCommand) => void): () => void => listen(CHANNEL.menuCommand, handler)
+            ? (handler: (command: MenuCommand) => void): () => void => {
+                const unsubscribe = listen(CHANNEL.menuCommand, handler);
+
+                // The main process holds the window's commands until this arrives.
+                ipcRenderer.send(CHANNEL.menuCommandsReady);
+
+                return unsubscribe;
+            }
             : undefined,
         onSignIn: (handler: () => void): () => void => listen(CHANNEL.signIn, () => handler()),
         /** The system accent colour changed. Exposed only with the `system-accent` capability. */

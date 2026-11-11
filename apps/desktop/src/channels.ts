@@ -9,6 +9,8 @@ export const CHANNEL = {
     getSystemAccentColor: "neore:get-system-accent-color",
     /** An application-menu item for the page (`app-menu.ts#MENU_COMMANDS`), sent to the focused site window. */
     menuCommand: "neore:menu-command",
+    /** The page subscribed to `menuCommand` (`onMenuCommand`); until then menu commands for its window are held. */
+    menuCommandsReady: "neore:menu-commands-ready",
     notify: "neore:notify",
     /** Opens one thread in its own window; the site passes the thread id, the shell builds the URL. */
     openThreadWindow: "neore:open-thread-window",

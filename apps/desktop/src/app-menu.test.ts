@@ -32,7 +32,7 @@ describe(buildAppMenuTemplate, () => {
             "separator",
             "quit",
         ]);
-        expect(roles(submenuOf(template, "window"))).toContain("front");
+        expect(roles(submenuOf(template, "window"))).toStrictEqual(["minimize", "zoom", "separator", "front"]);
     });
 
     it("moves Settings and Quit into File elsewhere, and has no app menu", () => {
@@ -41,7 +41,7 @@ describe(buildAppMenuTemplate, () => {
 
         expect(template.map((entry) => entry.label ?? entry.role)).toStrictEqual(["File", "Edit", "View", "window"]);
         expect(roles(file)).toStrictEqual(["New Chat", "separator", "Settings…", "separator", "close", "quit"]);
-        expect(roles(submenuOf(template, "window"))).not.toContain("front");
+        expect(roles(submenuOf(template, "window"))).toStrictEqual(["minimize", "close"]);
     });
 
     it("sends New Chat and Settings as commands, with their accelerators", () => {
@@ -56,6 +56,24 @@ describe(buildAppMenuTemplate, () => {
         expect(newChat?.accelerator).toBe("CmdOrCtrl+N");
         expect(settings?.accelerator).toBe("CmdOrCtrl+,");
         expect(onCommand.mock.calls).toStrictEqual([["new-chat"], ["settings"]]);
+    });
+
+    it("only shows New Chat's accelerator, which the site handles itself, and registers Settings'", () => {
+        for (const platform of ["darwin", "linux", "win32"] as const) {
+            const template = build({ platform });
+            const settings = [...submenuOf(template, "Neore"), ...submenuOf(template, "File")].find((item) => item.label === "Settings…");
+
+            expect(submenuOf(template, "File")[0]?.registerAccelerator, platform).toBe(false);
+            expect(settings?.registerAccelerator, platform).toBeUndefined();
+        }
+    });
+
+    it("keeps New Chat a command when clicked with its accelerator unregistered", () => {
+        const onCommand = vi.fn();
+
+        click(submenuOf(build({ onCommand, platform: "linux" }), "File")[0]);
+
+        expect(onCommand.mock.calls).toStrictEqual([["new-chat"]]);
     });
 
     it("keeps reload and the developer tools out of a packaged build", () => {

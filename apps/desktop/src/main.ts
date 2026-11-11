@@ -23,6 +23,7 @@ import { createDictation } from "./dictation/index.js";
 import type { DroppedFile } from "./dropped-files.js";
 import { queueDroppedFiles, readDroppedFiles } from "./dropped-files.js";
 import { loginItemMenuState } from "./login-item.js";
+import { createMenuDelivery } from "./menu-delivery.js";
 import { recoveryPageUrl, shouldRecoverFromLoadFailure, shouldRecoverFromRendererGone } from "./recovery.js";
 import type { PendingSignIn, SignInHandoff } from "./sign-in.js";
 import { beginSignIn, completeSignIn, isFlowState, parseSignInCallback } from "./sign-in.js";
@@ -267,6 +268,19 @@ const siteWindows = new Set<BrowserWindow>();
 /** A window that is destroyed or is showing something other than the site (the recovery page) gets nothing. */
 const isShowingSite = (win: BrowserWindow): boolean => !win.isDestroyed() && isTrustedUrl(origin, win.webContents.getURL());
 
+/** Menu commands wait for the page to listen; a page that never does (an older site) gets New Chat by URL. */
+const menuDelivery = createMenuDelivery<BrowserWindow>({
+    fallback: (win, command) => {
+        if (command === "new-chat") {
+            win.webContents.loadURL(newChatUrl(origin).href);
+        } else {
+            log(`the page does not listen for menu commands; "${command}" dropped`);
+        }
+    },
+    isShowingSite,
+    send: (win, command) => win.webContents.send(CHANNEL.menuCommand, command),
+});
+
 const broadcastSystemAccent = (): void => {
     const accent = readSystemAccent();
 
@@ -369,7 +383,10 @@ const guardSiteWindow = (win: BrowserWindow, reveal: () => void): void => {
     const contents = win.webContents;
 
     siteWindows.add(win);
-    win.on("closed", () => siteWindows.delete(win));
+    win.on("closed", () => {
+        siteWindows.delete(win);
+        menuDelivery.forget(win);
+    });
 
     contents.setWindowOpenHandler(({ url }) => {
         switch (classifyUrl(origin, url)) {
@@ -402,6 +419,11 @@ const guardSiteWindow = (win: BrowserWindow, reveal: () => void): void => {
     contents.on("will-navigate", (event, url) => guardNavigation(event, url));
     contents.on("will-redirect", (event, url) => guardNavigation(event, url));
     contents.on("will-attach-webview", (event) => event.preventDefault());
+
+    // Each committed document has to subscribe to menu commands again (an in-page route change is not a `did-navigate`).
+    // `did-stop-loading` rather than `did-finish-load`: it also ends a load that failed or was stopped.
+    contents.on("did-navigate", (_event, url: string) => menuDelivery.navigated(win, isTrustedUrl(origin, url)));
+    contents.on("did-stop-loading", () => menuDelivery.loaded(win));
 
     // A site that cannot be loaded or a renderer that died leaves a blank window with no way forward: show our own page.
     contents.on("did-fail-load", (_event, errorCode: number, description: string, validatedUrl: string, isMainFrame: boolean) => {
@@ -607,12 +629,12 @@ const focusMain = (): void => {
 };
 
 /**
- * A menu command goes to the site window in front. With none in front (the Quick Composer, a local window, or no
- * window at all) the main window is brought forward and takes it.
+ * A menu command goes to the site window in front. With none in front (the Quick Composer, a local window, a window on
+ * the recovery page, or no window at all) the main window is brought forward and takes it, once its page listens.
  */
 const sendMenuCommand = (command: MenuCommand): void => {
     const focused = BrowserWindow.getFocusedWindow();
-    const target = focused !== null && siteWindows.has(focused) ? focused : undefined;
+    const target = focused !== null && siteWindows.has(focused) && isShowingSite(focused) ? focused : undefined;
 
     if (target === undefined) {
         focusMain();
@@ -620,8 +642,8 @@ const sendMenuCommand = (command: MenuCommand): void => {
 
     const win = target ?? state.mainWindow;
 
-    if (win !== undefined && isShowingSite(win)) {
-        win.webContents.send(CHANNEL.menuCommand, command);
+    if (win !== undefined) {
+        menuDelivery.deliver(win, command);
     }
 };
 
@@ -932,6 +954,21 @@ const registerIpc = (): void => {
         }
 
         openOrFocusThreadWindow(url);
+    });
+
+    // Sent, not invoked: the page has nothing to wait for.
+    ipcMain.on(CHANNEL.menuCommandsReady, (event): void => {
+        if (!isTrusted(event)) {
+            log("menu-commands-ready: ignored an untrusted sender");
+
+            return;
+        }
+
+        const win = [...siteWindows].find((candidate) => !candidate.isDestroyed() && candidate.webContents === event.sender);
+
+        if (win !== undefined) {
+            menuDelivery.ready(win);
+        }
     });
 
     ipcMain.handle(CHANNEL.getSystemAccentColor, (event): string | null => {

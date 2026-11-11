@@ -14,6 +14,7 @@ import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { SHOW_FALLBACK_MS } from "./appearance.js";
 import { CAPABILITIES_ARG } from "./channels.js";
 import { DICTATION_SHORTCUT } from "./dictation/hold.js";
+import { MENU_READY_GRACE_MS } from "./menu-delivery.js";
 import { WINDOW_STATE_FILE } from "./window-state.js";
 
 type Listener = (event: { preventDefault: () => void }, url: string) => void;
@@ -213,7 +214,7 @@ vi.mock("electron", () => {
         },
         ipcMain: {
             handle: (channel: string, listener: (event: unknown, payload?: unknown) => unknown) => fakeElectron.ipc.set(channel, listener),
-            on: () => {},
+            on: (channel: string, listener: (event: unknown, payload?: unknown) => unknown) => fakeElectron.ipc.set(channel, listener),
         },
         Menu: {
             buildFromTemplate: (template: unknown) => {
@@ -627,19 +628,29 @@ describe("IPC", () => {
 });
 
 describe("look and application menu", () => {
-    /** The main window back on the site: an earlier case left the recovery page in it. */
+    /** A committed main-frame navigation of `win` to `url`, as Electron reports it. */
+    const navigate = (win: FakeWindow, url: string): void => {
+        win.webContents.loadURL(url);
+        guardOf(win, "did-navigate")?.({ preventDefault: () => {} }, url);
+    };
+    /** The page subscribed to menu commands (`onMenuCommand`), which the preload reports from its top frame. */
+    const listening = (win: FakeWindow): unknown => fake().ipc.get("neore:menu-commands-ready")?.(topFrameOf(win, win.webContents.getURL()));
+    const stoppedLoading = (win: FakeWindow): void => guardOf(win, "did-stop-loading")?.({ preventDefault: () => {} }, "");
+    /** The main window back on the site, its page listening: an earlier case left the recovery page in it. */
     const onSite = (): FakeWindow => {
-        mainWindow().webContents.loadURL(`${SITE}/chat`);
+        navigate(mainWindow(), `${SITE}/chat`);
+        listening(mainWindow());
 
         return mainWindow();
     };
-    const menuItem = (menu: string, label: string) =>
+    /** Settings… sits in the app menu on macOS and in File elsewhere. */
+    const menuItem = (label: string) =>
         fake()
             .applicationMenu
             ?.template
-            .find((entry) => entry.label === menu)
-            ?.submenu
-            ?.find((item) => item.label === label);
+            .flatMap((entry) => entry.submenu ?? [])
+            .find((item) => item.label === label);
+    const menuPayloads = () => fake().payloads.filter((sent) => sent.channel === "neore:menu-command");
 
     it("creates the site windows hidden, on the dark background, and shows one at its first paint", () => {
         fake().ipc.get("neore:open-thread-window")?.(siteSender(), "thread-ready");
@@ -672,32 +683,14 @@ describe("look and application menu", () => {
         expect(() => get?.(sender("https://example.org/"))).toThrow("untrusted");
     });
 
-    it("follows accent changes off macOS through accent-color-changed, not through the theme", () => {
-        expect(fake().accentChangedListeners).toHaveLength(1);
-        expect(fake().macNotifications).toHaveLength(0);
-        expect(fake().themeListeners).toHaveLength(0);
-    });
-
-    it("sends a changed accent colour to the site windows", () => {
-        const win = onSite();
-
-        fake().accentColor = "FF0000FF";
-        fake().payloads.length = 0;
-        fake().accentChangedListeners.forEach((listener) => listener());
-        fake().accentColor = "0a84ffff";
-
-        expect(fake().payloads).toContainEqual({ channel: "neore:system-accent-color", payload: "#ff0000", window: win.id });
-        expect(fake().payloads.every((sent) => sent.window !== composer().id)).toBe(true);
-    });
-
     it("installs an application menu whose New Chat and Settings reach the site window in front", () => {
         const win = onSite();
 
         fake().payloads.length = 0;
         fake().focusedWindow = win;
-        menuItem("File", "New Chat")?.click?.();
+        menuItem("New Chat")?.click?.();
         fake().focusedWindow = composer();
-        menuItem("File", "Settings…")?.click?.();
+        menuItem("Settings…")?.click?.();
         fake().focusedWindow = null;
 
         expect(fake().payloads).toStrictEqual([
@@ -706,13 +699,125 @@ describe("look and application menu", () => {
         ]);
     });
 
+    it("sends a menu command to the main window when the focused thread window shows the recovery page", () => {
+        const main = onSite();
+
+        fake().ipc.get("neore:open-thread-window")?.(siteSender(), "thread-recovery");
+
+        const thread = fake().windows.at(-1) as FakeWindow;
+
+        navigate(thread, `${SITE}/chat/thread-recovery`);
+        listening(thread);
+        navigate(thread, "data:text/html,recovery");
+        fake().payloads.length = 0;
+        fake().focusedWindow = thread;
+        menuItem("New Chat")?.click?.();
+        fake().focusedWindow = null;
+
+        expect(fake().payloads).toStrictEqual([{ channel: "neore:menu-command", payload: "new-chat", window: main.id }]);
+    });
+
+    it("holds menu commands until the page listens, then sends each once", () => {
+        const win = mainWindow();
+
+        navigate(win, `${SITE}/chat`);
+        fake().payloads.length = 0;
+        menuItem("New Chat")?.click?.();
+        menuItem("New Chat")?.click?.();
+        menuItem("Settings…")?.click?.();
+        expect(menuPayloads()).toStrictEqual([]);
+
+        listening(win);
+        expect(menuPayloads()).toStrictEqual([
+            { channel: "neore:menu-command", payload: "new-chat", window: win.id },
+            { channel: "neore:menu-command", payload: "settings", window: win.id },
+        ]);
+    });
+
+    it("takes the readiness only from the top frame of a site window", () => {
+        const win = mainWindow();
+        const ready = fake().ipc.get("neore:menu-commands-ready");
+
+        navigate(win, `${SITE}/chat`);
+        fake().payloads.length = 0;
+        menuItem("New Chat")?.click?.();
+        ready?.({ sender: win.webContents, senderFrame: { url: `${SITE}/chat` } });
+        ready?.(topFrameOf(win, "https://example.org/"));
+        ready?.(composerSender());
+        expect(menuPayloads()).toStrictEqual([]);
+
+        listening(win);
+        expect(menuPayloads()).toStrictEqual([{ channel: "neore:menu-command", payload: "new-chat", window: win.id }]);
+    });
+
+    it("drops held commands when the window turns to the recovery page", () => {
+        const win = mainWindow();
+
+        navigate(win, `${SITE}/chat`);
+        fake().payloads.length = 0;
+        menuItem("New Chat")?.click?.();
+        navigate(win, "data:text/html,recovery");
+        navigate(win, `${SITE}/chat`);
+        listening(win);
+
+        expect(menuPayloads()).toStrictEqual([]);
+    });
+
+    describe("a page that never listens", () => {
+        afterEach(() => {
+            vi.useRealTimers();
+            onSite();
+        });
+
+        it("gets New Chat by URL once its grace period ends, and Settings is dropped", () => {
+            vi.useFakeTimers();
+
+            const win = mainWindow();
+
+            navigate(win, `${SITE}/chat/thread-1`);
+            stoppedLoading(win);
+            fake().payloads.length = 0;
+            menuItem("New Chat")?.click?.();
+
+            vi.advanceTimersByTime(MENU_READY_GRACE_MS - 1);
+            expect(win.loaded.at(-1)).toBe(`${SITE}/chat/thread-1`);
+            vi.advanceTimersByTime(1);
+            expect(win.loaded.at(-1)).toBe(`${SITE}/chat`);
+
+            navigate(win, `${SITE}/chat/thread-1`);
+            stoppedLoading(win);
+            vi.advanceTimersByTime(MENU_READY_GRACE_MS);
+            menuItem("Settings…")?.click?.();
+
+            expect(win.loaded.at(-1)).toBe(`${SITE}/chat/thread-1`);
+            expect(menuPayloads()).toStrictEqual([]);
+        });
+
+        it("gets the command itself when it starts listening within the grace period", () => {
+            vi.useFakeTimers();
+
+            const win = mainWindow();
+
+            navigate(win, `${SITE}/chat/thread-1`);
+            stoppedLoading(win);
+            fake().payloads.length = 0;
+            menuItem("New Chat")?.click?.();
+            vi.advanceTimersByTime(MENU_READY_GRACE_MS - 1);
+            listening(win);
+            vi.advanceTimersByTime(MENU_READY_GRACE_MS);
+
+            expect(win.loaded.at(-1)).toBe(`${SITE}/chat/thread-1`);
+            expect(menuPayloads()).toStrictEqual([{ channel: "neore:menu-command", payload: "new-chat", window: win.id }]);
+        });
+    });
+
     it("sends neither a menu command nor the accent colour to a main window showing the recovery page", () => {
-        mainWindow().webContents.loadURL("data:text/html,recovery");
+        navigate(mainWindow(), "data:text/html,recovery");
         fake().payloads.length = 0;
         fake().focusedWindow = mainWindow();
-        menuItem("File", "New Chat")?.click?.();
+        menuItem("New Chat")?.click?.();
         fake().focusedWindow = null;
-        menuItem("File", "Settings…")?.click?.();
+        menuItem("Settings…")?.click?.();
         fake().accentChangedListeners.forEach((listener) => listener());
 
         expect(fake().payloads.filter((sent) => sent.window === mainWindow().id)).toStrictEqual([]);
@@ -963,6 +1068,25 @@ describe("main window reveal and saved state", () => {
 
         expect(win.options).toMatchObject({ backgroundColor: "#00000000", vibrancy: "sidebar", visualEffectState: "followWindow" });
         expect(capabilitiesOf(win)).toContain("vibrancy");
+    });
+
+    it("off macOS follows the accent through accent-color-changed, not the theme, and sends it to the site windows", async () => {
+        const listenersBefore = fake().accentChangedListeners.length;
+        const notificationsBefore = fake().macNotifications.length;
+        const themeListenersBefore = fake().themeListeners.length;
+        const { win } = await restart("linux");
+        const added = fake().accentChangedListeners.slice(listenersBefore);
+
+        expect(added).toHaveLength(1);
+        expect(fake().macNotifications).toHaveLength(notificationsBefore);
+        expect(fake().themeListeners).toHaveLength(themeListenersBefore);
+
+        fake().payloads.length = 0;
+        fake().accentColor = "FF0000FF";
+        added[0]?.();
+        fake().accentColor = "0a84ffff";
+
+        expect(fake().payloads).toContainEqual({ channel: "neore:system-accent-color", payload: "#ff0000", window: win.id });
     });
 
     it("on macOS follows the accent through AppleColorPreferencesChangedNotification", async () => {
