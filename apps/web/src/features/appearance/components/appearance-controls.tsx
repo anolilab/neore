@@ -12,7 +12,7 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { useAppearanceSettings, useLayoutState } from "@/features/layout/hooks/use-ui-state";
-import { getNativeSystemAccentColor, onNativeSystemAccentColor } from "@/lib/native/bridge";
+import { watchNativeSystemAccentColor } from "@/lib/native/system-accent";
 import { useIsNativeShell, useNativeCapability } from "@/lib/native/use-native-capability";
 
 import type { AccentId } from "../lib/accent-presets";
@@ -110,9 +110,7 @@ const AppearanceControls: FC = () => {
             return undefined;
         }
 
-        void getNativeSystemAccentColor().then(setSystemAccentHex);
-
-        return onNativeSystemAccentColor(setSystemAccentHex);
+        return watchNativeSystemAccentColor(setSystemAccentHex);
     }, [hasSystemAccent]);
 
     const contrastOptions = useMemo<{ id: ContrastId; label: string }[]>(

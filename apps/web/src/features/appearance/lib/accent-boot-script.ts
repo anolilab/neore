@@ -1,3 +1,5 @@
+import { toScriptLiteral } from "@/lib/inline-script";
+
 import { ACCENT_IDS, DEFAULT_ACCENT } from "./accent-presets";
 import { CONTRAST_ATTRIBUTE, DEFAULT_DENSITY, DEFAULT_MAIN_FONT, DENSITY_ATTRIBUTE, DENSITY_IDS, FONT_ATTRIBUTE, MAIN_FONT_IDS } from "./display-preferences";
 import { SYSTEM_ACCENT, SYSTEM_ACCENT_CACHE_KEY, SYSTEM_ACCENT_PROPERTIES } from "./native-appearance";
@@ -22,7 +24,8 @@ export const NATIVE_VIBRANCY_ATTRIBUTE = "data-native-vibrancy";
  * The desktop shell, before first paint (the preload installs `window.neoreNative` before any page script):
  * `data-native` (and `data-native-vibrancy`) for the native CSS, spellcheck off by default (prose editors opt back
  * in), the system font for an untouched default font, and the OS accent (cached from the last run) for an
- * untouched default accent or a stored `system`. Mirrors `effectiveAccent` / `effectiveMainFont`.
+ * untouched default accent or a stored `system`. Mirrors `effectiveAccent` / `effectiveMainFont`: `system` first, then
+ * an id outside its allow-list counts as the default, and only an `explicit` flag of exactly `true` keeps the default.
  *
  * It runs in its own `try`, with `a` (the stored appearance) left `{}` when storage is corrupt or throws, so the
  * shell marks still land. Every cached token must be `#rrggbb` before any of them is written.
@@ -30,18 +33,20 @@ export const NATIVE_VIBRANCY_ATTRIBUTE = "data-native-vibrancy";
 const NATIVE_BOOT = [
     "try{var n=window.neoreNative;",
     "if(n){",
-    "var d=document.documentElement;var p=Array.isArray(n.capabilities)?n.capabilities:[];var x=a.explicit||{};",
-    `d.setAttribute(${JSON.stringify(NATIVE_ATTRIBUTE)},"");`,
-    `if(p.indexOf("vibrancy")!==-1){d.setAttribute(${JSON.stringify(NATIVE_VIBRANCY_ATTRIBUTE)},"")}`,
+    'var d=document.documentElement;var p=Array.isArray(n.capabilities)?n.capabilities:[];var x=a.explicit&&typeof a.explicit==="object"?a.explicit:{};',
+    `d.setAttribute(${toScriptLiteral(NATIVE_ATTRIBUTE)},"");`,
+    `if(p.indexOf("vibrancy")!==-1){d.setAttribute(${toScriptLiteral(NATIVE_VIBRANCY_ATTRIBUTE)},"")}`,
     'd.setAttribute("spellcheck","false");',
-    `if(!x.mainFont&&(a.mainFont===undefined||a.mainFont===${JSON.stringify(DEFAULT_MAIN_FONT)})){d.setAttribute(${JSON.stringify(FONT_ATTRIBUTE)},"system")}`,
-    `var ac=a.accentColor;if(p.indexOf("system-accent")!==-1&&(ac===${JSON.stringify(SYSTEM_ACCENT)}||(!x.accentColor&&(ac===undefined||ac===${JSON.stringify(DEFAULT_ACCENT)})))){`,
-    `var t=JSON.parse(localStorage.getItem(${JSON.stringify(SYSTEM_ACCENT_CACHE_KEY)})||"null");`,
-    `var h=/^#[0-9a-f]{6}$/;var q=${JSON.stringify(SYSTEM_ACCENT_PROPERTIES)};var ok=!!t&&typeof t==="object";`,
+    `var f=${toScriptLiteral(MAIN_FONT_IDS)}.indexOf(a.mainFont)!==-1?a.mainFont:${toScriptLiteral(DEFAULT_MAIN_FONT)};`,
+    `if(x.mainFont!==true&&f===${toScriptLiteral(DEFAULT_MAIN_FONT)}){d.setAttribute(${toScriptLiteral(FONT_ATTRIBUTE)},"system")}`,
+    `var ac=a.accentColor;var ap=${toScriptLiteral(ACCENT_IDS)}.indexOf(ac)!==-1?ac:${toScriptLiteral(DEFAULT_ACCENT)};`,
+    `if(p.indexOf("system-accent")!==-1&&(ac===${toScriptLiteral(SYSTEM_ACCENT)}||(x.accentColor!==true&&ap===${toScriptLiteral(DEFAULT_ACCENT)}))){`,
+    `var t=JSON.parse(localStorage.getItem(${toScriptLiteral(SYSTEM_ACCENT_CACHE_KEY)})||"null");`,
+    `var h=/^#[0-9a-f]{6}$/;var q=${toScriptLiteral(SYSTEM_ACCENT_PROPERTIES)};var ok=!!t&&typeof t==="object";`,
     "for(var r in q){if(ok&&!h.test(t[r])){ok=false}}",
     "if(ok){",
     "for(var r in q){d.style.setProperty(q[r],t[r])}",
-    `d.setAttribute(${JSON.stringify(ACCENT_ATTRIBUTE)},${JSON.stringify(SYSTEM_ACCENT)})`,
+    `d.setAttribute(${toScriptLiteral(ACCENT_ATTRIBUTE)},${toScriptLiteral(SYSTEM_ACCENT)})`,
     "}}}}catch(e){}",
 ].join("");
 
@@ -55,7 +60,7 @@ const NATIVE_BOOT = [
  * Only a known id from the allow-list is ever written into the DOM; anything
  * else in storage (or no storage at all) leaves the default tokens in place.
  */
-export const ACCENT_BOOT_SCRIPT = `(function(){var a={};try{var s=JSON.parse(localStorage.getItem(${JSON.stringify(UI_STATE_STORAGE_KEY)})||"null");a=s&&s.state&&s.state.appearance||{};var c=${JSON.stringify(BOOT_ATTRIBUTES)};for(var i=0;i<c.length;i++){var m=c[i];var v=a[m.key];if(v!==m.fallback&&m.ids.indexOf(v)!==-1){document.documentElement.setAttribute(m.attribute,v)}}var k=a.contrast;if(k==="high"||(k!=="standard"&&window.matchMedia&&window.matchMedia("(prefers-contrast: more)").matches)){document.documentElement.setAttribute("data-contrast","high")}}catch(e){}${NATIVE_BOOT}})();`;
+export const ACCENT_BOOT_SCRIPT = `(function(){var a={};try{var s=JSON.parse(localStorage.getItem(${toScriptLiteral(UI_STATE_STORAGE_KEY)})||"null");a=s&&s.state&&s.state.appearance||{};var c=${toScriptLiteral(BOOT_ATTRIBUTES)};for(var i=0;i<c.length;i++){var m=c[i];var v=a[m.key];if(v!==m.fallback&&m.ids.indexOf(v)!==-1){document.documentElement.setAttribute(m.attribute,v)}}var k=a.contrast;if(k==="high"||(k!=="standard"&&window.matchMedia&&window.matchMedia("(prefers-contrast: more)").matches)){document.documentElement.setAttribute("data-contrast","high")}}catch(e){}${NATIVE_BOOT}})();`;
 
 /** The runtime twin of the contrast part of the boot script. */
 export const applyContrastAttribute = (value: "high" | undefined, root: HTMLElement = document.documentElement): void => {

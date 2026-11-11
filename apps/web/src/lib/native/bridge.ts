@@ -9,7 +9,7 @@
  * in `apps/desktop/src/preload.ts`.
  */
 
-type UnlistenFunction = () => void;
+export type UnlistenFunction = () => void;
 
 /** A file the shell read from disk for the page; `File` is built from it here. */
 export interface NativeDroppedFile {
@@ -18,7 +18,7 @@ export interface NativeDroppedFile {
 }
 
 /** What the Electron preload exposes (`apps/desktop/src/preload.ts`). */
-interface NativeBridge {
+export interface NativeBridge {
     capabilities: ReadonlyArray<string>;
     device?: NativeDeviceRelay;
     /** The OS accent colour as `#rrggbb`, or `null` when the OS has none. Only with the `system-accent` capability. */
@@ -45,7 +45,7 @@ interface NativeBridge {
 }
 
 /** The device relay the shell exposes when it advertises `device` (`apps/desktop/src/preload.ts`). Relay only. */
-interface NativeDeviceRelay {
+export interface NativeDeviceRelay {
     execute: (call: { envelope: string; signature: string }) => Promise<NativeSigned>;
     hostConnect: (deviceId: string) => Promise<NativeHostProbe>;
     hostDisconnect: (deviceId: string) => Promise<void>;
@@ -62,7 +62,8 @@ interface NativeDeviceRelay {
 /** A reply shorter than this finished while the user was probably still watching. */
 export const LONG_REPLY_MS = 15_000;
 
-const getNative = (): NativeBridge | undefined => {
+/** The shell's preload API; `undefined` outside the desktop shell. */
+export const getNative = (): NativeBridge | undefined => {
     const candidate = (globalThis as { neoreNative?: Partial<NativeBridge> }).neoreNative;
 
     return typeof candidate?.notify === "function" && typeof candidate.takePendingCompose === "function" && typeof candidate.onCompose === "function"
@@ -80,50 +81,6 @@ export const hasNativeCapability = (capability: string): boolean => getNative()?
 
 /** The commands the shell's application menu sends to the page. */
 export type NativeMenuCommand = "new-chat" | "settings";
-
-const NATIVE_MENU_COMMANDS: ReadonlySet<string> = new Set<NativeMenuCommand>(["new-chat", "settings"]);
-
-/** Calls `handler` with each application-menu command; unknown commands are dropped. A no-op without `menu-commands`. */
-export const onNativeMenuCommand = (handler: (command: NativeMenuCommand) => void): UnlistenFunction => {
-    if (!hasNativeCapability("menu-commands")) {
-        return () => {};
-    }
-
-    return (
-        getNative()?.onMenuCommand?.((command: string) => {
-            if (NATIVE_MENU_COMMANDS.has(command)) {
-                handler(command as NativeMenuCommand);
-            }
-        }) ?? (() => {})
-    );
-};
-
-const HEX_COLOR = /^#[\da-f]{6}$/i;
-
-/** Anything but `#rrggbb` from the shell is treated as "no accent colour". */
-const toAccentHex = (value: unknown): string | null => (typeof value === "string" && HEX_COLOR.test(value) ? value.toLowerCase() : null);
-
-/** The OS accent colour as lower-case `#rrggbb`; `null` without `system-accent`, when the OS has none, or on failure. */
-export const getNativeSystemAccentColor = async (): Promise<string | null> => {
-    if (!hasNativeCapability("system-accent")) {
-        return null;
-    }
-
-    try {
-        return toAccentHex(await getNative()?.getSystemAccentColor?.());
-    } catch {
-        return null;
-    }
-};
-
-/** Calls `handler` with each change of the OS accent colour (`null`: none). A no-op without `system-accent`. */
-export const onNativeSystemAccentColor = (handler: (hex: string | null) => void): UnlistenFunction => {
-    if (!hasNativeCapability("system-accent")) {
-        return () => {};
-    }
-
-    return getNative()?.onSystemAccentColor?.((value: string | null) => handler(toAccentHex(value))) ?? (() => {});
-};
 
 export interface NativeNotification {
     body?: string;
@@ -179,103 +136,6 @@ export const openThreadWindow = async (threadId: string): Promise<boolean> => {
     }
 };
 
-/** Takes (and clears) the text of a deep link the shell is holding for the composer, if any. */
-export const takePendingDraft = async (): Promise<string | undefined> => {
-    try {
-        const text = await getNative()?.takePendingDraft?.();
-
-        return typeof text === "string" && text.trim() !== "" ? text : undefined;
-    } catch {
-        return undefined;
-    }
-};
-
-/** Takes (and clears) the text the shell is holding for a new chat, if any. */
-export const takePendingCompose = async (): Promise<string | undefined> => {
-    try {
-        const text = await getNative()?.takePendingCompose();
-
-        return typeof text === "string" && text.trim() !== "" ? text : undefined;
-    } catch {
-        return undefined;
-    }
-};
-
-/** Takes (and clears) the files the shell was handed on the dock icon, as `File`s. */
-export const takePendingFiles = async (): Promise<File[]> => {
-    try {
-        const files = await getNative()?.takePendingFiles?.();
-
-        return (files ?? []).map(({ data, name }) => new File([data], name));
-    } catch {
-        return [];
-    }
-};
-
-/**
- * Pulls what the shell holds once on subscribe (a value that arrived before the
- * page listened) and again on every `listen` notification. `listen` returns
- * `undefined` when the shell does not offer that event, and then nothing is pulled.
- */
-const onNativePending = <T>(
-    listen: (listener: () => void) => UnlistenFunction | undefined,
-    take: () => Promise<T | undefined>,
-    handler: (value: T) => void,
-): UnlistenFunction => {
-    let disposed = false;
-
-    const drain = async () => {
-        const value = await take();
-
-        if (value !== undefined && !disposed) {
-            handler(value);
-        }
-    };
-
-    const stop = listen(() => drain());
-
-    if (stop === undefined) {
-        return () => {};
-    }
-
-    void drain();
-
-    return () => {
-        disposed = true;
-        stop();
-    };
-};
-
-/**
- * Calls `handler` with each batch of files the shell is handed (the dock icon),
- * including a batch that arrived before the page loaded. Returns the unsubscribe function.
- */
-export const onNativeFiles = (handler: (files: File[]) => void): UnlistenFunction =>
-    onNativePending(
-        (listener) => getNative()?.onFiles?.(listener),
-        async () => {
-            const files = await takePendingFiles();
-
-            return files.length > 0 ? files : undefined;
-        },
-        handler,
-    );
-
-/**
- * Calls `handler` with every text the shell hands over (Quick Composer, a
- * `neore://new?text=` link, a share), including one that arrived before the
- * page loaded. Returns the unsubscribe function.
- */
-export const onNativeCompose = (handler: (text: string) => void): UnlistenFunction =>
-    onNativePending((listener) => getNative()?.onCompose(listener), takePendingCompose, handler);
-
-/**
- * Calls `handler` with the text of every `neore://new?text=` link, including one that arrived before the page
- * loaded. The text is for the composer to show and the user to send: a link never sends it.
- */
-export const onNativeDraft = (handler: (text: string) => void): UnlistenFunction =>
-    onNativePending((listener) => getNative()?.onDraft?.(listener), takePendingDraft, handler);
-
 /** A system-browser sign-in the shell received: the code, and the verifier that proves this app started it. */
 export interface NativeSignIn {
     code: string;
@@ -283,71 +143,13 @@ export interface NativeSignIn {
     redirectUri: string;
 }
 
-/** Only a shell that advertises `sign-in` has the flow; anywhere else every sign-in call is a no-op. */
-const getSignInBridge = (): NativeBridge | undefined => {
-    const native = getNative();
-
-    return native?.capabilities.includes("sign-in") ? native : undefined;
-};
-
-/** Takes (and clears) the sign-in the shell is holding for this page, if any. */
-export const takePendingSignIn = async (): Promise<NativeSignIn | undefined> => {
-    try {
-        const signIn = await getSignInBridge()?.takePendingSignIn();
-
-        return signIn ?? undefined;
-    } catch {
-        return undefined;
-    }
-};
-
-/**
- * Calls `handler` with each browser sign-in the shell receives, including one
- * that arrived before the page subscribed. Returns the unsubscribe function.
- */
-export const onNativeSignIn = (handler: (signIn: NativeSignIn) => void): UnlistenFunction =>
-    onNativePending((listener) => getSignInBridge()?.onSignIn(listener), takePendingSignIn, handler);
-
-/** Opens the system browser on the sign-in page (the shell does the same when Google is opened in the window). */
-export const startNativeBrowserSignIn = async (): Promise<void> => {
-    try {
-        await getSignInBridge()?.startBrowserSignIn();
-    } catch {
-        // Best-effort: the browser did not open; the user can sign in another way.
-    }
-};
-
-/**
- * The app-origin endpoint that exchanges the code and sets the session cookie
- * (`backend/lunora/auth/client-grant-cookie.ts`, reached through the app's
- * `/api/auth/*` proxy, so the cookie lands on THIS origin).
- */
-export const NATIVE_SIGN_IN_COOKIE_PATH = "/api/auth/client-grant/cookie";
-
-/** Exchanges a browser sign-in for a session cookie on this origin. Resolves whether it worked. */
-export const completeNativeSignIn = async (signIn: NativeSignIn, fetchImpl: typeof fetch = fetch): Promise<boolean> => {
-    try {
-        const response = await fetchImpl(NATIVE_SIGN_IN_COOKIE_PATH, {
-            body: JSON.stringify({ code: signIn.code, codeVerifier: signIn.codeVerifier, redirectUri: signIn.redirectUri }),
-            credentials: "same-origin",
-            headers: { "Content-Type": "application/json" },
-            method: "POST",
-        });
-
-        await response.body?.cancel();
-
-        return response.ok;
-    } catch {
-        return false;
-    }
-};
-
 // ─── Device execution ───────────────────────────────────────────────────────
 //
 // The shell's relay: the main process (`registerDeviceIpc`), the preload's `deviceRelay`, and
 // the Rust core. Each function forwards to it when the shell advertises `device`, and answers
 // "not available" otherwise, so the devices UI shows pairing as unavailable instead of failing a
 // call. The page only relays signed envelopes; the core verifies them and asks the user locally.
+// The types are here; the functions are in `device-bridge.ts`, off the first load.
 
 export type NativeDevicePlatform = "linux" | "macos" | "windows";
 
@@ -402,104 +204,9 @@ export interface NativeSigned {
     signature: string;
 }
 
-/** Only a shell that advertises `device` has the relay; anywhere else every device call is inert. */
-const getDeviceBridge = (): NativeDeviceRelay | undefined => {
-    const native = getNative();
-    const relay = native?.capabilities.includes("device") ? native.device : undefined;
-
-    return relay !== undefined && typeof relay.execute === "function" ? relay : undefined;
-};
-
-/** `undefined` until the shell advertises `device`; also `undefined` when the core failed to load. */
-export const getNativeDeviceStatus = async (): Promise<NativeDeviceStatus | undefined> => {
-    try {
-        return (await getDeviceBridge()?.status()) ?? undefined;
-    } catch {
-        return undefined;
-    }
-};
-
-/** `false` until the shell advertises `device`, and when the shell refuses the pairing. */
-export const pairNativeDevice = async (pairing: { accountLabel: string; deviceId: string; secret: string }): Promise<boolean> => {
-    try {
-        return (await getDeviceBridge()?.pair(pairing)) === true;
-    } catch {
-        return false;
-    }
-};
-
-/** `undefined` until the shell advertises `device`. With a device id: that server's manifest, signed with its own secret. */
-export const getNativeDeviceManifest = async (deviceId?: string): Promise<(NativeSigned & { appVersion?: string }) | undefined> =>
-    getDeviceBridge()?.manifest(deviceId);
-
-/**
- * Connects a server that is not paired yet. The shell asks the user to trust its key on first use and for a key
- * passphrase, in its own window. Rejects with the reason when it cannot connect.
- */
-export const probeNativeHost = async (spec: NativeHostSpec): Promise<NativeHostProbe> => {
-    const relay = getDeviceBridge();
-
-    if (relay === undefined) {
-        throw new Error("This desktop app cannot connect to servers");
-    }
-
-    return relay.hostProbe(spec);
-};
-
-/** Stores the probed server with the secret the backend minted for it. `false` when the user declined in the shell. */
-export const pairNativeHost = async (pairing: { deviceId: string; secret: string; spec: NativeHostSpec }): Promise<boolean> => {
-    try {
-        return (await getDeviceBridge()?.hostPair(pairing)) === true;
-    } catch {
-        return false;
-    }
-};
-
-/** Connects a paired server again. Rejects with the reason (a changed host key, a refused login…). */
-export const connectNativeHost = async (deviceId: string): Promise<NativeHostProbe | undefined> => getDeviceBridge()?.hostConnect(deviceId);
-
-export const disconnectNativeHost = async (deviceId: string): Promise<void> => {
-    try {
-        await getDeviceBridge()?.hostDisconnect(deviceId);
-    } catch {
-        // Already gone.
-    }
-};
-
-/** Rejects until the shell advertises `device`; otherwise the shell's own rejection reaches the caller. */
-export const executeOnNativeDevice = async (call: { envelope: string; signature: string }): Promise<NativeSigned> => {
-    const relay = getDeviceBridge();
-
-    if (relay === undefined) {
-        throw new Error("This desktop app has no device execution yet");
-    }
-
-    return relay.execute(call);
-};
-
-/** Opens the shell's local window. A no-op until the shell advertises `device`. */
-export const openNativeDeviceSettings = async (): Promise<void> => {
-    try {
-        await getDeviceBridge()?.openSettings();
-    } catch {
-        // The window did not open; the user can still open it from the shell's menu.
-    }
-};
-
 /** A signed "prompting" / "running" report for one call, relayed as-is to `reportDeviceCallProgress`. */
 export interface NativeDeviceProgress extends NativeSigned {
     callId: string;
     /** The device the report is for: this computer, or a server it speaks for. */
     deviceId: string;
 }
-
-/** Signed progress reports for calls this page relayed; a no-op until the shell advertises `device`. */
-export const onNativeDeviceProgress = (handler: (report: NativeDeviceProgress) => void): UnlistenFunction =>
-    getDeviceBridge()?.onProgress(handler) ?? (() => {});
-
-/** Calls `handler` once on subscribe, then on each shell change; only the one call outside the shell. */
-export const onNativeDeviceChanged = (handler: () => void): UnlistenFunction => {
-    handler();
-
-    return getDeviceBridge()?.onChanged(handler) ?? (() => {});
-};

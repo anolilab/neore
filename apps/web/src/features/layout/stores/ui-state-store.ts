@@ -387,8 +387,12 @@ export const useUIStateStore = create<UIStateStore>()(
                 },
                 setAppearance: (appearance: Partial<AppearanceSettings>) => {
                     set((state) => {
+                        // Marks only accumulate, merged with the latest state: two choices before a re-render keep both.
+                        const explicit =
+                            appearance.explicit === undefined ? state.appearance.explicit : { ...state.appearance.explicit, ...appearance.explicit };
+
                         return {
-                            appearance: { ...state.appearance, ...appearance },
+                            appearance: { ...state.appearance, ...appearance, explicit },
                         };
                     });
                 },

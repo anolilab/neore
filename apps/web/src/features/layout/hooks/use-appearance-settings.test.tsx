@@ -67,4 +67,16 @@ describe(useAppearanceSettings, () => {
 
         expect(useUIStateStore.getState().appearance.explicit).toStrictEqual({ accentColor: true, mainFont: true });
     });
+
+    it("keeps both marks when two choices land before a re-render", () => {
+        const { result } = renderHook(() => useAppearanceSettings());
+        const { setAccentColor, setMainFont } = result.current;
+
+        act(() => {
+            setAccentColor("teal");
+            setMainFont("serif");
+        });
+
+        expect(useUIStateStore.getState().appearance.explicit).toStrictEqual({ accentColor: true, mainFont: true });
+    });
 });

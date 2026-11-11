@@ -1,34 +1,37 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
-    completeNativeSignIn,
-    executeOnNativeDevice,
-    getNativeDeviceManifest,
-    getNativeDeviceStatus,
-    getNativeSystemAccentColor,
     hasNativeCapability,
     isNativeShell,
     LONG_REPLY_MS,
-    NATIVE_SIGN_IN_COOKIE_PATH,
     notifyNative,
-    onNativeCompose,
+    openThreadWindow,
+    setNativeBadge,
+    shouldNotifyReplyFinished,
+    supportsThreadWindows,
+} from "./bridge";
+import {
+    executeOnNativeDevice,
+    getNativeDeviceManifest,
+    getNativeDeviceStatus,
     onNativeDeviceChanged,
     onNativeDeviceProgress,
+    openNativeDeviceSettings,
+    pairNativeDevice,
+} from "./device-bridge";
+import {
+    completeNativeSignIn,
+    NATIVE_SIGN_IN_COOKIE_PATH,
+    onNativeCompose,
     onNativeFiles,
     onNativeMenuCommand,
     onNativeSignIn,
-    onNativeSystemAccentColor,
-    openNativeDeviceSettings,
-    openThreadWindow,
-    pairNativeDevice,
-    setNativeBadge,
-    shouldNotifyReplyFinished,
     startNativeBrowserSignIn,
-    supportsThreadWindows,
     takePendingCompose,
     takePendingFiles,
     takePendingSignIn,
-} from "./bridge";
+} from "./shell-inbox";
+import { getNativeSystemAccentColor, onNativeSystemAccentColor, watchNativeSystemAccentColor } from "./system-accent";
 
 type NativeDeviceRelayMock = Record<"execute" | "manifest" | "onChanged" | "onProgress" | "openSettings" | "pair" | "status", ReturnType<typeof vi.fn>>;
 
@@ -548,7 +551,7 @@ describe("system accent colour", () => {
         expect(handler.mock.calls).toStrictEqual([["#ff9500"], [null], [null]]);
     });
 
-    it("answers null when the shell call fails", async () => {
+    it("answers undefined, not null (no accent), when the shell call fails", async () => {
         installNative({
             capabilities: ["system-accent"],
             getSystemAccentColor: vi.fn(async () => {
@@ -556,6 +559,86 @@ describe("system accent colour", () => {
             }),
         });
 
-        await expect(getNativeSystemAccentColor()).resolves.toBeNull();
+        await expect(getNativeSystemAccentColor()).resolves.toBeUndefined();
+    });
+});
+
+describe(watchNativeSystemAccentColor, () => {
+    /** Lets every pending promise callback run (one macrotask). */
+    const settle = async (): Promise<void> => {
+        await new Promise<void>((resolve) => {
+            setTimeout(resolve, 0);
+        });
+    };
+
+    /** A shell whose initial read resolves when the test says so, and whose live event the test sends. */
+    const deferredShell = (): { reject: () => void; resolve: (value: string | null) => void; send: (hex: string | null) => void } => {
+        const control = { reject: () => {}, resolve: (_value: string | null) => {}, send: (_hex: string | null) => {} };
+
+        installNative({
+            capabilities: ["system-accent"],
+            getSystemAccentColor: vi.fn(
+                async () =>
+                    await new Promise<string | null>((resolve, reject) => {
+                        control.resolve = resolve;
+                        control.reject = () => reject(new Error("ipc"));
+                    }),
+            ),
+            onSystemAccentColor: vi.fn((listener: (hex: string | null) => void) => {
+                control.send = listener;
+
+                return () => {
+                    control.send = () => {};
+                };
+            }),
+        });
+
+        return control;
+    };
+
+    it("reports the initial colour, then each change", async () => {
+        const shell = deferredShell();
+        const handler = vi.fn();
+
+        watchNativeSystemAccentColor(handler);
+        shell.resolve("#007aff");
+        await vi.waitFor(() => expect(handler).toHaveBeenCalledOnce());
+        shell.send("#ff9500");
+
+        expect(handler.mock.calls).toStrictEqual([["#007aff"], ["#ff9500"]]);
+    });
+
+    it("drops an initial read that lands after a live change", async () => {
+        const shell = deferredShell();
+        const handler = vi.fn();
+
+        watchNativeSystemAccentColor(handler);
+        shell.send("#ff9500");
+        shell.resolve("#007aff");
+        await settle();
+
+        expect(handler.mock.calls).toStrictEqual([["#ff9500"]]);
+    });
+
+    it("drops an initial read that lands after it stopped", async () => {
+        const shell = deferredShell();
+        const handler = vi.fn();
+
+        watchNativeSystemAccentColor(handler)();
+        shell.resolve("#007aff");
+        await settle();
+
+        expect(handler).not.toHaveBeenCalled();
+    });
+
+    it("reports nothing when the initial read fails, so the painted accent stays", async () => {
+        const shell = deferredShell();
+        const handler = vi.fn();
+
+        watchNativeSystemAccentColor(handler);
+        shell.reject();
+        await settle();
+
+        expect(handler).not.toHaveBeenCalled();
     });
 });

@@ -42,7 +42,6 @@ import env from "@/lib/env";
 import { DEFAULT_LOCALE } from "@/lib/intl/client";
 import { CRPCProvider, useLunora, useLunoraAuth } from "@/lib/lunora/crpc";
 import { isNativeShell, setNativeBadge } from "@/lib/native/bridge";
-import NativeBridge from "@/lib/native/native-bridge";
 import { getClientPostHogState } from "@/lib/posthog/client-state";
 import { forgetClientPostHog, rememberClientPostHog } from "@/lib/request-context";
 import rootBeforeLoad from "@/lib/root-before-load";
@@ -85,6 +84,8 @@ const SettingsModal = lazy(() =>
     }),
 );
 const SwUpdatePrompt = lazy(() => import("@/components/sw-update-prompt"));
+/** Only the desktop shell loads it: the web build never downloads the shell's listeners. */
+const NativeBridge = lazy(() => import("@/lib/native/native-bridge"));
 const ChangelogCard = lazy(() => import("@/features/changelog/components/changelog-card"));
 const ChangelogPanel = lazy(() => import("@/features/changelog/components/changelog-panel"));
 
@@ -484,7 +485,11 @@ const RootComponent = () => {
                                                         <SwUpdatePrompt />
                                                     </Suspense>
                                                     <Toaster />
-                                                    <NativeBridge />
+                                                    {isNative && (
+                                                        <Suspense fallback={null}>
+                                                            <NativeBridge />
+                                                        </Suspense>
+                                                    )}
                                                     <AppearanceSync />
                                                     <Suspense fallback={null}>
                                                         <ChangelogCard />

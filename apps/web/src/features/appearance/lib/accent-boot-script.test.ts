@@ -9,7 +9,11 @@ import {
     UI_STATE_STORAGE_KEY,
 } from "./accent-boot-script";
 import { CONTRAST_ATTRIBUTE, DENSITY_ATTRIBUTE, FONT_ATTRIBUTE, PREFERS_MORE_CONTRAST_QUERY } from "./display-preferences";
-import { SYSTEM_ACCENT_CACHE_KEY, SYSTEM_ACCENT_PROPERTIES, systemAccentTokens } from "./native-appearance";
+import { SYSTEM_ACCENT_CACHE_KEY, SYSTEM_ACCENT_PROPERTIES } from "./native-appearance";
+import { systemAccentTokens } from "./system-accent-tokens";
+
+/** What could end an inline script early: a closing tag, a comment opener, or a raw line separator. */
+const SCRIPT_BREAKOUT = /<\/|<!--|[\u{2028}\u{2029}]/u;
 
 const BLUE_TOKENS = systemAccentTokens("#007aff");
 
@@ -124,6 +128,36 @@ describe("accent boot script", () => {
             localStorage.setItem(SYSTEM_ACCENT_CACHE_KEY, JSON.stringify({ accent: "#007aff", foreground: "#ffffff" }));
             runBootScript();
             expect(html.hasAttribute(ACCENT_ATTRIBUTE)).toBe(false);
+        });
+
+        it("treats a retired accent or font id as the untouched default, as the runtime does", () => {
+            shell(["system-accent"]);
+            cacheAccent();
+            store({ accentColor: "lime", mainFont: "comic" });
+            runBootScript();
+
+            expect(html.getAttribute(ACCENT_ATTRIBUTE)).toBe("system");
+            expect(html.getAttribute(FONT_ATTRIBUTE)).toBe("system");
+        });
+
+        it("counts only an explicit flag of exactly true", () => {
+            shell(["system-accent"]);
+            cacheAccent();
+            store({ accentColor: "default", explicit: { accentColor: "yes", mainFont: 1 }, mainFont: "inter" });
+            runBootScript();
+
+            expect(html.getAttribute(ACCENT_ATTRIBUTE)).toBe("system");
+            expect(html.getAttribute(FONT_ATTRIBUTE)).toBe("system");
+        });
+
+        it("keeps a retired id with an explicit flag on the default preset and font", () => {
+            shell(["system-accent"]);
+            cacheAccent();
+            store({ accentColor: "lime", explicit: { accentColor: true, mainFont: true }, mainFont: "comic" });
+            runBootScript();
+
+            expect(html.hasAttribute(ACCENT_ATTRIBUTE)).toBe(false);
+            expect(html.hasAttribute(FONT_ATTRIBUTE)).toBe(false);
         });
 
         it("still marks the shell when the stored state is corrupt", () => {
@@ -249,6 +283,10 @@ describe("accent boot script", () => {
         store({ accentColor: '"><script>alert(1)</script>' });
         runBootScript();
         expect(document.documentElement.hasAttribute(ACCENT_ATTRIBUTE)).toBe(false);
+    });
+
+    it("holds nothing that could close its script element", () => {
+        expect(ACCENT_BOOT_SCRIPT).not.toMatch(SCRIPT_BREAKOUT);
     });
 
     it("survives corrupt storage", () => {

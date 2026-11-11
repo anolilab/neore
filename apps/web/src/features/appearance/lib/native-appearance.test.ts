@@ -9,8 +9,8 @@ import {
     isAccentChoice,
     SYSTEM_ACCENT_CACHE_KEY,
     SYSTEM_ACCENT_PROPERTIES,
-    systemAccentTokens,
 } from "./native-appearance";
+import { systemAccentTokens } from "./system-accent-tokens";
 
 /** The macOS accent palette (System Settings > Appearance), and two extremes. */
 const MACOS_ACCENTS = [

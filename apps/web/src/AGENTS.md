@@ -67,6 +67,9 @@ The rules for working in `apps/web/src`. The detail, reasoning and code examples
   and would undo the boot script for a frame. `system` accent and `explicit` stay local (the server knows neither).
   The shell sets `spellcheck="false"` on `<html>`: a raw prose `<textarea>` needs `spellCheck` (`native-shell.test.ts`
   checks). The OS accent is never painted raw: `systemAccentTokens` derives a shade per mode that meets the preset bars.
+- Shell-only code stays off the first load (`scripts/check-web-bundle.ts`): `lib/native/bridge.ts` keeps only what
+  web paths call; shell events, sign-in, devices and the OS accent live in `shell-inbox.ts`, `device-bridge.ts`,
+  `system-accent.ts`, imported only from lazy code. Interpolate into inline scripts with `toScriptLiteral`.
 
 ## CONVENTIONS
 

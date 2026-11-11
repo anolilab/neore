@@ -158,7 +158,8 @@ export const useAppearanceSettings = (): AppearanceSettingsHookReturn => {
 
     const update = (changes: Omit<Partial<AppearanceSettings>, "explicit">, explicit?: keyof ExplicitAppearance) => {
         // `explicit` is local bookkeeping: it marks a value the user picked, so the desktop shell's defaults step aside.
-        setAppearance(explicit === undefined ? changes : { ...changes, explicit: { ...appearance.explicit, [explicit]: true } });
+        // The store merges the mark into its latest state, so a second choice before a re-render keeps the first one's.
+        setAppearance(explicit === undefined ? changes : { ...changes, explicit: { [explicit]: true } });
 
         // `system` is a per-device choice the server's validator does not know.
         const { accentColor, ...synced } = changes;

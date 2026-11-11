@@ -8,7 +8,7 @@ import { useUIStateStore } from "@/features/layout/stores/ui-state-store";
 import useAfterFirstPaint from "@/hooks/use-after-first-paint";
 import { authClient } from "@/lib/auth/client";
 import { useCRPC } from "@/lib/lunora/crpc";
-import { getNativeSystemAccentColor, hasNativeCapability, isNativeShell, onNativeSystemAccentColor } from "@/lib/native/bridge";
+import { hasNativeCapability, isNativeShell } from "@/lib/native/bridge";
 
 import { applyAccentAttribute, applyContrastAttribute, applyRootAttribute } from "../lib/accent-boot-script";
 import { DEFAULT_ACCENT, isAccentId } from "../lib/accent-presets";
@@ -26,14 +26,15 @@ import {
     isMainFontId,
     PREFERS_MORE_CONTRAST_QUERY,
 } from "../lib/display-preferences";
-import {
-    applySystemAccentTokens,
-    cacheSystemAccentTokens,
-    effectiveAccent,
-    effectiveMainFont,
-    SYSTEM_ACCENT,
-    systemAccentTokens,
-} from "../lib/native-appearance";
+import type { SystemAccentTokens } from "../lib/native-appearance";
+import { applySystemAccentTokens, cacheSystemAccentTokens, effectiveAccent, effectiveMainFont, SYSTEM_ACCENT } from "../lib/native-appearance";
+
+/** Paints the OS accent tokens and caches them for the next boot; `null` (the OS has none) falls back to the default preset. */
+const paintSystemAccent = (tokens: SystemAccentTokens | null): void => {
+    applySystemAccentTokens(tokens);
+    cacheSystemAccentTokens(tokens);
+    applyAccentAttribute(tokens === null ? DEFAULT_ACCENT : SYSTEM_ACCENT);
+};
 
 /**
  * Applies the Appearance settings app-wide; renders nothing.
@@ -75,22 +76,18 @@ const AppearanceSync = () => {
             return undefined;
         }
 
-        // The OS accent arrives over IPC; until then the boot script's cached copy (or the default preset) shows.
+        // The OS accent arrives over IPC; until then the boot script's cached copy (or the default preset) shows. The
+        // code that follows it loads only here, so the web build never downloads it.
         let disposed = false;
-        const apply = (hex: string | null): void => {
-            if (disposed) {
-                return;
+        let stop = (): void => {};
+
+        void (async () => {
+            const { followSystemAccent } = await import("../lib/system-accent-sync");
+
+            if (!disposed) {
+                stop = followSystemAccent(paintSystemAccent);
             }
-
-            const tokens = hex === null ? null : systemAccentTokens(hex);
-
-            applySystemAccentTokens(tokens);
-            cacheSystemAccentTokens(tokens);
-            applyAccentAttribute(tokens === null ? DEFAULT_ACCENT : SYSTEM_ACCENT);
-        };
-
-        void getNativeSystemAccentColor().then(apply);
-        const stop = onNativeSystemAccentColor(apply);
+        })();
 
         return () => {
             disposed = true;

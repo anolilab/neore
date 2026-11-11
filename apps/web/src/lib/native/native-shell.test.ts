@@ -106,3 +106,13 @@ describe("prose fields under the shell's spellcheck=false", () => {
         },
     );
 });
+
+describe("thread title fields under the shell's spellcheck=false", () => {
+    // Titles are prose; the editors are `<InlineEdit>` and `<Input>`, which the textarea scan above does not see.
+    it.each(["../../features/chat/header/chat-header.tsx", "../../features/chat/thread-list/rename-thread-dialog.tsx"])(
+        "%s turns spellcheck back on",
+        (path) => {
+            expect(readRelative(path)).toMatch(SPELLCHECK_ON);
+        },
+    );
+});

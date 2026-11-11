@@ -9,7 +9,8 @@ import { useUIStateStore } from "@/features/layout/stores/ui-state-store";
 import useAfterFirstPaint from "@/hooks/use-after-first-paint";
 import { trackEvent } from "@/lib/analytics";
 
-import { completeNativeSignIn, getNativeDeviceStatus, onNativeCompose, onNativeDraft, onNativeFiles, onNativeMenuCommand, onNativeSignIn } from "./bridge";
+import { getNativeDeviceStatus } from "./device-bridge";
+import { completeNativeSignIn, onNativeCompose, onNativeDraft, onNativeFiles, onNativeMenuCommand, onNativeSignIn } from "./shell-inbox";
 
 /** Only the desktop shell ever loads it. */
 const DeviceRelay = lazy(async () => await import("@/features/devices/components/device-relay"));
