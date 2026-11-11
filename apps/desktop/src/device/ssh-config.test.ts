@@ -166,6 +166,14 @@ describe("parseSshConfig", () => {
         expect(plain?.disabledReason).toBeNull();
     });
 
+    it("compares Match host and Match originalhost names without regard to case", () => {
+        const byHostName = parse("Host a\n  HostName a.example.com\nMatch host A.EXAMPLE.COM\n  Port 2200\n");
+        const byAlias = parse("Host a\n  HostName a.example.com\nMatch originalhost A\n  Port 2200\n");
+
+        expect(byHostName.map((host) => host.disabledReason !== null)).toEqual([true]);
+        expect(byAlias.map((host) => host.disabledReason !== null)).toEqual([true]);
+    });
+
     it("applies User, IdentityFile and ProxyJump of a Host * block to named aliases, first value first", () => {
         const [first, second] = parse("Host a\n  User mine\nHost *\n  User all\n  IdentityFile /k/all\n  ProxyJump bastion\n");
 

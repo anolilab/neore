@@ -238,7 +238,9 @@ export const parseSshConfig = (text: string, home: string): SshHost[] => {
             }
         }
 
-        const usesMatch = matchesAnything || matchPatterns.some((pattern) => globMatches(pattern, alias) || (effective.hostName !== null && globMatches(pattern, effective.hostName)));
+        // OpenSSH compares `Match host` and `Match originalhost` names without regard to case, unlike `Host` patterns.
+        const matchesName = (pattern: string, name: string): boolean => globMatches(pattern.toLowerCase(), name.toLowerCase());
+        const usesMatch = matchesAnything || matchPatterns.some((pattern) => matchesName(pattern, alias) || (effective.hostName !== null && matchesName(pattern, effective.hostName)));
 
         hosts.push({
             alias,
