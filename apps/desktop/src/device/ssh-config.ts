@@ -92,11 +92,19 @@ const unsupported = (key: string): string => `This host uses ${key} in ~/.ssh/co
 /** What one setting line says about its Host block. */
 const settingOf = (key: string, value: string, home: string): Partial<Block> => {
     switch (key.toLowerCase()) {
+        // ssh expands `%` tokens (%h, %n, %r, ...) in these values, and the transport runs with -F /dev/null, so a value
+        // that holds one cannot be honoured.
         case "hostname": {
-            return { hostName: firstWord(value) };
+            const name = firstWord(value);
+
+            return name?.includes("%") ? { reason: unsupported(key) } : { hostName: name };
         }
         case "identityfile": {
             const file = firstWord(value);
+
+            if (file?.includes("%")) {
+                return { reason: unsupported(key) };
+            }
 
             return { identityFile: file === null ? null : expandHome(file, home) };
         }

@@ -166,6 +166,12 @@ describe("parseSshConfig", () => {
         expect(plain?.disabledReason).toBeNull();
     });
 
+    it("disables a host whose HostName or IdentityFile holds an ssh token it cannot expand", () => {
+        expect(parse("Host a\n  HostName %h.example.com\n").map((host) => host.disabledReason !== null)).toEqual([true]);
+        expect(parse("Host a\n  HostName a.example.com\n  IdentityFile ~/.ssh/%r\n").map((host) => host.disabledReason !== null)).toEqual([true]);
+        expect(parse("Host a\n  HostName a.example.com\n  IdentityFile ~/.ssh/id\n").map((host) => host.disabledReason !== null)).toEqual([false]);
+    });
+
     it("compares Match host and Match originalhost names without regard to case", () => {
         const byHostName = parse("Host a\n  HostName a.example.com\nMatch host A.EXAMPLE.COM\n  Port 2200\n");
         const byAlias = parse("Host a\n  HostName a.example.com\nMatch originalhost A\n  Port 2200\n");
