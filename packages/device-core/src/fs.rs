@@ -12,6 +12,7 @@
 //! instead of being followed. Windows opens the target first and then checks
 //! the real path of the open handle against the roots.
 
+use std::collections::BinaryHeap;
 use std::fs;
 use std::io::{self, Read, Write};
 use std::path::{Component, Path, PathBuf};
@@ -895,6 +896,23 @@ fn absolute(raw: &str) -> Result<PathBuf, String> {
 /// shared folders: the picker needs to find a folder before it is shared. Files and symbolic links are not listed,
 /// so the answer holds no file names and no contents.
 pub fn browse_dirs(raw: &str, after: Option<&str>, limit: usize) -> Result<Value, String> {
+    browse_dirs_with_home(
+        raw,
+        after,
+        limit,
+        crate::actions::canonical_home().as_deref(),
+    )
+}
+
+/// [`browse_dirs`] with the home folder given, so the refused-root answer can be tested. Memory is bounded by
+/// `limit`: only the `limit + 1` smallest names after the cursor are kept, the extra one telling whether another
+/// page exists.
+fn browse_dirs_with_home(
+    raw: &str,
+    after: Option<&str>,
+    limit: usize,
+    home: Option<&Path>,
+) -> Result<Value, String> {
     let requested = absolute(raw)?;
     let folder = fs::canonicalize(&requested).map_err(|_| format!("{raw}: not found"))?;
 
@@ -902,7 +920,7 @@ pub fn browse_dirs(raw: &str, after: Option<&str>, limit: usize) -> Result<Value
         return Err(format!("{raw}: not a folder"));
     }
 
-    let mut names = Vec::new();
+    let mut smallest: BinaryHeap<String> = BinaryHeap::with_capacity(limit + 1);
 
     for (scanned, entry) in fs::read_dir(&folder)
         .map_err(|error| error.to_string())?
@@ -923,27 +941,41 @@ pub fn browse_dirs(raw: &str, after: Option<&str>, limit: usize) -> Result<Value
             continue;
         }
 
-        if let Ok(name) = entry.file_name().into_string() {
-            names.push(name);
+        let Ok(name) = entry.file_name().into_string() else {
+            continue;
+        };
+
+        if after.is_some_and(|after| name.as_str() <= after) {
+            continue;
+        }
+
+        if smallest.len() > limit {
+            if smallest.peek().is_some_and(|largest| name < *largest) {
+                smallest.pop();
+                smallest.push(name);
+            }
+        } else {
+            smallest.push(name);
         }
     }
 
+    let mut names = smallest.into_vec();
+
     names.sort();
 
-    let start = after.map_or(0, |after| {
-        names.partition_point(|name| name.as_str() <= after)
-    });
-    let page: Vec<&String> = names.iter().skip(start).take(limit).collect();
-    let next = (names.len() > start + page.len())
-        .then(|| page.last().map(|name| name.to_string()))
-        .flatten();
-    let entries: Vec<Value> = page.iter().map(|name| json!({ "name": name })).collect();
+    let more = names.len() > limit;
+
+    names.truncate(limit);
+
+    let next = more.then(|| names.last().cloned()).flatten();
+    let entries: Vec<Value> = names.iter().map(|name| json!({ "name": name })).collect();
 
     Ok(json!({
         "path": folder.to_string_lossy(),
         "parent": folder.parent().map(|parent| parent.to_string_lossy().into_owned()),
         "entries": entries,
         "next": next,
+        "refusedRoot": crate::actions::refused_root(&folder, home).is_some(),
     }))
 }
 
@@ -1182,6 +1214,48 @@ mod tests {
         fs::write(dir.join("root/a.txt"), "hello").unwrap();
         fs::write(dir.join("secret.txt"), "nope").unwrap();
         dir
+    }
+
+    #[test]
+    fn browse_reports_a_refused_root() {
+        let dir = scratch("browse-refused");
+        let home = fs::canonicalize(dir.join("root")).unwrap();
+        let parent = fs::canonicalize(&dir).unwrap();
+        let sub = home.join("sub");
+        let at = |path: &Path| {
+            browse_dirs_with_home(&path.to_string_lossy(), None, 10, Some(&home)).unwrap()
+                ["refusedRoot"]
+                .clone()
+        };
+
+        assert_eq!(at(&home), json!(true));
+        assert_eq!(at(&parent), json!(true));
+        assert_eq!(at(&sub), json!(false));
+    }
+
+    #[test]
+    fn browse_keeps_only_the_requested_page_in_order() {
+        let dir = scratch("browse-many");
+
+        for name in ["m", "d", "z", "a", "q", "b"] {
+            fs::create_dir_all(dir.join("many").join(name)).unwrap();
+        }
+
+        let folder = dir.join("many").to_string_lossy().into_owned();
+        let page = browse_dirs(&folder, Some("a"), 3).unwrap();
+        let names: Vec<&str> = page["entries"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|entry| entry["name"].as_str().unwrap())
+            .collect();
+
+        assert_eq!(names, ["b", "d", "m"]);
+        assert_eq!(page["next"], json!("m"));
+        assert_eq!(
+            browse_dirs(&folder, Some("m"), 3).unwrap()["next"],
+            Value::Null
+        );
     }
 
     #[test]

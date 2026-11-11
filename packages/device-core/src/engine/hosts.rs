@@ -1383,7 +1383,7 @@ impl DeviceState {
         let params = json!({ "after": after, "path": path, "roots": host.roots });
         let page = link.list_files(&params, FILES_WAIT);
 
-        self.audit_files(&host, "files_list", path, page.is_ok());
+        self.audit_files(&host, "files_list", path, "window", page.is_ok());
 
         page.map(|mut page| {
             page["host"] = json!(host.name);
@@ -1405,7 +1405,7 @@ impl DeviceState {
         let params = json!({ "after": after, "path": path });
         let page = link.browse(&params, FILES_WAIT);
 
-        self.audit_files(&host, "folder_browse", path, page.is_ok());
+        self.audit_files(&host, "folder_browse", path, "page", page.is_ok());
 
         page.map(|mut page| {
             page["host"] = json!(host.name);
@@ -1419,15 +1419,16 @@ impl DeviceState {
         let (host, link) = self.files_link(device_id)?;
         let created = link.make_dir(&json!({ "path": path }), FILES_WAIT);
 
-        self.audit_files(&host, "folder_create", path, created.is_ok());
+        self.audit_files(&host, "folder_create", path, "window", created.is_ok());
 
         created
     }
 
-    /// Records what the local window did on a server. It decided itself, so the decision is "window".
-    fn audit_files(&self, host: &Host, tool: &str, path: &str, completed: bool) {
+    /// Records what was done on a server. `decision` says who decided: "window" when the local window confirmed
+    /// or ran it itself, "page" when the web page asked through the desktop bridge with no native prompt.
+    fn audit_files(&self, host: &Host, tool: &str, path: &str, decision: &str, completed: bool) {
         self.audit(json!({
-            "at": now_ms(), "decision": "window", "host": host.name, "path": path,
+            "at": now_ms(), "decision": decision, "host": host.name, "path": path,
             "status": if completed { "completed" } else { "failed" }, "tool": tool,
         }));
     }
@@ -1447,6 +1448,7 @@ impl DeviceState {
             &host,
             "files_read",
             path,
+            "window",
             remote
                 .as_ref()
                 .is_ok_and(|remote| remote.status == "completed"),
@@ -1520,7 +1522,7 @@ impl DeviceState {
             let _ = stdfs::remove_file(&partial);
         }
 
-        self.audit_files(&host, "files_download", path, result.is_ok());
+        self.audit_files(&host, "files_download", path, "window", result.is_ok());
 
         result.map(|mut summary| {
             summary["host"] = json!(host.name);
