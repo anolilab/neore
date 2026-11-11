@@ -2,14 +2,16 @@
 // Run `lunora codegen` to regenerate.
 
 import { DEFER_VALIDATION as DEFER, installCompiledValidatorMap } from "lunorash/values";
-import * as lunora_plugins_repair_184 from "../../plugins/repair.js";
+import * as lunora_plugins_repair_resume_184 from "../../plugins/repair-resume.js";
 
 /** Install the precompiled argument parsers before the module is dispatched. */
-installCompiledValidatorMap(lunora_plugins_repair_184.repairPlugin.args, (source) => {
+installCompiledValidatorMap(lunora_plugins_repair_resume_184.beginRepair.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["pluginSlug"] !== "string") return DEFER;
 if (source["pluginSlug"].length > 64) return DEFER;
-return { "pluginSlug": source["pluginSlug"] };
+if (typeof source["userId"] !== "string") return DEFER;
+if (source["userId"].length > 128) return DEFER;
+return { "pluginSlug": source["pluginSlug"], "userId": source["userId"] };
 });
-export * from "../../plugins/repair.js";
+export * from "../../plugins/repair-resume.js";

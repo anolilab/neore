@@ -41517,10 +41517,10 @@
         "x-lunora-function-kind": "action"
       }
     },
-    "/_lunora/rpc#plugins_repair:repairPlugin": {
+    "/_lunora/rpc#plugins_repair_resume:repairPlugin": {
       "post": {
-        "description": "Invoke the `mutation` `plugins_repair:repairPlugin` over the Lunora RPC envelope (POST /_lunora/rpc).",
-        "operationId": "plugins_repair:repairPlugin",
+        "description": "Invoke the `action` `plugins_repair_resume:repairPlugin` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "plugins_repair_resume:repairPlugin",
         "requestBody": {
           "content": {
             "application/json": {
@@ -41529,17 +41529,25 @@
                 "properties": {
                   "args": {
                     "properties": {
+                      "contentHash": {
+                        "type": "string"
+                      },
+                      "markdown": {
+                        "type": "string"
+                      },
                       "pluginSlug": {
                         "type": "string"
                       }
                     },
                     "required": [
+                      "contentHash",
+                      "markdown",
                       "pluginSlug"
                     ],
                     "type": "object"
                   },
                   "functionPath": {
-                    "const": "plugins_repair:repairPlugin",
+                    "const": "plugins_repair_resume:repairPlugin",
                     "type": "string"
                   },
                   "shardKey": {
@@ -41562,10 +41570,7 @@
               "application/json": {
                 "schema": {
                   "properties": {
-                    "linked": {
-                      "type": "number"
-                    },
-                    "missing": {
+                    "created": {
                       "items": {
                         "type": "string"
                       },
@@ -41585,8 +41590,7 @@
                     }
                   },
                   "required": [
-                    "linked",
-                    "missing",
+                    "created",
                     "status"
                   ],
                   "type": "object"
@@ -41599,11 +41603,11 @@
             "$ref": "#/components/responses/LunoraError"
           }
         },
-        "summary": "mutation: plugins_repair:repairPlugin",
+        "summary": "action: plugins_repair_resume:repairPlugin",
         "tags": [
           "plugins"
         ],
-        "x-lunora-function-kind": "mutation"
+        "x-lunora-function-kind": "action"
       }
     },
     "/_lunora/rpc#plugins_uninstall:uninstallPlugin": {
