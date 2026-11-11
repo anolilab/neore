@@ -84,7 +84,6 @@ const syncActionsNow = async (): Promise<boolean> => {
 const attemptSetUp = async (): Promise<boolean> => {
     try {
         await configurePhoneNotifications();
-        await syncApprovalActions();
 
         return true;
     } catch (error: unknown) {
@@ -111,8 +110,8 @@ const setUpNotifications = async (): Promise<boolean> => {
             return false;
         }
 
-        // The attempt may have run in an earlier language: the actions are checked against the current one, and registered again
-        // when it changed, before any registration proceeds.
+        // The actions are checked against the current language, and registered again when it changed, before any registration
+        // proceeds. This is the only place the sync runs, so it runs once per setup.
         return await syncActionsNow();
     } finally {
         if (setup.inFlight === attempt) {

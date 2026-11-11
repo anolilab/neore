@@ -103,10 +103,18 @@ export const attachApprovalTapListener = (
             return "not-answered";
         }
 
+        // An answer already in flight settles this tap, unless it was skipped: then this listener, if it is still active, waits for
+        // it and tries again. Trying again re-reads the map, so concurrent listeners never submit the same answer twice.
         const pending = pendingAnswers.get(key);
 
         if (pending !== undefined) {
-            return await pending;
+            const outcome = await pending;
+
+            if (outcome !== "not-answered" || !isActive) {
+                return outcome;
+            }
+
+            return await answerTap(response);
         }
 
         const attempt = answerOnce(response, key);

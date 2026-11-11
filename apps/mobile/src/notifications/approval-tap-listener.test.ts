@@ -34,6 +34,33 @@ const attach = (source: TapSource, answer: (value: unknown) => Promise<void>) =>
     attachApprovalTapListener(source, answer as never, new Set<string>(), new Set<string>());
 
 describe("attachApprovalTapListener", () => {
+    it("lets a replacement listener answer a live tap that an earlier listener skipped while it was in flight", async () => {
+        const answered = new Set<string>();
+        const replayed = new Set<string>();
+        const skipping = vi.fn(async (_value: ApprovalAnswer): Promise<boolean | undefined> => {
+            await new Promise<void>((resolve) => {
+                setTimeout(() => {
+                    resolve();
+                }, 5);
+            });
+
+            return false;
+        });
+        const answerLater = vi.fn(async (_value: ApprovalAnswer) => true as const);
+        const earlier = fakeSource(tap("n1", "approve"));
+        const replacement = fakeSource(null);
+
+        const first = attachApprovalTapListener(earlier, skipping, answered, replayed);
+        const second = attachApprovalTapListener(replacement, answerLater, answered, replayed);
+
+        await second.launched;
+        await replacement.fire(tap("n1", "approve"));
+        await first.launched;
+
+        expect(answerLater).toHaveBeenCalledTimes(1);
+        expect(answered.size).toBe(1);
+    });
+
     it("leaves a launch response to the next listener when this one was removed while reading it", async () => {
         const answered = new Set<string>();
         const replayed = new Set<string>();
