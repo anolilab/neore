@@ -23,8 +23,8 @@ const SYSTEM_ACCENT_HIGH_TEXT_CONTRAST = 7;
 const SYSTEM_ACCENT_SURFACE_CONTRAST = 3;
 
 const MIX_STEPS = 100;
-/** How far the hover shade moves from the fill, away from its label. */
-const HOVER_MIX = 0.15;
+/** How far the hover shade moves from the fill, largest first: the most visible step that keeps every bar. */
+const HOVER_MIXES = [0.15, 0.12, 0.09, 0.06] as const;
 
 const toHex = (channels: ReadonlyArray<number>): string => `#${channels.map((channel) => Math.round(channel).toString(16).padStart(2, "0")).join("")}`;
 
@@ -71,8 +71,18 @@ const modeShades = (hex: string, towards: string, surfaces: ReadonlyArray<string
     );
     const foreground = readableText(fill);
     const text = firstShade(hex, towards, (shade) => surfaces.every((surface: string) => contrastRatio(shade, surface) >= textContrast));
+    // The first visible step that keeps both the label's contrast and the 3:1 against every surface: away from the
+    // label, then deeper into the mode (a fill at its 3:1 limit fades into the page when lightened), then towards the label.
+    const hoverPasses = (shade: string): boolean =>
+        shade !== fill &&
+        contrastRatio(shade, foreground) >= textContrast &&
+        surfaces.every((surface: string) => contrastRatio(shade, surface) >= SYSTEM_ACCENT_SURFACE_CONTRAST);
+    const hover =
+        [foreground === WHITE ? BLACK : WHITE, towards, foreground]
+            .flatMap((target) => HOVER_MIXES.map((amount) => mix(fill, target, amount)))
+            .find(hoverPasses) ?? fill;
 
-    return { fill, foreground, hover: mix(fill, foreground === WHITE ? BLACK : WHITE, HOVER_MIX), text };
+    return { fill, foreground, hover, text };
 };
 
 /**

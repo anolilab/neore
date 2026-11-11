@@ -98,6 +98,11 @@ describe(systemAccentTokens, () => {
         ] as const)("%s: the label keeps %s:1 on the hover shade, which differs from the fill", (mode, bar) => {
             expect(contrastRatio(tokens[`${mode}Foreground`], tokens[`${mode}Hover`])).toBeGreaterThanOrEqual(bar);
 
+            // A hovered button still stands out from the page (a white OS accent in light mode faded to ~2.5:1).
+            for (const surface of SURFACES[mode]) {
+                expect(contrastRatio(tokens[`${mode}Hover`], surface)).toBeGreaterThanOrEqual(AA_NON_TEXT);
+            }
+
             if (tokens[mode] !== "#000000" && tokens[mode] !== "#ffffff") {
                 expect(tokens[`${mode}Hover`]).not.toBe(tokens[mode]);
             }
