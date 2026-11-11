@@ -343,6 +343,24 @@ describe("project repositories", () => {
         );
     });
 
+    it("refuses a stamp that keeps losing to picks landing between its read and its write", async () => {
+        // Each read finds a lower stamp, and each write finds that another pick changed it meanwhile.
+        const losing = {
+            db: {
+                patchIf: async () => {
+                    return { applied: false, doc: { defaultAt: 1 } };
+                },
+                projectRepositories: {
+                    findFirst: async () => {
+                        return { defaultAt: 1 };
+                    },
+                },
+            },
+        };
+
+        await expect(applyDefaultStamp(losing as never, "r1" as never, 5)).rejects.toMatchObject({ code: "CONFLICT" });
+    });
+
     it("never lowers a row's stamp with an older claim, and reports a row removed meanwhile", async () => {
         const projectId = await projectOf({ userId: OWNER });
 

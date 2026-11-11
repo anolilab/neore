@@ -710,7 +710,8 @@ const claimDefaultStamp = async (context: MutationCtx, repo: Doc<"projectReposit
 /**
  * Writes a claimed stamp onto a repo row, never lowering one: an older claim that lands after a newer pick of the same
  * row leaves the newer stamp. Each write applies only while the row still holds the stamp read just before. Whether
- * the row is still there: one removed meanwhile is not an error, its stamp is simply unused.
+ * the row is still there: one removed meanwhile is not an error, its stamp is simply unused. A write that keeps losing
+ * to picks landing in between is refused (`CONFLICT`).
  */
 export const applyDefaultStamp = async (context: MutationCtx, repoId: Id<"projectRepositories">, stamp: number): Promise<boolean> => {
     let row = await context.db.projectRepositories.findFirst({ consistency: "primary", where: { _id: repoId } });
@@ -729,7 +730,13 @@ export const applyDefaultStamp = async (context: MutationCtx, repoId: Id<"projec
         row = result.doc as Doc<"projectRepositories"> | null;
     }
 
-    return row !== null;
+    if (!row) {
+        return false;
+    }
+
+    // Still under this claim after every attempt: picks keep landing between the read and the write. Say so, rather
+    // than report a default that was not written.
+    throw new LunoraError("CONFLICT", "The default repository changed meanwhile; try again.");
 };
 
 /** Stamps a repo as its project's default with a stamp of its own (`claimDefaultStamp`): the latest claim wins. */

@@ -23,6 +23,8 @@ const backend = vi.hoisted(() => {
         // What `listProjectRepos` answers; a test adds to it to stand for another member's change.
         listed: [{ defaultBranch: "develop", id: "r1", isDefault: true, revision: 0, url: "https://github.com/acme/web.git" }] as unknown[],
         listReads: 0,
+        // The next read of the list fails, once.
+        listFails: false,
         update: vi.fn(),
     };
 });
@@ -36,6 +38,12 @@ vi.mock("@/lib/lunora/crpc", () => {
                     queryFn: async () => {
                         if (name === "listProjectRepos") {
                             backend.listReads += 1;
+
+                            if (backend.listFails) {
+                                backend.listFails = false;
+
+                                throw new Error("network");
+                            }
 
                             return [...backend.listed];
                         }
@@ -203,6 +211,28 @@ describe("ProjectRepositories", () => {
             expect(await screen.findByText("acme/docs")).toBeDefined();
         } finally {
             backend.listed.splice(1);
+            vi.useRealTimers();
+        }
+    });
+
+    it("keeps the list it has, with no error, when a refresh fails", async () => {
+        vi.useFakeTimers({ shouldAdvanceTime: true });
+
+        try {
+            backend.listReads = 0;
+            renderSection();
+            expect(await screen.findByText("acme/web")).toBeDefined();
+
+            backend.listFails = true;
+            await act(async () => {
+                await vi.advanceTimersByTimeAsync(15_000);
+            });
+
+            expect(backend.listReads).toBe(2);
+            expect(screen.getByText("acme/web")).toBeDefined();
+            expect(screen.queryByText("Could not load this project's repositories.")).toBeNull();
+        } finally {
+            backend.listFails = false;
             vi.useRealTimers();
         }
     });

@@ -308,7 +308,8 @@ const ProjectRepositories: FC<{ projectId: string }> = ({ projectId }) => {
                 {loading ? t`Loading repositories…` : ""}
             </p>
 
-            {loadFailed && (
+            {/* A failed refresh keeps the list it had: only a list that never loaded is an error. */}
+            {loadFailed && !repositories && (
                 <p className="text-destructive text-xs" role="alert">
                     {t`Could not load this project's repositories.`}
                 </p>
