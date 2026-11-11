@@ -578,6 +578,7 @@ const CustomProvidersSettings: FC = () => {
                                 id={fieldId("models")}
                                 onChange={(e) => update({ modelsText: e.target.value })}
                                 placeholder={form.type === "anthropic" ? "claude-sonnet-4-5\nclaude-haiku-4-5" : "llama3.1:8b\nqwen2.5:14b"}
+                                spellCheck={false}
                                 value={form.modelsText}
                             />
                             <p className="text-muted-foreground text-xs" id={fieldId("models-hint")}>
