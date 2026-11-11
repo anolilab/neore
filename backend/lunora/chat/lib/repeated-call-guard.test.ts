@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { ALTERNATING_CALL_WINDOW, findRepeatedCallLoop, loopNoticeText, REPEATED_CALL_LIMIT } from "./repeated-call-guard";
+import { ALTERNATING_CALL_WINDOW, findRepeatedCallLoop, type LoopFinding, loopNoticeText, REPEATED_CALL_LIMIT, repeatedCallGuard } from "./repeated-call-guard";
 
 type Call = [string, unknown];
 
@@ -135,5 +135,47 @@ describe("loopNoticeText", () => {
         const text = loopNoticeText({ kind: "alternate", toolNames: ["read", "write"] });
 
         expect(text).toContain('"read" and "write" kept alternating');
+    });
+});
+
+describe("the notice never carries an argument or a result", () => {
+    const SECRET = "tok-7f3c-do-not-show";
+
+    it("keeps a repeated call's distinctive argument out of the notice", () => {
+        const finding = findRepeatedCallLoop(steps(["search", { query: SECRET }], ["search", { query: SECRET }], ["search", { query: SECRET }]));
+
+        expect(finding).toBeDefined();
+        expect(loopNoticeText(finding as LoopFinding)).not.toContain(SECRET);
+        expect(loopNoticeText(finding as LoopFinding)).toContain('"search"');
+    });
+
+    it("keeps an alternation's distinctive argument out of the notice", () => {
+        const finding = findRepeatedCallLoop(
+            steps(["read", { path: SECRET }], ["write", { path: SECRET }], ["read", { path: SECRET }], ["write", { path: SECRET }]),
+        );
+
+        expect(finding).toBeDefined();
+        expect(loopNoticeText(finding as LoopFinding)).not.toContain(SECRET);
+        expect(loopNoticeText(finding as LoopFinding)).toContain('"read" and "write"');
+    });
+});
+
+describe("repeatedCallGuard", () => {
+    it("ends the turn on the same loop the plain decision finds, and keeps that finding", () => {
+        const guard = repeatedCallGuard();
+        const looping = steps(["search", { q: 1 }], ["search", { q: 1 }], ["search", { q: 1 }]);
+
+        expect(guard.finding).toBeUndefined();
+        expect(guard.stop({ steps: looping })).toBe(true);
+        expect(guard.finding).toStrictEqual({ count: 3, kind: "repeat", toolName: "search" });
+    });
+
+    it("clears the finding when a later evaluation finds no loop", () => {
+        const guard = repeatedCallGuard();
+
+        guard.stop({ steps: steps(["search", { q: 1 }], ["search", { q: 1 }], ["search", { q: 1 }]) });
+
+        expect(guard.stop({ steps: steps(["search", { q: 2 }]) })).toBe(false);
+        expect(guard.finding).toBeUndefined();
     });
 });

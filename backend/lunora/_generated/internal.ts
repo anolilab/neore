@@ -460,6 +460,9 @@ export interface InternalApiTypes {
             releaseGuestNoteSend: FunctionReference<"mutation", { claimedAt: number; messageId: Id<"threadGuestMessages"> }, null>;
             sweepGuestLinks: FunctionReference<"mutation", {}, null>;
         };
+        loop_stop: {
+            appendLoopStopNotice: FunctionReference<"mutation", { notice: string; replyRowId: string; threadId: Id<"threads">; userId: string }, boolean>;
+        };
         mcp_registry: {
             fetchMcpRegistryPage: FunctionReference<"action", { cursor: string | null; search: string | null }, { nextCursor?: string; servers: Array<{ description: string; icon?: string; id: string; remotes: Array<{ headers: Array<{ choices?: Array<string>; description?: string; isRequired: boolean; isSecret: boolean; name: string; placeholder?: string; value?: string }>; protocol: "http" | "sse"; url: string; variables: Array<{ choices?: Array<string>; description?: string; isRequired: boolean; isSecret: boolean; name: string; placeholder?: string; value?: string }> }>; repositoryUrl?: string; title: string; version: string; websiteUrl?: string }> }>;
         };
@@ -552,7 +555,7 @@ export interface InternalApiTypes {
         tools: {
             browser_node: {
                 closeBrowserSession: FunctionReference<"action", { sessionId: Id<"browserSessions"> }, void>;
-                executeBrowserAction: FunctionReference<"action", { action: "navigate" | "screenshot" | "click" | "type" | "extract" | "scroll"; browserSettings?: unknown; direction?: string; fullPage?: boolean; selector?: string; text?: string; threadId: Id<"threads">; url?: string; userId: string; userTier?: string }, unknown>;
+                executeBrowserAction: FunctionReference<"action", { action: "navigate" | "screenshot" | "click" | "type" | "extract" | "scroll"; browserSettings?: unknown; direction?: string; fullPage?: boolean; selector?: string; text?: string; threadId: Id<"threads">; url?: string; userId: string; userTier?: string }, import("@neore/service-sdk/browser-renderer").BrowserActionResponse>;
             };
             code_execution_node: {
                 default: FunctionReference<"action", { code: string; threadId?: Id<"threads">; timeoutMs?: number; userId?: string }, { files: import("../chat/tools/sandbox-outputs.js").SandboxOutputFile[]; skippedFiles: import("../chat/tools/sandbox-outputs.js").SkippedOutputFile[]; error: string | undefined; results: { type: "text"; value: string; }[]; stderr: string; stdout: string; } | { error: string; results: { type: "error"; value: string; }[]; stderr: string; stdout: string; } | { error: string | undefined; results: { format?: string; type: "text" | "image" | "error"; value: string; }[]; stderr: string; stdout: string; }>;
@@ -1769,6 +1772,9 @@ export const internal: InternalApiTypes = {
             recordGuestNoteSent: { __lunoraRef: "chat_guest_links:recordGuestNoteSent" },
             releaseGuestNoteSend: { __lunoraRef: "chat_guest_links:releaseGuestNoteSend" },
             sweepGuestLinks: { __lunoraRef: "chat_guest_links:sweepGuestLinks" },
+        },
+        loop_stop: {
+            appendLoopStopNotice: { __lunoraRef: "chat_loop_stop:appendLoopStopNotice" },
         },
         mcp_registry: {
             fetchMcpRegistryPage: { __lunoraRef: "chat_mcp_registry:fetchMcpRegistryPage" },

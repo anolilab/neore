@@ -56,7 +56,8 @@ import {
 import { buildAgentTools } from "./lib/agent-tools";
 import { chargeCompactionCall } from "./lib/compaction-quota";
 import { getMaxSteps, getModelContextWindow } from "./lib/auto-continue";
-import { findRepeatedCallLoop, type LoopFinding, loopNoticeText } from "./lib/repeated-call-guard";
+import { type RepeatedCallGuard, repeatedCallGuard } from "./lib/repeated-call-guard";
+import { writeLoopStopNotice } from "./loop-stop";
 import { RUN_BEAT_MS } from "./lib/interrupted-run";
 import { createToolRunMarker } from "./lib/mark-tool-runs";
 import { isRunReplaced } from "./lib/run-epoch";
@@ -683,15 +684,14 @@ export const runStreamingAgent = internalAction
                 // The steps this invocation finished: a pause carries the count to its resume.
                 const stepsFinished = { count: 0 };
                 // The loop the repeated-call guard ended the turn on: its closing line is written once the run has ended.
-                const loopStop: { finding?: LoopFinding } = {};
+                const loopGuard = repeatedCallGuard();
 
                 streamTextArgs.stopWhen = [
                     ...stopWhenStopped(ctx, streamId, maxSteps),
-                    ({ steps }: { steps: Parameters<typeof findRepeatedCallLoop>[0] }) => {
+                    ({ steps }: { steps: Parameters<RepeatedCallGuard["stop"]>[0]["steps"] }) => {
                         stepsFinished.count = steps.length;
-                        loopStop.finding = findRepeatedCallLoop(steps);
 
-                        return loopStop.finding !== undefined;
+                        return loopGuard.stop({ steps });
                     },
                 ];
 
@@ -879,20 +879,13 @@ export const runStreamingAgent = internalAction
                 // A turn the repeated-call guard ended closes with a line that names the loop. It is written only now, once the run has
                 // finished normally (a stopped reply takes none), and under the reply's last row, which the write re-checks is still the
                 // active leaf. A failed write never fails the run.
-                const replyRowId = result.savedMessages?.at(-1)?._id;
-
-                if (loopStop.finding && replyRowId !== undefined) {
-                    await ctx
-                        .runMutation(internal.chat.loop_stop.appendLoopStopNotice, {
-                            notice: loopNoticeText(loopStop.finding),
-                            replyRowId: String(replyRowId),
-                            threadId,
-                            userId,
-                        })
-                        .catch((error: unknown) => {
-                            streamLogger.warn("[BgAgent] Could not write the repeated-call notice:", error);
-                        });
-                }
+                await writeLoopStopNotice(ctx, {
+                    finding: loopGuard.finding,
+                    savedMessages: result.savedMessages,
+                    streamId,
+                    threadId,
+                    userId,
+                });
 
                 // Post-stream work: timing and memory extraction, then follow-ups.
                 await recordRun({

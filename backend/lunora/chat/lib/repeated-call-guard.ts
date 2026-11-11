@@ -50,8 +50,25 @@ const sortKeys = (value: unknown): unknown => {
     return value;
 };
 
-const callKey = (call: ToolCallLike, output: unknown): string =>
-    `${call.toolName}\u{0}${JSON.stringify(sortKeys(call.input ?? null))}\u{0}${JSON.stringify(sortKeys(output ?? null))}`;
+/**
+ * Each call's key, serialised once. The stop condition runs twice a step over the same call objects, and a tool result can be
+ * large, so the key is kept on the call rather than rebuilt from the full output every time.
+ */
+const keys = new WeakMap<ToolCallLike, string>();
+
+const callKey = (call: ToolCallLike, output: unknown): string => {
+    const known = keys.get(call);
+
+    if (known !== undefined) {
+        return known;
+    }
+
+    const key = `${call.toolName}\u{0}${JSON.stringify(sortKeys(call.input ?? null))}\u{0}${JSON.stringify(sortKeys(output ?? null))}`;
+
+    keys.set(call, key);
+
+    return key;
+};
 
 /** The calls of the finished steps, newest first, each keyed. Lazy: a call is keyed only when the decision reaches it. */
 function* newestFirst(steps: ReadonlyArray<StepLike>): Generator<Walked> {
@@ -120,6 +137,31 @@ export const findRepeatedCallLoop = (steps: ReadonlyArray<StepLike>): LoopFindin
     }
 
     return undefined;
+};
+
+/**
+ * A stop condition for a run's `stopWhen` that also keeps the loop it ended the turn on. Every runner (the chat, a group speaker,
+ * an approval continuation) takes one, so each ends a loop the same way and then writes the same closing line
+ * (`chat/loop-stop.ts`: `writeLoopStopNotice`). `finding` is set once a step has been evaluated and stays `undefined` otherwise.
+ */
+export type RepeatedCallGuard = {
+    readonly finding: LoopFinding | undefined;
+    stop: (options: { steps: ReadonlyArray<StepLike> }) => boolean;
+};
+
+export const repeatedCallGuard = (): RepeatedCallGuard => {
+    let finding: LoopFinding | undefined;
+
+    return {
+        get finding() {
+            return finding;
+        },
+        stop: ({ steps }) => {
+            finding = findRepeatedCallLoop(steps);
+
+            return finding !== undefined;
+        },
+    };
 };
 
 /** A tool name as it reads in a notice: bounded, with control characters blanked and Markdown metacharacters escaped. */

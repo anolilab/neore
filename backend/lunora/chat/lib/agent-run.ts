@@ -71,7 +71,8 @@ import { shouldNoteBriefActivity } from "../../notifications/daily-brief-logic";
 import { buildKnowledgeCitations, type KnowledgeSource } from "../../knowledge/citations";
 import type { ReplySkill } from "../../usage/activity-logic";
 import { type DispatchOrigin, stopWhenRequested } from "../../sub-agents/logic";
-import { findRepeatedCallLoop } from "./repeated-call-guard";
+import { writeLoopStopNotice } from "../loop-stop";
+import { type LoopFinding, type RepeatedCallGuard, repeatedCallGuard } from "./repeated-call-guard";
 
 /** Registry providers carry an `internal-` prefix the provider-keyed options do not. */
 export const INTERNAL_PREFIX_RE = /^internal-/;
@@ -1134,7 +1135,15 @@ export const resumeApprovedRun = async (
         keepOpenUnlessPaused?: boolean;
         steerable?: boolean;
     } = {},
-): Promise<{ awaitingInput?: AwaitingInput; lastMessageId: string | undefined; messageIds?: string[]; paused: boolean; stopped: boolean }> => {
+): Promise<{
+    awaitingInput?: AwaitingInput;
+    lastMessageId: string | undefined;
+    /** The repeated-call loop the run ended on, when its guard ended it (its reply is finished and its notice written). */
+    looped?: LoopFinding;
+    messageIds?: string[];
+    paused: boolean;
+    stopped: boolean;
+}> => {
     const { answer, answerFileIds, answers, approvalId, approved, config, denyReason, streamId, threadId, userId } = args;
     const { customProvider } = await resolveRunModel(ctx, config.model, userId);
     // A sub-agent child is not interactive: no person is in its chat, so it resumes with the refusals its paused run had
@@ -1293,10 +1302,13 @@ export const resumeApprovedRun = async (
         });
 
         streamTextArgs.abortSignal = stopping.signal;
-        // The repeated-call guard ends a looping turn here too, not only in the chat runner (`execute.ts`).
+        // The repeated-call guard ends a looping turn here too, not only in the chat runner (`execute.ts`). Its closing line is
+        // written below once the continuation has finished, and the caller reads the loop it ended on (`looped`).
+        const loopGuard = repeatedCallGuard();
+
         streamTextArgs.stopWhen = [
             ...stopWhenStopped(ctx, streamId, maxSteps),
-            ({ steps }: { steps: Parameters<typeof findRepeatedCallLoop>[0] }) => findRepeatedCallLoop(steps) !== undefined,
+            (guardInput: Parameters<RepeatedCallGuard["stop"]>[0]) => loopGuard.stop(guardInput),
         ];
 
         // A sub-agent child is also stopped from its run (a parent's Stop, `cancelRun`, the reaper), not only from its own
@@ -1462,6 +1474,11 @@ export const resumeApprovedRun = async (
             return await stoppedAt(error);
         }
 
+        // A loop the guard ended closes with its line, as in the chat runner. A continuation that paused again has no finished reply yet.
+        const looped = paused ? undefined : loopGuard.finding;
+
+        await writeLoopStopNotice(ctx, { finding: looped, savedMessages: result.savedMessages, streamId, threadId, userId });
+
         // Bookkeeping after the reply (memory, the summary): a failure here is logged and never changes how the run ended,
         // so a run that paused again still returns its pause (a sub-agent child then waits, rather than being failed).
         try {
@@ -1470,7 +1487,7 @@ export const resumeApprovedRun = async (
             streamLogger.error(`[AgentRun] Could not record the continuation of ${threadId}:`, recordError);
         }
 
-        return { awaitingInput, lastMessageId: messageIds.at(-1), messageIds, paused, stopped: false };
+        return { awaitingInput, lastMessageId: messageIds.at(-1), looped, messageIds, paused, stopped: false };
     } catch (error) {
         if (started) {
             await stampSavedToolCallsQuietly(ctx, {

@@ -63,8 +63,9 @@ import { buildAgentTools } from "../lib/agent-tools";
 import { getMaxSteps } from "../lib/auto-continue";
 import getAgent from "../lib/get-agent";
 import { closeMCPClients } from "../lib/mcp-tools";
-import { findRepeatedCallLoop } from "../lib/repeated-call-guard";
+import { type LoopFinding, type RepeatedCallGuard, repeatedCallGuard } from "../lib/repeated-call-guard";
 import { pipeToPersistentChunks, type PipedStream, stopWhenStopped, toolProgressSink } from "../lib/persist-stream";
+import { writeLoopStopNotice } from "../loop-stop";
 import type { SearchMode } from "../lib/tool-builder";
 import type { ToolRunConfig } from "../lib/tool-run-config";
 import type { AskUserQuestionAnswer } from "../tools/ask-user-constants";
@@ -251,7 +252,14 @@ const runSpeaker = async (
     turn: TurnContext,
     speaker: GroupParticipantRun,
     position: QueuePosition,
-): Promise<{ awaitingInput?: AwaitingInput; lastMessageId: string | undefined; paused: boolean; stopped: boolean }> => {
+): Promise<{
+    awaitingInput?: AwaitingInput;
+    lastMessageId: string | undefined;
+    /** The repeated-call loop that ended this speaker's reply, when its guard ended it. */
+    looped?: LoopFinding;
+    paused: boolean;
+    stopped: boolean;
+}> => {
     let mcpClients: MCPClient[] = [];
 
     try {
@@ -364,10 +372,13 @@ const runSpeaker = async (
         const stopping = new AbortController();
 
         streamTextArgs.abortSignal = stopping.signal;
-        // The repeated-call guard ends a looping group turn too (`chat/execute.ts` has the chat runner's notice).
+        // The repeated-call guard ends a looping group turn too (`chat/execute.ts` has the chat runner's notice). A speaker it ends
+        // closes the whole turn (`runQueue`), not only its own reply.
+        const loopGuard = repeatedCallGuard();
+
         streamTextArgs.stopWhen = [
             ...stopWhenStopped(ctx, turn.streamId, getMaxSteps(turn.shouldAutoContinue)),
-            ({ steps }: { steps: Parameters<typeof findRepeatedCallLoop>[0] }) => findRepeatedCallLoop(steps) !== undefined,
+            (options: Parameters<RepeatedCallGuard["stop"]>[0]) => loopGuard.stop(options),
         ];
 
         // Admitted by the stream this turn runs on (`streamRunThread`): the context is read without a proof.
@@ -424,7 +435,7 @@ const runSpeaker = async (
             // What the speaker finished before the stop is a reply like any other on the usage page.
             await recordRun(undefined);
 
-            return { lastMessageId: undefined, paused: false, stopped: true };
+            return { lastMessageId: undefined, looped: undefined, paused: false, stopped: true };
         };
         let piped: PipedStream;
 
@@ -479,9 +490,19 @@ const runSpeaker = async (
             return await stoppedAt(error);
         }
 
+        // A loop the guard ended closes with its line; a speaker that paused again has no finished reply yet.
+        const looped = paused ? undefined : loopGuard.finding;
+
+        await writeLoopStopNotice(ctx, {
+            finding: looped,
+            savedMessages: result.savedMessages,
+            streamId: turn.streamId,
+            threadId: turn.threadId,
+            userId: turn.userId,
+        });
         await recordRun(firstTokenTime);
 
-        return { awaitingInput, lastMessageId: savedIds.at(-1), paused, stopped: false };
+        return { awaitingInput, lastMessageId: savedIds.at(-1), looped, paused, stopped: false };
     } finally {
         await closeMCPClients(mcpClients);
     }
@@ -580,7 +601,7 @@ const runQueue = async (
 
         spoken.push(speaker.skillId);
 
-        const { awaitingInput, lastMessageId, paused, stopped } = await runSpeaker(ctx, turn, speaker, {
+        const { awaitingInput, lastMessageId, looped, paused, stopped } = await runSpeaker(ctx, turn, speaker, {
             continueFromMessageId: continueFrom,
             remaining: queue,
             spokenSkillIds: spoken,
@@ -598,6 +619,12 @@ const runQueue = async (
         if (stopped) {
             // The stop ended the stream and the thread's run; no further speaker.
             return;
+        }
+
+        if (looped !== undefined) {
+            // The repeated-call guard ended this speaker's reply, and its notice is written: the turn ends here, with no further
+            // speaker, but closes normally (below), as a finished turn does.
+            break;
         }
 
         continueFrom = lastMessageId ?? continueFrom;
@@ -884,9 +911,10 @@ export const continueGroupAfterToolApproval = async (
     // prompt as a sibling reply; closing the turn is the safe reading.
     const remaining: TurnQueue = group.steps ? { kind: "steps", steps: group.steps } : { kind: "speakers", queue: group.queue };
 
+    // A continuation the repeated-call guard ended closes the turn too: no speaker after it.
     await runQueue(ctx, turn, {
         continueFromMessageId: resumed.lastMessageId,
-        plan: resumed.lastMessageId ? remaining : { kind: "speakers", queue: [] },
+        plan: resumed.lastMessageId && resumed.looped === undefined ? remaining : { kind: "speakers", queue: [] },
         spokenSkillIds: group.spokenSkillIds,
     });
 };
