@@ -29,7 +29,8 @@ import { isDeviceInScope, resolveThreadProject } from "./lib/scope";
 import { signDevicePayload, utf8Length } from "./lib/signing";
 import { assertRoomForDevice, insertDevice } from "./lib/register";
 import { mergeTaint } from "./lib/taint";
-import { clearProjectsBatch } from "./lib/clear-projects";
+import { CLEAR_PROJECTS_RETRY, clearProjectsBatch } from "./lib/clear-projects";
+import { runAfterWithRetry } from "../lib/shard-scheduler";
 import { countOpenCalls, isAcpTool, isDeviceOnline, isDeviceOutdated, isTerminalCallStatus, OPEN_CALL_STATUSES } from "./lib/state";
 import { vDeviceCallStatus, vDeviceManifestTool, vDevicePlatform, vDeviceTaintSource } from "./validators";
 
@@ -366,7 +367,7 @@ export const clearDeviceProjects = internalMutation
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
         if (await clearProjectsBatch(ctx, args.userId, args.machineId)) {
-            await ctx.scheduler.runAfter(0, internal.devices.internal.clearDeviceProjects, args);
+            await runAfterWithRetry(ctx.scheduler, 0, internal.devices.internal.clearDeviceProjects, args, CLEAR_PROJECTS_RETRY);
         }
 
         return null;
