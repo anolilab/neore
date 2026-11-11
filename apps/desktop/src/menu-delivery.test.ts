@@ -140,8 +140,6 @@ describe(createMenuDelivery, () => {
         delivery.navigationStarted(win);
         delivery.deliver(win, "new-chat");
         vi.advanceTimersByTime(MENU_READY_GRACE_MS * 2);
-        delivery.loaded(win);
-        vi.advanceTimersByTime(MENU_READY_GRACE_MS * 2);
 
         expect(fellBack).toStrictEqual([]);
         expect(sent).toStrictEqual([]);
@@ -162,6 +160,66 @@ describe(createMenuDelivery, () => {
             [win, "settings"],
             [win, "new-chat"],
         ]);
+    });
+
+    it("gives the page back what it was when loading stops with a navigation still uncommitted", () => {
+        const { delivery, sent } = setup();
+        const win = { onSite: true };
+
+        delivery.ready(win);
+        delivery.navigationStarted(win);
+        delivery.deliver(win, "settings");
+        expect(sent).toStrictEqual([]);
+
+        delivery.loaded(win);
+        delivery.deliver(win, "new-chat");
+        expect(sent).toStrictEqual([
+            [win, "settings"],
+            [win, "new-chat"],
+        ]);
+    });
+
+    it("gives the page back at once when the shell cancels a navigation, and counts its later failure only once", () => {
+        const { delivery, sent } = setup();
+        const win = { onSite: true };
+
+        delivery.ready(win);
+        delivery.navigationStarted(win);
+        delivery.deliver(win, "settings");
+        delivery.navigationCancelled(win);
+        expect(sent).toStrictEqual([[win, "settings"]]);
+
+        // A cancelled navigation that no longer counts gives nothing back twice, and the count never goes below zero.
+        delivery.navigationCancelled(win);
+        delivery.navigationStarted(win);
+        delivery.navigationAbandoned(win);
+        delivery.deliver(win, "new-chat");
+        expect(sent).toStrictEqual([[win, "settings"]]);
+
+        // A second navigation is pending while the first is cancelled: commands stay held until both are done.
+        delivery.navigationStarted(win);
+        delivery.navigationCancelled(win);
+        delivery.navigationAbandoned(win);
+        expect(sent).toStrictEqual([[win, "settings"]]);
+
+        delivery.navigationAbandoned(win);
+        expect(sent).toStrictEqual([
+            [win, "settings"],
+            [win, "new-chat"],
+        ]);
+    });
+
+    it("runs the grace period for a page that was not listening when its navigation is settled at the stop", () => {
+        const { delivery, fellBack } = setup();
+        const win = { onSite: true };
+
+        delivery.loaded(win);
+        delivery.navigationStarted(win);
+        delivery.deliver(win, "new-chat");
+        delivery.loaded(win);
+        vi.advanceTimersByTime(MENU_READY_GRACE_MS);
+
+        expect(fellBack).toStrictEqual([[win, "new-chat"]]);
     });
 
     it("holds commands again once the page stops listening, and sends them when it listens again", () => {

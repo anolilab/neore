@@ -812,6 +812,44 @@ describe("look and application menu", () => {
         ]);
     });
 
+    it("sends the commands held during a link click the shell cancelled to the page that stayed, once", () => {
+        const win = onSite();
+        const abandoned = guardOf(win, "did-fail-provisional-load") as unknown as (event: unknown, code: number, text: string, url: string, isMainFrame: boolean) => void;
+
+        fake().payloads.length = 0;
+        startNavigation(win, "https://example.org/");
+        menuItem("New Chat")?.click?.();
+        expect(menuPayloads()).toStrictEqual([]);
+
+        guardOf(win, "will-navigate")?.({ preventDefault: () => {} }, "https://example.org/");
+        expect(menuPayloads()).toStrictEqual([{ channel: "neore:menu-command", payload: "new-chat", window: win.id }]);
+
+        // Its own failure, when Electron reports it, changes nothing.
+        abandoned({}, -3, "ERR_ABORTED", "https://example.org/", true);
+        stoppedLoading(win);
+        menuItem("Settings…")?.click?.();
+        expect(menuPayloads()).toStrictEqual([
+            { channel: "neore:menu-command", payload: "new-chat", window: win.id },
+            { channel: "neore:menu-command", payload: "settings", window: win.id },
+        ]);
+    });
+
+    it("sends the commands held during a navigation that stopped loading without a commit to the page that stayed", () => {
+        const win = onSite();
+
+        fake().payloads.length = 0;
+        startNavigation(win, `${SITE}/export.csv`);
+        menuItem("Settings…")?.click?.();
+        expect(menuPayloads()).toStrictEqual([]);
+
+        stoppedLoading(win);
+        menuItem("New Chat")?.click?.();
+        expect(menuPayloads()).toStrictEqual([
+            { channel: "neore:menu-command", payload: "settings", window: win.id },
+            { channel: "neore:menu-command", payload: "new-chat", window: win.id },
+        ]);
+    });
+
     it("holds commands once the page stops listening, until it listens again, and only on its own word", () => {
         const win = onSite();
         const unready = fake().ipc.get("neore:menu-commands-unready");
@@ -865,19 +903,20 @@ describe("look and application menu", () => {
             expect(menuPayloads()).toStrictEqual([]);
         });
 
-        it("opens no second window for New Chat when the page already is a new chat", () => {
+        it("gets New Chat in a fresh window even when the page is at the new-chat path with a linked draft", () => {
             vi.useFakeTimers();
 
             const win = mainWindow();
             const windowCount = fake().windows.length;
 
-            navigate(win, `${SITE}/chat`);
+            navigate(win, `${SITE}/chat?prompt=draft`);
             stoppedLoading(win);
             vi.advanceTimersByTime(MENU_READY_GRACE_MS);
             menuItem("New Chat")?.click?.();
 
-            expect(fake().windows).toHaveLength(windowCount);
-            expect(win.loaded.at(-1)).toBe(`${SITE}/chat`);
+            expect(fake().windows).toHaveLength(windowCount + 1);
+            expect(fake().windows.at(-1)?.loaded.at(-1)).toBe(`${SITE}/chat`);
+            expect(win.loaded.at(-1)).toBe(`${SITE}/chat?prompt=draft`);
         });
 
         it("falls back once the grace period ends for a loaded page that stopped listening", () => {

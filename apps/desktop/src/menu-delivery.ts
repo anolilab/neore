@@ -3,7 +3,8 @@
  * from the shell, so a page may never listen (an older site): the page says it listens through `menuCommandsReady`,
  * and a page that has not said so `MENU_READY_GRACE_MS` after its load gets the shell's own fallback instead.
  * Readiness belongs to a document: from the start of a main-frame navigation the departing page gets nothing, and
- * every committed one starts over. A navigation that never commits gives the page that stayed its state back.
+ * every committed one starts over. A navigation that never commits gives the page that stayed its state back: the shell
+ * cancelled it, `did-fail-provisional-load` ended it, or loading stopped with it still uncommitted.
  */
 import type { MenuCommand } from "./app-menu.js";
 
@@ -14,6 +15,8 @@ export const MENU_READY_GRACE_MS = 2000;
 type Phase = "absent" | "loading" | "ready";
 
 interface WindowState {
+    /** Navigations the shell cancelled and already counted: their `did-fail-provisional-load`, if it comes, is not counted again. */
+    cancelled: number;
     /** The current document finished loading (or stopped): the grace period may run. */
     loaded: boolean;
     /** Main-frame navigations started and neither committed nor abandoned. While one is, every command queues. */
@@ -44,6 +47,8 @@ export interface MenuDelivery<W> {
     navigated: (win: W, toSite: boolean) => void;
     /** A main-frame navigation ended without a new document (cancelled, a download, a 204): the page stays. */
     navigationAbandoned: (win: W) => void;
+    /** The shell cancelled a main-frame navigation after it started (`will-navigate`, `will-redirect`): the page stays. */
+    navigationCancelled: (win: W) => void;
     /** A main-frame cross-document navigation started: the departing page gets nothing more. */
     navigationStarted: (win: W) => void;
     /** The page subscribed to menu commands: what was queued is sent now. */
@@ -59,7 +64,7 @@ export const createMenuDelivery = <W>({ fallback, isShowingSite, send }: MenuDel
         let state = states.get(win);
 
         if (state === undefined) {
-            state = { loaded: false, pending: 0, phase: "loading", queue: [], toSite: true };
+            state = { cancelled: 0, loaded: false, pending: 0, phase: "loading", queue: [], toSite: true };
             states.set(win, state);
         }
 
@@ -123,6 +128,46 @@ export const createMenuDelivery = <W>({ fallback, isShowingSite, send }: MenuDel
         }, MENU_READY_GRACE_MS);
     };
 
+    /** No navigation is pending any more and none committed: the page that stayed gets its own state back. */
+    const resumePage = (win: W): void => {
+        const state = stateOf(win);
+
+        state.pending = 0;
+
+        if (state.resume === undefined) {
+            return;
+        }
+
+        state.phase = state.resume.phase;
+        state.toSite = state.resume.toSite;
+        state.resume = undefined;
+
+        if (!state.toSite) {
+            state.queue = [];
+        }
+
+        if (state.phase === "loading") {
+            startGrace(win);
+        } else {
+            flush(win);
+        }
+    };
+
+    /** One pending navigation ended without a commit; never below zero. */
+    const abandonOne = (win: W): void => {
+        const state = stateOf(win);
+
+        if (state.pending === 0) {
+            return;
+        }
+
+        state.pending -= 1;
+
+        if (state.pending === 0) {
+            resumePage(win);
+        }
+    };
+
     return {
         deliver,
         forget: (win) => {
@@ -137,12 +182,21 @@ export const createMenuDelivery = <W>({ fallback, isShowingSite, send }: MenuDel
             const state = stateOf(win);
 
             state.loaded = true;
-            startGrace(win);
+            // Loading stopped: nothing is in flight, so a navigation still pending ended without a word (cancelled,
+            // a download, a 204), and no `did-fail-provisional-load` is still to come.
+            state.cancelled = 0;
+
+            if (state.pending > 0) {
+                resumePage(win);
+            } else {
+                startGrace(win);
+            }
         },
         navigated: (win, toSite) => {
             const state = stateOf(win);
 
             stopTimer(win);
+            state.cancelled = 0;
             state.loaded = false;
             state.pending = 0;
             state.phase = "loading";
@@ -156,29 +210,23 @@ export const createMenuDelivery = <W>({ fallback, isShowingSite, send }: MenuDel
         navigationAbandoned: (win) => {
             const state = stateOf(win);
 
+            if (state.cancelled > 0) {
+                state.cancelled -= 1;
+
+                return;
+            }
+
+            abandonOne(win);
+        },
+        navigationCancelled: (win) => {
+            const state = stateOf(win);
+
             if (state.pending === 0) {
                 return;
             }
 
-            state.pending -= 1;
-
-            if (state.pending > 0 || state.resume === undefined) {
-                return;
-            }
-
-            state.phase = state.resume.phase;
-            state.toSite = state.resume.toSite;
-            state.resume = undefined;
-
-            if (!state.toSite) {
-                state.queue = [];
-            }
-
-            if (state.phase === "loading") {
-                startGrace(win);
-            } else {
-                flush(win);
-            }
+            state.cancelled += 1;
+            abandonOne(win);
         },
         navigationStarted: (win) => {
             const state = stateOf(win);

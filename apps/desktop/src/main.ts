@@ -188,30 +188,31 @@ const openWebLinkExternally = (url: URL | undefined): void => {
     }
 };
 
-const guardNavigation = (event: { preventDefault: () => void }, url: string): void => {
+/** Cancels a navigation that leaves the site and hands it elsewhere; answers whether it did. */
+const guardNavigation = (event: { preventDefault: () => void }, url: string): boolean => {
     switch (classifyUrl(origin, url)) {
         case "artifact": {
             event.preventDefault();
             openArtifactWindow(new URL(url));
 
-            break;
+            return true;
         }
         case "external": {
             event.preventDefault();
             openWebLinkExternally(URL.parse(url) ?? undefined);
 
-            break;
+            return true;
         }
         case "oauth": {
             // Google refuses embedded webviews: cancel, and run the flow in the system browser.
             event.preventDefault();
             startBrowserSignIn();
 
-            break;
+            return true;
         }
         default: {
             // "site": an ordinary page of ours navigates in place.
-            break;
+            return false;
         }
     }
 };
@@ -275,13 +276,8 @@ const isShowingSite = (win: BrowserWindow): boolean => !win.isDestroyed() && isT
 const menuDelivery = createMenuDelivery<BrowserWindow>({
     fallback: (win, command) => {
         if (command === "new-chat") {
-            const target = newChatUrl(origin);
-
-            if (URL.parse(win.webContents.getURL())?.pathname === target.pathname) {
-                bringForward(win);
-            } else {
-                openSiteWindow(target);
-            }
+            // Always a fresh window: even a page at the new-chat path may hold a draft (`/chat?prompt=…`).
+            openSiteWindow(newChatUrl(origin));
         } else {
             log(`the page does not listen for menu commands; "${command}" dropped`);
         }
@@ -430,14 +426,24 @@ const guardSiteWindow = (win: BrowserWindow, reveal: () => void): void => {
         return { action: "deny" };
     });
 
-    contents.on("will-navigate", (event, url) => guardNavigation(event, url));
-    contents.on("will-redirect", (event, url) => guardNavigation(event, url));
+    // Both come after `did-start-navigation` (`will-navigate` from Electron's navigation throttle): a navigation cancelled
+    // here was counted as started, and the page that stays gets its menu commands back at once.
+    contents.on("will-navigate", (event, url) => {
+        if (guardNavigation(event, url)) {
+            menuDelivery.navigationCancelled(win);
+        }
+    });
+    contents.on("will-redirect", (event, url) => {
+        if (guardNavigation(event, url) && event.isMainFrame) {
+            menuDelivery.navigationCancelled(win);
+        }
+    });
     contents.on("will-attach-webview", (event) => event.preventDefault());
 
     // Each committed document has to subscribe to menu commands again (an in-page route change is not a `did-navigate`).
     // From the start of a cross-document navigation the departing page gets nothing: it may unload before it acts.
-    // One that never commits (cancelled, a download) ends in `did-fail-provisional-load`, and the page stays.
-    // `did-stop-loading` rather than `did-finish-load`: it also ends a load that failed or was stopped.
+    // One that never commits (cancelled, a download) ends in `did-fail-provisional-load`, and the page stays; one that
+    // ends with no word at all is settled at `did-stop-loading`, which also ends a load that failed or was stopped.
     contents.on("did-start-navigation", (details) => {
         if (details.isMainFrame && !details.isSameDocument) {
             menuDelivery.navigationStarted(win);
