@@ -1166,7 +1166,10 @@ export const LUNORA_FUNCTION_MANIFEST: Readonly<Record<string, FunctionManifestE
     "plugins_install_steps:recordIntent": {"argumentDescriptors":[{"kind":"string","name":"contentHash","optional":false},{"kind":"string","name":"entryKey","optional":false},{"kind":"number","name":"generation","optional":false},{"kind":"string","name":"installId","optional":false},{"kind":"union","name":"kind","optional":false},{"kind":"string","name":"userId","optional":false}],"exportName":"recordIntent","kind":"mutation","moduleId":"lunora_plugins_install_steps_183","visibility":"internal"},
     "plugins_repair_resume:beginRepair": {"argumentDescriptors":[{"kind":"string","name":"contentHash","optional":false},{"kind":"string","name":"pluginSlug","optional":false},{"kind":"string","name":"userId","optional":false}],"exportName":"beginRepair","kind":"mutation","moduleId":"lunora_plugins_repair_resume_184","visibility":"internal"},
     "plugins_repair_resume:repairPlugin": {"argumentDescriptors":[{"kind":"string","name":"contentHash","optional":false},{"kind":"string","name":"markdown","optional":false},{"kind":"string","name":"pluginSlug","optional":false}],"exportName":"repairPlugin","kind":"action","moduleId":"lunora_plugins_repair_resume_184","visibility":"public"},
-    "plugins_uninstall:uninstallPlugin": {"argumentDescriptors":[{"kind":"string","name":"pluginSlug","optional":false}],"exportName":"uninstallPlugin","kind":"mutation","moduleId":"lunora_plugins_uninstall_185","visibility":"public"},
+    "plugins_uninstall_action:beginUninstall": {"argumentDescriptors":[{"kind":"string","name":"pluginSlug","optional":false},{"kind":"string","name":"userId","optional":false}],"exportName":"beginUninstall","kind":"mutation","moduleId":"lunora_plugins_uninstall_action_185","visibility":"internal"},
+    "plugins_uninstall_action:claimGroup": {"argumentDescriptors":[{"kind":"number","name":"generation","optional":false},{"kind":"string","name":"installId","optional":false},{"kind":"string","name":"threadId","optional":false}],"exportName":"claimGroup","kind":"mutation","moduleId":"lunora_plugins_uninstall_action_185","visibility":"internal"},
+    "plugins_uninstall_action:finishUninstall": {"argumentDescriptors":[{"kind":"number","name":"generation","optional":false},{"kind":"string","name":"installId","optional":false}],"exportName":"finishUninstall","kind":"mutation","moduleId":"lunora_plugins_uninstall_action_185","visibility":"internal"},
+    "plugins_uninstall_action:uninstallPlugin": {"argumentDescriptors":[{"kind":"string","name":"pluginSlug","optional":false}],"exportName":"uninstallPlugin","kind":"action","moduleId":"lunora_plugins_uninstall_action_185","visibility":"public"},
     "plugins_update_apply:beginUpdate": {"argumentDescriptors":[{"kind":"string","name":"installId","optional":false},{"kind":"string","name":"targetVersion","optional":false},{"kind":"string","name":"userId","optional":false}],"exportName":"beginUpdate","kind":"mutation","moduleId":"lunora_plugins_update_apply_186","visibility":"internal"},
     "plugins_update_apply:detachChild": {"argumentDescriptors":[{"kind":"string","name":"entryKey","optional":false},{"kind":"number","name":"generation","optional":false},{"kind":"string","name":"installId","optional":false},{"kind":"string","name":"userId","optional":false}],"exportName":"detachChild","kind":"mutation","moduleId":"lunora_plugins_update_apply_186","visibility":"internal"},
     "plugins_update_apply:finishUpdate": {"argumentDescriptors":[{"kind":"string","name":"contentHash","optional":false},{"kind":"number","name":"generation","optional":false},{"kind":"string","name":"installId","optional":false},{"kind":"string","name":"version","optional":false}],"exportName":"finishUpdate","kind":"mutation","moduleId":"lunora_plugins_update_apply_186","visibility":"internal"},
@@ -1729,7 +1732,7 @@ const MODULE_LOADERS: Record<string, () => Promise<Record<string, unknown>>> = {
     "lunora_plugins_install_action_182": () => import("./fn/lunora_plugins_install_action_182.js"),
     "lunora_plugins_install_steps_183": () => import("./fn/lunora_plugins_install_steps_183.js"),
     "lunora_plugins_repair_resume_184": () => import("./fn/lunora_plugins_repair_resume_184.js"),
-    "lunora_plugins_uninstall_185": () => import("./fn/lunora_plugins_uninstall_185.js"),
+    "lunora_plugins_uninstall_action_185": () => import("./fn/lunora_plugins_uninstall_action_185.js"),
     "lunora_plugins_update_apply_186": () => import("./fn/lunora_plugins_update_apply_186.js"),
     "lunora_plugins_update_187": () => import("./fn/lunora_plugins_update_187.js"),
     "lunora_projects_functions_188": () => import("./fn/lunora_projects_functions_188.js"),
@@ -3000,7 +3003,10 @@ export const LUNORA_FUNCTIONS: Record<string, RegisteredLunoraFunction> = {
     "plugins_install_steps:recordIntent": { args: {}, handler: unloadedFunctionHandler, "argumentDescriptors":[{"kind":"string","name":"contentHash","optional":false},{"kind":"string","name":"entryKey","optional":false},{"kind":"number","name":"generation","optional":false},{"kind":"string","name":"installId","optional":false},{"kind":"union","name":"kind","optional":false},{"kind":"string","name":"userId","optional":false}],"kind":"mutation","visibility":"internal" } satisfies RegisteredLunoraFunction & Pick<FunctionManifestEntry, "argumentDescriptors" | "channel" | "expose">,
     "plugins_repair_resume:beginRepair": { args: {}, handler: unloadedFunctionHandler, "argumentDescriptors":[{"kind":"string","name":"contentHash","optional":false},{"kind":"string","name":"pluginSlug","optional":false},{"kind":"string","name":"userId","optional":false}],"kind":"mutation","visibility":"internal" } satisfies RegisteredLunoraFunction & Pick<FunctionManifestEntry, "argumentDescriptors" | "channel" | "expose">,
     "plugins_repair_resume:repairPlugin": { args: {}, handler: unloadedFunctionHandler, "argumentDescriptors":[{"kind":"string","name":"contentHash","optional":false},{"kind":"string","name":"markdown","optional":false},{"kind":"string","name":"pluginSlug","optional":false}],"kind":"action","visibility":"public" } satisfies RegisteredLunoraFunction & Pick<FunctionManifestEntry, "argumentDescriptors" | "channel" | "expose">,
-    "plugins_uninstall:uninstallPlugin": { args: {}, handler: unloadedFunctionHandler, "argumentDescriptors":[{"kind":"string","name":"pluginSlug","optional":false}],"kind":"mutation","visibility":"public" } satisfies RegisteredLunoraFunction & Pick<FunctionManifestEntry, "argumentDescriptors" | "channel" | "expose">,
+    "plugins_uninstall_action:beginUninstall": { args: {}, handler: unloadedFunctionHandler, "argumentDescriptors":[{"kind":"string","name":"pluginSlug","optional":false},{"kind":"string","name":"userId","optional":false}],"kind":"mutation","visibility":"internal" } satisfies RegisteredLunoraFunction & Pick<FunctionManifestEntry, "argumentDescriptors" | "channel" | "expose">,
+    "plugins_uninstall_action:claimGroup": { args: {}, handler: unloadedFunctionHandler, "argumentDescriptors":[{"kind":"number","name":"generation","optional":false},{"kind":"string","name":"installId","optional":false},{"kind":"string","name":"threadId","optional":false}],"kind":"mutation","visibility":"internal" } satisfies RegisteredLunoraFunction & Pick<FunctionManifestEntry, "argumentDescriptors" | "channel" | "expose">,
+    "plugins_uninstall_action:finishUninstall": { args: {}, handler: unloadedFunctionHandler, "argumentDescriptors":[{"kind":"number","name":"generation","optional":false},{"kind":"string","name":"installId","optional":false}],"kind":"mutation","visibility":"internal" } satisfies RegisteredLunoraFunction & Pick<FunctionManifestEntry, "argumentDescriptors" | "channel" | "expose">,
+    "plugins_uninstall_action:uninstallPlugin": { args: {}, handler: unloadedFunctionHandler, "argumentDescriptors":[{"kind":"string","name":"pluginSlug","optional":false}],"kind":"action","visibility":"public" } satisfies RegisteredLunoraFunction & Pick<FunctionManifestEntry, "argumentDescriptors" | "channel" | "expose">,
     "plugins_update_apply:beginUpdate": { args: {}, handler: unloadedFunctionHandler, "argumentDescriptors":[{"kind":"string","name":"installId","optional":false},{"kind":"string","name":"targetVersion","optional":false},{"kind":"string","name":"userId","optional":false}],"kind":"mutation","visibility":"internal" } satisfies RegisteredLunoraFunction & Pick<FunctionManifestEntry, "argumentDescriptors" | "channel" | "expose">,
     "plugins_update_apply:detachChild": { args: {}, handler: unloadedFunctionHandler, "argumentDescriptors":[{"kind":"string","name":"entryKey","optional":false},{"kind":"number","name":"generation","optional":false},{"kind":"string","name":"installId","optional":false},{"kind":"string","name":"userId","optional":false}],"kind":"mutation","visibility":"internal" } satisfies RegisteredLunoraFunction & Pick<FunctionManifestEntry, "argumentDescriptors" | "channel" | "expose">,
     "plugins_update_apply:finishUpdate": { args: {}, handler: unloadedFunctionHandler, "argumentDescriptors":[{"kind":"string","name":"contentHash","optional":false},{"kind":"number","name":"generation","optional":false},{"kind":"string","name":"installId","optional":false},{"kind":"string","name":"version","optional":false}],"kind":"mutation","visibility":"internal" } satisfies RegisteredLunoraFunction & Pick<FunctionManifestEntry, "argumentDescriptors" | "channel" | "expose">,
@@ -4963,7 +4969,10 @@ export interface Caller {
             beginRepair: (args: { contentHash: string; pluginSlug: string; userId: string }) => Promise<{ generation: number; installId: string; linked: number; missing: Array<{ entryKey: string; intentId: string; kind: "skill" | "trigger" | "group" }>; status: "installed" | "needs-repair" }>;
             repairPlugin: (args: { contentHash: string; markdown: string; pluginSlug: string }) => Promise<{ created: Array<string>; status: "installed" | "needs-repair" }>;
         };
-        uninstall: {
+        uninstall_action: {
+            beginUninstall: (args: { pluginSlug: string; userId: string }) => Promise<{ generation: number; groups: Array<string>; installId: string; kept: Array<string>; removed: number }>;
+            claimGroup: (args: { generation: number; installId: string; threadId: string }) => Promise<boolean>;
+            finishUninstall: (args: { generation: number; installId: string }) => Promise<null>;
             uninstallPlugin: (args: { pluginSlug: string }) => Promise<{ kept: Array<string>; removed: number }>;
         };
         update: {
@@ -7068,8 +7077,11 @@ export const createCaller = (context: CallerCtx): Caller => ({
             beginRepair: (args) => callRegistered(context, "plugins_repair_resume:beginRepair", args),
             repairPlugin: (args) => callRegistered(context, "plugins_repair_resume:repairPlugin", args),
         },
-        uninstall: {
-            uninstallPlugin: (args) => callRegistered(context, "plugins_uninstall:uninstallPlugin", args),
+        uninstall_action: {
+            beginUninstall: (args) => callRegistered(context, "plugins_uninstall_action:beginUninstall", args),
+            claimGroup: (args) => callRegistered(context, "plugins_uninstall_action:claimGroup", args),
+            finishUninstall: (args) => callRegistered(context, "plugins_uninstall_action:finishUninstall", args),
+            uninstallPlugin: (args) => callRegistered(context, "plugins_uninstall_action:uninstallPlugin", args),
         },
         update: {
             loadInstalledForUpdate: (args) => callRegistered(context, "plugins_update:loadInstalledForUpdate", args),
