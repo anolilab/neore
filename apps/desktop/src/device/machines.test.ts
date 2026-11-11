@@ -302,6 +302,16 @@ describe("shareFolder", () => {
         expect(deps.setRoots).toHaveBeenCalledWith("srv-1", ["/srv/app", "/real/proj"]);
     });
 
+    it("refuses a resolved folder whose name would disguise the share prompt, without asking", async () => {
+        const { deps, machines } = setup();
+
+        deps.hostBrowse.mockResolvedValueOnce({ entries: [], host: "build", next: null, parent: "/", path: "/real/\u{202E}proj", refusedRoot: false });
+
+        await expect(machines.shareFolder("srv-1", "/link/proj")).rejects.toThrow("device: path is invalid");
+        expect(deps.confirm).not.toHaveBeenCalled();
+        expect(deps.setRoots).not.toHaveBeenCalled();
+    });
+
     it("refuses the server's home folder or one above it, without asking", async () => {
         const { deps, machines } = setup();
 
