@@ -769,10 +769,11 @@ describe("look and application menu", () => {
             onSite();
         });
 
-        it("gets New Chat by URL once its grace period ends, and Settings is dropped", () => {
+        it("gets New Chat in a new window once its grace period ends, never over its own page, and Settings is dropped", () => {
             vi.useFakeTimers();
 
             const win = mainWindow();
+            const windowCount = fake().windows.length;
 
             navigate(win, `${SITE}/chat/thread-1`);
             stoppedLoading(win);
@@ -780,17 +781,33 @@ describe("look and application menu", () => {
             menuItem("New Chat")?.click?.();
 
             vi.advanceTimersByTime(MENU_READY_GRACE_MS - 1);
-            expect(win.loaded.at(-1)).toBe(`${SITE}/chat/thread-1`);
+            expect(fake().windows).toHaveLength(windowCount);
             vi.advanceTimersByTime(1);
-            expect(win.loaded.at(-1)).toBe(`${SITE}/chat`);
+            // A reply may still be streaming on thread-1: that page is left alone.
+            expect(win.loaded.at(-1)).toBe(`${SITE}/chat/thread-1`);
+            expect(fake().windows).toHaveLength(windowCount + 1);
+            expect(fake().windows.at(-1)?.loaded.at(-1)).toBe(`${SITE}/chat`);
 
-            navigate(win, `${SITE}/chat/thread-1`);
-            stoppedLoading(win);
             vi.advanceTimersByTime(MENU_READY_GRACE_MS);
             menuItem("Settings…")?.click?.();
 
             expect(win.loaded.at(-1)).toBe(`${SITE}/chat/thread-1`);
             expect(menuPayloads()).toStrictEqual([]);
+        });
+
+        it("opens no second window for New Chat when the page already is a new chat", () => {
+            vi.useFakeTimers();
+
+            const win = mainWindow();
+            const windowCount = fake().windows.length;
+
+            navigate(win, `${SITE}/chat`);
+            stoppedLoading(win);
+            vi.advanceTimersByTime(MENU_READY_GRACE_MS);
+            menuItem("New Chat")?.click?.();
+
+            expect(fake().windows).toHaveLength(windowCount);
+            expect(win.loaded.at(-1)).toBe(`${SITE}/chat`);
         });
 
         it("gets the command itself when it starts listening within the grace period", () => {

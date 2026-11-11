@@ -268,11 +268,20 @@ const siteWindows = new Set<BrowserWindow>();
 /** A window that is destroyed or is showing something other than the site (the recovery page) gets nothing. */
 const isShowingSite = (win: BrowserWindow): boolean => !win.isDestroyed() && isTrustedUrl(origin, win.webContents.getURL());
 
-/** Menu commands wait for the page to listen; a page that never does (an older site) gets New Chat by URL. */
+/**
+ * Menu commands wait for the page to listen. A page that never does (an older site) gets New Chat in a window of its
+ * own: loading it over the current page would cut off a reply that is still streaming there.
+ */
 const menuDelivery = createMenuDelivery<BrowserWindow>({
     fallback: (win, command) => {
         if (command === "new-chat") {
-            win.webContents.loadURL(newChatUrl(origin).href);
+            const target = newChatUrl(origin);
+
+            if (URL.parse(win.webContents.getURL())?.pathname === target.pathname) {
+                bringForward(win);
+            } else {
+                openSiteWindow(target);
+            }
         } else {
             log(`the page does not listen for menu commands; "${command}" dropped`);
         }
