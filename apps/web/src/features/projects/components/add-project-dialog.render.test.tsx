@@ -121,6 +121,16 @@ describe("AddProjectDialog", () => {
         expect(screen.getByText("SSH hosts come from ~/.ssh/config. Picking one connects it.")).toBeTruthy();
     });
 
+    it("shows no spinner on a row while nothing is connecting", async () => {
+        installBridge();
+        render(<AddProjectDialog onClose={() => {}} onCreateNew={() => {}} open />);
+
+        const computer = await screen.findByRole("button", { name: THIS_COMPUTER });
+
+        // eslint-disable-next-line testing-library/no-node-access -- the spinner is an icon with no role, so its class is the only mark of it
+        expect(computer.querySelector(".animate-spin")).toBeNull();
+    });
+
     it("browses a folder on this computer and adds the project titled with the folder's name", async () => {
         const device = installBridge();
         const onClose = vi.fn();
