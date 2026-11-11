@@ -284,9 +284,14 @@ const menuDelivery = createMenuDelivery<BrowserWindow>({
         }
     },
     isShowingSite,
-    offSite: (win, command) => {
+    offSite: async (win, command) => {
         if (command === "new-chat") {
-            win.loadURL(newChatUrl(origin).href);
+            // The site is likely unreachable here: `did-fail-load` shows the recovery page again.
+            try {
+                await win.loadURL(newChatUrl(origin).href);
+            } catch (error) {
+                log(`could not open New Chat: ${String(error)}`);
+            }
         } else {
             log(`the window shows no site page; "${command}" dropped`);
         }
