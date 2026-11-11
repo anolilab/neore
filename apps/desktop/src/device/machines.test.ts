@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
@@ -71,6 +71,7 @@ describe("list", () => {
         ]);
         expect(rows[0]?.id).toBe("desk-1");
         expect(rows[1]?.id).toBe("srv-1");
+        expect(rows[2]?.disabledReason).toContain("Pair this server");
         expect(rows[3]?.disabledReason).toBe("uses ProxyJump");
     });
 
@@ -188,15 +189,26 @@ describe("browse", () => {
 });
 
 describe("createFolder", () => {
-    it("makes a folder on this computer without a prompt, and refuses a file", async () => {
+    it("makes a folder on this computer after a confirmation, asks nothing for one that exists, and refuses a file", async () => {
         const { deps, machines } = setup();
         const target = path.join(root, "x", "y");
 
         await expect(machines.createFolder("desk-1", target)).resolves.toMatchObject({ created: true });
+        expect(deps.confirm).toHaveBeenCalledTimes(1);
         await expect(machines.createFolder("desk-1", target)).resolves.toMatchObject({ created: false });
+        expect(deps.confirm).toHaveBeenCalledTimes(1);
         writeFileSync(path.join(root, "f"), "x");
         await expect(machines.createFolder("desk-1", path.join(root, "f"))).rejects.toThrow("is a file");
-        expect(deps.confirm).not.toHaveBeenCalled();
+        expect(deps.confirm).toHaveBeenCalledTimes(1);
+    });
+
+    it("makes nothing on this computer when the confirmation is declined", async () => {
+        const { deps, machines } = setup({ answer: false });
+        const target = path.join(root, "declined");
+
+        await expect(machines.createFolder("desk-1", target)).rejects.toThrow("declined");
+        expect(existsSync(target)).toBe(false);
+        expect(deps.confirm).toHaveBeenCalledWith(expect.objectContaining({ detail: expect.stringContaining(target) }));
     });
 
     it("confirms by naming the server and the path, then makes the folder on the server", async () => {
