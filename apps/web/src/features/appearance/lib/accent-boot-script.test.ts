@@ -8,8 +8,9 @@ import {
     NATIVE_VIBRANCY_ATTRIBUTE,
     UI_STATE_STORAGE_KEY,
 } from "./accent-boot-script";
-import { CONTRAST_ATTRIBUTE, DENSITY_ATTRIBUTE, FONT_ATTRIBUTE, PREFERS_MORE_CONTRAST_QUERY } from "./display-preferences";
-import { SYSTEM_ACCENT_CACHE_KEY, SYSTEM_ACCENT_PROPERTIES } from "./native-appearance";
+import { DEFAULT_ACCENT } from "./accent-presets";
+import { CONTRAST_ATTRIBUTE, DEFAULT_MAIN_FONT, DENSITY_ATTRIBUTE, FONT_ATTRIBUTE, PREFERS_MORE_CONTRAST_QUERY } from "./display-preferences";
+import { effectiveAccent, effectiveMainFont, isExplicit, SYSTEM_ACCENT_CACHE_KEY, SYSTEM_ACCENT_PROPERTIES } from "./native-appearance";
 import { systemAccentTokens } from "./system-accent-tokens";
 
 /** What could end an inline script early: a closing tag, a comment opener, or a raw line separator. */
@@ -148,6 +149,38 @@ describe("accent boot script", () => {
 
             expect(html.getAttribute(ACCENT_ATTRIBUTE)).toBe("system");
             expect(html.getAttribute(FONT_ATTRIBUTE)).toBe("system");
+        });
+
+        it("counts a synced mark as explicit, like a choice made here", () => {
+            shell(["system-accent"]);
+            cacheAccent();
+            store({ accentColor: "default", explicit: { accentColor: "synced", mainFont: "synced" }, mainFont: "inter" });
+            runBootScript();
+
+            expect(html.hasAttribute(ACCENT_ATTRIBUTE)).toBe(false);
+            expect(html.hasAttribute(FONT_ATTRIBUTE)).toBe(false);
+        });
+
+        // The same rule as the runtime helpers, for every kind of mark: what the boot script paints is what AppearanceSync keeps.
+        const MARKS = [undefined, true, false, "synced", "yes", 1] as const;
+        const ACCENTS = ["default", "teal", "system", "lime", undefined] as const;
+        const FONTS = ["inter", "serif", "system", "comic", undefined] as const;
+
+        it.each(
+            MARKS.flatMap((mark) =>
+                ACCENTS.flatMap((accentColor) => FONTS.flatMap((mainFont) => [true, false].map((capable) => [mark, accentColor, mainFont, capable] as const))),
+            ),
+        )("matches effectiveAccent / effectiveMainFont (mark %j, accent %j, font %j, OS accent %j)", (mark, accentColor, mainFont, capable) => {
+            shell(capable ? ["system-accent"] : []);
+            cacheAccent();
+            store({ accentColor, explicit: { accentColor: mark, mainFont: mark }, mainFont });
+            runBootScript();
+
+            const accent = effectiveAccent(accentColor, isExplicit(mark), capable);
+            const font = effectiveMainFont(mainFont, isExplicit(mark), true);
+
+            expect(html.getAttribute(ACCENT_ATTRIBUTE)).toBe(accent === DEFAULT_ACCENT ? null : accent);
+            expect(html.getAttribute(FONT_ATTRIBUTE)).toBe(font === DEFAULT_MAIN_FONT ? null : font);
         });
 
         it("keeps a retired id with an explicit flag on the default preset and font", () => {

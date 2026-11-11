@@ -65,6 +65,9 @@ The rules for working in `apps/web/src`. The detail, reasoning and code examples
   `lib/native/native-shell.css`, and gate a list row's hover background with the `web:` variant. Effects that apply a
   shell default (`AppearanceSync`) read `isNativeShell()` inside the effect: a hook reads "no shell" while hydrating
   and would undo the boot script for a frame. `system` accent and `explicit` stay local (the server knows neither).
+  A mark is `true` (picked here) or `"synced"` (adopted for `syncedUserId`; another account signing in resets it);
+  the boot script reads marks through `EXPLICIT_MARKS`, the list `isExplicit` uses.
+  The default Button's label is `--primary-label` (black, the OS accent's foreground under `system`), not `text-black`.
   The shell sets `spellcheck="false"` on `<html>`: a raw prose `<textarea>` needs `spellCheck` (`native-shell.test.ts`
   checks). The OS accent is never painted raw: `systemAccentTokens` derives a shade per mode that meets the preset bars.
 - Shell-only code stays off the first load (`scripts/check-web-bundle.ts`): `lib/native/bridge.ts` keeps only what

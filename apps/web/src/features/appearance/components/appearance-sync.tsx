@@ -27,7 +27,16 @@ import {
     PREFERS_MORE_CONTRAST_QUERY,
 } from "../lib/display-preferences";
 import type { SystemAccentTokens } from "../lib/native-appearance";
-import { applySystemAccentTokens, cacheSystemAccentTokens, effectiveAccent, effectiveMainFont, SYSTEM_ACCENT } from "../lib/native-appearance";
+import {
+    applySystemAccentTokens,
+    cacheSystemAccentTokens,
+    effectiveAccent,
+    effectiveMainFont,
+    isExplicit,
+    SYNCED_MARK,
+    SYSTEM_ACCENT,
+    withoutSyncedChoices,
+} from "../lib/native-appearance";
 
 /** Paints the OS accent tokens and caches them for the next boot; `null` (the OS has none) falls back to the default preset. */
 const paintSystemAccent = (tokens: SystemAccentTokens | null): void => {
@@ -49,14 +58,16 @@ const paintSystemAccent = (tokens: SystemAccentTokens | null): void => {
  * - The account's stored choice (`userSettings`) is adopted when it arrives or
  *   changes, so it follows the user across devices. Deferred past first paint
  *   and skipped when signed out: localStorage already painted the right thing,
- *   and first paint's query budget is not spent on it.
+ *   and first paint's query budget is not spent on it. What it adopts is marked
+ *   `synced` for that account: another account signing in drops it, so the
+ *   shell's defaults apply again where that account stored nothing.
  */
 const AppearanceSync = () => {
     const { accentColor, capLongCodeBlocks, codeHighlightTheme, codeLineNumbers, contrast, density, explicit, mainFont, mermaidTheme } = useUIStateStore(
         (state) => state.appearance,
     );
-    const accentExplicit = explicit?.accentColor === true;
-    const fontExplicit = explicit?.mainFont === true;
+    const accentExplicit = isExplicit(explicit?.accentColor);
+    const fontExplicit = isExplicit(explicit?.mainFont);
     const setAppearance = useUIStateStore((state) => state.setAppearance);
     const chatTextSize = useUIStateStore((state) => state.layout.fontSize);
 
@@ -125,8 +136,11 @@ const AppearanceSync = () => {
 
     const crpc = useCRPC();
     const { data: sessionData } = authClient.useSession();
+    const userId = sessionData?.user?.id;
     const afterFirstPaint = useAfterFirstPaint();
-    const { data: userSettings } = useQuery(crpc.auth.functions.getUserSettings.queryOptions(afterFirstPaint && sessionData?.user?.id ? {} : skipToken));
+    const { data: settingsRow } = useQuery(crpc.auth.functions.getUserSettings.queryOptions(afterFirstPaint && userId ? {} : skipToken));
+    // The query key carries no user: right after an account switch it can still hold the last account's row.
+    const userSettings = settingsRow?.userId === userId ? settingsRow : undefined;
 
     const storedAccent = userSettings?.accentColor;
     const storedCodeTheme = userSettings?.codeHighlightTheme;
@@ -137,6 +151,17 @@ const AppearanceSync = () => {
     const storedCapLongCodeBlocks = userSettings?.capLongCodeBlocks;
     const storedCodeLineNumbers = userSettings?.codeLineNumbers;
 
+    // Before adopting the account's settings, in the same commit: another account's synced accent and font go first.
+    useEffect(() => {
+        const current = useUIStateStore.getState().appearance;
+
+        if (userId === undefined || current.syncedUserId === userId) {
+            return;
+        }
+
+        setAppearance({ ...withoutSyncedChoices(current.explicit), syncedUserId: userId });
+    }, [userId, setAppearance]);
+
     useEffect(() => {
         const changes: Parameters<typeof setAppearance>[0] = {};
         const current = useUIStateStore.getState().appearance;
@@ -146,7 +171,7 @@ const AppearanceSync = () => {
         // synced preset does not replace it.
         if (isAccentId(storedAccent) && current.accentColor !== SYSTEM_ACCENT) {
             changes.accentColor = storedAccent;
-            marked.accentColor = true;
+            marked.accentColor = SYNCED_MARK;
         }
 
         if (typeof storedCapLongCodeBlocks === "boolean") {
@@ -175,11 +200,11 @@ const AppearanceSync = () => {
 
         if (isMainFontId(storedMainFont)) {
             changes.mainFont = storedMainFont;
-            marked.mainFont = true;
+            marked.mainFont = SYNCED_MARK;
         }
 
         if (Object.keys(changes).length > 0) {
-            setAppearance({ ...changes, explicit: marked });
+            setAppearance({ ...changes, explicit: marked, syncedUserId: userId });
         }
     }, [
         storedAccent,
@@ -191,6 +216,8 @@ const AppearanceSync = () => {
         storedMainFont,
         storedMermaidTheme,
         setAppearance,
+        // A new account re-adopts its settings after the effect above dropped the last one's, even where they match.
+        userId,
     ]);
 
     return null;

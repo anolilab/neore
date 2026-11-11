@@ -39,10 +39,12 @@ export type AppearanceSettings = {
     /** Absent means `system`: follow the OS `prefers-contrast: more` setting. */
     contrast?: ContrastId;
     density: DensityId;
-    /** Values the user picked (here or synced from another device); the desktop shell has its own defaults for the rest. */
+    /** Values the user picked (here, or synced from the account); the desktop shell has its own defaults for the rest. */
     explicit?: ExplicitAppearance;
     mainFont: MainFontId;
     mermaidTheme: MermaidThemeId;
+    /** The account the `synced` marks came from; another one signing in drops them (`AppearanceSync`). */
+    syncedUserId?: string;
 };
 
 export type KeyboardShortcuts = {

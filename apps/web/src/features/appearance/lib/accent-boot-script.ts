@@ -2,7 +2,7 @@ import { toScriptLiteral } from "@/lib/inline-script";
 
 import { ACCENT_IDS, DEFAULT_ACCENT } from "./accent-presets";
 import { CONTRAST_ATTRIBUTE, DEFAULT_DENSITY, DEFAULT_MAIN_FONT, DENSITY_ATTRIBUTE, DENSITY_IDS, FONT_ATTRIBUTE, MAIN_FONT_IDS } from "./display-preferences";
-import { SYSTEM_ACCENT, SYSTEM_ACCENT_CACHE_KEY, SYSTEM_ACCENT_PROPERTIES } from "./native-appearance";
+import { EXPLICIT_MARKS, SYSTEM_ACCENT, SYSTEM_ACCENT_CACHE_KEY, SYSTEM_ACCENT_PROPERTIES } from "./native-appearance";
 
 /** The `persist` key of `useUIStateStore` (`features/layout/stores/ui-state-store.ts`). */
 export const UI_STATE_STORAGE_KEY = "neore-ui-state";
@@ -25,7 +25,8 @@ export const NATIVE_VIBRANCY_ATTRIBUTE = "data-native-vibrancy";
  * `data-native` (and `data-native-vibrancy`) for the native CSS, spellcheck off by default (prose editors opt back
  * in), the system font for an untouched default font, and the OS accent (cached from the last run) for an
  * untouched default accent or a stored `system`. Mirrors `effectiveAccent` / `effectiveMainFont`: `system` first, then
- * an id outside its allow-list counts as the default, and only an `explicit` flag of exactly `true` keeps the default.
+ * an id outside its allow-list counts as the default, and only a mark in `EXPLICIT_MARKS` (`isExplicit`) keeps the
+ * default. A mark synced from an account that is no longer signed in still counts here; `AppearanceSync` drops it.
  *
  * It runs in its own `try`, with `a` (the stored appearance) left `{}` when storage is corrupt or throws, so the
  * shell marks still land. Every cached token must be `#rrggbb` before any of them is written.
@@ -34,13 +35,14 @@ const NATIVE_BOOT = [
     "try{var n=window.neoreNative;",
     "if(n){",
     'var d=document.documentElement;var p=Array.isArray(n.capabilities)?n.capabilities:[];var x=a.explicit&&typeof a.explicit==="object"?a.explicit:{};',
+    `var e=${toScriptLiteral(EXPLICIT_MARKS)};`,
     `d.setAttribute(${toScriptLiteral(NATIVE_ATTRIBUTE)},"");`,
     `if(p.indexOf("vibrancy")!==-1){d.setAttribute(${toScriptLiteral(NATIVE_VIBRANCY_ATTRIBUTE)},"")}`,
     'd.setAttribute("spellcheck","false");',
     `var f=${toScriptLiteral(MAIN_FONT_IDS)}.indexOf(a.mainFont)!==-1?a.mainFont:${toScriptLiteral(DEFAULT_MAIN_FONT)};`,
-    `if(x.mainFont!==true&&f===${toScriptLiteral(DEFAULT_MAIN_FONT)}){d.setAttribute(${toScriptLiteral(FONT_ATTRIBUTE)},"system")}`,
+    `if(e.indexOf(x.mainFont)===-1&&f===${toScriptLiteral(DEFAULT_MAIN_FONT)}){d.setAttribute(${toScriptLiteral(FONT_ATTRIBUTE)},"system")}`,
     `var ac=a.accentColor;var ap=${toScriptLiteral(ACCENT_IDS)}.indexOf(ac)!==-1?ac:${toScriptLiteral(DEFAULT_ACCENT)};`,
-    `if(p.indexOf("system-accent")!==-1&&(ac===${toScriptLiteral(SYSTEM_ACCENT)}||(x.accentColor!==true&&ap===${toScriptLiteral(DEFAULT_ACCENT)}))){`,
+    `if(p.indexOf("system-accent")!==-1&&(ac===${toScriptLiteral(SYSTEM_ACCENT)}||(e.indexOf(x.accentColor)===-1&&ap===${toScriptLiteral(DEFAULT_ACCENT)}))){`,
     `var t=JSON.parse(localStorage.getItem(${toScriptLiteral(SYSTEM_ACCENT_CACHE_KEY)})||"null");`,
     `var h=/^#[0-9a-f]{6}$/;var q=${toScriptLiteral(SYSTEM_ACCENT_PROPERTIES)};var ok=!!t&&typeof t==="object";`,
     "for(var r in q){if(ok&&!h.test(t[r])){ok=false}}",

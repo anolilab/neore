@@ -90,6 +90,18 @@
     --primary-text: var(--primary);
 }
 
+/*
+ * The default Button's label: black on the brand lime and on every preset, as before. The OS accent can be dark, so
+ * there it follows the computed foreground (white or obsidian, `system-accent-tokens.ts`; high contrast included).
+ */
+:root {
+    --primary-label: #000000;
+}
+
+:root[data-accent="system"] {
+    --primary-label: var(--primary-foreground);
+}
+
 .dark {
     --background: var(--brand-charcoal);
     --foreground: var(--brand-frost);
@@ -144,6 +156,7 @@
     --color-primary: var(--primary);
     --color-primary-foreground: var(--primary-foreground);
     --color-primary-text: var(--primary-text);
+    --color-primary-label: var(--primary-label);
     --color-secondary: var(--secondary);
     --color-secondary-foreground: var(--secondary-foreground);
     --color-muted: var(--muted);

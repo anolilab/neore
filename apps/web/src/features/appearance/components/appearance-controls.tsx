@@ -23,7 +23,7 @@ import type { CodeHighlightThemeId, MermaidThemeId } from "../lib/code-themes";
 import { CODE_HIGHLIGHT_THEME_IDS, isCodeHighlightThemeId, isMermaidThemeId, MERMAID_THEME_IDS } from "../lib/code-themes";
 import type { ContrastId, DensityId, MainFontId } from "../lib/display-preferences";
 import { DEFAULT_CONTRAST, isContrastId, isDensityId, isMainFontId } from "../lib/display-preferences";
-import { effectiveAccent, effectiveMainFont, isAccentChoice, SYSTEM_ACCENT } from "../lib/native-appearance";
+import { effectiveAccent, effectiveMainFont, isAccentChoice, isExplicit, SYSTEM_ACCENT } from "../lib/native-appearance";
 
 const ACCENT_LABEL_ID = "accent-color-label";
 const CONTRAST_LABEL_ID = "ui-contrast-label";
@@ -100,8 +100,8 @@ const AppearanceControls: FC = () => {
     const isNative = useIsNativeShell();
     const hasSystemAccent = useNativeCapability("system-accent");
     // What is painted, so the shell's own defaults (OS accent, system font) show as selected.
-    const accentColor = effectiveAccent(storedAccent, explicit?.accentColor === true, hasSystemAccent);
-    const mainFont = effectiveMainFont(storedMainFont, explicit?.mainFont === true, isNative);
+    const accentColor = effectiveAccent(storedAccent, isExplicit(explicit?.accentColor), hasSystemAccent);
+    const mainFont = effectiveMainFont(storedMainFont, isExplicit(explicit?.mainFont), isNative);
     const [systemAccentHex, setSystemAccentHex] = useState<string | null>(null);
 
     // The swatch shows the OS colour even while a preset is chosen.

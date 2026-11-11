@@ -9,7 +9,8 @@ import { DEFAULT_MAIN_FONT, isMainFontId } from "./display-preferences";
  * - `system` accent: the OS accent colour, offered only when the shell advertises `system-accent`. It is a
  *   per-device choice, so it is never written to `userSettings` (whose validator knows only the presets).
  * - With nothing chosen, the shell paints the OS accent and the system font instead of the brand lime and Geist.
- *   An explicit choice (here, or synced from another device) always wins.
+ *   An explicit choice (here, or synced from the signed-in account) always wins; a synced one lasts only as long as
+ *   that account stays signed in (`withoutSyncedChoices`).
  */
 
 export const SYSTEM_ACCENT = "system";
@@ -37,8 +38,44 @@ export const SYSTEM_ACCENT_PROPERTIES = {
 /** The last OS accent tokens, so the boot script can paint them before the shell answers. */
 export const SYSTEM_ACCENT_CACHE_KEY = "neore-system-accent";
 
+/** A value adopted from the signed-in account's `userSettings`, as opposed to one picked on this device. */
+export const SYNCED_MARK = "synced";
+
+/**
+ * How a value came to be chosen: `true` picked on this device (and every mark stored before the two were told apart),
+ * `synced` adopted from the account. Both count as explicit.
+ */
+export type ExplicitMark = boolean | typeof SYNCED_MARK;
+
 /** Which appearance values the user picked, as opposed to the shipped defaults. */
-export type ExplicitAppearance = { accentColor?: boolean; mainFont?: boolean };
+export type ExplicitAppearance = { accentColor?: ExplicitMark; mainFont?: ExplicitMark };
+
+/** The marks that count as a choice. The boot script embeds this list, so it reads a mark exactly as `isExplicit` does. */
+export const EXPLICIT_MARKS: ReadonlyArray<unknown> = [true, SYNCED_MARK];
+
+export const isExplicit = (mark: unknown): boolean => EXPLICIT_MARKS.includes(mark);
+
+type SyncedChoiceReset = { accentColor?: AccentId; explicit: ExplicitAppearance; mainFont?: MainFontId };
+
+/**
+ * The appearance changes that drop what another account synced: each `synced` value goes back to its default, unmarked,
+ * so the shell's defaults apply again. A choice made on this device stays.
+ */
+export const withoutSyncedChoices = (explicit: ExplicitAppearance | undefined): SyncedChoiceReset => {
+    const changes: SyncedChoiceReset = { explicit: {} };
+
+    if (explicit?.accentColor === SYNCED_MARK) {
+        changes.accentColor = DEFAULT_ACCENT;
+        changes.explicit.accentColor = undefined;
+    }
+
+    if (explicit?.mainFont === SYNCED_MARK) {
+        changes.mainFont = DEFAULT_MAIN_FONT;
+        changes.explicit.mainFont = undefined;
+    }
+
+    return changes;
+};
 
 /** Each value is a lower-case `#rrggbb`. */
 export type SystemAccentTokens = Record<keyof typeof SYSTEM_ACCENT_PROPERTIES, string>;
