@@ -62,4 +62,36 @@ describe("a lazily loaded shell chunk", () => {
         expect(await screen.findByText("bridge mounted")).toBeTruthy();
         expect(load).toHaveBeenCalledTimes(3);
     });
+
+    it("loads again once the window is back online, after every retry failed", async () => {
+        let online = false;
+        const load = vi.fn(async (): Promise<{ default: ComponentType }> => {
+            if (!online) {
+                throw new TypeError("Failed to fetch dynamically imported module");
+            }
+
+            return { default: Bridge };
+        });
+
+        renderShellChunk(load);
+
+        await act(async () => {
+            await new Promise<void>((resolve) => {
+                setTimeout(resolve, 50);
+            });
+        });
+
+        expect(load).toHaveBeenCalledTimes(4);
+        expect(screen.queryByText("bridge mounted")).toBeNull();
+        expect(screen.getByTestId("app").childNodes).toHaveLength(1);
+
+        online = true;
+        act(() => {
+            globalThis.dispatchEvent(new Event("online"));
+        });
+
+        expect(await screen.findByText("bridge mounted")).toBeTruthy();
+        expect(load).toHaveBeenCalledTimes(5);
+        expect(screen.getByText("app content")).toBeTruthy();
+    });
 });

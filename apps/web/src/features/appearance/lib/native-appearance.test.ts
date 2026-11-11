@@ -42,6 +42,25 @@ const SURFACES = {
 
 const HEX = /^#[\da-f]{6}$/;
 
+/**
+ * The accent tints `text-primary-text` sits on: labels on `bg-primary/10` and `bg-primary/5`, toggles hovered to
+ * `bg-primary/20`.
+ */
+const TINT_ALPHAS = [0.05, 0.1, 0.2] as const;
+
+/** `fill` at `alpha` over the opaque `surface`, as the browser composites it in sRGB. */
+const composite = (fill: string, alpha: number, surface: string): string => {
+    const channel = (color: string, index: number): number => Number.parseInt(color.slice(1 + index * 2, 3 + index * 2), 16);
+
+    return `#${[0, 1, 2]
+        .map((index) =>
+            Math.round(channel(fill, index) * alpha + channel(surface, index) * (1 - alpha))
+                .toString(16)
+                .padStart(2, "0"),
+        )
+        .join("")}`;
+};
+
 describe(systemAccentTokens, () => {
     describe.each(MACOS_ACCENTS)("%s (%s)", (_name, hex) => {
         const tokens = systemAccentTokens(hex);
@@ -87,6 +106,23 @@ describe(systemAccentTokens, () => {
 
             for (const surface of surfaces) {
                 expect(contrastRatio(tokens[`${mode}Text`], surface)).toBeGreaterThanOrEqual(bar);
+            }
+        });
+
+        // Accent-coloured labels on an accent tint (`bg-primary/10 text-primary-text`): the tint darkens a light page
+        // (lightens a dark one), so a text shade that only clears the flat surfaces can fall short on it.
+        it.each([
+            ["light", AA_TEXT],
+            ["dark", AA_TEXT],
+            ["contrastLight", AAA_TEXT],
+            ["contrastDark", AAA_TEXT],
+        ] as const)("%s: the text shade reads at %s:1 on the fill's tints over the background and card", (mode, bar) => {
+            const surfaces = SURFACES[mode];
+
+            for (const surface of surfaces) {
+                for (const alpha of TINT_ALPHAS) {
+                    expect(contrastRatio(tokens[`${mode}Text`], composite(tokens[mode], alpha, surface))).toBeGreaterThanOrEqual(bar);
+                }
             }
         });
 

@@ -22,6 +22,12 @@ const SYSTEM_ACCENT_TEXT_CONTRAST = 4.5;
 const SYSTEM_ACCENT_HIGH_TEXT_CONTRAST = 7;
 const SYSTEM_ACCENT_SURFACE_CONTRAST = 3;
 
+/**
+ * The opacities of the fill that `text-primary-text` sits on: labels on `bg-primary/10` and `bg-primary/5`, toggles
+ * hovered to `bg-primary/20`. Each tints the page towards the fill, so the text shade is checked on them too.
+ */
+const TINT_ALPHAS = [0.05, 0.1, 0.2] as const;
+
 const MIX_STEPS = 100;
 /** How far the hover shade moves from the fill, largest first: the most visible step that keeps every bar. */
 const HOVER_MIXES = [0.15, 0.12, 0.09, 0.06] as const;
@@ -59,7 +65,8 @@ type ModeShades = { fill: string; foreground: string; hover: string; text: strin
  *   `SYSTEM_ACCENT_SURFACE_CONTRAST` from every surface, with that label as `foreground`;
  * - `hover`, the fill moved away from its label, so the label keeps its contrast on hover (a translucent
  *   `bg-primary/80` would blend it towards the surface);
- * - `text`, the closest that reads at `textContrast` as text on every surface (links, `--primary-text`).
+ * - `text`, the closest that reads at `textContrast` as text on every surface and on the fill's tints over them
+ *   (links, `--primary-text`, accent labels on `bg-primary/10`).
  */
 const modeShades = (hex: string, towards: string, surfaces: ReadonlyArray<string>, textContrast: number): ModeShades => {
     const fill = firstShade(
@@ -70,7 +77,9 @@ const modeShades = (hex: string, towards: string, surfaces: ReadonlyArray<string
             surfaces.every((surface: string) => contrastRatio(shade, surface) >= SYSTEM_ACCENT_SURFACE_CONTRAST),
     );
     const foreground = readableText(fill);
-    const text = firstShade(hex, towards, (shade) => surfaces.every((surface: string) => contrastRatio(shade, surface) >= textContrast));
+    // `fill` at `alpha` over a surface is the surface moved `alpha` of the way to the fill.
+    const textSurfaces = [...surfaces, ...surfaces.flatMap((surface: string) => TINT_ALPHAS.map((alpha) => mix(surface, fill, alpha)))];
+    const text = firstShade(hex, towards, (shade) => textSurfaces.every((surface: string) => contrastRatio(shade, surface) >= textContrast));
     // The first visible step that keeps both the label's contrast and the 3:1 against every surface: away from the
     // label, then deeper into the mode (a fill at its 3:1 limit fades into the page when lightened), then towards the label.
     const hoverPasses = (shade: string): boolean =>
@@ -88,7 +97,7 @@ const modeShades = (hex: string, towards: string, surfaces: ReadonlyArray<string
 /**
  * The OS accent per mode, each shade the closest to the OS colour that meets the presets' bars: its label (white or
  * obsidian, whichever reads better) at 4.5:1 (7:1 under high contrast) on the fill and on its hover, the fill 3:1
- * against that mode's background and card, and the text shade at 4.5:1 (7:1) on them. Light mode darkens, dark mode
+ * against that mode's background and card, and the text shade at 4.5:1 (7:1) on them and on the fill's tints over them. Light mode darkens, dark mode
  * lightens.
  */
 export const systemAccentTokens = (hex: string): SystemAccentTokens => {
