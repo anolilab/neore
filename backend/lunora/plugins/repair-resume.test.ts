@@ -46,7 +46,7 @@ describe("repair: taking over a stopped install", () => {
 
         await run(async (context) => await context.runMutation(markNeedsRepair, { generation: first.generation, installId: first.installId }));
 
-        const begun = await run(async (context) => await beginRepairRows(context, OWNER, SLUG));
+        const begun = await run(async (context) => await beginRepairRows(context, OWNER, SLUG, HASH));
 
         expect(begun.status).toBe("needs-repair");
         expect(begun.missing).toEqual([{ entryKey: "skill:ghost", intentId, kind: "skill" }]);
@@ -93,7 +93,7 @@ describe("repair: taking over a stopped install", () => {
         );
         await run(async (context) => await context.runMutation(markNeedsRepair, { generation: first.generation, installId: first.installId }));
 
-        const begun = await run(async (context) => await beginRepairRows(context, OWNER, SLUG));
+        const begun = await run(async (context) => await beginRepairRows(context, OWNER, SLUG, HASH));
 
         expect(begun).toMatchObject({ missing: [], status: "installed", linked: 1 });
         expect(intentId).toBeTruthy();

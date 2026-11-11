@@ -121,12 +121,13 @@ export const updateSkillChild = internalMutation
     });
 
 export const finishUpdate = internalMutation
-    .input({ generation: v.number(), installId: v.string().max(128), version: v.string().max(32) })
+    .input({ contentHash: v.string().max(128), generation: v.number(), installId: v.string().max(128), version: v.string().max(32) })
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
         await heldInstall(ctx, args.installId as Id<"pluginInstalls">, args.generation);
 
         await ctx.db.patch("pluginInstalls", args.installId as Id<"pluginInstalls">, {
+            contentHash: args.contentHash,
             status: "installed",
             updatedAt: ctx.now,
             version: args.version,

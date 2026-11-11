@@ -1048,14 +1048,14 @@ export interface InternalApiTypes {
             recordIntent: FunctionReference<"mutation", { contentHash: string; entryKey: string; generation: number; installId: string; kind: "skill" | "trigger" | "group"; userId: string }, string>;
         };
         repair_resume: {
-            beginRepair: FunctionReference<"mutation", { pluginSlug: string; userId: string }, { generation: number; installId: string; linked: number; missing: Array<{ entryKey: string; intentId: string; kind: "skill" | "trigger" | "group" }>; status: "installed" | "needs-repair" }>;
+            beginRepair: FunctionReference<"mutation", { contentHash: string; pluginSlug: string; userId: string }, { generation: number; installId: string; linked: number; missing: Array<{ entryKey: string; intentId: string; kind: "skill" | "trigger" | "group" }>; status: "installed" | "needs-repair" }>;
         };
         update: {
             loadInstalledForUpdate: FunctionReference<"query", { pluginSlug: string; userId: string }, null | { children: Array<{ contentHash: string; currentHash: string; entryKey: string; kind: "skill" | "trigger" | "group" }>; installId: string; status: string; version: string }>;
         };
         update_apply: {
             beginUpdate: FunctionReference<"mutation", { installId: string; targetVersion: string; userId: string }, number>;
-            finishUpdate: FunctionReference<"mutation", { generation: number; installId: string; version: string }, null>;
+            finishUpdate: FunctionReference<"mutation", { contentHash: string; generation: number; installId: string; version: string }, null>;
             updateSkillChild: FunctionReference<"mutation", { category?: string; config?: unknown; contentHash: string; description: string; entryKey: string; generation: number; icon?: string; installId: string; instructions: string; name: string; tags?: Array<string>; variables?: unknown; version?: string; userId: string }, null>;
         };
     };

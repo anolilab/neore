@@ -84,7 +84,9 @@ describe("applying an update", () => {
                     userId: OWNER,
                 }),
         );
-        await run(async (context) => await context.runMutation(finishUpdate, { generation, installId, version: "1.1.0" }));
+        await run(
+            async (context) => await context.runMutation(finishUpdate, { contentHash: await skillRowHash(REVISED), generation, installId, version: "1.1.0" }),
+        );
 
         const skill = await run(async (context) => await context.db.skills.findFirst({ where: { _id: skillId } }));
         const link = await run(async (context) => (await context.db.pluginItems.findMany({ where: { installId } })).page[0]);

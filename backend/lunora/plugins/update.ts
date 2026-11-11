@@ -216,6 +216,7 @@ export const updatePlugin = authAction
         }
 
         await ctx.runMutation(internal.plugins.update_apply.finishUpdate, {
+            contentHash: hash,
             generation,
             installId: installed.installId,
             version: header.version,
