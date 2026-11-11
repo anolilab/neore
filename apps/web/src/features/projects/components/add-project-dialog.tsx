@@ -322,7 +322,7 @@ const AddProjectContent = ({ onClose, onCreateNew }: Omit<AddProjectDialogProps,
                                                         </span>
                                                     )}
                                                 </span>
-                                                {pendingKey === row.sshAlias ? (
+                                                {pendingKey !== null && pendingKey === row.sshAlias ? (
                                                     <Loader2 aria-hidden="true" className="size-4 shrink-0 animate-spin" />
                                                 ) : (
                                                     <ChevronRight aria-hidden="true" className="text-muted-foreground size-4 shrink-0" />
