@@ -42,11 +42,10 @@ const stringField = (data: unknown, key: string): string | undefined => {
 };
 
 /**
- * A thread id: a bounded run of letters, digits, dots, underscores and hyphens, which covers the ids the server stores, including those
- * kept by a trusted import. Anything else in an alert's data is not one, so the tap is declined before any write is made with it. The
- * server still checks that the thread and the approval belong to the caller.
+ * A thread id as the server issues it: a bounded run of URL-safe characters. Anything else in an alert's data is not one, so the tap
+ * is declined before any write is made with it.
  */
-const THREAD_ID_FORMAT = /^[\w.-]{1,256}$/u;
+const THREAD_ID_FORMAT = /^[\w-]{1,64}$/u;
 
 export const isThreadId = (value: string): boolean => THREAD_ID_FORMAT.test(value);
 
