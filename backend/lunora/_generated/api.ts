@@ -635,6 +635,9 @@ export interface ApiTypes {
         repair: {
             repairPlugin: FunctionReference<"mutation", { pluginSlug: string }, { linked: number; missing: Array<string>; status: "installed" | "needs-repair" }>;
         };
+        uninstall: {
+            uninstallPlugin: FunctionReference<"mutation", { pluginSlug: string }, { kept: Array<string>; removed: number }>;
+        };
         update: {
             previewUpdate: FunctionReference<"action", { markdown: string }, { downgrade: boolean; installedVersion: string; plan: Array<{ action: "create" | "delete" | "detach" | "keep-edited" | "report-group" | "same" | "update"; entryKey: string }>; targetVersion: string }>;
             updatePlugin: FunctionReference<"action", { confirmDowngrade: boolean; contentHash: string; markdown: string }, { applied: Array<string>; skipped: Array<{ action: "create" | "delete" | "detach" | "keep-edited" | "report-group" | "same" | "update"; entryKey: string }>; version: string }>;
@@ -1563,6 +1566,9 @@ export const api: ApiTypes = {
         },
         repair: {
             repairPlugin: { __lunoraRef: "plugins_repair:repairPlugin" },
+        },
+        uninstall: {
+            uninstallPlugin: { __lunoraRef: "plugins_uninstall:uninstallPlugin" },
         },
         update: {
             previewUpdate: { __lunoraRef: "plugins_update:previewUpdate" },

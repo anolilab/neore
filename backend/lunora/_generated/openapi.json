@@ -41606,6 +41606,82 @@
         "x-lunora-function-kind": "mutation"
       }
     },
+    "/_lunora/rpc#plugins_uninstall:uninstallPlugin": {
+      "post": {
+        "description": "Invoke the `mutation` `plugins_uninstall:uninstallPlugin` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "plugins_uninstall:uninstallPlugin",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "pluginSlug": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "pluginSlug"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "plugins_uninstall:uninstallPlugin",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "kept": {
+                      "items": {
+                        "type": "string"
+                      },
+                      "type": "array"
+                    },
+                    "removed": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "kept",
+                    "removed"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "mutation: plugins_uninstall:uninstallPlugin",
+        "tags": [
+          "plugins"
+        ],
+        "x-lunora-function-kind": "mutation"
+      }
+    },
     "/_lunora/rpc#plugins_update:previewUpdate": {
       "post": {
         "description": "Invoke the `action` `plugins_update:previewUpdate` over the Lunora RPC envelope (POST /_lunora/rpc).",
