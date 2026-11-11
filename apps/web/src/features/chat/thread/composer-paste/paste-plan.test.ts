@@ -163,6 +163,15 @@ describe("composer paste", () => {
         }
     });
 
+    it("converts a crafted style attribute under the cap in linear time", () => {
+        for (const style of ["text-decoration:".repeat(50_000), "mso-list:".repeat(80_000)]) {
+            const started = performance.now();
+
+            htmlToMarkdown(`<p><span style="${style}">x</span></p>`);
+            expect(performance.now() - started).toBeLessThan(1000);
+        }
+    });
+
     it("falls back to the plain text for HTML nested too deep to convert in bounded work", async () => {
         // Each quote re-indents all it holds: 300 deep over 1000 lines would be ~90M characters.
         const quotes = `${"<blockquote>".repeat(300)}${"a<br>".repeat(1000)}`;
