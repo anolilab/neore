@@ -17,6 +17,7 @@ import { internal } from "../_generated/internal";
 import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
 import { internalMutation, internalQuery } from "../_generated/server";
+import { rateLimitGuard } from "../lib/rate-limiter";
 import { isThreadLocked } from "../lib/thread-lock";
 import { authAction, authMutation, authQuery, rateLimit } from "../lib/crpc";
 import {
@@ -396,135 +397,194 @@ const assertWebhookTemplateFits = (type: string, template: string | undefined): 
     }
 };
 
+export const triggerCreateFields = {
+    botComputer: v.optional(v.boolean()),
+    botId: v.optional(v.string().max(MAX_LENGTH.id)),
+    cronExpression: v.optional(v.string().max(MAX_LENGTH.short)),
+    description: v.optional(v.string().max(MAX_LENGTH.long)),
+    // Event triggers only: what to watch (a page, a moment, a thread). Required for an event trigger.
+    eventSource: v.optional(vEventSourceInput),
+    // Webhook triggers only. The whole set replaces the stored one; an empty array clears it.
+    // At most MAX_FILTERS entries; `assertValidFilters` checks the rest of the grammar.
+    filters: v.optional(
+        v
+            .array(
+                v.object({
+                    op: v.union(
+                        v.literal("equals"),
+                        v.literal("not_equals"),
+                        v.literal("contains"),
+                        v.literal("starts_with"),
+                        v.literal("exists"),
+                        v.literal("not_exists"),
+                    ),
+                    path: v.string().max(MAX_PATH_LENGTH),
+                    value: v.optional(v.string().max(MAX_FILTER_VALUE_LENGTH)),
+                }),
+            )
+            .check((value) => value.length <= MAX_FILTERS, { message: `at most ${String(MAX_FILTERS)} payload filters` }),
+    ),
+    inputTemplate: v.optional(v.string().max(MAX_LENGTH.document)),
+    model: v.string().max(MAX_LENGTH.short),
+    name: v.string().max(MAX_LENGTH.short),
+    // Bot routines only. Skips a run that has nothing to report (`triggers/quiet.ts`); unset means off.
+    quietWhenEmpty: v.optional(v.boolean()),
+    searchMode: v.optional(v.string().max(MAX_LENGTH.short)),
+    systemPrompt: v.optional(v.string().max(MAX_LENGTH.document)),
+    timezone: v.optional(v.string().max(MAX_LENGTH.short)),
+    type: v.from(triggerTypeSchema),
+    // Webhook triggers only. Compiles to the event's filters and the provider's scheme; takes no `filters`.
+    webhookPreset: v.optional(vWebhookPreset),
+    // Webhook triggers only; unset means "timestamped". Fixed at creation, with the secret.
+    webhookSignatureScheme: v.optional(vWebhookSignatureScheme),
+};
+
+const vTriggerCreateArgs = v.object({ ...triggerCreateFields });
+
+/** The owner a trigger row is created for. The caller stamps it from its own identity, never from request input. */
+export interface TriggerOwner {
+    userId: string;
+}
+
+/** The plugin link a trigger carries when an install created it. */
+export interface TriggerPluginLink {
+    pluginInstallId: string;
+    pluginMarker: string;
+}
+
+/** Creates a trigger row (disabled until the owner enables it) and its webhook route. Shared by `createTrigger` and the plugin wrapper. */
+export const insertTrigger = async (
+    context: MutationCtx,
+    owner: TriggerOwner,
+    args: Infer<typeof vTriggerCreateArgs>,
+    plugin?: TriggerPluginLink,
+): Promise<{ triggerId: string; webhookSecret?: string }> => {
+    const { userId } = owner;
+    const { now } = context;
+
+    // `v.from(zodSchema)` surfaces the field as `unknown` on the args type, so
+    // re-parse here to recover the `"schedule" | "webhook" | "event"` union the
+    // `triggers` table declares.
+    const triggerType = triggerTypeSchema.parse(args.type);
+
+    await assertCustomModelRunnable(context, args.model, userId);
+
+    const timezone = args.timezone?.trim() || undefined;
+
+    if (timezone !== undefined) assertTimeZone(timezone);
+
+    if (args.cronExpression !== undefined || triggerType === "schedule") {
+        assertCronExpression(args.cronExpression ?? "");
+    }
+
+    // Generate webhook secret for webhook triggers
+    const plaintextSecret = triggerType === "webhook" ? crypto.randomUUID() : undefined;
+    // Encrypt the secret before storing — only the encrypted form is persisted
+    const webhookSecret = plaintextSecret ? await encryptKey(plaintextSecret, "tool-keys") : undefined;
+
+    // A routine can only name a bot the caller owns; a foreign id is a refusal, not a silent plain routine.
+    const createBot = args.botId ? await context.runQuery(internal.bots.functions.getBotForRun, { botId: args.botId, userId }) : null;
+
+    if (args.botId && !createBot) {
+        throw new LunoraError("NOT_FOUND", "Bot not found");
+    }
+
+    // The bot's model is the one the run uses, so it is checked like the trigger's own.
+    if (createBot) await assertCustomModelRunnable(context, createBot.model, userId);
+
+    assertBotRoutineOptions({ botComputer: args.botComputer === true, botId: args.botId, quietWhenEmpty: args.quietWhenEmpty === true, type: triggerType });
+
+    const { filters, webhookSignatureScheme } = webhookSetup(args, triggerType);
+    const eventSource = await checkedEventSource(context, args.eventSource, triggerType, userId, now);
+
+    // Checked as stored: removing hidden characters can join a placeholder (`{{pay\u{200B}load}}`) that was not one before.
+    const inputTemplate = cleanPromptField(args.inputTemplate, "The input");
+
+    assertWebhookTemplateFits(triggerType, inputTemplate);
+
+    const inserted = await context.db.insert("triggers", {
+        botComputer: args.botComputer === true ? true : undefined,
+        botId: args.botId as Id<"bots"> | undefined,
+        createdAt: now,
+        cronExpression: args.cronExpression,
+        description: args.description,
+        enabled: false, // Start disabled — user must explicitly enable
+        eventSource,
+        filters,
+        inputTemplate,
+        model: args.model,
+        name: args.name,
+        quietWhenEmpty: args.quietWhenEmpty === true ? true : undefined,
+        searchMode: args.searchMode,
+        systemPrompt: cleanPromptField(args.systemPrompt, "The system prompt"),
+        timezone,
+        triggerCount: 0,
+        type: triggerType,
+        updatedAt: now,
+        userId,
+        webhookSecret,
+        pluginInstallId: plugin?.pluginInstallId,
+        pluginMarker: plugin?.pluginMarker,
+        webhookSignatureScheme,
+    });
+
+    // A webhook names only the trigger; this is how it finds the shard.
+    await setShardRoute(context, "trigger", inserted as string, userId);
+    // `db.insert` returns the branded id STRING, not a row and not an array. The
+    // `Array.isArray(...)` narrowing produced an `any` branch, which is the only
+    // reason `.id` compiled — at runtime it read `.id` off a string, so
+    // `createTrigger` returned `{ triggerId: undefined }`. Fourth site with this
+    // shape (see also workflow/presence, system-prompts, messenger).
+    const triggerId = inserted;
+
+    // Return the plaintext secret once so the user can configure their webhook sender.
+    // It is never returned again — only the encrypted form is stored.
+    context.log.event("triggers.create_trigger", { hasWebhookSecret: plaintextSecret !== undefined, type: triggerType });
+
+    return {
+        triggerId: triggerId as string,
+        ...(plaintextSecret && { webhookSecret: plaintextSecret }),
+    };
+};
+
+/** Create a new trigger */
 export const createTrigger = authMutation
     .use(rateLimit("triggers/create"))
+    .input({ ...triggerCreateFields })
+    .output(v.object({ triggerId: v.string(), webhookSecret: v.optional(v.string()) }))
+    .mutation(async ({ args, ctx: context }) => await insertTrigger(context, { userId: context.user.userId }, args));
+
+/**
+ * Creates a trigger for a plugin install. Called from an action. A trigger with the same marker is returned as it is, so a
+ * retried install makes no second copy and spends no rate-limit budget on the re-find. A webhook secret is returned once, when the
+ * trigger is created; a re-found trigger returns none, so the install must say the secret was already issued.
+ */
+export const createPluginTrigger = internalMutation
     .input({
-        botComputer: v.optional(v.boolean()),
-        botId: v.optional(v.string().max(MAX_LENGTH.id)),
-        cronExpression: v.optional(v.string().max(MAX_LENGTH.short)),
-        description: v.optional(v.string().max(MAX_LENGTH.long)),
-        // Event triggers only: what to watch (a page, a moment, a thread). Required for an event trigger.
-        eventSource: v.optional(vEventSourceInput),
-        // Webhook triggers only. The whole set replaces the stored one; an empty array clears it.
-        // At most MAX_FILTERS entries; `assertValidFilters` checks the rest of the grammar.
-        filters: v.optional(
-            v
-                .array(
-                    v.object({
-                        op: v.union(
-                            v.literal("equals"),
-                            v.literal("not_equals"),
-                            v.literal("contains"),
-                            v.literal("starts_with"),
-                            v.literal("exists"),
-                            v.literal("not_exists"),
-                        ),
-                        path: v.string().max(MAX_PATH_LENGTH),
-                        value: v.optional(v.string().max(MAX_FILTER_VALUE_LENGTH)),
-                    }),
-                )
-                .check((value) => value.length <= MAX_FILTERS, { message: `at most ${String(MAX_FILTERS)} payload filters` }),
-        ),
-        inputTemplate: v.optional(v.string().max(MAX_LENGTH.document)),
-        model: v.string().max(MAX_LENGTH.short),
-        name: v.string().max(MAX_LENGTH.short),
-        // Bot routines only. Skips a run that has nothing to report (`triggers/quiet.ts`); unset means off.
-        quietWhenEmpty: v.optional(v.boolean()),
-        searchMode: v.optional(v.string().max(MAX_LENGTH.short)),
-        systemPrompt: v.optional(v.string().max(MAX_LENGTH.document)),
-        timezone: v.optional(v.string().max(MAX_LENGTH.short)),
-        type: v.from(triggerTypeSchema),
-        // Webhook triggers only. Compiles to the event's filters and the provider's scheme; takes no `filters`.
-        webhookPreset: v.optional(vWebhookPreset),
-        // Webhook triggers only; unset means "timestamped". Fixed at creation, with the secret.
-        webhookSignatureScheme: v.optional(vWebhookSignatureScheme),
+        ...triggerCreateFields,
+        plan: v.optional(v.string().max(MAX_LENGTH.short)),
+        pluginInstallId: v.string().max(MAX_LENGTH.id),
+        pluginMarker: v.string().max(MAX_LENGTH.short),
+        userId: v.string().max(MAX_LENGTH.id),
     })
     .output(v.object({ triggerId: v.string(), webhookSecret: v.optional(v.string()) }))
-    .mutation(async ({ args, ctx: context }) => {
-        const { userId } = context.user;
-        const { now } = context;
+    .mutation(async ({ args: { plan, pluginInstallId, pluginMarker, userId, ...fields }, ctx }) => {
+        const existing = await ctx.db
+            .query("triggers")
+            .withIndex("by_plugin_marker", (q) => q.eq("pluginMarker", pluginMarker))
+            .first();
 
-        // `v.from(zodSchema)` surfaces the field as `unknown` on the args type, so
-        // re-parse here to recover the `"schedule" | "webhook" | "event"` union the
-        // `triggers` table declares.
-        const triggerType = triggerTypeSchema.parse(args.type);
+        if (existing) {
+            if (existing.userId !== userId) {
+                throw new LunoraError("FORBIDDEN", "That plugin trigger belongs to another account");
+            }
 
-        await assertCustomModelRunnable(context, args.model, userId);
-
-        const timezone = args.timezone?.trim() || undefined;
-
-        if (timezone !== undefined) assertTimeZone(timezone);
-
-        if (args.cronExpression !== undefined || triggerType === "schedule") {
-            assertCronExpression(args.cronExpression ?? "");
+            return { triggerId: existing._id as string };
         }
 
-        // Generate webhook secret for webhook triggers
-        const plaintextSecret = triggerType === "webhook" ? crypto.randomUUID() : undefined;
-        // Encrypt the secret before storing — only the encrypted form is persisted
-        const webhookSecret = plaintextSecret ? await encryptKey(plaintextSecret, "tool-keys") : undefined;
+        await rateLimitGuard({ ...ctx, rateLimitKey: "triggers/create", user: { plan, userId } } as never);
 
-        // A routine can only name a bot the caller owns; a foreign id is a refusal, not a silent plain routine.
-        const createBot = args.botId ? await context.runQuery(internal.bots.functions.getBotForRun, { botId: args.botId, userId }) : null;
-
-        if (args.botId && !createBot) {
-            throw new LunoraError("NOT_FOUND", "Bot not found");
-        }
-
-        // The bot's model is the one the run uses, so it is checked like the trigger's own.
-        if (createBot) await assertCustomModelRunnable(context, createBot.model, userId);
-
-        assertBotRoutineOptions({ botComputer: args.botComputer === true, botId: args.botId, quietWhenEmpty: args.quietWhenEmpty === true, type: triggerType });
-
-        const { filters, webhookSignatureScheme } = webhookSetup(args, triggerType);
-        const eventSource = await checkedEventSource(context, args.eventSource, triggerType, userId, now);
-
-        // Checked as stored: removing hidden characters can join a placeholder (`{{pay\u{200B}load}}`) that was not one before.
-        const inputTemplate = cleanPromptField(args.inputTemplate, "The input");
-
-        assertWebhookTemplateFits(triggerType, inputTemplate);
-
-        const inserted = await context.db.insert("triggers", {
-            botComputer: args.botComputer === true ? true : undefined,
-            botId: args.botId as Id<"bots"> | undefined,
-            createdAt: now,
-            cronExpression: args.cronExpression,
-            description: args.description,
-            enabled: false, // Start disabled — user must explicitly enable
-            eventSource,
-            filters,
-            inputTemplate,
-            model: args.model,
-            name: args.name,
-            quietWhenEmpty: args.quietWhenEmpty === true ? true : undefined,
-            searchMode: args.searchMode,
-            systemPrompt: cleanPromptField(args.systemPrompt, "The system prompt"),
-            timezone,
-            triggerCount: 0,
-            type: triggerType,
-            updatedAt: now,
-            userId,
-            webhookSecret,
-            webhookSignatureScheme,
-        });
-
-        // A webhook names only the trigger; this is how it finds the shard.
-        await setShardRoute(context, "trigger", inserted as string, userId);
-        // `db.insert` returns the branded id STRING, not a row and not an array. The
-        // `Array.isArray(...)` narrowing produced an `any` branch, which is the only
-        // reason `.id` compiled — at runtime it read `.id` off a string, so
-        // `createTrigger` returned `{ triggerId: undefined }`. Fourth site with this
-        // shape (see also workflow/presence, system-prompts, messenger).
-        const triggerId = inserted;
-
-        // Return the plaintext secret once so the user can configure their webhook sender.
-        // It is never returned again — only the encrypted form is stored.
-        context.log.event("triggers.create_trigger", { hasWebhookSecret: plaintextSecret !== undefined, type: triggerType });
-
-        return {
-            triggerId: triggerId as string,
-            ...(plaintextSecret && { webhookSecret: plaintextSecret }),
-        };
+        return await insertTrigger(ctx, { userId }, fields, { pluginInstallId, pluginMarker });
     });
 
 /** Update an existing trigger */
