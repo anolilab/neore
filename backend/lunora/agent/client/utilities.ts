@@ -41,14 +41,8 @@ export const willContinue = async (
         return false;
     }
 
-    // If any tool result has an error, continue without evaluating stopWhen.
-    // This allows the LLM to retry or handle the error.
-    const hasErrorResult = step.toolResults.some((result) => (result as { isError?: boolean }).isError === true);
-
-    if (hasErrorResult) {
-        return true;
-    }
-
+    // A tool error does not continue the turn on its own: the stop conditions decide, as the model's own loop does, so a retry the
+    // conditions end (a repeated failing call) does not leave a pending row for a step that will never run.
     if (Array.isArray(stopWhen)) {
         const stops = await Promise.all(stopWhen.map(async (s) => s({ steps })));
 

@@ -56,6 +56,8 @@ import {
 import { buildAgentTools } from "./lib/agent-tools";
 import { chargeCompactionCall } from "./lib/compaction-quota";
 import { getMaxSteps, getModelContextWindow } from "./lib/auto-continue";
+import { type RepeatedCallGuard, repeatedCallGuard } from "./lib/repeated-call-guard";
+import { writeLoopStopNotice } from "./loop-stop";
 import { RUN_BEAT_MS } from "./lib/interrupted-run";
 import { createToolRunMarker } from "./lib/mark-tool-runs";
 import { isRunReplaced } from "./lib/run-epoch";
@@ -681,13 +683,15 @@ export const runStreamingAgent = internalAction
                 };
                 // The steps this invocation finished: a pause carries the count to its resume.
                 const stepsFinished = { count: 0 };
+                // The loop the repeated-call guard ended the turn on: its closing line is written once the run has ended.
+                const loopGuard = repeatedCallGuard();
 
                 streamTextArgs.stopWhen = [
                     ...stopWhenStopped(ctx, streamId, maxSteps),
-                    ({ steps }: { steps: ReadonlyArray<unknown> }) => {
+                    ({ steps }: { steps: Parameters<RepeatedCallGuard["stop"]>[0]["steps"] }) => {
                         stepsFinished.count = steps.length;
 
-                        return false;
+                        return loopGuard.stop({ steps });
                     },
                 ];
 
@@ -871,6 +875,17 @@ export const runStreamingAgent = internalAction
 
                     return;
                 }
+
+                // A turn the repeated-call guard ended closes with a line that names the loop. It is written only now, once the run has
+                // finished normally (a stopped reply takes none), and under the reply's last row, which the write re-checks is still the
+                // active leaf. A failed write never fails the run.
+                await writeLoopStopNotice(ctx, {
+                    finding: loopGuard.finding,
+                    savedMessages: result.savedMessages,
+                    streamId,
+                    threadId,
+                    userId,
+                });
 
                 // Post-stream work: timing and memory extraction, then follow-ups.
                 await recordRun({
