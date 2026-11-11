@@ -11269,6 +11269,13 @@
               "nullable": false,
               "optional": false,
               "unique": false,
+              "literal": "\"task_stuck\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
               "literal": "\"tool_approval\""
             },
             {
@@ -25106,6 +25113,32 @@
             }
           ]
         },
+        "stuckCheckAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "stuckNotice": {
+          "kind": "object",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "fields": {
+            "days": {
+              "kind": "number",
+              "nullable": false,
+              "optional": false,
+              "unique": false
+            },
+            "since": {
+              "kind": "number",
+              "nullable": false,
+              "optional": false,
+              "unique": false
+            }
+          }
+        },
         "successCriteria": {
           "kind": "string",
           "nullable": false,
@@ -25136,6 +25169,13 @@
           "fields": [
             "recurring",
             "nextRunAt"
+          ],
+          "unique": false
+        },
+        "by_status_and_stuckCheckAt": {
+          "fields": [
+            "status",
+            "stuckCheckAt"
           ],
           "unique": false
         },
@@ -25344,6 +25384,91 @@
       "memory": false,
       "relations": {},
       "shardMode": "global:d1"
+    },
+    "teammateConnectorAccess": {
+      "commitOrdered": false,
+      "fields": {
+        "botId": {
+          "kind": "id",
+          "nullable": false,
+          "optional": false,
+          "unique": false,
+          "ref": "bots"
+        },
+        "connectorSlug": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false,
+          "refined": true
+        },
+        "level": {
+          "kind": "union",
+          "nullable": false,
+          "optional": false,
+          "unique": false,
+          "members": [
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"none\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"read_only\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"read_write\""
+            }
+          ]
+        },
+        "updatedAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "userId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        }
+      },
+      "indexes": {
+        "by_botId_connectorSlug": {
+          "fields": [
+            "botId",
+            "connectorSlug"
+          ],
+          "unique": false
+        },
+        "by_userId": {
+          "fields": [
+            "userId"
+          ],
+          "unique": false
+        },
+        "by_userId_connectorSlug": {
+          "fields": [
+            "userId",
+            "connectorSlug"
+          ],
+          "unique": false
+        }
+      },
+      "memory": false,
+      "relations": {},
+      "shardMode": "shardBy:userId"
     },
     "temporaryThreads": {
       "commitOrdered": false,
@@ -28040,6 +28165,18 @@
           "kind": "number",
           "nullable": false,
           "optional": false,
+          "unique": false
+        },
+        "pauseId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "reminderSentAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
           "unique": false
         },
         "resolvedAt": {
