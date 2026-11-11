@@ -611,6 +611,15 @@ export const loadImportContext = internalQuery
         return { skillCount: skills.length, slugs: skills.map((skill) => skill.slug) };
     });
 
+/** A plugin file is installed by the plugin procedures, never through the bundle preview or import. */
+const refuseIfPlugin = (markdown: string): void => {
+    const parsed = parseBundleMarkdown(markdown);
+
+    if (parsed.ok && parsed.bundle.plugin) {
+        throw new LunoraError("BAD_REQUEST", "This file is a plugin. Install it from the plugin install page; a bundle import cannot install it.");
+    }
+};
+
 export const planFor = async (
     ctx: {
         runQuery: (reference: typeof internal.skills.bundle.loadImportContext, args: { userId: string }) => Promise<{ skillCount: number; slugs: string[] }>;
@@ -623,10 +632,6 @@ export const planFor = async (
 
     if (!parsed.ok) {
         throw new LunoraError("BAD_REQUEST", parsed.errors.join("; "));
-    }
-
-    if (parsed.bundle.plugin) {
-        throw new LunoraError("BAD_REQUEST", "This file is a plugin. Install it from the plugin install page; a bundle import cannot install it.");
     }
 
     const known = await ctx.runQuery(internal.skills.bundle.loadImportContext, { userId: ctx.user.userId });
@@ -708,6 +713,7 @@ export const previewBundle = authAction
         }),
     )
     .action(async ({ args, ctx }) => {
+        refuseIfPlugin(args.markdown);
         const { bundle, entries, env } = await planFor(ctx, args.markdown, undefined);
 
         ctx.log.event("skills.bundle_preview", { entries: entries.length, ready: entries.filter((entry) => entry.problems.length === 0).length });
@@ -766,6 +772,7 @@ export const importBundle = authAction
 
         assertWithin(selected.size, BUNDLE_LIMITS.skills + BUNDLE_LIMITS.triggers + BUNDLE_LIMITS.groupChats, "items");
 
+        refuseIfPlugin(args.markdown);
         const { entries } = await planFor(ctx, args.markdown, selected);
 
         assertSelectionImportable(entries, selected);
