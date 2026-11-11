@@ -7,7 +7,11 @@
  * Hover backgrounds on list rows are gated in the components with the `web:` variant (packages/ui/src/global.css).
  */
 
-/* Controls show the arrow, as native apps do; real hyperlinks in content keep the hand, text fields the I-beam. */
+/*
+ * Controls show the arrow, as native apps do; real hyperlinks in content keep the hand, text fields the I-beam. Only the
+ * hand is replaced: a control that asks for another cursor (`cursor-grab`, `active:cursor-grabbing`, …) keeps it, and
+ * the `:where()` keeps these rules below the disabled one.
+ */
 :root[data-native]
     :is(
         button,
@@ -25,9 +29,9 @@
         [role="switch"],
         [role="checkbox"],
         [role="radio"],
-        [role="treeitem"],
-        .cursor-pointer
-    ) {
+        [role="treeitem"]
+    ):where(:not([class*="cursor-"])),
+:root[data-native] [class*="cursor-pointer"] {
     cursor: default;
 }
 
@@ -37,7 +41,9 @@
 }
 
 :root[data-native]
-    :is(textarea, [contenteditable="true"], input:not([type="button"], [type="checkbox"], [type="radio"], [type="range"], [type="submit"], [type="file"])) {
+    :is(textarea, [contenteditable="true"], input:not([type="button"], [type="checkbox"], [type="radio"], [type="range"], [type="submit"], [type="file"])):not(
+        :disabled
+    ) {
     cursor: text;
 }
 
@@ -71,6 +77,11 @@
 
 :root[data-native] :is(input, textarea, [contenteditable="true"], .message-text, .prose, pre, code, [data-selectable], .select-text) {
     user-select: text;
+}
+
+/* A disabled control says so, as the components' `disabled:cursor-not-allowed` would without the rules above. */
+:root[data-native] :is(:disabled, [aria-disabled="true"], [data-disabled]) {
+    cursor: not-allowed;
 }
 
 /* No hover fades on chrome: a native control changes at once. */

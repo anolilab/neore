@@ -133,13 +133,14 @@ const AppearanceControls: FC = () => {
 
     const fontOptions = useMemo<{ id: MainFontId; label: string }[]>(
         () => [
-            { id: "inter", label: t`Sans (default)` },
+            // In the shell an untouched font is the system face (`effectiveMainFont`), so that one is the default.
+            { id: "inter", label: isNative ? t`Sans` : t`Sans (default)` },
             { id: "serif", label: t`Serif` },
             { id: "mono", label: t`Monospace` },
-            { id: "system", label: t`System UI` },
+            { id: "system", label: isNative ? t`System UI (default)` : t`System UI` },
             { id: "dyslexic", label: t`Dyslexia-friendly` },
         ],
-        [t],
+        [isNative, t],
     );
 
     const { fontSize, setFontSize } = useLayoutState();
@@ -155,14 +156,15 @@ const AppearanceControls: FC = () => {
     const accentLabels = useMemo<Record<AccentId, string>>(() => {
         return {
             blue: t`Blue`,
-            default: t`Lime (default)`,
+            // Where the OS accent is offered, an untouched accent is the OS accent (`effectiveAccent`).
+            default: hasSystemAccent ? t`Lime` : t`Lime (default)`,
             green: t`Green`,
             orange: t`Orange`,
             rose: t`Rose`,
             teal: t`Teal`,
             violet: t`Violet`,
         };
-    }, [t]);
+    }, [hasSystemAccent, t]);
 
     const codeThemeLabels = useMemo<Record<CodeHighlightThemeId, string>>(() => {
         return {
@@ -219,7 +221,7 @@ const AppearanceControls: FC = () => {
                                     <CheckIcon aria-hidden="true" className="size-3" />
                                 </Radio.Indicator>
                             </Radio.Root>
-                            <span className="group-has-data-checked:font-medium">{t`System`}</span>
+                            <span className="group-has-data-checked:font-medium">{t`System (default)`}</span>
                         </label>
                     )}
                     {ACCENT_PRESETS.map((preset) => (

@@ -176,15 +176,22 @@
     --primary-foreground: #191919;
 }
 
-/* The OS accent: native-appearance.ts computes a shade per mode that reaches 7:1 against its label. */
+/*
+ * The OS accent: system-accent-tokens.ts computes a shade per mode that reaches 7:1 against its label, a hover shade
+ * that keeps it, and a text shade that reaches 7:1 against the page.
+ */
 :root[data-contrast="high"][data-accent="system"] {
     --primary: var(--system-accent-contrast-light);
     --primary-foreground: var(--system-accent-contrast-light-foreground);
+    --primary-hover: var(--system-accent-contrast-light-hover);
+    --primary-text: var(--system-accent-contrast-light-text);
 }
 
 :root.dark[data-contrast="high"][data-accent="system"] {
     --primary: var(--system-accent-contrast-dark);
     --primary-foreground: var(--system-accent-contrast-dark-foreground);
+    --primary-hover: var(--system-accent-contrast-dark-hover);
+    --primary-text: var(--system-accent-contrast-dark-text);
 }
 
 /*

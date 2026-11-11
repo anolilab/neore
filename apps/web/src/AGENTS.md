@@ -69,7 +69,9 @@ The rules for working in `apps/web/src`. The detail, reasoning and code examples
   the boot script reads marks through `EXPLICIT_MARKS`, the list `isExplicit` uses.
   The default Button's label is `--primary-label` (black, the OS accent's foreground under `system`), not `text-black`.
   The shell sets `spellcheck="false"` on `<html>`: a raw prose `<textarea>` needs `spellCheck` (`native-shell.test.ts`
-  checks). The OS accent is never painted raw: `systemAccentTokens` derives a shade per mode that meets the preset bars.
+  checks). The OS accent is never painted raw: `systemAccentTokens` derives a shade per mode that meets the preset bars,
+  plus a `-text` shade (`--primary-text`, 4.5:1/7:1 as text) and a solid `-hover` (`--primary-hover`, keeps the label's
+  contrast). The shell's `cursor: default` replaces only the hand; other cursor utilities and disabled states keep theirs.
 - Shell-only code stays off the first load (`scripts/check-web-bundle.ts`): `lib/native/bridge.ts` keeps only what
   web paths call; shell events, sign-in, devices and the OS accent live in `shell-inbox.ts`, `device-bridge.ts`,
   `system-accent.ts`, imported only from lazy code. Interpolate into inline scripts with `toScriptLiteral`.

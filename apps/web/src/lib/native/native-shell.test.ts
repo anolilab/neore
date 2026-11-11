@@ -96,6 +96,62 @@ describe("native-shell.css selection rules", () => {
     });
 });
 
+describe("native-shell.css cursors", () => {
+    // Tailwind's cursor utilities as the app builds them: layered, so any unlayered shell rule that matches beats them.
+    const UTILITIES = String.raw`@layer utilities {
+        .cursor-pointer { cursor: pointer; }
+        .cursor-grab { cursor: grab; }
+        .disabled\:cursor-not-allowed:disabled { cursor: not-allowed; }
+    }`;
+
+    beforeEach(() => {
+        document.documentElement.dataset.native = "";
+
+        const style = document.createElement("style");
+
+        style.textContent = `${UTILITIES}\n${CSS}`;
+        document.head.insertAdjacentElement("beforeend", style);
+        document.body.innerHTML = `
+            <button id="plain">New</button>
+            <div class="cursor-pointer" id="pointer">Row</div>
+            <button class="cursor-grab active:cursor-grabbing" draggable="true" id="draggable">Agent node</button>
+            <button class="cursor-pointer disabled:cursor-not-allowed" disabled id="disabled">Send</button>
+            <div aria-disabled="true" class="cursor-pointer" role="menuitem" id="aria-disabled">Delete</div>
+            <div data-disabled="" role="option" id="data-disabled">Unavailable</div>
+            <textarea disabled id="disabled-field"></textarea>
+            <textarea id="field"></textarea>
+        `;
+    });
+
+    afterEach(() => {
+        delete document.documentElement.dataset.native;
+        document.head.replaceChildren();
+        document.body.replaceChildren();
+    });
+
+    const cursor = (id: string): string => getComputedStyle(document.querySelector(`#${id}`) as Element).cursor;
+
+    it("replaces the hand with the arrow", () => {
+        expect(cursor("plain")).toBe("default");
+        expect(cursor("pointer")).toBe("default");
+        expect(cursor("field")).toBe("text");
+    });
+
+    it("keeps a drag cursor a control asks for", () => {
+        expect(cursor("draggable")).toBe("grab");
+    });
+
+    it.each(["disabled", "aria-disabled", "data-disabled", "disabled-field"])("shows not-allowed on a disabled control (%s)", (id) => {
+        expect(cursor(id)).toBe("not-allowed");
+    });
+
+    it("leaves the utilities alone outside the shell", () => {
+        delete document.documentElement.dataset.native;
+
+        expect(cursor("pointer")).toBe("pointer");
+    });
+});
+
 /** Raw `<textarea>`s that are not prose: read-only output. */
 const NOT_PROSE = /\breadOnly\b/;
 

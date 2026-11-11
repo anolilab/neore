@@ -5,11 +5,12 @@ import { useUIStateStore } from "@/features/layout/stores/ui-state-store";
 
 import { CHAT_TEXT_SIZE_ATTRIBUTE } from "../lib/chat-text-size";
 import type { ExplicitAppearance } from "../lib/native-appearance";
+import { systemAccentTokens } from "../lib/system-accent-tokens";
 import AppearanceSync from "./appearance-sync";
 
 /** The signed-in user, and the `userSettings` row the mocked query returns. */
 const server = vi.hoisted(() => {
-    return { settings: undefined as Record<string, unknown> | undefined, userId: undefined as string | undefined };
+    return { pending: false, settings: undefined as Record<string, unknown> | undefined, userId: undefined as string | undefined };
 });
 
 vi.mock("@tanstack/react-query", () => {
@@ -27,7 +28,11 @@ vi.mock("@/lib/auth/client", () => {
     return {
         authClient: {
             useSession: () => {
-                return { data: server.userId === undefined ? undefined : { user: { id: server.userId } } };
+                return {
+                    data: server.userId === undefined ? null : { user: { id: server.userId } },
+                    error: null,
+                    isPending: server.pending,
+                };
             },
         },
     };
@@ -46,6 +51,27 @@ vi.mock("@/lib/lunora/crpc", () => {
                     },
                 },
             };
+        },
+    };
+});
+
+/** The OS accent's lazy chunk: the first `failures` loads reject, as a dropped connection would make them. */
+const accentChunk = vi.hoisted(() => {
+    return { failures: 0, loads: 0, stop: () => {}, tokens: undefined as Record<string, string> | undefined };
+});
+
+vi.mock("../lib/system-accent-sync", () => {
+    accentChunk.loads += 1;
+
+    if (accentChunk.loads <= accentChunk.failures) {
+        throw new Error("Failed to fetch dynamically imported module");
+    }
+
+    return {
+        followSystemAccent: (paint: (tokens: unknown) => void) => {
+            paint(accentChunk.tokens);
+
+            return accentChunk.stop;
         },
     };
 });
@@ -80,6 +106,7 @@ describe("AppearanceSync chat text size", () => {
 
 describe("AppearanceSync adopting the account's settings", () => {
     afterEach(() => {
+        server.pending = false;
         server.settings = undefined;
         server.userId = undefined;
         useUIStateStore.getState().resetAppearance();
@@ -210,6 +237,32 @@ describe("AppearanceSync adopting the account's settings", () => {
         expect(marks()).toStrictEqual({ accentColor: "synced" });
     });
 
+    it("drops the synced choices on sign-out and keeps the ones made here", () => {
+        signIn("user-a", { accentColor: "teal", mainFont: "serif" });
+        const { rerender } = render(<AppearanceSync />);
+
+        act(() => useUIStateStore.getState().setAppearance({ explicit: { mainFont: true } }));
+        server.userId = undefined;
+        server.settings = undefined;
+        rerender(<AppearanceSync />);
+
+        expect(useUIStateStore.getState().appearance).toMatchObject({ accentColor: "default", mainFont: "serif", syncedUserId: undefined });
+        expect(marks()).toStrictEqual({ mainFont: true });
+    });
+
+    it("keeps the synced choices while the session read is still pending", () => {
+        signIn("user-a", { accentColor: "teal" });
+        const { rerender } = render(<AppearanceSync />);
+
+        server.userId = undefined;
+        server.settings = undefined;
+        server.pending = true;
+        rerender(<AppearanceSync />);
+
+        expect(useUIStateStore.getState().appearance).toMatchObject({ accentColor: "teal", syncedUserId: "user-a" });
+        expect(marks()).toStrictEqual({ accentColor: "synced" });
+    });
+
     it("ignores a cached row that belongs to the last account", () => {
         signIn("user-a", { accentColor: "teal" });
         const { rerender } = render(<AppearanceSync />);
@@ -219,5 +272,72 @@ describe("AppearanceSync adopting the account's settings", () => {
 
         expect(useUIStateStore.getState().appearance.accentColor).toBe("default");
         expect(marks()).toStrictEqual({});
+    });
+});
+
+describe("AppearanceSync loading the OS accent's chunk", () => {
+    afterEach(() => {
+        accentChunk.failures = 0;
+        accentChunk.loads = 0;
+        vi.useRealTimers();
+        vi.unstubAllGlobals();
+        delete document.documentElement.dataset.accent;
+        document.documentElement.removeAttribute("style");
+    });
+
+    const shellWithSystemAccent = (failures: number): void => {
+        accentChunk.failures = failures;
+        accentChunk.tokens = systemAccentTokens("#007aff");
+        vi.useFakeTimers();
+        vi.stubGlobal("neoreNative", {
+            capabilities: ["system-accent"],
+            notify: () => {},
+            onCompose: () => () => {},
+            takePendingCompose: async () => undefined,
+        });
+        // What the boot script painted from its cache.
+        document.documentElement.dataset.accent = "system";
+    };
+
+    const settle = async (milliseconds: number): Promise<void> => {
+        await act(async () => {
+            await vi.advanceTimersByTimeAsync(milliseconds);
+        });
+    };
+
+    it("gives up after three retries", async () => {
+        shellWithSystemAccent(10);
+        render(<AppearanceSync />);
+
+        await settle(60_000);
+        expect(accentChunk.loads).toBe(4);
+        expect(document.documentElement.dataset.accent).toBe("system");
+    });
+
+    it("stops retrying once unmounted", async () => {
+        shellWithSystemAccent(10);
+        const { unmount } = render(<AppearanceSync />);
+
+        await settle(0);
+        unmount();
+        await settle(60_000);
+        expect(accentChunk.loads).toBe(1);
+    });
+
+    // Last: once a load succeeds the mocked module is cached, and later loads no longer reach the factory.
+    it("keeps the painted accent through failed loads and follows the OS accent once one succeeds", async () => {
+        shellWithSystemAccent(2);
+        render(<AppearanceSync />);
+
+        await settle(0);
+        expect(accentChunk.loads).toBe(1);
+        expect(document.documentElement.dataset.accent).toBe("system");
+
+        await settle(1000);
+        expect(accentChunk.loads).toBe(2);
+
+        await settle(2000);
+        expect(accentChunk.loads).toBe(3);
+        expect(document.documentElement.style.getPropertyValue("--system-accent-light")).toBe(accentChunk.tokens?.light);
     });
 });

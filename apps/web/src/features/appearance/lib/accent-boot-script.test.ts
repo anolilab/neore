@@ -100,6 +100,8 @@ describe("accent boot script", () => {
             expect(html.style.getPropertyValue(SYSTEM_ACCENT_PROPERTIES.light)).toBe(BLUE_TOKENS.light);
             expect(html.style.getPropertyValue(SYSTEM_ACCENT_PROPERTIES.dark)).toBe(BLUE_TOKENS.dark);
             expect(html.style.getPropertyValue(SYSTEM_ACCENT_PROPERTIES.contrastLightForeground)).toBe(BLUE_TOKENS.contrastLightForeground);
+            expect(html.style.getPropertyValue(SYSTEM_ACCENT_PROPERTIES.lightText)).toBe(BLUE_TOKENS.lightText);
+            expect(html.style.getPropertyValue(SYSTEM_ACCENT_PROPERTIES.contrastDarkHover)).toBe(BLUE_TOKENS.contrastDarkHover);
 
             html.removeAttribute(ACCENT_ATTRIBUTE);
             store({ accentColor: "system", explicit: { accentColor: true } });
@@ -124,6 +126,16 @@ describe("accent boot script", () => {
             runBootScript();
             expect(html.hasAttribute(ACCENT_ATTRIBUTE)).toBe(false);
             expect(html.style.getPropertyValue(SYSTEM_ACCENT_PROPERTIES.light)).toBe("");
+
+            // A cache from before the text and hover shades would leave `--primary-text` unset: it waits for the shell too.
+            const withoutTextAndHover: Partial<typeof BLUE_TOKENS> = { ...BLUE_TOKENS };
+
+            delete withoutTextAndHover.lightText;
+            delete withoutTextAndHover.darkHover;
+
+            localStorage.setItem(SYSTEM_ACCENT_CACHE_KEY, JSON.stringify(withoutTextAndHover));
+            runBootScript();
+            expect(html.hasAttribute(ACCENT_ATTRIBUTE)).toBe(false);
 
             // A cache from before the per-mode tokens waits for the shell's answer.
             localStorage.setItem(SYSTEM_ACCENT_CACHE_KEY, JSON.stringify({ accent: "#007aff", foreground: "#ffffff" }));
@@ -166,21 +178,29 @@ describe("accent boot script", () => {
         const ACCENTS = ["default", "teal", "system", "lime", undefined] as const;
         const FONTS = ["inter", "serif", "system", "comic", undefined] as const;
 
-        it.each(
-            MARKS.flatMap((mark) =>
+        it("matches effectiveAccent / effectiveMainFont for every mark, accent, font and OS accent", () => {
+            const cases = MARKS.flatMap((mark) =>
                 ACCENTS.flatMap((accentColor) => FONTS.flatMap((mainFont) => [true, false].map((capable) => [mark, accentColor, mainFont, capable] as const))),
-            ),
-        )("matches effectiveAccent / effectiveMainFont (mark %j, accent %j, font %j, OS accent %j)", (mark, accentColor, mainFont, capable) => {
-            shell(capable ? ["system-accent"] : []);
-            cacheAccent();
-            store({ accentColor, explicit: { accentColor: mark, mainFont: mark }, mainFont });
-            runBootScript();
+            );
 
-            const accent = effectiveAccent(accentColor, isExplicit(mark), capable);
-            const font = effectiveMainFont(mainFont, isExplicit(mark), true);
+            expect(cases).toHaveLength(300);
 
-            expect(html.getAttribute(ACCENT_ATTRIBUTE)).toBe(accent === DEFAULT_ACCENT ? null : accent);
-            expect(html.getAttribute(FONT_ATTRIBUTE)).toBe(font === DEFAULT_MAIN_FONT ? null : font);
+            for (const [mark, accentColor, mainFont, capable] of cases) {
+                html.removeAttribute(ACCENT_ATTRIBUTE);
+                html.removeAttribute(FONT_ATTRIBUTE);
+                html.removeAttribute("style");
+                shell(capable ? ["system-accent"] : []);
+                cacheAccent();
+                store({ accentColor, explicit: { accentColor: mark, mainFont: mark }, mainFont });
+                runBootScript();
+
+                const accent = effectiveAccent(accentColor, isExplicit(mark), capable);
+                const font = effectiveMainFont(mainFont, isExplicit(mark), true);
+                const label = JSON.stringify({ accentColor, capable, mainFont, mark });
+
+                expect(html.getAttribute(ACCENT_ATTRIBUTE), label).toBe(accent === DEFAULT_ACCENT ? null : accent);
+                expect(html.getAttribute(FONT_ATTRIBUTE), label).toBe(font === DEFAULT_MAIN_FONT ? null : font);
+            }
         });
 
         it("keeps a retired id with an explicit flag on the default preset and font", () => {

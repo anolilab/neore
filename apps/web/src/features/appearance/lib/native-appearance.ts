@@ -22,17 +22,26 @@ export const isAccentChoice = (value: unknown): value is AccentChoice => value =
 
 /**
  * The inline custom properties `:root[data-accent="system"]` reads (`accent-presets.css` for each mode,
- * `contrast-presets.css` under high contrast): one shade of the OS accent per mode, each with its text colour.
+ * `contrast-presets.css` under high contrast): one shade of the OS accent per mode, each with its label colour, its
+ * solid hover shade (`--primary-hover`), and the shade it takes as text on the page (`--primary-text`).
  */
 export const SYSTEM_ACCENT_PROPERTIES = {
     contrastDark: "--system-accent-contrast-dark",
     contrastDarkForeground: "--system-accent-contrast-dark-foreground",
+    contrastDarkHover: "--system-accent-contrast-dark-hover",
+    contrastDarkText: "--system-accent-contrast-dark-text",
     contrastLight: "--system-accent-contrast-light",
     contrastLightForeground: "--system-accent-contrast-light-foreground",
+    contrastLightHover: "--system-accent-contrast-light-hover",
+    contrastLightText: "--system-accent-contrast-light-text",
     dark: "--system-accent-dark",
     darkForeground: "--system-accent-dark-foreground",
+    darkHover: "--system-accent-dark-hover",
+    darkText: "--system-accent-dark-text",
     light: "--system-accent-light",
     lightForeground: "--system-accent-light-foreground",
+    lightHover: "--system-accent-light-hover",
+    lightText: "--system-accent-light-text",
 } as const;
 
 /** The last OS accent tokens, so the boot script can paint them before the shell answers. */

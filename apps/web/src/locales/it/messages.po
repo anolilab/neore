@@ -18302,6 +18302,10 @@ msgstr "Compiti di ragionamento leggeri con il modello piccolo di Alibaba e la c
 msgid "Like General, but also specifies output format, validation rules, and examples."
 msgstr "Come Generale, ma specifica anche formato di output, regole di validazione ed esempi."
 
+#: src/features/appearance/components/appearance-controls.tsx:160
+msgid "Lime"
+msgstr "Lime"
+
 #: src/features/appearance/components/appearance-controls.tsx:139
 msgid "Lime (default)"
 msgstr "Lime (predefinito)"
@@ -27941,6 +27945,10 @@ msgstr "Sampler"
 msgid "Sandbox & Code Execution"
 msgstr "Sandbox ed esecuzione di codice"
 
+#: src/features/appearance/components/appearance-controls.tsx:137
+msgid "Sans"
+msgstr "Sans"
+
 #: src/features/appearance/components/appearance-controls.tsx:117
 msgid "Sans (default)"
 msgstr "Sans (predefinito)"
@@ -31659,9 +31667,17 @@ msgstr "Preset di prompt di sistema"
 msgid "System Prompts"
 msgstr "Prompt di sistema"
 
+#: src/features/appearance/components/appearance-controls.tsx:224
+msgid "System (default)"
+msgstr "Sistema (predefinito)"
+
 #: src/features/appearance/components/appearance-controls.tsx:120
 msgid "System UI"
 msgstr "Interfaccia di sistema"
+
+#: src/features/appearance/components/appearance-controls.tsx:140
+msgid "System UI (default)"
+msgstr "Interfaccia di sistema (predefinita)"
 
 #: ../../packages/ui/src/components/zoomable-image.tsx:386
 msgid "Tab to the zoom buttons, then plus and minus zoom, zero resets, and arrow keys pan when zoomed. Double-click or scroll to zoom, drag to pan."

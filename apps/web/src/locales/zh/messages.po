@@ -18302,6 +18302,10 @@ msgstr "使用阿里巴巴小模型及思考能力的轻量推理任务"
 msgid "Like General, but also specifies output format, validation rules, and examples."
 msgstr "与“通用”类似，但还会指定输出格式、验证规则和示例。"
 
+#: src/features/appearance/components/appearance-controls.tsx:160
+msgid "Lime"
+msgstr "青柠"
+
 #: src/features/appearance/components/appearance-controls.tsx:139
 msgid "Lime (default)"
 msgstr "青柠（默认）"
@@ -27941,6 +27945,10 @@ msgstr "采样器"
 msgid "Sandbox & Code Execution"
 msgstr "沙盒与代码执行"
 
+#: src/features/appearance/components/appearance-controls.tsx:137
+msgid "Sans"
+msgstr "无衬线"
+
 #: src/features/appearance/components/appearance-controls.tsx:117
 msgid "Sans (default)"
 msgstr "无衬线（默认）"
@@ -31659,9 +31667,17 @@ msgstr "系统提示词预设"
 msgid "System Prompts"
 msgstr "系统提示词"
 
+#: src/features/appearance/components/appearance-controls.tsx:224
+msgid "System (default)"
+msgstr "系统（默认）"
+
 #: src/features/appearance/components/appearance-controls.tsx:120
 msgid "System UI"
 msgstr "系统界面"
+
+#: src/features/appearance/components/appearance-controls.tsx:140
+msgid "System UI (default)"
+msgstr "系统界面（默认）"
 
 #: ../../packages/ui/src/components/zoomable-image.tsx:386
 msgid "Tab to the zoom buttons, then plus and minus zoom, zero resets, and arrow keys pan when zoomed. Double-click or scroll to zoom, drag to pan."

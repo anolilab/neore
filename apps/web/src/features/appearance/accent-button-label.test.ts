@@ -8,6 +8,7 @@ import { compile } from "tailwindcss";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { ACCENT_PRESETS } from "./lib/accent-presets";
+import { contrastRatio } from "./lib/color-contrast";
 import { applySystemAccentTokens } from "./lib/native-appearance";
 import { systemAccentTokens } from "./lib/system-accent-tokens";
 
@@ -54,12 +55,84 @@ const rgb = (hex: string): string => {
 /** A dark OS accent (macOS graphite-ish blue): its light-mode shade carries white text. */
 const DARK_OS_ACCENT = "#1f3a93";
 
-describe("the default Button's label", () => {
+/** The macOS accent palette (System Settings > Appearance), as in native-appearance.test.ts. */
+const MACOS_ACCENTS = ["#007aff", "#953d96", "#f74f9e", "#e0383e", "#f7821b", "#ffc600", "#62ba46", "#8c8c8c"] as const;
+
+/** `--background` and `--card` per mode, plain and high contrast: what a translucent hover blends with. */
+const SURFACES = {
+    high: { dark: ["#000000"], light: ["#ffffff"] },
+    normal: { dark: ["#212121"], light: ["#f2f2f2", "#ffffff"] },
+} as const;
+
+const RGB = /^rgba?\((?<r>[\d.]+), (?<g>[\d.]+), (?<b>[\d.]+)(?:, (?<alpha>[\d.]+))?\)$/u;
+const OKLAB = /^oklab\((?<l>[-\d.e]+) (?<a>[-\d.e]+) (?<b>[-\d.e]+)(?: \/ (?<alpha>[\d.]+))?\)$/u;
+
+const toHex = (channels: ReadonlyArray<number>): string =>
+    `#${channels
+        .map((channel) =>
+            Math.round(Math.min(255, Math.max(0, channel)))
+                .toString(16)
+                .padStart(2, "0"),
+        )
+        .join("")}`;
+
+const encode = (linear: number): number => 255 * (linear <= 0.0031308 ? 12.92 * linear : 1.055 * linear ** (1 / 2.4) - 0.055);
+
+/** A computed colour (`rgb()`, `rgba()`, or the `oklab()` jsdom resolves `color-mix()` to) as 0–255 sRGB channels and alpha. */
+const parseComputed = (color: string): { alpha: number; channels: [number, number, number] } => {
+    const rgbGroups = RGB.exec(color)?.groups;
+
+    if (rgbGroups) {
+        return { alpha: Number(rgbGroups.alpha ?? 1), channels: [Number(rgbGroups.r), Number(rgbGroups.g), Number(rgbGroups.b)] };
+    }
+
+    const lab = OKLAB.exec(color)?.groups;
+
+    if (!lab) {
+        throw new Error(`Unexpected computed colour: ${color}`);
+    }
+
+    const [l, a, b] = [Number(lab.l), Number(lab.a), Number(lab.b)];
+    const lms = [l + 0.3963377774 * a + 0.2158037573 * b, l - 0.1055613458 * a - 0.0638541728 * b, l - 0.0894841775 * a - 1.291485548 * b].map(
+        (value) => value ** 3,
+    ) as [number, number, number];
+
+    return {
+        alpha: Number(lab.alpha ?? 1),
+        channels: [
+            encode(4.0767416621 * lms[0] - 3.3077115913 * lms[1] + 0.2309699292 * lms[2]),
+            encode(-1.2684380046 * lms[0] + 2.6097574011 * lms[1] - 0.3413193965 * lms[2]),
+            encode(-0.0041960863 * lms[0] - 0.7034186147 * lms[1] + 1.707614701 * lms[2]),
+        ],
+    };
+};
+
+/** `color` painted over the opaque `surface`, as `#rrggbb`. */
+const over = (color: string, surface: string): string => {
+    const { alpha, channels } = parseComputed(color);
+    const base = parseComputed(rgb(surface)).channels;
+
+    return toHex(channels.map((channel, index) => channel * alpha + base[index]! * (1 - alpha)));
+};
+
+/** The default Button's hover background utility, without its `hover:` variant, so jsdom can compute it at rest. */
+const HOVER_BACKGROUND = buttonVariants()
+    .split(WHITESPACE)
+    .find((name) => name.startsWith("hover:bg-"))
+    ?.slice("hover:".length);
+
+describe("the default Button's label and the accent text", () => {
     const root = document.documentElement;
     let button: HTMLButtonElement;
+    /** Carries the hover background at rest. */
+    let hovered: HTMLSpanElement;
+    /** The 80% fill the default Button hovered with before the OS accent had its own shade. */
+    let translucent: HTMLSpanElement;
+    /** Accent-coloured text, as links use. */
+    let accentText: HTMLAnchorElement;
 
     beforeAll(async () => {
-        const classes = buttonVariants().split(WHITESPACE);
+        const classes = [...buttonVariants().split(WHITESPACE), HOVER_BACKGROUND ?? "", "bg-primary/80", "text-primary-text"];
         const style = document.createElement("style");
 
         style.textContent = [await buildButtonCss(classes), readRelative(ACCENT_CSS), readRelative(CONTRAST_CSS)].join("\n");
@@ -67,7 +140,16 @@ describe("the default Button's label", () => {
 
         button = document.createElement("button");
         button.className = buttonVariants();
-        document.body.insertAdjacentElement("beforeend", button);
+        hovered = document.createElement("span");
+        hovered.className = HOVER_BACKGROUND ?? "";
+        translucent = document.createElement("span");
+        translucent.className = "bg-primary/80";
+        accentText = document.createElement("a");
+        accentText.className = "text-primary-text";
+
+        for (const element of [button, hovered, translucent, accentText]) {
+            document.body.insertAdjacentElement("beforeend", element);
+        }
     });
 
     afterAll(() => {
@@ -114,6 +196,46 @@ describe("the default Button's label", () => {
 
         expect(paint("system", mode, contrast)).toBe(rgb(foregrounds[contrast][mode]));
     });
+
+    // `bg-primary/80` blends the fill towards the surface: on the OS accent the label fell to ~3.2:1 there.
+    describe.each(MACOS_ACCENTS)("on hover over the OS accent %s", (hex) => {
+        it.each(VARIANTS)(`keeps the label at its bar on every surface (%s, %s contrast)`, (mode, contrast) => {
+            applySystemAccentTokens(systemAccentTokens(hex));
+
+            const label = paint("system", mode, contrast);
+            const background = getComputedStyle(hovered).backgroundColor;
+            const bar = contrast === "high" ? 7 : 4.5;
+            const surfaces = SURFACES[contrast][mode];
+
+            for (const surface of surfaces) {
+                expect(contrastRatio(over(label, surface), over(background, surface)), `${background} over ${surface}`).toBeGreaterThanOrEqual(bar);
+            }
+        });
+    });
+
+    // `--primary` need only stand out 3:1 from the page; as text it must read at 4.5:1 (7:1 under high contrast).
+    describe.each(MACOS_ACCENTS)("accent-coloured text with the OS accent %s", (hex) => {
+        it.each(VARIANTS)("reads at its bar on every surface (%s, %s contrast)", (mode, contrast) => {
+            applySystemAccentTokens(systemAccentTokens(hex));
+            paint("system", mode, contrast);
+
+            const text = getComputedStyle(accentText).color;
+            const surfaces = SURFACES[contrast][mode];
+
+            for (const surface of surfaces) {
+                expect(contrastRatio(over(text, surface), surface), `${text} on ${surface}`).toBeGreaterThanOrEqual(contrast === "high" ? 7 : 4.5);
+            }
+        });
+    });
+
+    it.each(ACCENT_PRESETS.flatMap((preset) => VARIANTS.map(([mode, contrast]) => [preset.id, mode, contrast] as const)))(
+        "hovers to the 80% fill on %s, as before (%s, %s contrast)",
+        (id, mode, contrast) => {
+            paint(id, mode, contrast);
+
+            expect(getComputedStyle(hovered).backgroundColor).toBe(getComputedStyle(translucent).backgroundColor);
+        },
+    );
 
     it("is white on a dark OS accent in light mode", () => {
         expect(systemAccentTokens(DARK_OS_ACCENT).lightForeground).toBe("#ffffff");

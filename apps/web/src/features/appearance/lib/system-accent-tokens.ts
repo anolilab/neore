@@ -11,7 +11,7 @@ const WHITE = "#ffffff";
 const OBSIDIAN = "#191919";
 const BLACK = "#000000";
 
-/** The surfaces each shade is checked against: `--background` and `--card` of global.css, and of high contrast. */
+/** The surfaces each shade is checked against (as text, too): `--background` and `--card` of global.css, and of high contrast. */
 const LIGHT_SURFACES = ["#f2f2f2", "#ffffff"] as const;
 const DARK_SURFACES = ["#212121"] as const;
 const CONTRAST_LIGHT_SURFACES = ["#ffffff"] as const;
@@ -23,6 +23,8 @@ const SYSTEM_ACCENT_HIGH_TEXT_CONTRAST = 7;
 const SYSTEM_ACCENT_SURFACE_CONTRAST = 3;
 
 const MIX_STEPS = 100;
+/** How far the hover shade moves from the fill, away from its label. */
+const HOVER_MIX = 0.15;
 
 const toHex = (channels: ReadonlyArray<number>): string => `#${channels.map((channel) => Math.round(channel).toString(16).padStart(2, "0")).join("")}`;
 
@@ -36,38 +38,72 @@ const mix = (hex: string, target: string, amount: number): string => {
 /** White or obsidian, whichever reads better on `accent`. */
 const readableText = (accent: string): string => (contrastRatio(accent, WHITE) >= contrastRatio(accent, OBSIDIAN) ? WHITE : OBSIDIAN);
 
-/**
- * The first shade of `hex`, darkened (towards black) or lightened (towards white), whose better text colour reaches
- * `textContrast` and which stands out `SYSTEM_ACCENT_SURFACE_CONTRAST` from every surface. Black and white always
- * meet both bars, so the walk always ends.
- */
-const readableShade = (hex: string, towards: string, surfaces: ReadonlyArray<string>, textContrast: number): [string, string] => {
+/** The first shade of `hex` on the way to `towards` (black or white) that `passes`; black and white pass every bar used here. */
+const firstShade = (hex: string, towards: string, passes: (shade: string) => boolean): string => {
     for (let step = 0; step <= MIX_STEPS; step += 1) {
-        const accent = mix(hex, towards, step / MIX_STEPS);
-        const foreground = readableText(accent);
+        const shade = mix(hex, towards, step / MIX_STEPS);
 
-        if (
-            contrastRatio(accent, foreground) >= textContrast &&
-            surfaces.every((surface: string) => contrastRatio(accent, surface) >= SYSTEM_ACCENT_SURFACE_CONTRAST)
-        ) {
-            return [accent, foreground];
+        if (passes(shade)) {
+            return shade;
         }
     }
 
-    return [towards, readableText(towards)];
+    return towards;
+};
+
+type ModeShades = { fill: string; foreground: string; hover: string; text: string };
+
+/**
+ * One mode's shades of `hex`, darkened (towards black) or lightened (towards white):
+ * - `fill`, the closest whose better label reaches `textContrast` and which stands out
+ *   `SYSTEM_ACCENT_SURFACE_CONTRAST` from every surface, with that label as `foreground`;
+ * - `hover`, the fill moved away from its label, so the label keeps its contrast on hover (a translucent
+ *   `bg-primary/80` would blend it towards the surface);
+ * - `text`, the closest that reads at `textContrast` as text on every surface (links, `--primary-text`).
+ */
+const modeShades = (hex: string, towards: string, surfaces: ReadonlyArray<string>, textContrast: number): ModeShades => {
+    const fill = firstShade(
+        hex,
+        towards,
+        (shade) =>
+            contrastRatio(shade, readableText(shade)) >= textContrast &&
+            surfaces.every((surface: string) => contrastRatio(shade, surface) >= SYSTEM_ACCENT_SURFACE_CONTRAST),
+    );
+    const foreground = readableText(fill);
+    const text = firstShade(hex, towards, (shade) => surfaces.every((surface: string) => contrastRatio(shade, surface) >= textContrast));
+
+    return { fill, foreground, hover: mix(fill, foreground === WHITE ? BLACK : WHITE, HOVER_MIX), text };
 };
 
 /**
- * The OS accent as one shade per mode, each the closest to the OS colour that meets the presets' bars: its text
- * colour (white or obsidian, whichever reads better) at 4.5:1 (7:1 under high contrast), and 3:1 against that mode's
- * background and card. Light mode darkens, dark mode lightens.
+ * The OS accent per mode, each shade the closest to the OS colour that meets the presets' bars: its label (white or
+ * obsidian, whichever reads better) at 4.5:1 (7:1 under high contrast) on the fill and on its hover, the fill 3:1
+ * against that mode's background and card, and the text shade at 4.5:1 (7:1) on them. Light mode darkens, dark mode
+ * lightens.
  */
 export const systemAccentTokens = (hex: string): SystemAccentTokens => {
     const base = hex.toLowerCase();
-    const [light, lightForeground] = readableShade(base, BLACK, LIGHT_SURFACES, SYSTEM_ACCENT_TEXT_CONTRAST);
-    const [dark, darkForeground] = readableShade(base, WHITE, DARK_SURFACES, SYSTEM_ACCENT_TEXT_CONTRAST);
-    const [contrastLight, contrastLightForeground] = readableShade(base, BLACK, CONTRAST_LIGHT_SURFACES, SYSTEM_ACCENT_HIGH_TEXT_CONTRAST);
-    const [contrastDark, contrastDarkForeground] = readableShade(base, WHITE, CONTRAST_DARK_SURFACES, SYSTEM_ACCENT_HIGH_TEXT_CONTRAST);
+    const light = modeShades(base, BLACK, LIGHT_SURFACES, SYSTEM_ACCENT_TEXT_CONTRAST);
+    const dark = modeShades(base, WHITE, DARK_SURFACES, SYSTEM_ACCENT_TEXT_CONTRAST);
+    const contrastLight = modeShades(base, BLACK, CONTRAST_LIGHT_SURFACES, SYSTEM_ACCENT_HIGH_TEXT_CONTRAST);
+    const contrastDark = modeShades(base, WHITE, CONTRAST_DARK_SURFACES, SYSTEM_ACCENT_HIGH_TEXT_CONTRAST);
 
-    return { contrastDark, contrastDarkForeground, contrastLight, contrastLightForeground, dark, darkForeground, light, lightForeground };
+    return {
+        contrastDark: contrastDark.fill,
+        contrastDarkForeground: contrastDark.foreground,
+        contrastDarkHover: contrastDark.hover,
+        contrastDarkText: contrastDark.text,
+        contrastLight: contrastLight.fill,
+        contrastLightForeground: contrastLight.foreground,
+        contrastLightHover: contrastLight.hover,
+        contrastLightText: contrastLight.text,
+        dark: dark.fill,
+        darkForeground: dark.foreground,
+        darkHover: dark.hover,
+        darkText: dark.text,
+        light: light.fill,
+        lightForeground: light.foreground,
+        lightHover: light.hover,
+        lightText: light.text,
+    };
 };

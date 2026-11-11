@@ -91,6 +91,8 @@
 :root[data-accent="system"] {
     --primary: var(--system-accent-light);
     --primary-foreground: var(--system-accent-light-foreground);
+    --primary-hover: var(--system-accent-light-hover);
+    --primary-text: var(--system-accent-light-text);
     --ring: var(--system-accent-light);
     --sidebar-ring: var(--system-accent-light);
 }
@@ -98,6 +100,8 @@
 :root.dark[data-accent="system"] {
     --primary: var(--system-accent-dark);
     --primary-foreground: var(--system-accent-dark-foreground);
+    --primary-hover: var(--system-accent-dark-hover);
+    --primary-text: var(--system-accent-dark-text);
     --ring: var(--system-accent-dark);
     --sidebar-ring: var(--system-accent-dark);
 }

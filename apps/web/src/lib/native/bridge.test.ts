@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
     hasNativeCapability,
@@ -564,11 +564,17 @@ describe("system accent colour", () => {
 });
 
 describe(watchNativeSystemAccentColor, () => {
-    /** Lets every pending promise callback run (one macrotask). */
+    // Fake timers: `runAllTimersAsync` flushes every pending promise callback, so no test waits on a real timeout.
+    beforeEach(() => {
+        vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+        vi.useRealTimers();
+    });
+
     const settle = async (): Promise<void> => {
-        await new Promise<void>((resolve) => {
-            setTimeout(resolve, 0);
-        });
+        await vi.runAllTimersAsync();
     };
 
     /** A shell whose initial read resolves when the test says so, and whose live event the test sends. */

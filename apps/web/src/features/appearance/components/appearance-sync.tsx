@@ -38,11 +38,48 @@ import {
     withoutSyncedChoices,
 } from "../lib/native-appearance";
 
+/** How many times a failed load of the OS accent's chunk is retried. */
+const ACCENT_CHUNK_RETRIES = 3;
+
 /** Paints the OS accent tokens and caches them for the next boot; `null` (the OS has none) falls back to the default preset. */
 const paintSystemAccent = (tokens: SystemAccentTokens | null): void => {
     applySystemAccentTokens(tokens);
     cacheSystemAccentTokens(tokens);
     applyAccentAttribute(tokens === null ? DEFAULT_ACCENT : SYSTEM_ACCENT);
+};
+
+/**
+ * Loads the OS accent's chunk and follows the OS accent; returns the function that stops (a pending retry too). A
+ * failed load keeps what is painted and is retried 1, 2 and 4 seconds later.
+ */
+const followSystemAccentChunk = (): (() => void) => {
+    let disposed = false;
+    let stop = (): void => {};
+    let retry: ReturnType<typeof setTimeout> | undefined;
+
+    const load = (attempt: number): void => {
+        void import("../lib/system-accent-sync")
+            .then(({ followSystemAccent }) => {
+                if (!disposed) {
+                    stop = followSystemAccent(paintSystemAccent);
+                }
+
+                return undefined;
+            })
+            .catch(() => {
+                if (!disposed && attempt < ACCENT_CHUNK_RETRIES) {
+                    retry = setTimeout(load, 1000 * 2 ** attempt, attempt + 1);
+                }
+            });
+    };
+
+    load(0);
+
+    return () => {
+        disposed = true;
+        clearTimeout(retry);
+        stop();
+    };
 };
 
 /**
@@ -61,8 +98,13 @@ const paintSystemAccent = (tokens: SystemAccentTokens | null): void => {
  *   and first paint's query budget is not spent on it. What it adopts is marked
  *   `synced` for that account: another account signing in drops it, so the
  *   shell's defaults apply again where that account stored nothing.
+ *
+ * Kept out of the React Compiler (`"use no memo"`): it renders nothing, so memoizing its effects saves no work, and
+ * the compiled form adds ~0.6 KiB gzip to the first load.
  */
 const AppearanceSync = () => {
+    "use no memo";
+
     const { accentColor, capLongCodeBlocks, codeHighlightTheme, codeLineNumbers, contrast, density, explicit, mainFont, mermaidTheme } = useUIStateStore(
         (state) => state.appearance,
     );
@@ -89,21 +131,7 @@ const AppearanceSync = () => {
 
         // The OS accent arrives over IPC; until then the boot script's cached copy (or the default preset) shows. The
         // code that follows it loads only here, so the web build never downloads it.
-        let disposed = false;
-        let stop = (): void => {};
-
-        void (async () => {
-            const { followSystemAccent } = await import("../lib/system-accent-sync");
-
-            if (!disposed) {
-                stop = followSystemAccent(paintSystemAccent);
-            }
-        })();
-
-        return () => {
-            disposed = true;
-            stop();
-        };
+        return followSystemAccentChunk();
     }, [accentColor, accentExplicit]);
 
     useEffect(() => {
@@ -135,8 +163,10 @@ const AppearanceSync = () => {
     }, [capLongCodeBlocks, codeHighlightTheme, codeLineNumbers, mermaidTheme]);
 
     const crpc = useCRPC();
-    const { data: sessionData } = authClient.useSession();
+    const { data: sessionData, error: sessionError, isPending: sessionPending } = authClient.useSession();
     const userId = sessionData?.user?.id;
+    // An answered "no session": not while the read is pending, and not when it failed.
+    const signedOut = !sessionPending && !sessionError && !sessionData?.user;
     const afterFirstPaint = useAfterFirstPaint();
     const { data: settingsRow } = useQuery(crpc.auth.functions.getUserSettings.queryOptions(afterFirstPaint && userId ? {} : skipToken));
     // The query key carries no user: right after an account switch it can still hold the last account's row.
@@ -152,15 +182,22 @@ const AppearanceSync = () => {
     const storedCodeLineNumbers = userSettings?.codeLineNumbers;
 
     // Before adopting the account's settings, in the same commit: another account's synced accent and font go first.
+    // Signing out drops them too; choices made on this device stay.
     useEffect(() => {
         const current = useUIStateStore.getState().appearance;
 
-        if (userId === undefined || current.syncedUserId === userId) {
+        if (userId === undefined) {
+            if (signedOut && current.syncedUserId !== undefined) {
+                setAppearance({ ...withoutSyncedChoices(current.explicit), syncedUserId: undefined });
+            }
+
             return;
         }
 
-        setAppearance({ ...withoutSyncedChoices(current.explicit), syncedUserId: userId });
-    }, [userId, setAppearance]);
+        if (current.syncedUserId !== userId) {
+            setAppearance({ ...withoutSyncedChoices(current.explicit), syncedUserId: userId });
+        }
+    }, [userId, signedOut, setAppearance]);
 
     useEffect(() => {
         const changes: Parameters<typeof setAppearance>[0] = {};

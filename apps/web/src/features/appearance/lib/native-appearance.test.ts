@@ -74,6 +74,33 @@ describe(systemAccentTokens, () => {
                 expect(contrastRatio(tokens[mode], surface)).toBeGreaterThanOrEqual(AA_NON_TEXT);
             }
         });
+
+        // `--primary-text` (links, accent-coloured words) is ordinary text: the fill's 3:1 is not enough for it.
+        it.each([
+            ["light", AA_TEXT],
+            ["dark", AA_TEXT],
+            ["contrastLight", AAA_TEXT],
+            ["contrastDark", AAA_TEXT],
+        ] as const)("%s: the text shade reads at %s:1 on the background and card", (mode, bar) => {
+            const surfaces = SURFACES[mode];
+
+            for (const surface of surfaces) {
+                expect(contrastRatio(tokens[`${mode}Text`], surface)).toBeGreaterThanOrEqual(bar);
+            }
+        });
+
+        it.each([
+            ["light", AA_TEXT],
+            ["dark", AA_TEXT],
+            ["contrastLight", AAA_TEXT],
+            ["contrastDark", AAA_TEXT],
+        ] as const)("%s: the label keeps %s:1 on the hover shade, which differs from the fill", (mode, bar) => {
+            expect(contrastRatio(tokens[`${mode}Foreground`], tokens[`${mode}Hover`])).toBeGreaterThanOrEqual(bar);
+
+            if (tokens[mode] !== "#000000" && tokens[mode] !== "#ffffff") {
+                expect(tokens[`${mode}Hover`]).not.toBe(tokens[mode]);
+            }
+        });
     });
 
     it("keeps an OS accent that already passes, and puts the better label on it", () => {

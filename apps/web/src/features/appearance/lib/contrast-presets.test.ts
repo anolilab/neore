@@ -84,8 +84,13 @@ describe("high contrast primary button (system)", () => {
     it.each([
         ["light", ':root[data-contrast="high"][data-accent="system"]', "--system-accent-contrast-light"],
         ["dark", ':root.dark[data-contrast="high"][data-accent="system"]', "--system-accent-contrast-dark"],
-    ])("uses the %s high-contrast shade of the OS accent", (_mode, selector, property) => {
-        expect(tokens(selector)).toStrictEqual({ "--primary": `var(${property})`, "--primary-foreground": `var(${property}-foreground)` });
+    ])("uses the %s high-contrast shades of the OS accent", (_mode, selector, property) => {
+        expect(tokens(selector)).toStrictEqual({
+            "--primary": `var(${property})`,
+            "--primary-foreground": `var(${property}-foreground)`,
+            "--primary-hover": `var(${property}-hover)`,
+            "--primary-text": `var(${property}-text)`,
+        });
     });
 });
 
