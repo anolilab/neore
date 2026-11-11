@@ -89,11 +89,13 @@ const ROW_CLASS =
     "hover:bg-muted focus-visible:ring-ring flex min-h-11 w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm outline-none focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-60";
 
 interface AddProjectContentProps extends Omit<AddProjectDialogProps, "open"> {
+    /** Servers paired in this session. One that is still listed as unpaired is connected, never paired again. */
+    pairedHosts: Set<string>;
     /** The host being paired or connected. Held by the owner of the open state, so it outlives a closed dialog. */
     pairingHosts: Set<string>;
 }
 
-const AddProjectContent = ({ onClose, onCreateNew, pairingHosts }: AddProjectContentProps) => {
+const AddProjectContent = ({ onClose, onCreateNew, pairingHosts, pairedHosts }: AddProjectContentProps) => {
     const { t } = useLingui();
     const crpc = useCRPC();
     const { mutateAsync: createProject } = useMutation(crpc.projects.functions.createProject.mutationOptions());
@@ -328,6 +330,8 @@ const AddProjectContent = ({ onClose, onCreateNew, pairingHosts }: AddProjectCon
             return { error: new Error("device: the person declined the pairing"), ok: false };
         }
 
+        pairedHosts.add(sshAlias);
+
         return attempt(() => bridge.connectAddProjectMachine(sshAlias));
     };
 
@@ -347,12 +351,13 @@ const AddProjectContent = ({ onClose, onCreateNew, pairingHosts }: AddProjectCon
             pairingHosts.add(state.sshAlias);
             setPendingKey(state.sshAlias);
 
+            const pairs = state.kind === "needs-pair" && !pairedHosts.has(state.sshAlias);
             const connected =
-                state.kind === "needs-pair"
+                state.kind === "needs-pair" && pairs
                     ? await pairServer(bridge, state.sshAlias, state.spec)
                     : await attempt(() => bridge.connectAddProjectMachine(state.sshAlias));
 
-            if (state.kind === "needs-pair") {
+            if (state.kind === "needs-pair" && pairs) {
                 // Pairing changed this server's row, so the list must show it as paired before the next pick, even when
                 // the connection after it failed.
                 const refreshed = await attempt(() => bridge.listAddProjectMachines());
@@ -630,11 +635,12 @@ const AddProjectContent = ({ onClose, onCreateNew, pairingHosts }: AddProjectCon
 
 const AddProjectDialog = ({ onClose, onCreateNew, open }: AddProjectDialogProps) => {
     const [pairingHosts] = useState(() => new Set<string>());
+    const [pairedHosts] = useState(() => new Set<string>());
 
     return (
         <Dialog onOpenChange={(nextOpen) => !nextOpen && onClose()} open={open}>
             {/* Mounted only while open: the dialog roots keep closed children mounted, which would reopen the last session. */}
-            {open && <AddProjectContent onClose={onClose} onCreateNew={onCreateNew} pairingHosts={pairingHosts} />}
+            {open && <AddProjectContent onClose={onClose} onCreateNew={onCreateNew} pairedHosts={pairedHosts} pairingHosts={pairingHosts} />}
         </Dialog>
     );
 };

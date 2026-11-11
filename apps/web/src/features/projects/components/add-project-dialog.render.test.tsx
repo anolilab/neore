@@ -455,4 +455,21 @@ describe("AddProjectDialog pairing and browsing guards", () => {
         await settle();
         expect(createProject).not.toHaveBeenCalled();
     });
+
+    it("does not register a second device when the list cannot be refreshed after pairing", async () => {
+        const device = installBridge();
+
+        device.connectAddProjectMachine.mockRejectedValueOnce(new Error("device: ssh failed"));
+        device.listAddProjectMachines.mockResolvedValueOnce(machines).mockRejectedValueOnce(new Error("device: the desktop is busy"));
+        render(<AddProjectDialog onClose={noop} onCreateNew={noop} open />);
+
+        fireEvent.click(await screen.findByRole("button", { name: NEW }));
+        expect(await screen.findByText("The desktop could not complete that. Try again.")).toBeTruthy();
+
+        fireEvent.click(await screen.findByRole("button", { name: NEW }));
+        expect(await screen.findByText("Add project on new")).toBeTruthy();
+        expect(registerDevice).toHaveBeenCalledTimes(1);
+        expect(device.hostPair).toHaveBeenCalledTimes(1);
+        expect(device.connectAddProjectMachine).toHaveBeenCalledTimes(2);
+    });
 });
