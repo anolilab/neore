@@ -41517,6 +41517,95 @@
         "x-lunora-function-kind": "action"
       }
     },
+    "/_lunora/rpc#plugins_repair:repairPlugin": {
+      "post": {
+        "description": "Invoke the `mutation` `plugins_repair:repairPlugin` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "plugins_repair:repairPlugin",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "pluginSlug": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "pluginSlug"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "plugins_repair:repairPlugin",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "linked": {
+                      "type": "number"
+                    },
+                    "missing": {
+                      "items": {
+                        "type": "string"
+                      },
+                      "type": "array"
+                    },
+                    "status": {
+                      "anyOf": [
+                        {
+                          "const": "installed",
+                          "type": "string"
+                        },
+                        {
+                          "const": "needs-repair",
+                          "type": "string"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "linked",
+                    "missing",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "mutation: plugins_repair:repairPlugin",
+        "tags": [
+          "plugins"
+        ],
+        "x-lunora-function-kind": "mutation"
+      }
+    },
     "/_lunora/rpc#projects_functions:addProjectRepo": {
       "post": {
         "description": "Invoke the `mutation` `projects_functions:addProjectRepo` over the Lunora RPC envelope (POST /_lunora/rpc).",
