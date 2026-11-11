@@ -227,13 +227,14 @@ const FileMentionPopup: FC<FileMentionPopupProps> = ({
     // Total items: participants + 1 for "Upload new file" + files and chats
     const totalItems = participantCount + rows.length + 1;
 
-    // Reset the highlighted row whenever the list length changes, and clear the search once the
-    // popup closes. Adjusting during render (rather than in an effect) avoids painting a frame
-    // with the stale selection. See https://react.dev/learn/you-might-not-need-an-effect
-    const [renderedItemCount, setRenderedItemCount] = useState(totalItems);
+    // Reset the highlighted row whenever the rows change — in number or in order (a search answer can move a file into the
+    // project) — and clear the search once the popup closes. Adjusting during render (rather than in an effect) avoids
+    // painting a frame with the stale selection. See https://react.dev/learn/you-might-not-need-an-effect
+    const rowsKey = `${String(participantCount)}:${rows.map((row) => (row.kind === "file" ? row.file._id : row.chat.id)).join(",")}`;
+    const [renderedRowsKey, setRenderedRowsKey] = useState(rowsKey);
 
-    if (renderedItemCount !== totalItems) {
-        setRenderedItemCount(totalItems);
+    if (renderedRowsKey !== rowsKey) {
+        setRenderedRowsKey(rowsKey);
         setSelectedIndex(0);
     }
 

@@ -2,7 +2,7 @@
 
 import { useQueryClient } from "@tanstack/react-query";
 import type { Editor } from "@tiptap/react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 
 import { THREAD_LIST_PAGINATION_OPTS } from "@/features/chat/core/constants/query-options";
 import useAfterFirstPaint from "@/hooks/use-after-first-paint";
@@ -17,28 +17,31 @@ import { useCRPC, useLunoraAuth } from "@/lib/lunora/crpc";
  * subscription: that starts when the menu mounts its query, as before, and answers from this cache. Both reads are the
  * user's, not the chat's, so a cached answer is not fetched again on another chat.
  *
- * Returns `true` from then on: the "/" menu loads its prompts and skills (actions, not cached queries) on it.
+ * Once per page load, not per composer: the composer remounts (and autofocuses) on every chat switch, and the "/" menu's
+ * prompts and skills are actions the cache does not keep. Returns `true` in the composer that warmed: its "/" menu loads
+ * them then; a later composer's loads on its first "/", as before.
  */
+const warmed = { done: false };
+
 const useMentionPrefetch = (editor: Editor | null, enabled: boolean): boolean => {
     const crpc = useCRPC();
     const queryClient = useQueryClient();
     const { isAuthenticated, isLoading } = useLunoraAuth();
     const afterFirstPaint = useAfterFirstPaint();
     const [warm, setWarm] = useState(false);
-    const doneRef = useRef(false);
     const ready = enabled && isAuthenticated && !isLoading && afterFirstPaint && editor !== null;
 
     useEffect(() => {
-        if (!ready || doneRef.current) {
+        if (!ready || warmed.done) {
             return undefined;
         }
 
         const prefetch = () => {
-            if (doneRef.current) {
+            if (warmed.done) {
                 return;
             }
 
-            doneRef.current = true;
+            warmed.done = true;
             setWarm(true);
             // A failed prefetch is not an error to show: the menu's own query tries again when it opens.
             void queryClient.prefetchQuery(crpc.vault.functions.getAttachmentsForUser.queryOptions({}));
