@@ -161,11 +161,10 @@ export const parseSshConfig = (text: string, home: string): SshHost[] => {
     const hosts: SshHost[] = [];
 
     for (const block of blocks) {
-        for (const alias of block.aliases) {
-            if (WILDCARD.test(alias) || seen.has(alias)) {
-                continue;
-            }
+        // An alias that a block names twice is listed once: the first occurrence is the one kept.
+        const aliases = block.aliases.filter((candidate, index) => !WILDCARD.test(candidate) && !seen.has(candidate) && block.aliases.indexOf(candidate) === index);
 
+        for (const alias of aliases) {
             const usesMatch = matchesAnything || matched.has(alias) || (block.hostName !== null && matched.has(block.hostName));
 
             seen.add(alias);
