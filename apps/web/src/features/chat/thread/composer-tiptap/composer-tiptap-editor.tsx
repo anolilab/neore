@@ -20,6 +20,7 @@ import { useLingui } from "@lingui/react/macro";
 import type { Editor } from "@tiptap/core";
 import PlaceholderExtension from "@tiptap/extension-placeholder";
 import { Fragment, Slice } from "@tiptap/pm/model";
+import type { EditorState } from "@tiptap/pm/state";
 import { Selection } from "@tiptap/pm/state";
 import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKitExtension from "@tiptap/starter-kit";
@@ -130,18 +131,26 @@ export interface ComposerTiptapEditorRef {
     /** Whether `event` is a paste made with Ctrl/Cmd+Shift+V, which keeps the text exactly as copied. */
     isPlainPaste: (event: { timeStamp: number }) => boolean;
     /** Inserts `text` over the selection as one undoable paste, a paragraph per line; false without an editor. */
-    pasteText: (text: string) => boolean;
+    pasteText: (text: string, at?: EditorState) => boolean;
 }
 
 const LINE_BREAK = /\r\n?|\n/;
 
-/** The paste the editor would make of `text/plain`, but with every line kept: its own parser merges blank lines. */
-const pastePlainText = (editor: Editor, text: string): boolean => {
+/**
+ * The paste the editor would make of `text/plain`, but with every line kept: its own parser merges blank lines. It
+ * replaces the selection of `at` when the text is unchanged since (a paste that waited for its conversion), else the
+ * current one.
+ */
+const pastePlainText = (editor: Editor, text: string, at?: EditorState): boolean => {
     const { schema, tr } = editor.state;
     const { paragraph } = schema.nodes;
 
     if (!paragraph) {
         return false;
+    }
+
+    if (at?.doc === tr.doc) {
+        tr.setSelection(at.selection);
     }
 
     const paragraphs = text.split(LINE_BREAK).map((line: string) => paragraph.create(null, line === "" ? null : schema.text(line)));
@@ -418,7 +427,7 @@ const ComposerTiptapEditor = ({
             focus: () => editor?.commands.focus(),
             getEditor: () => editor,
             isPlainPaste: (event: { timeStamp: number }) => event.timeStamp - plainPasteKeyAt.current < PLAIN_PASTE_WINDOW_MS,
-            pasteText: (text: string) => (editor && !editor.isDestroyed ? pastePlainText(editor, text) : false),
+            pasteText: (text: string, at?: EditorState) => (editor && !editor.isDestroyed ? pastePlainText(editor, text, at) : false),
         };
     }, [editor]);
 

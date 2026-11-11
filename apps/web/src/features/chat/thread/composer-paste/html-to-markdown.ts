@@ -16,9 +16,7 @@ const SKIPPED = new Set([
     "EMBED",
     "HEAD",
     "IFRAME",
-    "IMG",
     "LINK",
-    "MATH",
     "META",
     "NOSCRIPT",
     "OBJECT",
@@ -57,7 +55,11 @@ const BOLD_STYLE = /font-weight\s*:\s*(?:bold|[6-9]00)/i;
 const NORMAL_WEIGHT = /font-weight\s*:\s*(?:normal|[1-4]00)/i;
 const ITALIC_STYLE = /font-style\s*:\s*italic/i;
 const STRIKE_STYLE = /text-decoration[\w-]*\s*:[^;]*line-through/i;
-const HIDDEN_STYLE = /display\s*:\s*none|mso-list\s*:\s*ignore/i;
+const HIDDEN_STYLE = /display\s*:\s*none|visibility\s*:\s*hidden|mso-list\s*:\s*ignore/i;
+const HIDDEN_CLASS = /(?:^|\s)(?:sr-only|visually-?hidden)(?:\s|$)/i;
+const EMOJI_NAME = /^:[\w+-]{1,40}:$/;
+const PICTOGRAPHIC = /\p{Extended_Pictographic}/u;
+const MATH_CLASS = /math/i;
 const WORD_LIST_LEVEL = /mso-list\s*:[^;]*level(\d)/i;
 const WORD_ORDERED_MARKER = /^\s*\w{1,4}[.)]/;
 const WORD_LIST_BULLET = /mso-list\s*:\s*ignore/i;
@@ -100,17 +102,6 @@ const oneLine = (text: string): string =>
         .map((line: string) => line.trim())
         .join(" ");
 
-/** Appends `next` to `out`, dropping the spaces that collapsed HTML whitespace leaves around line breaks. */
-const append = (out: string, next: string): string => {
-    if (next === "") {
-        return out;
-    }
-
-    const head = next.startsWith("\n") ? trimSpacesEnd(out) : out;
-
-    return head + (head.endsWith("\n") ? trimSpacesStart(next) : next);
-};
-
 const styleOf = (element: Element): string => element.getAttribute("style") ?? "";
 
 /** `**`, `*` or `~~` around inline content, with its outer spaces kept outside; nothing around content that spans lines. */
@@ -124,17 +115,36 @@ const wrap = (inner: string, marker: string): string => {
     return inner.slice(0, inner.indexOf(core)) + marker + core + marker + inner.slice(inner.indexOf(core) + core.length);
 };
 
-const indent = (text: string, prefix: string, first: string): string =>
-    text
-        .split("\n")
-        .map((line: string, index: number) => {
-            if (index === 0) {
-                return first + line;
-            }
+/**
+ * `first` before the first line of `text` and `prefix` before the others (`blank` for an empty one), code blocks in it
+ * included, so a fence inside a list item or a quote stays inside it.
+ */
+const prefixLines = (text: string, first: string, prefix: string, blank: string, context: Context): string => {
+    const prefixed = (line: string, index: number): string => {
+        if (index === 0) {
+            return line;
+        }
 
-            return line === "" ? "" : prefix + line;
-        })
-        .join("\n");
+        return line === "" ? blank : prefix + line;
+    };
+
+    for (const match of text.matchAll(PLACEHOLDER)) {
+        const index = Number(match[1]);
+
+        context.code[index] = (context.code[index] ?? "")
+            .split("\n")
+            .map((line: string, lineIndex: number) => prefixed(line, lineIndex))
+            .join("\n");
+    }
+
+    return (
+        first +
+        text
+            .split("\n")
+            .map((line: string, lineIndex: number) => prefixed(line, lineIndex))
+            .join("\n")
+    );
+};
 
 const languageOf = (pre: Element): string => {
     for (const element of [pre.querySelector("code"), pre, pre.parentElement, pre.parentElement?.parentElement]) {
@@ -217,7 +227,7 @@ const list = (element: Element, context: Context): string => {
         const body = children(item, context).replaceAll(BLANK_LINES, "\n\n").trim();
 
         number += 1;
-        items.push(" ".repeat(4).repeat(level - 1) + indent(body, " ".repeat(marker.length), marker));
+        items.push(" ".repeat(4).repeat(level - 1) + prefixLines(body, marker, " ".repeat(marker.length), "", context));
     }
 
     return `\n\n${items.join("\n")}\n\n`;
@@ -242,7 +252,13 @@ const element = (node: Element, context: Context): string => {
     const tag = node.tagName.toUpperCase();
     const style = styleOf(node);
 
-    if (SKIPPED.has(tag) || HIDDEN_STYLE.test(style) || node.hasAttribute("hidden")) {
+    if (
+        SKIPPED.has(tag) ||
+        HIDDEN_STYLE.test(style) ||
+        HIDDEN_CLASS.test(node.getAttribute("class") ?? "") ||
+        node.hasAttribute("hidden") ||
+        node.getAttribute("aria-hidden") === "true"
+    ) {
         return "";
     }
 
@@ -269,10 +285,7 @@ const element = (node: Element, context: Context): string => {
         case "BLOCKQUOTE": {
             const inner = children(node, context).replaceAll(BLANK_LINES, "\n\n").trim();
 
-            return `\n\n${inner
-                .split("\n")
-                .map((line: string) => (line === "" ? ">" : `> ${line}`))
-                .join("\n")}\n\n`;
+            return `\n\n${prefixLines(inner, "> ", "> ", ">", context)}\n\n`;
         }
         case "BR": {
             return context.inTable ? " " : "\n";
@@ -295,6 +308,16 @@ const element = (node: Element, context: Context): string => {
         case "HR": {
             return "\n\n---\n\n";
         }
+        case "IMG": {
+            // Emoji and formulas drawn as pictures are text; other images arrive as files, if at all.
+            const alt = node.getAttribute("alt")?.trim() ?? "";
+
+            if (MATH_CLASS.test(node.getAttribute("class") ?? "") && alt !== "") {
+                return `$${alt}$`;
+            }
+
+            return EMOJI_NAME.test(alt) || (alt.length <= 16 && PICTOGRAPHIC.test(alt)) ? alt : "";
+        }
         case "INPUT": {
             if (node.getAttribute("type") !== "checkbox") {
                 return "";
@@ -302,11 +325,20 @@ const element = (node: Element, context: Context): string => {
 
             return node.hasAttribute("checked") ? "[x] " : "[ ] ";
         }
+        case "MATH": {
+            const tex = node.querySelector('annotation[encoding="application/x-tex"]')?.textContent?.trim();
+
+            return tex ? `$${tex}$` : "";
+        }
         case "OL":
         case "UL": {
             return list(node, context);
         }
         case "PRE": {
+            if (context.inTable) {
+                return inlineCode(node.textContent ?? "");
+            }
+
             context.code.push(fenceCode(node.textContent ?? "", languageOf(node)));
 
             return `\n\n\0${context.code.length - 1}\0\n\n`;
@@ -349,18 +381,46 @@ const element = (node: Element, context: Context): string => {
     return LINE_BLOCKS.has(tag) || tag === "LI" || tag === "TR" ? `\n${inner.trim()}\n` : inner;
 };
 
+/** The Markdown for the child nodes, without the spaces that collapsed HTML whitespace leaves around line breaks. */
 function children(node: Node, context: Context): string {
-    let out = "";
+    // Parts, not one growing string: a long page has thousands of blocks, and re-reading the whole text for each is quadratic.
+    const parts: string[] = [];
 
     for (const child of node.childNodes) {
+        let next = "";
+
         if (child.nodeType === Node.TEXT_NODE) {
-            out = append(out, (child.nodeValue ?? "").replaceAll("\0", "").replaceAll(/\s+/g, " "));
+            next = (child.nodeValue ?? "").replaceAll("\0", "").replaceAll(/\s+/g, " ");
         } else if (child.nodeType === Node.ELEMENT_NODE) {
-            out = append(out, element(child as Element, context));
+            next = element(child as Element, context);
         }
+
+        if (next === "") {
+            continue;
+        }
+
+        if (next.startsWith("\n")) {
+            while (parts.length > 0) {
+                const last = trimSpacesEnd(parts.at(-1) ?? "");
+
+                if (last !== "") {
+                    parts[parts.length - 1] = last;
+                    break;
+                }
+
+                parts.pop();
+            }
+        }
+
+        if (parts.at(-1)?.endsWith("\n")) {
+            // Two line blocks in a row (a div per line) share one line break; a paragraph keeps its blank line.
+            next = trimSpacesStart(next.startsWith("\n") && !next.startsWith("\n\n") ? next.slice(1) : next);
+        }
+
+        parts.push(next);
     }
 
-    return out;
+    return parts.join("");
 }
 
 /** The Markdown for a clipboard `text/html` payload; empty when it holds no text. */

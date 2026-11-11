@@ -8,17 +8,20 @@ export type PastePlan = { html: string; kind: "html"; plain: string } | { kind: 
 
 const URL_ONLY = /^https?:\/\/\S+$/i;
 const LINK = /<a\s[^>]*href/i;
+const LANGUAGE = /class="[^"]*(?:language|lang|highlight)-/i;
 // Formatting the Markdown can carry. A `<pre>` alone is not in it: terminals and code editors wrap their text in one.
 const FORMATTING = [
     /<(?:h[1-6]|ul|ol|table|blockquote)[\s>]/i,
     /<(?:[bis]|strong|em|del|strike|code|kbd)[\s>]/i,
     LINK,
-    /class="[^"]*(?:language|lang|highlight)-/i,
     /font-weight\s*:\s*(?:bold|[6-9]00)|font-style\s*:\s*italic/i,
 ];
-// Paragraphs, lists, headings and tables are a document, even next to a monospace block.
+// Paragraphs, lists, headings and tables are a document, even in a monospace block.
 const STRUCTURE = /<(?:h[1-6]|ul|ol|table|blockquote|p)[\s>]/i;
-const MONOSPACE = /<pre[\s>]|white-space\s*:\s*pre|font-family\s*:[^;">]*(?:monospace|consolas|menlo|courier|monaco)/i;
+// The first element that holds content: not the document, its head, or a comment.
+const FIRST_ELEMENT = /<(?![!/]|(?:html|head|body|meta|title|style)\b)([a-z][\w-]*)(\s[^>]*)?>/i;
+const MONOSPACE_FONT = /font-family\s*:[^;">]*(?:mono|consolas|menlo|courier)/i;
+const MAX_CONVERTED_HTML = 1_000_000;
 const BACKTICK_RUNS = /`+/g;
 const LANGUAGE_UNSAFE = /[^\w#+.-]/g;
 const VSCODE_LANGUAGES: Record<string, string> = { javascriptreact: "jsx", plaintext: "", shellscript: "bash", typescriptreact: "tsx" };
@@ -40,10 +43,23 @@ export const fenceCode = (code: string, language = ""): string => {
 
 /**
  * Whether clipboard HTML adds nothing to its `text/plain`: text in a span or div, or a code editor's or terminal's
- * monospace block. A regex over the markup, so the converter is never loaded for it.
+ * monospace block (whose colours and bold keywords are not formatting). Regexes over the markup, so the converter is
+ * never loaded for it.
  */
-export const isPlainHtml = (html: string): boolean =>
-    FORMATTING.every((pattern: RegExp) => !pattern.test(html)) || (MONOSPACE.test(html) && !STRUCTURE.test(html) && !LINK.test(html));
+export const isPlainHtml = (html: string): boolean => {
+    if (LANGUAGE.test(html)) {
+        return false;
+    }
+
+    if (FORMATTING.every((pattern: RegExp) => !pattern.test(html))) {
+        return true;
+    }
+
+    const [, tag = "", attributes = ""] = FIRST_ELEMENT.exec(html) ?? [];
+    const monospaceRoot = tag.toLowerCase() === "pre" || (tag.toLowerCase() === "div" && MONOSPACE_FONT.test(attributes));
+
+    return monospaceRoot && !STRUCTURE.test(html) && !LINK.test(html);
+};
 
 const vscodeLanguage = (data: string): string | undefined => {
     try {
@@ -104,6 +120,11 @@ export const isLongPaste = (text: string): boolean => text.length > 500 || text.
 export const planText = async (plan: Exclude<PastePlan, { kind: "default" }>): Promise<string> => {
     if (plan.kind === "text") {
         return plan.text;
+    }
+
+    // A page this big becomes an attachment whatever its form; converting it would only hold up the tab.
+    if (plan.html.length > MAX_CONVERTED_HTML) {
+        return plan.plain;
     }
 
     try {

@@ -7,7 +7,7 @@ import terminalHtml from "./__fixtures__/terminal.html?raw";
 import vscodeHtml from "./__fixtures__/vscode.html?raw";
 import wordHtml from "./__fixtures__/word-paragraph.html?raw";
 import { htmlToMarkdown } from "./html-to-markdown";
-import { isLongPaste, planPaste, planText } from "./paste-plan";
+import { isLongPaste, isPlainHtml, planPaste, planText } from "./paste-plan";
 
 const clipboard = (data: Record<string, string>): Pick<DataTransfer, "getData"> => {
     return { getData: (type: string) => data[type] ?? "" };
@@ -90,6 +90,41 @@ describe("composer paste", () => {
 
         expect(markdown).toBe("Hello **world**\n\nclick me");
         expect((globalThis as { __pasteExecuted?: boolean }).__pasteExecuted).toBeUndefined();
+    });
+
+    it.each([
+        ["a div per line is a line each", "<div>one <b>1</b></div> <div>two</div><div><br></div><div>four</div><p>para</p>", "one **1**\ntwo\n\nfour\n\npara"],
+        ["a code block in a list item stays in it", "<ul><li>step<pre>a\n\nb</pre></li></ul>", "- step\n\n  ```\n  a\n\n  b\n  ```"],
+        ["a code block in a quote stays in it", "<blockquote><p>q</p><pre>a\nb</pre></blockquote>", "> q\n>\n> ```\n> a\n> b\n> ```"],
+        [
+            "text the page hides is left out",
+            '<p>Hi <span style="visibility:hidden">secret</span><span class="sr-only">sr</span><b aria-hidden="true">x</b>there</p>',
+            "Hi there",
+        ],
+        [
+            "emoji and formulas drawn as images keep their text",
+            '<p>Ship <img alt="🎉"> <img alt=":tada:"> <img class="mwe-math-fallback-image-inline" alt="E=mc^2"> <img alt="A chart"></p>',
+            "Ship 🎉 :tada: $E=mc^2$",
+        ],
+    ])("%s", (_label: string, html: string, markdown: string) => {
+        expect(htmlToMarkdown(html)).toBe(markdown);
+    });
+
+    it.each([
+        [
+            "part of a Google Docs paragraph with bold",
+            '<b style="font-weight:normal" id="docs-internal-guid-1"><span style="font-weight:700;white-space:pre-wrap">bold</span> rest</b>',
+            false,
+        ],
+        ["inline code in a sentence", 'Call <code style="font-family:ui-monospace,monospace">foo()</code> now', false],
+        ["a lone code block with a language", '<pre class="language-js">x()</pre>', false],
+        [
+            "a JetBrains copy with bold keywords",
+            '<pre style="font-family:\'JetBrains Mono\',monospace"><span style="font-weight:bold">fun</span> x()</pre>',
+            true,
+        ],
+    ])("treats %s as plain: %s", (_label: string, html: string, plain: boolean) => {
+        expect(isPlainHtml(html)).toBe(plain);
     });
 
     it("keeps backticks inside code from closing the fence", () => {
