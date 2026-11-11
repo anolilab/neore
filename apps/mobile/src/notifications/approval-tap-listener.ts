@@ -22,6 +22,9 @@ export interface ApprovalTapListener {
     remove: () => void;
 }
 
+/** What became of a tap: answered, failed (kept for a retry in the app), or not answered by this listener (left for another). */
+type TapOutcome = "answered" | "failed" | "not-answered";
+
 /**
  * The taps that were answered, by notification and action. A tap is recorded only once its answer succeeds, so a default tap
  * (which answers nothing) never blocks a later approve or deny, and a refused answer can be retried by a new tap. Shared across
@@ -30,8 +33,9 @@ export interface ApprovalTapListener {
 const answeredTaps = new Set<string>();
 
 /**
- * The launch responses already read. Expo keeps the last response, so it is read on every subscription; each one is handled once,
- * whether or not its answer succeeded, so a restart or a new sign-in does not send a stored tap again without a new tap.
+ * The launch responses already read. Expo keeps the last response, so it is read on every subscription. A launch response stays
+ * marked once its answer succeeded or failed, so a restart or a new sign-in does not send it again. One that was skipped (not
+ * answered, for example during sign-out) is unmarked, so the next listener can answer it.
  */
 const replayedLaunches = new Set<string>();
 
@@ -54,29 +58,56 @@ const tapKey = (response: TapResponse): string => `${response.notification.reque
  */
 export const attachApprovalTapListener = (
     source: TapSource,
-    answer: (value: ApprovalAnswer) => Promise<boolean | void>,
+    answer: (value: ApprovalAnswer) => Promise<boolean | undefined>,
     answered: Set<string> = answeredTaps,
     replayed: Set<string> = replayedLaunches,
 ): ApprovalTapListener => {
     let isActive = true;
-    const inFlight = new Set<string>();
+    // The answer in flight for each tap: a second delivery of the same tap waits for its outcome rather than reporting its own.
+    const inFlight = new Map<string, Promise<TapOutcome>>();
 
-    const answerTap = async (response: TapResponse): Promise<void> => {
-        const key = tapKey(response);
-
-        if (!isActive || answered.has(key) || inFlight.has(key)) {
-            return;
-        }
-
-        inFlight.add(key);
-
+    // "answered" and "failed" settle the tap for good (a failed one is kept for the user to retry in the app); "not-answered" is a
+    // tap this listener did not answer, and is left for another listener to read.
+    const answerOnce = async (response: TapResponse, key: string): Promise<TapOutcome> => {
         try {
             if (await answerApprovalFromTap(response, answer)) {
                 answered.add(key);
+
+                return "answered";
             }
+
+            return "not-answered";
         } catch (error: unknown) {
             // eslint-disable-next-line no-console -- no logger in the app; a failed answer must not be silent
             console.warn(`Could not answer the tool approval from its notification (${failureCode(error)}).`);
+
+            return "failed";
+        }
+    };
+
+    const answerTap = async (response: TapResponse): Promise<TapOutcome> => {
+        const key = tapKey(response);
+
+        if (answered.has(key)) {
+            return "answered";
+        }
+
+        if (!isActive) {
+            return "not-answered";
+        }
+
+        const pending = inFlight.get(key);
+
+        if (pending !== undefined) {
+            return await pending;
+        }
+
+        const attempt = answerOnce(response, key);
+
+        inFlight.set(key, attempt);
+
+        try {
+            return await attempt;
         } finally {
             inFlight.delete(key);
         }
@@ -87,8 +118,17 @@ export const attachApprovalTapListener = (
             const launch = await source.getLast();
 
             if (launch && !replayed.has(launch.notification.request.identifier)) {
-                replayed.add(launch.notification.request.identifier);
-                await answerTap(launch);
+                const launchId = launch.notification.request.identifier;
+
+                // Marked while its answer is in flight, so no other listener reads it too; unmarked again when it was skipped, so the
+                // next listener (after a sign-in, say) can answer it.
+                replayed.add(launchId);
+
+                const outcome = await answerTap(launch);
+
+                if (outcome === "not-answered") {
+                    replayed.delete(launchId);
+                }
             }
         } catch {
             // eslint-disable-next-line no-console -- no logger in the app; a failed read must not be silent
@@ -96,7 +136,9 @@ export const attachApprovalTapListener = (
         }
     })();
 
-    const subscription = source.addListener(answerTap);
+    const subscription = source.addListener(async (response: TapResponse): Promise<void> => {
+        await answerTap(response);
+    });
 
     return {
         launched,

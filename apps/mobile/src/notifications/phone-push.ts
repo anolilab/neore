@@ -119,21 +119,28 @@ export const configurePhoneNotifications = onceItWorks(async () => {
         },
     });
 
-    // Before any alert can arrive with its approve and deny actions. A failure here does not skip the Android channel the alerts are
-    // shown on; the failure is raised once the channel is set, so this call is tried again later like any failed step.
-    let categoryError: unknown;
-
-    try {
-        await registerApprovalActions();
-    } catch (error: unknown) {
-        categoryError = error;
-    }
-
     if (Platform.OS === "android") {
         await setNotificationChannelAsync(ANDROID_CHANNEL_ID, { importance: AndroidImportance.HIGH, name: channelName(deviceLocale()) });
     }
-
-    if (categoryError !== undefined) {
-        throw categoryError instanceof Error ? categoryError : new Error("Could not register the approval actions.");
-    }
 });
+
+/** The language the approval actions were last registered in, once they were: a change of language registers them again. */
+const approvalActionsState = { isRegistered: false, locale: undefined as string | undefined };
+
+/**
+ * Registers the approve and deny actions in the phone's current language, unless they already are. Called before every
+ * registration, so a language change reaches the buttons on the next foreground without an app restart. A failure is raised, so the
+ * registration waits and is tried again.
+ */
+export const syncApprovalActions = async (): Promise<void> => {
+    const locale = deviceLocale();
+
+    if (approvalActionsState.isRegistered && approvalActionsState.locale === locale) {
+        return;
+    }
+
+    await registerApprovalActions(locale);
+
+    approvalActionsState.isRegistered = true;
+    approvalActionsState.locale = locale;
+};
