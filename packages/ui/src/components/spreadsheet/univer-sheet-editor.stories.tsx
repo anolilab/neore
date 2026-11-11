@@ -33,13 +33,10 @@ type Story = StoryObj<typeof meta>;
  * positive tabindex fails it.
  */
 const settled: Story["play"] = async ({ canvasElement }) => {
-    await waitFor(
-        () => {
-            expect(canvasElement.querySelector("canvas")).not.toBeNull();
-            expect(canvasElement.querySelector('[tabindex]:not([tabindex="0"]):not([tabindex="-1"])')).toBeNull();
-        },
-        { timeout: 15_000 },
-    );
+    // Two waits, so a timeout names the condition that was not met.
+    await waitFor(() => expect(canvasElement.querySelector("canvas")).not.toBeNull(), { timeout: 15_000 });
+    // Only the canvases: they are what the repair resets, and any other positive tabindex is left for the a11y check to report.
+    await waitFor(() => expect(canvasElement.querySelector('canvas[tabindex]:not([tabindex="0"]):not([tabindex="-1"])')).toBeNull(), { timeout: 15_000 });
 };
 
 export const Default: Story = {
