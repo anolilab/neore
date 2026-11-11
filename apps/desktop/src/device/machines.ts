@@ -11,6 +11,7 @@ import path from "node:path";
 import type { AddProjectMachine, CreatedMachineFolder, MachineFolderPage, MachineServerSpec, SharedMachineFolder } from "../add-project-machines.types";
 import type { SshHost } from "./ssh-config";
 import type { BrowsePage, CreatedFolder, DeviceStatus, HostView, SettingsView } from "./types";
+import { readMachinePath } from "./validate";
 
 /** The same page size and scan cap as the host's `browse`. */
 const PAGE_ENTRIES = 2000;
@@ -340,7 +341,8 @@ export const createAddProjectMachines = (dependencies: MachineDependencies): Add
             throw new Error("device: that folder is the server's home folder or one above it. Choose a folder inside it.");
         }
 
-        const target = resolved.path;
+        // The resolved path is what the prompt shows and what is stored, so it gets the same prompt-safety check as the request.
+        const target = readMachinePath(resolved.path, false);
 
         if (machine.host.roots.some((root) => isInside(target, root))) {
             throw new Error("device: that folder is already shared");
