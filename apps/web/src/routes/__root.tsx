@@ -42,6 +42,7 @@ import env from "@/lib/env";
 import { DEFAULT_LOCALE } from "@/lib/intl/client";
 import { CRPCProvider, useLunora, useLunoraAuth } from "@/lib/lunora/crpc";
 import { isNativeShell, setNativeBadge } from "@/lib/native/bridge";
+import { retryChunk, SilentBoundary } from "@/lib/native/shell-chunk";
 import { getClientPostHogState } from "@/lib/posthog/client-state";
 import { forgetClientPostHog, rememberClientPostHog } from "@/lib/request-context";
 import rootBeforeLoad from "@/lib/root-before-load";
@@ -84,8 +85,12 @@ const SettingsModal = lazy(() =>
     }),
 );
 const SwUpdatePrompt = lazy(() => import("@/components/sw-update-prompt"));
-/** Only the desktop shell loads it: the web build never downloads the shell's listeners. */
-const NativeBridge = lazy(() => import("@/lib/native/native-bridge"));
+
+/**
+ * Only the desktop shell loads it: the web build never downloads the shell's listeners. A failed chunk load is retried
+ * and then renders nothing, so the app runs without the listeners rather than falling to the root error boundary.
+ */
+const NativeBridge = lazy(async () => await retryChunk(async () => await import("@/lib/native/native-bridge")));
 const ChangelogCard = lazy(() => import("@/features/changelog/components/changelog-card"));
 const ChangelogPanel = lazy(() => import("@/features/changelog/components/changelog-panel"));
 
@@ -486,9 +491,11 @@ const RootComponent = () => {
                                                     </Suspense>
                                                     <Toaster />
                                                     {isNative && (
-                                                        <Suspense fallback={null}>
-                                                            <NativeBridge />
-                                                        </Suspense>
+                                                        <SilentBoundary>
+                                                            <Suspense fallback={null}>
+                                                                <NativeBridge />
+                                                            </Suspense>
+                                                        </SilentBoundary>
                                                     )}
                                                     <AppearanceSync />
                                                     <Suspense fallback={null}>

@@ -48,7 +48,9 @@
 }
 
 /*
- * Interface chrome is not selectable: the thread sidebar (the right one holds content), headers and toolbars, menus, tabs, buttons, labels and navigation.
+ * Interface chrome is not selectable: the thread sidebar (the right one holds content), the app's chrome headers (marked
+ * `data-chrome`: the site header, a split pane's title bar) and toolbars, menus, tabs, buttons, labels and navigation.
+ * A page's own `<header>` (a title and its description) is content and stays selectable.
  * Message content, code, fields, dialogs' bodies and everything else outside these regions stays selectable, and
  * fields and editors inside them (the thread search, the find bar) opt back in. Content is never chrome: a link
  * Streamdown renders as `<button data-streamdown="link">` in a message stays selectable, and so does any element
@@ -57,7 +59,7 @@
 :root[data-native]
     :is(
         [data-slot="sidebar"][data-side="left"],
-        header,
+        [data-chrome],
         nav,
         button,
         label,
@@ -85,7 +87,7 @@
 }
 
 /* No hover fades on chrome: a native control changes at once. */
-:root[data-native] :is([data-slot="sidebar"], header, nav) :is(a, button, [role="button"], [role="menuitem"], [role="tab"]) {
+:root[data-native] :is([data-slot="sidebar"], [data-chrome], nav) :is(a, button, [role="button"], [role="menuitem"], [role="tab"]) {
     transition-property: none;
 }
 

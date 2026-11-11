@@ -33,7 +33,8 @@ describe("native-shell.css selection rules", () => {
     beforeEach(() => {
         document.documentElement.dataset.native = "";
         document.body.innerHTML = `
-            <header><button id="header-button">New</button><button class="select-text" id="selectable-button">id-123</button></header>
+            <header data-chrome="" id="chrome-header"><h1>Chat</h1><button id="header-button">New</button><button class="select-text" id="selectable-button">id-123</button></header>
+            <header id="content-header"><h1 id="content-title">Develop</h1><p id="content-description">Pull requests and runs.</p></header>
             <div class="message-text"><p>See <button data-streamdown="link" id="message-link">the docs</button></p></div>
             <div class="prose"><span role="button" id="prose-button">term</span></div>
         `;
@@ -86,6 +87,15 @@ describe("native-shell.css selection rules", () => {
             expect(userSelect("message-link")).not.toBe("none");
             expect(userSelect("prose-button")).not.toBe("none");
             expect(userSelect("selectable-button")).toBe("text");
+        });
+
+        it("keeps a chrome header unselectable and a page's own header selectable", () => {
+            // jsdom does not carry `none` down to the children, so the header itself is what is checked; in a browser
+            // an `auto` child of a selectable parent computes to `text`.
+            expect(userSelect("chrome-header")).toBe("none");
+            expect(userSelect("content-header")).not.toBe("none");
+            expect(userSelect("content-title")).not.toBe("none");
+            expect(userSelect("content-description")).not.toBe("none");
         });
 
         it("computes nothing outside the shell", () => {

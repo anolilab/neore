@@ -31,17 +31,28 @@ const queryClient = vi.hoisted(() => {
     };
 });
 
+/** The query options the component passed last; `useQuery` answers only an enabled one, as TanStack Query would. */
+const query = vi.hoisted(() => {
+    return { enabledReads: 0, skipToken: Symbol("skipToken") };
+});
+
 vi.mock("@tanstack/react-query", () => {
     return {
-        skipToken: Symbol("skipToken"),
-        useQuery: () => {
+        skipToken: query.skipToken,
+        useQuery: (options: { enabled?: boolean; queryFn?: unknown }) => {
+            if (options.queryFn === query.skipToken || options.enabled === false) {
+                return { data: undefined };
+            }
+
+            query.enabledReads += 1;
+
             return { data: server.settings };
         },
         useQueryClient: () => queryClient,
     };
 });
 vi.mock("@/hooks/use-after-first-paint", () => {
-    return { default: () => false };
+    return { default: () => true };
 });
 vi.mock("@/lib/auth/client", () => {
     return {
@@ -62,8 +73,8 @@ vi.mock("@/lib/lunora/crpc", () => {
             functions: {
                 getUserSettings: {
                     queryKey: () => ["getUserSettings"],
-                    queryOptions: () => {
-                        return {};
+                    queryOptions: (args: unknown) => {
+                        return { queryFn: args === query.skipToken ? query.skipToken : async () => server.settings, queryKey: ["getUserSettings"] };
                     },
                 },
             },
@@ -299,14 +310,19 @@ describe("AppearanceSync adopting the account's settings", () => {
         signIn("user-a", { accentColor: "teal" });
         const { rerender } = render(<AppearanceSync />);
 
+        expect(useUIStateStore.getState().appearance).toMatchObject({ accentColor: "teal", syncedUserId: "user-a" });
+
         // The cache still holds user A's fresh row.
         server.userId = "user-b";
         rerender(<AppearanceSync />);
 
         expect(queryClient.invalidateQueries).toHaveBeenCalledWith({ queryKey: ["getUserSettings"] });
 
-        // The refetched row reaches the component.
+        // The refetched row reaches the component through the enabled query.
+        query.enabledReads = 0;
         rerender(<AppearanceSync />);
+
+        expect(query.enabledReads).toBeGreaterThan(0);
 
         expect(useUIStateStore.getState().appearance).toMatchObject({ accentColor: "blue", mainFont: "serif", syncedUserId: "user-b" });
         expect(marks()).toStrictEqual({ accentColor: "synced", mainFont: "synced" });
