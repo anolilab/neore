@@ -59,7 +59,8 @@
 
 - **Offline cold start** is the SITE's service worker, not the shell: `apps/web/public/offline-shell-sw.js` keeps
   `/offline-shell` (root route only, rendered for nobody: the root `beforeLoad` never reads the session on that path,
-  `apps/web/src/lib/offline-shell.ts`) per build revision, and answers an Electron navigation the network FAILED with
-  it (a 5xx is passed through). The cached response keeps its own CSP header, whose nonce matches its HTML. It only
+  `apps/web/src/lib/root-before-load.ts`) per build revision, revalidated every 30 min of online use, and answers an
+  Electron GET navigation the network FAILED with it (a 5xx is passed through). An older revision's shell stays, as
+  the fallback while its entry chunk is still cached, until the current one is kept. The cached response keeps its own CSP header, whose nonce matches its HTML. It only
   helps after one online run, and only for route chunks that run loaded (`bundle-assets`). Detection is
   `Electron/` in the worker's user agent: keep the default user agent. The recovery page stays for a first run.

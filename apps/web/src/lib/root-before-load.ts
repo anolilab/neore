@@ -13,7 +13,8 @@ interface RootBeforeLoadOptions {
  */
 const rootBeforeLoad = async (options: RootBeforeLoadOptions) => {
     // The offline shell is kept on disk by the service worker: render it for nobody, never read the session.
-    if (options.location.pathname === OFFLINE_SHELL_PATH) {
+    // Server-only: the worker serves the kept HTML under the window's own URL, so the client never runs this branch.
+    if (import.meta.env.SSR && options.location.pathname === OFFLINE_SHELL_PATH) {
         const { nonce } = await readRequestContext(options);
 
         return offlineShellRootContext(nonce);

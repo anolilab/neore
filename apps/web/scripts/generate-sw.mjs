@@ -27,7 +27,10 @@ const HASHED_ASSET_RE = /-[\w-]{8}\.\w+$/u;
 /** Static, user-agnostic page served for a navigation the network failed. */
 const OFFLINE_FALLBACK_URL = "/offline.html";
 
-/** The desktop shell's offline page, kept by `public/offline-shell-sw.js` (see `src/lib/offline-shell.ts`). */
+/**
+ * The desktop shell's offline page, kept by `public/offline-shell-sw.js`; the server renders it for nobody (the
+ * `OFFLINE_SHELL_PATH` branch of `src/lib/root-before-load.ts`, which must name the same path).
+ */
 const OFFLINE_SHELL_URL = "/offline-shell";
 
 /**
@@ -88,7 +91,8 @@ const readAppShell = () => {
         // The shell HTML names it; `offline-shell-sw.js` keeps only HTML that does (deploy skew).
         entry: entries[0],
         files: [...files],
-        // Any client change renames a chunk, so the manifest's hash names this build's shell HTML.
+        // Any client change renames a chunk, so the manifest's hash names this build's shell HTML. A server-only
+        // change keeps the revision: `offline-shell-sw.js` revalidates the kept shell for that.
         revision: createHash("sha256").update(manifestSource).digest("hex").slice(0, 16),
     };
 };

@@ -33,7 +33,7 @@ pnpm lint:types           # TypeScript check (NOT pnpm typecheck); inside apps/w
   long-running flow; shell details in `apps/desktop/AGENTS.md`.
 - **Service worker** (`scripts/generate-sw.mjs` + `public/*-sw.js`): navigations are never cached. The one HTML it
   keeps is `/offline-shell` (desktop offline start, see `apps/desktop/AGENTS.md`); never make that path read the
-  session, and never add `/offline-shell` data a cookie could change.
+  session (`src/lib/root-before-load.ts`), and never add `/offline-shell` data a cookie could change.
 
 ## ANTI-PATTERNS
 

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { getSessionAuthState } from "@/lib/auth/server-functions";
 
@@ -18,7 +18,13 @@ const options = (pathname: string) => {
 
 describe(rootBeforeLoad, () => {
     beforeEach(() => {
+        // The branch is server-only: the server is what renders the shell.
+        vi.stubEnv("SSR", true);
         vi.mocked(getSessionAuthState).mockReset().mockResolvedValue({ status: "authenticated", token: "tok" });
+    });
+
+    afterEach(() => {
+        vi.unstubAllEnvs();
     });
 
     it("never reads the session for the offline shell, and renders it for nobody", async () => {
