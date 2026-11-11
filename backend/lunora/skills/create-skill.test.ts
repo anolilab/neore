@@ -42,7 +42,8 @@ describe("plugin skills", () => {
 
     const rowsWithMarker = async () => await harness.run(async (context: any) => (await context.db.skills.findMany({ where: { pluginMarker: MARKER } })).page);
 
-    it("refuses a plugin source through the public create procedure", async () => {
+    // PENDING: this public-call check cannot run in this harness yet. The call fails at sign-in before its validators run, so a pass proves nothing. Redo it with the authz suite's registry setup (authz-regressions.test.ts).
+    it.todo("refuses a plugin source through the public create procedure", async () => {
         await expect(
             harness
                 .withIdentity({ userId: OWNER } as never)
@@ -52,7 +53,8 @@ describe("plugin skills", () => {
         expect(await rowsWithMarker()).toHaveLength(0);
     });
 
-    it("never stores a marker from the public create procedure, even when a caller sends one", async () => {
+    // PENDING: this public-call check cannot run in this harness yet. The call fails at sign-in before its validators run, so a pass proves nothing. Redo it with the authz suite's registry setup (authz-regressions.test.ts).
+    it.todo("never stores a marker from the public create procedure, even when a caller sends one", async () => {
         await harness
             .withIdentity({ userId: OWNER } as never)
             .mutation(api.skills.functions.createSkill as never, { ...skillInput, source: { type: "editor" }, pluginMarker: MARKER } as never)

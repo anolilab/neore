@@ -600,7 +600,7 @@ export const loadImportContext = internalQuery
         return { skillCount: skills.length, slugs: skills.map((skill) => skill.slug) };
     });
 
-const planFor = async (
+export const planFor = async (
     ctx: {
         runQuery: (reference: typeof internal.skills.bundle.loadImportContext, args: { userId: string }) => Promise<{ skillCount: number; slugs: string[] }>;
         user: { isAdmin?: boolean; plan?: string | null; userId: string };
