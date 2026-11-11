@@ -141,6 +141,7 @@ describe("classifyDisabledReason", () => {
     it.each([
         ["This host uses ProxyJump in ~/.ssh/config, which Neore does not support.", { key: "ProxyJump", kind: "unsupported-setting" }],
         ["This host is used by a Match rule in ~/.ssh/config, which Neore does not evaluate.", { kind: "match-rule" }],
+        ["This host has an invalid Port in ~/.ssh/config.", { kind: "invalid-port" }],
         ["Pair this computer with your account first (Settings \u{2192} Devices).", { kind: "pair-this-computer" }],
         ["something else", { kind: "other" }],
     ])("%s", (reason, expected) => {

@@ -17,8 +17,14 @@ const TOO_MANY_ROOTS = /already has \d+ shared folders/i;
 const UNSUPPORTED_HOST_KEY = /^This host uses (\S+) in ~\/\.ssh\/config/;
 const MATCH_RULE_HOST = /Match rule in ~\/\.ssh\/config/;
 const PAIR_THIS_COMPUTER_FIRST = /^Pair this computer with your account first/;
+const INVALID_PORT = /^This host has an invalid Port in ~\/\.ssh\/config\./;
 
-export type DisabledReasonKind = { kind: "match-rule" } | { kind: "other" } | { kind: "pair-this-computer" } | { key: string; kind: "unsupported-setting" };
+export type DisabledReasonKind =
+    | { kind: "invalid-port" }
+    | { kind: "match-rule" }
+    | { kind: "other" }
+    | { kind: "pair-this-computer" }
+    | { key: string; kind: "unsupported-setting" };
 
 /** Which of the desktop's reasons a row is disabled for, so the picker can say it in the person's language. */
 export const classifyDisabledReason = (reason: string): DisabledReasonKind => {
@@ -30,6 +36,10 @@ export const classifyDisabledReason = (reason: string): DisabledReasonKind => {
 
     if (MATCH_RULE_HOST.test(reason)) {
         return { kind: "match-rule" };
+    }
+
+    if (INVALID_PORT.test(reason)) {
+        return { kind: "invalid-port" };
     }
 
     return PAIR_THIS_COMPUTER_FIRST.test(reason) ? { kind: "pair-this-computer" } : { kind: "other" };
