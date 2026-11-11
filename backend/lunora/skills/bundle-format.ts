@@ -564,7 +564,7 @@ const readEntry = (raw: RawSection, seenSlugs: Set<string>): BundleEntry => {
 };
 
 /** Reads the plugin header of a `bundle: 2` file, refusing a value that is not a slug, a version or a SHA-256 hex digest. */
-const readPluginHeader = (frontmatter: Record<string, unknown>): { errors: string[]; header: PluginHeader; ok: true } | { errors: string[]; ok: false } => {
+const readPluginHeader = (frontmatter: Record<string, unknown>): { header: PluginHeader; ok: true } | { errors: string[]; ok: false } => {
     const header = { contentHash: String(frontmatter.contentHash), slug: String(frontmatter.plugin), version: String(frontmatter.pluginVersion) };
     const errors: string[] = [];
 
@@ -580,7 +580,7 @@ const readPluginHeader = (frontmatter: Record<string, unknown>): { errors: strin
         errors.push("The content hash must be a SHA-256 hex digest");
     }
 
-    return errors.length > 0 ? { errors, ok: false } : { errors, header, ok: true };
+    return errors.length > 0 ? { errors, ok: false } : { header, ok: true };
 };
 
 /** Reads a bundle file. Structural trouble (version, size, counts, fences) fails the file; trouble inside one item stays on that item. */
