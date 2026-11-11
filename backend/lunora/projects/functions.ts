@@ -9,9 +9,11 @@ import type { MutationCtx, QueryCtx } from "../_generated/server";
 import { getMemberByOrganizationAndUser } from "../auth/lib/better-auth-queries";
 import { requireOwnedThread } from "../agent/thread-read-access";
 import { assertOwnOrganizationId } from "../auth/lib/organization-helpers";
-import { authMutation, authQuery, internalQuery, rateLimit } from "../lib/crpc";
+import { authMutation, authQuery, internalMutation, internalQuery, rateLimit } from "../lib/crpc";
 import { isUniqueViolation, throwForbidden } from "../lib/error-helpers";
+import { enqueueJob } from "../lib/job-queue";
 import { admitOrganization, systemDb } from "../lib/rls/scope";
+import { ROOT_SHARD_KEY } from "../lib/shard-context";
 import { MAX_LENGTH } from "../lib/validators";
 import { eraseProjectRepositories } from "./gdpr";
 import {
@@ -289,9 +291,10 @@ const RESTAMP_PASSES = 3;
  * organization a move asked for. Two moves whose writes land out of order would otherwise leave the rows on the
  * earlier target. Each row is patched only while it still holds the organization read here, so an older move's late
  * write never replaces a newer one's; the project is read again after each pass, and the rows are stamped again while
- * it moved on. Rows still stale after the last pass are logged; an erasure re-stamps them (`eraseUnlessMoved`).
+ * it moved on. Rows still stale after the last pass are logged, and a queued retry (`restampProjectRepositories`)
+ * re-stamps them a minute later, up to {@link RESTAMP_RETRIES} times.
  */
-const restampRepositories = async (context: MutationCtx, projectId: Id<"projects">): Promise<void> => {
+const restampRepositories = async (context: MutationCtx, projectId: Id<"projects">, retry = 0): Promise<void> => {
     // One read more than there are passes: the last only checks that the last pass settled the rows.
     for (let pass = 0; pass <= RESTAMP_PASSES; pass += 1) {
         const project = await systemDb(context).projects.findFirst({ consistency: "primary", where: { _id: projectId } });
@@ -329,8 +332,36 @@ const restampRepositories = async (context: MutationCtx, projectId: Id<"projects
         );
     }
 
-    context.log.event("projects.restamp_unsettled", { projectId });
+    context.log.event("projects.restamp_unsettled", { projectId, retry });
+
+    if (retry >= RESTAMP_RETRIES) {
+        return;
+    }
+
+    // Never fails the move: the rows' copy only serves `findRepoProject`, and every access check reads the project.
+    try {
+        await enqueueJob(
+            internal.projects.functions.restampProjectRepositories,
+            { projectId, retry: retry + 1 },
+            { delayMs: 60_000, shardKey: ROOT_SHARD_KEY },
+        );
+    } catch (error) {
+        context.log.event("projects.restamp_retry_not_queued", { error: String(error), projectId });
+    }
 };
+
+/** Queued retries of a re-stamp that moves kept unsettling (`restampRepositories`). */
+const RESTAMP_RETRIES = 3;
+
+/** Re-stamps a project's repository rows from the project as it is now: the queued retry of an unsettled re-stamp. */
+export const restampProjectRepositories = internalMutation
+    .input({ projectId: v.id("projects"), retry: v.number() })
+    .output(v.null())
+    .mutation(async ({ args, ctx: context }) => {
+        await restampRepositories(context, args.projectId as Id<"projects">, args.retry);
+
+        return null;
+    });
 
 /** The project when the caller may change its repositories: the owner, or any member for an organization project nobody owns (as `updateProject`). */
 const editableProject = async (context: MutationCtx, projectId: Id<"projects">, userId: string): Promise<Doc<"projects">> => {

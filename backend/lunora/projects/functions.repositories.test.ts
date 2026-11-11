@@ -14,6 +14,7 @@ import {
     findRepoProject,
     listProjectRepos,
     removeProjectRepo,
+    restampProjectRepositories,
     applyDefaultStamp,
     setDefaultProjectRepo,
     stampDefault,
@@ -541,6 +542,24 @@ describe("project repositories", () => {
         });
 
         expect(rows.map((row: { organizationId?: string }) => row.organizationId)).toStrictEqual(["org-3"]);
+    });
+
+    it("re-stamps rows a move left unsettled when its queued retry runs", async () => {
+        const projectId = await projectOf({ organizationId: "org-2" });
+
+        // Rows still on the organization a move left: the passes ran out while moves kept landing.
+        await harness.run(async (ctx: any) => {
+            await ctx.db.insert("projectRepositories", { createdAt: 0, organizationId: "org-1", projectId, url: "https://github.com/acme/web.git" });
+        });
+        await harness.run(async (ctx: any) => await ctx.runMutation(restampProjectRepositories, { projectId, retry: 1 }));
+
+        const rows = await harness.run(async (ctx: any) => {
+            const { page } = await ctx.db.projectRepositories.findMany({ where: { projectId } });
+
+            return page;
+        });
+
+        expect(rows.map((row: { organizationId?: string }) => row.organizationId)).toStrictEqual(["org-2"]);
     });
 
     it("moves a project's repositories with it when the project changes organization", async () => {
