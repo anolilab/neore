@@ -290,6 +290,29 @@ describe("project repositories", () => {
         await expect(add(OWNER, projectId, "acme/one-too-many")).rejects.toMatchObject({ data: { reason: "limit" } });
     });
 
+    it("refuses to remove, edit or pick the default counter or a delete's marker by id", async () => {
+        const projectId = await projectOf({ userId: OWNER });
+        const web = await add(OWNER, projectId, "acme/web");
+
+        await as(OWNER).mutation(setDefaultProjectRepo as never, { repoId: web } as never);
+
+        const { counter, marker } = (await harness.run(async (ctx: any) => {
+            const found = await ctx.db.projectRepositories.findFirst({ where: { projectId, url: DEFAULT_COUNTER_URL } });
+            // A marker past its time: only `editableRepo` stands in the way.
+            const written = await ctx.db.insert("projectRepositories", { createdAt: 0, deletingAt: 0, projectId, url: DELETION_MARKER_URL, userId: OWNER });
+
+            return { counter: found._id, marker: written };
+        })) as { counter: string; marker: string };
+
+        for (const repoId of [counter, marker]) {
+            await expect(as(OWNER).mutation(removeProjectRepo as never, { repoId } as never)).rejects.toMatchObject({ code: "NOT_FOUND" });
+            await expect(as(OWNER).mutation(setDefaultProjectRepo as never, { repoId } as never)).rejects.toMatchObject({ code: "NOT_FOUND" });
+            await expect(as(OWNER).mutation(updateProjectRepo as never, { defaultBranch: "main", repoId, revision: 0 } as never)).rejects.toMatchObject({
+                code: "NOT_FOUND",
+            });
+        }
+    });
+
     it("refuses a default pick while the project is being deleted, and writes no counter", async () => {
         // One clock for the marker's stamp and the mutation's expiry check.
         vi.useFakeTimers({ now: 1_000_000, toFake: ["Date"] });

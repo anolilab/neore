@@ -383,7 +383,8 @@ const editableProject = async (context: MutationCtx, projectId: Id<"projects">, 
 const editableRepo = async (context: MutationCtx, repoId: Id<"projectRepositories">, userId: string): Promise<Doc<"projectRepositories">> => {
     const repo = await context.db.projectRepositories.findFirst({ where: { _id: repoId } });
 
-    if (!repo) {
+    // A delete's marker or the default counter is not a repository: no remove, branch edit or pick reaches it by id.
+    if (!repo || !isRepoRow(repo)) {
         throw new LunoraError("NOT_FOUND", "Repository not found");
     }
 
