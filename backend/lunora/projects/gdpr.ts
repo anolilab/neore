@@ -7,11 +7,12 @@
 import { v } from "lunorash/server";
 
 import { internal } from "../_generated/internal";
-import type { Id } from "../_generated/dataModel";
+import type { Doc, Id } from "../_generated/dataModel";
 import { internalMutation, internalQuery, type MutationCtx } from "../_generated/server";
 import { BATCH, type BatchResult, full } from "../gdpr/batch";
 import { enqueueJob } from "../lib/job-queue";
 import { logger } from "../lib/logger";
+import { systemDb } from "../lib/rls/scope";
 import { ROOT_SHARD_KEY } from "../lib/shard-context";
 import { MAX_LENGTH } from "../lib/validators";
 import { DELETION_MARKER_URL } from "./repositories";
@@ -42,6 +43,42 @@ const repoLogger = logger.scope("project-repositories");
 const isOrganizationOwned = (row: { organizationId?: string; userId?: string }): boolean => row.userId === undefined && !!row.organizationId;
 
 /**
+ * Erases an organization-owned row of a deleted organization, unless its project has moved to another organization: a
+ * move commits the project before it re-stamps the rows, and a re-stamp that failed is never retried. Such a row is
+ * re-stamped here instead. The project is read from the primary, once per project (`projects`). Returns whether it erased.
+ */
+const eraseUnlessMoved = async (
+    ctx: MutationCtx,
+    row: Doc<"projectRepositories">,
+    projects: Map<string, Promise<Doc<"projects"> | null>>,
+): Promise<boolean> => {
+    if (!projects.has(row.projectId)) {
+        projects.set(row.projectId, systemDb(ctx).projects.findFirst({ consistency: "primary", where: { _id: row.projectId } }));
+    }
+
+    let project: Doc<"projects"> | null | undefined;
+
+    try {
+        project = await projects.get(row.projectId);
+    } catch (error) {
+        // As for an organization that cannot be read: a failed read never deletes rows.
+        repoLogger.error("Reading a project during an organization's repository erase failed; its row is kept", { error, projectId: row.projectId });
+
+        return false;
+    }
+
+    if (project && (project.organizationId ?? "") !== row.organizationId) {
+        await ctx.db.patch("projectRepositories", row._id, { organizationId: project.organizationId ?? "" });
+
+        return false;
+    }
+
+    await ctx.db.delete("projectRepositories", row._id);
+
+    return true;
+};
+
+/**
  * A deleted organization's repository rows: those of its projects nobody owns. A project someone owns keeps its rows;
  * they go with the owner's account. One page per run, by cursor, so rows kept do not stop it; the next page is scheduled.
  */
@@ -52,7 +89,9 @@ export const eraseOrganizationRepositories = internalMutation
         // From the primary: a replica's stale copy could still show a row under this organization after its project moved.
         const page = await ctx.db.projectRepositories.findMany({ consistency: "primary", cursor: cursor ?? null, limit: BATCH, where: { organizationId } });
 
-        await Promise.all(page.page.filter((row) => isOrganizationOwned(row)).map((row) => ctx.db.delete("projectRepositories", row._id)));
+        const projects = new Map<string, Promise<Doc<"projects"> | null>>();
+
+        await Promise.all(page.page.filter((row) => isOrganizationOwned(row)).map(async (row) => await eraseUnlessMoved(ctx, row, projects)));
 
         if (!page.isDone && page.continueCursor) {
             await ctx.scheduler.runAfter(0, internal.projects.gdpr.eraseOrganizationRepositories, { cursor: page.continueCursor, organizationId });
@@ -84,6 +123,7 @@ export const sweepOrphanedOrganizationRepositories = internalMutation
         // From the primary, like the organization read below: no stale `organizationId` decides a delete.
         const page = await ctx.db.projectRepositories.findMany({ consistency: "primary", cursor: args.cursor ?? null, limit: ORPHAN_SWEEP_PAGE_SIZE });
         const gone = new Map<string, boolean>();
+        const projects = new Map<string, Promise<Doc<"projects"> | null>>();
         let deleted = 0;
 
         for (const row of page.page) {
@@ -108,8 +148,7 @@ export const sweepOrphanedOrganizationRepositories = internalMutation
                 }
             }
 
-            if (gone.get(organizationId)) {
-                await ctx.db.delete("projectRepositories", row._id);
+            if (gone.get(organizationId) && (await eraseUnlessMoved(ctx, row, projects))) {
                 deleted += 1;
             }
         }

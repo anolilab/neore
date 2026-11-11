@@ -405,6 +405,25 @@ describe("project repositories", () => {
         expect(await urlsLeft()).toStrictEqual(["https://github.com/acme/owned.git"]);
     });
 
+    it("keeps a moved project's repositories when the organization it left is deleted, and re-stamps them", async () => {
+        // The move committed the project to org-b, but re-stamping its row failed: the row still names org-a.
+        const projectId = await projectOf({ organizationId: "org-b" });
+
+        await harness.run(async (ctx: any) => {
+            await ctx.db.insert("projectRepositories", { createdAt: 0, organizationId: "org-a", projectId, url: "https://github.com/acme/web.git" });
+        });
+
+        await harness.run(async (ctx: any) => await ctx.runMutation(eraseOrganizationRepositories, { organizationId: "org-a" }));
+
+        const rows = await harness.run(async (ctx: any) => {
+            const { page } = await ctx.db.projectRepositories.findMany({ where: { projectId } });
+
+            return page;
+        });
+
+        expect(rows.map((row: { organizationId?: string }) => row.organizationId)).toStrictEqual(["org-b"]);
+    });
+
     it("sweeps an organization's leftover repository rows once the organization is gone", async () => {
         const projectId = await harness.run(async (ctx: any) => {
             const organizationId = await ctx.db.insert("organization", { createdAt: 1, name: "Gone", slug: "gone" });
