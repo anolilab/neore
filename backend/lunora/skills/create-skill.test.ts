@@ -1,9 +1,62 @@
 import { lunoraTest } from "@lunora/testing";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { createPluginSkill } from "./create-skill";
-import { api } from "../_generated/api";
+import { registeredApi } from "../../test/registered-api";
 import schema from "../schema";
+import { createPluginSkill } from "./create-skill";
+
+const registry = vi.hoisted(() => new Map<string, unknown>());
+
+vi.mock("../_generated/api", async (importOriginal) => registeredApi(await importOriginal(), registry));
+vi.mock("../_generated/internal", async (importOriginal) => registeredApi(await importOriginal(), registry));
+
+const sessionFrom = vi.hoisted(() => async (context: { auth: { userId?: string | null } }) => {
+    const { userId } = context.auth;
+
+    return userId ? { activeOrganization: null, email: `${userId}@example.com`, id: userId, isAdmin: false, name: userId, plan: "premium", userId } : null;
+});
+
+vi.mock("../lib/crpc-auth-helpers", async (importOriginal) => {
+    return {
+        ...(await importOriginal<typeof import("../lib/crpc-auth-helpers")>()),
+        getSessionUser: sessionFrom,
+        getSessionUserForQuery: sessionFrom,
+        getSessionUserForQueryLite: sessionFrom,
+        getSessionUserWithAnonymous: sessionFrom,
+    };
+});
+
+vi.mock("../lib/rate-limiter", async (importOriginal) => {
+    return {
+        ...(await importOriginal<typeof import("../lib/rate-limiter")>()),
+        rateLimitGuard: async () => undefined,
+    };
+});
+
+const MODULES = {
+    skills_create_skill: async () => await import("./create-skill"),
+    skills_functions: async () => await import("./functions"),
+} as const;
+
+beforeAll(async () => {
+    for (const [module, load] of Object.entries(MODULES)) {
+        const exports = await load();
+
+        for (const [name, value] of Object.entries(exports)) {
+            registry.set(`${module}:${name}`, value);
+        }
+    }
+}, 60_000);
+
+const procedureAt = (module: keyof typeof MODULES, name: string): never => {
+    const procedure = registry.get(`${module}:${name}`);
+
+    if (!procedure) {
+        throw new Error(`create-skill.test: ${module}.${name} is not exported`);
+    }
+
+    return procedure as never;
+};
 
 const OWNER = "owner-a";
 const INSTALL = "install-1";
@@ -28,11 +81,7 @@ const pluginInput = {
 describe("plugin skills", () => {
     let harness: ReturnType<typeof lunoraTest>;
 
-    beforeEach(async () => {
-        // The registry is lazy: a function is registered only once its module has been evaluated.
-        const { loadAllFunctions } = await import("../_generated/functions");
-
-        await loadAllFunctions();
+    beforeEach(() => {
         harness = lunoraTest(schema as never);
     });
 
@@ -42,24 +91,26 @@ describe("plugin skills", () => {
 
     const rowsWithMarker = async () => await harness.run(async (context: any) => (await context.db.skills.findMany({ where: { pluginMarker: MARKER } })).page);
 
-    // PENDING: this public-call check cannot run in this harness yet. The call fails at sign-in before its validators run, so a pass proves nothing. Redo it with the authz suite's registry setup (authz-regressions.test.ts).
-    it.todo("refuses a plugin source through the public create procedure", async () => {
+    it("refuses a plugin source through the public create procedure, and stores nothing", async () => {
         await expect(
             harness
                 .withIdentity({ userId: OWNER } as never)
-                .mutation(api.skills.functions.createSkill as never, { ...skillInput, source: { type: "plugin", version: "1.0.0" } } as never),
+                .mutation(procedureAt("skills_functions", "createSkill"), { ...skillInput, source: { type: "plugin", version: "1.0.0" } } as never),
         ).rejects.toThrow();
 
         expect(await rowsWithMarker()).toHaveLength(0);
     });
 
-    // PENDING: this public-call check cannot run in this harness yet. The call fails at sign-in before its validators run, so a pass proves nothing. Redo it with the authz suite's registry setup (authz-regressions.test.ts).
-    it.todo("never stores a marker from the public create procedure, even when a caller sends one", async () => {
-        await harness
+    it("never stores a marker from the public create procedure, even when a caller sends one", async () => {
+        const outcome = await harness
             .withIdentity({ userId: OWNER } as never)
-            .mutation(api.skills.functions.createSkill as never, { ...skillInput, source: { type: "editor" }, pluginMarker: MARKER } as never)
-            .catch(() => undefined);
+            .mutation(procedureAt("skills_functions", "createSkill"), { ...skillInput, source: { type: "editor" }, pluginMarker: MARKER } as never)
+            .then(
+                () => "stored without the marker",
+                () => "refused",
+            );
 
+        expect(["stored without the marker", "refused"]).toContain(outcome);
         expect(await rowsWithMarker()).toHaveLength(0);
     });
 
