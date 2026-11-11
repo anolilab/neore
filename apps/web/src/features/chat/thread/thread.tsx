@@ -31,7 +31,9 @@ import type { PendingAttachment } from "@/features/chat/core/stores/chat-ui-stor
 import type { ComposerMode } from "@/features/chat/core/stores/model-store";
 import { useModelStore } from "@/features/chat/core/stores/model-store";
 import ForwardSelectionBar from "@/features/chat/forward/forward-selection-bar";
+import useStoredDrafts from "@/features/chat/split/use-stored-drafts";
 import { hasUnseenReply } from "@/features/chat/thread-list/lib/thread-state-rules";
+import { isThreadLocked } from "@/features/chat/thread-list/thread-lock";
 import WorkerComposer from "@/features/sub-agents/components/worker-composer";
 import WorkerList from "@/features/sub-agents/components/worker-list";
 import WorkerRunLog from "@/features/sub-agents/components/worker-run-log";
@@ -142,6 +144,13 @@ const ThreadContent: FC<ThreadProps> = ({ className, composerActive = true, init
     const isMultiChatThread = thread?.multiChat === true;
     // A worker takes a turn only through `dispatchToWorker`, so its thread gets its own composer.
     const { isLoading: isWorkerLoading, worker } = useWorker(isNewThread ? undefined : threadId);
+
+    // The draft is kept across a reload for the chat composer below, once the chat is known (a locked one keeps none).
+    useStoredDrafts(
+        isNewThread || !threadId ? "new" : threadId,
+        composerActive && !worker && !isWorkerLoading && (isNewThread || Boolean(thread)) ? sessionData?.user?.id : undefined,
+        isThreadLocked(thread?.lockedAt),
+    );
 
     const crpc = useCRPC();
     const afterFirstPaint = useAfterFirstPaint();

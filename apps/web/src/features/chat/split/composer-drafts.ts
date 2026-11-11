@@ -7,7 +7,8 @@ import type { ParkedModelState } from "@/features/chat/core/stores/model-store";
 /**
  * Unsent composer state by thread, for the split view. The composer's draft (text, attachments, references) is one global
  * value, so when focus moves to another pane the outgoing state is parked here and the incoming pane's is taken back out.
- * Memory only: a reload starts with empty drafts, as a single chat does.
+ * A copy of every draft is kept in `localStorage` for a reload (`stored-drafts.ts`, loaded lazily); only its key and its
+ * removal live here, so sign-out can drop it without loading that module.
  */
 export interface ComposerDraft {
     attachedReferences: ReferenceSelection[];
@@ -22,6 +23,23 @@ const parkedModels = new Map<string, ParkedModelState>();
 const workerDrafts = new Map<string, string>();
 // Counts the clears (sign-out, account switch). A write-back that started before a clear must not land after it.
 const generation = { count: 0 };
+
+/** The `localStorage` record of the signed-in account's unsent drafts (`stored-drafts.ts`). */
+export const DRAFTS_STORAGE_KEY = "neore:composer-drafts:v1";
+
+/**
+ * Removes the stored drafts. For sign-out and an account switch: the drafts are the account's, not the browser's. It moves the
+ * generation on, so a write scheduled before it drops itself.
+ */
+export const dropStoredDrafts = (): void => {
+    generation.count += 1;
+
+    try {
+        globalThis.localStorage?.removeItem(DRAFTS_STORAGE_KEY);
+    } catch {
+        // Blocked storage holds nothing to remove.
+    }
+};
 
 /** The thread ids that have a parked draft, so a row or a pane header can show the mark. Replaced on each sync, never mutated. */
 export const useParkedDraftStore = create<{ threadIds: ReadonlySet<string> }>()(() => {
@@ -72,7 +90,7 @@ export const clearComposerDrafts = (): void => {
     drafts.clear();
     parkedModels.clear();
     workerDrafts.clear();
-    generation.count += 1;
+    dropStoredDrafts();
     syncParked();
 };
 
