@@ -23,6 +23,32 @@ const INSTALL_CLAIM_SCOPE = "plugin-install";
 
 const vKind = v.union(v.literal("skill"), v.literal("trigger"), v.literal("group"));
 
+const TOOL_CONFIG_KEYS = ["additionalTools", "disabledTools"] as const;
+
+/** Whether a skill's config adds or removes tools. A plugin skill may not: its tools are the person's, not its author's. */
+export const refusesToolConfig = (config: unknown): boolean => {
+    if (typeof config !== "object" || config === null) {
+        return false;
+    }
+
+    return TOOL_CONFIG_KEYS.some((key) => {
+        const value = Reflect.get(config, key);
+
+        return Array.isArray(value) && value.length > 0;
+    });
+};
+
+/** Refuses a plugin whose skills set tools, naming the first one. */
+export const assertNoToolConfig = (entries: ReadonlyArray<{ plan?: { kind: string; create?: unknown }; title: string }>): void => {
+    const offender = entries.find(
+        (entry) => entry.plan?.kind === "skill" && refusesToolConfig((entry.plan.create as { config?: unknown } | undefined)?.config),
+    );
+
+    if (offender) {
+        throw new LunoraError("BAD_REQUEST", `"${offender.title}" sets tools. A plugin skill cannot add or remove tools.`);
+    }
+};
+
 const organizationRefusal = "Organization plugin installs are not available yet";
 
 /** Refuses a file that is not a plugin, or whose body no longer matches its header. Returns the hash of the body. */
@@ -64,6 +90,7 @@ export const previewPlugin = authAction
 
         const { header, hash, name } = await checkPluginFile(args.markdown);
         const { entries } = await planFor(ctx, args.markdown, undefined);
+        assertNoToolConfig(entries);
 
         return {
             contentHash: hash,
@@ -107,6 +134,7 @@ export const installPlugin = authAction
 
         try {
             const { entries } = await planFor(ctx, args.markdown, undefined);
+            assertNoToolConfig(entries);
             const selected = new Set(entries.map((entry) => entry.key));
             const hashByKey = new Map(await Promise.all(entries.map(async (entry) => [entry.key, await entryHash(entry)] as const)));
 
