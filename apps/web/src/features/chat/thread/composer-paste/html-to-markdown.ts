@@ -387,7 +387,7 @@ const list = (element: Element, context: Context): string => {
     const items: string[] = [];
 
     for (const item of element.children) {
-        if (item.tagName !== "LI") {
+        if (item.tagName !== "LI" || isHidden(item)) {
             continue;
         }
 

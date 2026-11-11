@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { insertPastedText } from "../composer-draft-file";
 import githubTable from "./__fixtures__/github-readme-table.html?raw";
 import googleDocs from "./__fixtures__/google-docs-list.html?raw";
 import googleDocsNumbered from "./__fixtures__/google-docs-numbered.html?raw";
@@ -8,14 +9,17 @@ import terminalHtml from "./__fixtures__/terminal.html?raw";
 import vscodeHtml from "./__fixtures__/vscode.html?raw";
 import wordHtml from "./__fixtures__/word-paragraph.html?raw";
 import { htmlToMarkdown } from "./html-to-markdown";
-import { isLongPaste, isPlainHtml, longestBacktickRun, planPaste, planText } from "./paste-plan";
+import { inOpenFence, isLongPaste, isPlainHtml, longestBacktickRun, onOwnLines, planPaste, planText } from "./paste-plan";
 
 const clipboard = (data: Record<string, string>): Pick<DataTransfer, "getData"> => {
     return { getData: (type: string) => data[type] ?? "" };
 };
 
-const paste = async (data: Record<string, string>, options: { plainOnly?: boolean; selectedText?: string } = {}): Promise<string | undefined> => {
-    const plan = planPaste(clipboard(data), { plainOnly: options.plainOnly ?? false, selectedText: options.selectedText ?? "" });
+const paste = async (
+    data: Record<string, string>,
+    options: { inFence?: boolean; plainOnly?: boolean; selectedText?: string } = {},
+): Promise<string | undefined> => {
+    const plan = planPaste(clipboard(data), { inFence: options.inFence, plainOnly: options.plainOnly ?? false, selectedText: options.selectedText ?? "" });
 
     return plan.kind === "default" ? undefined : planText(plan);
 };
@@ -105,12 +109,16 @@ describe("composer paste", () => {
             paste({
                 "text/html": `<SCRIPT>s<b></Script ><style>p{}</style>Hi<noscript>n</noscript><Template>t</template><p>${"x".repeat(1_000_000)}<script>s`,
             }),
-        ).resolves.toBe(`Hi${"x".repeat(1_000_000)}`);
+        ).resolves.toBe(`Hi\n${"x".repeat(1_000_000)}`);
 
         const text = await paste({ "text/html": "<div><b>row</b> &amp; &lt;more&gt;</div>".repeat(150_000) });
 
-        expect(text?.startsWith("row & <more>row")).toBe(true);
-        expect(text).toHaveLength(150_000 * "row & <more>".length);
+        expect(text?.startsWith("row & <more>\nrow")).toBe(true);
+        expect(text).toHaveLength(150_000 * "row & <more>\n".length - 1);
+        // Blocks, lines and cells keep their words apart.
+        await expect(
+            paste({ "text/html": `<p>one</p><p>two<br>three</p><table><tr><td>a</td><td>b</td></tr></table><!--${"x".repeat(1_000_000)}-->` }),
+        ).resolves.toBe("one\ntwo\nthree\n a b");
         expect(isLongPaste(text ?? "")).toBe(true);
         expect(
             planPaste(
@@ -192,6 +200,11 @@ describe("composer paste", () => {
             "| A | B | C |\n| --- | --- | --- |\n| ab |  | c |\n| a | b | c |\n|  | b2 | c2 |",
         ],
         [
+            "hidden list items are left out",
+            '<ol><li>one</li><li hidden>secret</li><li style="display:none">secret</li><li aria-hidden="true">secret</li><li>two</li></ol>',
+            "1. one\n2. two",
+        ],
+        [
             "hidden table rows and cells are left out",
             '<table><tr><th>A</th><th style="display:none">S</th><th>B</th></tr><tr style="display:none"><td>secret</td></tr><tbody hidden><tr><td>secret</td></tr></tbody><tr><td>a</td><td aria-hidden="true">secret</td><td>b</td></tr></table>',
             "| A | B |\n| --- | --- |\n| a | b |",
@@ -243,5 +256,56 @@ describe("composer paste", () => {
 
     it("keeps backticks inside code from closing the fence", () => {
         expect(htmlToMarkdown('<p>Run <code>a`b</code></p><pre class="language-md">```js\nx\n```</pre>')).toBe("Run ``a`b``\n\n````md\n```js\nx\n```\n````");
+    });
+});
+
+describe("pasted blocks beside text", () => {
+    const table = "<table><tr><th>a</th><th>b</th></tr><tr><td>1</td><td>2</td></tr></table>";
+    // The draft once the paste lands at `caret`, as the composer inserts it.
+    const pasteInto = async (draft: string, caret: number, data: Record<string, string>): Promise<string> => {
+        const text = (await paste(data)) ?? "";
+
+        return insertPastedText(draft, onOwnLines(text, caret > 0 && draft[caret - 1] !== "\n", caret < draft.length && draft[caret] !== "\n"), caret, caret);
+    };
+
+    it("starts a table pasted after text on its own line, a blank line apart", async () => {
+        await expect(pasteInto("Hi ", 3, { "text/html": table, "text/plain": "a\tb\n1\t2" })).resolves.toSatisfy((draft: string) =>
+            draft.startsWith("Hi \n\n| a | b |"),
+        );
+    });
+
+    it("adds nothing to a table pasted at the start of an empty line", async () => {
+        const markdown = await paste({ "text/html": table, "text/plain": "a\tb\n1\t2" });
+
+        await expect(pasteInto("Hi\n", 3, { "text/html": table, "text/plain": "a\tb\n1\t2" })).resolves.toBe(`Hi\n${markdown}`);
+    });
+
+    it("puts a code block pasted mid-line on lines of its own", async () => {
+        await expect(pasteInto("before after", 7, { "text/html": '<pre class="language-js">x()</pre>', "text/plain": "x()" })).resolves.toBe(
+            "before \n\n```js\nx()\n```\n\nafter",
+        );
+    });
+
+    it("keeps an inline paste inline", async () => {
+        await expect(pasteInto("see  here", 4, { "text/html": '<a href="https://example.com/docs">docs</a>', "text/plain": "docs" })).resolves.toBe(
+            "see [docs](https://example.com/docs) here",
+        );
+    });
+});
+
+describe("a paste inside a code block the person typed", () => {
+    it("knows a fence is open from an odd number of fence lines before the caret", () => {
+        expect(inOpenFence("Look:\n```ts\nconst a = 1;\n")).toBe(true);
+        expect(inOpenFence("```\nx\n```\nafter ")).toBe(false);
+        expect(inOpenFence("no fence")).toBe(false);
+    });
+
+    it("inserts code as copied, without a fence of its own or Markdown", async () => {
+        const code = "const a = 1;\nconst b = 2;";
+        const vscode = { "text/html": "<div>x</div>", "text/plain": code, "vscode-editor-data": '{"mode":"typescript"}' };
+
+        await expect(paste(vscode, { inFence: true })).resolves.toBe(code);
+        await expect(paste({ "text/html": '<pre class="language-js">x()</pre>', "text/plain": "x()" }, { inFence: true })).resolves.toBe("x()");
+        await expect(paste(vscode)).resolves.toBe(`\`\`\`typescript\n${code}\n\`\`\``);
     });
 });

@@ -28,6 +28,10 @@ const ENTITY = /&(?:amp|gt|lt|nbsp|quot|#39);/g;
 const ENTITIES: Record<string, string> = { "&#39;": "'", "&amp;": "&", "&gt;": ">", "&lt;": "<", "&nbsp;": " ", "&quot;": '"' };
 // Elements whose content is not text the page shows.
 const RAW_TEXT = /<(script|style|noscript|template)[\s/>]/iy;
+// Tags whose text stands apart from its neighbours': on a line of its own, or a cell away.
+const LINE_TAG = /<\/?(?:p|div|br|li|tr|h[1-6])[\s/>]/iy;
+const CELL_TAG = /<t[dh][\s/>]/iy;
+const LINE_RUNS = /\n{2,}/g;
 const LANGUAGE_UNSAFE = /[^\w#+.-]/g;
 const VSCODE_LANGUAGES: Record<string, string> = { javascriptreact: "jsx", plaintext: "", shellscript: "bash", typescriptreact: "tsx" };
 
@@ -88,20 +92,48 @@ const vscodeLanguage = (data: string): string | undefined => {
 /** Past 500 characters or 10 lines a paste becomes a text attachment instead of composer text. */
 export const isLongPaste = (text: string): boolean => text.length > 500 || text.split("\n").length > 10;
 
+// Markdown lines that only parse at a line's start: a table row, a fence, a heading, a list item, a quote.
+const BLOCK_LINE = /^(?:\||`{3}|~{3}|#{1,6}\s|[-*+]\s|\d+[.)]\s|>)/;
+// A table or fence also takes a blank line, or the text beside it is read as part of it.
+const BLANK_LINE_BLOCK = /^(?:\||`{3}|~{3})/;
+
+/** The line breaks that keep `line` apart from text beside it on the same line. */
+const blockBreak = (line: string): string => {
+    if (!BLOCK_LINE.test(line)) {
+        return "";
+    }
+
+    return BLANK_LINE_BLOCK.test(line) ? "\n\n" : "\n";
+};
+
+/** `markdown` with line breaks where its first or last line is a block that would join the text beside the caret. */
+export const onOwnLines = (markdown: string, textBefore: boolean, textAfter: boolean): string => {
+    const lines = markdown.split("\n");
+
+    return (textBefore ? blockBreak(lines[0] ?? "") : "") + markdown + (textAfter ? blockBreak(lines.at(-1) ?? "") : "");
+};
+
 const markdownLink = (label: string, url: string): string =>
     `[${label.replaceAll(/[[\]\\]/g, String.raw`\$&`)}](${url.replaceAll("(", "%28").replaceAll(")", "%29")})`;
 
+const FENCE_LINE = /^ {0,3}(?:`{3}|~{3})/;
+
+/** Whether `textBefore` (the draft before the caret) leaves a code fence open: an odd number of fence lines. */
+export const inOpenFence = (textBefore: string): boolean => textBefore.split("\n").filter((line: string) => FENCE_LINE.test(line)).length % 2 === 1;
+
 interface PasteOptions {
+    /** The caret is in a code block the person typed: what is pasted is code, never Markdown. */
+    inFence?: boolean;
     /** Ctrl/Cmd+Shift+V: the text exactly as copied. */
     plainOnly: boolean;
     /** The composer text the paste replaces. */
     selectedText: string;
 }
 
-export const planPaste = (data: Pick<DataTransfer, "getData">, { plainOnly, selectedText }: PasteOptions): PastePlan => {
+export const planPaste = (data: Pick<DataTransfer, "getData">, { inFence = false, plainOnly, selectedText }: PasteOptions): PastePlan => {
     const plain = data.getData("text/plain");
 
-    if (plainOnly) {
+    if (plainOnly || inFence) {
         // Without text/plain the editor would paste the HTML with its formatting; a plain paste then inserts nothing.
         return plain === "" && data.getData("text/html").trim() === "" ? { kind: "default" } : { kind: "text", text: plain };
     }
@@ -135,7 +167,10 @@ export const planPaste = (data: Pick<DataTransfer, "getData">, { plainOnly, sele
     return plain !== "" && isPlainHtml(html) ? { kind: "text", text: plain } : { html, kind: "html", plain };
 };
 
-/** The text of HTML too big to parse, in one pass: every `<…>` and script, style, noscript and template dropped, the common entities decoded. */
+/**
+ * The text of HTML too big to parse, in one pass: every `<…>` and script, style, noscript and template dropped, a line
+ * break for a paragraph, div, line, list item, row or heading tag and a space for a cell, the common entities decoded.
+ */
 const stripTags = (html: string): string => {
     const parts: string[] = [];
     let index = 0;
@@ -149,6 +184,15 @@ const stripTags = (html: string): string => {
         }
 
         parts.push(html.slice(index, open));
+        LINE_TAG.lastIndex = open;
+        CELL_TAG.lastIndex = open;
+
+        if (LINE_TAG.test(html)) {
+            parts.push("\n");
+        } else if (CELL_TAG.test(html)) {
+            parts.push(" ");
+        }
+
         RAW_TEXT.lastIndex = open;
 
         // A script's or style's text runs to its end tag, or to the end.
@@ -170,6 +214,7 @@ const stripTags = (html: string): string => {
     return parts
         .join("")
         .replaceAll(ENTITY, (entity: string) => ENTITIES[entity] ?? entity)
+        .replaceAll(LINE_RUNS, "\n")
         .trim();
 };
 

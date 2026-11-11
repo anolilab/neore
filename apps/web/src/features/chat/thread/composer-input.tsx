@@ -72,7 +72,7 @@ import { attachLongPaste, draftFitsAsFile, insertPastedText, moveDraftToFile, pa
 import type { ComposerInputAreaRef } from "./composer-input-area";
 import ComposerInputArea from "./composer-input-area";
 import ComposerLongTextPrompt from "./composer-long-text-prompt";
-import { isLongPaste, planPaste, planText } from "./composer-paste/paste-plan";
+import { inOpenFence, isLongPaste, onOwnLines, planPaste, planText } from "./composer-paste/paste-plan";
 import ComposerPromptQueue from "./composer-prompt-queue";
 import { isEditable, TextAttachmentEditorDialog } from "./composer-text-attachment-editor";
 import { quoteRestoreDraft } from "./composer-tiptap/extensions/quote-chip";
@@ -832,20 +832,24 @@ const ComposerInput = ({
     }, [attachTextAsFile, removeAttachment, setText]);
 
     // The paste position as offsets into the plain draft text (the editor joins blocks with "\n"); the end when unknown.
-    const pasteSelection = useCallback((): { end: number; start: number } => {
+    // `textBefore` and `textAfter`: whether the caret's line has text on that side of it.
+    const pasteSelection = useCallback((): { end: number; start: number; textAfter: boolean; textBefore: boolean } => {
         const editor = inputAreaRef.current?.getEditor()?.getEditor();
 
         if (!editor || editor.isDestroyed) {
-            const { length } = useChatUIStore.getState().composerText;
+            const draft = useChatUIStore.getState().composerText;
 
-            return { end: length, start: length };
+            return { end: draft.length, start: draft.length, textAfter: false, textBefore: draft !== "" && !draft.endsWith("\n") };
         }
 
         const { doc, selection } = editor.state;
+        const isText = (node: { type: { name: string } } | null): boolean => node !== null && node.type.name !== "hardBreak";
 
         return {
             end: doc.textBetween(0, selection.to, "\n").length,
             start: doc.textBetween(0, selection.from, "\n").length,
+            textAfter: isText(selection.$to.nodeAfter),
+            textBefore: isText(selection.$from.nodeBefore),
         };
     }, []);
 
@@ -913,9 +917,11 @@ const ComposerInput = ({
 
             const editorHandle = inputAreaRef.current?.getEditor();
             const editor = editorHandle?.getEditor();
+            const live = editor && !editor.isDestroyed ? editor.state : undefined;
             const plan = planPaste(e.clipboardData, {
+                inFence: inOpenFence(live ? live.doc.textBetween(0, live.selection.from, "\n") : useChatUIStore.getState().composerText),
                 plainOnly: editorHandle?.isPlainPaste(e) ?? false,
-                selectedText: editor && !editor.isDestroyed ? editor.state.doc.textBetween(editor.state.selection.from, editor.state.selection.to, "\n") : "",
+                selectedText: live ? live.doc.textBetween(live.selection.from, live.selection.to, "\n") : "",
             });
             const plainText = e.clipboardData.getData("text/plain");
 
@@ -951,9 +957,12 @@ const ComposerInput = ({
 
             if (!isLongPaste(pastedText)) {
                 const draft = useChatUIStore.getState().composerText;
+                // Converted Markdown that opens or ends with a table, fence, heading, list or quote keeps it off the text beside the caret.
+                const converted = plan.kind === "html" || (plan.kind === "text" && plan.text !== plainText);
+                const inserted = converted ? onOwnLines(pastedText, selection.textBefore, selection.textAfter) : pastedText;
 
-                if (!inputAreaRef.current?.getEditor()?.pasteText(pastedText, stateAtPaste)) {
-                    setText(draft === draftAtPaste ? insertPastedText(draft, pastedText, selection.start, selection.end) : draft + pastedText);
+                if (!inputAreaRef.current?.getEditor()?.pasteText(inserted, stateAtPaste)) {
+                    setText(draft === draftAtPaste ? insertPastedText(draft, inserted, selection.start, selection.end) : draft + inserted);
                 }
 
                 return;
