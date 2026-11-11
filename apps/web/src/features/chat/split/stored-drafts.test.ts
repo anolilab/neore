@@ -208,8 +208,26 @@ describe("accounts", () => {
         type("old account");
         flushStoredDrafts();
         clearComposerDrafts();
+        vi.advanceTimersByTime(DRAFT_WRITE_DELAY_MS);
+        globalThis.dispatchEvent(new Event("pagehide"));
 
         expect(stored()).toBeNull();
+    });
+
+    it("does not store the previous account's text under the next one", () => {
+        bindStoredDrafts("thread-a", "user-1", false);
+        type("user one's text");
+        flushStoredDrafts();
+        clearComposerDrafts();
+        bindStoredDrafts("new", "user-2", false);
+        vi.advanceTimersByTime(DRAFT_WRITE_DELAY_MS);
+
+        expect(stored()).toBeNull();
+
+        type("user two's text");
+        vi.advanceTimersByTime(DRAFT_WRITE_DELAY_MS);
+
+        expect(stored()).toStrictEqual({ d: { new: expect.objectContaining({ t: "user two's text" }) }, u: "user-2" });
     });
 });
 
@@ -275,5 +293,35 @@ describe("moving between chats", () => {
         flushStoredDrafts();
 
         expect(stored()?.d["thread-a"]?.t).toBe("pane a");
+    });
+
+    it("keeps both chats' drafts when the text only came along to the next chat", () => {
+        localStorage.setItem(
+            DRAFTS_STORAGE_KEY,
+            JSON.stringify({ d: { "thread-a": { at: Date.now(), t: "x" }, "thread-b": { at: Date.now(), t: "y" } }, u: "user-1" }),
+        );
+        bindStoredDrafts("thread-a", "user-1", false);
+        bindStoredDrafts("thread-b", "user-1", false);
+        bindStoredDrafts("thread-c", "user-1", false);
+        vi.advanceTimersByTime(DRAFT_WRITE_DELAY_MS);
+
+        expect(readStoredDrafts("user-1").get("thread-a")?.t).toBe("x");
+        expect(readStoredDrafts("user-1").get("thread-b")?.t).toBe("y");
+        expect(readStoredDrafts("user-1").has("thread-c")).toBe(false);
+
+        type("x edited in c");
+        vi.advanceTimersByTime(DRAFT_WRITE_DELAY_MS);
+
+        expect(readStoredDrafts("user-1").get("thread-c")?.t).toBe("x edited in c");
+        expect(readStoredDrafts("user-1").has("thread-a")).toBe(false);
+    });
+
+    it("does not store a locked chat's text under the chat it came along to", () => {
+        bindStoredDrafts("thread-a", "user-1", true);
+        type("locked text");
+        bindStoredDrafts("thread-b", "user-1", false);
+        vi.advanceTimersByTime(DRAFT_WRITE_DELAY_MS);
+
+        expect(stored()).toBeNull();
     });
 });

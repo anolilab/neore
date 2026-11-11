@@ -5,7 +5,7 @@ import { fromStoredAttachment, toStoredAttachment } from "@/features/chat/core/s
 import type { StoredAttachment } from "@/features/chat/core/utils/prompt-queue";
 
 import type { ComposerDraft } from "./composer-drafts";
-import { draftGeneration, DRAFTS_STORAGE_KEY, hasDraftContent, peekComposerDraft, useParkedDraftStore } from "./composer-drafts";
+import { draftGeneration, DRAFTS_STORAGE_KEY, hasDraftContent, peekComposerDraft, useParkedDraftStore, useSplitViewMountedStore } from "./composer-drafts";
 
 /**
  * Unsent drafts in `localStorage`, so a reload, a crash or an app update does not lose them. Loaded lazily (see
@@ -125,16 +125,25 @@ const toStoredDraft = (content: Partial<Content> | undefined, at: number): Store
     return t === "" && a.length === 0 && r.length === 0 ? undefined : { a, at, r, t };
 };
 
-/** The chat the live composer belongs to: the last one whose composer mounted. It keeps it after an unmount (the text stays). */
+/**
+ * The chat the live composer belongs to: the last one whose composer mounted. It keeps it after an unmount (the text stays).
+ * `generation` is the clears of stored drafts when it was made: after a sign-out or an account switch nothing is written for it.
+ */
 interface Binding {
+    generation: number;
     owner: string;
     userId: string;
 }
 
 const state = {
     binding: undefined as Binding | undefined,
-    /** The clears of stored drafts when the pending write was scheduled; a write that a clear overtook is dropped. */
-    generation: draftGeneration(),
+
+    /**
+     * Set when the composer's content came along from another chat or account (single view keeps the text when you move on):
+     * it is not this chat's draft until it is edited here, so it is not stored, and `carriedFrom` keeps its own entry.
+     */
+    carried: false,
+    carriedFrom: undefined as string | undefined,
     /** Chats seen locked this page load: none of their drafts is stored. */
     locked: new Set<string>(),
     timer: undefined as ReturnType<typeof setTimeout> | undefined,
@@ -143,7 +152,7 @@ const state = {
 };
 
 /** This page's drafts now: the parked ones and the live composer under its chat, without locked chats. */
-const snapshot = (owner: string, now: number): Map<string, StoredDraft> => {
+const snapshot = (owner: string, now: number, carried: boolean): Map<string, StoredDraft> => {
     const drafts = new Map<string, StoredDraft>();
 
     for (const threadId of useParkedDraftStore.getState().threadIds) {
@@ -154,7 +163,7 @@ const snapshot = (owner: string, now: number): Map<string, StoredDraft> => {
         }
     }
 
-    const live = toStoredDraft(useChatUIStore.getState(), now);
+    const live = carried ? undefined : toStoredDraft(useChatUIStore.getState(), now);
 
     // An empty composer does not hide the chat's parked draft: focus moving to another pane parks it, then empties the composer.
     if (live) {
@@ -179,8 +188,12 @@ export const flushStoredDrafts = (): void => {
 
     const { binding } = state;
 
-    if (!binding || draftGeneration() !== state.generation) {
-        // Signed out or switched since: what this page wrote is gone, and the old account's draft must not come back.
+    if (!binding || draftGeneration() !== binding.generation) {
+        // Signed out or switched since: what this page wrote is gone, and the old account's draft must not come back. Nothing is
+        // written until a composer binds again, and what the composer still holds is not stored until it is edited.
+        state.binding = undefined;
+        state.carried = true;
+        state.carriedFrom = undefined;
         state.written.clear();
 
         return;
@@ -188,8 +201,8 @@ export const flushStoredDrafts = (): void => {
 
     const now = Date.now();
     const stored = readStoredDrafts(binding.userId, now);
-    const current = snapshot(binding.owner, now);
-    const removed = [...state.written, ...state.locked].filter((key) => !current.has(key));
+    const current = snapshot(binding.owner, now, state.carried);
+    const removed = [...state.written, ...state.locked].filter((key) => !current.has(key) && !(state.carried && key === state.carriedFrom));
 
     for (const key of removed) {
         stored.delete(key);
@@ -209,16 +222,14 @@ export const flushStoredDrafts = (): void => {
     }
 
     state.written = new Set(current.keys());
+
+    if (state.carried && state.carriedFrom !== undefined && !state.locked.has(state.carriedFrom)) {
+        state.written.add(state.carriedFrom);
+    }
 };
 
 const schedule = (): void => {
-    if (state.timer === undefined) {
-        state.generation = draftGeneration();
-    } else {
-        clearTimeout(state.timer);
-    }
-
-    // Started at the first change after a write, so a clear between them always wins.
+    clearTimeout(state.timer);
     state.timer = setTimeout(() => {
         // Not `flushStoredDrafts` directly: it returns early without a timer.
         flushStoredDrafts();
@@ -244,12 +255,16 @@ const listen = (): void => {
 
     const stopComposer = useChatUIStore.subscribe((next, previous) => {
         if (
-            next.composerText !== previous.composerText ||
-            next.composerAttachments !== previous.composerAttachments ||
-            next.attachedReferences !== previous.attachedReferences
+            next.composerText === previous.composerText &&
+            next.composerAttachments === previous.composerAttachments &&
+            next.attachedReferences === previous.attachedReferences
         ) {
-            schedule();
+            return;
         }
+
+        // Edited here: the content is this chat's draft now.
+        state.carried = false;
+        schedule();
     });
     const stopParked = useParkedDraftStore.subscribe(schedule);
 
@@ -274,11 +289,24 @@ export const bindStoredDrafts = (owner: string, userId: string, locked: boolean)
     // A pending write is the previous chat's state (a draft just emptied, say): it lands first, so it is not read back stale.
     flushStoredDrafts();
 
-    if (state.binding && state.binding.userId !== userId) {
+    const previous = state.binding;
+    const switchedUser = previous !== undefined && previous.userId !== userId;
+    const moved = previous !== undefined && previous.owner !== owner && !useSplitViewMountedStore.getState().mounted;
+
+    if (switchedUser) {
         state.written.clear();
     }
 
-    state.binding = { owner, userId };
+    if (switchedUser || moved) {
+        // In split view the composer is emptied and refilled with the focused pane's own draft, so nothing is carried there. Text
+        // carried on through several chats is still the first one's.
+        const from = state.carried ? state.carriedFrom : previous.owner;
+
+        state.carried = hasDraftContent(useChatUIStore.getState()) && (switchedUser || from !== owner);
+        state.carriedFrom = switchedUser ? undefined : from;
+    }
+
+    state.binding = { generation: draftGeneration(), owner, userId };
     listen();
 
     if (locked) {
@@ -307,6 +335,8 @@ export const resetStoredDraftsForTests = (): void => {
     clearTimeout(state.timer);
     state.timer = undefined;
     state.binding = undefined;
+    state.carried = false;
+    state.carriedFrom = undefined;
     state.locked.clear();
     state.written.clear();
     listening.stop?.();
