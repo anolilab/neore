@@ -98,4 +98,70 @@ if (typeof source["userId"] !== "string") return DEFER;
 if (source["userId"].length > 128) return DEFER;
 return { ...(__has1 ? { "category": __val1 } : {}), ...(__has2 ? { "config": __val2 } : {}), "contentHash": source["contentHash"], "description": source["description"], "entryKey": source["entryKey"], "generation": source["generation"], ...(__has3 ? { "icon": __val3 } : {}), "installId": source["installId"], "instructions": source["instructions"], "name": source["name"], ...(__has5 ? { "tags": __val5 } : {}), ...(__has6 ? { "variables": __val6 } : {}), ...(__has7 ? { "version": __val7 } : {}), "userId": source["userId"] };
 });
+installCompiledValidatorMap(lunora_plugins_update_apply_186.updateTriggerChild.args, (source) => {
+if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
+if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
+if (typeof source["contentHash"] !== "string") return DEFER;
+if (source["contentHash"].length > 128) return DEFER;
+let __has1 = false;
+let __val1;
+if (source["cronExpression"] !== undefined) {
+if (typeof source["cronExpression"] !== "string") return DEFER;
+if (source["cronExpression"].length > 256) return DEFER;
+__val1 = source["cronExpression"];
+__has1 = true;
+}
+let __has2 = false;
+let __val2;
+if (source["description"] !== undefined) {
+if (typeof source["description"] !== "string") return DEFER;
+if (source["description"].length > 4096) return DEFER;
+__val2 = source["description"];
+__has2 = true;
+}
+if (typeof source["entryKey"] !== "string") return DEFER;
+if (source["entryKey"].length > 256) return DEFER;
+if (typeof source["generation"] !== "number" || !Number.isFinite(source["generation"])) return DEFER;
+let __has3 = false;
+let __val3;
+if (source["inputTemplate"] !== undefined) {
+if (typeof source["inputTemplate"] !== "string") return DEFER;
+if (source["inputTemplate"].length > 65536) return DEFER;
+__val3 = source["inputTemplate"];
+__has3 = true;
+}
+if (typeof source["installId"] !== "string") return DEFER;
+if (source["installId"].length > 128) return DEFER;
+if (typeof source["model"] !== "string") return DEFER;
+if (source["model"].length > 256) return DEFER;
+if (typeof source["name"] !== "string") return DEFER;
+if (source["name"].length > 256) return DEFER;
+let __has4 = false;
+let __val4;
+if (source["searchMode"] !== undefined) {
+if (typeof source["searchMode"] !== "string") return DEFER;
+if (source["searchMode"].length > 256) return DEFER;
+__val4 = source["searchMode"];
+__has4 = true;
+}
+let __has5 = false;
+let __val5;
+if (source["systemPrompt"] !== undefined) {
+if (typeof source["systemPrompt"] !== "string") return DEFER;
+if (source["systemPrompt"].length > 65536) return DEFER;
+__val5 = source["systemPrompt"];
+__has5 = true;
+}
+let __has6 = false;
+let __val6;
+if (source["timezone"] !== undefined) {
+if (typeof source["timezone"] !== "string") return DEFER;
+if (source["timezone"].length > 128) return DEFER;
+__val6 = source["timezone"];
+__has6 = true;
+}
+if (typeof source["userId"] !== "string") return DEFER;
+if (source["userId"].length > 128) return DEFER;
+return { "contentHash": source["contentHash"], ...(__has1 ? { "cronExpression": __val1 } : {}), ...(__has2 ? { "description": __val2 } : {}), "entryKey": source["entryKey"], "generation": source["generation"], ...(__has3 ? { "inputTemplate": __val3 } : {}), "installId": source["installId"], "model": source["model"], "name": source["name"], ...(__has4 ? { "searchMode": __val4 } : {}), ...(__has5 ? { "systemPrompt": __val5 } : {}), ...(__has6 ? { "timezone": __val6 } : {}), "userId": source["userId"] };
+});
 export * from "../../plugins/update-apply.js";

@@ -157,7 +157,7 @@ const checkedEventSource = async (
  * expression fires every minute (`getNextCronTime` reads garbage as a wildcard),
  * and each run is a paid agent turn.
  */
-const assertCronExpression = (cronExpression: string): void => {
+export const assertCronExpression = (cronExpression: string): void => {
     if (!isHourlyOrSlowerCronExpression(cronExpression)) {
         throw new LunoraError(
             "BAD_REQUEST",

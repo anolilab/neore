@@ -1057,6 +1057,7 @@ export interface InternalApiTypes {
             beginUpdate: FunctionReference<"mutation", { installId: string; targetVersion: string; userId: string }, number>;
             finishUpdate: FunctionReference<"mutation", { contentHash: string; generation: number; installId: string; version: string }, null>;
             updateSkillChild: FunctionReference<"mutation", { category?: string; config?: unknown; contentHash: string; description: string; entryKey: string; generation: number; icon?: string; installId: string; instructions: string; name: string; tags?: Array<string>; variables?: unknown; version?: string; userId: string }, null>;
+            updateTriggerChild: FunctionReference<"mutation", { contentHash: string; cronExpression?: string; description?: string; entryKey: string; generation: number; inputTemplate?: string; installId: string; model: string; name: string; searchMode?: string; systemPrompt?: string; timezone?: string; userId: string }, null>;
         };
     };
     projects: {
@@ -2406,6 +2407,7 @@ export const internal: InternalApiTypes = {
             beginUpdate: { __lunoraRef: "plugins_update_apply:beginUpdate" },
             finishUpdate: { __lunoraRef: "plugins_update_apply:finishUpdate" },
             updateSkillChild: { __lunoraRef: "plugins_update_apply:updateSkillChild" },
+            updateTriggerChild: { __lunoraRef: "plugins_update_apply:updateTriggerChild" },
         },
     },
     projects: {

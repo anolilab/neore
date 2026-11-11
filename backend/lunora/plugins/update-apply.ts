@@ -10,11 +10,13 @@
  */
 import { LunoraError, v } from "lunorash/server";
 
+import { assertCronExpression } from "../triggers/functions";
+
 import type { Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
 import { internalMutation } from "../_generated/server";
 import { withoutUndefined } from "../lib/patch";
-import { skillRowHash } from "./entry-hash";
+import { skillRowHash, triggerRowHash } from "./entry-hash";
 import { LEASE_MS, markerFor } from "./logic";
 
 const STALE = "STALE_LEASE: this install was taken over by another action";
@@ -132,6 +134,85 @@ export const finishUpdate = internalMutation
             updatedAt: ctx.now,
             version: args.version,
         });
+
+        return null;
+    });
+
+/**
+ * Rewrites one unedited schedule trigger in place. The trigger is switched off: a changed trigger must be read and re-enabled by
+ * the person, so new content never runs unseen. Only schedule triggers are updated here; a webhook or an event trigger is
+ * reported as skipped.
+ *
+ * A field the new version leaves out keeps its old value, so the trigger then reads as edited (the safe side).
+ */
+export const updateTriggerChild = internalMutation
+    .input({
+        contentHash: v.string().max(128),
+        cronExpression: v.optional(v.string().max(256)),
+        description: v.optional(v.string().max(4096)),
+        entryKey: v.string().max(256),
+        generation: v.number(),
+        inputTemplate: v.optional(v.string().max(65536)),
+        installId: v.string().max(128),
+        model: v.string().max(256),
+        name: v.string().max(256),
+        searchMode: v.optional(v.string().max(256)),
+        systemPrompt: v.optional(v.string().max(65536)),
+        timezone: v.optional(v.string().max(128)),
+        userId: v.string().max(128),
+    })
+    .output(v.null())
+    .mutation(async ({ args, ctx }) => {
+        await heldInstall(ctx, args.installId as Id<"pluginInstalls">, args.generation);
+
+        const { page } = await ctx.db.pluginItems.findMany({ where: { installId: args.installId } });
+        const link = page.find((row) => row.entryKey === args.entryKey && row.kind === "trigger");
+
+        if (!link || link.state !== "created") {
+            throw new LunoraError("CONFLICT", `The child "${args.entryKey}" is not a linked trigger of this plugin`);
+        }
+
+        const trigger = await ctx.db
+            .query("triggers")
+            .withIndex("by_plugin_marker", (q) => q.eq("pluginMarker", markerFor(args.installId, args.entryKey)))
+            .first();
+
+        if (!trigger || trigger.userId !== args.userId) {
+            throw new LunoraError("CONFLICT", `The trigger for "${args.entryKey}" is missing`);
+        }
+
+        if (trigger.type !== "schedule") {
+            throw new LunoraError("CONFLICT", `"${args.entryKey}" is not a schedule trigger, so it is not updated in place`);
+        }
+
+        if ((await triggerRowHash(trigger)) !== link.contentHash) {
+            throw new LunoraError("CONFLICT", `The trigger for "${args.entryKey}" was edited, so it is kept as it is`);
+        }
+
+        if (args.cronExpression !== undefined) {
+            assertCronExpression(args.cronExpression);
+        }
+
+        await ctx.db.patch("pluginItems", link._id as Id<"pluginItems">, { pendingHash: args.contentHash });
+
+        await ctx.db.patch(
+            "triggers",
+            trigger._id as Id<"triggers">,
+            withoutUndefined({
+                cronExpression: args.cronExpression,
+                description: args.description,
+                enabled: false,
+                inputTemplate: args.inputTemplate,
+                model: args.model,
+                name: args.name,
+                searchMode: args.searchMode,
+                systemPrompt: args.systemPrompt,
+                timezone: args.timezone,
+                updatedAt: ctx.now,
+            }),
+        );
+
+        await ctx.db.patch("pluginItems", link._id as Id<"pluginItems">, { contentHash: args.contentHash, pendingHash: "" });
 
         return null;
     });
