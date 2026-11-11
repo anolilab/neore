@@ -188,6 +188,10 @@ const AddProjectContent = ({ onClose, onCreateNew, pairingHosts }: AddProjectCon
             return t`This host is used by a Match rule in ~/.ssh/config, which Neore does not evaluate.`;
         }
 
+        if (kind.kind === "invalid-port") {
+            return t`This host has an invalid Port in ~/.ssh/config.`;
+        }
+
         return kind.kind === "pair-this-computer" ? t`Pair this computer with your account first (Settings → Devices).` : reason;
     };
 
