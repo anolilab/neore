@@ -1850,7 +1850,7 @@ msgstr "Uma senha mantém esta conversa fechada para qualquer pessoa que use um 
 msgid "A placeholder or @mention outside quotes is read as null here, so this error may come from it until a run fills it in"
 msgstr "Um marcador ou @menção fora das aspas é lido aqui como null, então este erro pode vir dele até que uma execução o preencha"
 
-#: src/features/projects/components/project-repositories.tsx:194
+#: src/features/projects/components/project-repositories.tsx:187
 msgid "A project can list at most {MAX_REPOSITORIES} repositories."
 msgstr "Um projeto pode listar no máximo {MAX_REPOSITORIES} repositórios."
 
@@ -2180,7 +2180,7 @@ msgid "Activity per month"
 msgstr "Atividade por mês"
 
 #: src/features/chat/tags/manage-thread-tags-dialog.tsx:225
-#: src/features/projects/components/project-repositories.tsx:432
+#: src/features/projects/components/project-repositories.tsx:426
 #: src/features/settings/components/chat/mcp/server-catalog.tsx:102
 #: src/features/workflow/components/gallery/publish-dialog.tsx:220
 msgid "Add"
@@ -2380,6 +2380,17 @@ msgstr "Adicionar chave de acesso"
 msgid "Add picked frame as image node"
 msgstr "Adicionar o quadro escolhido como nó de imagem"
 
+#: src/features/chat/thread-list/thread-list-header.tsx:127
+#: src/features/chat/thread-list/thread-list-header.tsx:137
+#: src/features/projects/components/add-project-dialog.tsx:431
+msgid "Add project"
+msgstr ""
+
+#. placeholder {0}: machine.name
+#: src/features/projects/components/add-project-dialog.tsx:269
+msgid "Add project on {0}"
+msgstr ""
+
 #: src/features/prompts/components/prompts-sidebar-tab.tsx:488
 msgid "Add prompt"
 msgstr "Adicionar prompt"
@@ -2553,6 +2564,10 @@ msgstr "Adicionado:"
 msgid "Adding documents… {0} of {1}"
 msgstr "Adicionando documentos… {0} de {1}"
 
+#: src/features/projects/components/add-project-dialog.tsx:280
+msgid "Adding the project…"
+msgstr ""
+
 #: src/features/devices/components/devices-settings.tsx:452
 msgid "Adding the server was cancelled on this computer."
 msgstr "A adição do servidor foi cancelada neste computador."
@@ -2562,6 +2577,7 @@ msgid "Adding your earlier replies…"
 msgstr "Adicionando suas respostas anteriores…"
 
 #: src/features/chat/aside/aside-panel.tsx:168
+#: src/features/projects/components/add-project-dialog.tsx:431
 msgid "Adding…"
 msgstr "Adicionando…"
 
@@ -4474,6 +4490,7 @@ msgstr "Portal do Azure → seu recurso do OpenAI → Chaves e ponto de extremid
 #: src/features/code/components/code-shell.tsx:162
 #: src/features/onboarding/components/onboarding-dialog.tsx:395
 #: src/features/pages/components/page-version-panel.tsx:89
+#: src/features/projects/components/add-project-dialog.tsx:428
 msgid "Back"
 msgstr "Voltar"
 
@@ -5494,6 +5511,7 @@ msgstr "Canadá"
 #: src/features/local-models/components/ollama-model-manager.tsx:300
 #: src/features/pages/components/page-agent-dialog.tsx:148
 #: src/features/pages/components/page-comments-panel.tsx:87
+#: src/features/projects/components/add-project-dialog.tsx:422
 #: src/features/projects/components/move-to-project-dialog.tsx:95
 #: src/features/projects/components/project-form-dialog.tsx:395
 #: src/features/prompts/components/prompt-form-dialog.tsx:501
@@ -6155,6 +6173,10 @@ msgstr "Escolha o modo de pesquisa"
 msgid "Choose the camera system for your shot"
 msgstr "Escolha o sistema de câmera para a sua cena"
 
+#: src/features/projects/components/add-project-dialog.tsx:272
+msgid "Choose the project's folder, or type a path."
+msgstr ""
+
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:355
 msgid "Choose which tools the assistant may use on its own, which need your approval, and which are off."
 msgstr "Escolha quais ferramentas o assistente pode usar sozinho, quais precisam da sua aprovação e quais ficam desativadas."
@@ -6465,6 +6487,10 @@ msgstr "área de transferência"
 msgid "clock"
 msgstr "relógio"
 
+#: src/features/projects/components/add-project-dialog.tsx:419
+msgid "Clone or create new…"
+msgstr ""
+
 #: ../../packages/ui/src/components/ai-elements/artifact.tsx:31
 #: ../../packages/ui/src/components/countdown-toast-card.tsx:192
 #: ../../packages/ui/src/components/data-grid/data-grid-keyboard-shortcuts.tsx:329
@@ -6720,7 +6746,7 @@ msgstr "Tarefas de programação que exigem o modelo especializado de 30B da Ali
 msgid "Coding tasks requiring Mistral's specialized development-focused model"
 msgstr "Tarefas de programação que exigem o modelo especializado da Mistral voltado para desenvolvimento"
 
-#: src/features/projects/components/project-repositories.tsx:291
+#: src/features/projects/components/project-repositories.tsx:284
 msgid "Coding-agent runs in this project offer these repositories, with the default preselected."
 msgstr "As execuções de agentes de código neste projeto oferecem estes repositórios, com o padrão pré-selecionado."
 
@@ -7522,6 +7548,10 @@ msgstr "Conectado a {0}"
 #: src/routes/auth/extension.tsx:89
 msgid "Connected. You can close this window."
 msgstr "Conectado. Você pode fechar esta janela."
+
+#: src/features/projects/components/add-project-dialog.tsx:277
+msgid "Connecting {pendingKey}…"
+msgstr ""
 
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:392
 msgid "Connecting to your MCP servers..."
@@ -8354,7 +8384,7 @@ msgstr "Não foi possível carregar as chaves de API. Tente novamente mais tarde
 msgid "Could not load image"
 msgstr "Não foi possível carregar a imagem"
 
-#: src/features/projects/components/project-repo-picker.tsx:188
+#: src/features/projects/components/project-repo-picker.tsx:196
 #: src/features/tasks/components/task-form-dialog.tsx:457
 msgid "Could not load more projects."
 msgstr "Não foi possível carregar mais projetos."
@@ -8396,12 +8426,12 @@ msgstr "Não foi possível carregar isto"
 msgid "Could not load this chat's details."
 msgstr ""
 
-#: src/features/projects/components/project-repositories.tsx:296
+#: src/features/projects/components/project-repositories.tsx:289
 msgid "Could not load this project, so its repositories cannot be changed."
 msgstr "Não foi possível carregar este projeto, por isso os seus repositórios não podem ser alterados."
 
-#: src/features/projects/components/project-repo-picker.tsx:226
-#: src/features/projects/components/project-repositories.tsx:317
+#: src/features/projects/components/project-repo-picker.tsx:234
+#: src/features/projects/components/project-repositories.tsx:311
 msgid "Could not load this project's repositories."
 msgstr "Não foi possível carregar os repositórios deste projeto."
 
@@ -8425,7 +8455,7 @@ msgstr "Não foi possível carregar os detalhes de cobrança da sua organizaçã
 msgid "Could not load your saved choices, so Skip and Resume are off until it is read again."
 msgstr ""
 
-#: src/features/projects/components/project-repo-picker.tsx:173
+#: src/features/projects/components/project-repo-picker.tsx:181
 msgid "Could not look up this repository's project."
 msgstr "Não foi possível obter o projeto deste repositório."
 
@@ -8846,8 +8876,6 @@ msgid "Create PR"
 msgstr "Criar PR"
 
 #: src/features/chat/signed-out/signed-out-chat.tsx:147
-#: src/features/chat/thread-list/thread-list-header.tsx:127
-#: src/features/chat/thread-list/thread-list-header.tsx:137
 msgid "Create project"
 msgstr "Criar projeto"
 
@@ -8918,6 +8946,10 @@ msgstr "Crie seu primeiro fluxo de trabalho para automatizar tarefas de IA visua
 #: src/features/skills/components/skill-item.tsx:80
 msgid "Created"
 msgstr "Criado"
+
+#: src/features/projects/components/add-project-dialog.tsx:118
+msgid "Created {path}"
+msgstr ""
 
 #: src/features/skills/components/bundle-import-dialog.tsx:151
 msgid "Created switched off."
@@ -9520,12 +9552,12 @@ msgstr "O LLM de chat avançado experimental da DeepSeek"
 msgid "DeepSeek's experimental advanced chat LLM with thinking"
 msgstr "O LLM de chat avançado experimental da DeepSeek, com raciocínio"
 
-#: src/features/projects/components/project-repositories.tsx:115
+#: src/features/projects/components/project-repositories.tsx:114
 msgid "default"
 msgstr "padrão"
 
 #: src/features/appearance/components/appearance-controls.tsx:164
-#: src/features/projects/components/project-repositories.tsx:349
+#: src/features/projects/components/project-repositories.tsx:343
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:75
 msgid "Default"
 msgstr "Padrão"
@@ -9544,16 +9576,16 @@ msgstr "Idioma padrão das respostas da IA"
 msgid "Default AI Settings"
 msgstr "Configurações padrão da IA"
 
-#: src/features/projects/components/project-repositories.tsx:410
+#: src/features/projects/components/project-repositories.tsx:404
 #: src/features/tasks/components/task-form-dialog.tsx:341
 msgid "Default branch"
 msgstr "Branch padrão"
 
-#: src/features/projects/components/project-repositories.tsx:101
+#: src/features/projects/components/project-repositories.tsx:100
 msgid "Default branch of {name}"
 msgstr "Branch padrão de {name}"
 
-#: src/features/projects/components/project-repositories.tsx:344
+#: src/features/projects/components/project-repositories.tsx:338
 msgid "Default branch:"
 msgstr "Branch padrão:"
 
@@ -14355,6 +14387,14 @@ msgstr "Focar no chat: {title}"
 msgid "Focus Search"
 msgstr "Focar na busca"
 
+#: src/features/projects/components/add-project-dialog.tsx:352
+msgid "Folder path"
+msgstr ""
+
+#: src/features/projects/components/add-project-dialog.tsx:363
+msgid "Folders"
+msgstr ""
+
 #: src/features/appearance/components/appearance-controls.tsx:99
 msgid "Follow my system (default)"
 msgstr "Seguir o sistema (padrão)"
@@ -15347,6 +15387,10 @@ msgstr "Ir para o cofre"
 #: src/features/pages/components/page-invite-accept.tsx:46
 msgid "Go to your pages"
 msgstr "Ir para suas páginas"
+
+#: src/features/projects/components/add-project-dialog.tsx:367
+msgid "Go up to {parent}"
+msgstr ""
 
 #: src/features/chat/goal/composer-goal.tsx:75
 #: src/features/chat/goal/goal-notes.tsx:70
@@ -18644,6 +18688,10 @@ msgstr "Carregando arquivos"
 msgid "Loading files…"
 msgstr "Carregando arquivos…"
 
+#: src/features/projects/components/add-project-dialog.tsx:278
+msgid "Loading folders…"
+msgstr ""
+
 #: src/features/canvas/canvas-panel.tsx:358
 msgid "Loading image editor..."
 msgstr "Carregando editor de imagens..."
@@ -18660,7 +18708,7 @@ msgstr "Carregando imagens"
 msgid "Loading messenger connections..."
 msgstr "Carregando conexões de mensageiros..."
 
-#: src/features/projects/components/project-repo-picker.tsx:167
+#: src/features/projects/components/project-repo-picker.tsx:175
 #: src/features/tasks/components/task-form-dialog.tsx:452
 msgid "Loading more projects…"
 msgstr "Carregando mais projetos…"
@@ -18712,8 +18760,8 @@ msgstr "Carregando pré-visualização..."
 msgid "Loading preview…"
 msgstr "Carregando pré-visualização…"
 
-#: src/features/projects/components/project-repo-picker.tsx:233
-#: src/features/projects/components/project-repositories.tsx:312
+#: src/features/projects/components/project-repo-picker.tsx:241
+#: src/features/projects/components/project-repositories.tsx:305
 msgid "Loading repositories…"
 msgstr "A carregar repositórios…"
 
@@ -19026,6 +19074,10 @@ msgstr "Channel access token de longa duração da aba Messaging API do seu cana
 msgid "Longest the answer may take, in milliseconds"
 msgstr "Tempo máximo que a resposta pode levar, em milissegundos"
 
+#: src/features/projects/components/add-project-dialog.tsx:293
+msgid "Looking for machines…"
+msgstr ""
+
 #: src/features/local-models/components/ollama-model-manager.tsx:166
 msgid "Looking for Ollama at {baseUrl}…"
 msgstr "Procurando o Ollama em {baseUrl}…"
@@ -19109,6 +19161,10 @@ msgstr "Binário Mach-O"
 msgid "Machine"
 msgstr ""
 
+#: src/features/projects/components/add-project-dialog.tsx:297
+msgid "Machines"
+msgstr ""
+
 #: src/features/local-models/components/local-setup-guide.tsx:76
 msgid "macOS"
 msgstr "macOS"
@@ -19145,7 +19201,7 @@ msgstr "Manter a consistência do assunto entre gerações"
 msgid "Major improvements in reasoning and instruction following"
 msgstr "Grandes melhorias em raciocínio e seguimento de instruções"
 
-#: src/features/projects/components/project-repositories.tsx:352
+#: src/features/projects/components/project-repositories.tsx:346
 msgid "Make {name} the default repository"
 msgstr "Definir {name} como repositório padrão"
 
@@ -19153,7 +19209,7 @@ msgstr "Definir {name} como repositório padrão"
 msgid "Make Admin"
 msgstr "Tornar admin"
 
-#: src/features/projects/components/project-repositories.tsx:361
+#: src/features/projects/components/project-repositories.tsx:355
 msgid "Make default"
 msgstr "Definir como padrão"
 
@@ -21580,6 +21636,10 @@ msgstr "Ainda não há arquivos na sua base de conhecimento. Envie documentos ac
 msgid "No focal length selected"
 msgstr "Nenhuma distância focal selecionada"
 
+#: src/features/projects/components/add-project-dialog.tsx:399
+msgid "No folders in here."
+msgstr ""
+
 #: src/features/tasks/components/task-form-dialog.tsx:383
 #: src/features/tasks/components/task-form-dialog.tsx:395
 msgid "No goal"
@@ -21769,7 +21829,7 @@ msgstr "Sem progresso há {quietMinutes} min"
 msgid "No progress: {0}"
 msgstr "Sem progresso: {0}"
 
-#: src/features/projects/components/project-repo-picker.tsx:97
+#: src/features/projects/components/project-repo-picker.tsx:105
 #: src/features/settings/components/chat/usage-project-breakdown.tsx:66
 #: src/features/tasks/components/task-form-dialog.tsx:430
 #: src/features/tasks/components/task-form-dialog.tsx:442
@@ -22718,7 +22778,7 @@ msgstr "Só o dono do chat pode iniciar um novo contexto."
 msgid "Only the owner of the chat can answer. Everyone else in a shared chat sees that the owner has to decide."
 msgstr ""
 
-#: src/features/projects/components/project-repositories.tsx:384
+#: src/features/projects/components/project-repositories.tsx:378
 msgid "Only the project's owner can change its repositories."
 msgstr "Somente o proprietário do projeto pode alterar seus repositórios."
 
@@ -23440,7 +23500,7 @@ msgstr "Prompt otimizado"
 msgid "Optimizing..."
 msgstr "Otimizando..."
 
-#: src/features/projects/components/project-repositories.tsx:419
+#: src/features/projects/components/project-repositories.tsx:413
 #: src/features/prompts/components/prompt-optimize-dialog.tsx:160
 msgid "optional"
 msgstr "opcional"
@@ -24347,7 +24407,7 @@ msgstr "Escolha um modelo para avaliar."
 msgid "Pick a page on the left, or create one with the + button."
 msgstr "Escolha uma página à esquerda ou crie uma com o botão +."
 
-#: src/features/projects/components/project-repo-picker.tsx:214
+#: src/features/projects/components/project-repo-picker.tsx:222
 msgid "Pick a repository"
 msgstr "Escolha um repositório"
 
@@ -24379,6 +24439,10 @@ msgstr "Escolha um item da caixa de entrada para lê-lo."
 #: src/features/skills/components/bundle-export-dialog.tsx:150
 msgid "Pick skills, schedules, webhooks and group chats to share as one Markdown file. API keys, webhook secrets, connector tokens and other credentials are never included, and neither are your account or organization ids."
 msgstr "Escolha habilidades, agendamentos, webhooks e chats em grupo para compartilhar como um único arquivo Markdown. Chaves de API, segredos de webhook, tokens de conectores e outras credenciais nunca são incluídos, nem os IDs da sua conta ou organização."
+
+#: src/features/projects/components/add-project-dialog.tsx:272
+msgid "Pick the computer or server the project's folder is on."
+msgstr ""
 
 #: src/features/chat/components/reference-picker/reference-picker-dialog.tsx:212
 msgid "Pick up to {maxReferences} images. The order you select them is the order the model will see them."
@@ -24915,6 +24979,10 @@ msgstr "Pressione enter ou espaço para selecionar um nó. Depois você pode usa
 msgid "Press enter or space to select an edge. You can then press delete to remove it or escape to cancel."
 msgstr "Pressione enter ou espaço para selecionar uma aresta. Depois você pode pressionar delete para removê-la ou escape para cancelar."
 
+#: src/features/projects/components/add-project-dialog.tsx:361
+msgid "Press Enter to open the folder. A folder that does not exist is created."
+msgstr ""
+
 #: src/features/settings/components/account/account-settings.tsx:225
 msgid "Press Enter to send"
 msgstr "Pressione Enter para enviar"
@@ -25327,7 +25395,7 @@ msgstr "Progresso"
 msgid "Progress of {toolName}"
 msgstr "Progresso de {toolName}"
 
-#: src/features/projects/components/project-repo-picker.tsx:137
+#: src/features/projects/components/project-repo-picker.tsx:145
 #: src/features/settings/components/chat/usage-project-breakdown.tsx:104
 #: src/features/tasks/components/task-form-dialog.tsx:427
 msgid "Project"
@@ -25345,7 +25413,7 @@ msgstr "Contexto do projeto"
 msgid "Project no longer available"
 msgstr "Projeto não está mais disponível"
 
-#: src/features/projects/components/project-repo-picker.tsx:197
+#: src/features/projects/components/project-repo-picker.tsx:205
 msgid "Project repository"
 msgstr "Repositório do projeto"
 
@@ -26697,7 +26765,7 @@ msgid "Remove {modelId} from blocked list"
 msgstr "Remover {modelId} da lista de bloqueados"
 
 #: src/features/pages/components/page-share-dialog.tsx:185
-#: src/features/projects/components/project-repositories.tsx:366
+#: src/features/projects/components/project-repositories.tsx:360
 msgid "Remove {name}"
 msgstr "Remover {name}"
 
@@ -27028,11 +27096,11 @@ msgstr ""
 msgid "Repos, issues, PRs, and code search"
 msgstr "Repositórios, issues, PRs e pesquisa de código"
 
-#: src/features/projects/components/project-repositories.tsx:290
+#: src/features/projects/components/project-repositories.tsx:283
 msgid "Repositories"
 msgstr "Repositórios"
 
-#: src/features/projects/components/project-repositories.tsx:390
+#: src/features/projects/components/project-repositories.tsx:384
 #: src/features/tasks/components/task-form-dialog.tsx:318
 msgid "Repository"
 msgstr "Repositório"
@@ -29374,7 +29442,11 @@ msgstr "Mostrar menos"
 msgid "Show more"
 msgstr "Mostrar mais"
 
-#: src/features/projects/components/project-repo-picker.tsx:167
+#: src/features/projects/components/add-project-dialog.tsx:409
+msgid "Show more folders"
+msgstr ""
+
+#: src/features/projects/components/project-repo-picker.tsx:175
 #: src/features/tasks/components/task-form-dialog.tsx:465
 msgid "Show more projects"
 msgstr "Mostrar mais projetos"
@@ -30407,6 +30479,10 @@ msgstr "Squash e mesclagem"
 #: src/features/chat/core/utils/language-utilities.ts:376
 msgid "Sri Lanka"
 msgstr "Sri Lanka"
+
+#: src/features/projects/components/add-project-dialog.tsx:336
+msgid "SSH hosts come from ~/.ssh/config. Picking one connects it."
+msgstr ""
 
 #: src/features/devices/lib/device-diagnostics.ts:72
 msgid "SSH server via a paired computer"
@@ -33195,7 +33271,7 @@ msgstr "Esta branch tem conflitos com a branch base."
 msgid "This branch is behind its base branch."
 msgstr "Esta branch está atrás da branch base."
 
-#: src/features/projects/components/project-repositories.tsx:197
+#: src/features/projects/components/project-repositories.tsx:190
 msgid "This branch was changed meanwhile. Check it and save again."
 msgstr "Este branch foi alterado entretanto. Verifique-o e guarde novamente."
 
@@ -33457,7 +33533,7 @@ msgstr "Isto já está na conversa."
 msgid "This is how your organization appears to members"
 msgstr "É assim que sua organização aparece para os membros"
 
-#: src/features/projects/components/project-repositories.tsx:188
+#: src/features/projects/components/project-repositories.tsx:181
 msgid "This is not a valid branch name."
 msgstr "Este não é um nome de branch válido."
 
@@ -33493,6 +33569,10 @@ msgstr "Este link está incompleto. Peça o link completo."
 #: src/features/chat/guest-links/guest-page.tsx:98
 msgid "This link is not taking messages right now. Try again later."
 msgstr "Este link não está aceitando mensagens no momento. Tente novamente mais tarde."
+
+#: src/features/projects/components/add-project-dialog.tsx:204
+msgid "This machine is not ready yet."
+msgstr ""
 
 #: src/features/chat/thread/memory-usage-action.tsx:63
 msgid "This memory has since been deleted."
@@ -33612,11 +33692,11 @@ msgstr "Este pull request já tem o máximo de conversas vinculadas que pode man
 msgid "This removes the model files from your computer. You can pull it again later."
 msgstr "Isso remove os arquivos do modelo do seu computador. Você pode baixá-lo novamente depois."
 
-#: src/features/projects/components/project-repositories.tsx:185
+#: src/features/projects/components/project-repositories.tsx:178
 msgid "This repository is already listed."
 msgstr "Este repositório já está na lista."
 
-#: src/features/projects/components/project-repositories.tsx:200
+#: src/features/projects/components/project-repositories.tsx:193
 msgid "This repository URL is too long."
 msgstr "Esta URL de repositório é longa demais."
 
@@ -34554,9 +34634,9 @@ msgstr "Tente ajustar os termos da pesquisa."
 #: src/features/develop/components/files-tab.tsx:275
 #: src/features/develop/components/thread-pull-requests.tsx:169
 #: src/features/home/components/home-page.tsx:152
-#: src/features/projects/components/project-repo-picker.tsx:182
 #: src/features/projects/components/project-repo-picker.tsx:190
-#: src/features/projects/components/project-repositories.tsx:305
+#: src/features/projects/components/project-repo-picker.tsx:198
+#: src/features/projects/components/project-repositories.tsx:298
 #: src/features/tasks/components/task-form-dialog.tsx:459
 msgid "Try again"
 msgstr "Tentar novamente"
@@ -35528,7 +35608,7 @@ msgstr "Use a IA para otimizar seu prompt e ter resultados melhores. Se quiser, 
 msgid "Use all enabled MCP servers"
 msgstr "Usar todos os servidores MCP ativados"
 
-#: src/features/projects/components/project-repositories.tsx:191
+#: src/features/projects/components/project-repositories.tsx:184
 #: src/features/tasks/components/task-form-dialog.tsx:95
 msgid "Use an https:// git URL or GitHub owner/repo"
 msgstr "Use uma URL git https:// ou owner/repo do GitHub"
@@ -36961,6 +37041,10 @@ msgstr "Quando o assistente deve usar esta habilidade?"
 #: src/features/tasks/components/task-form-dialog.tsx:586
 msgid "Where each run goes"
 msgstr "Para onde vai cada execução"
+
+#: src/features/projects/components/add-project-dialog.tsx:269
+msgid "Where is the project?"
+msgstr ""
 
 #: src/features/develop/components/guide-tab.tsx:165
 msgid "Where the guide is written"

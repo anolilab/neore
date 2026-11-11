@@ -38,7 +38,7 @@ const ThreadListHeader: FC<ThreadListHeaderProps> = memo(({ isSearchLoading = fa
 
     const {
         enterSelectionMode,
-        openCreateProjectDialog,
+        openAddProjectDialog,
         searchQuery,
         searchType,
         selectedCategory,
@@ -52,7 +52,7 @@ const ThreadListHeader: FC<ThreadListHeaderProps> = memo(({ isSearchLoading = fa
         useShallow((state) => {
             return {
                 enterSelectionMode: state.enterSelectionMode,
-                openCreateProjectDialog: state.openCreateProjectDialog,
+                openAddProjectDialog: state.openAddProjectDialog,
                 searchQuery: state.searchQuery,
                 searchType: state.searchType,
                 selectedCategory: state.selectedCategory,
@@ -124,9 +124,9 @@ const ThreadListHeader: FC<ThreadListHeaderProps> = memo(({ isSearchLoading = fa
                             <TooltipTrigger
                                 render={
                                     <Button
-                                        aria-label={t`Create project`}
+                                        aria-label={t`Add project`}
                                         className="text-brand-black dark:text-brand-white hover:bg-sidebar-accent hover:text-sidebar-accent-foreground h-9 w-9 p-0"
-                                        onClick={openCreateProjectDialog}
+                                        onClick={openAddProjectDialog}
                                         size="sm"
                                         variant="ghost"
                                     >
@@ -134,7 +134,7 @@ const ThreadListHeader: FC<ThreadListHeaderProps> = memo(({ isSearchLoading = fa
                                     </Button>
                                 }
                             />
-                            <TooltipContent>{t`Create project`}</TooltipContent>
+                            <TooltipContent>{t`Add project`}</TooltipContent>
                         </Tooltip>
                     </TooltipProvider>
                     <CreateGroupChatButton className="text-brand-black dark:text-brand-white hover:bg-sidebar-accent hover:text-sidebar-accent-foreground h-9 w-9 p-0" />

@@ -9,6 +9,8 @@
  * in `apps/desktop/src/preload.ts`.
  */
 
+import type { AddProjectMachinesBridge } from "../../../../desktop/src/add-project-machines.types";
+
 type UnlistenFunction = () => void;
 
 /** A file the shell read from disk for the page; `File` is built from it here. */
@@ -65,6 +67,23 @@ const getNative = (): NativeBridge | undefined => {
 };
 
 export const isNativeShell = (): boolean => getNative() !== undefined;
+
+const ADD_PROJECT_METHODS = [
+    "browseMachineFolders",
+    "connectAddProjectMachine",
+    "createMachineFolder",
+    "listAddProjectMachines",
+    "shareMachineFolder",
+] as const;
+
+/** The machine picker of "Add project", or undefined in a browser and in a shell that lacks it. */
+export const getAddProjectBridge = (): AddProjectMachinesBridge | undefined => {
+    const device = getNative()?.device as Partial<AddProjectMachinesBridge> | undefined;
+
+    return device !== undefined && ADD_PROJECT_METHODS.every((method) => typeof device[method] === "function")
+        ? (device as AddProjectMachinesBridge)
+        : undefined;
+};
 
 export interface NativeNotification {
     body?: string;
