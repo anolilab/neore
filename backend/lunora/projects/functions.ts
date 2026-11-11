@@ -377,7 +377,8 @@ export const listProjectRepos = authQuery
     .input({ projectId: v.id("projects") })
     .output(v.array(vProjectRepo))
     .query(async ({ args: { projectId }, ctx: context }) => {
-        if (!(await readableProject(context, projectId as Id<"projects">, context.user.userId))) {
+        // The project from the primary: a replica that has not seen it move must not still hand out its repositories.
+        if (!(await readableProject(context, projectId as Id<"projects">, context.user.userId, { primary: true }))) {
             throw new LunoraError("NOT_FOUND", "Project not found");
         }
 

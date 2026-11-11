@@ -3,6 +3,7 @@
  * the empty state must not remount the form and drop what was typed.
  */
 import { act, fireEvent, render, screen } from "@testing-library/react";
+import type { ChangeEvent } from "react";
 import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 
@@ -20,7 +21,7 @@ const state = vi.hoisted(() => {
         skills: async () => {
             state.skillLoads += 1;
 
-            return await new Promise<unknown[]>((resolve) => {
+            return await new Promise<unknown[]>((resolve: (skills: unknown[]) => void) => {
                 deferred.resolve = resolve;
             });
         },
@@ -105,7 +106,7 @@ vi.mock("./skill-form-dialog", () => {
 
         return (
             <div role="dialog">
-                <input aria-label="Skill name" onChange={(event) => setName(event.target.value)} value={name} />
+                <input aria-label="Skill name" onChange={(event: ChangeEvent<HTMLInputElement>) => setName(event.target.value)} value={name} />
             </div>
         );
     };

@@ -15,6 +15,7 @@ import { logger } from "../lib/logger";
 import { systemDb } from "../lib/rls/scope";
 import { ROOT_SHARD_KEY } from "../lib/shard-context";
 import { MAX_LENGTH } from "../lib/validators";
+import { PROJECTS_PER_DETAILS_READ } from "./export-pages";
 import { DELETION_MARKER_URL } from "./repositories";
 
 /** A project's repositories, one batch; with `keepMarker`, a delete's marker stays until the delete is done. */
@@ -188,22 +189,28 @@ export const collectProjectRepositoriesForExport = internalQuery
     });
 
 /**
- * A project's details for the export, next to its repositories: its title and whether it is shared (`isPublic`), never the share
- * token (`pages/gdpr.ts` drops a page's the same way). `readBytes` is what reading the whole row cost, `context` and
- * workflow included, so the export can count it against its read budget. `null` for a project that is gone or not
- * the user's.
+ * Projects' details for the export, next to their repositories, in one read: each one's title and whether it is shared
+ * (`isPublic`), never the share token (`pages/gdpr.ts` drops a page's the same way). `readBytes` is what reading the
+ * whole rows cost, `context` and workflow included, so the export can count it against its read budget. A project
+ * that is gone or not the user's is left out.
  */
 export const collectProjectDetailsForExport = internalQuery
-    .input({ projectId: v.id("projects"), userId: v.string().max(MAX_LENGTH.id) })
-    .output(v.object({ project: v.union(v.object({ sharingEnabled: v.boolean(), title: v.string() }), v.null()), readBytes: v.number() }))
-    .query(async ({ args: { projectId, userId }, ctx }) => {
-        const project = await ctx.db.projects.findFirst({ where: { _id: projectId } });
-        const readBytes = project ? new TextEncoder().encode(JSON.stringify(project)).byteLength : 0;
+    .input({ projectIds: v.array(v.id("projects")).max(PROJECTS_PER_DETAILS_READ), userId: v.string().max(MAX_LENGTH.id) })
+    .output(
+        v.object({
+            projects: v.array(v.object({ project: v.object({ sharingEnabled: v.boolean(), title: v.string() }), projectId: v.string() })),
+            readBytes: v.number(),
+        }),
+    )
+    .query(async ({ args: { projectIds, userId }, ctx }) => {
+        const { page } = await ctx.db.projects.findMany({ where: { _id: { in: projectIds } } });
+        const readBytes = page.reduce((total, row) => total + new TextEncoder().encode(JSON.stringify(row)).byteLength, 0);
+        const projects = page
+            .filter((row) => row.userId === userId)
+            .map((row) => {
+                // Shared while it is public: unpublishing keeps the token (so a re-publish keeps its link) but clears `isPublic`.
+                return { project: { sharingEnabled: row.isPublic === true, title: row.title }, projectId: row._id };
+            });
 
-        if (!project || project.userId !== userId) {
-            return { project: null, readBytes };
-        }
-
-        // Shared while it is public: unpublishing keeps the token (so a re-publish keeps its link) but clears `isPublic`.
-        return { project: { sharingEnabled: project.isPublic === true, title: project.title }, readBytes };
+        return { projects, readBytes };
     });

@@ -15,19 +15,24 @@ const B = "user-b";
 
 let harness: ReturnType<typeof lunoraTest>;
 
-const exportFor = async (userId: string, maxBytes = Infinity): Promise<{ pages: number; projectRepositories: unknown[] }> => {
+const exportFor = async (userId: string, maxBytes = Infinity): Promise<{ detailReads: number; pages: number; projectRepositories: unknown[] }> => {
     let pages = 0;
+    let detailReads = 0;
     const { projectRepositories } = await collectAllRepositories(
         async (cursor) => {
             pages += 1;
 
             return await harness.run((async (ctx: any) => await ctx.runQuery(collectProjectRepositoriesForExport, { cursor, userId })) as never);
         },
-        async (projectId) => await harness.run((async (ctx: any) => await ctx.runQuery(collectProjectDetailsForExport, { projectId, userId })) as never),
+        async (projectIds) => {
+            detailReads += 1;
+
+            return await harness.run((async (ctx: any) => await ctx.runQuery(collectProjectDetailsForExport, { projectIds, userId })) as never);
+        },
         maxBytes,
     );
 
-    return { pages, projectRepositories };
+    return { detailReads, pages, projectRepositories };
 };
 
 beforeEach(() => {
@@ -72,22 +77,28 @@ describe("project repositories in the GDPR export", () => {
         expect(JSON.stringify(projectRepositories)).not.toMatch(SHARE_TOKENS);
     });
 
-    it("marks a project's details as left out once its reads pass the budget, and still exports every repository", async () => {
+    it("reads projects two to a query, and marks the details left out once the reads pass the budget", async () => {
         await harness.run((async (ctx: any) => {
-            for (const title of ["First", "Second"]) {
+            for (const title of ["One", "Two", "Three", "Four", "Five", "Six"]) {
                 const projectId = await ctx.db.insert("projects", { context: "x".repeat(5000), createdAt: 1, title, userId: A });
 
                 await ctx.db.insert("projectRepositories", { createdAt: 1, projectId, url: `https://github.com/o/${title}.git`, userId: A });
             }
         }) as never);
 
-        // Room for the rows and the first project's read (about 5 KB), which uses up the rest: the second is not read.
-        const { projectRepositories } = await exportFor(A, 3000);
+        const all = await exportFor(A);
 
-        // Whichever project is read first gets its details; the other is marked, and both repositories are exported.
-        expect(projectRepositories).toHaveLength(2);
-        expect(projectRepositories.filter((row) => "title" in (row as { project: object }).project)).toHaveLength(1);
-        expect(projectRepositories.filter((row) => "detailsOmitted" in (row as { project: object }).project)).toHaveLength(1);
+        expect(all.detailReads).toBe(3);
+        expect(all.projectRepositories.filter((row) => "title" in (row as { project: object }).project)).toHaveLength(6);
+
+        // Room for the rows and the first read of two projects (about 10 KB), which uses up the rest: the other four are
+        // not read, and every repository is still exported.
+        const capped = await exportFor(A, 3000);
+
+        expect(capped.detailReads).toBe(1);
+        expect(capped.projectRepositories).toHaveLength(6);
+        expect(capped.projectRepositories.filter((row) => "title" in (row as { project: object }).project)).toHaveLength(2);
+        expect(capped.projectRepositories.filter((row) => "detailsOmitted" in (row as { project: object }).project)).toHaveLength(4);
     });
 
     it("pages past one page (230 rows over 3 pages of 100) and reports done only after the last", async () => {
@@ -114,7 +125,7 @@ describe("project repositories in the GDPR export", () => {
             collectAllRepositories(
                 async () => page(),
                 async () => {
-                    return { project: null, readBytes: 0 };
+                    return { projects: [], readBytes: 0 };
                 },
                 1000,
             ),

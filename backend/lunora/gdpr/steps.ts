@@ -604,8 +604,11 @@ export const generateExportFile = internalAction
         // The user's repository rows with their projects' details (`projects/gdpr.ts`), read here a page per query.
         const repositories = await collectAllRepositories(
             async (cursor) => await context.runQuery(internal.projects.gdpr.collectProjectRepositoriesForExport, { cursor, userId: args.userId }),
-            async (projectId) =>
-                await context.runQuery(internal.projects.gdpr.collectProjectDetailsForExport, { projectId: projectId as Id<"projects">, userId: args.userId }),
+            async (projectIds) =>
+                await context.runQuery(internal.projects.gdpr.collectProjectDetailsForExport, {
+                    projectIds: projectIds as Id<"projects">[],
+                    userId: args.userId,
+                }),
             repositoriesReadBudget(acpReadBytes),
         );
         const projectRepositories = { projectRepositories: repositories.projectRepositories };

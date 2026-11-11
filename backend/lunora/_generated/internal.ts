@@ -1030,7 +1030,7 @@ export interface InternalApiTypes {
             getProjectContextForRun: FunctionReference<"query", { projectId: Id<"projects">; userId: string }, string | null>;
         };
         gdpr: {
-            collectProjectDetailsForExport: FunctionReference<"query", { projectId: Id<"projects">; userId: string }, { project: { sharingEnabled: boolean; title: string } | null; readBytes: number }>;
+            collectProjectDetailsForExport: FunctionReference<"query", { projectIds: Array<Id<"projects">>; userId: string }, { projects: Array<{ project: { sharingEnabled: boolean; title: string }; projectId: string }>; readBytes: number }>;
             collectProjectRepositoriesForExport: FunctionReference<"query", { cursor?: string | null; userId: string }, { cursor: string | null; projectRepositories: Array<unknown> }>;
             eraseOrganizationRepositories: FunctionReference<"mutation", { cursor?: string; organizationId: string }, null>;
             sweepOrphanedOrganizationRepositories: FunctionReference<"mutation", { cursor?: string }, null>;

@@ -18,14 +18,24 @@ vi.mock("@lingui/react/macro", () => {
 });
 
 const backend = vi.hoisted(() => {
-    return { add: vi.fn(), update: vi.fn() };
+    return { add: vi.fn(), listReads: 0, update: vi.fn() };
 });
 
 vi.mock("@/lib/lunora/crpc", () => {
     const query = (name: string, data: unknown) => {
         return {
+            queryKey: (args: unknown) => [name, args],
             queryOptions: (args: unknown) => {
-                return { queryFn: async () => data, queryKey: [name, args] };
+                return {
+                    queryFn: async () => {
+                        if (name === "listProjectRepos") {
+                            backend.listReads += 1;
+                        }
+
+                        return data;
+                    },
+                    queryKey: [name, args],
+                };
             },
         };
     };
@@ -38,6 +48,16 @@ vi.mock("@/lib/lunora/crpc", () => {
     };
 
     return {
+        // The one-shot read a change ends with (`refreshList`).
+        useCRPCClient: () => {
+            return {
+                query: async () => {
+                    backend.listReads += 1;
+
+                    return [];
+                },
+            };
+        },
         useCRPC: () => {
             return {
                 projects: {
@@ -152,5 +172,17 @@ describe("ProjectRepositories", () => {
         expect(branch.getAttribute("aria-invalid")).toBe("true");
         expect(branch.getAttribute("aria-describedby")).toBe(alert.id);
         expect(screen.getByRole("textbox", { name: "Repository" }).getAttribute("aria-invalid")).toBe("false");
+    });
+
+    it("reads the list again once an added repository lands", async () => {
+        backend.add.mockResolvedValue("r2");
+        backend.listReads = 0;
+        renderSection();
+
+        fireEvent.change(await screen.findByRole("textbox", { name: "Repository" }), { target: { value: "acme/api" } });
+        await vi.waitFor(() => expect(backend.listReads).toBe(1));
+        fireEvent.click(screen.getByRole("button", { name: "Add" }));
+
+        await vi.waitFor(() => expect(backend.listReads).toBe(2));
     });
 });

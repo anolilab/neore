@@ -1,19 +1,20 @@
 "use client";
 
 import { useLingui } from "@lingui/react/macro";
+import { api } from "@neore/backend/api";
 import type { Id } from "@neore/backend/dataModel";
 import { Badge } from "@neore/ui/components/badge";
 import { Button } from "@neore/ui/components/button";
 import { Input } from "@neore/ui/components/input";
 import { Label } from "@neore/ui/components/label";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { GitBranch, Plus, Trash2 } from "lucide-react";
 import type { FC, KeyboardEvent } from "react";
 import { useEffect, useId, useRef, useState } from "react";
 
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 import { getLocalizedError } from "@/features/auth/lib/utilities";
-import { useCRPC } from "@/lib/lunora/crpc";
+import { useCRPC, useCRPCClient } from "@/lib/lunora/crpc";
 
 import { repoLabels } from "../lib/repositories";
 
@@ -150,6 +151,17 @@ const ProjectRepositories: FC<{ projectId: string }> = ({ projectId }) => {
     const removed = useMutation(crpc.projects.functions.removeProjectRepo.mutationOptions());
     const madeDefault = useMutation(crpc.projects.functions.setDefaultProjectRepo.mutationOptions());
     const updated = useMutation(crpc.projects.functions.updateProjectRepo.mutationOptions());
+    const queryClient = useQueryClient();
+    const crpcClient = useCRPCClient();
+    // The list is live, but after each change, landed or refused, a one-shot read writes the current list into the same
+    // cache entry, so the settings never wait on the subscription to report the change. The query's own options stay
+    // as they are: `fetchQuery` would replace them, and with them the live marker.
+    const refreshList = () => {
+        void crpcClient
+            .query(api.projects.functions.listProjectRepos, args)
+            .then((list) => queryClient.setQueryData(crpc.projects.functions.listProjectRepos.queryKey(args), list))
+            .catch(() => undefined);
+    };
     const canEdit = !!project && (!project.userId || project.userId === sessionData?.user?.id);
     // Until the session has answered, an owner would read as someone else: say nothing rather than "owner only".
     const readOnly = !!project && !canEdit && sessionData !== undefined;
@@ -186,9 +198,15 @@ const ProjectRepositories: FC<{ projectId: string }> = ({ projectId }) => {
     /** Runs a row's branch change; a refusal comes back for that row to show, never on the Add form. */
     const saveBranch = async (repoId: Id<"projectRepositories">, defaultBranch: string, revision: number): Promise<BranchSave> => {
         try {
-            return { revision: await updated.mutateAsync({ defaultBranch, repoId, revision }) };
+            const saved = await updated.mutateAsync({ defaultBranch, repoId, revision });
+
+            refreshList();
+
+            return { revision: saved };
         } catch (changeError) {
             const { revision: current } = refusalOf(changeError) as { revision?: unknown };
+
+            refreshList();
 
             return { error: messageFor(changeError), ...(typeof current === "number" && { staleRevision: current }) };
         }
@@ -198,10 +216,12 @@ const ProjectRepositories: FC<{ projectId: string }> = ({ projectId }) => {
     const run = async (change: () => Promise<unknown>): Promise<boolean> => {
         try {
             await change();
+            refreshList();
             setError(undefined);
 
             return true;
         } catch (changeError) {
+            refreshList();
             setError({ field: refusalOf(changeError).field, message: messageFor(changeError) });
 
             return false;
