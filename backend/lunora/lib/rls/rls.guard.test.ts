@@ -58,7 +58,7 @@ const SYSTEM_DB_IMPORTERS = [
     // The owner of a thread a message write links files under (`chatFileThreads`); the link is written, never returned.
     "agent/files.ts",
     "gdpr/functions.ts",
-    "skills/functions.ts",
+    "skills/create-skill.ts",
     // Whether the lead is shared at all, before a worker is allowed to reach the owner's computer: a refusal, never rows.
     "sub-agents/functions.ts",
     "skills/marketplace.ts",

@@ -44,6 +44,7 @@ import {
 } from "./evals/validators";
 import { AUDIT_TABLES, auditTriggersFor } from "./lib/audit-triggers";
 import { vCapabilityReport } from "./lib/capability-report";
+import { vPluginInstallStatus, vPluginItemKind, vPluginItemState } from "./plugins/validators";
 import { notificationInputFields } from "./notifications/validators";
 import {
     vCachedRequest,
@@ -1654,6 +1655,37 @@ export const schema = defineSchema({
         .index("slug", ["slug"])
         .triggers((t) => auditTriggersFor(t, "organization", AUDIT_TABLES["organization"]!)),
 
+    // A plugin install and the children it created. Global: install state must be readable without a user's shard.
+    pluginInstalls: defineTable({
+        contentHash: v.string(),
+        generation: v.number(),
+        installedAt: v.number(),
+        leaseUntil: v.optional(v.number()),
+        pluginSlug: v.string(),
+        status: vPluginInstallStatus,
+        targetVersion: v.optional(v.string()),
+        updatedAt: v.number(),
+        userId: v.string(),
+        version: v.string(),
+    })
+        .global()
+        .index("by_user_and_slug", ["userId", "pluginSlug"]),
+
+    pluginItems: defineTable({
+        contentHash: v.string(),
+        createdAt: v.number(),
+        entryKey: v.string(),
+        installId: v.string(),
+        itemId: v.optional(v.string()),
+        kind: vPluginItemKind,
+        pendingHash: v.optional(v.string()),
+        state: vPluginItemState,
+        userId: v.string(),
+    })
+        .global()
+        .index("by_install", ["installId"])
+        .index("by_user", ["userId"]),
+
     organizationPolicies: defineTable({
         // The policy as canonical JSON text, written only after `auth/lib/organization-policy.ts`
         // accepted it. Text, not a typed object, so the parser stays the one place that knows its shape.
@@ -2580,9 +2612,12 @@ export const schema = defineSchema({
         instructions: v.string(),
         name: v.string(),
         organizationId: v.optional(v.string()),
+        pluginInstallId: v.optional(v.string()),
+        pluginMarker: v.optional(v.string()),
         slug: v.string(),
         source: v.union(
             v.object({ type: v.literal("editor") }),
+            v.object({ type: v.literal("plugin"), version: v.string() }),
             v.object({ commitSha: v.optional(v.string()), path: v.optional(v.string()), repoUrl: v.string(), type: v.literal("github") }),
             v.object({ originalSkillId: v.string(), type: v.literal("official") }),
             v.object({ filename: v.string(), type: v.literal("upload"), uploadedAt: v.number() }),
@@ -2603,6 +2638,8 @@ export const schema = defineSchema({
         .index("by_organization", ["organizationId"])
         .index("by_category", ["category"])
         .index("by_visibility", ["visibility"])
+        .index("by_plugin_install", ["pluginInstallId"])
+        .index("by_plugin_marker", ["pluginMarker"])
         .searchIndex("search_skills_name", { field: "name", filterFields: ["userId"] })
         .searchIndex("search_skills_description", { field: "description", filterFields: ["userId"] })
         .relations((r) => {
@@ -3140,6 +3177,9 @@ export const schema = defineSchema({
         }),
 
     threads: defineTable({
+        // A plugin install's child. Written only by internal wrappers.
+        pluginInstallId: v.optional(v.string()),
+        pluginMarker: v.optional(v.string()),
         // Cache of the agent the active path runs on, for the thread list and the composer's
         // first paint; the path's last `agentSwitch` row decides (`agent/agent-switch.ts`).
         // Unset = the thread was never switched, and every send keeps its own model.
@@ -3255,6 +3295,8 @@ export const schema = defineSchema({
         .index("by_user_and_order", ["userId", "order"])
         // Home's "recent threads" and the Daily Brief's "threads touched since".
         .index("by_user_and_updatedAt", ["userId", "updatedAt"])
+        .index("by_plugin_install", ["pluginInstallId"])
+        .index("by_plugin_marker", ["pluginMarker"])
         .index("by_user_and_organization_and_updatedAt", ["userId", "organizationId", "updatedAt"])
         .searchIndex("title", { field: "title", filterFields: ["userId"] })
         .searchIndex("summary", { field: "summary", filterFields: ["userId"] })
@@ -3431,6 +3473,8 @@ export const schema = defineSchema({
         webhookPreviousSecret: v.optional(v.string()),
         webhookPreviousSecretExpiresAt: v.optional(v.number()),
         webhookSecret: v.optional(v.string()),
+        pluginInstallId: v.optional(v.string()),
+        pluginMarker: v.optional(v.string()),
         // How a webhook delivery is signed; unset = "timestamped" (`triggers/http.ts`).
         // A trigger accepts only its own scheme's headers. Widening this union is additive.
         webhookSignatureScheme: v.optional(vWebhookSignatureScheme),
@@ -3441,7 +3485,9 @@ export const schema = defineSchema({
         .index("by_enabled_nextTriggerAt", ["enabled", "nextTriggerAt"])
         // The active-watcher cap counts one user's switched-on event triggers; the dispatcher reads the due ones in order. Both stop at a bound.
         .index("by_userId_type_enabled", ["userId", "type", "enabled"])
-        .index("by_type_enabled_nextTriggerAt", ["type", "enabled", "nextTriggerAt"]),
+        .index("by_type_enabled_nextTriggerAt", ["type", "enabled", "nextTriggerAt"])
+        .index("by_plugin_install", ["pluginInstallId"])
+        .index("by_plugin_marker", ["pluginMarker"]),
 
     twoFactor: defineTable({
         backupCodes: v.string(),

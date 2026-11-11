@@ -2,13 +2,13 @@
 // Run `lunora codegen` to regenerate.
 
 import { DEFER_VALIDATION as DEFER, installCompiledValidatorMap } from "lunorash/values";
-import * as lunora_skills_jit_tool_loader_200 from "../../skills/jit-tool-loader.js";
+import * as lunora_tasks_execute_224 from "../../tasks/execute.js";
 
 /** Install the precompiled argument parsers before the module is dispatched. */
-installCompiledValidatorMap(lunora_skills_jit_tool_loader_200.getSkillToolConfig.args, (source) => {
+installCompiledValidatorMap(lunora_tasks_execute_224.finishCodingAgentRound.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
-if (typeof source["skillId"] !== "string") return DEFER;
-return { "skillId": source["skillId"] };
+if (typeof source["codingRunId"] !== "string") return DEFER;
+return { "codingRunId": source["codingRunId"] };
 });
-export * from "../../skills/jit-tool-loader.js";
+export * from "../../tasks/execute.js";

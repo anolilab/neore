@@ -685,6 +685,9 @@ export const vThreadDocFields = {
     _id: v.string(),
     // Written only by `agent/agent-switch.ts`, which keeps it in step with the active path.
     activeAgent: v.optional(vAgentRef),
+    // A plugin install's child, written only by its internal wrapper.
+    pluginInstallId: v.optional(v.string()),
+    pluginMarker: v.optional(v.string()),
     // Written only by `agent/branches.ts` (the switcher, regenerate, edit), so
     // deliberately not a create field.
     activeLeafMessageId: v.optional(v.string()),

@@ -310,6 +310,40 @@ export const organization = sqliteTable("organization", {
     slug: index("slug").on(t.slug),
 }));
 
+export const pluginInstalls = sqliteTable("pluginInstalls", {
+    _id: text("_id").primaryKey(),
+    _creationTime: integer("_creationTime").notNull(),
+    contentHash: text("contentHash").notNull(),
+    generation: real("generation").notNull(),
+    installedAt: real("installedAt").notNull(),
+    leaseUntil: real("leaseUntil"),
+    pluginSlug: text("pluginSlug").notNull(),
+    status: text("status", { mode: "json" }).$type<"installing" | "installed" | "updating" | "uninstalling" | "needs-repair">().notNull(),
+    targetVersion: text("targetVersion"),
+    updatedAt: real("updatedAt").notNull(),
+    userId: text("userId").notNull(),
+    version: text("version").notNull(),
+}, (t) => ({
+    by_user_and_slug: index("by_user_and_slug").on(t.userId, t.pluginSlug),
+}));
+
+export const pluginItems = sqliteTable("pluginItems", {
+    _id: text("_id").primaryKey(),
+    _creationTime: integer("_creationTime").notNull(),
+    contentHash: text("contentHash").notNull(),
+    createdAt: real("createdAt").notNull(),
+    entryKey: text("entryKey").notNull(),
+    installId: text("installId").notNull(),
+    itemId: text("itemId"),
+    kind: text("kind", { mode: "json" }).$type<"skill" | "trigger" | "group">().notNull(),
+    pendingHash: text("pendingHash"),
+    state: text("state", { mode: "json" }).$type<"intent" | "created" | "updating" | "detached">().notNull(),
+    userId: text("userId").notNull(),
+}, (t) => ({
+    by_install: index("by_install").on(t.installId),
+    by_user: index("by_user").on(t.userId),
+}));
+
 export const organizationPolicies = sqliteTable("organizationPolicies", {
     _id: text("_id").primaryKey(),
     _creationTime: integer("_creationTime").notNull(),
@@ -597,8 +631,10 @@ export const skills = sqliteTable("skills", {
     instructions: text("instructions").notNull(),
     name: text("name").notNull(),
     organizationId: text("organizationId"),
+    pluginInstallId: text("pluginInstallId"),
+    pluginMarker: text("pluginMarker"),
     slug: text("slug").notNull(),
-    source: text("source", { mode: "json" }).$type<{ type: "editor" } | { commitSha?: string; path?: string; repoUrl: string; type: "github" } | { originalSkillId: string; type: "official" } | { filename: string; type: "upload"; uploadedAt: number }>().notNull(),
+    source: text("source", { mode: "json" }).$type<{ type: "editor" } | { type: "plugin"; version: string } | { commitSha?: string; path?: string; repoUrl: string; type: "github" } | { originalSkillId: string; type: "official" } | { filename: string; type: "upload"; uploadedAt: number }>().notNull(),
     tags: text("tags", { mode: "json" }).$type<Array<string>>(),
     updatedAt: real("updatedAt"),
     userId: text("userId").notNull(),
@@ -610,6 +646,8 @@ export const skills = sqliteTable("skills", {
     by_organization: index("by_organization").on(t.organizationId),
     by_category: index("by_category").on(t.category),
     by_visibility: index("by_visibility").on(t.visibility),
+    by_plugin_install: index("by_plugin_install").on(t.pluginInstallId),
+    by_plugin_marker: index("by_plugin_marker").on(t.pluginMarker),
 }));
 
 export const skillStats = sqliteTable("skillStats", {

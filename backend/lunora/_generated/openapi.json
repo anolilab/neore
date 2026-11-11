@@ -16620,6 +16620,12 @@
                                 ],
                                 "type": "object"
                               },
+                              "pluginInstallId": {
+                                "type": "string"
+                              },
+                              "pluginMarker": {
+                                "type": "string"
+                              },
                               "activeLeafMessageId": {
                                 "type": "string"
                               },
@@ -19378,6 +19384,12 @@
                           "model"
                         ],
                         "type": "object"
+                      },
+                      "pluginInstallId": {
+                        "type": "string"
+                      },
+                      "pluginMarker": {
+                        "type": "string"
                       },
                       "activeLeafMessageId": {
                         "type": "string"

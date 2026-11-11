@@ -1650,6 +1650,8 @@ export const threadRelationships = sqliteTable("threadRelationships", {
 export const threads = sqliteTable("threads", {
     _id: text("_id").primaryKey(),
     _creationTime: integer("_creationTime").notNull(),
+    pluginInstallId: text("pluginInstallId"),
+    pluginMarker: text("pluginMarker"),
     activeAgent: text("activeAgent", { mode: "json" }).$type<{ kind: "model"; model: string }>(),
     activeLeafMessageId: text("activeLeafMessageId"),
     autoModel: integer("autoModel", { mode: "boolean" }),
@@ -1717,6 +1719,8 @@ export const threads = sqliteTable("threads", {
     by_userId_externalThreadId: index("by_userId_externalThreadId").on(t.userId, t.externalThreadId),
     by_user_and_order: index("by_user_and_order").on(t.userId, t.order),
     by_user_and_updatedAt: index("by_user_and_updatedAt").on(t.userId, t.updatedAt),
+    by_plugin_install: index("by_plugin_install").on(t.pluginInstallId),
+    by_plugin_marker: index("by_plugin_marker").on(t.pluginMarker),
     by_user_and_organization_and_updatedAt: index("by_user_and_organization_and_updatedAt").on(t.userId, t.organizationId, t.updatedAt),
 }));
 
@@ -1827,6 +1831,8 @@ export const triggers = sqliteTable("triggers", {
     webhookPreviousSecret: text("webhookPreviousSecret"),
     webhookPreviousSecretExpiresAt: real("webhookPreviousSecretExpiresAt"),
     webhookSecret: text("webhookSecret"),
+    pluginInstallId: text("pluginInstallId"),
+    pluginMarker: text("pluginMarker"),
     webhookSignatureScheme: text("webhookSignatureScheme", { mode: "json" }).$type<"timestamped" | "native" | "gitlab-token">(),
 }, (t) => ({
     by_userId_organizationId: index("by_userId_organizationId").on(t.userId, t.organizationId),
@@ -1834,6 +1840,8 @@ export const triggers = sqliteTable("triggers", {
     by_enabled_nextTriggerAt: index("by_enabled_nextTriggerAt").on(t.enabled, t.nextTriggerAt),
     by_userId_type_enabled: index("by_userId_type_enabled").on(t.userId, t.type, t.enabled),
     by_type_enabled_nextTriggerAt: index("by_type_enabled_nextTriggerAt").on(t.type, t.enabled, t.nextTriggerAt),
+    by_plugin_install: index("by_plugin_install").on(t.pluginInstallId),
+    by_plugin_marker: index("by_plugin_marker").on(t.pluginMarker),
 }));
 
 export const usageBackfill = sqliteTable("usageBackfill", {

@@ -2,16 +2,16 @@
 // Run `lunora codegen` to regenerate.
 
 import { DEFER_VALIDATION as DEFER, installCompiledValidatorMap } from "lunorash/values";
-import * as lunora_source_control_freshness_internal_202 from "../../source-control/freshness-internal.js";
+import * as lunora_source_control_freshness_internal_203 from "../../source-control/freshness-internal.js";
 
 /** Install the precompiled argument parsers before the module is dispatched. */
-installCompiledValidatorMap(lunora_source_control_freshness_internal_202.getWatchForPoll.args, (source) => {
+installCompiledValidatorMap(lunora_source_control_freshness_internal_203.getWatchForPoll.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["watchId"] !== "string") return DEFER;
 return { "watchId": source["watchId"] };
 });
-installCompiledValidatorMap(lunora_source_control_freshness_internal_202.getWatchForWebhook.args, (source) => {
+installCompiledValidatorMap(lunora_source_control_freshness_internal_203.getWatchForWebhook.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["watchId"] !== "string") return DEFER;

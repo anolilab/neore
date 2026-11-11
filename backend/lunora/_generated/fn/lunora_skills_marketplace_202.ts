@@ -2,44 +2,38 @@
 // Run `lunora codegen` to regenerate.
 
 import { DEFER_VALIDATION as DEFER, installCompiledValidatorMap } from "lunorash/values";
-import * as lunora_tasks_functions_224 from "../../tasks/functions.js";
+import * as lunora_skills_marketplace_202 from "../../skills/marketplace.js";
 
 /** Install the precompiled argument parsers before the module is dispatched. */
-installCompiledValidatorMap(lunora_tasks_functions_224.cancelTask.args, (source) => {
+installCompiledValidatorMap(lunora_skills_marketplace_202.forkSkill.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
-if (typeof source["taskId"] !== "string") return DEFER;
-return { "taskId": source["taskId"] };
+if (typeof source["skillId"] !== "string") return DEFER;
+return { "skillId": source["skillId"] };
 });
-installCompiledValidatorMap(lunora_tasks_functions_224.deleteGoal.args, (source) => {
+installCompiledValidatorMap(lunora_skills_marketplace_202.getSkillDetail.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
-if (typeof source["goalId"] !== "string") return DEFER;
-return { "goalId": source["goalId"] };
+if (typeof source["skillId"] !== "string") return DEFER;
+return { "skillId": source["skillId"] };
 });
-installCompiledValidatorMap(lunora_tasks_functions_224.deleteTask.args, (source) => {
+installCompiledValidatorMap(lunora_skills_marketplace_202.installSkill.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
-if (typeof source["taskId"] !== "string") return DEFER;
-return { "taskId": source["taskId"] };
+if (typeof source["skillId"] !== "string") return DEFER;
+return { "skillId": source["skillId"] };
 });
-installCompiledValidatorMap(lunora_tasks_functions_224.getTaskRuns.args, (source) => {
+installCompiledValidatorMap(lunora_skills_marketplace_202.rateSkill.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
-let __has1 = false;
-let __val1;
-if (source["limit"] !== undefined) {
-if (typeof source["limit"] !== "number" || !Number.isFinite(source["limit"])) return DEFER;
-__val1 = source["limit"];
-__has1 = true;
-}
-if (typeof source["taskId"] !== "string") return DEFER;
-return { ...(__has1 ? { "limit": __val1 } : {}), "taskId": source["taskId"] };
+if (typeof source["rating"] !== "number" || !Number.isFinite(source["rating"])) return DEFER;
+if (typeof source["skillId"] !== "string") return DEFER;
+return { "rating": source["rating"], "skillId": source["skillId"] };
 });
-installCompiledValidatorMap(lunora_tasks_functions_224.runTask.args, (source) => {
+installCompiledValidatorMap(lunora_skills_marketplace_202.uninstallSkill.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
-if (typeof source["taskId"] !== "string") return DEFER;
-return { "taskId": source["taskId"] };
+if (typeof source["skillId"] !== "string") return DEFER;
+return { "skillId": source["skillId"] };
 });
-export * from "../../tasks/functions.js";
+export * from "../../skills/marketplace.js";
