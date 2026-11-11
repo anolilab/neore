@@ -618,10 +618,10 @@ overrides:
   # 8.x and split that arrangement.
   "@babel/core@<7.29.6": 7.29.7
   "@babel/plugin-transform-modules-systemjs@>=7.12.0 <=7.29.3": ">=7.29.4"
-  # node-forge <=1.4.0 (PEM ReDoS, PKCS#12 MAC forgery, TLS DoS, basicConstraints
-  # bypass, AES-GCM tag length, among others), all fixed in 1.4.1. Reached only
-  # through apps/mobile's Expo CLI chain (@expo/code-signing-certificates).
-  "node-forge@<=1.4.0": 1.4.1
+  # node-forge <=1.4.2 (PEM ReDoS, PKCS#12 MAC forgery, TLS DoS, basicConstraints
+  # bypass, AES-GCM tag length, Ed25519 small-order keys, among others), all fixed
+  # in 1.4.3. Reached only through the Expo CLI chain (@expo/code-signing-certificates).
+  "node-forge@<=1.4.2": 1.4.3
   # Babel 7's traverse gets the Babel 7 types it was built for. The React
   # Compiler checks patterns with `path.isLVal()`, which @babel/traverse answers
   # from ITS @babel/types; under the global 8.0.4 override that dropped
