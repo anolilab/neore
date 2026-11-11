@@ -1260,6 +1260,7 @@ export interface InternalApiTypes {
         functions: {
             admitTriggerRun: FunctionReference<"mutation", { claim?: { claimedAt: number; key: string; scope: string }; executionId?: Id<"triggerExecutions">; filterPayload?: string; releaseUnlessRun?: boolean; requireEnabled?: boolean; triggerId: Id<"triggers"> }, null | string | { filtered: string } | { skipped: "disabled" | "duplicate" }>;
             createExecution: FunctionReference<"mutation", { firing?: number; payload?: string; triggerId: Id<"triggers"> }, Id<"triggerExecutions">>;
+            createPluginTrigger: FunctionReference<"mutation", { botComputer?: boolean; botId?: string; cronExpression?: string; description?: string; eventSource?: { contains?: string; cooldownMinutes?: number; intervalMinutes?: number; kind: "page"; selector?: string; url: string } | { at: number; kind: "time" } | { cooldownMinutes?: number; intervalMinutes?: number; kind: "thread"; threadId: string }; filters?: Array<{ op: "equals" | "not_equals" | "contains" | "starts_with" | "exists" | "not_exists"; path: string; value?: string }>; inputTemplate?: string; model: string; name: string; quietWhenEmpty?: boolean; searchMode?: string; systemPrompt?: string; timezone?: string; type: "event" | "schedule" | "webhook"; webhookPreset?: { event: "pull_request_opened" | "pull_request_merged" | "pull_request_review_requested" | "issue_assigned"; provider: "github" } | { event: "merge_request_opened" | "merge_request_merged"; provider: "gitlab" }; webhookSignatureScheme?: "timestamped" | "native" | "gitlab-token"; plan?: string; pluginInstallId: string; pluginMarker: string; userId: string }, { triggerId: string; webhookSecret?: string }>;
             getDueScheduleTriggers: FunctionReference<"query", { now: number }, import("./dataModel.js").Doc_triggers[]>;
             getTriggerInternal: FunctionReference<"query", { triggerId: Id<"triggers"> }, import("./dataModel.js").Doc_triggers | null>;
             pruneExpiredRunPrompts: FunctionReference<"mutation", {}, null>;
@@ -2583,6 +2584,7 @@ export const internal: InternalApiTypes = {
         functions: {
             admitTriggerRun: { __lunoraRef: "triggers_functions:admitTriggerRun" },
             createExecution: { __lunoraRef: "triggers_functions:createExecution" },
+            createPluginTrigger: { __lunoraRef: "triggers_functions:createPluginTrigger" },
             getDueScheduleTriggers: { __lunoraRef: "triggers_functions:getDueScheduleTriggers" },
             getTriggerInternal: { __lunoraRef: "triggers_functions:getTriggerInternal" },
             pruneExpiredRunPrompts: { __lunoraRef: "triggers_functions:pruneExpiredRunPrompts" },
