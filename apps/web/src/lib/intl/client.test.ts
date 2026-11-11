@@ -40,4 +40,15 @@ describe(dynamicActivate, () => {
 
         expect(i18n.loadAndActivate).toHaveBeenCalledExactlyOnceWith({ locale: "fr", messages: { greeting: "Bonjour" } });
     });
+
+    it("activates both when two requests' i18n instances load at the same time", async () => {
+        // The server makes an i18n instance per request: one request's activation must not cancel another's.
+        const first = { loadAndActivate: vi.fn() } as unknown as I18n;
+        const second = { loadAndActivate: vi.fn() } as unknown as I18n;
+
+        await Promise.all([dynamicActivate(first, "de"), dynamicActivate(second, "fr")]);
+
+        expect(first.loadAndActivate).toHaveBeenCalledExactlyOnceWith({ locale: "de", messages: { greeting: "Hallo" } });
+        expect(second.loadAndActivate).toHaveBeenCalledExactlyOnceWith({ locale: "fr", messages: { greeting: "Bonjour" } });
+    });
 });

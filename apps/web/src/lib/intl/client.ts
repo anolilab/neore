@@ -8,19 +8,21 @@ import { DEFAULT_LOCALE, extractLocaleFromPath, parseLocaleCookie, shouldIgnoreP
 // Re-export everything from shared so existing import paths keep working
 export { DEFAULT_LOCALE, extractLocaleFromPath, isLocaleValid, locales, parseLocaleCookie, shouldIgnorePath } from "./shared";
 
-const activations = { latest: 0 };
+/** The latest activation per i18n instance: the server makes one per request, and requests must not cancel each other. */
+const latestActivation = new WeakMap<I18n, number>();
 
 /**
- * We do a dynamic import of just the catalog that we need. The latest call wins: an earlier one whose catalog loads
- * last (the offline shell's switch, then a pick in the locale menu) must not replace the newer choice.
+ * We do a dynamic import of just the catalog that we need. The latest call on an i18n instance wins: an earlier one
+ * whose catalog loads last (the offline shell's switch, then a pick in the locale menu) must not replace the newer choice.
  */
 export const dynamicActivate = async (i18n: I18n, locale: string): Promise<void> => {
-    activations.latest += 1;
+    const id = (latestActivation.get(i18n) ?? 0) + 1;
 
-    const id = activations.latest;
+    latestActivation.set(i18n, id);
+
     const { messages } = await import(`../../locales/${locale}/messages.po`);
 
-    if (id === activations.latest) {
+    if (latestActivation.get(i18n) === id) {
         i18n.loadAndActivate({ locale, messages });
     }
 };
