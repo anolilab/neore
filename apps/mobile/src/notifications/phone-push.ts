@@ -16,6 +16,7 @@ import {
 } from "expo-notifications";
 import { Platform } from "react-native";
 
+import { registerApprovalActions } from "./approval-actions";
 import type { PushPlatform, PushServer } from "./push-registration";
 import { createPendingWork, languageTag, onceItWorks } from "./push-registration";
 
@@ -118,7 +119,21 @@ export const configurePhoneNotifications = onceItWorks(async () => {
         },
     });
 
+    // Before any alert can arrive with its approve and deny actions. A failure here does not skip the Android channel the alerts are
+    // shown on; the failure is raised once the channel is set, so this call is tried again later like any failed step.
+    let categoryError: unknown;
+
+    try {
+        await registerApprovalActions();
+    } catch (error: unknown) {
+        categoryError = error;
+    }
+
     if (Platform.OS === "android") {
         await setNotificationChannelAsync(ANDROID_CHANNEL_ID, { importance: AndroidImportance.HIGH, name: channelName(deviceLocale()) });
+    }
+
+    if (categoryError !== undefined) {
+        throw categoryError instanceof Error ? categoryError : new Error("Could not register the approval actions.");
     }
 });
