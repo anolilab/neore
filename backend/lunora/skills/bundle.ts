@@ -614,6 +614,10 @@ const planFor = async (
         throw new LunoraError("BAD_REQUEST", parsed.errors.join("; "));
     }
 
+    if (parsed.bundle.plugin) {
+        throw new LunoraError("BAD_REQUEST", "This file is a plugin. Install it from the plugin install page; a bundle import cannot install it.");
+    }
+
     const known = await ctx.runQuery(internal.skills.bundle.loadImportContext, { userId: ctx.user.userId });
     const knownTools = knownToolNames();
     const env: PlanEnv = {
