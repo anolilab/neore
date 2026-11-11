@@ -13,7 +13,7 @@ import { authAction, rateLimit } from "../lib/crpc";
 import { MAX_LENGTH } from "../lib/validators";
 import { planFor } from "../skills/bundle";
 import { assertNoToolConfig, checkPluginFile } from "./install-action";
-import { entryHash, skillContent, skillRowHash } from "./entry-hash";
+import { entryHash, skillContent, skillRowHash, triggerRowHash } from "./entry-hash";
 import { diffUpdate, isDowngrade, markerFor } from "./logic";
 import type { UpdateAction } from "./logic";
 import { vPluginItemKind } from "./validators";
@@ -67,6 +67,13 @@ export const loadInstalledForUpdate = internalQuery
                 const skill = await ctx.db.skills.findFirst({ where: { pluginMarker: markerFor(installId, link.entryKey) } });
 
                 currentHash = skill ? await skillRowHash(skill) : "missing";
+            } else if (link.kind === "trigger") {
+                const trigger = await ctx.db
+                    .query("triggers")
+                    .withIndex("by_plugin_marker", (q) => q.eq("pluginMarker", markerFor(installId, link.entryKey)))
+                    .first();
+
+                currentHash = trigger ? await triggerRowHash(trigger) : "missing";
             }
 
             children.push({ contentHash: link.contentHash, currentHash, entryKey: link.entryKey, kind: link.kind });
