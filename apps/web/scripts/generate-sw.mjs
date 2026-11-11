@@ -4,7 +4,7 @@
  * Generates a production service worker using workbox-build after
  * the Vite/TanStack Start build completes.
  *
- * Usage: node scripts/generate-sw.mjs
+ * Usage: node scripts/generate-sw.mjs [client dir, default dist/client]
  */
 
 import { createHash } from "node:crypto";
@@ -13,7 +13,7 @@ import { resolve } from "node:path";
 
 import { generateSW } from "workbox-build";
 
-const clientDir = resolve(import.meta.dirname, "../dist/client");
+const clientDir = resolve(process.argv[2] ?? resolve(import.meta.dirname, "../dist/client"));
 
 /**
  * Vite's content hash in an output name (`index-Bk9j37oz.js`). Workbox gives
@@ -51,6 +51,7 @@ const readAppShell = () => {
     rmSync(manifestDir, { force: true, recursive: true });
     const files = new Set();
     const seen = new Set();
+    const entries = [];
 
     const walk = (key) => {
         if (seen.has(key)) {
@@ -74,16 +75,22 @@ const readAppShell = () => {
 
     for (const [key, chunk] of Object.entries(manifest)) {
         if (chunk.isEntry) {
+            entries.push(chunk.file);
             walk(key);
         }
     }
 
-    if (files.size === 0) {
-        throw new Error("No entry chunk in .vite/manifest.json — is `build.manifest` still enabled?");
+    if (entries.length !== 1) {
+        throw new Error(`Expected one entry chunk in .vite/manifest.json, found ${entries.length} — is \`build.manifest\` still enabled?`);
     }
 
-    // Any client change renames a chunk, so the manifest's hash names this build's shell HTML.
-    return { files: [...files], revision: createHash("sha256").update(manifestSource).digest("hex").slice(0, 16) };
+    return {
+        // The shell HTML names it; `offline-shell-sw.js` keeps only HTML that does (deploy skew).
+        entry: entries[0],
+        files: [...files],
+        // Any client change renames a chunk, so the manifest's hash names this build's shell HTML.
+        revision: createHash("sha256").update(manifestSource).digest("hex").slice(0, 16),
+    };
 };
 
 try {
@@ -156,7 +163,7 @@ try {
     });
 
     // Read by `offline-shell-sw.js`. In sw.js itself, so a new shell is a new worker.
-    const offlineShell = JSON.stringify({ revision: appShell.revision, url: OFFLINE_SHELL_URL });
+    const offlineShell = JSON.stringify({ entry: appShell.entry, revision: appShell.revision, url: OFFLINE_SHELL_URL });
 
     writeFileSync(swDest, `self.__NEORE_OFFLINE_SHELL__ = ${offlineShell};\n${readFileSync(swDest, "utf8")}`);
 
