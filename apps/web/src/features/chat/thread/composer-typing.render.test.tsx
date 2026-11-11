@@ -1,7 +1,7 @@
 /**
- * Render-count profile of typing into the composer of a long thread. The real `ComposerInput` (its input row too, with
- * the tiptap editor stubbed), the real message list, the prompt-improvement panel and sidebar rows that ask "has this
- * chat a draft?" are mounted side by side under React Profilers. Each keystroke goes in the way the editor's
+ * Render-count profile of typing into the composer of a thread. The real `ComposerInput` (its input row too, with the
+ * tiptap editor stubbed), the real message list, the prompt-improvement panel, the search suggestions and sidebar rows
+ * that ask "has this chat a draft?" are mounted side by side under React Profilers. Each keystroke goes in the way the editor's
  * `onUpdate` sends it: the whole draft through `onChange`.
  */
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -217,10 +217,11 @@ const { default: PromptImprovementPanel } = await import("@/features/chat/prompt
 const { default: ComposerSearchSuggestions } = await import("./composer-search-suggestions");
 const { useChatHasDraft } = await import("@/features/chat/split/use-chat-has-draft");
 
-// Enough rows to show none re-renders; 200 rows made the mount alone pass the default timeout under a full run.
-const THREAD_LENGTH = 60;
-const SIDEBAR_ROWS = 50;
-const KEYSTROKES = 20;
+// A subscription that re-renders does so on the first key, so a short thread shows it as well as a long one; each row's
+// mount is what makes this test slow (200 rows passed the default timeout under a full run).
+const THREAD_LENGTH = 20;
+const SIDEBAR_ROWS = 10;
+const KEYSTROKES = 10;
 
 const makeMessage = (index: number): UIMessage => {
     const role = index % 2 === 0 ? "user" : "assistant";
@@ -288,7 +289,7 @@ const type = (text: string): void => {
     }
 };
 
-describe("typing into the composer of a long thread", () => {
+describe("typing into the composer of a thread", () => {
     beforeEach(() => {
         // A search mode, so the search suggestions are mounted as they are in the chat.
         useModelStore.setState({ searchMode: "code" });
