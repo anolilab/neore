@@ -4,7 +4,8 @@
  * and a page that has not said so `MENU_READY_GRACE_MS` after its load gets the shell's own fallback instead.
  * Readiness belongs to a document: from the start of a main-frame navigation the departing page gets nothing, and
  * every committed one starts over. A navigation that never commits gives the page that stayed its state back: the shell
- * cancelled it, `did-fail-provisional-load` ended it, or loading stopped with it still uncommitted.
+ * cancelled it, `did-fail-provisional-load` ended it, or loading stopped with it still uncommitted and nothing else loading.
+ * A stop that comes while the webContents is still loading belongs to a navigation a newer one replaced: it ends nothing.
  */
 import type { MenuCommand } from "./app-menu.js";
 
@@ -43,8 +44,12 @@ export interface MenuDelivery<W> {
     deliver: (win: W, command: MenuCommand) => void;
     /** The window is gone: its queue and timer with it. */
     forget: (win: W) => void;
-    /** The page finished loading (or stopped): the grace period starts. */
-    loaded: (win: W) => void;
+
+    /**
+     * The page finished loading (or stopped): the grace period starts. `stillLoading` is the webContents' `isLoading()`
+     * at that stop: a newer navigation is under way, so the stop is an earlier one's and the page that stays is not known.
+     */
+    loaded: (win: W, stillLoading?: boolean) => void;
     /** A main-frame document was committed; `toSite` is whether it is the site. */
     navigated: (win: W, toSite: boolean) => void;
     /** A main-frame navigation ended without a new document (cancelled, a download, a 204): the page stays. */
@@ -185,7 +190,12 @@ export const createMenuDelivery = <W>({ fallback, isShowingSite, offSite, send }
                 states.delete(win);
             }
         },
-        loaded: (win) => {
+        loaded: (win, stillLoading = false) => {
+            // A cancelled navigation's stop that arrives after the next one started: the commands held are that one's.
+            if (stillLoading) {
+                return;
+            }
+
             const state = stateOf(win);
 
             state.loaded = true;

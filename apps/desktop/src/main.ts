@@ -522,7 +522,8 @@ const guardSiteWindow = (win: BrowserWindow, reveal: (focus?: boolean) => void):
     // Each committed document has to subscribe to menu commands again (an in-page route change is not a `did-navigate`).
     // From the start of a cross-document navigation the departing page gets nothing: it may unload before it acts.
     // One that never commits (cancelled, a download) ends in `did-fail-provisional-load`, and the page stays; one that
-    // ends with no word at all is settled at `did-stop-loading`, which also ends a load that failed or was stopped.
+    // ends with no word at all is settled at `did-stop-loading` once nothing is loading, which also ends a load that failed
+    // or was stopped.
     contents.on("did-start-navigation", (details) => {
         if (details.isMainFrame && !details.isSameDocument) {
             menuDelivery.navigationStarted(win);
@@ -538,7 +539,8 @@ const guardSiteWindow = (win: BrowserWindow, reveal: (focus?: boolean) => void):
         nextSiteDocument(contents);
         menuDelivery.navigated(win, isTrustedUrl(origin, url));
     });
-    contents.on("did-stop-loading", () => menuDelivery.loaded(win));
+    // A stop while still loading is a replaced navigation's: the newer one keeps what is held for its page.
+    contents.on("did-stop-loading", () => menuDelivery.loaded(win, contents.isLoading()));
 
     // A site that cannot be loaded or a renderer that died leaves a blank window with no way forward: show our own page.
     const recover = async (page: string): Promise<void> => {

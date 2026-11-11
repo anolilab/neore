@@ -203,6 +203,29 @@ describe(createMenuDelivery, () => {
         ]);
     });
 
+    it("keeps what was held for the next page when an earlier navigation's stop comes while that one loads", () => {
+        const { delivery, fellBack, sent } = setup();
+        const win = { onSite: true };
+
+        delivery.ready(win);
+        // A starts and is cancelled with no word; B starts; A's stop arrives with B still loading.
+        delivery.navigationStarted(win);
+        delivery.navigationStarted(win);
+        delivery.deliver(win, "new-chat");
+        delivery.loaded(win, true);
+        vi.advanceTimersByTime(MENU_READY_GRACE_MS * 2);
+        // The departing page subscribing again is still not B's page listening.
+        delivery.ready(win);
+        expect(sent).toStrictEqual([]);
+        expect(fellBack).toStrictEqual([]);
+
+        delivery.navigated(win, true);
+        delivery.loaded(win, false);
+        delivery.ready(win);
+        expect(sent).toStrictEqual([[win, "new-chat"]]);
+        expect(fellBack).toStrictEqual([]);
+    });
+
     it("gives the page back at once when the shell cancels a navigation, and counts its later failure only once", () => {
         const { delivery, sent } = setup();
         const win = { onSite: true };

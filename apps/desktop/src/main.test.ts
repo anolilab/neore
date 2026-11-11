@@ -38,6 +38,9 @@ interface FakeWindow {
         handlers: Map<string, Listener>;
         id: number;
         isDestroyed: () => boolean;
+        isLoading: () => boolean;
+        /** What `isLoading()` answers: a navigation is still in progress. */
+        loading: boolean;
         loadURL: (url: string) => Promise<void>;
         mainFrame: { url: string };
         on: (event: string, listener: Listener) => void;
@@ -173,6 +176,8 @@ vi.mock("electron", () => {
                 handlers: webHandlers,
                 id,
                 isDestroyed: () => window.destroyed,
+                isLoading: () => window.webContents.loading,
+                loading: false,
                 loadURL: (url: string) => {
                     window.loaded.push(url);
 
@@ -936,6 +941,29 @@ describe("look and application menu", () => {
             { channel: "neore:menu-command", payload: "settings", window: win.id },
             { channel: "neore:menu-command", payload: "new-chat", window: win.id },
         ]);
+    });
+
+    it("keeps what was held for the next page when a cancelled navigation's stop comes after that one started", () => {
+        const win = onSite();
+
+        fake().payloads.length = 0;
+        // The first is cancelled with no word of its own (stopped, a download); the second starts before its stop.
+        startNavigation(win, `${SITE}/export.csv`);
+        startNavigation(win, `${SITE}/chat/thread-2`);
+        menuItem("New Chat")?.click?.();
+
+        // The first navigation's stop: the webContents is still loading the second.
+        win.webContents.loading = true;
+        stoppedLoading(win);
+        win.webContents.loading = false;
+        expect(menuPayloads()).toStrictEqual([]);
+
+        navigate(win, `${SITE}/chat/thread-2`);
+        stoppedLoading(win);
+        expect(menuPayloads()).toStrictEqual([]);
+
+        listening(win);
+        expect(menuPayloads()).toStrictEqual([{ channel: "neore:menu-command", payload: "new-chat", window: win.id }]);
     });
 
     it("holds commands once the page stops listening, until it listens again, and only on its own word", () => {
