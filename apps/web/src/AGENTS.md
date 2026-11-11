@@ -61,6 +61,10 @@ The rules for working in `apps/web/src`. The detail, reasoning and code examples
   `_authenticated/` layout; `(chat)/route.tsx` uses `<Authenticated>`.
 - Throw/handle the error classes from `lib/errors/index.ts` (`ServerError`, `ValidationError`, …), switching on `code`.
 - Access browser APIs only after hydration: track `isHydrated` (`features/auth/hooks/use-last-signin-method.ts`).
+- Desktop shell look: the boot script sets `data-native` / `data-native-vibrancy` on `<html>` before paint; style it in
+  `lib/native/native-shell.css`, and gate a list row's hover background with the `web:` variant. Effects that apply a
+  shell default (`AppearanceSync`) read `isNativeShell()` inside the effect: a hook reads "no shell" while hydrating
+  and would undo the boot script for a frame. `system` accent and `explicit` stay local (the server knows neither).
 
 ## CONVENTIONS
 

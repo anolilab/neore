@@ -1,5 +1,6 @@
 import { ACCENT_IDS, DEFAULT_ACCENT } from "./accent-presets";
 import { CONTRAST_ATTRIBUTE, DEFAULT_DENSITY, DEFAULT_MAIN_FONT, DENSITY_ATTRIBUTE, DENSITY_IDS, FONT_ATTRIBUTE, MAIN_FONT_IDS } from "./display-preferences";
+import { SYSTEM_ACCENT, SYSTEM_ACCENT_CACHE_KEY, SYSTEM_ACCENT_FOREGROUND_PROPERTY, SYSTEM_ACCENT_PROPERTY } from "./native-appearance";
 
 /** The `persist` key of `useUIStateStore` (`features/layout/stores/ui-state-store.ts`). */
 export const UI_STATE_STORAGE_KEY = "neore-ui-state";
@@ -13,6 +14,33 @@ const BOOT_ATTRIBUTES = [
     { attribute: FONT_ATTRIBUTE, fallback: DEFAULT_MAIN_FONT, ids: MAIN_FONT_IDS, key: "mainFont" },
 ] as const;
 
+/** On `<html>` inside the desktop shell, and when its window has macOS vibrancy behind it. */
+export const NATIVE_ATTRIBUTE = "data-native";
+export const NATIVE_VIBRANCY_ATTRIBUTE = "data-native-vibrancy";
+
+/**
+ * The desktop shell, before first paint (the preload installs `window.neoreNative` before any page script):
+ * `data-native` (and `data-native-vibrancy`) for the native CSS, spellcheck off by default (prose editors opt back
+ * in), the system font for an untouched default font, and the OS accent (cached from the last run) for an
+ * untouched default accent or a stored `system`. Mirrors `effectiveAccent` / `effectiveMainFont`.
+ */
+const NATIVE_BOOT = [
+    "var n=window.neoreNative;",
+    "if(n){",
+    "var d=document.documentElement;var p=Array.isArray(n.capabilities)?n.capabilities:[];var x=a.explicit||{};",
+    `d.setAttribute(${JSON.stringify(NATIVE_ATTRIBUTE)},"");`,
+    `if(p.indexOf("vibrancy")!==-1){d.setAttribute(${JSON.stringify(NATIVE_VIBRANCY_ATTRIBUTE)},"")}`,
+    'd.setAttribute("spellcheck","false");',
+    `if(!x.mainFont&&(a.mainFont===undefined||a.mainFont===${JSON.stringify(DEFAULT_MAIN_FONT)})){d.setAttribute(${JSON.stringify(FONT_ATTRIBUTE)},"system")}`,
+    `var ac=a.accentColor;if(p.indexOf("system-accent")!==-1&&(ac===${JSON.stringify(SYSTEM_ACCENT)}||(!x.accentColor&&(ac===undefined||ac===${JSON.stringify(DEFAULT_ACCENT)})))){`,
+    `var t=JSON.parse(localStorage.getItem(${JSON.stringify(SYSTEM_ACCENT_CACHE_KEY)})||"null");`,
+    "var h=/^#[0-9a-f]{6}$/;",
+    "if(t&&h.test(t.accent)&&h.test(t.foreground)){",
+    `d.style.setProperty(${JSON.stringify(SYSTEM_ACCENT_PROPERTY)},t.accent);d.style.setProperty(${JSON.stringify(SYSTEM_ACCENT_FOREGROUND_PROPERTY)},t.foreground);`,
+    `d.setAttribute(${JSON.stringify(ACCENT_ATTRIBUTE)},${JSON.stringify(SYSTEM_ACCENT)})`,
+    "}}}",
+].join("");
+
 /**
  * Inline `<head>` script that puts the stored accent, density and font on
  * `<html>` BEFORE first paint, the way next-themes applies the theme class: the
@@ -23,7 +51,7 @@ const BOOT_ATTRIBUTES = [
  * Only a known id from the allow-list is ever written into the DOM; anything
  * else in storage (or no storage at all) leaves the default tokens in place.
  */
-export const ACCENT_BOOT_SCRIPT = `(function(){try{var s=JSON.parse(localStorage.getItem(${JSON.stringify(UI_STATE_STORAGE_KEY)})||"null");var a=s&&s.state&&s.state.appearance||{};var c=${JSON.stringify(BOOT_ATTRIBUTES)};for(var i=0;i<c.length;i++){var m=c[i];var v=a[m.key];if(v!==m.fallback&&m.ids.indexOf(v)!==-1){document.documentElement.setAttribute(m.attribute,v)}}var k=a.contrast;if(k==="high"||(k!=="standard"&&window.matchMedia&&window.matchMedia("(prefers-contrast: more)").matches)){document.documentElement.setAttribute("data-contrast","high")}}catch(e){}})();`;
+export const ACCENT_BOOT_SCRIPT = `(function(){try{var s=JSON.parse(localStorage.getItem(${JSON.stringify(UI_STATE_STORAGE_KEY)})||"null");var a=s&&s.state&&s.state.appearance||{};var c=${JSON.stringify(BOOT_ATTRIBUTES)};for(var i=0;i<c.length;i++){var m=c[i];var v=a[m.key];if(v!==m.fallback&&m.ids.indexOf(v)!==-1){document.documentElement.setAttribute(m.attribute,v)}}var k=a.contrast;if(k==="high"||(k!=="standard"&&window.matchMedia&&window.matchMedia("(prefers-contrast: more)").matches)){document.documentElement.setAttribute("data-contrast","high")}${NATIVE_BOOT}}catch(e){}})();`;
 
 /** The runtime twin of the contrast part of the boot script. */
 export const applyContrastAttribute = (value: "high" | undefined, root: HTMLElement = document.documentElement): void => {

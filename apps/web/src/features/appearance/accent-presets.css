@@ -87,3 +87,11 @@
     --ring: #2dd4bf;
     --sidebar-ring: #2dd4bf;
 }
+
+:root[data-accent="system"],
+:root.dark[data-accent="system"] {
+    --primary: var(--system-accent);
+    --primary-foreground: var(--system-accent-foreground);
+    --ring: var(--system-accent);
+    --sidebar-ring: var(--system-accent);
+}

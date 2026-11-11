@@ -31617,9 +31617,10 @@ msgstr "統合役（回答をまとめる）"
 msgid "Synthesizer (weighs both sides)"
 msgstr "統合役（双方を比較検討する）"
 
+#: src/features/appearance/components/appearance-controls.tsx:224
 #: src/features/auth/components/device-code-parts.tsx:126
 msgid "System"
-msgstr ""
+msgstr "システム"
 
 #: src/features/settings/components/chat/default-models-settings.tsx:81
 #: src/features/settings/components/chat/default-models-settings.tsx:119

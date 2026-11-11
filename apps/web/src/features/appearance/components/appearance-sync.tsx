@@ -8,6 +8,7 @@ import { useUIStateStore } from "@/features/layout/stores/ui-state-store";
 import useAfterFirstPaint from "@/hooks/use-after-first-paint";
 import { authClient } from "@/lib/auth/client";
 import { useCRPC } from "@/lib/lunora/crpc";
+import { getNativeSystemAccentColor, hasNativeCapability, isNativeShell, onNativeSystemAccentColor } from "@/lib/native/bridge";
 
 import { applyAccentAttribute, applyContrastAttribute, applyRootAttribute } from "../lib/accent-boot-script";
 import { DEFAULT_ACCENT, isAccentId } from "../lib/accent-presets";
@@ -25,6 +26,14 @@ import {
     isMainFontId,
     PREFERS_MORE_CONTRAST_QUERY,
 } from "../lib/display-preferences";
+import {
+    applySystemAccentTokens,
+    cacheSystemAccentTokens,
+    effectiveAccent,
+    effectiveMainFont,
+    SYSTEM_ACCENT,
+    systemAccentTokens,
+} from "../lib/native-appearance";
 
 /**
  * Applies the Appearance settings app-wide; renders nothing.
@@ -32,6 +41,8 @@ import {
  * - The accent, density and font go on `<html>` as `data-accent`,
  *   `data-density` and `data-font` (the boot script already did so before first
  *   paint; this keeps them in step with later changes).
+ * - In the desktop shell, an untouched accent and font become the OS accent
+ *   (followed live) and the system face (`native-appearance.ts`).
  * - The chat text size goes on `<html data-chat-text-size>` the same way.
  * - The code / Mermaid themes are pushed to the Streamdown renderers.
  * - The account's stored choice (`userSettings`) is adopted when it arrives or
@@ -40,9 +51,11 @@ import {
  *   and first paint's query budget is not spent on it.
  */
 const AppearanceSync = () => {
-    const { accentColor, capLongCodeBlocks, codeHighlightTheme, codeLineNumbers, contrast, density, mainFont, mermaidTheme } = useUIStateStore(
+    const { accentColor, capLongCodeBlocks, codeHighlightTheme, codeLineNumbers, contrast, density, explicit, mainFont, mermaidTheme } = useUIStateStore(
         (state) => state.appearance,
     );
+    const accentExplicit = explicit?.accentColor === true;
+    const fontExplicit = explicit?.mainFont === true;
     const setAppearance = useUIStateStore((state) => state.setAppearance);
     const chatTextSize = useUIStateStore((state) => state.layout.fontSize);
 
@@ -50,9 +63,40 @@ const AppearanceSync = () => {
         applyChatTextSize(chatTextSize);
     }, [chatTextSize]);
 
+    // The shell is read inside the effects, not through a hook: a hook reads "no shell" in the hydration pass, and an
+    // effect run with that value would undo the boot script's native font and accent for a frame.
     useEffect(() => {
-        applyAccentAttribute(isAccentId(accentColor) ? accentColor : DEFAULT_ACCENT);
-    }, [accentColor]);
+        const accent = effectiveAccent(accentColor, accentExplicit, hasNativeCapability("system-accent"));
+
+        if (accent !== SYSTEM_ACCENT) {
+            applyAccentAttribute(accent);
+            applySystemAccentTokens(null);
+
+            return undefined;
+        }
+
+        // The OS accent arrives over IPC; until then the boot script's cached copy (or the default preset) shows.
+        let disposed = false;
+        const apply = (hex: string | null): void => {
+            if (disposed) {
+                return;
+            }
+
+            const tokens = hex === null ? null : systemAccentTokens(hex);
+
+            applySystemAccentTokens(tokens);
+            cacheSystemAccentTokens(tokens);
+            applyAccentAttribute(tokens === null ? DEFAULT_ACCENT : SYSTEM_ACCENT);
+        };
+
+        void getNativeSystemAccentColor().then(apply);
+        const stop = onNativeSystemAccentColor(apply);
+
+        return () => {
+            disposed = true;
+            stop();
+        };
+    }, [accentColor, accentExplicit]);
 
     useEffect(() => {
         const systemPreference = globalThis.matchMedia(PREFERS_MORE_CONTRAST_QUERY);
@@ -69,8 +113,8 @@ const AppearanceSync = () => {
     }, [density]);
 
     useEffect(() => {
-        applyRootAttribute(FONT_ATTRIBUTE, isMainFontId(mainFont) ? mainFont : DEFAULT_MAIN_FONT, DEFAULT_MAIN_FONT);
-    }, [mainFont]);
+        applyRootAttribute(FONT_ATTRIBUTE, effectiveMainFont(mainFont, fontExplicit, isNativeShell()), DEFAULT_MAIN_FONT);
+    }, [mainFont, fontExplicit]);
 
     useEffect(() => {
         setStreamdownAppearance({
@@ -98,9 +142,14 @@ const AppearanceSync = () => {
 
     useEffect(() => {
         const changes: Parameters<typeof setAppearance>[0] = {};
+        const current = useUIStateStore.getState().appearance;
+        const marked = { ...current.explicit };
 
-        if (isAccentId(storedAccent)) {
+        // A stored value is a choice the user made on some device. `system` is this device's own choice, so a
+        // synced preset does not replace it.
+        if (isAccentId(storedAccent) && current.accentColor !== SYSTEM_ACCENT) {
             changes.accentColor = storedAccent;
+            marked.accentColor = true;
         }
 
         if (typeof storedCapLongCodeBlocks === "boolean") {
@@ -129,10 +178,11 @@ const AppearanceSync = () => {
 
         if (isMainFontId(storedMainFont)) {
             changes.mainFont = storedMainFont;
+            marked.mainFont = true;
         }
 
         if (Object.keys(changes).length > 0) {
-            setAppearance(changes);
+            setAppearance({ ...changes, explicit: marked });
         }
     }, [
         storedAccent,

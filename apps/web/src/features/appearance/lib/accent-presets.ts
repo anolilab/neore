@@ -108,5 +108,15 @@ export const renderAccentCss = (): string => {
               ],
     );
 
-    return `${[header, ...rules].join("\n\n")}\n`;
+    // The OS accent (`native-appearance.ts`): one colour for both modes, put on <html> as inline custom properties.
+    const system = [
+        `:root[data-accent="system"],\n:root.dark[data-accent="system"] {`,
+        "    --primary: var(--system-accent);",
+        "    --primary-foreground: var(--system-accent-foreground);",
+        "    --ring: var(--system-accent);",
+        "    --sidebar-ring: var(--system-accent);",
+        "}",
+    ].join("\n");
+
+    return `${[header, ...rules, system].join("\n\n")}\n`;
 };

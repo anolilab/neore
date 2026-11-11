@@ -14,6 +14,8 @@
 /* UI density tokens and font families (`data-density` / `data-font`) */
 @import "./features/appearance/display-presets.css";
 @import "./features/appearance/contrast-presets.css";
+/* The desktop shell: cursor, selection, hover and vibrancy (`data-native` on <html>) */
+@import "./lib/native/native-shell.css";
 /* Import KaTeX styles for math rendering */
 @import "katex/dist/katex.min.css";
 

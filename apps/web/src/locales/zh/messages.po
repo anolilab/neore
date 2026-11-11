@@ -31617,9 +31617,10 @@ msgstr "汇总者（合并回答）"
 msgid "Synthesizer (weighs both sides)"
 msgstr "汇总者（权衡双方）"
 
+#: src/features/appearance/components/appearance-controls.tsx:224
 #: src/features/auth/components/device-code-parts.tsx:126
 msgid "System"
-msgstr ""
+msgstr "系统"
 
 #: src/features/settings/components/chat/default-models-settings.tsx:81
 #: src/features/settings/components/chat/default-models-settings.tsx:119

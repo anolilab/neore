@@ -21,13 +21,19 @@ export interface NativeDroppedFile {
 interface NativeBridge {
     capabilities: ReadonlyArray<string>;
     device?: NativeDeviceRelay;
+    /** The OS accent colour as `#rrggbb`, or `null` when the OS has none. Only with the `system-accent` capability. */
+    getSystemAccentColor?: () => Promise<string | null>;
     notify: (title: string, body?: string) => Promise<void>;
     onCompose: (handler: () => void) => UnlistenFunction;
     /** A `neore://new?text=` link's text, for the composer to show and not send. Optional: older shells lack it. */
     onDraft?: (handler: () => void) => UnlistenFunction;
     /** Files dropped on the dock icon (macOS). Optional: older shells lack it. */
     onFiles?: (handler: () => void) => UnlistenFunction;
+    /** Commands from the shell's application menu. Only with the `menu-commands` capability. */
+    onMenuCommand?: (handler: (command: NativeMenuCommand) => void) => UnlistenFunction;
     onSignIn: (handler: () => void) => UnlistenFunction;
+    /** Each change of the OS accent colour. Only with the `system-accent` capability. */
+    onSystemAccentColor?: (handler: (hex: string | null) => void) => UnlistenFunction;
     openThreadWindow: (threadId: string) => Promise<void>;
     /** The dock / launcher badge count. Optional: older shells lack it. */
     setBadge?: (count: number) => Promise<void>;
@@ -65,6 +71,59 @@ const getNative = (): NativeBridge | undefined => {
 };
 
 export const isNativeShell = (): boolean => getNative() !== undefined;
+
+/**
+ * What the shell can do, from `capabilities` (`vibrancy`, `system-accent`, `menu-commands`, …). Known synchronously,
+ * so the boot script and render code can branch on it; always `false` outside the shell.
+ */
+export const hasNativeCapability = (capability: string): boolean => getNative()?.capabilities.includes(capability) === true;
+
+/** The commands the shell's application menu sends to the page. */
+export type NativeMenuCommand = "new-chat" | "settings";
+
+const NATIVE_MENU_COMMANDS: ReadonlySet<string> = new Set<NativeMenuCommand>(["new-chat", "settings"]);
+
+/** Calls `handler` with each application-menu command; unknown commands are dropped. A no-op without `menu-commands`. */
+export const onNativeMenuCommand = (handler: (command: NativeMenuCommand) => void): UnlistenFunction => {
+    if (!hasNativeCapability("menu-commands")) {
+        return () => {};
+    }
+
+    return (
+        getNative()?.onMenuCommand?.((command: string) => {
+            if (NATIVE_MENU_COMMANDS.has(command)) {
+                handler(command as NativeMenuCommand);
+            }
+        }) ?? (() => {})
+    );
+};
+
+const HEX_COLOR = /^#[\da-f]{6}$/i;
+
+/** Anything but `#rrggbb` from the shell is treated as "no accent colour". */
+const toAccentHex = (value: unknown): string | null => (typeof value === "string" && HEX_COLOR.test(value) ? value.toLowerCase() : null);
+
+/** The OS accent colour as lower-case `#rrggbb`; `null` without `system-accent`, when the OS has none, or on failure. */
+export const getNativeSystemAccentColor = async (): Promise<string | null> => {
+    if (!hasNativeCapability("system-accent")) {
+        return null;
+    }
+
+    try {
+        return toAccentHex(await getNative()?.getSystemAccentColor?.());
+    } catch {
+        return null;
+    }
+};
+
+/** Calls `handler` with each change of the OS accent colour (`null`: none). A no-op without `system-accent`. */
+export const onNativeSystemAccentColor = (handler: (hex: string | null) => void): UnlistenFunction => {
+    if (!hasNativeCapability("system-accent")) {
+        return () => {};
+    }
+
+    return getNative()?.onSystemAccentColor?.((value: string | null) => handler(toAccentHex(value))) ?? (() => {});
+};
 
 export interface NativeNotification {
     body?: string;

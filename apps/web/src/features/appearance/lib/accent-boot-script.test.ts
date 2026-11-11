@@ -1,7 +1,15 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { ACCENT_ATTRIBUTE, ACCENT_BOOT_SCRIPT, applyAccentAttribute, UI_STATE_STORAGE_KEY } from "./accent-boot-script";
+import {
+    ACCENT_ATTRIBUTE,
+    ACCENT_BOOT_SCRIPT,
+    applyAccentAttribute,
+    NATIVE_ATTRIBUTE,
+    NATIVE_VIBRANCY_ATTRIBUTE,
+    UI_STATE_STORAGE_KEY,
+} from "./accent-boot-script";
 import { CONTRAST_ATTRIBUTE, DENSITY_ATTRIBUTE, FONT_ATTRIBUTE, PREFERS_MORE_CONTRAST_QUERY } from "./display-preferences";
+import { SYSTEM_ACCENT_CACHE_KEY, SYSTEM_ACCENT_PROPERTY } from "./native-appearance";
 
 const runBootScript = (): void => {
     // eslint-disable-next-line sonarjs/code-eval -- runs the inline script exactly as the browser would
@@ -19,7 +27,95 @@ describe("accent boot script", () => {
         document.documentElement.removeAttribute(DENSITY_ATTRIBUTE);
         document.documentElement.removeAttribute(FONT_ATTRIBUTE);
         document.documentElement.removeAttribute(CONTRAST_ATTRIBUTE);
+        document.documentElement.removeAttribute(NATIVE_ATTRIBUTE);
+        document.documentElement.removeAttribute(NATIVE_VIBRANCY_ATTRIBUTE);
+        document.documentElement.removeAttribute("spellcheck");
+        document.documentElement.removeAttribute("style");
         vi.unstubAllGlobals();
+    });
+
+    describe("desktop shell", () => {
+        const shell = (capabilities: string[]) => {
+            vi.stubGlobal("neoreNative", { capabilities });
+        };
+        const cacheAccent = () => {
+            localStorage.setItem(SYSTEM_ACCENT_CACHE_KEY, JSON.stringify({ accent: "#007aff", foreground: "#ffffff" }));
+        };
+        const html = document.documentElement;
+
+        it("adds nothing in a browser", () => {
+            cacheAccent();
+            runBootScript();
+
+            expect(html.hasAttribute(NATIVE_ATTRIBUTE)).toBe(false);
+            expect(html.hasAttribute("spellcheck")).toBe(false);
+            expect(html.hasAttribute(FONT_ATTRIBUTE)).toBe(false);
+            expect(html.hasAttribute(ACCENT_ATTRIBUTE)).toBe(false);
+        });
+
+        it("marks the shell, its vibrancy, and turns spellcheck off", () => {
+            shell(["vibrancy"]);
+            runBootScript();
+
+            expect(html.getAttribute(NATIVE_ATTRIBUTE)).toBe("");
+            expect(html.getAttribute(NATIVE_VIBRANCY_ATTRIBUTE)).toBe("");
+            expect(html.getAttribute("spellcheck")).toBe("false");
+        });
+
+        it("leaves vibrancy off without the capability", () => {
+            shell([]);
+            runBootScript();
+
+            expect(html.hasAttribute(NATIVE_ATTRIBUTE)).toBe(true);
+            expect(html.hasAttribute(NATIVE_VIBRANCY_ATTRIBUTE)).toBe(false);
+        });
+
+        it("uses the system font for an untouched default, and keeps an explicit one", () => {
+            shell([]);
+            runBootScript();
+            expect(html.getAttribute(FONT_ATTRIBUTE)).toBe("system");
+
+            html.removeAttribute(FONT_ATTRIBUTE);
+            store({ explicit: { mainFont: true }, mainFont: "inter" });
+            runBootScript();
+            expect(html.hasAttribute(FONT_ATTRIBUTE)).toBe(false);
+
+            store({ mainFont: "serif" });
+            runBootScript();
+            expect(html.getAttribute(FONT_ATTRIBUTE)).toBe("serif");
+        });
+
+        it("paints the cached OS accent for an untouched default or a stored `system`", () => {
+            shell(["system-accent"]);
+            cacheAccent();
+            runBootScript();
+            expect(html.getAttribute(ACCENT_ATTRIBUTE)).toBe("system");
+            expect(html.style.getPropertyValue(SYSTEM_ACCENT_PROPERTY)).toBe("#007aff");
+
+            html.removeAttribute(ACCENT_ATTRIBUTE);
+            store({ accentColor: "system", explicit: { accentColor: true } });
+            runBootScript();
+            expect(html.getAttribute(ACCENT_ATTRIBUTE)).toBe("system");
+        });
+
+        it("keeps an explicit preset, and needs the capability and a valid cache", () => {
+            shell(["system-accent"]);
+            cacheAccent();
+            store({ accentColor: "default", explicit: { accentColor: true } });
+            runBootScript();
+            expect(html.hasAttribute(ACCENT_ATTRIBUTE)).toBe(false);
+
+            shell([]);
+            store({ accentColor: "system" });
+            runBootScript();
+            expect(html.hasAttribute(ACCENT_ATTRIBUTE)).toBe(false);
+
+            shell(["system-accent"]);
+            localStorage.setItem(SYSTEM_ACCENT_CACHE_KEY, JSON.stringify({ accent: "red;}", foreground: "#ffffff" }));
+            runBootScript();
+            expect(html.hasAttribute(ACCENT_ATTRIBUTE)).toBe(false);
+            expect(html.style.getPropertyValue(SYSTEM_ACCENT_PROPERTY)).toBe("");
+        });
     });
 
     describe("contrast", () => {

@@ -31617,9 +31617,10 @@ msgstr "Sintetizzatore (unisce le risposte)"
 msgid "Synthesizer (weighs both sides)"
 msgstr "Sintetizzatore (valuta entrambe le parti)"
 
+#: src/features/appearance/components/appearance-controls.tsx:224
 #: src/features/auth/components/device-code-parts.tsx:126
 msgid "System"
-msgstr ""
+msgstr "Sistema"
 
 #: src/features/settings/components/chat/default-models-settings.tsx:81
 #: src/features/settings/components/chat/default-models-settings.tsx:119

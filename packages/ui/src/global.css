@@ -5,6 +5,8 @@
 @plugin "@tailwindcss/typography";
 
 @custom-variant dark (&:is(.dark *));
+/* Outside the desktop shell (`data-native` on <html>): for hover backgrounds native list rows do not have. */
+@custom-variant web (&:where(:root:not([data-native]) *));
 
 @theme {
     /* Custom viewport height for framer */

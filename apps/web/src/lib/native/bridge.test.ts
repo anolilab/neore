@@ -5,6 +5,8 @@ import {
     executeOnNativeDevice,
     getNativeDeviceManifest,
     getNativeDeviceStatus,
+    getNativeSystemAccentColor,
+    hasNativeCapability,
     isNativeShell,
     LONG_REPLY_MS,
     NATIVE_SIGN_IN_COOKIE_PATH,
@@ -13,7 +15,9 @@ import {
     onNativeDeviceChanged,
     onNativeDeviceProgress,
     onNativeFiles,
+    onNativeMenuCommand,
     onNativeSignIn,
+    onNativeSystemAccentColor,
     openNativeDeviceSettings,
     openThreadWindow,
     pairNativeDevice,
@@ -31,10 +35,13 @@ type NativeDeviceRelayMock = Record<"execute" | "manifest" | "onChanged" | "onPr
 type Native = {
     capabilities: string[];
     device?: NativeDeviceRelayMock;
+    getSystemAccentColor?: ReturnType<typeof vi.fn>;
     notify: ReturnType<typeof vi.fn>;
     onCompose: ReturnType<typeof vi.fn>;
     onFiles?: ReturnType<typeof vi.fn>;
+    onMenuCommand?: ReturnType<typeof vi.fn>;
     onSignIn?: ReturnType<typeof vi.fn>;
+    onSystemAccentColor?: ReturnType<typeof vi.fn>;
     openThreadWindow?: ReturnType<typeof vi.fn>;
     setBadge?: ReturnType<typeof vi.fn>;
     startBrowserSignIn?: ReturnType<typeof vi.fn>;
@@ -217,7 +224,7 @@ describe("browser sign-in handoff", () => {
                 return () => {};
             }),
             takePendingSignIn: vi.fn(async () => signIn),
-        } as Partial<Native>);
+        });
         const handler = vi.fn();
 
         onNativeSignIn(handler);
@@ -231,7 +238,7 @@ describe("browser sign-in handoff", () => {
     });
 
     it("reads nothing when the shell holds no sign-in, and treats a failure as nothing", async () => {
-        installNative({ capabilities: ["sign-in"], onSignIn: vi.fn(() => () => {}), takePendingSignIn: vi.fn(async () => null) } as Partial<Native>);
+        installNative({ capabilities: ["sign-in"], onSignIn: vi.fn(() => () => {}), takePendingSignIn: vi.fn(async () => null) });
 
         expect(await takePendingSignIn()).toBeUndefined();
 
@@ -241,7 +248,7 @@ describe("browser sign-in handoff", () => {
             takePendingSignIn: vi.fn(async () => {
                 throw new Error("ipc");
             }),
-        } as Partial<Native>);
+        });
 
         expect(await takePendingSignIn()).toBeUndefined();
     });
@@ -249,7 +256,7 @@ describe("browser sign-in handoff", () => {
     it("asks the shell to open the browser when it advertises sign-in", async () => {
         const startBrowserSignIn = vi.fn(async () => undefined);
 
-        installNative({ capabilities: ["sign-in"], startBrowserSignIn } as Partial<Native>);
+        installNative({ capabilities: ["sign-in"], startBrowserSignIn });
         await startNativeBrowserSignIn();
 
         expect(startBrowserSignIn).toHaveBeenCalledTimes(1);
@@ -465,5 +472,90 @@ describe("dock badge", () => {
         });
 
         await expect(setNativeBadge(1)).resolves.toBeUndefined();
+    });
+});
+
+describe("menu commands", () => {
+    it("is inert without the capability", () => {
+        const onMenuCommand = vi.fn(() => () => {});
+
+        installNative({ onMenuCommand });
+
+        const handler = vi.fn();
+
+        onNativeMenuCommand(handler)();
+
+        expect(onMenuCommand).not.toHaveBeenCalled();
+        expect(hasNativeCapability("menu-commands")).toBe(false);
+    });
+
+    it("passes known commands on and drops the rest", () => {
+        let send: (command: string) => void = () => {};
+        const stop = vi.fn();
+
+        installNative({
+            capabilities: ["menu-commands"],
+            onMenuCommand: vi.fn((listener: (command: string) => void) => {
+                send = listener;
+
+                return stop;
+            }),
+        });
+
+        const handler = vi.fn();
+        const unsubscribe = onNativeMenuCommand(handler);
+
+        send("new-chat");
+        send("settings");
+        send("quit");
+
+        expect(handler.mock.calls).toStrictEqual([["new-chat"], ["settings"]]);
+
+        unsubscribe();
+        expect(stop).toHaveBeenCalledOnce();
+    });
+});
+
+describe("system accent colour", () => {
+    it("is null and inert without the capability", async () => {
+        installNative({ getSystemAccentColor: vi.fn(async () => "#007aff") });
+
+        await expect(getNativeSystemAccentColor()).resolves.toBeNull();
+    });
+
+    it("reads and follows the OS colour, rejecting anything but #rrggbb", async () => {
+        let send: (hex: string | null) => void = () => {};
+
+        installNative({
+            capabilities: ["system-accent"],
+            getSystemAccentColor: vi.fn(async () => "#007AFF"),
+            onSystemAccentColor: vi.fn((listener: (hex: string | null) => void) => {
+                send = listener;
+
+                return () => {};
+            }),
+        });
+
+        await expect(getNativeSystemAccentColor()).resolves.toBe("#007aff");
+
+        const handler = vi.fn();
+
+        onNativeSystemAccentColor(handler);
+        send("#ff9500");
+        send("url(x)");
+        send(null);
+
+        expect(handler.mock.calls).toStrictEqual([["#ff9500"], [null], [null]]);
+    });
+
+    it("answers null when the shell call fails", async () => {
+        installNative({
+            capabilities: ["system-accent"],
+            getSystemAccentColor: vi.fn(async () => {
+                throw new Error("ipc");
+            }),
+        });
+
+        await expect(getNativeSystemAccentColor()).resolves.toBeNull();
     });
 });

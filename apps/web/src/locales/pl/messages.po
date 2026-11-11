@@ -31617,9 +31617,10 @@ msgstr "Syntezator (łączy odpowiedzi)"
 msgid "Synthesizer (weighs both sides)"
 msgstr "Syntezator (waży obie strony)"
 
+#: src/features/appearance/components/appearance-controls.tsx:224
 #: src/features/auth/components/device-code-parts.tsx:126
 msgid "System"
-msgstr ""
+msgstr "System"
 
 #: src/features/settings/components/chat/default-models-settings.tsx:81
 #: src/features/settings/components/chat/default-models-settings.tsx:119

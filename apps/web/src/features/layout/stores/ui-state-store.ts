@@ -4,9 +4,9 @@ import { withoutFocusAreaKeys } from "@neore/backend/auth/shortcut";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
-import type { AccentId } from "@/features/appearance/lib/accent-presets";
 import type { CodeHighlightThemeId, MermaidThemeId } from "@/features/appearance/lib/code-themes";
 import type { ContrastId, DensityId, MainFontId } from "@/features/appearance/lib/display-preferences";
+import type { AccentChoice, ExplicitAppearance } from "@/features/appearance/lib/native-appearance";
 
 const platformModifier = "ctrl";
 
@@ -29,7 +29,8 @@ export type ModalState = {
 
 /** Accent colour, code-block and diagram themes, UI density and font family — see `features/appearance`. */
 export type AppearanceSettings = {
-    accentColor: AccentId;
+    /** A preset, or `system` (the OS accent; desktop shell only, never synced to `userSettings`). */
+    accentColor: AccentChoice;
     /** Absent means on: long code blocks scroll inside a 24-line cap until expanded. */
     capLongCodeBlocks?: boolean;
     codeHighlightTheme: CodeHighlightThemeId;
@@ -38,6 +39,8 @@ export type AppearanceSettings = {
     /** Absent means `system`: follow the OS `prefers-contrast: more` setting. */
     contrast?: ContrastId;
     density: DensityId;
+    /** Values the user picked (here or synced from another device); the desktop shell has its own defaults for the rest. */
+    explicit?: ExplicitAppearance;
     mainFont: MainFontId;
     mermaidTheme: MermaidThemeId;
 };

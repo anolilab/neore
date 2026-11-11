@@ -5,10 +5,11 @@ import { lazy, Suspense, useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
+import { useUIStateStore } from "@/features/layout/stores/ui-state-store";
 import useAfterFirstPaint from "@/hooks/use-after-first-paint";
 import { trackEvent } from "@/lib/analytics";
 
-import { completeNativeSignIn, getNativeDeviceStatus, onNativeCompose, onNativeDraft, onNativeFiles, onNativeSignIn } from "./bridge";
+import { completeNativeSignIn, getNativeDeviceStatus, onNativeCompose, onNativeDraft, onNativeFiles, onNativeMenuCommand, onNativeSignIn } from "./bridge";
 
 /** Only the desktop shell ever loads it. */
 const DeviceRelay = lazy(async () => await import("@/features/devices/components/device-relay"));
@@ -38,6 +39,8 @@ const requestAttach = async (files: File[]): Promise<void> => {
  *   as a new chat; files dropped on the dock icon are attached to a new chat;
  * - a system-browser sign-in the shell received is exchanged for a session
  *   cookie on this origin, then the page reloads signed in;
+ * - the application menu's New Chat opens the new-chat route (as the `newChat`
+ *   shortcut does) and Settings opens the settings modal (as the sidebar's cog does);
  * - on desktop, for a signed-in account and after first paint, the device
  *   relay runs (`features/devices`): agent calls to this computer go to the
  *   shell, which asks the user in its own window.
@@ -97,6 +100,21 @@ const NativeBridge = (): JSX.Element | null => {
                 })();
             }),
         [openNewChat],
+    );
+
+    useEffect(
+        () =>
+            onNativeMenuCommand((command) => {
+                if (command === "settings") {
+                    // The modal `useModalState("settings")` opens, as the sidebar's cog does.
+                    useUIStateStore.getState().openModal("settings");
+
+                    return;
+                }
+
+                void navigate({ search: {}, to: "/chat" });
+            }),
+        [navigate],
     );
 
     useEffect(

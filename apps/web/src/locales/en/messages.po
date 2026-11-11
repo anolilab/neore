@@ -31691,6 +31691,7 @@ msgstr "Synthesizer (merges the answers)"
 msgid "Synthesizer (weighs both sides)"
 msgstr "Synthesizer (weighs both sides)"
 
+#: src/features/appearance/components/appearance-controls.tsx:224
 #: src/features/auth/components/device-code-parts.tsx:126
 msgid "System"
 msgstr "System"
