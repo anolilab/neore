@@ -374,18 +374,21 @@ const SkillList = ({ reloadKey = 0 }: SkillListProps) => {
         </>
     );
 
-    // Show empty state if no skills
+    // Show empty state if no skills. The dialogs render at the same place in both branches: the list resolving to empty
+    // while "Create skill" is open must not remount the form and drop what was typed.
     if (skillsBase && skillsBase.length === 0) {
         return (
             <>
-                <SkillEmptyState isLoggedIn={isLoggedIn} onCreateSkill={handleCreateSkill} skillCount={skillCount || null} />
-                {isLoggedIn && (
-                    <div className="mt-4 flex justify-center gap-2">
-                        {builderButton}
-                        {importButton}
-                        {bundleButtons}
-                    </div>
-                )}
+                <div>
+                    <SkillEmptyState isLoggedIn={isLoggedIn} onCreateSkill={handleCreateSkill} skillCount={skillCount || null} />
+                    {isLoggedIn && (
+                        <div className="mt-4 flex justify-center gap-2">
+                            {builderButton}
+                            {importButton}
+                            {bundleButtons}
+                        </div>
+                    )}
+                </div>
                 {dialogs}
             </>
         );
@@ -394,70 +397,71 @@ const SkillList = ({ reloadKey = 0 }: SkillListProps) => {
     const setupPanel = builderSetup && <SkillBuilderSetup onDismiss={() => setBuilderSetup(null)} onDone={setBuilderSetup} pending={builderSetup} />;
 
     return (
-        <div className="space-y-4">
-            {/* Toolbar */}
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex flex-1 items-center gap-2">
-                    <div className="relative flex-1">
-                        <Search aria-hidden="true" className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2" />
-                        <Input
-                            aria-label={t`Search your skills`}
-                            className="pl-9"
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            placeholder={t`Search skills...`}
-                            type="search"
-                            value={searchQuery}
-                        />
+        <>
+            <div className="space-y-4">
+                {/* Toolbar */}
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex flex-1 items-center gap-2">
+                        <div className="relative flex-1">
+                            <Search aria-hidden="true" className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2" />
+                            <Input
+                                aria-label={t`Search your skills`}
+                                className="pl-9"
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                placeholder={t`Search skills...`}
+                                type="search"
+                                value={searchQuery}
+                            />
+                        </div>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                        <Select onValueChange={(value) => setSortBy(value as SortOption)} value={sortBy}>
+                            <SelectTrigger aria-label={t`Sort skills`} className="w-40">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="recent">{t`Recently Created`}</SelectItem>
+                                <SelectItem value="mostUsed">{t`Most Used`}</SelectItem>
+                                <SelectItem value="alphabetical">{t`Alphabetical`}</SelectItem>
+                            </SelectContent>
+                        </Select>
+                        {builderButton}
+                        {importButton}
+                        {bundleButtons}
+                        <Button onClick={handleCreateSkill}>
+                            <Plus aria-hidden="true" className="mr-2 size-4" />
+                            {t`Add Skill`}
+                        </Button>
                     </div>
                 </div>
-                <div className="flex flex-wrap items-center gap-2">
-                    <Select onValueChange={(value) => setSortBy(value as SortOption)} value={sortBy}>
-                        <SelectTrigger aria-label={t`Sort skills`} className="w-40">
-                            <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="recent">{t`Recently Created`}</SelectItem>
-                            <SelectItem value="mostUsed">{t`Most Used`}</SelectItem>
-                            <SelectItem value="alphabetical">{t`Alphabetical`}</SelectItem>
-                        </SelectContent>
-                    </Select>
-                    {builderButton}
-                    {importButton}
-                    {bundleButtons}
-                    <Button onClick={handleCreateSkill}>
-                        <Plus aria-hidden="true" className="mr-2 size-4" />
-                        {t`Add Skill`}
-                    </Button>
-                </div>
+
+                {setupPanel}
+
+                {/* Skills Grid */}
+                {filteredSkills.length === 0 ? (
+                    <div className="flex h-64 items-center justify-center rounded-lg border border-dashed">
+                        <p className="text-muted-foreground">{t`No skills found matching your search`}</p>
+                    </div>
+                ) : (
+                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                        {filteredSkills.map((skill) => (
+                            <SkillItem
+                                canDelete={skill.userId === currentUserId}
+                                isBusy={busySkillId === skill._id}
+                                key={skill._id}
+                                onDelete={setDeletingSkill}
+                                onEdit={handleEditSkill}
+                                onExport={handleExportSkill}
+                                onFork={(target) => runInstalledAction(target, "fork")}
+                                onUninstall={(target) => runInstalledAction(target, "uninstall")}
+                                skill={skill}
+                            />
+                        ))}
+                    </div>
+                )}
             </div>
-
-            {setupPanel}
-
-            {/* Skills Grid */}
-            {filteredSkills.length === 0 ? (
-                <div className="flex h-64 items-center justify-center rounded-lg border border-dashed">
-                    <p className="text-muted-foreground">{t`No skills found matching your search`}</p>
-                </div>
-            ) : (
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                    {filteredSkills.map((skill) => (
-                        <SkillItem
-                            canDelete={skill.userId === currentUserId}
-                            isBusy={busySkillId === skill._id}
-                            key={skill._id}
-                            onDelete={setDeletingSkill}
-                            onEdit={handleEditSkill}
-                            onExport={handleExportSkill}
-                            onFork={(target) => runInstalledAction(target, "fork")}
-                            onUninstall={(target) => runInstalledAction(target, "uninstall")}
-                            skill={skill}
-                        />
-                    ))}
-                </div>
-            )}
-
             {dialogs}
-        </div>
+        </>
     );
 };
 

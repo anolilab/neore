@@ -112,6 +112,16 @@ export const GITHUB_CREDENTIAL_ORIGIN = "https://github.com";
 const GITHUB_SHORTHAND = /^[\w.-]+\/[\w.-]+$/u;
 
 const DOT_GIT_SUFFIX = /\.git$/u;
+/** `path` without trailing slashes; a loop, not a regex, so a long run of slashes stays linear. */
+const withoutTrailingSlashes = (path: string): string => {
+    let end = path.length;
+
+    while (end > 0 && path[end - 1] === "/") {
+        end -= 1;
+    }
+
+    return path.slice(0, end);
+};
 
 const COMMIT_SHA = /^[0-9a-f]{40}$/u;
 
@@ -153,7 +163,8 @@ export const parseRepoUrl = (raw: string): ParsedRepo => {
     const host = url.hostname.toLowerCase();
 
     if (host === "github.com" || host === "www.github.com") {
-        const segments = url.pathname.replace(DOT_GIT_SUFFIX, "").split("/").filter(Boolean);
+        // Trailing slashes go first, so `web.git/` loses its `.git` too and never stores as `web.git.git`.
+        const segments = withoutTrailingSlashes(url.pathname).replace(DOT_GIT_SUFFIX, "").split("/").filter(Boolean);
         const [owner, repo] = segments;
 
         if (segments.length !== 2 || !owner || !repo || !GITHUB_SEGMENT.test(owner) || !GITHUB_SEGMENT.test(repo)) {
@@ -168,9 +179,24 @@ export const parseRepoUrl = (raw: string): ParsedRepo => {
 
 const BRANCH = /^[\w./-]{1,200}$/u;
 
-/** A branch name safe to hand to git: no leading dash (an option), no `..`, no `@{`. */
+/** A path component git refuses: one that starts with a dot, or ends in `.lock`. */
+const BAD_COMPONENT = /(?:^|\/)\.|\.lock(?:\/|$)/u;
+
+/**
+ * A branch name safe to hand to git, within `BRANCH`'s character set and the rules `git check-ref-format --branch`
+ * applies to it (`BRANCH` is narrower than git, so some names git accepts are refused): no leading dash (an option),
+ * no `..` or `//`, no component starting with a dot or ending in `.lock`, no trailing dot or slash. `@` and `{`
+ * are outside the character set, so `@{` cannot occur.
+ */
 export const isValidBranchName = (branch: string): boolean =>
-    BRANCH.test(branch) && !branch.startsWith("-") && !branch.startsWith("/") && !branch.endsWith("/") && !branch.includes("..") && !branch.endsWith(".lock");
+    BRANCH.test(branch) &&
+    !branch.startsWith("-") &&
+    !branch.startsWith("/") &&
+    !branch.endsWith("/") &&
+    !branch.endsWith(".") &&
+    !branch.includes("..") &&
+    !branch.includes("//") &&
+    !BAD_COMPONENT.test(branch);
 
 // ─── Environment ─────────────────────────────────────────────────────────────
 

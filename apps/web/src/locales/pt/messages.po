@@ -33,7 +33,7 @@ msgstr "-- INSERIR --"
 msgid "-- NORMAL --"
 msgstr "-- NORMAL --"
 
-#: src/features/notifications/components/notification-list.tsx:113
+#: src/features/notifications/components/notification-list.tsx:115
 msgid ", unread"
 msgstr ", não lida"
 
@@ -174,18 +174,6 @@ msgstr "(indisponível)"
 #: src/features/settings/connectors/messenger/messenger-platform-card.tsx:197
 msgid "(valid until {pairingValidUntil})"
 msgstr "(válido até {pairingValidUntil})"
-
-#: ../../packages/chat-ui/src/chat/tool-output-loader.tsx:63
-msgid "Loading output..."
-msgstr "A carregar a saída..."
-
-#: ../../packages/chat-ui/src/chat/tool-output-loader.tsx:70
-msgid "Output could not be loaded."
-msgstr "Não foi possível carregar a saída."
-
-#: ../../packages/chat-ui/src/chat/tool-output-loader.tsx:53
-msgid "Output is not loaded in this view."
-msgstr "A saída não é carregada nesta visualização."
 
 #. placeholder {0}: model.activeDays
 #: src/features/settings/components/chat/usage-activity-heatmap.tsx:110
@@ -1733,6 +1721,10 @@ msgstr "Um {requestNoun} precisa de um título. Digite um para salvar."
 msgid "A {requestNoun} title is at most {0} characters."
 msgstr "O título de um {requestNoun} tem no máximo {0} caracteres."
 
+#: src/features/marketing/use-cases/use-case-data.ts:28
+msgid "A background run never stops to wait for you. Questions to you are dropped from it, so it finishes on its own or fails."
+msgstr ""
+
 #: src/features/develop/components/watched-repositories.tsx:72
 msgid "a change is waiting to be read"
 msgstr "há uma alteração aguardando leitura"
@@ -1741,7 +1733,7 @@ msgstr "há uma alteração aguardando leitura"
 msgid "A chat is waiting for your answer"
 msgstr "Um chat está aguardando sua resposta"
 
-#: src/features/tasks/components/task-form-dialog.tsx:96
+#: src/features/tasks/components/task-form-dialog.tsx:98
 msgid "A coding agent needs a repository to work on"
 msgstr "Um agente de código precisa de um repositório para trabalhar"
 
@@ -1782,6 +1774,10 @@ msgstr "Um link do GitHub para uma pasta de habilidade ou seu SKILL.md, um link 
 msgid "A goal groups tasks. Its progress follows from how many of them are done."
 msgstr "Uma meta agrupa tarefas. O progresso dela depende de quantas foram concluídas."
 
+#: src/features/marketing/use-cases/visuals/group-chats-visual.tsx:13
+msgid "A group chat. A question from the owner is answered by three agents in turn: a security reviewer, a performance reviewer, and a lead who sums up."
+msgstr ""
+
 #: src/features/develop/components/guide-tab.tsx:101
 msgid "A guide for this {requestNoun} is already being written."
 msgstr "Um guia para este {requestNoun} já está sendo escrito."
@@ -1797,6 +1793,10 @@ msgstr "Uma chave já está salva. Deixe em branco para mantê-la."
 #: src/features/settings/components/chat/native-providers-settings.tsx:349
 msgid "A key is saved. Leave blank to keep it. Changing the endpoint, region or access key id requires entering it again."
 msgstr "Há uma chave salva. Deixe em branco para mantê-la. Alterar o endpoint, a região ou o ID da chave de acesso exige digitá-la novamente."
+
+#: src/features/marketing/use-cases/visuals/messaging-visual.tsx:14
+msgid "A message arrives from a chat app, a dot travels down to the agent, and the reply appears in the same chat."
+msgstr ""
 
 #: src/features/evals/components/run-dialog.tsx:176
 msgid "A model with a system prompt"
@@ -1822,7 +1822,7 @@ msgstr "Um novo chat será aberto com as mensagens selecionadas citadas. Revise 
 msgid "A new secret is shown once. The old secret stops working at once unless you keep it below, so update the sender right after. The webhook URL stays the same."
 msgstr "Um novo segredo é exibido uma única vez. O segredo antigo deixa de funcionar imediatamente, a menos que você o mantenha abaixo, então atualize o remetente logo em seguida. A URL do webhook continua a mesma."
 
-#: src/features/tasks/components/task-form-dialog.tsx:139
+#: src/features/tasks/components/task-form-dialog.tsx:141
 msgid "A new thread each run"
 msgstr "Uma nova conversa a cada execução"
 
@@ -1850,11 +1850,15 @@ msgstr "Uma senha mantém esta conversa fechada para qualquer pessoa que use um 
 msgid "A placeholder or @mention outside quotes is read as null here, so this error may come from it until a run fills it in"
 msgstr "Um marcador ou @menção fora das aspas é lido aqui como null, então este erro pode vir dele até que uma execução o preencha"
 
+#: src/features/projects/components/project-repositories.tsx:194
+msgid "A project can list at most {MAX_REPOSITORIES} repositories."
+msgstr "Um projeto pode listar no máximo {MAX_REPOSITORIES} repositórios."
+
 #: src/features/settings/components/chat/event-trigger-fields.tsx:227
 msgid "A public http or https address. The first check only records how the page looks. Only the first 1 MiB of a page is read."
 msgstr "Um endereço http ou https público. A primeira verificação apenas registra a aparência da página. Somente o primeiro 1 MiB de uma página é lido."
 
-#: src/features/notifications/lib/notification-labels.ts:39
+#: src/features/notifications/lib/notification-labels.ts:40
 msgid "A question is waiting for you"
 msgstr "Uma pergunta está esperando por você"
 
@@ -1871,7 +1875,19 @@ msgstr "Uma expressão regular à qual a resposta deve corresponder"
 msgid "A reply is posted straight away, not with the rest of your review."
 msgstr "Uma resposta é publicada imediatamente, e não junto com o restante da sua revisão."
 
-#: src/features/tasks/components/task-form-dialog.tsx:450
+#: src/features/marketing/use-cases/use-case-data.ts:112
+msgid "A reply that used memories shows a \"Memories used\" list, so you can see exactly what it was given."
+msgstr ""
+
+#: src/features/marketing/use-cases/use-case-data.ts:89
+msgid "A routed or mentioned turn has at most three speakers. A parallel turn has up to four answers and a synthesis, and a debate runs up to three rounds."
+msgstr ""
+
+#: src/features/marketing/use-cases/use-case-data.ts:25
+msgid "A run never writes into a chat that is locked or shared by link. It starts a new chat instead, and the task says why."
+msgstr ""
+
+#: src/features/tasks/components/task-form-dialog.tsx:469
 msgid "A run's thread is filed in this project. Moving the task to another project starts a new thread."
 msgstr "A conversa de cada execução fica neste projeto. Mover a tarefa para outro projeto inicia uma nova conversa."
 
@@ -1887,6 +1903,10 @@ msgstr "Um breve resumo toda manhã do que terminou, do que está em execução 
 msgid "A skill is a reusable set of instructions you can run with a slash command."
 msgstr "Uma habilidade é um conjunto reutilizável de instruções que você pode executar com um comando de barra."
 
+#: src/features/marketing/use-cases/use-case-data.ts:26
+msgid "A slot that cannot start (still running, waiting for review, blocked) is shown on the task and is not run later."
+msgstr ""
+
 #: src/features/develop/components/guide-view.tsx:130
 msgid "A suggestion only. Add the label on {hostLabel} yourself if you agree."
 msgstr "Apenas uma sugestão. Adicione o rótulo em {hostLabel} você mesmo, se concordar."
@@ -1894,6 +1914,10 @@ msgstr "Apenas uma sugestão. Adicione o rótulo em {hostLabel} você mesmo, se 
 #: src/features/settings/components/chat/event-trigger-fields.tsx:238
 msgid "A tag, #id, .class, tag.class or tag#id. Leave it empty to watch the whole page."
 msgstr "Uma tag, #id, .class, tag.class ou tag#id. Deixe vazio para monitorar a página inteira."
+
+#: src/features/notifications/lib/notification-labels.ts:70
+msgid "A task is stuck"
+msgstr ""
 
 #: src/features/chat/group/create-group-chat-button.tsx:157
 msgid "A template adds its participants to your skills, where you can edit them."
@@ -1903,7 +1927,7 @@ msgstr "Um modelo adiciona os participantes às suas habilidades, onde você pod
 msgid "A thread gets a reply"
 msgstr "Uma conversa recebe uma resposta"
 
-#: src/features/notifications/lib/notification-labels.ts:69
+#: src/features/notifications/lib/notification-labels.ts:73
 msgid "A tool call needs your approval"
 msgstr "Uma chamada de ferramenta precisa da sua aprovação"
 
@@ -1911,11 +1935,15 @@ msgstr "Uma chamada de ferramenta precisa da sua aprovação"
 msgid "A tool cannot be both added and disabled"
 msgstr "Uma ferramenta não pode ser adicionada e desativada ao mesmo tempo"
 
+#: src/features/marketing/use-cases/use-case-data.ts:91
+msgid "A tool that needs your approval pauses the turn with a card. Only the owner answers, and the queued speakers continue afterwards."
+msgstr ""
+
 #: src/features/settings/components/chat/trigger-settings.tsx:344
 msgid "A unique webhook URL and secret will be generated when you create this trigger. Use the URL as the target for external services (Zapier, n8n, your own code, etc.)."
 msgstr "Uma URL de webhook e um segredo exclusivos serão gerados quando você criar este gatilho. Use a URL como destino para serviços externos (Zapier, n8n, seu próprio código etc.)."
 
-#: src/features/notifications/lib/notification-labels.ts:75
+#: src/features/notifications/lib/notification-labels.ts:79
 msgid "A usage alert was triggered"
 msgstr "Um alerta de uso foi acionado"
 
@@ -1923,9 +1951,17 @@ msgstr "Um alerta de uso foi acionado"
 msgid "A value does not have the format this request asks for, so nothing was saved. Check it and enter it again."
 msgstr "Um valor não tem o formato que esta solicitação pede, então nada foi salvo. Confira e digite novamente."
 
+#: src/features/marketing/use-cases/use-case-data.ts:38
+msgid "A verifier model judges the answer. A pass counts as done. A failed check is retried automatically while repair rounds remain, then goes to your review. If the verifier cannot run, the run goes to your review."
+msgstr ""
+
 #: src/features/develop/components/watched-repositories.tsx:38
 msgid "A webhook only tells Neore to look again sooner. Polling keeps working without one."
 msgstr "Um webhook apenas avisa o Neore para verificar de novo mais cedo. A verificação periódica continua funcionando sem ele."
+
+#: src/features/marketing/use-cases/visuals/routines-visual.tsx:23
+msgid "A weekly routine. A playhead moves along the week; each slot shows its run, and the Wednesday run is skipped because the last one was still going."
+msgstr ""
 
 #: src/features/prompts/components/prompt-list.tsx:544
 msgid "A-Z"
@@ -2144,6 +2180,7 @@ msgid "Activity per month"
 msgstr "Atividade por mês"
 
 #: src/features/chat/tags/manage-thread-tags-dialog.tsx:225
+#: src/features/projects/components/project-repositories.tsx:432
 #: src/features/settings/components/chat/mcp/server-catalog.tsx:102
 #: src/features/workflow/components/gallery/publish-dialog.tsx:220
 msgid "Add"
@@ -2386,7 +2423,7 @@ msgstr "Adicionar linha"
 msgid "Add Server"
 msgstr "Adicionar servidor"
 
-#: src/features/skills/components/skill-list.tsx:429
+#: src/features/skills/components/skill-list.tsx:433
 msgid "Add Skill"
 msgstr "Adicionar habilidade"
 
@@ -2735,6 +2772,10 @@ msgstr "Africâner (África do Sul)"
 msgid "After"
 msgstr "Depois"
 
+#: src/features/marketing/use-cases/use-case-data.ts:119
+msgid "After a reply, a fast check decides whether the exchange could hold a fact about you. Most turns, like a thank you, are skipped."
+msgstr ""
+
 #: src/features/settings/connectors/messenger/messenger-setup-dialog.tsx:71
 msgid "After activating the connection here, paste the webhook URL as the bot's Messaging endpoint, then add the Microsoft Teams channel to the bot."
 msgstr "Depois de ativar a conexão aqui, cole a URL do webhook como Messaging endpoint do bot e, em seguida, adicione o canal do Microsoft Teams ao bot."
@@ -2774,7 +2815,7 @@ msgstr "Após conteúdo externo"
 #: src/features/evals/components/dataset-panel.tsx:102
 #: src/features/layout/lib/dashboard-page-names.ts:14
 #: src/features/settings/lib/settings-navigation.ts:93
-#: src/features/tasks/components/task-form-dialog.tsx:335
+#: src/features/tasks/components/task-form-dialog.tsx:354
 msgid "Agent"
 msgstr "Agente"
 
@@ -2917,7 +2958,7 @@ msgstr "Geração de vídeos com IA"
 msgid "AI-assisted bug triage with full recording context"
 msgstr "Triagem de bugs assistida por IA com todo o contexto da gravação"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:369
+#: ../../packages/chat-ui/src/chat/message-content.tsx:377
 msgid "AI-generated"
 msgstr "Gerado por IA"
 
@@ -3209,6 +3250,10 @@ msgstr "Todas as tarefas"
 msgid "All Types"
 msgstr "Todos os tipos"
 
+#: src/features/marketing/use-cases/use-case-page.tsx:22
+msgid "All use cases"
+msgstr ""
+
 #: src/features/admin/components/admin-dashboard-stats.tsx:180
 msgid "All Users"
 msgstr "Todos os usuários"
@@ -3220,6 +3265,10 @@ msgstr "Permitir \"{tool}\" de {server}?"
 #: src/features/chat/thread/tool-approval.tsx:100
 msgid "Allow \"{tool}\"?"
 msgstr "Permitir \"{tool}\"?"
+
+#: src/features/marketing/use-cases/visuals/approvals-visual.tsx:15
+msgid "Allow \"delete_files\" from the drafts server?"
+msgstr ""
 
 #: src/features/chat/thread/tool-approval.tsx:133
 msgid "Allow {tool} for 1 hour"
@@ -3268,7 +3317,7 @@ msgstr "Regiões permitidas"
 msgid "Alloy (Neutral)"
 msgstr "Alloy (Neutra)"
 
-#: src/features/skills/components/skill-list.tsx:421
+#: src/features/skills/components/skill-list.tsx:425
 msgid "Alphabetical"
 msgstr "Ordem alfabética"
 
@@ -3285,12 +3334,17 @@ msgid "Also viewing"
 msgstr "Também visualizando"
 
 #: src/features/chat/thread/tool-approval.tsx:129
+#: src/features/marketing/use-cases/visuals/approvals-visual.tsx:35
 msgid "Always allow"
 msgstr "Sempre permitir"
 
 #: src/features/chat/thread/tool-approval.tsx:127
 msgid "Always allow {tool}"
 msgstr "Sempre permitir {tool}"
+
+#: src/features/marketing/use-cases/use-case-data.ts:47
+msgid "Always allow sets Auto for that one tool. Allow for 1 hour and Allow for today are time-boxed and lapse on their own."
+msgstr ""
 
 #: src/features/vault/components/empty-states.tsx:33
 msgid "Always find what you need"
@@ -3332,9 +3386,17 @@ msgstr "Um defensor e um cético argumentam a favor e contra em duas rodadas; um
 msgid "An agent (skill)"
 msgstr "Um agente (habilidade)"
 
-#: src/features/tasks/components/task-form-dialog.tsx:205
+#: src/features/tasks/components/task-form-dialog.tsx:207
 msgid "An agent works the task on its own, then a verifier checks the result against your success criteria."
 msgstr "Um agente executa a tarefa por conta própria e, depois, um verificador confere o resultado com seus critérios de sucesso."
+
+#: src/features/marketing/use-cases/visuals/approvals-visual.tsx:13
+msgid "An approval card asks to allow a tool. A pointer clicks Approve, the status changes to running, and the result appears."
+msgstr ""
+
+#: src/features/marketing/use-cases/use-case-data.ts:48
+msgid "An approved call to an external (MCP) server runs only if that tool's name, input schema and annotations are unchanged since you approved it. If they changed, the call does not run. The model is told, and a new call asks you again."
+msgstr ""
 
 #: src/features/settings/connectors/messenger/messenger-setup-dialog.tsx:38
 msgid "An Encrypt Key is required: Feishu only signs events when one is set, and unsigned events are refused."
@@ -3348,7 +3410,7 @@ msgstr "Ocorreu um erro"
 msgid "An error occurred during One Tap sign in"
 msgstr "Ocorreu um erro ao entrar com o One Tap"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1147
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1155
 msgid "An error occurred while generating the response."
 msgstr "Ocorreu um erro ao gerar a resposta."
 
@@ -3367,6 +3429,10 @@ msgstr "Uma imagem no arquivo está corrompida."
 #: src/features/devices/components/device-scope.tsx:114
 msgid "An older project not listed here"
 msgstr "Um projeto mais antigo que não está listado aqui"
+
+#: src/features/marketing/use-cases/use-case-data.ts:49
+msgid "An opt-in quick check can approve clearly read-only calls from servers you mark as trusted. It is off by default."
+msgstr ""
 
 #: src/lib/errors/index.ts:199
 msgid "An unexpected error occurred."
@@ -3632,7 +3698,7 @@ msgid "App Secret from your Meta app's App settings > Basic, used to verify X-Hu
 msgstr "App Secret em App settings > Basic do seu app da Meta, usado para verificar o X-Hub-Signature-256"
 
 #: ../../packages/ui/src/components/canvas-editor/canvas-property-panel.tsx:316
-#: src/features/projects/components/project-form-dialog.tsx:233
+#: src/features/projects/components/project-form-dialog.tsx:234
 #: src/features/settings/components/account/account-settings.tsx:180
 #: src/features/settings/lib/settings-keywords.ts:27
 msgid "Appearance"
@@ -3698,9 +3764,22 @@ msgstr "aprovação"
 msgid "Approval"
 msgstr "Aprovação"
 
+#: src/features/marketing/use-cases/use-case-data.ts:51
+msgid "Approvals"
+msgstr ""
+
+#: src/features/marketing/use-cases/use-case-data.ts:53
+msgid "Approvals — the agent asks before a risky action"
+msgstr ""
+
+#: src/features/marketing/use-cases/use-case-data.ts:52
+msgid "Approvals in Neore: a tool you set to Ask stops before it runs, and you decide with the exact input in front of you."
+msgstr ""
+
 #: src/features/auth/components/device-approval.tsx:242
 #: src/features/chat/thread/tool-approval.tsx:121
 #: src/features/develop/components/review-panel.tsx:64
+#: src/features/marketing/use-cases/visuals/approvals-visual.tsx:32
 #: src/features/tasks/components/task-detail-dialog.tsx:104
 msgid "Approve"
 msgstr "Aprovar"
@@ -3720,12 +3799,17 @@ msgstr "Aprovar {tool} uma vez"
 msgid "Approve a code"
 msgstr ""
 
+#: src/features/marketing/use-cases/use-case-data.ts:59
+msgid "Approve runs the call once and the reply continues from its result. Deny sends a denial back to the model, which carries on without that tool."
+msgstr ""
+
 #: src/features/auth/components/device-approval.tsx:128
 #: src/features/auth/components/device-approval.tsx:133
 msgid "Approved"
 msgstr ""
 
 #: src/features/chat/thread/tool-approval.tsx:79
+#: src/features/marketing/use-cases/visuals/approvals-visual.tsx:23
 msgid "Approved — running tool"
 msgstr "Aprovado — executando ferramenta"
 
@@ -4003,7 +4087,7 @@ msgid "Aspect Ratio"
 msgstr "Proporção"
 
 #: src/features/tasks/components/task-detail-dialog.tsx:223
-#: src/features/tasks/components/task-form-dialog.tsx:270
+#: src/features/tasks/components/task-form-dialog.tsx:272
 msgid "Assigned to"
 msgstr "Atribuída a"
 
@@ -4584,6 +4668,10 @@ msgstr "Antes"
 msgid "Before a connected tool set to Ask pauses the chat, a short model check reads the call. It only looks at tools from MCP servers and connectors you have marked as trusted, and only those whose name starts with a read verb such as get, list, search or fetch, and never after the chat has read your knowledge base, memories, project context, a tool result, an attached file, document or web page, or while any skill is enabled. If it judges the call low risk, the call runs and the chat notes that it was approved automatically, with the reason. Everything else still asks you. Off by default."
 msgstr "Antes de uma ferramenta conectada definida como Perguntar pausar o chat, uma rápida verificação do modelo lê a chamada. Ela só analisa ferramentas de servidores MCP e conectores que você marcou como confiáveis, e apenas aquelas cujo nome começa com um verbo de leitura como get, list, search ou fetch, e nunca depois que o chat leu sua base de conhecimento, memórias, contexto do projeto, o resultado de uma ferramenta, um arquivo anexado, documento ou página da web, nem enquanto qualquer habilidade estiver ativada. Se ela julgar a chamada de baixo risco, a chamada é executada e o chat registra que foi aprovada automaticamente, com o motivo. Todo o resto continua pedindo sua confirmação. Desativado por padrão."
 
+#: src/features/marketing/use-cases/use-case-data.ts:121
+msgid "Before each reply, the memories most relevant to the message are added to the prompt, weighted by relevance, confidence, importance and recency."
+msgstr ""
+
 #: src/features/workflow/templates/index.ts:126
 msgid "beginner"
 msgstr "iniciante"
@@ -4922,7 +5010,7 @@ msgstr "Brainstorming"
 #: ../../packages/chat-ui/src/chat/message-item.tsx:203
 #: src/features/chat/core/hooks/use-thread-manager.ts:138
 #: src/features/chat/core/hooks/use-thread-manager.ts:151
-#: src/features/tasks/components/task-form-dialog.tsx:317
+#: src/features/tasks/components/task-form-dialog.tsx:336
 #: src/features/workflow/types/index.ts:425
 #: src/features/workflow/types/index.ts:429
 msgid "Branch"
@@ -4969,7 +5057,7 @@ msgstr "Brasil"
 msgid "Break down complex tasks into numbered steps with progress tracking. Ideal for multi-step projects and development tasks."
 msgstr "Divida tarefas complexas em etapas numeradas com acompanhamento de progresso. Ideal para projetos com várias etapas e tarefas de desenvolvimento."
 
-#: src/features/projects/components/project-form-dialog.tsx:221
+#: src/features/projects/components/project-form-dialog.tsx:222
 msgid "Brief description of this project"
 msgstr "Breve descrição deste projeto"
 
@@ -5021,11 +5109,11 @@ msgstr "Navegue e restaure versões anteriores do seu fluxo de trabalho."
 msgid "Browse, fork, and remix workflows shared by the community"
 msgstr "Explore, copie e remixe fluxos de trabalho compartilhados pela comunidade"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:730
+#: ../../packages/chat-ui/src/chat/message-content.tsx:738
 msgid "Browser"
 msgstr "Navegador"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:753
+#: ../../packages/chat-ui/src/chat/message-content.tsx:761
 msgid "Browser action failed"
 msgstr "Falha na ação do navegador"
 
@@ -5033,7 +5121,7 @@ msgstr "Falha na ação do navegador"
 msgid "Browser Automation"
 msgstr "Automação de navegador"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:751
+#: ../../packages/chat-ui/src/chat/message-content.tsx:759
 msgid "Browser error"
 msgstr "Erro do navegador"
 
@@ -5042,7 +5130,7 @@ msgid "Browser notes"
 msgstr "Observações sobre navegadores"
 
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:262
-#: ../../packages/chat-ui/src/chat/message-content.tsx:713
+#: ../../packages/chat-ui/src/chat/message-content.tsx:721
 msgid "Browser screenshot"
 msgstr "Captura de tela do navegador"
 
@@ -5050,7 +5138,7 @@ msgstr "Captura de tela do navegador"
 msgid "Browser Session"
 msgstr "Sessão do navegador"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:663
+#: ../../packages/chat-ui/src/chat/message-content.tsx:671
 msgid "Browser working..."
 msgstr "Navegador trabalhando..."
 
@@ -5407,7 +5495,7 @@ msgstr "Canadá"
 #: src/features/pages/components/page-agent-dialog.tsx:148
 #: src/features/pages/components/page-comments-panel.tsx:87
 #: src/features/projects/components/move-to-project-dialog.tsx:95
-#: src/features/projects/components/project-form-dialog.tsx:392
+#: src/features/projects/components/project-form-dialog.tsx:395
 #: src/features/prompts/components/prompt-form-dialog.tsx:501
 #: src/features/prompts/components/prompt-optimize-dialog.tsx:194
 #: src/features/prompts/components/variable-fill-dialog.tsx:185
@@ -5433,7 +5521,7 @@ msgstr "Canadá"
 #: src/features/slides/components/slide-editor-dialog.tsx:113
 #: src/features/tasks/components/goal-form-dialog.tsx:164
 #: src/features/tasks/components/task-card.tsx:106
-#: src/features/tasks/components/task-form-dialog.tsx:617
+#: src/features/tasks/components/task-form-dialog.tsx:636
 #: src/features/workflow/components/nodes/mask-editor.tsx:286
 #: src/features/workflow/components/nodes/video-trim-dialog.tsx:236
 #: src/features/workflow/components/prompt-to-workflow-dialog.tsx:142
@@ -5491,6 +5579,10 @@ msgstr "Cancelando..."
 #: src/features/evals/components/run-comparison.tsx:149
 msgid "Candidate"
 msgstr "Candidato"
+
+#: src/features/marketing/use-cases/use-case-data.ts:120
+msgid "Candidate facts are saved with a type: identity, preference, context, activity or experience. Near-duplicates are merged."
+msgstr ""
 
 #. placeholder {0}: item.disabledReason
 #: src/features/skills/components/bundle-export-dialog.tsx:72
@@ -5771,7 +5863,7 @@ msgstr "Chat · Imagens · Vídeo · Áudio · Documentos"
 msgid "Chat actions"
 msgstr "Ações do chat"
 
-#: src/features/tasks/components/task-form-dialog.tsx:132
+#: src/features/tasks/components/task-form-dialog.tsx:134
 msgid "Chat agent"
 msgstr "Agente de chat"
 
@@ -5787,11 +5879,11 @@ msgstr "Chat copiado para a área de transferência como Markdown"
 msgid "Chat Import"
 msgstr "Importação de chats"
 
-#: src/features/notifications/lib/notification-labels.ts:42
+#: src/features/notifications/lib/notification-labels.ts:43
 msgid "Chat import failed"
 msgstr "A importação de chats falhou"
 
-#: src/features/notifications/lib/notification-labels.ts:42
+#: src/features/notifications/lib/notification-labels.ts:43
 msgid "Chat import finished"
 msgstr "Importação de chats concluída"
 
@@ -5926,7 +6018,7 @@ msgstr "Verificado: {0}"
 msgid "Checking"
 msgstr ""
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:386
+#: ../../packages/chat-ui/src/chat/message-content.tsx:394
 msgid "Checking image safety..."
 msgstr "Verificando a segurança da imagem..."
 
@@ -6038,6 +6130,10 @@ msgstr "Escolha como o Neore avisa sobre trabalho concluído e o que precisa de 
 #: src/features/settings/components/account/account-settings.tsx:213
 msgid "Choose how to send messages in the chat. Cmd/Ctrl+Enter always sends."
 msgstr "Escolha como enviar mensagens no chat. Cmd/Ctrl+Enter sempre envia."
+
+#: src/features/marketing/use-cases/use-case-data.ts:99
+msgid "Choose how turns are handed out: supervisor (a routing step picks who speaks), round-robin, mention-only, parallel, or debate."
+msgstr ""
 
 #: src/features/develop/components/review-panel.tsx:129
 msgid "Choose how you review this before you submit it."
@@ -6173,7 +6269,7 @@ msgstr "claude"
 msgid "Claude Code"
 msgstr "Claude Code"
 
-#: src/features/tasks/components/task-form-dialog.tsx:133
+#: src/features/tasks/components/task-form-dialog.tsx:135
 msgid "Claude Code (coding agent)"
 msgstr "Claude Code (agente de código)"
 
@@ -6250,7 +6346,7 @@ msgid "Clear mask"
 msgstr "Limpar máscara"
 
 #: src/features/skills/components/skill-form-dialog.tsx:373
-#: src/features/tasks/components/task-form-dialog.tsx:394
+#: src/features/tasks/components/task-form-dialog.tsx:413
 msgid "Clear model"
 msgstr "Limpar modelo"
 
@@ -6337,7 +6433,7 @@ msgstr "Clique para editar"
 msgid "Click to edit..."
 msgstr "Clique para editar..."
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:655
+#: ../../packages/chat-ui/src/chat/message-content.tsx:663
 msgid "Clicking element..."
 msgstr "Clicando no elemento..."
 
@@ -6493,7 +6589,7 @@ msgstr "Os modelos do Cloudflare Workers AI são executados onde a Cloudflare ti
 msgid "Code"
 msgstr "Código"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:128
+#: ../../packages/chat-ui/src/chat/message-content.tsx:129
 #: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:331
 msgid "Code block"
 msgstr "Bloco de código"
@@ -6506,7 +6602,7 @@ msgstr "Execução de código"
 msgid "Code execution and sandbox files"
 msgstr "Execução de código e arquivos do sandbox"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:631
+#: ../../packages/chat-ui/src/chat/message-content.tsx:639
 msgid "Code execution failed"
 msgstr "Falha na execução do código"
 
@@ -6530,11 +6626,12 @@ msgstr "O modo de código ainda não está disponível para a sua conta."
 msgid "Code navigation"
 msgstr "Navegação de código"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:587
+#: ../../packages/chat-ui/src/chat/message-content.tsx:595
 msgid "Code output"
 msgstr "Saída do código"
 
 #: src/features/chat/group/group-mode.ts:50
+#: src/features/marketing/use-cases/visuals/group-chats-visual.tsx:16
 msgid "Code review panel"
 msgstr "Painel de revisão de código"
 
@@ -6581,11 +6678,11 @@ msgstr "Log do agente de código"
 msgid "Coding Agent Pull Requests"
 msgstr "Pull requests dos agentes de programação"
 
-#: src/features/notifications/lib/notification-labels.ts:45
+#: src/features/notifications/lib/notification-labels.ts:46
 msgid "Coding agent run failed"
 msgstr "A execução do agente de código falhou"
 
-#: src/features/notifications/lib/notification-labels.ts:45
+#: src/features/notifications/lib/notification-labels.ts:46
 msgid "Coding agent run finished"
 msgstr "Execução do agente de código concluída"
 
@@ -6622,6 +6719,10 @@ msgstr "Tarefas de programação que exigem o modelo especializado de 30B da Ali
 #: src/features/marketing/data/models-data.ts:1336
 msgid "Coding tasks requiring Mistral's specialized development-focused model"
 msgstr "Tarefas de programação que exigem o modelo especializado da Mistral voltado para desenvolvimento"
+
+#: src/features/projects/components/project-repositories.tsx:291
+msgid "Coding-agent runs in this project offer these repositories, with the default preselected."
+msgstr "As execuções de agentes de código neste projeto oferecem estes repositórios, com o padrão pré-selecionado."
 
 #: src/lib/model-descriptions.ts:59
 msgid "Coding-specialized model from Alibaba"
@@ -6711,7 +6812,7 @@ msgid "Colombia"
 msgstr "Colômbia"
 
 #: src/features/canvas/canvas-panel.tsx:123
-#: src/features/projects/components/project-form-dialog.tsx:240
+#: src/features/projects/components/project-form-dialog.tsx:241
 msgid "Color"
 msgstr "Cor"
 
@@ -7150,7 +7251,7 @@ msgstr "Configure módulos avançados do agente de IA para executar tarefas melh
 msgid "Configure chat behavior and preferences."
 msgstr "Configure o comportamento e as preferências do chat."
 
-#: src/features/projects/components/project-form-dialog.tsx:344
+#: src/features/projects/components/project-form-dialog.tsx:345
 msgid "Configure default model, reasoning effort, and features for new chats created in this project."
 msgstr "Configure o modelo padrão, o esforço de raciocínio e os recursos para novos chats criados neste projeto."
 
@@ -7259,6 +7360,10 @@ msgstr "Conectar {label}"
 #: src/features/develop/components/failure-notice.tsx:19
 msgid "Connect {label} to see what needs your review here."
 msgstr "Conecte {label} para ver aqui o que precisa da sua revisão."
+
+#: src/features/marketing/use-cases/use-case-data.ts:83
+msgid "Connect a bot you own to a messaging app and message your agent from your phone. Messages from the app have their own pairing and rate-limit checks, then land in the same chat history as your web chats."
+msgstr ""
 
 #: src/features/code/components/code-shell.tsx:97
 msgid "Connect a Git host to review pull requests here."
@@ -7375,6 +7480,10 @@ msgstr "Conecte suas contas de mensageiros para enviar mensagens à IA a partir 
 #: src/features/settings/connectors/messenger/messenger-page.tsx:104
 msgid "Connect your messenger platforms to chat with AI directly from Telegram, Slack, Discord, WhatsApp, LINE, Feishu/Lark, Microsoft Teams or WeChat. Messages appear in your thread list with the platform tag."
 msgstr "Conecte seus mensageiros para conversar com a IA direto do Telegram, Slack, Discord, WhatsApp, LINE, Feishu/Lark, Microsoft Teams ou WeChat. As mensagens aparecem na sua lista de conversas com a tag da plataforma."
+
+#: src/features/marketing/use-cases/use-case-data.ts:73
+msgid "Connect your own Telegram, WhatsApp, Slack or Discord bot to Neore and message your agent from the app you already use."
+msgstr ""
 
 #: src/features/settings/components/chat/mcp/status-indicator.tsx:24
 #: src/features/settings/connectors/connector-card.tsx:74
@@ -7595,7 +7704,7 @@ msgstr "Slide de conteúdo"
 msgid "Context"
 msgstr "Contexto"
 
-#: src/features/projects/components/project-form-dialog.tsx:318
+#: src/features/projects/components/project-form-dialog.tsx:319
 msgid "Context / Instructions"
 msgstr "Contexto / instruções"
 
@@ -7652,7 +7761,7 @@ msgstr "Continuar neste chat"
 msgid "Continue interrupted replies"
 msgstr "Continuar respostas interrompidas"
 
-#: src/features/tasks/components/task-form-dialog.tsx:137
+#: src/features/tasks/components/task-form-dialog.tsx:139
 msgid "Continue the same thread"
 msgstr "Continuar na mesma conversa"
 
@@ -8245,7 +8354,8 @@ msgstr "Não foi possível carregar as chaves de API. Tente novamente mais tarde
 msgid "Could not load image"
 msgstr "Não foi possível carregar a imagem"
 
-#: src/features/tasks/components/task-form-dialog.tsx:438
+#: src/features/projects/components/project-repo-picker.tsx:188
+#: src/features/tasks/components/task-form-dialog.tsx:457
 msgid "Could not load more projects."
 msgstr "Não foi possível carregar mais projetos."
 
@@ -8286,6 +8396,15 @@ msgstr "Não foi possível carregar isto"
 msgid "Could not load this chat's details."
 msgstr ""
 
+#: src/features/projects/components/project-repositories.tsx:296
+msgid "Could not load this project, so its repositories cannot be changed."
+msgstr "Não foi possível carregar este projeto, por isso os seus repositórios não podem ser alterados."
+
+#: src/features/projects/components/project-repo-picker.tsx:226
+#: src/features/projects/components/project-repositories.tsx:317
+msgid "Could not load this project's repositories."
+msgstr "Não foi possível carregar os repositórios deste projeto."
+
 #: src/features/projects/components/project-usage-summary.tsx:61
 msgid "Could not load this project's usage."
 msgstr "Não foi possível carregar o uso deste projeto."
@@ -8305,6 +8424,10 @@ msgstr "Não foi possível carregar os detalhes de cobrança da sua organizaçã
 #: src/features/onboarding/components/setup-checklist.tsx:230
 msgid "Could not load your saved choices, so Skip and Resume are off until it is read again."
 msgstr ""
+
+#: src/features/projects/components/project-repo-picker.tsx:173
+msgid "Could not look up this repository's project."
+msgstr "Não foi possível obter o projeto deste repositório."
 
 #: src/features/pages/components/pages-sidebar.tsx:108
 msgid "Could not move the page"
@@ -8544,6 +8667,10 @@ msgstr "Criar"
 msgid "Create & connect node"
 msgstr "Criar e conectar nó"
 
+#: src/features/marketing/use-cases/use-case-data.ts:77
+msgid "Create a bot in the app and paste its token into settings. Tokens are stored encrypted, like your provider keys."
+msgstr ""
+
 #: src/features/settings/connectors/messenger/messenger-setup-dialog.tsx:80
 msgid "Create a bot via @BotFather on Telegram if you haven't already."
 msgstr "Crie um bot pelo @BotFather no Telegram, se ainda não tiver criado."
@@ -8563,6 +8690,10 @@ msgstr "Crie um dataset de casos de teste — cada um com uma entrada e, opciona
 #: src/features/settings/connectors/messenger/messenger-setup-dialog.tsx:32
 msgid "Create a Discord Application at discord.com/developers/applications."
 msgstr "Crie um Discord Application em discord.com/developers/applications."
+
+#: src/features/marketing/use-cases/use-case-data.ts:98
+msgid "Create a group chat with its participants. Each one gets its own instructions, model and tools. Templates include a code review panel and a pros and cons debate."
+msgstr ""
 
 #: src/features/settings/connectors/messenger/messenger-setup-dialog.tsx:50
 msgid "Create a Messaging API channel in the LINE Developers Console (developers.line.biz/console)."
@@ -8584,7 +8715,7 @@ msgstr "Crie uma nova ramificação a partir desta mensagem. Dê um nome a ela p
 msgid "Create a new organization to collaborate with your team"
 msgstr "Crie uma nova organização para colaborar com sua equipe"
 
-#: src/features/projects/components/project-form-dialog.tsx:186
+#: src/features/projects/components/project-form-dialog.tsx:187
 msgid "Create a new project to group related chats with shared context."
 msgstr "Crie um novo projeto para agrupar chats relacionados com contexto compartilhado."
 
@@ -8720,8 +8851,8 @@ msgstr "Criar PR"
 msgid "Create project"
 msgstr "Criar projeto"
 
-#: src/features/projects/components/project-form-dialog.tsx:184
-#: src/features/projects/components/project-form-dialog.tsx:405
+#: src/features/projects/components/project-form-dialog.tsx:185
+#: src/features/projects/components/project-form-dialog.tsx:408
 msgid "Create Project"
 msgstr "Criar projeto"
 
@@ -8740,7 +8871,7 @@ msgstr "Criar habilidade"
 msgid "Create Skill"
 msgstr "Criar habilidade"
 
-#: src/features/tasks/components/task-form-dialog.tsx:620
+#: src/features/tasks/components/task-form-dialog.tsx:639
 msgid "Create task"
 msgstr "Criar tarefa"
 
@@ -8805,7 +8936,7 @@ msgstr "Cria um link de uso único, válido por 7 dias. Quem abrir o link com lo
 msgid "Creating branch..."
 msgstr "Criando ramificação..."
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:310
+#: ../../packages/chat-ui/src/chat/message-content.tsx:318
 msgid "Creating slides..."
 msgstr "Criando slides..."
 
@@ -8910,7 +9041,7 @@ msgstr "Croata (Croácia)"
 msgid "Cron Expression"
 msgstr "Expressão cron"
 
-#: src/features/tasks/components/task-form-dialog.tsx:547
+#: src/features/tasks/components/task-form-dialog.tsx:566
 msgid "Cron expression (UTC)"
 msgstr "Expressão cron (UTC)"
 
@@ -9001,7 +9132,7 @@ msgstr "Atualmente restrito"
 msgid "Custom"
 msgstr "Personalizado"
 
-#: src/features/tasks/components/task-form-dialog.tsx:123
+#: src/features/tasks/components/task-form-dialog.tsx:125
 msgid "Custom (cron)"
 msgstr "Personalizado (cron)"
 
@@ -9089,7 +9220,7 @@ msgstr "Personalize os atalhos de teclado para ações comuns. Clique em \"Grava
 msgid "Customize the appearance of the application."
 msgstr "Personalize a aparência do aplicativo."
 
-#: src/features/projects/components/project-form-dialog.tsx:234
+#: src/features/projects/components/project-form-dialog.tsx:235
 msgid "Customize the visual appearance of this project."
 msgstr "Personalize a aparência deste projeto."
 
@@ -9214,7 +9345,7 @@ msgstr "Resumo de acesso aos dados"
 msgid "Data Export"
 msgstr "Exportação de dados"
 
-#: src/features/notifications/lib/notification-labels.ts:51
+#: src/features/notifications/lib/notification-labels.ts:52
 msgid "Data export failed"
 msgstr "A exportação de dados falhou"
 
@@ -9389,13 +9520,18 @@ msgstr "O LLM de chat avançado experimental da DeepSeek"
 msgid "DeepSeek's experimental advanced chat LLM with thinking"
 msgstr "O LLM de chat avançado experimental da DeepSeek, com raciocínio"
 
+#: src/features/projects/components/project-repositories.tsx:115
+msgid "default"
+msgstr "padrão"
+
 #: src/features/appearance/components/appearance-controls.tsx:164
+#: src/features/projects/components/project-repositories.tsx:349
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:75
 msgid "Default"
 msgstr "Padrão"
 
-#: src/features/tasks/components/task-form-dialog.tsx:338
-#: src/features/tasks/components/task-form-dialog.tsx:350
+#: src/features/tasks/components/task-form-dialog.tsx:357
+#: src/features/tasks/components/task-form-dialog.tsx:369
 msgid "Default agent"
 msgstr "Agente padrão"
 
@@ -9404,13 +9540,22 @@ msgstr "Agente padrão"
 msgid "Default AI Response Language"
 msgstr "Idioma padrão das respostas da IA"
 
-#: src/features/projects/components/project-form-dialog.tsx:342
+#: src/features/projects/components/project-form-dialog.tsx:343
 msgid "Default AI Settings"
 msgstr "Configurações padrão da IA"
 
-#: src/features/tasks/components/task-form-dialog.tsx:322
+#: src/features/projects/components/project-repositories.tsx:410
+#: src/features/tasks/components/task-form-dialog.tsx:341
 msgid "Default branch"
 msgstr "Branch padrão"
+
+#: src/features/projects/components/project-repositories.tsx:101
+msgid "Default branch of {name}"
+msgstr "Branch padrão de {name}"
+
+#: src/features/projects/components/project-repositories.tsx:344
+msgid "Default branch:"
+msgstr "Branch padrão:"
 
 #: src/features/settings/components/account/account-settings.tsx:263
 #: src/features/settings/lib/settings-keywords.ts:30
@@ -9433,7 +9578,7 @@ msgstr "Idioma padrão atualizado"
 msgid "default model"
 msgstr "modelo padrão"
 
-#: src/features/projects/components/project-form-dialog.tsx:352
+#: src/features/projects/components/project-form-dialog.tsx:353
 msgid "Default Model"
 msgstr "Modelo padrão"
 
@@ -9831,6 +9976,10 @@ msgstr "Excluir com os arquivos"
 msgid "Deleted {0, plural, one {# prompt} other {# prompts}}"
 msgstr "{0, plural, one {# prompt excluído} other {# prompts excluídos}}"
 
+#: src/features/marketing/use-cases/visuals/approvals-visual.tsx:16
+msgid "Deletes 3 files in /drafts"
+msgstr ""
+
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-file.tsx:77
 #: src/components/delete-confirmation-dialog.tsx:65
 #: src/features/admin/components/admin-cleanup-dashboard.tsx:285
@@ -9907,6 +10056,7 @@ msgstr "Densidade atualizada"
 
 #: src/features/auth/components/device-approval.tsx:233
 #: src/features/chat/thread/tool-approval.tsx:125
+#: src/features/marketing/use-cases/visuals/approvals-visual.tsx:34
 msgid "Deny"
 msgstr "Negar"
 
@@ -9927,7 +10077,7 @@ msgstr ""
 msgid "Depart:"
 msgstr "Partida:"
 
-#: src/features/tasks/components/task-form-dialog.tsx:482
+#: src/features/tasks/components/task-form-dialog.tsx:501
 msgid "Depends on"
 msgstr "Depende de"
 
@@ -9996,6 +10146,10 @@ msgstr "Descreva a cena ou adicione modificadores de estilo..."
 msgid "Describe the scene or context..."
 msgstr "Descreva a cena ou o contexto..."
 
+#: src/features/marketing/use-cases/use-case-data.ts:35
+msgid "Describe the task, the result you expect, and when it repeats: daily, weekly, or a cron expression in UTC."
+msgstr ""
+
 #: src/features/workflow/components/nodes/video-node.tsx:152
 msgid "Describe the video to generate..."
 msgstr "Descreva o vídeo a ser gerado..."
@@ -10037,7 +10191,7 @@ msgstr "Descreva seu fluxo de trabalho... ex.: “Gerar uma imagem a partir de t
 #: src/features/develop/components/pull-request-view.tsx:74
 #: src/features/evals/components/dataset-form-dialog.tsx:102
 #: src/features/knowledge/components/collection-dialog.tsx:69
-#: src/features/projects/components/project-form-dialog.tsx:214
+#: src/features/projects/components/project-form-dialog.tsx:215
 #: src/features/prompts/components/prompt-form-dialog.tsx:266
 #: src/features/prompts/components/prompt-list-view.tsx:117
 #: src/features/prompts/components/prompt-list-view.tsx:120
@@ -10435,7 +10589,7 @@ msgid "Do you want to add more rows?"
 msgstr "Deseja adicionar mais linhas?"
 
 #: ../../packages/chat-ui/src/chat/document-artifact.tsx:44
-#: ../../packages/chat-ui/src/chat/message-content.tsx:285
+#: ../../packages/chat-ui/src/chat/message-content.tsx:293
 #: ../../packages/ui/src/components/file-renderers/docx-preview.tsx:114
 #: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:182
 msgid "Document"
@@ -10468,7 +10622,7 @@ msgstr "não é igual a"
 msgid "does not exist"
 msgstr "não existe"
 
-#: src/features/tasks/components/task-form-dialog.tsx:126
+#: src/features/tasks/components/task-form-dialog.tsx:128
 msgid "Does not repeat"
 msgstr "Não se repete"
 
@@ -10497,6 +10651,10 @@ msgstr "Concluído"
 #: src/features/devices/components/device-tool-call.tsx:199
 msgid "Done on {device}"
 msgstr "Concluído em {device}"
+
+#: src/features/marketing/use-cases/visuals/approvals-visual.tsx:46
+msgid "Done. 3 files moved to the trash."
+msgstr ""
 
 #: ../../packages/ui/src/components/data-grid/data-grid-keyboard-shortcuts.tsx:45
 msgid "Double Click"
@@ -10587,7 +10745,7 @@ msgstr "Baixar documento"
 msgid "Download Export"
 msgstr "Baixar exportação"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:448
+#: ../../packages/chat-ui/src/chat/message-content.tsx:456
 #: ../../packages/ui/src/components/file-renderers/generic-file-card.tsx:87
 msgid "Download file"
 msgstr "Baixar arquivo"
@@ -10810,7 +10968,7 @@ msgstr "ex.: Revisor de código"
 msgid "e.g. Every Monday, summarise new GitHub issues in my repo and draft replies for the urgent ones"
 msgstr "ex.: Toda segunda-feira, resuma as novas issues do GitHub no meu repositório e escreva rascunhos de resposta para as urgentes"
 
-#: src/features/tasks/components/task-form-dialog.tsx:261
+#: src/features/tasks/components/task-form-dialog.tsx:263
 msgid "e.g. Lists at least five sources, each with a link"
 msgstr "ex.: Lista pelo menos cinco fontes, cada uma com um link"
 
@@ -10846,7 +11004,7 @@ msgstr "ex.: Trabalho"
 msgid "e.g., Emphasize concise outputs, target a beginner audience..."
 msgstr "ex.: Priorize respostas concisas, foque em um público iniciante..."
 
-#: src/features/projects/components/project-form-dialog.tsx:202
+#: src/features/projects/components/project-form-dialog.tsx:203
 msgid "e.g., Financial Planning"
 msgstr "ex.: Planejamento financeiro"
 
@@ -10891,21 +11049,41 @@ msgstr "Cada verificação é uma pequena chamada de modelo na sua conta e tem l
 msgid "Each code can only be used once. Keep them secure and treat them like passwords."
 msgstr "Cada código só pode ser usado uma vez. Guarde-os com segurança e trate-os como senhas."
 
+#: src/features/marketing/use-cases/use-case-data.ts:78
+msgid "Each connection gets its own webhook address, and the app sends new messages to it."
+msgstr ""
+
 #: src/features/settings/connectors/messenger/messenger-setup-dialog.tsx:29
 msgid "Each Discord channel creates a separate thread in Neore Chat. The AI will auto-respond in the channel."
 msgstr "Cada canal do Discord cria uma conversa separada no Neore Chat. A IA vai responder automaticamente no canal."
 
-#: src/features/tasks/components/task-form-dialog.tsx:143
+#: src/features/marketing/use-cases/use-case-data.ts:80
+msgid "Each message is checked for freshness and duplicates, rate limited per sender, then handed to the agent."
+msgstr ""
+
+#: src/features/marketing/use-cases/use-case-data.ts:36
+msgid "Each minute the scheduler starts the due runs for the current slot, oldest first. A sweep takes a limited number, so the rest start in a later minute. After an outage it starts one catch-up run, not a burst of missed runs."
+msgstr ""
+
+#: src/features/marketing/use-cases/use-case-data.ts:88
+msgid "Each participant runs with its own instructions, model and tools, and each speaker's usage is recorded on its own."
+msgstr ""
+
+#: src/features/tasks/components/task-form-dialog.tsx:145
 msgid "Each run is added to the last run's thread after a divider. The history stays, but the agent is not sent earlier runs."
 msgstr "Cada execução é adicionada à conversa da anterior após um divisor. O histórico é mantido, mas as execuções anteriores não são enviadas ao agente."
 
-#: src/features/tasks/components/task-form-dialog.tsx:142
+#: src/features/tasks/components/task-form-dialog.tsx:144
 msgid "Each run is added to the last run's thread, and the agent sees the earlier runs."
 msgstr "Cada execução é adicionada à conversa da anterior, e o agente vê as execuções anteriores."
 
-#: src/features/tasks/components/task-form-dialog.tsx:144
+#: src/features/tasks/components/task-form-dialog.tsx:146
 msgid "Each run starts its own thread."
 msgstr "Cada execução inicia sua própria conversa."
+
+#: src/features/marketing/use-cases/use-case-data.ts:101
+msgid "Each speaker runs as a full agent reply in the same thread, and a marker shows who is talking."
+msgstr ""
 
 #: src/features/settings/components/chat/trigger-settings.tsx:1078
 msgid "Each trigger creates a new thread and runs your agent with up to 25 iterations (Deep Work mode). Results are visible in your thread list."
@@ -11058,12 +11236,16 @@ msgstr "Editar memória"
 msgid "Edit Mode"
 msgstr "Modo de edição"
 
+#: src/features/marketing/use-cases/use-case-data.ts:111
+msgid "Edit or delete the memories listed in settings. Clear all asks for confirmation first."
+msgstr ""
+
 #: src/features/settings/components/chat/system-prompt-preset-settings.tsx:293
 #: src/features/settings/components/chat/system-prompt-preset-settings.tsx:315
 msgid "Edit preset"
 msgstr "Editar predefinição"
 
-#: src/features/projects/components/project-form-dialog.tsx:184
+#: src/features/projects/components/project-form-dialog.tsx:185
 msgid "Edit Project"
 msgstr "Editar projeto"
 
@@ -11106,7 +11288,7 @@ msgstr "Edite regiões específicas de uma imagem"
 msgid "Edit specific regions of an image with AI"
 msgstr "Edite regiões específicas de uma imagem com IA"
 
-#: src/features/tasks/components/task-form-dialog.tsx:204
+#: src/features/tasks/components/task-form-dialog.tsx:206
 msgid "Edit task"
 msgstr "Editar tarefa"
 
@@ -11967,7 +12149,7 @@ msgstr "Taxa de erros"
 msgid "Error trace:"
 msgstr "Rastreamento do erro:"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:246
+#: ../../packages/chat-ui/src/chat/message-content.tsx:254
 msgid "Error:"
 msgstr "Erro:"
 
@@ -12017,11 +12199,11 @@ msgstr "Estoniano (Estônia)"
 msgid "European Union"
 msgstr "União Europeia"
 
-#: src/features/notifications/lib/notification-labels.ts:54
+#: src/features/notifications/lib/notification-labels.ts:55
 msgid "Eval run failed"
 msgstr "A execução da avaliação falhou"
 
-#: src/features/notifications/lib/notification-labels.ts:54
+#: src/features/notifications/lib/notification-labels.ts:55
 msgid "Eval run finished"
 msgstr "Execução da avaliação concluída"
 
@@ -12052,7 +12234,7 @@ msgstr "Evento"
 msgid "Every 6 hours"
 msgstr "A cada 6 horas"
 
-#: src/features/tasks/components/task-form-dialog.tsx:124
+#: src/features/tasks/components/task-form-dialog.tsx:126
 msgid "Every day at 09:00 UTC"
 msgstr "Todos os dias às 09:00 UTC"
 
@@ -12060,7 +12242,7 @@ msgstr "Todos os dias às 09:00 UTC"
 msgid "Every day at 8 AM"
 msgstr "Todos os dias às 8h"
 
-#: src/features/tasks/components/task-form-dialog.tsx:125
+#: src/features/tasks/components/task-form-dialog.tsx:127
 msgid "Every hour"
 msgstr "A cada hora"
 
@@ -12235,7 +12417,7 @@ msgstr "Executando ferramentas..."
 msgid "Execution"
 msgstr "Execução"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:621
+#: ../../packages/chat-ui/src/chat/message-content.tsx:629
 msgid "Execution failed"
 msgstr "Falha na execução"
 
@@ -12578,11 +12760,11 @@ msgstr "Extrair página"
 msgid "Extract subject"
 msgstr "Extrair objeto principal"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:721
+#: ../../packages/chat-ui/src/chat/message-content.tsx:729
 msgid "Extracted"
 msgstr "Extraído"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:656
+#: ../../packages/chat-ui/src/chat/message-content.tsx:664
 msgid "Extracting content..."
 msgstr "Extraindo conteúdo..."
 
@@ -13173,7 +13355,7 @@ msgstr "Falha ao salvar as configurações"
 msgid "Failed to save skill"
 msgstr "Falha ao salvar a habilidade"
 
-#: src/features/tasks/components/task-form-dialog.tsx:190
+#: src/features/tasks/components/task-form-dialog.tsx:192
 msgid "Failed to save task"
 msgstr "Falha ao salvar a tarefa"
 
@@ -14218,6 +14400,10 @@ msgstr "Peso da fonte"
 msgid "For detailed information including conversations and messages, please use the Data Export feature."
 msgstr "Para informações detalhadas, incluindo conversas e mensagens, use o recurso Exportação de dados."
 
+#: src/features/marketing/use-cases/use-case-data.ts:100
+msgid "For each message from you, the chat decides who answers. A routed or mentioned turn has at most three speakers."
+msgstr ""
+
 #: src/features/settings/components/personalization/personalization-settings.tsx:285
 msgid "For example: \"Focus on Python best practices\", \"Maintain a professional tone\", or \"Always cite sources for key conclusions\"."
 msgstr "Por exemplo: \"Foque nas boas práticas de Python\", \"Mantenha um tom profissional\" ou \"Sempre cite fontes para as conclusões principais\"."
@@ -14420,6 +14606,10 @@ msgstr "Francês (Suíça)"
 #: src/features/marketing/components/landing-page.tsx:1120
 msgid "Frequently asked <0>questions</0>."
 msgstr "Perguntas <0>frequentes</0>."
+
+#: src/features/marketing/use-cases/visuals/routines-visual.tsx:19
+msgid "Fri"
+msgstr ""
 
 #: src/features/chat/thread-list/hierarchical-thread-list.tsx:122
 msgid "From"
@@ -14874,7 +15064,7 @@ msgstr "Vídeo gerado"
 msgid "Generated videos will appear here. Start by describing what you want to create in the composer below."
 msgstr "Os vídeos gerados vão aparecer aqui. Comece descrevendo o que você quer criar no campo abaixo."
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:463
+#: ../../packages/chat-ui/src/chat/message-content.tsx:471
 msgid "Generating audio..."
 msgstr "Gerando áudio..."
 
@@ -14882,12 +15072,12 @@ msgstr "Gerando áudio..."
 msgid "Generating draft…"
 msgstr "Gerando rascunho…"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:464
+#: ../../packages/chat-ui/src/chat/message-content.tsx:472
 #: src/features/chat/thread/media-gallery-view.tsx:395
 msgid "Generating image..."
 msgstr "Gerando imagem..."
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:307
+#: ../../packages/chat-ui/src/chat/message-content.tsx:315
 msgid "Generating presentation..."
 msgstr "Gerando apresentação..."
 
@@ -14895,7 +15085,7 @@ msgstr "Gerando apresentação..."
 msgid "Generating response"
 msgstr "Gerando resposta"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:465
+#: ../../packages/chat-ui/src/chat/message-content.tsx:473
 #: src/features/chat/thread/media-gallery-view.tsx:395
 msgid "Generating video..."
 msgstr "Gerando vídeo..."
@@ -15161,7 +15351,7 @@ msgstr "Ir para suas páginas"
 #: src/features/chat/goal/composer-goal.tsx:75
 #: src/features/chat/goal/goal-notes.tsx:70
 #: src/features/chat/goal/goal-notes.tsx:77
-#: src/features/tasks/components/task-form-dialog.tsx:361
+#: src/features/tasks/components/task-form-dialog.tsx:380
 msgid "Goal"
 msgstr "Meta"
 
@@ -15521,9 +15711,18 @@ msgstr "Chat em grupo"
 msgid "Group chat participants"
 msgstr "Participantes do chat em grupo"
 
+#: src/features/marketing/use-cases/use-case-data.ts:93
 #: src/features/skills/components/bundle-export-dialog.tsx:205
 msgid "Group chats"
 msgstr "Chats em grupo"
+
+#: src/features/marketing/use-cases/use-case-data.ts:95
+msgid "Group chats — several agents in one thread"
+msgstr ""
+
+#: src/features/marketing/use-cases/use-case-data.ts:94
+msgid "Group chats in Neore: several agents with their own roles answer in one thread. Run a review panel, a debate, or a round-robin, with a cap on speakers per turn."
+msgstr ""
 
 #: src/features/knowledge/components/collection-dialog.tsx:53
 msgid "Group knowledge files into a library you can attach to a chat or a project as a whole."
@@ -15704,6 +15903,10 @@ msgstr "Me ajude a escrever um e-mail profissional para meu gerente"
 #: src/features/settings/components/personalization/personalization-settings.tsx:212
 msgid "Help the AI understand you better by sharing some information about yourself. This information is used to personalize responses across all tasks."
 msgstr "Ajude a IA a entender você melhor compartilhando algumas informações sobre você. Essas informações são usadas para personalizar as respostas em todas as tarefas."
+
+#: src/features/marketing/use-cases/visuals/messaging-visual.tsx:45
+msgid "Here is a summary, with the open items first."
+msgstr ""
 
 #: src/features/appearance/components/appearance-controls.tsx:252
 msgid "Here they are: planning, budget and next steps."
@@ -16061,11 +16264,15 @@ msgstr "Como funciona o roteamento inteligente?"
 msgid "How is Neore different from ChatGPT?"
 msgstr "Qual é a diferença entre o Neore e o ChatGPT?"
 
+#: src/features/marketing/use-cases/use-case-page.tsx:34
+msgid "How it works"
+msgstr ""
+
 #: src/features/settings/components/account/account-settings.tsx:581
 msgid "How long temporary chats are kept before being automatically deleted. Default: 24 hours."
 msgstr "Por quanto tempo os chats temporários são mantidos antes de serem excluídos automaticamente. Padrão: 24 horas."
 
-#: src/features/tasks/components/task-form-dialog.tsx:609
+#: src/features/tasks/components/task-form-dialog.tsx:628
 msgid "How often the agent retries with the verifier's feedback before asking you to review."
 msgstr "Quantas vezes o agente tenta novamente com o feedback do verificador antes de pedir sua revisão."
 
@@ -16163,7 +16370,7 @@ msgstr "Islandês"
 msgid "Icelandic (Iceland)"
 msgstr "Islandês (Islândia)"
 
-#: src/features/projects/components/project-form-dialog.tsx:275
+#: src/features/projects/components/project-form-dialog.tsx:276
 msgid "Icon"
 msgstr "Ícone"
 
@@ -16220,7 +16427,7 @@ msgid "illustration"
 msgstr "ilustração"
 
 #: ../../packages/chat-ui/src/chat/document-artifact.tsx:42
-#: ../../packages/chat-ui/src/chat/message-content.tsx:415
+#: ../../packages/chat-ui/src/chat/message-content.tsx:423
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:679
 #: ../../packages/ui/src/components/ai-elements/attachments-utilities.tsx:47
 #: ../../packages/ui/src/components/ai-elements/attachments.tsx:107
@@ -16636,6 +16843,10 @@ msgstr "Em {0}"
 msgid "in {0}ms"
 msgstr "em {0}ms"
 
+#: src/features/marketing/use-cases/use-case-data.ts:102
+msgid "In a debate, the pro and contra roles argue for up to three rounds, and a synthesizer role writes the outcome."
+msgstr ""
+
 #: src/features/settings/connectors/messenger/messenger-setup-dialog.tsx:100
 msgid "In Settings > API Keys add all four under \"Messenger Bot Keys\"."
 msgstr "Em Configurações > Chaves de API, adicione os quatro em \"Chaves de bots de mensageiros\"."
@@ -16814,7 +17025,7 @@ msgstr "Modelo de entrada"
 msgid "Input tokens"
 msgstr "Tokens de entrada"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:230
+#: ../../packages/chat-ui/src/chat/message-content.tsx:231
 msgid "Input:"
 msgstr "Entrada:"
 
@@ -16902,12 +17113,12 @@ msgstr "instruções"
 #: src/features/skills/components/skill-builder-review.tsx:166
 #: src/features/skills/components/skill-form-dialog.tsx:274
 #: src/features/tasks/components/task-detail-dialog.tsx:233
-#: src/features/tasks/components/task-form-dialog.tsx:237
+#: src/features/tasks/components/task-form-dialog.tsx:239
 msgid "Instructions"
 msgstr "Instruções"
 
 #: src/features/skills/components/skill-form-dialog.tsx:69
-#: src/features/tasks/components/task-form-dialog.tsx:87
+#: src/features/tasks/components/task-form-dialog.tsx:89
 msgid "Instructions are required"
 msgstr "As instruções são obrigatórias"
 
@@ -16919,7 +17130,7 @@ msgstr "As instruções são longas demais"
 msgid "Instructions for the AI..."
 msgstr "Instruções para a IA..."
 
-#: src/features/tasks/components/task-form-dialog.tsx:90
+#: src/features/tasks/components/task-form-dialog.tsx:92
 msgid "Instructions must be {INSTRUCTIONS_MAX} characters or less"
 msgstr "As instruções devem ter no máximo {INSTRUCTIONS_MAX} caracteres"
 
@@ -17175,6 +17386,10 @@ msgstr "Meus dados são privados?"
 msgid "Is the claim about 5G causing health issues supported by science?"
 msgstr "A afirmação de que o 5G causa problemas de saúde tem respaldo científico?"
 
+#: src/features/marketing/use-cases/visuals/group-chats-visual.tsx:21
+msgid "Is this change safe to ship?"
+msgstr ""
+
 #: src/features/chat/core/utils/language-utilities.ts:364
 msgid "Israel"
 msgstr "Israel"
@@ -17220,7 +17435,7 @@ msgstr "Abriu uma sessão diferente da própria, então a conversa foi transferi
 msgid "It was not saved. Paste it again and save."
 msgstr "Não foi salvo. Cole novamente e salve."
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:392
+#: ../../packages/chat-ui/src/chat/message-content.tsx:400
 msgid "It will be visible once approved by a moderator"
 msgstr "Ela ficará visível assim que for aprovada por um moderador"
 
@@ -18416,7 +18631,7 @@ msgstr "Carregando editor..."
 msgid "Loading editor…"
 msgstr "Carregando editor…"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:329
+#: ../../packages/chat-ui/src/chat/message-content.tsx:337
 #: ../../packages/ui/src/components/file-renderers/fetched-text-preview.tsx:65
 msgid "Loading file…"
 msgstr "Carregando arquivo…"
@@ -18445,7 +18660,8 @@ msgstr "Carregando imagens"
 msgid "Loading messenger connections..."
 msgstr "Carregando conexões de mensageiros..."
 
-#: src/features/tasks/components/task-form-dialog.tsx:433
+#: src/features/projects/components/project-repo-picker.tsx:167
+#: src/features/tasks/components/task-form-dialog.tsx:452
 msgid "Loading more projects…"
 msgstr "Carregando mais projetos…"
 
@@ -18461,6 +18677,10 @@ msgstr "Carregando mensagens mais antigas..."
 #: src/features/onboarding/components/onboarding-dialog.tsx:289
 msgid "Loading onboarding"
 msgstr "Carregando introdução"
+
+#: ../../packages/chat-ui/src/chat/tool-output-loader.tsx:60
+msgid "Loading output..."
+msgstr "A carregar a saída..."
 
 #: src/features/pages/components/page-view.tsx:181
 msgid "Loading page…"
@@ -18491,6 +18711,11 @@ msgstr "Carregando pré-visualização..."
 #: src/features/chat/thread/sandbox-files.tsx:104
 msgid "Loading preview…"
 msgstr "Carregando pré-visualização…"
+
+#: src/features/projects/components/project-repo-picker.tsx:233
+#: src/features/projects/components/project-repositories.tsx:312
+msgid "Loading repositories…"
+msgstr "A carregar repositórios…"
 
 #: src/features/evals/components/run-detail.tsx:144
 msgid "Loading run…"
@@ -18598,7 +18823,7 @@ msgstr "Carregando seus projetos…"
 msgid "Loading..."
 msgstr "Carregando..."
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:332
+#: ../../packages/chat-ui/src/chat/message-content.tsx:340
 #: src/features/auth/components/device-approval.tsx:349
 #: src/features/chat/thread/memory-usage-action.tsx:46
 #: src/features/chat/thread/request-secret-prompt.tsx:479
@@ -18920,9 +19145,17 @@ msgstr "Manter a consistência do assunto entre gerações"
 msgid "Major improvements in reasoning and instruction following"
 msgstr "Grandes melhorias em raciocínio e seguimento de instruções"
 
+#: src/features/projects/components/project-repositories.tsx:352
+msgid "Make {name} the default repository"
+msgstr "Definir {name} como repositório padrão"
+
 #: src/features/admin/components/user-cell.tsx:115
 msgid "Make Admin"
 msgstr "Tornar admin"
+
+#: src/features/projects/components/project-repositories.tsx:361
+msgid "Make default"
+msgstr "Definir como padrão"
 
 #: src/features/canvas/components/canvas-toolbar.tsx:30
 msgid "Make longer"
@@ -19397,15 +19630,24 @@ msgstr "Memórias"
 msgid "Memories used"
 msgstr "Memórias usadas"
 
+#: src/features/marketing/use-cases/visuals/memory-visual.tsx:35
+msgid "Memories used (2)"
+msgstr ""
+
 #. placeholder {0}: usage.count
 #: src/features/chat/thread/memory-usage-action.tsx:37
 msgid "Memories used for this reply ({0})"
 msgstr "Memórias usadas nesta resposta ({0})"
 
+#: src/features/marketing/use-cases/use-case-data.ts:114
 #: src/features/settings/components/personalization/memory-settings.tsx:156
 #: src/features/settings/lib/settings-keywords.ts:96
 msgid "Memory"
 msgstr "Memória"
+
+#: src/features/marketing/use-cases/use-case-data.ts:116
+msgid "Memory — what the agent keeps across chats"
+msgstr ""
 
 #: src/features/settings/components/personalization/memory-settings.tsx:104
 msgid "Memory deleted"
@@ -19419,13 +19661,29 @@ msgstr "Memória desativada"
 msgid "Memory enabled"
 msgstr "Memória ativada"
 
+#: src/features/marketing/use-cases/use-case-data.ts:115
+msgid "Memory in Neore: the agent keeps useful facts about you across chats, you can review and edit them in settings, and it is off until you turn it on."
+msgstr ""
+
+#: src/features/marketing/use-cases/use-case-data.ts:109
+msgid "Memory is off until you turn it on. Temporary chats and locked chats are never mined for memories."
+msgstr ""
+
 #: src/features/settings/components/personalization/memory-item.tsx:125
 msgid "Memory text"
 msgstr "Texto da memória"
 
+#: src/features/marketing/use-cases/use-case-data.ts:126
+msgid "Memory the agent keeps across chats"
+msgstr ""
+
 #: src/features/settings/components/personalization/memory-item.tsx:79
 msgid "Memory type"
 msgstr "Tipo de memória"
+
+#: src/features/marketing/use-cases/visuals/memory-visual.tsx:13
+msgid "Memory. A new preference is saved as a memory, then a later question uses two saved memories, which are listed as memories used."
+msgstr ""
 
 #: src/features/chat/group/group-mode.ts:67
 msgid "Mentions only"
@@ -19554,6 +19812,10 @@ msgstr "As mensagens interrompem a vez do agente"
 #: src/features/settings/components/account/account-settings.tsx:571
 msgid "Messages will wait for the agent's turn to end"
 msgstr "As mensagens esperarão o fim da vez do agente"
+
+#: src/features/marketing/use-cases/use-case-data.ts:72
+msgid "Messaging apps"
+msgstr ""
 
 #: src/features/settings/connectors/messenger/messenger-platform-card.tsx:157
 msgid "messenger"
@@ -19847,7 +20109,7 @@ msgstr "Modo:"
 #: src/features/prompts/components/prompt-form-dialog.tsx:387
 #: src/features/settings/components/chat/bots-settings.tsx:135
 #: src/features/settings/components/chat/usage-settings.tsx:317
-#: src/features/tasks/components/task-form-dialog.tsx:388
+#: src/features/tasks/components/task-form-dialog.tsx:407
 #: src/features/workflow/components/nodes/ai-node.tsx:34
 #: src/features/workflow/components/nodes/background-removal-node.tsx:63
 #: src/features/workflow/components/nodes/character-ref-node.tsx:144
@@ -20022,7 +20284,11 @@ msgstr "módulos"
 msgid "MoE"
 msgstr "MoE"
 
-#: src/features/tasks/components/task-form-dialog.tsx:128
+#: src/features/marketing/use-cases/visuals/routines-visual.tsx:19
+msgid "Mon"
+msgstr ""
+
+#: src/features/tasks/components/task-form-dialog.tsx:130
 msgid "Mondays at 09:00 UTC"
 msgstr "Segundas-feiras às 09:00 UTC"
 
@@ -20162,7 +20428,7 @@ msgid "Most the case may cost, in US dollars"
 msgstr "Custo máximo do caso, em dólares americanos"
 
 #: src/features/prompts/components/prompt-list.tsx:538
-#: src/features/skills/components/skill-list.tsx:420
+#: src/features/skills/components/skill-list.tsx:424
 msgid "Most Used"
 msgstr "Mais usados"
 
@@ -20588,11 +20854,11 @@ msgstr "Navegar pelas conversas"
 msgid "navigate within each column"
 msgstr "navegue dentro de cada coluna"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:722
+#: ../../packages/chat-ui/src/chat/message-content.tsx:730
 msgid "Navigated"
 msgstr "Navegou"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:663
+#: ../../packages/chat-ui/src/chat/message-content.tsx:671
 msgid "Navigating to {target}..."
 msgstr "Navegando para {target}..."
 
@@ -20653,6 +20919,10 @@ msgstr "Neore (com data e hora)"
 #: src/features/devices/components/devices-settings.tsx:296
 msgid "Neore {0}"
 msgstr "Neore {0}"
+
+#: src/features/marketing/use-cases/visuals/messaging-visual.tsx:42
+msgid "Neore agent"
+msgstr ""
 
 #: src/features/chat/thread/composer.tsx:688
 msgid "Neore can make mistakes. Check important information."
@@ -20717,6 +20987,10 @@ msgstr "O Neore neste computador está desatualizado, então o agente não pode 
 #: src/features/chat/host/host-send-errors.ts:17
 msgid "Neore on your computer is out of date. Update it, then try again."
 msgstr "O Neore no seu computador está desatualizado. Atualize-o e tente novamente."
+
+#: src/routes/(public)/use-cases/index.tsx:32
+msgid "Neore use cases"
+msgstr ""
 
 #: src/features/devices/components/devices-settings.tsx:296
 msgid "Neore version not reported"
@@ -20926,7 +21200,7 @@ msgstr "Novo prompt"
 msgid "New tag"
 msgstr "Nova tag"
 
-#: src/features/tasks/components/task-form-dialog.tsx:204
+#: src/features/tasks/components/task-form-dialog.tsx:206
 #: src/features/tasks/components/tasks-page.tsx:205
 msgid "New task"
 msgstr "Nova tarefa"
@@ -21306,8 +21580,8 @@ msgstr "Ainda não há arquivos na sua base de conhecimento. Envie documentos ac
 msgid "No focal length selected"
 msgstr "Nenhuma distância focal selecionada"
 
-#: src/features/tasks/components/task-form-dialog.tsx:364
-#: src/features/tasks/components/task-form-dialog.tsx:376
+#: src/features/tasks/components/task-form-dialog.tsx:383
+#: src/features/tasks/components/task-form-dialog.tsx:395
 msgid "No goal"
 msgstr "Sem meta"
 
@@ -21425,6 +21699,10 @@ msgstr "Nenhum modelo instalado ainda."
 msgid "No name"
 msgstr "Sem nome"
 
+#: src/features/marketing/use-cases/visuals/group-chats-visual.tsx:26
+msgid "No new secrets. The upload path still needs a size check."
+msgstr ""
+
 #: src/features/workflow/components/canvas/execution-history-panel.tsx:177
 msgid "No node execution data available."
 msgstr "Nenhum dado de execução de nó disponível."
@@ -21437,7 +21715,7 @@ msgstr "Nenhum prompt otimizado recebido"
 msgid "No options found."
 msgstr "Nenhuma opção encontrada."
 
-#: src/features/tasks/components/task-form-dialog.tsx:486
+#: src/features/tasks/components/task-form-dialog.tsx:505
 msgid "No other tasks yet."
 msgstr "Ainda não há outras tarefas."
 
@@ -21491,9 +21769,10 @@ msgstr "Sem progresso há {quietMinutes} min"
 msgid "No progress: {0}"
 msgstr "Sem progresso: {0}"
 
+#: src/features/projects/components/project-repo-picker.tsx:97
 #: src/features/settings/components/chat/usage-project-breakdown.tsx:66
-#: src/features/tasks/components/task-form-dialog.tsx:411
-#: src/features/tasks/components/task-form-dialog.tsx:423
+#: src/features/tasks/components/task-form-dialog.tsx:430
+#: src/features/tasks/components/task-form-dialog.tsx:442
 msgid "No project"
 msgstr "Sem projeto"
 
@@ -21603,7 +21882,7 @@ msgstr "Nenhum atalho corresponde a \"{query}\"."
 msgid "No skill"
 msgstr "Sem habilidade"
 
-#: src/features/skills/components/skill-list.tsx:439
+#: src/features/skills/components/skill-list.tsx:443
 msgid "No skills found matching your search"
 msgstr "Nenhuma habilidade corresponde à sua pesquisa"
 
@@ -21808,8 +22087,8 @@ msgstr "Nenhum"
 msgid "None — show the answers only"
 msgstr "Nenhum — mostrar só as respostas"
 
-#: src/features/tasks/components/task-form-dialog.tsx:458
-#: src/features/tasks/components/task-form-dialog.tsx:470
+#: src/features/tasks/components/task-form-dialog.tsx:477
+#: src/features/tasks/components/task-form-dialog.tsx:489
 msgid "None (top-level task)"
 msgstr "Nenhuma (tarefa de nível superior)"
 
@@ -21994,7 +22273,7 @@ msgstr "Nada está esperando por você."
 msgid "Nothing to stop: that run had already ended."
 msgstr "Nada para interromper: essa execução já havia terminado."
 
-#: src/features/notifications/lib/notification-labels.ts:78
+#: src/features/notifications/lib/notification-labels.ts:82
 msgid "Notification"
 msgstr "Notificação"
 
@@ -22213,6 +22492,10 @@ msgstr "Ollama ou LM Studio em localhost, acessados pelo seu navegador. Apenas t
 msgid "On this computer"
 msgstr "Neste computador"
 
+#: src/features/marketing/use-cases/use-case-data.ts:70
+msgid "On WhatsApp a reply is sent only while the 24-hour service window from the contact's last message is open."
+msgstr ""
+
 #: src/features/settings/components/chat/mcp/popular-servers.ts:249
 msgid "On-demand web scraping and data extraction recipes"
 msgstr "Receitas de web scraping e extração de dados sob demanda"
@@ -22250,6 +22533,10 @@ msgstr "A introdução vai recomeçar na sua próxima visita ao chat."
 #: src/features/onboarding/components/onboarding-dialog.tsx:313
 msgid "Onboarding wizard"
 msgstr "Assistente de introdução"
+
+#: src/features/marketing/use-cases/use-case-data.ts:123
+msgid "Once a night, for users active that day, a reflection pass merges duplicates and promotes repeated facts."
+msgstr ""
 
 #: src/features/appearance/components/appearance-controls.tsx:154
 msgid "One"
@@ -22350,6 +22637,10 @@ msgstr "Só é possível comparar modelos de {0}. Limpe a seleção para trocar 
 msgid "Only 3B activated per token for efficiency"
 msgstr "Apenas 3B ativados por token, para mais eficiência"
 
+#: src/features/marketing/use-cases/use-case-data.ts:67
+msgid "Only a paired contact reaches the model. Anyone else gets a reply that the bot is private."
+msgstr ""
+
 #: src/features/auth/components/device-code-parts.tsx:86
 msgid "Only continue if you started this just now by running `neore login --device`, and the code above matches the one in your terminal."
 msgstr ""
@@ -22423,6 +22714,14 @@ msgstr "Só o dono de um chat pode compactá-lo."
 msgid "Only the owner of a chat can start a new context."
 msgstr "Só o dono do chat pode iniciar um novo contexto."
 
+#: src/features/marketing/use-cases/use-case-data.ts:58
+msgid "Only the owner of the chat can answer. Everyone else in a shared chat sees that the owner has to decide."
+msgstr ""
+
+#: src/features/projects/components/project-repositories.tsx:384
+msgid "Only the project's owner can change its repositories."
+msgstr "Somente o proprietário do projeto pode alterar seus repositórios."
+
 #: src/features/devices/components/device-scope.tsx:73
 msgid "Only these projects"
 msgstr "Somente estes projetos"
@@ -22468,7 +22767,7 @@ msgstr "Ops! Algo deu errado"
 msgid "Opacity"
 msgstr "Opacidade"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:708
+#: ../../packages/chat-ui/src/chat/message-content.tsx:716
 #: src/components/command-palette.tsx:700
 #: src/features/chat/link-preview/link-preview-card.tsx:117
 #: src/features/develop/components/pull-request-actions-panel.tsx:112
@@ -22495,7 +22794,7 @@ msgstr "Abrir {filename}"
 msgid "Open {modelName} in full thread"
 msgstr "Abrir {modelName} na conversa completa"
 
-#: src/features/tasks/components/task-form-dialog.tsx:328
+#: src/features/tasks/components/task-form-dialog.tsx:347
 msgid "Open a pull request with the change (GitHub, needs the GitHub connector)"
 msgstr "Abrir um pull request com a alteração (GitHub, requer o conector do GitHub)"
 
@@ -22848,7 +23147,7 @@ msgstr "openai"
 msgid "OpenAI"
 msgstr "OpenAI"
 
-#: src/features/tasks/components/task-form-dialog.tsx:134
+#: src/features/tasks/components/task-form-dialog.tsx:136
 msgid "OpenAI Codex (coding agent)"
 msgstr "OpenAI Codex (agente de código)"
 
@@ -23141,6 +23440,7 @@ msgstr "Prompt otimizado"
 msgid "Optimizing..."
 msgstr "Otimizando..."
 
+#: src/features/projects/components/project-repositories.tsx:419
 #: src/features/prompts/components/prompt-optimize-dialog.tsx:160
 msgid "optional"
 msgstr "opcional"
@@ -23158,7 +23458,7 @@ msgid "Optional. Criteria the judge grades the answer against."
 msgstr "Opcional. Critérios que o juiz usa para avaliar a resposta."
 
 #: src/features/evals/components/run-dialog.tsx:215
-#: src/features/tasks/components/task-form-dialog.tsx:391
+#: src/features/tasks/components/task-form-dialog.tsx:410
 msgid "Optional. Defaults to the skill's preferred model, then the default model."
 msgstr "Opcional. Usa o modelo preferido da habilidade e, depois, o modelo padrão."
 
@@ -23361,7 +23661,7 @@ msgstr "Desatualizado"
 msgid "Outpaint"
 msgstr "Outpaint"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:563
+#: ../../packages/chat-ui/src/chat/message-content.tsx:571
 #: ../../packages/ui/src/components/ai-elements/context.tsx:277
 #: src/components/model-picker/model-picker.tsx:206
 #: src/features/devices/components/device-tool-call.tsx:174
@@ -23379,6 +23679,10 @@ msgstr "Saída (stdout e stderr)"
 msgid "Output {outputNumber}: {label}"
 msgstr "Saída {outputNumber}: {label}"
 
+#: ../../packages/chat-ui/src/chat/tool-output-loader.tsx:68
+msgid "Output could not be loaded."
+msgstr "Não foi possível carregar a saída."
+
 #: src/features/devices/components/device-tool-call.tsx:106
 #: src/features/devices/components/device-tool-call.tsx:136
 msgid "Output cut at {DEVICE_OUTPUT_CAP_LABEL}"
@@ -23391,6 +23695,10 @@ msgstr "Arquivos de saída"
 #: src/features/workflow/components/nodes/background-removal-node.tsx:73
 msgid "Output Format"
 msgstr "Formato de saída"
+
+#: ../../packages/chat-ui/src/chat/tool-output-loader.tsx:54
+msgid "Output is not loaded in this view."
+msgstr "A saída não é carregada nesta visualização."
 
 #: src/features/chat/thread/composer.tsx:250
 msgid "Output Mode"
@@ -23409,7 +23717,8 @@ msgstr "Tipo de saída"
 msgid "Output-format focused"
 msgstr "Foco no formato de saída"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:238
+#: ../../packages/chat-ui/src/chat/message-content.tsx:239
+#: ../../packages/chat-ui/src/chat/message-content.tsx:247
 msgid "Output:"
 msgstr "Saída:"
 
@@ -23453,7 +23762,7 @@ msgstr "owner/name"
 msgid "Pacific Time (US & Canada)"
 msgstr "Horário do Pacífico (EUA e Canadá)"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:662
+#: ../../packages/chat-ui/src/chat/message-content.tsx:670
 msgid "page"
 msgstr "página"
 
@@ -23584,6 +23893,14 @@ msgstr "Paralelo"
 msgid "Parallel Compare"
 msgstr "Comparação paralela"
 
+#: src/features/marketing/use-cases/use-case-data.ts:90
+msgid "Parallel means independent, not simultaneous: replies still come one after another, and no speaker sees the others' answers to the same message."
+msgstr ""
+
+#: src/features/marketing/use-cases/visuals/group-chats-visual.tsx:17
+msgid "Parallel replies"
+msgstr ""
+
 #: src/features/chat/thread/sub-agent-parent-breadcrumb.tsx:51
 msgid "Parent chat"
 msgstr "Chat pai"
@@ -23655,6 +23972,10 @@ msgstr "aprovado"
 #: src/features/tasks/components/task-detail-dialog.tsx:137
 msgid "Passed"
 msgstr "Aprovado"
+
+#: src/features/marketing/use-cases/visuals/routines-visual.tsx:53
+msgid "Passed check"
+msgstr ""
 
 #: src/features/auth/components/settings/passkey/passkeys-card.tsx:93
 msgid "Passkeys"
@@ -23883,6 +24204,10 @@ msgstr "pessoas"
 msgid "People with access"
 msgstr "Pessoas com acesso"
 
+#: src/features/marketing/use-cases/use-case-data.ts:46
+msgid "Per tool, choose Ask, Auto or Off. Off blocks the tool, and Auto runs it without a card."
+msgstr ""
+
 #: src/features/evals/components/run-comparison.tsx:143
 msgid "Per-case changes between the two runs"
 msgstr "Alterações por caso entre as duas execuções"
@@ -23894,6 +24219,10 @@ msgstr "Tons de pele perfeitos, TV de prestígio"
 #: src/features/marketing/data/models-data.ts:1367
 msgid "Performance comparable to Mistral Small 24B"
 msgstr "Desempenho comparável ao Mistral Small 24B"
+
+#: src/features/marketing/use-cases/visuals/group-chats-visual.tsx:30
+msgid "Performance Reviewer"
+msgstr ""
 
 #: src/features/settings/components/chat/usage-settings.tsx:473
 msgid "Period"
@@ -24018,6 +24347,10 @@ msgstr "Escolha um modelo para avaliar."
 msgid "Pick a page on the left, or create one with the + button."
 msgstr "Escolha uma página à esquerda ou crie uma com o botão +."
 
+#: src/features/projects/components/project-repo-picker.tsx:214
+msgid "Pick a repository"
+msgstr "Escolha um repositório"
+
 #: src/features/evals/components/run-dialog.tsx:197
 msgid "Pick a skill"
 msgstr "Escolha uma habilidade"
@@ -24089,6 +24422,10 @@ msgstr "Pika Labs 2.2 — modelo de vídeo focado em narrativa, com storytelling
 #: src/features/chat/thread/text-selection-menu.tsx:504
 msgid "Pin"
 msgstr "Fixar"
+
+#: src/features/marketing/use-cases/use-case-data.ts:110
+msgid "Pin a memory to keep it from fading, merging or being promoted. Only activity memories fade on their own."
+msgstr ""
 
 #: src/features/settings/components/personalization/memory-item.tsx:103
 msgid "Pin memory"
@@ -24166,6 +24503,10 @@ msgstr "plano"
 #: src/features/chat/thread/composer.tsx:272
 msgid "Plan a project or brainstorm ideas..."
 msgstr "Planeje um projeto ou crie ideias..."
+
+#: src/features/marketing/use-cases/visuals/memory-visual.tsx:31
+msgid "Plan my week"
+msgstr ""
 
 #: src/features/settings/lib/settings-keywords.ts:56
 msgid "planner"
@@ -24421,6 +24762,16 @@ msgstr "Modelo preferido"
 #: src/features/skills/components/skill-builder-review.tsx:193
 msgid "Preferred model: {0}"
 msgstr "Modelo preferido: {0}"
+
+#: src/features/marketing/use-cases/visuals/memory-visual.tsx:18
+#: src/features/marketing/use-cases/visuals/memory-visual.tsx:37
+msgid "Prefers metric units"
+msgstr ""
+
+#: src/features/marketing/use-cases/visuals/memory-visual.tsx:24
+#: src/features/marketing/use-cases/visuals/memory-visual.tsx:38
+msgid "Prefers short answers"
+msgstr ""
 
 #. placeholder {0}: skill.model
 #: src/features/skills/components/bundle-import-dialog.tsx:124
@@ -24976,8 +25327,9 @@ msgstr "Progresso"
 msgid "Progress of {toolName}"
 msgstr "Progresso de {toolName}"
 
+#: src/features/projects/components/project-repo-picker.tsx:137
 #: src/features/settings/components/chat/usage-project-breakdown.tsx:104
-#: src/features/tasks/components/task-form-dialog.tsx:408
+#: src/features/tasks/components/task-form-dialog.tsx:427
 msgid "Project"
 msgstr "Projeto"
 
@@ -24985,13 +25337,17 @@ msgstr "Projeto"
 msgid "Project actions"
 msgstr "Ações do projeto"
 
-#: src/features/projects/components/project-form-dialog.tsx:323
+#: src/features/projects/components/project-form-dialog.tsx:324
 msgid "Project Context"
 msgstr "Contexto do projeto"
 
 #: src/features/settings/components/chat/usage-project-breakdown.tsx:58
 msgid "Project no longer available"
 msgstr "Projeto não está mais disponível"
+
+#: src/features/projects/components/project-repo-picker.tsx:197
+msgid "Project repository"
+msgstr "Repositório do projeto"
 
 #: src/features/chat/thread-list/hooks/use-thread-groups.ts:548
 msgid "Projects"
@@ -25340,6 +25696,10 @@ msgstr "As notificações push estão ativadas neste navegador"
 msgid "Push notifications on this browser"
 msgstr "Notificações push neste navegador"
 
+#: src/features/marketing/use-cases/use-case-data.ts:104
+msgid "Put several agents with their own roles in one thread. A review panel can check a change from security and performance angles, and a debate can argue both sides before a synthesis."
+msgstr ""
+
 #: src/features/chat/thread/composer-image-settings.tsx:181
 #: src/features/chat/thread/media-gallery-view.tsx:473
 msgid "Quality"
@@ -25635,6 +25995,10 @@ msgstr "Ler a documentação"
 msgid "Read the guide"
 msgstr ""
 
+#: src/features/marketing/use-cases/use-cases-index-page.tsx:34
+msgid "Read the page"
+msgstr ""
+
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:70
 msgid "read-only"
 msgstr "somente leitura"
@@ -25662,6 +26026,10 @@ msgstr "Pronto"
 #: src/features/develop/components/inbox-list.tsx:53
 msgid "Ready to merge"
 msgstr "Pronto para mesclar"
+
+#: src/features/marketing/use-cases/use-case-page.tsx:72
+msgid "Ready to try it? Start a chat for free."
+msgstr ""
 
 #: src/features/marketing/components/gateway-landing-page.tsx:124
 msgid "Real-time analytics"
@@ -25867,7 +26235,7 @@ msgstr "Mensagens recentes"
 msgid "Recent Registrations"
 msgstr "Cadastros recentes"
 
-#: src/features/skills/components/skill-list.tsx:419
+#: src/features/skills/components/skill-list.tsx:423
 msgid "Recently Created"
 msgstr "Criadas recentemente"
 
@@ -26147,6 +26515,10 @@ msgstr "Usuários comuns"
 msgid "Reject"
 msgstr "Recusar"
 
+#: src/features/marketing/use-cases/use-case-data.ts:27
+msgid "Rejecting a result in review marks the run as failed. The rejected answer stays on record."
+msgstr ""
+
 #: src/features/devices/lib/device-diagnostics.ts:69
 msgid "relay (another paired computer)"
 msgstr "retransmissão (outro computador pareado)"
@@ -26271,8 +26643,8 @@ msgstr "Lembrar de mim"
 #: src/features/chat/thread/composer-input.tsx:411
 #: src/features/devices/components/devices-settings.tsx:334
 #: src/features/devices/components/devices-settings.tsx:340
-#: src/features/projects/components/project-form-dialog.tsx:264
-#: src/features/projects/components/project-form-dialog.tsx:305
+#: src/features/projects/components/project-form-dialog.tsx:265
+#: src/features/projects/components/project-form-dialog.tsx:306
 #: src/features/settings/components/chat/custom-providers-settings.tsx:652
 #: src/features/settings/components/chat/favorite-models-settings.tsx:186
 #: src/features/settings/components/chat/native-providers-settings.tsx:723
@@ -26325,6 +26697,7 @@ msgid "Remove {modelId} from blocked list"
 msgstr "Remover {modelId} da lista de bloqueados"
 
 #: src/features/pages/components/page-share-dialog.tsx:185
+#: src/features/projects/components/project-repositories.tsx:366
 msgid "Remove {name}"
 msgstr "Remover {name}"
 
@@ -26565,11 +26938,11 @@ msgstr "Instruções de correção:"
 msgid "repair round"
 msgstr "rodada de correção"
 
-#: src/features/tasks/components/task-form-dialog.tsx:594
+#: src/features/tasks/components/task-form-dialog.tsx:613
 msgid "Repair rounds"
 msgstr "Rodadas de correção"
 
-#: src/features/tasks/components/task-form-dialog.tsx:515
+#: src/features/tasks/components/task-form-dialog.tsx:534
 msgid "Repeat"
 msgstr "Repetir"
 
@@ -26647,11 +27020,20 @@ msgstr "Resposta concluída"
 msgid "Reply ready"
 msgstr "Resposta pronta"
 
+#: src/features/marketing/use-cases/use-case-data.ts:68
+msgid "Reply tools are off by default. You switch them on per connection and choose which groups they may use."
+msgstr ""
+
 #: src/features/settings/components/chat/mcp/popular-servers.ts:35
 msgid "Repos, issues, PRs, and code search"
 msgstr "Repositórios, issues, PRs e pesquisa de código"
 
-#: src/features/tasks/components/task-form-dialog.tsx:299
+#: src/features/projects/components/project-repositories.tsx:290
+msgid "Repositories"
+msgstr "Repositórios"
+
+#: src/features/projects/components/project-repositories.tsx:390
+#: src/features/tasks/components/task-form-dialog.tsx:318
 msgid "Repository"
 msgstr "Repositório"
 
@@ -27087,6 +27469,10 @@ msgstr "Revisar e adicionar"
 msgid "Review and moderate flagged content across chat and vault."
 msgstr "Revise e modere o conteúdo sinalizado no chat e no cofre."
 
+#: src/features/marketing/use-cases/visuals/group-chats-visual.tsx:35
+msgid "Review Lead"
+msgstr ""
+
 #: src/features/settings/components/privacy/privacy-policy.tsx:16
 msgid "Review our privacy policy and data processing practices"
 msgstr "Leia nossa política de privacidade e nossas práticas de tratamento de dados"
@@ -27300,6 +27686,22 @@ msgstr "Roteie, acompanhe, <0>otimize.</0>"
 msgid "Route: {route}"
 msgstr "Rota: {route}"
 
+#: src/features/marketing/use-cases/use-case-data.ts:30
+msgid "Routines"
+msgstr ""
+
+#: src/features/marketing/use-cases/use-case-data.ts:32
+msgid "Routines — scheduled agent tasks"
+msgstr ""
+
+#: src/features/marketing/use-cases/use-case-data.ts:31
+msgid "Routines in Neore: give the agent a task and a repeat schedule. It runs in the background, a second model checks each answer, and you get the result."
+msgstr ""
+
+#: src/features/marketing/use-cases/use-case-data.ts:42
+msgid "Routines that run while you are away"
+msgstr ""
+
 #: src/routes/admin/gateway/index.tsx:302
 msgid "Routing Tier Distribution"
 msgstr "Distribuição por nível de roteamento"
@@ -27421,7 +27823,7 @@ msgstr "Execute seu fluxo de trabalho para ver o histórico de execuções aqui.
 msgid "Running"
 msgstr "Em execução"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:524
+#: ../../packages/chat-ui/src/chat/message-content.tsx:532
 msgid "Running code..."
 msgstr "Executando código..."
 
@@ -27429,7 +27831,7 @@ msgstr "Executando código..."
 msgid "Running on {device}…"
 msgstr "Executando em {device}…"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:207
+#: ../../packages/chat-ui/src/chat/message-content.tsx:208
 #: src/features/admin/components/admin-cleanup-dashboard.tsx:258
 #: src/features/workflow/components/canvas/workflow-controls.tsx:622
 #: src/features/workflow/components/nodes/base-node.tsx:263
@@ -27441,7 +27843,7 @@ msgstr "Executando..."
 msgid "Runs ({0})"
 msgstr "Execuções ({0})"
 
-#: src/features/tasks/components/task-form-dialog.tsx:291
+#: src/features/tasks/components/task-form-dialog.tsx:293
 msgid "Runs in a cloud sandbox for up to 20 minutes on your own {keyProvider} API key (Settings → API keys). Private GitHub repositories need the GitHub connector."
 msgstr "Roda em um sandbox na nuvem por até 20 minutos usando sua própria chave de API do {keyProvider} (Configurações → Chaves de API). Repositórios privados do GitHub precisam do conector do GitHub."
 
@@ -27527,7 +27929,7 @@ msgstr "Mesmo tamanho da atual"
 msgid "Same seed = reproducible results"
 msgstr "Mesma seed = resultados reproduzíveis"
 
-#: src/features/tasks/components/task-form-dialog.tsx:138
+#: src/features/tasks/components/task-form-dialog.tsx:140
 msgid "Same thread, fresh context each run"
 msgstr "Mesma conversa, contexto novo a cada execução"
 
@@ -27623,7 +28025,7 @@ msgstr "Salvar caso"
 #: src/features/settings/components/chat/system-prompt-preset-settings.tsx:247
 #: src/features/skills/components/skill-form-dialog.tsx:152
 #: src/features/tasks/components/goal-form-dialog.tsx:167
-#: src/features/tasks/components/task-form-dialog.tsx:620
+#: src/features/tasks/components/task-form-dialog.tsx:639
 #: src/features/workflow/components/canvas/workflow-controls.tsx:406
 msgid "Save changes"
 msgstr "Salvar alterações"
@@ -27676,6 +28078,7 @@ msgstr "Salvar versão como nova"
 msgid "Save workflow"
 msgstr "Salvar fluxo de trabalho"
 
+#: src/features/marketing/use-cases/visuals/memory-visual.tsx:25
 #: src/features/workflow/components/canvas/workflow-controls.tsx:401
 msgid "Saved"
 msgstr "Salvo"
@@ -27696,6 +28099,10 @@ msgstr "Salvo — o assistente pode usá-lo uma vez, nesta resposta"
 msgid "Saved as preset"
 msgstr "Salvo como predefinição"
 
+#: src/features/marketing/use-cases/visuals/memory-visual.tsx:16
+msgid "Saved memories"
+msgstr ""
+
 #: src/features/develop/components/pull-request-edit-action.tsx:86
 msgid "Saved on {hostLabel}."
 msgstr "Salvo em {hostLabel}."
@@ -27707,7 +28114,7 @@ msgstr "Salvo em \"{0}\""
 
 #: src/features/auth/components/team/team-settings-dialog.tsx:215
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:394
-#: src/features/projects/components/project-form-dialog.tsx:409
+#: src/features/projects/components/project-form-dialog.tsx:412
 #: src/features/prompts/components/prompt-form-dialog.tsx:521
 #: src/features/prompts/components/thread-variables-config.tsx:258
 #: src/features/settings/components/chat/api-keys-settings.tsx:436
@@ -27803,7 +28210,7 @@ msgid "Screen capture failed. Please try again."
 msgstr "A captura de tela falhou. Tente novamente."
 
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:118
-#: ../../packages/chat-ui/src/chat/message-content.tsx:704
+#: ../../packages/chat-ui/src/chat/message-content.tsx:712
 msgid "Screenshot"
 msgstr "Captura de tela"
 
@@ -28012,7 +28419,7 @@ msgstr "Pesquisar configurações..."
 msgid "Search shortcuts..."
 msgstr "Pesquisar atalhos..."
 
-#: src/features/skills/components/skill-list.tsx:407
+#: src/features/skills/components/skill-list.tsx:411
 msgid "Search skills..."
 msgstr "Pesquisar habilidades..."
 
@@ -28076,7 +28483,7 @@ msgstr "Pesquise posts do X"
 msgid "Search your knowledge files and score retrieval (hit rate, MRR, precision, recall) and faithfulness."
 msgstr "Pesquise seus arquivos de conhecimento e pontue a recuperação (taxa de acerto, MRR, precisão, recall) e a fidelidade."
 
-#: src/features/skills/components/skill-list.tsx:404
+#: src/features/skills/components/skill-list.tsx:408
 msgid "Search your skills"
 msgstr "Pesquisar suas habilidades"
 
@@ -28141,6 +28548,10 @@ msgstr "Seções"
 msgid "Security"
 msgstr "Segurança"
 
+#: src/features/marketing/use-cases/visuals/group-chats-visual.tsx:25
+msgid "Security Reviewer"
+msgstr ""
+
 #: src/features/chat/group/group-mode.ts:48
 msgid "Security, performance and maintainability reviewers answer side by side; the review lead merges their findings."
 msgstr "Revisores de segurança, desempenho e manutenibilidade respondem lado a lado; o líder da revisão combina as conclusões."
@@ -28148,6 +28559,10 @@ msgstr "Revisores de segurança, desempenho e manutenibilidade respondem lado a 
 #: src/features/marketing/components/landing-page.tsx:903
 msgid "See all features"
 msgstr "Ver todos os recursos"
+
+#: src/routes/(public)/use-cases/index.tsx:20
+msgid "See how Neore runs scheduled routines, asks before risky actions, and answers from Telegram, WhatsApp, Slack and Discord."
+msgstr ""
 
 #: src/features/marketing/components/landing-page.tsx:924
 msgid "See how teams use Neore to replace their entire AI stack."
@@ -28208,8 +28623,8 @@ msgid "Select all cells"
 msgstr "Selecionar todas as células"
 
 #: ../../packages/ui/src/components/icon-picker.tsx:431
-#: src/features/projects/components/project-form-dialog.tsx:287
-#: src/features/projects/components/project-form-dialog.tsx:300
+#: src/features/projects/components/project-form-dialog.tsx:288
+#: src/features/projects/components/project-form-dialog.tsx:301
 msgid "Select an icon"
 msgstr "Selecione um ícone"
 
@@ -28667,6 +29082,10 @@ msgstr "Sessões revogadas"
 msgid "Set a password for your account"
 msgstr "Defina uma senha para sua conta"
 
+#: src/features/marketing/use-cases/use-case-data.ts:41
+msgid "Set a task once with a repeat schedule, and the agent runs it on time in the background. A second model checks each answer before it counts as done, and you get the result as a notification."
+msgstr ""
+
 #: src/features/chat/thread/request-secret-prompt.tsx:196
 msgid "Set as the {header} header on your {serverName} MCP server"
 msgstr "Definido como o cabeçalho {header} no seu servidor MCP {serverName}"
@@ -28736,6 +29155,10 @@ msgstr "Guia de configuração: Ollama e LM Studio"
 #: src/features/settings/components/chat/mcp/server-catalog.tsx:69
 msgid "Setup required"
 msgstr "Configuração necessária"
+
+#: src/features/marketing/use-cases/use-case-data.ts:105
+msgid "Several agents in one chat"
+msgstr ""
 
 #: src/features/chat/group/create-group-chat-button.tsx:130
 msgid "Several of your skills answer in one conversation. Mention one with @ to hear from it directly."
@@ -28839,6 +29262,10 @@ msgstr "shift+enter"
 #: src/features/workflow/components/nodes/audio-node.tsx:22
 msgid "Shimmer (Warm)"
 msgstr "Shimmer (quente)"
+
+#: src/features/marketing/use-cases/visuals/group-chats-visual.tsx:36
+msgid "Ship after the size check is added."
+msgstr ""
 
 #: src/features/marketing/components/gateway-landing-page.tsx:845
 msgid "Ship AI features <0>faster.</0>"
@@ -28947,7 +29374,8 @@ msgstr "Mostrar menos"
 msgid "Show more"
 msgstr "Mostrar mais"
 
-#: src/features/tasks/components/task-form-dialog.tsx:446
+#: src/features/projects/components/project-repo-picker.tsx:167
+#: src/features/tasks/components/task-form-dialog.tsx:465
 msgid "Show more projects"
 msgstr "Mostrar mais projetos"
 
@@ -29403,6 +29831,10 @@ msgstr "Arquivos que não são exports de chat foram ignorados: {0}"
 msgid "skipped: still running"
 msgstr "ignorada: ainda em execução"
 
+#: src/features/marketing/use-cases/visuals/routines-visual.tsx:51
+msgid "Skipped: still running"
+msgstr ""
+
 #: src/features/tasks/components/task-skipped-slot.tsx:13
 msgid "skipped: waiting for your review"
 msgstr "ignorada: aguardando sua revisão"
@@ -29461,7 +29893,7 @@ msgstr "Slide {streamingSlideNumber}"
 msgid "Slide title"
 msgstr "Título do slide"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1080
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1088
 msgid "Slide updated"
 msgstr "Slide atualizado"
 
@@ -29619,7 +30051,7 @@ msgstr "Capacidade sólida de uso geral"
 msgid "Solid performance across most task types"
 msgstr "Desempenho sólido na maioria dos tipos de tarefa"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:613
+#: ../../packages/chat-ui/src/chat/message-content.tsx:621
 msgid "Some images from this run could not be saved."
 msgstr "Não foi possível salvar algumas imagens desta execução."
 
@@ -29679,7 +30111,7 @@ msgstr "Direção da ordenação"
 msgid "Sort models"
 msgstr "Ordenar modelos"
 
-#: src/features/skills/components/skill-list.tsx:415
+#: src/features/skills/components/skill-list.tsx:419
 msgid "Sort skills"
 msgstr "Ordenar habilidades"
 
@@ -29712,8 +30144,8 @@ msgstr "Efeitos sonoros ativados"
 msgid "Source"
 msgstr "Fonte"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1217
-#: src/features/chat/thread/message-content.tsx:141
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1225
+#: src/features/chat/thread/message-content.tsx:146
 msgid "Source {index}"
 msgstr "Fonte {index}"
 
@@ -30872,11 +31304,11 @@ msgstr "animação estilizada"
 msgid "Sub-agent"
 msgstr "Subagente"
 
-#: src/features/notifications/lib/notification-labels.ts:63
+#: src/features/notifications/lib/notification-labels.ts:64
 msgid "Sub-agent failed"
 msgstr "O subagente falhou"
 
-#: src/features/notifications/lib/notification-labels.ts:63
+#: src/features/notifications/lib/notification-labels.ts:64
 msgid "Sub-agent finished"
 msgstr "Subagente concluído"
 
@@ -30909,7 +31341,7 @@ msgstr "Assine por US$ 8/mês para desbloquear todos os modelos."
 msgid "Substantially improved reasoning, vision, and instruction following"
 msgstr "Raciocínio, visão e seguimento de instruções substancialmente melhores"
 
-#: src/features/tasks/components/task-form-dialog.tsx:455
+#: src/features/tasks/components/task-form-dialog.tsx:474
 msgid "Subtask of"
 msgstr "Subtarefa de"
 
@@ -30919,11 +31351,11 @@ msgstr "Subtarefa de {parentTitle}"
 
 #: src/features/tasks/components/goal-form-dialog.tsx:121
 #: src/features/tasks/components/task-detail-dialog.tsx:238
-#: src/features/tasks/components/task-form-dialog.tsx:256
+#: src/features/tasks/components/task-form-dialog.tsx:258
 msgid "Success criteria"
 msgstr "Critérios de sucesso"
 
-#: src/features/tasks/components/task-form-dialog.tsx:81
+#: src/features/tasks/components/task-form-dialog.tsx:83
 msgid "Success criteria must be {CRITERIA_MAX} characters or less"
 msgstr "Os critérios de sucesso devem ter no máximo {CRITERIA_MAX} caracteres"
 
@@ -30973,6 +31405,10 @@ msgstr "Ideal para tarefas complexas: Papel / Contexto / Atenção / Habilidades
 #: src/features/settings/components/account/account-settings.tsx:364
 msgid "Summarise long chats"
 msgstr "Resumir chats longos"
+
+#: src/features/marketing/use-cases/visuals/messaging-visual.tsx:24
+msgid "Summarise my notes from today"
+msgstr ""
 
 #: src/features/appearance/components/appearance-controls.tsx:250
 msgid "Summarise my notes in three bullets."
@@ -31280,7 +31716,7 @@ msgstr "Pegue uma imagem de entrada, remova o fundo e depois aplique uma transfe
 msgid "Take turns"
 msgstr "Revezar"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:657
+#: ../../packages/chat-ui/src/chat/message-content.tsx:665
 msgid "Taking screenshot..."
 msgstr "Fazendo captura de tela..."
 
@@ -31296,6 +31732,10 @@ msgstr "Converse com a IA pelo Microsoft Teams por meio de um Azure Bot. Cada co
 #: src/features/chat/thread/composer-search-mode.tsx:48
 msgid "Talk to the model directly"
 msgstr "Converse diretamente com o modelo"
+
+#: src/features/marketing/use-cases/use-case-data.ts:84
+msgid "Talk to your agent from Telegram, WhatsApp, Slack or Discord"
+msgstr ""
 
 #: ../../packages/ui/src/components/data-grid/data-grid-row-height-menu.tsx:24
 msgid "Tall"
@@ -31341,11 +31781,11 @@ msgstr "E-mails de tarefas desativados"
 msgid "Task emails turned on"
 msgstr "E-mails de tarefas ativados"
 
-#: src/features/notifications/lib/notification-labels.ts:66
+#: src/features/notifications/lib/notification-labels.ts:67
 msgid "Task failed"
 msgstr "A tarefa falhou"
 
-#: src/features/notifications/lib/notification-labels.ts:66
+#: src/features/notifications/lib/notification-labels.ts:67
 msgid "Task finished"
 msgstr "Tarefa concluída"
 
@@ -31507,6 +31947,10 @@ msgstr "Token do bot do Telegram"
 #: src/features/settings/components/chat/api-keys-settings.tsx:108
 msgid "Telegram Webhook Secret"
 msgstr "Webhook Secret do Telegram"
+
+#: src/features/marketing/use-cases/use-case-data.ts:74
+msgid "Telegram, WhatsApp, Slack and Discord — message your agent"
+msgstr ""
 
 #: src/features/chat/components/cinema-studio/cinema-option-labels.ts:65
 msgid "Telephoto"
@@ -31880,6 +32324,10 @@ msgstr "O {requestNoun} tem um commit mais novo. Escreva o guia novamente antes 
 msgid "The 43-character EncodingAESKey (message encryption must be set to safe mode)"
 msgstr "A EncodingAESKey de 43 caracteres (a criptografia de mensagens deve estar no modo seguro)"
 
+#: src/features/marketing/use-cases/use-case-data.ts:63
+msgid "The agent asks before a risky action"
+msgstr ""
+
 #: src/features/devices/components/devices-settings.tsx:341
 msgid "The agent can no longer ask this device for anything. Its activity log stays until it expires."
 msgstr "O agente não poderá mais pedir nada a este dispositivo. O registro de atividade permanece até expirar."
@@ -31899,6 +32347,10 @@ msgstr "O agente ainda está trabalhando na última mensagem."
 #: src/features/chat/host/diff-comments-draft.tsx:74
 msgid "The agent is working. You can send these when it is done."
 msgstr "O agente está trabalhando. Você pode enviar isto quando ele terminar."
+
+#: src/features/marketing/use-cases/use-case-data.ts:125
+msgid "The agent keeps the facts you share and uses them in later chats, such as your preferred units or the project you are on. You can see, edit, pin or delete the memories listed in settings."
+msgstr ""
 
 #: src/features/settings/components/chat/agent-settings.tsx:75
 msgid "The agent loop is always enabled for systematic task execution. These settings control additional specialized modules that enhance the AI's capabilities for specific task types."
@@ -31937,7 +32389,7 @@ msgstr "O assistente tem algumas perguntas"
 msgid "The assistant has a question"
 msgstr "O assistente tem uma pergunta"
 
-#: src/features/notifications/lib/notification-labels.ts:60
+#: src/features/notifications/lib/notification-labels.ts:61
 msgid "The assistant is asking for a secret"
 msgstr "O assistente está pedindo um segredo"
 
@@ -31977,9 +32429,13 @@ msgstr "A alteração tem novos commits desde que você começou esta revisão. 
 msgid "The change is too large to show in full."
 msgstr "A alteração é grande demais para ser exibida por completo."
 
-#: src/features/tasks/components/task-form-dialog.tsx:292
+#: src/features/tasks/components/task-form-dialog.tsx:294
 msgid "The chat agent works the task with its tools, optionally following a skill."
 msgstr "O agente de chat executa a tarefa com suas ferramentas, seguindo opcionalmente uma habilidade."
+
+#: src/features/marketing/use-cases/use-case-data.ts:57
+msgid "The chat shows a card with the tool name, the server it comes from, and a \"Show what it will send\" section with the exact input."
+msgstr ""
 
 #: src/features/chat/host/host-composer.tsx:921
 msgid "The chat's state could not be read, so queued messages wait."
@@ -32309,6 +32765,10 @@ msgstr "O MCP Registry está indisponível no momento. Mostrando servidores popu
 msgid "The message could not be sent. Check your connection and try again."
 msgstr "Não foi possível enviar a mensagem. Verifique sua conexão e tente novamente."
 
+#: src/features/marketing/use-cases/use-case-data.ts:56
+msgid "The model asks to use a tool you set to Ask. The run stops before the tool executes."
+msgstr ""
+
 #: src/features/chat/core/hooks/use-prompt-link-draft.ts:160
 msgid "The model in the link is not available. The chat keeps its model."
 msgstr "O modelo do link não está disponível. O chat mantém o modelo dele."
@@ -32359,6 +32819,10 @@ msgstr "O app Neore neste dispositivo vai entrar como {0}. Continue apenas se vo
 #: src/features/chat/lock/thread-lock-dialog.tsx:117
 msgid "The new passcode needs {MIN_PASSCODE_LENGTH} characters, typed twice the same."
 msgstr "A nova senha precisa ter {MIN_PASSCODE_LENGTH} caracteres, digitados duas vezes de forma idêntica."
+
+#: src/features/marketing/use-cases/visuals/group-chats-visual.tsx:31
+msgid "The new query is indexed. No extra round trip."
+msgstr ""
 
 #: src/features/auth/components/device-code-parts.tsx:112
 msgid "The operating system keychain"
@@ -32421,6 +32885,10 @@ msgstr "O refinamento não alterou nenhum campo."
 msgid "The region where you enabled model access in the Bedrock console."
 msgstr "A região em que você habilitou o acesso aos modelos no console do Bedrock."
 
+#: src/features/marketing/use-cases/use-case-data.ts:81
+msgid "The reply goes back to the same chat. Files are fetched when the reply is made, with a 20 MB limit and a list of allowed types."
+msgstr ""
+
 #: src/features/chat/aside/aside-panel.tsx:102
 msgid "The reply is still running. Add it when the reply finishes."
 msgstr "A resposta ainda está em andamento. Adicione quando ela terminar."
@@ -32432,6 +32900,10 @@ msgstr "A resposta ainda está em andamento. Tente novamente quando terminar."
 #: src/features/chat/host/host-composer.tsx:308
 msgid "The reply stopped, but the stop did not reach the computer, so the agent may still be running. Send next once it has stopped."
 msgstr "A resposta parou, mas a parada não chegou ao computador, então o agente pode ainda estar em execução. Use « Enviar a seguir » quando ele tiver parado."
+
+#: src/features/marketing/use-cases/use-case-data.ts:60
+msgid "The request is saved with the message, so the card is still there after a reload."
+msgstr ""
 
 #: src/lib/errors/index.ts:184
 msgid "The request timed out but may still complete. Check the conversation before trying again."
@@ -32457,7 +32929,11 @@ msgstr "A nova tentativa está demorando mais que o esperado"
 msgid "The right model, every time."
 msgstr "O modelo certo, sempre."
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:733
+#: src/features/marketing/use-cases/use-case-data.ts:37
+msgid "The run goes where you chose: a new chat each time, the same chat as before, or the same chat with a fresh context."
+msgstr ""
+
+#: ../../packages/chat-ui/src/chat/message-content.tsx:741
 msgid "The screenshot could not be saved."
 msgstr "Não foi possível salvar a captura de tela."
 
@@ -32481,7 +32957,7 @@ msgstr "A tag \"{pendingDeleteName}\" será removida de todos os chats que a tê
 msgid "The task and its run history are removed. Tasks that depend on it stop waiting for it."
 msgstr "A tarefa e o histórico de execuções dela serão removidos. As tarefas que dependem dela deixam de esperar por ela."
 
-#: src/features/tasks/components/task-form-dialog.tsx:484
+#: src/features/tasks/components/task-form-dialog.tsx:503
 msgid "The task waits until every selected task is done."
 msgstr "A tarefa espera até que todas as tarefas selecionadas sejam concluídas."
 
@@ -32530,7 +33006,7 @@ msgstr "O usuário não será notificado sobre a representação"
 msgid "The verifier did not pass this result after the allowed repair rounds. Approve it as is, reject it, or send it back with a note."
 msgstr "O verificador não aprovou este resultado após as rodadas de correção permitidas. Aprove como está, rejeite ou devolva com uma observação."
 
-#: src/features/tasks/components/task-form-dialog.tsx:265
+#: src/features/tasks/components/task-form-dialog.tsx:267
 msgid "The verifier passes the result only if every criterion is met."
 msgstr "O verificador só aprova o resultado se todos os critérios forem atendidos."
 
@@ -32673,7 +33149,7 @@ msgid "Thinking-enabled vision-language model"
 msgstr "Modelo de visão e linguagem com pensamento"
 
 #: ../../packages/chat-ui/src/chat/auto-continue-status.tsx:54
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1143
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1151
 #: ../../packages/ui/src/components/ai-elements/reasoning.tsx:114
 #: src/features/chat/thread/streaming-placeholder.tsx:799
 msgid "Thinking..."
@@ -32718,6 +33194,10 @@ msgstr "Esta branch tem conflitos com a branch base."
 #: src/features/develop/components/merge-panel.tsx:77
 msgid "This branch is behind its base branch."
 msgstr "Esta branch está atrás da branch base."
+
+#: src/features/projects/components/project-repositories.tsx:197
+msgid "This branch was changed meanwhile. Check it and save again."
+msgstr "Este branch foi alterado entretanto. Verifique-o e guarde novamente."
 
 #: src/features/notifications/components/notification-settings.tsx:190
 msgid "This browser cannot receive push notifications here."
@@ -32859,11 +33339,11 @@ msgstr "O relógio deste computador está cerca de {minutes} minutos atrasado em
 msgid "This connection needs to be renewed."
 msgstr "Esta conexão precisa ser renovada."
 
-#: src/features/projects/components/project-form-dialog.tsx:327
+#: src/features/projects/components/project-form-dialog.tsx:328
 msgid "This context will be automatically added to each chat in your project. You can include instructions, background information, or any shared knowledge."
 msgstr "Este contexto será adicionado automaticamente a cada chat do seu projeto. Você pode incluir instruções, informações de contexto ou qualquer conhecimento compartilhado."
 
-#: src/features/projects/components/project-form-dialog.tsx:332
+#: src/features/projects/components/project-form-dialog.tsx:333
 msgid "This context will be prepended to the system prompt for all chats in this project."
 msgstr "Este contexto será inserido antes do prompt de sistema em todos os chats deste projeto."
 
@@ -32951,7 +33431,7 @@ msgstr "Este host ainda não oferece uma caixa de entrada."
 msgid "This host does not offer any view of a {requestNoun} yet."
 msgstr "Este host ainda não oferece nenhuma visualização de um {requestNoun}."
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:391
+#: ../../packages/chat-ui/src/chat/message-content.tsx:399
 msgid "This image has been flagged for review"
 msgstr "Esta imagem foi sinalizada para revisão"
 
@@ -32976,6 +33456,10 @@ msgstr "Isto já está na conversa."
 #: src/features/auth/components/organization/organization-name-card.tsx:155
 msgid "This is how your organization appears to members"
 msgstr "É assim que sua organização aparece para os membros"
+
+#: src/features/projects/components/project-repositories.tsx:188
+msgid "This is not a valid branch name."
+msgstr "Este não é um nome de branch válido."
 
 #: src/features/chat/thread/request-secret-prompt.tsx:447
 msgid "This is too long: up to {valueMax} characters."
@@ -33127,6 +33611,14 @@ msgstr "Este pull request já tem o máximo de conversas vinculadas que pode man
 #: src/features/local-models/components/ollama-model-manager.tsx:337
 msgid "This removes the model files from your computer. You can pull it again later."
 msgstr "Isso remove os arquivos do modelo do seu computador. Você pode baixá-lo novamente depois."
+
+#: src/features/projects/components/project-repositories.tsx:185
+msgid "This repository is already listed."
+msgstr "Este repositório já está na lista."
+
+#: src/features/projects/components/project-repositories.tsx:200
+msgid "This repository URL is too long."
+msgstr "Esta URL de repositório é longa demais."
 
 #: src/features/develop/components/watched-repositories.tsx:68
 msgid "This repository was not found."
@@ -33439,6 +33931,10 @@ msgstr "Limiar"
 msgid "Threshold must be between 1 and 365 days"
 msgstr "O limite deve estar entre 1 e 365 dias"
 
+#: src/features/marketing/use-cases/visuals/routines-visual.tsx:19
+msgid "Thu"
+msgstr ""
+
 #: src/features/evals/components/dataset-panel.tsx:219
 msgid "Tick two runs to compare them."
 msgstr "Marque duas execuções para compará-las."
@@ -33483,10 +33979,10 @@ msgstr "Fuso horário atualizado"
 
 #: src/features/chat/thread-list/rename-thread-dialog.tsx:148
 #: src/features/develop/components/pull-request-edit-action.tsx:124
-#: src/features/projects/components/project-form-dialog.tsx:195
+#: src/features/projects/components/project-form-dialog.tsx:196
 #: src/features/slides/components/slide-editor-dialog.tsx:90
 #: src/features/tasks/components/goal-form-dialog.tsx:88
-#: src/features/tasks/components/task-form-dialog.tsx:219
+#: src/features/tasks/components/task-form-dialog.tsx:221
 msgid "Title"
 msgstr "Título"
 
@@ -33495,11 +33991,11 @@ msgid "Title (optional)"
 msgstr "Título (opcional)"
 
 #: src/features/tasks/components/goal-form-dialog.tsx:43
-#: src/features/tasks/components/task-form-dialog.tsx:99
+#: src/features/tasks/components/task-form-dialog.tsx:101
 msgid "Title is required"
 msgstr "O título é obrigatório"
 
-#: src/features/tasks/components/task-form-dialog.tsx:102
+#: src/features/tasks/components/task-form-dialog.tsx:104
 msgid "Title must be {TITLE_MAX} characters or less"
 msgstr "O título deve ter no máximo {TITLE_MAX} caracteres"
 
@@ -33731,6 +34227,10 @@ msgstr "Ferramentas"
 msgid "Tools run on their own settings; a quick check can clear low-risk calls"
 msgstr ""
 
+#: src/features/marketing/use-cases/use-case-data.ts:69
+msgid "Tools that need your approval are not offered in messaging apps, because nobody can approve a card there."
+msgstr ""
+
 #: src/features/skills/components/skill-form-dialog.tsx:440
 msgid "Tools the assistant must not use while this skill runs."
 msgstr "Ferramentas que o assistente não deve usar enquanto esta habilidade estiver em execução."
@@ -33738,6 +34238,10 @@ msgstr "Ferramentas que o assistente não deve usar enquanto esta habilidade est
 #: src/features/skills/components/skill-form-dialog.tsx:428
 msgid "Tools the skill needs even when the current chat mode would not load them."
 msgstr "Ferramentas de que a habilidade precisa mesmo quando o modo de chat atual não as carregaria."
+
+#: src/features/marketing/use-cases/use-case-data.ts:62
+msgid "Tools you set to Ask stop and wait for your decision. You see what the tool will send before it runs, then choose to allow it once, for an hour, for the day, or always. Tools set to Auto run without a card."
+msgstr ""
 
 #: src/features/workflow/components/nodes/outpaint-node.tsx:27
 msgid "Top"
@@ -33968,11 +34472,11 @@ msgstr "Gatilho ativado"
 msgid "Trigger name is required"
 msgstr "O nome do gatilho é obrigatório"
 
-#: src/features/notifications/lib/notification-labels.ts:72
+#: src/features/notifications/lib/notification-labels.ts:76
 msgid "Trigger run failed"
 msgstr "A execução do gatilho falhou"
 
-#: src/features/notifications/lib/notification-labels.ts:72
+#: src/features/notifications/lib/notification-labels.ts:76
 msgid "Trigger run finished"
 msgstr "Execução do gatilho concluída"
 
@@ -34050,7 +34554,10 @@ msgstr "Tente ajustar os termos da pesquisa."
 #: src/features/develop/components/files-tab.tsx:275
 #: src/features/develop/components/thread-pull-requests.tsx:169
 #: src/features/home/components/home-page.tsx:152
-#: src/features/tasks/components/task-form-dialog.tsx:440
+#: src/features/projects/components/project-repo-picker.tsx:182
+#: src/features/projects/components/project-repo-picker.tsx:190
+#: src/features/projects/components/project-repositories.tsx:305
+#: src/features/tasks/components/task-form-dialog.tsx:459
 msgid "Try again"
 msgstr "Tentar novamente"
 
@@ -34083,6 +34590,10 @@ msgstr "Experimente grátis"
 msgid "Try it Now"
 msgstr "Experimente agora"
 
+#: src/features/marketing/use-cases/use-case-page.tsx:74
+msgid "Try Neore"
+msgstr ""
+
 #: ../../packages/ui/src/components/data-grid/data-grid-keyboard-shortcuts.tsx:353
 msgid "Try searching for a different term."
 msgstr "Tente pesquisar outro termo."
@@ -34098,6 +34609,10 @@ msgstr "Tente pesquisar nos títulos ou resumos das conversas"
 #: src/features/skills/components/skill-builder-test-drive.tsx:93
 msgid "Try the draft with the settings you accepted, without saving it. Opens a temporary chat in a new tab."
 msgstr "Teste o rascunho com as configurações que você aceitou, sem salvar. Abre um chat temporário em uma nova aba."
+
+#: src/features/marketing/use-cases/visuals/routines-visual.tsx:19
+msgid "Tue"
+msgstr ""
 
 #: src/features/marketing/data/models-data.ts:274
 msgid "Turbo-speed generation without quality loss"
@@ -34241,7 +34756,7 @@ msgstr "Digite sua mensagem..."
 msgid "Typeface for the whole interface. Code blocks always stay monospace."
 msgstr "Fonte de toda a interface. Os blocos de código sempre permanecem em monoespaçada."
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:658
+#: ../../packages/chat-ui/src/chat/message-content.tsx:666
 msgid "Typing text..."
 msgstr "Digitando texto..."
 
@@ -34589,6 +35104,10 @@ msgstr "até {0}"
 msgid "Until {until}"
 msgstr "Até {until}"
 
+#: src/features/marketing/use-cases/use-case-data.ts:79
+msgid "Until a chat is paired, the bot answers only that it is private. Send /pair with the code from settings to link your contact."
+msgstr ""
+
 #: src/features/pages/components/page-tree-item.tsx:53
 #: src/features/pages/components/page-view.tsx:390
 #: src/features/pages/components/page-view.tsx:397
@@ -34645,7 +35164,7 @@ msgstr "Atualizar duração"
 msgid "Update failed"
 msgstr "Falha na atualização"
 
-#: src/features/projects/components/project-form-dialog.tsx:405
+#: src/features/projects/components/project-form-dialog.tsx:408
 msgid "Update Project"
 msgstr "Atualizar projeto"
 
@@ -34679,7 +35198,7 @@ msgstr "Atualize a função deste membro"
 msgid "Update your account email address"
 msgstr "Atualize o endereço de e-mail da sua conta"
 
-#: src/features/projects/components/project-form-dialog.tsx:186
+#: src/features/projects/components/project-form-dialog.tsx:187
 msgid "Update your project details below."
 msgstr "Atualize os detalhes do seu projeto abaixo."
 
@@ -34734,11 +35253,11 @@ msgstr "Desempenho de fronteira atualizado da OpenAI"
 msgid "Updated reasoning capabilities over the original R1"
 msgstr "Recursos de raciocínio atualizados em relação ao R1 original"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1078
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1086
 msgid "Updated slide"
 msgstr "Slide atualizado"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1078
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1086
 msgid "Updated slide {slideNumber}"
 msgstr "Slide {slideNumber} atualizado"
 
@@ -35009,7 +35528,8 @@ msgstr "Use a IA para otimizar seu prompt e ter resultados melhores. Se quiser, 
 msgid "Use all enabled MCP servers"
 msgstr "Usar todos os servidores MCP ativados"
 
-#: src/features/tasks/components/task-form-dialog.tsx:93
+#: src/features/projects/components/project-repositories.tsx:191
+#: src/features/tasks/components/task-form-dialog.tsx:95
 msgid "Use an https:// git URL or GitHub owner/repo"
 msgstr "Use uma URL git https:// ou owner/repo do GitHub"
 
@@ -35021,16 +35541,28 @@ msgstr "Use pelo menos {MIN_PASSCODE_LENGTH} caracteres."
 msgid "Use browser automation to navigate websites, extract data, take screenshots, and interact with web pages."
 msgstr "Use a automação de navegador para navegar em sites, extrair dados, fazer capturas de tela e interagir com páginas da web."
 
+#: src/features/marketing/use-cases/use-cases-index-page.tsx:17
+msgid "Use cases"
+msgstr ""
+
 #: src/features/marketing/components/landing-footer.tsx:112
 #: src/features/marketing/components/landing-page.tsx:912
 msgid "Use Cases"
 msgstr "Casos de uso"
 
+#: src/routes/(public)/use-cases/index.tsx:24
+msgid "Use cases — what Neore does"
+msgstr ""
+
+#: src/routes/(public)/use-cases/index.tsx:31
+msgid "Use cases for Neore: routines, approvals and messaging apps"
+msgstr ""
+
 #: src/features/chat/thread/composer-draw-dialog.tsx:388
 msgid "Use Drawing"
 msgstr "Usar desenho"
 
-#: src/features/tasks/components/task-form-dialog.tsx:84
+#: src/features/tasks/components/task-form-dialog.tsx:86
 msgid "Use five cron fields, e.g. \"0 9 * * 1\" for Mondays at 09:00 UTC"
 msgstr "Use cinco campos cron, ex.: \"0 9 * * 1\" para segundas-feiras às 09:00 UTC"
 
@@ -36044,6 +36576,7 @@ msgstr "Aguardando sua resposta em {0}"
 #: src/features/chat/thread-list/thread-node.tsx:641
 #: src/features/chat/thread/tool-approval.tsx:74
 #: src/features/home/components/home-page.tsx:114
+#: src/features/marketing/use-cases/visuals/approvals-visual.tsx:20
 #: src/features/sub-agents/components/sub-agent-tool-view.tsx:52
 msgid "Waiting for your approval"
 msgstr "Aguardando sua aprovação"
@@ -36204,7 +36737,11 @@ msgstr "EncodingAESKey do WeChat"
 msgid "WeChat Token"
 msgstr "Token do WeChat"
 
-#: src/features/tasks/components/task-form-dialog.tsx:127
+#: src/features/marketing/use-cases/visuals/routines-visual.tsx:19
+msgid "Wed"
+msgstr ""
+
+#: src/features/tasks/components/task-form-dialog.tsx:129
 msgid "Weekdays at 09:00 UTC"
 msgstr "Dias úteis às 09:00 UTC"
 
@@ -36296,6 +36833,10 @@ msgstr "O que ele avalia"
 msgid "What needs you, what's running, and where you left off."
 msgstr "O que precisa de você, o que está em execução e onde você parou."
 
+#: src/features/marketing/use-cases/use-cases-index-page.tsx:19
+msgid "What Neore does day to day: work that runs on a schedule, approvals before risky actions, and the chat apps you already use."
+msgstr ""
+
 #: src/features/pages/components/page-agent-dialog.tsx:121
 #: src/features/skills/components/skill-builder-dialog.tsx:283
 msgid "What should change?"
@@ -36310,7 +36851,7 @@ msgid "What should the agent change?"
 msgstr "O que o agente deve alterar?"
 
 #: src/features/skills/components/skill-builder-dialog.tsx:208
-#: src/features/tasks/components/task-form-dialog.tsx:244
+#: src/features/tasks/components/task-form-dialog.tsx:246
 msgid "What should the agent do?"
 msgstr "O que o agente deve fazer?"
 
@@ -36397,6 +36938,10 @@ msgstr "Verify Token do WhatsApp"
 msgid "When"
 msgstr "Quando"
 
+#: src/features/marketing/use-cases/use-case-data.ts:122
+msgid "When a new fact conflicts with an old one, the old memory is updated, superseded, or the new fact is ignored."
+msgstr ""
+
 #: src/features/settings/components/account/account-settings.tsx:538
 msgid "When a reply is cut off by an update or an outage, it continues from its last finished step, up to 3 times. A reply interrupted while a tool was running is never continued."
 msgstr "Quando uma resposta é cortada por uma atualização ou uma interrupção, ela continua a partir do último passo concluído, até 3 vezes. Uma resposta interrompida enquanto uma ferramenta estava em execução nunca é continuada."
@@ -36413,7 +36958,7 @@ msgstr "Quando definido, só esses provedores serão usados. Deixe em branco par
 msgid "When should the assistant use this skill?"
 msgstr "Quando o assistente deve usar esta habilidade?"
 
-#: src/features/tasks/components/task-form-dialog.tsx:567
+#: src/features/tasks/components/task-form-dialog.tsx:586
 msgid "Where each run goes"
 msgstr "Para onde vai cada execução"
 
@@ -36428,6 +36973,10 @@ msgstr "Onde este dispositivo é oferecido"
 #: src/features/marketing/components/landing-page.tsx:571
 msgid "Where thoughts<0/><1>become actions.</1>"
 msgstr "Onde ideias<0/><1>viram ações.</1>"
+
+#: src/features/marketing/use-cases/use-case-page.tsx:60
+msgid "Where you stay in control"
+msgstr ""
 
 #: src/features/marketing/components/landing-page.tsx:258
 msgid "Which AI models are included?"
@@ -36566,6 +37115,10 @@ msgstr "Trabalhando"
 #: src/features/develop/components/pull-request-actions-panel.tsx:98
 msgid "Working on {0}…"
 msgstr "Trabalhando em {0}…"
+
+#: src/features/marketing/use-cases/visuals/memory-visual.tsx:19
+msgid "Working on a mobile app"
+msgstr ""
 
 #. placeholder {0}: goal.maxRounds
 #: src/features/chat/goal/goal-notes.tsx:61
@@ -36861,9 +37414,17 @@ msgstr "Você não pode fazer uma pergunta paralela neste chat."
 msgid "You cannot see that pull request on the host."
 msgstr "Você não consegue ver esse pull request no host."
 
+#: src/features/marketing/use-cases/use-case-data.ts:24
+msgid "You choose the schedule, the run destination and the project. The project must be one you can write to."
+msgstr ""
+
 #: src/features/skills/components/skill-builder-setup.tsx:92
 msgid "You chose these integrations in the agent builder. Each one opens for you to review before anything connects."
 msgstr "Você escolheu estas integrações no criador de agentes. Cada uma abre para você revisar antes de qualquer conexão."
+
+#: src/features/marketing/use-cases/use-case-data.ts:39
+msgid "You get a notification when a run finishes, needs your review or fails. A finished run links to its chat, and a run that needs review links to the tasks board."
+msgstr ""
 
 #: src/features/auth/components/team/leave-team-dialog.tsx:47
 msgid "You have left the team"
@@ -36943,7 +37504,7 @@ msgstr "Você será redirecionado de volta para cá depois de entrar."
 msgid "You'll need an authenticator app like Google Authenticator or Authy to generate verification codes."
 msgstr "Você vai precisar de um app autenticador, como Google Authenticator ou Authy, para gerar os códigos de verificação."
 
-#: src/features/notifications/components/notification-list.tsx:82
+#: src/features/notifications/components/notification-list.tsx:84
 msgid "You're all caught up."
 msgstr "Você está em dia."
 
@@ -37089,7 +37650,7 @@ msgstr "Suas conversas continuam privadas"
 msgid "Your current anonymous session will be converted to a permanent account."
 msgstr "Sua sessão anônima atual será convertida em uma conta permanente."
 
-#: src/features/notifications/lib/notification-labels.ts:48
+#: src/features/notifications/lib/notification-labels.ts:49
 msgid "Your daily brief"
 msgstr "Seu Daily Brief"
 
@@ -37098,7 +37659,7 @@ msgstr "Seu Daily Brief"
 msgid "Your daily limit for AI requests is used up."
 msgstr "Seu limite diário de solicitações de IA foi atingido."
 
-#: src/features/notifications/lib/notification-labels.ts:51
+#: src/features/notifications/lib/notification-labels.ts:52
 msgid "Your data export is ready"
 msgstr "Sua exportação de dados está pronta"
 
@@ -37243,7 +37804,7 @@ msgstr "Sua revisão está sendo enviada. Aguarde a conclusão."
 msgid "Your review is kept."
 msgstr "Sua revisão foi mantida."
 
-#: src/features/notifications/lib/notification-labels.ts:57
+#: src/features/notifications/lib/notification-labels.ts:58
 msgid "Your review was requested"
 msgstr "Sua revisão foi solicitada"
 

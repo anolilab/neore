@@ -552,7 +552,7 @@ export interface InternalApiTypes {
         tools: {
             browser_node: {
                 closeBrowserSession: FunctionReference<"action", { sessionId: Id<"browserSessions"> }, void>;
-                executeBrowserAction: FunctionReference<"action", { action: "navigate" | "screenshot" | "click" | "type" | "extract" | "scroll"; browserSettings?: unknown; direction?: string; fullPage?: boolean; selector?: string; text?: string; threadId: Id<"threads">; url?: string; userId: string; userTier?: string }, import("@neore/service-sdk/browser-renderer").BrowserActionResponse>;
+                executeBrowserAction: FunctionReference<"action", { action: "navigate" | "screenshot" | "click" | "type" | "extract" | "scroll"; browserSettings?: unknown; direction?: string; fullPage?: boolean; selector?: string; text?: string; threadId: Id<"threads">; url?: string; userId: string; userTier?: string }, unknown>;
             };
             code_execution_node: {
                 default: FunctionReference<"action", { code: string; threadId?: Id<"threads">; timeoutMs?: number; userId?: string }, { files: import("../chat/tools/sandbox-outputs.js").SandboxOutputFile[]; skippedFiles: import("../chat/tools/sandbox-outputs.js").SkippedOutputFile[]; error: string | undefined; results: { type: "text"; value: string; }[]; stderr: string; stdout: string; } | { error: string; results: { type: "error"; value: string; }[]; stderr: string; stdout: string; } | { error: string | undefined; results: { format?: string; type: "text" | "image" | "error"; value: string; }[]; stderr: string; stdout: string; }>;
@@ -1028,6 +1028,12 @@ export interface InternalApiTypes {
     projects: {
         functions: {
             getProjectContextForRun: FunctionReference<"query", { projectId: Id<"projects">; userId: string }, string | null>;
+        };
+        gdpr: {
+            collectProjectDetailsForExport: FunctionReference<"query", { projectIds: Array<Id<"projects">>; userId: string }, { projects: Array<{ project: { sharingEnabled: boolean; title: string }; projectId: string }>; readBytes: number }>;
+            collectProjectRepositoriesForExport: FunctionReference<"query", { cursor?: string | null; userId: string }, { cursor: string | null; projectRepositories: Array<unknown> }>;
+            eraseOrganizationRepositories: FunctionReference<"mutation", { cursor?: string; organizationId: string }, null>;
+            sweepOrphanedOrganizationRepositories: FunctionReference<"mutation", { cursor?: string }, null>;
         };
     };
     prompts: {
@@ -2332,6 +2338,12 @@ export const internal: InternalApiTypes = {
     projects: {
         functions: {
             getProjectContextForRun: { __lunoraRef: "projects_functions:getProjectContextForRun" },
+        },
+        gdpr: {
+            collectProjectDetailsForExport: { __lunoraRef: "projects_gdpr:collectProjectDetailsForExport" },
+            collectProjectRepositoriesForExport: { __lunoraRef: "projects_gdpr:collectProjectRepositoriesForExport" },
+            eraseOrganizationRepositories: { __lunoraRef: "projects_gdpr:eraseOrganizationRepositories" },
+            sweepOrphanedOrganizationRepositories: { __lunoraRef: "projects_gdpr:sweepOrphanedOrganizationRepositories" },
         },
     },
     prompts: {

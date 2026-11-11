@@ -20616,6 +20616,92 @@
       "relations": {},
       "shardMode": "root"
     },
+    "projectRepositories": {
+      "commitOrdered": false,
+      "fields": {
+        "branchRevision": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "createdAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "defaultAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "defaultBranch": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "deletingAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "organizationId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "projectId": {
+          "kind": "id",
+          "nullable": false,
+          "optional": false,
+          "unique": false,
+          "ref": "projects"
+        },
+        "url": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "userId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        }
+      },
+      "indexes": {
+        "by_organization_and_url": {
+          "fields": [
+            "organizationId",
+            "url"
+          ],
+          "unique": false
+        },
+        "by_project_and_url": {
+          "fields": [
+            "projectId",
+            "url"
+          ],
+          "unique": true
+        },
+        "by_user_and_url": {
+          "fields": [
+            "userId",
+            "url"
+          ],
+          "unique": false
+        }
+      },
+      "memory": false,
+      "relations": {},
+      "shardMode": "global:d1"
+    },
     "projects": {
       "commitOrdered": false,
       "fields": {

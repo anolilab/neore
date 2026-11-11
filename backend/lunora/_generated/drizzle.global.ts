@@ -375,6 +375,24 @@ export const passkey = sqliteTable("passkey", {
     credentialID: index("credentialID").on(t.credentialID),
 }));
 
+export const projectRepositories = sqliteTable("projectRepositories", {
+    _id: text("_id").primaryKey(),
+    _creationTime: integer("_creationTime").notNull(),
+    branchRevision: real("branchRevision"),
+    createdAt: real("createdAt").notNull(),
+    defaultAt: real("defaultAt"),
+    defaultBranch: text("defaultBranch"),
+    deletingAt: real("deletingAt"),
+    organizationId: text("organizationId"),
+    projectId: text("projectId").references((): AnySQLiteColumn => projects._id).notNull(),
+    url: text("url").notNull(),
+    userId: text("userId"),
+}, (t) => ({
+    by_project_and_url: uniqueIndex("by_project_and_url").on(t.projectId, t.url),
+    by_user_and_url: index("by_user_and_url").on(t.userId, t.url),
+    by_organization_and_url: index("by_organization_and_url").on(t.organizationId, t.url),
+}));
+
 export const projects = sqliteTable("projects", {
     _id: text("_id").primaryKey(),
     _creationTime: integer("_creationTime").notNull(),

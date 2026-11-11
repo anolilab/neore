@@ -41268,6 +41268,76 @@
         "x-lunora-function-kind": "mutation"
       }
     },
+    "/_lunora/rpc#projects_functions:addProjectRepo": {
+      "post": {
+        "description": "Invoke the `mutation` `projects_functions:addProjectRepo` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "projects_functions:addProjectRepo",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "defaultBranch": {
+                        "type": "string"
+                      },
+                      "projectId": {
+                        "description": "Id<\"projects\">",
+                        "type": "string",
+                        "x-lunora-table": "projects"
+                      },
+                      "url": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "projectId",
+                      "url"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "projects_functions:addProjectRepo",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "mutation: projects_functions:addProjectRepo",
+        "tags": [
+          "projects"
+        ],
+        "x-lunora-function-kind": "mutation"
+      }
+    },
     "/_lunora/rpc#projects_functions:createProject": {
       "post": {
         "description": "Invoke the `mutation` `projects_functions:createProject` over the Lunora RPC envelope (POST /_lunora/rpc).",
@@ -41428,6 +41498,86 @@
           "projects"
         ],
         "x-lunora-function-kind": "mutation"
+      }
+    },
+    "/_lunora/rpc#projects_functions:findRepoProject": {
+      "post": {
+        "description": "Invoke the `query` `projects_functions:findRepoProject` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "projects_functions:findRepoProject",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "url": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "url"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "projects_functions:findRepoProject",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "properties": {
+                        "projectId": {
+                          "type": "string"
+                        },
+                        "title": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "projectId",
+                        "title"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "query: projects_functions:findRepoProject",
+        "tags": [
+          "projects"
+        ],
+        "x-lunora-function-kind": "query"
       }
     },
     "/_lunora/rpc#projects_functions:getProject": {
@@ -41758,6 +41908,95 @@
           }
         },
         "summary": "query: projects_functions:listPinnedProjects",
+        "tags": [
+          "projects"
+        ],
+        "x-lunora-function-kind": "query"
+      }
+    },
+    "/_lunora/rpc#projects_functions:listProjectRepos": {
+      "post": {
+        "description": "Invoke the `query` `projects_functions:listProjectRepos` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "projects_functions:listProjectRepos",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "projectId": {
+                        "description": "Id<\"projects\">",
+                        "type": "string",
+                        "x-lunora-table": "projects"
+                      }
+                    },
+                    "required": [
+                      "projectId"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "projects_functions:listProjectRepos",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "properties": {
+                      "defaultBranch": {
+                        "type": "string"
+                      },
+                      "id": {
+                        "type": "string"
+                      },
+                      "isDefault": {
+                        "type": "boolean"
+                      },
+                      "revision": {
+                        "type": "number"
+                      },
+                      "url": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "isDefault",
+                      "revision",
+                      "url"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "query: projects_functions:listProjectRepos",
         "tags": [
           "projects"
         ],
@@ -42369,6 +42608,132 @@
         "x-lunora-function-kind": "mutation"
       }
     },
+    "/_lunora/rpc#projects_functions:removeProjectRepo": {
+      "post": {
+        "description": "Invoke the `mutation` `projects_functions:removeProjectRepo` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "projects_functions:removeProjectRepo",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "repoId": {
+                        "description": "Id<\"projectRepositories\">",
+                        "type": "string",
+                        "x-lunora-table": "projectRepositories"
+                      }
+                    },
+                    "required": [
+                      "repoId"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "projects_functions:removeProjectRepo",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "null"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "mutation: projects_functions:removeProjectRepo",
+        "tags": [
+          "projects"
+        ],
+        "x-lunora-function-kind": "mutation"
+      }
+    },
+    "/_lunora/rpc#projects_functions:setDefaultProjectRepo": {
+      "post": {
+        "description": "Invoke the `mutation` `projects_functions:setDefaultProjectRepo` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "projects_functions:setDefaultProjectRepo",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "repoId": {
+                        "description": "Id<\"projectRepositories\">",
+                        "type": "string",
+                        "x-lunora-table": "projectRepositories"
+                      }
+                    },
+                    "required": [
+                      "repoId"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "projects_functions:setDefaultProjectRepo",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "null"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "mutation: projects_functions:setDefaultProjectRepo",
+        "tags": [
+          "projects"
+        ],
+        "x-lunora-function-kind": "mutation"
+      }
+    },
     "/_lunora/rpc#projects_functions:unpinProject": {
       "post": {
         "description": "Invoke the `mutation` `projects_functions:unpinProject` over the Lunora RPC envelope (POST /_lunora/rpc).",
@@ -42632,6 +42997,76 @@
           }
         },
         "summary": "mutation: projects_functions:updateProjectOrder",
+        "tags": [
+          "projects"
+        ],
+        "x-lunora-function-kind": "mutation"
+      }
+    },
+    "/_lunora/rpc#projects_functions:updateProjectRepo": {
+      "post": {
+        "description": "Invoke the `mutation` `projects_functions:updateProjectRepo` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "projects_functions:updateProjectRepo",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "defaultBranch": {
+                        "type": "string"
+                      },
+                      "repoId": {
+                        "description": "Id<\"projectRepositories\">",
+                        "type": "string",
+                        "x-lunora-table": "projectRepositories"
+                      },
+                      "revision": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "repoId",
+                      "revision"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "projects_functions:updateProjectRepo",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "number"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "mutation: projects_functions:updateProjectRepo",
         "tags": [
           "projects"
         ],

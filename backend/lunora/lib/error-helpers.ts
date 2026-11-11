@@ -73,3 +73,20 @@ export function assert(condition: unknown, message = "Assertion failed"): assert
         throw new LunoraError("INTERNAL", message);
     }
 }
+
+/** SQLite's wording, raw ("failed") or as Lunora rewords it ("violation"). */
+const UNIQUE_CONSTRAINT = /unique constraint (?:failed|violation)/iu;
+
+/**
+ * A unique index refusing the row: Lunora's `ConflictError` with `kind: "unique"`, or SQLite's own error where a layer
+ * passes it through. Nothing else means two writes raced for one unique key.
+ */
+export const isUniqueViolation = (error: unknown): boolean => {
+    if ((error as { kind?: unknown } | null)?.kind === "unique") {
+        return true;
+    }
+
+    const cause = error instanceof Error ? error.cause : undefined;
+
+    return UNIQUE_CONSTRAINT.test(String(error)) || (cause !== undefined && UNIQUE_CONSTRAINT.test(String(cause)));
+};

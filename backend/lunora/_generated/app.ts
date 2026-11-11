@@ -731,6 +731,7 @@ class AppBuilder<Env extends object> {
             ["presentations", { mode: { field: "userId", kind: "shardBy" } }],
             ["presentationSlides", { mode: { kind: "root" } }],
             ["projectKnowledge", { mode: { kind: "root" } }],
+            ["projectRepositories", { mode: { kind: "global" } }],
             ["projects", { mode: { kind: "global" } }],
             ["promptHistory", { mode: { kind: "global" } }],
             ["prompts", { mode: { kind: "global" } }],

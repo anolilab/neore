@@ -64,6 +64,7 @@ export const GLOBAL_USER_COLUMNS: Readonly<Record<string, ReadonlyArray<string>>
     pageAccess: ["userId", "ownerId", "grantedBy"],
     pageInvites: ["userId", "ownerId", "acceptedBy"],
     passkey: ["userId"],
+    projectRepositories: ["userId"],
     projects: ["userId"],
     promptHistory: ["userId"],
     prompts: ["userId"],
