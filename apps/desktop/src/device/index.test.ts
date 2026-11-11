@@ -473,11 +473,11 @@ describe("add-project machines (the site window)", () => {
         expect(core.settingsUpdate).toHaveBeenCalledWith(JSON.stringify({ host: { deviceId: "srv-1", roots: ["/srv/app", "/data/p"] } }));
     });
 
-    it("connect an ssh host that is not paired yet through the probe, which asks the person in the local window", async () => {
+    it("refuses to connect an ssh host that is not paired yet, and probes nothing", async () => {
         core.settingsGet.mockReturnValue(JSON.stringify({ hosts: [], paired: true, roots: [] }));
 
-        await expect(invoke(DEVICE_CHANNEL.connectAddProjectMachine, siteEvent(), "build")).resolves.toMatchObject({ status: "unpaired" });
-        expect(JSON.parse(core.hostProbe.mock.calls[0]?.[0] ?? "{}")).toMatchObject({ address: "build.example.com", name: "build", port: 22, user: "deploy" });
+        await expect(invoke(DEVICE_CHANNEL.connectAddProjectMachine, siteEvent(), "build")).rejects.toThrow("pair this server first");
+        expect(core.hostProbe).not.toHaveBeenCalled();
     });
 });
 

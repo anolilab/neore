@@ -631,7 +631,6 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
         hostBrowse: async (deviceId, folder, after) => requireTransport().hostBrowse(deviceId, folder, after),
         hostConnect: async (deviceId) => requireTransport().hostConnect(deviceId, false),
         hostMakeDir: async (deviceId, folder) => requireTransport().hostMakeDir(deviceId, folder),
-        hostProbe: async (spec) => requireTransport().hostProbe(spec),
         setRoots: (deviceId, roots) => {
             requireTransport().settingsUpdate(JSON.stringify({ host: { deviceId, roots } }));
         },

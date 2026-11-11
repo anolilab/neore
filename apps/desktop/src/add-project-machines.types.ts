@@ -7,6 +7,16 @@ export type MachineKind = "server" | "this-computer";
 
 export type MachineStatus = "connected" | "disabled" | "not-connected" | "this-computer" | "unpaired";
 
+/** How to reach an ssh host that is not paired yet: what the pairing needs. */
+export interface MachineServerSpec {
+    address: string;
+    /** The key file the config names, absolute; null when the agent and default keys are used. */
+    identityFile: string | null;
+    name: string;
+    port: number;
+    user: string;
+}
+
 /** One row of "Where is the project?". */
 export interface AddProjectMachine {
     /** Why the row cannot be picked; null when it can. */
@@ -17,6 +27,8 @@ export interface AddProjectMachine {
     /** "This computer", "Connected", or "SSH · &lt;alias&gt; · not connected yet". */
     label: string;
     name: string;
+    /** What pairing the ssh host needs; set only for an ssh host that is not paired yet. */
+    spec: MachineServerSpec | null;
     /** The `Host` alias in ~/.ssh/config; null for this computer. */
     sshAlias: string | null;
     status: MachineStatus;
