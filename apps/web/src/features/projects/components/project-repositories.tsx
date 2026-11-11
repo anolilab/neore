@@ -15,13 +15,10 @@ import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 import { getLocalizedError } from "@/features/auth/lib/utilities";
 import { useCRPC } from "@/lib/lunora/crpc";
 
-import { repoLabels } from "../lib/repositories";
+import { repoLabels, REPOSITORIES_REFRESH_MS } from "../lib/repositories";
 
 /** Repositories one project lists, at most; mirrors the backend's limit. */
 const MAX_REPOSITORIES = 20;
-
-/** How often open settings read the list again, for changes another member made. */
-const REPOSITORIES_REFRESH_MS = 15_000;
 
 /** What a refused entry carries (`addProjectRepo`): the field to correct, and why. */
 const refusalOf = (error: unknown): { field?: unknown; reason?: unknown } => (error as { data?: { field?: unknown; reason?: unknown } } | null)?.data ?? {};

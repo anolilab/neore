@@ -11,7 +11,7 @@ import { useEffect, useId, useRef, useState } from "react";
 
 import { useCRPC } from "@/lib/lunora/crpc";
 
-import { repoLabels, storedRepoUrl } from "../lib/repositories";
+import { repoLabels, REPOSITORIES_REFRESH_MS, storedRepoUrl } from "../lib/repositories";
 
 /** The Select value for "no project": type any repository instead. */
 const NO_PROJECT = "__none__";
@@ -90,6 +90,8 @@ const ProjectRepoPicker: FC<ProjectRepoPickerProps> = ({ branch, onPick, paging,
         isPending: reposLoading,
     } = useQuery({
         ...crpc.projects.functions.listProjectRepos.queryOptions(projectId === NO_PROJECT ? skipToken : { projectId: projectId as Id<"projects"> }),
+        // While the picker stays open, too: a repository added elsewhere reaches it only on a read.
+        refetchInterval: REPOSITORIES_REFRESH_MS,
         staleTime: 0,
     });
     const canLoadMore = paging !== undefined && (paging.hasMore || paging.isLoadingMore);
