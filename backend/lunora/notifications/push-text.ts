@@ -81,9 +81,27 @@ export const PHONE_PLACEHOLDER_TITLE = "Neore";
 
 const LANGUAGE_SEPARATOR = /[-_]/u;
 
-export const phonePlaceholderBody = (language: string | undefined): string => {
+/** The title an approval alert shows for a call whose tool name cannot be read back, worded like the rest of the phone's alerts. */
+const APPROVAL_TOOL_FALLBACKS: Readonly<Record<string, string>> = {
+    de: "Ein Werkzeug",
+    en: "A tool",
+    es: "Una herramienta",
+    fr: "Un outil",
+    it: "Uno strumento",
+    ja: "ツール",
+    pl: "Narzędzie",
+    pt: "Uma ferramenta",
+    zh: "一个工具",
+};
+
+/** The table entry for the phone's language, English when it is not known or has no entry. */
+const localized = (table: Readonly<Record<string, string>>, language: string | undefined): string => {
     const base = language?.toLowerCase().split(LANGUAGE_SEPARATOR, 1)[0] ?? "en";
 
     // Own keys only: a language such as `constructor` must not read an inherited property.
-    return Object.hasOwn(PHONE_PLACEHOLDER_BODIES, base) ? (PHONE_PLACEHOLDER_BODIES[base] as string) : (PHONE_PLACEHOLDER_BODIES.en as string);
+    return Object.hasOwn(table, base) ? (table[base] as string) : (table.en as string);
 };
+
+export const phonePlaceholderBody = (language: string | undefined): string => localized(PHONE_PLACEHOLDER_BODIES, language);
+
+export const approvalToolFallback = (language: string | undefined): string => localized(APPROVAL_TOOL_FALLBACKS, language);

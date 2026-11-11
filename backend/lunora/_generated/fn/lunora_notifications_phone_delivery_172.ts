@@ -60,6 +60,13 @@ if (typeof source !== "object" || source === null || Array.isArray(source)) retu
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["notificationId"] !== "string") return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
-return { "notificationId": source["notificationId"], "userId": source["userId"] };
+let __has1 = false;
+let __val1;
+if (source["waits"] !== undefined) {
+if (typeof source["waits"] !== "number" || !Number.isFinite(source["waits"])) return DEFER;
+__val1 = source["waits"];
+__has1 = true;
+}
+return { "notificationId": source["notificationId"], "userId": source["userId"], ...(__has1 ? { "waits": __val1 } : {}) };
 });
 export * from "../../notifications/phone-delivery.js";

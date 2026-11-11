@@ -915,6 +915,7 @@ export const nodeExecutions = sqliteTable("nodeExecutions", {
 export const notifications = sqliteTable("notifications", {
     _id: text("_id").primaryKey(),
     _creationTime: integer("_creationTime").notNull(),
+    approvalId: text("approvalId"),
     body: text("body"),
     dedupeKey: text("dedupeKey"),
     emailOutcome: integer("emailOutcome", { mode: "boolean" }),

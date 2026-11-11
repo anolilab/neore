@@ -115,6 +115,8 @@ const remindPauses = async (ctx: MutationCtx, unsent: DueRow[], now: number): Pr
         // Every request of the pause is classified before anything is sent, so a question first in the pause cannot hide an approval
         // after it. The latest turn decides which of them are still waiting.
         const kinds = new Set<"approval" | "question" | "secret">();
+        // The first ordinary approval the latest turn still holds: the one the push's Approve and Deny act on, and none otherwise.
+        let actionableId: string | undefined;
 
         if (thread && live) {
             for (const row of rows) {
@@ -126,6 +128,7 @@ const remindPauses = async (ctx: MutationCtx, unsent: DueRow[], now: number): Pr
 
                 if (isOrdinaryApproval(request.toolName)) {
                     kinds.add("approval");
+                    actionableId ??= row.approvalId;
                 } else if (request.toolName === REQUEST_SECRET_TOOL_NAME) {
                     kinds.add("secret");
                 } else {
@@ -140,6 +143,8 @@ const remindPauses = async (ctx: MutationCtx, unsent: DueRow[], now: number): Pr
             const notified = await notifyQuietly(ctx, {
                 dedupeKey: `tool_approval_reminder:${first.threadId}:${first.pauseId ?? first.createdAt}`,
                 link: `/chat/${first.threadId}`,
+                // The phone's approve and deny act on this approval, as on the first push (`notifications/phone-delivery.ts`).
+                ...(actionableId !== undefined && { approvalId: actionableId }),
                 title: thread.title ?? "Chat",
                 type,
                 userId: first.userId,
