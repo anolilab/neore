@@ -1035,6 +1035,16 @@ export interface InternalApiTypes {
             redeemPageInvite: FunctionReference<"mutation", { token: string; userId: string }, { pageId: Id<"pages"> }>;
         };
     };
+    plugins: {
+        install_steps: {
+            createInstallRow: FunctionReference<"mutation", { contentHash: string; pluginSlug: string; userId: string; version: string }, { generation: number; installId: string }>;
+            deleteInstall: FunctionReference<"mutation", { generation: number; installId: string }, null>;
+            finishInstall: FunctionReference<"mutation", { generation: number; installId: string }, null>;
+            markNeedsRepair: FunctionReference<"mutation", { generation: number; installId: string }, null>;
+            recordCreated: FunctionReference<"mutation", { generation: number; installId: string; intentId: string; itemId: string }, null>;
+            recordIntent: FunctionReference<"mutation", { entryKey: string; generation: number; installId: string; kind: "skill" | "trigger" | "group"; userId: string }, string>;
+        };
+    };
     projects: {
         functions: {
             getProjectContextForRun: FunctionReference<"query", { projectId: Id<"projects">; userId: string }, string | null>;
@@ -2358,6 +2368,16 @@ export const internal: InternalApiTypes = {
             getPublicPageOwner: { __lunoraRef: "pages_sharing:getPublicPageOwner" },
             readPublicPage: { __lunoraRef: "pages_sharing:readPublicPage" },
             redeemPageInvite: { __lunoraRef: "pages_sharing:redeemPageInvite" },
+        },
+    },
+    plugins: {
+        install_steps: {
+            createInstallRow: { __lunoraRef: "plugins_install_steps:createInstallRow" },
+            deleteInstall: { __lunoraRef: "plugins_install_steps:deleteInstall" },
+            finishInstall: { __lunoraRef: "plugins_install_steps:finishInstall" },
+            markNeedsRepair: { __lunoraRef: "plugins_install_steps:markNeedsRepair" },
+            recordCreated: { __lunoraRef: "plugins_install_steps:recordCreated" },
+            recordIntent: { __lunoraRef: "plugins_install_steps:recordIntent" },
         },
     },
     projects: {
