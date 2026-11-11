@@ -1086,11 +1086,11 @@ describe("releaseDeviceCall", () => {
 });
 
 describe("revokeDevice", () => {
-    // The harness does not dispatch scheduled jobs, so a test runs the clearing body with the job's own args.
     const remainingOn = async (deviceId: string) =>
         (await harness.run(
             async (ctx: any) => (await ctx.db.projects.findMany({ limit: 1000, where: { machineId: deviceId, userId: ownerId } })).page.length,
         )) as number;
+    // The harness does not dispatch scheduled jobs, so a test runs the clearing body with the job's own args.
     const clearScheduled = async (args: unknown) => await harness.run(async (ctx: any) => await ctx.runMutation(internals.clearDeviceProjects, args as never));
 
     it("clears the machine and folder of the owner's projects on the device, in a scheduled run, and leaves other users' projects alone", async () => {
