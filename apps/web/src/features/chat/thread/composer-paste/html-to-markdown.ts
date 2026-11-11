@@ -104,6 +104,33 @@ const oneLine = (text: string): string =>
 
 const styleOf = (element: Element): string => element.getAttribute("style") ?? "";
 
+/** Whether the page leaves `element` out of what it shows (or it is not text at all). */
+const isHidden = (element: Element): boolean =>
+    SKIPPED.has(element.tagName.toUpperCase()) ||
+    HIDDEN_STYLE.test(styleOf(element)) ||
+    HIDDEN_CLASS.test(element.getAttribute("class") ?? "") ||
+    element.hasAttribute("hidden") ||
+    element.getAttribute("aria-hidden") === "true";
+
+/** The text of code as shown, whitespace kept: no hidden parts, and a line per `<br>` and per line block. */
+const codeText = (node: Node): string => {
+    let text = "";
+
+    for (const child of node.childNodes) {
+        if (child.nodeType === Node.TEXT_NODE) {
+            text += (child.nodeValue ?? "").replaceAll("\0", "");
+        } else if (child.nodeType === Node.ELEMENT_NODE && !isHidden(child as Element)) {
+            const { tagName } = child as Element;
+            const inner = tagName === "BR" ? "\n" : codeText(child);
+            const onNewLine = (BLOCKS.has(tagName) || LINE_BLOCKS.has(tagName)) && text !== "" && !text.endsWith("\n");
+
+            text += onNewLine ? `\n${inner}` : inner;
+        }
+    }
+
+    return text;
+};
+
 /** `**`, `*` or `~~` around inline content, with its outer spaces kept outside; nothing around content that spans lines. */
 const wrap = (inner: string, marker: string): string => {
     const core = inner.trim();
@@ -195,10 +222,48 @@ const cellText = (cell: Element, context: Context): string =>
 
 const table = (element: Element, context: Context): string => {
     const rows = [...element.querySelectorAll("tr")].filter((row: Element) => row.closest("table") === element);
-    const cells = rows.map((row: Element) =>
-        [...row.children].filter((cell: Element) => cell.tagName === "TD" || cell.tagName === "TH").map((cell: Element) => cellText(cell, context)),
-    );
-    const width = Math.max(0, ...cells.map((row: string[]) => row.length));
+    // Rows each column is still covered for by a cell above that spans down: a spanning cell keeps the cells after it under their own headers.
+    const covered: number[] = [];
+    const cells = rows.map((row: Element) => {
+        const line: string[] = [];
+        let column = 0;
+        const skipCovered = (): void => {
+            while ((covered[column] ?? 0) > 0) {
+                covered[column] = (covered[column] ?? 1) - 1;
+                line[column] = "";
+                column += 1;
+            }
+        };
+
+        for (const cell of row.children) {
+            if (!(cell instanceof HTMLTableCellElement)) {
+                continue;
+            }
+
+            skipCovered();
+            line[column] = cellText(cell, context);
+
+            // The DOM clamps both spans; `rowspan="0"` runs to the end.
+            for (let offset = 0; offset < cell.colSpan; offset += 1) {
+                line[column + offset] ??= "";
+                covered[column + offset] = (cell.rowSpan || rows.length) - 1;
+            }
+
+            column += cell.colSpan;
+        }
+
+        while (column < covered.length) {
+            skipCovered();
+            column += 1;
+        }
+
+        return line;
+    });
+    let width = 0;
+
+    for (const row of cells) {
+        width = Math.max(width, row.length);
+    }
 
     if (width === 0) {
         return "";
@@ -212,7 +277,8 @@ const table = (element: Element, context: Context): string => {
 
 const list = (element: Element, context: Context): string => {
     const ordered = element.tagName === "OL";
-    let number = Number.parseInt(element.getAttribute("start") ?? "1", 10) || 1;
+    // A number per depth: Google Docs keeps nested items in a flat list and marks their depth with aria-level.
+    const numbers: number[] = [];
     const items: string[] = [];
 
     for (const item of element.children) {
@@ -220,21 +286,27 @@ const list = (element: Element, context: Context): string => {
             continue;
         }
 
-        const marker = ordered ? `${number}. ` : "- ";
-        // Google Docs keeps nested items in a flat list and marks their depth with aria-level.
         const ariaLevel = Number.parseInt(item.getAttribute("aria-level") ?? "1", 10) || 1;
         const level = Math.min(Math.max(ariaLevel, 1), 6);
-        const body = children(item, context).replaceAll(BLANK_LINES, "\n\n").trim();
+        const number = numbers[level - 1] ?? (level === 1 ? Number.parseInt(element.getAttribute("start") ?? "1", 10) || 1 : 1);
 
-        number += 1;
-        items.push(" ".repeat(4).repeat(level - 1) + prefixLines(body, marker, " ".repeat(marker.length), "", context));
+        numbers.length = level;
+        numbers[level - 1] = number + 1;
+        items.push(listItem(children(item, context).replaceAll(BLANK_LINES, "\n\n").trim(), level, ordered ? `${number}. ` : "- ", context));
     }
 
     return `\n\n${items.join("\n")}\n\n`;
 };
 
+/** A list item at depth `level` (from 1): every line of it indented to that depth, code blocks included. */
+const listItem = (body: string, level: number, marker: string, context: Context): string => {
+    const indent = " ".repeat(4 * (level - 1));
+
+    return prefixLines(body, indent + marker, indent + " ".repeat(marker.length), "", context);
+};
+
 /** Word writes a list as paragraphs with `mso-list` styles and the bullet as hidden text. */
-const wordListItem = (element: Element, inner: string): string | undefined => {
+const wordListItem = (element: Element, inner: string, context: Context): string | undefined => {
     const level = WORD_LIST_LEVEL.exec(styleOf(element));
 
     if (!level) {
@@ -245,20 +317,14 @@ const wordListItem = (element: Element, inner: string): string | undefined => {
     const number = bullet.endsWith(")") ? `${bullet.slice(0, -1)}.` : bullet;
     const marker = WORD_ORDERED_MARKER.test(bullet) ? `${number} ` : "- ";
 
-    return `\n${" ".repeat(4).repeat(Number(level[1]) - 1)}${marker}${inner.trim()}\n`;
+    return `\n${listItem(inner.trim(), Number(level[1]), marker, context)}\n`;
 };
 
 const element = (node: Element, context: Context): string => {
     const tag = node.tagName.toUpperCase();
     const style = styleOf(node);
 
-    if (
-        SKIPPED.has(tag) ||
-        HIDDEN_STYLE.test(style) ||
-        HIDDEN_CLASS.test(node.getAttribute("class") ?? "") ||
-        node.hasAttribute("hidden") ||
-        node.getAttribute("aria-hidden") === "true"
-    ) {
+    if (isHidden(node)) {
         return "";
     }
 
@@ -294,7 +360,7 @@ const element = (node: Element, context: Context): string => {
         case "KBD":
         case "SAMP":
         case "TT": {
-            return inlineCode(node.textContent ?? "");
+            return inlineCode(codeText(node));
         }
         case "DEL":
         case "S":
@@ -335,11 +401,13 @@ const element = (node: Element, context: Context): string => {
             return list(node, context);
         }
         case "PRE": {
+            const code = codeText(node);
+
             if (context.inTable) {
-                return inlineCode(node.textContent ?? "");
+                return inlineCode(code);
             }
 
-            context.code.push(fenceCode(node.textContent ?? "", languageOf(node)));
+            context.code.push(fenceCode(code, languageOf(node)));
 
             return `\n\n\0${context.code.length - 1}\0\n\n`;
         }
@@ -367,7 +435,7 @@ const element = (node: Element, context: Context): string => {
     }
 
     if (tag === "P") {
-        const item = wordListItem(node, inner);
+        const item = wordListItem(node, inner, context);
 
         if (item !== undefined) {
             return item;
@@ -413,8 +481,13 @@ function children(node: Node, context: Context): string {
         }
 
         if (parts.at(-1)?.endsWith("\n")) {
-            // Two line blocks in a row (a div per line) share one line break; a paragraph keeps its blank line.
-            next = trimSpacesStart(next.startsWith("\n") && !next.startsWith("\n\n") ? next.slice(1) : next);
+            // Two line blocks in a row (a div per line) share one line break; a paragraph keeps its blank line, and a nested
+            // list item its indent.
+            if (!next.startsWith("\n")) {
+                next = trimSpacesStart(next);
+            } else if (!next.startsWith("\n\n")) {
+                next = next.slice(1);
+            }
         }
 
         parts.push(next);

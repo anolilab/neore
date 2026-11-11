@@ -117,6 +117,8 @@ export const insertPastedText = (draft: string, text: string, start: number, end
 interface AttachLongPasteOptions {
     attach: (text: string) => Promise<TextFileResult>;
     discard: (attachmentId: string) => void;
+    /** The draft when the paste was made, if that was before this call (a conversion ran in between); `selection` points into it. */
+    draftAtPaste?: string;
     /** Ids of the attachments in the composer right now. */
     getAttachmentIds: () => string[];
     /** The chat the composer belongs to right now; a paste is never written into a different one than it started in. */
@@ -143,6 +145,7 @@ interface AttachLongPasteOptions {
 export const attachLongPaste = async ({
     attach,
     discard,
+    draftAtPaste: givenDraft,
     getAttachmentIds,
     getChatKey,
     getDraft,
@@ -154,7 +157,7 @@ export const attachLongPaste = async ({
     setDraft,
 }: AttachLongPasteOptions): Promise<boolean> => {
     const chatKey = getChatKey();
-    const draftAtPaste = getDraft();
+    const draftAtPaste = givenDraft ?? getDraft();
     const { attachmentId, error } = await attach(pastedText);
 
     if (error === undefined) {

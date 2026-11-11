@@ -84,6 +84,13 @@ describe("attachLongPaste", () => {
         expect(options.onFailure).toHaveBeenCalledWith("Too big");
     });
 
+    it("appends the text when the draft changed before the upload started, while the paste was being converted", async () => {
+        const { options, state } = setup({ attachmentId: "a1", error: "Too big" }, "beforeTYPED after");
+
+        expect(await attachLongPaste({ ...options, draftAtPaste: "before after" })).toBe(false);
+        expect(state.text).toBe("beforeTYPED afterPASTED");
+    });
+
     it("leaves another chat's draft alone and says the text was not inserted when the chat changed during the upload", async () => {
         const { options, state } = setup({ attachmentId: "a1", error: "Too big" });
 

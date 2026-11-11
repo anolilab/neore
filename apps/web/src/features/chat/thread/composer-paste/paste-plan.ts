@@ -8,7 +8,7 @@ export type PastePlan = { html: string; kind: "html"; plain: string } | { kind: 
 
 const URL_ONLY = /^https?:\/\/\S+$/i;
 const LINK = /<a\s[^>]*href/i;
-const LANGUAGE = /class="[^"]*(?:language|lang|highlight)-/i;
+const LANGUAGE = /class=["']?[^"'>]*(?:language|lang|highlight)-/i;
 // Formatting the Markdown can carry. A `<pre>` alone is not in it: terminals and code editors wrap their text in one.
 const FORMATTING = [
     /<(?:h[1-6]|ul|ol|table|blockquote)[\s>]/i,
@@ -26,7 +26,16 @@ const BACKTICK_RUNS = /`+/g;
 const LANGUAGE_UNSAFE = /[^\w#+.-]/g;
 const VSCODE_LANGUAGES: Record<string, string> = { javascriptreact: "jsx", plaintext: "", shellscript: "bash", typescriptreact: "tsx" };
 
-export const longestBacktickRun = (text: string): number => Math.max(0, ...(text.match(BACKTICK_RUNS) ?? []).map((run: string) => run.length));
+/** A loop, not `Math.max(...runs)`: a big paste has more runs than a call takes arguments. */
+export const longestBacktickRun = (text: string): number => {
+    let longest = 0;
+
+    for (const [run] of text.matchAll(BACKTICK_RUNS)) {
+        longest = Math.max(longest, run.length);
+    }
+
+    return longest;
+};
 
 /** `code` as a fenced block; the fence is longer than any backtick run inside. */
 export const fenceCode = (code: string, language = ""): string => {
@@ -71,6 +80,9 @@ const vscodeLanguage = (data: string): string | undefined => {
     }
 };
 
+/** Past 500 characters or 10 lines a paste becomes a text attachment instead of composer text. */
+export const isLongPaste = (text: string): boolean => text.length > 500 || text.split("\n").length > 10;
+
 const markdownLink = (label: string, url: string): string =>
     `[${label.replaceAll(/[[\]\\]/g, String.raw`\$&`)}](${url.replaceAll("(", "%28").replaceAll(")", "%29")})`;
 
@@ -85,18 +97,21 @@ export const planPaste = (data: Pick<DataTransfer, "getData">, { plainOnly, sele
     const plain = data.getData("text/plain");
 
     if (plainOnly) {
-        return plain === "" ? { kind: "default" } : { kind: "text", text: plain };
+        // Without text/plain the editor would paste the HTML with its formatting; a plain paste then inserts nothing.
+        return plain === "" && data.getData("text/html").trim() === "" ? { kind: "default" } : { kind: "text", text: plain };
     }
 
     const url = plain.trim();
 
-    if (selectedText.trim() !== "" && !selectedText.includes("\n") && URL_ONLY.test(url)) {
+    // A URL pasted over a URL replaces it.
+    if (selectedText.trim() !== "" && !selectedText.includes("\n") && URL_ONLY.test(url) && !URL_ONLY.test(selectedText.trim())) {
         return { kind: "text", text: markdownLink(selectedText, url) };
     }
 
     const vscode = data.getData("vscode-editor-data");
 
-    if (vscode !== "" && plain.trim().includes("\n")) {
+    // A long copy becomes an attachment, which holds the code as copied, without fence lines.
+    if (vscode !== "" && plain.trim().includes("\n") && !isLongPaste(plain)) {
         const language = vscodeLanguage(vscode);
 
         if (language !== undefined) {
@@ -112,9 +127,6 @@ export const planPaste = (data: Pick<DataTransfer, "getData">, { plainOnly, sele
 
     return plain !== "" && isPlainHtml(html) ? { kind: "text", text: plain } : { html, kind: "html", plain };
 };
-
-/** Past 500 characters or 10 lines a paste becomes a text attachment instead of composer text. */
-export const isLongPaste = (text: string): boolean => text.length > 500 || text.split("\n").length > 10;
 
 /** The text a paste inserts: the Markdown for HTML, or `plain` when the converter cannot load (a deploy since the page opened) or finds no text. */
 export const planText = async (plan: Exclude<PastePlan, { kind: "default" }>): Promise<string> => {

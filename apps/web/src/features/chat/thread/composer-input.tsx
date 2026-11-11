@@ -929,6 +929,7 @@ const ComposerInput = ({
             // Read before the conversion and the upload: the caret moves while they run.
             const selection = pasteSelection();
             const stateAtPaste = editor?.state;
+            const draftAtPaste = useChatUIStore.getState().composerText;
             const chatKey = getChatKey();
             // Converted text is measured as it lands: a short web page can be a long table.
             const { removed: pasteRemoved, text: pastedText } = stripHiddenText(plan.kind === "default" ? plainText : await planText(plan));
@@ -942,8 +943,10 @@ const ComposerInput = ({
             }
 
             if (!isLongPaste(pastedText)) {
+                const draft = useChatUIStore.getState().composerText;
+
                 if (!inputAreaRef.current?.getEditor()?.pasteText(pastedText, stateAtPaste)) {
-                    setText(insertPastedText(useChatUIStore.getState().composerText, pastedText, selection.start, selection.end));
+                    setText(draft === draftAtPaste ? insertPastedText(draft, pastedText, selection.start, selection.end) : draft + pastedText);
                 }
 
                 return;
@@ -952,6 +955,7 @@ const ComposerInput = ({
             await attachLongPaste({
                 attach: attachTextAsFile,
                 discard: removeAttachment,
+                draftAtPaste,
                 getAttachmentIds: () => useChatUIStore.getState().composerAttachments.map((attachment) => attachment.id),
                 getChatKey,
                 getDraft: () => useChatUIStore.getState().composerText,

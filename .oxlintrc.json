@@ -72,6 +72,7 @@
         "/apps/web/public/**",
         "/apps/web/scripts/**",
         "/apps/web/src/assets/**",
+        "/apps/web/src/features/chat/thread/composer-paste/__fixtures__/**",
         "/apps/web/src/features/marketing/assets/**",
         "/apps/web/src/features/marketing/data/**",
         "/apps/web/src/locales/**",
