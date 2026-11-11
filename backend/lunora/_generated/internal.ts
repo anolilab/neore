@@ -1042,7 +1042,10 @@ export interface InternalApiTypes {
             finishInstall: FunctionReference<"mutation", { generation: number; installId: string }, null>;
             markNeedsRepair: FunctionReference<"mutation", { generation: number; installId: string }, null>;
             recordCreated: FunctionReference<"mutation", { generation: number; installId: string; intentId: string; itemId: string }, null>;
-            recordIntent: FunctionReference<"mutation", { entryKey: string; generation: number; installId: string; kind: "skill" | "trigger" | "group"; userId: string }, string>;
+            recordIntent: FunctionReference<"mutation", { contentHash: string; entryKey: string; generation: number; installId: string; kind: "skill" | "trigger" | "group"; userId: string }, string>;
+        };
+        update: {
+            loadInstalledForUpdate: FunctionReference<"query", { pluginSlug: string; userId: string }, null | { children: Array<{ contentHash: string; currentHash: string; entryKey: string; kind: "skill" | "trigger" | "group" }>; installId: string; status: string; version: string }>;
         };
     };
     projects: {
@@ -2378,6 +2381,9 @@ export const internal: InternalApiTypes = {
             markNeedsRepair: { __lunoraRef: "plugins_install_steps:markNeedsRepair" },
             recordCreated: { __lunoraRef: "plugins_install_steps:recordCreated" },
             recordIntent: { __lunoraRef: "plugins_install_steps:recordIntent" },
+        },
+        update: {
+            loadInstalledForUpdate: { __lunoraRef: "plugins_update:loadInstalledForUpdate" },
         },
     },
     projects: {

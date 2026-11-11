@@ -635,6 +635,9 @@ export interface ApiTypes {
         repair: {
             repairPlugin: FunctionReference<"mutation", { pluginSlug: string }, { linked: number; missing: Array<string>; status: "installed" | "needs-repair" }>;
         };
+        update: {
+            previewUpdate: FunctionReference<"action", { markdown: string }, { downgrade: boolean; installedVersion: string; plan: Array<{ action: "create" | "delete" | "detach" | "keep-edited" | "report-group" | "same" | "update"; entryKey: string }>; targetVersion: string }>;
+        };
     };
     projects: {
         functions: {
@@ -1559,6 +1562,9 @@ export const api: ApiTypes = {
         },
         repair: {
             repairPlugin: { __lunoraRef: "plugins_repair:repairPlugin" },
+        },
+        update: {
+            previewUpdate: { __lunoraRef: "plugins_update:previewUpdate" },
         },
     },
     projects: {

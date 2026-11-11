@@ -58,6 +58,7 @@ export const createInstallRow = internalMutation
 
 export const recordIntent = internalMutation
     .input({
+        contentHash: v.string().max(128),
         entryKey: v.string().max(256),
         generation: v.number(),
         installId: v.string().max(128),
@@ -66,10 +67,10 @@ export const recordIntent = internalMutation
     })
     .output(v.string())
     .mutation(async ({ args, ctx }) => {
-        const install = await heldInstall(ctx, args.installId as Id<"pluginInstalls">, args.generation);
+        await heldInstall(ctx, args.installId as Id<"pluginInstalls">, args.generation);
 
         const itemId = await ctx.db.insert("pluginItems", {
-            contentHash: install.contentHash,
+            contentHash: args.contentHash,
             createdAt: ctx.now,
             entryKey: args.entryKey,
             installId: args.installId,

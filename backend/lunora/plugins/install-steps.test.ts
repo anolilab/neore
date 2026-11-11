@@ -36,7 +36,8 @@ describe("install steps", () => {
         const { generation, installId } = await run(async (context) => await context.runMutation(createInstallRow, start));
 
         const intentId = await run(
-            async (context) => await context.runMutation(recordIntent, { entryKey: "skill:1", generation, installId, kind: "skill", userId: OWNER }),
+            async (context) =>
+                await context.runMutation(recordIntent, { contentHash: HASH, entryKey: "skill:1", generation, installId, kind: "skill", userId: OWNER }),
         );
 
         await run(async (context) => await context.runMutation(recordCreated, { generation, installId, intentId, itemId: "skill-row-1" }));
@@ -53,7 +54,10 @@ describe("install steps", () => {
         const { installId } = await run(async (context) => await context.runMutation(createInstallRow, start));
 
         await expect(
-            run(async (context) => await context.runMutation(recordIntent, { entryKey: "skill:1", generation: 2, installId, kind: "skill", userId: OWNER })),
+            run(
+                async (context) =>
+                    await context.runMutation(recordIntent, { contentHash: HASH, entryKey: "skill:1", generation: 2, installId, kind: "skill", userId: OWNER }),
+            ),
         ).rejects.toThrow("STALE_LEASE");
 
         const links = await run(async (context) => (await context.db.pluginItems.findMany({ where: { installId } })).page);
@@ -74,7 +78,10 @@ describe("install steps", () => {
     it("rolls back: the links and the install are removed", async () => {
         const { generation, installId } = await run(async (context) => await context.runMutation(createInstallRow, start));
 
-        await run(async (context) => await context.runMutation(recordIntent, { entryKey: "skill:1", generation, installId, kind: "skill", userId: OWNER }));
+        await run(
+            async (context) =>
+                await context.runMutation(recordIntent, { contentHash: HASH, entryKey: "skill:1", generation, installId, kind: "skill", userId: OWNER }),
+        );
         await run(async (context) => await context.runMutation(deleteInstall, { generation, installId }));
 
         const install = await run(async (context) => await context.db.pluginInstalls.findFirst({ where: { _id: installId } }));
