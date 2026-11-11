@@ -39,9 +39,18 @@ const answeredTaps = new Set<string>();
  */
 const replayedLaunches = new Set<string>();
 
-/** The code an error carries, when it has one, for the log: never its message, which can quote an approval id or a token. */
+/** The answers in flight, by tap, across every listener: a tap replaced by a new subscription while it is answered is not sent twice. */
+const pendingAnswers = new Map<string, Promise<TapOutcome>>();
+
+/** The shape of a machine code such as `CONFLICT` or `RATE_LIMITED`: upper case, digits and underscores, bounded. */
+const MACHINE_CODE = /^[A-Z][A-Z0-9_]{0,39}$/u;
+
+/**
+ * The code an error carries, for the log, when it has the shape of a machine code. Anything else, including a message or a token that
+ * a code might carry, is logged as "unknown".
+ */
 const failureCode = (error: unknown): string => {
-    if (typeof error === "object" && error !== null && "code" in error && typeof error.code === "string") {
+    if (typeof error === "object" && error !== null && "code" in error && typeof error.code === "string" && MACHINE_CODE.test(error.code)) {
         return error.code;
     }
 
@@ -63,8 +72,6 @@ export const attachApprovalTapListener = (
     replayed: Set<string> = replayedLaunches,
 ): ApprovalTapListener => {
     let isActive = true;
-    // The answer in flight for each tap: a second delivery of the same tap waits for its outcome rather than reporting its own.
-    const inFlight = new Map<string, Promise<TapOutcome>>();
 
     // "answered" and "failed" settle the tap for good (a failed one is kept for the user to retry in the app); "not-answered" is a
     // tap this listener did not answer, and is left for another listener to read.
@@ -96,7 +103,7 @@ export const attachApprovalTapListener = (
             return "not-answered";
         }
 
-        const pending = inFlight.get(key);
+        const pending = pendingAnswers.get(key);
 
         if (pending !== undefined) {
             return await pending;
@@ -104,12 +111,12 @@ export const attachApprovalTapListener = (
 
         const attempt = answerOnce(response, key);
 
-        inFlight.set(key, attempt);
+        pendingAnswers.set(key, attempt);
 
         try {
             return await attempt;
         } finally {
-            inFlight.delete(key);
+            pendingAnswers.delete(key);
         }
     };
 
@@ -117,17 +124,20 @@ export const attachApprovalTapListener = (
         try {
             const launch = await source.getLast();
 
-            if (launch && !replayed.has(launch.notification.request.identifier)) {
-                const launchId = launch.notification.request.identifier;
+            if (launch) {
+                // Keyed by the tap, not the alert: a default tap on an alert must not hide a later approve or deny on the same alert.
+                const launchKey = tapKey(launch);
 
-                // Marked while its answer is in flight, so no other listener reads it too; unmarked again when it was skipped, so the
-                // next listener (after a sign-in, say) can answer it.
-                replayed.add(launchId);
+                if (!replayed.has(launchKey)) {
+                    // Marked while its answer is in flight, so no other listener reads it too; unmarked again when it was skipped, so
+                    // the next listener (after a sign-in, say) can answer it.
+                    replayed.add(launchKey);
 
-                const outcome = await answerTap(launch);
+                    const outcome = await answerTap(launch);
 
-                if (outcome === "not-answered") {
-                    replayed.delete(launchId);
+                    if (outcome === "not-answered") {
+                        replayed.delete(launchKey);
+                    }
                 }
             }
         } catch {

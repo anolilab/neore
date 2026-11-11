@@ -34,6 +34,39 @@ const attach = (source: TapSource, answer: (value: unknown) => Promise<void>) =>
     attachApprovalTapListener(source, answer as never, new Set<string>(), new Set<string>());
 
 describe("attachApprovalTapListener", () => {
+    it("logs a failure's code only when it has the shape of a machine code, never a token that a code could carry", async () => {
+        const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+        const failing = vi.fn(async (_value: ApprovalAnswer): Promise<boolean | undefined> => {
+            throw Object.assign(new Error("boom"), { code: "tok_SECRET-1234" });
+        });
+        const source = fakeSource(tap("n1", "approve"));
+
+        const listener = attachApprovalTapListener(source, failing, new Set<string>(), new Set<string>());
+
+        await listener.launched;
+
+        expect(warn).toHaveBeenCalledWith(expect.stringContaining("(unknown)"));
+        expect(JSON.stringify(warn.mock.calls)).not.toContain("SECRET");
+        warn.mockRestore();
+    });
+
+    it("answers an approve on an alert whose earlier default tap was read by another listener", async () => {
+        const answered = new Set<string>();
+        const replayed = new Set<string>();
+        const answer = vi.fn(async (_value: ApprovalAnswer) => true as const);
+
+        const first = attachApprovalTapListener(fakeSource(tap("n1", "default")), answer, answered, replayed);
+
+        await first.launched;
+
+        const later = attachApprovalTapListener(fakeSource(tap("n1", "approve")), answer, answered, replayed);
+
+        await later.launched;
+
+        expect(answer).toHaveBeenCalledTimes(1);
+        expect(answer).toHaveBeenCalledWith({ approvalId: "approval-1", decision: "approve", threadId: "thread-1" });
+    });
+
     it("does not record a tap as answered when the answer was skipped, so it is read again", async () => {
         const skipped = vi.fn(async (_value: ApprovalAnswer) => false as const);
         const answered = new Set<string>();

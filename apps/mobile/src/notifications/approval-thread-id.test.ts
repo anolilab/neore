@@ -11,13 +11,15 @@ const tap = (threadId: unknown): NotificationTap => {
 };
 
 describe("isThreadId", () => {
-    it("accepts a bounded run of URL-safe characters", () => {
+    it("accepts a bounded run of letters, digits, dots, underscores and hyphens, including an imported id", () => {
         expect(isThreadId("thread_01-AB")).toBe(true);
+        expect(isThreadId("import.2024-05.chat")).toBe(true);
+        expect(isThreadId("a".repeat(256))).toBe(true);
     });
 
     it("refuses an empty, over-long, or markup-bearing value", () => {
         expect(isThreadId("")).toBe(false);
-        expect(isThreadId("a".repeat(65))).toBe(false);
+        expect(isThreadId("a".repeat(257))).toBe(false);
         expect(isThreadId("<script>")).toBe(false);
         expect(isThreadId("a/b")).toBe(false);
     });
