@@ -80,9 +80,8 @@ const load = (scope: Record<string, unknown>): Map<string, Listener> => {
 const html = (body: string, headers: Record<string, string> = {}) =>
     new Response(body, { headers: { "Content-Type": "text/html; charset=utf-8", ...headers }, status: 200 });
 
-/** A shell as the worker keeps it: stamped with its entry chunk and when it was kept. */
-const keptShell = (body: string, { entry = ENTRY, keptAt = Date.now() } = {}) =>
-    html(body, { "X-Neore-Shell-Entry": entry, "X-Neore-Shell-Kept-At": String(keptAt) });
+/** A shell as the worker keeps it: stamped with when it was kept. */
+const keptShell = (body: string, { keptAt = Date.now() } = {}) => html(body, { "X-Neore-Shell-Kept-At": String(keptAt) });
 
 const activate = async (listeners: Map<string, Listener>) => {
     const waited: Promise<unknown>[] = [];
@@ -144,15 +143,33 @@ describe("offline-shell-sw.js", () => {
         expect(await kept?.text()).toBe(SHELL_HTML);
         // The nonce in the header is the one the HTML was rendered with: they travel together.
         expect(kept?.headers.get("Content-Security-Policy")).toBe("script-src 'nonce-n1'");
-        expect(kept?.headers.get("X-Neore-Shell-Entry")).toBe(ENTRY);
+        expect(kept?.headers.get("X-Neore-Shell-Kept-At")).toMatch(/^\d+$/u);
     });
 
-    it("deletes the older shells once this revision's shell is kept, and leaves other caches alone", async () => {
-        const caches = fakeCaches({ "bundle-assets": {}, "neore-offline-shell-rev1": { "/offline-shell": keptShell("old") } });
+    // The installing worker can still fail, and a stale worker's late refresh must not delete a newer worker's shell.
+    it("never deletes another cache when it keeps the shell, on install or after a navigation", async () => {
+        const others = {
+            "bundle-assets": {},
+            "neore-offline-shell-rev1": { "/offline-shell": keptShell("old") },
+            "neore-offline-shell-rev3": { "/offline-shell": keptShell("new") },
+        };
+        const installed = fakeCaches(others);
+        const navigated = fakeCaches(others);
+        const fetch = vi.fn(async (input: string | { url: string }) => (typeof input === "string" ? html(SHELL_HTML) : new Response("page", { status: 200 })));
 
-        await install(load({ caches, fetch: vi.fn(async () => html(SHELL_HTML)) }));
+        await install(load({ caches: installed, fetch }));
+        await navigate(load({ caches: navigated, fetch })).settled;
 
-        expect([...caches.stores.keys()].toSorted()).toStrictEqual(["bundle-assets", "neore-offline-shell-rev2"]);
+        for (const caches of [installed, navigated]) {
+            expect(caches.delete).not.toHaveBeenCalled();
+            expect(await caches.stores.get("neore-offline-shell-rev2")?.get("/offline-shell")?.text()).toBe(SHELL_HTML);
+            expect([...caches.stores.keys()].toSorted()).toStrictEqual([
+                "bundle-assets",
+                "neore-offline-shell-rev1",
+                "neore-offline-shell-rev2",
+                "neore-offline-shell-rev3",
+            ]);
+        }
     });
 
     it.each([
@@ -166,13 +183,12 @@ describe("offline-shell-sw.js", () => {
                 throw new TypeError("Failed to fetch");
             },
         ],
-    ])("never fails the install on %s, keeps nothing, and keeps the older shell", async (_label, fetch) => {
-        const caches = fakeCaches({ "neore-offline-shell-rev1": { "/offline-shell": keptShell("old") } });
+    ])("never fails the install on %s and keeps nothing", async (_label, fetch) => {
+        const caches = fakeCaches();
 
         await install(load({ caches, fetch: vi.fn(fetch) }));
 
         expect(caches.stores.get("neore-offline-shell-rev2")?.size ?? 0).toBe(0);
-        expect(caches.stores.has("neore-offline-shell-rev1")).toBe(true);
     });
 
     it("gives up on a shell fetch that never answers after 10 seconds, so the install is not held open", async () => {
@@ -254,16 +270,21 @@ describe("offline-shell-sw.js", () => {
         expect(await caches.stores.get("neore-offline-shell-rev2")?.get("/offline-shell")?.text()).toBe("old shell");
     });
 
-    it("deletes older shells on activate only once this revision has one", async () => {
-        const older = { "neore-offline-shell-rev1": { "/offline-shell": keptShell("old") } };
-        const withCurrent = fakeCaches({ "bundle-assets": {}, ...older, "neore-offline-shell-rev2": { "/offline-shell": keptShell("shell") } });
-        const withoutCurrent = fakeCaches({ "bundle-assets": {}, ...older });
+    it("deletes every other revision's shell on activate, and leaves other caches alone", async () => {
+        const others = {
+            "bundle-assets": {},
+            "neore-offline-shell-rev1": { "/offline-shell": keptShell("old") },
+            "neore-offline-shell-rev3": { "/offline-shell": keptShell("stale write") },
+        };
+        const withCurrent = fakeCaches({ ...others, "neore-offline-shell-rev2": { "/offline-shell": keptShell("shell") } });
+        // An older shell is no fallback: Workbox drops the old build's precached chunks on this activate.
+        const withoutCurrent = fakeCaches(others);
 
         await activate(load({ caches: withCurrent, fetch: vi.fn() }));
         await activate(load({ caches: withoutCurrent, fetch: vi.fn() }));
 
         expect([...withCurrent.stores.keys()].toSorted()).toStrictEqual(["bundle-assets", "neore-offline-shell-rev2"]);
-        expect(withoutCurrent.stores.has("neore-offline-shell-rev1")).toBe(true);
+        expect([...withoutCurrent.stores.keys()]).toStrictEqual(["bundle-assets"]);
     });
 
     it("answers a desktop navigation from the network while it is up, even with a server error", async () => {
@@ -285,18 +306,13 @@ describe("offline-shell-sw.js", () => {
         expect(await (await navigate(listeners).answer)?.text()).toBe("shell");
     });
 
-    it("falls back to the newest older shell whose entry chunk this worker still has, else the offline page", async () => {
-        const OLD_ENTRY = "assets/index-Old00000.js";
-        const older = {
-            "neore-offline-shell-rev0": { "/offline-shell": keptShell("oldest", { entry: OLD_ENTRY }) },
-            "neore-offline-shell-rev1": { "/offline-shell": keptShell("old", { entry: "assets/index-Gone0000.js" }) },
-        };
-        const precache = { "/offline.html?__WB_REVISION__=abc": html("offline") };
-        const served = fakeCaches({ ...older, "workbox-precache-v2": { ...precache, [`/${OLD_ENTRY}`]: new Response("js") } });
-        const gone = fakeCaches({ ...older, "workbox-precache-v2": precache });
+    it("answers the offline page, never another revision's shell, when this revision's shell is missing", async () => {
+        const caches = fakeCaches({
+            "neore-offline-shell-rev1": { "/offline-shell": keptShell("old") },
+            "workbox-precache-v2": { "/offline.html?__WB_REVISION__=abc": html("offline") },
+        });
 
-        expect(await (await navigate(load({ caches: served, fetch: offline() })).answer)?.text()).toBe("oldest");
-        expect(await (await navigate(load({ caches: gone, fetch: offline() })).answer)?.text()).toBe("offline");
+        expect(await (await navigate(load({ caches, fetch: offline() })).answer)?.text()).toBe("offline");
     });
 
     it("falls back to the precached offline page, then to the network error, when no shell is kept", async () => {

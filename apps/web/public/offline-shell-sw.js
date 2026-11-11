@@ -15,14 +15,18 @@
  *   bounded by `SHELL_FETCH_TIMEOUT_MS`: a failure or a stall never fails or
  *   holds up the install, it only leaves the shell missing. The server renders
  *   that path for nobody (the `OFFLINE_SHELL_PATH` branch of
- *   `src/lib/root-before-load.ts`), so no session data is kept. Once this
- *   revision's shell is kept, the older revisions' shells are deleted.
- * - activate: delete the older shells only when this revision has one; until
- *   then the newest of them is the fallback.
+ *   `src/lib/root-before-load.ts`), so no session data is kept. Keeping writes
+ *   only this revision's cache and never deletes another: the installing worker
+ *   may still fail, and a stale worker's late refresh must not touch a newer
+ *   worker's shell.
+ * - activate: delete every other revision's shell. Only the active worker
+ *   prunes; a shell a stale worker writes after that is removed by the next
+ *   activate. An older shell is never an answer: Workbox's precache cleanup
+ *   drops the old build's chunks when this worker activates, so its HTML would
+ *   name scripts that are gone.
  * - fetch: in the Electron shell only, a top-level GET document navigation goes
  *   to the network as before; when the network FAILS (offline, DNS), this
- *   revision's shell answers, else the newest older shell whose entry chunk this
- *   worker still has cached, else the precached `offline.html`. A server answer,
+ *   revision's shell answers, else the precached `offline.html`. A server answer,
  *   even a 5xx, is returned as is. Iframe navigations (artifact and canvas
  *   previews), form POSTs and browsers keep Workbox's own route (`offline.html`).
  *   Registered before Workbox's listener, so `stopImmediatePropagation` keeps
@@ -47,8 +51,6 @@
     const SHELL_FETCH_TIMEOUT_MS = 10_000;
     /** How often an online navigation fetches a kept shell again. */
     const REVALIDATE_MS = 30 * 60 * 1000;
-    /** The entry chunk a kept shell names, so an older shell can be checked against what this worker has. */
-    const ENTRY_HEADER = "X-Neore-Shell-Entry";
     /** When the shell was kept: the throttle outlives the worker, which stops whenever it is idle. */
     const KEPT_AT_HEADER = "X-Neore-Shell-Kept-At";
     const cacheName = PREFIX + config.revision;
@@ -57,8 +59,8 @@
 
     const currentShell = async () => await (await self.caches.open(cacheName)).match(config.url);
 
-    /** Deletes the shells of older revisions. */
-    const dropOlderShells = async () => {
+    /** Deletes the shells of other revisions; run by the active worker only. */
+    const dropOtherShells = async () => {
         const names = await self.caches.keys();
 
         await Promise.all(names.filter((name) => name.startsWith(PREFIX) && name !== cacheName).map((name) => self.caches.delete(name)));
@@ -85,13 +87,11 @@
 
         const headers = new Headers(response.headers);
 
-        headers.set(ENTRY_HEADER, config.entry);
         headers.set(KEPT_AT_HEADER, String(Date.now()));
 
         const cache = await self.caches.open(cacheName);
 
         await cache.put(config.url, new Response(body, { headers, status: 200 }));
-        await dropOlderShells();
     };
 
     let refreshing;
@@ -108,25 +108,8 @@
         return refreshing;
     };
 
-    /** The newest older shell whose entry chunk this worker still has cached (precache or `bundle-assets`). */
-    const olderShell = async () => {
-        const names = (await self.caches.keys()).filter((name) => name.startsWith(PREFIX) && name !== cacheName);
-
-        // Cache Storage lists names in creation order: the newest is last.
-        for (const name of names.toReversed()) {
-            const shell = await (await self.caches.open(name)).match(config.url);
-            const entry = shell?.headers.get(ENTRY_HEADER);
-
-            if (entry && (await self.caches.match(`/${entry}`))) {
-                return shell;
-            }
-        }
-
-        return undefined;
-    };
-
     const offlineAnswer = async (error) => {
-        const shell = (await currentShell()) ?? (await olderShell());
+        const shell = await currentShell();
 
         if (shell) {
             return shell;
@@ -151,7 +134,7 @@
     });
 
     self.addEventListener("activate", (event) => {
-        event.waitUntil(currentShell().then((kept) => (kept ? dropOlderShells() : undefined)));
+        event.waitUntil(dropOtherShells());
     });
 
     self.addEventListener("fetch", (event) => {
