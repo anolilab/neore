@@ -15,9 +15,10 @@ import { draftGeneration, draftOwnership, hasDraftContent, peekComposerDraft, us
  * `{ v: draft, t: savedAt, w: writeId }`. A write touches only the entries of drafts that changed on this page, and a draft
  * sent or emptied here is removed only while its entry still carries this page's last write id: another tab's entry is never
  * removed or rewritten unless edited here. Two tabs editing the same chat are last-write-wins. Reads look only at the current
- * account's entries; sign-out and an account switch remove only the departing account's (`dropStoredDrafts`). What is kept is
- * the text, attachments that finished uploading (by file id, never their bytes) and references with a web URL (never a `blob:`
- * or `data:` one). Every storage access is guarded: a failure only means the draft is not kept.
+ * account's entries; sign-out and an account switch remove only the departing account's (`dropStoredDrafts`), or every
+ * account's when a sign-out cannot tell whose. What is kept is the text, attachments that finished uploading (by file id, never
+ * their bytes) and references with a web URL (never a `blob:` or `data:` one). Every storage access is guarded: a failure only
+ * means the draft is not kept.
  */
 
 export const DRAFT_TTL_MS = 30 * 24 * 60 * 60 * 1000;
@@ -217,10 +218,11 @@ const snapshot = (owner: string): Map<string, StoredDraft> => {
 
 /**
  * After a sign-out or an account switch what this page wrote is gone, and the old account's draft must not come back. Nothing is
- * written until a composer binds again, and what the composer still holds is not stored until it is edited.
+ * written until a composer binds again, and what the composer still holds is not stored until it is edited. Only a clear of the
+ * binding's own account counts: the next account's composer may bind before the switch drops the departing account's drafts.
  */
 const forgetIfCleared = (): void => {
-    if (!state.binding || draftGeneration() === state.binding.generation) {
+    if (!state.binding || draftGeneration(state.binding.userId) === state.binding.generation) {
         return;
     }
 
@@ -439,7 +441,7 @@ export const bindStoredDrafts = (owner: string, userId: string, locked: boolean)
     // Before the first binding, the composer's text is the chat's whose composer showed with it (`use-stored-drafts.ts`); from
     // before a sign-out or an account switch, it is no account's.
     const { first } = draftOwnership;
-    const previous = state.binding ?? (first && first.generation !== draftGeneration() ? { owner: "", userId: "" } : first);
+    const previous = state.binding ?? (first && first.generation !== draftGeneration(first.userId) ? { owner: "", userId: "" } : first);
     const switchedUser = previous !== undefined && previous.userId !== userId;
     const moved = previous !== undefined && previous.owner !== owner && !useSplitViewMountedStore.getState().mounted;
     const ui = useChatUIStore.getState();
@@ -461,7 +463,7 @@ export const bindStoredDrafts = (owner: string, userId: string, locked: boolean)
         state.carriedFrom = switchedUser ? undefined : from;
     }
 
-    state.binding = { generation: draftGeneration(), owner, userId };
+    state.binding = { generation: draftGeneration(userId), owner, userId };
     listen();
 
     if (locked) {

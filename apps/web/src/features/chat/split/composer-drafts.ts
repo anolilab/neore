@@ -21,35 +21,36 @@ const drafts = new Map<string, ComposerDraft>();
 const parkedModels = new Map<string, ParkedModelState>();
 // A worker's unsent message, by worker thread. Its composer unmounts when focus moves, so the text waits here.
 const workerDrafts = new Map<string, string>();
-// Counts the clears (sign-out, account switch). A write-back that started before a clear must not land after it.
-const generation = { count: 0 };
+// The key prefix each clear (sign-out, account switch) removed: one account's, or every account's. A write-back that started
+// before a clear of its account must not land after it.
+const cleared: string[] = [];
 
 /**
  * What the lazy storage module (`stored-drafts.ts`) needs before it loads, and its hand-over once it has. Here because the first
- * page load carries every byte: the account whose drafts this page keeps (read before an account switch, so only its drafts are
- * removed after it), the chat whose composer holds the text (`use-stored-drafts.ts`; typed before the module binds, it is that
- * chat's), the message a route last put in the composer (until edited, no chat's draft) and the module's hand-over when focus
- * moves to another pane (`watchPaneFocus`).
+ * page load carries every byte: the chat whose composer holds the text (`use-stored-drafts.ts`; typed before the module binds, it
+ * is that chat's), the message a route last put in the composer (until edited, no chat's draft) and the module's hand-over when
+ * focus moves to another pane (`watchPaneFocus`).
  */
 export const draftOwnership: {
-    account?: string;
     first?: { generation: number; owner: string; userId: string };
     handOver?: (owner: string | undefined) => void;
     prefill?: string;
 } = {};
 
 /**
- * Removes `userId`'s stored drafts (by default the account whose composer showed last), never another account's. For sign-out
- * and an account switch: the drafts are the account's, not the browser's. It moves the generation on, so a write scheduled
- * before it drops itself.
+ * Removes `userId`'s stored drafts, never another account's; every account's when `userId` is undefined (a sign-out that could
+ * not read who signs out). For sign-out and an account switch: the drafts are the account's, not the browser's. It moves the
+ * account's generation on, so a write scheduled before it drops itself.
  */
-export const dropStoredDrafts = (userId = draftOwnership.account): void => {
-    generation.count += 1;
+export const dropStoredDrafts = (userId?: string): void => {
+    // Each stored draft is one entry, `neore-draft:<userId>:<owner>` (`stored-drafts.ts`).
+    const prefix = userId === undefined ? "neore-draft:" : `neore-draft:${userId}:`;
+
+    cleared.push(prefix);
 
     try {
         for (const key of Object.keys(globalThis.localStorage)) {
-            // Each stored draft is one entry, `neore-draft:<userId>:<owner>` (`stored-drafts.ts`).
-            if (userId && key.startsWith(`neore-draft:${userId}:`)) {
+            if (key.startsWith(prefix)) {
                 globalThis.localStorage.removeItem(key);
             }
         }
@@ -111,8 +112,12 @@ export const clearComposerDrafts = (userId?: string): void => {
     syncParked();
 };
 
-/** The clears so far. A write-back captures it when it starts and drops itself when the value has moved on. */
-export const draftGeneration = (): number => generation.count;
+/**
+ * The clears so far; with `userId`, those that removed its drafts. A write-back captures it when it starts and drops itself when
+ * the value has moved on.
+ */
+export const draftGeneration = (userId?: string): number =>
+    userId === undefined ? cleared.length : cleared.filter((prefix) => `neore-draft:${userId}:`.startsWith(prefix)).length;
 
 /** A worker's unsent message, kept while its composer is not shown. Empty text is forgotten. */
 export const saveWorkerDraft = (workerId: string, text: string): void => {

@@ -6,13 +6,17 @@ import { releaseThreadListWrites, writeThreadListCache } from "@/features/chat/t
 import SignOut from "./sign-out";
 
 const auth = vi.hoisted(() => {
-    return { outcome: "success" as "error" | "success", signOut: vi.fn() };
+    return { outcome: "success" as "error" | "success", session: { data: null as { user: { id: string } } | null }, signOut: vi.fn() };
 });
 
 vi.mock("@/features/auth/lib/auth-ui-provider", () => {
     return {
         useAuth: () => {
-            return { authClient: { signOut: auth.signOut }, basePath: "/auth", viewPaths: { SIGN_IN: "sign-in" } };
+            return {
+                authClient: { $store: { atoms: { session: { get: () => auth.session } } }, signOut: auth.signOut },
+                basePath: "/auth",
+                viewPaths: { SIGN_IN: "sign-in" },
+            };
         },
     };
 });
@@ -35,6 +39,7 @@ const list = {
 describe("SignOut", () => {
     beforeEach(() => {
         localStorage.clear();
+        auth.session.data = null;
         releaseThreadListWrites();
         localStorage.setItem("neore-collapsed-groups", '["archived"]');
         writeThreadListCache("alice", list);
@@ -66,5 +71,31 @@ describe("SignOut", () => {
             expect(globalThis.location.replace).toHaveBeenCalledWith("/auth/sign-in");
         });
         expect(globalThis.location.replace).toHaveBeenCalledTimes(1);
+    });
+
+    it("drops the signed-in account's unsent drafts, with no composer shown on this page load, and leaves another account's", async () => {
+        auth.session.data = { user: { id: "alice" } };
+        localStorage.setItem("neore-draft:alice:thread-a", "{}");
+        localStorage.setItem("neore-draft:bob:thread-a", "{}");
+
+        render(<SignOut />);
+
+        await vi.waitFor(() => {
+            expect(auth.signOut).toHaveBeenCalled();
+        });
+        expect(localStorage.getItem("neore-draft:alice:thread-a")).toBeNull();
+        expect(localStorage.getItem("neore-draft:bob:thread-a")).toBe("{}");
+    });
+
+    it("drops every account's unsent drafts when the session does not say whose they are", async () => {
+        localStorage.setItem("neore-draft:alice:thread-a", "{}");
+        localStorage.setItem("neore-draft:bob:thread-a", "{}");
+
+        render(<SignOut />);
+
+        await vi.waitFor(() => {
+            expect(auth.signOut).toHaveBeenCalled();
+        });
+        expect(Object.keys(localStorage).filter((key) => key.startsWith("neore-draft:"))).toStrictEqual([]);
     });
 });

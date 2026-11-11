@@ -359,6 +359,19 @@ describe("accounts", () => {
 
         expect(draftKeys()).toStrictEqual([draftKey("user-2", "new")]);
     });
+
+    it("keeps saving the next account's drafts when its composer bound before the departing account's were dropped", () => {
+        bindStoredDrafts("thread-a", "user-1", false);
+        type("user one's text");
+        flushStoredDrafts();
+        bindStoredDrafts("new", "user-2", false);
+        clearComposerDrafts("user-1");
+        type("user two's text");
+        vi.advanceTimersByTime(DRAFT_WRITE_DELAY_MS);
+
+        expect(draftKeys()).toStrictEqual([draftKey("user-2", "new")]);
+        expect(text("new", "user-2")).toBe("user two's text");
+    });
 });
 
 describe("after a clear", () => {

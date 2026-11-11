@@ -28,18 +28,17 @@ const useStoredDrafts = (owner: string, userId: string | undefined, locked: bool
         // Now, not once the chunk loads: text typed before then is this chat's even if the chat changes meanwhile. Only an empty
         // composer changes hands.
         if (!draftOwnership.first || !hasDraftContent(useChatUIStore.getState())) {
-            draftOwnership.first = { generation: draftGeneration(), owner, userId };
+            draftOwnership.first = { generation: draftGeneration(userId), owner, userId };
         }
 
-        draftOwnership.account = userId;
-
-        // The chunk may load after the chat changed or the drafts were dropped (sign-out): then this binding is stale.
+        // The chunk may load after the chat changed or this account's drafts were dropped (sign-out): then this binding is stale.
+        // Another account's drop (the one just switched away from) leaves it be.
         let current = true;
-        const generation = draftGeneration();
+        const generation = draftGeneration(userId);
 
         void import("./stored-drafts")
             .then(({ bindStoredDrafts }) => {
-                if (current && generation === draftGeneration()) {
+                if (current && generation === draftGeneration(userId)) {
                     bindStoredDrafts(owner, userId, locked);
                 }
 

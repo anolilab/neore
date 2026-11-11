@@ -2,12 +2,13 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { draftGeneration, draftOwnership } from "@/features/chat/split/composer-drafts";
+import { draftGeneration } from "@/features/chat/split/composer-drafts";
 import { releaseThreadListWrites, writeThreadListCache } from "@/features/chat/thread-list/lib/thread-list-cache";
 
 import NavUser from "./nav-user";
 
-const MINE = "neore-draft:user-1:thread-a";
+// The signed-in user (`auth.session`) is "alice".
+const MINE = "neore-draft:alice:thread-a";
 const THEIRS = "neore-draft:user-2:thread-a";
 
 const auth = vi.hoisted(() => {
@@ -160,7 +161,6 @@ describe("NavUser sign-out", () => {
     });
 
     it("keeps the unsent drafts, and their saving, when the sign-out fails", async () => {
-        draftOwnership.account = "user-1";
         localStorage.setItem(MINE, "{}");
 
         const generation = draftGeneration();
@@ -179,8 +179,7 @@ describe("NavUser sign-out", () => {
         expect(draftGeneration()).toBe(generation);
     });
 
-    it("drops the account's unsent drafts once the sign-out succeeded, and leaves another account's", async () => {
-        draftOwnership.account = "user-1";
+    it("drops the signed-in account's unsent drafts once the sign-out succeeded, with no composer shown, and leaves another account's", async () => {
         localStorage.setItem(MINE, "{}");
         localStorage.setItem(THEIRS, "{}");
         vi.stubGlobal("location", { reload: vi.fn() });
