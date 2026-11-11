@@ -8,13 +8,21 @@ import { DEFAULT_LOCALE, extractLocaleFromPath, parseLocaleCookie, shouldIgnoreP
 // Re-export everything from shared so existing import paths keep working
 export { DEFAULT_LOCALE, extractLocaleFromPath, isLocaleValid, locales, parseLocaleCookie, shouldIgnorePath } from "./shared";
 
+const activations = { latest: 0 };
+
 /**
- * We do a dynamic import of just the catalog that we need.
+ * We do a dynamic import of just the catalog that we need. The latest call wins: an earlier one whose catalog loads
+ * last (the offline shell's switch, then a pick in the locale menu) must not replace the newer choice.
  */
 export const dynamicActivate = async (i18n: I18n, locale: string): Promise<void> => {
+    activations.latest += 1;
+
+    const id = activations.latest;
     const { messages } = await import(`../../locales/${locale}/messages.po`);
 
-    i18n.loadAndActivate({ locale, messages });
+    if (id === activations.latest) {
+        i18n.loadAndActivate({ locale, messages });
+    }
 };
 
 /**

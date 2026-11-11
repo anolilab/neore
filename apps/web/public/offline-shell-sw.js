@@ -30,8 +30,10 @@
  *   revision's shell answers, else the precached `offline.html`. A server answer,
  *   even a 5xx, is returned as is. Iframe navigations (artifact and canvas
  *   previews), form POSTs and browsers keep Workbox's own route (`offline.html`).
- *   Registered before Workbox's listener, so `stopImmediatePropagation` keeps
- *   Workbox from answering the same event twice.
+ *   A desktop GET for exactly `catalog`, which is kept in the revision's cache
+ *   with the shell, is answered from the caches, else the network; every other
+ *   request is left alone. Registered before Workbox's listener, so
+ *   `stopImmediatePropagation` keeps Workbox from answering the same event twice.
  *
  * The cached response keeps the CSP header it was served with, and that
  * header's nonce is the one in its HTML, so the stale nonce still matches.
@@ -101,17 +103,19 @@
     };
 
     /**
-     * Puts the default locale's catalog where Workbox's `bundle-assets` rule (`scripts/generate-sw.mjs`) looks for it,
-     * unless it is there: the shell activates the window's locale, and when that catalog was never loaded online the
-     * client falls back to this one (`src/lib/intl/router-plugin.tsx`). Desktop only, unlike a precache entry.
-     * Best-effort and bounded by `SHELL_FETCH_TIMEOUT_MS`: a failure or a stall only leaves the catalog missing.
+     * Keeps the default locale's catalog in this revision's cache, unless it is there: the shell activates the window's
+     * locale, and when that catalog was never loaded online the client falls back to this one
+     * (`src/lib/intl/router-plugin.tsx`). Not in Workbox's `bundle-assets`: a `cache.put` there is never tracked by its
+     * expiration, so every deploy's catalog would stay; here the activate that drops the shell drops it too. Desktop
+     * only, unlike a precache entry. Best-effort and bounded by `SHELL_FETCH_TIMEOUT_MS`: a failure or a stall only
+     * leaves the catalog missing.
      */
     const keepCatalog = async () => {
         if (typeof config.catalog !== "string") {
             return;
         }
 
-        const cache = await self.caches.open("bundle-assets");
+        const cache = await self.caches.open(cacheName);
 
         if (await cache.match(config.catalog)) {
             return;
@@ -123,6 +127,16 @@
         if (response.ok) {
             await cache.put(config.catalog, response);
         }
+    };
+
+    const isCatalog = (request) => {
+        if (typeof config.catalog !== "string") {
+            return false;
+        }
+
+        const url = new URL(request.url);
+
+        return url.origin === self.location.origin && url.pathname === config.catalog;
     };
 
     const quietly = (promise) => promise.catch(() => undefined);
@@ -173,6 +187,20 @@
 
     self.addEventListener("fetch", (event) => {
         const { request } = event;
+
+        // The kept catalog is in no cache Workbox reads: answer from any cache (this revision's, or `bundle-assets` when
+        // a window loaded it), else the network. Decided here because `respondWith` cannot wait to hand the event on.
+        if (request.method === "GET" && isDesktopShell() && isCatalog(request)) {
+            event.stopImmediatePropagation();
+            event.respondWith(
+                self.caches
+                    .match(config.catalog)
+                    .catch(() => undefined)
+                    .then((kept) => kept ?? self.fetch(request)),
+            );
+
+            return;
+        }
 
         if (request.method !== "GET" || request.mode !== "navigate" || request.destination !== "document" || !isDesktopShell()) {
             return;
