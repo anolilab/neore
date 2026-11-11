@@ -43,6 +43,7 @@ import { DEFAULT_LOCALE } from "@/lib/intl/client";
 import { CRPCProvider, useLunora, useLunoraAuth } from "@/lib/lunora/crpc";
 import { isNativeShell, setNativeBadge } from "@/lib/native/bridge";
 import NativeBridge from "@/lib/native/native-bridge";
+import { OFFLINE_SHELL_PATH, offlineShellRootContext } from "@/lib/offline-shell";
 import { getClientPostHogState } from "@/lib/posthog/client-state";
 import { forgetClientPostHog, readRequestContext, rememberClientPostHog } from "@/lib/request-context";
 import { jsonLd, seo } from "@/lib/seo";
@@ -517,6 +518,13 @@ export const Route = createRootRouteWithContext<AppContext>()({
         };
     },
     beforeLoad: async (context) => {
+        // The offline shell is kept on disk by the service worker: render it for nobody, never read the session.
+        if (context.location.pathname === OFFLINE_SHELL_PATH) {
+            const { nonce } = await readRequestContext(context);
+
+            return offlineShellRootContext(nonce);
+        }
+
         // CSP nonce (security-middleware) and PostHog flags (posthog-middleware)
         // arrive as `serverContext`, not on the router context — see
         // `readRequestContext`. Read in parallel with the token: during SSR both

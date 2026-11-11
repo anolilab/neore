@@ -7,7 +7,8 @@
  * Usage: node scripts/generate-sw.mjs
  */
 
-import { readFileSync, rmSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { readFileSync, rmSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 import { generateSW } from "workbox-build";
@@ -26,6 +27,9 @@ const HASHED_ASSET_RE = /-[\w-]{8}\.\w+$/u;
 /** Static, user-agnostic page served for a navigation the network failed. */
 const OFFLINE_FALLBACK_URL = "/offline.html";
 
+/** The desktop shell's offline page, kept by `public/offline-shell-sw.js` (see `src/lib/offline-shell.ts`). */
+const OFFLINE_SHELL_URL = "/offline-shell";
+
 /**
  * The app shell: the client entry and everything it imports STATICALLY, JS and
  * CSS only. That is what every page needs before it can render, so it is what
@@ -39,7 +43,8 @@ const OFFLINE_FALLBACK_URL = "/offline.html";
  */
 const readAppShell = () => {
     const manifestDir = resolve(clientDir, ".vite");
-    const manifest = JSON.parse(readFileSync(resolve(manifestDir, "manifest.json"), "utf8"));
+    const manifestSource = readFileSync(resolve(manifestDir, "manifest.json"), "utf8");
+    const manifest = JSON.parse(manifestSource);
 
     // Build metadata, not an asset: everything in dist/client is deployed as a
     // public static file, and the manifest maps every source path to its chunk.
@@ -77,10 +82,13 @@ const readAppShell = () => {
         throw new Error("No entry chunk in .vite/manifest.json — is `build.manifest` still enabled?");
     }
 
-    return [...files];
+    // Any client change renames a chunk, so the manifest's hash names this build's shell HTML.
+    return { files: [...files], revision: createHash("sha256").update(manifestSource).digest("hex").slice(0, 16) };
 };
 
 try {
+    const appShell = readAppShell();
+    const swDest = resolve(clientDir, "sw.js");
     const { count, size, warnings } = await generateSW({
         cleanupOutdatedCaches: true,
         clientsClaim: true,
@@ -89,11 +97,13 @@ try {
         globIgnores: ["**/node_modules/**", "sw.js", "workbox-*.js"],
         // The shell, plus the root-level icons and manifest the install prompt
         // and an offline start need. Nothing else — see readAppShell.
-        globPatterns: [...readAppShell(), "*.{ico,svg}", "manifest.json", OFFLINE_FALLBACK_URL.slice(1)],
+        globPatterns: [...appShell.files, "*.{ico,svg}", "manifest.json", OFFLINE_FALLBACK_URL.slice(1)],
         // Plain JS the generated worker imports, so its handlers survive every
         // regeneration: Web Push (`push` / `notificationclick`) and the
-        // `activate` sweep of runtime caches older workers left behind.
-        importScripts: ["push-sw.js", "sw-cache-cleanup.js"],
+        // `activate` sweep of runtime caches older workers left behind, and the
+        // desktop shell's offline cold start (it must register its `fetch`
+        // listener before Workbox does).
+        importScripts: ["push-sw.js", "sw-cache-cleanup.js", "offline-shell-sw.js"],
         runtimeCaching: [
             // Cache-first for static assets (fonts, images)
             {
@@ -142,8 +152,13 @@ try {
             },
         ],
         skipWaiting: true,
-        swDest: resolve(clientDir, "sw.js"),
+        swDest,
     });
+
+    // Read by `offline-shell-sw.js`. In sw.js itself, so a new shell is a new worker.
+    const offlineShell = JSON.stringify({ revision: appShell.revision, url: OFFLINE_SHELL_URL });
+
+    writeFileSync(swDest, `self.__NEORE_OFFLINE_SHELL__ = ${offlineShell};\n${readFileSync(swDest, "utf8")}`);
 
     /**
      * Workbox reports every over-limit file as a warning. Here that is the

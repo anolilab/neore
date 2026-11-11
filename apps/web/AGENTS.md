@@ -31,6 +31,9 @@ pnpm lint:types           # TypeScript check (NOT pnpm typecheck); inside apps/w
 - Domain code in `src/features/<domain>/`; strict TypeScript with explicit types on all callback params.
 - **Native shell**: call `notifyNative` (`src/lib/native/bridge.ts`, a no-op outside the desktop shell) from any
   long-running flow; shell details in `apps/desktop/AGENTS.md`.
+- **Service worker** (`scripts/generate-sw.mjs` + `public/*-sw.js`): navigations are never cached. The one HTML it
+  keeps is `/offline-shell` (desktop offline start, see `apps/desktop/AGENTS.md`); never make that path read the
+  session, and never add `/offline-shell` data a cookie could change.
 
 ## ANTI-PATTERNS
 
