@@ -1,6 +1,8 @@
 /**
  * A read-only reader for the simple keys of `~/.ssh/config`. The transport runs `ssh -F /dev/null`, so nothing in
- * that file applies by itself: the keys read here are passed to `ssh` explicitly. What the reader cannot honour
+ * that file applies by itself: the keys read here are passed to `ssh` explicitly, resolved as ssh would: blocks in file
+ * order (settings before the first `Host` line first), the first value of a key wins, and a block applies to an alias
+ * when one of its `Host` patterns matches it and no negated pattern does. What the reader cannot honour
  * (`Match`, `Include`, `ProxyJump`, `ProxyCommand`) makes a host disabled instead of being guessed at.
  */
 import { readFileSync } from "node:fs";
@@ -18,20 +20,24 @@ export interface SshHost {
 }
 
 interface Block {
-    aliases: string[];
     hostName: string | null;
     identityFile: string | null;
+    /** The `Host` patterns of the block; the block before the first `Host` line holds `*`, as ssh applies it to every host. */
+    patterns: string[];
     port: number | null;
     reason: string | null;
     user: string | null;
 }
 
 const WILDCARD = /[!*?]/u;
+const GLOB_SPECIAL = /[$()+.\\[\]^{|}]/gu;
 const KEY_END = /[\s=]/u;
 const WORD = /"([^"]*)"|(\S+)/gu;
 const LINE_BREAK = /\r?\n/u;
 /** A `Match` criterion that depends on something this reader cannot evaluate: it may change any host. */
 const MATCH_ANYWHERE = new Set(["all", "canonical", "exec", "final", "localnetwork", "tagged"]);
+
+const EMPTY: Block = { hostName: null, identityFile: null, patterns: [], port: null, reason: null, user: null };
 
 const words = (value: string): string[] => Array.from(value.matchAll(WORD), (match) => match[1] ?? match[2] ?? "");
 
@@ -112,6 +118,29 @@ const readMatch = (value: string): { anything: boolean; names: string[] } => {
     return { anything: parts.some((part) => MATCH_ANYWHERE.has(part.toLowerCase())), names: parts };
 };
 
+const globMatches = (pattern: string, name: string): boolean => {
+    const source = pattern.replaceAll(GLOB_SPECIAL, String.raw`\$&`).replaceAll("*", ".*").replaceAll("?", ".");
+
+    return new RegExp(`^${source}$`, "u").test(name);
+};
+
+/** Whether a block's `Host` patterns select the alias: a negated match excludes the block, otherwise one positive match suffices. */
+const appliesTo = (block: Block, alias: string): boolean => {
+    let matched = false;
+
+    for (const pattern of block.patterns) {
+        if (pattern.startsWith("!")) {
+            if (globMatches(pattern.slice(1), alias)) {
+                return false;
+            }
+        } else if (globMatches(pattern, alias)) {
+            matched = true;
+        }
+    }
+
+    return matched;
+};
+
 interface Parsed {
     blocks: Block[];
     matched: Set<string>;
@@ -119,11 +148,11 @@ interface Parsed {
 }
 
 const readLines = (text: string, home: string): Parsed => {
-    const blocks: Block[] = [];
+    const blocks: Block[] = [{ ...EMPTY, patterns: ["*"] }];
     const matched = new Set<string>();
     let matchesAnything = false;
-    // The index of the Host block that settings belong to; a Match block holds settings of its own, none of them a Host's.
-    let current = -1;
+    // The index of the block that settings belong to: 0 is the global block before the first Host line; a Match block holds settings of its own, none of them a Host's.
+    let current = 0;
 
     for (const raw of text.split(LINE_BREAK)) {
         const line = raw.trim();
@@ -135,7 +164,7 @@ const readLines = (text: string, home: string): Parsed => {
         }
 
         if (key === "host") {
-            blocks.push({ aliases: words(parts.value), hostName: null, identityFile: null, port: null, reason: null, user: null });
+            blocks.push({ ...EMPTY, patterns: words(parts.value) });
             current = blocks.length - 1;
         } else if (key === "match") {
             const match = readMatch(parts.value);
@@ -157,26 +186,32 @@ const readLines = (text: string, home: string): Parsed => {
 /** Parses the text of an ssh config. Pure, so it is tested without a file. */
 export const parseSshConfig = (text: string, home: string): SshHost[] => {
     const { blocks, matched, matchesAnything } = readLines(text, home);
-    const seen = new Set<string>();
     const hosts: SshHost[] = [];
 
-    for (const block of blocks) {
-        // An alias that a block names twice is listed once: the first occurrence is the one kept.
-        const aliases = block.aliases.filter((candidate, index) => !WILDCARD.test(candidate) && !seen.has(candidate) && block.aliases.indexOf(candidate) === index);
+    // Wildcard patterns are not hosts; they only contribute settings. An alias a line names twice is listed once, and one its own line negates is not listed.
+    const listed = blocks.flatMap((block) => block.patterns.filter((alias) => !WILDCARD.test(alias) && appliesTo(block, alias)));
 
-        for (const alias of aliases) {
-            const usesMatch = matchesAnything || matched.has(alias) || (block.hostName !== null && matched.has(block.hostName));
+    const aliases = [...new Set(listed)];
 
-            seen.add(alias);
-            hosts.push({
-                alias,
-                disabledReason: block.reason ?? (usesMatch ? "This host is used by a Match rule in ~/.ssh/config, which Neore does not evaluate." : null),
-                hostName: block.hostName,
-                identityFile: block.identityFile,
-                port: block.port,
-                user: block.user,
-            });
+    for (const alias of aliases) {
+        const effective = { ...EMPTY };
+
+        for (const candidate of blocks) {
+            if (appliesTo(candidate, alias)) {
+                Object.assign(effective, mergeFirst(effective, candidate));
+            }
         }
+
+        const usesMatch = matchesAnything || matched.has(alias) || (effective.hostName !== null && matched.has(effective.hostName));
+
+        hosts.push({
+            alias,
+            disabledReason: effective.reason ?? (usesMatch ? "This host is used by a Match rule in ~/.ssh/config, which Neore does not evaluate." : null),
+            hostName: effective.hostName,
+            identityFile: effective.identityFile,
+            port: effective.port,
+            user: effective.user,
+        });
     }
 
     return hosts;

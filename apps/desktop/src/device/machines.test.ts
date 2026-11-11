@@ -41,7 +41,7 @@ const setup = (options: { answer?: boolean; deviceId?: string | null; hosts?: Ho
         confirm: vi.fn(async () => options.answer ?? true),
         home: () => root,
         hostBrowse: vi.fn(async (_id: string, folder: string) => {
-            return { entries: [{ name: "app" }], host: "build", next: null, parent: "/", path: folder };
+            return { entries: [{ name: "app" }], host: "build", next: null, parent: "/", path: folder, refusedRoot: false };
         }),
         hostConnect: vi.fn(async () => { return {}; }),
         hostMakeDir: vi.fn(async (_id: string, folder: string) => {
@@ -192,6 +192,21 @@ describe("browse", () => {
     });
 });
 
+describe("browse eligibility", () => {
+    it("refuses a paired server that no eligible ssh config entry stands for", async () => {
+        const { deps, machines } = setup({ ssh: [ssh("other", { hostName: "other.example.com" })] });
+
+        await expect(machines.browse("srv-1", "/srv/app")).rejects.toThrow("unknown machine");
+        expect(deps.hostBrowse).not.toHaveBeenCalled();
+    });
+
+    it("refuses a paired server whose ssh config entry is disabled", async () => {
+        const { machines } = setup({ ssh: [ssh("build", { disabledReason: "uses ProxyJump", hostName: "build.example.com" })] });
+
+        await expect(machines.browse("srv-1", "/srv/app")).rejects.toThrow("unknown machine");
+    });
+});
+
 describe("createFolder", () => {
     it("makes a folder on this computer after a confirmation, asks nothing for one that exists, and refuses a file", async () => {
         const { deps, machines } = setup();
@@ -255,7 +270,7 @@ describe("shareFolder", () => {
     it("adds the folder to the server's shared folders after a confirmation naming both", async () => {
         const { deps, machines } = setup();
 
-        await expect(machines.shareFolder("srv-1", "/data/proj")).resolves.toEqual({ shared: true });
+        await expect(machines.shareFolder("srv-1", "/data/proj")).resolves.toEqual({ path: "/data/proj", shared: true });
 
         expect(deps.confirm).toHaveBeenCalledWith(expect.objectContaining({ detail: expect.stringContaining("/data/proj"), message: expect.stringContaining("build") }));
         expect(deps.setRoots).toHaveBeenCalledWith("srv-1", ["/srv/app", "/data/proj"]);
@@ -273,14 +288,43 @@ describe("shareFolder", () => {
 
         await expect(machines.shareFolder("srv-1", "/srv/app")).rejects.toThrow("already shared");
         await expect(machines.shareFolder("srv-1", "/srv/app/sub")).rejects.toThrow("already shared");
-        await expect(machines.shareFolder("srv-1", "/srv/application")).resolves.toEqual({ shared: true });
+        await expect(machines.shareFolder("srv-1", "/srv/application")).resolves.toEqual({ path: "/srv/application", shared: true });
         expect(deps.confirm).toHaveBeenCalledTimes(1);
+    });
+
+    it("shows and stores the folder the host resolved", async () => {
+        const { deps, machines } = setup();
+
+        deps.hostBrowse.mockResolvedValueOnce({ entries: [], host: "build", next: null, parent: "/", path: "/real/proj", refusedRoot: false });
+
+        await expect(machines.shareFolder("srv-1", "/link/proj")).resolves.toEqual({ path: "/real/proj", shared: true });
+        expect(deps.confirm).toHaveBeenCalledWith(expect.objectContaining({ detail: expect.stringContaining("/real/proj") }));
+        expect(deps.setRoots).toHaveBeenCalledWith("srv-1", ["/srv/app", "/real/proj"]);
+    });
+
+    it("refuses the server's home folder or one above it, without asking", async () => {
+        const { deps, machines } = setup();
+
+        deps.hostBrowse.mockResolvedValueOnce({ entries: [], host: "build", next: null, parent: "/", path: "/home/deploy", refusedRoot: true });
+
+        await expect(machines.shareFolder("srv-1", "/home/deploy")).rejects.toThrow("home folder or one above it");
+        expect(deps.confirm).not.toHaveBeenCalled();
+        expect(deps.setRoots).not.toHaveBeenCalled();
+    });
+
+    it("refuses a 21st shared folder before asking", async () => {
+        const roots = Array.from({ length: 20 }, (_, index) => `/srv/r${index}`);
+        const { deps, machines } = setup({ hosts: [server({ roots })] });
+
+        await expect(machines.shareFolder("srv-1", "/data/proj")).rejects.toThrow("already has 20 shared folders");
+        expect(deps.confirm).not.toHaveBeenCalled();
+        expect(deps.setRoots).not.toHaveBeenCalled();
     });
 
     it("is a no-op for this computer", async () => {
         const { deps, machines } = setup();
 
-        await expect(machines.shareFolder("desk-1", root)).resolves.toEqual({ shared: false });
+        await expect(machines.shareFolder("desk-1", root)).resolves.toEqual({ path: root, shared: false });
         expect(deps.confirm).not.toHaveBeenCalled();
         expect(deps.setRoots).not.toHaveBeenCalled();
     });
@@ -296,6 +340,9 @@ describe("validators", () => {
         expect(() => readMachinePath("/a\0b", false)).toThrow("device: path is invalid");
         expect(() => readMachinePath(`/${"a".repeat(1024)}`, false)).toThrow("device: path is invalid");
         expect(() => readMachinePath(`/${"é".repeat(600)}`, false)).toThrow("device: path is invalid");
+        expect(() => readMachinePath("/a\u{202E}b", false)).toThrow("device: path is invalid");
+        expect(() => readMachinePath("/a\u{2066}b", true)).toThrow("device: path is invalid");
+        expect(() => readMachinePath("/a\u{200B}b", false)).toThrow("device: path is invalid");
         expect(() => readMachinePath(7, false)).toThrow("device: path is invalid");
     });
 

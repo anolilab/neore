@@ -4,8 +4,8 @@
  * a page cannot open or change anything on a server by itself. Arguments are validated by the caller (`validate.ts`)
  * and the machine ids and aliases are checked here against what this process knows.
  */
-import type { Dirent, Stats } from "node:fs";
-import { mkdir, readdir, realpath, stat } from "node:fs/promises";
+import type { Stats } from "node:fs";
+import { mkdir, opendir, realpath, stat } from "node:fs/promises";
 import path from "node:path";
 
 import type { AddProjectMachine, CreatedMachineFolder, MachineFolderPage, MachineServerSpec, SharedMachineFolder } from "../add-project-machines.types";
@@ -15,6 +15,8 @@ import type { BrowsePage, CreatedFolder, DeviceStatus, HostView, SettingsView } 
 /** The same page size and scan cap as the host's `browse`. */
 const PAGE_ENTRIES = 2000;
 const MAX_SCAN = 1_000_000;
+/** The most shared folders one server may have. Must match MAX_ROOTS in the host (`packages/device-core`). */
+const MAX_SERVER_ROOTS = 20;
 
 export interface MachineDependencies {
     /** A native dialog; resolves true only for the person's OK. */
@@ -51,6 +53,8 @@ const statOrNull = async (file: string): Promise<Stats | null> => {
     }
 };
 
+const rootLimit = (): string => `device: this server already has ${MAX_SERVER_ROOTS} shared folders; share a parent folder or remove one in the desktop app.`;
+
 const declined = (): Error => new Error("device: the person declined");
 
 const requireConnected = (host: HostView): HostView => {
@@ -61,10 +65,37 @@ const requireConnected = (host: HostView): HostView => {
     return host;
 };
 
+const compareNames = (left: string, right: string): number => (left < right ? -1 : Number(left > right));
+
+/** Puts a name into a sorted list at its place and drops the largest when the list grows past `size`. */
+const insertSmallest = (sorted: string[], name: string, size: number): void => {
+    let low = 0;
+    let high = sorted.length;
+
+    while (low < high) {
+        const middle = Math.floor((low + high) / 2);
+
+        if (compareNames(sorted[middle] as string, name) < 0) {
+            low = middle + 1;
+        } else {
+            high = middle;
+        }
+    }
+
+    if (low >= size) {
+        return;
+    }
+
+    sorted.splice(low, 0, name);
+
+    if (sorted.length > size) {
+        sorted.pop();
+    }
+};
+
 /** Directory names of a folder on this computer; a symlink is neither a directory nor a file here, as on a server. */
 const browseLocal = async (requested: string, after?: string): Promise<MachineFolderPage> => {
     let folder: string;
-    let entries: Dirent[];
 
     try {
         folder = await realpath(requested);
@@ -72,23 +103,33 @@ const browseLocal = async (requested: string, after?: string): Promise<MachineFo
         throw new Error("device: that folder was not found");
     }
 
+    // Only the page and one more name are kept, so a folder of a million entries costs one page of memory.
+    const kept: string[] = [];
+    let scanned = 0;
+
     try {
-        entries = await readdir(folder, { withFileTypes: true });
-    } catch {
-        throw new Error("device: that folder cannot be read");
+        const directory = await opendir(folder);
+
+        for await (const entry of directory) {
+            scanned += 1;
+
+            if (scanned > MAX_SCAN) {
+                throw new Error("device: too many entries to browse");
+            }
+
+            if (entry.isDirectory() && (after === undefined || entry.name > after)) {
+                insertSmallest(kept, entry.name, PAGE_ENTRIES + 1);
+            }
+        }
+    } catch (error) {
+        if (error instanceof Error && error.message === "device: too many entries to browse") {
+            throw error;
+        }
+
+        throw new Error("device: that folder cannot be read", { cause: error });
     }
 
-    if (entries.length > MAX_SCAN) {
-        throw new Error("device: too many entries to browse");
-    }
-
-    const names = entries.filter((entry) => entry.isDirectory()).map((entry) => entry.name);
-
-    // `names` is a copy; the tsconfig lib has no `toSorted`.
-    names.sort((left, right) => (left < right ? -1 : Number(left > right)));
-    const start = after === undefined ? 0 : names.findIndex((name) => name > after);
-    const rest = start === -1 ? [] : names.slice(start);
-    const page = rest.slice(0, PAGE_ENTRIES);
+    const page = kept.slice(0, PAGE_ENTRIES);
     const parent = path.dirname(folder);
 
     return {
@@ -96,7 +137,7 @@ const browseLocal = async (requested: string, after?: string): Promise<MachineFo
             return { name };
         }),
         host: "This computer",
-        next: rest.length > page.length ? (page.at(-1) ?? null) : null,
+        next: kept.length > page.length ? (page.at(-1) ?? null) : null,
         parent: parent === folder ? null : parent,
         path: folder,
     };
@@ -134,6 +175,12 @@ export const createAddProjectMachines = (dependencies: MachineDependencies): Add
         return entry;
     };
 
+    /** The paired server an ssh host stands for: same address, port and, when the config names one, user. */
+    const pairedFor = (entry: SshHost): HostView | undefined =>
+        dependencies
+            .settings()
+            .hosts.find((host) => host.address === (entry.hostName ?? entry.alias) && host.port === (entry.port ?? 22) && (entry.user === null || host.user === entry.user));
+
     const machineFor = (machineId: string): Machine => {
         if (dependencies.status().deviceId === machineId) {
             return { kind: "this-computer" };
@@ -141,18 +188,15 @@ export const createAddProjectMachines = (dependencies: MachineDependencies): Add
 
         const host = dependencies.settings().hosts.find((candidate) => candidate.deviceId === machineId);
 
-        if (host === undefined) {
+        // Only a server the picker lists: some usable ssh host of the config must stand for it.
+        const listed = dependencies.sshHosts().some((entry) => entry.disabledReason === null && pairedFor(entry)?.deviceId === machineId);
+
+        if (host === undefined || !listed) {
             throw new Error("device: unknown machine");
         }
 
         return { host, kind: "server" };
     };
-
-    /** The paired server an ssh host stands for: same address, port and, when the config names one, user. */
-    const pairedFor = (entry: SshHost): HostView | undefined =>
-        dependencies
-            .settings()
-            .hosts.find((host) => host.address === (entry.hostName ?? entry.alias) && host.port === (entry.port ?? 22) && (entry.user === null || host.user === entry.user));
 
     /** What pairing an ssh host needs: the same address, port and user the transport would use. */
     const specFor = (entry: SshHost): MachineServerSpec => {
@@ -269,16 +313,29 @@ export const createAddProjectMachines = (dependencies: MachineDependencies): Add
         const machine = machineFor(machineId);
 
         if (machine.kind === "this-computer") {
-            return { shared: false };
+            return { path: folder, shared: false };
         }
 
-        if (machine.host.roots.some((root) => isInside(folder, root))) {
+        // The host resolves the folder (symlinks) and says whether it refuses it as a root; what is shown and stored is what it resolved.
+        const resolved = await dependencies.hostBrowse(requireConnected(machine.host).deviceId, folder);
+
+        if (resolved.refusedRoot) {
+            throw new Error("device: that folder is the server's home folder or one above it. Choose a folder inside it.");
+        }
+
+        const target = resolved.path;
+
+        if (machine.host.roots.some((root) => isInside(target, root))) {
             throw new Error("device: that folder is already shared");
+        }
+
+        if (machine.host.roots.length >= MAX_SERVER_ROOTS) {
+            throw new Error(rootLimit());
         }
 
         if (
             !await ask({
-                detail: `Folder: ${JSON.stringify(folder)}\nIts coding agents and tools can then read and change files in it.`,
+                detail: `Folder: ${JSON.stringify(target)}\nIts coding agents and tools can then read and change files in it.`,
                 message: `Share a folder on the server “${machine.host.name}” with Neore?`,
             })
         ) {
@@ -288,13 +345,17 @@ export const createAddProjectMachines = (dependencies: MachineDependencies): Add
         // The settings may have changed while the dialog was open.
         const latest = machineFor(machineId);
 
-        if (latest.kind !== "server" || latest.host.roots.some((root) => isInside(folder, root))) {
+        if (latest.kind !== "server" || latest.host.roots.some((root) => isInside(target, root))) {
             throw new Error("device: that folder is already shared");
         }
 
-        dependencies.setRoots(latest.host.deviceId, [...latest.host.roots, folder]);
+        if (latest.host.roots.length >= MAX_SERVER_ROOTS) {
+            throw new Error(rootLimit());
+        }
 
-        return { shared: true };
+        dependencies.setRoots(latest.host.deviceId, [...latest.host.roots, target]);
+
+        return { path: target, shared: true };
     };
 
     return { browse, connect, createFolder, list, shareFolder };
