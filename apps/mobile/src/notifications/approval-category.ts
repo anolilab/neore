@@ -4,10 +4,21 @@
  */
 import { APPROVE_ACTION, DENY_ACTION, TOOL_APPROVAL_CATEGORY } from "./approval-response";
 
-/** The actions a tool approval's alert carries. Neither opens the app: an answer is made from the alert itself. */
+/**
+ * The actions a tool approval's alert carries. Neither opens the app: an answer is made from the alert itself. Both need the phone
+ * unlocked first, so an approval cannot be answered from a locked screen.
+ */
 export const APPROVAL_ACTIONS = [
-    { buttonTitle: "Approve", identifier: APPROVE_ACTION, options: { opensAppToForeground: false } },
-    { buttonTitle: "Deny", identifier: DENY_ACTION, options: { isDestructive: true, opensAppToForeground: false } },
+    {
+        buttonTitle: "Approve",
+        identifier: APPROVE_ACTION,
+        options: { isAuthenticationRequired: true, opensAppToForeground: false },
+    },
+    {
+        buttonTitle: "Deny",
+        identifier: DENY_ACTION,
+        options: { isAuthenticationRequired: true, isDestructive: true, opensAppToForeground: false },
+    },
 ] as const;
 
 export type ApprovalAction = (typeof APPROVAL_ACTIONS)[number];

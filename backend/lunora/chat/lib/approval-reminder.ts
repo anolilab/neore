@@ -65,29 +65,32 @@ const pauseKey = (row: DueRow): string => `${row.threadId}\u{0}${row.pauseId ?? 
 /** Reminds each pending pause in the window once. Returns how many rows it looked at. */
 export const remindPendingApprovals = async (ctx: MutationCtx, now: number): Promise<number> => {
     const reminderPoint = now - APPROVAL_REMINDER_AFTER_MS;
-    let lower = reminderPoint - APPROVAL_REMINDER_WINDOW_MS;
+    const lower = reminderPoint - APPROVAL_REMINDER_WINDOW_MS;
     let looked = 0;
+    let cursor: string | null = null;
 
-    for (let page = 0; page < REMINDER_MAX_PAGES; page += 1) {
-        // Both ends are inclusive: a request asked exactly four hours ago is due now.
-        const due = await ctx.db
+    for (let pageNumber = 0; pageNumber < REMINDER_MAX_PAGES; pageNumber += 1) {
+        // Both ends are inclusive: a request asked exactly four hours ago is due now. The cursor carries the walk on, not the
+        // creation time, so a page full of rows that share one creation time cannot hide the rows behind it.
+        const {
+            continueCursor,
+            isDone,
+            page: due,
+        } = await ctx.db
             .query("toolApprovalRuns")
             .withIndex("by_status_createdAt", (q) => q.eq("status", "pending").gte("createdAt", lower).lte("createdAt", reminderPoint))
-            .take(REMINDER_BATCH);
+            .paginate({ cursor, numItems: REMINDER_BATCH });
 
         const unsent = due.filter((row) => row.reminderSentAt === undefined);
 
         looked += unsent.length;
         await remindPauses(ctx, unsent, now);
 
-        const last = due.at(-1)?.createdAt;
-
-        // A short page is the end of the window; a page that did not move past its start cannot be walked further.
-        if (due.length < REMINDER_BATCH || last === undefined || last <= lower) {
+        if (isDone || continueCursor === null) {
             break;
         }
 
-        lower = last;
+        cursor = continueCursor;
     }
 
     return looked;

@@ -51,9 +51,13 @@ export const isThreadId = (value: string): boolean => THREAD_ID_FORMAT.test(valu
 
 /**
  * Answers the approval a tap on approve or deny names. Returns `false` for any other tap, including the default tap that
- * opens the app, and for an alert missing either id. The answer is made only for a tap with both ids present.
+ * opens the app, and for an alert missing either id. The answer is made only for a tap with both ids present. `answer` resolves
+ * `false` when it made no answer (the account was signing out): such a tap is not counted as answered.
  */
-export const answerApprovalFromTap = async (tap: NotificationTap, answer: (value: ApprovalAnswer) => Promise<void>): Promise<boolean> => {
+export const answerApprovalFromTap = async (
+    tap: NotificationTap,
+    answer: (value: ApprovalAnswer) => Promise<boolean | void>,
+): Promise<boolean> => {
     const decision = decisionOf(tap.actionIdentifier);
     const { data } = tap.notification.request.content;
 
@@ -68,7 +72,7 @@ export const answerApprovalFromTap = async (tap: NotificationTap, answer: (value
         return false;
     }
 
-    await answer({ approvalId, decision, threadId });
+    const answered = await answer({ approvalId, decision, threadId });
 
-    return true;
+    return answered !== false;
 };

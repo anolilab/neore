@@ -65,7 +65,13 @@ export const appendLoopStopNoticeRow = async (
         return false;
     }
 
-    const leaf = thread.activeLeafMessageId ? await resolveLeafRow(ctx, thread._id, thread.activeLeafMessageId) : null;
+    // A thread that never branched has no stored leaf: its last row by storage order is the one the linear read path shows.
+    const leaf = thread.activeLeafMessageId
+        ? await resolveLeafRow(ctx, thread._id, thread.activeLeafMessageId)
+        : await ctx.db.messages.findFirst({
+              orderBy: [{ order: "desc" }, { stepOrder: "desc" }, { _creationTime: "desc" }],
+              where: { threadId: thread._id },
+          });
 
     // The reply's last row must still be the active leaf: otherwise another message has moved the branch, and the notice would
     // land under the wrong reply.
