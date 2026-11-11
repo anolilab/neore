@@ -7,21 +7,23 @@
 export type PastePlan = { html: string; kind: "html"; plain: string } | { kind: "default" } | { kind: "text"; text: string };
 
 const URL_ONLY = /^https?:\/\/\S+$/i;
-const LINK = /<a\s[^>]*href/i;
-const LANGUAGE = /class=["']?[^"'>]*(?:language|lang|highlight)-/i;
+// Repetitions are bounded and tags are found with indexOf: the clipboard HTML is untrusted, and a regex that rescans to
+// the end from every `<` or `class=` would take quadratic time on a crafted copy.
+const LINK_START = /<a\s/gi;
+const HREF = /href/i;
+const LANGUAGE = /class=["']?[^"'>]{0,200}(?:language|lang|highlight)-/i;
 // Formatting the Markdown can carry. A `<pre>` alone is not in it: terminals and code editors wrap their text in one.
 const FORMATTING = [
     /<(?:h[1-6]|ul|ol|table|blockquote)[\s>]/i,
     /<(?:[bis]|strong|em|del|strike|code|kbd|math|img)[\s>]/i,
-    LINK,
     /font-weight\s*:\s*(?:bold|[6-9]00)|font-style\s*:\s*italic/i,
-    /text-decoration[\w-]*\s*:[^;"]*line-through/i,
+    /text-decoration[\w-]{0,20}\s*:[^;"]{0,100}line-through/i,
 ];
 // Paragraphs, lists, headings and tables are a document, even in a monospace block.
 const STRUCTURE = /<(?:h[1-6]|ul|ol|table|blockquote|p)[\s>]/i;
 // The first element that holds content: not the document, its head, or a comment.
-const FIRST_ELEMENT = /<(?![!/]|(?:html|head|body|meta|title|style)\b)([a-z][\w-]*)(\s[^>]*)?>/i;
-const MONOSPACE_FONT = /font-family\s*:[^;">]*(?:mono|consolas|menlo|courier)/i;
+const FIRST_ELEMENT = /<(?![!/]|(?:html|head|body|meta|title|style)\b)([a-z][\w-]*)(?=[\s>])/i;
+const MONOSPACE_FONT = /font-family\s*:[^;">]{0,200}(?:mono|consolas|menlo|courier)/i;
 const MAX_CONVERTED_HTML = 1_000_000;
 const BACKTICK_RUNS = /`+/g;
 const ENTITY = /&(?:amp|gt|lt|nbsp|quot|#39);/g;
@@ -59,6 +61,36 @@ export const fenceCode = (code: string, language = ""): string => {
     return `${fence}${language}\n${code.slice(0, end)}\n${fence}`;
 };
 
+/** Whether an `<a>` tag in `html` has an `href`. One pass: each tag's attributes are read once, up to its `>`. */
+const hasLink = (html: string): boolean => {
+    const starts = new RegExp(LINK_START);
+
+    for (let start = starts.exec(html); start; start = starts.exec(html)) {
+        const end = html.indexOf(">", start.index);
+
+        // No `>` after this `<a`: none after any later one either.
+        if (end === -1) {
+            return false;
+        }
+
+        if (HREF.test(html.slice(start.index, end))) {
+            return true;
+        }
+
+        starts.lastIndex = end;
+    }
+
+    return false;
+};
+
+/** The first content element's tag name and attributes, as `<name …>` up to the first `>` after it. */
+const firstElement = (html: string): [tag: string, attributes: string] => {
+    const match = FIRST_ELEMENT.exec(html);
+    const end = match ? html.indexOf(">", match.index) : -1;
+
+    return match && end !== -1 ? [match[1] ?? "", html.slice(match.index + match[0].length, end)] : ["", ""];
+};
+
 /**
  * Whether clipboard HTML adds nothing to its `text/plain`: text in a span or div, or a code editor's or terminal's
  * monospace block (whose colours and bold keywords are not formatting). Regexes over the markup, so the converter is
@@ -69,14 +101,16 @@ export const isPlainHtml = (html: string): boolean => {
         return false;
     }
 
-    if (FORMATTING.every((pattern: RegExp) => !pattern.test(html))) {
+    const link = hasLink(html);
+
+    if (!link && FORMATTING.every((pattern: RegExp) => !pattern.test(html))) {
         return true;
     }
 
-    const [, tag = "", attributes = ""] = FIRST_ELEMENT.exec(html) ?? [];
+    const [tag, attributes] = firstElement(html);
     const monospaceRoot = tag.toLowerCase() === "pre" || (tag.toLowerCase() === "div" && MONOSPACE_FONT.test(attributes));
 
-    return monospaceRoot && !STRUCTURE.test(html) && !LINK.test(html);
+    return monospaceRoot && !STRUCTURE.test(html) && !link;
 };
 
 const vscodeLanguage = (data: string): string | undefined => {
@@ -164,7 +198,41 @@ export const planPaste = (data: Pick<DataTransfer, "getData">, { inFence = false
         return { kind: "default" };
     }
 
-    return plain !== "" && isPlainHtml(html) ? { kind: "text", text: plain } : { html, kind: "html", plain };
+    // HTML past the cap is never converted (planText), so it need not be checked.
+    return plain !== "" && html.length <= MAX_CONVERTED_HTML && isPlainHtml(html) ? { kind: "text", text: plain } : { html, kind: "html", plain };
+};
+
+const QUOTE_AFTER_EQUALS = /=\s*$/;
+
+/**
+ * The `>` that ends the tag opening at `open`, or -1: a `>` inside a quoted attribute value does not end it. Each
+ * character is read once.
+ */
+const tagEnd = (html: string, open: number): number => {
+    let index = open + 1;
+
+    while (index < html.length) {
+        const char = html[index];
+
+        if (char === ">") {
+            return index;
+        }
+
+        // A quote opens a value only right after `=`: `<p>don't` has no attribute to skip.
+        if ((char === '"' || char === "'") && QUOTE_AFTER_EQUALS.test(html.slice(Math.max(open, index - 20), index))) {
+            const closeQuote = html.indexOf(char, index + 1);
+
+            if (closeQuote === -1) {
+                return -1;
+            }
+
+            index = closeQuote;
+        }
+
+        index += 1;
+    }
+
+    return -1;
 };
 
 /**
@@ -206,9 +274,10 @@ const stripTags = (html: string): string => {
             from = end.exec(html)?.index ?? html.length;
         }
 
-        const close = html.indexOf(">", from);
+        // A comment ends at `-->`, a tag at its first `>` outside a quoted value.
+        const [close, closeLength] = html.startsWith("<!--", from) ? [html.indexOf("-->", from + 4), 3] : [tagEnd(html, from), 1];
 
-        index = close === -1 ? html.length : close + 1;
+        index = close === -1 ? html.length : close + closeLength;
     }
 
     return parts

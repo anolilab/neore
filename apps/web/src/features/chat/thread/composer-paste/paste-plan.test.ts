@@ -35,6 +35,16 @@ describe("composer paste", () => {
         expect(htmlToMarkdown(googleDocsNumbered)).toBe(["1. Install", "    1. Download", "       the installer", "    2. Run it", "2. Sign in"].join("\n"));
     });
 
+    it("starts a list copied from a nested Google Docs item at the left edge, keeping its nesting", () => {
+        expect(htmlToMarkdown('<ul><li aria-level="2">a</li><li aria-level="3">b</li><li aria-level="2">c</li></ul>')).toBe(
+            ["- a", "    - b", "- c"].join("\n"),
+        );
+    });
+
+    it("keeps the spaces at both ends of inline code", () => {
+        expect(htmlToMarkdown("<p>a <code> both </code> b <code> left</code></p>")).toBe("a `  both  ` b ` left`");
+    });
+
     it("turns a GitHub README table into a GFM table and keeps the code block's language", async () => {
         await expect(paste({ "text/html": githubTable, "text/plain": "Options" })).resolves.toBe(
             [
@@ -132,6 +142,25 @@ describe("composer paste", () => {
                 },
             ),
         ).toStrictEqual({ kind: "default" });
+    });
+
+    it("keeps quoted attribute values out of the text of HTML too big to convert", async () => {
+        await expect(
+            paste({ "text/html": `<div title=">secret">visible</div><div data-x='a>b'>two</div><p>don't > stop</p><!--${"x".repeat(1_000_000)}-->` }),
+        ).resolves.toBe("visible\ntwo\ndon't > stop");
+    });
+
+    it("plans crafted multi-megabyte HTML in linear time", () => {
+        const plain = { plainOnly: false, selectedText: "" };
+
+        for (const html of ["class=".repeat(500_000), "<b ".repeat(1_000_000), "<a ".repeat(1_000_000), "text-decoration".repeat(200_000)]) {
+            const started = performance.now();
+
+            planPaste(clipboard({ "text/html": html, "text/plain": "plain" }), plain);
+            // Under the cap the formatting checks run on all of it.
+            isPlainHtml(html.slice(0, 1_000_000));
+            expect(performance.now() - started).toBeLessThan(500);
+        }
     });
 
     it("falls back to the plain text for HTML nested too deep to convert in bounded work", async () => {

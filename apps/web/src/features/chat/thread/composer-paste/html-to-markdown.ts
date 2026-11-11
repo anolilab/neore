@@ -212,7 +212,8 @@ const inlineCode = (text: string): string => {
     }
 
     const fence = "`".repeat(longestBacktickRun(code) + 1);
-    const pad = code.startsWith("`") || code.endsWith("`") ? " " : "";
+    // Markdown drops one space from each end of a code span that has one at both: a pad keeps the copied spaces.
+    const pad = code.startsWith("`") || code.endsWith("`") || (code.startsWith(" ") && code.endsWith(" ")) ? " " : "";
 
     return fence + pad + code + pad + fence;
 };
@@ -385,14 +386,21 @@ const list = (element: Element, context: Context): string => {
     // A number per depth: Google Docs keeps nested items in a flat list and marks their depth with aria-level.
     const numbers: number[] = [];
     const items: string[] = [];
-
-    for (const item of element.children) {
-        if (item.tagName !== "LI" || isHidden(item)) {
-            continue;
-        }
-
+    const listItems = [...element.children].filter((item: Element) => item.tagName === "LI" && !isHidden(item));
+    const ariaLevels = listItems.map((item: Element) => {
         const ariaLevel = Number.parseInt(item.getAttribute("aria-level") ?? "1", 10) || 1;
-        const level = Math.min(Math.max(ariaLevel, 1), 6);
+
+        return Math.min(Math.max(ariaLevel, 1), 6);
+    });
+    // A copy that starts at a nested item keeps its nesting, but from the left edge: deeper is a code block in Markdown.
+    let topLevel = 6;
+
+    for (const ariaLevel of ariaLevels) {
+        topLevel = Math.min(topLevel, ariaLevel);
+    }
+
+    for (const [index, item] of listItems.entries()) {
+        const level = (ariaLevels[index] ?? 1) - topLevel + 1;
         const number =
             (ordered ? listNumber(item.getAttribute("value")) : undefined) ??
             numbers[level - 1] ??
