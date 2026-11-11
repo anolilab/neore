@@ -442,6 +442,7 @@ export interface InternalApiTypes {
         group: {
             functions: {
                 createImportedGroupChat: FunctionReference<"mutation", { debateRounds?: number; mode: "supervisor" | "round-robin" | "mention-only" | "parallel" | "debate"; model: string; organizationId?: string; skillIds: Array<string>; synthesizerSkillId?: string; title?: string; userId: string }, { threadId: string }>;
+                createPluginGroupChat: FunctionReference<"mutation", { debateRounds?: number; mode: "supervisor" | "round-robin" | "mention-only" | "parallel" | "debate"; model: string; organizationId?: string; plan?: string; pluginInstallId: string; pluginMarker: string; skillIds: Array<string>; synthesizerSkillId?: string; title?: string; userId: string }, { threadId: string }>;
                 getGroupHistory: FunctionReference<"query", { threadId: string; userId: string }, Array<{ agentName?: string; id: string; role: "user" | "assistant"; speakerSkillId?: string; text: string }>>;
                 getGroupRunConfig: FunctionReference<"query", { organizationId?: string; threadId: string; userId: string }, null | { debateRounds?: number; mode: "supervisor" | "round-robin" | "mention-only" | "parallel" | "debate"; participants: Array<{ config?: { additionalTools?: Array<string>; disabledTools?: Array<string>; preferredModel?: string; reasoningEffort?: number; searchMode?: string; voice?: string }; description: string; instructions: string; name: string; skillId: string; slug: string }>; stopRequestedAt?: number; synthesizerSkillId?: string }>;
                 isGroupStopRequested: FunctionReference<"query", { since: number; threadId: string }, boolean>;
@@ -1766,6 +1767,7 @@ export const internal: InternalApiTypes = {
         group: {
             functions: {
                 createImportedGroupChat: { __lunoraRef: "chat_group_functions:createImportedGroupChat" },
+                createPluginGroupChat: { __lunoraRef: "chat_group_functions:createPluginGroupChat" },
                 getGroupHistory: { __lunoraRef: "chat_group_functions:getGroupHistory" },
                 getGroupRunConfig: { __lunoraRef: "chat_group_functions:getGroupRunConfig" },
                 isGroupStopRequested: { __lunoraRef: "chat_group_functions:isGroupStopRequested" },

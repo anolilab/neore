@@ -17,6 +17,7 @@ import { LunoraError, v } from "lunorash/server";
 import type { Doc, Id } from "../../_generated/dataModel";
 import { refuseHostThread } from "../../acp/lib/host-thread";
 import { internalMutation, internalQuery } from "../../_generated/server";
+import { rateLimitGuard } from "../../lib/rate-limiter";
 import type { MutationCtx, QueryCtx as QueryContext } from "../../_generated/server";
 import { loadActivePathTail } from "../../agent/branch-rows";
 import { insertThread, patchMessage, patchThread } from "../../agent/table-writes";
@@ -176,7 +177,7 @@ interface NewGroupChat {
 const insertGroupChat = async (
     ctx: Pick<MutationCtx, "db" | "now">,
     { debateRounds, mode, model, organizationId, skillIds, synthesizerSkillId, title, userId }: NewGroupChat,
-    { requireEnabled }: { requireEnabled: boolean },
+    { plugin, requireEnabled }: { plugin?: { pluginInstallId: string; pluginMarker: string }; requireEnabled: boolean },
 ): Promise<{ threadId: string }> => {
     if (skillIds.length < 2) {
         throw new LunoraError("BAD_REQUEST", "A group chat needs at least two participants");
@@ -198,6 +199,8 @@ const insertGroupChat = async (
         },
         model,
         ...(organizationId && { organizationId }),
+        pluginInstallId: plugin?.pluginInstallId,
+        pluginMarker: plugin?.pluginMarker,
         status: "active",
         tags: ["chat"],
         title: title?.trim().slice(0, 200) || DEFAULT_GROUP_TITLE,
@@ -333,6 +336,45 @@ export const createImportedGroupChat = internalMutation
     })
     .output(v.object({ threadId: v.string() }))
     .mutation(async ({ args, ctx }) => await insertGroupChat(ctx, args, { requireEnabled: false }));
+
+/**
+ * Creates a group chat for a plugin install, after the install's skills exist. Called from an action. A group with the same
+ * marker is returned as it is, so a retried install makes no second group and spends no budget on the re-find. Its skills arrive
+ * switched off, so the owner must switch them on before a turn runs them (`loadUsableParticipants`).
+ */
+export const createPluginGroupChat = internalMutation
+    .input({
+        debateRounds: v.optional(v.number()),
+        mode: vGroupChatMode,
+        model: v.string().max(MAX_LENGTH.short),
+        organizationId: v.optional(v.string().max(MAX_LENGTH.id)),
+        plan: v.optional(v.string().max(MAX_LENGTH.short)),
+        pluginInstallId: v.string().max(MAX_LENGTH.id),
+        pluginMarker: v.string().max(MAX_LENGTH.short),
+        skillIds: v.array(v.string().max(MAX_LENGTH.id)),
+        synthesizerSkillId: v.optional(v.string().max(MAX_LENGTH.id)),
+        title: v.optional(v.string().max(MAX_LENGTH.long)),
+        userId: v.string().max(MAX_LENGTH.id),
+    })
+    .output(v.object({ threadId: v.string() }))
+    .mutation(async ({ args: { plan, pluginInstallId, pluginMarker, userId, ...fields }, ctx }) => {
+        const existing = await ctx.db
+            .query("threads")
+            .withIndex("by_plugin_marker", (q) => q.eq("pluginMarker", pluginMarker))
+            .first();
+
+        if (existing) {
+            if (existing.userId !== userId) {
+                throw new LunoraError("FORBIDDEN", "That plugin group belongs to another account");
+            }
+
+            return { threadId: existing._id as string };
+        }
+
+        await rateLimitGuard({ ...ctx, rateLimitKey: "chat/create", user: { plan, userId } } as never);
+
+        return await insertGroupChat(ctx, { ...fields, userId }, { plugin: { pluginInstallId, pluginMarker }, requireEnabled: false });
+    });
 
 /**
  * Open a group chat from a seeded template (`templates.ts`): the caller gets
