@@ -357,7 +357,7 @@ const AddProjectContent = ({ onClose, onCreateNew, pairingHosts, pairedHosts }: 
                     ? await pairServer(bridge, state.sshAlias, state.spec)
                     : await attempt(() => bridge.connectAddProjectMachine(state.sshAlias));
 
-            if (state.kind === "needs-pair" && pairs) {
+            if (pairs) {
                 // Pairing changed this server's row, so the list must show it as paired before the next pick, even when
                 // the connection after it failed.
                 const refreshed = await attempt(() => bridge.listAddProjectMachines());
