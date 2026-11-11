@@ -636,6 +636,17 @@ describe("look and application menu", () => {
     /** The page subscribed to menu commands (`onMenuCommand`), which the preload reports from its top frame. */
     const listening = (win: FakeWindow): unknown => fake().ipc.get("neore:menu-commands-ready")?.(topFrameOf(win, win.webContents.getURL()));
     const stoppedLoading = (win: FakeWindow): void => guardOf(win, "did-stop-loading")?.({ preventDefault: () => {} }, "");
+    /** The page's last `onMenuCommand` subscriber left, reported from its top frame. */
+    const stoppedListening = (win: FakeWindow): unknown => fake().ipc.get("neore:menu-commands-unready")?.(topFrameOf(win, win.webContents.getURL()));
+    /** A main-frame navigation of `win` started, not committed yet: `did-start-navigation` as Electron 45 reports it. */
+    const startNavigation = (win: FakeWindow, url: string, details: { isMainFrame?: boolean; isSameDocument?: boolean } = {}): void =>
+        (guardOf(win, "did-start-navigation") as unknown as (details: object) => void)({
+            frame: null,
+            isMainFrame: details.isMainFrame ?? true,
+            isSameDocument: details.isSameDocument ?? false,
+            preventDefault: () => {},
+            url,
+        });
     /** The main window back on the site, its page listening: an earlier case left the recovery page in it. */
     const onSite = (): FakeWindow => {
         navigate(mainWindow(), `${SITE}/chat`);
@@ -763,6 +774,65 @@ describe("look and application menu", () => {
         expect(menuPayloads()).toStrictEqual([]);
     });
 
+    it("holds a command chosen between a navigation's start and its commit for the new page, whatever the old page says", () => {
+        const win = onSite();
+
+        fake().payloads.length = 0;
+        startNavigation(win, `${SITE}/chat/thread-2`);
+        menuItem("New Chat")?.click?.();
+        // The departing document still answers to the window's top frame until the commit.
+        listening(win);
+        expect(menuPayloads()).toStrictEqual([]);
+
+        navigate(win, `${SITE}/chat/thread-2`);
+        expect(menuPayloads()).toStrictEqual([]);
+
+        listening(win);
+        expect(menuPayloads()).toStrictEqual([{ channel: "neore:menu-command", payload: "new-chat", window: win.id }]);
+    });
+
+    it("keeps sending to the page through a subframe's or an in-page navigation, and through one that never commits", () => {
+        const win = onSite();
+        const abandoned = guardOf(win, "did-fail-provisional-load") as unknown as (event: unknown, code: number, text: string, url: string, isMainFrame: boolean) => void;
+
+        fake().payloads.length = 0;
+        startNavigation(win, `${SITE}/embed`, { isMainFrame: false });
+        startNavigation(win, `${SITE}/chat/thread-3`, { isSameDocument: true });
+        menuItem("New Chat")?.click?.();
+        expect(menuPayloads()).toHaveLength(1);
+
+        startNavigation(win, `${SITE}/download.zip`);
+        menuItem("Settings…")?.click?.();
+        expect(menuPayloads()).toHaveLength(1);
+
+        abandoned({}, -3, "ERR_ABORTED", `${SITE}/download.zip`, true);
+        expect(menuPayloads()).toStrictEqual([
+            { channel: "neore:menu-command", payload: "new-chat", window: win.id },
+            { channel: "neore:menu-command", payload: "settings", window: win.id },
+        ]);
+    });
+
+    it("holds commands once the page stops listening, until it listens again, and only on its own word", () => {
+        const win = onSite();
+        const unready = fake().ipc.get("neore:menu-commands-unready");
+
+        unready?.(topFrameOf(win, "https://example.org/"));
+        unready?.(composerSender());
+        fake().payloads.length = 0;
+        menuItem("Settings…")?.click?.();
+        expect(menuPayloads()).toHaveLength(1);
+
+        stoppedListening(win);
+        menuItem("New Chat")?.click?.();
+        expect(menuPayloads()).toHaveLength(1);
+
+        listening(win);
+        expect(menuPayloads()).toStrictEqual([
+            { channel: "neore:menu-command", payload: "settings", window: win.id },
+            { channel: "neore:menu-command", payload: "new-chat", window: win.id },
+        ]);
+    });
+
     describe("a page that never listens", () => {
         afterEach(() => {
             vi.useRealTimers();
@@ -808,6 +878,25 @@ describe("look and application menu", () => {
 
             expect(fake().windows).toHaveLength(windowCount);
             expect(win.loaded.at(-1)).toBe(`${SITE}/chat`);
+        });
+
+        it("falls back once the grace period ends for a loaded page that stopped listening", () => {
+            vi.useFakeTimers();
+
+            const win = mainWindow();
+            const windowCount = fake().windows.length;
+
+            navigate(win, `${SITE}/chat/thread-1`);
+            stoppedLoading(win);
+            listening(win);
+            stoppedListening(win);
+            menuItem("New Chat")?.click?.();
+            vi.advanceTimersByTime(MENU_READY_GRACE_MS - 1);
+            expect(fake().windows).toHaveLength(windowCount);
+
+            vi.advanceTimersByTime(1);
+            expect(fake().windows).toHaveLength(windowCount + 1);
+            expect(win.loaded.at(-1)).toBe(`${SITE}/chat/thread-1`);
         });
 
         it("gets the command itself when it starts listening within the grace period", () => {
@@ -1056,10 +1145,43 @@ describe("main window reveal and saved state", () => {
         expect(readSaved(file).maximized).toBe(true);
 
         // Once revealed, a close saves what the window is.
-        readyToShow(win);
+        fake().appHandlers.get("second-instance")?.({}, ["neore"]);
         win.maximized = false;
         closeWindow(win);
         expect(readSaved(file).maximized).toBe(false);
+    });
+
+    describe("closed before its first paint", () => {
+        afterEach(() => {
+            vi.useRealTimers();
+        });
+
+        it("stays hidden at its first paint and at the show fallback", async () => {
+            vi.useFakeTimers();
+
+            const { win } = await restart("linux", { maximized: true });
+
+            closeWindow(win);
+            readyToShow(win);
+            vi.advanceTimersByTime(SHOW_FALLBACK_MS);
+
+            expect(win.calls).toStrictEqual([]);
+            expect(win.shown).toBe(false);
+        });
+
+        it("is revealed, maximized as saved, when it is brought forward", async () => {
+            vi.useFakeTimers();
+
+            const { win } = await restart("darwin", { maximized: true });
+
+            closeWindow(win);
+            vi.advanceTimersByTime(SHOW_FALLBACK_MS);
+            fake().appHandlers.get("second-instance")?.({}, ["neore"]);
+            expect(win.calls).toStrictEqual(["maximize", "show"]);
+
+            readyToShow(win);
+            expect(win.calls).toStrictEqual(["maximize", "show"]);
+        });
     });
 
     it("reveals a main window brought forward before its first paint once, maximized, with no second show later", async () => {

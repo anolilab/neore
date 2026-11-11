@@ -2,17 +2,26 @@
  * Delivers application-menu commands to a site window only once its page listens. The deployed site is updated apart
  * from the shell, so a page may never listen (an older site): the page says it listens through `menuCommandsReady`,
  * and a page that has not said so `MENU_READY_GRACE_MS` after its load gets the shell's own fallback instead.
- * Readiness belongs to a document, so every committed main-frame navigation starts over.
+ * Readiness belongs to a document: from the start of a main-frame navigation the departing page gets nothing, and
+ * every committed one starts over. A navigation that never commits gives the page that stayed its state back.
  */
 import type { MenuCommand } from "./app-menu.js";
 
 /** How long a loaded page has to start listening before its commands take the fallback. */
 export const MENU_READY_GRACE_MS = 2000;
 
+/** `loading` queues, `ready` sends, `absent` (loaded, never listened) takes the fallback. */
+type Phase = "absent" | "loading" | "ready";
+
 interface WindowState {
-    /** `loading` queues, `ready` sends, `absent` (loaded, never listened) takes the fallback. */
-    phase: "absent" | "loading" | "ready";
+    /** The current document finished loading (or stopped): the grace period may run. */
+    loaded: boolean;
+    /** Main-frame navigations started and neither committed nor abandoned. While one is, every command queues. */
+    pending: number;
+    phase: Phase;
     queue: MenuCommand[];
+    /** The departing document's own phase and kind while a navigation is pending, given back if none commits. */
+    resume?: { phase: Phase; toSite: boolean };
     timer?: ReturnType<typeof setTimeout>;
     /** The current document is not the site (the recovery page): nothing is queued for it. */
     toSite: boolean;
@@ -33,8 +42,14 @@ export interface MenuDelivery<W> {
     loaded: (win: W) => void;
     /** A main-frame document was committed; `toSite` is whether it is the site. */
     navigated: (win: W, toSite: boolean) => void;
+    /** A main-frame navigation ended without a new document (cancelled, a download, a 204): the page stays. */
+    navigationAbandoned: (win: W) => void;
+    /** A main-frame cross-document navigation started: the departing page gets nothing more. */
+    navigationStarted: (win: W) => void;
     /** The page subscribed to menu commands: what was queued is sent now. */
     ready: (win: W) => void;
+    /** The page's last subscriber left: commands queue again, and the grace period runs for a loaded page. */
+    unready: (win: W) => void;
 }
 
 export const createMenuDelivery = <W>({ fallback, isShowingSite, send }: MenuDeliveryOptions<W>): MenuDelivery<W> => {
@@ -44,11 +59,18 @@ export const createMenuDelivery = <W>({ fallback, isShowingSite, send }: MenuDel
         let state = states.get(win);
 
         if (state === undefined) {
-            state = { phase: "loading", queue: [], toSite: true };
+            state = { loaded: false, pending: 0, phase: "loading", queue: [], toSite: true };
             states.set(win, state);
         }
 
         return state;
+    };
+
+    const stopTimer = (win: W): void => {
+        const state = stateOf(win);
+
+        clearTimeout(state.timer);
+        state.timer = undefined;
     };
 
     const deliver = (win: W, command: MenuCommand): void => {
@@ -74,59 +96,136 @@ export const createMenuDelivery = <W>({ fallback, isShowingSite, send }: MenuDel
         }
     };
 
+    /** Sends (or falls back for) what was held, now that the phase says where it goes. */
+    const flush = (win: W): void => {
+        const state = stateOf(win);
+        const queued = state.queue;
+
+        state.queue = [];
+
+        for (const command of queued) {
+            deliver(win, command);
+        }
+    };
+
+    /** A loaded page that is not listening gets `MENU_READY_GRACE_MS` before its commands take the fallback. */
+    const startGrace = (win: W): void => {
+        const state = stateOf(win);
+
+        if (state.phase !== "loading" || !state.loaded || state.pending > 0 || state.timer !== undefined) {
+            return;
+        }
+
+        state.timer = setTimeout(() => {
+            state.timer = undefined;
+            state.phase = "absent";
+            flush(win);
+        }, MENU_READY_GRACE_MS);
+    };
+
     return {
         deliver,
         forget: (win) => {
             const state = states.get(win);
 
             if (state !== undefined) {
-                clearTimeout(state.timer);
+                stopTimer(win);
                 states.delete(win);
             }
         },
         loaded: (win) => {
             const state = stateOf(win);
 
-            if (state.phase !== "loading" || state.timer !== undefined) {
-                return;
-            }
-
-            state.timer = setTimeout(() => {
-                const queued = state.queue;
-
-                state.timer = undefined;
-                state.phase = "absent";
-                state.queue = [];
-
-                for (const command of queued) {
-                    deliver(win, command);
-                }
-            }, MENU_READY_GRACE_MS);
+            state.loaded = true;
+            startGrace(win);
         },
         navigated: (win, toSite) => {
             const state = stateOf(win);
 
-            clearTimeout(state.timer);
-            state.timer = undefined;
+            stopTimer(win);
+            state.loaded = false;
+            state.pending = 0;
             state.phase = "loading";
+            state.resume = undefined;
             state.toSite = toSite;
 
             if (!toSite) {
                 state.queue = [];
             }
         },
+        navigationAbandoned: (win) => {
+            const state = stateOf(win);
+
+            if (state.pending === 0) {
+                return;
+            }
+
+            state.pending -= 1;
+
+            if (state.pending > 0 || state.resume === undefined) {
+                return;
+            }
+
+            state.phase = state.resume.phase;
+            state.toSite = state.resume.toSite;
+            state.resume = undefined;
+
+            if (!state.toSite) {
+                state.queue = [];
+            }
+
+            if (state.phase === "loading") {
+                startGrace(win);
+            } else {
+                flush(win);
+            }
+        },
+        navigationStarted: (win) => {
+            const state = stateOf(win);
+
+            if (state.pending === 0) {
+                state.resume = { phase: state.phase, toSite: state.toSite };
+            }
+
+            state.pending += 1;
+            stopTimer(win);
+            state.phase = "loading";
+            // Where it goes is known at the commit: until then a command is held, and dropped if it is not the site.
+            state.toSite = true;
+        },
         ready: (win) => {
             const state = stateOf(win);
-            const queued = state.queue;
 
-            clearTimeout(state.timer);
-            state.timer = undefined;
-            state.phase = "ready";
-            state.queue = [];
+            // Before the commit only the departing document can say this: it is that page's, never the next one's.
+            if (state.pending > 0) {
+                if (state.resume !== undefined) {
+                    state.resume.phase = "ready";
+                }
 
-            for (const command of queued) {
-                deliver(win, command);
+                return;
             }
+
+            stopTimer(win);
+            state.phase = "ready";
+            flush(win);
+        },
+        unready: (win) => {
+            const state = stateOf(win);
+
+            if (state.pending > 0) {
+                if (state.resume?.phase === "ready") {
+                    state.resume.phase = "loading";
+                }
+
+                return;
+            }
+
+            if (state.phase !== "ready") {
+                return;
+            }
+
+            state.phase = "loading";
+            startGrace(win);
         },
     };
 };

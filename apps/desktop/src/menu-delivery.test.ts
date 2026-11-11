@@ -112,6 +112,87 @@ describe(createMenuDelivery, () => {
         expect(fellBack).toStrictEqual([]);
     });
 
+    it("holds a command chosen while a navigation is under way and sends it to the new page once it listens", () => {
+        const { delivery, fellBack, sent } = setup();
+        const win = { onSite: true };
+
+        delivery.ready(win);
+        delivery.navigationStarted(win);
+        delivery.deliver(win, "new-chat");
+        // The departing page subscribing again (or late) is not the new page listening.
+        delivery.ready(win);
+        expect(sent).toStrictEqual([]);
+
+        delivery.navigated(win, true);
+        delivery.loaded(win);
+        delivery.ready(win);
+        vi.advanceTimersByTime(MENU_READY_GRACE_MS);
+
+        expect(sent).toStrictEqual([[win, "new-chat"]]);
+        expect(fellBack).toStrictEqual([]);
+    });
+
+    it("runs no grace period for the departing page while a navigation is under way", () => {
+        const { delivery, fellBack, sent } = setup();
+        const win = { onSite: true };
+
+        delivery.loaded(win);
+        delivery.navigationStarted(win);
+        delivery.deliver(win, "new-chat");
+        vi.advanceTimersByTime(MENU_READY_GRACE_MS * 2);
+        delivery.loaded(win);
+        vi.advanceTimersByTime(MENU_READY_GRACE_MS * 2);
+
+        expect(fellBack).toStrictEqual([]);
+        expect(sent).toStrictEqual([]);
+    });
+
+    it("gives the page back what it was when a navigation never commits", () => {
+        const { delivery, sent } = setup();
+        const win = { onSite: true };
+
+        delivery.ready(win);
+        delivery.navigationStarted(win);
+        delivery.deliver(win, "settings");
+        expect(sent).toStrictEqual([]);
+
+        delivery.navigationAbandoned(win);
+        delivery.deliver(win, "new-chat");
+        expect(sent).toStrictEqual([
+            [win, "settings"],
+            [win, "new-chat"],
+        ]);
+    });
+
+    it("holds commands again once the page stops listening, and sends them when it listens again", () => {
+        const { delivery, fellBack, sent } = setup();
+        const win = { onSite: true };
+
+        delivery.loaded(win);
+        delivery.ready(win);
+        delivery.unready(win);
+        delivery.deliver(win, "new-chat");
+        vi.advanceTimersByTime(MENU_READY_GRACE_MS - 1);
+        delivery.ready(win);
+
+        expect(sent).toStrictEqual([[win, "new-chat"]]);
+        expect(fellBack).toStrictEqual([]);
+    });
+
+    it("falls back for a loaded page that stopped listening and does not listen again within the grace period", () => {
+        const { delivery, fellBack, sent } = setup();
+        const win = { onSite: true };
+
+        delivery.loaded(win);
+        delivery.ready(win);
+        delivery.unready(win);
+        delivery.deliver(win, "new-chat");
+        vi.advanceTimersByTime(MENU_READY_GRACE_MS);
+
+        expect(fellBack).toStrictEqual([[win, "new-chat"]]);
+        expect(sent).toStrictEqual([]);
+    });
+
     it("forgets a closed window, its queue and its pending fallback", () => {
         const { delivery, fellBack, sent } = setup();
         const win = { onSite: true };

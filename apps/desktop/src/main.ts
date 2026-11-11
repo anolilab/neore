@@ -306,6 +306,9 @@ const siteBackground = (withVibrancy: boolean): string => windowBackground({ dar
 /** The reveal of each window that has not been shown yet. A window without an entry has been revealed. */
 const pendingReveals = new WeakMap<BrowserWindow, () => void>();
 
+/** Windows hidden on purpose before their first reveal: neither the first paint nor the fallback timer shows them. */
+const hiddenBeforeReveal = new WeakSet<BrowserWindow>();
+
 const isRevealed = (win: BrowserWindow): boolean => !pendingReveals.has(win);
 
 /**
@@ -315,7 +318,8 @@ const isRevealed = (win: BrowserWindow): boolean => !pendingReveals.has(win);
 const showWhenReady = (win: BrowserWindow, show: () => void = () => win.show()): () => void => {
     let shown = false;
     const reveal = (): void => {
-        if (shown || win.isDestroyed()) {
+        // Closed (hidden) before it was ever shown: only `bringForward` may show it now.
+        if (shown || win.isDestroyed() || hiddenBeforeReveal.has(win)) {
             return;
         }
 
@@ -341,6 +345,7 @@ const bringForward = (win: BrowserWindow): void => {
     const reveal = pendingReveals.get(win);
 
     if (reveal !== undefined) {
+        hiddenBeforeReveal.delete(win);
         reveal();
 
         return;
@@ -430,7 +435,19 @@ const guardSiteWindow = (win: BrowserWindow, reveal: () => void): void => {
     contents.on("will-attach-webview", (event) => event.preventDefault());
 
     // Each committed document has to subscribe to menu commands again (an in-page route change is not a `did-navigate`).
+    // From the start of a cross-document navigation the departing page gets nothing: it may unload before it acts.
+    // One that never commits (cancelled, a download) ends in `did-fail-provisional-load`, and the page stays.
     // `did-stop-loading` rather than `did-finish-load`: it also ends a load that failed or was stopped.
+    contents.on("did-start-navigation", (details) => {
+        if (details.isMainFrame && !details.isSameDocument) {
+            menuDelivery.navigationStarted(win);
+        }
+    });
+    contents.on("did-fail-provisional-load", (_event, _code, _description, _url, isMainFrame: boolean) => {
+        if (isMainFrame) {
+            menuDelivery.navigationAbandoned(win);
+        }
+    });
     contents.on("did-navigate", (_event, url: string) => menuDelivery.navigated(win, isTrustedUrl(origin, url)));
     contents.on("did-stop-loading", () => menuDelivery.loaded(win));
 
@@ -611,6 +628,11 @@ const createMainWindow = (): BrowserWindow => {
         }
 
         event.preventDefault();
+
+        if (!isRevealed(win)) {
+            hiddenBeforeReveal.add(win);
+        }
+
         win.hide();
     });
 
@@ -977,6 +999,21 @@ const registerIpc = (): void => {
 
         if (win !== undefined) {
             menuDelivery.ready(win);
+        }
+    });
+
+    // The page's last `onMenuCommand` subscriber left: its commands are held again, as for a page that has not listened.
+    ipcMain.on(CHANNEL.menuCommandsUnready, (event): void => {
+        if (!isTrusted(event)) {
+            log("menu-commands-unready: ignored an untrusted sender");
+
+            return;
+        }
+
+        const win = [...siteWindows].find((candidate) => !candidate.isDestroyed() && candidate.webContents === event.sender);
+
+        if (win !== undefined) {
+            menuDelivery.unready(win);
         }
     });
 

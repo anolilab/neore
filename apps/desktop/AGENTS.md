@@ -67,8 +67,11 @@
 
 - **Window look** (`appearance.ts`, `app-menu.ts`, `menu-delivery.ts`): site windows start hidden; `maximize()` SHOWS a
   hidden window on Windows and Linux, so the saved maximized state is applied at the reveal, and an early bring-forward
-  runs that reveal (`bringForward`), never a bare `show()`. The live accent event is `accent-color-changed` on Windows and
+  runs that reveal (`bringForward`), never a bare `show()`. A main window closed (hidden) before its reveal stays hidden
+  through `ready-to-show` and the fallback timer; only `bringForward` reveals it. The live accent event is `accent-color-changed` on Windows and
   Linux only; macOS needs `subscribeNotification("AppleColorPreferencesChangedNotification")`. Vibrancy shows only through
   a fully transparent `backgroundColor`. The deployed site ships apart from the shell, so a menu command waits until the
   page's `onMenuCommand` sends `menu-commands-ready` (per document); 2 s after a load without it, New Chat loads the URL and
-  the rest is dropped. New Chat's ⌘N is `registerAccelerator: false`: the site binds it itself.
+  the rest is dropped. Commands queue from `did-start-navigation` (main frame, cross-document) to the NEW page's ready: a
+  ready before `did-navigate` is the departing page's; `did-fail-provisional-load` gives that page its state back. The
+  preload counts subscribers: the last unsubscribe sends `menu-commands-unready`, which queues again and re-arms the 2 s. New Chat's ⌘N is `registerAccelerator: false`: the site binds it itself.
