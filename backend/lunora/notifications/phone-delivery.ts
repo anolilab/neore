@@ -18,7 +18,7 @@ import type { PhonePlatform } from "./native-push-config";
 import { expoAccessToken } from "./native-push-config";
 import { MAX_PUSH_DEVICES_PER_USER } from "./push-device-writes";
 import { threadIdOfLink } from "./locked-link";
-import { PHONE_PLACEHOLDER_TITLE, phonePlaceholderBody, pushUrgency } from "./push-text";
+import { approvalToolFallback, PHONE_PLACEHOLDER_TITLE, phonePlaceholderBody, pushUrgency } from "./push-text";
 
 const vPlatform = v.union(v.literal("android"), v.literal("ios"));
 
@@ -120,7 +120,7 @@ export interface PhonePushMessage {
      * A tool approval still pending on its chat. The lock screen shows the tool's name and the teammate's name, and nothing
      * else of the request: never its arguments.
      */
-    approval?: { approvalId: string; teammate: string; tool: string };
+    approval?: { approvalId: string; teammate: string; tool: string | null };
     notificationId: string;
     /** The chat a tap opens, when the notification is about one. */
     threadId?: string;
@@ -146,7 +146,8 @@ export const phoneMessage = (device: { language?: string; platform: PhonePlatfor
             data,
             priority: message.urgency,
             sound: "default",
-            title: message.approval.tool.slice(0, APPROVAL_TITLE_MAX),
+            // A call whose name cannot be read back is titled in the phone's own language, as the generic alert is.
+            title: (message.approval.tool ?? approvalToolFallback(device.language)).slice(0, APPROVAL_TITLE_MAX),
             to: device.token,
             ttl: PUSH_TTL_SECONDS,
         };
@@ -255,15 +256,21 @@ export const deliverToPhones = async (ctx: ActionCtx, userId: string, message: P
     }
 };
 
+/** A sub-agent's approval push waits this long between checks that its run has started waiting on it… */
+const SUB_AGENT_WAIT_MS = 30_000;
+
+/** …and is checked this many times (five minutes) before the owner gets the generic alert instead. */
+const SUB_AGENT_WAIT_ATTEMPTS = 10;
+
 /**
  * The phone half of a notification's push, its own job beside the browsers' (`push.ts`), so each is retried on its
  * own. Only the ids and the urgency are read from the notification; its title and text never leave here.
  */
 export const sendPhonePush = internalAction
-    .input({ notificationId: v.id("notifications"), userId: v.string() })
+    .input({ notificationId: v.id("notifications"), userId: v.string(), waits: v.optional(v.number()) })
     .output(v.null())
     .action(async ({ args, ctx }) => {
-        const notification = await ctx.runQuery(internal.notifications.push.loadPushNotification, args);
+        const notification = await ctx.runQuery(internal.notifications.push.loadPushNotification, { notificationId: args.notificationId, userId: args.userId });
 
         if (!notification) {
             return null;
@@ -280,6 +287,32 @@ export const sendPhonePush = internalAction
                 return null;
             }
 
+            // A sub-agent's approval is answerable only once its run waits on it: until then the actionable alert is held and
+            // sent by a later attempt. After the last attempt the owner still gets the generic alert, which names nothing.
+            const working = await ctx.runQuery(internal.notifications.phone_content.subAgentStillWorking, {
+                approvalId: notification.approvalId,
+            });
+
+            if (working && (args.waits ?? 0) < SUB_AGENT_WAIT_ATTEMPTS) {
+                await ctx.scheduler.runAfter(SUB_AGENT_WAIT_MS, internal.notifications.phone_delivery.sendPhonePush, {
+                    notificationId: args.notificationId,
+                    userId: args.userId,
+                    waits: (args.waits ?? 0) + 1,
+                });
+
+                return null;
+            }
+
+            if (working) {
+                await deliverToPhones(ctx, args.userId, {
+                    notificationId: args.notificationId,
+                    urgency: pushUrgency(notification.type),
+                    ...(threadId !== undefined && { threadId }),
+                });
+
+                return null;
+            }
+
             const found = await ctx.runQuery(internal.notifications.phone_content.loadApprovalForPush, {
                 approvalId: notification.approvalId,
                 threadId,
@@ -292,7 +325,8 @@ export const sendPhonePush = internalAction
 
             // A locked chat still tells the owner a run waits for them, with the generic alert that names nothing.
             if (!("locked" in found)) {
-                approval = { approvalId: notification.approvalId, teammate: found.teammate, tool: found.tool };
+                // The approval the names belong to: the one asked, or a sibling still pending once that one is answered.
+                approval = { approvalId: found.approvalId, teammate: found.teammate, tool: found.tool };
             }
         }
 

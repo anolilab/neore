@@ -85,7 +85,7 @@ afterEach(() => {
 });
 
 describe("the approval alert on a phone", () => {
-    const message = (approval: { approvalId: string; teammate: string; tool: string } | undefined) =>
+    const message = (approval: { approvalId: string; teammate: string; tool: string | null } | undefined) =>
         phoneMessage(DEVICE, {
             notificationId: "n1",
             threadId: "t1",
@@ -104,7 +104,7 @@ describe("the approval alert on a phone", () => {
     it("carries only ids in data, never the call's arguments, for the names the seeded request loads", async () => {
         // The message is built from what the loader reads off the seeded request, whose arguments hold the secret.
         const loaded = await names();
-        const sent = message(loaded === null ? undefined : { approvalId: APPROVAL_ID, ...loaded });
+        const sent = message(loaded ?? undefined);
 
         expect(sent.title).toBe("deleteFile");
         expect(sent.body).toBe("Ada");
@@ -123,11 +123,49 @@ describe("the approval alert on a phone", () => {
     it("cuts a tool name longer than the lock screen shows", () => {
         expect(message({ approvalId: APPROVAL_ID, teammate: "Ada", tool: "x".repeat(300) }).title).toHaveLength(100);
     });
+
+    it("titles a call whose name cannot be read back in the phone's own language", () => {
+        const german = phoneMessage(
+            { ...DEVICE, language: "de-DE" },
+            {
+                approval: { approvalId: APPROVAL_ID, teammate: "Ada", tool: null },
+                notificationId: "n1",
+                threadId: "t1",
+                urgency: "high",
+            },
+        );
+
+        expect(german.title).toBe("Ein Werkzeug");
+        expect(message({ approvalId: APPROVAL_ID, teammate: "Ada", tool: null }).title).toBe("A tool");
+    });
 });
 
 describe("the names an approval push is built from", () => {
     it("names the tool that is pending and the chat's teammate", async () => {
-        expect(await names()).toStrictEqual({ teammate: "Ada", tool: "deleteFile" });
+        expect(await names()).toStrictEqual({ approvalId: APPROVAL_ID, teammate: "Ada", tool: "deleteFile" });
+    });
+
+    it("names another request of the same pause once the one asked is answered, so the push's controls still reach a live request", async () => {
+        await harness.run(async (ctx: any) => {
+            const [run] = await ctx.db
+                .query("toolApprovalRuns")
+                .withIndex("by_approvalId", (q: any) => q.eq("approvalId", APPROVAL_ID))
+                .take(1);
+
+            await ctx.db.patch("toolApprovalRuns", run._id, { pauseId: APPROVAL_ID, status: "approved" });
+            await ctx.db.insert("toolApprovalRuns", {
+                approvalId: "a2",
+                config: CONFIG,
+                createdAt: Date.now(),
+                pauseId: APPROVAL_ID,
+                status: "pending",
+                threadId,
+                userId: OWNER,
+            });
+        });
+        await insertMessage(2, requestMessage("a2", "webSearch"), true);
+
+        expect(await names()).toStrictEqual({ approvalId: "a2", teammate: "Ada", tool: "webSearch" });
     });
 
     it("refuses an approval the conversation has moved past", async () => {

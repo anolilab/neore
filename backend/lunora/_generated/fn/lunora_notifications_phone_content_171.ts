@@ -5,6 +5,14 @@ import { DEFER_VALIDATION as DEFER, installCompiledValidatorMap } from "lunorash
 import * as lunora_notifications_phone_content_171 from "../../notifications/phone-content.js";
 
 /** Install the precompiled argument parsers before the module is dispatched. */
+installCompiledValidatorMap(lunora_notifications_phone_content_171.loadApprovalForPush.args, (source) => {
+if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
+if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
+if (typeof source["approvalId"] !== "string") return DEFER;
+if (typeof source["threadId"] !== "string") return DEFER;
+if (typeof source["userId"] !== "string") return DEFER;
+return { "approvalId": source["approvalId"], "threadId": source["threadId"], "userId": source["userId"] };
+});
 installCompiledValidatorMap(lunora_notifications_phone_content_171.loadPhonePushContent.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
@@ -18,5 +26,11 @@ if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(
 if (typeof source["threadId"] !== "string") return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "threadId": source["threadId"], "userId": source["userId"] };
+});
+installCompiledValidatorMap(lunora_notifications_phone_content_171.subAgentStillWorking.args, (source) => {
+if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
+if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
+if (typeof source["approvalId"] !== "string") return DEFER;
+return { "approvalId": source["approvalId"] };
 });
 export * from "../../notifications/phone-content.js";
