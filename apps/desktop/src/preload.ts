@@ -7,6 +7,7 @@
 import type { IpcRendererEvent } from "electron";
 import { contextBridge, ipcRenderer } from "electron";
 
+import type { MenuCommand } from "./app-menu.js";
 import { CAPABILITIES_ARG, CHANNEL, SITE_ORIGIN_ARG } from "./channels.js";
 import { DEVICE_CHANNEL } from "./device/channels.js";
 
@@ -54,12 +55,24 @@ if (siteOrigin !== undefined && document.location.origin === siteOrigin) {
         /** What this build can do. The web side must read this, not assume it. */
         capabilities,
         device: capabilities.includes("device") ? deviceRelay : undefined,
+        /** The system accent colour as `#rrggbb`, or `null`. Exposed only with the `system-accent` capability. */
+        getSystemAccentColor: capabilities.includes("system-accent")
+            ? (): Promise<string | null> => ipcRenderer.invoke(CHANNEL.getSystemAccentColor)
+            : undefined,
         notify: (title: string, body?: string) => ipcRenderer.invoke(CHANNEL.notify, { body, title }),
         onCompose: (handler: () => void): () => void => listen(CHANNEL.compose, () => handler()),
         /** A deep link's text for the composer, which is not sent. Pair with `takePendingDraft`. */
         onDraft: (handler: () => void): () => void => listen(CHANNEL.draft, () => handler()),
         onFiles: (handler: () => void): () => void => listen(CHANNEL.files, () => handler()),
+        /** The application menu's New Chat and Settings… items. Exposed only with the `menu-commands` capability. */
+        onMenuCommand: capabilities.includes("menu-commands")
+            ? (handler: (command: MenuCommand) => void): () => void => listen(CHANNEL.menuCommand, handler)
+            : undefined,
         onSignIn: (handler: () => void): () => void => listen(CHANNEL.signIn, () => handler()),
+        /** The system accent colour changed. Exposed only with the `system-accent` capability. */
+        onSystemAccentColor: capabilities.includes("system-accent")
+            ? (handler: (hex: string | null) => void): () => void => listen(CHANNEL.systemAccentColor, handler)
+            : undefined,
         /** Opens a thread in its own window. Exposed only with the `thread-windows` capability. */
         openThreadWindow: (threadId: string): Promise<void> => ipcRenderer.invoke(CHANNEL.openThreadWindow, threadId),
         /** Unread count for the dock / launcher badge; the main process clamps it to 0..999. */

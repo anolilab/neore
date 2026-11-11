@@ -10,8 +10,11 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 import type { BrowserWindowConstructorOptions, IpcMainInvokeEvent, WebPreferences } from "electron";
-import { app, BrowserWindow, globalShortcut, ipcMain, Menu, nativeImage, Notification, screen, session, shell, Tray } from "electron";
+import { app, BrowserWindow, globalShortcut, ipcMain, Menu, nativeImage, nativeTheme, Notification, screen, session, shell, systemPreferences, Tray } from "electron";
 
+import type { MenuCommand } from "./app-menu.js";
+import { buildAppMenuTemplate } from "./app-menu.js";
+import { accentHex, SHOW_FALLBACK_MS, supportsVibrancy, windowBackground } from "./appearance.js";
 import { createSetBadgeHandler } from "./badge.js";
 import { CAPABILITIES_ARG, CHANNEL, SITE_ORIGIN_ARG } from "./channels.js";
 import { registerDeviceIpc } from "./device/index.js";
@@ -81,6 +84,19 @@ const TITLE_BAR_SCRIPT = `(() => {
 .min-h-svh, .min-h-screen { min-height: calc(100dvh - ${TITLE_BAR_HEIGHT}px) !important; }\`;
     document.head.append(style);
 })();`;
+
+/**
+ * The site windows draw the sidebar material behind the page; the page makes its sidebar see-through only when told
+ * (the `vibrancy` capability), so its main pane stays opaque.
+ */
+const VIBRANCY = supportsVibrancy(process.platform);
+const vibrancy: BrowserWindowConstructorOptions = VIBRANCY ? { vibrancy: "sidebar", visualEffectState: "followWindow" } : {};
+
+/**
+ * Windows and Linux put the menu bar above the page's own top bar; hidden, it is one Alt press away and its accelerators
+ * still work. macOS keeps its menu in the system bar.
+ */
+const hiddenMenuBar: BrowserWindowConstructorOptions = process.platform === "darwin" ? {} : { autoHideMenuBar: true };
 // URL schemes are case-insensitive and the parser lowercases them, so the command-line filters compare case-insensitively too.
 const SCHEME_PREFIX = `${SCHEME}://`;
 
@@ -206,7 +222,15 @@ const guardNavigation = (event: { preventDefault: () => void }, url: string): vo
  * that claimed a call would return its result to a window that may close.
  */
 const siteCapabilities = (isMain: boolean): string[] => {
-    const capabilities = ["notifications", "compose", "sign-in", "thread-windows"];
+    const capabilities = ["notifications", "compose", "sign-in", "thread-windows", "menu-commands"];
+
+    if (VIBRANCY) {
+        capabilities.push("vibrancy");
+    }
+
+    if (hasSystemAccent()) {
+        capabilities.push("system-accent");
+    }
 
     if (isMain && state.deviceReady && existsSync(path.join(__dirname, "device-window", "device.html"))) {
         capabilities.push("device");
@@ -217,6 +241,61 @@ const siteCapabilities = (isMain: boolean): string[] => {
     }
 
     return capabilities;
+};
+
+/**
+ * The accent colour as `#rrggbb`, or `null`. macOS and Windows always have one; Linux answers only on some desktops, and
+ * an Electron without the method, or a desktop that throws, has none.
+ */
+const readSystemAccent = (): string | null => {
+    try {
+        return typeof systemPreferences.getAccentColor === "function" ? accentHex(systemPreferences.getAccentColor()) : null;
+    } catch {
+        return null;
+    }
+};
+
+const hasSystemAccent = (): boolean => process.platform === "darwin" || process.platform === "win32" || readSystemAccent() !== null;
+
+/** Every open site window (main, thread, same-origin popup): what the accent colour and menu commands are sent to. */
+const siteWindows = new Set<BrowserWindow>();
+
+/** A window that is destroyed or is showing something other than the site (the recovery page) gets nothing. */
+const isShowingSite = (win: BrowserWindow): boolean => !win.isDestroyed() && isTrustedUrl(origin, win.webContents.getURL());
+
+const broadcastSystemAccent = (): void => {
+    const accent = readSystemAccent();
+
+    for (const win of siteWindows) {
+        if (isShowingSite(win)) {
+            win.webContents.send(CHANNEL.systemAccentColor, accent);
+        }
+    }
+};
+
+/** Filled with the page's own background until its first paint; with vibrancy, left clear so the material shows. */
+const siteBackground = (withVibrancy: boolean): string => windowBackground({ dark: nativeTheme.shouldUseDarkColors, vibrancy: withVibrancy });
+
+/**
+ * Windows are created hidden and shown at their first paint, so nobody sees an empty frame. A page that never paints
+ * (a hung load, a failure the recovery page replaces) is shown anyway: by the returned function, or after a timeout.
+ */
+const showWhenReady = (win: BrowserWindow, show: () => void = () => win.show()): () => void => {
+    let shown = false;
+    const reveal = (): void => {
+        if (shown || win.isDestroyed()) {
+            return;
+        }
+
+        shown = true;
+        clearTimeout(timer);
+        show();
+    };
+    const timer = setTimeout(reveal, SHOW_FALLBACK_MS);
+
+    win.on("ready-to-show", reveal);
+
+    return reveal;
 };
 
 const windowStateFile = (): string => path.join(app.getPath("userData"), WINDOW_STATE_FILE);
@@ -250,8 +329,11 @@ const siteWebPreferences = (isMain: boolean): WebPreferences => {
 };
 
 /** Popups, navigation and webviews of a site window: same-origin stays in the app, sign-in goes to the system browser, the rest is refused. */
-const guardSiteWindow = (win: BrowserWindow): void => {
+const guardSiteWindow = (win: BrowserWindow, reveal: () => void): void => {
     const contents = win.webContents;
+
+    siteWindows.add(win);
+    win.on("closed", () => siteWindows.delete(win));
 
     contents.setWindowOpenHandler(({ url }) => {
         switch (classifyUrl(origin, url)) {
@@ -292,6 +374,7 @@ const guardSiteWindow = (win: BrowserWindow): void => {
         }
 
         log(`the page failed to load (${errorCode} ${description})`);
+        reveal();
         contents.loadURL(recoveryPageUrl("unreachable", newChatUrl(origin).href, `${description} (${errorCode})`));
     });
     contents.on("render-process-gone", (_event, details: { reason: string }) => {
@@ -300,6 +383,7 @@ const guardSiteWindow = (win: BrowserWindow): void => {
         }
 
         log(`the page process ended (${details.reason})`);
+        reveal();
         contents.loadURL(recoveryPageUrl("crashed", newChatUrl(origin).href, details.reason));
     });
 
@@ -333,16 +417,20 @@ const quitWhenNoSiteWindow = (): void => {
  */
 const openSiteWindow = (url: URL): BrowserWindow => {
     const win = new BrowserWindow({
+        backgroundColor: siteBackground(VIBRANCY),
         height: DEFAULT_SIZE.height,
         minHeight: 560,
         minWidth: 420,
+        show: false,
         title: "Neore",
         ...macTitleBar,
+        ...vibrancy,
+        ...hiddenMenuBar,
         webPreferences: siteWebPreferences(false),
         width: DEFAULT_SIZE.width,
     });
 
-    guardSiteWindow(win);
+    guardSiteWindow(win, showWhenReady(win));
     win.loadURL(url.href);
 
     return win;
@@ -383,10 +471,13 @@ const openOrFocusThreadWindow = (url: URL): void => {
  */
 const openArtifactWindow = (url: URL): void => {
     const win = new BrowserWindow({
+        backgroundColor: siteBackground(false),
         height: DEFAULT_SIZE.height,
         minHeight: 560,
         minWidth: 420,
+        show: false,
         title: "Neore preview",
+        ...hiddenMenuBar,
         webPreferences: {
             contextIsolation: true,
             nodeIntegration: false,
@@ -406,6 +497,7 @@ const openArtifactWindow = (url: URL): void => {
     contents.on("will-navigate", (event) => event.preventDefault());
     contents.on("will-redirect", (event) => event.preventDefault());
     contents.on("will-attach-webview", (event) => event.preventDefault());
+    showWhenReady(win);
     win.loadURL(url.href);
 };
 
@@ -416,20 +508,28 @@ const createMainWindow = (): BrowserWindow => {
         screen.getAllDisplays().map((display) => display.workArea),
     );
     const win = new BrowserWindow({
+        backgroundColor: siteBackground(VIBRANCY),
         height: saved?.bounds.height ?? DEFAULT_SIZE.height,
         minHeight: 560,
         minWidth: 420,
+        show: false,
         title: "Neore",
         ...macTitleBar,
+        ...vibrancy,
+        ...hiddenMenuBar,
         webPreferences: siteWebPreferences(true),
         width: saved?.bounds.width ?? DEFAULT_SIZE.width,
         x: saved?.bounds.x,
         y: saved?.bounds.y,
     });
+    // `maximize` shows a hidden window on Windows and Linux, so it waits for the first paint too.
+    const reveal = showWhenReady(win, () => {
+        if (saved?.maximized) {
+            win.maximize();
+        }
 
-    if (saved?.maximized) {
-        win.maximize();
-    }
+        win.show();
+    });
 
     // Move and resize fire many times a second; one write after the last one is enough.
     const stateSaver = createDebouncer(() => saveWindowState(win), SAVE_DEBOUNCE_MS);
@@ -437,7 +537,7 @@ const createMainWindow = (): BrowserWindow => {
     win.on("move", () => stateSaver.call());
     win.on("resize", () => stateSaver.call());
 
-    guardSiteWindow(win);
+    guardSiteWindow(win, reveal);
 
     win.on("close", (event) => {
         // Saved here too: a hide keeps the window alive, but the next launch should still start where it was left.
@@ -478,6 +578,41 @@ const focusMain = (): void => {
 
     mainWindow.show();
     mainWindow.focus();
+};
+
+/**
+ * A menu command goes to the site window in front. With none in front (the Quick Composer, a local window, or no
+ * window at all) the main window is brought forward and takes it.
+ */
+const sendMenuCommand = (command: MenuCommand): void => {
+    const focused = BrowserWindow.getFocusedWindow();
+    const target = focused !== null && siteWindows.has(focused) ? focused : undefined;
+
+    if (target === undefined) {
+        focusMain();
+    }
+
+    const win = target ?? state.mainWindow;
+
+    if (win !== undefined && isShowingSite(win)) {
+        win.webContents.send(CHANNEL.menuCommand, command);
+    }
+};
+
+const documentationUrl = (): URL => new URL("/docs", origin);
+
+const installAppMenu = (): void => {
+    Menu.setApplicationMenu(
+        Menu.buildFromTemplate(
+            buildAppMenuTemplate({
+                appName: app.name,
+                isPackaged: app.isPackaged,
+                onCommand: sendMenuCommand,
+                onOpenDocumentation: () => openWebLinkExternally(documentationUrl()),
+                platform: process.platform,
+            }),
+        ),
+    );
 };
 
 /** Like `handOffCompose`: the files are held for `takePendingFiles`, and the event only tells the page to ask. */
@@ -773,6 +908,14 @@ const registerIpc = (): void => {
         openOrFocusThreadWindow(url);
     });
 
+    ipcMain.handle(CHANNEL.getSystemAccentColor, (event): string | null => {
+        if (!isTrusted(event)) {
+            throw new Error("system-accent-color: untrusted sender");
+        }
+
+        return readSystemAccent();
+    });
+
     ipcMain.handle(CHANNEL.takePendingCompose, (event): string | undefined => {
         if (!isMainWindow(event)) {
             return undefined;
@@ -961,6 +1104,10 @@ const start = (): void => {
 
     registerIpc();
     registerSchemeInDev();
+    installAppMenu();
+    // macOS reports an accent change through the theme; Windows and Linux have their own event.
+    nativeTheme.on("updated", broadcastSystemAccent);
+    systemPreferences.on("accent-color-changed", broadcastSystemAccent);
     createMainWindow();
     createQuickComposer();
     createTray();

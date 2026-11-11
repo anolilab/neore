@@ -64,3 +64,10 @@
   revision's shell, whose precached chunks are gone. Only `activate` prunes other revisions. The cached response keeps
   its own CSP header, whose nonce matches its HTML. It only helps after one online run, and only for route chunks that
   run loaded (`bundle-assets`). Detection is `Electron/` in the worker's user agent: keep the default user agent. The recovery page stays for a first run.
+
+- **Window look** (`appearance.ts`, `app-menu.ts`): site windows start `show: false` and appear at `ready-to-show`,
+  on a load failure (the recovery page) or after 5 s, so a hung load never leaves an invisible window. `maximize()`
+  SHOWS a hidden window on Windows and Linux, so the saved maximized state is applied at reveal, not at creation.
+  macOS `vibrancy` shows only through a fully transparent `backgroundColor` (`#00000000`); the page opts its sidebar in
+  via the `vibrancy` capability. Menu commands (`menu-commands`) and the accent colour (`system-accent`) go only to
+  windows in `siteWindows` that are showing the site.

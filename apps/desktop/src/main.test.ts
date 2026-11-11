@@ -19,26 +19,33 @@ interface FakeWindow {
     handlers: Map<string, Listener>;
     id: number;
     loaded: string[];
+    options: Record<string, unknown>;
     sent: string[];
     shown: boolean;
     webContents: {
+        getURL: () => string;
         handlers: Map<string, Listener>;
         id: number;
         loadURL: (url: string) => Promise<void>;
         mainFrame: { url: string };
         on: (event: string, listener: Listener) => void;
-        send: (channel: string) => void;
+        send: (channel: string, payload?: unknown) => void;
         setWindowOpenHandler: (listener: (details: { url: string }) => { action: string }) => void;
         windowOpen?: (details: { url: string }) => { action: string };
     };
 }
 
 interface Fake {
+    accentColor: string;
+    accentListeners: (() => void)[];
     appHandlers: Map<string, (...args: unknown[]) => void>;
+    applicationMenu?: { template: { label?: string; role?: string; submenu?: { click?: () => void; label?: string }[] }[] };
+    focusedWindow: FakeWindow | null;
     ipc: Map<string, (event: unknown, payload?: unknown) => unknown>;
     notificationFails: boolean;
     notifications: { body?: string; title: string }[];
     opened: string[];
+    payloads: { channel: string; payload: unknown; window: number }[];
     permissionCheck?: (wc: unknown, permission: string, requestingOrigin: string, details?: unknown) => boolean;
     permissionRequest?: (wc: unknown, permission: string, callback: (isAllowed: boolean) => void, details: { mediaTypes?: string[]; requestingUrl: string }) => void;
     shortcuts: Map<string, () => void>;
@@ -49,11 +56,15 @@ interface Fake {
 
 vi.mock("electron", () => {
     const fakeElectron: Fake = {
+        accentColor: "0a84ffff",
+        accentListeners: [],
         appHandlers: new Map(),
+        focusedWindow: null,
         ipc: new Map(),
         notificationFails: false,
         notifications: [],
         opened: [],
+        payloads: [],
         shortcuts: new Map(),
         trayFails: false,
         trays: 0,
@@ -61,7 +72,7 @@ vi.mock("electron", () => {
     };
 
     /** A window record: its state and the methods `main.ts` calls, all on one object. */
-    const createWindow = (): FakeWindow => {
+    const createWindow = (options: Record<string, unknown> = {}): FakeWindow => {
         const id = fakeElectron.windows.length + 1;
         const handlers = new Map<string, Listener>();
         const webHandlers = new Map<string, Listener>();
@@ -94,6 +105,7 @@ vi.mock("electron", () => {
 
                 return window;
             },
+            options,
             restore: () => {},
             sent: [] as string[],
             show: () => {
@@ -101,6 +113,7 @@ vi.mock("electron", () => {
             },
             shown: false,
             webContents: {
+                getURL: () => window.loaded.at(-1) ?? "",
                 handlers: webHandlers,
                 id,
                 loadURL: (url: string) => {
@@ -112,8 +125,9 @@ vi.mock("electron", () => {
                 on: (event: string, listener: Listener) => {
                     webHandlers.set(event, listener);
                 },
-                send: (channel: string) => {
+                send: (channel: string, payload?: unknown) => {
                     window.sent.push(channel);
+                    fakeElectron.payloads.push({ channel, payload, window: id });
                 },
                 setWindowOpenHandler: (listener: (details: { url: string }) => { action: string }) => {
                     window.webContents.windowOpen = listener;
@@ -128,9 +142,11 @@ vi.mock("electron", () => {
     };
 
     // Plain functions, not `vi.fn`: `main.ts` calls them with `new`, and they return the record.
-    const FakeBrowserWindow = function FakeBrowserWindow() {
-        return createWindow();
+    const FakeBrowserWindow = function FakeBrowserWindow(options: Record<string, unknown>) {
+        return createWindow(options);
     };
+
+    FakeBrowserWindow.getFocusedWindow = (): FakeWindow | null => fakeElectron.focusedWindow;
 
     const FakeTray = function FakeTray() {
         if (fakeElectron.trayFails) {
@@ -158,6 +174,7 @@ vi.mock("electron", () => {
             getVersion: () => "0.0.0-test",
             isPackaged: false,
             isReady: () => true,
+            name: "Neore",
             on: (event: string, listener: (...args: unknown[]) => void) => fakeElectron.appHandlers.set(event, listener),
             quit: () => {},
             requestSingleInstanceLock: () => true,
@@ -177,8 +194,11 @@ vi.mock("electron", () => {
             on: () => {},
         },
         Menu: {
-            buildFromTemplate: () => {
-                return {};
+            buildFromTemplate: (template: unknown) => {
+                return { template };
+            },
+            setApplicationMenu: (menu: Fake["applicationMenu"]) => {
+                fakeElectron.applicationMenu = menu;
             },
         },
         nativeImage: {
@@ -189,6 +209,12 @@ vi.mock("electron", () => {
                     },
                 };
             },
+        },
+        nativeTheme: {
+            on: (_event: string, listener: () => void) => {
+                fakeElectron.accentListeners.push(listener);
+            },
+            shouldUseDarkColors: true,
         },
         Notification: FakeNotification,
         screen: {
@@ -207,6 +233,12 @@ vi.mock("electron", () => {
         shell: {
             openExternal: async (url: string) => {
                 fakeElectron.opened.push(url);
+            },
+        },
+        systemPreferences: {
+            getAccentColor: () => fakeElectron.accentColor,
+            on: (_event: string, listener: () => void) => {
+                fakeElectron.accentListeners.push(listener);
             },
         },
         Tray: FakeTray,
@@ -562,6 +594,92 @@ describe("IPC", () => {
         openThread?.(siteSender(), "thread-2");
 
         expect(fake().windows).toHaveLength(opened);
+    });
+});
+
+describe("look and application menu", () => {
+    /** The main window back on the site: an earlier case left the recovery page in it. */
+    const onSite = (): FakeWindow => {
+        mainWindow().webContents.loadURL(`${SITE}/chat`);
+
+        return mainWindow();
+    };
+    const menuItem = (menu: string, label: string) =>
+        fake()
+            .applicationMenu
+            ?.template
+            .find((entry) => entry.label === menu)
+            ?.submenu
+            ?.find((item) => item.label === label);
+
+    it("creates the site windows hidden, on the dark background, and shows one at its first paint", () => {
+        fake().ipc.get("neore:open-thread-window")?.(siteSender(), "thread-ready");
+
+        const win = fake().windows.at(-1) as FakeWindow;
+
+        expect(mainWindow().options).toMatchObject({ backgroundColor: "#212121", show: false });
+        expect(win.options).toMatchObject({ backgroundColor: "#212121", show: false });
+        expect(win.shown).toBe(false);
+        (win.handlers.get("ready-to-show") as unknown as () => void)();
+        expect(win.shown).toBe(true);
+    });
+
+    it("shows a thread window that never paints once its load fails", () => {
+        fake().ipc.get("neore:open-thread-window")?.(siteSender(), "thread-paint");
+
+        const win = fake().windows.at(-1) as FakeWindow;
+        const failed = guardOf(win, "did-fail-load") as unknown as (event: unknown, code: number, text: string, url: string, isMainFrame: boolean) => void;
+
+        expect(win.options).toMatchObject({ show: false });
+        expect(win.shown).toBe(false);
+        failed({}, -105, "ERR_NAME_NOT_RESOLVED", `${SITE}/chat/thread-paint`, true);
+        expect(win.shown).toBe(true);
+    });
+
+    it("answers the accent colour as #rrggbb to the site only", () => {
+        const get = fake().ipc.get("neore:get-system-accent-color");
+
+        expect(get?.(siteSender())).toBe("#0a84ff");
+        expect(() => get?.(sender("https://example.org/"))).toThrow("untrusted");
+    });
+
+    it("sends a changed accent colour to the site windows", () => {
+        const win = onSite();
+
+        fake().accentColor = "FF0000FF";
+        fake().payloads.length = 0;
+        fake().accentListeners.forEach((listener) => listener());
+        fake().accentColor = "0a84ffff";
+
+        expect(fake().payloads).toContainEqual({ channel: "neore:system-accent-color", payload: "#ff0000", window: win.id });
+        expect(fake().payloads.every((sent) => sent.window !== composer().id)).toBe(true);
+    });
+
+    it("installs an application menu whose New Chat and Settings reach the site window in front", () => {
+        const win = onSite();
+
+        fake().payloads.length = 0;
+        fake().focusedWindow = win;
+        menuItem("File", "New Chat")?.click?.();
+        fake().focusedWindow = composer();
+        menuItem("File", "Settings…")?.click?.();
+        fake().focusedWindow = null;
+
+        expect(fake().payloads).toStrictEqual([
+            { channel: "neore:menu-command", payload: "new-chat", window: win.id },
+            { channel: "neore:menu-command", payload: "settings", window: win.id },
+        ]);
+    });
+
+    it("opens the docs in the system browser from Help", () => {
+        fake()
+            .applicationMenu
+            ?.template
+            .find((entry) => entry.role === "help")
+            ?.submenu?.[0]
+            ?.click?.();
+
+        expect(fake().opened.at(-1)).toBe(`${SITE}/docs`);
     });
 });
 
