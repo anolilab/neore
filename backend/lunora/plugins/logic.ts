@@ -213,7 +213,5 @@ export const isCompletePluginExport = (
         return false;
     }
 
-    return children.every(
-        (child) => selectedIds.has(child.id) && child.state === "created" && child.pendingHash === undefined && child.currentHash === child.contentHash,
-    );
+    return children.every((child) => selectedIds.has(child.id) && child.state === "created" && !child.pendingHash && child.currentHash === child.contentHash);
 };
