@@ -35845,6 +35845,10 @@ msgstr "Variáveis:"
 msgid "Vault"
 msgstr "Cofre"
 
+#: src/features/chat/thread/composer-tiptap/file-mention-popup.tsx
+msgid "In this project"
+msgstr "Neste projeto"
+
 #: src/features/chat/thread/composer-tiptap/file-mention-popup.tsx:392
 msgid "Vault files"
 msgstr "Arquivos do cofre"

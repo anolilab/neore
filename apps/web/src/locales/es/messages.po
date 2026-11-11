@@ -35845,6 +35845,10 @@ msgstr "Variables:"
 msgid "Vault"
 msgstr "Bóveda"
 
+#: src/features/chat/thread/composer-tiptap/file-mention-popup.tsx
+msgid "In this project"
+msgstr "En este proyecto"
+
 #: src/features/chat/thread/composer-tiptap/file-mention-popup.tsx:392
 msgid "Vault files"
 msgstr "Archivos de la bóveda"

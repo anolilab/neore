@@ -27,6 +27,7 @@ import { useLunoraActionOptions } from "@/lib/lunora/crpc";
 
 import type { ComposerSlashState, SlashCommandMatch } from "./extensions/slash-command";
 import { clearedCommandRange, isBareCommand, isPrefixOfCommand } from "./extensions/slash-command";
+import { POPUP_ENTER_MOTION, POPUP_ROW_MOTION } from "./popup-motion";
 
 ("use client");
 
@@ -50,6 +51,8 @@ interface SlashCommandPopupProps {
     onReplace: (from: number, to: number, replacement: string) => void;
     /** The editor's whole text now; a `/clear` that finished reads it, so an edit the menu has not seen yet is not cut. */
     readDraft: () => string;
+    /** The composer has focus after first paint: load the prompts and skills now, so "/prompt" and "/skill" open with them. */
+    warm?: boolean;
 }
 
 // `/model` stays first: the list is not filtered for a partial command, so Enter on a bare `/` picks the first entry,
@@ -134,7 +137,17 @@ const filterSkills = (skills: Doc<"skills">[], query: string): Doc<"skills">[] =
 // Main Component
 // ============================================================================
 
-const SlashCommandPopup: FC<SlashCommandPopupProps> = ({ currentThreadId, editorRect, favoriteModelIds, match, models, onDismiss, onReplace, readDraft }) => {
+const SlashCommandPopup: FC<SlashCommandPopupProps> = ({
+    currentThreadId,
+    editorRect,
+    favoriteModelIds,
+    match,
+    models,
+    onDismiss,
+    onReplace,
+    readDraft,
+    warm = false,
+}) => {
     const { i18n } = useLingui();
     const selectedModel = useModelStore((state) => state.selectedModel);
     const setSelectedModelStore = useModelStore((state) => state.setSelectedModel);
@@ -153,13 +166,13 @@ const SlashCommandPopup: FC<SlashCommandPopupProps> = ({ currentThreadId, editor
     const [prompts, setPrompts] = useState<Doc<"prompts">[]>([]);
     const [skills, setSkills] = useState<Doc<"skills">[]>([]);
 
-    // Loaded once, on the first "/" — not on mount: the editor mounts this popup
-    // permanently, and two actions on every first paint of /chat queued on the
-    // one `__root__` shard (see `e2e/first-paint.e2e.test.ts`).
+    // Loaded once, when the composer is warm (`use-mention-prefetch.ts`) or on the first "/" — not on mount: the editor
+    // mounts this popup permanently, and two actions on every first paint of /chat queued on the one `__root__` shard
+    // (see `e2e/first-paint.e2e.test.ts`).
     const hasMatch = match !== null;
     const [shouldLoad, setShouldLoad] = useState(false);
 
-    if (hasMatch && !shouldLoad) {
+    if ((hasMatch || warm) && !shouldLoad) {
         setShouldLoad(true);
     }
 
@@ -473,7 +486,7 @@ const SlashCommandPopup: FC<SlashCommandPopupProps> = ({ currentThreadId, editor
                     "border-border dark:border-white/10",
                     "shadow-md dark:shadow-xl dark:shadow-black/50",
                     "ring-foreground/10 ring-1 dark:ring-white/10",
-                    "animate-in fade-in-0 zoom-in-95 slide-in-from-bottom-2",
+                    POPUP_ENTER_MOTION,
                 )}
                 style={{ width: MENU_WIDTH }}
             >
@@ -487,7 +500,7 @@ const SlashCommandPopup: FC<SlashCommandPopupProps> = ({ currentThreadId, editor
                                     </CommandGroupLabel>
                                     {(items as ReadonlyArray<(typeof COMMANDS)[number]>).map((command, index) => (
                                         <CommandItem
-                                            className={clsx("transition-colors", index === selectedIndex && "bg-accent text-accent-foreground")}
+                                            className={clsx(POPUP_ROW_MOTION, index === selectedIndex && "bg-accent text-accent-foreground")}
                                             key={command.id}
                                             onClick={(e) => {
                                                 e.preventDefault();
@@ -513,7 +526,7 @@ const SlashCommandPopup: FC<SlashCommandPopupProps> = ({ currentThreadId, editor
                                         return (
                                             <CommandItem
                                                 className={clsx(
-                                                    "transition-colors",
+                                                    POPUP_ROW_MOTION,
                                                     index === selectedIndex && "bg-accent text-accent-foreground",
                                                     !isSelectable && "cursor-not-allowed opacity-50",
                                                 )}
@@ -551,7 +564,7 @@ const SlashCommandPopup: FC<SlashCommandPopupProps> = ({ currentThreadId, editor
                                     </CommandGroupLabel>
                                     {(items as Doc<"prompts">[]).map((prompt, index) => (
                                         <CommandItem
-                                            className={clsx("transition-colors", index === selectedIndex && "bg-accent text-accent-foreground")}
+                                            className={clsx(POPUP_ROW_MOTION, index === selectedIndex && "bg-accent text-accent-foreground")}
                                             key={prompt._id}
                                             onClick={(e) => {
                                                 e.preventDefault();
@@ -584,7 +597,7 @@ const SlashCommandPopup: FC<SlashCommandPopupProps> = ({ currentThreadId, editor
                                     </CommandGroupLabel>
                                     {(items as Doc<"skills">[]).map((skill, index) => (
                                         <CommandItem
-                                            className={clsx("transition-colors", index === selectedIndex && "bg-accent text-accent-foreground")}
+                                            className={clsx(POPUP_ROW_MOTION, index === selectedIndex && "bg-accent text-accent-foreground")}
                                             key={skill._id}
                                             onClick={(e) => {
                                                 e.preventDefault();

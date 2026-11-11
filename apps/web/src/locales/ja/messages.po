@@ -35845,6 +35845,10 @@ msgstr "変数："
 msgid "Vault"
 msgstr "Vault"
 
+#: src/features/chat/thread/composer-tiptap/file-mention-popup.tsx
+msgid "In this project"
+msgstr "このプロジェクト内"
+
 #: src/features/chat/thread/composer-tiptap/file-mention-popup.tsx:392
 msgid "Vault files"
 msgstr "ボールトのファイル"

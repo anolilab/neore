@@ -35845,6 +35845,10 @@ msgstr "变量："
 msgid "Vault"
 msgstr "保险库"
 
+#: src/features/chat/thread/composer-tiptap/file-mention-popup.tsx
+msgid "In this project"
+msgstr "在此项目中"
+
 #: src/features/chat/thread/composer-tiptap/file-mention-popup.tsx:392
 msgid "Vault files"
 msgstr "文件库文件"
