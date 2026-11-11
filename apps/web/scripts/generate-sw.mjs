@@ -8,7 +8,7 @@
  */
 
 import { createHash } from "node:crypto";
-import { readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 import { generateSW } from "workbox-build";
@@ -177,6 +177,15 @@ try {
     const offlineShell = JSON.stringify({ catalog: appShell.catalog, entry: appShell.entry, revision: appShell.revision, url: OFFLINE_SHELL_URL });
 
     writeFileSync(swDest, `self.__NEORE_OFFLINE_SHELL__ = ${offlineShell};\n${readFileSync(swDest, "utf8")}`);
+
+    // Workbox wrote sw.js.map for the file without that line: one leading `;` (an empty first line) keeps every mapping on its line.
+    const swMap = `${swDest}.map`;
+
+    if (existsSync(swMap)) {
+        const map = JSON.parse(readFileSync(swMap, "utf8"));
+
+        writeFileSync(swMap, JSON.stringify({ ...map, mappings: `;${map.mappings}` }));
+    }
 
     /**
      * Workbox reports every over-limit file as a warning. Here that is the

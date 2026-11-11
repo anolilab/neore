@@ -503,6 +503,19 @@ describe("generate-sw.mjs", () => {
         expect(sw).toMatch(/importScripts\([^)]*"offline-shell-sw\.js"/u);
     });
 
+    it("shifts sw.js.map down one line for the config line put in front of sw.js", () => {
+        const sw = generate(ENTRY);
+        const dir = dirs.at(-1) as string;
+        const map = JSON.parse(readFileSync(join(dir, "sw.js.map"), "utf8")) as { mappings: string };
+
+        expect(sw.split("\n")[0]).toMatch(/^self\.__NEORE_OFFLINE_SHELL__ = /u);
+        // `;` separates generated lines: the config line maps to nothing, and Workbox's first line keeps its mappings.
+        const [configLine, workboxFirstLine] = map.mappings.split(";");
+
+        expect(configLine).toBe("");
+        expect(workboxFirstLine).not.toBe("");
+    }, 30_000);
+
     it("changes the revision with the client manifest", () => {
         const first = config(generate(ENTRY));
         const second = config(generate("assets/index-Ef56Gh78.js"));
