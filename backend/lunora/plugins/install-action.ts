@@ -169,14 +169,15 @@ export const installPlugin = authAction
             });
 
             try {
-                const items = await runBundleImport(entries, selected, ops);
+                const items = await runBundleImport(entries, selected, ops, { keepOnRateLimit: true });
 
                 await ctx.runMutation(internal.plugins.install_steps.finishInstall, { generation, installId });
 
                 return { installId, items };
             } catch (error) {
-                // Rows the rollback could not remove keep the install as `needs-repair`; a clean rollback removes it.
-                if (error instanceof BundleImportError && error.leftBehind.length > 0) {
+                // A rate limit keeps the rows created so far, and repair finishes the rest. Rows the rollback could not remove keep the
+                // install as `needs-repair` too; a clean rollback removes it.
+                if (error instanceof BundleImportError && (error.resumable || error.leftBehind.length > 0)) {
                     await ctx.runMutation(internal.plugins.install_steps.markNeedsRepair, { generation, installId });
                 } else {
                     await ctx.runMutation(internal.plugins.install_steps.deleteInstall, { generation, installId });

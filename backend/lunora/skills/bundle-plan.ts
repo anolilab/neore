@@ -473,11 +473,14 @@ export interface ImportedItem {
 export class BundleImportError extends Error {
     /** What could not be removed again after the failure. */
     leftBehind: string[];
+    /** Set when the rows created so far are kept on purpose, so a repair can finish the rest (a rate limit). */
+    resumable: boolean;
 
-    constructor(message: string, leftBehind: string[]) {
+    constructor(message: string, leftBehind: string[], resumable = false) {
         super(message);
         this.name = "BundleImportError";
         this.leftBehind = leftBehind;
+        this.resumable = resumable;
     }
 }
 
@@ -547,7 +550,12 @@ const createPlanned = async (entry: PlanEntry, ops: BundleOps, idByKey: Map<stri
  * of them fails. Removal is best effort (each create is its own mutation): an
  * item it cannot remove is named in the error; a skill and a trigger stay switched off, a group chat starts nothing.
  */
-export const runBundleImport = async (entries: ReadonlyArray<PlanEntry>, selected: ReadonlySet<string>, ops: BundleOps): Promise<ImportedItem[]> => {
+export const runBundleImport = async (
+    entries: ReadonlyArray<PlanEntry>,
+    selected: ReadonlySet<string>,
+    ops: BundleOps,
+    options: { keepOnRateLimit?: boolean } = {},
+): Promise<ImportedItem[]> => {
     const created: ImportedItem[] = [];
     const idByKey = new Map<string, string>();
     const order: Record<BundleItemKind, number> = { group: 1, skill: 0, trigger: 2 };
@@ -607,6 +615,11 @@ export const runBundleImport = async (entries: ReadonlyArray<PlanEntry>, selecte
         try {
             created.push(await createPlanned(entry, ops, idByKey));
         } catch (error) {
+            // A rate limit is not a failure of the import: what was created is kept, and a repair resumes the rest.
+            if (options.keepOnRateLimit && error instanceof LunoraError && error.code === "TOO_MANY_REQUESTS") {
+                throw new BundleImportError(`"${entry.title}" hit the rate limit. What was created so far is kept, and repair finishes the rest.`, [], true);
+            }
+
             const { failed, kept } = await rollback();
             const reason = messageOf(error);
             const failedNote = failed.length === 0 ? "" : ` These could not be removed again: ${failed.join(", ")}. Delete them by hand.`;
