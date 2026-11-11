@@ -124,7 +124,8 @@ export const attachApprovalTapListener = (
         try {
             const launch = await source.getLast();
 
-            if (launch) {
+            // A listener removed while the launch response was being read leaves it for the next listener: it does not claim it.
+            if (launch && isActive) {
                 // Keyed by the tap, not the alert: a default tap on an alert must not hide a later approve or deny on the same alert.
                 const launchKey = tapKey(launch);
 

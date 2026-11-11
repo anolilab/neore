@@ -34,6 +34,35 @@ const attach = (source: TapSource, answer: (value: unknown) => Promise<void>) =>
     attachApprovalTapListener(source, answer as never, new Set<string>(), new Set<string>());
 
 describe("attachApprovalTapListener", () => {
+    it("leaves a launch response to the next listener when this one was removed while reading it", async () => {
+        const answered = new Set<string>();
+        const replayed = new Set<string>();
+        const answer = vi.fn(async (_value: ApprovalAnswer) => true as const);
+        const slow: TapSource = {
+            addListener: () => ({ remove: () => undefined }),
+            getLast: () =>
+                new Promise<TapResponse>((resolve) => {
+                    setTimeout(() => {
+                        resolve(tap("n1", "approve"));
+                    }, 5);
+                }),
+        };
+
+        const removed = attachApprovalTapListener(slow, answer, answered, replayed);
+
+        removed.remove();
+        await removed.launched;
+
+        expect(answer).not.toHaveBeenCalled();
+        expect(replayed.size).toBe(0);
+
+        const next = attachApprovalTapListener(fakeSource(tap("n1", "approve")), answer, answered, replayed);
+
+        await next.launched;
+
+        expect(answer).toHaveBeenCalledTimes(1);
+    });
+
     it("logs a failure's code only when it has the shape of a machine code, never a token that a code could carry", async () => {
         const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
         const failing = vi.fn(async (_value: ApprovalAnswer): Promise<boolean | undefined> => {
