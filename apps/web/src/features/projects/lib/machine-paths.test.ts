@@ -4,6 +4,7 @@ import type { AddProjectMachine } from "../../../../../desktop/src/add-project-m
 import {
     failureText,
     folderNeedsSharing,
+    hostSpecOf,
     isAbsolutePath,
     isAlreadySharedError,
     isMissingFolderError,
@@ -20,6 +21,7 @@ const machine = (overrides: Partial<AddProjectMachine>): AddProjectMachine => {
         kind: "server",
         label: "Connected",
         name: "box",
+        spec: null,
         sshAlias: "box",
         status: "connected",
         ...overrides,
@@ -77,6 +79,25 @@ describe("machineRowState", () => {
 
     it("connects an ssh host that is not connected yet", () => {
         expect(machineRowState(machine({ id: null, status: "not-connected" }))).toEqual({ kind: "needs-connect", sshAlias: "box" });
+    });
+
+    it("pairs an ssh host that this computer has not paired yet, with the spec it needs", () => {
+        const spec = { address: "box.example.com", identityFile: null, name: "box", port: 22, user: "me" };
+
+        expect(machineRowState(machine({ id: null, spec, status: "unpaired" }))).toEqual({ kind: "needs-pair", spec, sshAlias: "box" });
+    });
+
+    it("gives the shell a spec without a key file when the config names none", () => {
+        const spec = { address: "box.example.com", identityFile: null, name: "box", port: 2222, user: "me" };
+
+        expect(hostSpecOf(spec)).toEqual({ address: "box.example.com", name: "box", port: 2222, user: "me" });
+        expect(hostSpecOf({ ...spec, identityFile: "/k/id" })).toEqual({
+            address: "box.example.com",
+            identityFile: "/k/id",
+            name: "box",
+            port: 2222,
+            user: "me",
+        });
     });
 
     it("picks a connected server and this computer directly", () => {

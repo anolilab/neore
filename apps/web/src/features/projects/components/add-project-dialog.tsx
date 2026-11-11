@@ -11,12 +11,13 @@ import type { KeyboardEvent } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useCRPC } from "@/lib/lunora/crpc";
-import { getAddProjectBridge } from "@/lib/native/bridge";
+import { getAddProjectBridge, pairNativeHost, probeNativeHost } from "@/lib/native/bridge";
 
-import type { AddProjectMachine, MachineFolderPage } from "../../../../../desktop/src/add-project-machines.types";
+import type { AddProjectMachine, AddProjectMachinesBridge, MachineFolderPage, MachineServerSpec } from "../../../../../desktop/src/add-project-machines.types";
 import {
     failureText,
     folderNeedsSharing,
+    hostSpecOf,
     isAbsolutePath,
     isAlreadySharedError,
     isMissingFolderError,
@@ -83,6 +84,8 @@ const AddProjectContent = ({ onClose, onCreateNew }: Omit<AddProjectDialogProps,
     const { t } = useLingui();
     const crpc = useCRPC();
     const { mutateAsync: createProject } = useMutation(crpc.projects.functions.createProject.mutationOptions());
+    const { mutateAsync: registerDevice } = useMutation(crpc.devices.functions.registerDevice.mutationOptions());
+    const { mutateAsync: revokeDevice } = useMutation(crpc.devices.functions.revokeDevice.mutationOptions());
     const titleReference = useRef<HTMLHeadingElement>(null);
 
     const [machines, setMachines] = useState<AddProjectMachine[] | null>(null);
@@ -172,6 +175,39 @@ const AddProjectContent = ({ onClose, onCreateNew }: Omit<AddProjectDialogProps,
         titleReference.current?.focus();
     }, [step]);
 
+    /** Pairs an ssh host as the Add a server form does: probe, register a device, pair it in the shell. Declining undoes the device. */
+    const pairServer = async (bridge: AddProjectMachinesBridge, sshAlias: string, spec: MachineServerSpec): Promise<Attempt<AddProjectMachine>> => {
+        const desktopId = machines?.find((candidate) => candidate.kind === "this-computer")?.id ?? null;
+
+        if (desktopId === null) {
+            return { error: new Error(t`This computer must be paired first.`), ok: false };
+        }
+
+        const nativeSpec = hostSpecOf(spec);
+        const probe = await attempt(() => probeNativeHost(nativeSpec));
+
+        if (!probe.ok) {
+            return { error: probe.error, ok: false };
+        }
+
+        const registered = await attempt(() => registerDevice({ name: spec.name, platform: probe.value.platform, viaDeviceId: desktopId as Id<"devices"> }));
+
+        if (!registered.ok) {
+            return { error: registered.error, ok: false };
+        }
+
+        const { deviceId, secret } = registered.value;
+        const confirmed = await attempt(() => pairNativeHost({ deviceId, secret, spec: nativeSpec }));
+
+        if (!confirmed.ok || !confirmed.value) {
+            await attempt(() => revokeDevice({ deviceId: deviceId as Id<"devices"> }));
+
+            return { error: new Error(t`Adding the server was cancelled on this computer.`), ok: false };
+        }
+
+        return attempt(() => bridge.connectAddProjectMachine(sshAlias));
+    };
+
     const pick = async (row: AddProjectMachine): Promise<void> => {
         const state = machineRowState(row);
         const bridge = getAddProjectBridge();
@@ -184,10 +220,13 @@ const AddProjectContent = ({ onClose, onCreateNew }: Omit<AddProjectDialogProps,
 
         let target = row;
 
-        if (state.kind === "needs-connect") {
+        if (state.kind === "needs-connect" || state.kind === "needs-pair") {
             setPendingKey(state.sshAlias);
 
-            const connected = await attempt(() => bridge.connectAddProjectMachine(state.sshAlias));
+            const connected =
+                state.kind === "needs-pair"
+                    ? await pairServer(bridge, state.sshAlias, state.spec)
+                    : await attempt(() => bridge.connectAddProjectMachine(state.sshAlias));
 
             setPendingKey(null);
 

@@ -17,11 +17,16 @@ vi.mock("@lingui/react/macro", () => {
 });
 
 const createProject = vi.fn(async (_args: unknown) => "project-1");
+const registerDevice = vi.fn(async (_args: unknown) => {
+    return { deviceId: "srv-new", secret: "s3cret" };
+});
+const revokeDevice = vi.fn(async (_args: unknown) => null);
+const mutations: Record<string, (args: unknown) => Promise<unknown>> = { registerDevice, revokeDevice };
 
 vi.mock("@tanstack/react-query", () => {
     return {
-        useMutation: () => {
-            return { mutateAsync: createProject };
+        useMutation: (options: { name: string }) => {
+            return { mutateAsync: mutations[options.name] ?? createProject };
         },
     };
 });
@@ -30,11 +35,25 @@ vi.mock("@/lib/lunora/crpc", () => {
     return {
         useCRPC: () => {
             return {
+                devices: {
+                    functions: {
+                        registerDevice: {
+                            mutationOptions: () => {
+                                return { name: "registerDevice" };
+                            },
+                        },
+                        revokeDevice: {
+                            mutationOptions: () => {
+                                return { name: "revokeDevice" };
+                            },
+                        },
+                    },
+                },
                 projects: {
                     functions: {
                         createProject: {
                             mutationOptions: () => {
-                                return {};
+                                return { name: "createProject" };
                             },
                         },
                     },
@@ -46,11 +65,51 @@ vi.mock("@/lib/lunora/crpc", () => {
 
 const THIS_COMPUTER = /This computer/;
 const OLD = /old/;
+const NEW = /^new/;
+
+const NEW_SPEC = { address: "new.example.com", identityFile: null, name: "new", port: 22, user: "me" };
 
 const machines = [
-    { disabledReason: null, id: "local", kind: "this-computer", label: "This computer", name: "This computer", sshAlias: null, status: "this-computer" },
-    { disabledReason: null, id: null, kind: "server", label: "SSH · box · not connected yet", name: "box", sshAlias: "box", status: "not-connected" },
-    { disabledReason: "Not paired on this computer", id: null, kind: "server", label: "SSH · old", name: "old", sshAlias: "old", status: "unpaired" },
+    {
+        disabledReason: null,
+        id: "local",
+        kind: "this-computer",
+        label: "This computer",
+        name: "This computer",
+        spec: null,
+        sshAlias: null,
+        status: "this-computer",
+    },
+    {
+        disabledReason: null,
+        id: null,
+        kind: "server",
+        label: "SSH · box · not connected yet",
+        name: "box",
+        spec: null,
+        sshAlias: "box",
+        status: "not-connected",
+    },
+    {
+        disabledReason: "Not paired on this computer",
+        id: null,
+        kind: "server",
+        label: "SSH · old",
+        name: "old",
+        spec: null,
+        sshAlias: "old",
+        status: "unpaired",
+    },
+    {
+        disabledReason: null,
+        id: null,
+        kind: "server",
+        label: "SSH · new · not connected yet",
+        name: "new",
+        spec: NEW_SPEC,
+        sshAlias: "new",
+        status: "unpaired",
+    },
 ];
 
 const installBridge = () => {
@@ -58,8 +117,15 @@ const installBridge = () => {
         browseMachineFolders: vi.fn(async ({ path }: { path: string }) => {
             return { entries: [{ name: "app" }, { name: "docs" }], host: "This computer", next: null, parent: null, path: path === "" ? "/home/me" : path };
         }),
-        connectAddProjectMachine: vi.fn(),
+        connectAddProjectMachine: vi.fn(async () => {
+            return { disabledReason: null, id: "srv-new", kind: "server", label: "Connected", name: "new", spec: null, sshAlias: "new", status: "connected" };
+        }),
         createMachineFolder: vi.fn(),
+        execute: vi.fn(),
+        hostPair: vi.fn(async () => true),
+        hostProbe: vi.fn(async () => {
+            return { platform: "linux", sandboxAvailable: true, sandboxDetail: "", version: "0.0.0" };
+        }),
         listAddProjectMachines: vi.fn(async () => machines),
         shareMachineFolder: vi.fn(async () => {
             return { shared: true };
@@ -104,6 +170,8 @@ beforeEach(() => {
 afterEach(() => {
     vi.unstubAllGlobals();
     createProject.mockClear();
+    registerDevice.mockClear();
+    revokeDevice.mockClear();
 });
 
 describe("AddProjectDialog", () => {
@@ -129,6 +197,36 @@ describe("AddProjectDialog", () => {
 
         // eslint-disable-next-line testing-library/no-node-access -- the spinner is an icon with no role, so its class is the only mark of it
         expect(computer.querySelector(".animate-spin")).toBeNull();
+    });
+
+    it("pairs an unpaired server as the Add a server form does, then browses it", async () => {
+        const device = installBridge();
+
+        render(<AddProjectDialog onClose={() => {}} onCreateNew={() => {}} open />);
+        fireEvent.click(await screen.findByRole("button", { name: NEW }));
+
+        expect(await screen.findByText("Add project on new")).toBeTruthy();
+        expect(device.hostProbe).toHaveBeenCalledWith({ address: "new.example.com", name: "new", port: 22, user: "me" });
+        expect(registerDevice).toHaveBeenCalledWith({ name: "new", platform: "linux", viaDeviceId: "local" });
+        expect(device.hostPair).toHaveBeenCalledWith({
+            deviceId: "srv-new",
+            secret: "s3cret",
+            spec: { address: "new.example.com", name: "new", port: 22, user: "me" },
+        });
+        expect(device.connectAddProjectMachine).toHaveBeenCalledWith("new");
+        expect(revokeDevice).not.toHaveBeenCalled();
+    });
+
+    it("revokes the device it registered when the person declines the pairing", async () => {
+        const device = installBridge();
+
+        device.hostPair.mockResolvedValueOnce(false);
+        render(<AddProjectDialog onClose={() => {}} onCreateNew={() => {}} open />);
+        fireEvent.click(await screen.findByRole("button", { name: NEW }));
+
+        expect(await screen.findByText("Adding the server was cancelled on this computer.")).toBeTruthy();
+        expect(revokeDevice).toHaveBeenCalledWith({ deviceId: "srv-new" });
+        expect(device.connectAddProjectMachine).not.toHaveBeenCalled();
     });
 
     it("browses a folder on this computer and adds the project titled with the folder's name", async () => {

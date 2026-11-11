@@ -1,4 +1,6 @@
-import type { AddProjectMachine } from "../../../../../desktop/src/add-project-machines.types";
+import type { NativeHostSpec } from "@/lib/native/bridge";
+
+import type { AddProjectMachine, MachineServerSpec } from "../../../../../desktop/src/add-project-machines.types";
 
 const DRIVE_ONLY = /^[a-z]:$/i;
 const DRIVE_ROOT = /^[a-z]:[/\\]$/i;
@@ -71,12 +73,20 @@ export const joinPath = (folder: string, name: string): string => {
 /** A path the desktop accepts: absolute, no NUL. */
 export const isAbsolutePath = (path: string): boolean => !path.includes("\0") && (path.startsWith("/") || DRIVE_ABSOLUTE.test(path));
 
-export type MachineRowState = { kind: "disabled"; reason: string } | { kind: "needs-connect"; sshAlias: string } | { kind: "ready"; machineId: string };
+export type MachineRowState =
+    | { kind: "disabled"; reason: string }
+    | { kind: "needs-connect"; sshAlias: string }
+    | { kind: "needs-pair"; spec: MachineServerSpec; sshAlias: string }
+    | { kind: "ready"; machineId: string };
 
 /** What picking a row does. A row with a reason, or with nothing to reach it by, is disabled. */
 export const machineRowState = (machine: AddProjectMachine): MachineRowState => {
     if (machine.disabledReason !== null) {
         return { kind: "disabled", reason: machine.disabledReason };
+    }
+
+    if (machine.spec !== null && machine.sshAlias !== null) {
+        return { kind: "needs-pair", spec: machine.spec, sshAlias: machine.sshAlias };
     }
 
     if (machine.id !== null && machine.status !== "not-connected") {
@@ -88,6 +98,17 @@ export const machineRowState = (machine: AddProjectMachine): MachineRowState => 
     }
 
     return { kind: "disabled", reason: "" };
+};
+
+/** The shell's description of an ssh host, from the desktop's spec; the key file is sent only when the config names one. */
+export const hostSpecOf = (spec: MachineServerSpec): NativeHostSpec => {
+    return {
+        address: spec.address,
+        name: spec.name,
+        port: spec.port,
+        user: spec.user,
+        ...(spec.identityFile !== null && { identityFile: spec.identityFile }),
+    };
 };
 
 /** A folder on a server must be among that server's shared folders before a project can point at it. */
