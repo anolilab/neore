@@ -10,7 +10,8 @@ import { OFFLINE_SHELL_PATH } from "../src/lib/offline-shell";
 const ELECTRON_UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Neore/1.0.0 Chrome/140.0.0.0 Electron/45.0.0 Safari/537.36";
 const CHROME_UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36";
 const ENTRY = "assets/index-Ab12Cd34.js";
-const SHELL = { entry: ENTRY, revision: "rev2", url: "/offline-shell" };
+const CATALOG = "/assets/messages-Ab12Cd34.js";
+const SHELL = { catalog: CATALOG, entry: ENTRY, revision: "rev2", url: "/offline-shell" };
 const SHELL_HTML = `<html><script type="module" src="/${ENTRY}"></script></html>`;
 
 interface FakeEvent {
@@ -34,6 +35,10 @@ const fakeCaches = (initial: Record<string, Record<string, Response>> = {}) => {
         const store = stores.get(name) as Map<string, Response>;
 
         return {
+            // The real `add` fetches the URL; what is kept is all these tests look at.
+            add: vi.fn(async (url: string) => {
+                store.set(url, new Response(`fetched ${url}`));
+            }),
             match: async (url: string) => store.get(url),
             put: async (url: string, response: Response) => {
                 store.set(url, response);
@@ -121,6 +126,10 @@ const offline = () =>
     });
 
 describe("offline-shell-sw.js", () => {
+    afterEach(() => {
+        vi.restoreAllMocks();
+    });
+
     it("does nothing without the config generate-sw.mjs writes into sw.js", () => {
         expect(load({ __NEORE_OFFLINE_SHELL__: undefined }).size).toBe(0);
     });
@@ -323,6 +332,46 @@ describe("offline-shell-sw.js", () => {
         await expect(navigate(load({ caches: fakeCaches(), fetch: failing })).answer).rejects.toThrow("Failed to fetch");
     });
 
+    it("answers the offline page when reading the kept shell fails, and the network error when that fails too", async () => {
+        const failing = offline();
+        const broken = fakeCaches({ "workbox-precache-v2": { "/offline.html?__WB_REVISION__=abc": html("offline") } });
+
+        broken.open = vi.fn(async () => {
+            throw new DOMException("quota", "QuotaExceededError");
+        });
+
+        expect(await (await navigate(load({ caches: broken, fetch: failing })).answer)?.text()).toBe("offline");
+
+        broken.match = vi.fn(async () => {
+            throw new DOMException("broken", "UnknownError");
+        });
+
+        await expect(navigate(load({ caches: broken, fetch: failing })).answer).rejects.toThrow("Failed to fetch");
+    });
+
+    it("keeps the default catalog in bundle-assets on install, and again after a navigation once it is gone", async () => {
+        const caches = fakeCaches();
+
+        await install(load({ caches, fetch: vi.fn(async () => html(SHELL_HTML)) }));
+        expect(await caches.stores.get("bundle-assets")?.get(CATALOG)?.text()).toBe(`fetched ${CATALOG}`);
+
+        caches.stores.get("bundle-assets")?.clear();
+        await navigate(load({ caches, fetch: vi.fn(async () => new Response("page", { status: 200 })) })).settled;
+        expect(caches.stores.get("bundle-assets")?.has(CATALOG)).toBe(true);
+    });
+
+    it("does not fetch a kept catalog again, and keeps none without one in the config", async () => {
+        const kept = fakeCaches({ "bundle-assets": { [CATALOG]: new Response("catalog") } });
+        const bundles = await kept.open("bundle-assets");
+        const none = fakeCaches();
+
+        await install(load({ caches: kept, fetch: vi.fn(async () => html(SHELL_HTML)) }));
+        await install(load({ __NEORE_OFFLINE_SHELL__: { ...SHELL, catalog: undefined }, caches: none, fetch: vi.fn(async () => html(SHELL_HTML)) }));
+
+        expect(bundles.add).not.toHaveBeenCalled();
+        expect(none.stores.get("bundle-assets")?.size ?? 0).toBe(0);
+    });
+
     it("leaves browsers, iframe navigations, form POSTs and non-navigation requests to Workbox", () => {
         const fetch = vi.fn();
         const browser = navigate(load({ caches: fakeCaches(), fetch, navigator: { userAgent: CHROME_UA } }));
@@ -357,7 +406,14 @@ describe("generate-sw.mjs", () => {
         dirs.push(dir);
         mkdirSync(join(dir, ".vite"));
         mkdirSync(join(dir, "assets"));
-        writeFileSync(join(dir, ".vite", "manifest.json"), JSON.stringify({ "client.tsx": { file: entryFile, isEntry: true } }));
+        writeFileSync(
+            join(dir, ".vite", "manifest.json"),
+            JSON.stringify({
+                "client.tsx": { file: entryFile, isEntry: true },
+                "src/locales/en/messages.po": { file: "assets/messages-Ab12Cd34.js", isDynamicEntry: true },
+            }),
+        );
+        writeFileSync(join(dir, "assets", "messages-Ab12Cd34.js"), "export const messages = {};");
         writeFileSync(join(dir, entryFile), "export {};");
         writeFileSync(join(dir, "offline.html"), "<html>offline</html>");
         execFileSync(process.execPath, [resolve(import.meta.dirname, "generate-sw.mjs"), dir], { stdio: "pipe" });
@@ -367,11 +423,11 @@ describe("generate-sw.mjs", () => {
 
     const config = (sw: string) => JSON.parse(/^self\.__NEORE_OFFLINE_SHELL__ = (.+);$/mu.exec(sw)?.[1] ?? "null") as typeof SHELL | null;
 
-    it("writes the config, with this build's entry chunk, before the worker imports offline-shell-sw.js", () => {
+    it("writes the config, with this build's entry chunk and default catalog, before the worker imports offline-shell-sw.js", () => {
         const sw = generate(ENTRY);
 
         // The path the server renders for nobody (`src/lib/root-before-load.ts`) is the one the worker keeps.
-        expect(config(sw)).toStrictEqual({ entry: ENTRY, revision: expect.stringMatching(/^[\da-f]{16}$/u), url: OFFLINE_SHELL_PATH });
+        expect(config(sw)).toStrictEqual({ catalog: CATALOG, entry: ENTRY, revision: expect.stringMatching(/^[\da-f]{16}$/u), url: OFFLINE_SHELL_PATH });
         expect(sw.indexOf("self.__NEORE_OFFLINE_SHELL__ = ")).toBe(0);
         expect(sw.indexOf("define(")).toBeGreaterThan(0);
         expect(sw).toMatch(/importScripts\([^)]*"offline-shell-sw\.js"/u);

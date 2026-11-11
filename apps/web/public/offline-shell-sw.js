@@ -1,9 +1,10 @@
 /**
  * The desktop shell's offline cold start. Imported by the generated service
  * worker (`scripts/generate-sw.mjs` → `importScripts`), which defines
- * `self.__NEORE_OFFLINE_SHELL__ = { entry, revision, url }` above it: the
+ * `self.__NEORE_OFFLINE_SHELL__ = { catalog, entry, revision, url }` above it: the
  * revision changes with every client build, so each deploy keeps the shell that
- * names its own hashed assets, and `entry` is that build's client entry chunk.
+ * names its own hashed assets, `entry` is that build's client entry chunk and
+ * `catalog` its default locale's message catalog chunk.
  * Plain JS and not bundled.
  *
  * - keep (install, and in the background after an online navigation at most
@@ -94,6 +95,25 @@
         await cache.put(config.url, new Response(body, { headers, status: 200 }));
     };
 
+    /**
+     * Puts the default locale's catalog where Workbox's `bundle-assets` rule (`scripts/generate-sw.mjs`) looks for it,
+     * unless it is there: the shell activates the window's locale, and when that catalog was never loaded online the
+     * client falls back to this one (`src/lib/intl/router-plugin.tsx`). Desktop only, unlike a precache entry.
+     */
+    const keepCatalog = async () => {
+        if (typeof config.catalog !== "string") {
+            return;
+        }
+
+        const cache = await self.caches.open("bundle-assets");
+
+        if (!(await cache.match(config.catalog))) {
+            await cache.add(config.catalog);
+        }
+    };
+
+    const quietly = (promise) => promise.catch(() => undefined);
+
     let refreshing;
 
     /** Keeps the shell when it is missing, else fetches it again every `REVALIDATE_MS`; one attempt at a time. */
@@ -109,14 +129,15 @@
     };
 
     const offlineAnswer = async (error) => {
-        const shell = await currentShell();
+        // A storage failure (quota, a broken cache) must not skip the static page; the error that counts is the network's.
+        const shell = await currentShell().catch(() => undefined);
 
         if (shell) {
             return shell;
         }
 
         // Workbox keys a revisioned precache entry with `?__WB_REVISION__=`.
-        const fallback = await self.caches.match("/offline.html", { ignoreSearch: true });
+        const fallback = await self.caches.match("/offline.html", { ignoreSearch: true }).catch(() => undefined);
 
         if (fallback) {
             return fallback;
@@ -130,7 +151,7 @@
             return;
         }
 
-        event.waitUntil(keepShell().catch(() => undefined));
+        event.waitUntil(Promise.all([quietly(keepShell()), quietly(keepCatalog())]));
     });
 
     self.addEventListener("activate", (event) => {
@@ -149,6 +170,11 @@
         event.stopImmediatePropagation();
         event.respondWith(network.catch((error) => offlineAnswer(error)));
         // The network is up: keep the shell if it is missing, and revalidate it now and then.
-        event.waitUntil(network.then(refreshShell, () => undefined));
+        event.waitUntil(
+            network.then(
+                () => Promise.all([refreshShell(), quietly(keepCatalog())]),
+                () => undefined,
+            ),
+        );
     });
 })();

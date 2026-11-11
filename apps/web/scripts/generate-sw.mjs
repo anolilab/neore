@@ -33,6 +33,9 @@ const OFFLINE_FALLBACK_URL = "/offline.html";
  */
 const OFFLINE_SHELL_URL = "/offline-shell";
 
+/** The default locale's catalog (`DEFAULT_LOCALE` in `src/lib/intl/shared.ts`): the offline shell's fallback catalog. */
+const DEFAULT_CATALOG = "src/locales/en/messages.po";
+
 /**
  * The app shell: the client entry and everything it imports STATICALLY, JS and
  * CSS only. That is what every page needs before it can render, so it is what
@@ -87,7 +90,11 @@ const readAppShell = () => {
         throw new Error(`Expected one entry chunk in .vite/manifest.json, found ${entries.length} — is \`build.manifest\` still enabled?`);
     }
 
+    const catalog = manifest[DEFAULT_CATALOG]?.file;
+
     return {
+        // Kept by `offline-shell-sw.js` on the desktop only, not precached: browsers never start from the shell.
+        catalog: catalog && `/${catalog}`,
         // The shell HTML names it; `offline-shell-sw.js` keeps only HTML that does (deploy skew).
         entry: entries[0],
         files: [...files],
@@ -167,7 +174,7 @@ try {
     });
 
     // Read by `offline-shell-sw.js`. In sw.js itself, so a new shell is a new worker.
-    const offlineShell = JSON.stringify({ entry: appShell.entry, revision: appShell.revision, url: OFFLINE_SHELL_URL });
+    const offlineShell = JSON.stringify({ catalog: appShell.catalog, entry: appShell.entry, revision: appShell.revision, url: OFFLINE_SHELL_URL });
 
     writeFileSync(swDest, `self.__NEORE_OFFLINE_SHELL__ = ${offlineShell};\n${readFileSync(swDest, "utf8")}`);
 
