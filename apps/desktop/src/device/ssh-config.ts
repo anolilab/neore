@@ -161,9 +161,11 @@ export const parseSshConfig = (text: string, home: string): SshHost[] => {
     const hosts: SshHost[] = [];
 
     for (const block of blocks) {
-        const aliases = block.aliases.filter((candidate) => !WILDCARD.test(candidate) && !seen.has(candidate));
+        for (const alias of block.aliases) {
+            if (WILDCARD.test(alias) || seen.has(alias)) {
+                continue;
+            }
 
-        for (const alias of aliases) {
             const usesMatch = matchesAnything || matched.has(alias) || (block.hostName !== null && matched.has(block.hostName));
 
             seen.add(alias);

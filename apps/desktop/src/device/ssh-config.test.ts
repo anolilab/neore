@@ -21,6 +21,12 @@ describe("parseSshConfig", () => {
         ]);
     });
 
+    it("lists an alias once when a Host line repeats it", () => {
+        const hosts = parse("Host box box\n  HostName box.example.com\n");
+
+        expect(hosts.map((host) => host.alias)).toEqual(["box"]);
+    });
+
     it("reads keys in any case, with = or quotes, and takes the first value of a key", () => {
         const [host] = parse("host box\n  hostname=a.example.com\n  HostName b.example.com\n  IdentityFile \"/k/one\"\n  IdentityFile /k/two\n");
 
