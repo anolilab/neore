@@ -1050,6 +1050,11 @@ export interface InternalApiTypes {
         repair_resume: {
             beginRepair: FunctionReference<"mutation", { contentHash: string; pluginSlug: string; userId: string }, { generation: number; installId: string; linked: number; missing: Array<{ entryKey: string; intentId: string; kind: "skill" | "trigger" | "group" }>; status: "installed" | "needs-repair" }>;
         };
+        uninstall_action: {
+            beginUninstall: FunctionReference<"mutation", { pluginSlug: string; userId: string }, { generation: number; groups: Array<string>; installId: string; kept: Array<string>; removed: number }>;
+            claimGroup: FunctionReference<"mutation", { generation: number; installId: string; threadId: string }, boolean>;
+            finishUninstall: FunctionReference<"mutation", { generation: number; installId: string }, null>;
+        };
         update: {
             loadInstalledForUpdate: FunctionReference<"query", { pluginSlug: string; userId: string }, null | { children: Array<{ contentHash: string; currentHash: string; entryKey: string; kind: "skill" | "trigger" | "group" }>; installId: string; status: string; version: string }>;
         };
@@ -2401,6 +2406,11 @@ export const internal: InternalApiTypes = {
         },
         repair_resume: {
             beginRepair: { __lunoraRef: "plugins_repair_resume:beginRepair" },
+        },
+        uninstall_action: {
+            beginUninstall: { __lunoraRef: "plugins_uninstall_action:beginUninstall" },
+            claimGroup: { __lunoraRef: "plugins_uninstall_action:claimGroup" },
+            finishUninstall: { __lunoraRef: "plugins_uninstall_action:finishUninstall" },
         },
         update: {
             loadInstalledForUpdate: { __lunoraRef: "plugins_update:loadInstalledForUpdate" },

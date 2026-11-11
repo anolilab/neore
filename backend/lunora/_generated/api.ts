@@ -635,8 +635,8 @@ export interface ApiTypes {
         repair_resume: {
             repairPlugin: FunctionReference<"action", { contentHash: string; markdown: string; pluginSlug: string }, { created: Array<string>; status: "installed" | "needs-repair" }>;
         };
-        uninstall: {
-            uninstallPlugin: FunctionReference<"mutation", { pluginSlug: string }, { kept: Array<string>; removed: number }>;
+        uninstall_action: {
+            uninstallPlugin: FunctionReference<"action", { pluginSlug: string }, { kept: Array<string>; removed: number }>;
         };
         update: {
             previewUpdate: FunctionReference<"action", { markdown: string }, { downgrade: boolean; installedVersion: string; plan: Array<{ action: "create" | "delete" | "detach" | "keep-edited" | "report-group" | "same" | "update"; entryKey: string }>; targetVersion: string }>;
@@ -1567,8 +1567,8 @@ export const api: ApiTypes = {
         repair_resume: {
             repairPlugin: { __lunoraRef: "plugins_repair_resume:repairPlugin" },
         },
-        uninstall: {
-            uninstallPlugin: { __lunoraRef: "plugins_uninstall:uninstallPlugin" },
+        uninstall_action: {
+            uninstallPlugin: { __lunoraRef: "plugins_uninstall_action:uninstallPlugin" },
         },
         update: {
             previewUpdate: { __lunoraRef: "plugins_update:previewUpdate" },
