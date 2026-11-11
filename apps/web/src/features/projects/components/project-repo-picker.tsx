@@ -80,12 +80,18 @@ const ProjectRepoPicker: FC<ProjectRepoPickerProps> = ({ branch, onPick, paging,
             generation.current += 1;
         };
     }, []);
-    const listFor = (id: string) => crpc.projects.functions.listProjectRepos.queryOptions({ projectId: id as Id<"projects"> });
+    // Not live (`NEVER_LIVE`: `.global()` writes reach no subscription), so never answered from a cache older than now.
+    const listFor = (id: string) => {
+        return { ...crpc.projects.functions.listProjectRepos.queryOptions({ projectId: id as Id<"projects"> }), staleTime: 0 };
+    };
     const {
         data: repositories = [],
         isError,
         isPending: reposLoading,
-    } = useQuery(crpc.projects.functions.listProjectRepos.queryOptions(projectId === NO_PROJECT ? skipToken : { projectId: projectId as Id<"projects"> }));
+    } = useQuery({
+        ...crpc.projects.functions.listProjectRepos.queryOptions(projectId === NO_PROJECT ? skipToken : { projectId: projectId as Id<"projects"> }),
+        staleTime: 0,
+    });
     const canLoadMore = paging !== undefined && (paging.hasMore || paging.isLoadingMore);
 
     if (projects.length === 0 && !canLoadMore && paging?.failed !== true) {

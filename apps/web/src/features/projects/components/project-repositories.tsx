@@ -1,25 +1,27 @@
 "use client";
 
 import { useLingui } from "@lingui/react/macro";
-import { api } from "@neore/backend/api";
 import type { Id } from "@neore/backend/dataModel";
 import { Badge } from "@neore/ui/components/badge";
 import { Button } from "@neore/ui/components/button";
 import { Input } from "@neore/ui/components/input";
 import { Label } from "@neore/ui/components/label";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { GitBranch, Plus, Trash2 } from "lucide-react";
 import type { FC, KeyboardEvent } from "react";
 import { useEffect, useId, useRef, useState } from "react";
 
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 import { getLocalizedError } from "@/features/auth/lib/utilities";
-import { useCRPC, useCRPCClient } from "@/lib/lunora/crpc";
+import { useCRPC } from "@/lib/lunora/crpc";
 
 import { repoLabels } from "../lib/repositories";
 
 /** Repositories one project lists, at most; mirrors the backend's limit. */
 const MAX_REPOSITORIES = 20;
+
+/** How often open settings read the list again, for changes another member made. */
+const REPOSITORIES_REFRESH_MS = 15_000;
 
 /** What a refused entry carries (`addProjectRepo`): the field to correct, and why. */
 const refusalOf = (error: unknown): { field?: unknown; reason?: unknown } => (error as { data?: { field?: unknown; reason?: unknown } } | null)?.data ?? {};
@@ -146,36 +148,25 @@ const ProjectRepositories: FC<{ projectId: string }> = ({ projectId }) => {
     const [error, setError] = useState<{ field?: unknown; message: string } | undefined>(undefined);
     const args = { projectId: projectId as Id<"projects"> };
     const { data: project, isError: projectFailed, refetch: retryProject } = useQuery(crpc.projects.functions.getProject.queryOptions(args));
-    const { data: repositories, isError: loadFailed } = useQuery(crpc.projects.functions.listProjectRepos.queryOptions(args));
+    // Not live (`NEVER_LIVE`): `.global()` writes reach no other member's subscription, so the list is read again on
+    // an interval and on focus while the settings are open, and right after each change.
+    const {
+        data: repositories,
+        isError: loadFailed,
+        refetch: refetchList,
+    } = useQuery({
+        ...crpc.projects.functions.listProjectRepos.queryOptions(args),
+        refetchInterval: REPOSITORIES_REFRESH_MS,
+        refetchOnWindowFocus: true,
+        staleTime: 0,
+    });
     const added = useMutation(crpc.projects.functions.addProjectRepo.mutationOptions());
     const removed = useMutation(crpc.projects.functions.removeProjectRepo.mutationOptions());
     const madeDefault = useMutation(crpc.projects.functions.setDefaultProjectRepo.mutationOptions());
     const updated = useMutation(crpc.projects.functions.updateProjectRepo.mutationOptions());
-    const queryClient = useQueryClient();
-    const crpcClient = useCRPCClient();
-    // The list is live, but after each change, landed or refused, a one-shot read writes the current list into the same
-    // cache entry, so the settings never wait on the subscription to report the change. The query's own options stay
-    // as they are: `fetchQuery` would replace them, and with them the live marker. A read is written only while it is
-    // the latest and nothing wrote the list meanwhile: a later change's read, or a live push (another tab's change),
-    // is at least as new, and an older answer must not put back the list from before it.
-    const latestRefresh = useRef(0);
+    // After each change, landed or refused. A refetch cancels one still in flight, so an older answer never lands last.
     const refreshList = () => {
-        latestRefresh.current += 1;
-
-        const refresh = latestRefresh.current;
-        const listKey = crpc.projects.functions.listProjectRepos.queryKey(args);
-        const listedAt = queryClient.getQueryState(listKey)?.dataUpdatedAt;
-
-        void crpcClient
-            .query(api.projects.functions.listProjectRepos, args)
-            .then((list) => {
-                if (refresh !== latestRefresh.current || queryClient.getQueryState(listKey)?.dataUpdatedAt !== listedAt) {
-                    return undefined;
-                }
-
-                return queryClient.setQueryData(listKey, list);
-            })
-            .catch(() => undefined);
+        void refetchList();
     };
     const canEdit = !!project && (!project.userId || project.userId === sessionData?.user?.id);
     // Until the session has answered, an owner would read as someone else: say nothing rather than "owner only".

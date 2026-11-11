@@ -15,7 +15,7 @@ import { logger } from "../lib/logger";
 import { ROOT_SHARD_KEY } from "../lib/shard-context";
 import { MAX_LENGTH } from "../lib/validators";
 import { PROJECTS_PER_DETAILS_READ } from "./export-pages";
-import { DELETION_MARKER_URL } from "./repositories";
+import { DELETION_MARKER_URL, isRepoRow } from "./repositories";
 
 /** A project's repositories, one batch; with `keepMarker`, a delete's marker stays until the delete is done. */
 export const eraseProjectRepositories = async (ctx: MutationCtx, projectId: Id<"projects">, { keepMarker = false } = {}): Promise<BatchResult> => {
@@ -179,7 +179,7 @@ export const collectProjectRepositoriesForExport = internalQuery
             where: { userId },
         });
         const projectRepositories = result.page
-            .filter((row) => row.deletingAt === undefined)
+            .filter((row) => isRepoRow(row))
             .map(({ createdAt, defaultAt, defaultBranch, projectId, url }) => {
                 return { createdAt, projectId, url, ...(defaultAt !== undefined && { defaultAt }), ...(defaultBranch && { defaultBranch }) };
             });

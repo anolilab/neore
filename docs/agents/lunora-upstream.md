@@ -23,6 +23,13 @@ The ORM-facade reads and
 index field of `messages` (read policy: `OR` of `{ userId }` and `{ threadId: { in } }`); the owner-policy `threadGuestLinks`
 honours it. `findSentNote` reads through `admittedThreadDb`; `agent/messages.ts#pinFollowingRowParent` is exposed.
 
+**Not filed yet (owner to decide): `.global()` writes and live queries.** In `@lunora/shard-engine@alpha.193`, only an
+insert into a `.global()` table re-runs the subscriptions that read it, and only on the writer's own Durable Object;
+`patch`, `replace`, `patchIf` and `delete` re-run none. No `.global()` write reaches another shard's subscriptions
+(`@lunora/do`'s `publishLiveFromAction`: "no cross-shard live fan-out"). A `.global()` shape (`defineShape`) is the one
+built-in that polls D1 (every 2s). Until then a list that other members change is read with refetches, not
+subscriptions: `projects_functions:listProjectRepos` is in `NEVER_LIVE` (`apps/web/src/lib/lunora/crpc.tsx`).
+
 Moving queue, mail, push and uploads onto Lunora (2026-10) filed and saw fixed,
 workarounds retired with `@lunora/cli@alpha.365`:
 [#1036](https://github.com/anolilab/lunora/issues/1036) (a `-preview` queue routed
