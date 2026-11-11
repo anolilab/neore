@@ -277,8 +277,6 @@ const NavUser: FC<NavUserProperties> = ({ trigger }) => {
                 onClick={async () => {
                     // Before the request, and it holds writes until the page reloads or the next sign-in: the sidebar stays mounted meanwhile.
                     clearThreadListCache();
-                    // The page reloads after a sign-out, before the handler that drops the unsent drafts would run.
-                    dropStoredDrafts();
                     // Push first, while the session still authenticates the server call.
                     await releasePush();
                     await authClient.signOut({
@@ -297,6 +295,9 @@ const NavUser: FC<NavUserProperties> = ({ trigger }) => {
                                 });
                             },
                             onSuccess: async () => {
+                                // Only once the session ended (a failed sign-out keeps them and their saving), and before the reload,
+                                // which comes before the handler that drops them would run.
+                                dropStoredDrafts();
                                 resetAnalyticsIdentity();
                                 // Only after the session ends: a failed sign-out keeps the badge.
                                 await setNativeBadge(0);

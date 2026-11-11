@@ -122,6 +122,8 @@ export const updateParkedAttachment = (id: string, updates: Partial<PendingAttac
     for (const [threadId, draft] of drafts) {
         if (draft.composerAttachments.some((a) => a.id === id)) {
             drafts.set(threadId, { ...draft, composerAttachments: draft.composerAttachments.map((a) => (a.id === id ? { ...a, ...updates } : a)) });
+            // So the stored copy picks up the finished upload.
+            syncParked();
 
             return true;
         }

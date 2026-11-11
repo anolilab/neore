@@ -10,6 +10,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { DRAFTS_STORAGE_KEY } from "@/features/chat/split/composer-drafts";
+
 import { LockedChatGate } from "./locked-chat-gate";
 
 const harness = vi.hoisted(() => {
@@ -102,6 +104,18 @@ afterEach(() => {
 });
 
 describe("a locked chat behind its gate", () => {
+    it("removes the chat's draft stored before the lock, and leaves the other chats' drafts", async () => {
+        localStorage.setItem(
+            DRAFTS_STORAGE_KEY,
+            JSON.stringify({ d: { "thread-1": { at: Date.now(), t: "secret" }, "thread-2": { at: Date.now(), t: "other" } }, u: "user-1" }),
+        );
+        renderGate();
+        await promptHeading();
+        await vi.dynamicImportSettled();
+
+        expect(JSON.parse(localStorage.getItem(DRAFTS_STORAGE_KEY) ?? "null")?.d).toStrictEqual({ "thread-2": expect.objectContaining({ t: "other" }) });
+    });
+
     it("shows the unlock prompt, not the chat, while no proof is in memory", async () => {
         renderGate();
 

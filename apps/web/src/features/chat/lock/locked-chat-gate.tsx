@@ -64,6 +64,17 @@ export const LockedChatGate = ({ children, lockedExtras, threadId }: { children:
     const refused = isThreadLockedError(error);
     const relockedAndPending = proof === undefined && relocked && !isSuccess && !error;
 
+    // The chat's composer never mounts while the gate holds, so its draft stored before the lock is removed from here.
+    useEffect(() => {
+        if (refused) {
+            void import("@/features/chat/split/stored-drafts")
+                .then(({ lockStoredDraft }) => lockStoredDraft(threadId))
+                .catch(() => {
+                    // The chunk did not load: the chat's composer removes it once it mounts.
+                });
+        }
+    }, [refused, threadId]);
+
     if (!refused && !relockedAndPending) {
         // A relocked chat whose read fails for another reason shows that error, not the prompt,
         // and its content stays unmounted.

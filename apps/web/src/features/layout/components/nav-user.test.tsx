@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { draftGeneration, DRAFTS_STORAGE_KEY } from "@/features/chat/split/composer-drafts";
 import { releaseThreadListWrites, writeThreadListCache } from "@/features/chat/thread-list/lib/thread-list-cache";
 
 import NavUser from "./nav-user";
@@ -153,6 +154,42 @@ describe("NavUser sign-out", () => {
             threads: { page: [{ _id: "t1", title: "Still signed in" }] },
         });
         expect(localStorage).toHaveLength(1);
+    });
+
+    it("keeps the unsent drafts, and their saving, when the sign-out fails", async () => {
+        localStorage.setItem(DRAFTS_STORAGE_KEY, "{}");
+
+        const generation = draftGeneration();
+
+        auth.signOut.mockImplementation(async ({ fetchOptions }: { fetchOptions: { onError: () => void } }) => {
+            fetchOptions.onError();
+        });
+        render(<NavUser />);
+
+        fireEvent.click(screen.getByText("Log out"));
+
+        await vi.waitFor(() => {
+            expect(auth.signOut).toHaveBeenCalled();
+        });
+        expect(localStorage.getItem(DRAFTS_STORAGE_KEY)).toBe("{}");
+        expect(draftGeneration()).toBe(generation);
+    });
+
+    it("drops the unsent drafts once the sign-out succeeded", async () => {
+        localStorage.setItem(DRAFTS_STORAGE_KEY, "{}");
+        vi.stubGlobal("location", { reload: vi.fn() });
+        auth.signOut.mockImplementation(async ({ fetchOptions }: { fetchOptions: { onSuccess: () => Promise<void> } }) => {
+            await fetchOptions.onSuccess();
+        });
+        render(<NavUser />);
+
+        fireEvent.click(screen.getByText("Log out"));
+
+        await vi.waitFor(() => {
+            expect(globalThis.location.reload).toHaveBeenCalled();
+        });
+        vi.unstubAllGlobals();
+        expect(localStorage.getItem(DRAFTS_STORAGE_KEY)).toBeNull();
     });
 
     it("clears it before the request is made", async () => {
