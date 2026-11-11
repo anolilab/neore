@@ -5,20 +5,27 @@
  * only way to reach IPC handlers without launching it.
  */
 import { createHash } from "node:crypto";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-import { beforeAll, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
+import { SHOW_FALLBACK_MS } from "./appearance.js";
+import { CAPABILITIES_ARG } from "./channels.js";
 import { DICTATION_SHORTCUT } from "./dictation/hold.js";
+import { WINDOW_STATE_FILE } from "./window-state.js";
 
 type Listener = (event: { preventDefault: () => void }, url: string) => void;
 
 interface FakeWindow {
+    /** `maximize` and `show`, in the order the main process called them. */
+    calls: string[];
     focused: boolean;
     handlers: Map<string, Listener>;
     id: number;
     loaded: string[];
+    maximized: boolean;
     options: Record<string, unknown>;
     sent: string[];
     shown: boolean;
@@ -36,12 +43,15 @@ interface FakeWindow {
 }
 
 interface Fake {
+    /** `systemPreferences.on("accent-color-changed")`: Windows and Linux. */
+    accentChangedListeners: (() => void)[];
     accentColor: string;
-    accentListeners: (() => void)[];
     appHandlers: Map<string, (...args: unknown[]) => void>;
     applicationMenu?: { template: { label?: string; role?: string; submenu?: { click?: () => void; label?: string }[] }[] };
     focusedWindow: FakeWindow | null;
     ipc: Map<string, (event: unknown, payload?: unknown) => unknown>;
+    /** `systemPreferences.subscribeNotification`: macOS distributed notifications, by name. */
+    macNotifications: { callback: () => void; name: string | null }[];
     notificationFails: boolean;
     notifications: { body?: string; title: string }[];
     opened: string[];
@@ -49,25 +59,31 @@ interface Fake {
     permissionCheck?: (wc: unknown, permission: string, requestingOrigin: string, details?: unknown) => boolean;
     permissionRequest?: (wc: unknown, permission: string, callback: (isAllowed: boolean) => void, details: { mediaTypes?: string[]; requestingUrl: string }) => void;
     shortcuts: Map<string, () => void>;
+    /** `nativeTheme.on(...)`, by event name. */
+    themeListeners: string[];
     trayFails: boolean;
     trays: number;
+    userData: string;
     windows: FakeWindow[];
 }
 
 vi.mock("electron", () => {
     const fakeElectron: Fake = {
+        accentChangedListeners: [],
         accentColor: "0a84ffff",
-        accentListeners: [],
         appHandlers: new Map(),
         focusedWindow: null,
         ipc: new Map(),
+        macNotifications: [],
         notificationFails: false,
         notifications: [],
         opened: [],
         payloads: [],
         shortcuts: new Map(),
+        themeListeners: [],
         trayFails: false,
         trays: 0,
+        userData: path.join(os.tmpdir(), "neore-desktop-test"),
         windows: [],
     };
 
@@ -77,6 +93,7 @@ vi.mock("electron", () => {
         const handlers = new Map<string, Listener>();
         const webHandlers = new Map<string, Listener>();
         const window = {
+            calls: [] as string[],
             center: () => {},
             focus: () => {},
             focused: true,
@@ -90,7 +107,7 @@ vi.mock("electron", () => {
             id,
             isDestroyed: () => false,
             isFocused: () => window.focused,
-            isMaximized: () => false,
+            isMaximized: () => window.maximized,
             isMinimized: () => false,
             isVisible: () => window.shown,
             loaded: [] as string[],
@@ -99,7 +116,11 @@ vi.mock("electron", () => {
 
                 return Promise.resolve();
             },
-            maximize: () => {},
+            maximize: () => {
+                window.calls.push("maximize");
+                window.maximized = true;
+            },
+            maximized: false,
             on: (event: string, listener: Listener) => {
                 handlers.set(event, listener);
 
@@ -109,6 +130,7 @@ vi.mock("electron", () => {
             restore: () => {},
             sent: [] as string[],
             show: () => {
+                window.calls.push("show");
                 window.shown = true;
             },
             shown: false,
@@ -170,7 +192,7 @@ vi.mock("electron", () => {
 
     return {
         app: {
-            getPath: () => path.join(os.tmpdir(), "neore-desktop-test"),
+            getPath: () => fakeElectron.userData,
             getVersion: () => "0.0.0-test",
             isPackaged: false,
             isReady: () => true,
@@ -211,8 +233,8 @@ vi.mock("electron", () => {
             },
         },
         nativeTheme: {
-            on: (_event: string, listener: () => void) => {
-                fakeElectron.accentListeners.push(listener);
+            on: (event: string) => {
+                fakeElectron.themeListeners.push(event);
             },
             shouldUseDarkColors: true,
         },
@@ -237,8 +259,15 @@ vi.mock("electron", () => {
         },
         systemPreferences: {
             getAccentColor: () => fakeElectron.accentColor,
-            on: (_event: string, listener: () => void) => {
-                fakeElectron.accentListeners.push(listener);
+            on: (event: string, listener: () => void) => {
+                if (event === "accent-color-changed") {
+                    fakeElectron.accentChangedListeners.push(listener);
+                }
+            },
+            subscribeNotification: (name: string | null, callback: () => void) => {
+                fakeElectron.macNotifications.push({ callback, name });
+
+                return fakeElectron.macNotifications.length;
             },
         },
         Tray: FakeTray,
@@ -643,12 +672,18 @@ describe("look and application menu", () => {
         expect(() => get?.(sender("https://example.org/"))).toThrow("untrusted");
     });
 
+    it("follows accent changes off macOS through accent-color-changed, not through the theme", () => {
+        expect(fake().accentChangedListeners).toHaveLength(1);
+        expect(fake().macNotifications).toHaveLength(0);
+        expect(fake().themeListeners).toHaveLength(0);
+    });
+
     it("sends a changed accent colour to the site windows", () => {
         const win = onSite();
 
         fake().accentColor = "FF0000FF";
         fake().payloads.length = 0;
-        fake().accentListeners.forEach((listener) => listener());
+        fake().accentChangedListeners.forEach((listener) => listener());
         fake().accentColor = "0a84ffff";
 
         expect(fake().payloads).toContainEqual({ channel: "neore:system-accent-color", payload: "#ff0000", window: win.id });
@@ -669,6 +704,55 @@ describe("look and application menu", () => {
             { channel: "neore:menu-command", payload: "new-chat", window: win.id },
             { channel: "neore:menu-command", payload: "settings", window: win.id },
         ]);
+    });
+
+    it("sends neither a menu command nor the accent colour to a main window showing the recovery page", () => {
+        mainWindow().webContents.loadURL("data:text/html,recovery");
+        fake().payloads.length = 0;
+        fake().focusedWindow = mainWindow();
+        menuItem("File", "New Chat")?.click?.();
+        fake().focusedWindow = null;
+        menuItem("File", "Settings…")?.click?.();
+        fake().accentChangedListeners.forEach((listener) => listener());
+
+        expect(fake().payloads.filter((sent) => sent.window === mainWindow().id)).toStrictEqual([]);
+        onSite();
+    });
+
+    describe("the show fallback", () => {
+        afterEach(() => {
+            vi.useRealTimers();
+        });
+
+        it("shows a window that never paints after SHOW_FALLBACK_MS, and not again at a late first paint", () => {
+            vi.useFakeTimers();
+            fake().ipc.get("neore:open-thread-window")?.(siteSender(), "thread-hung");
+
+            const win = fake().windows.at(-1) as FakeWindow;
+
+            vi.advanceTimersByTime(SHOW_FALLBACK_MS - 1);
+            expect(win.shown).toBe(false);
+            vi.advanceTimersByTime(1);
+            expect(win.calls).toStrictEqual(["show"]);
+
+            (win.handlers.get("ready-to-show") as unknown as () => void)();
+            expect(win.calls).toStrictEqual(["show"]);
+        });
+    });
+
+    it("reveals a thread window asked for again before its first paint once, through its reveal", () => {
+        const openThread = fake().ipc.get("neore:open-thread-window");
+
+        openThread?.(siteSender(), "thread-early");
+
+        const win = fake().windows.at(-1) as FakeWindow;
+
+        expect(win.shown).toBe(false);
+        openThread?.(siteSender(), "thread-early");
+        expect(win.calls).toStrictEqual(["show"]);
+
+        (win.handlers.get("ready-to-show") as unknown as () => void)();
+        expect(win.calls).toStrictEqual(["show"]);
     });
 
     it("opens the docs in the system browser from Help", () => {
@@ -784,5 +868,117 @@ describe("tray failure", () => {
 
         await expect(startWithoutTray("linux", true)).resolves.toEqual([]);
         expect(fake().shortcuts.has(COMPOSER_SHORTCUT)).toBe(true);
+    });
+});
+
+/**
+ * Starts the app again as `platform`, with `saved` as the window state on disk, and returns the new main window and the
+ * state file. Like `startWithoutTray`, it re-imports `main.js`; the windows of the earlier start stay in the fake.
+ */
+const restart = async (platform: NodeJS.Platform, saved?: { maximized: boolean }): Promise<{ file: string; win: FakeWindow }> => {
+    const original = Object.getOwnPropertyDescriptor(process, "platform");
+    const userData = mkdtempSync(path.join(os.tmpdir(), "neore-desktop-test-"));
+    const file = path.join(userData, WINDOW_STATE_FILE);
+    const first = fake().windows.length;
+
+    if (saved !== undefined) {
+        writeFileSync(file, JSON.stringify({ bounds: { height: 700, width: 1000, x: 10, y: 10 }, maximized: saved.maximized }));
+    }
+
+    fake().userData = userData;
+    Object.defineProperty(process, "platform", { value: platform });
+
+    try {
+        vi.resetModules();
+        await import("./main.js");
+        fake().appHandlers.get("ready")?.();
+    } finally {
+        if (original) {
+            Object.defineProperty(process, "platform", original);
+        }
+    }
+
+    return { file, win: fake().windows[first] as FakeWindow };
+};
+
+const readSaved = (file: string): { maximized: boolean } => JSON.parse(readFileSync(file, "utf8")) as { maximized: boolean };
+const readyToShow = (win: FakeWindow): void => (win.handlers.get("ready-to-show") as unknown as () => void)();
+const closeWindow = (win: FakeWindow): void => win.handlers.get("close")?.({ preventDefault: () => {} }, "");
+const capabilitiesOf = (win: FakeWindow): string[] =>
+    ((win.options.webPreferences as { additionalArguments: string[] }).additionalArguments.find((argument) => argument.startsWith(CAPABILITIES_ARG)) ?? "")
+        .slice(CAPABILITIES_ARG.length)
+        .split(",");
+
+describe("main window reveal and saved state", () => {
+    it("maximizes a window saved maximized at its reveal, not at creation, and before showing it", async () => {
+        const { win } = await restart("linux", { maximized: true });
+
+        expect(win.options).toMatchObject({ height: 700, show: false, width: 1000 });
+        expect(win.calls).toStrictEqual([]);
+
+        readyToShow(win);
+        expect(win.calls).toStrictEqual(["maximize", "show"]);
+    });
+
+    it("does not maximize a window saved unmaximized", async () => {
+        const { win } = await restart("linux", { maximized: false });
+
+        readyToShow(win);
+        expect(win.calls).toStrictEqual(["show"]);
+    });
+
+    it("keeps the saved maximized state when the window closes before its reveal", async () => {
+        const { file, win } = await restart("linux", { maximized: true });
+
+        closeWindow(win);
+        expect(readSaved(file).maximized).toBe(true);
+
+        // Once revealed, a close saves what the window is.
+        readyToShow(win);
+        win.maximized = false;
+        closeWindow(win);
+        expect(readSaved(file).maximized).toBe(false);
+    });
+
+    it("reveals a main window brought forward before its first paint once, maximized, with no second show later", async () => {
+        const { win } = await restart("linux", { maximized: true });
+
+        fake().appHandlers.get("second-instance")?.({}, ["neore"]);
+        expect(win.calls).toStrictEqual(["maximize", "show"]);
+
+        readyToShow(win);
+        expect(win.calls).toStrictEqual(["maximize", "show"]);
+    });
+
+    it("draws no vibrancy off macOS", async () => {
+        const { win } = await restart("linux");
+
+        expect(win.options).not.toHaveProperty("vibrancy");
+        expect(win.options).toMatchObject({ backgroundColor: "#212121" });
+        expect(capabilitiesOf(win)).not.toContain("vibrancy");
+    });
+
+    it("on macOS draws the sidebar material through a transparent window and advertises it", async () => {
+        const { win } = await restart("darwin");
+
+        expect(win.options).toMatchObject({ backgroundColor: "#00000000", vibrancy: "sidebar", visualEffectState: "followWindow" });
+        expect(capabilitiesOf(win)).toContain("vibrancy");
+    });
+
+    it("on macOS follows the accent through AppleColorPreferencesChangedNotification", async () => {
+        const listenersBefore = fake().accentChangedListeners.length;
+        const notificationsBefore = fake().macNotifications.length;
+        const { win } = await restart("darwin");
+        const subscribed = fake().macNotifications.slice(notificationsBefore);
+
+        expect(fake().accentChangedListeners).toHaveLength(listenersBefore);
+        expect(subscribed.map((entry) => entry.name)).toStrictEqual(["AppleColorPreferencesChangedNotification"]);
+
+        fake().payloads.length = 0;
+        fake().accentColor = "34c759ff";
+        subscribed[0]?.callback();
+        fake().accentColor = "0a84ffff";
+
+        expect(fake().payloads).toContainEqual({ channel: "neore:system-accent-color", payload: "#34c759", window: win.id });
     });
 });

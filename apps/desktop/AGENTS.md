@@ -67,7 +67,10 @@
 
 - **Window look** (`appearance.ts`, `app-menu.ts`): site windows start `show: false` and appear at `ready-to-show`,
   on a load failure (the recovery page) or after 5 s, so a hung load never leaves an invisible window. `maximize()`
-  SHOWS a hidden window on Windows and Linux, so the saved maximized state is applied at reveal, not at creation.
+  SHOWS a hidden window on Windows and Linux, so the saved maximized state is applied at reveal, not at creation;
+  bringing a window forward before then runs its reveal (`bringForward`), never a bare `show()`, and the state is not
+  saved before it (`isMaximized()` is still false). The accent's live event is `accent-color-changed` on Windows and
+  Linux only; macOS uses `subscribeNotification("AppleColorPreferencesChangedNotification")`.
   macOS `vibrancy` shows only through a fully transparent `backgroundColor` (`#00000000`); the page opts its sidebar in
   via the `vibrancy` capability. Menu commands (`menu-commands`) and the accent colour (`system-accent`) go only to
   windows in `siteWindows` that are showing the site.

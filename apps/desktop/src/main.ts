@@ -255,6 +255,10 @@ const readSystemAccent = (): string | null => {
     }
 };
 
+/** What macOS posts to every app when the user picks another accent (or highlight) colour. */
+// eslint-disable-next-line no-secrets/no-secrets -- a macOS notification name, not a credential
+const MAC_ACCENT_NOTIFICATION = "AppleColorPreferencesChangedNotification";
+
 const hasSystemAccent = (): boolean => process.platform === "darwin" || process.platform === "win32" || readSystemAccent() !== null;
 
 /** Every open site window (main, thread, same-origin popup): what the accent colour and menu commands are sent to. */
@@ -276,6 +280,11 @@ const broadcastSystemAccent = (): void => {
 /** Filled with the page's own background until its first paint; with vibrancy, left clear so the material shows. */
 const siteBackground = (withVibrancy: boolean): string => windowBackground({ dark: nativeTheme.shouldUseDarkColors, vibrancy: withVibrancy });
 
+/** The reveal of each window that has not been shown yet. A window without an entry has been revealed. */
+const pendingReveals = new WeakMap<BrowserWindow, () => void>();
+
+const isRevealed = (win: BrowserWindow): boolean => !pendingReveals.has(win);
+
 /**
  * Windows are created hidden and shown at their first paint, so nobody sees an empty frame. A page that never paints
  * (a hung load, a failure the recovery page replaces) is shown anyway: by the returned function, or after a timeout.
@@ -288,21 +297,48 @@ const showWhenReady = (win: BrowserWindow, show: () => void = () => win.show()):
         }
 
         shown = true;
+        pendingReveals.delete(win);
         clearTimeout(timer);
         show();
     };
     const timer = setTimeout(reveal, SHOW_FALLBACK_MS);
 
+    pendingReveals.set(win, reveal);
     win.on("ready-to-show", reveal);
 
     return reveal;
 };
 
+/**
+ * Brings a window forward. One not revealed yet is revealed now, through its own reveal: a plain `show` would leave the
+ * reveal to run again at `ready-to-show`, and on Windows and Linux its `maximize` would then resize the window and take
+ * the focus a second time.
+ */
+const bringForward = (win: BrowserWindow): void => {
+    const reveal = pendingReveals.get(win);
+
+    if (reveal !== undefined) {
+        reveal();
+
+        return;
+    }
+
+    if (win.isMinimized()) {
+        win.restore();
+    }
+
+    win.show();
+    win.focus();
+};
+
 const windowStateFile = (): string => path.join(app.getPath("userData"), WINDOW_STATE_FILE);
 
-/** Writes the main window's normal (not maximized) bounds. A failed write is logged; it never stops a close. */
+/**
+ * Writes the main window's normal (not maximized) bounds. A failed write is logged; it never stops a close.
+ * Before its reveal the window has not been maximized yet, so nothing is written: the saved state stays as it was.
+ */
 const saveWindowState = (win: BrowserWindow): void => {
-    if (win.isDestroyed()) {
+    if (win.isDestroyed() || !isRevealed(win)) {
         return;
     }
 
@@ -443,12 +479,7 @@ const openOrFocusThreadWindow = (url: URL): void => {
     const open = threadWindows.get(url.href);
 
     if (open !== undefined && !open.isDestroyed()) {
-        if (open.isMinimized()) {
-            open.restore();
-        }
-
-        open.show();
-        open.focus();
+        bringForward(open);
 
         return;
     }
@@ -572,12 +603,7 @@ const focusMain = (): void => {
         return;
     }
 
-    if (mainWindow.isMinimized()) {
-        mainWindow.restore();
-    }
-
-    mainWindow.show();
-    mainWindow.focus();
+    bringForward(mainWindow);
 };
 
 /**
@@ -1105,9 +1131,14 @@ const start = (): void => {
     registerIpc();
     registerSchemeInDev();
     installAppMenu();
-    // macOS reports an accent change through the theme; Windows and Linux have their own event.
-    nativeTheme.on("updated", broadcastSystemAccent);
-    systemPreferences.on("accent-color-changed", broadcastSystemAccent);
+
+    // `accent-color-changed` is Windows and Linux only; macOS posts a distributed notification instead.
+    if (process.platform === "darwin") {
+        systemPreferences.subscribeNotification(MAC_ACCENT_NOTIFICATION, broadcastSystemAccent);
+    } else {
+        systemPreferences.on("accent-color-changed", broadcastSystemAccent);
+    }
+
     createMainWindow();
     createQuickComposer();
     createTray();
