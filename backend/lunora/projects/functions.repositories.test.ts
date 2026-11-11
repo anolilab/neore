@@ -14,6 +14,7 @@ import {
     findRepoProject,
     listProjectRepos,
     removeProjectRepo,
+    applyDefaultStamp,
     setDefaultProjectRepo,
     stampDefault,
     underDeleteMarker,
@@ -289,23 +290,79 @@ describe("project repositories", () => {
     });
 
     it("refuses a default pick while the project is being deleted, and writes no counter", async () => {
-        const projectId = await projectOf({ userId: OWNER });
-        const web = await add(OWNER, projectId, "acme/web");
+        // One clock for the marker's stamp and the mutation's expiry check.
+        vi.useFakeTimers({ now: 1_000_000, toFake: ["Date"] });
 
-        // A delete in progress has written its marker.
+        try {
+            const projectId = await projectOf({ userId: OWNER });
+            const web = await add(OWNER, projectId, "acme/web");
+
+            // A delete in progress has written its marker.
+            await harness.run(async (ctx: any) => {
+                await ctx.db.insert("projectRepositories", { createdAt: 0, deletingAt: Date.now(), projectId, url: DELETION_MARKER_URL, userId: OWNER });
+            });
+
+            await expect(as(OWNER).mutation(setDefaultProjectRepo as never, { repoId: web } as never)).rejects.toMatchObject({ code: "NOT_FOUND" });
+
+            const counters = await harness.run(async (ctx: any) => {
+                const { page } = await ctx.db.projectRepositories.findMany({ where: { projectId, url: DEFAULT_COUNTER_URL } });
+
+                return page;
+            });
+
+            expect(counters).toStrictEqual([]);
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it("settles two first picks at once on the counter's unique URL, each with a stamp of its own", async () => {
+        const projectId = await projectOf({ userId: OWNER });
+        const ids = (await harness.run(async (ctx: any) => [
+            await ctx.db.insert("projectRepositories", { createdAt: 0, projectId, url: "https://github.com/acme/a.git", userId: OWNER }),
+            await ctx.db.insert("projectRepositories", { createdAt: 1, projectId, url: "https://github.com/acme/b.git", userId: OWNER }),
+        ])) as string[];
+
+        // Neither pick finds a counter: both try to insert it.
         await harness.run(async (ctx: any) => {
-            await ctx.db.insert("projectRepositories", { createdAt: 0, deletingAt: Date.now(), projectId, url: DELETION_MARKER_URL, userId: OWNER });
+            const [first, second] = await Promise.all(ids.map(async (id) => await ctx.db.get("projectRepositories", id)));
+
+            await Promise.all([stampDefault(ctx, first, { userId: OWNER }), stampDefault(ctx, second, { userId: OWNER })]);
         });
 
-        await expect(as(OWNER).mutation(setDefaultProjectRepo as never, { repoId: web } as never)).rejects.toMatchObject({ code: "NOT_FOUND" });
-
-        const counters = await harness.run(async (ctx: any) => {
-            const { page } = await ctx.db.projectRepositories.findMany({ where: { projectId, url: DEFAULT_COUNTER_URL } });
+        const rows = await harness.run(async (ctx: any) => {
+            const { page } = await ctx.db.projectRepositories.findMany({ where: { projectId } });
 
             return page;
         });
 
-        expect(counters).toStrictEqual([]);
+        expect(rows.filter((row: { url: string }) => row.url === DEFAULT_COUNTER_URL)).toHaveLength(1);
+        expect(new Set(rows.filter((row: { url: string }) => row.url !== DEFAULT_COUNTER_URL).map((row: { defaultAt?: number }) => row.defaultAt)).size).toBe(
+            2,
+        );
+    });
+
+    it("never lowers a row's stamp with an older claim, and reports a row removed meanwhile", async () => {
+        const projectId = await projectOf({ userId: OWNER });
+
+        await harness.run(async (ctx: any) => {
+            const picked = await ctx.db.insert("projectRepositories", {
+                createdAt: 0,
+                defaultAt: 10,
+                projectId,
+                url: "https://github.com/acme/a.git",
+                userId: OWNER,
+            });
+            const removed = await ctx.db.insert("projectRepositories", { createdAt: 1, projectId, url: "https://github.com/acme/b.git", userId: OWNER });
+
+            await ctx.db.delete("projectRepositories", removed);
+
+            await expect(applyDefaultStamp(ctx, picked, 5)).resolves.toBe(true);
+            const row = await ctx.db.get("projectRepositories", picked);
+
+            expect(row.defaultAt).toBe(10);
+            await expect(applyDefaultStamp(ctx, removed, 11)).resolves.toBe(false);
+        });
     });
 
     it("finds the caller's project that lists a repository, past 60 other accounts listing it, and nobody else's", async () => {
@@ -343,6 +400,20 @@ describe("project repositories", () => {
         // No active organization in the session: org-b is found through the caller's membership alone.
         await expect(find(MEMBER)).resolves.toStrictEqual({ projectId, title: "Shared" });
         await expect(find(STRANGER)).resolves.toBeNull();
+    });
+
+    it("finds a project in an organization past the caller's first 90 memberships", async () => {
+        const projectId = await projectOf({ organizationId: "org-94", title: "Far" });
+
+        await harness.run(async (ctx: any) => {
+            for (let index = 0; index < 95; index += 1) {
+                await ctx.db.insert("member", { createdAt: index, organizationId: `org-${String(index)}`, role: "member", userId: MEMBER });
+            }
+
+            await ctx.db.insert("projectRepositories", { createdAt: 0, organizationId: "org-94", projectId, url: "https://github.com/acme/far.git" });
+        });
+
+        await expect(as(MEMBER).query(findRepoProject as never, { url: "acme/far" } as never)).resolves.toStrictEqual({ projectId, title: "Far" });
     });
 
     it("leaves no row from an add that races a project delete", async () => {

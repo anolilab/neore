@@ -287,10 +287,13 @@ const RESTAMP_PASSES = 3;
 /**
  * Stamps a project's repository rows with the organization the project has now, read from the primary: never the
  * organization a move asked for. Two moves whose writes land out of order would otherwise leave the rows on the
- * earlier target. The project is read again after the rows are stamped, and they are stamped again while it moved on.
+ * earlier target. Each row is patched only while it still holds the organization read here, so an older move's late
+ * write never replaces a newer one's; the project is read again after each pass, and the rows are stamped again while
+ * it moved on. Rows still stale after the last pass are logged; an erasure re-stamps them (`eraseUnlessMoved`).
  */
 const restampRepositories = async (context: MutationCtx, projectId: Id<"projects">): Promise<void> => {
-    for (let pass = 0; pass < RESTAMP_PASSES; pass += 1) {
+    // One read more than there are passes: the last only checks that the last pass settled the rows.
+    for (let pass = 0; pass <= RESTAMP_PASSES; pass += 1) {
         const project = await systemDb(context).projects.findFirst({ consistency: "primary", where: { _id: projectId } });
 
         if (!project) {
@@ -311,8 +314,19 @@ const restampRepositories = async (context: MutationCtx, projectId: Id<"projects
             return;
         }
 
-        // A row removed meanwhile (a take-back, a remove) is skipped, not an error: `patchIf` applies to no row then.
-        await Promise.all(stale.map((row) => context.db.patchIf("projectRepositories", row._id, { patch: { organizationId }, where: { projectId } })));
+        if (pass === RESTAMP_PASSES) {
+            break;
+        }
+
+        // A row removed or re-stamped meanwhile applies no patch, and is looked at again on the next pass.
+        await Promise.all(
+            stale.map((row) =>
+                context.db.patchIf("projectRepositories", row._id, {
+                    patch: { organizationId },
+                    where: { organizationId: row.organizationId ?? null, projectId },
+                }),
+            ),
+        );
     }
 
     context.log.event("projects.restamp_unsettled", { projectId });
@@ -411,8 +425,11 @@ export const listProjectRepos = authQuery
         return withDefault(await repoRows(context, projectId as Id<"projects">, { primary: true }));
     });
 
-/** Rows one URL lookup reads per scope (the caller's own, their organizations'). */
+/** Rows one URL lookup reads per scope (the caller's own, each page of their organizations'). */
 const REPO_LOOKUP_LIMIT = MAX_PROJECT_REPOSITORIES;
+
+/** Pages of {@link IDS_PER_READ} memberships one URL lookup reads: 900 organizations, a bound no member reaches. */
+const MEMBERSHIP_PAGES = 10;
 
 /**
  * The oldest project the caller can read that lists this repository, or `null`: a run picker reopened on a saved run
@@ -434,19 +451,37 @@ export const findRepoProject = authQuery
 
         const { userId } = context.user;
         const own = await context.db.projectRepositories.findMany({ limit: REPO_LOOKUP_LIMIT, where: { url, userId } });
-        // The organizations the caller belongs to, the first {@link IDS_PER_READ}: one `in` read, which binds them with
-        // the URL. Each row found is still decided by `readableProject` below.
-        const { page: memberships } = await context.db.member.findMany({ limit: IDS_PER_READ, where: { userId } });
-        const organizationIds = memberships.map((membership) => membership.organizationId);
-        const shared =
-            organizationIds.length > 0
-                ? await context.db.projectRepositories.findMany({
-                      limit: REPO_LOOKUP_LIMIT,
-                      orderBy: [{ _creationTime: "asc" }],
-                      where: { organizationId: { in: organizationIds }, url },
-                  })
-                : { page: [] };
-        const oldestFirst = [...own.page, ...shared.page].toSorted((left, right) => left._creationTime - right._creationTime);
+        // The organizations the caller belongs to, {@link IDS_PER_READ} at a time: each page is one `in` read, which binds
+        // them with the URL. Each row found is still decided by `readableProject` below.
+        const shared: Doc<"projectRepositories">[] = [];
+        let cursor: string | null = null;
+
+        for (let page = 0; page < MEMBERSHIP_PAGES; page += 1) {
+            const memberships: { continueCursor: string | null; isDone: boolean; page: Doc<"member">[] } = await context.db.member.findMany({
+                cursor,
+                limit: IDS_PER_READ,
+                where: { userId },
+            });
+            const organizationIds = memberships.page.map((membership) => membership.organizationId);
+
+            if (organizationIds.length > 0) {
+                const { page: rows } = await context.db.projectRepositories.findMany({
+                    limit: REPO_LOOKUP_LIMIT,
+                    orderBy: [{ _creationTime: "asc" }],
+                    where: { organizationId: { in: organizationIds }, url },
+                });
+
+                shared.push(...rows);
+            }
+
+            if (memberships.isDone || !memberships.continueCursor) {
+                break;
+            }
+
+            cursor = memberships.continueCursor;
+        }
+
+        const oldestFirst = [...own.page, ...shared].toSorted((left, right) => left._creationTime - right._creationTime);
 
         for (const row of oldestFirst) {
             const project = await readableProject(context, row.projectId, context.user.userId);
@@ -599,8 +634,13 @@ const claimDefaultStamp = async (context: MutationCtx, repo: Doc<"projectReposit
             where: { projectId: repo.projectId, url: DEFAULT_COUNTER_URL },
         });
 
+        // Past every stamp a row holds too, not only the counter's: a row may carry a stamp the counter never handed out
+        // (a pick from before the counter existed).
+        const rows = await repoRows(context, repo.projectId, { primary: true });
+        const highest = Math.max(0, ...rows.map((row) => row.defaultAt ?? 0));
+
         if (counter) {
-            const stamp = (counter.defaultAt ?? 0) + 1;
+            const stamp = Math.max(counter.defaultAt ?? 0, highest) + 1;
             const { applied } = await context.db.patchIf("projectRepositories", counter._id, {
                 patch: { defaultAt: stamp },
                 where: { defaultAt: counter.defaultAt ?? 0 },
@@ -613,8 +653,7 @@ const claimDefaultStamp = async (context: MutationCtx, repo: Doc<"projectReposit
             continue;
         }
 
-        const rows = await repoRows(context, repo.projectId, { primary: true });
-        const stamp = Math.max(0, ...rows.map((row) => row.defaultAt ?? 0)) + 1;
+        const stamp = highest + 1;
 
         try {
             await context.db.insert("projectRepositories", {
@@ -638,15 +677,33 @@ const claimDefaultStamp = async (context: MutationCtx, repo: Doc<"projectReposit
 };
 
 /**
- * Stamps a repo as its project's default with a stamp of its own (`claimDefaultStamp`): the latest claim wins. Whether
- * the repo row was still there to stamp: one removed meanwhile is not an error, its stamp is simply unused.
+ * Writes a claimed stamp onto a repo row, never lowering one: an older claim that lands after a newer pick of the same
+ * row leaves the newer stamp. Each write applies only while the row still holds the stamp read just before. Whether
+ * the row is still there: one removed meanwhile is not an error, its stamp is simply unused.
  */
-export const stampDefault = async (context: MutationCtx, repo: Doc<"projectRepositories">, owner: ProjectOwner): Promise<boolean> => {
-    const stamp = await claimDefaultStamp(context, repo, owner);
-    const { applied } = await context.db.patchIf("projectRepositories", repo._id, { patch: { defaultAt: stamp }, where: { projectId: repo.projectId } });
+export const applyDefaultStamp = async (context: MutationCtx, repoId: Id<"projectRepositories">, stamp: number): Promise<boolean> => {
+    let row = await context.db.projectRepositories.findFirst({ consistency: "primary", where: { _id: repoId } });
 
-    return applied;
+    for (let attempt = 0; attempt < DEFAULT_PICK_ATTEMPTS && row; attempt += 1) {
+        if ((row.defaultAt ?? 0) >= stamp) {
+            return true;
+        }
+
+        const result = await context.db.patchIf("projectRepositories", repoId, { patch: { defaultAt: stamp }, where: { defaultAt: row.defaultAt ?? null } });
+
+        if (result.applied) {
+            return true;
+        }
+
+        row = result.doc as Doc<"projectRepositories"> | null;
+    }
+
+    return row !== null;
 };
+
+/** Stamps a repo as its project's default with a stamp of its own (`claimDefaultStamp`): the latest claim wins. */
+export const stampDefault = async (context: MutationCtx, repo: Doc<"projectRepositories">, owner: ProjectOwner): Promise<boolean> =>
+    await applyDefaultStamp(context, repo._id, await claimDefaultStamp(context, repo, owner));
 
 /**
  * Makes one repo the default a run picker preselects: one row written besides the project's counter, the latest pick

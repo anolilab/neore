@@ -18,7 +18,13 @@ vi.mock("@lingui/react/macro", () => {
 });
 
 const backend = vi.hoisted(() => {
-    return { add: vi.fn(), listReads: 0, update: vi.fn() };
+    return {
+        add: vi.fn(),
+        // What `listProjectRepos` answers; a test adds to it to stand for another member's change.
+        listed: [{ defaultBranch: "develop", id: "r1", isDefault: true, revision: 0, url: "https://github.com/acme/web.git" }] as unknown[],
+        listReads: 0,
+        update: vi.fn(),
+    };
 });
 
 vi.mock("@/lib/lunora/crpc", () => {
@@ -30,6 +36,8 @@ vi.mock("@/lib/lunora/crpc", () => {
                     queryFn: async () => {
                         if (name === "listProjectRepos") {
                             backend.listReads += 1;
+
+                            return [...backend.listed];
                         }
 
                         return data;
@@ -183,13 +191,18 @@ describe("ProjectRepositories", () => {
             backend.listReads = 0;
             renderSection();
             await vi.waitFor(() => expect(backend.listReads).toBe(1));
+            expect(screen.queryByText("acme/docs")).toBeNull();
 
+            // Another member adds a repository meanwhile: the next read returns it.
+            backend.listed.push({ id: "r3", isDefault: false, revision: 0, url: "https://github.com/acme/docs.git" });
             await act(async () => {
                 await vi.advanceTimersByTimeAsync(15_000);
             });
 
             expect(backend.listReads).toBe(2);
+            expect(await screen.findByText("acme/docs")).toBeDefined();
         } finally {
+            backend.listed.splice(1);
             vi.useRealTimers();
         }
     });
