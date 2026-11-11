@@ -9,8 +9,8 @@ import { v } from "lunorash/server";
 
 import type { Id } from "../_generated/dataModel";
 import { internalQuery } from "../_generated/server";
-import { skillRowHash, triggerRowHash } from "./entry-hash";
-import { isCompletePluginExport, markerFor } from "./logic";
+import { liveHashOf } from "./live-hash";
+import { isCompletePluginExport } from "./logic";
 
 export interface PluginHeader {
     contentHash: string;
@@ -93,17 +93,7 @@ export const pluginForSelection = internalQuery
         const children = [];
 
         for (const link of links) {
-            // A skill or a trigger has a known live content; a group reads as "unknown", which is not unedited.
-            const marker = markerFor(installId, link.entryKey);
-            const skill = link.kind === "skill" ? await ctx.db.skills.findFirst({ where: { pluginMarker: marker } }) : null;
-            const trigger =
-                link.kind === "trigger"
-                    ? await ctx.db
-                          .query("triggers")
-                          .withIndex("by_plugin_marker", (q) => q.eq("pluginMarker", marker))
-                          .first()
-                    : null;
-            const currentHash = skill ? await skillRowHash(skill) : trigger ? await triggerRowHash(trigger) : "unknown";
+            const currentHash = await liveHashOf(ctx, installId, link);
 
             children.push({ contentHash: link.contentHash, currentHash, id: link.itemId ?? "", pendingHash: link.pendingHash, state: link.state });
         }
