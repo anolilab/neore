@@ -37,6 +37,8 @@ import { internalMutation, internalQuery } from "../_generated/server";
 import { authAction, authQuery, rateLimit } from "../lib/crpc";
 import { MAX_LENGTH } from "../lib/validators";
 import type { BundleItem, SkillSource } from "./bundle-format";
+import { withPluginHeader } from "../plugins/export";
+import { bodyHash } from "../plugins/logic";
 import { BUNDLE_LIMITS, buildBundleMarkdown, groupItemOf, parseBundleMarkdown, skillItemOf, triggerItemOf } from "./bundle-format";
 import type { PlanEntry, PlanEnv } from "./bundle-plan";
 import { assertSelectionImportable, BundleImportError, mayRetryImport, planBundle, runBundleImport, skillLimitFor } from "./bundle-plan";
@@ -503,8 +505,8 @@ export const exportBundle = authAction
         }
 
         const name = args.name.trim() || "Team bundle";
-        const markdown = buildBundleMarkdown({ description: args.description ?? "", items, name });
-        const check = parseBundleMarkdown(markdown);
+        const built = buildBundleMarkdown({ description: args.description ?? "", items, name });
+        const check = parseBundleMarkdown(built);
 
         if (!check.ok) {
             throw new LunoraError("BAD_REQUEST", check.errors.join("; "));
@@ -515,6 +517,15 @@ export const exportBundle = authAction
         if (unreadable) {
             throw new LunoraError("BAD_REQUEST", `"${unreadable.label}" cannot be exported: ${unreadable.problems.join(" ")}`);
         }
+
+        // A selection that is exactly one installed plugin's unedited children is exported as that plugin's own file.
+        const plugin = await ctx.runQuery(internal.plugins.export.pluginForSelection, {
+            groupChatIds: groupChatIds,
+            skillIds: skillIds,
+            triggerIds: triggerIds,
+            userId,
+        });
+        const markdown = plugin ? withPluginHeader(built, { contentHash: await bodyHash(built), slug: plugin.slug, version: plugin.version }) : built;
 
         ctx.log.event("skills.bundle_export", { groupChats: sources.groupChats.length, skills: skillSources.size, triggers: sources.triggers.length });
 
