@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { contrastRatio } from "./color-contrast";
 import {
+    adoptedMark,
     applySystemAccentTokens,
     cacheSystemAccentTokens,
     effectiveAccent,
@@ -183,5 +184,19 @@ describe(effectiveMainFont, () => {
         expect(effectiveMainFont("inter", true, true)).toBe("inter");
         expect(effectiveMainFont("serif", false, true)).toBe("serif");
         expect(effectiveMainFont("roboto-slab", false, false)).toBe("inter");
+    });
+});
+
+describe(adoptedMark, () => {
+    it("keeps a value already shown here this device's choice, marked or picked before marks existed", () => {
+        expect(adoptedMark(true, "teal", "teal", "default")).toBe(true);
+        expect(adoptedMark(undefined, "teal", "teal", "default")).toBe(true);
+    });
+
+    it("marks synced what the account replaces, fills in, or already synced", () => {
+        expect(adoptedMark(true, "teal", "blue", "default")).toBe("synced");
+        expect(adoptedMark(undefined, "teal", "blue", "default")).toBe("synced");
+        expect(adoptedMark(undefined, "default", "default", "default")).toBe("synced");
+        expect(adoptedMark("synced", "teal", "teal", "default")).toBe("synced");
     });
 });

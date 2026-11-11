@@ -1,7 +1,7 @@
 "use client";
 
 import { setStreamdownAppearance } from "@neore/ui/hooks/use-streamdown-appearance";
-import { skipToken, useQuery } from "@tanstack/react-query";
+import { skipToken, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 
 import { useUIStateStore } from "@/features/layout/stores/ui-state-store";
@@ -163,14 +163,23 @@ const AppearanceSync = () => {
     }, [capLongCodeBlocks, codeHighlightTheme, codeLineNumbers, mermaidTheme]);
 
     const crpc = useCRPC();
+    const queryClient = useQueryClient();
     const { data: sessionData, error: sessionError, isPending: sessionPending } = authClient.useSession();
     const userId = sessionData?.user?.id;
     // An answered "no session": not while the read is pending, and not when it failed.
     const signedOut = !sessionPending && !sessionError && !sessionData?.user;
     const afterFirstPaint = useAfterFirstPaint();
     const { data: settingsRow } = useQuery(crpc.auth.functions.getUserSettings.queryOptions(afterFirstPaint && userId ? {} : skipToken));
-    // The query key carries no user: right after an account switch it can still hold the last account's row.
+    // The query key carries no user: right after an account switch it can still hold the last account's row, which is
+    // ignored here and refetched below.
     const userSettings = settingsRow?.userId === userId ? settingsRow : undefined;
+    const holdsAnotherAccountsRow = userId !== undefined && settingsRow !== undefined && settingsRow !== null && settingsRow.userId !== userId;
+
+    useEffect(() => {
+        if (holdsAnotherAccountsRow) {
+            void queryClient.invalidateQueries({ queryKey: crpc.auth.functions.getUserSettings.queryKey({}) });
+        }
+    }, [crpc, holdsAnotherAccountsRow, queryClient]);
 
     const storedAccent = userSettings?.accentColor;
     const storedCodeTheme = userSettings?.codeHighlightTheme;
@@ -208,7 +217,7 @@ const AppearanceSync = () => {
         // synced preset does not replace it.
         if (isAccentId(storedAccent) && current.accentColor !== SYSTEM_ACCENT) {
             changes.accentColor = storedAccent;
-            marked.accentColor = adoptedMark(current.explicit?.accentColor, current.accentColor === storedAccent);
+            marked.accentColor = adoptedMark(current.explicit?.accentColor, current.accentColor, storedAccent, DEFAULT_ACCENT);
         }
 
         if (typeof storedCapLongCodeBlocks === "boolean") {
@@ -237,7 +246,7 @@ const AppearanceSync = () => {
 
         if (isMainFontId(storedMainFont)) {
             changes.mainFont = storedMainFont;
-            marked.mainFont = adoptedMark(current.explicit?.mainFont, current.mainFont === storedMainFont);
+            marked.mainFont = adoptedMark(current.explicit?.mainFont, current.mainFont, storedMainFont, DEFAULT_MAIN_FONT);
         }
 
         if (Object.keys(changes).length > 0) {

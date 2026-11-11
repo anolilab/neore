@@ -61,20 +61,11 @@ The rules for working in `apps/web/src`. The detail, reasoning and code examples
   `_authenticated/` layout; `(chat)/route.tsx` uses `<Authenticated>`.
 - Throw/handle the error classes from `lib/errors/index.ts` (`ServerError`, `ValidationError`, …), switching on `code`.
 - Access browser APIs only after hydration: track `isHydrated` (`features/auth/hooks/use-last-signin-method.ts`).
-- Desktop shell look: the boot script sets `data-native` / `data-native-vibrancy` on `<html>` before paint; style it in
-  `lib/native/native-shell.css`, and gate a list row's hover background with the `web:` variant. Effects that apply a
-  shell default (`AppearanceSync`) read `isNativeShell()` inside the effect: a hook reads "no shell" while hydrating
-  and would undo the boot script for a frame. `system` accent and `explicit` stay local (the server knows neither).
-  A mark is `true` (picked here) or `"synced"` (adopted for `syncedUserId`; another account signing in resets it);
-  the boot script reads marks through `EXPLICIT_MARKS`, the list `isExplicit` uses.
-  The default Button's label is `--primary-label` (black, the OS accent's foreground under `system`), not `text-black`.
-  The shell sets `spellcheck="false"` on `<html>`: a raw prose `<textarea>` needs `spellCheck` (`native-shell.test.ts`
-  checks). The OS accent is never painted raw: `systemAccentTokens` derives a shade per mode that meets the preset bars,
-  plus a `-text` shade (`--primary-text`, 4.5:1/7:1 as text) and a solid `-hover` (`--primary-hover`, keeps the label's
-  contrast). The shell's `cursor: default` replaces only the hand; other cursor utilities and disabled states keep theirs.
-- Shell-only code stays off the first load (`scripts/check-web-bundle.ts`): `lib/native/bridge.ts` keeps only what
-  web paths call; shell events, sign-in, devices and the OS accent live in `shell-inbox.ts`, `device-bridge.ts`,
-  `system-accent.ts`, imported only from lazy code. Interpolate into inline scripts with `toScriptLiteral`.
+- Desktop shell ([why](../../../docs/agents/web-src.md#desktop-shell)): style `data-native` in
+  `lib/native/native-shell.css`; gate list-row hover with `web:`. Read `isNativeShell()` inside effects, not via a
+  hook. Keep `system` accent and `explicit` marks local; the boot script reads marks via `EXPLICIT_MARKS`. Use
+  `--primary-label`/`-text`/`-hover`, never `text-black` or the raw OS accent. Give a prose `<textarea>` `spellCheck`.
+- Keep shell-only code off the first load (`scripts/check-web-bundle.ts`); use `toScriptLiteral` in inline scripts.
 
 ## CONVENTIONS
 

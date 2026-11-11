@@ -9,8 +9,26 @@ import { systemAccentTokens } from "../lib/system-accent-tokens";
 import AppearanceSync from "./appearance-sync";
 
 /** The signed-in user, and the `userSettings` row the mocked query returns. */
+/** A `userSettings` row, as far as these tests fill it in. */
+type SettingsRow = Partial<Record<"accentColor" | "density" | "mainFont" | "userId", string>>;
+
 const server = vi.hoisted(() => {
-    return { pending: false, settings: undefined as Record<string, unknown> | undefined, userId: undefined as string | undefined };
+    return {
+        pending: false,
+        /** Each account's row, as a refetch would return it. */
+        rows: {} as Record<string, SettingsRow>,
+        settings: undefined as SettingsRow | undefined,
+        userId: undefined as string | undefined,
+    };
+});
+
+/** An invalidation refetches under the current session. */
+const queryClient = vi.hoisted(() => {
+    return {
+        invalidateQueries: vi.fn(async () => {
+            server.settings = server.userId === undefined ? undefined : server.rows[server.userId];
+        }),
+    };
 });
 
 vi.mock("@tanstack/react-query", () => {
@@ -19,6 +37,7 @@ vi.mock("@tanstack/react-query", () => {
         useQuery: () => {
             return { data: server.settings };
         },
+        useQueryClient: () => queryClient,
     };
 });
 vi.mock("@/hooks/use-after-first-paint", () => {
@@ -38,21 +57,20 @@ vi.mock("@/lib/auth/client", () => {
     };
 });
 vi.mock("@/lib/lunora/crpc", () => {
-    return {
-        useCRPC: () => {
-            return {
-                auth: {
-                    functions: {
-                        getUserSettings: {
-                            queryOptions: () => {
-                                return {};
-                            },
-                        },
+    const crpc = {
+        auth: {
+            functions: {
+                getUserSettings: {
+                    queryKey: () => ["getUserSettings"],
+                    queryOptions: () => {
+                        return {};
                     },
                 },
-            };
+            },
         },
     };
+
+    return { useCRPC: () => crpc };
 });
 
 /** The OS accent's lazy chunk: the first `failures` loads reject, as a dropped connection would make them. */
@@ -107,7 +125,9 @@ describe("AppearanceSync chat text size", () => {
 describe("AppearanceSync adopting the account's settings", () => {
     afterEach(() => {
         server.pending = false;
+        server.rows = {};
         server.settings = undefined;
+        queryClient.invalidateQueries.mockClear();
         server.userId = undefined;
         useUIStateStore.getState().resetAppearance();
         delete document.documentElement.dataset.accent;
@@ -271,6 +291,54 @@ describe("AppearanceSync adopting the account's settings", () => {
         rerender(<AppearanceSync />);
 
         expect(useUIStateStore.getState().appearance.accentColor).toBe("default");
+        expect(marks()).toStrictEqual({});
+    });
+
+    it("refetches the settings after a direct account switch and adopts the new account's", () => {
+        server.rows = { "user-a": { accentColor: "teal", userId: "user-a" }, "user-b": { accentColor: "blue", mainFont: "serif", userId: "user-b" } };
+        signIn("user-a", { accentColor: "teal" });
+        const { rerender } = render(<AppearanceSync />);
+
+        // The cache still holds user A's fresh row.
+        server.userId = "user-b";
+        rerender(<AppearanceSync />);
+
+        expect(queryClient.invalidateQueries).toHaveBeenCalledWith({ queryKey: ["getUserSettings"] });
+
+        // The refetched row reaches the component.
+        rerender(<AppearanceSync />);
+
+        expect(useUIStateStore.getState().appearance).toMatchObject({ accentColor: "blue", mainFont: "serif", syncedUserId: "user-b" });
+        expect(marks()).toStrictEqual({ accentColor: "synced", mainFont: "synced" });
+    });
+
+    it("keeps an unmarked value from before marks existed when the account echoes it, through sign-out", () => {
+        act(() => useUIStateStore.getState().setAppearance({ accentColor: "teal", mainFont: "mono" }));
+        signIn("user-a", { accentColor: "teal", mainFont: "mono" });
+        const { rerender } = render(<AppearanceSync />);
+
+        expect(marks()).toStrictEqual({ accentColor: true, mainFont: true });
+
+        server.userId = undefined;
+        server.settings = undefined;
+        rerender(<AppearanceSync />);
+
+        expect(useUIStateStore.getState().appearance).toMatchObject({ accentColor: "teal", mainFont: "mono", syncedUserId: undefined });
+        expect(marks()).toStrictEqual({ accentColor: true, mainFont: true });
+    });
+
+    it("marks a different account value over an unmarked one synced, and drops it on sign-out", () => {
+        act(() => useUIStateStore.getState().setAppearance({ accentColor: "teal", mainFont: "mono" }));
+        signIn("user-a", { accentColor: "blue", mainFont: "serif" });
+        const { rerender } = render(<AppearanceSync />);
+
+        expect(marks()).toStrictEqual({ accentColor: "synced", mainFont: "synced" });
+
+        server.userId = undefined;
+        server.settings = undefined;
+        rerender(<AppearanceSync />);
+
+        expect(useUIStateStore.getState().appearance).toMatchObject({ accentColor: "default", mainFont: "inter" });
         expect(marks()).toStrictEqual({});
     });
 });
