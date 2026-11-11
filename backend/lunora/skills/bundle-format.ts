@@ -44,6 +44,16 @@ import { FRONTMATTER_RE, parseFrontmatterYaml, parseSkillMarkdown, skillToMarkdo
 
 export const BUNDLE_VERSION = 1;
 
+/** A plugin's own file: the same items as a bundle, with a plugin header that names the install's slug, version and content hash. */
+export const PLUGIN_BUNDLE_VERSION = 2;
+
+/** The header keys that only a plugin file carries. */
+const PLUGIN_HEADER_KEYS = ["plugin", "pluginVersion", "contentHash"] as const;
+
+const PLUGIN_SLUG_RE = /^[a-z][a-z0-9-]{0,63}$/u;
+const PLUGIN_VERSION_RE = /^\d+\.\d+\.\d+$/u;
+const CONTENT_HASH_RE = /^[0-9a-f]{64}$/u;
+
 /**
  * The caps. The per-kind counts sit below the smallest window of the create
  * procedure each kind goes through (`skills/create` 10 a minute,
@@ -121,10 +131,18 @@ export interface BundleEntry {
     warnings: string[];
 }
 
+/** The plugin header of a `bundle: 2` file. The header is a label: it grants nothing, and an install recomputes the hash. */
+export interface PluginHeader {
+    contentHash: string;
+    slug: string;
+    version: string;
+}
+
 export interface ParsedBundle {
     description: string;
     entries: BundleEntry[];
     name: string;
+    plugin?: PluginHeader;
 }
 
 export type ParseBundleResult = { bundle: ParsedBundle; ok: true } | { errors: string[]; ok: false };
@@ -545,6 +563,26 @@ const readEntry = (raw: RawSection, seenSlugs: Set<string>): BundleEntry => {
     return entry;
 };
 
+/** Reads the plugin header of a `bundle: 2` file, refusing a value that is not a slug, a version or a SHA-256 hex digest. */
+const readPluginHeader = (frontmatter: Record<string, unknown>): { header: PluginHeader; ok: true } | { errors: string[]; ok: false } => {
+    const header = { contentHash: String(frontmatter.contentHash), slug: String(frontmatter.plugin), version: String(frontmatter.pluginVersion) };
+    const errors: string[] = [];
+
+    if (!PLUGIN_SLUG_RE.test(header.slug)) {
+        errors.push("The plugin slug must be lowercase letters, digits and dashes, starting with a letter");
+    }
+
+    if (!PLUGIN_VERSION_RE.test(header.version)) {
+        errors.push("The plugin version must be major.minor.patch");
+    }
+
+    if (!CONTENT_HASH_RE.test(header.contentHash)) {
+        errors.push("The content hash must be a SHA-256 hex digest");
+    }
+
+    return errors.length > 0 ? { errors, ok: false } : { header, ok: true };
+};
+
 /** Reads a bundle file. Structural trouble (version, size, counts, fences) fails the file; trouble inside one item stays on that item. */
 export const parseBundleMarkdown = (markdown: string): ParseBundleResult => {
     const size = byteLength(markdown);
@@ -574,8 +612,29 @@ export const parseBundleMarkdown = (markdown: string): ParseBundleResult => {
         return { errors: ["This is not a bundle: the frontmatter has no `bundle` version"], ok: false };
     }
 
-    if (version !== String(BUNDLE_VERSION)) {
-        return { errors: [`Unsupported bundle version "${String(version)}"; this app reads version ${String(BUNDLE_VERSION)}`], ok: false };
+    const isPlugin = version === String(PLUGIN_BUNDLE_VERSION);
+
+    if (version !== String(BUNDLE_VERSION) && !isPlugin) {
+        return {
+            errors: [`Unsupported bundle version "${String(version)}"; this app reads versions ${String(BUNDLE_VERSION)} and ${String(PLUGIN_BUNDLE_VERSION)}`],
+            ok: false,
+        };
+    }
+
+    const headerKeys = PLUGIN_HEADER_KEYS.filter((key) => frontmatter[key] !== undefined);
+
+    if (!isPlugin && headerKeys.length > 0) {
+        return { errors: ["A plugin header needs `bundle: 2`"], ok: false };
+    }
+
+    if (isPlugin && headerKeys.length !== PLUGIN_HEADER_KEYS.length) {
+        return { errors: ["A `bundle: 2` file must carry `plugin`, `pluginVersion` and `contentHash`"], ok: false };
+    }
+
+    const plugin = isPlugin ? readPluginHeader(frontmatter) : undefined;
+
+    if (plugin && !plugin.ok) {
+        return { errors: plugin.errors, ok: false };
     }
 
     const errors: string[] = [];
@@ -605,7 +664,7 @@ export const parseBundleMarkdown = (markdown: string): ParseBundleResult => {
     const description = typeof frontmatter.description === "string" ? singleLine(frontmatter.description, BUNDLE_LIMITS.description) : "";
 
     return {
-        bundle: { description, entries: sections.map((raw) => readEntry(raw, seenSlugs)), name: name || "Bundle" },
+        bundle: { description, entries: sections.map((raw) => readEntry(raw, seenSlugs)), name: name || "Bundle", ...(plugin && { plugin: plugin.header }) },
         ok: true,
     };
 };
