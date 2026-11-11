@@ -61,7 +61,6 @@ export const lastSegment = (path: string): string => {
     return trimmed.slice(trimmed.lastIndexOf(separatorOf(trimmed)) + 1);
 };
 
-/** `name` inside `folder`. */
 export const joinPath = (folder: string, name: string): string => {
     const base = trimTrailing(folder);
     const separator = separatorOf(base);
