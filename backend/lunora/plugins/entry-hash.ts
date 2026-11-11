@@ -34,10 +34,55 @@ export const skillContent = (source: SkillContent): SkillContent => ({
     version: source.version,
 });
 
-/** The hash of an entry as the file defines it. A skill is hashed over its content fields, the same way its row is. */
+/** The fields of a trigger that the file defines and its row stores as written. */
+export interface TriggerContent {
+    botComputer?: boolean;
+    botId?: string;
+    cronExpression?: string;
+    description?: string;
+    eventSource?: unknown;
+    filters?: unknown;
+    inputTemplate?: string;
+    model?: string;
+    name: string;
+    quietWhenEmpty?: boolean;
+    searchMode?: string;
+    systemPrompt?: string;
+    timezone?: string;
+    type: string;
+    webhookSignatureScheme?: string;
+}
+
+/** A trigger's content, with only the fields the file defines. */
+export const triggerContent = (source: TriggerContent): TriggerContent => ({
+    botComputer: source.botComputer,
+    botId: source.botId,
+    cronExpression: source.cronExpression,
+    description: source.description,
+    eventSource: source.eventSource,
+    filters: source.filters,
+    inputTemplate: source.inputTemplate,
+    model: source.model,
+    name: source.name,
+    quietWhenEmpty: source.quietWhenEmpty,
+    searchMode: source.searchMode,
+    systemPrompt: source.systemPrompt,
+    timezone: source.timezone,
+    type: source.type,
+    webhookSignatureScheme: source.webhookSignatureScheme,
+});
+
+/** A trigger's live hash, read back from its row. A row that stores a field differently from the file reads as edited, which is the safe side. */
+export const triggerRowHash = async (row: TriggerContent): Promise<string> => await contentHash(triggerContent(row));
+
+/** The hash of an entry as the file defines it. A skill and a trigger are hashed over their content fields, the way their rows are. */
 export const entryHash = async (entry: PlanEntry): Promise<string> => {
     if (entry.plan?.kind === "skill") {
         return await contentHash(skillContent(entry.plan.create));
+    }
+
+    if (entry.plan?.kind === "trigger") {
+        return await contentHash(triggerContent(entry.plan.create as TriggerContent));
     }
 
     return await contentHash(entry.plan?.create ?? null);
