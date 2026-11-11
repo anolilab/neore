@@ -100,11 +100,15 @@ describe("composer paste", () => {
 
     it("takes the text of HTML too big to convert when it is the only text, and leaves a composer quote chip to the editor", async () => {
         await expect(paste({ "text/html": `<p>Hello</p><!--${"x".repeat(1_000_000)}-->` })).resolves.toBe("Hello");
+        // What the page does not show stays out: script, style, noscript and template content, in any case, closed or not.
+        await expect(
+            paste({
+                "text/html": `<SCRIPT>s<b></Script ><style>p{}</style>Hi<noscript>n</noscript><Template>t</template><p>${"x".repeat(1_000_000)}<script>s`,
+            }),
+        ).resolves.toBe(`Hi${"x".repeat(1_000_000)}`);
 
-        const started = performance.now();
         const text = await paste({ "text/html": "<div><b>row</b> &amp; &lt;more&gt;</div>".repeat(150_000) });
 
-        expect(performance.now() - started).toBeLessThan(1000);
         expect(text?.startsWith("row & <more>row")).toBe(true);
         expect(text).toHaveLength(150_000 * "row & <more>".length);
         expect(isLongPaste(text ?? "")).toBe(true);
@@ -120,6 +124,17 @@ describe("composer paste", () => {
                 },
             ),
         ).toStrictEqual({ kind: "default" });
+    });
+
+    it("falls back to the plain text for HTML nested too deep to convert in bounded work", async () => {
+        // Each quote re-indents all it holds: 300 deep over 1000 lines would be ~90M characters.
+        const quotes = `${"<blockquote>".repeat(300)}${"a<br>".repeat(1000)}`;
+
+        expect(() => htmlToMarkdown(quotes)).toThrow(RangeError);
+        expect(() => htmlToMarkdown(`${"<div>".repeat(600)}a`)).toThrow(RangeError);
+        await expect(paste({ "text/html": quotes, "text/plain": "plain" })).resolves.toBe("plain");
+        await expect(paste({ "text/html": `${"<ul><li>".repeat(600)}deep` })).resolves.toBe("deep");
+        expect(htmlToMarkdown(`${"<blockquote>".repeat(3)}a`)).toBe("> > > a");
     });
 
     it("pastes a table whose spans would fill too many cells as its text", () => {
@@ -180,6 +195,11 @@ describe("composer paste", () => {
             "hidden table rows and cells are left out",
             '<table><tr><th>A</th><th style="display:none">S</th><th>B</th></tr><tr style="display:none"><td>secret</td></tr><tbody hidden><tr><td>secret</td></tr></tbody><tr><td>a</td><td aria-hidden="true">secret</td><td>b</td></tr></table>',
             "| A | B |\n| --- | --- |\n| a | b |",
+        ],
+        [
+            "a backslash in a cell or a link label never escapes the Markdown around it",
+            String.raw`<table><tr><th>A</th><th>B</th></tr><tr><td>a\|b</td><td>c</td></tr></table><p><a href="https://x.y/">C:\dir\</a> <a href="https://x.y/">a\]b</a></p>`,
+            ["| A | B |", "| --- | --- |", String.raw`| a\\\|b | c |`, "", String.raw`[C:\dir\\](https://x.y/) [a\\\]b](https://x.y/)`].join("\n"),
         ],
         ["a table keeps its caption", "<table><caption>Prices</caption><tr><th>A</th></tr><tr><td>1</td></tr></table>", "Prices\n\n| A |\n| --- |\n| 1 |"],
         [

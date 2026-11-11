@@ -26,6 +26,8 @@ const MAX_CONVERTED_HTML = 1_000_000;
 const BACKTICK_RUNS = /`+/g;
 const ENTITY = /&(?:amp|gt|lt|nbsp|quot|#39);/g;
 const ENTITIES: Record<string, string> = { "&#39;": "'", "&amp;": "&", "&gt;": ">", "&lt;": "<", "&nbsp;": " ", "&quot;": '"' };
+// Elements whose content is not text the page shows.
+const RAW_TEXT = /<(script|style|noscript|template)[\s/>]/iy;
 const LANGUAGE_UNSAFE = /[^\w#+.-]/g;
 const VSCODE_LANGUAGES: Record<string, string> = { javascriptreact: "jsx", plaintext: "", shellscript: "bash", typescriptreact: "tsx" };
 
@@ -133,7 +135,7 @@ export const planPaste = (data: Pick<DataTransfer, "getData">, { plainOnly, sele
     return plain !== "" && isPlainHtml(html) ? { kind: "text", text: plain } : { html, kind: "html", plain };
 };
 
-/** The text of HTML too big to parse, in one pass: every `<…>` dropped and the common entities decoded. */
+/** The text of HTML too big to parse, in one pass: every `<…>` and script, style, noscript and template dropped, the common entities decoded. */
 const stripTags = (html: string): string => {
     const parts: string[] = [];
     let index = 0;
@@ -141,9 +143,26 @@ const stripTags = (html: string): string => {
     while (index < html.length) {
         const open = html.indexOf("<", index);
 
-        parts.push(html.slice(index, open === -1 ? html.length : open));
+        if (open === -1) {
+            parts.push(html.slice(index));
+            break;
+        }
 
-        const close = open === -1 ? -1 : html.indexOf(">", open);
+        parts.push(html.slice(index, open));
+        RAW_TEXT.lastIndex = open;
+
+        // A script's or style's text runs to its end tag, or to the end.
+        const raw = RAW_TEXT.exec(html);
+        let from = open;
+
+        if (raw) {
+            const end = new RegExp(`</${raw[1]}`, "gi");
+
+            end.lastIndex = RAW_TEXT.lastIndex;
+            from = end.exec(html)?.index ?? html.length;
+        }
+
+        const close = html.indexOf(">", from);
 
         index = close === -1 ? html.length : close + 1;
     }
@@ -162,7 +181,7 @@ export const planText = async (plan: Exclude<PastePlan, { kind: "default" }>): P
 
     // A page this big becomes an attachment whatever its form; converting it would only hold up the tab.
     if (plan.html.length > MAX_CONVERTED_HTML) {
-        return plan.plain === "" ? stripTags(plan.html) : plan.plain;
+        return plan.plain || stripTags(plan.html);
     }
 
     try {
@@ -170,6 +189,7 @@ export const planText = async (plan: Exclude<PastePlan, { kind: "default" }>): P
 
         return htmlToMarkdown(plan.html) || plan.plain;
     } catch {
-        return plan.plain;
+        // Also HTML nested too deep to convert.
+        return plan.plain || stripTags(plan.html);
     }
 };

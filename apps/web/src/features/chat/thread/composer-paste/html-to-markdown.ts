@@ -68,10 +68,17 @@ const BLANK_LINES = /\n{3,}/g;
 const PLACEHOLDER = /\0(\d+)\0/g;
 /** Grid cells all tables of a paste may fill: spans multiply a cell, and past this a table is pasted as its text. */
 const MAX_TABLE_CELLS = 100_000;
+/** Characters quotes and list items may re-indent in all: each re-indents all it holds, so deep nesting is quadratic. */
+const MAX_INDENT_WORK = 20_000_000;
+/** Elements deep the walk goes before the paste falls back to its plain text, well before the stack runs out. */
+const MAX_DEPTH = 500;
 
 interface Context {
     /** Fenced code blocks, put back at the end so whitespace clean-up never touches them. */
     code: string[];
+    depth: number;
+    /** Characters quotes and list items may still re-indent. */
+    indentWork: number;
     inTable: boolean;
     /** Grid cells the tables still left to convert may fill. */
     tableCells: number;
@@ -159,13 +166,21 @@ const prefixLines = (text: string, first: string, prefix: string, blank: string,
         return line === "" ? blank : prefix + line;
     };
 
+    context.indentWork -= text.length;
+
     for (const match of text.matchAll(PLACEHOLDER)) {
         const index = Number(match[1]);
+
+        context.indentWork -= context.code[index]?.length ?? 0;
 
         context.code[index] = (context.code[index] ?? "")
             .split("\n")
             .map((line: string, lineIndex: number) => prefixed(line, lineIndex))
             .join("\n");
+    }
+
+    if (context.indentWork < 0) {
+        throw new RangeError("Nested too deep to convert");
     }
 
     return (
@@ -219,6 +234,17 @@ const safeHref = (element: Element): string | undefined => {
     }
 };
 
+/** A run of backslashes and `|`, `[` or `]`, each escaped so no backslash escapes Markdown; a backslash tail stays unless it ends the text. */
+const escapeRun = (run: string, atEnd: boolean): string => {
+    let end = run.length;
+
+    while (!atEnd && run[end - 1] === "\\") {
+        end -= 1;
+    }
+
+    return run.slice(0, end).replaceAll(/./g, String.raw`\$&`) + run.slice(end);
+};
+
 /** A cell's text on one line. The context is shared, not copied, so cells of tables nested in it count against the budget. */
 const cellText = (cell: Element, context: Context): string => {
     const { inTable } = context;
@@ -231,7 +257,7 @@ const cellText = (cell: Element, context: Context): string => {
 
     return oneLine(text)
         .trim()
-        .replaceAll("|", String.raw`\|`);
+        .replaceAll(/[\\|]+/g, (run: string) => escapeRun(run, false));
 };
 
 /** Whether `node` or a parent of it below `root` is hidden. */
@@ -419,7 +445,9 @@ const element = (node: Element, context: Context): string => {
                 return text;
             }
 
-            const label = text.trim().replaceAll(/[[\]]/g, String.raw`\$&`);
+            const label = text
+                .trim()
+                .replaceAll(/[\\[\]]+/g, (run: string, offset: number, whole: string) => escapeRun(run, offset + run.length === whole.length));
 
             return label === href ? href : `[${label}](${href})`;
         }
@@ -533,8 +561,14 @@ const element = (node: Element, context: Context): string => {
 
 /** The Markdown for the child nodes, without the spaces that collapsed HTML whitespace leaves around line breaks. */
 function children(node: Node, context: Context): string {
+    if (context.depth >= MAX_DEPTH) {
+        throw new RangeError("Nested too deep to convert");
+    }
+
     // Parts, not one growing string: a long page has thousands of blocks, and re-reading the whole text for each is quadratic.
     const parts: string[] = [];
+
+    context.depth += 1;
 
     for (const child of node.childNodes) {
         let next = "";
@@ -578,13 +612,15 @@ function children(node: Node, context: Context): string {
         parts.push(next);
     }
 
+    context.depth -= 1;
+
     return parts.join("");
 }
 
 /** The Markdown for a clipboard `text/html` payload; empty when it holds no text. */
 export const htmlToMarkdown = (html: string): string => {
     const parsed = new DOMParser().parseFromString(html, "text/html");
-    const context: Context = { code: [], inTable: false, tableCells: MAX_TABLE_CELLS };
+    const context: Context = { code: [], depth: 0, indentWork: MAX_INDENT_WORK, inTable: false, tableCells: MAX_TABLE_CELLS };
 
     return children(parsed.body, context)
         .split("\n")
