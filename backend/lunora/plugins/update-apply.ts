@@ -10,7 +10,7 @@
  */
 import { LunoraError, v } from "lunorash/server";
 
-import { assertCronExpression } from "../triggers/functions";
+import { assertCronExpression, assertCustomModelRunnable } from "../triggers/functions";
 
 import type { Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
@@ -192,6 +192,9 @@ export const updateTriggerChild = internalMutation
         if (args.cronExpression !== undefined) {
             assertCronExpression(args.cronExpression);
         }
+
+        // The same model check the create path makes: a custom model must be one the owner may run.
+        await assertCustomModelRunnable(ctx, args.model, args.userId);
 
         await ctx.db.patch("pluginItems", link._id as Id<"pluginItems">, { pendingHash: args.contentHash });
 
