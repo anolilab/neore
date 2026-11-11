@@ -9,7 +9,7 @@ import { LunoraError, v } from "lunorash/server";
 
 import { internal } from "../_generated/internal";
 import { internalQuery } from "../_generated/server";
-import { authAction } from "../lib/crpc";
+import { authAction, rateLimit } from "../lib/crpc";
 import { MAX_LENGTH } from "../lib/validators";
 import { planFor } from "../skills/bundle";
 import { checkPluginFile } from "./install-action";
@@ -127,6 +127,7 @@ export const updatePlugin = authAction
         contentHash: v.string().max(128),
         markdown: v.string().max(MAX_LENGTH.document),
     })
+    .use(rateLimit("plugins/install"))
     .output(
         v.object({
             applied: v.array(v.string()),
