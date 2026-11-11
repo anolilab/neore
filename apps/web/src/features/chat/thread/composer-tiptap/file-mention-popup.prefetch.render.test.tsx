@@ -13,7 +13,9 @@ const harness = vi.hoisted(() => {
     return {
         calls: { files: 0, search: 0, threads: 0 },
         files: [] as unknown[],
+        filesFail: false,
         threads: [] as unknown[],
+        token: "token" as null | string,
     };
 });
 
@@ -21,6 +23,15 @@ vi.mock("@lingui/react/macro", () => {
     return {
         useLingui: () => {
             return { t: (strings: TemplateStringsArray, ...values: unknown[]) => String.raw({ raw: strings }, ...values) };
+        },
+    };
+});
+
+vi.mock("@lunora/react", async (importOriginal) => {
+    return {
+        ...(await importOriginal<typeof import("@lunora/react")>()),
+        useAuth: () => {
+            return { token: harness.token };
         },
     };
 });
@@ -69,7 +80,17 @@ vi.mock("@/lib/lunora/crpc", () => {
                 }),
             },
         },
-        vault: { functions: { getAttachmentsForUser: leaf("vault_functions:getAttachmentsForUser", "files", () => harness.files) } },
+        vault: {
+            functions: {
+                getAttachmentsForUser: leaf("vault_functions:getAttachmentsForUser", "files", () => {
+                    if (harness.filesFail) {
+                        throw new Error("offline");
+                    }
+
+                    return harness.files;
+                }),
+            },
+        },
     };
 
     return {
@@ -127,6 +148,8 @@ beforeEach(() => {
 
 const setup = () => {
     harness.calls = { files: 0, search: 0, threads: 0 };
+    harness.filesFail = false;
+    harness.token = "token";
     harness.threads = [
         thread("current", "Current chat", 50, "project-a"),
         thread("sibling", "Sibling chat", 10, "project-a"),
@@ -194,6 +217,121 @@ describe("FileMentionPopup prefetch", () => {
     });
 });
 
+describe("FileMentionPopup prefetch follows the cache", () => {
+    const focused = (wrapper: (props: { children: ReactNode }) => ReactNode) => {
+        const { editor, focus } = fakeEditor();
+        const view = renderHook(() => useMentionPrefetch(editor, true), { wrapper });
+
+        act(focus);
+
+        return { focus, view };
+    };
+
+    it("does not fetch again for the next chat's composer while the cache holds the reads", async () => {
+        expect.hasAssertions();
+
+        const { wrapper } = setup();
+
+        focused(wrapper);
+        await waitFor(() => {
+            expect(harness.calls).toStrictEqual({ files: 1, search: 0, threads: 1 });
+        });
+
+        const next = focused(wrapper);
+
+        await Promise.resolve();
+        expect(harness.calls).toStrictEqual({ files: 1, search: 0, threads: 1 });
+        // Its "/" menu loads on the first "/": a chat switch costs no actions.
+        expect(next.view.result.current).toBe(false);
+    });
+
+    it("fetches again once the files entry is collected", async () => {
+        expect.hasAssertions();
+
+        const { queryClient, wrapper } = setup();
+        const { focus } = focused(wrapper);
+
+        await waitFor(() => {
+            expect(harness.calls.files).toBe(1);
+        });
+
+        // What garbage collection does to an entry left unobserved past its `gcTime`.
+        queryClient.removeQueries({ queryKey: ["lunora", "vault_functions:getAttachmentsForUser"] });
+        act(focus);
+
+        await waitFor(() => {
+            expect(harness.calls.files).toBe(2);
+        });
+    });
+
+    it("warms a later sign-in's composer after sign-out cleared the cache", async () => {
+        expect.hasAssertions();
+
+        const { queryClient, wrapper } = setup();
+
+        focused(wrapper);
+        await waitFor(() => {
+            expect(harness.calls).toStrictEqual({ files: 1, search: 0, threads: 1 });
+        });
+
+        // `AuthRecovery` in `__root.tsx` on sign-out.
+        queryClient.clear();
+
+        const next = focused(wrapper);
+
+        await waitFor(() => {
+            expect(harness.calls).toStrictEqual({ files: 2, search: 0, threads: 2 });
+        });
+        expect(next.view.result.current).toBe(true);
+    });
+
+    it("waits for the client's token, then warms the focused composer", async () => {
+        expect.hasAssertions();
+
+        const { wrapper } = setup();
+
+        harness.token = null;
+
+        const { editor } = fakeEditor();
+        const view = renderHook(() => useMentionPrefetch(editor, true), { wrapper });
+
+        (editor as { isFocused: boolean }).isFocused = true;
+        view.rerender();
+        await Promise.resolve();
+        expect(harness.calls).toStrictEqual({ files: 0, search: 0, threads: 0 });
+
+        harness.token = "token";
+        view.rerender();
+
+        await waitFor(() => {
+            expect(harness.calls).toStrictEqual({ files: 1, search: 0, threads: 1 });
+        });
+        expect(view.result.current).toBe(true);
+    });
+
+    it("tries a failed prefetch again on the next focus", async () => {
+        expect.hasAssertions();
+
+        const { queryClient, wrapper } = setup();
+
+        harness.filesFail = true;
+
+        const { focus } = focused(wrapper);
+
+        await waitFor(() => {
+            expect(queryClient.getQueryState(["lunora", "vault_functions:getAttachmentsForUser", "{}", null])?.status).toBe("error");
+        });
+
+        harness.filesFail = false;
+        act(focus);
+
+        await waitFor(() => {
+            expect(queryClient.getQueryData(["lunora", "vault_functions:getAttachmentsForUser", "{}", null])).toStrictEqual(harness.files);
+        });
+        expect(harness.calls.files).toBe(2);
+    });
+});
+
 describe("FileMentionPopup project ranking", () => {
     it("lists the current project's files and chats first, under their own label", async () => {
         expect.hasAssertions();
@@ -246,10 +384,17 @@ describe("FileMentionPopup motion", () => {
         openPopup(wrapper);
 
         const [option] = await screen.findAllByRole("option");
-        const enter = POPUP_ENTER_MOTION.split(" ");
+        // The panel is the portal box's child: the box that holds the search field, found without reading its classes.
+        let panel: HTMLElement = screen.getByPlaceholderText("Search files and chats...");
 
-        // The panel's own classes are not reachable through roles; every popup takes them from this one constant.
-        expect(enter).toStrictEqual(expect.arrayContaining(["animate-in", "duration-100", "motion-reduce:animate-none"]));
+        // eslint-disable-next-line testing-library/no-node-access -- the panel has no role to query by
+        while (panel.parentElement && !panel.parentElement.classList.contains("fixed")) {
+            // eslint-disable-next-line testing-library/no-node-access -- see above
+            panel = panel.parentElement;
+        }
+
+        expect(panel.className.split(" ")).toStrictEqual(expect.arrayContaining(POPUP_ENTER_MOTION.split(" ")));
+        expect(panel.className.split(" ")).toStrictEqual(expect.arrayContaining(["animate-in", "duration-100", "motion-reduce:animate-none"]));
         expect(option?.className.split(" ")).toStrictEqual(expect.arrayContaining(["transition-colors", "duration-75", "motion-reduce:transition-none"]));
     });
 });

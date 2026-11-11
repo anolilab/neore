@@ -160,46 +160,63 @@ const SlashCommandPopup: FC<SlashCommandPopupProps> = ({
     const user = sessionData?.user;
     const isProUser = (user as { plan?: string; role?: string } | undefined)?.plan === "premium" || user?.role === "admin";
 
-    // Fetch prompts and skills
-    const { mutateAsync: getPrompts } = useMutation(useLunoraActionOptions(api.prompts.functions.getPrompts));
-    const { mutateAsync: getSkills } = useMutation(useLunoraActionOptions(api.skills.functions.getSkills));
+    // Fetch prompts and skills. Offline they fail at once, as Lunora's own `useAction` does, instead of waiting paused for the
+    // network (TanStack's default for a mutation): a failed load is tried again when the menu next opens.
+    const { mutateAsync: getPrompts } = useMutation({ ...useLunoraActionOptions(api.prompts.functions.getPrompts), networkMode: "always" });
+    const { mutateAsync: getSkills } = useMutation({ ...useLunoraActionOptions(api.skills.functions.getSkills), networkMode: "always" });
     const [prompts, setPrompts] = useState<Doc<"prompts">[]>([]);
     const [skills, setSkills] = useState<Doc<"skills">[]>([]);
+    const loadedRef = useRef({ prompts: false, skills: false });
 
-    // Loaded once, when the composer is warm (`use-mention-prefetch.ts`) or on the first "/" — not on mount: the editor
-    // mounts this popup permanently, and two actions on every first paint of /chat queued on the one `__root__` shard
-    // (see `e2e/first-paint.e2e.test.ts`).
-    const hasMatch = match !== null;
-    const [shouldLoad, setShouldLoad] = useState(false);
+    // Loaded when the composer is warm (`use-mention-prefetch.ts`) or on the first "/" — not on mount: the editor mounts
+    // this popup permanently, and two actions on every first paint of /chat queued on the one `__root__` shard (see
+    // `e2e/first-paint.e2e.test.ts`). What failed is tried again once, when "/" opens or its submenu changes, never in a loop.
+    const menuKey = match === null ? null : (match.command ?? "");
+    const [load, setLoad] = useState<"done" | "failed" | "idle" | "pending">("idle");
+    const [loadMenuKey, setLoadMenuKey] = useState(menuKey);
 
-    if ((hasMatch || warm) && !shouldLoad) {
-        setShouldLoad(true);
+    if (loadMenuKey !== menuKey) {
+        setLoadMenuKey(menuKey);
+    }
+
+    if ((load === "idle" && (menuKey !== null || warm)) || (load === "failed" && menuKey !== null && menuKey !== loadMenuKey)) {
+        setLoad("pending");
     }
 
     useEffect(() => {
-        if (!shouldLoad) {
+        if (load !== "pending") {
             return undefined;
         }
 
         let isCancelled = false;
+        const loaded = loadedRef.current;
+        const promptsLoad = loaded.prompts ? undefined : getPrompts({});
+        const skillsLoad = loaded.skills ? undefined : getSkills({ sortBy: "recent" });
 
-        Promise.all([getPrompts({}), getSkills({ sortBy: "recent" })])
-            .then(([p, s]) => {
-                if (isCancelled) {
-                    return undefined;
-                }
-
-                setPrompts(p as Doc<"prompts">[]);
-                setSkills(s as Doc<"skills">[]);
-
+        void Promise.allSettled([promptsLoad, skillsLoad]).then(([p, s]) => {
+            if (isCancelled) {
                 return undefined;
-            })
-            .catch(() => {});
+            }
+
+            if (promptsLoad && p.status === "fulfilled") {
+                loaded.prompts = true;
+                setPrompts(p.value as Doc<"prompts">[]);
+            }
+
+            if (skillsLoad && s.status === "fulfilled") {
+                loaded.skills = true;
+                setSkills(s.value as Doc<"skills">[]);
+            }
+
+            setLoad(loaded.prompts && loaded.skills ? "done" : "failed");
+
+            return undefined;
+        });
 
         return () => {
             isCancelled = true;
         };
-    }, [getPrompts, getSkills, shouldLoad]);
+    }, [getPrompts, getSkills, load]);
 
     const [selectedIndex, setSelectedIndex] = useState(0);
     const commandListRef = useRef<HTMLDivElement | null>(null);
