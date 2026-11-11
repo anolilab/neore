@@ -87,13 +87,16 @@ describe(createMenuDelivery, () => {
     });
 
     it("does not fall back once the page listens within the grace period", () => {
-        const { delivery, fellBack } = setup();
+        const { delivery, fellBack, sent } = setup();
         const win = { onSite: true };
 
         delivery.loaded(win);
         delivery.ready(win);
         vi.advanceTimersByTime(MENU_READY_GRACE_MS * 2);
+        // A command after the grace period still reaches the listening page: the timer did not mark it absent.
+        delivery.deliver(win, "new-chat");
 
+        expect(sent).toStrictEqual([[win, "new-chat"]]);
         expect(fellBack).toStrictEqual([]);
     });
 
