@@ -55,6 +55,12 @@ export const EXPLICIT_MARKS: ReadonlyArray<unknown> = [true, SYNCED_MARK];
 
 export const isExplicit = (mark: unknown): boolean => EXPLICIT_MARKS.includes(mark);
 
+/**
+ * The mark for a value adopted from the account. The account echoing back what was picked on this device (a save, then
+ * a refetch) keeps it this device's choice, so switching accounts does not reset it.
+ */
+export const adoptedMark = (current: ExplicitMark | undefined, sameValue: boolean): ExplicitMark => (sameValue && current === true ? true : SYNCED_MARK);
+
 type SyncedChoiceReset = { accentColor?: AccentId; explicit: ExplicitAppearance; mainFont?: MainFontId };
 
 /**

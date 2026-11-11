@@ -28,12 +28,12 @@ import {
 } from "../lib/display-preferences";
 import type { SystemAccentTokens } from "../lib/native-appearance";
 import {
+    adoptedMark,
     applySystemAccentTokens,
     cacheSystemAccentTokens,
     effectiveAccent,
     effectiveMainFont,
     isExplicit,
-    SYNCED_MARK,
     SYSTEM_ACCENT,
     withoutSyncedChoices,
 } from "../lib/native-appearance";
@@ -171,7 +171,7 @@ const AppearanceSync = () => {
         // synced preset does not replace it.
         if (isAccentId(storedAccent) && current.accentColor !== SYSTEM_ACCENT) {
             changes.accentColor = storedAccent;
-            marked.accentColor = SYNCED_MARK;
+            marked.accentColor = adoptedMark(current.explicit?.accentColor, current.accentColor === storedAccent);
         }
 
         if (typeof storedCapLongCodeBlocks === "boolean") {
@@ -200,7 +200,7 @@ const AppearanceSync = () => {
 
         if (isMainFontId(storedMainFont)) {
             changes.mainFont = storedMainFont;
-            marked.mainFont = SYNCED_MARK;
+            marked.mainFont = adoptedMark(current.explicit?.mainFont, current.mainFont === storedMainFont);
         }
 
         if (Object.keys(changes).length > 0) {

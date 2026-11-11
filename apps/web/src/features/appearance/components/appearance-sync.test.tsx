@@ -154,6 +154,33 @@ describe("AppearanceSync adopting the account's settings", () => {
         expect(marks()).toStrictEqual({ accentColor: true });
     });
 
+    it("keeps a value picked here this device's choice when the account echoes it back, across an account switch", () => {
+        signIn("user-a");
+        const { rerender } = render(<AppearanceSync />);
+
+        act(() => useUIStateStore.getState().setAppearance({ accentColor: "teal", explicit: { accentColor: true, mainFont: true }, mainFont: "mono" }));
+        // The save comes back through the settings query.
+        signIn("user-a", { accentColor: "teal", mainFont: "mono" });
+        rerender(<AppearanceSync />);
+
+        expect(marks()).toStrictEqual({ accentColor: true, mainFont: true });
+
+        signIn("user-b");
+        rerender(<AppearanceSync />);
+
+        expect(useUIStateStore.getState().appearance).toMatchObject({ accentColor: "teal", mainFont: "mono", syncedUserId: "user-b" });
+        expect(marks()).toStrictEqual({ accentColor: true, mainFont: true });
+    });
+
+    it("marks a different account value synced even over a choice made here", () => {
+        act(() => useUIStateStore.getState().setAppearance({ accentColor: "teal", explicit: { accentColor: true } }));
+        signIn("user-a", { accentColor: "default" });
+        render(<AppearanceSync />);
+
+        expect(useUIStateStore.getState().appearance.accentColor).toBe("default");
+        expect(marks()).toStrictEqual({ accentColor: "synced" });
+    });
+
     it("keeps a choice stored before synced marks existed (`true`) when another account signs in", () => {
         act(() => useUIStateStore.getState().setAppearance({ accentColor: "teal", explicit: { accentColor: true, mainFont: true }, mainFont: "mono" }));
         signIn("user-b");
