@@ -12,7 +12,6 @@ import { internalMutation, internalQuery, type MutationCtx } from "../_generated
 import { BATCH, type BatchResult, full } from "../gdpr/batch";
 import { enqueueJob } from "../lib/job-queue";
 import { logger } from "../lib/logger";
-import { systemDb } from "../lib/rls/scope";
 import { ROOT_SHARD_KEY } from "../lib/shard-context";
 import { MAX_LENGTH } from "../lib/validators";
 import { PROJECTS_PER_DETAILS_READ } from "./export-pages";
@@ -54,7 +53,7 @@ const eraseUnlessMoved = async (
     projects: Map<string, Promise<Doc<"projects"> | null>>,
 ): Promise<boolean> => {
     if (!projects.has(row.projectId)) {
-        projects.set(row.projectId, systemDb(ctx).projects.findFirst({ consistency: "primary", where: { _id: row.projectId } }));
+        projects.set(row.projectId, ctx.db.projects.findFirst({ consistency: "primary", where: { _id: row.projectId } }));
     }
 
     let project: Doc<"projects"> | null | undefined;
