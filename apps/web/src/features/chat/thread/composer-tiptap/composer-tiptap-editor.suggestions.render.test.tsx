@@ -5,6 +5,7 @@
  * handed; the editor, its extensions and the match logic are the real ones.
  */
 import { act, render, waitFor } from "@testing-library/react";
+import { closeHistory } from "@tiptap/pm/history";
 import { createRef } from "react";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -202,5 +203,42 @@ describe("ComposerTiptapEditor paste", () => {
         pasteInto(view.container.querySelector(".ProseMirror") as HTMLElement, "pasted");
 
         expect(ref.current!.getEditor()!.getText()).toBe(expected);
+    });
+
+    it("pastes converted text inside a line with its blank lines, as one undo step, and spots Ctrl+Shift+V", async () => {
+        const ref = createRef<ComposerTiptapEditorRef>();
+        const view = render(<ComposerTiptapEditor onChange={() => {}} onSubmit={() => {}} ref={ref} value="ab" />);
+
+        await waitFor(() => {
+            expect(ref.current?.getEditor()?.getText()).toBe("ab");
+        });
+
+        const editor = ref.current!.getEditor()!;
+
+        act(() => {
+            // The draft was set just before: without a boundary, undo would take it back with the paste.
+            editor.view.dispatch(closeHistory(editor.state.tr));
+            editor.commands.setTextSelection(2);
+            ref.current!.pasteText("- **x**\n\n| a |");
+        });
+
+        expect(editor.getText({ blockSeparator: "\n" })).toBe("a- **x**\n\n| a |b");
+
+        act(() => {
+            editor.commands.undo();
+        });
+
+        expect(editor.getText()).toBe("ab");
+
+        // eslint-disable-next-line testing-library/no-container, testing-library/no-node-access -- the editor has no role to query by
+        const element = view.container.querySelector(".ProseMirror") as HTMLElement;
+        const keydown = new KeyboardEvent("keydown", { bubbles: true, ctrlKey: true, key: "V", shiftKey: true });
+
+        act(() => {
+            element.dispatchEvent(keydown);
+        });
+
+        expect(ref.current!.isPlainPaste({ timeStamp: keydown.timeStamp + 10 })).toBe(true);
+        expect(ref.current!.isPlainPaste({ timeStamp: keydown.timeStamp + 5000 })).toBe(false);
     });
 });

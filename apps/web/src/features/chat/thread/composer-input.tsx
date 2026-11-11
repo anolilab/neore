@@ -68,10 +68,11 @@ import type { ChatReference } from "./chat-reference";
 import { buildChatTranscript, chatReferenceFileName } from "./chat-reference";
 import CompletionSound from "./completion-sound";
 import type { TextFileResult } from "./composer-draft-file";
-import { attachLongPaste, draftFitsAsFile, moveDraftToFile, pasteHasText, undoLongPaste } from "./composer-draft-file";
+import { attachLongPaste, draftFitsAsFile, insertPastedText, moveDraftToFile, pasteHasText, undoLongPaste } from "./composer-draft-file";
 import type { ComposerInputAreaRef } from "./composer-input-area";
 import ComposerInputArea from "./composer-input-area";
 import ComposerLongTextPrompt from "./composer-long-text-prompt";
+import { isLongPaste, planPaste, planText } from "./composer-paste/paste-plan";
 import ComposerPromptQueue from "./composer-prompt-queue";
 import { isEditable, TextAttachmentEditorDialog } from "./composer-text-attachment-editor";
 import { quoteRestoreDraft } from "./composer-tiptap/extensions/quote-chip";
@@ -910,43 +911,65 @@ const ComposerInput = ({
                 }
             }
 
-            // Check for long text content
-            const { removed: pasteRemoved, text: pastedText } = stripHiddenText(e.clipboardData.getData("text/plain"));
+            const editorHandle = inputAreaRef.current?.getEditor();
+            const editor = editorHandle?.getEditor();
+            const plan = planPaste(e.clipboardData, {
+                plainOnly: editorHandle?.isPlainPaste(e) ?? false,
+                selectedText: editor && !editor.isDestroyed ? editor.state.doc.textBetween(editor.state.selection.from, editor.state.selection.to, "\n") : "",
+            });
+            const plainText = e.clipboardData.getData("text/plain");
 
-            // Auto-convert if text is long (>500 chars or >10 lines)
-            if (pastedText && (pastedText.length > 500 || pastedText.split("\n").length > 10)) {
-                e.preventDefault();
+            // Plain text the editor can paste itself: it does, as it always has.
+            if (plan.kind === "default" && !isLongPaste(stripHiddenText(plainText).text)) {
+                return;
+            }
 
-                // Read before the upload: the caret moves while it runs.
-                const selection = pasteSelection();
+            e.preventDefault();
 
-                if (pasteRemoved > 0) {
-                    useChatUIStore.getState().noteComposerHiddenRemoved(pasteRemoved);
+            // Read before the conversion and the upload: the caret moves while they run.
+            const selection = pasteSelection();
+            const chatKey = getChatKey();
+            // Converted text is measured as it lands: a short web page can be a long table.
+            const { removed: pasteRemoved, text: pastedText } = stripHiddenText(plan.kind === "default" ? plainText : await planText(plan));
+
+            if (!pastedText || getChatKey() !== chatKey) {
+                return;
+            }
+
+            if (pasteRemoved > 0) {
+                useChatUIStore.getState().noteComposerHiddenRemoved(pasteRemoved);
+            }
+
+            if (!isLongPaste(pastedText)) {
+                if (!inputAreaRef.current?.getEditor()?.pasteText(pastedText)) {
+                    setText(insertPastedText(useChatUIStore.getState().composerText, pastedText, selection.start, selection.end));
                 }
 
-                await attachLongPaste({
-                    attach: attachTextAsFile,
-                    discard: removeAttachment,
-                    getAttachmentIds: () => useChatUIStore.getState().composerAttachments.map((attachment) => attachment.id),
-                    getChatKey,
-                    getDraft: () => useChatUIStore.getState().composerText,
-                    onAttached: (attachmentId) => {
-                        announcePasteAttached(attachmentId, pastedText);
-                    },
-                    onNotInserted: () => {
-                        showError(t`The pasted text could not be attached and was not inserted.`);
-                    },
-                    // A recognised failure was toasted where it was worded; the text is back in the composer.
-                    onFailure: (error) => {
-                        if (!toastedMessages.has(error)) {
-                            showError(error);
-                        }
-                    },
-                    pastedText,
-                    selection,
-                    setDraft: setText,
-                });
+                return;
             }
+
+            await attachLongPaste({
+                attach: attachTextAsFile,
+                discard: removeAttachment,
+                getAttachmentIds: () => useChatUIStore.getState().composerAttachments.map((attachment) => attachment.id),
+                getChatKey,
+                getDraft: () => useChatUIStore.getState().composerText,
+                onAttached: (attachmentId) => {
+                    announcePasteAttached(attachmentId, pastedText);
+                },
+                onNotInserted: () => {
+                    showError(t`The pasted text could not be attached and was not inserted.`);
+                },
+                // A recognised failure was toasted where it was worded; the text is back in the composer.
+                onFailure: (error) => {
+                    if (!toastedMessages.has(error)) {
+                        showError(error);
+                    }
+                },
+                pastedText,
+                selection,
+                setDraft: setText,
+            });
         },
         [handleFileSelect, announcePasteAttached, attachTextAsFile, getChatKey, pasteSelection, removeAttachment, setText, t],
     );

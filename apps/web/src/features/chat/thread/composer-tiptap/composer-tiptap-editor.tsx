@@ -19,6 +19,7 @@
 import { useLingui } from "@lingui/react/macro";
 import type { Editor } from "@tiptap/core";
 import PlaceholderExtension from "@tiptap/extension-placeholder";
+import { Fragment, Slice } from "@tiptap/pm/model";
 import { Selection } from "@tiptap/pm/state";
 import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKitExtension from "@tiptap/starter-kit";
@@ -126,7 +127,30 @@ export interface ComposerTiptapEditorRef {
     blur: () => void;
     focus: () => void;
     getEditor: () => Editor | null;
+    /** Whether `event` is a paste made with Ctrl/Cmd+Shift+V, which keeps the text exactly as copied. */
+    isPlainPaste: (event: { timeStamp: number }) => boolean;
+    /** Inserts `text` over the selection as one undoable paste, a paragraph per line; false without an editor. */
+    pasteText: (text: string) => boolean;
 }
+
+const LINE_BREAK = /\r\n?|\n/;
+
+/** The paste the editor would make of `text/plain`, but with every line kept: its own parser merges blank lines. */
+const pastePlainText = (editor: Editor, text: string): boolean => {
+    const { schema, tr } = editor.state;
+    const { paragraph } = schema.nodes;
+
+    if (!paragraph) {
+        return false;
+    }
+
+    const paragraphs = text.split(LINE_BREAK).map((line: string) => paragraph.create(null, line === "" ? null : schema.text(line)));
+    const slice = new Slice(Fragment.from(paragraphs), 1, 1);
+
+    editor.view.dispatch(tr.replaceSelection(slice).scrollIntoView().setMeta("paste", true).setMeta("uiEvent", "paste"));
+
+    return true;
+};
 
 // ============================================================================
 // Constants — hoisted to avoid new references on every render
@@ -135,6 +159,9 @@ export interface ComposerTiptapEditorRef {
 
 const EMPTY_BANNED_MATCHES: BannedWordMatch[] = [];
 const EMPTY_VARIABLES: PromptVariable[] = [];
+
+/** A paste this soon after Ctrl/Cmd+Shift+V came from it: the paste event itself does not say. */
+const PLAIN_PASTE_WINDOW_MS = 1000;
 
 /** How long the "suggestion available" announcement stays in the live region. */
 const ANNOUNCEMENT_CLEAR_MS = 4000;
@@ -259,6 +286,8 @@ const ComposerTiptapEditor = ({
         historyRecalledRef.current = isHistoryRecalled;
     }, [isVimEnabled, isHistoryRecalled]);
 
+    const plainPasteKeyAt = useRef(-Infinity);
+
     // Create editor
     const editor = useEditor({
         autofocus: autoFocus ? "end" : false,
@@ -268,6 +297,13 @@ const ComposerTiptapEditor = ({
             // The composer's paste handler runs first (capture phase) and prevents a paste it turns into a file; the editor
             // then leaves that paste alone, so a long text is never both attached and inserted.
             handlePaste: (_view, event) => event.defaultPrevented,
+            handleKeyDown: (_view, event) => {
+                if (event.shiftKey && (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "v") {
+                    plainPasteKeyAt.current = event.timeStamp;
+                }
+
+                return false;
+            },
         },
         extensions: [
             StarterKitExtension.configure({
@@ -381,6 +417,8 @@ const ComposerTiptapEditor = ({
             blur: () => editor?.commands.blur(),
             focus: () => editor?.commands.focus(),
             getEditor: () => editor,
+            isPlainPaste: (event: { timeStamp: number }) => event.timeStamp - plainPasteKeyAt.current < PLAIN_PASTE_WINDOW_MS,
+            pasteText: (text: string) => (editor && !editor.isDestroyed ? pastePlainText(editor, text) : false),
         };
     }, [editor]);
 
