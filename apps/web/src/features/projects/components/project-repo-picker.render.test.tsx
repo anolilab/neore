@@ -18,9 +18,11 @@ vi.mock("@lingui/react/macro", () => {
 });
 
 // `gate.open` holds every repository-list answer back until it resolves.
-const { gate, repositories } = vi.hoisted(() => {
+const { gate, lookup, repositories } = vi.hoisted(() => {
     return {
         gate: { open: Promise.resolve() },
+        // `lookup.fails` makes the reopened run's project lookup (`findRepoProject`) fail.
+        lookup: { fails: false },
         repositories: [
             { id: "repo_a", isDefault: false, url: "https://github.com/acme/web.git" },
             { defaultBranch: "develop", id: "repo_b", isDefault: true, url: "https://github.com/acme/api.git" },
@@ -42,6 +44,10 @@ vi.mock("@/lib/lunora/crpc", async () => {
                                     ? { queryFn: skip, queryKey: ["find"] }
                                     : {
                                           queryFn: async () => {
+                                              if (lookup.fails) {
+                                                  throw new Error("lookup failed");
+                                              }
+
                                               return { projectId: "p_far", title: "Far" };
                                           },
                                           queryKey: ["find", args],
@@ -69,6 +75,7 @@ vi.mock("@/lib/lunora/crpc", async () => {
 
 beforeEach(() => {
     gate.open = Promise.resolve();
+    lookup.fails = false;
     // The popup positions itself with these; jsdom lacks getAnimations, and the setup's observer mock (re-installed before every test) is not constructible.
     Element.prototype.getAnimations = () => [];
     vi.stubGlobal(
@@ -183,5 +190,20 @@ describe("ProjectRepoPicker", () => {
 
         await waitFor(() => expect(screen.getByRole("combobox", { name: "Project repository" }).textContent).toContain("acme/web"));
         expect(screen.getByRole("combobox", { name: "Project" }).textContent).toContain("Far");
+    });
+
+    it("says so when the reopened run's project cannot be looked up, rather than showing no project as the answer", async () => {
+        lookup.fails = true;
+
+        render(
+            <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+                <ProjectRepoPicker branch="" onPick={vi.fn()} projects={[{ _id: "p_web", title: "Web" }]} repoUrl="acme/api" />
+            </QueryClientProvider>,
+        );
+
+        const alert = await screen.findByRole("alert");
+
+        expect(alert.textContent).toContain("Could not look up this repository's project.");
+        expect(screen.getByRole("button", { name: "Try again" })).toBeDefined();
     });
 });

@@ -155,11 +155,23 @@ const ProjectRepositories: FC<{ projectId: string }> = ({ projectId }) => {
     const crpcClient = useCRPCClient();
     // The list is live, but after each change, landed or refused, a one-shot read writes the current list into the same
     // cache entry, so the settings never wait on the subscription to report the change. The query's own options stay
-    // as they are: `fetchQuery` would replace them, and with them the live marker.
+    // as they are: `fetchQuery` would replace them, and with them the live marker. Only the latest read is written:
+    // one that answers after a later change's read would put back the list from before it.
+    const latestRefresh = useRef(0);
     const refreshList = () => {
+        latestRefresh.current += 1;
+
+        const refresh = latestRefresh.current;
+
         void crpcClient
             .query(api.projects.functions.listProjectRepos, args)
-            .then((list) => queryClient.setQueryData(crpc.projects.functions.listProjectRepos.queryKey(args), list))
+            .then((list) => {
+                if (refresh !== latestRefresh.current) {
+                    return undefined;
+                }
+
+                return queryClient.setQueryData(crpc.projects.functions.listProjectRepos.queryKey(args), list);
+            })
             .catch(() => undefined);
     };
     const canEdit = !!project && (!project.userId || project.userId === sessionData?.user?.id);

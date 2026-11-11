@@ -1733,7 +1733,7 @@ msgstr "有变更等待查看"
 msgid "A chat is waiting for your answer"
 msgstr "有一个对话在等待你的回复"
 
-#: src/features/tasks/components/task-form-dialog.tsx:97
+#: src/features/tasks/components/task-form-dialog.tsx:98
 msgid "A coding agent needs a repository to work on"
 msgstr "编程智能体需要一个代码仓库来工作"
 
@@ -1822,7 +1822,7 @@ msgstr "将打开一个引用所选消息的新聊天。检查后再发送。"
 msgid "A new secret is shown once. The old secret stops working at once unless you keep it below, so update the sender right after. The webhook URL stays the same."
 msgstr "新密钥仅显示一次。除非你在下方保留旧密钥，否则旧密钥会立即失效，因此请随后立刻更新发送方。webhook URL 保持不变。"
 
-#: src/features/tasks/components/task-form-dialog.tsx:140
+#: src/features/tasks/components/task-form-dialog.tsx:141
 msgid "A new thread each run"
 msgstr "每次运行新建一个对话"
 
@@ -1850,7 +1850,7 @@ msgstr "口令可防止任何使用你已登录浏览器的人打开此聊天。
 msgid "A placeholder or @mention outside quotes is read as null here, so this error may come from it until a run fills it in"
 msgstr "引号外的占位符或 @提及 在此处会被读作 null，因此在运行填入之前，此错误可能由它引起"
 
-#: src/features/projects/components/project-repositories.tsx:172
+#: src/features/projects/components/project-repositories.tsx:194
 msgid "A project can list at most {MAX_REPOSITORIES} repositories."
 msgstr "一个项目最多可列出 {MAX_REPOSITORIES} 个仓库。"
 
@@ -1887,7 +1887,7 @@ msgstr ""
 msgid "A run never writes into a chat that is locked or shared by link. It starts a new chat instead, and the task says why."
 msgstr ""
 
-#: src/features/tasks/components/task-form-dialog.tsx:468
+#: src/features/tasks/components/task-form-dialog.tsx:469
 msgid "A run's thread is filed in this project. Moving the task to another project starts a new thread."
 msgstr "运行的对话会归入此项目。将任务移到其他项目会新建对话。"
 
@@ -2180,7 +2180,7 @@ msgid "Activity per month"
 msgstr "每月活动"
 
 #: src/features/chat/tags/manage-thread-tags-dialog.tsx:225
-#: src/features/projects/components/project-repositories.tsx:402
+#: src/features/projects/components/project-repositories.tsx:432
 #: src/features/settings/components/chat/mcp/server-catalog.tsx:102
 #: src/features/workflow/components/gallery/publish-dialog.tsx:220
 msgid "Add"
@@ -2815,7 +2815,7 @@ msgstr "在外部内容之后"
 #: src/features/evals/components/dataset-panel.tsx:102
 #: src/features/layout/lib/dashboard-page-names.ts:14
 #: src/features/settings/lib/settings-navigation.ts:93
-#: src/features/tasks/components/task-form-dialog.tsx:353
+#: src/features/tasks/components/task-form-dialog.tsx:354
 msgid "Agent"
 msgstr "智能体"
 
@@ -3386,7 +3386,7 @@ msgstr "支持者和怀疑者进行两轮正反辩论；主持人权衡双方观
 msgid "An agent (skill)"
 msgstr "智能体（技能）"
 
-#: src/features/tasks/components/task-form-dialog.tsx:206
+#: src/features/tasks/components/task-form-dialog.tsx:207
 msgid "An agent works the task on its own, then a verifier checks the result against your success criteria."
 msgstr "智能体会自主处理任务，然后由验证器根据你的成功标准检查结果。"
 
@@ -4087,7 +4087,7 @@ msgid "Aspect Ratio"
 msgstr "宽高比"
 
 #: src/features/tasks/components/task-detail-dialog.tsx:223
-#: src/features/tasks/components/task-form-dialog.tsx:271
+#: src/features/tasks/components/task-form-dialog.tsx:272
 msgid "Assigned to"
 msgstr "分配给"
 
@@ -5010,7 +5010,7 @@ msgstr "头脑风暴"
 #: ../../packages/chat-ui/src/chat/message-item.tsx:203
 #: src/features/chat/core/hooks/use-thread-manager.ts:138
 #: src/features/chat/core/hooks/use-thread-manager.ts:151
-#: src/features/tasks/components/task-form-dialog.tsx:335
+#: src/features/tasks/components/task-form-dialog.tsx:336
 #: src/features/workflow/types/index.ts:425
 #: src/features/workflow/types/index.ts:429
 msgid "Branch"
@@ -5521,7 +5521,7 @@ msgstr "加拿大"
 #: src/features/slides/components/slide-editor-dialog.tsx:113
 #: src/features/tasks/components/goal-form-dialog.tsx:164
 #: src/features/tasks/components/task-card.tsx:106
-#: src/features/tasks/components/task-form-dialog.tsx:635
+#: src/features/tasks/components/task-form-dialog.tsx:636
 #: src/features/workflow/components/nodes/mask-editor.tsx:286
 #: src/features/workflow/components/nodes/video-trim-dialog.tsx:236
 #: src/features/workflow/components/prompt-to-workflow-dialog.tsx:142
@@ -5863,7 +5863,7 @@ msgstr "聊天 · 图像 · 视频 · 音频 · 文档"
 msgid "Chat actions"
 msgstr "聊天操作"
 
-#: src/features/tasks/components/task-form-dialog.tsx:133
+#: src/features/tasks/components/task-form-dialog.tsx:134
 msgid "Chat agent"
 msgstr "聊天智能体"
 
@@ -6269,7 +6269,7 @@ msgstr "claude"
 msgid "Claude Code"
 msgstr "Claude Code"
 
-#: src/features/tasks/components/task-form-dialog.tsx:134
+#: src/features/tasks/components/task-form-dialog.tsx:135
 msgid "Claude Code (coding agent)"
 msgstr "Claude Code（编程智能体）"
 
@@ -6346,7 +6346,7 @@ msgid "Clear mask"
 msgstr "清除蒙版"
 
 #: src/features/skills/components/skill-form-dialog.tsx:373
-#: src/features/tasks/components/task-form-dialog.tsx:412
+#: src/features/tasks/components/task-form-dialog.tsx:413
 msgid "Clear model"
 msgstr "清除模型"
 
@@ -6720,7 +6720,7 @@ msgstr "需要阿里巴巴 30B 编程专用模型的编程任务"
 msgid "Coding tasks requiring Mistral's specialized development-focused model"
 msgstr "需要 Mistral 开发专用模型的编程任务"
 
-#: src/features/projects/components/project-repositories.tsx:261
+#: src/features/projects/components/project-repositories.tsx:291
 msgid "Coding-agent runs in this project offer these repositories, with the default preselected."
 msgstr "此项目中的编码代理运行会提供这些仓库，并预先选中默认仓库。"
 
@@ -7761,7 +7761,7 @@ msgstr "在此聊天中继续"
 msgid "Continue interrupted replies"
 msgstr "继续被中断的回复"
 
-#: src/features/tasks/components/task-form-dialog.tsx:138
+#: src/features/tasks/components/task-form-dialog.tsx:139
 msgid "Continue the same thread"
 msgstr "在同一对话中继续"
 
@@ -8354,8 +8354,8 @@ msgstr "无法加载 API 密钥。请稍后重试。"
 msgid "Could not load image"
 msgstr "无法加载图片"
 
-#: src/features/projects/components/project-repo-picker.tsx:155
-#: src/features/tasks/components/task-form-dialog.tsx:456
+#: src/features/projects/components/project-repo-picker.tsx:188
+#: src/features/tasks/components/task-form-dialog.tsx:457
 msgid "Could not load more projects."
 msgstr "无法加载更多项目。"
 
@@ -8396,12 +8396,12 @@ msgstr "无法加载此内容"
 msgid "Could not load this chat's details."
 msgstr ""
 
-#: src/features/projects/components/project-repositories.tsx:266
+#: src/features/projects/components/project-repositories.tsx:296
 msgid "Could not load this project, so its repositories cannot be changed."
 msgstr "无法加载此项目，因此无法更改其仓库。"
 
-#: src/features/projects/components/project-repo-picker.tsx:189
-#: src/features/projects/components/project-repositories.tsx:287
+#: src/features/projects/components/project-repo-picker.tsx:226
+#: src/features/projects/components/project-repositories.tsx:317
 msgid "Could not load this project's repositories."
 msgstr "无法加载此项目的仓库。"
 
@@ -8424,6 +8424,10 @@ msgstr "无法加载你所在组织的账单详情。请稍后重试。"
 #: src/features/onboarding/components/setup-checklist.tsx:230
 msgid "Could not load your saved choices, so Skip and Resume are off until it is read again."
 msgstr ""
+
+#: src/features/projects/components/project-repo-picker.tsx:173
+msgid "Could not look up this repository's project."
+msgstr "无法获取此仓库所属的项目。"
 
 #: src/features/pages/components/pages-sidebar.tsx:108
 msgid "Could not move the page"
@@ -8867,7 +8871,7 @@ msgstr "创建技能"
 msgid "Create Skill"
 msgstr "创建技能"
 
-#: src/features/tasks/components/task-form-dialog.tsx:638
+#: src/features/tasks/components/task-form-dialog.tsx:639
 msgid "Create task"
 msgstr "创建任务"
 
@@ -9037,7 +9041,7 @@ msgstr "克罗地亚语（克罗地亚）"
 msgid "Cron Expression"
 msgstr "Cron 表达式"
 
-#: src/features/tasks/components/task-form-dialog.tsx:565
+#: src/features/tasks/components/task-form-dialog.tsx:566
 msgid "Cron expression (UTC)"
 msgstr "Cron 表达式（UTC）"
 
@@ -9128,7 +9132,7 @@ msgstr "当前受限"
 msgid "Custom"
 msgstr "自定义"
 
-#: src/features/tasks/components/task-form-dialog.tsx:124
+#: src/features/tasks/components/task-form-dialog.tsx:125
 msgid "Custom (cron)"
 msgstr "自定义（cron）"
 
@@ -9516,18 +9520,18 @@ msgstr "DeepSeek 的实验性高级聊天 LLM"
 msgid "DeepSeek's experimental advanced chat LLM with thinking"
 msgstr "DeepSeek 支持思考的实验性高级聊天 LLM"
 
-#: src/features/projects/components/project-repositories.tsx:114
+#: src/features/projects/components/project-repositories.tsx:115
 msgid "default"
 msgstr "默认"
 
 #: src/features/appearance/components/appearance-controls.tsx:164
-#: src/features/projects/components/project-repositories.tsx:319
+#: src/features/projects/components/project-repositories.tsx:349
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:75
 msgid "Default"
 msgstr "默认"
 
-#: src/features/tasks/components/task-form-dialog.tsx:356
-#: src/features/tasks/components/task-form-dialog.tsx:368
+#: src/features/tasks/components/task-form-dialog.tsx:357
+#: src/features/tasks/components/task-form-dialog.tsx:369
 msgid "Default agent"
 msgstr "默认智能体"
 
@@ -9540,16 +9544,16 @@ msgstr "默认 AI 回复语言"
 msgid "Default AI Settings"
 msgstr "默认 AI 设置"
 
-#: src/features/projects/components/project-repositories.tsx:380
-#: src/features/tasks/components/task-form-dialog.tsx:340
+#: src/features/projects/components/project-repositories.tsx:410
+#: src/features/tasks/components/task-form-dialog.tsx:341
 msgid "Default branch"
 msgstr "默认分支"
 
-#: src/features/projects/components/project-repositories.tsx:100
+#: src/features/projects/components/project-repositories.tsx:101
 msgid "Default branch of {name}"
 msgstr "{name} 的默认分支"
 
-#: src/features/projects/components/project-repositories.tsx:314
+#: src/features/projects/components/project-repositories.tsx:344
 msgid "Default branch:"
 msgstr "默认分支："
 
@@ -10073,7 +10077,7 @@ msgstr ""
 msgid "Depart:"
 msgstr "出发："
 
-#: src/features/tasks/components/task-form-dialog.tsx:500
+#: src/features/tasks/components/task-form-dialog.tsx:501
 msgid "Depends on"
 msgstr "依赖于"
 
@@ -10618,7 +10622,7 @@ msgstr "不等于"
 msgid "does not exist"
 msgstr "不存在"
 
-#: src/features/tasks/components/task-form-dialog.tsx:127
+#: src/features/tasks/components/task-form-dialog.tsx:128
 msgid "Does not repeat"
 msgstr "不重复"
 
@@ -10964,7 +10968,7 @@ msgstr "例如：代码审查员"
 msgid "e.g. Every Monday, summarise new GitHub issues in my repo and draft replies for the urgent ones"
 msgstr "例如：每周一汇总我仓库中新的 GitHub issue，并为紧急的问题起草回复"
 
-#: src/features/tasks/components/task-form-dialog.tsx:262
+#: src/features/tasks/components/task-form-dialog.tsx:263
 msgid "e.g. Lists at least five sources, each with a link"
 msgstr "例如：列出至少五个来源，每个附带链接"
 
@@ -11065,15 +11069,15 @@ msgstr ""
 msgid "Each participant runs with its own instructions, model and tools, and each speaker's usage is recorded on its own."
 msgstr ""
 
-#: src/features/tasks/components/task-form-dialog.tsx:144
+#: src/features/tasks/components/task-form-dialog.tsx:145
 msgid "Each run is added to the last run's thread after a divider. The history stays, but the agent is not sent earlier runs."
 msgstr "每次运行会在分隔线之后追加到上次运行的对话中。历史记录会保留，但不会把之前的运行发送给智能体。"
 
-#: src/features/tasks/components/task-form-dialog.tsx:143
+#: src/features/tasks/components/task-form-dialog.tsx:144
 msgid "Each run is added to the last run's thread, and the agent sees the earlier runs."
 msgstr "每次运行都会追加到上次运行的对话中，智能体可以看到之前的运行。"
 
-#: src/features/tasks/components/task-form-dialog.tsx:145
+#: src/features/tasks/components/task-form-dialog.tsx:146
 msgid "Each run starts its own thread."
 msgstr "每次运行都会新建自己的对话。"
 
@@ -11284,7 +11288,7 @@ msgstr "编辑图像的特定区域"
 msgid "Edit specific regions of an image with AI"
 msgstr "用 AI 编辑图像的特定区域"
 
-#: src/features/tasks/components/task-form-dialog.tsx:205
+#: src/features/tasks/components/task-form-dialog.tsx:206
 msgid "Edit task"
 msgstr "编辑任务"
 
@@ -12230,7 +12234,7 @@ msgstr "事件"
 msgid "Every 6 hours"
 msgstr "每 6 小时"
 
-#: src/features/tasks/components/task-form-dialog.tsx:125
+#: src/features/tasks/components/task-form-dialog.tsx:126
 msgid "Every day at 09:00 UTC"
 msgstr "每天 09:00 UTC"
 
@@ -12238,7 +12242,7 @@ msgstr "每天 09:00 UTC"
 msgid "Every day at 8 AM"
 msgstr "每天早上 8 点"
 
-#: src/features/tasks/components/task-form-dialog.tsx:126
+#: src/features/tasks/components/task-form-dialog.tsx:127
 msgid "Every hour"
 msgstr "每小时"
 
@@ -13351,7 +13355,7 @@ msgstr "保存设置失败"
 msgid "Failed to save skill"
 msgstr "保存技能失败"
 
-#: src/features/tasks/components/task-form-dialog.tsx:191
+#: src/features/tasks/components/task-form-dialog.tsx:192
 msgid "Failed to save task"
 msgstr "保存任务失败"
 
@@ -15347,7 +15351,7 @@ msgstr "前往你的页面"
 #: src/features/chat/goal/composer-goal.tsx:75
 #: src/features/chat/goal/goal-notes.tsx:70
 #: src/features/chat/goal/goal-notes.tsx:77
-#: src/features/tasks/components/task-form-dialog.tsx:379
+#: src/features/tasks/components/task-form-dialog.tsx:380
 msgid "Goal"
 msgstr "目标"
 
@@ -16268,7 +16272,7 @@ msgstr ""
 msgid "How long temporary chats are kept before being automatically deleted. Default: 24 hours."
 msgstr "临时聊天在自动删除前保留的时长。默认：24 小时。"
 
-#: src/features/tasks/components/task-form-dialog.tsx:627
+#: src/features/tasks/components/task-form-dialog.tsx:628
 msgid "How often the agent retries with the verifier's feedback before asking you to review."
 msgstr "在请你审核之前，智能体根据验证器反馈重试的次数。"
 
@@ -17109,12 +17113,12 @@ msgstr "指令"
 #: src/features/skills/components/skill-builder-review.tsx:166
 #: src/features/skills/components/skill-form-dialog.tsx:274
 #: src/features/tasks/components/task-detail-dialog.tsx:233
-#: src/features/tasks/components/task-form-dialog.tsx:238
+#: src/features/tasks/components/task-form-dialog.tsx:239
 msgid "Instructions"
 msgstr "指令"
 
 #: src/features/skills/components/skill-form-dialog.tsx:69
-#: src/features/tasks/components/task-form-dialog.tsx:88
+#: src/features/tasks/components/task-form-dialog.tsx:89
 msgid "Instructions are required"
 msgstr "请输入指令"
 
@@ -17126,7 +17130,7 @@ msgstr "指令过长"
 msgid "Instructions for the AI..."
 msgstr "给 AI 的指令..."
 
-#: src/features/tasks/components/task-form-dialog.tsx:91
+#: src/features/tasks/components/task-form-dialog.tsx:92
 msgid "Instructions must be {INSTRUCTIONS_MAX} characters or less"
 msgstr "指令不能超过 {INSTRUCTIONS_MAX} 个字符"
 
@@ -18656,8 +18660,8 @@ msgstr "正在加载图片"
 msgid "Loading messenger connections..."
 msgstr "正在加载即时通讯连接..."
 
-#: src/features/projects/components/project-repo-picker.tsx:150
-#: src/features/tasks/components/task-form-dialog.tsx:451
+#: src/features/projects/components/project-repo-picker.tsx:167
+#: src/features/tasks/components/task-form-dialog.tsx:452
 msgid "Loading more projects…"
 msgstr "正在加载更多项目…"
 
@@ -18708,8 +18712,8 @@ msgstr "正在加载预览..."
 msgid "Loading preview…"
 msgstr "正在加载预览…"
 
-#: src/features/projects/components/project-repo-picker.tsx:196
-#: src/features/projects/components/project-repositories.tsx:282
+#: src/features/projects/components/project-repo-picker.tsx:233
+#: src/features/projects/components/project-repositories.tsx:312
 msgid "Loading repositories…"
 msgstr "正在加载仓库…"
 
@@ -19141,7 +19145,7 @@ msgstr "在多次生成中保持主体一致"
 msgid "Major improvements in reasoning and instruction following"
 msgstr "推理和指令遵循能力大幅提升"
 
-#: src/features/projects/components/project-repositories.tsx:322
+#: src/features/projects/components/project-repositories.tsx:352
 msgid "Make {name} the default repository"
 msgstr "将 {name} 设为默认仓库"
 
@@ -19149,7 +19153,7 @@ msgstr "将 {name} 设为默认仓库"
 msgid "Make Admin"
 msgstr "设为管理员"
 
-#: src/features/projects/components/project-repositories.tsx:331
+#: src/features/projects/components/project-repositories.tsx:361
 msgid "Make default"
 msgstr "设为默认"
 
@@ -20105,7 +20109,7 @@ msgstr "模式："
 #: src/features/prompts/components/prompt-form-dialog.tsx:387
 #: src/features/settings/components/chat/bots-settings.tsx:135
 #: src/features/settings/components/chat/usage-settings.tsx:317
-#: src/features/tasks/components/task-form-dialog.tsx:406
+#: src/features/tasks/components/task-form-dialog.tsx:407
 #: src/features/workflow/components/nodes/ai-node.tsx:34
 #: src/features/workflow/components/nodes/background-removal-node.tsx:63
 #: src/features/workflow/components/nodes/character-ref-node.tsx:144
@@ -20284,7 +20288,7 @@ msgstr "MoE"
 msgid "Mon"
 msgstr ""
 
-#: src/features/tasks/components/task-form-dialog.tsx:129
+#: src/features/tasks/components/task-form-dialog.tsx:130
 msgid "Mondays at 09:00 UTC"
 msgstr "每周一 09:00 UTC"
 
@@ -21196,7 +21200,7 @@ msgstr "新建提示词"
 msgid "New tag"
 msgstr "新标签"
 
-#: src/features/tasks/components/task-form-dialog.tsx:205
+#: src/features/tasks/components/task-form-dialog.tsx:206
 #: src/features/tasks/components/tasks-page.tsx:205
 msgid "New task"
 msgstr "新建任务"
@@ -21576,8 +21580,8 @@ msgstr "你的知识库中还没有文件。在上方上传文档即可开始。
 msgid "No focal length selected"
 msgstr "未选择焦距"
 
-#: src/features/tasks/components/task-form-dialog.tsx:382
-#: src/features/tasks/components/task-form-dialog.tsx:394
+#: src/features/tasks/components/task-form-dialog.tsx:383
+#: src/features/tasks/components/task-form-dialog.tsx:395
 msgid "No goal"
 msgstr "无目标"
 
@@ -21711,7 +21715,7 @@ msgstr "未收到优化后的提示词"
 msgid "No options found."
 msgstr "未找到选项。"
 
-#: src/features/tasks/components/task-form-dialog.tsx:504
+#: src/features/tasks/components/task-form-dialog.tsx:505
 msgid "No other tasks yet."
 msgstr "还没有其他任务。"
 
@@ -21765,10 +21769,10 @@ msgstr "{quietMinutes} 分钟无进展"
 msgid "No progress: {0}"
 msgstr "无进展：{0}"
 
-#: src/features/projects/components/project-repo-picker.tsx:80
+#: src/features/projects/components/project-repo-picker.tsx:97
 #: src/features/settings/components/chat/usage-project-breakdown.tsx:66
-#: src/features/tasks/components/task-form-dialog.tsx:429
-#: src/features/tasks/components/task-form-dialog.tsx:441
+#: src/features/tasks/components/task-form-dialog.tsx:430
+#: src/features/tasks/components/task-form-dialog.tsx:442
 msgid "No project"
 msgstr "无项目"
 
@@ -22083,8 +22087,8 @@ msgstr "无"
 msgid "None — show the answers only"
 msgstr "无 — 仅显示回答"
 
-#: src/features/tasks/components/task-form-dialog.tsx:476
-#: src/features/tasks/components/task-form-dialog.tsx:488
+#: src/features/tasks/components/task-form-dialog.tsx:477
+#: src/features/tasks/components/task-form-dialog.tsx:489
 msgid "None (top-level task)"
 msgstr "无（顶级任务）"
 
@@ -22714,7 +22718,7 @@ msgstr "只有聊天的所有者才能开始新的上下文。"
 msgid "Only the owner of the chat can answer. Everyone else in a shared chat sees that the owner has to decide."
 msgstr ""
 
-#: src/features/projects/components/project-repositories.tsx:354
+#: src/features/projects/components/project-repositories.tsx:384
 msgid "Only the project's owner can change its repositories."
 msgstr "只有项目所有者可以更改其仓库。"
 
@@ -22790,7 +22794,7 @@ msgstr "打开 {filename}"
 msgid "Open {modelName} in full thread"
 msgstr "在完整对话中打开 {modelName}"
 
-#: src/features/tasks/components/task-form-dialog.tsx:346
+#: src/features/tasks/components/task-form-dialog.tsx:347
 msgid "Open a pull request with the change (GitHub, needs the GitHub connector)"
 msgstr "用更改创建拉取请求（GitHub，需要 GitHub 连接器）"
 
@@ -23143,7 +23147,7 @@ msgstr "openai"
 msgid "OpenAI"
 msgstr "OpenAI"
 
-#: src/features/tasks/components/task-form-dialog.tsx:135
+#: src/features/tasks/components/task-form-dialog.tsx:136
 msgid "OpenAI Codex (coding agent)"
 msgstr "OpenAI Codex（编程智能体）"
 
@@ -23436,7 +23440,7 @@ msgstr "优化后的提示词"
 msgid "Optimizing..."
 msgstr "正在优化..."
 
-#: src/features/projects/components/project-repositories.tsx:389
+#: src/features/projects/components/project-repositories.tsx:419
 #: src/features/prompts/components/prompt-optimize-dialog.tsx:160
 msgid "optional"
 msgstr "可选"
@@ -23454,7 +23458,7 @@ msgid "Optional. Criteria the judge grades the answer against."
 msgstr "可选。评委用来为答案评分的标准。"
 
 #: src/features/evals/components/run-dialog.tsx:215
-#: src/features/tasks/components/task-form-dialog.tsx:409
+#: src/features/tasks/components/task-form-dialog.tsx:410
 msgid "Optional. Defaults to the skill's preferred model, then the default model."
 msgstr "可选。默认使用技能的首选模型，其次是默认模型。"
 
@@ -24343,7 +24347,7 @@ msgstr "选择要评测的模型。"
 msgid "Pick a page on the left, or create one with the + button."
 msgstr "在左侧选择一个页面，或点击 + 按钮新建一个。"
 
-#: src/features/projects/components/project-repo-picker.tsx:177
+#: src/features/projects/components/project-repo-picker.tsx:214
 msgid "Pick a repository"
 msgstr "选择仓库"
 
@@ -25323,9 +25327,9 @@ msgstr "进度"
 msgid "Progress of {toolName}"
 msgstr "{toolName} 的进度"
 
-#: src/features/projects/components/project-repo-picker.tsx:120
+#: src/features/projects/components/project-repo-picker.tsx:137
 #: src/features/settings/components/chat/usage-project-breakdown.tsx:104
-#: src/features/tasks/components/task-form-dialog.tsx:426
+#: src/features/tasks/components/task-form-dialog.tsx:427
 msgid "Project"
 msgstr "项目"
 
@@ -25341,7 +25345,7 @@ msgstr "项目上下文"
 msgid "Project no longer available"
 msgstr "项目已不可用"
 
-#: src/features/projects/components/project-repo-picker.tsx:164
+#: src/features/projects/components/project-repo-picker.tsx:197
 msgid "Project repository"
 msgstr "项目仓库"
 
@@ -26693,7 +26697,7 @@ msgid "Remove {modelId} from blocked list"
 msgstr "从屏蔽列表中移除 {modelId}"
 
 #: src/features/pages/components/page-share-dialog.tsx:185
-#: src/features/projects/components/project-repositories.tsx:336
+#: src/features/projects/components/project-repositories.tsx:366
 msgid "Remove {name}"
 msgstr "移除 {name}"
 
@@ -26934,11 +26938,11 @@ msgstr "修复说明："
 msgid "repair round"
 msgstr "修复轮次"
 
-#: src/features/tasks/components/task-form-dialog.tsx:612
+#: src/features/tasks/components/task-form-dialog.tsx:613
 msgid "Repair rounds"
 msgstr "修复轮数"
 
-#: src/features/tasks/components/task-form-dialog.tsx:533
+#: src/features/tasks/components/task-form-dialog.tsx:534
 msgid "Repeat"
 msgstr "重复"
 
@@ -27024,12 +27028,12 @@ msgstr ""
 msgid "Repos, issues, PRs, and code search"
 msgstr "仓库、Issue、PR 和代码搜索"
 
-#: src/features/projects/components/project-repositories.tsx:260
+#: src/features/projects/components/project-repositories.tsx:290
 msgid "Repositories"
 msgstr "仓库"
 
-#: src/features/projects/components/project-repositories.tsx:360
-#: src/features/tasks/components/task-form-dialog.tsx:317
+#: src/features/projects/components/project-repositories.tsx:390
+#: src/features/tasks/components/task-form-dialog.tsx:318
 msgid "Repository"
 msgstr "代码仓库"
 
@@ -27839,7 +27843,7 @@ msgstr "正在运行..."
 msgid "Runs ({0})"
 msgstr "运行（{0}）"
 
-#: src/features/tasks/components/task-form-dialog.tsx:292
+#: src/features/tasks/components/task-form-dialog.tsx:293
 msgid "Runs in a cloud sandbox for up to 20 minutes on your own {keyProvider} API key (Settings → API keys). Private GitHub repositories need the GitHub connector."
 msgstr "在云端沙盒中使用你自己的 {keyProvider} API 密钥（设置 → API 密钥）运行最多 20 分钟。私有 GitHub 仓库需要 GitHub 连接器。"
 
@@ -27925,7 +27929,7 @@ msgstr "与当前版本长度相同"
 msgid "Same seed = reproducible results"
 msgstr "相同种子 = 可复现的结果"
 
-#: src/features/tasks/components/task-form-dialog.tsx:139
+#: src/features/tasks/components/task-form-dialog.tsx:140
 msgid "Same thread, fresh context each run"
 msgstr "同一对话，每次运行使用全新上下文"
 
@@ -28021,7 +28025,7 @@ msgstr "保存用例"
 #: src/features/settings/components/chat/system-prompt-preset-settings.tsx:247
 #: src/features/skills/components/skill-form-dialog.tsx:152
 #: src/features/tasks/components/goal-form-dialog.tsx:167
-#: src/features/tasks/components/task-form-dialog.tsx:638
+#: src/features/tasks/components/task-form-dialog.tsx:639
 #: src/features/workflow/components/canvas/workflow-controls.tsx:406
 msgid "Save changes"
 msgstr "保存更改"
@@ -29370,8 +29374,8 @@ msgstr "收起"
 msgid "Show more"
 msgstr "展开"
 
-#: src/features/projects/components/project-repo-picker.tsx:150
-#: src/features/tasks/components/task-form-dialog.tsx:464
+#: src/features/projects/components/project-repo-picker.tsx:167
+#: src/features/tasks/components/task-form-dialog.tsx:465
 msgid "Show more projects"
 msgstr "显示更多项目"
 
@@ -31337,7 +31341,7 @@ msgstr "以 $8/月订阅，解锁所有模型。"
 msgid "Substantially improved reasoning, vision, and instruction following"
 msgstr "推理、视觉和指令遵循能力大幅提升"
 
-#: src/features/tasks/components/task-form-dialog.tsx:473
+#: src/features/tasks/components/task-form-dialog.tsx:474
 msgid "Subtask of"
 msgstr "父任务"
 
@@ -31347,11 +31351,11 @@ msgstr "{parentTitle} 的子任务"
 
 #: src/features/tasks/components/goal-form-dialog.tsx:121
 #: src/features/tasks/components/task-detail-dialog.tsx:238
-#: src/features/tasks/components/task-form-dialog.tsx:257
+#: src/features/tasks/components/task-form-dialog.tsx:258
 msgid "Success criteria"
 msgstr "成功标准"
 
-#: src/features/tasks/components/task-form-dialog.tsx:82
+#: src/features/tasks/components/task-form-dialog.tsx:83
 msgid "Success criteria must be {CRITERIA_MAX} characters or less"
 msgstr "成功标准不能超过 {CRITERIA_MAX} 个字符"
 
@@ -32425,7 +32429,7 @@ msgstr "自你开始此审查以来，变更有了新的提交。请先提交或
 msgid "The change is too large to show in full."
 msgstr "更改过大，无法完整显示。"
 
-#: src/features/tasks/components/task-form-dialog.tsx:293
+#: src/features/tasks/components/task-form-dialog.tsx:294
 msgid "The chat agent works the task with its tools, optionally following a skill."
 msgstr "聊天智能体使用其工具处理任务，并可选择遵循某个技能。"
 
@@ -32953,7 +32957,7 @@ msgstr "标签“{pendingDeleteName}”将从所有使用它的聊天中移除�
 msgid "The task and its run history are removed. Tasks that depend on it stop waiting for it."
 msgstr "任务及其运行历史将被删除。依赖它的任务将不再等待它。"
 
-#: src/features/tasks/components/task-form-dialog.tsx:502
+#: src/features/tasks/components/task-form-dialog.tsx:503
 msgid "The task waits until every selected task is done."
 msgstr "此任务会等到所有选定任务都完成后再开始。"
 
@@ -33002,7 +33006,7 @@ msgstr "用户不会收到模拟登录的通知"
 msgid "The verifier did not pass this result after the allowed repair rounds. Approve it as is, reject it, or send it back with a note."
 msgstr "在允许的修复轮次之后，验证器仍未通过此结果。你可以原样批准、拒绝，或附上备注退回。"
 
-#: src/features/tasks/components/task-form-dialog.tsx:266
+#: src/features/tasks/components/task-form-dialog.tsx:267
 msgid "The verifier passes the result only if every criterion is met."
 msgstr "只有满足所有标准，验证器才会通过结果。"
 
@@ -33191,7 +33195,7 @@ msgstr "此分支与其基础分支有冲突。"
 msgid "This branch is behind its base branch."
 msgstr "此分支落后于其基础分支。"
 
-#: src/features/projects/components/project-repositories.tsx:175
+#: src/features/projects/components/project-repositories.tsx:197
 msgid "This branch was changed meanwhile. Check it and save again."
 msgstr "此分支在此期间已被更改。请检查后重新保存。"
 
@@ -33453,7 +33457,7 @@ msgstr "这已经在对话中了。"
 msgid "This is how your organization appears to members"
 msgstr "这是你的组织向成员显示的名称"
 
-#: src/features/projects/components/project-repositories.tsx:166
+#: src/features/projects/components/project-repositories.tsx:188
 msgid "This is not a valid branch name."
 msgstr "这不是有效的分支名称。"
 
@@ -33608,11 +33612,11 @@ msgstr "此拉取请求已关联了所能保留的最多对话数。"
 msgid "This removes the model files from your computer. You can pull it again later."
 msgstr "这会从你的电脑中删除模型文件。你以后可以重新拉取。"
 
-#: src/features/projects/components/project-repositories.tsx:163
+#: src/features/projects/components/project-repositories.tsx:185
 msgid "This repository is already listed."
 msgstr "此仓库已在列表中。"
 
-#: src/features/projects/components/project-repositories.tsx:178
+#: src/features/projects/components/project-repositories.tsx:200
 msgid "This repository URL is too long."
 msgstr "此仓库 URL 过长。"
 
@@ -33978,7 +33982,7 @@ msgstr "时区已更新"
 #: src/features/projects/components/project-form-dialog.tsx:196
 #: src/features/slides/components/slide-editor-dialog.tsx:90
 #: src/features/tasks/components/goal-form-dialog.tsx:88
-#: src/features/tasks/components/task-form-dialog.tsx:220
+#: src/features/tasks/components/task-form-dialog.tsx:221
 msgid "Title"
 msgstr "标题"
 
@@ -33987,11 +33991,11 @@ msgid "Title (optional)"
 msgstr "标题（可选）"
 
 #: src/features/tasks/components/goal-form-dialog.tsx:43
-#: src/features/tasks/components/task-form-dialog.tsx:100
+#: src/features/tasks/components/task-form-dialog.tsx:101
 msgid "Title is required"
 msgstr "请输入标题"
 
-#: src/features/tasks/components/task-form-dialog.tsx:103
+#: src/features/tasks/components/task-form-dialog.tsx:104
 msgid "Title must be {TITLE_MAX} characters or less"
 msgstr "标题不能超过 {TITLE_MAX} 个字符"
 
@@ -34550,9 +34554,10 @@ msgstr "尝试调整搜索词。"
 #: src/features/develop/components/files-tab.tsx:275
 #: src/features/develop/components/thread-pull-requests.tsx:169
 #: src/features/home/components/home-page.tsx:152
-#: src/features/projects/components/project-repo-picker.tsx:157
-#: src/features/projects/components/project-repositories.tsx:275
-#: src/features/tasks/components/task-form-dialog.tsx:458
+#: src/features/projects/components/project-repo-picker.tsx:182
+#: src/features/projects/components/project-repo-picker.tsx:190
+#: src/features/projects/components/project-repositories.tsx:305
+#: src/features/tasks/components/task-form-dialog.tsx:459
 msgid "Try again"
 msgstr "重试"
 
@@ -35523,8 +35528,8 @@ msgstr "使用 AI 优化你的提示词以获得更好的结果。你也可以�
 msgid "Use all enabled MCP servers"
 msgstr "使用所有已启用的 MCP 服务器"
 
-#: src/features/projects/components/project-repositories.tsx:169
-#: src/features/tasks/components/task-form-dialog.tsx:94
+#: src/features/projects/components/project-repositories.tsx:191
+#: src/features/tasks/components/task-form-dialog.tsx:95
 msgid "Use an https:// git URL or GitHub owner/repo"
 msgstr "使用 https:// git URL 或 GitHub owner/repo"
 
@@ -35557,7 +35562,7 @@ msgstr ""
 msgid "Use Drawing"
 msgstr "使用绘图"
 
-#: src/features/tasks/components/task-form-dialog.tsx:85
+#: src/features/tasks/components/task-form-dialog.tsx:86
 msgid "Use five cron fields, e.g. \"0 9 * * 1\" for Mondays at 09:00 UTC"
 msgstr "使用五个 cron 字段，例如“0 9 * * 1”表示每周一 09:00 UTC"
 
@@ -36736,7 +36741,7 @@ msgstr "WeChat Token"
 msgid "Wed"
 msgstr ""
 
-#: src/features/tasks/components/task-form-dialog.tsx:128
+#: src/features/tasks/components/task-form-dialog.tsx:129
 msgid "Weekdays at 09:00 UTC"
 msgstr "工作日 09:00 UTC"
 
@@ -36846,7 +36851,7 @@ msgid "What should the agent change?"
 msgstr "智能体应该更改什么？"
 
 #: src/features/skills/components/skill-builder-dialog.tsx:208
-#: src/features/tasks/components/task-form-dialog.tsx:245
+#: src/features/tasks/components/task-form-dialog.tsx:246
 msgid "What should the agent do?"
 msgstr "智能体应该做什么？"
 
@@ -36953,7 +36958,7 @@ msgstr "设置后，只会使用这些提供商。留空则允许全部。"
 msgid "When should the assistant use this skill?"
 msgstr "助手应在什么时候使用此技能？"
 
-#: src/features/tasks/components/task-form-dialog.tsx:585
+#: src/features/tasks/components/task-form-dialog.tsx:586
 msgid "Where each run goes"
 msgstr "每次运行的去向"
 

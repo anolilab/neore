@@ -52,7 +52,11 @@ const ProjectRepoPicker: FC<ProjectRepoPickerProps> = ({ branch, onPick, paging,
     // `undefined` until the person picks: a reopened run shows the project that lists its repository (`findRepoProject`).
     const [pickedProjectId, setProjectId] = useState<string | undefined>(undefined);
     const [openedUrl] = useState(() => repoUrl.trim());
-    const { data: openedProject } = useQuery(
+    const {
+        data: openedProject,
+        isError: openedFailed,
+        refetch: retryOpened,
+    } = useQuery(
         // Kept after a pick too: a repository picked inside the found project keeps that project, and its title comes from here.
         crpc.projects.functions.findRepoProject.queryOptions(openedUrl ? { url: openedUrl } : skipToken, { live: false }),
     );
@@ -162,6 +166,22 @@ const ProjectRepoPicker: FC<ProjectRepoPickerProps> = ({ branch, onPick, paging,
                     >
                         {paging.isLoadingMore ? t`Loading more projects…` : t`Show more projects`}
                     </Button>
+                )}
+                {/* A failed lookup is not "no project": say so, and let the person try again or pick one. */}
+                {openedFailed && pickedProjectId === undefined && stillOpened && (
+                    <p className="text-destructive flex items-center gap-2 text-xs" role="alert">
+                        {t`Could not look up this repository's project.`}
+                        <Button
+                            onClick={() => {
+                                void retryOpened();
+                            }}
+                            size="sm"
+                            type="button"
+                            variant="ghost"
+                        >
+                            {t`Try again`}
+                        </Button>
+                    </p>
                 )}
                 {paging?.failed === true && (
                     <p className="text-destructive flex items-center gap-2 text-xs" role="alert">

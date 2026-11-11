@@ -382,7 +382,9 @@ export const listProjectRepos = authQuery
             throw new LunoraError("NOT_FOUND", "Project not found");
         }
 
-        return withDefault(await repoRows(context, projectId as Id<"projects">));
+        // From the primary too: the settings read this right after a change, and a lagging replica would hand back the
+        // list from before it.
+        return withDefault(await repoRows(context, projectId as Id<"projects">, { primary: true }));
     });
 
 /** Rows one URL lookup reads per scope (the caller's own, their organization's). */
