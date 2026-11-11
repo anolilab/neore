@@ -71,7 +71,15 @@ const { ComposerTiptapEditor } = await import("./composer-tiptap-editor");
 const { usePromptHistory } = await import("../use-prompt-history");
 
 /** The composer's history wiring in miniature: a send records the prompt, as the thread's messages would. */
-const Harness = ({ editorRef }: { editorRef: React.RefObject<ComposerTiptapEditorRef | null> }) => {
+const Harness = ({
+    editorRef,
+    isStreaming = false,
+    onCancel,
+}: {
+    editorRef: React.RefObject<ComposerTiptapEditorRef | null>;
+    isStreaming?: boolean;
+    onCancel?: () => void;
+}) => {
     const sent = useRef<string[]>([]);
     const getText = useCallback(() => editorRef.current?.getEditor()?.getText() ?? "", [editorRef]);
     const history = usePromptHistory(getText);
@@ -85,13 +93,27 @@ const Harness = ({ editorRef }: { editorRef: React.RefObject<ComposerTiptapEdito
         editor.commands.clearContent(true);
     }, [editorRef, history]);
 
-    return <ComposerTiptapEditor onChange={history.onTextChange} onHistoryNavigate={history.navigate} onSubmit={onSubmit} ref={editorRef} value="" />;
+    return (
+        <ComposerTiptapEditor
+            isStreaming={isStreaming}
+            onCancel={onCancel}
+            onChange={history.onTextChange}
+            onHistoryNavigate={history.navigate}
+            onSubmit={onSubmit}
+            ref={editorRef}
+            value=""
+        />
+    );
 };
 
+/** A key as the keyboard sends it: to whatever has the focus, which must still be the editor. */
 const press = (element: HTMLElement, key: string) => {
+    /* eslint-disable testing-library/no-node-access -- the focused element is what is under test: a key goes where focus is */
+    expect(document.activeElement).toBe(element);
     act(() => {
-        element.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, cancelable: true, key }));
+        document.activeElement!.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, cancelable: true, key }));
     });
+    /* eslint-enable testing-library/no-node-access */
 };
 
 describe("ComposerTiptapEditor prompt history", () => {
@@ -115,6 +137,8 @@ describe("ComposerTiptapEditor prompt history", () => {
 
         for (const prompt of ["first prompt", "second prompt"]) {
             act(() => {
+                editor.commands.focus();
+                element.focus();
                 editor.commands.insertContent(prompt);
             });
             press(element, "Enter");
@@ -124,6 +148,7 @@ describe("ComposerTiptapEditor prompt history", () => {
 
         act(() => {
             editor.commands.focus("start");
+            element.focus();
         });
         press(element, "ArrowUp");
 
@@ -135,6 +160,7 @@ describe("ComposerTiptapEditor prompt history", () => {
 
         act(() => {
             editor.commands.focus("end");
+            element.focus();
         });
         press(element, "ArrowDown");
 
@@ -154,10 +180,39 @@ describe("ComposerTiptapEditor prompt history", () => {
         const element = view.container.querySelector(".ProseMirror") as HTMLElement;
 
         act(() => {
+            editor.commands.focus();
+            element.focus();
             editor.commands.insertContent("/compact keep the code");
         });
         press(element, "Enter");
 
         expect(editor.getText()).toBe("");
+    });
+
+    it("cancels a reply that started streaming after the editor was built with Escape, and lets Escape through otherwise", async () => {
+        const ref = createRef<ComposerTiptapEditorRef>();
+        const onCancel = vi.fn();
+        const view = render(<Harness editorRef={ref} onCancel={onCancel} />);
+
+        await waitFor(() => {
+            expect(ref.current?.getEditor()).toBeTruthy();
+        });
+
+        const editor = ref.current!.getEditor()!;
+        // eslint-disable-next-line testing-library/no-container, testing-library/no-node-access -- the editor has no role to query by
+        const element = view.container.querySelector(".ProseMirror") as HTMLElement;
+
+        act(() => {
+            editor.commands.focus();
+            element.focus();
+        });
+        press(element, "Escape");
+
+        expect(onCancel).not.toHaveBeenCalled();
+
+        view.rerender(<Harness editorRef={ref} isStreaming onCancel={onCancel} />);
+        press(element, "Escape");
+
+        expect(onCancel).toHaveBeenCalledOnce();
     });
 });
