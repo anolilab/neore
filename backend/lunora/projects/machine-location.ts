@@ -12,7 +12,7 @@ const textEncoder = new TextEncoder();
 
 /** `true` for a path within the byte cap, with no NUL, that starts at a root (`/…` or a drive such as `C:\…`). */
 export const isProjectFolderPath = (path: string): boolean =>
-    ABSOLUTE_PATH.test(path) && !path.includes("\u0000") && textEncoder.encode(path).length <= MAX_PROJECT_PATH_BYTES;
+    ABSOLUTE_PATH.test(path) && !path.includes("\u{0}") && textEncoder.encode(path).length <= MAX_PROJECT_PATH_BYTES;
 
 /**
  * Checks the machine and folder a new project records and returns them. The device must be the caller's own and

@@ -65,7 +65,9 @@ describe("createProject machine and folder", () => {
         const machineId = await insertDevice(OWNER);
         const id = await create({ machineId, path: String.raw`C:\Users\me\app` });
 
-        expect((await stored(id))?.path).toBe(String.raw`C:\Users\me\app`);
+        const row = await stored(id);
+
+        expect(row?.path).toBe(String.raw`C:\Users\me\app`);
     });
 
     it("refuses another user's device", async () => {
@@ -89,7 +91,7 @@ describe("createProject machine and folder", () => {
     it("refuses a path with a NUL", async () => {
         const machineId = await insertDevice(OWNER);
 
-        await expect(create({ machineId, path: "/tmp/a\u0000b" })).rejects.toThrow(BAD_PATH);
+        await expect(create({ machineId, path: "/tmp/a\u{0}b" })).rejects.toThrow(BAD_PATH);
     });
 
     it("refuses a path over 1024 bytes, counting bytes and not characters", async () => {
