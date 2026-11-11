@@ -61,6 +61,8 @@ import { DEFAULT_RECENT_MESSAGES } from "../agent/shared";
 import { threadSummaryTaint } from "../agent/thread-summary-taint";
 import { REQUEST_SECRET_TOOL_NAME } from "./tools/request-secret-constants";
 import { assertRunHeld, vRunHold } from "./lib/run-epoch";
+import { APPROVAL_REMINDER_SCHEDULE_DELAY_MS } from "./lib/approval-reminder";
+import { runAfterOnShard } from "../lib/shard-scheduler";
 
 const vToolPermissionMode = v.union(v.literal("auto"), v.literal("ask"), v.literal("off"));
 const vToolPermissions = v.record(v.string(), vToolPermissionMode);
@@ -742,17 +744,32 @@ export const recordPendingToolApprovals = internalMutation
 
         const uniqueIds = new Set(approvalIds);
         const secretIds = new Set(secretApprovalIds);
+        // Every row of this pause carries the same id, so the reminder can tell this pause from another in the same millisecond.
+        const [pauseId] = uniqueIds;
 
         for (const approvalId of uniqueIds) {
             await ctx.db.insert("toolApprovalRuns", {
                 approvalId,
                 config,
                 createdAt,
+                ...(pauseId !== undefined && { pauseId }),
                 secretRequest: secretIds.has(approvalId),
                 status: "pending",
                 threadId,
                 userId: ownerId,
             });
+        }
+
+        // The four-hour reminder is due on the owner's shard when this pause comes due. Scheduled here, not left to the idle
+        // housekeeping sweep, which can wait a day and so miss the reminder's one-hour window (`lib/approval-reminder.ts`).
+        if (uniqueIds.size > 0) {
+            await runAfterOnShard(
+                ctx.scheduler,
+                APPROVAL_REMINDER_SCHEDULE_DELAY_MS,
+                internal.chat.approval_reminder_sweep.sweepApprovalReminders,
+                { userId: ownerId },
+                ownerId,
+            );
         }
 
         // One notification per pause, to the thread OWNER — only they can answer

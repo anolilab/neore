@@ -352,6 +352,9 @@ export interface InternalApiTypes {
             commitAgentSwitch: FunctionReference<"mutation", { clientId: string; expectedLeafId: string; handoff?: { mode: "delta" | "portable"; summarized: boolean; text: string }; target: { kind: "model"; model: string } | { agentKey: string; folderId: string; hostId: Id<"devices">; kind: "host" }; threadId: Id<"threads">; unlockProof?: string; userId: string }, { agent: { kind: "model"; model: string } | { agentKey: string; agentLabel: string; folderId: string; folderLabel: string; hostId: string; kind: "host" }; coldStartCostly: boolean; forkedThreadId?: string; messageId: string | null; switched: boolean }>;
             planAgentSwitch: FunctionReference<"query", { clientId: string; mode?: "full" | "portable"; target: { kind: "model"; model: string } | { agentKey: string; folderId: string; hostId: Id<"devices">; kind: "host" }; threadId: Id<"threads">; unlockProof?: string; userId: string }, { agent: { kind: "model"; model: string }; allowance?: boolean; contextWindow?: number; leafId?: string; mode?: "full" | "portable" | "delta" | "native"; omittedEarlier?: boolean; turns?: Array<{ role: "assistant" | "user"; text: string }> }>;
         };
+        approval_reminder_sweep: {
+            sweepApprovalReminders: FunctionReference<"mutation", { userId: string }, null>;
+        };
         aside: {
             readAsideSnapshot: FunctionReference<"query", { threadId: Id<"threads">; unlockProof?: string; userId: string }, { liveReply?: string; rows: Array<{ role: "assistant" | "user"; text: string }>; running: boolean }>;
         };
@@ -1665,6 +1668,9 @@ export const internal: InternalApiTypes = {
             beginSwitchSummary: { __lunoraRef: "chat_agent_switch:beginSwitchSummary" },
             commitAgentSwitch: { __lunoraRef: "chat_agent_switch:commitAgentSwitch" },
             planAgentSwitch: { __lunoraRef: "chat_agent_switch:planAgentSwitch" },
+        },
+        approval_reminder_sweep: {
+            sweepApprovalReminders: { __lunoraRef: "chat_approval_reminder_sweep:sweepApprovalReminders" },
         },
         aside: {
             readAsideSnapshot: { __lunoraRef: "chat_aside:readAsideSnapshot" },

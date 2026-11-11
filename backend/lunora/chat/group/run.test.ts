@@ -214,6 +214,7 @@ beforeAll(async () => {
         agent_messages: await import("../../agent/messages"),
         agent_streams: await import("../../agent/streams"),
         agent_threads: await import("../../agent/threads"),
+        chat_approval_reminder_sweep: await import("../approval-reminder-sweep"),
         chat_group_functions: await import("./functions"),
         chat_mcp_tool_labels: await import("../mcp-tool-labels"),
         chat_streaming_persistent_library: await import("../streaming/persistent/library"),
