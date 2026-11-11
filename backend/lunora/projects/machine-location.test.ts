@@ -158,39 +158,20 @@ describe("createProject machine and folder", () => {
             expect(project).not.toHaveProperty("path");
         });
 
-        it("omits them from a member's listing and pinned listing, and keeps them for the owner's", async () => {
+        it.each([
+            ["projects", listProjects, listPinnedProjects],
+            ["agent", listAgentProjects, listAgentPinnedProjects],
+        ])("omits them from a member's %s listing and pinned listing, and keeps them for the owner's", async (_name, list, pinnedList) => {
             const { machineId, member, owner } = await seed();
             const paginationOptions = { cursor: null, numItems: 10 };
-            const memberPage = (await as(member).query(listProjects as never, { organizationId: ORG, paginationOpts: paginationOptions } as never)) as {
+            const memberPage = (await as(member).query(list as never, { organizationId: ORG, paginationOpts: paginationOptions } as never)) as {
                 page: Record<string, unknown>[];
             };
-            const memberPinned = (await as(member).query(listPinnedProjects as never, { organizationId: ORG } as never)) as Record<string, unknown>[];
-            const ownerPage = (await as(owner).query(listProjects as never, { organizationId: ORG, paginationOpts: paginationOptions } as never)) as {
+            const memberPinned = (await as(member).query(pinnedList as never, { organizationId: ORG } as never)) as Record<string, unknown>[];
+            const ownerPage = (await as(owner).query(list as never, { organizationId: ORG, paginationOpts: paginationOptions } as never)) as {
                 page: Record<string, unknown>[];
             };
-
-            expect(memberPage.page).toHaveLength(1);
-            expect(memberPinned).toHaveLength(1);
-
-            for (const row of [...memberPage.page, ...memberPinned]) {
-                expect(row).not.toHaveProperty("machineId");
-                expect(row).not.toHaveProperty("path");
-            }
-
-            expect(ownerPage.page[0]).toMatchObject({ machineId, path: PATH });
-        });
-
-        it("omits them from a member's agent listings, and keeps them for the owner's", async () => {
-            const { machineId, member, owner } = await seed();
-            const paginationOptions = { cursor: null, numItems: 10 };
-            const memberPage = (await as(member).query(listAgentProjects as never, { organizationId: ORG, paginationOpts: paginationOptions } as never)) as {
-                page: Record<string, unknown>[];
-            };
-            const memberPinned = (await as(member).query(listAgentPinnedProjects as never, { organizationId: ORG } as never)) as Record<string, unknown>[];
-            const ownerPage = (await as(owner).query(listAgentProjects as never, { organizationId: ORG, paginationOpts: paginationOptions } as never)) as {
-                page: Record<string, unknown>[];
-            };
-            const ownerPinned = (await as(owner).query(listAgentPinnedProjects as never, { organizationId: ORG } as never)) as Record<string, unknown>[];
+            const ownerPinned = (await as(owner).query(pinnedList as never, { organizationId: ORG } as never)) as Record<string, unknown>[];
 
             expect(memberPage.page).toHaveLength(1);
             expect(memberPinned).toHaveLength(1);
