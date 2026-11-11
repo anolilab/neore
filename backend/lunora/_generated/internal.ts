@@ -1036,6 +1036,9 @@ export interface InternalApiTypes {
         };
     };
     plugins: {
+        export: {
+            pluginForSelection: FunctionReference<"query", { groupChatIds: Array<string>; skillIds: Array<string>; triggerIds: Array<string>; userId: string }, null | { slug: string; version: string }>;
+        };
         install_steps: {
             createInstallRow: FunctionReference<"mutation", { contentHash: string; pluginSlug: string; userId: string; version: string }, { generation: number; installId: string }>;
             deleteInstall: FunctionReference<"mutation", { generation: number; installId: string }, null>;
@@ -2379,6 +2382,9 @@ export const internal: InternalApiTypes = {
         },
     },
     plugins: {
+        export: {
+            pluginForSelection: { __lunoraRef: "plugins_export:pluginForSelection" },
+        },
         install_steps: {
             createInstallRow: { __lunoraRef: "plugins_install_steps:createInstallRow" },
             deleteInstall: { __lunoraRef: "plugins_install_steps:deleteInstall" },
