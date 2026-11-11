@@ -67,6 +67,7 @@ const TaskFormDialogBody = ({ defaultGoalId, editingTask, goals, onClose, onSubm
         isLoadingMore: isLoadingMoreProjects,
         loadMore: loadMoreProjects,
         projects,
+        readableProjects,
         retry: retryProjects,
     } = useTaskProjects(values.projectId);
     const models = useFeatureFlaggedModels();
@@ -310,7 +311,7 @@ const TaskFormDialogBody = ({ defaultGoalId, editingTask, goals, onClose, onSubm
                                         loadMore: loadMoreProjects,
                                         retry: retryProjects,
                                     }}
-                                    projects={projects}
+                                    projects={readableProjects}
                                     repoUrl={values.repoUrl}
                                 />
                                 <div className="space-y-2">
