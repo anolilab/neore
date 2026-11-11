@@ -10,13 +10,14 @@
  */
 import { LunoraError, v } from "lunorash/server";
 
-import { assertCronExpression, assertCustomModelRunnable } from "../triggers/functions";
+import { assertCronExpression, assertCustomModelRunnable, deleteTriggerRows } from "../triggers/functions";
 
 import type { Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
 import { internalMutation } from "../_generated/server";
 import { withoutUndefined } from "../lib/patch";
 import { skillRowHash, triggerRowHash } from "./entry-hash";
+import { deleteSkillRows } from "../skills/functions";
 import { LEASE_MS, markerFor } from "./logic";
 
 const STALE = "STALE_LEASE: this install was taken over by another action";
@@ -216,6 +217,103 @@ export const updateTriggerChild = internalMutation
         );
 
         await ctx.db.patch("pluginItems", link._id as Id<"pluginItems">, { contentHash: args.contentHash, pendingHash: "" });
+
+        return null;
+    });
+
+/** The child's link, by its entry key, after the generation check. */
+const linkFor = async (ctx: Pick<MutationCtx, "db">, installId: string, entryKey: string) => {
+    const { page } = await ctx.db.pluginItems.findMany({ where: { installId } });
+
+    return page.find((row) => row.entryKey === entryKey);
+};
+
+/**
+ * Removes an unedited child that the new version no longer has: its row, then its link. A child whose content is not what was
+ * installed is refused here too, so the check does not depend on the diff having been current.
+ */
+export const removeChild = internalMutation
+    .input({ entryKey: v.string().max(256), generation: v.number(), installId: v.string().max(128), userId: v.string().max(128) })
+    .output(v.null())
+    .mutation(async ({ args, ctx }) => {
+        await heldInstall(ctx, args.installId as Id<"pluginInstalls">, args.generation);
+
+        const link = await linkFor(ctx, args.installId, args.entryKey);
+
+        if (!link) {
+            return null;
+        }
+
+        if (link.kind === "skill") {
+            const skill = await ctx.db.skills.findFirst({ where: { pluginMarker: markerFor(args.installId, args.entryKey) } });
+
+            if (skill && skill.userId === args.userId) {
+                if ((await skillRowHash(skill)) !== link.contentHash) {
+                    throw new LunoraError("CONFLICT", `The skill for "${args.entryKey}" was edited, so it is kept`);
+                }
+
+                await deleteSkillRows(ctx, skill._id as Id<"skills">, args.userId);
+            }
+        } else if (link.kind === "trigger") {
+            const trigger = await ctx.db
+                .query("triggers")
+                .withIndex("by_plugin_marker", (q) => q.eq("pluginMarker", markerFor(args.installId, args.entryKey)))
+                .first();
+
+            if (trigger && trigger.userId === args.userId) {
+                if ((await triggerRowHash(trigger)) !== link.contentHash) {
+                    throw new LunoraError("CONFLICT", `The trigger for "${args.entryKey}" was edited, so it is kept`);
+                }
+
+                await deleteTriggerRows(ctx, trigger._id as Id<"triggers">);
+            }
+        } else {
+            throw new LunoraError("CONFLICT", `"${args.entryKey}" is a group chat, which is not removed in place`);
+        }
+
+        await ctx.db.delete("pluginItems", link._id as Id<"pluginItems">);
+
+        return null;
+    });
+
+/**
+ * Keeps an edited child that the new version no longer has: its marker fields are cleared, so no later sweep finds it, and a
+ * trigger is switched off. The link is marked detached.
+ */
+export const detachChild = internalMutation
+    .input({ entryKey: v.string().max(256), generation: v.number(), installId: v.string().max(128), userId: v.string().max(128) })
+    .output(v.null())
+    .mutation(async ({ args, ctx }) => {
+        await heldInstall(ctx, args.installId as Id<"pluginInstalls">, args.generation);
+
+        const link = await linkFor(ctx, args.installId, args.entryKey);
+
+        if (!link) {
+            return null;
+        }
+
+        const marker = markerFor(args.installId, args.entryKey);
+
+        if (link.kind === "skill") {
+            const skill = await ctx.db.skills.findFirst({ where: { pluginMarker: marker } });
+
+            if (skill && skill.userId === args.userId) {
+                await ctx.db.patch("skills", skill._id as Id<"skills">, { pluginInstallId: "", pluginMarker: "" });
+            }
+        } else if (link.kind === "trigger") {
+            const trigger = await ctx.db
+                .query("triggers")
+                .withIndex("by_plugin_marker", (q) => q.eq("pluginMarker", marker))
+                .first();
+
+            if (trigger && trigger.userId === args.userId) {
+                await ctx.db.patch("triggers", trigger._id as Id<"triggers">, { enabled: false, pluginInstallId: "", pluginMarker: "" });
+            }
+        } else {
+            throw new LunoraError("CONFLICT", `"${args.entryKey}" is a group chat, which is not detached in place`);
+        }
+
+        await ctx.db.patch("pluginItems", link._id as Id<"pluginItems">, { state: "detached" });
 
         return null;
     });

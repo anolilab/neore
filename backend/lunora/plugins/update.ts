@@ -10,6 +10,8 @@ import { LunoraError, v } from "lunorash/server";
 import { internal } from "../_generated/internal";
 import { internalQuery } from "../_generated/server";
 import { authAction, rateLimit } from "../lib/crpc";
+import { childOps } from "./install-ops";
+import { runBundleImport } from "../skills/bundle-plan";
 import { MAX_LENGTH } from "../lib/validators";
 import { planFor } from "../skills/bundle";
 import { assertNoToolConfig, checkPluginFile } from "./install-action";
@@ -169,6 +171,7 @@ export const updatePlugin = authAction
 
         const applied: string[] = [];
         const skipped: Array<{ action: UpdateAction; entryKey: string }> = [];
+        const createKeys = new Set<string>();
 
         for (const step of plan) {
             if (step.action === "same") {
@@ -176,6 +179,35 @@ export const updatePlugin = authAction
             }
 
             const entry = entries.find((candidate) => candidate.key === step.entryKey);
+            const child = installed.children.find((row) => row.entryKey === step.entryKey);
+
+            if (step.action === "create") {
+                // A new group chat needs its participants in the same selection; it is reported until that is handled.
+                if (entry?.plan?.kind === "group") {
+                    skipped.push(step);
+                } else {
+                    createKeys.add(step.entryKey);
+                }
+                continue;
+            }
+
+            if (step.action === "delete" || step.action === "detach") {
+                if (child?.kind === "group") {
+                    skipped.push(step);
+                    continue;
+                }
+
+                const args = { entryKey: step.entryKey, generation, installId: installed.installId, userId };
+
+                if (step.action === "delete") {
+                    await ctx.runMutation(internal.plugins.update_apply.removeChild, args);
+                } else {
+                    await ctx.runMutation(internal.plugins.update_apply.detachChild, args);
+                }
+
+                applied.push(step.entryKey);
+                continue;
+            }
 
             if (step.action === "update" && entry?.plan?.kind === "trigger" && entry.plan.create.type === "schedule") {
                 const create = entry.plan.create;
@@ -223,6 +255,35 @@ export const updatePlugin = authAction
                 version: content.version,
             });
             applied.push(step.entryKey);
+        }
+
+        if (createKeys.size > 0) {
+            // New skills and triggers are created the way install creates them: intent first, then the create, then the link.
+            const hashByKey = new Map(await Promise.all(entries.map(async (entry) => [entry.key, await entryHash(entry)] as const)));
+            const created = await runBundleImport(
+                entries,
+                createKeys,
+                childOps(ctx, {
+                    generation,
+                    installId: installed.installId,
+                    intentFor: async (key, kind) =>
+                        await ctx.runMutation(internal.plugins.install_steps.recordIntent, {
+                            contentHash: hashByKey.get(key) ?? "",
+                            entryKey: key,
+                            generation,
+                            installId: installed.installId,
+                            kind,
+                            userId,
+                        }),
+                    isPremium: ctx.user.plan === "premium" || ctx.user.isAdmin === true,
+                    plan: ctx.user.plan ?? undefined,
+                    userId,
+                    version: header.version,
+                }),
+                { keepOnRateLimit: true },
+            );
+
+            applied.push(...created.map((item) => item.key));
         }
 
         await ctx.runMutation(internal.plugins.update_apply.finishUpdate, {

@@ -16,6 +16,18 @@ if (typeof source["userId"] !== "string") return DEFER;
 if (source["userId"].length > 128) return DEFER;
 return { "installId": source["installId"], "targetVersion": source["targetVersion"], "userId": source["userId"] };
 });
+installCompiledValidatorMap(lunora_plugins_update_apply_186.detachChild.args, (source) => {
+if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
+if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
+if (typeof source["entryKey"] !== "string") return DEFER;
+if (source["entryKey"].length > 256) return DEFER;
+if (typeof source["generation"] !== "number" || !Number.isFinite(source["generation"])) return DEFER;
+if (typeof source["installId"] !== "string") return DEFER;
+if (source["installId"].length > 128) return DEFER;
+if (typeof source["userId"] !== "string") return DEFER;
+if (source["userId"].length > 128) return DEFER;
+return { "entryKey": source["entryKey"], "generation": source["generation"], "installId": source["installId"], "userId": source["userId"] };
+});
 installCompiledValidatorMap(lunora_plugins_update_apply_186.finishUpdate.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
@@ -27,6 +39,18 @@ if (source["installId"].length > 128) return DEFER;
 if (typeof source["version"] !== "string") return DEFER;
 if (source["version"].length > 32) return DEFER;
 return { "contentHash": source["contentHash"], "generation": source["generation"], "installId": source["installId"], "version": source["version"] };
+});
+installCompiledValidatorMap(lunora_plugins_update_apply_186.removeChild.args, (source) => {
+if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
+if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
+if (typeof source["entryKey"] !== "string") return DEFER;
+if (source["entryKey"].length > 256) return DEFER;
+if (typeof source["generation"] !== "number" || !Number.isFinite(source["generation"])) return DEFER;
+if (typeof source["installId"] !== "string") return DEFER;
+if (source["installId"].length > 128) return DEFER;
+if (typeof source["userId"] !== "string") return DEFER;
+if (source["userId"].length > 128) return DEFER;
+return { "entryKey": source["entryKey"], "generation": source["generation"], "installId": source["installId"], "userId": source["userId"] };
 });
 installCompiledValidatorMap(lunora_plugins_update_apply_186.updateSkillChild.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
