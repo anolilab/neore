@@ -658,6 +658,36 @@ describe("project repositories", () => {
         expect(rows.map((row: { organizationId?: string }) => row.organizationId)).toStrictEqual(["org-b"]);
     });
 
+    it("re-stamps in the daily sweep the rows of a project that moved, whether someone owns it or not", async () => {
+        const { owned, shared } = (await harness.run(async (ctx: any) => {
+            // The organization the rows still name exists: nothing to erase, only a stale copy to repair.
+            const left = await ctx.db.insert("organization", { createdAt: 1, name: "Left", slug: "left" });
+            const ownedProject = await ctx.db.insert("projects", { createdAt: 0, organizationId: "org-new", title: "owned", userId: OWNER });
+            const sharedProject = await ctx.db.insert("projects", { createdAt: 0, organizationId: "org-new", title: "shared" });
+
+            await ctx.db.insert("projectRepositories", {
+                createdAt: 0,
+                organizationId: left,
+                projectId: ownedProject,
+                url: "https://github.com/acme/o.git",
+                userId: OWNER,
+            });
+            await ctx.db.insert("projectRepositories", { createdAt: 0, organizationId: left, projectId: sharedProject, url: "https://github.com/acme/s.git" });
+
+            return { owned: ownedProject, shared: sharedProject };
+        })) as { owned: string; shared: string };
+
+        await harness.run(async (ctx: any) => await ctx.runMutation(sweepOrphanedOrganizationRepositories, {}));
+
+        const stamped = await harness.run(async (ctx: any) => {
+            const { page } = await ctx.db.projectRepositories.findMany({ where: { projectId: { in: [owned, shared] } } });
+
+            return page.map((row: { organizationId?: string }) => row.organizationId);
+        });
+
+        expect(stamped).toStrictEqual(["org-new", "org-new"]);
+    });
+
     it("sweeps an organization's leftover repository rows once the organization is gone", async () => {
         const projectId = await harness.run(async (ctx: any) => {
             const organizationId = await ctx.db.insert("organization", { createdAt: 1, name: "Gone", slug: "gone" });
