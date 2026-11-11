@@ -8,7 +8,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cascadeDeleteUser } from "../auth/hooks";
 import { reassignGlobalRows } from "../lib/account-merge";
 import schema from "../schema";
-import { getNativePushConfig, isUniqueViolation, registerPushDevice, unregisterPushDevice } from "./native-push";
+import { isUniqueViolation } from "../lib/error-helpers";
+import { getNativePushConfig, registerPushDevice, unregisterPushDevice } from "./native-push";
 import { collectNotificationsForExport, deleteUserNotifications } from "./gdpr";
 import { deleteIfUnchanged, dropPushDevicesOf, MAX_PUSH_DEVICES_PER_USER, trimPushDevices } from "./push-device-writes";
 

@@ -10,7 +10,7 @@ import { getMemberByOrganizationAndUser } from "../auth/lib/better-auth-queries"
 import { requireOwnedThread } from "../agent/thread-read-access";
 import { assertOwnOrganizationId } from "../auth/lib/organization-helpers";
 import { authMutation, authQuery, internalQuery, rateLimit } from "../lib/crpc";
-import { throwForbidden } from "../lib/error-helpers";
+import { isUniqueViolation, throwForbidden } from "../lib/error-helpers";
 import { admitOrganization, systemDb } from "../lib/rls/scope";
 import { MAX_LENGTH } from "../lib/validators";
 import { eraseProjectRepositories } from "./gdpr";
@@ -457,9 +457,7 @@ export const addProjectRepo = authMutation
                 ...(project.userId && { userId: project.userId }),
             });
         } catch (error) {
-            const conflict = error as { code?: unknown; kind?: unknown };
-
-            if (conflict.code === "CONFLICT" && conflict.kind === "unique") {
+            if (isUniqueViolation(error)) {
                 throw refused(new ProjectRepoError("url", "duplicate", "This repository is already listed"));
             }
 
@@ -597,9 +595,7 @@ const markDeleteUnderway = async (context: MutationCtx, projectId: Id<"projects"
         });
     } catch (error) {
         // A second delete of the same project (a double click) wrote the marker first: it serves both.
-        const conflict = error as { code?: unknown; kind?: unknown };
-
-        if (conflict.code !== "CONFLICT" || conflict.kind !== "unique") {
+        if (!isUniqueViolation(error)) {
             throw error;
         }
     }

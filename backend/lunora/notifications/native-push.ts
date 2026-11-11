@@ -11,6 +11,7 @@ import { v } from "lunorash/server";
 import { isAccountDeletionUnderway } from "../gdpr/deletion-guard";
 import type { Id } from "../_generated/dataModel";
 import { authMutation, authQuery, rateLimit } from "../lib/crpc";
+import { isUniqueViolation } from "../lib/error-helpers";
 import { patchRow, withoutUndefined } from "../lib/patch";
 import { systemDb } from "../lib/rls/scope";
 import { isPhonePushConfigured } from "./native-push-config";
@@ -27,23 +28,6 @@ const vPlatform = v.union(v.literal("android"), v.literal("ios"));
 const LANGUAGE_TAG = /^[A-Za-z]{2,3}(?:-[A-Za-z\d]{1,8})*$/u;
 
 const vLanguage = v.string().check((value) => value.length <= 35 && LANGUAGE_TAG.test(value), { message: "Invalid language" });
-
-/** SQLite's wording, raw ("failed") or as Lunora rewords it ("violation"). */
-const UNIQUE_CONSTRAINT = /unique constraint (?:failed|violation)/iu;
-
-/**
- * A unique index refusing the row: Lunora's `ConflictError` with `kind: "unique"`, or SQLite's own error where a layer
- * passes it through. Nothing else is two registrations racing.
- */
-export const isUniqueViolation = (error: unknown): boolean => {
-    if ((error as { kind?: unknown } | null)?.kind === "unique") {
-        return true;
-    }
-
-    const cause = error instanceof Error ? error.cause : undefined;
-
-    return UNIQUE_CONSTRAINT.test(String(error)) || (cause !== undefined && UNIQUE_CONSTRAINT.test(String(cause)));
-};
 
 /**
  * The sign-in a call comes from: the phone app's grant (`grantSessionId`, from its JWT's `gsid`) or a web session

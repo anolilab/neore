@@ -3,7 +3,7 @@
  * the empty state must not remount the form and drop what was typed.
  */
 import { act, fireEvent, render, screen } from "@testing-library/react";
-import { useEffect } from "react";
+import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 
 // Stable across renders, as the real hooks are: the load effect depends on `t` and the actions, so a new identity per
@@ -16,7 +16,6 @@ const state = vi.hoisted(() => {
             return { canCreate: true, count: 0, isPremium: false, limit: null };
         },
         deferred,
-        formMounts: 0,
         skillLoads: 0,
         skills: async () => {
             state.skillLoads += 1;
@@ -99,14 +98,16 @@ vi.mock("@/features/billing/hooks/use-checkout", () => {
     };
 });
 
-// The form counts its own mounts: a remount is what loses the typed text.
+// The form keeps its draft in its own state, as the real one does: a remount loses what was typed.
 vi.mock("./skill-form-dialog", () => {
     const FormBody = () => {
-        useEffect(() => {
-            state.formMounts += 1;
-        }, []);
+        const [name, setName] = useState("");
 
-        return <div role="dialog">Create skill</div>;
+        return (
+            <div role="dialog">
+                <input aria-label="Skill name" onChange={(event) => setName(event.target.value)} value={name} />
+            </div>
+        );
     };
 
     return {
@@ -136,19 +137,18 @@ vi.mock("./skill-empty-state", () => {
 const { default: SkillList } = await import("./skill-list");
 
 describe("SkillList", () => {
-    it("keeps an open create form mounted when the first load resolves to no skills", async () => {
+    it("keeps what was typed in an open create form when the first load resolves to no skills", async () => {
         render(<SkillList />);
 
         fireEvent.click(screen.getByRole("button", { name: "Add Skill" }));
-        expect(screen.getByRole("dialog")).toBeDefined();
+        fireEvent.change(screen.getByRole("textbox", { name: "Skill name" }), { target: { value: "Release notes" } });
 
         await act(async () => {
             state.deferred.resolve?.([]);
         });
 
         expect(await screen.findByText("No skills yet")).toBeDefined();
-        expect(screen.getByRole("dialog")).toBeDefined();
-        expect(state.formMounts).toBe(1);
+        expect(screen.getByRole<HTMLInputElement>("textbox", { name: "Skill name" }).value).toBe("Release notes");
         expect(state.skillLoads).toBe(1);
     });
 });
