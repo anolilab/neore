@@ -35,10 +35,6 @@ const fakeCaches = (initial: Record<string, Record<string, Response>> = {}) => {
         const store = stores.get(name) as Map<string, Response>;
 
         return {
-            // The real `add` fetches the URL; what is kept is all these tests look at.
-            add: vi.fn(async (url: string) => {
-                store.set(url, new Response(`fetched ${url}`));
-            }),
             match: async (url: string) => store.get(url),
             put: async (url: string, response: Response) => {
                 store.set(url, response);
@@ -208,6 +204,10 @@ describe("offline-shell-sw.js", () => {
         const fetch = vi.fn(
             async (_url: string, init: { signal: AbortSignal }) =>
                 await new Promise<Response>((_resolve, reject) => {
+                    if (init.signal.aborted) {
+                        reject(init.signal.reason);
+                    }
+
                     init.signal.addEventListener("abort", () => reject(init.signal.reason));
                 }),
         );
@@ -243,7 +243,10 @@ describe("offline-shell-sw.js", () => {
     });
 
     it("does not fetch a recently kept shell again after a navigation, nor while offline", async () => {
-        const kept = fakeCaches({ "neore-offline-shell-rev2": { "/offline-shell": keptShell("shell") } });
+        const kept = fakeCaches({
+            "bundle-assets": { [CATALOG]: new Response("catalog") },
+            "neore-offline-shell-rev2": { "/offline-shell": keptShell("shell") },
+        });
         const online = vi.fn(async () => new Response("page", { status: 200 }));
 
         await navigate(load({ caches: kept, fetch: online })).settled;
@@ -259,7 +262,7 @@ describe("offline-shell-sw.js", () => {
 
     it("revalidates a shell kept over 30 minutes ago after a navigation, so a server-only deploy reaches it", async () => {
         const stale = keptShell("old shell", { keptAt: Date.now() - 31 * 60 * 1000 });
-        const caches = fakeCaches({ "neore-offline-shell-rev2": { "/offline-shell": stale } });
+        const caches = fakeCaches({ "bundle-assets": { [CATALOG]: new Response("catalog") }, "neore-offline-shell-rev2": { "/offline-shell": stale } });
         const fetch = vi.fn(async (input: string | { url: string }) => (typeof input === "string" ? html(SHELL_HTML) : new Response("page", { status: 200 })));
 
         await navigate(load({ caches, fetch })).settled;
@@ -294,6 +297,33 @@ describe("offline-shell-sw.js", () => {
 
         expect([...withCurrent.stores.keys()].toSorted()).toStrictEqual(["bundle-assets", "neore-offline-shell-rev2"]);
         expect([...withoutCurrent.stores.keys()]).toStrictEqual(["bundle-assets"]);
+    });
+
+    it("never fails the activation when listing or deleting caches fails, and leaves the undeletable ones for the next one", async () => {
+        const unlisted = fakeCaches({ "neore-offline-shell-rev1": { "/offline-shell": keptShell("old") } });
+
+        unlisted.keys = vi.fn(async () => {
+            throw new DOMException("broken", "UnknownError");
+        });
+
+        await expect(activate(load({ caches: unlisted, fetch: vi.fn() }))).resolves.toBeUndefined();
+
+        const undeletable = fakeCaches({
+            "neore-offline-shell-rev1": { "/offline-shell": keptShell("old") },
+            "neore-offline-shell-rev3": { "/offline-shell": keptShell("stale write") },
+        });
+        const remove = undeletable.delete;
+
+        undeletable.delete = vi.fn(async (name: string) => {
+            if (name === "neore-offline-shell-rev1") {
+                throw new DOMException("broken", "UnknownError");
+            }
+
+            return await remove(name);
+        });
+
+        await expect(activate(load({ caches: undeletable, fetch: vi.fn() }))).resolves.toBeUndefined();
+        expect([...undeletable.stores.keys()]).toStrictEqual(["neore-offline-shell-rev1"]);
     });
 
     it("answers a desktop navigation from the network while it is up, even with a server error", async () => {
@@ -351,25 +381,65 @@ describe("offline-shell-sw.js", () => {
 
     it("keeps the default catalog in bundle-assets on install, and again after a navigation once it is gone", async () => {
         const caches = fakeCaches();
+        const fetch = vi.fn(async (input: string | { url: string }) => (input === CATALOG ? new Response("catalog") : html(SHELL_HTML)));
 
-        await install(load({ caches, fetch: vi.fn(async () => html(SHELL_HTML)) }));
-        expect(await caches.stores.get("bundle-assets")?.get(CATALOG)?.text()).toBe(`fetched ${CATALOG}`);
+        await install(load({ caches, fetch }));
+        expect(fetch).toHaveBeenCalledWith(CATALOG, { signal: expect.any(AbortSignal) });
+        expect(await caches.stores.get("bundle-assets")?.get(CATALOG)?.text()).toBe("catalog");
 
         caches.stores.get("bundle-assets")?.clear();
-        await navigate(load({ caches, fetch: vi.fn(async () => new Response("page", { status: 200 })) })).settled;
+        await navigate(load({ caches, fetch })).settled;
         expect(caches.stores.get("bundle-assets")?.has(CATALOG)).toBe(true);
     });
 
     it("does not fetch a kept catalog again, and keeps none without one in the config", async () => {
         const kept = fakeCaches({ "bundle-assets": { [CATALOG]: new Response("catalog") } });
-        const bundles = await kept.open("bundle-assets");
+        const fetch = vi.fn(async () => html(SHELL_HTML));
         const none = fakeCaches();
 
-        await install(load({ caches: kept, fetch: vi.fn(async () => html(SHELL_HTML)) }));
-        await install(load({ __NEORE_OFFLINE_SHELL__: { ...SHELL, catalog: undefined }, caches: none, fetch: vi.fn(async () => html(SHELL_HTML)) }));
+        await install(load({ caches: kept, fetch }));
+        await install(load({ __NEORE_OFFLINE_SHELL__: { ...SHELL, catalog: undefined }, caches: none, fetch }));
 
-        expect(bundles.add).not.toHaveBeenCalled();
+        expect(fetch).not.toHaveBeenCalledWith(CATALOG, expect.anything());
         expect(none.stores.get("bundle-assets")?.size ?? 0).toBe(0);
+    });
+
+    it("keeps no catalog the server did not answer with", async () => {
+        const caches = fakeCaches();
+
+        await install(load({ caches, fetch: vi.fn(async (input: string) => (input === CATALOG ? new Response("gone", { status: 404 }) : html(SHELL_HTML))) }));
+
+        expect(caches.stores.get("bundle-assets")?.has(CATALOG)).toBe(false);
+    });
+
+    it("gives up on a catalog fetch that never answers after 10 seconds, so the install is not held open", async () => {
+        const caches = fakeCaches();
+        const timeout = new AbortController();
+        const timeoutSpy = vi.spyOn(AbortSignal, "timeout").mockReturnValue(timeout.signal);
+        // The shell answers; the catalog stays pending until its signal aborts, like the real fetch.
+        const fetch = vi.fn(async (input: string, init?: { signal?: AbortSignal }) => {
+            if (input !== CATALOG) {
+                return html(SHELL_HTML);
+            }
+
+            return await new Promise<Response>((_resolve, reject) => {
+                init?.signal?.addEventListener("abort", () => reject(init.signal?.reason));
+            });
+        });
+        let settled = false;
+        const installed = install(load({ caches, fetch })).then(() => {
+            settled = true;
+        });
+
+        await vi.waitFor(() => expect(fetch).toHaveBeenCalledWith(CATALOG, { signal: timeout.signal }));
+        expect(timeoutSpy).toHaveBeenCalledWith(10_000);
+        expect(settled).toBe(false);
+
+        timeout.abort(new DOMException("signal timed out", "TimeoutError"));
+        await installed;
+
+        expect(caches.stores.get("bundle-assets")?.has(CATALOG)).toBe(false);
+        expect(await caches.stores.get("neore-offline-shell-rev2")?.get("/offline-shell")?.text()).toBe(SHELL_HTML);
     });
 
     it("leaves browsers, iframe navigations, form POSTs and non-navigation requests to Workbox", () => {

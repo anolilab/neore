@@ -60,11 +60,16 @@
 
     const currentShell = async () => await (await self.caches.open(cacheName)).match(config.url);
 
-    /** Deletes the shells of other revisions; run by the active worker only. */
+    /**
+     * Deletes the shells of other revisions; run by the active worker only. Never rejects: a storage failure must not
+     * fail the activation, and a cache it could not delete is tried again by the next activate.
+     */
     const dropOtherShells = async () => {
-        const names = await self.caches.keys();
+        const names = await self.caches.keys().catch(() => []);
 
-        await Promise.all(names.filter((name) => name.startsWith(PREFIX) && name !== cacheName).map((name) => self.caches.delete(name)));
+        await Promise.all(
+            names.filter((name) => name.startsWith(PREFIX) && name !== cacheName).map((name) => self.caches.delete(name).catch(() => false)),
+        );
     };
 
     const keepShell = async () => {
@@ -99,6 +104,7 @@
      * Puts the default locale's catalog where Workbox's `bundle-assets` rule (`scripts/generate-sw.mjs`) looks for it,
      * unless it is there: the shell activates the window's locale, and when that catalog was never loaded online the
      * client falls back to this one (`src/lib/intl/router-plugin.tsx`). Desktop only, unlike a precache entry.
+     * Best-effort and bounded by `SHELL_FETCH_TIMEOUT_MS`: a failure or a stall only leaves the catalog missing.
      */
     const keepCatalog = async () => {
         if (typeof config.catalog !== "string") {
@@ -107,8 +113,15 @@
 
         const cache = await self.caches.open("bundle-assets");
 
-        if (!(await cache.match(config.catalog))) {
-            await cache.add(config.catalog);
+        if (await cache.match(config.catalog)) {
+            return;
+        }
+
+        // Bounded like the shell: `cache.add` has no timeout, and a stalled catalog would hold the install open.
+        const response = await self.fetch(config.catalog, { signal: AbortSignal.timeout(SHELL_FETCH_TIMEOUT_MS) });
+
+        if (response.ok) {
+            await cache.put(config.catalog, response);
         }
     };
 
