@@ -5,21 +5,30 @@
 import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { registeredApi } from "../../test/registered-api";
+import { registeredApi, registerModule } from "../../test/registered-api";
 import schema from "../schema";
-import { deleteBotConnectorAccess, MAX_SETTINGS_PER_TEAMMATE, threadConnectorAccess } from "./access";
+import { MAX_SETTINGS_PER_TEAMMATE, threadConnectorAccess } from "./access";
 
 const registry = vi.hoisted(() => new Map<string, unknown>());
 
 vi.mock("../_generated/api", async (importOriginal) => registeredApi(await importOriginal(), registry));
 vi.mock("../_generated/internal", async (importOriginal) => registeredApi(await importOriginal(), registry));
+vi.mock("../lib/rate-limiter", async (importOriginal) => {
+    return {
+        ...(await importOriginal<typeof import("../lib/rate-limiter")>()),
+        rateLimitGuard: async () => undefined,
+    };
+});
 
 beforeAll(async () => {
-    const exports = await import("./access");
+    const access = await import("./access");
 
-    for (const [name, value] of Object.entries(exports)) {
+    for (const [name, value] of Object.entries(access)) {
         registry.set(`connectors_access:${name}`, value);
     }
+
+    registerModule(registry, "bots_functions", await import("../bots/functions"));
+    registerModule(registry, "sandbox_functions", await import("../sandbox/functions"));
 });
 
 type Harness = ReturnType<typeof lunoraTest>;
@@ -67,7 +76,15 @@ const countSettings = async (forBot = botId) =>
         return rows.filter((row) => row.botId === forBot).length;
     });
 
+const levelOf = async (connectorSlug: string, forBot = botId) =>
+    await harness.run(async (ctx: any) => {
+        const rows: { botId: string; connectorSlug: string; level: string }[] = await ctx.db.query("teammateConnectorAccess").collect();
+
+        return rows.find((row) => row.botId === forBot && row.connectorSlug === connectorSlug)?.level;
+    });
+
 const setter = (): never => registry.get("connectors_access:setTeammateConnectorAccess") as never;
+const deleter = (): never => registry.get("bots_functions:deleteBot") as never;
 
 describe("the limit on a teammate's connection settings", () => {
     it("refuses a new setting once the teammate holds the most a run reads, and writes nothing", async () => {
@@ -85,6 +102,7 @@ describe("the limit on a teammate's connection settings", () => {
 
         await harness.withIdentity({ userId: OWNER } as never).mutation(setter(), { botId, connectorSlug: "slug-0", level: "none" } as never);
 
+        expect(await levelOf("slug-0")).toBe("none");
         expect(await countSettings()).toBe(MAX_SETTINGS_PER_TEAMMATE);
     });
 });
@@ -107,7 +125,7 @@ describe("a deleted teammate", () => {
         await insertSettings(MAX_SETTINGS_PER_TEAMMATE + 3);
         await insertSettings(2, otherBot);
 
-        await harness.run(async (ctx: any) => await deleteBotConnectorAccess(ctx, botId as never));
+        await harness.withIdentity({ userId: OWNER } as never).mutation(deleter(), { botId } as never);
 
         expect(await countSettings()).toBe(0);
         expect(await countSettings(otherBot)).toBe(2);
