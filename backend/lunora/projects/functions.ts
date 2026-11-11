@@ -27,7 +27,7 @@ import {
     ProjectRepoError,
     withDefault,
 } from "./repositories";
-import { resolveProjectLocation } from "./machine-location";
+import { forViewer, resolveProjectLocation } from "./machine-location";
 
 /** Whether `userId` is a current member of an organization. */
 type MembershipCheck = (organizationId: string) => Promise<boolean>;
@@ -153,7 +153,11 @@ export const getProject = authQuery
     .input({
         projectId: v.id("projects"),
     })
-    .query(async ({ args: { projectId }, ctx: context }) => await readableProject(context, projectId as Id<"projects">, context.user.userId));
+    .query(async ({ args: { projectId }, ctx: context }) => {
+        const project = await readableProject(context, projectId as Id<"projects">, context.user.userId);
+
+        return project && forViewer(project, context.user.userId);
+    });
 
 export const listProjects = authQuery
     .input({
@@ -179,11 +183,9 @@ export const listProjects = authQuery
     .query(async ({ args: { organizationId, paginationOpts }, ctx: context }) => {
         const { userId } = context.user;
 
-        if (organizationId) {
-            return await listProjectsHandler(context, { organizationId, paginationOpts });
-        }
+        const result = await listProjectsHandler(context, organizationId ? { organizationId, paginationOpts } : { paginationOpts, userId });
 
-        return await listProjectsHandler(context, { paginationOpts, userId });
+        return { ...result, page: result.page.map((project) => forViewer(project, userId)) };
     });
 
 export const listPinnedProjects = authQuery
@@ -194,11 +196,9 @@ export const listPinnedProjects = authQuery
     .query(async ({ args: { organizationId }, ctx: context }) => {
         const { userId } = context.user;
 
-        if (organizationId) {
-            return await listPinnedProjectsHandler(context, { organizationId });
-        }
+        const pinned = await listPinnedProjectsHandler(context, organizationId ? { organizationId } : { userId });
 
-        return await listPinnedProjectsHandler(context, { userId });
+        return pinned.map((project) => forViewer(project, userId));
     });
 
 export const createProject = authMutation
