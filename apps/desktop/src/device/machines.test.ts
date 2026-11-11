@@ -351,7 +351,14 @@ describe("pairing identity", () => {
 
         expect(setup({ hosts, ssh: [ssh("build", { identityFile: "/k/new" })] }).machines.list()[1]?.status).toBe("unpaired");
         expect(setup({ hosts, ssh: [ssh("build", { identityFile: "/k/old" })] }).machines.list()[1]?.status).toBe("connected");
-        expect(setup({ hosts, ssh: [ssh("build")] }).machines.list()[1]?.status).toBe("connected");
+        expect(setup({ hosts, ssh: [ssh("build")] }).machines.list()[1]?.status).toBe("unpaired");
+    });
+
+    it("pairs an alias that names no key file with the saved host that has none, not one with a key", () => {
+        const hosts = [server({ deviceId: "srv-key", identityFile: "/k/old" }), server({ deviceId: "srv-plain", identityFile: null })];
+        const [, box] = setup({ hosts, ssh: [ssh("build")] }).machines.list();
+
+        expect(box?.id).toBe("srv-plain");
     });
 
     it("writes nothing when the paired server changes while the folder confirmation is open", async () => {

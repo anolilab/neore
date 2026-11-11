@@ -175,7 +175,7 @@ export const createAddProjectMachines = (dependencies: MachineDependencies): Add
         return entry;
     };
 
-    /** The paired server an ssh host stands for: same address, port and, when the config names one, user. */
+    /** The paired server an ssh host stands for: the same address, port, user and key file the transport would use. */
     const pairedFor = (entry: SshHost): HostView | undefined =>
         dependencies
             .settings()
@@ -184,7 +184,7 @@ export const createAddProjectMachines = (dependencies: MachineDependencies): Add
                     host.address === (entry.hostName ?? entry.alias) &&
                     host.port === (entry.port ?? 22) &&
                     host.user === (entry.user ?? dependencies.username()) &&
-                    (entry.identityFile === null || host.identityFile === entry.identityFile),
+                    (host.identityFile ?? null) === entry.identityFile,
             );
 
     const machineFor = (machineId: string): Machine => {
