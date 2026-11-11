@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { AddProjectMachine } from "../../../../../desktop/src/add-project-machines.types";
 import {
+    classifyDisabledReason,
     folderNeedsSharing,
     hostSpecOf,
     isAbsolutePath,
@@ -10,6 +11,7 @@ import {
     isFilePathError,
     isMissingFolderError,
     isNotConnectedError,
+    isPathFailure,
     isUnreadableFolderError,
     joinPath,
     lastSegment,
@@ -132,5 +134,29 @@ describe("desktop failures", () => {
         expect(isFilePathError(new Error("device: that path is a file"))).toBe(true);
         expect(isUnreadableFolderError(new Error("device: too many entries to browse"))).toBe(true);
         expect(isDeclinedError(new Error("device: that folder was not found"))).toBe(false);
+    });
+});
+
+describe("classifyDisabledReason", () => {
+    it.each([
+        ["This host uses ProxyJump in ~/.ssh/config, which Neore does not support.", { key: "ProxyJump", kind: "unsupported-setting" }],
+        ["This host is used by a Match rule in ~/.ssh/config, which Neore does not evaluate.", { kind: "match-rule" }],
+        ["Pair this computer with your account first (Settings \u{2192} Devices).", { kind: "pair-this-computer" }],
+        ["something else", { kind: "other" }],
+    ])("%s", (reason, expected) => {
+        expect(classifyDisabledReason(reason)).toEqual(expected);
+    });
+});
+
+describe("isPathFailure", () => {
+    it.each([
+        ["device: /x not found", true],
+        ["device: /x is a file", true],
+        ["device: folder cannot be read", true],
+        ["device: home folder or one above", true],
+        ["device: connect the server first", false],
+        ["device: declined", false],
+    ])("%s -> %s", (message, expected) => {
+        expect(isPathFailure(new Error(message))).toBe(expected);
     });
 });
