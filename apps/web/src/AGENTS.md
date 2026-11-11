@@ -65,6 +65,8 @@ The rules for working in `apps/web/src`. The detail, reasoning and code examples
   `lib/native/native-shell.css`, and gate a list row's hover background with the `web:` variant. Effects that apply a
   shell default (`AppearanceSync`) read `isNativeShell()` inside the effect: a hook reads "no shell" while hydrating
   and would undo the boot script for a frame. `system` accent and `explicit` stay local (the server knows neither).
+  The shell sets `spellcheck="false"` on `<html>`: a raw prose `<textarea>` needs `spellCheck` (`native-shell.test.ts`
+  checks). The OS accent is never painted raw: `systemAccentTokens` derives a shade per mode that meets the preset bars.
 
 ## CONVENTIONS
 

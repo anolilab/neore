@@ -108,15 +108,17 @@ export const renderAccentCss = (): string => {
               ],
     );
 
-    // The OS accent (`native-appearance.ts`): one colour for both modes, put on <html> as inline custom properties.
-    const system = [
-        `:root[data-accent="system"],\n:root.dark[data-accent="system"] {`,
-        "    --primary: var(--system-accent);",
-        "    --primary-foreground: var(--system-accent-foreground);",
-        "    --ring: var(--system-accent);",
-        "    --sidebar-ring: var(--system-accent);",
-        "}",
-    ].join("\n");
+    // The OS accent (`native-appearance.ts`): a shade per mode, put on <html> as inline custom properties.
+    const system = (["light", "dark"] as const).map((mode) =>
+        [
+            `${mode === "dark" ? ":root.dark" : ":root"}[data-accent="system"] {`,
+            `    --primary: var(--system-accent-${mode});`,
+            `    --primary-foreground: var(--system-accent-${mode}-foreground);`,
+            `    --ring: var(--system-accent-${mode});`,
+            `    --sidebar-ring: var(--system-accent-${mode});`,
+            "}",
+        ].join("\n"),
+    );
 
-    return `${[header, ...rules, system].join("\n\n")}\n`;
+    return `${[header, ...rules, ...system].join("\n\n")}\n`;
 };

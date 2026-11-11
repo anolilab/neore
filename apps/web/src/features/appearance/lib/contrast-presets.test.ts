@@ -79,6 +79,16 @@ describe.each(["blue", "violet", "green", "orange", "rose", "teal"])("high contr
     });
 });
 
+describe("high contrast primary button (system)", () => {
+    // native-appearance.test.ts checks the 7:1 shades it computes for every OS accent.
+    it.each([
+        ["light", ':root[data-contrast="high"][data-accent="system"]', "--system-accent-contrast-light"],
+        ["dark", ':root.dark[data-contrast="high"][data-accent="system"]', "--system-accent-contrast-dark"],
+    ])("uses the %s high-contrast shade of the OS accent", (_mode, selector, property) => {
+        expect(tokens(selector)).toStrictEqual({ "--primary": `var(${property})`, "--primary-foreground": `var(${property}-foreground)` });
+    });
+});
+
 describe("documentation sidebar", () => {
     it("is restyled in both themes, against its own !important colours", () => {
         expect(CSS).toContain(':root[data-contrast="high"] #nd-sidebar {');

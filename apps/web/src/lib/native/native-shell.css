@@ -44,7 +44,9 @@
 /*
  * Interface chrome is not selectable: the thread sidebar (the right one holds content), headers and toolbars, menus, tabs, buttons, labels and navigation.
  * Message content, code, fields, dialogs' bodies and everything else outside these regions stays selectable, and
- * fields and editors inside them (the thread search, the find bar) opt back in.
+ * fields and editors inside them (the thread search, the find bar) opt back in. Content is never chrome: a link
+ * Streamdown renders as `<button data-streamdown="link">` in a message stays selectable, and so does any element
+ * marked `select-text` (Tailwind's utility is layered, so it would lose to this rule without the exclusion).
  */
 :root[data-native]
     :is(
@@ -63,11 +65,11 @@
         [role="menuitemcheckbox"],
         [role="menuitemradio"],
         [role="tooltip"]
-    ) {
+    ):not(.select-text, :is(.message-text, .prose, [data-selectable]) *) {
     user-select: none;
 }
 
-:root[data-native] :is(input, textarea, [contenteditable="true"], .message-text, pre, code, [data-selectable]) {
+:root[data-native] :is(input, textarea, [contenteditable="true"], .message-text, .prose, pre, code, [data-selectable], .select-text) {
     user-select: text;
 }
 

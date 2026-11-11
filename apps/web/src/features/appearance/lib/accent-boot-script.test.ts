@@ -9,7 +9,9 @@ import {
     UI_STATE_STORAGE_KEY,
 } from "./accent-boot-script";
 import { CONTRAST_ATTRIBUTE, DENSITY_ATTRIBUTE, FONT_ATTRIBUTE, PREFERS_MORE_CONTRAST_QUERY } from "./display-preferences";
-import { SYSTEM_ACCENT_CACHE_KEY, SYSTEM_ACCENT_PROPERTY } from "./native-appearance";
+import { SYSTEM_ACCENT_CACHE_KEY, SYSTEM_ACCENT_PROPERTIES, systemAccentTokens } from "./native-appearance";
+
+const BLUE_TOKENS = systemAccentTokens("#007aff");
 
 const runBootScript = (): void => {
     // eslint-disable-next-line sonarjs/code-eval -- runs the inline script exactly as the browser would
@@ -39,7 +41,7 @@ describe("accent boot script", () => {
             vi.stubGlobal("neoreNative", { capabilities });
         };
         const cacheAccent = () => {
-            localStorage.setItem(SYSTEM_ACCENT_CACHE_KEY, JSON.stringify({ accent: "#007aff", foreground: "#ffffff" }));
+            localStorage.setItem(SYSTEM_ACCENT_CACHE_KEY, JSON.stringify(BLUE_TOKENS));
         };
         const html = document.documentElement;
 
@@ -90,7 +92,9 @@ describe("accent boot script", () => {
             cacheAccent();
             runBootScript();
             expect(html.getAttribute(ACCENT_ATTRIBUTE)).toBe("system");
-            expect(html.style.getPropertyValue(SYSTEM_ACCENT_PROPERTY)).toBe("#007aff");
+            expect(html.style.getPropertyValue(SYSTEM_ACCENT_PROPERTIES.light)).toBe(BLUE_TOKENS.light);
+            expect(html.style.getPropertyValue(SYSTEM_ACCENT_PROPERTIES.dark)).toBe(BLUE_TOKENS.dark);
+            expect(html.style.getPropertyValue(SYSTEM_ACCENT_PROPERTIES.contrastLightForeground)).toBe(BLUE_TOKENS.contrastLightForeground);
 
             html.removeAttribute(ACCENT_ATTRIBUTE);
             store({ accentColor: "system", explicit: { accentColor: true } });
@@ -111,10 +115,46 @@ describe("accent boot script", () => {
             expect(html.hasAttribute(ACCENT_ATTRIBUTE)).toBe(false);
 
             shell(["system-accent"]);
-            localStorage.setItem(SYSTEM_ACCENT_CACHE_KEY, JSON.stringify({ accent: "red;}", foreground: "#ffffff" }));
+            localStorage.setItem(SYSTEM_ACCENT_CACHE_KEY, JSON.stringify({ ...BLUE_TOKENS, dark: "red;}" }));
             runBootScript();
             expect(html.hasAttribute(ACCENT_ATTRIBUTE)).toBe(false);
-            expect(html.style.getPropertyValue(SYSTEM_ACCENT_PROPERTY)).toBe("");
+            expect(html.style.getPropertyValue(SYSTEM_ACCENT_PROPERTIES.light)).toBe("");
+
+            // A cache from before the per-mode tokens waits for the shell's answer.
+            localStorage.setItem(SYSTEM_ACCENT_CACHE_KEY, JSON.stringify({ accent: "#007aff", foreground: "#ffffff" }));
+            runBootScript();
+            expect(html.hasAttribute(ACCENT_ATTRIBUTE)).toBe(false);
+        });
+
+        it("still marks the shell when the stored state is corrupt", () => {
+            shell(["vibrancy", "system-accent"]);
+            cacheAccent();
+            localStorage.setItem(UI_STATE_STORAGE_KEY, "{not json");
+            runBootScript();
+
+            expect(html.getAttribute(NATIVE_ATTRIBUTE)).toBe("");
+            expect(html.getAttribute(NATIVE_VIBRANCY_ATTRIBUTE)).toBe("");
+            expect(html.getAttribute("spellcheck")).toBe("false");
+            expect(html.getAttribute(FONT_ATTRIBUTE)).toBe("system");
+            expect(html.getAttribute(ACCENT_ATTRIBUTE)).toBe("system");
+        });
+
+        it("still marks the shell when storage throws", () => {
+            shell(["vibrancy"]);
+            vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+                throw new DOMException("denied", "SecurityError");
+            });
+
+            try {
+                expect(runBootScript).not.toThrow();
+            } finally {
+                vi.restoreAllMocks();
+            }
+
+            expect(html.getAttribute(NATIVE_ATTRIBUTE)).toBe("");
+            expect(html.getAttribute(NATIVE_VIBRANCY_ATTRIBUTE)).toBe("");
+            expect(html.getAttribute("spellcheck")).toBe("false");
+            expect(html.hasAttribute(ACCENT_ATTRIBUTE)).toBe(false);
         });
     });
 

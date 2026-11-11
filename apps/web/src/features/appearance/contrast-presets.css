@@ -176,6 +176,17 @@
     --primary-foreground: #191919;
 }
 
+/* The OS accent: native-appearance.ts computes a shade per mode that reaches 7:1 against its label. */
+:root[data-contrast="high"][data-accent="system"] {
+    --primary: var(--system-accent-contrast-light);
+    --primary-foreground: var(--system-accent-contrast-light-foreground);
+}
+
+:root.dark[data-contrast="high"][data-accent="system"] {
+    --primary: var(--system-accent-contrast-dark);
+    --primary-foreground: var(--system-accent-contrast-dark-foreground);
+}
+
 /*
  * The documentation sidebar sets its colours with !important, so its high-contrast rules are more specific and
  * also !important. The dark rule carries the extra `.dark`, as the layout's does.

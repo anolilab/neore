@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 
+import { contrastRatio } from "./color-contrast";
 import {
     applySystemAccentTokens,
     cacheSystemAccentTokens,
@@ -7,15 +8,82 @@ import {
     effectiveMainFont,
     isAccentChoice,
     SYSTEM_ACCENT_CACHE_KEY,
-    SYSTEM_ACCENT_FOREGROUND_PROPERTY,
-    SYSTEM_ACCENT_PROPERTY,
+    SYSTEM_ACCENT_PROPERTIES,
     systemAccentTokens,
 } from "./native-appearance";
 
+/** The macOS accent palette (System Settings > Appearance), and two extremes. */
+const MACOS_ACCENTS = [
+    ["blue", "#007aff"],
+    ["purple", "#953d96"],
+    ["pink", "#f74f9e"],
+    ["red", "#e0383e"],
+    ["orange", "#f7821b"],
+    ["yellow", "#ffc600"],
+    ["green", "#62ba46"],
+    ["graphite", "#8c8c8c"],
+    ["white", "#ffffff"],
+    ["black", "#000000"],
+] as const;
+
+/** The same bars as accent-presets.test.ts (4.5:1 text, 3:1 against the surfaces) and contrast-presets.test.ts (7:1). */
+const AA_TEXT = 4.5;
+const AAA_TEXT = 7;
+const AA_NON_TEXT = 3;
+
+/** `--background` / `--card` of packages/ui/src/global.css and of contrast-presets.css. */
+const SURFACES = {
+    contrastDark: ["#000000"],
+    contrastLight: ["#ffffff"],
+    dark: ["#212121"],
+    light: ["#f2f2f2", "#ffffff"],
+} as const;
+
+const HEX = /^#[\da-f]{6}$/;
+
 describe(systemAccentTokens, () => {
-    it("puts white text on a dark accent and obsidian on a light one", () => {
-        expect(systemAccentTokens("#007AFF")).toStrictEqual({ accent: "#007aff", foreground: "#ffffff" });
-        expect(systemAccentTokens("#ffc600")).toStrictEqual({ accent: "#ffc600", foreground: "#191919" });
+    describe.each(MACOS_ACCENTS)("%s (%s)", (_name, hex) => {
+        const tokens = systemAccentTokens(hex);
+
+        it("emits a #rrggbb value for every token", () => {
+            expect(new Set(Object.keys(tokens))).toStrictEqual(new Set(Object.keys(SYSTEM_ACCENT_PROPERTIES)));
+
+            const values = Object.values(tokens);
+
+            for (const value of values) {
+                expect(value).toMatch(HEX);
+            }
+        });
+
+        it.each(["light", "dark"] as const)(`%s: label ≥ ${AA_TEXT}:1, accent ≥ ${AA_NON_TEXT}:1 against the background and card`, (mode) => {
+            expect(contrastRatio(tokens[`${mode}Foreground`], tokens[mode])).toBeGreaterThanOrEqual(AA_TEXT);
+
+            const surfaces = SURFACES[mode];
+
+            for (const surface of surfaces) {
+                expect(contrastRatio(tokens[mode], surface)).toBeGreaterThanOrEqual(AA_NON_TEXT);
+            }
+        });
+
+        it.each(["contrastLight", "contrastDark"] as const)(`%s: label ≥ ${AAA_TEXT}:1, accent ≥ ${AA_NON_TEXT}:1 against the background`, (mode) => {
+            expect(contrastRatio(tokens[`${mode}Foreground`], tokens[mode])).toBeGreaterThanOrEqual(AAA_TEXT);
+
+            const surfaces = SURFACES[mode];
+
+            for (const surface of surfaces) {
+                expect(contrastRatio(tokens[mode], surface)).toBeGreaterThanOrEqual(AA_NON_TEXT);
+            }
+        });
+    });
+
+    it("keeps an OS accent that already passes, and puts the better label on it", () => {
+        // #007aff carries white at only 4.02:1, so light mode darkens it; dark mode lightens it under obsidian.
+        const blue = systemAccentTokens("#007AFF");
+
+        expect(blue.light).not.toBe("#007aff");
+        expect(blue.lightForeground).toBe("#ffffff");
+        expect(systemAccentTokens("#ffc600").darkForeground).toBe("#191919");
+        expect(systemAccentTokens("#1d4ed8")).toMatchObject({ light: "#1d4ed8", lightForeground: "#ffffff" });
     });
 });
 
@@ -25,20 +93,27 @@ describe("system accent tokens on <html>", () => {
         localStorage.clear();
     });
 
-    it("sets and clears the custom properties", () => {
-        applySystemAccentTokens({ accent: "#007aff", foreground: "#ffffff" });
+    const blue = systemAccentTokens("#007aff");
 
-        expect(document.documentElement.style.getPropertyValue(SYSTEM_ACCENT_PROPERTY)).toBe("#007aff");
-        expect(document.documentElement.style.getPropertyValue(SYSTEM_ACCENT_FOREGROUND_PROPERTY)).toBe("#ffffff");
+    const properties = Object.entries(SYSTEM_ACCENT_PROPERTIES);
+
+    it("sets and clears the custom properties", () => {
+        applySystemAccentTokens(blue);
+
+        for (const [key, property] of properties) {
+            expect(document.documentElement.style.getPropertyValue(property)).toBe(blue[key as keyof typeof blue]);
+        }
 
         applySystemAccentTokens(null);
 
-        expect(document.documentElement.style.getPropertyValue(SYSTEM_ACCENT_PROPERTY)).toBe("");
+        for (const [, property] of properties) {
+            expect(document.documentElement.style.getPropertyValue(property)).toBe("");
+        }
     });
 
     it("caches the tokens for the boot script and forgets them", () => {
-        cacheSystemAccentTokens({ accent: "#007aff", foreground: "#ffffff" });
-        expect(JSON.parse(localStorage.getItem(SYSTEM_ACCENT_CACHE_KEY) ?? "null")).toStrictEqual({ accent: "#007aff", foreground: "#ffffff" });
+        cacheSystemAccentTokens(blue);
+        expect(JSON.parse(localStorage.getItem(SYSTEM_ACCENT_CACHE_KEY) ?? "null")).toStrictEqual(blue);
 
         cacheSystemAccentTokens(null);
         expect(localStorage.getItem(SYSTEM_ACCENT_CACHE_KEY)).toBeNull();
