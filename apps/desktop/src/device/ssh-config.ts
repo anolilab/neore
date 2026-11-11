@@ -102,11 +102,7 @@ const settingOf = (key: string, value: string, home: string): Partial<Block> => 
         case "identityfile": {
             const file = firstWord(value);
 
-            if (file?.includes("%")) {
-                return { reason: unsupported(key) };
-            }
-
-            return { identityFile: file === null ? null : expandHome(file, home) };
+            return file?.includes("%") ? { reason: unsupported(key) } : { identityFile: file === null ? null : expandHome(file, home) };
         }
         case "include":
         case "proxycommand":
