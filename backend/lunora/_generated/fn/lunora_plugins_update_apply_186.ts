@@ -19,12 +19,14 @@ return { "installId": source["installId"], "targetVersion": source["targetVersio
 installCompiledValidatorMap(lunora_plugins_update_apply_186.finishUpdate.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
+if (typeof source["contentHash"] !== "string") return DEFER;
+if (source["contentHash"].length > 128) return DEFER;
 if (typeof source["generation"] !== "number" || !Number.isFinite(source["generation"])) return DEFER;
 if (typeof source["installId"] !== "string") return DEFER;
 if (source["installId"].length > 128) return DEFER;
 if (typeof source["version"] !== "string") return DEFER;
 if (source["version"].length > 32) return DEFER;
-return { "generation": source["generation"], "installId": source["installId"], "version": source["version"] };
+return { "contentHash": source["contentHash"], "generation": source["generation"], "installId": source["installId"], "version": source["version"] };
 });
 installCompiledValidatorMap(lunora_plugins_update_apply_186.updateSkillChild.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
