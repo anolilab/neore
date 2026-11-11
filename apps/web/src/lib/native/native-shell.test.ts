@@ -65,6 +65,35 @@ describe("native-shell.css selection rules", () => {
         expect(byId("selectable-button").matches(chrome)).toBe(false);
         expect(byId("selectable-button").matches(optBack)).toBe(true);
     });
+
+    describe("with the stylesheet applied", () => {
+        // The cascade itself, not just the selectors: a later rule that overrides these would fail here.
+        beforeEach(() => {
+            const style = document.createElement("style");
+
+            style.textContent = CSS;
+            document.head.insertAdjacentElement("beforeend", style);
+        });
+
+        afterEach(() => {
+            document.head.replaceChildren();
+        });
+
+        const userSelect = (id: string): string => getComputedStyle(byId(id)).getPropertyValue("user-select");
+
+        it("computes `none` for chrome and `text` for content and opt-backs", () => {
+            expect(userSelect("header-button")).toBe("none");
+            expect(userSelect("message-link")).not.toBe("none");
+            expect(userSelect("prose-button")).not.toBe("none");
+            expect(userSelect("selectable-button")).toBe("text");
+        });
+
+        it("computes nothing outside the shell", () => {
+            delete document.documentElement.dataset.native;
+
+            expect(userSelect("header-button")).not.toBe("none");
+        });
+    });
 });
 
 /** Raw `<textarea>`s that are not prose: read-only output. */
