@@ -58,7 +58,8 @@ describe("SignOut", () => {
         await vi.waitFor(() => {
             expect(auth.signOut).toHaveBeenCalled();
         });
-        expect(localStorage).toHaveLength(1);
+        // Only the thread list goes; the drafts' clear marker (`dropStoredDrafts`) is new, and other settings stay.
+        expect(Object.keys(localStorage).filter((key) => !key.startsWith("neore-draft-cleared:"))).toStrictEqual(["neore-collapsed-groups"]);
         expect(localStorage.getItem("neore-collapsed-groups")).toBe('["archived"]');
     });
 
