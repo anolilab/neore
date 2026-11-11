@@ -1085,6 +1085,23 @@ describe("releaseDeviceCall", () => {
 });
 
 describe("revokeDevice", () => {
+    it("clears the machine and folder of the owner's projects on the device and leaves other users' projects alone", async () => {
+        const { deviceId } = await pairedDevice(ownerId);
+        const mine = await insertProject(ownerId, { machineId: deviceId, path: "/home/me/app" });
+        const theirs = await insertProject(STRANGER, { machineId: deviceId, path: "/home/them/app" });
+        const read = async (id: string) =>
+            (await harness.run(async (ctx: any) => await ctx.db.projects.findFirst({ where: { _id: id } }))) as Record<string, unknown>;
+
+        await as(ownerId).mutation(functions.revokeDevice as never, { deviceId } as never);
+
+        const cleared = await read(mine);
+
+        expect(cleared).toMatchObject({ title: "Project", userId: ownerId });
+        expect(cleared.machineId).toBeUndefined();
+        expect(cleared.path).toBeUndefined();
+        expect(await read(theirs)).toMatchObject({ machineId: deviceId, path: "/home/them/app" });
+    });
+
     it("deletes the device and expires its open calls; the audit rows stay", async () => {
         const { deviceId } = await pairedDevice(ownerId);
         const threadId = await insertThread(ownerId);

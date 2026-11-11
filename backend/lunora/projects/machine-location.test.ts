@@ -159,12 +159,12 @@ describe("createProject machine and folder", () => {
 
         it("omits them from a member's listing and pinned listing, and keeps them for the owner's", async () => {
             const { machineId, member, owner } = await seed();
-            const paginationOpts = { cursor: null, numItems: 10 };
-            const memberPage = (await as(member).query(listProjects as never, { organizationId: ORG, paginationOpts } as never)) as {
+            const paginationOptions = { cursor: null, numItems: 10 };
+            const memberPage = (await as(member).query(listProjects as never, { organizationId: ORG, paginationOpts: paginationOptions } as never)) as {
                 page: Record<string, unknown>[];
             };
             const memberPinned = (await as(member).query(listPinnedProjects as never, { organizationId: ORG } as never)) as Record<string, unknown>[];
-            const ownerPage = (await as(owner).query(listProjects as never, { organizationId: ORG, paginationOpts } as never)) as {
+            const ownerPage = (await as(owner).query(listProjects as never, { organizationId: ORG, paginationOpts: paginationOptions } as never)) as {
                 page: Record<string, unknown>[];
             };
 

@@ -243,6 +243,23 @@ export const setDeviceProjectScope = authMutation
         return null;
     });
 
+const PROJECT_CLEAR_BATCH = 100;
+
+/** Removes the machine and folder from the user's projects that live on `machineId`; the projects stay. */
+const clearProjectsOnMachine = async (ctx: Pick<MutationCtx, "db">, userId: string, machineId: Id<"devices">): Promise<void> => {
+    for (;;) {
+        const { page } = await ctx.db.projects.findMany({ limit: PROJECT_CLEAR_BATCH, where: { machineId, userId } });
+
+        for (const project of page) {
+            await patchRow(ctx.db, "projects", project, { machineId: undefined, path: undefined });
+        }
+
+        if (page.length < PROJECT_CLEAR_BATCH) {
+            return;
+        }
+    }
+};
+
 /**
  * Unpairs a device from the web — the way out for a lost laptop. The row (and
  * with it the secret) is deleted, so nothing is ever signed for it again; its
@@ -276,6 +293,7 @@ export const revokeDevice = authMutation
             await expireOpenCalls(ctx, revoked._id, "The device was removed");
             await endHostSessionsOfDevice(ctx, revoked._id, ctx.now);
             await deleteShardRoute(ctx, "device", revoked._id as string);
+            await clearProjectsOnMachine(ctx, userId, revoked._id);
             await ctx.db.delete("devices", revoked._id);
         }
 
