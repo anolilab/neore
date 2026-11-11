@@ -13,7 +13,7 @@ const ENTRY = "assets/index-Ab12Cd34.js";
 const CATALOG = "/assets/messages-Ab12Cd34.js";
 const SHELL = { catalog: CATALOG, entry: ENTRY, revision: "rev2", url: "/offline-shell" };
 const ORIGIN = "https://app.example";
-const SHELL_HTML = `<html><script type="module" src="/${ENTRY}"></script></html>`;
+const SHELL_HTML = `<html><script nonce="n1">self.__boot = 1;</script><script type="module" src="/${ENTRY}"></script></html>`;
 
 interface FakeEvent {
     request?: { destination: string; method: string; mode: string; url: string };
@@ -147,9 +147,15 @@ describe("offline-shell-sw.js", () => {
 
         const kept = caches.stores.get("neore-offline-shell-rev2")?.get("/offline-shell");
 
-        expect(await kept?.text()).toBe(SHELL_HTML);
+        const keptHtml = await kept?.text();
+
+        expect(keptHtml).toBe(SHELL_HTML);
         // The nonce in the header is the one the HTML was rendered with: they travel together.
-        expect(kept?.headers.get("Content-Security-Policy")).toBe("script-src 'nonce-n1'");
+        const headerNonce = /'nonce-([^']+)'/u.exec(kept?.headers.get("Content-Security-Policy") ?? "")?.[1];
+        const htmlNonces = [...(keptHtml ?? "").matchAll(/\snonce="([^"]+)"/gu)].map((match) => match[1]);
+
+        expect(headerNonce).toBe("n1");
+        expect(htmlNonces).toStrictEqual([headerNonce]);
         expect(kept?.headers.get("X-Neore-Shell-Kept-At")).toMatch(/^\d+$/u);
     });
 
