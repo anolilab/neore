@@ -9,6 +9,7 @@ import useAfterFirstPaint from "@/hooks/use-after-first-paint";
 import { authClient } from "@/lib/auth/client";
 import { useCRPC } from "@/lib/lunora/crpc";
 import { hasNativeCapability, isNativeShell } from "@/lib/native/bridge";
+import { retryChunk } from "@/lib/native/shell-chunk";
 
 import { applyAccentAttribute, applyContrastAttribute, applyRootAttribute } from "../lib/accent-boot-script";
 import { DEFAULT_ACCENT, isAccentId } from "../lib/accent-presets";
@@ -38,9 +39,6 @@ import {
     withoutSyncedChoices,
 } from "../lib/native-appearance";
 
-/** How many times a failed load of the OS accent's chunk is retried. */
-const ACCENT_CHUNK_RETRIES = 3;
-
 /** Paints the OS accent tokens and caches them for the next boot; `null` (the OS has none) falls back to the default preset. */
 const paintSystemAccent = (tokens: SystemAccentTokens | null): void => {
     applySystemAccentTokens(tokens);
@@ -50,34 +48,30 @@ const paintSystemAccent = (tokens: SystemAccentTokens | null): void => {
 
 /**
  * Loads the OS accent's chunk and follows the OS accent; returns the function that stops (a pending retry too). A
- * failed load keeps what is painted and is retried 1, 2 and 4 seconds later.
+ * failed load keeps what is painted and is retried 1, 2 and 4 seconds later (`retryChunk`).
  */
 const followSystemAccentChunk = (): (() => void) => {
     let disposed = false;
     let stop = (): void => {};
-    let retry: ReturnType<typeof setTimeout> | undefined;
 
-    const load = (attempt: number): void => {
-        void import("../lib/system-accent-sync")
-            .then(({ followSystemAccent }) => {
-                if (!disposed) {
-                    stop = followSystemAccent(paintSystemAccent);
-                }
+    void retryChunk(async () => {
+        if (disposed) {
+            throw new Error("AppearanceSync unmounted");
+        }
 
-                return undefined;
-            })
-            .catch(() => {
-                if (!disposed && attempt < ACCENT_CHUNK_RETRIES) {
-                    retry = setTimeout(load, 1000 * 2 ** attempt, attempt + 1);
-                }
-            });
-    };
+        return await import("../lib/system-accent-sync");
+    })
+        .then(({ followSystemAccent }) => {
+            if (!disposed) {
+                stop = followSystemAccent(paintSystemAccent);
+            }
 
-    load(0);
+            return undefined;
+        })
+        .catch(() => {});
 
     return () => {
         disposed = true;
-        clearTimeout(retry);
         stop();
     };
 };

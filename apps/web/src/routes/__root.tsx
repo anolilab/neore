@@ -32,7 +32,6 @@ import AuthUIProviderTanstack from "@/features/auth/lib/tanstack/auth-ui-provide
 import { closeSidePanelForSessionSwitch } from "@/features/chat/core/stores/chat-ui-store";
 import { clearComposerDrafts } from "@/features/chat/split/composer-drafts";
 import ConnectionProvider from "@/features/connection/components/connection-provider";
-import OfflineScreen from "@/features/connection/components/offline-screen";
 import { useUIStateStore } from "@/features/layout/stores/ui-state-store";
 import type { SettingsTab } from "@/features/settings/lib/settings-navigation";
 import usePostHogIdentity from "@/hooks/use-posthog-identity";
@@ -42,7 +41,7 @@ import env from "@/lib/env";
 import { DEFAULT_LOCALE } from "@/lib/intl/client";
 import { CRPCProvider, useLunora, useLunoraAuth } from "@/lib/lunora/crpc";
 import { isNativeShell, setNativeBadge } from "@/lib/native/bridge";
-import { retryChunk, SilentBoundary } from "@/lib/native/shell-chunk";
+import { lazyShellChunk } from "@/lib/native/shell-chunk";
 import { getClientPostHogState } from "@/lib/posthog/client-state";
 import { forgetClientPostHog, rememberClientPostHog } from "@/lib/request-context";
 import rootBeforeLoad from "@/lib/root-before-load";
@@ -90,7 +89,13 @@ const SwUpdatePrompt = lazy(() => import("@/components/sw-update-prompt"));
  * Only the desktop shell loads it: the web build never downloads the shell's listeners. A failed chunk load is retried
  * and then renders nothing, so the app runs without the listeners rather than falling to the root error boundary.
  */
-const NativeBridge = lazy(async () => await retryChunk(async () => await import("@/lib/native/native-bridge")));
+const NativeBridge = lazyShellChunk(async () => await import("@/lib/native/native-bridge"));
+
+/**
+ * Shell-only too. It must still show offline, which is when it is needed: the shell fetches it on mount, and
+ * `scripts/generate-sw.mjs` precaches its chunk for an offline start.
+ */
+const OfflineScreen = lazyShellChunk(async () => await import("@/features/connection/components/offline-screen"));
 const ChangelogCard = lazy(() => import("@/features/changelog/components/changelog-card"));
 const ChangelogPanel = lazy(() => import("@/features/changelog/components/changelog-panel"));
 
@@ -476,8 +481,11 @@ const RootComponent = () => {
                                                     <PostHogConsentSync />
                                                     <ImpersonationBanner />
                                                     <ConnectionProvider>
-                                                        {/* Eager, not lazy: a lazy chunk cannot load while the app is offline, which is when this screen is needed. */}
-                                                        {isNative && <OfflineScreen />}
+                                                        {isNative && (
+                                                            <Suspense fallback={null}>
+                                                                <OfflineScreen />
+                                                            </Suspense>
+                                                        )}
                                                         <ScreenSizeDebug />
                                                         <Outlet />
                                                     </ConnectionProvider>
@@ -491,11 +499,9 @@ const RootComponent = () => {
                                                     </Suspense>
                                                     <Toaster />
                                                     {isNative && (
-                                                        <SilentBoundary>
-                                                            <Suspense fallback={null}>
-                                                                <NativeBridge />
-                                                            </Suspense>
-                                                        </SilentBoundary>
+                                                        <Suspense fallback={null}>
+                                                            <NativeBridge />
+                                                        </Suspense>
                                                     )}
                                                     <AppearanceSync />
                                                     <Suspense fallback={null}>

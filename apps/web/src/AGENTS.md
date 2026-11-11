@@ -65,7 +65,9 @@ The rules for working in `apps/web/src`. The detail, reasoning and code examples
   `lib/native/native-shell.css`; gate list-row hover with `web:`. Read `isNativeShell()` inside effects, not via a
   hook. Keep `system` accent and `explicit` marks local; the boot script reads marks via `EXPLICIT_MARKS`. Use
   `--primary-label`/`-text`/`-hover`, never `text-black` or the raw OS accent. Give a prose `<textarea>` `spellCheck`.
-- Keep shell-only code off the first load (`scripts/check-web-bundle.ts`); use `toScriptLiteral` in inline scripts.
+- Keep shell-only code off the first load (`scripts/check-web-bundle.ts`): mount it with `lazyShellChunk`
+  (`lib/native/shell-chunk.tsx`); one needed offline also goes in `OFFLINE_SHELL_CHUNKS` (`scripts/generate-sw.mjs`).
+  Use `toScriptLiteral` in inline scripts.
 
 ## CONVENTIONS
 

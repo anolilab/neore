@@ -1,5 +1,5 @@
-import type { ReactNode } from "react";
-import { Component } from "react";
+import type { ComponentType } from "react";
+import { lazy } from "react";
 
 /** How many times a failed load of a shell chunk is retried. */
 const SHELL_CHUNK_RETRIES = 3;
@@ -24,18 +24,16 @@ export const retryChunk = async <T,>(load: () => Promise<T>, retries = SHELL_CHU
     }
 };
 
-/** Renders nothing once its children throw: a shell chunk that never loads costs its listeners, not the whole app. */
-export class SilentBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
-    public static getDerivedStateFromError(): { failed: boolean } {
-        return { failed: true };
-    }
+const Nothing = (): null => null;
 
-    public override state = { failed: false };
-
-    public override render(): ReactNode {
-        const { failed } = this.state;
-        const { children } = this.props;
-
-        return failed ? null : children;
-    }
-}
+/**
+ * `lazy()` for a shell chunk: a failed load is retried, and a chunk that never loads renders nothing, so the app runs
+ * without it rather than falling to the root error boundary. No error boundary needed: the factory never rejects.
+ */
+export const lazyShellChunk = (load: () => Promise<{ default: ComponentType }>, retries?: number, baseDelay?: number): ComponentType =>
+    lazy(
+        async () =>
+            await retryChunk(load, retries, baseDelay).catch(() => {
+                return { default: Nothing };
+            }),
+    );
