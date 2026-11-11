@@ -188,7 +188,7 @@ export const runAfterWithRetry = async <A extends Record<string, unknown>>(
     delayMs: number,
     target: { __lunoraRef: string },
     args: A,
-    retry: { backoff?: "exponential" | "linear"; baseMs?: number; maxAttempts?: number; maxMs?: number },
+    retry: { backoff?: "exponential" | "linear"; baseMs?: number; forever?: boolean; maxAttempts?: number; maxMs?: number },
 ): Promise<string> =>
     await (scheduler as { runAfter: (delay: number, target: unknown, args: A, options: { retry: typeof retry }) => Promise<string> }).runAfter(
         delayMs,

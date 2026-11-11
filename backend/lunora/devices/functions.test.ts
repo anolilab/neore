@@ -39,6 +39,7 @@ const { createAcpCall } = await import("./lib/acp-call");
 const { ACP_CLAIM_WINDOW_MS, DEVICE_CLAIM_WINDOW_MS } = await import("./lib/constants");
 const { claimWindowMs, isAcpTool, OPEN_CALL_PAGE } = await import("./lib/state");
 const { isDeviceInScope } = await import("./lib/scope");
+const { PROJECT_CLEAR_BATCH } = await import("./lib/clear-projects");
 
 type Harness = ReturnType<typeof lunoraTest>;
 
@@ -1085,7 +1086,14 @@ describe("releaseDeviceCall", () => {
 });
 
 describe("revokeDevice", () => {
-    it("clears the machine and folder of the owner's projects on the device and leaves other users' projects alone", async () => {
+    const remainingOn = async (deviceId: string) =>
+        (await harness.run(
+            async (ctx: any) => (await ctx.db.projects.findMany({ limit: 1000, where: { machineId: deviceId, userId: ownerId } })).page.length,
+        )) as number;
+    // The harness does not dispatch scheduled jobs, so a test runs the clearing body with the job's own args.
+    const clearScheduled = async (args: unknown) => await harness.run(async (ctx: any) => await ctx.runMutation(internals.clearDeviceProjects, args as never));
+
+    it("clears the machine and folder of the owner's projects on the device, in a scheduled run, and leaves other users' projects alone", async () => {
         const { deviceId } = await pairedDevice(ownerId);
         const mine = await insertProject(ownerId, { machineId: deviceId, path: "/home/me/app" });
         const theirs = await insertProject(STRANGER, { machineId: deviceId, path: "/home/them/app" });
@@ -1094,12 +1102,59 @@ describe("revokeDevice", () => {
 
         await as(ownerId).mutation(functions.revokeDevice as never, { deviceId } as never);
 
+        // The revoke leaves the projects alone; only the scheduled run clears them.
+        expect(await read(mine)).toMatchObject({ machineId: deviceId, path: "/home/me/app" });
+        expect(harness.scheduler.list()).toHaveLength(1);
+
+        await clearScheduled(harness.scheduler.list()[0]?.args);
+
         const cleared = await read(mine);
 
         expect(cleared).toMatchObject({ title: "Project", userId: ownerId });
         expect(cleared.machineId).toBeUndefined();
         expect(cleared.path).toBeUndefined();
         expect(await read(theirs)).toMatchObject({ machineId: deviceId, path: "/home/them/app" });
+        expect(harness.scheduler.list()).toHaveLength(1);
+    });
+
+    it("keeps scheduling full batches until a run clears a partial one", async () => {
+        const { deviceId } = await pairedDevice(ownerId);
+
+        for (let index = 0; index < PROJECT_CLEAR_BATCH * 2 + 1; index += 1) {
+            await insertProject(ownerId, { machineId: deviceId, path: `/home/me/app-${index}` });
+        }
+
+        await as(ownerId).mutation(functions.revokeDevice as never, { deviceId } as never);
+
+        for (let run = 1; run <= 3; run += 1) {
+            await clearScheduled(harness.scheduler.list()[run - 1]?.args);
+        }
+
+        expect(await remainingOn(deviceId)).toBe(0);
+        expect(harness.scheduler.list()).toHaveLength(3);
+    });
+
+    it("clears a large set one batch per scheduled run, and a run that clears a partial batch schedules nothing", async () => {
+        const { deviceId } = await pairedDevice(ownerId);
+
+        for (let index = 0; index < PROJECT_CLEAR_BATCH + 1; index += 1) {
+            await insertProject(ownerId, { machineId: deviceId, path: `/home/me/app-${index}` });
+        }
+
+        await as(ownerId).mutation(functions.revokeDevice as never, { deviceId } as never);
+
+        expect(await remainingOn(deviceId)).toBe(PROJECT_CLEAR_BATCH + 1);
+        expect(harness.scheduler.list()).toHaveLength(1);
+
+        await clearScheduled(harness.scheduler.list()[0]?.args);
+
+        expect(await remainingOn(deviceId)).toBe(1);
+        expect(harness.scheduler.list()).toHaveLength(2);
+
+        await clearScheduled(harness.scheduler.list()[1]?.args);
+
+        expect(await remainingOn(deviceId)).toBe(0);
+        expect(harness.scheduler.list()).toHaveLength(2);
     });
 
     it("deletes the device and expires its open calls; the audit rows stay", async () => {

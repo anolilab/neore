@@ -10,6 +10,7 @@ import type { QueryCtx } from "../_generated/server";
 import { internalMutation, internalQuery } from "../_generated/server";
 import { ACP_CLEARED } from "../acp/lib/constants";
 import { HOST_DID_NOT_ANSWER, onAcpCallEnded } from "../acp/lib/calls";
+import { internal } from "../_generated/internal";
 import { isAccountDeletionUnderway } from "../gdpr/deletion-guard";
 import { threadHandoffTaint, threadSummaryTaint } from "../agent/thread-summary-taint";
 import { decryptKey } from "../lib/encryption";
@@ -28,6 +29,8 @@ import { isDeviceInScope, resolveThreadProject } from "./lib/scope";
 import { signDevicePayload, utf8Length } from "./lib/signing";
 import { assertRoomForDevice, insertDevice } from "./lib/register";
 import { mergeTaint } from "./lib/taint";
+import { CLEAR_PROJECTS_RETRY, clearProjectsBatch } from "./lib/clear-projects";
+import { runAfterWithRetry } from "../lib/shard-scheduler";
 import { countOpenCalls, isAcpTool, isDeviceOnline, isDeviceOutdated, isTerminalCallStatus, OPEN_CALL_STATUSES } from "./lib/state";
 import { vDeviceCallStatus, vDeviceManifestTool, vDevicePlatform, vDeviceTaintSource } from "./validators";
 
@@ -353,6 +356,22 @@ const assertAccountMayPair = async (ctx: QueryCtx, userId: string): Promise<void
         throw new LunoraError("FORBIDDEN", "This account is being deleted");
     }
 };
+
+/**
+ * Clears a revoked device's machine and folder from the owner's projects (scheduled by `revokeDevice`): one batch per
+ * run, and a run that cleared a full batch schedules the next. Needs no device row, which the revoke has already
+ * deleted. Running it again, or a second run for the same machine, is harmless: a run finds fewer rows or none.
+ */
+export const clearDeviceProjects = internalMutation
+    .input({ machineId: v.id("devices"), userId: v.string() })
+    .output(v.null())
+    .mutation(async ({ args, ctx }) => {
+        if (await clearProjectsBatch(ctx, args.userId, args.machineId)) {
+            await runAfterWithRetry(ctx.scheduler, 0, internal.devices.internal.clearDeviceProjects, args, CLEAR_PROJECTS_RETRY);
+        }
+
+        return null;
+    });
 
 /**
  * Before a pairing code is spent (`auth/cli-device-auth.ts`, `POST /device/host`): refuses an account that could not
