@@ -627,6 +627,12 @@ export interface ApiTypes {
             updatePageGrant: FunctionReference<"mutation", { pageId: Id<"pages">; permission: "read" | "comment" | "write" | "admin"; targetUserId: string }, null>;
         };
     };
+    plugins: {
+        install_action: {
+            installPlugin: FunctionReference<"action", { contentHash: string; markdown: string }, { installId: string; items: Array<{ id: string; key: string; kind: "skill" | "trigger" | "group"; title: string }> }>;
+            previewPlugin: FunctionReference<"action", { markdown: string }, { contentHash: string; items: Array<{ key: string; kind: "skill" | "trigger" | "group"; title: string; warnings: Array<string> }>; name: string; pluginSlug: string; pluginVersion: string }>;
+        };
+    };
     projects: {
         functions: {
             addProjectRepo: FunctionReference<"mutation", { defaultBranch?: string; projectId: Id<"projects">; url: string }, string>;
@@ -1541,6 +1547,12 @@ export const api: ApiTypes = {
             revokePageInvite: { __lunoraRef: "pages_sharing:revokePageInvite" },
             setPagePublic: { __lunoraRef: "pages_sharing:setPagePublic" },
             updatePageGrant: { __lunoraRef: "pages_sharing:updatePageGrant" },
+        },
+    },
+    plugins: {
+        install_action: {
+            installPlugin: { __lunoraRef: "plugins_install_action:installPlugin" },
+            previewPlugin: { __lunoraRef: "plugins_install_action:previewPlugin" },
         },
     },
     projects: {

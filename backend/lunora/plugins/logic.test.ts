@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
     actionsFor,
+    bodyHash,
     canonicalJson,
     compareVersions,
     contentHash,
@@ -190,5 +191,18 @@ describe("isCompletePluginExport", () => {
         expect(isCompletePluginExport({ status: "installed" }, [{ ...created("s1"), state: "detached" }, other], selected)).toBe(false);
         expect(isCompletePluginExport({ status: "installed" }, [{ ...created("s1"), pendingHash: "h2" }, other], selected)).toBe(false);
         expect(isCompletePluginExport({ status: "installed" }, [{ ...created("s1"), currentHash: "edited" }, other], selected)).toBe(false);
+    });
+});
+
+describe("bodyHash", () => {
+    const file = (header: string, body: string) => `---\n${header}\n---\n${body}`;
+
+    it("ignores the header, so the header can carry the hash", async () => {
+        expect(await bodyHash(file("contentHash: aaa", "item"))).toBe(await bodyHash(file("contentHash: bbb", "item")));
+    });
+
+    it("changes when the body changes, and treats CRLF and LF the same", async () => {
+        expect(await bodyHash(file("h", "item one"))).not.toBe(await bodyHash(file("h", "item two")));
+        expect(await bodyHash(file("h", "a\r\nb"))).toBe(await bodyHash(file("h", "a\nb")));
     });
 });

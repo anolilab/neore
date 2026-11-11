@@ -41280,6 +41280,243 @@
         "x-lunora-function-kind": "mutation"
       }
     },
+    "/_lunora/rpc#plugins_install_action:installPlugin": {
+      "post": {
+        "description": "Invoke the `action` `plugins_install_action:installPlugin` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "plugins_install_action:installPlugin",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "contentHash": {
+                        "type": "string"
+                      },
+                      "markdown": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "contentHash",
+                      "markdown"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "plugins_install_action:installPlugin",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "installId": {
+                      "type": "string"
+                    },
+                    "items": {
+                      "items": {
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "key": {
+                            "type": "string"
+                          },
+                          "kind": {
+                            "anyOf": [
+                              {
+                                "const": "skill",
+                                "type": "string"
+                              },
+                              {
+                                "const": "trigger",
+                                "type": "string"
+                              },
+                              {
+                                "const": "group",
+                                "type": "string"
+                              }
+                            ]
+                          },
+                          "title": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "key",
+                          "kind",
+                          "title"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    }
+                  },
+                  "required": [
+                    "installId",
+                    "items"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "action: plugins_install_action:installPlugin",
+        "tags": [
+          "plugins"
+        ],
+        "x-lunora-function-kind": "action"
+      }
+    },
+    "/_lunora/rpc#plugins_install_action:previewPlugin": {
+      "post": {
+        "description": "Invoke the `action` `plugins_install_action:previewPlugin` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "plugins_install_action:previewPlugin",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "markdown": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "markdown"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "plugins_install_action:previewPlugin",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "contentHash": {
+                      "type": "string"
+                    },
+                    "items": {
+                      "items": {
+                        "properties": {
+                          "key": {
+                            "type": "string"
+                          },
+                          "kind": {
+                            "anyOf": [
+                              {
+                                "const": "skill",
+                                "type": "string"
+                              },
+                              {
+                                "const": "trigger",
+                                "type": "string"
+                              },
+                              {
+                                "const": "group",
+                                "type": "string"
+                              }
+                            ]
+                          },
+                          "title": {
+                            "type": "string"
+                          },
+                          "warnings": {
+                            "items": {
+                              "type": "string"
+                            },
+                            "type": "array"
+                          }
+                        },
+                        "required": [
+                          "key",
+                          "kind",
+                          "title",
+                          "warnings"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "pluginSlug": {
+                      "type": "string"
+                    },
+                    "pluginVersion": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "contentHash",
+                    "items",
+                    "name",
+                    "pluginSlug",
+                    "pluginVersion"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "action: plugins_install_action:previewPlugin",
+        "tags": [
+          "plugins"
+        ],
+        "x-lunora-function-kind": "action"
+      }
+    },
     "/_lunora/rpc#projects_functions:addProjectRepo": {
       "post": {
         "description": "Invoke the `mutation` `projects_functions:addProjectRepo` over the Lunora RPC envelope (POST /_lunora/rpc).",
@@ -63242,6 +63479,10 @@
     {
       "description": "Collaborative pages: content, versions, comments, presence, access grants and public sharing.",
       "name": "pages"
+    },
+    {
+      "description": "Plugins: versioned installs of skills, triggers and group chats, with their children tracked by install.",
+      "name": "plugins"
     },
     {
       "description": "Projects that group threads, with their knowledge and settings.",

@@ -86,6 +86,15 @@ export const canonicalJson = (value: unknown): string => {
     return JSON.stringify(value);
 };
 
+/** The frontmatter block at the top of a bundle file: the header, which is not part of the hashed content. */
+const FRONTMATTER_RE = /^---\r?\n[\s\S]*?\r?\n---\r?\n?/u;
+
+/**
+ * The content hash of a plugin file: SHA-256 of its body, with the header removed and line endings normalised.
+ * The header carries this hash, so the hash cannot cover the header. Any change to an item changes it.
+ */
+export const bodyHash = async (markdown: string): Promise<string> => await sha256Hex(markdown.replace(FRONTMATTER_RE, "").replaceAll("\r\n", "\n"));
+
 /** The content hash of one plugin entry, over its canonical fields. Any change to the instruction, schedule or name changes it. */
 export const contentHash = async (content: unknown): Promise<string> => await sha256Hex(canonicalJson(content));
 
