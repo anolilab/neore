@@ -65,14 +65,29 @@ export const LockedChatGate = ({ children, lockedExtras, threadId }: { children:
     const relockedAndPending = proof === undefined && relocked && !isSuccess && !error;
 
     // The chat's composer never mounts while the gate holds, so its draft stored before the lock is removed from here.
+    // A chunk that loads after the chat unlocked does nothing: the unlocked composer may already be storing its draft.
     useEffect(() => {
-        if (refused) {
-            void import("@/features/chat/split/stored-drafts")
-                .then(({ lockStoredDraft }) => lockStoredDraft(threadId))
-                .catch(() => {
-                    // The chunk did not load: the chat's composer removes it once it mounts.
-                });
+        if (!refused) {
+            return undefined;
         }
+
+        let current = true;
+
+        void import("@/features/chat/split/stored-drafts")
+            .then(({ lockStoredDraft }) => {
+                if (current) {
+                    lockStoredDraft(threadId);
+                }
+
+                return undefined;
+            })
+            .catch(() => {
+                // The chunk did not load: the chat's composer removes it once it mounts.
+            });
+
+        return () => {
+            current = false;
+        };
     }, [refused, threadId]);
 
     if (!refused && !relockedAndPending) {

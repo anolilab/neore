@@ -3,26 +3,39 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { PendingAttachment } from "@/features/chat/core/stores/chat-ui-store";
 import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
 
-import { clearComposerDrafts, DRAFTS_STORAGE_KEY, dropStoredDrafts, saveComposerDraft } from "./composer-drafts";
+import { clearComposerDrafts, draftOwnership, dropStoredDrafts, saveComposerDraft, setSplitViewMounted } from "./composer-drafts";
+import { restoreLiveComposerFor, watchPaneFocus } from "./pane-state";
+import { initialSplitLayout, splitLayoutReducer } from "./split-layout";
+import { useSplitLayoutStore } from "./split-layout-store";
 import {
     bindStoredDrafts,
     DRAFT_TTL_MS,
     DRAFT_WRITE_DELAY_MS,
+    draftKey,
     flushStoredDrafts,
+    LEGACY_DRAFTS_KEY,
     lockStoredDraft,
     MAX_STORED_DRAFTS,
-    readStoredDrafts,
     resetStoredDraftsForTests,
 } from "./stored-drafts";
 
-const stored = (): { d: Record<string, { a?: unknown[]; at: number; r?: unknown[]; t: string }>; u: string } | null => {
-    const raw = localStorage.getItem(DRAFTS_STORAGE_KEY);
+const entry = (owner: string, userId = "user-1"): { t: number; v: { a?: unknown[]; r?: unknown[]; t: string }; w: string } | undefined => {
+    const raw = localStorage.getItem(draftKey(userId, owner));
 
-    return raw === null ? null : JSON.parse(raw);
+    return raw === null ? undefined : JSON.parse(raw);
 };
 
-const type = (text: string): void => {
-    useChatUIStore.getState().setComposerText(text);
+const text = (owner: string, userId = "user-1"): string | undefined => entry(owner, userId)?.v.t;
+
+/** Another tab's (or a previous page load's) entry. */
+const put = (owner: string, t: string, { at = Date.now(), userId = "user-1", w = "other" }: { at?: number; userId?: string; w?: string } = {}): void => {
+    localStorage.setItem(draftKey(userId, owner), JSON.stringify({ t: at, v: { t }, w }));
+};
+
+const draftKeys = (): string[] => Object.keys(localStorage).filter((key) => key.startsWith("neore-draft:"));
+
+const type = (value: string): void => {
+    useChatUIStore.getState().setComposerText(value);
 };
 
 const uploaded: PendingAttachment = {
@@ -41,6 +54,7 @@ beforeEach(() => {
     localStorage.clear();
     resetStoredDraftsForTests();
     clearComposerDrafts();
+    draftOwnership.prefill = undefined;
     useChatUIStore.getState().clearComposer();
 });
 
@@ -65,7 +79,20 @@ describe("writing", () => {
         vi.advanceTimersByTime(1);
 
         expect(setItem).toHaveBeenCalledTimes(1);
-        expect(stored()?.d["thread-a"]?.t).toBe("he");
+        expect(text("thread-a")).toBe("he");
+    });
+
+    it("writes only the entries of drafts that changed here", () => {
+        bindStoredDrafts("thread-a", "user-1", false);
+        type("mine");
+        saveComposerDraft("thread-b", { composerText: "parked" });
+        flushStoredDrafts();
+        const setItem = vi.spyOn(Storage.prototype, "setItem");
+
+        type("mine, edited");
+        flushStoredDrafts();
+
+        expect(setItem.mock.calls.map(([key]) => key)).toStrictEqual([draftKey("user-1", "thread-a")]);
     });
 
     it("writes a pending draft at once when the page is hidden or left", () => {
@@ -74,12 +101,12 @@ describe("writing", () => {
         Object.defineProperty(document, "visibilityState", { configurable: true, value: "hidden" });
         document.dispatchEvent(new Event("visibilitychange"));
 
-        expect(stored()?.d["thread-a"]?.t).toBe("leaving");
+        expect(text("thread-a")).toBe("leaving");
 
         type("leaving now");
         globalThis.dispatchEvent(new Event("pagehide"));
 
-        expect(stored()?.d["thread-a"]?.t).toBe("leaving now");
+        expect(text("thread-a")).toBe("leaving now");
     });
 
     it("keeps an uploaded attachment by file id and drops one still uploading", () => {
@@ -87,43 +114,44 @@ describe("writing", () => {
         useChatUIStore.setState({ composerAttachments: [uploaded, { ...uploaded, fileId: undefined, id: "attachment-2", status: "uploading" }] });
         flushStoredDrafts();
 
-        expect(stored()?.d["thread-a"]?.a).toStrictEqual([{ fileId: "file-1", kind: "document", mediaType: "application/pdf", name: "notes.pdf", size: 5 }]);
+        expect(entry("thread-a")?.v.a).toStrictEqual([{ fileId: "file-1", kind: "document", mediaType: "application/pdf", name: "notes.pdf", size: 5 }]);
     });
 
-    it("keeps no draft of a locked chat, and removes the one it had", () => {
-        bindStoredDrafts("thread-a", "user-1", false);
-        type("secret");
-        flushStoredDrafts();
-        bindStoredDrafts("thread-a", "user-1", true);
-        flushStoredDrafts();
-
-        expect(stored()).toBeNull();
-    });
-
-    it("removes the draft of a chat seen locked at once, not after the delay", () => {
+    it("removes the draft of a chat seen locked at once, and keeps none for it", () => {
         bindStoredDrafts("thread-a", "user-1", false);
         type("secret");
         flushStoredDrafts();
         bindStoredDrafts("thread-a", "user-1", true);
 
-        expect(stored()).toBeNull();
+        expect(draftKeys()).toStrictEqual([]);
+
+        flushStoredDrafts();
+
+        expect(draftKeys()).toStrictEqual([]);
     });
 
-    it("removes the draft of a chat the lock gate keeps closed, and stores none for it", () => {
-        localStorage.setItem(
-            DRAFTS_STORAGE_KEY,
-            JSON.stringify({ d: { "thread-a": { at: Date.now(), t: "secret" }, "thread-b": { at: Date.now(), t: "other" } }, u: "user-1" }),
-        );
+    it("removes the draft of a chat the lock gate keeps closed, from any account, and stores none for it", () => {
+        put("thread-a", "secret");
+        put("thread-a", "secret too", { userId: "user-2" });
+        put("thread-b", "other");
         lockStoredDraft("thread-a");
 
-        expect(readStoredDrafts("user-1").has("thread-a")).toBe(false);
-        expect(readStoredDrafts("user-1").get("thread-b")?.t).toBe("other");
+        expect(draftKeys()).toStrictEqual([draftKey("user-1", "thread-b")]);
 
         bindStoredDrafts("thread-b", "user-1", false);
         saveComposerDraft("thread-a", { composerText: "parked secret" });
         flushStoredDrafts();
 
-        expect(readStoredDrafts("user-1").has("thread-a")).toBe(false);
+        expect(text("thread-a")).toBeUndefined();
+    });
+
+    it("stores a chat's draft again once it binds unlocked", () => {
+        lockStoredDraft("thread-a");
+        bindStoredDrafts("thread-a", "user-1", false);
+        type("unlocked now");
+        flushStoredDrafts();
+
+        expect(text("thread-a")).toBe("unlocked now");
     });
 
     it("writes a parked draft again when its upload finishes", () => {
@@ -131,20 +159,12 @@ describe("writing", () => {
         saveComposerDraft("thread-a", { composerAttachments: [{ ...uploaded, fileId: undefined, status: "uploading" }] });
         vi.advanceTimersByTime(DRAFT_WRITE_DELAY_MS);
 
-        expect(stored()).toBeNull();
+        expect(text("thread-a")).toBeUndefined();
 
         useChatUIStore.getState().updateAttachment("attachment-1", { fileId: "file-1", status: "complete" });
         vi.advanceTimersByTime(DRAFT_WRITE_DELAY_MS);
 
-        expect(stored()?.d["thread-a"]?.a).toHaveLength(1);
-    });
-
-    it("keeps a draft parked in split view under its chat", () => {
-        bindStoredDrafts("thread-b", "user-1", false);
-        saveComposerDraft("thread-a", { composerText: "parked" });
-        flushStoredDrafts();
-
-        expect(stored()?.d["thread-a"]?.t).toBe("parked");
+        expect(entry("thread-a")?.v.a).toHaveLength(1);
     });
 });
 
@@ -156,58 +176,67 @@ describe("sending", () => {
         useChatUIStore.getState().clearComposer();
         vi.advanceTimersByTime(DRAFT_WRITE_DELAY_MS);
 
-        expect(stored()).toBeNull();
+        expect(draftKeys()).toStrictEqual([]);
     });
 
     it("leaves drafts this page never wrote alone", () => {
-        localStorage.setItem(DRAFTS_STORAGE_KEY, JSON.stringify({ d: { "thread-x": { at: Date.now(), t: "other tab" } }, u: "user-1" }));
+        put("thread-x", "other tab");
         bindStoredDrafts("thread-a", "user-1", false);
         type("mine");
         flushStoredDrafts();
         useChatUIStore.getState().clearComposer();
         flushStoredDrafts();
 
-        expect(stored()?.d).toStrictEqual({ "thread-x": { a: [], at: expect.any(Number), r: [], t: "other tab" } });
+        expect(draftKeys()).toStrictEqual([draftKey("user-1", "thread-x")]);
     });
 });
 
 describe("other tabs", () => {
-    const otherTabWrites = (text: string): void => {
-        localStorage.setItem(DRAFTS_STORAGE_KEY, JSON.stringify({ d: { "thread-a": { at: Date.now() + 1, t: text } }, u: "user-1" }));
-    };
+    it("never rewrites another tab's entry of a different chat (no read-modify-write of a shared record)", () => {
+        bindStoredDrafts("thread-a", "user-1", false);
+        type("tab one");
+        flushStoredDrafts();
+        // The other tab wrote thread-b after this tab last read anything: a shared record rewritten from that read would lose it.
+        put("thread-b", "tab two");
+        type("tab one, edited");
+        flushStoredDrafts();
+
+        expect(text("thread-a")).toBe("tab one, edited");
+        expect(text("thread-b")).toBe("tab two");
+    });
 
     it("does not overwrite another tab's newer draft of the same chat with an unchanged copy", () => {
         bindStoredDrafts("thread-a", "user-1", false);
         type("tab one");
         flushStoredDrafts();
-        otherTabWrites("tab two");
+        put("thread-a", "tab two");
         saveComposerDraft("thread-b", { composerText: "another chat" });
         flushStoredDrafts();
 
-        expect(stored()?.d["thread-a"]?.t).toBe("tab two");
-        expect(stored()?.d["thread-b"]?.t).toBe("another chat");
+        expect(text("thread-a")).toBe("tab two");
+        expect(text("thread-b")).toBe("another chat");
 
         type("tab one, edited");
         flushStoredDrafts();
 
-        expect(stored()?.d["thread-a"]?.t).toBe("tab one, edited");
+        expect(text("thread-a")).toBe("tab one, edited");
     });
 
-    it("does not remove another tab's newer draft when this tab's copy is sent", () => {
+    it("does not remove another tab's draft of the same chat written in the same millisecond", () => {
         bindStoredDrafts("thread-a", "user-1", false);
         type("tab one");
         flushStoredDrafts();
-        otherTabWrites("tab two");
+        put("thread-a", "tab two", { at: entry("thread-a")?.t });
         useChatUIStore.getState().clearComposer();
         flushStoredDrafts();
 
-        expect(stored()?.d["thread-a"]?.t).toBe("tab two");
+        expect(text("thread-a")).toBe("tab two");
     });
 });
 
 describe("restoring", () => {
     it("removes a restored draft that is sent before the first write", () => {
-        localStorage.setItem(DRAFTS_STORAGE_KEY, JSON.stringify({ d: { "thread-a": { at: Date.now(), t: "restored" } }, u: "user-1" }));
+        put("thread-a", "restored");
         bindStoredDrafts("thread-a", "user-1", false);
 
         expect(useChatUIStore.getState().composerText).toBe("restored");
@@ -215,15 +244,16 @@ describe("restoring", () => {
         useChatUIStore.getState().clearComposer();
         vi.advanceTimersByTime(DRAFT_WRITE_DELAY_MS);
 
-        expect(stored()).toBeNull();
+        expect(draftKeys()).toStrictEqual([]);
     });
 
     it("fills an empty composer with the chat's draft and its uploaded attachments", () => {
         localStorage.setItem(
-            DRAFTS_STORAGE_KEY,
+            draftKey("user-1", "thread-a"),
             JSON.stringify({
-                d: { "thread-a": { a: [{ fileId: "file-1", kind: "image", mediaType: "image/png", name: "a.png", size: 3 }], at: Date.now(), t: "draft" } },
-                u: "user-1",
+                t: Date.now(),
+                v: { a: [{ fileId: "file-1", kind: "image", mediaType: "image/png", name: "a.png", size: 3 }], t: "draft" },
+                w: "x",
             }),
         );
         bindStoredDrafts("thread-a", "user-1", false);
@@ -235,40 +265,61 @@ describe("restoring", () => {
     });
 
     it("never replaces text being typed", () => {
-        localStorage.setItem(DRAFTS_STORAGE_KEY, JSON.stringify({ d: { "thread-a": { at: Date.now(), t: "old draft" } }, u: "user-1" }));
+        put("thread-a", "old draft");
         type("typing");
         bindStoredDrafts("thread-a", "user-1", false);
 
         expect(useChatUIStore.getState().composerText).toBe("typing");
     });
 
-    it("drops drafts older than the TTL", () => {
-        localStorage.setItem(DRAFTS_STORAGE_KEY, JSON.stringify({ d: { "thread-a": { at: Date.now() - DRAFT_TTL_MS - 1, t: "stale" } }, u: "user-1" }));
+    it("deletes drafts older than the TTL from storage on the next write, not only ignores them", () => {
+        put("thread-a", "stale", { at: Date.now() - DRAFT_TTL_MS - 1 });
         bindStoredDrafts("thread-a", "user-1", false);
 
         expect(useChatUIStore.getState().composerText).toBe("");
+
+        saveComposerDraft("thread-b", { composerText: "fresh" });
+        flushStoredDrafts();
+
+        expect(draftKeys()).toStrictEqual([draftKey("user-1", "thread-b")]);
     });
 
-    it("keeps only the most recent drafts", () => {
+    it("keeps only each account's most recent drafts", () => {
         const now = Date.now();
-        const d = Object.fromEntries(Array.from({ length: MAX_STORED_DRAFTS }, (_, index) => [`thread-${String(index)}`, { at: now - 1000 - index, t: "x" }]));
 
-        localStorage.setItem(DRAFTS_STORAGE_KEY, JSON.stringify({ d, u: "user-1" }));
+        for (let index = 0; index < MAX_STORED_DRAFTS; index += 1) {
+            put(`thread-${String(index)}`, "x", { at: now - 1000 - index });
+        }
+
+        put("thread-0", "y", { userId: "user-2" });
         bindStoredDrafts("thread-new", "user-1", false);
         type("newest");
         flushStoredDrafts();
 
-        const kept = [...readStoredDrafts("user-1").keys()];
+        const kept = draftKeys();
 
-        expect(kept).toHaveLength(MAX_STORED_DRAFTS);
-        expect(kept).toContain("thread-new");
-        expect(kept).not.toContain(`thread-${String(MAX_STORED_DRAFTS - 1)}`);
+        expect(kept.filter((key) => key.startsWith("neore-draft:user-1:"))).toHaveLength(MAX_STORED_DRAFTS);
+        expect(kept).toContain(draftKey("user-1", "thread-new"));
+        expect(kept).toContain(draftKey("user-2", "thread-0"));
+        expect(kept).not.toContain(draftKey("user-1", `thread-${String(MAX_STORED_DRAFTS - 1)}`));
+    });
+});
+
+describe("loading", () => {
+    it("removes expired entries and the old single record on its first use after a load, with no write", () => {
+        put("thread-a", "stale", { at: Date.now() - DRAFT_TTL_MS - 1, userId: "user-2" });
+        put("thread-b", "fresh");
+        localStorage.setItem(LEGACY_DRAFTS_KEY, JSON.stringify({ d: { "thread-c": { at: Date.now(), t: "old" } }, u: "user-1" }));
+        bindStoredDrafts("thread-z", "user-1", false);
+
+        expect(draftKeys()).toStrictEqual([draftKey("user-1", "thread-b")]);
+        expect(localStorage.getItem(LEGACY_DRAFTS_KEY)).toBeNull();
     });
 });
 
 describe("accounts", () => {
-    it("never restores another account's drafts, and replaces them on the next write", () => {
-        localStorage.setItem(DRAFTS_STORAGE_KEY, JSON.stringify({ d: { "thread-a": { at: Date.now(), t: "theirs" } }, u: "user-1" }));
+    it("never restores another account's drafts, nor touches them on a write", () => {
+        put("thread-a", "theirs");
         bindStoredDrafts("thread-a", "user-2", false);
 
         expect(useChatUIStore.getState().composerText).toBe("");
@@ -276,46 +327,37 @@ describe("accounts", () => {
         type("mine");
         flushStoredDrafts();
 
-        expect(stored()).toStrictEqual({ d: { "thread-a": expect.objectContaining({ t: "mine" }) }, u: "user-2" });
+        expect(text("thread-a", "user-2")).toBe("mine");
+        expect(text("thread-a")).toBe("theirs");
     });
 
-    it("removes the drafts on sign-out, and a write pending from before does not bring them back", () => {
+    it("removes only the departing account's drafts on sign-out, and a write pending from before does not bring them back", () => {
+        put("thread-z", "other account", { userId: "user-2" });
         bindStoredDrafts("thread-a", "user-1", false);
         type("before sign-out");
         flushStoredDrafts();
         type("still pending");
-        dropStoredDrafts();
+        dropStoredDrafts("user-1");
         globalThis.dispatchEvent(new Event("pagehide"));
         vi.advanceTimersByTime(DRAFT_WRITE_DELAY_MS);
 
-        expect(stored()).toBeNull();
-    });
-
-    it("removes them when the session's parked state is cleared (account switch)", () => {
-        bindStoredDrafts("thread-a", "user-1", false);
-        type("old account");
-        flushStoredDrafts();
-        clearComposerDrafts();
-        vi.advanceTimersByTime(DRAFT_WRITE_DELAY_MS);
-        globalThis.dispatchEvent(new Event("pagehide"));
-
-        expect(stored()).toBeNull();
+        expect(draftKeys()).toStrictEqual([draftKey("user-2", "thread-z")]);
     });
 
     it("does not store the previous account's text under the next one", () => {
         bindStoredDrafts("thread-a", "user-1", false);
         type("user one's text");
         flushStoredDrafts();
-        clearComposerDrafts();
+        clearComposerDrafts("user-1");
         bindStoredDrafts("new", "user-2", false);
         vi.advanceTimersByTime(DRAFT_WRITE_DELAY_MS);
 
-        expect(stored()).toBeNull();
+        expect(draftKeys()).toStrictEqual([]);
 
         type("user two's text");
         vi.advanceTimersByTime(DRAFT_WRITE_DELAY_MS);
 
-        expect(stored()).toStrictEqual({ d: { new: expect.objectContaining({ t: "user two's text" }) }, u: "user-2" });
+        expect(draftKeys()).toStrictEqual([draftKey("user-2", "new")]);
     });
 });
 
@@ -324,16 +366,16 @@ describe("after a clear", () => {
         bindStoredDrafts("thread-a", "user-1", false);
         type("before");
         flushStoredDrafts();
-        dropStoredDrafts();
+        dropStoredDrafts("user-1");
         bindStoredDrafts("thread-a", "user-1", false);
         vi.advanceTimersByTime(DRAFT_WRITE_DELAY_MS);
 
-        expect(stored()).toBeNull();
+        expect(draftKeys()).toStrictEqual([]);
 
         type("after");
         vi.advanceTimersByTime(DRAFT_WRITE_DELAY_MS);
 
-        expect(stored()?.d["thread-a"]?.t).toBe("after");
+        expect(text("thread-a")).toBe("after");
     });
 
     it("does not store the previous account's text when its upload finishes under the next one", () => {
@@ -341,13 +383,53 @@ describe("after a clear", () => {
         type("user one's text");
         useChatUIStore.setState({ composerAttachments: [{ ...uploaded, fileId: undefined, status: "uploading" }] });
         flushStoredDrafts();
-        clearComposerDrafts();
+        clearComposerDrafts("user-1");
         bindStoredDrafts("new", "user-2", false);
         vi.advanceTimersByTime(DRAFT_WRITE_DELAY_MS);
         useChatUIStore.getState().updateAttachment("attachment-1", { fileId: "file-1", status: "complete" });
         vi.advanceTimersByTime(DRAFT_WRITE_DELAY_MS);
 
-        expect(stored()).toBeNull();
+        expect(draftKeys()).toStrictEqual([]);
+    });
+});
+
+describe("a prefilled message", () => {
+    const prefill = (value: string): void => {
+        draftOwnership.prefill = value;
+        type(value);
+    };
+
+    it("is not stored over the chat's saved draft, which comes back once the prefill is sent", () => {
+        put("thread-a", "saved draft");
+        prefill("from the link");
+        bindStoredDrafts("thread-a", "user-1", false);
+        vi.advanceTimersByTime(DRAFT_WRITE_DELAY_MS);
+
+        expect(useChatUIStore.getState().composerText).toBe("from the link");
+        expect(text("thread-a")).toBe("saved draft");
+
+        useChatUIStore.getState().clearComposer();
+
+        expect(useChatUIStore.getState().composerText).toBe("saved draft");
+
+        vi.advanceTimersByTime(DRAFT_WRITE_DELAY_MS);
+
+        expect(text("thread-a")).toBe("saved draft");
+    });
+
+    it("is stored once edited", () => {
+        put("thread-a", "saved draft");
+        bindStoredDrafts("thread-a", "user-1", false);
+        useChatUIStore.getState().clearComposer();
+        prefill("from the link");
+        vi.advanceTimersByTime(DRAFT_WRITE_DELAY_MS);
+
+        expect(text("thread-a")).toBe("saved draft");
+
+        type("from the link, edited");
+        vi.advanceTimersByTime(DRAFT_WRITE_DELAY_MS);
+
+        expect(text("thread-a")).toBe("from the link, edited");
     });
 });
 
@@ -367,7 +449,7 @@ describe("storage that fails", () => {
             bindStoredDrafts("thread-a", "user-1", false);
             type("still typing");
             vi.advanceTimersByTime(DRAFT_WRITE_DELAY_MS);
-            dropStoredDrafts();
+            dropStoredDrafts("user-1");
         }).not.toThrow();
         expect(useChatUIStore.getState().composerText).toBe("still typing");
     });
@@ -389,7 +471,7 @@ describe("storage that fails", () => {
         type("second");
         flushStoredDrafts();
 
-        expect(readStoredDrafts("user-1").get("thread-a")).toBeUndefined();
+        expect(text("thread-a")).toBeUndefined();
     });
 });
 
@@ -405,35 +487,23 @@ describe("moving between chats", () => {
         expect(useChatUIStore.getState().composerText).toBe("");
     });
 
-    it("keeps the draft of a pane that lost focus while the next pane's composer mounts", () => {
-        bindStoredDrafts("thread-a", "user-1", false);
-        type("pane a");
-        saveComposerDraft("thread-a", { composerText: "pane a" });
-        useChatUIStore.getState().clearComposer();
-        flushStoredDrafts();
-
-        expect(stored()?.d["thread-a"]?.t).toBe("pane a");
-    });
-
     it("keeps both chats' drafts when the text only came along to the next chat", () => {
-        localStorage.setItem(
-            DRAFTS_STORAGE_KEY,
-            JSON.stringify({ d: { "thread-a": { at: Date.now(), t: "x" }, "thread-b": { at: Date.now(), t: "y" } }, u: "user-1" }),
-        );
+        put("thread-a", "x");
+        put("thread-b", "y");
         bindStoredDrafts("thread-a", "user-1", false);
         bindStoredDrafts("thread-b", "user-1", false);
         bindStoredDrafts("thread-c", "user-1", false);
         vi.advanceTimersByTime(DRAFT_WRITE_DELAY_MS);
 
-        expect(readStoredDrafts("user-1").get("thread-a")?.t).toBe("x");
-        expect(readStoredDrafts("user-1").get("thread-b")?.t).toBe("y");
-        expect(readStoredDrafts("user-1").has("thread-c")).toBe(false);
+        expect(text("thread-a")).toBe("x");
+        expect(text("thread-b")).toBe("y");
+        expect(text("thread-c")).toBeUndefined();
 
         type("x edited in c");
         vi.advanceTimersByTime(DRAFT_WRITE_DELAY_MS);
 
-        expect(readStoredDrafts("user-1").get("thread-c")?.t).toBe("x edited in c");
-        expect(readStoredDrafts("user-1").has("thread-a")).toBe(false);
+        expect(text("thread-c")).toBe("x edited in c");
+        expect(text("thread-a")).toBeUndefined();
     });
 
     it("does not store a locked chat's text under the chat it came along to", () => {
@@ -442,6 +512,42 @@ describe("moving between chats", () => {
         bindStoredDrafts("thread-b", "user-1", false);
         vi.advanceTimersByTime(DRAFT_WRITE_DELAY_MS);
 
-        expect(stored()).toBeNull();
+        expect(draftKeys()).toStrictEqual([]);
+    });
+});
+
+describe("switching split panes", () => {
+    const watcher: { stop?: () => void } = {};
+
+    beforeEach(() => {
+        let layout = initialSplitLayout();
+
+        layout = splitLayoutReducer(layout, { threadId: "thread-a", type: "open" });
+        layout = splitLayoutReducer(layout, { threadId: "thread-b", type: "open" });
+        layout = splitLayoutReducer(layout, { index: 0, type: "focus" });
+        useSplitLayoutStore.setState({ layout });
+        setSplitViewMounted(true);
+        watcher.stop = watchPaneFocus();
+    });
+
+    afterEach(() => {
+        watcher.stop?.();
+        setSplitViewMounted(false);
+        useSplitLayoutStore.setState({ layout: initialSplitLayout() });
+    });
+
+    it("stores each pane's text under its own chat right after the switch, before any timer runs", () => {
+        bindStoredDrafts("thread-a", "user-1", false);
+        type("pane a");
+        saveComposerDraft("thread-b", { composerText: "pane b" });
+        flushStoredDrafts();
+
+        useSplitLayoutStore.getState().dispatch({ index: 1, type: "focus" });
+        // The split view's parent effect brings the incoming pane's draft back, then its composer binds.
+        restoreLiveComposerFor("thread-b");
+        bindStoredDrafts("thread-b", "user-1", false);
+
+        expect(text("thread-a")).toBe("pane a");
+        expect(text("thread-b")).toBe("pane b");
     });
 });

@@ -1,6 +1,8 @@
 import { useEffect } from "react";
 
-import { draftGeneration } from "./composer-drafts";
+import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
+
+import { draftGeneration, draftOwnership, hasDraftContent } from "./composer-drafts";
 
 /**
  * Whether the chat's draft is the shared composer's, so it can be stored: not a worker's (its own composer) nor a host-run chat's
@@ -22,6 +24,14 @@ const useStoredDrafts = (owner: string, userId: string | undefined, locked: bool
         if (!userId) {
             return undefined;
         }
+
+        // Now, not once the chunk loads: text typed before then is this chat's even if the chat changes meanwhile. Only an empty
+        // composer changes hands.
+        if (!draftOwnership.first || !hasDraftContent(useChatUIStore.getState())) {
+            draftOwnership.first = { generation: draftGeneration(), owner, userId };
+        }
+
+        draftOwnership.account = userId;
 
         // The chunk may load after the chat changed or the drafts were dropped (sign-out): then this binding is stale.
         let current = true;

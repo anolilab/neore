@@ -7,6 +7,7 @@ import { useUIStateStore } from "@/features/layout/stores/ui-state-store";
 
 import type { ComposerDraft } from "./composer-drafts";
 import {
+    draftOwnership,
     hasDraftContent,
     peekComposerDraft,
     peekParkedModelState,
@@ -270,6 +271,8 @@ export const watchPaneFocus = (): (() => void) =>
             focusEpoch.count += 1;
             parkModelState(before);
             parkLiveComposer(before);
+            // Stored now, while the composer is empty: once the incoming pane's draft is back in it, it is that pane's.
+            draftOwnership.handOver?.(after);
             // The outgoing chat's comparison is not the incoming one's: its own parent turns comparison back on when it has focus.
             useModelStore.setState({ comparisonMode: false, selectedModelsForComparison: [] });
         }

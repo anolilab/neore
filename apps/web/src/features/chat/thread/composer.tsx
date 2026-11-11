@@ -54,6 +54,7 @@ import { getValidThreadId } from "@/features/chat/core/utils/thread-id";
 import ComposerGoal from "@/features/chat/goal/composer-goal";
 import HostComposer from "@/features/chat/host/host-composer";
 import PromptImprovementPanel from "@/features/chat/prompt-improvement/components/prompt-improvement-panel";
+import { draftOwnership } from "@/features/chat/split/composer-drafts";
 import { restoreLiveComposerFor } from "@/features/chat/split/pane-state";
 import ConnectionBanner from "@/features/connection/components/connection-banner";
 import useFeatureFlaggedModels from "@/hooks/use-feature-flagged-models";
@@ -589,6 +590,8 @@ const Composer: FC<ComposerProps> = ({
             const key = `${threadId ?? ""}\n${initialMessage}`;
 
             if (!splitPane || ui.appliedInitialMessageKey !== key) {
+                // Untouched, it is not stored over the chat's saved draft (`stored-drafts.ts`).
+                draftOwnership.prefill = initialMessage;
                 ui.setComposerText(initialMessage);
             }
 

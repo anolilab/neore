@@ -10,9 +10,13 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { DRAFTS_STORAGE_KEY } from "@/features/chat/split/composer-drafts";
-
 import { LockedChatGate } from "./locked-chat-gate";
+
+const draft = (threadId: string, text: string): void => {
+    localStorage.setItem(`neore-draft:user-1:${threadId}`, JSON.stringify({ t: Date.now(), v: { t: text }, w: "w" }));
+};
+
+const draftKeys = (): string[] => Object.keys(localStorage).filter((key) => key.startsWith("neore-draft:"));
 
 const harness = vi.hoisted(() => {
     // `validProof` is the passcode epoch: null accepts any proof, a string accepts only that one.
@@ -101,19 +105,43 @@ beforeEach(() => {
 
 afterEach(() => {
     forgetAllUnlockProofs();
+    vi.doUnmock("@/features/chat/split/stored-drafts");
+    localStorage.clear();
 });
 
 describe("a locked chat behind its gate", () => {
     it("removes the chat's draft stored before the lock, and leaves the other chats' drafts", async () => {
-        localStorage.setItem(
-            DRAFTS_STORAGE_KEY,
-            JSON.stringify({ d: { "thread-1": { at: Date.now(), t: "secret" }, "thread-2": { at: Date.now(), t: "other" } }, u: "user-1" }),
-        );
+        draft("thread-1", "secret");
+        draft("thread-2", "other");
         renderGate();
         await promptHeading();
         await vi.dynamicImportSettled();
 
-        expect(JSON.parse(localStorage.getItem(DRAFTS_STORAGE_KEY) ?? "null")?.d).toStrictEqual({ "thread-2": expect.objectContaining({ t: "other" }) });
+        expect(draftKeys()).toStrictEqual(["neore-draft:user-1:thread-2"]);
+    });
+
+    it("leaves the draft alone when the chat unlocked before the storage code loaded", async () => {
+        const chunk = { loaded: false };
+
+        // The draft storage chunk loads only once `chunk.loaded` is set.
+        vi.doMock("@/features/chat/split/stored-drafts", async (importOriginal) => {
+            await vi.waitUntil(() => chunk.loaded);
+
+            return importOriginal();
+        });
+        renderGate();
+        await promptHeading();
+        act(() => {
+            rememberUnlockProof("thread-1", "proof-1", Date.now() + 60_000);
+        });
+        expect(await screen.findByText("chat body")).toBeTruthy();
+        // The unlocked chat's composer stores its draft.
+        draft("thread-1", "typed after unlocking");
+        chunk.loaded = true;
+        await import("@/features/chat/split/stored-drafts");
+        await settle();
+
+        expect(draftKeys()).toStrictEqual(["neore-draft:user-1:thread-1"]);
     });
 
     it("shows the unlock prompt, not the chat, while no proof is in memory", async () => {

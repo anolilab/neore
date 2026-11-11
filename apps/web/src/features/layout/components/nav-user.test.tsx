@@ -2,10 +2,13 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { draftGeneration, DRAFTS_STORAGE_KEY } from "@/features/chat/split/composer-drafts";
+import { draftGeneration, draftOwnership } from "@/features/chat/split/composer-drafts";
 import { releaseThreadListWrites, writeThreadListCache } from "@/features/chat/thread-list/lib/thread-list-cache";
 
 import NavUser from "./nav-user";
+
+const MINE = "neore-draft:user-1:thread-a";
+const THEIRS = "neore-draft:user-2:thread-a";
 
 const auth = vi.hoisted(() => {
     const session = { data: { user: { email: "a@example.com", id: "alice", name: "Alice" } }, isPending: false };
@@ -157,7 +160,8 @@ describe("NavUser sign-out", () => {
     });
 
     it("keeps the unsent drafts, and their saving, when the sign-out fails", async () => {
-        localStorage.setItem(DRAFTS_STORAGE_KEY, "{}");
+        draftOwnership.account = "user-1";
+        localStorage.setItem(MINE, "{}");
 
         const generation = draftGeneration();
 
@@ -171,12 +175,14 @@ describe("NavUser sign-out", () => {
         await vi.waitFor(() => {
             expect(auth.signOut).toHaveBeenCalled();
         });
-        expect(localStorage.getItem(DRAFTS_STORAGE_KEY)).toBe("{}");
+        expect(localStorage.getItem(MINE)).toBe("{}");
         expect(draftGeneration()).toBe(generation);
     });
 
-    it("drops the unsent drafts once the sign-out succeeded", async () => {
-        localStorage.setItem(DRAFTS_STORAGE_KEY, "{}");
+    it("drops the account's unsent drafts once the sign-out succeeded, and leaves another account's", async () => {
+        draftOwnership.account = "user-1";
+        localStorage.setItem(MINE, "{}");
+        localStorage.setItem(THEIRS, "{}");
         vi.stubGlobal("location", { reload: vi.fn() });
         auth.signOut.mockImplementation(async ({ fetchOptions }: { fetchOptions: { onSuccess: () => Promise<void> } }) => {
             await fetchOptions.onSuccess();
@@ -189,7 +195,8 @@ describe("NavUser sign-out", () => {
             expect(globalThis.location.reload).toHaveBeenCalled();
         });
         vi.unstubAllGlobals();
-        expect(localStorage.getItem(DRAFTS_STORAGE_KEY)).toBeNull();
+        expect(localStorage.getItem(MINE)).toBeNull();
+        expect(localStorage.getItem(THEIRS)).toBe("{}");
     });
 
     it("clears it before the request is made", async () => {

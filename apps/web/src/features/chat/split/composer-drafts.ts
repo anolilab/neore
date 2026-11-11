@@ -7,8 +7,8 @@ import type { ParkedModelState } from "@/features/chat/core/stores/model-store";
 /**
  * Unsent composer state by thread, for the split view. The composer's draft (text, attachments, references) is one global
  * value, so when focus moves to another pane the outgoing state is parked here and the incoming pane's is taken back out.
- * A copy of every draft is kept in `localStorage` for a reload (`stored-drafts.ts`, loaded lazily); only its key and its
- * removal live here, so sign-out can drop it without loading that module.
+ * A copy of every draft is kept in `localStorage` for a reload (`stored-drafts.ts`, loaded lazily); its keys and their removal
+ * live here, so sign-out can drop them without loading that module.
  */
 export interface ComposerDraft {
     attachedReferences: ReferenceSelection[];
@@ -24,18 +24,35 @@ const workerDrafts = new Map<string, string>();
 // Counts the clears (sign-out, account switch). A write-back that started before a clear must not land after it.
 const generation = { count: 0 };
 
-/** The `localStorage` record of the signed-in account's unsent drafts (`stored-drafts.ts`). */
-export const DRAFTS_STORAGE_KEY = "neore:composer-drafts:v1";
+/**
+ * What the lazy storage module (`stored-drafts.ts`) needs before it loads, and its hand-over once it has. Here because the first
+ * page load carries every byte: the account whose drafts this page keeps (read before an account switch, so only its drafts are
+ * removed after it), the chat whose composer holds the text (`use-stored-drafts.ts`; typed before the module binds, it is that
+ * chat's), the message a route last put in the composer (until edited, no chat's draft) and the module's hand-over when focus
+ * moves to another pane (`watchPaneFocus`).
+ */
+export const draftOwnership: {
+    account?: string;
+    first?: { generation: number; owner: string; userId: string };
+    handOver?: (owner: string | undefined) => void;
+    prefill?: string;
+} = {};
 
 /**
- * Removes the stored drafts. For sign-out and an account switch: the drafts are the account's, not the browser's. It moves the
- * generation on, so a write scheduled before it drops itself.
+ * Removes `userId`'s stored drafts (by default the account whose composer showed last), never another account's. For sign-out
+ * and an account switch: the drafts are the account's, not the browser's. It moves the generation on, so a write scheduled
+ * before it drops itself.
  */
-export const dropStoredDrafts = (): void => {
+export const dropStoredDrafts = (userId = draftOwnership.account): void => {
     generation.count += 1;
 
     try {
-        globalThis.localStorage?.removeItem(DRAFTS_STORAGE_KEY);
+        for (const key of Object.keys(globalThis.localStorage)) {
+            // Each stored draft is one entry, `neore-draft:<userId>:<owner>` (`stored-drafts.ts`).
+            if (userId && key.startsWith(`neore-draft:${userId}:`)) {
+                globalThis.localStorage.removeItem(key);
+            }
+        }
     } catch {
         // Blocked storage holds nothing to remove.
     }
@@ -86,11 +103,11 @@ export const takeComposerDraftState = (threadId: string): ComposerDraft => {
     return draft;
 };
 
-export const clearComposerDrafts = (): void => {
+export const clearComposerDrafts = (userId?: string): void => {
     drafts.clear();
     parkedModels.clear();
     workerDrafts.clear();
-    dropStoredDrafts();
+    dropStoredDrafts(userId);
     syncParked();
 };
 

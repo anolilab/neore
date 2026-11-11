@@ -5,19 +5,19 @@ import { fromStoredAttachment, toStoredAttachment } from "@/features/chat/core/s
 import type { StoredAttachment } from "@/features/chat/core/utils/prompt-queue";
 
 import type { ComposerDraft } from "./composer-drafts";
-import { draftGeneration, DRAFTS_STORAGE_KEY, hasDraftContent, peekComposerDraft, useParkedDraftStore, useSplitViewMountedStore } from "./composer-drafts";
+import { draftGeneration, draftOwnership, hasDraftContent, peekComposerDraft, useParkedDraftStore, useSplitViewMountedStore } from "./composer-drafts";
 
 /**
  * Unsent drafts in `localStorage`, so a reload, a crash or an app update does not lose them. Loaded lazily (see
  * `use-stored-drafts.ts`): the first paint never waits for it.
  *
- * One record holds one account's drafts (`u`), keyed by chat ("new" for the new-chat composer). A record of another account
- * reads as empty and is replaced by the next write; sign-out and an account switch remove it (`dropStoredDrafts`). What is kept
- * is the text, attachments that finished uploading (by file id, never their bytes) and references with a web URL (never a
- * `blob:` or `data:` one). This page's drafts are the live composer under its chat plus the drafts parked in split view. A draft is
- * written when it changed here; a chat this page wrote or restored that has none now is removed. An entry another tab wrote since
- * is left alone either way: only an edit here replaces it. Every storage access is guarded: a failure only means the draft is not
- * kept.
+ * Each draft is its own entry, `neore-draft:<userId>:<owner>` (owner: a chat id, or "new" for the new-chat composer), holding
+ * `{ v: draft, t: savedAt, w: writeId }`. A write touches only the entries of drafts that changed on this page, and a draft
+ * sent or emptied here is removed only while its entry still carries this page's last write id: another tab's entry is never
+ * removed or rewritten unless edited here. Two tabs editing the same chat are last-write-wins. Reads look only at the current
+ * account's entries; sign-out and an account switch remove only the departing account's (`dropStoredDrafts`). What is kept is
+ * the text, attachments that finished uploading (by file id, never their bytes) and references with a web URL (never a `blob:`
+ * or `data:` one). Every storage access is guarded: a failure only means the draft is not kept.
  */
 
 export const DRAFT_TTL_MS = 30 * 24 * 60 * 60 * 1000;
@@ -27,10 +27,14 @@ export const NEW_CHAT_DRAFT_KEY = "new";
 
 export interface StoredDraft {
     a?: StoredAttachment[];
-    /** When it was last written. */
-    at: number;
     r?: ReferenceSelection[];
     t: string;
+}
+
+interface Entry {
+    t: number;
+    v: StoredDraft;
+    w: string;
 }
 
 type Content = Pick<ComposerDraft, "attachedReferences" | "composerAttachments" | "composerText">;
@@ -40,6 +44,14 @@ const storage = (): Storage | undefined => {
         return globalThis.localStorage ?? undefined;
     } catch {
         return undefined;
+    }
+};
+
+const remove = (key: string): void => {
+    try {
+        storage()?.removeItem(key);
+    } catch {
+        // Blocked storage holds nothing to remove.
     }
 };
 
@@ -60,59 +72,78 @@ const isAttachment = (value: unknown): value is StoredAttachment =>
     typeof value.size === "number" &&
     ["document", "file", "image"].includes(value.kind as string);
 
-const readDraft = (value: unknown, oldest: number): StoredDraft | undefined => {
-    if (!isRecord(value) || typeof value.t !== "string" || typeof value.at !== "number" || value.at < oldest) {
+const DRAFT_KEY_PREFIX = "neore-draft:";
+
+/** The record preview builds kept every draft in. Removed, never read. */
+export const LEGACY_DRAFTS_KEY = "neore:composer-drafts:v1";
+
+/** The `localStorage` keys that start with `prefix`; none when storage is blocked. */
+const draftKeys = (prefix: string): string[] => {
+    try {
+        return Object.keys(globalThis.localStorage).filter((key) => key.startsWith(prefix));
+    } catch {
+        return [];
+    }
+};
+
+const draftKeyPrefix = (userId: string): string => `${DRAFT_KEY_PREFIX}${userId}:`;
+
+export const draftKey = (userId: string, owner: string): string => `${draftKeyPrefix(userId)}${owner}`;
+
+/** The entry under `key`; undefined when missing, expired, corrupt, empty or unreadable. */
+const readEntry = (key: string, now = Date.now()): Entry | undefined => {
+    try {
+        const parsed: unknown = JSON.parse(storage()?.getItem(key) ?? "null");
+
+        if (
+            !isRecord(parsed) ||
+            !isRecord(parsed.v) ||
+            typeof parsed.v.t !== "string" ||
+            typeof parsed.t !== "number" ||
+            parsed.t < now - DRAFT_TTL_MS ||
+            typeof parsed.w !== "string"
+        ) {
+            return undefined;
+        }
+
+        const a = Array.isArray(parsed.v.a) ? parsed.v.a.filter(isAttachment) : [];
+        const r = Array.isArray(parsed.v.r) ? parsed.v.r.filter(isReference) : [];
+
+        return parsed.v.t === "" && a.length === 0 && r.length === 0 ? undefined : { t: parsed.t, v: { a, r, t: parsed.v.t }, w: parsed.w };
+    } catch {
         return undefined;
     }
-
-    const a = Array.isArray(value.a) ? value.a.filter(isAttachment) : [];
-    const r = Array.isArray(value.r) ? value.r.filter(isReference) : [];
-
-    return value.t === "" && a.length === 0 && r.length === 0 ? undefined : { a, at: value.at, r, t: value.t };
 };
 
-/** `userId`'s stored drafts that have not expired; empty for another account's record, a corrupt one or no storage. */
-export const readStoredDrafts = (userId: string, now = Date.now()): Map<string, StoredDraft> => {
-    const drafts = new Map<string, StoredDraft>();
+/** Removes the expired and unreadable entries under `prefix`, and each account's beyond its {@link MAX_STORED_DRAFTS} newest. */
+const prune = (prefix: string, now = Date.now()): void => {
+    const byAccount = new Map<string, [string, number][]>();
 
-    try {
-        const raw = storage()?.getItem(DRAFTS_STORAGE_KEY);
-        const parsed: unknown = raw ? JSON.parse(raw) : undefined;
+    for (const key of draftKeys(prefix)) {
+        const entry = readEntry(key, now);
 
-        if (isRecord(parsed) && parsed.u === userId && isRecord(parsed.d)) {
-            for (const [key, value] of Object.entries(parsed.d)) {
-                const draft = readDraft(value, now - DRAFT_TTL_MS);
+        if (entry) {
+            const account = key.slice(0, key.lastIndexOf(":"));
 
-                if (draft) {
-                    drafts.set(key, draft);
-                }
-            }
-        }
-    } catch {
-        // Unreadable: no drafts.
-    }
-
-    return drafts;
-};
-
-/** Keeps the newest {@link MAX_STORED_DRAFTS}; an empty set removes the record. */
-const writeStoredDrafts = (userId: string, drafts: Map<string, StoredDraft>): boolean => {
-    try {
-        const kept = [...drafts].toSorted(([, left], [, right]) => right.at - left.at).slice(0, MAX_STORED_DRAFTS);
-
-        if (kept.length === 0) {
-            storage()?.removeItem(DRAFTS_STORAGE_KEY);
+            byAccount.set(account, [...(byAccount.get(account) ?? []), [key, entry.t]]);
         } else {
-            storage()?.setItem(DRAFTS_STORAGE_KEY, JSON.stringify({ d: Object.fromEntries(kept), u: userId }));
+            remove(key);
         }
+    }
 
-        return true;
-    } catch {
-        return false;
+    for (const entries of byAccount.values()) {
+        const overCap = entries.toSorted(([, left], [, right]) => right - left).slice(MAX_STORED_DRAFTS);
+
+        for (const [key] of overCap) {
+            remove(key);
+        }
     }
 };
 
-const toStoredDraft = (content: Partial<Content> | undefined, at: number): StoredDraft | undefined => {
+const newWriteId = (): string =>
+    typeof globalThis.crypto?.randomUUID === "function" ? globalThis.crypto.randomUUID() : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+
+const toStoredDraft = (content: Partial<Content> | undefined): StoredDraft | undefined => {
     if (!hasDraftContent(content)) {
         return undefined;
     }
@@ -123,21 +154,13 @@ const toStoredDraft = (content: Partial<Content> | undefined, at: number): Store
     const r = (content?.attachedReferences ?? []).filter(isReference);
     const t = content?.composerText ?? "";
 
-    return t === "" && a.length === 0 && r.length === 0 ? undefined : { a, at, r, t };
+    return t === "" && a.length === 0 && r.length === 0 ? undefined : { a, r, t };
 };
 
-/** A draft's content, to tell an edit from the same draft written again. */
-const contentOf = (draft: StoredDraft): string => JSON.stringify([draft.t, draft.a, draft.r]);
-
-/** What this page last wrote or restored for a chat: its time tells this page's entry from one another tab wrote since. */
-interface Written {
-    at: number;
-    content: string;
-}
-
 /**
- * The chat the live composer belongs to: the last one whose composer mounted. It keeps it after an unmount (the text stays).
- * `generation` is the clears of stored drafts when it was made: after a sign-out or an account switch nothing is written for it.
+ * The chat the live composer belongs to: the last one whose composer mounted (or whose pane took focus). It keeps it after an
+ * unmount (the text stays). `generation` is the clears of stored drafts when it was made: after a sign-out or an account switch
+ * nothing is written for it.
  */
 interface Binding {
     generation: number;
@@ -150,34 +173,39 @@ const state = {
 
     /**
      * Set when the composer's content came along from another chat or account (single view keeps the text when you move on):
-     * it is not this chat's draft until it is edited here, so it is not stored, and `carriedFrom` keeps its own entry.
+     * it stays `carriedFrom`'s draft until it is edited here (none after an account switch).
      */
     carried: false,
     carriedFrom: undefined as string | undefined,
-    /** Chats seen locked this page load: none of their drafts is stored. */
+    /** Chats seen locked this page load, until they bind unlocked: none of their drafts is stored. */
     locked: new Set<string>(),
+    /** What this page last wrote or restored, by chat: unchanged content is not written again, and only this write is removed. */
+    mine: new Map<string, { content: string; w: string }>(),
+    /** The composer holds a route's prefilled message nobody edited: it is no chat's draft, and the chat's stored one stays. */
+    prefill: false,
+    started: false,
     timer: undefined as ReturnType<typeof setTimeout> | undefined,
-    /** The chats whose draft this page stored or restored, so one that has none now is removed. */
-    written: new Map<string, Written>(),
 };
 
-/** This page's drafts now: the parked ones and the live composer under its chat, without locked chats. */
-const snapshot = (owner: string, now: number, carried: boolean): Map<string, StoredDraft> => {
+/** This page's drafts now: the parked ones and the live composer under its owner, without locked chats. */
+const snapshot = (owner: string): Map<string, StoredDraft> => {
     const drafts = new Map<string, StoredDraft>();
 
     for (const threadId of useParkedDraftStore.getState().threadIds) {
-        const draft = toStoredDraft(peekComposerDraft(threadId), now);
+        const draft = toStoredDraft(peekComposerDraft(threadId));
 
         if (draft) {
             drafts.set(threadId, draft);
         }
     }
 
-    const live = carried ? undefined : toStoredDraft(useChatUIStore.getState(), now);
+    // Carried text stays its first chat's; an untouched prefill is no chat's.
+    const liveOwner = state.carried ? state.carriedFrom : owner;
+    const live = state.prefill ? undefined : toStoredDraft(useChatUIStore.getState());
 
     // An empty composer does not hide the chat's parked draft: focus moving to another pane parks it, then empties the composer.
-    if (live) {
-        drafts.set(owner, live);
+    if (live && liveOwner !== undefined) {
+        drafts.set(liveOwner, live);
     }
 
     for (const threadId of state.locked) {
@@ -201,7 +229,7 @@ const forgetIfCleared = (): void => {
     state.binding = undefined;
     state.carried = true;
     state.carriedFrom = undefined;
-    state.written.clear();
+    state.mine.clear();
 };
 
 /** Writes this page's drafts now, if a write is pending. */
@@ -217,76 +245,48 @@ export const flushStoredDrafts = (): void => {
         return;
     }
 
-    const now = Date.now();
-    const stored = readStoredDrafts(binding.userId, now);
-    const current = snapshot(binding.owner, now, state.carried);
-    const carriedFrom = state.carried ? state.carriedFrom : undefined;
-    const written = new Map<string, Written>();
-    const changed: string[] = [];
-    // Another tab wrote this chat's entry after this page did (or this page never did): it is that tab's draft now.
-    const theirs = (key: string): boolean => stored.has(key) && stored.get(key)?.at !== state.written.get(key)?.at;
+    const current = snapshot(binding.owner);
 
-    for (const [key, mine] of state.written) {
-        if (state.locked.has(key)) {
+    for (const [owner, { w }] of state.mine) {
+        if (current.has(owner)) {
             continue;
         }
 
-        if (key === carriedFrom || current.has(key)) {
-            written.set(key, mine);
-        } else if (!theirs(key)) {
-            stored.delete(key);
-        }
-    }
+        const key = draftKey(binding.userId, owner);
 
-    for (const key of state.locked) {
-        stored.delete(key);
-    }
-
-    for (const [key, draft] of current) {
-        const content = contentOf(draft);
-
-        // The same draft as this page last wrote: an entry another tab wrote since stays, and this one keeps its time.
-        if (written.get(key)?.content !== content) {
-            stored.set(key, draft);
-            written.set(key, { at: draft.at, content });
-            changed.push(key);
-        }
-    }
-
-    if (!writeStoredDrafts(binding.userId, stored)) {
-        // Full: at least what was removed or changed must not come back stale on a reload.
-        for (const key of changed) {
-            stored.delete(key);
-            written.delete(key);
+        // Sent or emptied here. An entry another tab wrote since is that tab's draft: it stays.
+        if (readEntry(key)?.w === w) {
+            remove(key);
         }
 
-        writeStoredDrafts(binding.userId, stored);
+        state.mine.delete(owner);
     }
 
-    state.written = written;
-};
+    const now = Date.now();
 
-/**
- * Removes a locked chat's stored draft now, from whichever account's record holds it, and keeps any from being stored this page
- * load. Also for a chat whose composer never mounts (`LockedChatGate`).
- */
-export const lockStoredDraft = (owner: string): void => {
-    state.locked.add(owner);
-    state.written.delete(owner);
+    for (const [owner, draft] of current) {
+        const content = JSON.stringify(draft);
+        const key = draftKey(binding.userId, owner);
 
-    try {
-        const parsed: unknown = JSON.parse(storage()?.getItem(DRAFTS_STORAGE_KEY) ?? "null");
+        // Unchanged since this page wrote it: an entry another tab wrote since stays.
+        if (state.mine.get(owner)?.content !== content) {
+            const w = newWriteId();
 
-        if (isRecord(parsed) && typeof parsed.u === "string") {
-            const drafts = readStoredDrafts(parsed.u);
+            try {
+                storage()?.setItem(key, JSON.stringify({ t: now, v: draft, w }));
+                state.mine.set(owner, { content, w });
+            } catch {
+                // Full: this chat's older entry from this page must not come back stale on a reload.
+                if (readEntry(key)?.w === state.mine.get(owner)?.w) {
+                    remove(key);
+                }
 
-            if (drafts.delete(owner)) {
-                writeStoredDrafts(parsed.u, drafts);
+                state.mine.delete(owner);
             }
         }
-    } catch {
-        // Unreadable: nothing to remove.
     }
+
+    prune(draftKeyPrefix(binding.userId), now);
 };
 
 const schedule = (): void => {
@@ -295,6 +295,67 @@ const schedule = (): void => {
         // Not `flushStoredDrafts` directly: it returns early without a timer.
         flushStoredDrafts();
     }, DRAFT_WRITE_DELAY_MS);
+};
+
+/** Focus moved to `owner`'s pane: the parked drafts are written now, and the live composer is that pane's from here on. */
+const handOver = (owner: string | undefined): void => {
+    schedule();
+    flushStoredDrafts();
+
+    if (state.binding && owner !== undefined) {
+        state.binding = { ...state.binding, owner };
+    }
+};
+
+/** Once per page load, on first use: the old single record, expired entries and drafts over the cap go. */
+const start = (): void => {
+    if (state.started) {
+        return;
+    }
+
+    state.started = true;
+    remove(LEGACY_DRAFTS_KEY);
+    prune(DRAFT_KEY_PREFIX);
+    draftOwnership.handOver = handOver;
+};
+
+/** Removes a locked chat's stored draft now, from any account, and stores none for it until it binds unlocked (`LockedChatGate`). */
+export const lockStoredDraft = (owner: string): void => {
+    start();
+    state.locked.add(owner);
+    state.mine.delete(owner);
+
+    for (const key of draftKeys(DRAFT_KEY_PREFIX)) {
+        if (key.endsWith(`:${owner}`)) {
+            remove(key);
+        }
+    }
+};
+
+/** Fills an empty composer with `owner`'s stored draft, unless the chat has one parked in split view (which is the newer). */
+const restore = (owner: string, userId: string): void => {
+    const ui = useChatUIStore.getState();
+    const entry = readEntry(draftKey(userId, owner));
+
+    if (entry && !hasDraftContent(ui) && !hasDraftContent(peekComposerDraft(owner))) {
+        ui.restoreComposer({
+            attachedReferences: entry.v.r ?? [],
+            composerAttachments: (entry.v.a ?? []).map((attachment, index) => fromStoredAttachment(attachment, index)),
+            composerText: entry.v.t,
+        });
+        // Restored here: sent or emptied before the next write, it is removed.
+        state.mine.set(owner, { content: JSON.stringify(entry.v), w: entry.w });
+    }
+};
+
+/** A route's message is in the composer: the chat it lands on keeps its stored draft, which is not this page's to remove. */
+const holdPrefill = (owner: string | undefined): void => {
+    state.prefill = true;
+    state.carried = false;
+
+    if (owner !== undefined) {
+        state.mine.delete(owner);
+    }
 };
 
 const onPageHide = (): void => {
@@ -331,7 +392,22 @@ const listen = (): void => {
             next.attachedReferences !== previous.attachedReferences ||
             next.composerAttachments.map((attachment) => attachment.id).join(",") !== previousIds
         ) {
-            state.carried = false;
+            const { binding } = state;
+
+            if (next.composerText !== "" && next.composerText === draftOwnership.prefill) {
+                holdPrefill(binding?.owner);
+            } else {
+                const wasPrefill = state.prefill;
+
+                draftOwnership.prefill = undefined;
+                state.prefill = false;
+                state.carried = false;
+
+                // The prefilled message was sent or cleared: the chat's own draft comes back.
+                if (wasPrefill && binding && !hasDraftContent(next)) {
+                    restore(binding.owner, binding.userId);
+                }
+            }
         }
 
         schedule();
@@ -352,28 +428,36 @@ const listen = (): void => {
 
 /**
  * Called when a chat's composer mounts: from now on the live composer is stored under `owner`. An empty composer gets the
- * chat's stored draft back, unless the chat has one parked in split view (which is the newer). Text being typed is never
- * replaced: `restoreComposer` does nothing to a composer with content.
+ * chat's stored draft back. Text being typed is never replaced: `restoreComposer` does nothing to a composer with content.
  */
 export const bindStoredDrafts = (owner: string, userId: string, locked: boolean): void => {
+    start();
     // A pending write is the previous chat's state (a draft just emptied, say): it lands first, so it is not read back stale. After a
     // sign-out the previous binding is forgotten, pending write or not.
     flushStoredDrafts();
 
-    const previous = state.binding;
+    // Before the first binding, the composer's text is the chat's whose composer showed with it (`use-stored-drafts.ts`); from
+    // before a sign-out or an account switch, it is no account's.
+    const { first } = draftOwnership;
+    const previous = state.binding ?? (first && first.generation !== draftGeneration() ? { owner: "", userId: "" } : first);
     const switchedUser = previous !== undefined && previous.userId !== userId;
     const moved = previous !== undefined && previous.owner !== owner && !useSplitViewMountedStore.getState().mounted;
+    const ui = useChatUIStore.getState();
 
     if (switchedUser) {
-        state.written.clear();
+        state.mine.clear();
     }
 
-    if (switchedUser || moved) {
+    state.prefill = false;
+
+    if (ui.composerText !== "" && ui.composerText === draftOwnership.prefill) {
+        holdPrefill(owner);
+    } else if (switchedUser || moved) {
         // In split view the composer is emptied and refilled with the focused pane's own draft, so nothing is carried there. Text
         // carried on through several chats is still the first one's.
         const from = state.carried ? state.carriedFrom : previous.owner;
 
-        state.carried = hasDraftContent(useChatUIStore.getState()) && (switchedUser || from !== owner);
+        state.carried = hasDraftContent(ui) && (switchedUser || from !== owner);
         state.carriedFrom = switchedUser ? undefined : from;
     }
 
@@ -384,19 +468,7 @@ export const bindStoredDrafts = (owner: string, userId: string, locked: boolean)
         lockStoredDraft(owner);
     } else {
         state.locked.delete(owner);
-
-        const ui = useChatUIStore.getState();
-        const stored = readStoredDrafts(userId).get(owner);
-
-        if (stored && !hasDraftContent(ui) && !hasDraftContent(peekComposerDraft(owner))) {
-            ui.restoreComposer({
-                attachedReferences: stored.r ?? [],
-                composerAttachments: (stored.a ?? []).map((attachment, index) => fromStoredAttachment(attachment, index)),
-                composerText: stored.t,
-            });
-            // Restored here: sent or emptied before the next write, it is removed.
-            state.written.set(owner, { at: stored.at, content: contentOf(stored) });
-        }
+        restore(owner, userId);
     }
 
     // What changed before this module loaded, or under the chat the composer showed before, is written now.
@@ -411,6 +483,8 @@ export const resetStoredDraftsForTests = (): void => {
     state.carried = false;
     state.carriedFrom = undefined;
     state.locked.clear();
-    state.written.clear();
+    state.mine.clear();
+    state.prefill = false;
+    state.started = false;
     listening.stop?.();
 };

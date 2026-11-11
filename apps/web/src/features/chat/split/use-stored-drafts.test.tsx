@@ -3,16 +3,17 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
 
-import { clearComposerDrafts, DRAFTS_STORAGE_KEY, dropStoredDrafts } from "./composer-drafts";
-import { flushStoredDrafts, resetStoredDraftsForTests } from "./stored-drafts";
+import { clearComposerDrafts, dropStoredDrafts } from "./composer-drafts";
+import { draftKey, flushStoredDrafts, resetStoredDraftsForTests } from "./stored-drafts";
 import useStoredDrafts, { keepsStoredDraft } from "./use-stored-drafts";
 
 const storeDrafts = (texts: Record<string, string>): void => {
-    const at = Date.now();
-    const d = Object.fromEntries(Object.entries(texts).map(([key, t]) => [key, { at, t }]));
-
-    localStorage.setItem(DRAFTS_STORAGE_KEY, JSON.stringify({ d, u: "user-1" }));
+    for (const [owner, t] of Object.entries(texts)) {
+        localStorage.setItem(draftKey("user-1", owner), JSON.stringify({ t: Date.now(), v: { t }, w: "w" }));
+    }
 };
+
+const storedText = (owner: string): string | undefined => JSON.parse(localStorage.getItem(draftKey("user-1", owner)) ?? "null")?.v.t;
 
 beforeEach(() => {
     localStorage.clear();
@@ -38,6 +39,23 @@ describe("useStoredDrafts", () => {
         expect(useChatUIStore.getState().composerText).toBe("draft b");
     });
 
+    it("stores text typed before the storage code loaded under the chat it was typed in, not the one navigated to", async () => {
+        const { rerender } = renderHook(
+            ({ owner }) => {
+                useStoredDrafts(owner, "user-1", false);
+            },
+            { initialProps: { owner: "thread-a" } },
+        );
+
+        useChatUIStore.getState().setComposerText("typed in a");
+        rerender({ owner: "thread-b" });
+        await vi.dynamicImportSettled();
+        flushStoredDrafts();
+
+        expect(storedText("thread-a")).toBe("typed in a");
+        expect(storedText("thread-b")).toBeUndefined();
+    });
+
     it("binds nothing when the drafts were dropped before the storage code loaded", async () => {
         useChatUIStore.getState().setComposerText("old account's text");
         renderHook(() => {
@@ -47,7 +65,7 @@ describe("useStoredDrafts", () => {
         await vi.dynamicImportSettled();
         flushStoredDrafts();
 
-        expect(localStorage.getItem(DRAFTS_STORAGE_KEY)).toBeNull();
+        expect(Object.keys(localStorage).filter((key) => key.startsWith("neore-draft:"))).toStrictEqual([]);
     });
 });
 
