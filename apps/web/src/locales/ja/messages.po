@@ -2382,12 +2382,12 @@ msgstr "選択したフレームを画像ノードとして追加"
 
 #: src/features/chat/thread-list/thread-list-header.tsx:127
 #: src/features/chat/thread-list/thread-list-header.tsx:137
-#: src/features/projects/components/add-project-dialog.tsx:584
+#: src/features/projects/components/add-project-dialog.tsx:618
 msgid "Add project"
 msgstr ""
 
 #. placeholder {0}: rowName(machine)
-#: src/features/projects/components/add-project-dialog.tsx:419
+#: src/features/projects/components/add-project-dialog.tsx:448
 msgid "Add project on {0}"
 msgstr ""
 
@@ -2564,7 +2564,7 @@ msgstr "追加："
 msgid "Adding documents… {0} of {1}"
 msgstr "ドキュメントを追加中… {0} / {1}"
 
-#: src/features/projects/components/add-project-dialog.tsx:430
+#: src/features/projects/components/add-project-dialog.tsx:459
 msgid "Adding the project…"
 msgstr ""
 
@@ -2577,7 +2577,7 @@ msgid "Adding your earlier replies…"
 msgstr "以前の返信を追加しています…"
 
 #: src/features/chat/aside/aside-panel.tsx:168
-#: src/features/projects/components/add-project-dialog.tsx:584
+#: src/features/projects/components/add-project-dialog.tsx:618
 msgid "Adding…"
 msgstr "追加中…"
 
@@ -4490,7 +4490,7 @@ msgstr "Azure ポータル → OpenAI リソース → キーとエンドポイ�
 #: src/features/code/components/code-shell.tsx:162
 #: src/features/onboarding/components/onboarding-dialog.tsx:395
 #: src/features/pages/components/page-version-panel.tsx:89
-#: src/features/projects/components/add-project-dialog.tsx:581
+#: src/features/projects/components/add-project-dialog.tsx:611
 msgid "Back"
 msgstr "戻る"
 
@@ -5511,7 +5511,7 @@ msgstr "カナダ"
 #: src/features/local-models/components/ollama-model-manager.tsx:300
 #: src/features/pages/components/page-agent-dialog.tsx:148
 #: src/features/pages/components/page-comments-panel.tsx:87
-#: src/features/projects/components/add-project-dialog.tsx:575
+#: src/features/projects/components/add-project-dialog.tsx:605
 #: src/features/projects/components/move-to-project-dialog.tsx:95
 #: src/features/projects/components/project-form-dialog.tsx:395
 #: src/features/prompts/components/prompt-form-dialog.tsx:501
@@ -5589,7 +5589,7 @@ msgstr "選択をキャンセル"
 msgid "Cancelled"
 msgstr "キャンセル済み"
 
-#: src/features/projects/components/add-project-dialog.tsx:125
+#: src/features/projects/components/add-project-dialog.tsx:135
 msgid "Cancelled on this computer."
 msgstr ""
 
@@ -6177,7 +6177,7 @@ msgstr "検索モードを選択"
 msgid "Choose the camera system for your shot"
 msgstr "撮影に使うカメラシステムを選択します"
 
-#: src/features/projects/components/add-project-dialog.tsx:422
+#: src/features/projects/components/add-project-dialog.tsx:451
 msgid "Choose the project's folder, or type a path."
 msgstr ""
 
@@ -6491,7 +6491,7 @@ msgstr "クリップボード"
 msgid "clock"
 msgstr "時計"
 
-#: src/features/projects/components/add-project-dialog.tsx:572
+#: src/features/projects/components/add-project-dialog.tsx:602
 msgid "Clone or create new…"
 msgstr ""
 
@@ -7483,7 +7483,7 @@ msgstr "最新の状態に保つには、ホストに接続してください。
 msgid "Connect third-party services to extend AI capabilities with your data and tools."
 msgstr "サードパーティのサービスを接続して、あなたのデータやツールで AI の機能を拡張します。"
 
-#: src/features/projects/components/add-project-dialog.tsx:141
+#: src/features/projects/components/add-project-dialog.tsx:151
 msgid "Connect this server first."
 msgstr ""
 
@@ -7519,7 +7519,7 @@ msgstr "メッセンジャープラットフォームを接続すると、Telegr
 msgid "Connect your own Telegram, WhatsApp, Slack or Discord bot to Neore and message your agent from the app you already use."
 msgstr ""
 
-#: src/features/projects/components/add-project-dialog.tsx:158
+#: src/features/projects/components/add-project-dialog.tsx:168
 #: src/features/settings/components/chat/mcp/status-indicator.tsx:24
 #: src/features/settings/connectors/connector-card.tsx:74
 #: src/features/settings/connectors/messenger/messenger-platform-card.tsx:172
@@ -7558,7 +7558,7 @@ msgstr "{0} に接続済み"
 msgid "Connected. You can close this window."
 msgstr "接続しました。このウィンドウは閉じてかまいません。"
 
-#: src/features/projects/components/add-project-dialog.tsx:427
+#: src/features/projects/components/add-project-dialog.tsx:456
 msgid "Connecting {pendingKey}…"
 msgstr ""
 
@@ -8956,7 +8956,7 @@ msgstr "最初のワークフローを作成して、AI タスクを視覚的に
 msgid "Created"
 msgstr "作成日"
 
-#: src/features/projects/components/add-project-dialog.tsx:202
+#: src/features/projects/components/add-project-dialog.tsx:228
 msgid "Created {path}"
 msgstr ""
 
@@ -14396,11 +14396,11 @@ msgstr "チャットにフォーカス: {title}"
 msgid "Focus Search"
 msgstr "検索にフォーカス"
 
-#: src/features/projects/components/add-project-dialog.tsx:502
+#: src/features/projects/components/add-project-dialog.tsx:531
 msgid "Folder path"
 msgstr ""
 
-#: src/features/projects/components/add-project-dialog.tsx:516
+#: src/features/projects/components/add-project-dialog.tsx:546
 msgid "Folders"
 msgstr ""
 
@@ -15397,7 +15397,7 @@ msgstr "ボールトへ移動"
 msgid "Go to your pages"
 msgstr "ページ一覧へ移動"
 
-#: src/features/projects/components/add-project-dialog.tsx:520
+#: src/features/projects/components/add-project-dialog.tsx:550
 msgid "Go up to {parent}"
 msgstr ""
 
@@ -18697,7 +18697,7 @@ msgstr "ファイルを読み込み中"
 msgid "Loading files…"
 msgstr "ファイルを読み込み中…"
 
-#: src/features/projects/components/add-project-dialog.tsx:428
+#: src/features/projects/components/add-project-dialog.tsx:457
 msgid "Loading folders…"
 msgstr ""
 
@@ -19083,7 +19083,7 @@ msgstr "LINE チャネルの Messaging API タブにある長期のチャネル�
 msgid "Longest the answer may take, in milliseconds"
 msgstr "回答にかけられる最大時間（ミリ秒）"
 
-#: src/features/projects/components/add-project-dialog.tsx:443
+#: src/features/projects/components/add-project-dialog.tsx:472
 msgid "Looking for machines…"
 msgstr ""
 
@@ -19170,7 +19170,7 @@ msgstr "Mach-O バイナリ"
 msgid "Machine"
 msgstr ""
 
-#: src/features/projects/components/add-project-dialog.tsx:447
+#: src/features/projects/components/add-project-dialog.tsx:476
 msgid "Machines"
 msgstr ""
 
@@ -21645,7 +21645,7 @@ msgstr "ナレッジベースにはまだファイルがありません。上か
 msgid "No focal length selected"
 msgstr "焦点距離が選択されていません"
 
-#: src/features/projects/components/add-project-dialog.tsx:552
+#: src/features/projects/components/add-project-dialog.tsx:582
 msgid "No folders in here."
 msgstr ""
 
@@ -23910,6 +23910,10 @@ msgstr ""
 msgid "Pair one in Settings"
 msgstr "設定でペアリングしてください"
 
+#: src/features/projects/components/add-project-dialog.tsx:191
+msgid "Pair this computer with your account first (Settings → Devices)."
+msgstr ""
+
 #: src/features/auth/components/device-approval.tsx:203
 msgid "Pair this machine?"
 msgstr ""
@@ -24449,7 +24453,7 @@ msgstr "受信トレイから 1 つ選ぶと、内容を読めます。"
 msgid "Pick skills, schedules, webhooks and group chats to share as one Markdown file. API keys, webhook secrets, connector tokens and other credentials are never included, and neither are your account or organization ids."
 msgstr "共有するスキル、スケジュール、Webhook、グループチャットを選んで、1 つの Markdown ファイルにまとめます。API キー、Webhook のシークレット、コネクタのトークンなどの認証情報は含まれません。アカウント ID や組織 ID も含まれません。"
 
-#: src/features/projects/components/add-project-dialog.tsx:422
+#: src/features/projects/components/add-project-dialog.tsx:451
 msgid "Pick the computer or server the project's folder is on."
 msgstr ""
 
@@ -24988,7 +24992,7 @@ msgstr "Enter キーまたはスペースキーでノードを選択します。
 msgid "Press enter or space to select an edge. You can then press delete to remove it or escape to cancel."
 msgstr "Enter キーまたはスペースキーでエッジを選択します。その後、Delete キーで削除、Esc キーでキャンセルできます。"
 
-#: src/features/projects/components/add-project-dialog.tsx:513
+#: src/features/projects/components/add-project-dialog.tsx:543
 msgid "Press Enter to open the folder. A folder that does not exist is created."
 msgstr ""
 
@@ -29451,7 +29455,7 @@ msgstr "表示を減らす"
 msgid "Show more"
 msgstr "さらに表示"
 
-#: src/features/projects/components/add-project-dialog.tsx:562
+#: src/features/projects/components/add-project-dialog.tsx:592
 msgid "Show more folders"
 msgstr ""
 
@@ -30490,16 +30494,16 @@ msgid "Sri Lanka"
 msgstr "スリランカ"
 
 #. placeholder {0}: row.name
-#: src/features/projects/components/add-project-dialog.tsx:162
+#: src/features/projects/components/add-project-dialog.tsx:172
 msgid "SSH · {0}"
 msgstr ""
 
 #. placeholder {0}: row.name
-#: src/features/projects/components/add-project-dialog.tsx:165
+#: src/features/projects/components/add-project-dialog.tsx:175
 msgid "SSH · {0} · not connected yet"
 msgstr ""
 
-#: src/features/projects/components/add-project-dialog.tsx:486
+#: src/features/projects/components/add-project-dialog.tsx:515
 msgid "SSH hosts come from ~/.ssh/config. Picking one connects it."
 msgstr ""
 
@@ -32367,7 +32371,7 @@ msgstr ""
 msgid "That did not work. Try again."
 msgstr "うまくいきませんでした。もう一度お試しください。"
 
-#: src/features/projects/components/add-project-dialog.tsx:129
+#: src/features/projects/components/add-project-dialog.tsx:139
 msgid "That folder is already shared with this server."
 msgstr ""
 
@@ -32375,11 +32379,11 @@ msgstr ""
 msgid "That folder is not offered for this repository on that computer."
 msgstr "そのフォルダは、そのコンピュータのこのリポジトリには提供されていません。"
 
-#: src/features/projects/components/add-project-dialog.tsx:133
+#: src/features/projects/components/add-project-dialog.tsx:143
 msgid "That folder is the server's home folder or a folder above it. Choose a folder inside it."
 msgstr ""
 
-#: src/features/projects/components/add-project-dialog.tsx:113
+#: src/features/projects/components/add-project-dialog.tsx:123
 msgid "That folder was not found."
 msgstr ""
 
@@ -32407,7 +32411,7 @@ msgstr "そのメッセージは長すぎて、ここから送信できません
 msgid "That passcode is not right."
 msgstr "パスコードが正しくありません。"
 
-#: src/features/projects/components/add-project-dialog.tsx:117
+#: src/features/projects/components/add-project-dialog.tsx:127
 msgid "That path is a file."
 msgstr ""
 
@@ -32620,7 +32624,7 @@ msgstr "説明が途中で切れています。"
 msgid "The desktop app runs on macOS, Windows and Linux. Installers are attached to a desktop release on GitHub, and they appear there once that release is published."
 msgstr "デスクトップアプリは macOS、Windows、Linux で動作します。インストーラーは GitHub のデスクトップリリースに添付され、そのリリースが公開されるとそこに表示されます。"
 
-#: src/features/projects/components/add-project-dialog.tsx:144
+#: src/features/projects/components/add-project-dialog.tsx:154
 msgid "The desktop could not complete that. Try again."
 msgstr ""
 
@@ -33413,8 +33417,8 @@ msgid "this computer"
 msgstr "このコンピュータ"
 
 #: src/features/devices/components/devices-settings.tsx:310
-#: src/features/projects/components/add-project-dialog.tsx:150
-#: src/features/projects/components/add-project-dialog.tsx:154
+#: src/features/projects/components/add-project-dialog.tsx:160
+#: src/features/projects/components/add-project-dialog.tsx:164
 #: src/features/settings/components/chat/custom-providers-settings.tsx:368
 msgid "This computer"
 msgstr "このコンピューター"
@@ -33440,7 +33444,7 @@ msgstr "このコンピューターは別のアカウントとペアリングさ
 msgid "This computer is paired. Choose which folders to share in the desktop app."
 msgstr "このコンピューターはペアリングされました。共有するフォルダーはデスクトップアプリで選択してください。"
 
-#: src/features/projects/components/add-project-dialog.tsx:276
+#: src/features/projects/components/add-project-dialog.tsx:302
 msgid "This computer must be paired first."
 msgstr ""
 
@@ -33540,7 +33544,7 @@ msgstr "このファイルは大きすぎる（{0} KB）ため、ブラウザー
 msgid "This file is too large (~{0} tokens) and exceeds the model's context window. The model may not be able to process this file effectively."
 msgstr "このファイルは大きすぎ（約 {0} トークン）、モデルのコンテキストウィンドウを超えています。モデルがこのファイルを適切に処理できない可能性があります。"
 
-#: src/features/projects/components/add-project-dialog.tsx:121
+#: src/features/projects/components/add-project-dialog.tsx:131
 msgid "This folder cannot be read."
 msgstr ""
 
@@ -33555,6 +33559,14 @@ msgstr "このホストはまだ受信トレイを提供していません。"
 #: src/features/develop/components/pull-request-view.tsx:133
 msgid "This host does not offer any view of a {requestNoun} yet."
 msgstr "このホストはまだ{requestNoun}のビューを提供していません。"
+
+#: src/features/projects/components/add-project-dialog.tsx:188
+msgid "This host is used by a Match rule in ~/.ssh/config, which Neore does not evaluate."
+msgstr ""
+
+#: src/features/projects/components/add-project-dialog.tsx:184
+msgid "This host uses {key} in ~/.ssh/config, which Neore does not support."
+msgstr ""
 
 #: ../../packages/chat-ui/src/chat/message-content.tsx:399
 msgid "This image has been flagged for review"
@@ -33619,7 +33631,7 @@ msgstr "このリンクは不完全です。完全なリンクを依頼してく
 msgid "This link is not taking messages right now. Try again later."
 msgstr "このリンクは現在メッセージを受け付けていません。後でもう一度お試しください。"
 
-#: src/features/projects/components/add-project-dialog.tsx:346
+#: src/features/projects/components/add-project-dialog.tsx:375
 msgid "This machine is not ready yet."
 msgstr ""
 
@@ -33773,7 +33785,7 @@ msgstr "この実行は利用できなくなりました。"
 msgid "This selection is too large to import at once. Import fewer files at a time."
 msgstr "この選択はサイズが大きすぎて一度にインポートできません。一度にインポートするファイルを減らしてください。"
 
-#: src/features/projects/components/add-project-dialog.tsx:137
+#: src/features/projects/components/add-project-dialog.tsx:147
 msgid "This server already has its maximum of shared folders. Share a parent folder or remove one in the desktop app."
 msgstr ""
 
@@ -37095,7 +37107,7 @@ msgstr "アシスタントはどんなときにこのスキルを使うべきで
 msgid "Where each run goes"
 msgstr "各実行の保存先"
 
-#: src/features/projects/components/add-project-dialog.tsx:419
+#: src/features/projects/components/add-project-dialog.tsx:448
 msgid "Where is the project?"
 msgstr ""
 

@@ -16,6 +16,7 @@ import { getAddProjectBridge, pairNativeHost, probeNativeHost } from "@/lib/nati
 
 import type { AddProjectMachine, AddProjectMachinesBridge, MachineFolderPage, MachineServerSpec } from "../../../../../desktop/src/add-project-machines.types";
 import {
+    classifyDisabledReason,
     folderNeedsSharing,
     hostSpecOf,
     isAbsolutePath,
@@ -24,6 +25,7 @@ import {
     isFilePathError,
     isMissingFolderError,
     isNotConnectedError,
+    isPathFailure,
     isRefusedRootError,
     isTooManyRootsError,
     isUnreadableFolderError,
@@ -86,7 +88,12 @@ const start = (work: Promise<void>): undefined => {
 const ROW_CLASS =
     "hover:bg-muted focus-visible:ring-ring flex min-h-11 w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm outline-none focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-60";
 
-const AddProjectContent = ({ onClose, onCreateNew }: Omit<AddProjectDialogProps, "open">) => {
+interface AddProjectContentProps extends Omit<AddProjectDialogProps, "open"> {
+    /** The host being paired or connected. Held by the owner of the open state, so it outlives a closed dialog. */
+    pairingHosts: Set<string>;
+}
+
+const AddProjectContent = ({ onClose, onCreateNew, pairingHosts }: AddProjectContentProps) => {
     const { t } = useLingui();
     const crpc = useCRPC();
     const { mutateAsync: createProject } = useMutation(crpc.projects.functions.createProject.mutationOptions());
@@ -102,9 +109,12 @@ const AddProjectContent = ({ onClose, onCreateNew }: Omit<AddProjectDialogProps,
     const [isBrowsing, setIsBrowsing] = useState(false);
     const [isAdding, setIsAdding] = useState(false);
     const [message, setMessage] = useState("");
-    const [error, setError] = useState("");
+    const [problem, setProblem] = useState({ forPath: false, text: "" });
 
     const machineId = machine?.id ?? null;
+    const error = problem.text;
+    const isPathError = problem.forPath && error !== "";
+    const setError = useCallback((text: string, forPath = false) => setProblem({ forPath, text }), []);
 
     /** A failure, in the words of the picker. The desktop's own text is English, so only recognised refusals are named. */
     const describeFailure = useCallback(
@@ -165,6 +175,22 @@ const AddProjectContent = ({ onClose, onCreateNew }: Omit<AddProjectDialogProps,
         return t`SSH · ${row.name} · not connected yet`;
     };
 
+    const reasonLabel = (reason: string): string => {
+        const kind = classifyDisabledReason(reason);
+
+        if (kind.kind === "unsupported-setting") {
+            const { key } = kind;
+
+            return t`This host uses ${key} in ~/.ssh/config, which Neore does not support.`;
+        }
+
+        if (kind.kind === "match-rule") {
+            return t`This host is used by a Match rule in ~/.ssh/config, which Neore does not evaluate.`;
+        }
+
+        return kind.kind === "pair-this-computer" ? t`Pair this computer with your account first (Settings → Devices).` : reason;
+    };
+
     // Each browse request gets a number. A response that is no longer the latest (the person went back, picked another
     // machine or typed another path meanwhile) is dropped, so an old folder never ends up under a new machine.
     const browseGeneration = useRef(0);
@@ -223,7 +249,7 @@ const AddProjectContent = ({ onClose, onCreateNew }: Omit<AddProjectDialogProps,
                 return;
             }
 
-            setError(describeFailure(result.error));
+            setError(describeFailure(result.error), isPathFailure(result.error));
 
             // A failed move to another folder selects nothing, so Add project cannot submit the folder still listed.
             // A failed next page keeps the page that was shown.
@@ -231,7 +257,7 @@ const AddProjectContent = ({ onClose, onCreateNew }: Omit<AddProjectDialogProps,
                 setListing(null);
             }
         },
-        [describeFailure, t],
+        [describeFailure, setError, t],
     );
 
     // The content mounts only while the dialog is open, so every opening starts at step 1 with a fresh list.
@@ -259,7 +285,7 @@ const AddProjectContent = ({ onClose, onCreateNew }: Omit<AddProjectDialogProps,
         return () => {
             cancelled = true;
         };
-    }, [describeFailure]);
+    }, [describeFailure, setError]);
 
     // Focus moves to the step title when the step changes.
     const step = machine === null ? 1 : 2;
@@ -305,7 +331,7 @@ const AddProjectContent = ({ onClose, onCreateNew }: Omit<AddProjectDialogProps,
         const state = machineRowState(row);
         const bridge = getAddProjectBridge();
 
-        if (state.kind === "disabled" || bridge === undefined || pendingKey !== null) {
+        if (state.kind === "disabled" || bridge === undefined || pendingKey !== null || pairingHosts.size > 0) {
             return;
         }
 
@@ -314,14 +340,13 @@ const AddProjectContent = ({ onClose, onCreateNew }: Omit<AddProjectDialogProps,
         let target = row;
 
         if (state.kind === "needs-connect" || state.kind === "needs-pair") {
+            pairingHosts.add(state.sshAlias);
             setPendingKey(state.sshAlias);
 
             const connected =
                 state.kind === "needs-pair"
                     ? await pairServer(bridge, state.sshAlias, state.spec)
                     : await attempt(() => bridge.connectAddProjectMachine(state.sshAlias));
-
-            setPendingKey(null);
 
             if (state.kind === "needs-pair") {
                 // Pairing changed this server's row, so the list must show it as paired before the next pick, even when
@@ -332,6 +357,10 @@ const AddProjectContent = ({ onClose, onCreateNew }: Omit<AddProjectDialogProps,
                     setMachines(refreshed.value);
                 }
             }
+
+            // Cleared only after the refresh, so the row cannot be picked again while it still shows as unpaired.
+            pairingHosts.clear();
+            setPendingKey(null);
 
             if (!connected.ok) {
                 setError(describeFailure(connected.error));
@@ -368,7 +397,7 @@ const AddProjectContent = ({ onClose, onCreateNew }: Omit<AddProjectDialogProps,
         const bridge = getAddProjectBridge();
         const path = listing?.path;
 
-        if (bridge === undefined || machine === null || machineId === null || path === undefined || isAdding) {
+        if (bridge === undefined || machine === null || machineId === null || path === undefined || isAdding || typedPath.trim() !== path) {
             return;
         }
 
@@ -385,7 +414,7 @@ const AddProjectContent = ({ onClose, onCreateNew }: Omit<AddProjectDialogProps,
                 projectPath = shared.value.path;
             } else if (!isAlreadySharedError(shared.error)) {
                 setIsAdding(false);
-                setError(describeFailure(shared.error));
+                setError(describeFailure(shared.error), isPathFailure(shared.error));
 
                 return;
             }
@@ -430,7 +459,7 @@ const AddProjectContent = ({ onClose, onCreateNew }: Omit<AddProjectDialogProps,
                     {isAdding && <p className="text-muted-foreground text-sm">{t`Adding the project…`}</p>}
                 </div>
                 {error !== "" && (
-                    <p className="text-destructive text-sm" role="alert">
+                    <p className="text-destructive text-sm" id="add-project-path-error" role="alert">
                         {error}
                     </p>
                 )}
@@ -468,7 +497,7 @@ const AddProjectContent = ({ onClose, onCreateNew }: Omit<AddProjectDialogProps,
                                                     <span className="text-muted-foreground block truncate text-xs">{rowLabel(row)}</span>
                                                     {reason !== "" && (
                                                         <span className="text-muted-foreground block text-xs" id={`machine-reason-${key}`}>
-                                                            {reason}
+                                                            {reasonLabel(reason)}
                                                         </span>
                                                     )}
                                                 </span>
@@ -502,7 +531,8 @@ const AddProjectContent = ({ onClose, onCreateNew }: Omit<AddProjectDialogProps,
                                 {t`Folder path`}
                             </label>
                             <Input
-                                aria-describedby="add-project-path-hint"
+                                aria-describedby={isPathError ? "add-project-path-error add-project-path-hint" : "add-project-path-hint"}
+                                aria-invalid={isPathError}
                                 autoComplete="off"
                                 id="add-project-path"
                                 onChange={(event) => setTypedPath(event.target.value)}
@@ -580,7 +610,11 @@ const AddProjectContent = ({ onClose, onCreateNew }: Omit<AddProjectDialogProps,
                         <Button disabled={isAdding} onClick={goBack} type="button" variant="outline">
                             {t`Back`}
                         </Button>
-                        <Button disabled={isAdding || isBrowsing || listing === null} onClick={() => start(add())} type="button">
+                        <Button
+                            disabled={isAdding || isBrowsing || listing === null || typedPath.trim() !== listing.path}
+                            onClick={() => start(add())}
+                            type="button"
+                        >
                             {isAdding ? t`Adding…` : t`Add project`}
                         </Button>
                     </>
@@ -590,11 +624,15 @@ const AddProjectContent = ({ onClose, onCreateNew }: Omit<AddProjectDialogProps,
     );
 };
 
-const AddProjectDialog = ({ onClose, onCreateNew, open }: AddProjectDialogProps) => (
-    <Dialog onOpenChange={(nextOpen) => !nextOpen && onClose()} open={open}>
-        {/* Mounted only while open: the dialog roots keep closed children mounted, which would reopen the last session. */}
-        {open && <AddProjectContent onClose={onClose} onCreateNew={onCreateNew} />}
-    </Dialog>
-);
+const AddProjectDialog = ({ onClose, onCreateNew, open }: AddProjectDialogProps) => {
+    const [pairingHosts] = useState(() => new Set<string>());
+
+    return (
+        <Dialog onOpenChange={(nextOpen) => !nextOpen && onClose()} open={open}>
+            {/* Mounted only while open: the dialog roots keep closed children mounted, which would reopen the last session. */}
+            {open && <AddProjectContent onClose={onClose} onCreateNew={onCreateNew} pairingHosts={pairingHosts} />}
+        </Dialog>
+    );
+};
 
 export default AddProjectDialog;

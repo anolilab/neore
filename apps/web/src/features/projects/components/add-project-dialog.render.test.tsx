@@ -261,3 +261,198 @@ describe("AddProjectDialog", () => {
         expect(device.shareMachineFolder).not.toHaveBeenCalled();
     });
 });
+
+const noop = () => {};
+
+const settle = () =>
+    new Promise<void>((resolve) => {
+        setTimeout(resolve, 0);
+    });
+
+const deferred = <T,>() => {
+    const settler: { resolve: (value: T) => void } = { resolve: noop };
+    const promise = new Promise<T>((resolve) => {
+        settler.resolve = resolve;
+    });
+
+    return { promise, resolve: (value: T) => settler.resolve(value) };
+};
+
+const PAIRED_NOT_CONNECTED = {
+    disabledReason: null,
+    id: "srv-new",
+    kind: "server",
+    label: "SSH · new · not connected yet",
+    name: "new",
+    spec: null,
+    sshAlias: "new",
+    status: "not-connected",
+};
+
+const page = (path: string) => {
+    return { entries: [], host: "This computer", next: null, parent: null, path };
+};
+
+describe("AddProjectDialog pairing and browsing guards", () => {
+    it("keeps the row locked until the machine list has refreshed after pairing", async () => {
+        const device = installBridge();
+        const refresh = deferred<typeof machines>();
+
+        device.listAddProjectMachines.mockResolvedValueOnce(machines).mockImplementationOnce(() => refresh.promise);
+        render(<AddProjectDialog onClose={noop} onCreateNew={noop} open />);
+
+        const row = await screen.findByRole("button", { name: NEW });
+
+        fireEvent.click(row);
+        await waitFor(() => expect(device.listAddProjectMachines).toHaveBeenCalledTimes(2));
+
+        expect(row).toHaveProperty("disabled", true);
+        fireEvent.click(row);
+        await settle();
+        expect(registerDevice).toHaveBeenCalledTimes(1);
+
+        refresh.resolve(machines);
+        expect(await screen.findByText("Add project on new")).toBeTruthy();
+        expect(registerDevice).toHaveBeenCalledTimes(1);
+    });
+
+    it("does not start a second pairing for the same host after the dialog is closed and reopened", async () => {
+        const device = installBridge();
+        const pairing = deferred<boolean>();
+
+        device.hostPair.mockImplementationOnce(() => pairing.promise);
+
+        const { rerender } = render(<AddProjectDialog onClose={noop} onCreateNew={noop} open />);
+
+        fireEvent.click(await screen.findByRole("button", { name: NEW }));
+        await waitFor(() => expect(device.hostPair).toHaveBeenCalledTimes(1));
+
+        rerender(<AddProjectDialog onClose={noop} onCreateNew={noop} open={false} />);
+        rerender(<AddProjectDialog onClose={noop} onCreateNew={noop} open />);
+
+        fireEvent.click(await screen.findByRole("button", { name: NEW }));
+        await settle();
+
+        expect(registerDevice).toHaveBeenCalledTimes(1);
+        expect(device.hostProbe).toHaveBeenCalledTimes(1);
+
+        pairing.resolve(true);
+        await settle();
+    });
+
+    it("shows a paired server as paired and does not pair again when connecting failed after the pairing", async () => {
+        const device = installBridge();
+
+        device.connectAddProjectMachine.mockRejectedValueOnce(new Error("device: ssh failed"));
+        device.listAddProjectMachines
+            .mockResolvedValueOnce(machines)
+            .mockResolvedValueOnce([...machines.slice(0, 3), PAIRED_NOT_CONNECTED] as unknown as typeof machines);
+        render(<AddProjectDialog onClose={noop} onCreateNew={noop} open />);
+
+        fireEvent.click(await screen.findByRole("button", { name: NEW }));
+        expect(await screen.findByText("The desktop could not complete that. Try again.")).toBeTruthy();
+        expect(device.hostPair).toHaveBeenCalledTimes(1);
+
+        fireEvent.click(await screen.findByRole("button", { name: NEW }));
+        expect(await screen.findByText("Add project on new")).toBeTruthy();
+        expect(device.hostPair).toHaveBeenCalledTimes(1);
+        expect(registerDevice).toHaveBeenCalledTimes(1);
+        expect(device.connectAddProjectMachine).toHaveBeenCalledTimes(2);
+    });
+
+    it("drops a folder that arrives after Back and a second pick of the machine", async () => {
+        const device = installBridge();
+        const first = deferred<ReturnType<typeof page>>();
+
+        device.browseMachineFolders.mockImplementationOnce(() => first.promise as never);
+        render(<AddProjectDialog onClose={noop} onCreateNew={noop} open />);
+
+        fireEvent.click(await screen.findByRole("button", { name: THIS_COMPUTER }));
+        fireEvent.click(await screen.findByRole("button", { name: "Back" }));
+        fireEvent.click(await screen.findByRole("button", { name: THIS_COMPUTER }));
+        await waitFor(() => expect((screen.getByLabelText("Folder path") as HTMLInputElement).value).toBe("/home/me"));
+
+        first.resolve(page("/stale"));
+        await settle();
+
+        expect((screen.getByLabelText("Folder path") as HTMLInputElement).value).toBe("/home/me");
+    });
+
+    it("drops the answer to an earlier path when a newer path was submitted", async () => {
+        const device = installBridge();
+
+        render(<AddProjectDialog onClose={noop} onCreateNew={noop} open />);
+        fireEvent.click(await screen.findByRole("button", { name: THIS_COMPUTER }));
+        await waitFor(() => expect((screen.getByLabelText("Folder path") as HTMLInputElement).value).toBe("/home/me"));
+
+        const slow = deferred<ReturnType<typeof page>>();
+        const input = screen.getByLabelText("Folder path");
+
+        device.browseMachineFolders.mockImplementationOnce(() => slow.promise as never);
+        fireEvent.change(input, { target: { value: "/a" } });
+        fireEvent.submit(input);
+        fireEvent.change(input, { target: { value: "/b" } });
+        fireEvent.submit(input);
+        await waitFor(() => expect((input as HTMLInputElement).value).toBe("/b"));
+
+        slow.resolve(page("/a"));
+        await settle();
+
+        expect((input as HTMLInputElement).value).toBe("/b");
+    });
+
+    it("marks the path input invalid and describes it with the error after a path error", async () => {
+        const device = installBridge();
+
+        render(<AddProjectDialog onClose={noop} onCreateNew={noop} open />);
+        fireEvent.click(await screen.findByRole("button", { name: THIS_COMPUTER }));
+        await waitFor(() => expect((screen.getByLabelText("Folder path") as HTMLInputElement).value).toBe("/home/me"));
+
+        const input = screen.getByLabelText("Folder path");
+
+        device.browseMachineFolders.mockRejectedValueOnce(new Error("device: /nope is a file"));
+        fireEvent.change(input, { target: { value: "/nope" } });
+        fireEvent.submit(input);
+
+        const alert = await screen.findByRole("alert");
+
+        expect(alert.textContent).toBe("That path is a file.");
+        expect(input.getAttribute("aria-invalid")).toBe("true");
+        expect(input.getAttribute("aria-describedby")).toContain(alert.id);
+        expect(input.getAttribute("aria-describedby")).toContain("add-project-path-hint");
+    });
+
+    it("does not mark the path input invalid for an error that is not about the path", async () => {
+        const device = installBridge();
+
+        render(<AddProjectDialog onClose={noop} onCreateNew={noop} open />);
+        fireEvent.click(await screen.findByRole("button", { name: THIS_COMPUTER }));
+        await waitFor(() => expect((screen.getByLabelText("Folder path") as HTMLInputElement).value).toBe("/home/me"));
+
+        const input = screen.getByLabelText("Folder path");
+
+        device.browseMachineFolders.mockRejectedValueOnce(new Error("device: connect the server first"));
+        fireEvent.change(input, { target: { value: "/x" } });
+        fireEvent.submit(input);
+
+        expect(await screen.findByRole("alert")).toBeTruthy();
+        expect(input.getAttribute("aria-invalid")).not.toBe("true");
+    });
+
+    it("keeps Add project disabled while the typed path differs from the folder that was opened", async () => {
+        installBridge();
+        render(<AddProjectDialog onClose={noop} onCreateNew={noop} open />);
+        fireEvent.click(await screen.findByRole("button", { name: THIS_COMPUTER }));
+        await waitFor(() => expect((screen.getByLabelText("Folder path") as HTMLInputElement).value).toBe("/home/me"));
+
+        const add = screen.getByRole("button", { name: "Add project" });
+
+        await waitFor(() => expect(add).toHaveProperty("disabled", false));
+        fireEvent.change(screen.getByLabelText("Folder path"), { target: { value: "/elsewhere" } });
+        expect(add).toHaveProperty("disabled", true);
+
+        fireEvent.click(add);
+        await settle();
+        expect(createProject).not.toHaveBeenCalled();
+    });
+});
