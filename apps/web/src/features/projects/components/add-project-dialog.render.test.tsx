@@ -224,9 +224,22 @@ describe("AddProjectDialog", () => {
         render(<AddProjectDialog onClose={() => {}} onCreateNew={() => {}} open />);
         fireEvent.click(await screen.findByRole("button", { name: NEW }));
 
-        expect(await screen.findByText("Adding the server was cancelled on this computer.")).toBeTruthy();
+        expect(await screen.findByText("Cancelled on this computer.")).toBeTruthy();
         expect(revokeDevice).toHaveBeenCalledWith({ deviceId: "srv-new" });
         expect(device.connectAddProjectMachine).not.toHaveBeenCalled();
+    });
+
+    it("starts every opening at step one, not at the folder of the last session", async () => {
+        installBridge();
+        const { rerender } = render(<AddProjectDialog onClose={() => {}} onCreateNew={() => {}} open />);
+
+        fireEvent.click(await screen.findByRole("button", { name: THIS_COMPUTER }));
+        expect(await screen.findByText("Add project on This computer")).toBeTruthy();
+
+        rerender(<AddProjectDialog onClose={() => {}} onCreateNew={() => {}} open={false} />);
+        rerender(<AddProjectDialog onClose={() => {}} onCreateNew={() => {}} open />);
+
+        expect(await screen.findByText("Where is the project?")).toBeTruthy();
     });
 
     it("browses a folder on this computer and adds the project titled with the folder's name", async () => {

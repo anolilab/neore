@@ -2,12 +2,15 @@ import { describe, expect, it } from "vitest";
 
 import type { AddProjectMachine } from "../../../../../desktop/src/add-project-machines.types";
 import {
-    failureText,
     folderNeedsSharing,
     hostSpecOf,
     isAbsolutePath,
     isAlreadySharedError,
+    isDeclinedError,
+    isFilePathError,
     isMissingFolderError,
+    isNotConnectedError,
+    isUnreadableFolderError,
     joinPath,
     lastSegment,
     machineRowState,
@@ -121,7 +124,13 @@ describe("desktop failures", () => {
         expect(isAlreadySharedError(new Error("device: the person declined"))).toBe(false);
     });
 
-    it("strips the prefixes the bridge adds", () => {
-        expect(failureText(new Error("Error invoking remote method 'x': Error: device: the person declined"))).toBe("the person declined");
+    it("recognises the desktop's refusals whatever prefix the bridge adds", () => {
+        const declined = new Error("Error invoking remote method 'x': Error: device: the person declined");
+
+        expect(isDeclinedError(declined)).toBe(true);
+        expect(isNotConnectedError(new Error("device: connect the server first"))).toBe(true);
+        expect(isFilePathError(new Error("device: that path is a file"))).toBe(true);
+        expect(isUnreadableFolderError(new Error("device: too many entries to browse"))).toBe(true);
+        expect(isDeclinedError(new Error("device: that folder was not found"))).toBe(false);
     });
 });
