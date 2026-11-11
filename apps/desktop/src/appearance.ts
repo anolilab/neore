@@ -1,6 +1,7 @@
 /**
  * How a site window looks before the page paints it, and the system accent colour the page may follow.
  */
+import { readFileSync, renameSync, writeFileSync } from "node:fs";
 
 /**
  * `--background` of `packages/ui/src/global.css` (`--brand-frost`, `--brand-charcoal`). The window is filled with it
@@ -24,6 +25,36 @@ export const windowBackground = ({ dark, vibrancy }: { dark: boolean; vibrancy: 
     }
 
     return dark ? DARK_BACKGROUND : LIGHT_BACKGROUND;
+};
+
+/** The theme the site last showed. The site has its own theme setting, so the system's may not be the page's. */
+export interface Appearance {
+    dark: boolean;
+}
+
+export const APPEARANCE_FILE = "appearance.json";
+
+/** Run in a loaded site page: whether it is dark (the `dark` class the web app's theme sets on the root element). */
+export const PAGE_IS_DARK_SCRIPT = `document.documentElement.classList.contains("dark")`;
+
+/** Anything but `{ dark: boolean }` (no file, a torn one) is `undefined`: the system theme decides. */
+export const readAppearance = (file: string): Appearance | undefined => {
+    try {
+        const data: unknown = JSON.parse(readFileSync(file, "utf8"));
+        const dark = typeof data === "object" && data !== null ? (data as { dark?: unknown }).dark : undefined;
+
+        return typeof dark === "boolean" ? { dark } : undefined;
+    } catch {
+        return undefined;
+    }
+};
+
+/** Temp file, then rename: a crash mid-write leaves the old file, never a torn one. */
+export const writeAppearance = (file: string, appearance: Appearance): void => {
+    const temporary = `${file}.${process.pid}.tmp`;
+
+    writeFileSync(temporary, `${JSON.stringify({ dark: appearance.dark })}\n`);
+    renameSync(temporary, file);
 };
 
 const ACCENT_PATTERN = /^#?([\da-f]{6})(?:[\da-f]{2})?$/iu;

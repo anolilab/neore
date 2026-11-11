@@ -1,6 +1,10 @@
+import { mkdtempSync, writeFileSync } from "node:fs";
+import os from "node:os";
+import path from "node:path";
+
 import { describe, expect, it } from "vitest";
 
-import { accentHex, DARK_BACKGROUND, LIGHT_BACKGROUND, supportsVibrancy, TRANSPARENT_BACKGROUND, windowBackground } from "./appearance.js";
+import { accentHex, DARK_BACKGROUND, LIGHT_BACKGROUND, readAppearance, windowBackground, writeAppearance } from "./appearance.js";
 
 describe(accentHex, () => {
     it.each([
@@ -18,17 +22,23 @@ describe(accentHex, () => {
 });
 
 describe(windowBackground, () => {
-    it("follows the theme, and is clear under vibrancy", () => {
+    it("follows the theme", () => {
         expect(windowBackground({ dark: true, vibrancy: false })).toBe(DARK_BACKGROUND);
         expect(windowBackground({ dark: false, vibrancy: false })).toBe(LIGHT_BACKGROUND);
-        expect(windowBackground({ dark: true, vibrancy: true })).toBe(TRANSPARENT_BACKGROUND);
     });
 });
 
-describe(supportsVibrancy, () => {
-    it("is macOS only", () => {
-        expect(supportsVibrancy("darwin")).toBe(true);
-        expect(supportsVibrancy("win32")).toBe(false);
-        expect(supportsVibrancy("linux")).toBe(false);
+describe(readAppearance, () => {
+    it("reads back what was written, and is undefined for no file or a torn one", () => {
+        const directory = mkdtempSync(path.join(os.tmpdir(), "neore-appearance-"));
+        const file = path.join(directory, "appearance.json");
+
+        expect(readAppearance(file)).toBeUndefined();
+        writeAppearance(file, { dark: true });
+        expect(readAppearance(file)).toStrictEqual({ dark: true });
+        writeFileSync(file, `{"dark":`);
+        expect(readAppearance(file)).toBeUndefined();
+        writeFileSync(file, `{"dark":"yes"}`);
+        expect(readAppearance(file)).toBeUndefined();
     });
 });

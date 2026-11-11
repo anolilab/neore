@@ -26,7 +26,7 @@ interface WindowState {
     /** The departing document's own phase and kind while a navigation is pending, given back if none commits. */
     resume?: { phase: Phase; toSite: boolean };
     timer?: ReturnType<typeof setTimeout>;
-    /** The current document is not the site (the recovery page): nothing is queued for it. */
+    /** The current document is not the site (the recovery page): nothing is queued for it; `offSite` takes a command. */
     toSite: boolean;
 }
 
@@ -34,6 +34,8 @@ export interface MenuDeliveryOptions<W> {
     /** The page did not listen: New Chat can still be loaded by URL; the rest is dropped. */
     fallback: (win: W, command: MenuCommand) => void;
     isShowingSite: (win: W) => boolean;
+    /** The committed document is not the site (the recovery page): it holds no work, so New Chat may replace it. */
+    offSite: (win: W, command: MenuCommand) => void;
     send: (win: W, command: MenuCommand) => void;
 }
 
@@ -57,7 +59,7 @@ export interface MenuDelivery<W> {
     unready: (win: W) => void;
 }
 
-export const createMenuDelivery = <W>({ fallback, isShowingSite, send }: MenuDeliveryOptions<W>): MenuDelivery<W> => {
+export const createMenuDelivery = <W>({ fallback, isShowingSite, offSite, send }: MenuDeliveryOptions<W>): MenuDelivery<W> => {
     const states = new Map<W, WindowState>();
 
     const stateOf = (win: W): WindowState => {
@@ -81,11 +83,16 @@ export const createMenuDelivery = <W>({ fallback, isShowingSite, send }: MenuDel
     const deliver = (win: W, command: MenuCommand): void => {
         const state = stateOf(win);
 
+        // Only a committed document is ever off the site: a navigation under way counts as going to the site.
+        if (!state.toSite) {
+            offSite(win, command);
+
+            return;
+        }
+
         if (state.phase === "loading") {
-            if (state.toSite) {
-                // One of each, in the order last asked for: a second ⌘N while loading is still one new chat.
-                state.queue = [...state.queue.filter((queued) => queued !== command), command];
-            }
+            // One of each, in the order last asked for: a second ⌘N while loading is still one new chat.
+            state.queue = [...state.queue.filter((queued) => queued !== command), command];
 
             return;
         }

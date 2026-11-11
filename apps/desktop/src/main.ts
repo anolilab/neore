@@ -9,12 +9,12 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
-import type { BrowserWindowConstructorOptions, IpcMainInvokeEvent, WebPreferences } from "electron";
+import type { BrowserWindowConstructorOptions, IpcMainInvokeEvent, WebContents, WebPreferences } from "electron";
 import { app, BrowserWindow, globalShortcut, ipcMain, Menu, nativeImage, nativeTheme, Notification, screen, session, shell, systemPreferences, Tray } from "electron";
 
 import type { MenuCommand } from "./app-menu.js";
 import { buildAppMenuTemplate } from "./app-menu.js";
-import { accentHex, SHOW_FALLBACK_MS, supportsVibrancy, windowBackground } from "./appearance.js";
+import { accentHex, APPEARANCE_FILE, PAGE_IS_DARK_SCRIPT, readAppearance, SHOW_FALLBACK_MS, supportsVibrancy, windowBackground, writeAppearance } from "./appearance.js";
 import { createSetBadgeHandler } from "./badge.js";
 import { CAPABILITIES_ARG, CHANNEL, SITE_ORIGIN_ARG } from "./channels.js";
 import { registerDeviceIpc } from "./device/index.js";
@@ -271,7 +271,8 @@ const isShowingSite = (win: BrowserWindow): boolean => !win.isDestroyed() && isT
 
 /**
  * Menu commands wait for the page to listen. A page that never does (an older site) gets New Chat in a window of its
- * own: loading it over the current page would cut off a reply that is still streaming there.
+ * own: loading it over the current page would cut off a reply that is still streaming there. The recovery page holds no
+ * work, so New Chat loads the site over it.
  */
 const menuDelivery = createMenuDelivery<BrowserWindow>({
     fallback: (win, command) => {
@@ -283,6 +284,13 @@ const menuDelivery = createMenuDelivery<BrowserWindow>({
         }
     },
     isShowingSite,
+    offSite: (win, command) => {
+        if (command === "new-chat") {
+            win.loadURL(newChatUrl(origin).href);
+        } else {
+            log(`the window shows no site page; "${command}" dropped`);
+        }
+    },
     send: (win, command) => win.webContents.send(CHANNEL.menuCommand, command),
 });
 
@@ -296,8 +304,27 @@ const broadcastSystemAccent = (): void => {
     }
 };
 
-/** Filled with the page's own background until its first paint; with vibrancy, left clear so the material shows. */
-const siteBackground = (withVibrancy: boolean): string => windowBackground({ dark: nativeTheme.shouldUseDarkColors, vibrancy: withVibrancy });
+const appearanceFile = (): string => path.join(app.getPath("userData"), APPEARANCE_FILE);
+
+/**
+ * Filled with the page's own background until its first paint; with vibrancy, left clear so the material shows. The
+ * site has a theme setting of its own, so the theme its last load showed wins over the system's.
+ */
+const siteBackground = (withVibrancy: boolean): string =>
+    windowBackground({ dark: readAppearance(appearanceFile())?.dark ?? nativeTheme.shouldUseDarkColors, vibrancy: withVibrancy });
+
+/** Keeps the theme a loaded site page shows, for the next window's pre-paint fill. A failure is logged, never thrown. */
+const rememberSiteTheme = async (contents: WebContents): Promise<void> => {
+    try {
+        const dark: unknown = await contents.executeJavaScript(PAGE_IS_DARK_SCRIPT);
+
+        if (typeof dark === "boolean" && readAppearance(appearanceFile())?.dark !== dark) {
+            writeAppearance(appearanceFile(), { dark });
+        }
+    } catch (error) {
+        log(`could not keep the page's theme: ${String(error)}`);
+    }
+};
 
 /** The reveal of each window that has not been shown yet. A window without an entry has been revealed. */
 const pendingReveals = new WeakMap<BrowserWindow, () => void>();
@@ -477,14 +504,18 @@ const guardSiteWindow = (win: BrowserWindow, reveal: () => void): void => {
         contents.loadURL(recoveryPageUrl("crashed", newChatUrl(origin).href, details.reason));
     });
 
-    if (process.platform === "darwin") {
-        contents.on("did-finish-load", () => {
-            // Only the site gets the strip: the page is ours, and the script is ours too.
-            if (isTrustedUrl(origin, contents.getURL())) {
-                contents.executeJavaScript(TITLE_BAR_SCRIPT);
-            }
-        });
-    }
+    contents.on("did-finish-load", () => {
+        // Only the site gets the strip and is asked its theme: the page is ours, and the scripts are ours too.
+        if (!isTrustedUrl(origin, contents.getURL())) {
+            return;
+        }
+
+        if (process.platform === "darwin") {
+            contents.executeJavaScript(TITLE_BAR_SCRIPT);
+        }
+
+        rememberSiteTheme(contents);
+    });
 };
 
 /**

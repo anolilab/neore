@@ -10,17 +10,21 @@ interface Win {
 const setup = () => {
     const sent: [Win, MenuCommand][] = [];
     const fellBack: [Win, MenuCommand][] = [];
+    const offSite: [Win, MenuCommand][] = [];
     const delivery = createMenuDelivery<Win>({
         fallback: (win, command) => {
             fellBack.push([win, command]);
         },
         isShowingSite: (win) => win.onSite,
+        offSite: (win, command) => {
+            offSite.push([win, command]);
+        },
         send: (win, command) => {
             sent.push([win, command]);
         },
     });
 
-    return { delivery, fellBack, sent };
+    return { delivery, fellBack, offSite, sent };
 };
 
 describe(createMenuDelivery, () => {
@@ -94,7 +98,7 @@ describe(createMenuDelivery, () => {
     });
 
     it("queues nothing for a document that is not the site, and drops what was held when the window turns to one", () => {
-        const { delivery, fellBack, sent } = setup();
+        const { delivery, fellBack, offSite, sent } = setup();
         const win = { onSite: true };
 
         delivery.deliver(win, "new-chat");
@@ -109,6 +113,26 @@ describe(createMenuDelivery, () => {
         delivery.ready(win);
 
         expect(sent).toStrictEqual([]);
+        expect(fellBack).toStrictEqual([]);
+        expect(offSite).toStrictEqual([[win, "settings"]]);
+    });
+
+    it("hands a command for a committed off-site document over at once, and holds it again once a navigation starts", () => {
+        const { delivery, fellBack, offSite, sent } = setup();
+        const win = { onSite: false };
+
+        delivery.navigated(win, false);
+        delivery.deliver(win, "new-chat");
+        expect(offSite).toStrictEqual([[win, "new-chat"]]);
+
+        delivery.navigationStarted(win);
+        delivery.deliver(win, "settings");
+        win.onSite = true;
+        delivery.navigated(win, true);
+        delivery.ready(win);
+
+        expect(offSite).toStrictEqual([[win, "new-chat"]]);
+        expect(sent).toStrictEqual([[win, "settings"]]);
         expect(fellBack).toStrictEqual([]);
     });
 

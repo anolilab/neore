@@ -11,7 +11,7 @@ import path from "node:path";
 
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
-import { SHOW_FALLBACK_MS } from "./appearance.js";
+import { APPEARANCE_FILE, SHOW_FALLBACK_MS } from "./appearance.js";
 import { CAPABILITIES_ARG } from "./channels.js";
 import { DICTATION_SHORTCUT } from "./dictation/hold.js";
 import { MENU_READY_GRACE_MS } from "./menu-delivery.js";
@@ -31,6 +31,7 @@ interface FakeWindow {
     sent: string[];
     shown: boolean;
     webContents: {
+        executeJavaScript: (code: string) => Promise<unknown>;
         getURL: () => string;
         handlers: Map<string, Listener>;
         id: number;
@@ -56,10 +57,14 @@ interface Fake {
     notificationFails: boolean;
     notifications: { body?: string; title: string }[];
     opened: string[];
+    /** What a site page answers to `executeJavaScript` (whether it is dark). */
+    pageDark: boolean;
     payloads: { channel: string; payload: unknown; window: number }[];
     permissionCheck?: (wc: unknown, permission: string, requestingOrigin: string, details?: unknown) => boolean;
     permissionRequest?: (wc: unknown, permission: string, callback: (isAllowed: boolean) => void, details: { mediaTypes?: string[]; requestingUrl: string }) => void;
     shortcuts: Map<string, () => void>;
+    /** `nativeTheme.shouldUseDarkColors`. */
+    systemDark: boolean;
     /** `nativeTheme.on(...)`, by event name. */
     themeListeners: string[];
     trayFails: boolean;
@@ -79,8 +84,10 @@ vi.mock("electron", () => {
         notificationFails: false,
         notifications: [],
         opened: [],
+        pageDark: true,
         payloads: [],
         shortcuts: new Map(),
+        systemDark: true,
         themeListeners: [],
         trayFails: false,
         trays: 0,
@@ -136,6 +143,7 @@ vi.mock("electron", () => {
             },
             shown: false,
             webContents: {
+                executeJavaScript: async () => fakeElectron.pageDark,
                 getURL: () => window.loaded.at(-1) ?? "",
                 handlers: webHandlers,
                 id,
@@ -237,7 +245,9 @@ vi.mock("electron", () => {
             on: (event: string) => {
                 fakeElectron.themeListeners.push(event);
             },
-            shouldUseDarkColors: true,
+            get shouldUseDarkColors() {
+                return fakeElectron.systemDark;
+            },
         },
         Notification: FakeNotification,
         screen: {
@@ -960,12 +970,27 @@ describe("look and application menu", () => {
         navigate(mainWindow(), "data:text/html,recovery");
         fake().payloads.length = 0;
         fake().focusedWindow = mainWindow();
-        menuItem("New Chat")?.click?.();
-        fake().focusedWindow = null;
         menuItem("Settings…")?.click?.();
+        fake().focusedWindow = null;
         fake().accentChangedListeners.forEach((listener) => listener());
 
         expect(fake().payloads.filter((sent) => sent.window === mainWindow().id)).toStrictEqual([]);
+        onSite();
+    });
+
+    it("loads a new chat over the recovery page of the main window, and drops Settings", () => {
+        const win = mainWindow();
+        const windowCount = fake().windows.length;
+
+        navigate(win, "data:text/html,recovery");
+        fake().payloads.length = 0;
+        menuItem("Settings…")?.click?.();
+        expect(win.loaded.at(-1)).toBe("data:text/html,recovery");
+
+        menuItem("New Chat")?.click?.();
+        expect(win.loaded.at(-1)).toBe(`${SITE}/chat`);
+        expect(fake().windows).toHaveLength(windowCount);
+        expect(menuPayloads()).toStrictEqual([]);
         onSite();
     });
 
@@ -1125,7 +1150,11 @@ describe("tray failure", () => {
  * Starts the app again as `platform`, with `saved` as the window state on disk, and returns the new main window and the
  * state file. Like `startWithoutTray`, it re-imports `main.js`; the windows of the earlier start stay in the fake.
  */
-const restart = async (platform: NodeJS.Platform, saved?: { maximized: boolean }): Promise<{ file: string; win: FakeWindow }> => {
+const restart = async (
+    platform: NodeJS.Platform,
+    saved?: { maximized: boolean },
+    appearance?: { dark: boolean },
+): Promise<{ file: string; userData: string; win: FakeWindow }> => {
     const original = Object.getOwnPropertyDescriptor(process, "platform");
     const userData = mkdtempSync(path.join(os.tmpdir(), "neore-desktop-test-"));
     const file = path.join(userData, WINDOW_STATE_FILE);
@@ -1133,6 +1162,10 @@ const restart = async (platform: NodeJS.Platform, saved?: { maximized: boolean }
 
     if (saved !== undefined) {
         writeFileSync(file, JSON.stringify({ bounds: { height: 700, width: 1000, x: 10, y: 10 }, maximized: saved.maximized }));
+    }
+
+    if (appearance !== undefined) {
+        writeFileSync(path.join(userData, APPEARANCE_FILE), JSON.stringify(appearance));
     }
 
     fake().userData = userData;
@@ -1148,7 +1181,7 @@ const restart = async (platform: NodeJS.Platform, saved?: { maximized: boolean }
         }
     }
 
-    return { file, win: fake().windows[first] as FakeWindow };
+    return { file, userData, win: fake().windows[first] as FakeWindow };
 };
 
 const readSaved = (file: string): { maximized: boolean } => JSON.parse(readFileSync(file, "utf8")) as { maximized: boolean };
@@ -1239,6 +1272,46 @@ describe("main window reveal and saved state", () => {
         expect(win.options).not.toHaveProperty("vibrancy");
         expect(win.options).toMatchObject({ backgroundColor: "#212121" });
         expect(capabilitiesOf(win)).not.toContain("vibrancy");
+    });
+
+    describe("the pre-paint fill on a light system", () => {
+        afterEach(() => {
+            fake().systemDark = true;
+            fake().pageDark = true;
+        });
+
+        it("follows the theme the site last showed, not the system's", async () => {
+            fake().systemDark = false;
+
+            const { win } = await restart("linux", undefined, { dark: true });
+
+            expect(win.options).toMatchObject({ backgroundColor: "#212121" });
+        });
+
+        it("keeps the theme a loaded site page shows for the next window, and asks no other page", async () => {
+            fake().systemDark = false;
+
+            const { userData, win } = await restart("linux");
+            const finished = (): void => guardOf(win, "did-finish-load")?.({ preventDefault: () => {} }, "");
+            const appearanceFile = path.join(userData, APPEARANCE_FILE);
+
+            expect(win.options).toMatchObject({ backgroundColor: "#f2f2f2" });
+
+            win.webContents.loadURL("data:text/html,recovery");
+            finished();
+            // Whatever the page might have answered has been written by now.
+            await new Promise((resolve) => {
+                setImmediate(resolve);
+            });
+            expect(() => readFileSync(appearanceFile, "utf8")).toThrow("ENOENT");
+
+            win.webContents.loadURL(`${SITE}/chat`);
+            finished();
+            await vi.waitFor(() => expect(JSON.parse(readFileSync(appearanceFile, "utf8"))).toStrictEqual({ dark: true }));
+
+            fake().ipc.get("neore:open-thread-window")?.(topFrameOf(win, `${SITE}/chat`), "thread-theme");
+            expect(fake().windows.at(-1)?.options).toMatchObject({ backgroundColor: "#212121" });
+        });
     });
 
     it("on macOS draws the sidebar material through a transparent window and advertises it", async () => {
