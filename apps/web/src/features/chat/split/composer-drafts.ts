@@ -51,6 +51,28 @@ export const draftsClearedAt = (userId: string): number => {
 };
 
 /**
+ * Removes the clear markers older than `maxAgeMs` (the drafts' TTL): by then no tab still holds a binding from before them that
+ * has not written since, and a departed account's id does not stay on the device for good. Unreadable markers go too.
+ */
+export const pruneClearMarkers = (maxAgeMs: number, now = Date.now()): void => {
+    try {
+        for (const key of Object.keys(globalThis.localStorage)) {
+            if (!key.startsWith(CLEARED_KEY_PREFIX)) {
+                continue;
+            }
+
+            const at = Number(globalThis.localStorage.getItem(key));
+
+            if (!Number.isFinite(at) || at < now - maxAgeMs) {
+                globalThis.localStorage.removeItem(key);
+            }
+        }
+    } catch {
+        // Blocked storage holds no markers.
+    }
+};
+
+/**
  * Removes `userId`'s stored drafts, never another account's; every account's when `userId` is undefined (a sign-out that could
  * not read who signs out). For sign-out and an account switch: the drafts are the account's, not the browser's. It moves the
  * account's generation on, so a write scheduled before it drops itself.

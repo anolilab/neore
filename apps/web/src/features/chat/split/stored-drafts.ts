@@ -11,6 +11,7 @@ import {
     draftsClearedAt,
     hasDraftContent,
     peekComposerDraft,
+    pruneClearMarkers,
     useParkedDraftStore,
     useSplitViewMountedStore,
 } from "./composer-drafts";
@@ -198,6 +199,8 @@ const state = {
     mine: new Map<string, { content: string; w: string }>(),
     /** The composer holds a route's prefilled message nobody edited: it is no chat's draft, and the chat's stored one stays. */
     prefill: false,
+    /** An untouched prefilled message is being sent: the chat's draft comes back when the send ends. */
+    prefillSending: false,
 
     /**
      * Set while the composer that owned the binding is unmounted (`releaseStoredDrafts`), to the chat its text was stored under:
@@ -350,6 +353,7 @@ const start = (): void => {
     state.started = true;
     remove(LEGACY_DRAFTS_KEY);
     prune(DRAFT_KEY_PREFIX);
+    pruneClearMarkers(DRAFT_TTL_MS);
     draftOwnership.handOver = handOver;
 };
 
@@ -410,6 +414,20 @@ const listen = (): void => {
     }
 
     const stopComposer = useChatUIStore.subscribe((next, previous) => {
+        // The send of an untouched prefilled message ended: the chat's own draft comes back now, unless the failed send's text
+        // came back first (it matched the prefill again, so it is held as one).
+        if (state.prefillSending && previous.isSubmitting && !next.isSubmitting) {
+            state.prefillSending = false;
+
+            if (!state.prefill) {
+                draftOwnership.prefill = undefined;
+
+                if (state.binding && !hasDraftContent(next)) {
+                    restore(state.binding.owner, state.binding.userId);
+                }
+            }
+        }
+
         if (
             next.composerText === previous.composerText &&
             next.composerAttachments === previous.composerAttachments &&
@@ -437,15 +455,22 @@ const listen = (): void => {
             } else if (next.composerText !== "" && next.composerText === draftOwnership.prefill) {
                 holdPrefill(binding?.owner);
             } else {
-                const wasPrefill = state.prefill;
+                const emptied = state.prefill && !hasDraftContent(next);
 
-                draftOwnership.prefill = undefined;
                 state.prefill = false;
                 state.carried = false;
 
-                // The prefilled message was sent or cleared: the chat's own draft comes back.
-                if (wasPrefill && binding && !hasDraftContent(next)) {
-                    restore(binding.owner, binding.userId);
+                if (emptied && next.isSubmitting) {
+                    // Sent: a failed send hands the text back, and it must stay the prefill, not overwrite the chat's draft. The
+                    // draft comes back once the send ends (above).
+                    state.prefillSending = true;
+                } else {
+                    draftOwnership.prefill = undefined;
+
+                    // The prefilled message was cleared: the chat's own draft comes back.
+                    if (emptied && binding) {
+                        restore(binding.owner, binding.userId);
+                    }
                 }
             }
         }
@@ -540,6 +565,7 @@ export const resetStoredDraftsForTests = (): void => {
     state.locked.clear();
     state.mine.clear();
     state.prefill = false;
+    state.prefillSending = false;
     state.released = undefined;
     state.started = false;
     listening.stop?.();

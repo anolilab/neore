@@ -321,6 +321,15 @@ describe("restoring", () => {
 });
 
 describe("loading", () => {
+    it("removes clear markers older than the drafts' TTL on its first use, and keeps newer ones", () => {
+        localStorage.setItem("neore-draft-cleared:old-user", String(Date.now() - DRAFT_TTL_MS - 1));
+        localStorage.setItem("neore-draft-cleared:recent-user", String(Date.now()));
+        bindStoredDrafts("thread-a", "user-1", false);
+
+        expect(localStorage.getItem("neore-draft-cleared:old-user")).toBeNull();
+        expect(localStorage.getItem("neore-draft-cleared:recent-user")).not.toBeNull();
+    });
+
     it("removes expired entries and the old single record on its first use after a load, with no write", () => {
         put("thread-a", "stale", { at: Date.now() - DRAFT_TTL_MS - 1, userId: "user-2" });
         put("thread-b", "fresh");
@@ -457,6 +466,37 @@ describe("a prefilled message", () => {
         vi.advanceTimersByTime(DRAFT_WRITE_DELAY_MS);
 
         expect(text("thread-a")).toBe("saved draft");
+    });
+
+    it("keeps the chat's saved draft when sending the prefill fails and its text comes back", () => {
+        put("thread-a", "saved draft");
+        prefill("from the link");
+        bindStoredDrafts("thread-a", "user-1", false);
+
+        // The send: submitting first, then the composer empties.
+        useChatUIStore.getState().setIsSubmitting(true);
+        useChatUIStore.getState().clearComposer();
+
+        expect(useChatUIStore.getState().composerText).toBe("");
+
+        // It fails: the text comes back, then submitting ends.
+        useChatUIStore.getState().setComposerText("from the link");
+        useChatUIStore.getState().setIsSubmitting(false);
+        vi.advanceTimersByTime(DRAFT_WRITE_DELAY_MS);
+
+        expect(useChatUIStore.getState().composerText).toBe("from the link");
+        expect(text("thread-a")).toBe("saved draft");
+    });
+
+    it("brings the chat's saved draft back once the prefill's send ends", () => {
+        put("thread-a", "saved draft");
+        prefill("from the link");
+        bindStoredDrafts("thread-a", "user-1", false);
+        useChatUIStore.getState().setIsSubmitting(true);
+        useChatUIStore.getState().clearComposer();
+        useChatUIStore.getState().setIsSubmitting(false);
+
+        expect(useChatUIStore.getState().composerText).toBe("saved draft");
     });
 
     it("is stored once edited", () => {
