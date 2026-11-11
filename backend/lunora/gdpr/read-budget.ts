@@ -15,6 +15,12 @@ export const READ_MARGIN_BYTES = 8 * 1024 * 1024;
  */
 export const TRIGGER_READ_BYTES = 12 * 1024 * 1024;
 
+/**
+ * What the coding-agent sessions may read. They are read first and cannot be cut short, so they keep the margin and the
+ * floor below free for the sections after them: past this the export fails with PAYLOAD_TOO_LARGE, never reads past the budget.
+ */
+export const ACP_READ_BYTES = ACTION_READ_BYTES - READ_MARGIN_BYTES;
+
 /** The least the project repositories may read, even when earlier sections used the rest of the budget. */
 export const REPOSITORIES_READ_FLOOR_BYTES = 256 * 1024;
 

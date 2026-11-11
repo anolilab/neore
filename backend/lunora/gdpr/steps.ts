@@ -4,7 +4,7 @@ import { PROJECT_SKILL_KEY } from "../usage/activity-logic";
 import { collectAcpSessionPages } from "../acp/gdpr";
 import { collectAllTriggers } from "../triggers/export-pages";
 import { collectAllRepositories } from "../projects/export-pages";
-import { projectDetailsReadBudget, repositoriesReadBudget, triggerReadBudget } from "./read-budget";
+import { ACP_READ_BYTES, projectDetailsReadBudget, repositoriesReadBudget, triggerReadBudget } from "./read-budget";
 import { internal } from "../_generated/internal";
 import type { Doc, Id } from "../_generated/dataModel";
 import { internalAction, internalQuery } from "../_generated/server";
@@ -593,7 +593,8 @@ export const generateExportFile = internalAction
             args.acpSessions ??
             (await collectAcpSessionPages(
                 async (cursor) => await context.runQuery(internal.acp.gdpr.collectAcpSessionsForExport, { cursor, userId: args.userId }),
-                MAX_EXPORT_BYTES,
+                // The sessions' own cap is below the action's budget, so the sections after them keep room to read.
+                ACP_READ_BYTES,
             ));
         // The project repositories share the action's read budget with the ACP sessions. Their rows cannot be cut short,
         // so a set too large for what is left fails with PAYLOAD_TOO_LARGE (a floor keeps a small set exportable even past
