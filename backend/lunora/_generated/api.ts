@@ -632,8 +632,8 @@ export interface ApiTypes {
             installPlugin: FunctionReference<"action", { contentHash: string; markdown: string }, { installId: string; items: Array<{ id: string; key: string; kind: "skill" | "trigger" | "group"; title: string }> }>;
             previewPlugin: FunctionReference<"action", { markdown: string }, { contentHash: string; items: Array<{ key: string; kind: "skill" | "trigger" | "group"; title: string; warnings: Array<string> }>; name: string; pluginSlug: string; pluginVersion: string }>;
         };
-        repair: {
-            repairPlugin: FunctionReference<"mutation", { pluginSlug: string }, { linked: number; missing: Array<string>; status: "installed" | "needs-repair" }>;
+        repair_resume: {
+            repairPlugin: FunctionReference<"action", { contentHash: string; markdown: string; pluginSlug: string }, { created: Array<string>; status: "installed" | "needs-repair" }>;
         };
         uninstall: {
             uninstallPlugin: FunctionReference<"mutation", { pluginSlug: string }, { kept: Array<string>; removed: number }>;
@@ -1564,8 +1564,8 @@ export const api: ApiTypes = {
             installPlugin: { __lunoraRef: "plugins_install_action:installPlugin" },
             previewPlugin: { __lunoraRef: "plugins_install_action:previewPlugin" },
         },
-        repair: {
-            repairPlugin: { __lunoraRef: "plugins_repair:repairPlugin" },
+        repair_resume: {
+            repairPlugin: { __lunoraRef: "plugins_repair_resume:repairPlugin" },
         },
         uninstall: {
             uninstallPlugin: { __lunoraRef: "plugins_uninstall:uninstallPlugin" },
