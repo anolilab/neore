@@ -33,6 +33,8 @@ export const DRAFT_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 export const MAX_STORED_DRAFTS = 50;
 export const DRAFT_WRITE_DELAY_MS = 400;
 export const NEW_CHAT_DRAFT_KEY = "new";
+/** How far ahead of this clock a saved time may be (another device's clock, a correction): later ones are unreadable. */
+export const DRAFT_CLOCK_SKEW_MS = 24 * 60 * 60 * 1000;
 
 export interface StoredDraft {
     a?: StoredAttachment[];
@@ -109,7 +111,9 @@ const readEntry = (key: string, now = Date.now()): Entry | undefined => {
             !isRecord(parsed.v) ||
             typeof parsed.v.t !== "string" ||
             typeof parsed.t !== "number" ||
+            !Number.isFinite(parsed.t) ||
             parsed.t < now - DRAFT_TTL_MS ||
+            parsed.t > now + DRAFT_CLOCK_SKEW_MS ||
             typeof parsed.w !== "string"
         ) {
             return undefined;
@@ -194,6 +198,12 @@ const state = {
     mine: new Map<string, { content: string; w: string }>(),
     /** The composer holds a route's prefilled message nobody edited: it is no chat's draft, and the chat's stored one stays. */
     prefill: false,
+
+    /**
+     * Set while the composer that owned the binding is unmounted (`releaseStoredDrafts`), to the chat its text was stored under:
+     * nothing the shared composer gets meanwhile is stored, and that chat's entry stays.
+     */
+    released: undefined as string | undefined,
     started: false,
     timer: undefined as ReturnType<typeof setTimeout> | undefined,
 };
@@ -212,7 +222,7 @@ const snapshot = (owner: string): Map<string, StoredDraft> => {
 
     // Carried text stays its first chat's; an untouched prefill is no chat's.
     const liveOwner = state.carried ? state.carriedFrom : owner;
-    const live = state.prefill ? undefined : toStoredDraft(useChatUIStore.getState());
+    const live = state.prefill || state.released !== undefined ? undefined : toStoredDraft(useChatUIStore.getState());
 
     // An empty composer does not hide the chat's parked draft: focus moving to another pane parks it, then empties the composer.
     if (live && liveOwner !== undefined) {
@@ -260,7 +270,7 @@ export const flushStoredDrafts = (): void => {
     const current = snapshot(binding.owner);
 
     for (const [owner, { w }] of state.mine) {
-        if (current.has(owner)) {
+        if (current.has(owner) || owner === state.released) {
             continue;
         }
 
@@ -418,7 +428,13 @@ const listen = (): void => {
         ) {
             const { binding } = state;
 
-            if (next.composerText !== "" && next.composerText === draftOwnership.prefill) {
+            if (state.released !== undefined) {
+                // Edited with no chat's composer on the page: no chat's draft. The released chat's entry stays its draft, and is no
+                // longer this page's to remove.
+                state.mine.delete(state.released);
+                state.carried = true;
+                state.carriedFrom = undefined;
+            } else if (next.composerText !== "" && next.composerText === draftOwnership.prefill) {
                 holdPrefill(binding?.owner);
             } else {
                 const wasPrefill = state.prefill;
@@ -473,6 +489,7 @@ export const bindStoredDrafts = (owner: string, userId: string, locked: boolean)
     }
 
     state.prefill = false;
+    state.released = undefined;
 
     if (ui.composerText !== "" && ui.composerText === draftOwnership.prefill) {
         holdPrefill(owner);
@@ -499,6 +516,20 @@ export const bindStoredDrafts = (owner: string, userId: string, locked: boolean)
     schedule();
 };
 
+/**
+ * The composer of `owner` unmounted and no other took over yet (`useStoredDrafts`' cleanup): its pending write lands now, and
+ * nothing the shared composer gets from here on is stored under `owner`. Its entry stays: it is the chat's draft. The binding
+ * itself stays, so the next composer still sees where any text came from.
+ */
+export const releaseStoredDrafts = (owner: string): void => {
+    if (state.binding?.owner !== owner) {
+        return;
+    }
+
+    flushStoredDrafts();
+    state.released = state.carried ? state.carriedFrom : owner;
+};
+
 /** For tests: forgets this page's state and stops listening. */
 export const resetStoredDraftsForTests = (): void => {
     clearTimeout(state.timer);
@@ -509,6 +540,7 @@ export const resetStoredDraftsForTests = (): void => {
     state.locked.clear();
     state.mine.clear();
     state.prefill = false;
+    state.released = undefined;
     state.started = false;
     listening.stop?.();
 };

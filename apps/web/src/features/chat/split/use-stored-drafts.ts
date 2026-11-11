@@ -15,6 +15,9 @@ export const keepsStoredDraft = (
     ownComposer: boolean,
 ): boolean => composerActive && !ownComposer && (isNewThread || (thread !== null && thread !== undefined && thread.runner !== "host"));
 
+/** The storage module once it loaded, so a cleanup can release its binding synchronously, before the next composer binds. */
+const loaded: { module?: typeof import("./stored-drafts") } = {};
+
 /**
  * Keeps the composer's draft in `localStorage` under `owner` (a chat id, or "new") for `userId`, and brings a stored draft back
  * into an empty composer. The storage code loads after the composer has painted. Nothing is stored without a user.
@@ -37,9 +40,11 @@ const useStoredDrafts = (owner: string, userId: string | undefined, locked: bool
         const generation = draftGeneration(userId);
 
         void import("./stored-drafts")
-            .then(({ bindStoredDrafts }) => {
+            .then((module) => {
+                loaded.module = module;
+
                 if (current && generation === draftGeneration(userId)) {
-                    bindStoredDrafts(owner, userId, locked);
+                    module.bindStoredDrafts(owner, userId, locked);
                 }
 
                 return undefined;
@@ -50,6 +55,7 @@ const useStoredDrafts = (owner: string, userId: string | undefined, locked: bool
 
         return () => {
             current = false;
+            loaded.module?.releaseStoredDrafts(owner);
         };
     }, [locked, owner, userId]);
 };

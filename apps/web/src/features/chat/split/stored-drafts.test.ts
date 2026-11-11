@@ -32,6 +32,9 @@ const put = (owner: string, t: string, { at = Date.now(), userId = "user-1", w =
     localStorage.setItem(draftKey(userId, owner), JSON.stringify({ t: at, v: { t }, w }));
 };
 
+/** A day in ms, spelled out so the test does not lean on the module's own window. */
+const DAY_MS = 24 * 60 * 60 * 1000;
+
 const draftKeys = (): string[] => Object.keys(localStorage).filter((key) => key.startsWith("neore-draft:"));
 
 const type = (value: string): void => {
@@ -272,6 +275,18 @@ describe("restoring", () => {
         expect(useChatUIStore.getState().composerText).toBe("typing");
     });
 
+    it("treats a draft saved too far in the future as unreadable, so a clock set back cannot keep it past the TTL", () => {
+        put("thread-a", "from the future", { at: Date.now() + 2 * DAY_MS });
+        bindStoredDrafts("thread-a", "user-1", false);
+
+        expect(useChatUIStore.getState().composerText).toBe("");
+
+        saveComposerDraft("thread-b", { composerText: "fresh" });
+        flushStoredDrafts();
+
+        expect(draftKeys()).toStrictEqual([draftKey("user-1", "thread-b")]);
+    });
+
     it("deletes drafts older than the TTL from storage on the next write, not only ignores them", () => {
         put("thread-a", "stale", { at: Date.now() - DRAFT_TTL_MS - 1 });
         bindStoredDrafts("thread-a", "user-1", false);
@@ -479,6 +494,23 @@ describe("storage that fails", () => {
             dropStoredDrafts("user-1");
         }).not.toThrow();
         expect(useChatUIStore.getState().composerText).toBe("still typing");
+    });
+
+    it("removes the departing account's drafts on sign-out even when storage is too full for the clear marker", () => {
+        put("thread-a", "on a shared device");
+
+        const { setItem } = Storage.prototype;
+
+        vi.spyOn(Storage.prototype, "setItem").mockImplementation((key: string, value: string) => {
+            if (key.startsWith("neore-draft-cleared:")) {
+                throw new Error("QuotaExceededError");
+            }
+
+            setItem.call(localStorage, key, value);
+        });
+        dropStoredDrafts("user-1");
+
+        expect(draftKeys()).toStrictEqual([]);
     });
 
     it("when full, does not leave the chat's older draft behind", () => {

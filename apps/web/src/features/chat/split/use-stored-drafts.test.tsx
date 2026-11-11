@@ -70,6 +70,28 @@ describe("useStoredDrafts", () => {
 });
 
 describe("keepsStoredDraft", () => {
+    it("stores nothing under a chat whose composer left when the shared composer is edited elsewhere, and keeps its draft", async () => {
+        const { rerender } = renderHook(
+            ({ userId }) => {
+                useStoredDrafts("thread-a", userId, false);
+            },
+            { initialProps: { userId: "user-1" as string | undefined } },
+        );
+
+        await vi.dynamicImportSettled();
+        useChatUIStore.getState().setComposerText("draft a");
+        // The chat's composer goes (a host-run chat, say), and a view with no stored draft changes the shared composer.
+        rerender({ userId: undefined });
+        expect(storedText("thread-a")).toBe("draft a");
+
+        useChatUIStore.getState().setComposerText("typed elsewhere");
+        flushStoredDrafts();
+        useChatUIStore.getState().clearComposer();
+        flushStoredDrafts();
+
+        expect(storedText("thread-a")).toBe("draft a");
+    });
+
     it("keeps the draft of a known cloud chat and of a new one", () => {
         expect(keepsStoredDraft(true, false, {}, false)).toBe(true);
         expect(keepsStoredDraft(true, true, undefined, false)).toBe(true);

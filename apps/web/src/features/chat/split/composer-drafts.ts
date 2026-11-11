@@ -62,9 +62,6 @@ export const dropStoredDrafts = (userId?: string): void => {
     cleared.push(prefix);
 
     try {
-        // Other tabs of the account read it before their next write (`draftsClearedAt`): their drafts must not come back either.
-        globalThis.localStorage.setItem(`${CLEARED_KEY_PREFIX}${userId ?? ALL_ACCOUNTS}`, String(Date.now()));
-
         for (const key of Object.keys(globalThis.localStorage)) {
             if (key.startsWith(prefix)) {
                 globalThis.localStorage.removeItem(key);
@@ -72,6 +69,14 @@ export const dropStoredDrafts = (userId?: string): void => {
         }
     } catch {
         // Blocked storage holds nothing to remove.
+    }
+
+    // After the removal, which frees the space it needs, and on its own: a full storage never keeps the drafts in place.
+    try {
+        // Other tabs of the account read it before their next write (`draftsClearedAt`): their drafts must not come back either.
+        globalThis.localStorage.setItem(`${CLEARED_KEY_PREFIX}${userId ?? ALL_ACCOUNTS}`, String(Date.now()));
+    } catch {
+        // Blocked or full: the other tabs forget the account when their own sign-out runs.
     }
 };
 
