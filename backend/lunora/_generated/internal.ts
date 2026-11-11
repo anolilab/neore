@@ -1031,6 +1031,7 @@ export interface InternalApiTypes {
     projects: {
         functions: {
             getProjectContextForRun: FunctionReference<"query", { projectId: Id<"projects">; userId: string }, string | null>;
+            restampProjectRepositories: FunctionReference<"mutation", { projectId: Id<"projects">; retry: number }, null>;
         };
         gdpr: {
             collectProjectDetailsForExport: FunctionReference<"query", { projectIds: Array<Id<"projects">>; userId: string }, { projects: Array<{ project: { sharingEnabled: boolean; title: string }; projectId: string }>; readBytes: number }>;
@@ -2344,6 +2345,7 @@ export const internal: InternalApiTypes = {
     projects: {
         functions: {
             getProjectContextForRun: { __lunoraRef: "projects_functions:getProjectContextForRun" },
+            restampProjectRepositories: { __lunoraRef: "projects_functions:restampProjectRepositories" },
         },
         gdpr: {
             collectProjectDetailsForExport: { __lunoraRef: "projects_gdpr:collectProjectDetailsForExport" },

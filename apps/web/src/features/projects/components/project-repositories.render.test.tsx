@@ -18,8 +18,15 @@ vi.mock("@lingui/react/macro", () => {
 });
 
 const backend = vi.hoisted(() => {
-    // `refresh` answers the one-shot read a change ends with; a test can hold it back.
-    return { add: vi.fn(), listReads: 0, refresh: async (): Promise<unknown[]> => [], update: vi.fn() };
+    return {
+        add: vi.fn(),
+        // What `listProjectRepos` answers; a test adds to it to stand for another member's change.
+        listed: [{ defaultBranch: "develop", id: "r1", isDefault: true, revision: 0, url: "https://github.com/acme/web.git" }] as unknown[],
+        listReads: 0,
+        // The next read of the list fails, once.
+        listFails: false,
+        update: vi.fn(),
+    };
 });
 
 vi.mock("@/lib/lunora/crpc", () => {
@@ -31,6 +38,14 @@ vi.mock("@/lib/lunora/crpc", () => {
                     queryFn: async () => {
                         if (name === "listProjectRepos") {
                             backend.listReads += 1;
+
+                            if (backend.listFails) {
+                                backend.listFails = false;
+
+                                throw new Error("network");
+                            }
+
+                            return [...backend.listed];
                         }
 
                         return data;
@@ -49,16 +64,6 @@ vi.mock("@/lib/lunora/crpc", () => {
     };
 
     return {
-        // The one-shot read a change ends with (`refreshList`).
-        useCRPCClient: () => {
-            return {
-                query: async () => {
-                    backend.listReads += 1;
-
-                    return await backend.refresh();
-                },
-            };
-        },
         useCRPC: () => {
             return {
                 projects: {
@@ -187,41 +192,48 @@ describe("ProjectRepositories", () => {
         await vi.waitFor(() => expect(backend.listReads).toBe(2));
     });
 
-    it("keeps a live push that lands while the refresh after a change is still reading", async () => {
-        const web = { defaultBranch: "develop", id: "r1", isDefault: true, revision: 0, url: "https://github.com/acme/web.git" };
-        const docs = { id: "r3", isDefault: false, revision: 0, url: "https://github.com/acme/docs.git" };
-        let answer: ((list: unknown[]) => void) | undefined;
+    it("reads the list again while the settings stay open, for another member's changes", async () => {
+        vi.useFakeTimers({ shouldAdvanceTime: true });
 
-        backend.refresh = async () =>
-            // eslint-disable-next-line unicorn/prefer-promise-with-resolvers
-            await new Promise<unknown[]>((resolve) => {
-                answer = resolve;
+        try {
+            backend.listReads = 0;
+            renderSection();
+            await vi.waitFor(() => expect(backend.listReads).toBe(1));
+            expect(screen.queryByText("acme/docs")).toBeNull();
+
+            // Another member adds a repository meanwhile: the next read returns it.
+            backend.listed.push({ id: "r3", isDefault: false, revision: 0, url: "https://github.com/acme/docs.git" });
+            await act(async () => {
+                await vi.advanceTimersByTimeAsync(15_000);
             });
-        backend.add.mockResolvedValue("r2");
-        backend.listReads = 0;
 
-        const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+            expect(backend.listReads).toBe(2);
+            expect(await screen.findByText("acme/docs")).toBeDefined();
+        } finally {
+            backend.listed.splice(1);
+            vi.useRealTimers();
+        }
+    });
 
-        render(
-            <QueryClientProvider client={client}>
-                <ProjectRepositories projectId="p1" />
-            </QueryClientProvider>,
-        );
+    it("keeps the list it has, with no error, when a refresh fails", async () => {
+        vi.useFakeTimers({ shouldAdvanceTime: true });
 
-        fireEvent.change(await screen.findByRole("textbox", { name: "Repository" }), { target: { value: "acme/api" } });
-        fireEvent.click(screen.getByRole("button", { name: "Add" }));
-        await vi.waitFor(() => expect(backend.listReads).toBe(2));
+        try {
+            backend.listReads = 0;
+            renderSection();
+            expect(await screen.findByText("acme/web")).toBeDefined();
 
-        // Another tab's change arrives live while the refresh is still reading; then the refresh answers with the list
-        // it read before that change.
-        act(() => {
-            client.setQueryData(["listProjectRepos", { projectId: "p1" }], [web, docs]);
-        });
-        await act(async () => {
-            answer?.([web]);
-        });
+            backend.listFails = true;
+            await act(async () => {
+                await vi.advanceTimersByTimeAsync(15_000);
+            });
 
-        expect(await screen.findByText("acme/docs")).toBeDefined();
-        backend.refresh = async () => [];
+            expect(backend.listReads).toBe(2);
+            expect(screen.getByText("acme/web")).toBeDefined();
+            expect(screen.queryByText("Could not load this project's repositories.")).toBeNull();
+        } finally {
+            backend.listFails = false;
+            vi.useRealTimers();
+        }
     });
 });

@@ -27,7 +27,9 @@
   erase or the daily sweep re-stamps a row whose project has moved on.
   `url` is `parseRepoUrl(..).cloneUrl`, so it compares equal to a run's
   `repoUrl`; the default is the row with the latest `defaultAt`, else the
-  first (`withDefault`). The table is `.global()` (D1, no transactions), so an
+  first (`withDefault`), each stamp claimed from the project's counter row
+  (`#default`, `stampDefault`). Readers refetch the list: `.global()` writes
+  reach no live subscription on another shard. The table is `.global()` (D1, no transactions), so an
   add checks the cap and its project after inserting and takes its row back.
   The task form's run picker (`project-repo-picker.tsx`) reads the picked
   project's list and preselects its default. A run still targets one repository.

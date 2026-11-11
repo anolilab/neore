@@ -15,7 +15,7 @@ import { logger } from "../lib/logger";
 import { ROOT_SHARD_KEY } from "../lib/shard-context";
 import { MAX_LENGTH } from "../lib/validators";
 import { PROJECTS_PER_DETAILS_READ } from "./export-pages";
-import { DELETION_MARKER_URL } from "./repositories";
+import { DELETION_MARKER_URL, isRepoRow } from "./repositories";
 
 /** A project's repositories, one batch; with `keepMarker`, a delete's marker stays until the delete is done. */
 export const eraseProjectRepositories = async (ctx: MutationCtx, projectId: Id<"projects">, { keepMarker = false } = {}): Promise<BatchResult> => {
@@ -68,7 +68,11 @@ const eraseUnlessMoved = async (
     }
 
     if (project && (project.organizationId ?? "") !== row.organizationId) {
-        await ctx.db.patch("projectRepositories", row._id, { organizationId: project.organizationId ?? "" });
+        // Only while the row still holds the copy read here: a move that stamped it meanwhile wins.
+        await ctx.db.patchIf("projectRepositories", row._id, {
+            patch: { organizationId: project.organizationId ?? "" },
+            where: { organizationId: row.organizationId ?? null, projectId: row.projectId },
+        });
 
         return false;
     }
@@ -76,6 +80,40 @@ const eraseUnlessMoved = async (
     await ctx.db.delete("projectRepositories", row._id);
 
     return true;
+};
+
+/**
+ * Re-stamps a row whose copy of its project's organization went stale (a move whose re-stamp and queued retries all
+ * lost to later moves, or whose retry could not be queued). The project is read from the primary, once per project.
+ * Only while the row still holds the copy read here, so a move landing meanwhile wins. Returns whether it re-stamped.
+ */
+const restampIfMoved = async (ctx: MutationCtx, row: Doc<"projectRepositories">, projects: Map<string, Promise<Doc<"projects"> | null>>): Promise<boolean> => {
+    if (!projects.has(row.projectId)) {
+        projects.set(row.projectId, ctx.db.projects.findFirst({ consistency: "primary", where: { _id: row.projectId } }));
+    }
+
+    let project: Doc<"projects"> | null | undefined;
+
+    try {
+        project = await projects.get(row.projectId);
+    } catch (error) {
+        repoLogger.error("Reading a project during the repository sweep failed; its row is left as it is", { error, projectId: row.projectId });
+
+        return false;
+    }
+
+    const organizationId = project?.organizationId ?? "";
+
+    if (!project || organizationId === (row.organizationId ?? "")) {
+        return false;
+    }
+
+    const { applied } = await ctx.db.patchIf("projectRepositories", row._id, {
+        patch: { organizationId },
+        where: { organizationId: row.organizationId ?? null, projectId: row.projectId },
+    });
+
+    return applied;
 };
 
 /**
@@ -114,7 +152,9 @@ const ORPHAN_SWEEP_PAGE_SIZE = 100;
 
 /**
  * Daily backstop for `eraseOrganizationRepositories`: the organization-owned rows whose organization no longer exists.
- * An organization that cannot be read is kept, so a failed read never deletes rows.
+ * An organization that cannot be read is kept, so a failed read never deletes rows. Every other row whose project has
+ * moved since its copy of the organization was written is re-stamped (`restampIfMoved`), so a move the re-stamp and its
+ * queued retries left unsettled is repaired within a day.
  */
 export const sweepOrphanedOrganizationRepositories = internalMutation
     .input({ cursor: v.optional(v.string().max(MAX_LENGTH.cursor)) })
@@ -125,9 +165,14 @@ export const sweepOrphanedOrganizationRepositories = internalMutation
         const gone = new Map<string, boolean>();
         const projects = new Map<string, Promise<Doc<"projects"> | null>>();
         let deleted = 0;
+        let restamped = 0;
 
         for (const row of page.page) {
             if (!isOrganizationOwned(row)) {
+                if (await restampIfMoved(ctx, row, projects)) {
+                    restamped += 1;
+                }
+
                 continue;
             }
 
@@ -148,13 +193,21 @@ export const sweepOrphanedOrganizationRepositories = internalMutation
                 }
             }
 
-            if (gone.get(organizationId) && (await eraseUnlessMoved(ctx, row, projects))) {
-                deleted += 1;
+            if (gone.get(organizationId)) {
+                if (await eraseUnlessMoved(ctx, row, projects)) {
+                    deleted += 1;
+                }
+            } else if (await restampIfMoved(ctx, row, projects)) {
+                restamped += 1;
             }
         }
 
         if (deleted > 0) {
             repoLogger.info("Removed repository rows of deleted organizations", { deleted });
+        }
+
+        if (restamped > 0) {
+            repoLogger.info("Re-stamped repository rows of projects that moved", { restamped });
         }
 
         if (!page.isDone && page.continueCursor) {
@@ -179,7 +232,7 @@ export const collectProjectRepositoriesForExport = internalQuery
             where: { userId },
         });
         const projectRepositories = result.page
-            .filter((row) => row.deletingAt === undefined)
+            .filter((row) => isRepoRow(row))
             .map(({ createdAt, defaultAt, defaultBranch, projectId, url }) => {
                 return { createdAt, projectId, url, ...(defaultAt !== undefined && { defaultAt }), ...(defaultBranch && { defaultBranch }) };
             });

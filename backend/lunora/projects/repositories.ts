@@ -11,6 +11,12 @@ import { isValidBranchName, parseRepoUrl } from "../coding-agents/commands";
 /** The URL of the row that marks a project delete in progress (`deletingAt`); no repository normalises to it. */
 export const DELETION_MARKER_URL = "";
 
+/** The URL of a project's default counter row: the last `defaultAt` stamp handed out (`stampDefault`). */
+export const DEFAULT_COUNTER_URL = "#default";
+
+/** Whether a stored row is a repository, not a delete's marker or the default counter. */
+export const isRepoRow = (row: { deletingAt?: number; url: string }): boolean => row.deletingAt === undefined && row.url !== DEFAULT_COUNTER_URL;
+
 /** How long a delete's marker refuses adds: one left by a delete that failed stops counting after this. */
 export const DELETION_MARKER_TTL_MS = 10 * 60 * 1000;
 
@@ -81,7 +87,7 @@ export const withDefault = (rows: ReadonlyArray<StoredRepo>): { defaultBranch?: 
     let picked: StoredRepo | undefined;
 
     for (const row of ordered) {
-        // Picks stamped alike (two at once) are settled by id, so every reader names the same default.
+        // Stamps are claimed one at a time from the project's counter row, so they are distinct; the id only keeps this total.
         if (
             row.defaultAt !== undefined &&
             (picked?.defaultAt === undefined || row.defaultAt > picked.defaultAt || (row.defaultAt === picked.defaultAt && row._id > picked._id))

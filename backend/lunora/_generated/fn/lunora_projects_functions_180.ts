@@ -29,6 +29,13 @@ if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(
 if (typeof source["repoId"] !== "string") return DEFER;
 return { "repoId": source["repoId"] };
 });
+installCompiledValidatorMap(lunora_projects_functions_180.restampProjectRepositories.args, (source) => {
+if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
+if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
+if (typeof source["projectId"] !== "string") return DEFER;
+if (typeof source["retry"] !== "number" || !Number.isFinite(source["retry"])) return DEFER;
+return { "projectId": source["projectId"], "retry": source["retry"] };
+});
 installCompiledValidatorMap(lunora_projects_functions_180.setDefaultProjectRepo.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;

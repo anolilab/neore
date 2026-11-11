@@ -118,6 +118,9 @@ export type ApiPath = PathsOf<ApiTypes, "">;
  * - Public catalogs change on deploys, not on user writes.
  * - Admin/impersonation flags are on every page and change about never; each
  *   live query is a seed on first paint (see `MAX_CONCURRENT_SEEDS`).
+ * - A project's repositories live in a `.global()` table, whose patches and
+ *   deletes re-run no subscription and whose writes never reach another shard's:
+ *   the readers refetch instead (`project-repositories.tsx`, the run picker).
  *
  * Typed against the generated paths, so a renamed or removed procedure fails
  * the typecheck here instead of silently going live again.
@@ -137,6 +140,7 @@ const NEVER_LIVE: ReadonlySet<string> = new Set<ApiPath>([
     "evals_functions:compareRuns",
     "gdpr_functions:getDataAccessSummary",
     "pages_functions:searchPages",
+    "projects_functions:listProjectRepos",
     "skills_marketplace:browseSkills",
     "skills_marketplace:searchSkills",
     "workflow_gallery:browseGallery",

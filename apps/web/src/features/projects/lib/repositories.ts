@@ -81,3 +81,9 @@ export const storedRepoUrl = (raw: string): string | undefined => {
         ? `https://github.com/${owner}/${repo}.git`
         : undefined;
 };
+
+/**
+ * How often an open settings section or run picker reads a project's repositories again: the list is not live
+ * (`NEVER_LIVE`), so another member's or tab's change shows only on a read.
+ */
+export const REPOSITORIES_REFRESH_MS = 15_000;

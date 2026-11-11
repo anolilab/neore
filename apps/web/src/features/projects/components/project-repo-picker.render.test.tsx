@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { useState } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -18,11 +18,13 @@ vi.mock("@lingui/react/macro", () => {
 });
 
 // `gate.open` holds every repository-list answer back until it resolves.
-const { gate, lookup, repositories } = vi.hoisted(() => {
+const { gate, lookup, reads, repositories } = vi.hoisted(() => {
     return {
         gate: { open: Promise.resolve() },
         // `lookup.fails` makes the reopened run's project lookup (`findRepoProject`) fail.
         lookup: { fails: false },
+        // How many times the repository list was read.
+        reads: { count: 0 },
         repositories: [
             { id: "repo_a", isDefault: false, url: "https://github.com/acme/web.git" },
             { defaultBranch: "develop", id: "repo_b", isDefault: true, url: "https://github.com/acme/api.git" },
@@ -59,6 +61,7 @@ vi.mock("@/lib/lunora/crpc", async () => {
                                     ? { queryFn: skip, queryKey: ["repos"] }
                                     : {
                                           queryFn: async () => {
+                                              reads.count += 1;
                                               await gate.open;
 
                                               return repositories;
@@ -205,5 +208,27 @@ describe("ProjectRepoPicker", () => {
 
         expect(alert.textContent).toContain("Could not look up this repository's project.");
         expect(screen.getByRole("button", { name: "Try again" })).toBeDefined();
+    });
+
+    it("reads the open project's repositories again while the picker stays open", async () => {
+        vi.useFakeTimers({ shouldAdvanceTime: true });
+
+        try {
+            reads.count = 0;
+            render(
+                <QueryClientProvider client={new QueryClient()}>
+                    <ProjectRepoPicker branch="" onPick={vi.fn()} projects={[{ _id: "p_web", title: "Web" }]} repoUrl="acme/api" />
+                </QueryClientProvider>,
+            );
+            await waitFor(() => expect(reads.count).toBe(1));
+
+            await act(async () => {
+                await vi.advanceTimersByTimeAsync(15_000);
+            });
+
+            expect(reads.count).toBe(2);
+        } finally {
+            vi.useRealTimers();
+        }
     });
 });

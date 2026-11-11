@@ -14,13 +14,16 @@ import {
     findRepoProject,
     listProjectRepos,
     removeProjectRepo,
+    restampProjectRepositories,
+    applyDefaultStamp,
     setDefaultProjectRepo,
+    stampDefault,
     underDeleteMarker,
     updateProject,
     updateProjectRepo,
 } from "./functions";
 import { eraseOrganizationRepositories, sweepOrphanedOrganizationRepositories } from "./gdpr";
-import { DELETION_MARKER_URL, MAX_PROJECT_REPOSITORIES } from "./repositories";
+import { DEFAULT_COUNTER_URL, DELETION_MARKER_URL, MAX_PROJECT_REPOSITORIES } from "./repositories";
 
 const OWNER = "user-owner";
 const STRANGER = "user-stranger";
@@ -245,6 +248,165 @@ describe("project repositories", () => {
         }
     });
 
+    it("gives two picks made at once stamps of their own, and keeps the counter out of the list and the cap", async () => {
+        const projectId = await projectOf({ userId: OWNER });
+        // A full list, staged directly: twenty adds would pass the add rate limit.
+        const ids = (await harness.run(async (ctx: any) => {
+            const inserted: string[] = [];
+
+            for (let index = 0; index < MAX_PROJECT_REPOSITORIES; index += 1) {
+                inserted.push(
+                    await ctx.db.insert("projectRepositories", {
+                        createdAt: index,
+                        projectId,
+                        url: `https://github.com/acme/r${String(index)}.git`,
+                        userId: OWNER,
+                    }),
+                );
+            }
+
+            return inserted;
+        })) as string[];
+
+        // A first pick writes the counter; the next two both read it before either claims a stamp from it.
+        await as(OWNER).mutation(setDefaultProjectRepo as never, { repoId: ids[1] } as never);
+        await harness.run(async (ctx: any) => {
+            const [first, second] = await Promise.all([ctx.db.get("projectRepositories", ids[3]), ctx.db.get("projectRepositories", ids[7])]);
+
+            await Promise.all([stampDefault(ctx, first, { userId: OWNER }), stampDefault(ctx, second, { userId: OWNER })]);
+        });
+
+        const rows = await harness.run(async (ctx: any) => {
+            const { page } = await ctx.db.projectRepositories.findMany({ where: { projectId } });
+
+            return page;
+        });
+        const stamps = rows.filter((row: { defaultAt?: number; url: string }) => row.url !== DEFAULT_COUNTER_URL && row.defaultAt !== undefined);
+        const repos = await list(OWNER, projectId);
+
+        expect(new Set(stamps.map((row: { defaultAt?: number }) => row.defaultAt)).size).toBe(3);
+        expect(repos).toHaveLength(MAX_PROJECT_REPOSITORIES);
+        expect(repos.filter((repo) => repo.isDefault)).toHaveLength(1);
+        await expect(add(OWNER, projectId, "acme/one-too-many")).rejects.toMatchObject({ data: { reason: "limit" } });
+    });
+
+    it("refuses to remove, edit or pick the default counter or a delete's marker by id", async () => {
+        const projectId = await projectOf({ userId: OWNER });
+        const web = await add(OWNER, projectId, "acme/web");
+
+        await as(OWNER).mutation(setDefaultProjectRepo as never, { repoId: web } as never);
+
+        const { counter, marker } = (await harness.run(async (ctx: any) => {
+            const found = await ctx.db.projectRepositories.findFirst({ where: { projectId, url: DEFAULT_COUNTER_URL } });
+            // A marker past its time: only `editableRepo` stands in the way.
+            const written = await ctx.db.insert("projectRepositories", { createdAt: 0, deletingAt: 0, projectId, url: DELETION_MARKER_URL, userId: OWNER });
+
+            return { counter: found._id, marker: written };
+        })) as { counter: string; marker: string };
+
+        for (const repoId of [counter, marker]) {
+            await expect(as(OWNER).mutation(removeProjectRepo as never, { repoId } as never)).rejects.toMatchObject({ code: "NOT_FOUND" });
+            await expect(as(OWNER).mutation(setDefaultProjectRepo as never, { repoId } as never)).rejects.toMatchObject({ code: "NOT_FOUND" });
+            await expect(as(OWNER).mutation(updateProjectRepo as never, { defaultBranch: "main", repoId, revision: 0 } as never)).rejects.toMatchObject({
+                code: "NOT_FOUND",
+            });
+        }
+    });
+
+    it("refuses a default pick while the project is being deleted, and writes no counter", async () => {
+        // One clock for the marker's stamp and the mutation's expiry check.
+        vi.useFakeTimers({ now: 1_000_000, toFake: ["Date"] });
+
+        try {
+            const projectId = await projectOf({ userId: OWNER });
+            const web = await add(OWNER, projectId, "acme/web");
+
+            // A delete in progress has written its marker.
+            await harness.run(async (ctx: any) => {
+                await ctx.db.insert("projectRepositories", { createdAt: 0, deletingAt: Date.now(), projectId, url: DELETION_MARKER_URL, userId: OWNER });
+            });
+
+            await expect(as(OWNER).mutation(setDefaultProjectRepo as never, { repoId: web } as never)).rejects.toMatchObject({ code: "NOT_FOUND" });
+
+            const counters = await harness.run(async (ctx: any) => {
+                const { page } = await ctx.db.projectRepositories.findMany({ where: { projectId, url: DEFAULT_COUNTER_URL } });
+
+                return page;
+            });
+
+            expect(counters).toStrictEqual([]);
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it("settles two first picks at once on the counter's unique URL, each with a stamp of its own", async () => {
+        const projectId = await projectOf({ userId: OWNER });
+        const ids = (await harness.run(async (ctx: any) => [
+            await ctx.db.insert("projectRepositories", { createdAt: 0, projectId, url: "https://github.com/acme/a.git", userId: OWNER }),
+            await ctx.db.insert("projectRepositories", { createdAt: 1, projectId, url: "https://github.com/acme/b.git", userId: OWNER }),
+        ])) as string[];
+
+        // Neither pick finds a counter: both try to insert it.
+        await harness.run(async (ctx: any) => {
+            const [first, second] = await Promise.all(ids.map(async (id) => await ctx.db.get("projectRepositories", id)));
+
+            await Promise.all([stampDefault(ctx, first, { userId: OWNER }), stampDefault(ctx, second, { userId: OWNER })]);
+        });
+
+        const rows = await harness.run(async (ctx: any) => {
+            const { page } = await ctx.db.projectRepositories.findMany({ where: { projectId } });
+
+            return page;
+        });
+
+        expect(rows.filter((row: { url: string }) => row.url === DEFAULT_COUNTER_URL)).toHaveLength(1);
+        expect(new Set(rows.filter((row: { url: string }) => row.url !== DEFAULT_COUNTER_URL).map((row: { defaultAt?: number }) => row.defaultAt)).size).toBe(
+            2,
+        );
+    });
+
+    it("refuses a stamp that keeps losing to picks landing between its read and its write", async () => {
+        // Each read finds a lower stamp, and each write finds that another pick changed it meanwhile.
+        const losing = {
+            db: {
+                patchIf: async () => {
+                    return { applied: false, doc: { defaultAt: 1 } };
+                },
+                projectRepositories: {
+                    findFirst: async () => {
+                        return { defaultAt: 1 };
+                    },
+                },
+            },
+        };
+
+        await expect(applyDefaultStamp(losing as never, "r1" as never, 5)).rejects.toMatchObject({ code: "CONFLICT" });
+    });
+
+    it("never lowers a row's stamp with an older claim, and reports a row removed meanwhile", async () => {
+        const projectId = await projectOf({ userId: OWNER });
+
+        await harness.run(async (ctx: any) => {
+            const picked = await ctx.db.insert("projectRepositories", {
+                createdAt: 0,
+                defaultAt: 10,
+                projectId,
+                url: "https://github.com/acme/a.git",
+                userId: OWNER,
+            });
+            const removed = await ctx.db.insert("projectRepositories", { createdAt: 1, projectId, url: "https://github.com/acme/b.git", userId: OWNER });
+
+            await ctx.db.delete("projectRepositories", removed);
+
+            await expect(applyDefaultStamp(ctx, picked, 5)).resolves.toBe(true);
+            const row = await ctx.db.get("projectRepositories", picked);
+
+            expect(row.defaultAt).toBe(10);
+            await expect(applyDefaultStamp(ctx, removed, 11)).resolves.toBe(false);
+        });
+    });
+
     it("finds the caller's project that lists a repository, past 60 other accounts listing it, and nobody else's", async () => {
         // Other accounts' rows, staged as `addProjectRepo` writes them, created before the caller's.
         await harness.run(async (ctx: any) => {
@@ -265,6 +427,35 @@ describe("project repositories", () => {
         await expect(find(OWNER, "https://github.com/acme/web")).resolves.toStrictEqual({ projectId, title: "Web" });
         await expect(find(STRANGER, "acme/web")).resolves.toBeNull();
         await expect(find(OWNER, "not a repo")).resolves.toBeNull();
+    });
+
+    it("finds a project in an organization the caller belongs to that is not the active one, and never in another", async () => {
+        const projectId = await projectOf({ organizationId: "org-b", title: "Shared" });
+
+        await harness.run(async (ctx: any) => {
+            await ctx.db.insert("member", { createdAt: 1, organizationId: "org-b", role: "member", userId: MEMBER });
+            await ctx.db.insert("projectRepositories", { createdAt: 0, organizationId: "org-b", projectId, url: "https://github.com/acme/shared.git" });
+        });
+
+        const find = (userId: string) => as(userId).query(findRepoProject as never, { url: "acme/shared" } as never);
+
+        // No active organization in the session: org-b is found through the caller's membership alone.
+        await expect(find(MEMBER)).resolves.toStrictEqual({ projectId, title: "Shared" });
+        await expect(find(STRANGER)).resolves.toBeNull();
+    });
+
+    it("finds a project in an organization past the caller's first 90 memberships", async () => {
+        const projectId = await projectOf({ organizationId: "org-94", title: "Far" });
+
+        await harness.run(async (ctx: any) => {
+            for (let index = 0; index < 95; index += 1) {
+                await ctx.db.insert("member", { createdAt: index, organizationId: `org-${String(index)}`, role: "member", userId: MEMBER });
+            }
+
+            await ctx.db.insert("projectRepositories", { createdAt: 0, organizationId: "org-94", projectId, url: "https://github.com/acme/far.git" });
+        });
+
+        await expect(as(MEMBER).query(findRepoProject as never, { url: "acme/far" } as never)).resolves.toStrictEqual({ projectId, title: "Far" });
     });
 
     it("leaves no row from an add that races a project delete", async () => {
@@ -369,6 +560,49 @@ describe("project repositories", () => {
         expect(markers).toHaveLength(1);
     });
 
+    it("stamps the rows with the organization a project ends in when two moves land out of order", async () => {
+        const projectId = await projectOf({ organizationId: "org-1", userId: OWNER });
+
+        await add(OWNER, projectId, "acme/web");
+        // A later move to org-3 lands after this move's project write, before its rows are stamped.
+        meanwhile.run = async (db) => {
+            await db.patch("projects", projectId, { organizationId: "org-3" });
+        };
+        activeOrganization.id = "org-2";
+
+        try {
+            await as(OWNER).mutation(updateProject as never, { patch: { organizationId: "org-2" }, projectId } as never);
+        } finally {
+            delete activeOrganization.id;
+        }
+
+        const rows = await harness.run(async (ctx: any) => {
+            const { page } = await ctx.db.projectRepositories.findMany({ where: { projectId } });
+
+            return page;
+        });
+
+        expect(rows.map((row: { organizationId?: string }) => row.organizationId)).toStrictEqual(["org-3"]);
+    });
+
+    it("re-stamps rows a move left unsettled when its queued retry runs", async () => {
+        const projectId = await projectOf({ organizationId: "org-2" });
+
+        // Rows still on the organization a move left: the passes ran out while moves kept landing.
+        await harness.run(async (ctx: any) => {
+            await ctx.db.insert("projectRepositories", { createdAt: 0, organizationId: "org-1", projectId, url: "https://github.com/acme/web.git" });
+        });
+        await harness.run(async (ctx: any) => await ctx.runMutation(restampProjectRepositories, { projectId, retry: 1 }));
+
+        const rows = await harness.run(async (ctx: any) => {
+            const { page } = await ctx.db.projectRepositories.findMany({ where: { projectId } });
+
+            return page;
+        });
+
+        expect(rows.map((row: { organizationId?: string }) => row.organizationId)).toStrictEqual(["org-2"]);
+    });
+
     it("moves a project's repositories with it when the project changes organization", async () => {
         const projectId = await projectOf({ organizationId: "org-1", userId: OWNER });
 
@@ -445,6 +679,36 @@ describe("project repositories", () => {
         });
 
         expect(rows.map((row: { organizationId?: string }) => row.organizationId)).toStrictEqual(["org-b"]);
+    });
+
+    it("re-stamps in the daily sweep the rows of a project that moved, whether someone owns it or not", async () => {
+        const { owned, shared } = (await harness.run(async (ctx: any) => {
+            // The organization the rows still name exists: nothing to erase, only a stale copy to repair.
+            const left = await ctx.db.insert("organization", { createdAt: 1, name: "Left", slug: "left" });
+            const ownedProject = await ctx.db.insert("projects", { createdAt: 0, organizationId: "org-new", title: "owned", userId: OWNER });
+            const sharedProject = await ctx.db.insert("projects", { createdAt: 0, organizationId: "org-new", title: "shared" });
+
+            await ctx.db.insert("projectRepositories", {
+                createdAt: 0,
+                organizationId: left,
+                projectId: ownedProject,
+                url: "https://github.com/acme/o.git",
+                userId: OWNER,
+            });
+            await ctx.db.insert("projectRepositories", { createdAt: 0, organizationId: left, projectId: sharedProject, url: "https://github.com/acme/s.git" });
+
+            return { owned: ownedProject, shared: sharedProject };
+        })) as { owned: string; shared: string };
+
+        await harness.run(async (ctx: any) => await ctx.runMutation(sweepOrphanedOrganizationRepositories, {}));
+
+        const stamped = await harness.run(async (ctx: any) => {
+            const { page } = await ctx.db.projectRepositories.findMany({ where: { projectId: { in: [owned, shared] } } });
+
+            return page.map((row: { organizationId?: string }) => row.organizationId);
+        });
+
+        expect(stamped).toStrictEqual(["org-new", "org-new"]);
     });
 
     it("sweeps an organization's leftover repository rows once the organization is gone", async () => {

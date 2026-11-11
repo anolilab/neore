@@ -2047,7 +2047,9 @@ export const schema = defineSchema({
 
     // The repositories a coding-agent run in a project picks from (`projects/repositories.ts`), one row each, so a
     // change to one never rewrites another or the project. Global, like `projects`: a member reads them from
-    // their own shard. `url` is in `parseRepoUrl` clone form; the default is the row with the latest `defaultAt`.
+    // their own shard. `url` is in `parseRepoUrl` clone form; the default is the row with the latest `defaultAt`. A row
+    // with the URL "#default" is not a repository either: it holds the project's last `defaultAt` stamp, so each pick
+    // claims the next one (`stampDefault`).
     // `userId` and `organizationId` copy the project's, so account deletion and export reach a row by its owner and a
     // URL lookup stays inside the caller's own and organization's rows. A row with `deletingAt` (and the URL "") is
     // not a repository: it marks a project delete in progress (`deleteProject`).
