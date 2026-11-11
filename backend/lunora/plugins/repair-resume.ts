@@ -125,7 +125,7 @@ export const repairPlugin = authAction
         });
 
         try {
-            const created = await runBundleImport(entries, missingKeys, ops);
+            const created = await runBundleImport(entries, missingKeys, ops, { keepOnRateLimit: true });
 
             await ctx.runMutation(internal.plugins.install_steps.finishInstall, { generation: begun.generation, installId: begun.installId });
 
