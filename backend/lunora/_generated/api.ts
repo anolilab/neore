@@ -632,6 +632,9 @@ export interface ApiTypes {
             installPlugin: FunctionReference<"action", { contentHash: string; markdown: string }, { installId: string; items: Array<{ id: string; key: string; kind: "skill" | "trigger" | "group"; title: string }> }>;
             previewPlugin: FunctionReference<"action", { markdown: string }, { contentHash: string; items: Array<{ key: string; kind: "skill" | "trigger" | "group"; title: string; warnings: Array<string> }>; name: string; pluginSlug: string; pluginVersion: string }>;
         };
+        repair: {
+            repairPlugin: FunctionReference<"mutation", { pluginSlug: string }, { linked: number; missing: Array<string>; status: "installed" | "needs-repair" }>;
+        };
     };
     projects: {
         functions: {
@@ -1553,6 +1556,9 @@ export const api: ApiTypes = {
         install_action: {
             installPlugin: { __lunoraRef: "plugins_install_action:installPlugin" },
             previewPlugin: { __lunoraRef: "plugins_install_action:previewPlugin" },
+        },
+        repair: {
+            repairPlugin: { __lunoraRef: "plugins_repair:repairPlugin" },
         },
     },
     projects: {
