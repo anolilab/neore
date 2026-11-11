@@ -39,7 +39,9 @@ describe("attachApprovalTapListener", () => {
         const replayed = new Set<string>();
         const answer = vi.fn(async (_value: ApprovalAnswer) => true as const);
         const slow: TapSource = {
-            addListener: () => ({ remove: () => undefined }),
+            addListener: () => {
+                return { remove: () => undefined };
+            },
             getLast: () =>
                 new Promise<TapResponse>((resolve) => {
                     setTimeout(() => {
