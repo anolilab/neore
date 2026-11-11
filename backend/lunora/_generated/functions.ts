@@ -7646,4 +7646,6 @@ export interface RegisteredDataMigration {
 export const LUNORA_MIGRATIONS: Record<string, RegisteredDataMigration> = {
     "add-headless-approved": lunora_migrations_255.addHeadlessApproved as unknown as RegisteredDataMigration,
     "add-headless-resume-bounds": lunora_migrations_255.addHeadlessResumeBounds as unknown as RegisteredDataMigration,
+    "drop-thread-is-group-chat": lunora_migrations_255.dropThreadIsGroupChat as unknown as RegisteredDataMigration,
+    "note-skill-source-plugin": lunora_migrations_255.noteSkillSourcePlugin as unknown as RegisteredDataMigration,
 };

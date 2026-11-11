@@ -37,3 +37,33 @@ export const addHeadlessResumeBounds = defineMigration({
         return { ...document, config: { ...config, stepsLeft: getMaxSteps(config.shouldAutoContinue === true) } };
     },
 });
+
+/**
+ * `threads.isGroupChat` is no longer in the schema. A group chat's shape is `groupChat` now. No deployed build has written
+ * the flag (`main` never had it), so this only clears it from rows written by a development build of this branch. A row
+ * without the flag is skipped.
+ */
+export const dropThreadIsGroupChat = defineMigration({
+    id: "drop-thread-is-group-chat",
+    table: "threads",
+    up: (document) => {
+        if (!("isGroupChat" in document)) {
+            return undefined;
+        }
+
+        const { isGroupChat: _dropped, ...rest } = document;
+
+        return rest;
+    },
+});
+
+/**
+ * `skills.source` gained a `plugin` member (`{ type: "plugin", version }`). The change only adds a member: every stored
+ * source already fits, so no row is rewritten. A row that is returned unchanged is skipped (`undefined`). The migration is
+ * kept so the table's change has one on record, as the schema gate asks.
+ */
+export const noteSkillSourcePlugin = defineMigration({
+    id: "note-skill-source-plugin",
+    table: "skills",
+    up: () => undefined,
+});
