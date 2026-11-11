@@ -3,7 +3,8 @@
  * that file applies by itself: the keys read here are passed to `ssh` explicitly, resolved as ssh would: blocks in file
  * order (settings before the first `Host` line first), the first value of a key wins, and a block applies to an alias
  * when one of its `Host` patterns matches it and no negated pattern does. What the reader cannot honour
- * (`Match`, `Include`, `ProxyJump`, `ProxyCommand`) makes a host disabled instead of being guessed at.
+ * (a `Match` rule it cannot tie to other hosts, `Include` in a `Host` block, `ProxyJump`, `ProxyCommand`, a malformed
+ * `Port`) makes a host disabled instead of being guessed at.
  */
 import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
@@ -34,19 +35,37 @@ const GLOB_SPECIAL = /[$()+.\\[\]^{|}]/gu;
 const KEY_END = /[\s=]/u;
 const WORD = /"([^"]*)"|(\S+)/gu;
 const LINE_BREAK = /\r?\n/u;
-/** A `Match` criterion that depends on something this reader cannot evaluate: it may change any host. */
-const MATCH_ANYWHERE = new Set(["all", "canonical", "exec", "final", "localnetwork", "tagged"]);
+const DIGITS = /^\d+$/u;
+const SPACE = /\s/u;
 
 const EMPTY: Block = { hostName: null, identityFile: null, patterns: [], port: null, reason: null, user: null };
 
-const words = (value: string): string[] => Array.from(value.matchAll(WORD), (match) => match[1] ?? match[2] ?? "");
+/** Drops a trailing `# comment`: a `#` that starts the text or follows a space, outside quotes. */
+const stripComment = (value: string): string => {
+    let quoted = false;
+
+    for (let index = 0; index < value.length; index += 1) {
+        const char = value.charAt(index);
+
+        if (char === '"') {
+            quoted = !quoted;
+        } else if (char === "#" && !quoted && (index === 0 || SPACE.test(value.charAt(index - 1)))) {
+            return value.slice(0, index);
+        }
+    }
+
+    return value;
+};
+
+const words = (value: string): string[] => Array.from(stripComment(value).matchAll(WORD), (match) => match[1] ?? match[2] ?? "");
 
 const firstWord = (value: string): string | null => words(value)[0] ?? null;
 
 const expandHome = (value: string, home: string): string => (value === "~" || value.startsWith("~/") ? path.join(home, value.slice(1)) : value);
 
+/** Decimal digits only, 1 to 65535; anything else is null. */
 const parsePort = (value: string): number | null => {
-    const port = Number(value);
+    const port = DIGITS.test(value) ? Number(value) : NaN;
 
     return Number.isSafeInteger(port) && port >= 1 && port <= 65_535 ? port : null;
 };
@@ -87,7 +106,10 @@ const settingOf = (key: string, value: string, home: string): Partial<Block> => 
             return { reason: unsupported(key) };
         }
         case "port": {
-            return { port: parsePort(firstWord(value) ?? "") };
+            const port = parsePort(firstWord(value) ?? "");
+
+            // An invalid value is kept as 0 so that no later Port fills it in; the host is disabled.
+            return port === null ? { port: 0, reason: "This host has an invalid Port in ~/.ssh/config." } : { port };
         }
         case "user": {
             return { user: firstWord(value) };
@@ -111,11 +133,27 @@ const mergeFirst = (block: Block, patch: Partial<Block>): Block => {
     };
 };
 
-/** The names a `Match` line mentions, and whether it has a criterion that may apply to any host. */
-const readMatch = (value: string): { anything: boolean; names: string[] } => {
-    const parts = words(value).flatMap((word) => word.split(","));
+/**
+ * What a `Match` line can apply to: the host patterns of `host` / `originalhost` criteria, or anything at all when it
+ * has a criterion this reader cannot evaluate (`user`, `exec`, `all`, `final`, ...) or a negated host pattern.
+ */
+const readMatch = (value: string): { anything: boolean; patterns: string[] } => {
+    const tokens = words(value);
+    const patterns: string[] = [];
 
-    return { anything: parts.some((part) => MATCH_ANYWHERE.has(part.toLowerCase())), names: parts };
+    for (let index = 0; index < tokens.length; index += 1) {
+        const keyword = (tokens[index] ?? "").toLowerCase();
+        const list = (tokens[index + 1] ?? "").split(",").filter(Boolean);
+
+        if ((keyword !== "host" && keyword !== "originalhost") || list.length === 0 || list.some((name) => name.startsWith("!"))) {
+            return { anything: true, patterns: [] };
+        }
+
+        patterns.push(...list);
+        index += 1;
+    }
+
+    return { anything: tokens.length === 0, patterns };
 };
 
 const globMatches = (pattern: string, name: string): boolean => {
@@ -143,13 +181,13 @@ const appliesTo = (block: Block, alias: string): boolean => {
 
 interface Parsed {
     blocks: Block[];
-    matched: Set<string>;
     matchesAnything: boolean;
+    matchPatterns: string[];
 }
 
 const readLines = (text: string, home: string): Parsed => {
     const blocks: Block[] = [{ ...EMPTY, patterns: ["*"] }];
-    const matched = new Set<string>();
+    const matchPatterns: string[] = [];
     let matchesAnything = false;
     // The index of the block that settings belong to: 0 is the global block before the first Host line; a Match block holds settings of its own, none of them a Host's.
     let current = 0;
@@ -171,21 +209,19 @@ const readLines = (text: string, home: string): Parsed => {
 
             current = -1;
             matchesAnything ||= match.anything;
-
-            for (const name of match.names) {
-                matched.add(name);
-            }
-        } else if (blocks[current] !== undefined) {
+            matchPatterns.push(...match.patterns);
+        } else if (blocks[current] !== undefined && !(key === "include" && current === 0)) {
+            // An Include before the first Host line adds blocks of its own, which this reader never sees; it is no reason to disable a host.
             blocks[current] = mergeFirst(blocks[current], settingOf(parts.key, parts.value, home));
         }
     }
 
-    return { blocks, matched, matchesAnything };
+    return { blocks, matchesAnything, matchPatterns };
 };
 
 /** Parses the text of an ssh config. Pure, so it is tested without a file. */
 export const parseSshConfig = (text: string, home: string): SshHost[] => {
-    const { blocks, matched, matchesAnything } = readLines(text, home);
+    const { blocks, matchesAnything, matchPatterns } = readLines(text, home);
     const hosts: SshHost[] = [];
 
     // Wildcard patterns are not hosts; they only contribute settings. An alias a line names twice is listed once, and one its own line negates is not listed.
@@ -202,14 +238,14 @@ export const parseSshConfig = (text: string, home: string): SshHost[] => {
             }
         }
 
-        const usesMatch = matchesAnything || matched.has(alias) || (effective.hostName !== null && matched.has(effective.hostName));
+        const usesMatch = matchesAnything || matchPatterns.some((pattern) => globMatches(pattern, alias) || (effective.hostName !== null && globMatches(pattern, effective.hostName)));
 
         hosts.push({
             alias,
             disabledReason: effective.reason ?? (usesMatch ? "This host is used by a Match rule in ~/.ssh/config, which Neore does not evaluate." : null),
             hostName: effective.hostName,
             identityFile: effective.identityFile,
-            port: effective.port,
+            port: effective.port === 0 ? null : effective.port,
             user: effective.user,
         });
     }

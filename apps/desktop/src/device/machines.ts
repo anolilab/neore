@@ -179,7 +179,13 @@ export const createAddProjectMachines = (dependencies: MachineDependencies): Add
     const pairedFor = (entry: SshHost): HostView | undefined =>
         dependencies
             .settings()
-            .hosts.find((host) => host.address === (entry.hostName ?? entry.alias) && host.port === (entry.port ?? 22) && (entry.user === null || host.user === entry.user));
+            .hosts.find(
+                (host) =>
+                    host.address === (entry.hostName ?? entry.alias) &&
+                    host.port === (entry.port ?? 22) &&
+                    host.user === (entry.user ?? dependencies.username()) &&
+                    (entry.identityFile === null || host.identityFile === entry.identityFile),
+            );
 
     const machineFor = (machineId: string): Machine => {
         if (dependencies.status().deviceId === machineId) {
@@ -196,6 +202,17 @@ export const createAddProjectMachines = (dependencies: MachineDependencies): Add
         }
 
         return { host, kind: "server" };
+    };
+
+    /** A server's pairing must be the same one after a confirmation as before it. */
+    const stillPaired = (machineId: string, before: HostView): HostView => {
+        const latest = machineFor(machineId);
+
+        if (latest.kind !== "server" || latest.host.deviceId !== before.deviceId || latest.host.address !== before.address || latest.host.port !== before.port || latest.host.user !== before.user) {
+            throw new Error("device: the server changed while the confirmation was open; try again");
+        }
+
+        return latest.host;
     };
 
     /** What pairing an ssh host needs: the same address, port and user the transport would use. */
@@ -306,7 +323,7 @@ export const createAddProjectMachines = (dependencies: MachineDependencies): Add
             throw declined();
         }
 
-        return dependencies.hostMakeDir(host.deviceId, folder);
+        return dependencies.hostMakeDir(requireConnected(stillPaired(machineId, host)).deviceId, folder);
     };
 
     const shareFolder = async (machineId: string, folder: string): Promise<SharedMachineFolder> => {
@@ -343,17 +360,17 @@ export const createAddProjectMachines = (dependencies: MachineDependencies): Add
         }
 
         // The settings may have changed while the dialog was open.
-        const latest = machineFor(machineId);
+        const latest = stillPaired(machineId, machine.host);
 
-        if (latest.kind !== "server" || latest.host.roots.some((root) => isInside(target, root))) {
+        if (latest.roots.some((root) => isInside(target, root))) {
             throw new Error("device: that folder is already shared");
         }
 
-        if (latest.host.roots.length >= MAX_SERVER_ROOTS) {
+        if (latest.roots.length >= MAX_SERVER_ROOTS) {
             throw new Error(rootLimit());
         }
 
-        dependencies.setRoots(latest.host.deviceId, [...latest.host.roots, target]);
+        dependencies.setRoots(latest.deviceId, [...latest.roots, target]);
 
         return { path: target, shared: true };
     };

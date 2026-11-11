@@ -111,6 +111,68 @@ describe("parseSshConfig", () => {
 
         expect(host).toMatchObject({ port: null, user: null });
     });
+
+    it("keeps a host enabled for an Include before the first Host line, and disables one for an Include inside its block", () => {
+        const [global] = parse("Include other\nHost a\n  HostName a.example.com\n");
+
+        expect(global).toMatchObject({ alias: "a", disabledReason: null });
+
+        const [inside] = parse("Host a\n  Include other\n");
+
+        expect(inside?.disabledReason).toContain("Include");
+    });
+
+    it("disables every host for a ProxyJump or ProxyCommand before the first Host line", () => {
+        const hosts = parse("ProxyJump bastion\nHost a\nHost b\n");
+
+        expect(hosts.map((host) => host.disabledReason !== null)).toEqual([true, true]);
+    });
+
+    it("accepts a decimal Port from 1 to 65535 only, and disables a host with any other value", () => {
+        const hosts = parse("Host hex\n  Port 0x10\nHost word\n  Port abc\nHost big\n  Port 99999\nHost zero\n  Port 0\nHost ok\n  Port 2222\nHost none\n");
+
+        expect(hosts.map((host) => [host.alias, host.port, host.disabledReason !== null])).toEqual([
+            ["hex", null, true],
+            ["word", null, true],
+            ["big", null, true],
+            ["zero", null, true],
+            ["ok", 2222, false],
+            ["none", null, false],
+        ]);
+    });
+
+    it("does not fall back to a later Port when the first one is invalid", () => {
+        const [host] = parse("Host a\n  Port abc\nHost *\n  Port 2200\n");
+
+        expect(host).toMatchObject({ port: null });
+        expect(host?.disabledReason).toContain("Port");
+    });
+
+    it("ignores an inline comment on a Host line, and keeps a # inside quotes", () => {
+        expect(parse("Host build # production\n").map((host) => host.alias)).toEqual(["build"]);
+        expect(parse('Host "a #b" c\n').map((host) => host.alias)).toEqual(["a #b", "c"]);
+        expect(parse("Host 😀 # production\n").map((host) => host.alias)).toEqual(["😀"]);
+    });
+
+    it("disables the hosts a Match rule it cannot evaluate could apply to", () => {
+        for (const rule of ["host *", "user deploy", "originalhost *.example.com", "host a,!b", "localuser me", "all", "canonical"]) {
+            const hosts = parse(`Host a\n  HostName a.example.com\nMatch ${rule}\n  Port 2200\n`);
+
+            expect(hosts.map((host) => host.disabledReason !== null), rule).toEqual([true]);
+        }
+
+        const [plain] = parse("Host a\n  HostName a.example.com\nMatch host other.example.com\n  Port 2200\n");
+
+        expect(plain?.disabledReason).toBeNull();
+    });
+
+    it("applies User, IdentityFile and ProxyJump of a Host * block to named aliases, first value first", () => {
+        const [first, second] = parse("Host a\n  User mine\nHost *\n  User all\n  IdentityFile /k/all\n  ProxyJump bastion\n");
+
+        expect(first).toMatchObject({ alias: "a", identityFile: "/k/all", user: "mine" });
+        expect(first?.disabledReason).toContain("ProxyJump");
+        expect(second).toBeUndefined();
+    });
 });
 
 describe("readSshConfig", () => {
