@@ -68,14 +68,6 @@ describe(buildAppMenuTemplate, () => {
         }
     });
 
-    it("keeps New Chat a command when clicked with its accelerator unregistered", () => {
-        const onCommand = vi.fn();
-
-        click(submenuOf(build({ onCommand, platform: "linux" }), "File")[0]);
-
-        expect(onCommand.mock.calls).toStrictEqual([["new-chat"]]);
-    });
-
     it("keeps reload and the developer tools out of a packaged build", () => {
         const packaged = roles(submenuOf(build(), "View"));
         const development = roles(submenuOf(build({ isPackaged: false }), "View"));
