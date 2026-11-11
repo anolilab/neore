@@ -32844,6 +32844,10 @@ msgstr "La page, toutes ses sous-pages, ses commentaires et son historique des v
 msgid "The pasted text could not be attached and was not inserted."
 msgstr "Le texte collé n’a pas pu être joint et n’a pas été inséré."
 
+#: src/features/chat/thread/composer-input.tsx:943
+msgid "The chat changed before the paste was ready, so it was not inserted."
+msgstr "La discussion a changé avant que le collage soit prêt, il n’a donc pas été inséré."
+
 #: src/features/canvas/pdf-preview-panel.tsx:112
 #: src/features/canvas/use-pdf-download.ts:82
 #: src/features/canvas/use-pdf-download.ts:158

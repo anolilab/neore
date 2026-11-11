@@ -98,8 +98,16 @@ describe("composer paste", () => {
         expect(planPaste(clipboard({ "text/html": googleDocs }), { plainOnly: true, selectedText: "" })).toStrictEqual({ kind: "text", text: "" });
     });
 
-    it("converts HTML too big to convert when it is the only text, and leaves a composer quote chip to the editor", async () => {
+    it("takes the text of HTML too big to convert when it is the only text, and leaves a composer quote chip to the editor", async () => {
         await expect(paste({ "text/html": `<p>Hello</p><!--${"x".repeat(1_000_000)}-->` })).resolves.toBe("Hello");
+
+        const started = performance.now();
+        const text = await paste({ "text/html": "<div><b>row</b> &amp; &lt;more&gt;</div>".repeat(150_000) });
+
+        expect(performance.now() - started).toBeLessThan(1000);
+        expect(text?.startsWith("row & <more>row")).toBe(true);
+        expect(text).toHaveLength(150_000 * "row & <more>".length);
+        expect(isLongPaste(text ?? "")).toBe(true);
         expect(
             planPaste(
                 clipboard({
@@ -134,6 +142,12 @@ describe("composer paste", () => {
     });
 
     it.each([
+        ["repeated <br> keeps its blank lines", "<p>A<br><br>B</p><div>C<br>\n<br>D</div>", "A\n\nB\n\nC\n\nD"],
+        [
+            "a table nested in a cell keeps its shown text",
+            '<table><tr><th>A</th><th>B</th></tr><tr><td>x<table><tr><td>in 1</td><td style="display:none">no</td></tr><tr><td>in <b>2</b></td></tr></table>y</td><td>z</td></tr></table>',
+            "| A | B |\n| --- | --- |\n| x in 1 in **2** y | z |",
+        ],
         ["a div per line is a line each", "<div>one <b>1</b></div> <div>two</div><div><br></div><div>four</div><p>para</p>", "one **1**\ntwo\n\nfour\n\npara"],
         ["a code block in a list item stays in it", "<ul><li>step<pre>a\n\nb</pre></li></ul>", "- step\n\n  ```\n  a\n\n  b\n  ```"],
         ["a code block in a quote stays in it", "<blockquote><p>q</p><pre>a\nb</pre></blockquote>", "> q\n>\n> ```\n> a\n> b\n> ```"],

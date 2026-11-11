@@ -219,10 +219,20 @@ const safeHref = (element: Element): string | undefined => {
     }
 };
 
-const cellText = (cell: Element, context: Context): string =>
-    oneLine(children(cell, { ...context, inTable: true }))
+/** A cell's text on one line. The context is shared, not copied, so cells of tables nested in it count against the budget. */
+const cellText = (cell: Element, context: Context): string => {
+    const { inTable } = context;
+
+    context.inTable = true;
+
+    const text = children(cell, context);
+
+    context.inTable = inTable;
+
+    return oneLine(text)
         .trim()
         .replaceAll("|", String.raw`\|`);
+};
 
 /** Whether `node` or a parent of it below `root` is hidden. */
 const isHiddenIn = (node: Element, root: Element): boolean => {
@@ -311,6 +321,30 @@ const table = (element: Element, context: Context): string => {
     const [head = [], ...body] = cells;
 
     return `${before}${[line(head), `|${" --- |".repeat(width)}`, ...body.map((row: string[]) => line(row))].join("\n")}\n\n`;
+};
+
+/** A table inside a cell, which has no room for a grid: the text of its shown cells, a block of its own. */
+const nestedTable = (element: Element, context: Context): string => {
+    const texts: string[] = [];
+
+    for (const row of element.querySelectorAll("tr")) {
+        if (row.closest("table") !== element || isHiddenIn(row, element)) {
+            continue;
+        }
+
+        for (const cell of row.children) {
+            if (!(cell instanceof HTMLTableCellElement) || isHidden(cell)) {
+                continue;
+            }
+
+            context.tableCells -= 1;
+            texts.push(oneLine(children(cell, context)).trim());
+        }
+    }
+
+    const text = texts.filter((cell: string) => cell !== "").join(" ");
+
+    return text === "" ? "" : `\n${text}\n`;
 };
 
 /** An `<ol start>` or `<li value>` number Markdown can write: 0 counts. */
@@ -460,7 +494,7 @@ const element = (node: Element, context: Context): string => {
             return `\n\n\0${context.code.length - 1}\0\n\n`;
         }
         case "TABLE": {
-            return context.inTable ? "" : table(node, context);
+            return context.inTable ? nestedTable(node, context) : table(node, context);
         }
         default: {
             break;
@@ -505,6 +539,9 @@ function children(node: Node, context: Context): string {
     for (const child of node.childNodes) {
         let next = "";
 
+        // A `<br>` is a line of its own: two in a row leave a blank line, where two line blocks in a row share a break.
+        const isBreak = child.nodeType === Node.ELEMENT_NODE && (child as Element).tagName === "BR";
+
         if (child.nodeType === Node.TEXT_NODE) {
             next = (child.nodeValue ?? "").replaceAll("\0", "").replaceAll(/\s+/g, " ");
         } else if (child.nodeType === Node.ELEMENT_NODE) {
@@ -533,7 +570,7 @@ function children(node: Node, context: Context): string {
             // list item its indent.
             if (!next.startsWith("\n")) {
                 next = trimSpacesStart(next);
-            } else if (!next.startsWith("\n\n")) {
+            } else if (!next.startsWith("\n\n") && !isBreak) {
                 next = next.slice(1);
             }
         }

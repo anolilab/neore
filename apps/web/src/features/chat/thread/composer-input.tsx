@@ -934,7 +934,14 @@ const ComposerInput = ({
             // Converted text is measured as it lands: a short web page can be a long table.
             const { removed: pasteRemoved, text: pastedText } = stripHiddenText(plan.kind === "default" ? plainText : await planText(plan));
 
-            if (!pastedText || getChatKey() !== chatKey) {
+            if (!pastedText) {
+                return;
+            }
+
+            // Another chat opened while the paste was converted: it is not written there, and the user is told so.
+            if (getChatKey() !== chatKey) {
+                showError(t`The chat changed before the paste was ready, so it was not inserted.`);
+
                 return;
             }
 

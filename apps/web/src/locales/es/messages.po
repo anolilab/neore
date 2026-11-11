@@ -32844,6 +32844,10 @@ msgstr "Se eliminan la página, todas sus subpáginas, sus comentarios y su hist
 msgid "The pasted text could not be attached and was not inserted."
 msgstr "No se pudo adjuntar el texto pegado y no se insertó."
 
+#: src/features/chat/thread/composer-input.tsx:943
+msgid "The chat changed before the paste was ready, so it was not inserted."
+msgstr "El chat cambió antes de que el pegado estuviera listo, así que no se insertó."
+
 #: src/features/canvas/pdf-preview-panel.tsx:112
 #: src/features/canvas/use-pdf-download.ts:82
 #: src/features/canvas/use-pdf-download.ts:158

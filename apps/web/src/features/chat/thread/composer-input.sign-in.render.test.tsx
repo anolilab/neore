@@ -4,7 +4,7 @@
  * nothing is sent, the draft stays, and the sign-in prompt opens.
  */
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -16,6 +16,8 @@ const harness = vi.hoisted(() => {
         mustSignIn: true,
         sendComparisonMessage: vi.fn(async () => undefined),
         sendMessage: vi.fn(async () => undefined),
+        showError: vi.fn(),
+        threadId: undefined as string | undefined,
     };
 });
 
@@ -56,8 +58,11 @@ vi.mock("@/features/chat/core/context/chat-context", () => {
         useChatLunora: () => {
             return {};
         },
+        useChatMessages: () => {
+            return { messages: [] };
+        },
         useChatThread: () => {
-            return { isNewThread: true, threadId: undefined };
+            return { isNewThread: true, threadId: harness.threadId };
         },
     };
 });
@@ -88,6 +93,10 @@ vi.mock("@/lib/auth/server-functions", () => {
     return { default: vi.fn() };
 });
 
+vi.mock("@/lib/toast", async (importOriginal) => {
+    return { ...(await importOriginal<typeof import("@/lib/toast")>()), showError: harness.showError };
+});
+
 vi.mock("@/lib/env", () => {
     return { default: { VITE_LUNORA_URL: "http://localhost:8788" } };
 });
@@ -115,9 +124,11 @@ vi.mock("./composer-tiptap/use-composer-autocomplete", () => {
 // The input row stands in with its contract: the draft and the submit control.
 vi.mock("./composer-input-area", () => {
     return {
-        default: ({ onSubmit, value }: { onSubmit: () => void; value: string }) => (
+        default: ({ onPaste, onSubmit, value }: { onPaste?: (event: unknown) => void; onSubmit: () => void; value: string }) => (
             <div>
-                <output aria-label="Draft">{value}</output>
+                <output aria-label="Draft" onPaste={onPaste}>
+                    {value}
+                </output>
                 <button onClick={onSubmit} type="button">
                     Send message
                 </button>
@@ -186,5 +197,34 @@ describe("ComposerInput under invite-only", () => {
 
         expect(onSubmitOverride).toHaveBeenCalledWith("compare these", []);
         expect(useLoginPromptStore.getState().isOpen).toBe(false);
+    });
+});
+
+describe("ComposerInput paste", () => {
+    afterEach(() => {
+        harness.threadId = undefined;
+        useChatUIStore.getState().clearComposer();
+        vi.clearAllMocks();
+    });
+
+    it("tells the user, and inserts nothing, when another chat opens while a paste is converted", async () => {
+        harness.mustSignIn = false;
+        harness.threadId = "chat-a";
+
+        const view = renderComposer();
+        const data: Record<string, string> = { "text/html": "<p><b>bold</b> text</p>", "text/plain": "bold text" };
+
+        fireEvent.paste(screen.getByLabelText("Draft"), { clipboardData: { getData: (type: string) => data[type] ?? "", items: [] } });
+        harness.threadId = "chat-b";
+        view.rerender(
+            <QueryClientProvider client={new QueryClient()}>
+                <ComposerInput />
+            </QueryClientProvider>,
+        );
+
+        await waitFor(() => {
+            expect(harness.showError).toHaveBeenCalledWith("The chat changed before the paste was ready, so it was not inserted.");
+        });
+        expect(useChatUIStore.getState().composerText).toBe("");
     });
 });

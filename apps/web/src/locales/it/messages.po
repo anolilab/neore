@@ -32844,6 +32844,10 @@ msgstr "La pagina, tutte le sottopagine, i relativi commenti e la cronologia del
 msgid "The pasted text could not be attached and was not inserted."
 msgstr "Impossibile allegare il testo incollato, quindi non è stato inserito."
 
+#: src/features/chat/thread/composer-input.tsx:943
+msgid "The chat changed before the paste was ready, so it was not inserted."
+msgstr "La chat è cambiata prima che l’incolla fosse pronto, quindi non è stato inserito."
+
 #: src/features/canvas/pdf-preview-panel.tsx:112
 #: src/features/canvas/use-pdf-download.ts:82
 #: src/features/canvas/use-pdf-download.ts:158

@@ -32844,6 +32844,10 @@ msgstr "该页面、所有子页面、评论及版本历史都将被删除。此
 msgid "The pasted text could not be attached and was not inserted."
 msgstr "粘贴的文本无法附加，也未被插入。"
 
+#: src/features/chat/thread/composer-input.tsx:943
+msgid "The chat changed before the paste was ready, so it was not inserted."
+msgstr "粘贴内容准备好之前聊天已切换，因此未插入。"
+
 #: src/features/canvas/pdf-preview-panel.tsx:112
 #: src/features/canvas/use-pdf-download.ts:82
 #: src/features/canvas/use-pdf-download.ts:158

@@ -32926,6 +32926,10 @@ msgstr "The page, every sub-page, its comments and its version history are delet
 msgid "The pasted text could not be attached and was not inserted."
 msgstr "The pasted text could not be attached and was not inserted."
 
+#: src/features/chat/thread/composer-input.tsx:943
+msgid "The chat changed before the paste was ready, so it was not inserted."
+msgstr "The chat changed before the paste was ready, so it was not inserted."
+
 #: src/features/canvas/pdf-preview-panel.tsx:112
 #: src/features/canvas/use-pdf-download.ts:82
 #: src/features/canvas/use-pdf-download.ts:158

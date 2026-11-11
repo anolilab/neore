@@ -24,6 +24,8 @@ const FIRST_ELEMENT = /<(?![!/]|(?:html|head|body|meta|title|style)\b)([a-z][\w-
 const MONOSPACE_FONT = /font-family\s*:[^;">]*(?:mono|consolas|menlo|courier)/i;
 const MAX_CONVERTED_HTML = 1_000_000;
 const BACKTICK_RUNS = /`+/g;
+const ENTITY = /&(?:amp|gt|lt|nbsp|quot|#39);/g;
+const ENTITIES: Record<string, string> = { "&#39;": "'", "&amp;": "&", "&gt;": ">", "&lt;": "<", "&nbsp;": " ", "&quot;": '"' };
 const LANGUAGE_UNSAFE = /[^\w#+.-]/g;
 const VSCODE_LANGUAGES: Record<string, string> = { javascriptreact: "jsx", plaintext: "", shellscript: "bash", typescriptreact: "tsx" };
 
@@ -131,15 +133,36 @@ export const planPaste = (data: Pick<DataTransfer, "getData">, { plainOnly, sele
     return plain !== "" && isPlainHtml(html) ? { kind: "text", text: plain } : { html, kind: "html", plain };
 };
 
+/** The text of HTML too big to parse, in one pass: every `<…>` dropped and the common entities decoded. */
+const stripTags = (html: string): string => {
+    const parts: string[] = [];
+    let index = 0;
+
+    while (index < html.length) {
+        const open = html.indexOf("<", index);
+
+        parts.push(html.slice(index, open === -1 ? html.length : open));
+
+        const close = open === -1 ? -1 : html.indexOf(">", open);
+
+        index = close === -1 ? html.length : close + 1;
+    }
+
+    return parts
+        .join("")
+        .replaceAll(ENTITY, (entity: string) => ENTITIES[entity] ?? entity)
+        .trim();
+};
+
 /** The text a paste inserts: the Markdown for HTML, or `plain` when the converter cannot load (a deploy since the page opened) or finds no text. */
 export const planText = async (plan: Exclude<PastePlan, { kind: "default" }>): Promise<string> => {
     if (plan.kind === "text") {
         return plan.text;
     }
 
-    // A page this big becomes an attachment whatever its form; converting it would only hold up the tab, unless it is the only text.
-    if (plan.html.length > MAX_CONVERTED_HTML && plan.plain !== "") {
-        return plan.plain;
+    // A page this big becomes an attachment whatever its form; converting it would only hold up the tab.
+    if (plan.html.length > MAX_CONVERTED_HTML) {
+        return plan.plain === "" ? stripTags(plan.html) : plan.plain;
     }
 
     try {

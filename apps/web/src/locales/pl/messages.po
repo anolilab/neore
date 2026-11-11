@@ -32844,6 +32844,10 @@ msgstr "Strona, wszystkie podstrony, komentarze i historia wersji zostaną usuni
 msgid "The pasted text could not be attached and was not inserted."
 msgstr "Nie udało się załączyć wklejonego tekstu i nie został wstawiony."
 
+#: src/features/chat/thread/composer-input.tsx:943
+msgid "The chat changed before the paste was ready, so it was not inserted."
+msgstr "Czat zmienił się, zanim wklejanie było gotowe, więc nic nie zostało wstawione."
+
 #: src/features/canvas/pdf-preview-panel.tsx:112
 #: src/features/canvas/use-pdf-download.ts:82
 #: src/features/canvas/use-pdf-download.ts:158
