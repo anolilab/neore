@@ -87,8 +87,8 @@ export const buildAppMenuTemplate = ({ appName, isPackaged, onCommand, onOpenDoc
         {
             // `role: "window"` lets macOS list the open windows in it.
             role: "window",
-            // `zoom` and `front` are macOS roles.
-            submenu: [{ role: "minimize" }, ...isMac ? [{ role: "zoom" } as const, separator, { role: "front" } as const] : [{ role: "close" } as const]],
+            // `zoom` and `front` are macOS roles; elsewhere Close lives in File only, so Ctrl+W is claimed once.
+            submenu: [{ role: "minimize" }, ...isMac ? [{ role: "zoom" } as const, separator, { role: "front" } as const] : []],
         },
     );
 

@@ -41,7 +41,7 @@ describe(buildAppMenuTemplate, () => {
 
         expect(template.map((entry) => entry.label ?? entry.role)).toStrictEqual(["File", "Edit", "View", "window"]);
         expect(roles(file)).toStrictEqual(["New Chat", "separator", "Settings…", "separator", "close", "quit"]);
-        expect(roles(submenuOf(template, "window"))).toStrictEqual(["minimize", "close"]);
+        expect(roles(submenuOf(template, "window"))).toStrictEqual(["minimize"]);
     });
 
     it("sends New Chat and Settings as commands, with their accelerators", () => {
