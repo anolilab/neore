@@ -5,7 +5,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 import { registeredApi, registerModule } from "../../test/registered-api";
 
 import { MAX_PROJECT_PATH_BYTES } from "./machine-location";
-import { createProject } from "./functions";
+import { createProject, getProject, listPinnedProjects, listProjects } from "./functions";
 import schema from "../schema";
 
 const registry = vi.hoisted(() => new Map<string, unknown>());
@@ -108,6 +108,76 @@ describe("createProject machine and folder", () => {
 
         await expect(create({ machineId })).rejects.toThrow(BAD_PATH);
         await expect(create({ path: "/tmp/app" })).rejects.toThrow();
+    });
+
+    describe("reads by an organization member", () => {
+        const ORG = "org-1";
+        const PATH = "/Users/me/code/app";
+
+        // The identity's user row must exist for the list reads, so the ids come from real rows.
+        const seed = async () => {
+            const insertUser = async (name: string) =>
+                (await harness.run(
+                    async (ctx: any) => await ctx.db.insert("user", { createdAt: 0, email: `${name}@example.com`, emailVerified: true, name, updatedAt: 0 }),
+                )) as string;
+            const owner = await insertUser("owner");
+            const member = await insertUser("member");
+            const machineId = await insertDevice(owner);
+            const projectId = (await harness.run(async (ctx: any) => {
+                await ctx.db.insert("member", { createdAt: 1, organizationId: ORG, role: "owner", userId: owner });
+                await ctx.db.insert("member", { createdAt: 1, organizationId: ORG, role: "member", userId: member });
+
+                return await ctx.db.insert("projects", {
+                    createdAt: 0,
+                    machineId,
+                    organizationId: ORG,
+                    path: PATH,
+                    pinnedAt: 5,
+                    title: "Shared",
+                    userId: owner,
+                });
+            })) as string;
+
+            return { machineId, member, owner, projectId };
+        };
+
+        it("shows the owner the machine and folder from getProject", async () => {
+            const { machineId, owner, projectId } = await seed();
+            const project = (await as(owner).query(getProject as never, { projectId } as never)) as Record<string, unknown>;
+
+            expect(project).toMatchObject({ machineId, path: PATH });
+        });
+
+        it("hides the machine and folder from a member who is not the owner", async () => {
+            const { member, projectId } = await seed();
+            const project = (await as(member).query(getProject as never, { projectId } as never)) as Record<string, unknown>;
+
+            expect(project.title).toBe("Shared");
+            expect(project).not.toHaveProperty("machineId");
+            expect(project).not.toHaveProperty("path");
+        });
+
+        it("omits them from a member's listing and pinned listing, and keeps them for the owner's", async () => {
+            const { machineId, member, owner } = await seed();
+            const paginationOpts = { cursor: null, numItems: 10 };
+            const memberPage = (await as(member).query(listProjects as never, { organizationId: ORG, paginationOpts } as never)) as {
+                page: Record<string, unknown>[];
+            };
+            const memberPinned = (await as(member).query(listPinnedProjects as never, { organizationId: ORG } as never)) as Record<string, unknown>[];
+            const ownerPage = (await as(owner).query(listProjects as never, { organizationId: ORG, paginationOpts } as never)) as {
+                page: Record<string, unknown>[];
+            };
+
+            expect(memberPage.page).toHaveLength(1);
+            expect(memberPinned).toHaveLength(1);
+
+            for (const row of [...memberPage.page, ...memberPinned]) {
+                expect(row).not.toHaveProperty("machineId");
+                expect(row).not.toHaveProperty("path");
+            }
+
+            expect(ownerPage.page[0]).toMatchObject({ machineId, path: PATH });
+        });
     });
 
     it("still creates a project without a machine", async () => {

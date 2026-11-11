@@ -15,6 +15,23 @@ export const isProjectFolderPath = (path: string): boolean =>
     ABSOLUTE_PATH.test(path) && !path.includes("\u{0}") && textEncoder.encode(path).length <= MAX_PROJECT_PATH_BYTES;
 
 /**
+ * The project as `viewerId` may see it. A machine belongs to its owner alone, so the machine and folder (a device id and
+ * an absolute path that often carries the OS username) are dropped for anyone else, such as another member of the
+ * project's organization. Every project row a client reads passes through here.
+ */
+export const forViewer = <T extends { machineId?: unknown; path?: unknown; userId?: string | null }>(project: T, viewerId: string): T => {
+    if (project.userId === viewerId) {
+        return project;
+    }
+
+    // The two names are dropped by the rest pattern, never read: that is how the fields leave the row.
+    // eslint-disable-next-line sonarjs/no-unused-vars -- the rest pattern is the point of this line
+    const { machineId: _machineId, path: _path, ...rest } = project;
+
+    return rest as T;
+};
+
+/**
  * Checks the machine and folder a new project records and returns them. The device must be the caller's own and
  * not revoked (a missing, foreign or revoked one is the same `NOT_FOUND`); the folder is required with it.
  */
