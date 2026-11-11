@@ -27,16 +27,31 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
+/**
+ * Waits until Univer has drawn its canvas and the editor's repairs (univer-accessibility.tsx, run from a
+ * MutationObserver) have caught up: the a11y check runs right after `play`, and a canvas still carrying Univer's own
+ * positive tabindex fails it.
+ */
+const settled: Story["play"] = async ({ canvasElement }) => {
+    await waitFor(
+        () => {
+            expect(canvasElement.querySelector("canvas")).not.toBeNull();
+            expect(canvasElement.querySelector('[tabindex]:not([tabindex="0"]):not([tabindex="-1"])')).toBeNull();
+        },
+        { timeout: 15_000 },
+    );
+};
+
 export const Default: Story = {
-    play: async ({ canvasElement }) => {
-        await waitFor(() => expect(canvasElement.querySelector("canvas")).not.toBeNull(), { timeout: 15_000 });
-    },
+    play: settled,
 };
 
 export const DarkMode: Story = {
     args: { darkMode: true },
+    play: settled,
 };
 
 export const Empty: Story = {
     args: { content: "" },
+    play: settled,
 };
