@@ -219,6 +219,9 @@ const readLines = (text: string, home: string): Parsed => {
     return { blocks, matchesAnything, matchPatterns };
 };
 
+/** OpenSSH compares `Match host` and `Match originalhost` names without regard to case, unlike `Host` patterns. */
+const matchesMatchName = (pattern: string, name: string): boolean => globMatches(pattern.toLowerCase(), name.toLowerCase());
+
 /** Parses the text of an ssh config. Pure, so it is tested without a file. */
 export const parseSshConfig = (text: string, home: string): SshHost[] => {
     const { blocks, matchesAnything, matchPatterns } = readLines(text, home);
@@ -238,9 +241,7 @@ export const parseSshConfig = (text: string, home: string): SshHost[] => {
             }
         }
 
-        // OpenSSH compares `Match host` and `Match originalhost` names without regard to case, unlike `Host` patterns.
-        const matchesName = (pattern: string, name: string): boolean => globMatches(pattern.toLowerCase(), name.toLowerCase());
-        const usesMatch = matchesAnything || matchPatterns.some((pattern) => matchesName(pattern, alias) || (effective.hostName !== null && matchesName(pattern, effective.hostName)));
+        const usesMatch = matchesAnything || matchPatterns.some((pattern) => matchesMatchName(pattern, alias) || (effective.hostName !== null && matchesMatchName(pattern, effective.hostName)));
 
         hosts.push({
             alias,
