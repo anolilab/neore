@@ -68,7 +68,11 @@ const eraseUnlessMoved = async (
     }
 
     if (project && (project.organizationId ?? "") !== row.organizationId) {
-        await ctx.db.patch("projectRepositories", row._id, { organizationId: project.organizationId ?? "" });
+        // Only while the row still holds the copy read here: a move that stamped it meanwhile wins.
+        await ctx.db.patchIf("projectRepositories", row._id, {
+            patch: { organizationId: project.organizationId ?? "" },
+            where: { organizationId: row.organizationId ?? null, projectId: row.projectId },
+        });
 
         return false;
     }
