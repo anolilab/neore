@@ -448,9 +448,13 @@ export const planBundle = (bundle: ParsedBundle, selected: ReadonlySet<string> |
 
 /** The creates and deletes an import is made of; the procedure wires them to `createSkill`, `createImportedGroupChat`, `createTrigger` and the unlimited, owner-only `removeImportedItem`. */
 export interface BundleOps {
-    createGroupChat: (args: Omit<GroupCreate, "participantKeys" | "synthesizerKey"> & { skillIds: string[]; synthesizerSkillId?: string }) => Promise<string>;
-    createSkill: (args: SkillCreate) => Promise<string>;
-    createTrigger: (args: TriggerCreate) => Promise<{ triggerId: string; webhookSecret?: string }>;
+    /** `key`: the entry's key in the file, which a plugin install turns into the child's marker. */
+    createGroupChat: (
+        args: Omit<GroupCreate, "participantKeys" | "synthesizerKey"> & { skillIds: string[]; synthesizerSkillId?: string },
+        key: string,
+    ) => Promise<string>;
+    createSkill: (args: SkillCreate, key: string) => Promise<string>;
+    createTrigger: (args: TriggerCreate, key: string) => Promise<{ triggerId: string; webhookSecret?: string }>;
     /** `kept`: the group chat has messages by now, so it was not deleted. */
     deleteGroupChat: (threadId: string) => Promise<undefined | void | { kept: boolean }>;
     deleteSkill: (skillId: string) => Promise<unknown>;
@@ -506,7 +510,7 @@ const createPlanned = async (entry: PlanEntry, ops: BundleOps, idByKey: Map<stri
     const { plan } = entry;
 
     if (plan?.kind === "skill") {
-        const id = await ops.createSkill(plan.create);
+        const id = await ops.createSkill(plan.create, entry.key);
 
         idByKey.set(entry.key, id);
 
@@ -516,17 +520,20 @@ const createPlanned = async (entry: PlanEntry, ops: BundleOps, idByKey: Map<stri
     if (plan?.kind === "group") {
         const { participantKeys, synthesizerKey, ...rest } = plan.create;
         const synthesizerSkillId = synthesizerKey === undefined ? undefined : idByKey.get(synthesizerKey);
-        const id = await ops.createGroupChat({
-            ...rest,
-            skillIds: participantKeys.map((key) => createdId(idByKey, key)),
-            ...(synthesizerSkillId !== undefined && { synthesizerSkillId }),
-        });
+        const id = await ops.createGroupChat(
+            {
+                ...rest,
+                skillIds: participantKeys.map((key) => createdId(idByKey, key)),
+                ...(synthesizerSkillId !== undefined && { synthesizerSkillId }),
+            },
+            entry.key,
+        );
 
         return { id, key: entry.key, kind: "group", title: entry.title };
     }
 
     if (plan?.kind === "trigger") {
-        const { triggerId, webhookSecret } = await ops.createTrigger(plan.create);
+        const { triggerId, webhookSecret } = await ops.createTrigger(plan.create, entry.key);
 
         return { id: triggerId, key: entry.key, kind: "trigger", title: entry.title, ...(webhookSecret !== undefined && { webhookSecret }) };
     }
