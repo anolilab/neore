@@ -210,7 +210,7 @@ fn the_host_says_what_it_can_sandbox_before_anything_else() {
     .is_ok();
 
     assert_eq!(hello["kind"], "hello");
-    assert_eq!(hello["protocol"], 3);
+    assert_eq!(hello["protocol"], device_core::host::PROTOCOL_VERSION);
     assert_eq!(hello["agents"], cfg!(unix));
     assert_eq!(hello["platform"], device_core::actions::platform());
     assert_eq!(hello["sandbox"]["available"], confines);
