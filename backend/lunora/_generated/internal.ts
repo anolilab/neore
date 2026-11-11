@@ -1047,6 +1047,11 @@ export interface InternalApiTypes {
         update: {
             loadInstalledForUpdate: FunctionReference<"query", { pluginSlug: string; userId: string }, null | { children: Array<{ contentHash: string; currentHash: string; entryKey: string; kind: "skill" | "trigger" | "group" }>; installId: string; status: string; version: string }>;
         };
+        update_apply: {
+            beginUpdate: FunctionReference<"mutation", { installId: string; targetVersion: string; userId: string }, number>;
+            finishUpdate: FunctionReference<"mutation", { generation: number; installId: string; version: string }, null>;
+            updateSkillChild: FunctionReference<"mutation", { category?: string; config?: unknown; contentHash: string; description: string; entryKey: string; generation: number; icon?: string; installId: string; instructions: string; name: string; tags?: Array<string>; variables?: unknown; version?: string; userId: string }, null>;
+        };
     };
     projects: {
         functions: {
@@ -2384,6 +2389,11 @@ export const internal: InternalApiTypes = {
         },
         update: {
             loadInstalledForUpdate: { __lunoraRef: "plugins_update:loadInstalledForUpdate" },
+        },
+        update_apply: {
+            beginUpdate: { __lunoraRef: "plugins_update_apply:beginUpdate" },
+            finishUpdate: { __lunoraRef: "plugins_update_apply:finishUpdate" },
+            updateSkillChild: { __lunoraRef: "plugins_update_apply:updateSkillChild" },
         },
     },
     projects: {

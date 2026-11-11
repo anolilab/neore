@@ -637,6 +637,7 @@ export interface ApiTypes {
         };
         update: {
             previewUpdate: FunctionReference<"action", { markdown: string }, { downgrade: boolean; installedVersion: string; plan: Array<{ action: "create" | "delete" | "detach" | "keep-edited" | "report-group" | "same" | "update"; entryKey: string }>; targetVersion: string }>;
+            updatePlugin: FunctionReference<"action", { confirmDowngrade: boolean; contentHash: string; markdown: string }, { applied: Array<string>; skipped: Array<{ action: "create" | "delete" | "detach" | "keep-edited" | "report-group" | "same" | "update"; entryKey: string }>; version: string }>;
         };
     };
     projects: {
@@ -1565,6 +1566,7 @@ export const api: ApiTypes = {
         },
         update: {
             previewUpdate: { __lunoraRef: "plugins_update:previewUpdate" },
+            updatePlugin: { __lunoraRef: "plugins_update:updatePlugin" },
         },
     },
     projects: {
