@@ -330,6 +330,59 @@ describe("shareFolder", () => {
     });
 });
 
+describe("pairing identity", () => {
+    it("pairs an alias with no User to the saved host of the local user, not another user's", () => {
+        const hosts = [server({ deviceId: "srv-deploy", user: "deploy" }), server({ deviceId: "srv-me", user: "me" })];
+        const [, box] = setup({ hosts, ssh: [ssh("build", { user: null })] }).machines.list();
+
+        expect(box?.id).toBe("srv-me");
+    });
+
+    it("does not pair two saved hosts that differ only by user to the wrong alias", () => {
+        const hosts = [server({ deviceId: "srv-a", user: "alice" }), server({ deviceId: "srv-b", user: "bob" })];
+        const [, box] = setup({ hosts, ssh: [ssh("build", { user: "bob" })] }).machines.list();
+
+        expect(box?.id).toBe("srv-b");
+        expect(setup({ hosts, ssh: [ssh("build", { user: "carol" })] }).machines.list()[1]?.status).toBe("unpaired");
+    });
+
+    it("does not reuse a saved host whose key file differs from the one the alias names", () => {
+        const hosts = [server({ identityFile: "/k/old" })];
+
+        expect(setup({ hosts, ssh: [ssh("build", { identityFile: "/k/new" })] }).machines.list()[1]?.status).toBe("unpaired");
+        expect(setup({ hosts, ssh: [ssh("build", { identityFile: "/k/old" })] }).machines.list()[1]?.status).toBe("connected");
+        expect(setup({ hosts, ssh: [ssh("build")] }).machines.list()[1]?.status).toBe("connected");
+    });
+
+    it("writes nothing when the paired server changes while the folder confirmation is open", async () => {
+        const entry = ssh("build");
+        const { deps, machines, state } = setup({ ssh: [entry] });
+
+        deps.confirm.mockImplementationOnce(async () => {
+            entry.hostName = "other.example.com";
+            state.hosts = [server({ address: "other.example.com" })];
+
+            return true;
+        });
+
+        await expect(machines.createFolder("srv-1", "/srv/new")).rejects.toThrow("server changed");
+        expect(deps.hostMakeDir).not.toHaveBeenCalled();
+    });
+
+    it("shares nothing when the paired server changes while the share confirmation is open", async () => {
+        const { deps, machines, state } = setup({ ssh: [ssh("build", { user: null })] });
+
+        deps.confirm.mockImplementationOnce(async () => {
+            state.hosts = [server({ user: "me" })];
+
+            return true;
+        });
+
+        await expect(machines.shareFolder("srv-1", "/data/proj")).rejects.toThrow();
+        expect(deps.setRoots).not.toHaveBeenCalled();
+    });
+});
+
 describe("validators", () => {
     it("accept an absolute path and refuse the rest", () => {
         expect(readMachinePath("/srv/app", false)).toBe("/srv/app");
@@ -344,6 +397,10 @@ describe("validators", () => {
         expect(() => readMachinePath("/a\u{2066}b", true)).toThrow("device: path is invalid");
         expect(() => readMachinePath("/a\u{200B}b", false)).toThrow("device: path is invalid");
         expect(() => readMachinePath(7, false)).toThrow("device: path is invalid");
+        expect(() => readMachinePath(String.raw`\\host\share\dir`, true)).toThrow("must be absolute");
+        expect(() => readMachinePath(String.raw`\\?\C:\dir`, true)).toThrow("must be absolute");
+        expect(() => readMachinePath("//host/share", true)).toThrow("must be absolute");
+        expect(readMachinePath("/home/me/app", true)).toBe("/home/me/app");
     });
 
     it("refuse a machine id or alias of the wrong shape", () => {
