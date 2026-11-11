@@ -2862,7 +2862,8 @@ export const schema = defineSchema({
         .index("by_botId_connectorSlug", ["botId", "connectorSlug"])
         // The app proxy's check for a call that names no thread: every teammate's setting for one connection (`access.ts`).
         .index("by_userId_connectorSlug", ["userId", "connectorSlug"])
-        .index("by_userId", ["userId"]),
+        .index("by_userId", ["userId"])
+        .triggers((t) => auditTriggersFor(t, "teammateConnectorAccess", AUDIT_TABLES["teammateConnectorAccess"]!)),
 
     teamMember: defineTable({
         createdAt: v.optional(v.number()),
