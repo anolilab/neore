@@ -267,4 +267,25 @@ describe("the four-hour approval reminder", () => {
         expect(await reminderOf("b149")).toBe(NOW);
         expect(await approvalPushes()).toHaveLength(1);
     });
+
+    it("decides a pause from all its requests when they straddle a page boundary: one approval push, no question push", async () => {
+        await insertThread();
+
+        // 999 older rows fill the first page, so the question is that page's last row and the approval opens the second page.
+        for (let index = 0; index < 999; index += 1) {
+            await insertRun({ approvalId: `f${index}`, createdAt: DUE - MINUTE, threadId });
+        }
+
+        await insertRequest("q1", "askUser");
+        await insertRequest("a1", "webSearch");
+        await insertRun({ approvalId: "q1", createdAt: DUE, pauseId: "pause-1", threadId });
+        await insertRun({ approvalId: "a1", createdAt: DUE, pauseId: "pause-1", threadId });
+
+        await sweep(NOW);
+
+        expect(await approvalPushes()).toHaveLength(1);
+        expect(await pushesOfType("ask_user")).toHaveLength(0);
+        expect(await reminderOf("q1")).toBe(NOW);
+        expect(await reminderOf("a1")).toBe(NOW);
+    });
 });

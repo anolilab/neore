@@ -11,20 +11,16 @@ import { backendPushServer, configurePhoneNotifications, deviceLocale, devicePus
 import { createForegroundGate, createPromptOffer, createTokenChangeFilter, registerPhoneForPush } from "./push-registration";
 
 /**
- * Runs the notification setup, the approval category included, and reports whether it worked. Push is best-effort: a failure is
- * logged and never breaks the screen that asked. A failed setup is not success: no registration goes on without its actions, and
- * the next attempt (a message, the app coming back to the front, a token rotation) runs the setup again.
+ * Runs the notification setup, the approval category included, before a registration. Push is best-effort: a failed step is logged
+ * and retried by the next attempt (a message, the app coming back to the front, a token rotation), but it never stops the
+ * registration, so the phone keeps its token and its ordinary alerts even while the approve and deny actions are missing.
  */
-const setUp = async (): Promise<boolean> => {
+const setUp = async (): Promise<void> => {
     try {
         await configurePhoneNotifications();
-
-        return true;
     } catch (error) {
         // eslint-disable-next-line no-console -- no logger in the app; a failed setup must not be silent
         console.warn("Could not set up notifications.", error);
-
-        return false;
     }
 };
 
@@ -89,13 +85,7 @@ export const offerPhonePush = async (userId: string): Promise<void> => {
 
     const { account } = signedIn;
 
-    const isSetUp = await setUp();
-
-    if (!isSetUp) {
-        promptOffer.release(userId);
-
-        return;
-    }
+    await setUp();
 
     const { didRun } = await register(true, () => account?.isCurrent === true);
 
@@ -157,11 +147,7 @@ export const usePhonePush = (): void => {
         const foreground = createForegroundGate(FOREGROUND_REGISTER_INTERVAL_MS);
         const isRotation = createTokenChangeFilter();
         const registerSilently = async (): Promise<boolean> => {
-            const isSetUp = await setUp();
-
-            if (!isSetUp) {
-                return false;
-            }
+            await setUp();
 
             const { isRegistered } = await register(false, isCurrent);
 

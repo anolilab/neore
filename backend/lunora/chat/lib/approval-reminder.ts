@@ -66,7 +66,7 @@ const pauseKey = (row: DueRow): string => `${row.threadId}\u{0}${row.pauseId ?? 
 export const remindPendingApprovals = async (ctx: MutationCtx, now: number): Promise<number> => {
     const reminderPoint = now - APPROVAL_REMINDER_AFTER_MS;
     const lower = reminderPoint - APPROVAL_REMINDER_WINDOW_MS;
-    let looked = 0;
+    const unsent: DueRow[] = [];
     let cursor: string | null = null;
 
     for (let pageNumber = 0; pageNumber < REMINDER_MAX_PAGES; pageNumber += 1) {
@@ -81,10 +81,7 @@ export const remindPendingApprovals = async (ctx: MutationCtx, now: number): Pro
             .withIndex("by_status_createdAt", (q) => q.eq("status", "pending").gte("createdAt", lower).lte("createdAt", reminderPoint))
             .paginate({ cursor, numItems: REMINDER_BATCH });
 
-        const unsent = due.filter((row) => row.reminderSentAt === undefined);
-
-        looked += unsent.length;
-        await remindPauses(ctx, unsent, now);
+        unsent.push(...due.filter((row) => row.reminderSentAt === undefined));
 
         if (isDone || continueCursor === null) {
             break;
@@ -93,7 +90,10 @@ export const remindPendingApprovals = async (ctx: MutationCtx, now: number): Pro
         cursor = continueCursor;
     }
 
-    return looked;
+    // Every page is read before any pause is decided, so a pause whose requests straddle a page boundary is classified as one.
+    await remindPauses(ctx, unsent, now);
+
+    return unsent.length;
 };
 
 const remindPauses = async (ctx: MutationCtx, unsent: DueRow[], now: number): Promise<void> => {
