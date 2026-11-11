@@ -10,17 +10,23 @@ import { ChevronRight, Folder, Loader2, Monitor, Server } from "lucide-react";
 import type { KeyboardEvent } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { getLocalizedError } from "@/features/auth/lib/utilities";
 import { useCRPC } from "@/lib/lunora/crpc";
 import { getAddProjectBridge, pairNativeHost, probeNativeHost } from "@/lib/native/bridge";
 
 import type { AddProjectMachine, AddProjectMachinesBridge, MachineFolderPage, MachineServerSpec } from "../../../../../desktop/src/add-project-machines.types";
 import {
-    failureText,
     folderNeedsSharing,
     hostSpecOf,
     isAbsolutePath,
     isAlreadySharedError,
+    isDeclinedError,
+    isFilePathError,
     isMissingFolderError,
+    isNotConnectedError,
+    isRefusedRootError,
+    isTooManyRootsError,
+    isUnreadableFolderError,
     joinPath,
     lastSegment,
     machineRowState,
@@ -100,6 +106,69 @@ const AddProjectContent = ({ onClose, onCreateNew }: Omit<AddProjectDialogProps,
 
     const machineId = machine?.id ?? null;
 
+    /** A failure, in the words of the picker. The desktop's own text is English, so only recognised refusals are named. */
+    const describeFailure = useCallback(
+        (failure: unknown): string => {
+            if (isMissingFolderError(failure)) {
+                return t`That folder was not found.`;
+            }
+
+            if (isFilePathError(failure)) {
+                return t`That path is a file.`;
+            }
+
+            if (isUnreadableFolderError(failure)) {
+                return t`This folder cannot be read.`;
+            }
+
+            if (isDeclinedError(failure)) {
+                return t`Cancelled on this computer.`;
+            }
+
+            if (isAlreadySharedError(failure)) {
+                return t`That folder is already shared with this server.`;
+            }
+
+            if (isRefusedRootError(failure)) {
+                return t`That folder is the server's home folder or a folder above it. Choose a folder inside it.`;
+            }
+
+            if (isTooManyRootsError(failure)) {
+                return t`This server already has its maximum of shared folders. Share a parent folder or remove one in the desktop app.`;
+            }
+
+            if (isNotConnectedError(failure)) {
+                return t`Connect this server first.`;
+            }
+
+            return t`The desktop could not complete that. Try again.`;
+        },
+        [t],
+    );
+
+    // The desktop names rows in English, so the picker names them itself: this computer and the status of a server.
+    const rowName = (row: AddProjectMachine): string => (row.kind === "this-computer" ? t`This computer` : row.name);
+
+    const rowLabel = (row: AddProjectMachine): string => {
+        if (row.kind === "this-computer") {
+            return t`This computer`;
+        }
+
+        if (row.status === "connected") {
+            return t`Connected`;
+        }
+
+        if (row.status === "disabled") {
+            return t`SSH · ${row.name}`;
+        }
+
+        return t`SSH · ${row.name} · not connected yet`;
+    };
+
+    // Each browse request gets a number. A response that is no longer the latest (the person went back, picked another
+    // machine or typed another path meanwhile) is dropped, so an old folder never ends up under a new machine.
+    const browseGeneration = useRef(0);
+
     const browse = useCallback(
         async (id: string, path: string, options: { after?: string; createIfMissing: boolean }) => {
             const bridge = getAddProjectBridge();
@@ -108,18 +177,34 @@ const AddProjectContent = ({ onClose, onCreateNew }: Omit<AddProjectDialogProps,
                 return;
             }
 
+            const generation = browseGeneration.current + 1;
+            const isCurrent = (): boolean => generation === browseGeneration.current;
+
+            browseGeneration.current = generation;
             setIsBrowsing(true);
             setError("");
             setMessage("");
 
             let result = await attempt(() => bridge.browseMachineFolders({ after: options.after, machineId: id, path }));
 
+            if (!isCurrent()) {
+                return;
+            }
+
             if (!result.ok && options.createIfMissing && isMissingFolderError(result.error) && isAbsolutePath(path)) {
                 const created = await attempt(() => bridge.createMachineFolder({ machineId: id, path }));
+
+                if (!isCurrent()) {
+                    return;
+                }
 
                 if (created.ok) {
                     setMessage(t`Created ${path}`);
                     result = await attempt(() => bridge.browseMachineFolders({ machineId: id, path: created.value.path }));
+
+                    if (!isCurrent()) {
+                        return;
+                    }
                 } else {
                     result = created;
                 }
@@ -134,11 +219,19 @@ const AddProjectContent = ({ onClose, onCreateNew }: Omit<AddProjectDialogProps,
                     options.after !== undefined && previous !== null ? { ...page, entries: [...previous.entries, ...page.entries] } : page,
                 );
                 setTypedPath(result.value.path);
-            } else {
-                setError(failureText(result.error));
+
+                return;
+            }
+
+            setError(describeFailure(result.error));
+
+            // A failed move to another folder selects nothing, so Add project cannot submit the folder still listed.
+            // A failed next page keeps the page that was shown.
+            if (options.after === undefined) {
+                setListing(null);
             }
         },
-        [t],
+        [describeFailure, t],
     );
 
     // The content mounts only while the dialog is open, so every opening starts at step 1 with a fresh list.
@@ -157,7 +250,7 @@ const AddProjectContent = ({ onClose, onCreateNew }: Omit<AddProjectDialogProps,
                 setMachines(result.value);
             } else {
                 setMachines([]);
-                setError(failureText(result.error));
+                setError(describeFailure(result.error));
             }
         };
 
@@ -166,7 +259,7 @@ const AddProjectContent = ({ onClose, onCreateNew }: Omit<AddProjectDialogProps,
         return () => {
             cancelled = true;
         };
-    }, []);
+    }, [describeFailure]);
 
     // Focus moves to the step title when the step changes.
     const step = machine === null ? 1 : 2;
@@ -202,7 +295,7 @@ const AddProjectContent = ({ onClose, onCreateNew }: Omit<AddProjectDialogProps,
         if (!confirmed.ok || !confirmed.value) {
             await attempt(() => revokeDevice({ deviceId: deviceId as Id<"devices"> }));
 
-            return { error: new Error(t`Adding the server was cancelled on this computer.`), ok: false };
+            return { error: new Error("device: the person declined the pairing"), ok: false };
         }
 
         return attempt(() => bridge.connectAddProjectMachine(sshAlias));
@@ -230,8 +323,18 @@ const AddProjectContent = ({ onClose, onCreateNew }: Omit<AddProjectDialogProps,
 
             setPendingKey(null);
 
+            if (state.kind === "needs-pair") {
+                // Pairing changed this server's row, so the list must show it as paired before the next pick, even when
+                // the connection after it failed.
+                const refreshed = await attempt(() => bridge.listAddProjectMachines());
+
+                if (refreshed.ok) {
+                    setMachines(refreshed.value);
+                }
+            }
+
             if (!connected.ok) {
-                setError(failureText(connected.error));
+                setError(describeFailure(connected.error));
 
                 return;
             }
@@ -252,6 +355,9 @@ const AddProjectContent = ({ onClose, onCreateNew }: Omit<AddProjectDialogProps,
     };
 
     const goBack = (): void => {
+        // A request still in flight belongs to the machine being left, so its answer is dropped.
+        browseGeneration.current += 1;
+        setIsBrowsing(false);
         setMachine(null);
         setListing(null);
         setError("");
@@ -269,12 +375,17 @@ const AddProjectContent = ({ onClose, onCreateNew }: Omit<AddProjectDialogProps,
         setIsAdding(true);
         setError("");
 
+        // The desktop answers with the folder it shared: a symlink is shared as its target, which is the folder to record.
+        let projectPath = path;
+
         if (folderNeedsSharing(machine)) {
             const shared = await attempt(() => bridge.shareMachineFolder({ machineId, path }));
 
-            if (!shared.ok && !isAlreadySharedError(shared.error)) {
+            if (shared.ok) {
+                projectPath = shared.value.path;
+            } else if (!isAlreadySharedError(shared.error)) {
                 setIsAdding(false);
-                setError(failureText(shared.error));
+                setError(describeFailure(shared.error));
 
                 return;
             }
@@ -283,15 +394,15 @@ const AddProjectContent = ({ onClose, onCreateNew }: Omit<AddProjectDialogProps,
         const created = await attempt(() =>
             createProject({
                 machineId: machineId as Id<"devices">,
-                path,
-                title: lastSegment(path) || machine.name,
+                path: projectPath,
+                title: lastSegment(projectPath) || rowName(machine),
             }),
         );
 
         setIsAdding(false);
 
         if (!created.ok) {
-            setError(failureText(created.error));
+            setError(getLocalizedError({ error: created.error, t }));
 
             return;
         }
@@ -305,7 +416,7 @@ const AddProjectContent = ({ onClose, onCreateNew }: Omit<AddProjectDialogProps,
         <DialogContent className="max-h-dvh max-w-xl overflow-y-auto">
             <DialogHeader>
                 <DialogTitle ref={titleReference} tabIndex={-1}>
-                    {machine === null ? t`Where is the project?` : t`Add project on ${machine.name}`}
+                    {machine === null ? t`Where is the project?` : t`Add project on ${rowName(machine)}`}
                 </DialogTitle>
                 <DialogDescription>
                     {machine === null ? t`Pick the computer or server the project's folder is on.` : t`Choose the project's folder, or type a path.`}
@@ -353,8 +464,8 @@ const AddProjectContent = ({ onClose, onCreateNew }: Omit<AddProjectDialogProps,
                                             >
                                                 <Icon aria-hidden="true" className="text-muted-foreground size-4 shrink-0" />
                                                 <span className="min-w-0 flex-1">
-                                                    <span className="block truncate font-medium">{row.name}</span>
-                                                    <span className="text-muted-foreground block truncate text-xs">{row.label}</span>
+                                                    <span className="block truncate font-medium">{rowName(row)}</span>
+                                                    <span className="text-muted-foreground block truncate text-xs">{rowLabel(row)}</span>
                                                     {reason !== "" && (
                                                         <span className="text-muted-foreground block text-xs" id={`machine-reason-${key}`}>
                                                             {reason}
@@ -391,13 +502,16 @@ const AddProjectContent = ({ onClose, onCreateNew }: Omit<AddProjectDialogProps,
                                 {t`Folder path`}
                             </label>
                             <Input
+                                aria-describedby="add-project-path-hint"
                                 autoComplete="off"
                                 id="add-project-path"
                                 onChange={(event) => setTypedPath(event.target.value)}
                                 spellCheck={false}
                                 value={typedPath}
                             />
-                            <p className="text-muted-foreground mt-1 text-xs">{t`Press Enter to open the folder. A folder that does not exist is created.`}</p>
+                            <p className="text-muted-foreground mt-1 text-xs" id="add-project-path-hint">
+                                {t`Press Enter to open the folder. A folder that does not exist is created.`}
+                            </p>
                         </form>
                         <ul aria-label={t`Folders`} className="max-h-72 space-y-1 overflow-y-auto">
                             {parent !== null && (
@@ -478,7 +592,8 @@ const AddProjectContent = ({ onClose, onCreateNew }: Omit<AddProjectDialogProps,
 
 const AddProjectDialog = ({ onClose, onCreateNew, open }: AddProjectDialogProps) => (
     <Dialog onOpenChange={(nextOpen) => !nextOpen && onClose()} open={open}>
-        <AddProjectContent onClose={onClose} onCreateNew={onCreateNew} />
+        {/* Mounted only while open: the dialog roots keep closed children mounted, which would reopen the last session. */}
+        {open && <AddProjectContent onClose={onClose} onCreateNew={onCreateNew} />}
     </Dialog>
 );
 

@@ -7,7 +7,12 @@ const DRIVE_ROOT = /^[a-z]:[/\\]$/i;
 const DRIVE_ABSOLUTE = /^[a-z]:[/\\]/i;
 const MISSING_FOLDER = /not found/i;
 const ALREADY_SHARED = /already shared|inside a share/i;
-const DESKTOP_PREFIX = /^(Error invoking remote method '[^']*': )?(Error: )?device: /;
+const FILE_PATH = /is a file/i;
+const UNREADABLE_FOLDER = /cannot be read|too many entries/i;
+const DECLINED = /declined/i;
+const NOT_CONNECTED = /connect the server first/i;
+const REFUSED_ROOT = /home folder or one above/i;
+const TOO_MANY_ROOTS = /already has \d+ shared folders/i;
 
 /** The separator a path uses: a drive letter or a backslash means Windows, anything else is POSIX. */
 const separatorOf = (path: string): "/" | "\\" => (path.includes("\\") && !path.includes("/") ? "\\" : "/");
@@ -122,5 +127,20 @@ export const isMissingFolderError = (error: unknown): boolean => MISSING_FOLDER.
 /** The desktop's refusal for a folder that a share already covers: the project can go on. */
 export const isAlreadySharedError = (error: unknown): boolean => ALREADY_SHARED.test(errorText(error));
 
-/** The text of a failure with the desktop's `device: ` prefix removed. */
-export const failureText = (error: unknown): string => errorText(error).replace(DESKTOP_PREFIX, "");
+/** The desktop's refusal for a path that is a file. */
+export const isFilePathError = (error: unknown): boolean => FILE_PATH.test(errorText(error));
+
+/** The desktop's refusal for a folder it cannot list, or one with too many entries to list. */
+export const isUnreadableFolderError = (error: unknown): boolean => UNREADABLE_FOLDER.test(errorText(error));
+
+/** The desktop's refusal when the person declined the confirmation in its window. */
+export const isDeclinedError = (error: unknown): boolean => DECLINED.test(errorText(error));
+
+/** The desktop's refusal for a folder that is the server's home folder or one above it. */
+export const isRefusedRootError = (error: unknown): boolean => REFUSED_ROOT.test(errorText(error));
+
+/** The desktop's refusal when a server already has its maximum of shared folders. */
+export const isTooManyRootsError = (error: unknown): boolean => TOO_MANY_ROOTS.test(errorText(error));
+
+/** The desktop's refusal for a server that is not connected yet. */
+export const isNotConnectedError = (error: unknown): boolean => NOT_CONNECTED.test(errorText(error));

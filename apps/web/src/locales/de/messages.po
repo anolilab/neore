@@ -2382,12 +2382,12 @@ msgstr "Gewähltes Bild als Bildknoten hinzufügen"
 
 #: src/features/chat/thread-list/thread-list-header.tsx:127
 #: src/features/chat/thread-list/thread-list-header.tsx:137
-#: src/features/projects/components/add-project-dialog.tsx:431
+#: src/features/projects/components/add-project-dialog.tsx:584
 msgid "Add project"
 msgstr ""
 
-#. placeholder {0}: machine.name
-#: src/features/projects/components/add-project-dialog.tsx:269
+#. placeholder {0}: rowName(machine)
+#: src/features/projects/components/add-project-dialog.tsx:419
 msgid "Add project on {0}"
 msgstr ""
 
@@ -2564,7 +2564,7 @@ msgstr "Hinzugefügt:"
 msgid "Adding documents… {0} of {1}"
 msgstr "Dokumente werden hinzugefügt… {0} von {1}"
 
-#: src/features/projects/components/add-project-dialog.tsx:280
+#: src/features/projects/components/add-project-dialog.tsx:430
 msgid "Adding the project…"
 msgstr ""
 
@@ -2577,7 +2577,7 @@ msgid "Adding your earlier replies…"
 msgstr "Deine früheren Antworten werden hinzugefügt…"
 
 #: src/features/chat/aside/aside-panel.tsx:168
-#: src/features/projects/components/add-project-dialog.tsx:431
+#: src/features/projects/components/add-project-dialog.tsx:584
 msgid "Adding…"
 msgstr "Wird hinzugefügt…"
 
@@ -4490,7 +4490,7 @@ msgstr "Azure-Portal → deine OpenAI-Ressource → Schlüssel und Endpunkt. Ver
 #: src/features/code/components/code-shell.tsx:162
 #: src/features/onboarding/components/onboarding-dialog.tsx:395
 #: src/features/pages/components/page-version-panel.tsx:89
-#: src/features/projects/components/add-project-dialog.tsx:428
+#: src/features/projects/components/add-project-dialog.tsx:581
 msgid "Back"
 msgstr "Zurück"
 
@@ -5511,7 +5511,7 @@ msgstr "Kanada"
 #: src/features/local-models/components/ollama-model-manager.tsx:300
 #: src/features/pages/components/page-agent-dialog.tsx:148
 #: src/features/pages/components/page-comments-panel.tsx:87
-#: src/features/projects/components/add-project-dialog.tsx:422
+#: src/features/projects/components/add-project-dialog.tsx:575
 #: src/features/projects/components/move-to-project-dialog.tsx:95
 #: src/features/projects/components/project-form-dialog.tsx:395
 #: src/features/prompts/components/prompt-form-dialog.tsx:501
@@ -5588,6 +5588,10 @@ msgstr "Auswahl abbrechen"
 #: src/features/workflow/components/canvas/workflow-controls.tsx:50
 msgid "Cancelled"
 msgstr "Abgebrochen"
+
+#: src/features/projects/components/add-project-dialog.tsx:125
+msgid "Cancelled on this computer."
+msgstr ""
 
 #: src/features/settings/components/privacy/data-export.tsx:108
 msgid "Cancelling..."
@@ -6173,7 +6177,7 @@ msgstr "Suchmodus wählen"
 msgid "Choose the camera system for your shot"
 msgstr "Wähle das Kamerasystem für deine Aufnahme"
 
-#: src/features/projects/components/add-project-dialog.tsx:272
+#: src/features/projects/components/add-project-dialog.tsx:422
 msgid "Choose the project's folder, or type a path."
 msgstr ""
 
@@ -6487,7 +6491,7 @@ msgstr "Zwischenablage"
 msgid "clock"
 msgstr "Uhr"
 
-#: src/features/projects/components/add-project-dialog.tsx:419
+#: src/features/projects/components/add-project-dialog.tsx:572
 msgid "Clone or create new…"
 msgstr ""
 
@@ -7479,6 +7483,10 @@ msgstr "Verbinde den Host, um dies aktuell zu halten."
 msgid "Connect third-party services to extend AI capabilities with your data and tools."
 msgstr "Verbinde Dienste von Drittanbietern, um die KI mit deinen Daten und Tools zu erweitern."
 
+#: src/features/projects/components/add-project-dialog.tsx:141
+msgid "Connect this server first."
+msgstr ""
+
 #: src/features/settings/components/chat/mcp-settings.tsx:409
 msgid "Connect to Model Context Protocol servers to extend AI capabilities with external tools."
 msgstr "Verbinde dich mit Model-Context-Protocol-Servern, um die KI mit externen Tools zu erweitern."
@@ -7511,6 +7519,7 @@ msgstr "Verbinde deine Messenger-Plattformen, um direkt aus Telegram, Slack, Dis
 msgid "Connect your own Telegram, WhatsApp, Slack or Discord bot to Neore and message your agent from the app you already use."
 msgstr ""
 
+#: src/features/projects/components/add-project-dialog.tsx:158
 #: src/features/settings/components/chat/mcp/status-indicator.tsx:24
 #: src/features/settings/connectors/connector-card.tsx:74
 #: src/features/settings/connectors/messenger/messenger-platform-card.tsx:172
@@ -7549,7 +7558,7 @@ msgstr "Verbunden mit {0}"
 msgid "Connected. You can close this window."
 msgstr "Verbunden. Du kannst dieses Fenster schließen."
 
-#: src/features/projects/components/add-project-dialog.tsx:277
+#: src/features/projects/components/add-project-dialog.tsx:427
 msgid "Connecting {pendingKey}…"
 msgstr ""
 
@@ -8947,7 +8956,7 @@ msgstr "Erstelle deinen ersten Workflow, um KI-Aufgaben visuell zu automatisiere
 msgid "Created"
 msgstr "Erstellt"
 
-#: src/features/projects/components/add-project-dialog.tsx:118
+#: src/features/projects/components/add-project-dialog.tsx:202
 msgid "Created {path}"
 msgstr ""
 
@@ -14387,11 +14396,11 @@ msgstr "Chat fokussieren: {title}"
 msgid "Focus Search"
 msgstr "Suche fokussieren"
 
-#: src/features/projects/components/add-project-dialog.tsx:352
+#: src/features/projects/components/add-project-dialog.tsx:502
 msgid "Folder path"
 msgstr ""
 
-#: src/features/projects/components/add-project-dialog.tsx:363
+#: src/features/projects/components/add-project-dialog.tsx:516
 msgid "Folders"
 msgstr ""
 
@@ -15388,7 +15397,7 @@ msgstr "Zum Tresor"
 msgid "Go to your pages"
 msgstr "Zu deinen Seiten"
 
-#: src/features/projects/components/add-project-dialog.tsx:367
+#: src/features/projects/components/add-project-dialog.tsx:520
 msgid "Go up to {parent}"
 msgstr ""
 
@@ -18688,7 +18697,7 @@ msgstr "Dateien werden geladen"
 msgid "Loading files…"
 msgstr "Dateien werden geladen…"
 
-#: src/features/projects/components/add-project-dialog.tsx:278
+#: src/features/projects/components/add-project-dialog.tsx:428
 msgid "Loading folders…"
 msgstr ""
 
@@ -19074,7 +19083,7 @@ msgstr "Langlebiges Channel Access Token aus dem Tab Messaging API deines LINE-K
 msgid "Longest the answer may take, in milliseconds"
 msgstr "Wie lange die Antwort höchstens dauern darf, in Millisekunden"
 
-#: src/features/projects/components/add-project-dialog.tsx:293
+#: src/features/projects/components/add-project-dialog.tsx:443
 msgid "Looking for machines…"
 msgstr ""
 
@@ -19161,7 +19170,7 @@ msgstr "Mach-O-Binärdatei"
 msgid "Machine"
 msgstr ""
 
-#: src/features/projects/components/add-project-dialog.tsx:297
+#: src/features/projects/components/add-project-dialog.tsx:447
 msgid "Machines"
 msgstr ""
 
@@ -21636,7 +21645,7 @@ msgstr "Noch keine Dateien in deiner Wissensdatenbank. Lade oben Dokumente hoch,
 msgid "No focal length selected"
 msgstr "Keine Brennweite ausgewählt"
 
-#: src/features/projects/components/add-project-dialog.tsx:399
+#: src/features/projects/components/add-project-dialog.tsx:552
 msgid "No folders in here."
 msgstr ""
 
@@ -24440,7 +24449,7 @@ msgstr "Wähle einen aus dem Posteingang, um ihn zu lesen."
 msgid "Pick skills, schedules, webhooks and group chats to share as one Markdown file. API keys, webhook secrets, connector tokens and other credentials are never included, and neither are your account or organization ids."
 msgstr "Wähle Skills, Zeitpläne, Webhooks und Gruppenchats aus, die du als eine Markdown-Datei teilen möchtest. API-Schlüssel, Webhook-Secrets, Connector-Tokens und andere Zugangsdaten sind nie enthalten, ebenso wenig deine Konto- oder Organisations-IDs."
 
-#: src/features/projects/components/add-project-dialog.tsx:272
+#: src/features/projects/components/add-project-dialog.tsx:422
 msgid "Pick the computer or server the project's folder is on."
 msgstr ""
 
@@ -24979,7 +24988,7 @@ msgstr "Drücke Enter oder die Leertaste, um einen Knoten auszuwählen. Danach k
 msgid "Press enter or space to select an edge. You can then press delete to remove it or escape to cancel."
 msgstr "Drücke Enter oder die Leertaste, um eine Kante auszuwählen. Danach kannst du sie mit Entf entfernen oder mit Esc abbrechen."
 
-#: src/features/projects/components/add-project-dialog.tsx:361
+#: src/features/projects/components/add-project-dialog.tsx:513
 msgid "Press Enter to open the folder. A folder that does not exist is created."
 msgstr ""
 
@@ -29442,7 +29451,7 @@ msgstr "Weniger anzeigen"
 msgid "Show more"
 msgstr "Mehr anzeigen"
 
-#: src/features/projects/components/add-project-dialog.tsx:409
+#: src/features/projects/components/add-project-dialog.tsx:562
 msgid "Show more folders"
 msgstr ""
 
@@ -30480,7 +30489,17 @@ msgstr "Squash und Merge"
 msgid "Sri Lanka"
 msgstr "Sri Lanka"
 
-#: src/features/projects/components/add-project-dialog.tsx:336
+#. placeholder {0}: row.name
+#: src/features/projects/components/add-project-dialog.tsx:162
+msgid "SSH · {0}"
+msgstr ""
+
+#. placeholder {0}: row.name
+#: src/features/projects/components/add-project-dialog.tsx:165
+msgid "SSH · {0} · not connected yet"
+msgstr ""
+
+#: src/features/projects/components/add-project-dialog.tsx:486
 msgid "SSH hosts come from ~/.ssh/config. Picking one connects it."
 msgstr ""
 
@@ -32348,9 +32367,21 @@ msgstr ""
 msgid "That did not work. Try again."
 msgstr "Das hat nicht funktioniert. Versuche es erneut."
 
+#: src/features/projects/components/add-project-dialog.tsx:129
+msgid "That folder is already shared with this server."
+msgstr ""
+
 #: src/features/develop/components/guide-tab.tsx:92
 msgid "That folder is not offered for this repository on that computer."
 msgstr "Dieser Ordner wird für dieses Repository auf jenem Computer nicht angeboten."
+
+#: src/features/projects/components/add-project-dialog.tsx:133
+msgid "That folder is the server's home folder or a folder above it. Choose a folder inside it."
+msgstr ""
+
+#: src/features/projects/components/add-project-dialog.tsx:113
+msgid "That folder was not found."
+msgstr ""
 
 #: src/features/develop/components/watched-repositories.tsx:163
 msgid "That is not a repository address."
@@ -32375,6 +32406,10 @@ msgstr "Diese Nachricht ist zu lang, um sie von hier zu senden."
 #: src/features/chat/lock/thread-lock-dialog.tsx:60
 msgid "That passcode is not right."
 msgstr "Dieser Passcode ist nicht richtig."
+
+#: src/features/projects/components/add-project-dialog.tsx:117
+msgid "That path is a file."
+msgstr ""
 
 #: src/features/chat/host/host-composer.tsx:755
 msgid "That request is no longer waiting."
@@ -32584,6 +32619,10 @@ msgstr "Die Beschreibung ist abgeschnitten."
 #: src/features/download/components/download-page.tsx:71
 msgid "The desktop app runs on macOS, Windows and Linux. Installers are attached to a desktop release on GitHub, and they appear there once that release is published."
 msgstr "Die Desktop-App läuft auf macOS, Windows und Linux. Installationsprogramme hängen an einem Desktop-Release auf GitHub und erscheinen dort, sobald das Release veröffentlicht ist."
+
+#: src/features/projects/components/add-project-dialog.tsx:144
+msgid "The desktop could not complete that. Try again."
+msgstr ""
 
 #: src/features/chat/thread/host-changes.tsx:126
 msgid "The diff as it was when the turn ended. Later edits to these files are not part of it."
@@ -33374,6 +33413,8 @@ msgid "this computer"
 msgstr "dieser Computer"
 
 #: src/features/devices/components/devices-settings.tsx:310
+#: src/features/projects/components/add-project-dialog.tsx:150
+#: src/features/projects/components/add-project-dialog.tsx:154
 #: src/features/settings/components/chat/custom-providers-settings.tsx:368
 msgid "This computer"
 msgstr "Dieser Computer"
@@ -33398,6 +33439,10 @@ msgstr "Dieser Computer ist mit einem anderen Konto gekoppelt."
 #: src/features/devices/components/devices-settings.tsx:563
 msgid "This computer is paired. Choose which folders to share in the desktop app."
 msgstr "Dieser Computer ist gekoppelt. Wähle in der Desktop-App, welche Ordner freigegeben werden."
+
+#: src/features/projects/components/add-project-dialog.tsx:276
+msgid "This computer must be paired first."
+msgstr ""
 
 #: src/features/devices/lib/device-diagnostics.ts:75
 msgid "this computer: {viaName}"
@@ -33495,6 +33540,10 @@ msgstr "Diese Datei ist zu groß ({0} KB), um sie im Browser anzuzeigen oder zu 
 msgid "This file is too large (~{0} tokens) and exceeds the model's context window. The model may not be able to process this file effectively."
 msgstr "Diese Datei ist zu groß (~{0} Token) und überschreitet das Kontextfenster des Modells. Das Modell ist möglicherweise nicht in der Lage, diese Datei effektiv zu verarbeiten."
 
+#: src/features/projects/components/add-project-dialog.tsx:121
+msgid "This folder cannot be read."
+msgstr ""
+
 #: src/features/develop/components/guide-tab.tsx:217
 msgid "This guide was written for an earlier commit. The {requestNoun} has changed since: write it again to see the change as it is now."
 msgstr "Dieser Leitfaden wurde für einen früheren Commit geschrieben. Der {requestNoun} hat sich seitdem geändert: Schreibe ihn erneut, um die Änderung im aktuellen Stand zu sehen."
@@ -33570,7 +33619,7 @@ msgstr "Dieser Link ist unvollständig. Bitte um den vollständigen Link."
 msgid "This link is not taking messages right now. Try again later."
 msgstr "Über diesen Link können gerade keine Nachrichten hinterlassen werden. Versuche es später erneut."
 
-#: src/features/projects/components/add-project-dialog.tsx:204
+#: src/features/projects/components/add-project-dialog.tsx:346
 msgid "This machine is not ready yet."
 msgstr ""
 
@@ -33723,6 +33772,10 @@ msgstr "Dieser Durchlauf ist nicht mehr verfügbar."
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:237
 msgid "This selection is too large to import at once. Import fewer files at a time."
 msgstr "Diese Auswahl ist zu groß, um sie auf einmal zu importieren. Importiere weniger Dateien auf einmal."
+
+#: src/features/projects/components/add-project-dialog.tsx:137
+msgid "This server already has its maximum of shared folders. Share a parent folder or remove one in the desktop app."
+msgstr ""
 
 #: src/features/settings/components/chat/mcp-settings.tsx:368
 msgid "This server requires sign-in. Save it, then choose Sign in."
@@ -37042,7 +37095,7 @@ msgstr "Wann soll der Assistent diesen Skill verwenden?"
 msgid "Where each run goes"
 msgstr "Wohin jeder Lauf geht"
 
-#: src/features/projects/components/add-project-dialog.tsx:269
+#: src/features/projects/components/add-project-dialog.tsx:419
 msgid "Where is the project?"
 msgstr ""
 
