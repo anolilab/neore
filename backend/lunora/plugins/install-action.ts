@@ -8,7 +8,7 @@
 import { LunoraError, v } from "lunorash/server";
 
 import { internal } from "../_generated/internal";
-import { authAction } from "../lib/crpc";
+import { authAction, rateLimit } from "../lib/crpc";
 import { MAX_LENGTH } from "../lib/validators";
 import { parseBundleMarkdown } from "../skills/bundle-format";
 import { planFor } from "../skills/bundle";
@@ -79,6 +79,7 @@ export const installPlugin = authAction
         contentHash: v.string().max(128),
         markdown: v.string().max(MAX_LENGTH.document),
     })
+    .use(rateLimit("plugins/install"))
     .output(v.object({ installId: v.string(), items: v.array(v.object({ id: v.string(), key: v.string(), kind: vKind, title: v.string() })) }))
     .action(async ({ args, ctx }) => {
         if (ctx.user.activeOrganization) {
