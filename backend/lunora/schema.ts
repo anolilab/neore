@@ -3323,6 +3323,9 @@ export const schema = defineSchema({
         reminderSentAt: v.optional(v.number()),
         resolvedAt: v.optional(v.number()),
         resolvedBy: v.optional(v.string()),
+        // The pause the request was asked in: the first request's id, shared by every row of that pause. Absent on rows written before
+        // it existed, which the reminder groups by creation time instead.
+        pauseId: v.optional(v.string()),
         // Whether the request is a `requestSecret` card (false: a plain approval or a question). Absent on rows written before it
         // existed, which `discardPausedThreadSecrets` classifies from the saved messages instead.
         secretRequest: v.optional(v.boolean()),

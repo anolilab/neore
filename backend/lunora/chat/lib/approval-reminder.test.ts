@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { runInShard } from "../../lib/shard-context";
 import schema from "../../schema";
+import { ASK_USER_TOOL_NAME } from "../tools/ask-user-constants";
 import { APPROVAL_REMINDER_AFTER_MS, APPROVAL_REMINDER_WINDOW_MS, remindPendingApprovals } from "./approval-reminder";
 
 type Harness = ReturnType<typeof lunoraTest>;
@@ -36,7 +37,7 @@ const insertThread = async (): Promise<void> => {
     threadId = (await harness.run(async (ctx: any) => await ctx.db.insert("threads", { status: "active", title: "Owner thread", userId: "u1" }))) as string;
 };
 
-const insertRun = async (row: { approvalId: string; createdAt: number; status?: "approved" | "denied" | "pending"; threadId: string }) =>
+const insertRun = async (row: { approvalId: string; createdAt: number; pauseId?: string; status?: "approved" | "denied" | "pending"; threadId: string }) =>
     await harness.run(
         async (ctx: any) =>
             await ctx.db.insert("toolApprovalRuns", {
@@ -121,6 +122,46 @@ describe("the four-hour approval reminder", () => {
 
         expect(later).toBe(0);
         expect(await approvalPushes()).toHaveLength(1);
+    });
+
+    it("reminds a pause that waits on a question with a generic push of that kind", async () => {
+        await insertThread();
+        await insertRequest("q1", ASK_USER_TOOL_NAME);
+        await insertRun({ approvalId: "q1", createdAt: DUE, threadId });
+
+        expect(await sweep(NOW)).toBe(1);
+
+        const questions = await harness.run(async (ctx: any) => {
+            const rows = await ctx.db.query("notifications").collect();
+
+            return rows.filter((row: { type: string }) => row.type === "ask_user");
+        });
+
+        expect(questions).toHaveLength(1);
+        expect(await reminderOf("q1")).toBe(NOW);
+    });
+
+    it("reminds a request asked exactly four hours before the sweep", async () => {
+        await insertThread();
+        await insertRequest("a1", "webSearch");
+        await insertRun({ approvalId: "a1", createdAt: NOW - APPROVAL_REMINDER_AFTER_MS, threadId });
+
+        expect(await sweep(NOW)).toBe(1);
+        expect(await approvalPushes()).toHaveLength(1);
+    });
+
+    it("keeps two pauses asked in the same millisecond apart: the latest is pushed, the earlier one is marked and not pushed", async () => {
+        await insertThread();
+        await insertRequest("a1", "webSearch");
+        await insertRequest("a2", "webSearch");
+        await insertRun({ approvalId: "a1", createdAt: DUE, pauseId: "a1", threadId });
+        await insertRun({ approvalId: "a2", createdAt: DUE, pauseId: "a2", threadId });
+
+        await sweep(NOW);
+
+        expect(await approvalPushes()).toHaveLength(1);
+        expect(await reminderOf("a1")).toBe(NOW);
+        expect(await reminderOf("a2")).toBe(NOW);
     });
 
     it("sends one push for the several approvals one pause asked for, and marks each of them", async () => {

@@ -744,12 +744,15 @@ export const recordPendingToolApprovals = internalMutation
 
         const uniqueIds = new Set(approvalIds);
         const secretIds = new Set(secretApprovalIds);
+        // Every row of this pause carries the same id, so the reminder can tell this pause from another in the same millisecond.
+        const [pauseId] = uniqueIds;
 
         for (const approvalId of uniqueIds) {
             await ctx.db.insert("toolApprovalRuns", {
                 approvalId,
                 config,
                 createdAt,
+                ...(pauseId !== undefined && { pauseId }),
                 secretRequest: secretIds.has(approvalId),
                 status: "pending",
                 threadId,
