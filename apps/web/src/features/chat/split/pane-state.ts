@@ -246,6 +246,9 @@ export const leaveSplitView = (focusedThreadId: string | undefined, routeThreadI
     }
 
     if (isPreferenceOff && routeThreadId !== undefined) {
+        // Stored now, while the composer is empty and still the focused pane's: once the routed chat's draft is back in it, it is
+        // that chat's, not text carried from the focused pane.
+        draftOwnership.handOver?.(routeThreadId);
         restoreLiveComposerFor(routeThreadId);
 
         // Restored here, not when the single chat's provider loads: the model choices are back before its composer is first shown.

@@ -37,6 +37,19 @@ export const draftOwnership: {
     prefill?: string;
 } = {};
 
+/** `neore-draft-cleared:<userId | *>`: when a tab last removed that account's drafts (every account's for `*`). Not a draft key. */
+const CLEARED_KEY_PREFIX = "neore-draft-cleared:";
+const ALL_ACCOUNTS = "*";
+
+/** When any tab last removed `userId`'s drafts, in ms; 0 when never or unreadable. */
+export const draftsClearedAt = (userId: string): number => {
+    try {
+        return Math.max(0, ...[userId, ALL_ACCOUNTS].map((account) => Number(globalThis.localStorage.getItem(`${CLEARED_KEY_PREFIX}${account}`)) || 0));
+    } catch {
+        return 0;
+    }
+};
+
 /**
  * Removes `userId`'s stored drafts, never another account's; every account's when `userId` is undefined (a sign-out that could
  * not read who signs out). For sign-out and an account switch: the drafts are the account's, not the browser's. It moves the
@@ -49,6 +62,9 @@ export const dropStoredDrafts = (userId?: string): void => {
     cleared.push(prefix);
 
     try {
+        // Other tabs of the account read it before their next write (`draftsClearedAt`): their drafts must not come back either.
+        globalThis.localStorage.setItem(`${CLEARED_KEY_PREFIX}${userId ?? ALL_ACCOUNTS}`, String(Date.now()));
+
         for (const key of Object.keys(globalThis.localStorage)) {
             if (key.startsWith(prefix)) {
                 globalThis.localStorage.removeItem(key);

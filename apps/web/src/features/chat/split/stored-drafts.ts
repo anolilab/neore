@@ -5,7 +5,15 @@ import { fromStoredAttachment, toStoredAttachment } from "@/features/chat/core/s
 import type { StoredAttachment } from "@/features/chat/core/utils/prompt-queue";
 
 import type { ComposerDraft } from "./composer-drafts";
-import { draftGeneration, draftOwnership, hasDraftContent, peekComposerDraft, useParkedDraftStore, useSplitViewMountedStore } from "./composer-drafts";
+import {
+    draftGeneration,
+    draftOwnership,
+    draftsClearedAt,
+    hasDraftContent,
+    peekComposerDraft,
+    useParkedDraftStore,
+    useSplitViewMountedStore,
+} from "./composer-drafts";
 
 /**
  * Unsent drafts in `localStorage`, so a reload, a crash or an app update does not lose them. Loaded lazily (see
@@ -164,6 +172,8 @@ const toStoredDraft = (content: Partial<Content> | undefined): StoredDraft | und
  * nothing is written for it.
  */
 interface Binding {
+    /** When it was made: a clear another tab marked after it (`draftsClearedAt`) forgets it too. */
+    at: number;
     generation: number;
     owner: string;
     userId: string;
@@ -222,7 +232,7 @@ const snapshot = (owner: string): Map<string, StoredDraft> => {
  * binding's own account counts: the next account's composer may bind before the switch drops the departing account's drafts.
  */
 const forgetIfCleared = (): void => {
-    if (!state.binding || draftGeneration(state.binding.userId) === state.binding.generation) {
+    if (!state.binding || (draftGeneration(state.binding.userId) === state.binding.generation && draftsClearedAt(state.binding.userId) <= state.binding.at)) {
         return;
     }
 
@@ -273,9 +283,21 @@ export const flushStoredDrafts = (): void => {
         // Unchanged since this page wrote it: an entry another tab wrote since stays.
         if (state.mine.get(owner)?.content !== content) {
             const w = newWriteId();
+            const store = storage();
+
+            // Storage out of reach is no write: the next flush tries again (an emptied content never matches a draft's).
+            if (store === undefined) {
+                const mine = state.mine.get(owner);
+
+                if (mine) {
+                    state.mine.set(owner, { ...mine, content: "" });
+                }
+
+                continue;
+            }
 
             try {
-                storage()?.setItem(key, JSON.stringify({ t: now, v: draft, w }));
+                store.setItem(key, JSON.stringify({ t: now, v: draft, w }));
                 state.mine.set(owner, { content, w });
             } catch {
                 // Full: this chat's older entry from this page must not come back stale on a reload.
@@ -463,7 +485,7 @@ export const bindStoredDrafts = (owner: string, userId: string, locked: boolean)
         state.carriedFrom = switchedUser ? undefined : from;
     }
 
-    state.binding = { generation: draftGeneration(userId), owner, userId };
+    state.binding = { at: Date.now(), generation: draftGeneration(userId), owner, userId };
     listen();
 
     if (locked) {

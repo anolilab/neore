@@ -4,7 +4,7 @@ import type { PendingAttachment } from "@/features/chat/core/stores/chat-ui-stor
 import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
 
 import { clearComposerDrafts, draftOwnership, dropStoredDrafts, saveComposerDraft, setSplitViewMounted } from "./composer-drafts";
-import { restoreLiveComposerFor, watchPaneFocus } from "./pane-state";
+import { leaveSplitView, restoreLiveComposerFor, watchPaneFocus } from "./pane-state";
 import { initialSplitLayout, splitLayoutReducer } from "./split-layout";
 import { useSplitLayoutStore } from "./split-layout-store";
 import {
@@ -375,6 +375,20 @@ describe("accounts", () => {
 });
 
 describe("after a clear", () => {
+    it("does not write an account's drafts back after another tab signed it out", () => {
+        bindStoredDrafts("thread-a", "user-1", false);
+        type("before sign-out");
+        flushStoredDrafts();
+        vi.advanceTimersByTime(1);
+        // Another tab signs out: its clear removes the entries and marks the time.
+        localStorage.removeItem(draftKey("user-1", "thread-a"));
+        localStorage.setItem("neore-draft-cleared:user-1", String(Date.now()));
+        type("typed after it");
+        globalThis.dispatchEvent(new Event("pagehide"));
+
+        expect(draftKeys()).toStrictEqual([]);
+    });
+
     it("does not store text from before a sign-out under a chat bound again after it", () => {
         bindStoredDrafts("thread-a", "user-1", false);
         type("before");
@@ -486,6 +500,25 @@ describe("storage that fails", () => {
 
         expect(text("thread-a")).toBeUndefined();
     });
+
+    it("writes a draft again once storage that was out of reach is back", () => {
+        bindStoredDrafts("thread-a", "user-1", false);
+        type("first");
+        flushStoredDrafts();
+
+        const blocked = vi.spyOn(globalThis, "localStorage", "get").mockImplementation(() => {
+            throw new Error("SecurityError");
+        });
+
+        type("second");
+        flushStoredDrafts();
+        blocked.mockRestore();
+        // Any later write (here another chat's parked draft) brings the unchanged text along.
+        saveComposerDraft("thread-b", { composerText: "other" });
+        flushStoredDrafts();
+
+        expect(text("thread-a")).toBe("second");
+    });
 });
 
 describe("moving between chats", () => {
@@ -560,6 +593,23 @@ describe("switching split panes", () => {
         restoreLiveComposerFor("thread-b");
         bindStoredDrafts("thread-b", "user-1", false);
 
+        expect(text("thread-a")).toBe("pane a");
+        expect(text("thread-b")).toBe("pane b");
+    });
+
+    it("keeps each chat's draft its own when split view closes on another chat than the focused pane's", () => {
+        bindStoredDrafts("thread-a", "user-1", false);
+        type("pane a");
+        saveComposerDraft("thread-b", { composerText: "pane b" });
+        flushStoredDrafts();
+
+        // The preference is off and the route shows pane b: its draft comes back to the single chat's composer.
+        leaveSplitView("thread-a", "thread-b");
+        setSplitViewMounted(false);
+        bindStoredDrafts("thread-b", "user-1", false);
+        vi.advanceTimersByTime(DRAFT_WRITE_DELAY_MS);
+
+        expect(useChatUIStore.getState().composerText).toBe("pane b");
         expect(text("thread-a")).toBe("pane a");
         expect(text("thread-b")).toBe("pane b");
     });
