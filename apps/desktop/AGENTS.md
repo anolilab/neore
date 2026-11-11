@@ -56,3 +56,11 @@
   opened in ONE stable folder per agent under `<userData>/acp-sign-in/`: some agents keep a record per folder, so a fresh
   folder per check would add one each time. Sign-out is the agent's own `logout`, after its open sessions end. Never
   sign a real account in or out in a test: Claude keeps its credential in the macOS Keychain, so an empty HOME isolates nothing.
+
+- **Offline cold start** is the SITE's service worker, not the shell: `apps/web/public/offline-shell-sw.js` keeps
+  `/offline-shell` (root route only, rendered for nobody: the root `beforeLoad` never reads the session on that path,
+  `apps/web/src/lib/root-before-load.ts`) per build revision, revalidated every 30 min of online use, and answers an
+  Electron GET navigation the network FAILED with it (a 5xx is passed through), else `offline.html`: never an older
+  revision's shell, whose precached chunks are gone. Only `activate` prunes other revisions. The cached response keeps
+  its own CSP header, whose nonce matches its HTML. It only helps after one online run, and only for route chunks that
+  run loaded (`bundle-assets`). Detection is `Electron/` in the worker's user agent: keep the default user agent. The recovery page stays for a first run.

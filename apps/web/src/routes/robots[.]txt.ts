@@ -21,6 +21,8 @@ export const Route = createFileRoute("/robots.txt")({
                     "Disallow: /workflow/",
                     "Disallow: /api/",
                     "Disallow: /_shortcut/",
+                    // The desktop shell's offline page (`src/lib/offline-shell.ts`): an empty root, also sent `X-Robots-Tag: noindex`.
+                    "Disallow: /offline-shell",
                     "",
                     `Sitemap: ${siteUrl}/sitemap.xml`,
                 ].join("\n");

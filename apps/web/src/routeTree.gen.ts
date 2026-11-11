@@ -16,6 +16,7 @@ import { Route as AuthRouteRouteImport } from './routes/auth/route'
 import { Route as DashboardRouteRouteImport } from './routes/dashboard/route'
 import { Route as DocsRouteRouteImport } from './routes/docs/route'
 import { Route as DownloadRouteImport } from './routes/download'
+import { Route as OfflineShellRouteImport } from './routes/offline-shell'
 import { Route as RobotsDottxtRouteImport } from './routes/robots[.]txt'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as chatWorkflowRouteRouteImport } from './routes/(chat)/workflow/route'
@@ -129,6 +130,11 @@ const DocsRouteRoute = DocsRouteRouteImport.update({
 const DownloadRoute = DownloadRouteImport.update({
   id: '/download',
   path: '/download',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OfflineShellRoute = OfflineShellRouteImport.update({
+  id: '/offline-shell',
+  path: '/offline-shell',
   getParentRoute: () => rootRouteImport,
 } as any)
 const RobotsDottxtRoute = RobotsDottxtRouteImport.update({
@@ -564,12 +570,13 @@ const DashboardSettingsConnectorsMessengerRoute =
   } as any)
 
 export interface FileRoutesByFullPath {
+  '/': typeof publicIndexRoute
   '/admin': typeof AdminRouteRouteWithChildren
   '/auth': typeof AuthRouteRouteWithChildren
   '/dashboard': typeof DashboardRouteRouteWithChildren
   '/docs': typeof DocsRouteRouteWithChildren
-  '/': typeof publicIndexRoute
   '/download': typeof DownloadRoute
+  '/offline-shell': typeof OfflineShellRoute
   '/robots.txt': typeof RobotsDottxtRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/workflow': typeof chatWorkflowRouteRouteWithChildren
@@ -652,9 +659,10 @@ export interface FileRoutesByFullPath {
   '/dashboard/settings/connectors/': typeof DashboardSettingsConnectorsIndexRoute
 }
 export interface FileRoutesByTo {
-  '/auth': typeof AuthRouteRouteWithChildren
   '/': typeof publicIndexRoute
+  '/auth': typeof AuthRouteRouteWithChildren
   '/download': typeof DownloadRoute
+  '/offline-shell': typeof OfflineShellRoute
   '/robots.txt': typeof RobotsDottxtRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/datenschutz': typeof publicDatenschutzRoute
@@ -742,6 +750,7 @@ export interface FileRoutesById {
   '/docs': typeof DocsRouteRouteWithChildren
   '/_shortcut': typeof ShortcutRouteWithChildren
   '/download': typeof DownloadRoute
+  '/offline-shell': typeof OfflineShellRoute
   '/robots.txt': typeof RobotsDottxtRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/(chat)/workflow': typeof chatWorkflowRouteRouteWithChildren
@@ -827,12 +836,13 @@ export interface FileRoutesById {
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
+    | '/'
     | '/admin'
     | '/auth'
     | '/dashboard'
     | '/docs'
-    | '/'
     | '/download'
+    | '/offline-shell'
     | '/robots.txt'
     | '/sitemap.xml'
     | '/workflow'
@@ -915,9 +925,10 @@ export interface FileRouteTypes {
     | '/dashboard/settings/connectors/'
   fileRoutesByTo: FileRoutesByTo
   to:
-    | '/auth'
     | '/'
+    | '/auth'
     | '/download'
+    | '/offline-shell'
     | '/robots.txt'
     | '/sitemap.xml'
     | '/datenschutz'
@@ -1004,6 +1015,7 @@ export interface FileRouteTypes {
     | '/docs'
     | '/_shortcut'
     | '/download'
+    | '/offline-shell'
     | '/robots.txt'
     | '/sitemap.xml'
     | '/(chat)/workflow'
@@ -1095,6 +1107,7 @@ export interface RootRouteChildren {
   DocsRouteRoute: typeof DocsRouteRouteWithChildren
   ShortcutRoute: typeof ShortcutRouteWithChildren
   DownloadRoute: typeof DownloadRoute
+  OfflineShellRoute: typeof OfflineShellRoute
   RobotsDottxtRoute: typeof RobotsDottxtRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   publicDatenschutzRoute: typeof publicDatenschutzRoute
@@ -1119,7 +1132,7 @@ declare module '@tanstack/react-router' {
     '/(chat)': {
       id: '/(chat)'
       path: ''
-      fullPath: ''
+      fullPath: '/'
       preLoaderRoute: typeof chatRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
@@ -1163,6 +1176,13 @@ declare module '@tanstack/react-router' {
       path: '/download'
       fullPath: '/download'
       preLoaderRoute: typeof DownloadRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/offline-shell': {
+      id: '/offline-shell'
+      path: '/offline-shell'
+      fullPath: '/offline-shell'
+      preLoaderRoute: typeof OfflineShellRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/robots.txt': {
@@ -1969,6 +1989,7 @@ const rootRouteChildren: RootRouteChildren = {
   DocsRouteRoute: DocsRouteRouteWithChildren,
   ShortcutRoute: ShortcutRouteWithChildren,
   DownloadRoute: DownloadRoute,
+  OfflineShellRoute: OfflineShellRoute,
   RobotsDottxtRoute: RobotsDottxtRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   publicDatenschutzRoute: publicDatenschutzRoute,

@@ -4,15 +4,16 @@
  * Generates a production service worker using workbox-build after
  * the Vite/TanStack Start build completes.
  *
- * Usage: node scripts/generate-sw.mjs
+ * Usage: node scripts/generate-sw.mjs [client dir, default dist/client]
  */
 
-import { readFileSync, rmSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 import { generateSW } from "workbox-build";
 
-const clientDir = resolve(import.meta.dirname, "../dist/client");
+const clientDir = resolve(process.argv[2] ?? resolve(import.meta.dirname, "../dist/client"));
 
 /**
  * Vite's content hash in an output name (`index-Bk9j37oz.js`). Workbox gives
@@ -27,6 +28,15 @@ const HASHED_ASSET_RE = /-[\w-]{8}\.\w+$/u;
 const OFFLINE_FALLBACK_URL = "/offline.html";
 
 /**
+ * The desktop shell's offline page, kept by `public/offline-shell-sw.js`; the server renders it for nobody (the
+ * `OFFLINE_SHELL_PATH` branch of `src/lib/root-before-load.ts`, which must name the same path).
+ */
+const OFFLINE_SHELL_URL = "/offline-shell";
+
+/** The default locale's catalog (`DEFAULT_LOCALE` in `src/lib/intl/shared.ts`): the offline shell's fallback catalog. */
+const DEFAULT_CATALOG = "src/locales/en/messages.po";
+
+/**
  * The app shell: the client entry and everything it imports STATICALLY, JS and
  * CSS only. That is what every page needs before it can render, so it is what
  * an offline start needs; everything else (route chunks, lazy editors, fonts)
@@ -39,13 +49,15 @@ const OFFLINE_FALLBACK_URL = "/offline.html";
  */
 const readAppShell = () => {
     const manifestDir = resolve(clientDir, ".vite");
-    const manifest = JSON.parse(readFileSync(resolve(manifestDir, "manifest.json"), "utf8"));
+    const manifestSource = readFileSync(resolve(manifestDir, "manifest.json"), "utf8");
+    const manifest = JSON.parse(manifestSource);
 
     // Build metadata, not an asset: everything in dist/client is deployed as a
     // public static file, and the manifest maps every source path to its chunk.
     rmSync(manifestDir, { force: true, recursive: true });
     const files = new Set();
     const seen = new Set();
+    const entries = [];
 
     const walk = (key) => {
         if (seen.has(key)) {
@@ -69,18 +81,32 @@ const readAppShell = () => {
 
     for (const [key, chunk] of Object.entries(manifest)) {
         if (chunk.isEntry) {
+            entries.push(chunk.file);
             walk(key);
         }
     }
 
-    if (files.size === 0) {
-        throw new Error("No entry chunk in .vite/manifest.json — is `build.manifest` still enabled?");
+    if (entries.length !== 1) {
+        throw new Error(`Expected one entry chunk in .vite/manifest.json, found ${entries.length} — is \`build.manifest\` still enabled?`);
     }
 
-    return [...files];
+    const catalog = manifest[DEFAULT_CATALOG]?.file;
+
+    return {
+        // Kept by `offline-shell-sw.js` on the desktop only, not precached: browsers never start from the shell.
+        catalog: catalog && `/${catalog}`,
+        // The shell HTML names it; `offline-shell-sw.js` keeps only HTML that does (deploy skew).
+        entry: entries[0],
+        files: [...files],
+        // Any client change renames a chunk, so the manifest's hash names this build's shell HTML. A server-only
+        // change keeps the revision: `offline-shell-sw.js` revalidates the kept shell for that.
+        revision: createHash("sha256").update(manifestSource).digest("hex").slice(0, 16),
+    };
 };
 
 try {
+    const appShell = readAppShell();
+    const swDest = resolve(clientDir, "sw.js");
     const { count, size, warnings } = await generateSW({
         cleanupOutdatedCaches: true,
         clientsClaim: true,
@@ -89,11 +115,13 @@ try {
         globIgnores: ["**/node_modules/**", "sw.js", "workbox-*.js"],
         // The shell, plus the root-level icons and manifest the install prompt
         // and an offline start need. Nothing else — see readAppShell.
-        globPatterns: [...readAppShell(), "*.{ico,svg}", "manifest.json", OFFLINE_FALLBACK_URL.slice(1)],
+        globPatterns: [...appShell.files, "*.{ico,svg}", "manifest.json", OFFLINE_FALLBACK_URL.slice(1)],
         // Plain JS the generated worker imports, so its handlers survive every
         // regeneration: Web Push (`push` / `notificationclick`) and the
-        // `activate` sweep of runtime caches older workers left behind.
-        importScripts: ["push-sw.js", "sw-cache-cleanup.js"],
+        // `activate` sweep of runtime caches older workers left behind, and the
+        // desktop shell's offline cold start (it must register its `fetch`
+        // listener before Workbox does).
+        importScripts: ["push-sw.js", "sw-cache-cleanup.js", "offline-shell-sw.js"],
         runtimeCaching: [
             // Cache-first for static assets (fonts, images)
             {
@@ -142,8 +170,22 @@ try {
             },
         ],
         skipWaiting: true,
-        swDest: resolve(clientDir, "sw.js"),
+        swDest,
     });
+
+    // Read by `offline-shell-sw.js`. In sw.js itself, so a new shell is a new worker.
+    const offlineShell = JSON.stringify({ catalog: appShell.catalog, entry: appShell.entry, revision: appShell.revision, url: OFFLINE_SHELL_URL });
+
+    writeFileSync(swDest, `self.__NEORE_OFFLINE_SHELL__ = ${offlineShell};\n${readFileSync(swDest, "utf8")}`);
+
+    // Workbox wrote sw.js.map for the file without that line: one leading `;` (an empty first line) keeps every mapping on its line.
+    const swMap = `${swDest}.map`;
+
+    if (existsSync(swMap)) {
+        const map = JSON.parse(readFileSync(swMap, "utf8"));
+
+        writeFileSync(swMap, JSON.stringify({ ...map, mappings: `;${map.mappings}` }));
+    }
 
     /**
      * Workbox reports every over-limit file as a warning. Here that is the
