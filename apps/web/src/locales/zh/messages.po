@@ -1850,7 +1850,7 @@ msgstr "口令可防止任何使用你已登录浏览器的人打开此聊天。
 msgid "A placeholder or @mention outside quotes is read as null here, so this error may come from it until a run fills it in"
 msgstr "引号外的占位符或 @提及 在此处会被读作 null，因此在运行填入之前，此错误可能由它引起"
 
-#: src/features/projects/components/project-repositories.tsx:194
+#: src/features/projects/components/project-repositories.tsx:187
 msgid "A project can list at most {MAX_REPOSITORIES} repositories."
 msgstr "一个项目最多可列出 {MAX_REPOSITORIES} 个仓库。"
 
@@ -2180,7 +2180,7 @@ msgid "Activity per month"
 msgstr "每月活动"
 
 #: src/features/chat/tags/manage-thread-tags-dialog.tsx:225
-#: src/features/projects/components/project-repositories.tsx:432
+#: src/features/projects/components/project-repositories.tsx:426
 #: src/features/settings/components/chat/mcp/server-catalog.tsx:102
 #: src/features/workflow/components/gallery/publish-dialog.tsx:220
 msgid "Add"
@@ -2380,6 +2380,17 @@ msgstr "添加通行密钥"
 msgid "Add picked frame as image node"
 msgstr "将选取的帧添加为图片节点"
 
+#: src/features/chat/thread-list/thread-list-header.tsx:127
+#: src/features/chat/thread-list/thread-list-header.tsx:137
+#: src/features/projects/components/add-project-dialog.tsx:627
+msgid "Add project"
+msgstr ""
+
+#. placeholder {0}: rowName(machine)
+#: src/features/projects/components/add-project-dialog.tsx:457
+msgid "Add project on {0}"
+msgstr ""
+
 #: src/features/prompts/components/prompts-sidebar-tab.tsx:488
 msgid "Add prompt"
 msgstr "添加提示词"
@@ -2553,6 +2564,10 @@ msgstr "新增："
 msgid "Adding documents… {0} of {1}"
 msgstr "正在添加文档… {0} / {1}"
 
+#: src/features/projects/components/add-project-dialog.tsx:468
+msgid "Adding the project…"
+msgstr ""
+
 #: src/features/devices/components/devices-settings.tsx:452
 msgid "Adding the server was cancelled on this computer."
 msgstr "在这台电脑上，添加服务器已被取消。"
@@ -2562,6 +2577,7 @@ msgid "Adding your earlier replies…"
 msgstr "正在添加你之前的回复…"
 
 #: src/features/chat/aside/aside-panel.tsx:168
+#: src/features/projects/components/add-project-dialog.tsx:627
 msgid "Adding…"
 msgstr "正在添加…"
 
@@ -4474,6 +4490,7 @@ msgstr "Azure 门户 → 你的 OpenAI 资源 → 密钥和终结点。加密存
 #: src/features/code/components/code-shell.tsx:162
 #: src/features/onboarding/components/onboarding-dialog.tsx:395
 #: src/features/pages/components/page-version-panel.tsx:89
+#: src/features/projects/components/add-project-dialog.tsx:620
 msgid "Back"
 msgstr "返回"
 
@@ -5494,6 +5511,7 @@ msgstr "加拿大"
 #: src/features/local-models/components/ollama-model-manager.tsx:300
 #: src/features/pages/components/page-agent-dialog.tsx:148
 #: src/features/pages/components/page-comments-panel.tsx:87
+#: src/features/projects/components/add-project-dialog.tsx:614
 #: src/features/projects/components/move-to-project-dialog.tsx:95
 #: src/features/projects/components/project-form-dialog.tsx:395
 #: src/features/prompts/components/prompt-form-dialog.tsx:501
@@ -5570,6 +5588,10 @@ msgstr "取消选择"
 #: src/features/workflow/components/canvas/workflow-controls.tsx:50
 msgid "Cancelled"
 msgstr "已取消"
+
+#: src/features/projects/components/add-project-dialog.tsx:137
+msgid "Cancelled on this computer."
+msgstr ""
 
 #: src/features/settings/components/privacy/data-export.tsx:108
 msgid "Cancelling..."
@@ -6155,6 +6177,10 @@ msgstr "选择搜索模式"
 msgid "Choose the camera system for your shot"
 msgstr "为你的镜头选择相机系统"
 
+#: src/features/projects/components/add-project-dialog.tsx:460
+msgid "Choose the project's folder, or type a path."
+msgstr ""
+
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:355
 msgid "Choose which tools the assistant may use on its own, which need your approval, and which are off."
 msgstr "选择哪些工具助手可以自行使用、哪些需要你批准、哪些关闭。"
@@ -6465,6 +6491,10 @@ msgstr "剪贴板"
 msgid "clock"
 msgstr "时钟"
 
+#: src/features/projects/components/add-project-dialog.tsx:611
+msgid "Clone or create new…"
+msgstr ""
+
 #: ../../packages/ui/src/components/ai-elements/artifact.tsx:31
 #: ../../packages/ui/src/components/countdown-toast-card.tsx:192
 #: ../../packages/ui/src/components/data-grid/data-grid-keyboard-shortcuts.tsx:329
@@ -6720,7 +6750,7 @@ msgstr "需要阿里巴巴 30B 编程专用模型的编程任务"
 msgid "Coding tasks requiring Mistral's specialized development-focused model"
 msgstr "需要 Mistral 开发专用模型的编程任务"
 
-#: src/features/projects/components/project-repositories.tsx:291
+#: src/features/projects/components/project-repositories.tsx:284
 msgid "Coding-agent runs in this project offer these repositories, with the default preselected."
 msgstr "此项目中的编码代理运行会提供这些仓库，并预先选中默认仓库。"
 
@@ -7453,6 +7483,10 @@ msgstr "连接托管服务以保持内容最新。"
 msgid "Connect third-party services to extend AI capabilities with your data and tools."
 msgstr "连接第三方服务，用你的数据和工具扩展 AI 能力。"
 
+#: src/features/projects/components/add-project-dialog.tsx:153
+msgid "Connect this server first."
+msgstr ""
+
 #: src/features/settings/components/chat/mcp-settings.tsx:409
 msgid "Connect to Model Context Protocol servers to extend AI capabilities with external tools."
 msgstr "连接 Model Context Protocol 服务器，用外部工具扩展 AI 能力。"
@@ -7485,6 +7519,7 @@ msgstr "连接你的消息平台，直接在 Telegram、Slack、Discord、WhatsA
 msgid "Connect your own Telegram, WhatsApp, Slack or Discord bot to Neore and message your agent from the app you already use."
 msgstr ""
 
+#: src/features/projects/components/add-project-dialog.tsx:170
 #: src/features/settings/components/chat/mcp/status-indicator.tsx:24
 #: src/features/settings/connectors/connector-card.tsx:74
 #: src/features/settings/connectors/messenger/messenger-platform-card.tsx:172
@@ -7522,6 +7557,10 @@ msgstr "已连接到 {0}"
 #: src/routes/auth/extension.tsx:89
 msgid "Connected. You can close this window."
 msgstr "已连接。你可以关闭此窗口。"
+
+#: src/features/projects/components/add-project-dialog.tsx:465
+msgid "Connecting {pendingKey}…"
+msgstr ""
 
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:392
 msgid "Connecting to your MCP servers..."
@@ -8354,7 +8393,7 @@ msgstr "无法加载 API 密钥。请稍后重试。"
 msgid "Could not load image"
 msgstr "无法加载图片"
 
-#: src/features/projects/components/project-repo-picker.tsx:188
+#: src/features/projects/components/project-repo-picker.tsx:196
 #: src/features/tasks/components/task-form-dialog.tsx:457
 msgid "Could not load more projects."
 msgstr "无法加载更多项目。"
@@ -8396,12 +8435,12 @@ msgstr "无法加载此内容"
 msgid "Could not load this chat's details."
 msgstr ""
 
-#: src/features/projects/components/project-repositories.tsx:296
+#: src/features/projects/components/project-repositories.tsx:289
 msgid "Could not load this project, so its repositories cannot be changed."
 msgstr "无法加载此项目，因此无法更改其仓库。"
 
-#: src/features/projects/components/project-repo-picker.tsx:226
-#: src/features/projects/components/project-repositories.tsx:317
+#: src/features/projects/components/project-repo-picker.tsx:234
+#: src/features/projects/components/project-repositories.tsx:311
 msgid "Could not load this project's repositories."
 msgstr "无法加载此项目的仓库。"
 
@@ -8425,7 +8464,7 @@ msgstr "无法加载你所在组织的账单详情。请稍后重试。"
 msgid "Could not load your saved choices, so Skip and Resume are off until it is read again."
 msgstr ""
 
-#: src/features/projects/components/project-repo-picker.tsx:173
+#: src/features/projects/components/project-repo-picker.tsx:181
 msgid "Could not look up this repository's project."
 msgstr "无法获取此仓库所属的项目。"
 
@@ -8846,8 +8885,6 @@ msgid "Create PR"
 msgstr "创建 PR"
 
 #: src/features/chat/signed-out/signed-out-chat.tsx:147
-#: src/features/chat/thread-list/thread-list-header.tsx:127
-#: src/features/chat/thread-list/thread-list-header.tsx:137
 msgid "Create project"
 msgstr "创建项目"
 
@@ -8918,6 +8955,10 @@ msgstr "创建你的第一个工作流，可视化地自动化 AI 任务。"
 #: src/features/skills/components/skill-item.tsx:80
 msgid "Created"
 msgstr "已创建"
+
+#: src/features/projects/components/add-project-dialog.tsx:234
+msgid "Created {path}"
+msgstr ""
 
 #: src/features/skills/components/bundle-import-dialog.tsx:151
 msgid "Created switched off."
@@ -9520,12 +9561,12 @@ msgstr "DeepSeek 的实验性高级聊天 LLM"
 msgid "DeepSeek's experimental advanced chat LLM with thinking"
 msgstr "DeepSeek 支持思考的实验性高级聊天 LLM"
 
-#: src/features/projects/components/project-repositories.tsx:115
+#: src/features/projects/components/project-repositories.tsx:114
 msgid "default"
 msgstr "默认"
 
 #: src/features/appearance/components/appearance-controls.tsx:164
-#: src/features/projects/components/project-repositories.tsx:349
+#: src/features/projects/components/project-repositories.tsx:343
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:75
 msgid "Default"
 msgstr "默认"
@@ -9544,16 +9585,16 @@ msgstr "默认 AI 回复语言"
 msgid "Default AI Settings"
 msgstr "默认 AI 设置"
 
-#: src/features/projects/components/project-repositories.tsx:410
+#: src/features/projects/components/project-repositories.tsx:404
 #: src/features/tasks/components/task-form-dialog.tsx:341
 msgid "Default branch"
 msgstr "默认分支"
 
-#: src/features/projects/components/project-repositories.tsx:101
+#: src/features/projects/components/project-repositories.tsx:100
 msgid "Default branch of {name}"
 msgstr "{name} 的默认分支"
 
-#: src/features/projects/components/project-repositories.tsx:344
+#: src/features/projects/components/project-repositories.tsx:338
 msgid "Default branch:"
 msgstr "默认分支："
 
@@ -14355,6 +14396,14 @@ msgstr "聚焦聊天：{title}"
 msgid "Focus Search"
 msgstr "聚焦搜索"
 
+#: src/features/projects/components/add-project-dialog.tsx:540
+msgid "Folder path"
+msgstr ""
+
+#: src/features/projects/components/add-project-dialog.tsx:555
+msgid "Folders"
+msgstr ""
+
 #: src/features/appearance/components/appearance-controls.tsx:99
 msgid "Follow my system (default)"
 msgstr "跟随系统（默认）"
@@ -15347,6 +15396,10 @@ msgstr "前往文件库"
 #: src/features/pages/components/page-invite-accept.tsx:46
 msgid "Go to your pages"
 msgstr "前往你的页面"
+
+#: src/features/projects/components/add-project-dialog.tsx:559
+msgid "Go up to {parent}"
+msgstr ""
 
 #: src/features/chat/goal/composer-goal.tsx:75
 #: src/features/chat/goal/goal-notes.tsx:70
@@ -18644,6 +18697,10 @@ msgstr "正在加载文件"
 msgid "Loading files…"
 msgstr "正在加载文件…"
 
+#: src/features/projects/components/add-project-dialog.tsx:466
+msgid "Loading folders…"
+msgstr ""
+
 #: src/features/canvas/canvas-panel.tsx:358
 msgid "Loading image editor..."
 msgstr "正在加载图像编辑器..."
@@ -18660,7 +18717,7 @@ msgstr "正在加载图片"
 msgid "Loading messenger connections..."
 msgstr "正在加载即时通讯连接..."
 
-#: src/features/projects/components/project-repo-picker.tsx:167
+#: src/features/projects/components/project-repo-picker.tsx:175
 #: src/features/tasks/components/task-form-dialog.tsx:452
 msgid "Loading more projects…"
 msgstr "正在加载更多项目…"
@@ -18712,8 +18769,8 @@ msgstr "正在加载预览..."
 msgid "Loading preview…"
 msgstr "正在加载预览…"
 
-#: src/features/projects/components/project-repo-picker.tsx:233
-#: src/features/projects/components/project-repositories.tsx:312
+#: src/features/projects/components/project-repo-picker.tsx:241
+#: src/features/projects/components/project-repositories.tsx:305
 msgid "Loading repositories…"
 msgstr "正在加载仓库…"
 
@@ -19026,6 +19083,10 @@ msgstr "LINE 频道 Messaging API 标签页中的长期 channel access token"
 msgid "Longest the answer may take, in milliseconds"
 msgstr "答案允许的最长耗时，单位为毫秒"
 
+#: src/features/projects/components/add-project-dialog.tsx:481
+msgid "Looking for machines…"
+msgstr ""
+
 #: src/features/local-models/components/ollama-model-manager.tsx:166
 msgid "Looking for Ollama at {baseUrl}…"
 msgstr "正在 {baseUrl} 查找 Ollama…"
@@ -19109,6 +19170,10 @@ msgstr "Mach-O 二进制文件"
 msgid "Machine"
 msgstr ""
 
+#: src/features/projects/components/add-project-dialog.tsx:485
+msgid "Machines"
+msgstr ""
+
 #: src/features/local-models/components/local-setup-guide.tsx:76
 msgid "macOS"
 msgstr "macOS"
@@ -19145,7 +19210,7 @@ msgstr "在多次生成中保持主体一致"
 msgid "Major improvements in reasoning and instruction following"
 msgstr "推理和指令遵循能力大幅提升"
 
-#: src/features/projects/components/project-repositories.tsx:352
+#: src/features/projects/components/project-repositories.tsx:346
 msgid "Make {name} the default repository"
 msgstr "将 {name} 设为默认仓库"
 
@@ -19153,7 +19218,7 @@ msgstr "将 {name} 设为默认仓库"
 msgid "Make Admin"
 msgstr "设为管理员"
 
-#: src/features/projects/components/project-repositories.tsx:361
+#: src/features/projects/components/project-repositories.tsx:355
 msgid "Make default"
 msgstr "设为默认"
 
@@ -21580,6 +21645,10 @@ msgstr "你的知识库中还没有文件。在上方上传文档即可开始。
 msgid "No focal length selected"
 msgstr "未选择焦距"
 
+#: src/features/projects/components/add-project-dialog.tsx:591
+msgid "No folders in here."
+msgstr ""
+
 #: src/features/tasks/components/task-form-dialog.tsx:383
 #: src/features/tasks/components/task-form-dialog.tsx:395
 msgid "No goal"
@@ -21769,7 +21838,7 @@ msgstr "{quietMinutes} 分钟无进展"
 msgid "No progress: {0}"
 msgstr "无进展：{0}"
 
-#: src/features/projects/components/project-repo-picker.tsx:97
+#: src/features/projects/components/project-repo-picker.tsx:105
 #: src/features/settings/components/chat/usage-project-breakdown.tsx:66
 #: src/features/tasks/components/task-form-dialog.tsx:430
 #: src/features/tasks/components/task-form-dialog.tsx:442
@@ -22718,7 +22787,7 @@ msgstr "只有聊天的所有者才能开始新的上下文。"
 msgid "Only the owner of the chat can answer. Everyone else in a shared chat sees that the owner has to decide."
 msgstr ""
 
-#: src/features/projects/components/project-repositories.tsx:384
+#: src/features/projects/components/project-repositories.tsx:378
 msgid "Only the project's owner can change its repositories."
 msgstr "只有项目所有者可以更改其仓库。"
 
@@ -23440,7 +23509,7 @@ msgstr "优化后的提示词"
 msgid "Optimizing..."
 msgstr "正在优化..."
 
-#: src/features/projects/components/project-repositories.tsx:419
+#: src/features/projects/components/project-repositories.tsx:413
 #: src/features/prompts/components/prompt-optimize-dialog.tsx:160
 msgid "optional"
 msgstr "可选"
@@ -23840,6 +23909,10 @@ msgstr ""
 #: src/features/code/components/code-shell.tsx:63
 msgid "Pair one in Settings"
 msgstr "在设置中配对一台"
+
+#: src/features/projects/components/add-project-dialog.tsx:197
+msgid "Pair this computer with your account first (Settings → Devices)."
+msgstr ""
 
 #: src/features/auth/components/device-approval.tsx:203
 msgid "Pair this machine?"
@@ -24347,7 +24420,7 @@ msgstr "选择要评测的模型。"
 msgid "Pick a page on the left, or create one with the + button."
 msgstr "在左侧选择一个页面，或点击 + 按钮新建一个。"
 
-#: src/features/projects/components/project-repo-picker.tsx:214
+#: src/features/projects/components/project-repo-picker.tsx:222
 msgid "Pick a repository"
 msgstr "选择仓库"
 
@@ -24379,6 +24452,10 @@ msgstr "从收件箱中选择一项进行阅读。"
 #: src/features/skills/components/bundle-export-dialog.tsx:150
 msgid "Pick skills, schedules, webhooks and group chats to share as one Markdown file. API keys, webhook secrets, connector tokens and other credentials are never included, and neither are your account or organization ids."
 msgstr "选择要作为一个 Markdown 文件分享的技能、计划任务、webhook 和群聊。API 密钥、webhook 密钥、连接器令牌和其他凭据绝不会包含在内，你的账号或组织 ID 也不会。"
+
+#: src/features/projects/components/add-project-dialog.tsx:460
+msgid "Pick the computer or server the project's folder is on."
+msgstr ""
 
 #: src/features/chat/components/reference-picker/reference-picker-dialog.tsx:212
 msgid "Pick up to {maxReferences} images. The order you select them is the order the model will see them."
@@ -24915,6 +24992,10 @@ msgstr "按回车键或空格键选择节点。然后可使用方向键移动节
 msgid "Press enter or space to select an edge. You can then press delete to remove it or escape to cancel."
 msgstr "按回车键或空格键选择连线。然后可按 Delete 键删除，或按 Esc 键取消。"
 
+#: src/features/projects/components/add-project-dialog.tsx:552
+msgid "Press Enter to open the folder. A folder that does not exist is created."
+msgstr ""
+
 #: src/features/settings/components/account/account-settings.tsx:225
 msgid "Press Enter to send"
 msgstr "按 Enter 发送"
@@ -25327,7 +25408,7 @@ msgstr "进度"
 msgid "Progress of {toolName}"
 msgstr "{toolName} 的进度"
 
-#: src/features/projects/components/project-repo-picker.tsx:137
+#: src/features/projects/components/project-repo-picker.tsx:145
 #: src/features/settings/components/chat/usage-project-breakdown.tsx:104
 #: src/features/tasks/components/task-form-dialog.tsx:427
 msgid "Project"
@@ -25345,7 +25426,7 @@ msgstr "项目上下文"
 msgid "Project no longer available"
 msgstr "项目已不可用"
 
-#: src/features/projects/components/project-repo-picker.tsx:197
+#: src/features/projects/components/project-repo-picker.tsx:205
 msgid "Project repository"
 msgstr "项目仓库"
 
@@ -26697,7 +26778,7 @@ msgid "Remove {modelId} from blocked list"
 msgstr "从屏蔽列表中移除 {modelId}"
 
 #: src/features/pages/components/page-share-dialog.tsx:185
-#: src/features/projects/components/project-repositories.tsx:366
+#: src/features/projects/components/project-repositories.tsx:360
 msgid "Remove {name}"
 msgstr "移除 {name}"
 
@@ -27028,11 +27109,11 @@ msgstr ""
 msgid "Repos, issues, PRs, and code search"
 msgstr "仓库、Issue、PR 和代码搜索"
 
-#: src/features/projects/components/project-repositories.tsx:290
+#: src/features/projects/components/project-repositories.tsx:283
 msgid "Repositories"
 msgstr "仓库"
 
-#: src/features/projects/components/project-repositories.tsx:390
+#: src/features/projects/components/project-repositories.tsx:384
 #: src/features/tasks/components/task-form-dialog.tsx:318
 msgid "Repository"
 msgstr "代码仓库"
@@ -29374,7 +29455,11 @@ msgstr "收起"
 msgid "Show more"
 msgstr "展开"
 
-#: src/features/projects/components/project-repo-picker.tsx:167
+#: src/features/projects/components/add-project-dialog.tsx:601
+msgid "Show more folders"
+msgstr ""
+
+#: src/features/projects/components/project-repo-picker.tsx:175
 #: src/features/tasks/components/task-form-dialog.tsx:465
 msgid "Show more projects"
 msgstr "显示更多项目"
@@ -30407,6 +30492,20 @@ msgstr "压缩并合并"
 #: src/features/chat/core/utils/language-utilities.ts:376
 msgid "Sri Lanka"
 msgstr "斯里兰卡"
+
+#. placeholder {0}: row.name
+#: src/features/projects/components/add-project-dialog.tsx:174
+msgid "SSH · {0}"
+msgstr ""
+
+#. placeholder {0}: row.name
+#: src/features/projects/components/add-project-dialog.tsx:177
+msgid "SSH · {0} · not connected yet"
+msgstr ""
+
+#: src/features/projects/components/add-project-dialog.tsx:524
+msgid "SSH hosts come from ~/.ssh/config. Picking one connects it."
+msgstr ""
 
 #: src/features/devices/lib/device-diagnostics.ts:72
 msgid "SSH server via a paired computer"
@@ -32272,9 +32371,21 @@ msgstr ""
 msgid "That did not work. Try again."
 msgstr "未成功。请重试。"
 
+#: src/features/projects/components/add-project-dialog.tsx:141
+msgid "That folder is already shared with this server."
+msgstr ""
+
 #: src/features/develop/components/guide-tab.tsx:92
 msgid "That folder is not offered for this repository on that computer."
 msgstr "那台电脑上未提供该文件夹用于此仓库。"
+
+#: src/features/projects/components/add-project-dialog.tsx:145
+msgid "That folder is the server's home folder or a folder above it. Choose a folder inside it."
+msgstr ""
+
+#: src/features/projects/components/add-project-dialog.tsx:125
+msgid "That folder was not found."
+msgstr ""
 
 #: src/features/develop/components/watched-repositories.tsx:163
 msgid "That is not a repository address."
@@ -32299,6 +32410,10 @@ msgstr "该消息过长，无法从这里发送。"
 #: src/features/chat/lock/thread-lock-dialog.tsx:60
 msgid "That passcode is not right."
 msgstr "口令不正确。"
+
+#: src/features/projects/components/add-project-dialog.tsx:129
+msgid "That path is a file."
+msgstr ""
 
 #: src/features/chat/host/host-composer.tsx:755
 msgid "That request is no longer waiting."
@@ -32508,6 +32623,10 @@ msgstr "描述已被截断。"
 #: src/features/download/components/download-page.tsx:71
 msgid "The desktop app runs on macOS, Windows and Linux. Installers are attached to a desktop release on GitHub, and they appear there once that release is published."
 msgstr "桌面应用支持 macOS、Windows 和 Linux。安装包附在 GitHub 上的桌面版发布中，发布后会在那里显示。"
+
+#: src/features/projects/components/add-project-dialog.tsx:156
+msgid "The desktop could not complete that. Try again."
+msgstr ""
 
 #: src/features/chat/thread/host-changes.tsx:126
 msgid "The diff as it was when the turn ended. Later edits to these files are not part of it."
@@ -33195,7 +33314,7 @@ msgstr "此分支与其基础分支有冲突。"
 msgid "This branch is behind its base branch."
 msgstr "此分支落后于其基础分支。"
 
-#: src/features/projects/components/project-repositories.tsx:197
+#: src/features/projects/components/project-repositories.tsx:190
 msgid "This branch was changed meanwhile. Check it and save again."
 msgstr "此分支在此期间已被更改。请检查后重新保存。"
 
@@ -33298,6 +33417,8 @@ msgid "this computer"
 msgstr "这台电脑"
 
 #: src/features/devices/components/devices-settings.tsx:310
+#: src/features/projects/components/add-project-dialog.tsx:162
+#: src/features/projects/components/add-project-dialog.tsx:166
 #: src/features/settings/components/chat/custom-providers-settings.tsx:368
 msgid "This computer"
 msgstr "此电脑"
@@ -33322,6 +33443,10 @@ msgstr "此计算机已与另一个账户配对。"
 #: src/features/devices/components/devices-settings.tsx:563
 msgid "This computer is paired. Choose which folders to share in the desktop app."
 msgstr "此计算机已配对。请在桌面应用中选择要共享的文件夹。"
+
+#: src/features/projects/components/add-project-dialog.tsx:308
+msgid "This computer must be paired first."
+msgstr ""
 
 #: src/features/devices/lib/device-diagnostics.ts:75
 msgid "this computer: {viaName}"
@@ -33419,6 +33544,10 @@ msgstr "此文件过大（{0} KB），无法在浏览器中预览或编辑。为
 msgid "This file is too large (~{0} tokens) and exceeds the model's context window. The model may not be able to process this file effectively."
 msgstr "此文件过大（约 {0} 个 token），超出了模型的上下文窗口。模型可能无法有效处理此文件。"
 
+#: src/features/projects/components/add-project-dialog.tsx:133
+msgid "This folder cannot be read."
+msgstr ""
+
 #: src/features/develop/components/guide-tab.tsx:217
 msgid "This guide was written for an earlier commit. The {requestNoun} has changed since: write it again to see the change as it is now."
 msgstr "此指南是针对较早的提交撰写的。此后{requestNoun}已发生变化：请重新撰写，以查看当前的变更。"
@@ -33430,6 +33559,18 @@ msgstr "此托管方暂不提供收件箱。"
 #: src/features/develop/components/pull-request-view.tsx:133
 msgid "This host does not offer any view of a {requestNoun} yet."
 msgstr "此托管方暂不提供{requestNoun}的任何视图。"
+
+#: src/features/projects/components/add-project-dialog.tsx:194
+msgid "This host has an invalid Port in ~/.ssh/config."
+msgstr ""
+
+#: src/features/projects/components/add-project-dialog.tsx:190
+msgid "This host is used by a Match rule in ~/.ssh/config, which Neore does not evaluate."
+msgstr ""
+
+#: src/features/projects/components/add-project-dialog.tsx:186
+msgid "This host uses {key} in ~/.ssh/config, which Neore does not support."
+msgstr ""
 
 #: ../../packages/chat-ui/src/chat/message-content.tsx:399
 msgid "This image has been flagged for review"
@@ -33457,7 +33598,7 @@ msgstr "这已经在对话中了。"
 msgid "This is how your organization appears to members"
 msgstr "这是你的组织向成员显示的名称"
 
-#: src/features/projects/components/project-repositories.tsx:188
+#: src/features/projects/components/project-repositories.tsx:181
 msgid "This is not a valid branch name."
 msgstr "这不是有效的分支名称。"
 
@@ -33493,6 +33634,10 @@ msgstr "此链接不完整。请索取完整链接。"
 #: src/features/chat/guest-links/guest-page.tsx:98
 msgid "This link is not taking messages right now. Try again later."
 msgstr "此链接目前不接收消息。请稍后再试。"
+
+#: src/features/projects/components/add-project-dialog.tsx:384
+msgid "This machine is not ready yet."
+msgstr ""
 
 #: src/features/chat/thread/memory-usage-action.tsx:63
 msgid "This memory has since been deleted."
@@ -33612,11 +33757,11 @@ msgstr "此拉取请求已关联了所能保留的最多对话数。"
 msgid "This removes the model files from your computer. You can pull it again later."
 msgstr "这会从你的电脑中删除模型文件。你以后可以重新拉取。"
 
-#: src/features/projects/components/project-repositories.tsx:185
+#: src/features/projects/components/project-repositories.tsx:178
 msgid "This repository is already listed."
 msgstr "此仓库已在列表中。"
 
-#: src/features/projects/components/project-repositories.tsx:200
+#: src/features/projects/components/project-repositories.tsx:193
 msgid "This repository URL is too long."
 msgstr "此仓库 URL 过长。"
 
@@ -33643,6 +33788,10 @@ msgstr "此运行已不可用。"
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:237
 msgid "This selection is too large to import at once. Import fewer files at a time."
 msgstr "所选内容过多，无法一次导入。请减少每次导入的文件数量。"
+
+#: src/features/projects/components/add-project-dialog.tsx:149
+msgid "This server already has its maximum of shared folders. Share a parent folder or remove one in the desktop app."
+msgstr ""
 
 #: src/features/settings/components/chat/mcp-settings.tsx:368
 msgid "This server requires sign-in. Save it, then choose Sign in."
@@ -34554,9 +34703,9 @@ msgstr "尝试调整搜索词。"
 #: src/features/develop/components/files-tab.tsx:275
 #: src/features/develop/components/thread-pull-requests.tsx:169
 #: src/features/home/components/home-page.tsx:152
-#: src/features/projects/components/project-repo-picker.tsx:182
 #: src/features/projects/components/project-repo-picker.tsx:190
-#: src/features/projects/components/project-repositories.tsx:305
+#: src/features/projects/components/project-repo-picker.tsx:198
+#: src/features/projects/components/project-repositories.tsx:298
 #: src/features/tasks/components/task-form-dialog.tsx:459
 msgid "Try again"
 msgstr "重试"
@@ -35528,7 +35677,7 @@ msgstr "使用 AI 优化你的提示词以获得更好的结果。你也可以�
 msgid "Use all enabled MCP servers"
 msgstr "使用所有已启用的 MCP 服务器"
 
-#: src/features/projects/components/project-repositories.tsx:191
+#: src/features/projects/components/project-repositories.tsx:184
 #: src/features/tasks/components/task-form-dialog.tsx:95
 msgid "Use an https:// git URL or GitHub owner/repo"
 msgstr "使用 https:// git URL 或 GitHub owner/repo"
@@ -36961,6 +37110,10 @@ msgstr "助手应在什么时候使用此技能？"
 #: src/features/tasks/components/task-form-dialog.tsx:586
 msgid "Where each run goes"
 msgstr "每次运行的去向"
+
+#: src/features/projects/components/add-project-dialog.tsx:457
+msgid "Where is the project?"
+msgstr ""
 
 #: src/features/develop/components/guide-tab.tsx:165
 msgid "Where the guide is written"

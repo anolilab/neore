@@ -486,7 +486,7 @@ mod tests {
                 hello: Hello {
                     agents: true,
                     platform: "linux".into(),
-                    protocol: 3,
+                    protocol: crate::host::PROTOCOL_VERSION,
                     sandbox: RemoteSandbox {
                         available: true,
                         detail: "Landlock".into(),

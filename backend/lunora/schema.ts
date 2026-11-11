@@ -2087,8 +2087,11 @@ export const schema = defineSchema({
         galleryViewCount: v.optional(v.number()),
         icon: v.optional(v.string()),
         isPublic: v.optional(v.boolean()),
+        // The device the project's folder lives on (this computer, or an SSH server's device) and the absolute folder path on it.
+        machineId: v.optional(v.id("devices")),
         order: v.optional(v.number()),
         organizationId: v.optional(v.string()),
+        path: v.optional(v.string()),
         pinnedAt: v.optional(v.number()),
         projectType: v.optional(v.union(v.literal("chat"), v.literal("workflow"))),
         publicAccessToken: v.optional(v.string()),

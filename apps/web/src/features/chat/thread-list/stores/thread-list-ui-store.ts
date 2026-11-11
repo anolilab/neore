@@ -10,6 +10,8 @@ import type { Dispatch, SetStateAction } from "react";
 import { create } from "zustand";
 import { devtools, subscribeWithSelector } from "zustand/middleware";
 
+import { getAddProjectBridge } from "@/lib/native/bridge";
+
 interface EditingProject {
     _id: string;
     color?: string;
@@ -38,6 +40,9 @@ interface ThreadListUIState {
     /** User tag filter; a thread matches when it carries any of these. */
     selectedTagIds: ReadonlyArray<string>;
     selectedThreadIds: Set<string>;
+    // Add project dialog (machine picker): only opened when the desktop bridge is present
+    showAddProjectDialog: boolean;
+
     // Keyboard help
     showKeyboardHelp: boolean;
 
@@ -54,10 +59,14 @@ interface ThreadListUIState {
 }
 
 interface ThreadListUIActions {
+    closeAddProjectDialog: () => void;
     closeProjectFormDialog: () => void;
     // Selection mode actions - supports both direct values and functional updates
     enterSelectionMode: () => void;
     exitSelectionMode: () => void;
+    /** The header action: the machine picker with the desktop bridge, the project form without. */
+    openAddProjectDialog: () => void;
+    /** The "Clone or create new…" exit of the Add project dialog: closes it and opens the project form. */
     openCreateProjectDialog: () => void;
     // Reset
     reset: () => void;
@@ -102,6 +111,7 @@ const initialState: ThreadListUIState = {
     selectedThreadIds: new Set(),
     showKeyboardHelp: false,
     showManageTagsDialog: false,
+    showAddProjectDialog: false,
     showProjectFormDialog: false,
     showSearch: false,
 };
@@ -116,6 +126,7 @@ export const useThreadListUIStore = create<ThreadListUIStore>()(
             return {
                 ...initialState,
 
+                closeAddProjectDialog: () => set({ showAddProjectDialog: false }),
                 closeProjectFormDialog: () => set({ showProjectFormDialog: false }),
                 // Selection mode actions
                 enterSelectionMode: () =>
@@ -130,9 +141,12 @@ export const useThreadListUIStore = create<ThreadListUIStore>()(
                         lastSelectedIndex: -1,
                         selectedThreadIds: new Set(),
                     }),
+                openAddProjectDialog: () =>
+                    set(getAddProjectBridge() === undefined ? { editingProject: null, showProjectFormDialog: true } : { showAddProjectDialog: true }),
                 openCreateProjectDialog: () =>
                     set({
                         editingProject: null,
+                        showAddProjectDialog: false,
                         showProjectFormDialog: true,
                     }),
                 // Reset
@@ -220,5 +234,8 @@ export const selectSetSelectedThreadIds = (state: ThreadListUIStore) => state.se
 export const selectSetLastSelectedIndex = (state: ThreadListUIStore) => state.setLastSelectedIndex;
 export const selectSetShowKeyboardHelp = (state: ThreadListUIStore) => state.setShowKeyboardHelp;
 export const selectToggleShowKeyboardHelp = (state: ThreadListUIStore) => state.toggleShowKeyboardHelp;
+export const selectShowAddProjectDialog = (state: ThreadListUIStore) => state.showAddProjectDialog;
+export const selectOpenAddProjectDialog = (state: ThreadListUIStore) => state.openAddProjectDialog;
+export const selectCloseAddProjectDialog = (state: ThreadListUIStore) => state.closeAddProjectDialog;
 export const selectOpenCreateProjectDialog = (state: ThreadListUIStore) => state.openCreateProjectDialog;
 export const selectCloseProjectFormDialog = (state: ThreadListUIStore) => state.closeProjectFormDialog;

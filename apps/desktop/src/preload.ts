@@ -35,17 +35,22 @@ const listen = <Payload>(channel: string, handler: (payload: Payload) => void): 
  * own preload, which the site cannot reach. Exposed only with the `device` capability.
  */
 const deviceRelay = {
+    browseMachineFolders: (request: { after?: string; machineId: string; path: string }) => ipcRenderer.invoke(DEVICE_CHANNEL.browseMachineFolders, request),
+    connectAddProjectMachine: (sshAlias: string) => ipcRenderer.invoke(DEVICE_CHANNEL.connectAddProjectMachine, sshAlias),
+    createMachineFolder: (request: { machineId: string; path: string }) => ipcRenderer.invoke(DEVICE_CHANNEL.createMachineFolder, request),
     execute: (call: { envelope: string; signature: string }) => ipcRenderer.invoke(DEVICE_CHANNEL.execute, call),
     hostConnect: (deviceId: string) => ipcRenderer.invoke(DEVICE_CHANNEL.hostConnect, deviceId),
     hostDisconnect: (deviceId: string) => ipcRenderer.invoke(DEVICE_CHANNEL.hostDisconnect, deviceId),
     hostPair: (pairing: { deviceId: string; secret: string; spec: Record<string, unknown> }) => ipcRenderer.invoke(DEVICE_CHANNEL.hostPair, pairing),
     hostProbe: (spec: Record<string, unknown>) => ipcRenderer.invoke(DEVICE_CHANNEL.hostProbe, spec),
+    listAddProjectMachines: () => ipcRenderer.invoke(DEVICE_CHANNEL.listAddProjectMachines),
     manifest: (deviceId?: string) => ipcRenderer.invoke(DEVICE_CHANNEL.manifest, deviceId),
     onChanged: (handler: () => void): () => void => listen(DEVICE_CHANNEL.changed, () => handler()),
     onProgress: (handler: (report: { callId: string; deviceId: string; payload: string; signature: string }) => void): () => void =>
         listen(DEVICE_CHANNEL.progress, handler),
     openSettings: () => ipcRenderer.invoke(DEVICE_CHANNEL.openSettings),
     pair: (pairing: { accountLabel: string; deviceId: string; secret: string }) => ipcRenderer.invoke(DEVICE_CHANNEL.pair, pairing),
+    shareMachineFolder: (request: { machineId: string; path: string }) => ipcRenderer.invoke(DEVICE_CHANNEL.shareMachineFolder, request),
     status: () => ipcRenderer.invoke(DEVICE_CHANNEL.status),
 };
 

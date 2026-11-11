@@ -381,6 +381,41 @@ impl DeviceCore {
         })
     }
 
+    /// The folders inside an absolute path on a connected server (`{ path, parent, entries, next, host }`, JSON).
+    #[napi]
+    pub fn host_browse<'env>(
+        &self,
+        env: &'env Env,
+        device_id: String,
+        path: String,
+        after: Option<String>,
+    ) -> Result<PromiseRaw<'env, String>> {
+        let state = Arc::clone(&self.state);
+
+        blocking(env, move || {
+            let page = state.host_browse(&device_id, &path, after.as_deref())?;
+
+            serde_json::to_string(&page).map_err(|error| error.to_string())
+        })
+    }
+
+    /// Creates an absolute folder on a connected server (`{ path, created, … }`, JSON).
+    #[napi]
+    pub fn host_make_dir<'env>(
+        &self,
+        env: &'env Env,
+        device_id: String,
+        path: String,
+    ) -> Result<PromiseRaw<'env, String>> {
+        let state = Arc::clone(&self.state);
+
+        blocking(env, move || {
+            let made = state.host_make_dir(&device_id, &path)?;
+
+            serde_json::to_string(&made).map_err(|error| error.to_string())
+        })
+    }
+
     /// A file of a connected server as text (`{ text, truncated, host, path }`, JSON).
     #[napi]
     pub fn host_file_read<'env>(

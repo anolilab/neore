@@ -544,11 +544,11 @@ for a schema table that is neither policed nor listed:
 | `pages_sharing.revokePageInvite` | mutation | authMutation + RL | pageInvites | page access | ok |
 | `pages_sharing.setPagePublic` | mutation | authMutation + RL | pages | page access | ok |
 | `pages_sharing.updatePageGrant` | mutation | authMutation + RL | pages | page access | ok |
-| `projects_functions.createProject` | mutation | authMutation + RL | — | org membership/role | **fixed** (medium) — organizationId must be the active org |
+| `projects_functions.createProject` | mutation | authMutation + RL | devices | org membership/role; optional `machineId` must be a device with `device.userId == caller` and no `revokedAt` (otherwise NOT_FOUND), with an absolute `path` | **fixed** (medium) — organizationId must be the active org; the machine and folder are recorded only for the caller's own live device |
 | `projects_functions.deleteProject` | mutation | authMutation + RL | projects | row.userId == caller | **fixed** (low) — move target must be the caller's project |
-| `projects_functions.getProject` | query | authQuery | projects | org membership/role; row.userId == caller | ok |
-| `projects_functions.listPinnedProjects` | query | authQuery | — | caller-scoped (ctx.user) | **fixed** (high) — via `agent_projects.listPinnedProjects` |
-| `projects_functions.listProjects` | query | authQuery | — | caller-scoped (ctx.user) | **fixed** (high) — via `agent_projects.listProjects` |
+| `projects_functions.getProject` | query | authQuery | projects | org membership/role; row.userId == caller | ok — the machine and folder (`machineId`, `path`) are returned to the project's owner only |
+| `projects_functions.listPinnedProjects` | query | authQuery | — | caller-scoped (ctx.user) | **fixed** (high) — via `agent_projects.listPinnedProjects`; the machine and folder are owner-only |
+| `projects_functions.listProjects` | query | authQuery | — | caller-scoped (ctx.user) | **fixed** (high) — via `agent_projects.listProjects`; the machine and folder are owner-only |
 | `projects_functions.listThreadsByProject` | query | authQuery | projects | row.userId == caller | ok |
 | `projects_functions.moveThreadToProject` | mutation | authMutation + RL | projects, threads | row.userId == caller | ok |
 | `projects_functions.pinProject` | mutation | authMutation + RL | projects | row.userId == caller | ok |
@@ -720,7 +720,7 @@ for a schema table that is neither policed nor listed:
 | `workflow_functions.getWorkflow` | query | authQuery | projects | row.userId == caller | ok |
 | `workflow_functions.listExecutions` | query | authQuery | projects | row.userId == caller | ok |
 | `workflow_functions.listNodeExecutions` | query | authQuery | workflowExecutions | row.userId == caller | ok |
-| `workflow_functions.listWorkflows` | query | authQuery | — | caller-scoped (ctx.user) | **fixed** (high) — via `agent_projects.listProjects` |
+| `workflow_functions.listWorkflows` | query | authQuery | — | caller-scoped (ctx.user) | **fixed** (high) — via `agent_projects.listProjects`; the machine and folder are owner-only |
 | `workflow_functions.updateExecutionStatus` | mutation | authMutation + RL | workflowExecutions | row.userId == caller | ok |
 | `workflow_functions.updateNodeExecution` | mutation | authMutation + RL | — | row.userId == caller | ok |
 | `workflow_functions.updateWorkflowContent` | mutation | authMutation + RL | projects | row.userId == caller | ok |

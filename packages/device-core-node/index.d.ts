@@ -76,6 +76,10 @@ export declare class DeviceCore {
    * local window. `after` is the `next` of the page before.
    */
   hostFilesList(deviceId: string, path: string, after?: string | undefined | null): Promise<string>
+  /** The folders inside an absolute path on a connected server (`{ path, parent, entries, next, host }`, JSON). */
+  hostBrowse(deviceId: string, path: string, after?: string | undefined | null): Promise<string>
+  /** Creates an absolute folder on a connected server (`{ path, created, … }`, JSON). */
+  hostMakeDir(deviceId: string, path: string): Promise<string>
   /** A file of a connected server as text (`{ text, truncated, host, path }`, JSON). */
   hostFileRead(deviceId: string, path: string): Promise<string>
   /**

@@ -23,7 +23,9 @@ const ENTRY_GZIP_BUDGET_KIB = 200;
 // ~25 of small shared chunks the new chunk split hoists into the first load.
 // 675 -> 676 with the countdown toast (#653): the card, its toast classes and the footer add ~0.2 KiB.
 // 676 -> 677 with the use-case pages: their routes, copy and index card add ~0.4 KiB to the first load.
-const CLOSURE_GZIP_BUDGET_KIB = 677;
+// 677 -> 678 with the add-project picker: its native-bridge check and the thread list's store state add ~0.1 KiB,
+// but the CI build measured 677.0 for this change, just over the old line.
+const CLOSURE_GZIP_BUDGET_KIB = 678;
 
 interface ManifestChunk {
     file: string;

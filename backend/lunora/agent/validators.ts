@@ -865,8 +865,10 @@ export const vProjectCreateFields = {
     icon: v.optional(v.string()),
     // Gallery fields
     isPublic: v.optional(v.boolean()),
+    machineId: v.optional(v.id("devices")),
     order: v.optional(v.number()),
     organizationId: v.optional(v.string()),
+    path: v.optional(v.string()),
     pinnedAt: v.optional(v.number()),
     // Workflow fields
     projectType: v.optional(v.union(v.literal("chat"), v.literal("workflow"))),
