@@ -12,7 +12,7 @@ import { internalQuery } from "../_generated/server";
 import { authAction, rateLimit } from "../lib/crpc";
 import { MAX_LENGTH } from "../lib/validators";
 import { planFor } from "../skills/bundle";
-import { checkPluginFile } from "./install-action";
+import { assertNoToolConfig, checkPluginFile } from "./install-action";
 import { entryHash, skillContent, skillRowHash } from "./entry-hash";
 import { diffUpdate, isDowngrade, markerFor } from "./logic";
 import type { UpdateAction } from "./logic";
@@ -105,6 +105,7 @@ export const previewUpdate = authAction
         }
 
         const { entries } = await planFor(ctx, args.markdown, undefined);
+        assertNoToolConfig(entries);
         const incoming = await Promise.all(entries.map(async (entry) => ({ contentHash: await entryHash(entry), entryKey: entry.key, kind: entry.kind })));
         const plan: Array<{ action: UpdateAction; entryKey: string }> = diffUpdate(installed.children, incoming);
 
@@ -161,6 +162,7 @@ export const updatePlugin = authAction
         }
 
         const { entries } = await planFor(ctx, args.markdown, undefined);
+        assertNoToolConfig(entries);
         const incoming = await Promise.all(entries.map(async (entry) => ({ contentHash: await entryHash(entry), entryKey: entry.key, kind: entry.kind })));
         const plan = diffUpdate(installed.children, incoming);
 
