@@ -5,6 +5,13 @@ import { DEFER_VALIDATION as DEFER, installCompiledValidatorMap } from "lunorash
 import * as lunora_devices_internal_120 from "../../devices/internal.js";
 
 /** Install the precompiled argument parsers before the module is dispatched. */
+installCompiledValidatorMap(lunora_devices_internal_120.clearDeviceProjects.args, (source) => {
+if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
+if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
+if (typeof source["machineId"] !== "string") return DEFER;
+if (typeof source["userId"] !== "string") return DEFER;
+return { "machineId": source["machineId"], "userId": source["userId"] };
+});
 installCompiledValidatorMap(lunora_devices_internal_120.expireDeviceCall.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;

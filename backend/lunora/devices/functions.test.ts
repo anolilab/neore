@@ -39,6 +39,7 @@ const { createAcpCall } = await import("./lib/acp-call");
 const { ACP_CLAIM_WINDOW_MS, DEVICE_CLAIM_WINDOW_MS } = await import("./lib/constants");
 const { claimWindowMs, isAcpTool, OPEN_CALL_PAGE } = await import("./lib/state");
 const { isDeviceInScope } = await import("./lib/scope");
+const { PROJECT_CLEAR_BATCH } = await import("./lib/clear-projects");
 
 type Harness = ReturnType<typeof lunoraTest>;
 
@@ -1100,6 +1101,32 @@ describe("revokeDevice", () => {
         expect(cleared.machineId).toBeUndefined();
         expect(cleared.path).toBeUndefined();
         expect(await read(theirs)).toMatchObject({ machineId: deviceId, path: "/home/them/app" });
+        expect(harness.scheduler.list()).toEqual([]);
+    });
+
+    it("clears one batch in the revoke and schedules the rest, which a run clears without scheduling again", async () => {
+        const { deviceId } = await pairedDevice(ownerId);
+
+        for (let index = 0; index < PROJECT_CLEAR_BATCH + 1; index += 1) {
+            await insertProject(ownerId, { machineId: deviceId, path: `/home/me/app-${index}` });
+        }
+
+        const remaining = async () =>
+            (await harness.run(
+                async (ctx: any) => (await ctx.db.projects.findMany({ limit: 1000, where: { machineId: deviceId, userId: ownerId } })).page.length,
+            )) as number;
+
+        await as(ownerId).mutation(functions.revokeDevice as never, { deviceId } as never);
+
+        expect(await remaining()).toBe(1);
+        expect(harness.scheduler.list()).toHaveLength(1);
+
+        const [continuation] = harness.scheduler.list();
+
+        await harness.run(async (ctx: any) => await ctx.runMutation(internals.clearDeviceProjects, continuation?.args as never));
+
+        expect(await remaining()).toBe(0);
+        expect(harness.scheduler.list()).toHaveLength(1);
     });
 
     it("deletes the device and expires its open calls; the audit rows stay", async () => {
