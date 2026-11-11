@@ -99,7 +99,9 @@ describe(systemAccentTokens, () => {
             expect(contrastRatio(tokens[`${mode}Foreground`], tokens[`${mode}Hover`])).toBeGreaterThanOrEqual(bar);
 
             // A hovered button still stands out from the page (a white OS accent in light mode faded to ~2.5:1).
-            for (const surface of SURFACES[mode]) {
+            const surfaces = SURFACES[mode];
+
+            for (const surface of surfaces) {
                 expect(contrastRatio(tokens[`${mode}Hover`], surface)).toBeGreaterThanOrEqual(AA_NON_TEXT);
             }
 

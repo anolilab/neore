@@ -80,7 +80,7 @@ const modeShades = (hex: string, towards: string, surfaces: ReadonlyArray<string
     const hover =
         [foreground === WHITE ? BLACK : WHITE, towards, foreground]
             .flatMap((target) => HOVER_MIXES.map((amount) => mix(fill, target, amount)))
-            .find(hoverPasses) ?? fill;
+            .find((shade) => hoverPasses(shade)) ?? fill;
 
     return { fill, foreground, hover, text };
 };
