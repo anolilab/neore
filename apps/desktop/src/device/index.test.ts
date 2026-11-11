@@ -257,7 +257,7 @@ const makeCore = () => {
         hostAgentStop: vi.fn(),
         hostAgentWrite: vi.fn(),
         hostBrowse: vi.fn(async (_deviceId: string, folder: string, _after?: string) =>
-            JSON.stringify({ entries: [{ name: "app" }], host: "build-box", next: null, parent: "/", path: folder }),
+            JSON.stringify({ entries: [{ name: "app" }], host: "build-box", next: null, parent: "/", path: folder, refusedRoot: false }),
         ),
         hostConnect: vi.fn(async () => JSON.stringify({ platform: "linux" })),
         hostDisconnect: vi.fn(),

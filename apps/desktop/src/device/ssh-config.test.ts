@@ -68,6 +68,44 @@ describe("parseSshConfig", () => {
         expect(exec.every((host) => host.disabledReason !== null)).toBe(true);
     });
 
+    it("applies a global setting before the first Host line", () => {
+        const [host] = parse("User ops\nHost box\n  HostName box.example.com\n");
+
+        expect(host).toMatchObject({ alias: "box", user: "ops" });
+    });
+
+    it("takes a setting the alias block lacks from a later wildcard block", () => {
+        const [host] = parse("Host box\n  HostName box.example.com\nHost *.example.com box\n  Port 2022\n");
+
+        expect(host).toMatchObject({ alias: "box", port: 2022 });
+    });
+
+    it("takes the first value across blocks in file order", () => {
+        const [host] = parse("Host box\n  Port 2200\nHost b*\n  Port 2300\n  User late\nHost *\n  User later\n");
+
+        expect(host).toMatchObject({ port: 2200, user: "late" });
+    });
+
+    it("excludes a block whose negated pattern matches", () => {
+        const hosts = parse("Host * !box\n  User skipped\nHost box other\n  Port 2200\n");
+
+        expect(hosts.map((host) => [host.alias, host.user, host.port])).toEqual([
+            ["box", null, 2200],
+            ["other", "skipped", 2200],
+        ]);
+    });
+
+    it("disables a host when a wildcard block that applies uses an unsupported key", () => {
+        const hosts = parse("Host box\n  HostName box.example.com\nHost *.internal\n  ProxyJump bastion\nHost plain.internal other\n");
+
+        expect(hosts.map((host) => [host.alias, host.disabledReason === null])).toEqual([
+            ["box", true],
+            ["plain.internal", false],
+            ["other", true],
+        ]);
+        expect(hosts[1]?.disabledReason).toContain("ProxyJump");
+    });
+
     it("does not give a Match block's keys to the Host above it", () => {
         const [host] = parse("Host a\n  HostName a.example.com\nMatch host zzz\n  User other\n  Port 99\n");
 

@@ -93,6 +93,8 @@ export interface BrowsePage {
     next: string | null;
     parent: string | null;
     path: string;
+    /** True when the folder is the server's home folder or above: the host refuses to share it. */
+    refusedRoot: boolean;
 }
 
 /** What creating a folder on a server did (`host_make_dir`). */

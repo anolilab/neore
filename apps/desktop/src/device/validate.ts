@@ -106,8 +106,11 @@ export const readServerPath = (value: unknown): string => {
 const MAX_MACHINE_PATH_BYTES = 1024;
 const ALIAS_FORBIDDEN = /[\s!*?]/u;
 
+/** Control, format (bidi overrides, zero-width) and line or paragraph separator characters: a native prompt would show another folder. */
+const UNSAFE_PATH_CHARACTER = /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/u;
+
 /**
- * A folder the add-project picker names: absolute, no NUL, at most 1024 bytes. `local` is this computer's rule for
+ * A folder the add-project picker names: absolute, no control or format characters, at most 1024 bytes. `local` is this computer's rule for
  * "absolute" (drive letters on Windows); a server's paths are POSIX. An empty path is allowed only when `allowEmpty`.
  */
 export const readMachinePath = (value: unknown, local: boolean, allowEmpty = false): string => {
@@ -117,7 +120,7 @@ export const readMachinePath = (value: unknown, local: boolean, allowEmpty = fal
 
     const folder = text(value, "path", MAX_MACHINE_PATH_BYTES);
 
-    if (folder.includes("\0") || Buffer.byteLength(folder) > MAX_MACHINE_PATH_BYTES) {
+    if (UNSAFE_PATH_CHARACTER.test(folder) || Buffer.byteLength(folder) > MAX_MACHINE_PATH_BYTES) {
         throw new Error("device: path is invalid");
     }
 

@@ -70,6 +70,8 @@ export interface CreatedMachineFolder {
 }
 
 export interface SharedMachineFolder {
+    /** The folder as the server resolves it (symlinks followed); the one that is shared. */
+    path: string;
     /** False when the folder is already shared, or on this computer. */
     shared: boolean;
 }
