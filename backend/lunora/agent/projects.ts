@@ -25,6 +25,7 @@ import { countedWorkflowFileIds } from "../workflow/images";
 import { changeRefcount } from "./files";
 import { listThreadItem } from "./threads";
 import { eraseProjectRepositories } from "../projects/gdpr";
+import { forViewer } from "../projects/machine-location";
 
 /**
  * A workflow keeps its images and reference media as chat-file references
@@ -136,7 +137,7 @@ export const listProjectsHandler = async (
     return {
         continueCursor: projects.continueCursor,
         isDone: projects.isDone,
-        page: (projects.page as unknown as Doc<"projects">[]).map((item) => publicProject(item)),
+        page: (projects.page as unknown as Doc<"projects">[]).map((item) => publicProject(forViewer(item, identity.userId))),
     };
 };
 
@@ -168,7 +169,7 @@ export const listPinnedProjectsHandler = async (ctx: QueryCtx, args: { organizat
         });
         const pinned = projects.filter((p) => p.pinnedAt !== undefined).toSorted((a, b) => (b.pinnedAt ?? 0) - (a.pinnedAt ?? 0));
 
-        return pinned.map((item) => publicProject(item));
+        return pinned.map((item) => publicProject(forViewer(item, identity.userId)));
     }
 
     // Membership, not just an org id: see `listProjects`.
@@ -182,7 +183,7 @@ export const listPinnedProjectsHandler = async (ctx: QueryCtx, args: { organizat
         });
         const pinned = allProjects.filter((p) => p.pinnedAt !== undefined).toSorted((a, b) => (b.pinnedAt ?? 0) - (a.pinnedAt ?? 0));
 
-        return pinned.map((item) => publicProject(item));
+        return pinned.map((item) => publicProject(forViewer(item, identity.userId)));
     }
 
     return [];
