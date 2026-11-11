@@ -5,11 +5,11 @@
  * only way to reach IPC handlers without launching it.
  */
 import { createHash } from "node:crypto";
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { APPEARANCE_FILE, SHOW_FALLBACK_MS } from "./appearance.js";
 import { CAPABILITIES_ARG } from "./channels.js";
@@ -20,8 +20,10 @@ import { WINDOW_STATE_FILE } from "./window-state.js";
 type Listener = (event: { preventDefault: () => void }, url: string) => void;
 
 interface FakeWindow {
-    /** `maximize` and `show`, in the order the main process called them. */
+    /** `maximize`, `show` and `showInactive`, in the order the main process called them. */
     calls: string[];
+    /** `isDestroyed()` of the window and its webContents. */
+    destroyed: boolean;
     focused: boolean;
     handlers: Map<string, Listener>;
     id: number;
@@ -35,6 +37,7 @@ interface FakeWindow {
         getURL: () => string;
         handlers: Map<string, Listener>;
         id: number;
+        isDestroyed: () => boolean;
         loadURL: (url: string) => Promise<void>;
         mainFrame: { url: string };
         on: (event: string, listener: Listener) => void;
@@ -67,6 +70,8 @@ interface Fake {
     systemDark: boolean;
     /** `nativeTheme.on(...)`, by event name. */
     themeListeners: string[];
+    /** Each theme watch a page was given (`pageThemeChangeScript`), unsettled until a case settles it. */
+    themeWatches: { reject: (error: Error) => void; resolve: (dark: boolean) => void; window: number }[];
     trayFails: boolean;
     trays: number;
     userData: string;
@@ -89,6 +94,7 @@ vi.mock("electron", () => {
         shortcuts: new Map(),
         systemDark: true,
         themeListeners: [],
+        themeWatches: [],
         trayFails: false,
         trays: 0,
         userData: path.join(os.tmpdir(), "neore-desktop-test"),
@@ -103,6 +109,7 @@ vi.mock("electron", () => {
         const window = {
             calls: [] as string[],
             center: () => {},
+            destroyed: false,
             focus: () => {},
             focused: true,
             getNormalBounds: () => {
@@ -113,7 +120,7 @@ vi.mock("electron", () => {
                 window.shown = false;
             },
             id,
-            isDestroyed: () => false,
+            isDestroyed: () => window.destroyed,
             isFocused: () => window.focused,
             isMaximized: () => window.maximized,
             isMinimized: () => false,
@@ -134,6 +141,11 @@ vi.mock("electron", () => {
 
                 return window;
             },
+            once: (event: string, listener: Listener) => {
+                handlers.set(event, listener);
+
+                return window;
+            },
             options,
             restore: () => {},
             sent: [] as string[],
@@ -141,12 +153,26 @@ vi.mock("electron", () => {
                 window.calls.push("show");
                 window.shown = true;
             },
+            showInactive: () => {
+                window.calls.push("showInactive");
+                window.shown = true;
+            },
             shown: false,
             webContents: {
-                executeJavaScript: async () => fakeElectron.pageDark,
+                executeJavaScript: async (code: string) => {
+                    if (!code.includes("MutationObserver")) {
+                        return fakeElectron.pageDark;
+                    }
+
+                    // A theme watch answers only when the page's theme changes: never, unless a case says so.
+                    return new Promise((resolve, reject) => {
+                        fakeElectron.themeWatches.push({ reject, resolve, window: id });
+                    });
+                },
                 getURL: () => window.loaded.at(-1) ?? "",
                 handlers: webHandlers,
                 id,
+                isDestroyed: () => window.destroyed,
                 loadURL: (url: string) => {
                     window.loaded.push(url);
 
@@ -297,6 +323,7 @@ const SAFE_TOKEN_PATTERN = /^[\w-]{43}$/u;
 const SITE_HTML_PATTERN = /^file:\/\/.*quick-composer\/index\.html$/u;
 const TITLE_200 = "t".repeat(200);
 const BLANK = " ".repeat(3);
+const RECOVERY_PAGE_PATTERN = /^data:text\/html/u;
 const sender = (url: string) => {
     const mainFrame = { url };
 
@@ -685,16 +712,67 @@ describe("look and application menu", () => {
         expect(win.shown).toBe(true);
     });
 
-    it("shows a thread window that never paints once its load fails", () => {
-        fake().ipc.get("neore:open-thread-window")?.(siteSender(), "thread-paint");
+    describe("a window whose load fails", () => {
+        afterEach(() => {
+            vi.useRealTimers();
+        });
 
-        const win = fake().windows.at(-1) as FakeWindow;
-        const failed = guardOf(win, "did-fail-load") as unknown as (event: unknown, code: number, text: string, url: string, isMainFrame: boolean) => void;
+        /** A thread window, opened and not painted yet, and its two load events. */
+        const openFailing = (thread: string) => {
+            fake().ipc.get("neore:open-thread-window")?.(siteSender(), thread);
 
-        expect(win.options).toMatchObject({ show: false });
-        expect(win.shown).toBe(false);
-        failed({}, -105, "ERR_NAME_NOT_RESOLVED", `${SITE}/chat/thread-paint`, true);
-        expect(win.shown).toBe(true);
+            const win = fake().windows.at(-1) as FakeWindow;
+            const failed = guardOf(win, "did-fail-load") as unknown as (event: unknown, code: number, text: string, url: string, isMainFrame: boolean) => void;
+
+            return {
+                fail: () => failed({}, -105, "ERR_NAME_NOT_RESOLVED", `${SITE}/chat/${thread}`, true),
+                finished: () => guardOf(win, "did-finish-load")?.({ preventDefault: () => {} }, ""),
+                win,
+            };
+        };
+
+        it("is shown once the recovery page is drawn, not empty before it, not even at the show fallback", () => {
+            vi.useFakeTimers();
+
+            const { fail, finished, win } = openFailing("thread-paint");
+
+            vi.advanceTimersByTime(SHOW_FALLBACK_MS - 1000);
+            fail();
+            expect(win.loaded.at(-1)).toMatch(RECOVERY_PAGE_PATTERN);
+            expect(win.shown).toBe(false);
+            vi.advanceTimersByTime(1000);
+            expect(win.shown).toBe(false);
+
+            finished();
+            expect(win.calls).toStrictEqual(["show"]);
+            vi.advanceTimersByTime(SHOW_FALLBACK_MS);
+            expect(win.calls).toStrictEqual(["show"]);
+        });
+
+        it("is shown SHOW_FALLBACK_MS after the failure when the recovery page never finishes loading", () => {
+            vi.useFakeTimers();
+
+            const { fail, win } = openFailing("thread-recovery-hung");
+
+            fail();
+            vi.advanceTimersByTime(SHOW_FALLBACK_MS - 1);
+            expect(win.shown).toBe(false);
+            vi.advanceTimersByTime(1);
+            expect(win.calls).toStrictEqual(["show"]);
+        });
+
+        it("leaves a window already shown as it is", () => {
+            vi.useFakeTimers();
+
+            const { fail, finished, win } = openFailing("thread-shown");
+
+            (win.handlers.get("ready-to-show") as unknown as () => void)();
+            fail();
+            finished();
+            vi.advanceTimersByTime(SHOW_FALLBACK_MS);
+            expect(win.calls).toStrictEqual(["show"]);
+            expect(win.loaded.at(-1)).toMatch(RECOVERY_PAGE_PATTERN);
+        });
     });
 
     it("answers the accent colour as #rrggbb to the site only", () => {
@@ -1146,6 +1224,17 @@ describe("tray failure", () => {
     });
 });
 
+/** The `userData` folder of each restart: removed once every case has run, whether it passed or not. */
+const temporaryDirectories: string[] = [];
+
+afterAll(() => {
+    for (const directory of temporaryDirectories) {
+        rmSync(directory, { force: true, recursive: true });
+    }
+
+    temporaryDirectories.length = 0;
+});
+
 /**
  * Starts the app again as `platform`, with `saved` as the window state on disk, and returns the new main window and the
  * state file. Like `startWithoutTray`, it re-imports `main.js`; the windows of the earlier start stay in the fake.
@@ -1157,6 +1246,8 @@ const restart = async (
 ): Promise<{ file: string; userData: string; win: FakeWindow }> => {
     const original = Object.getOwnPropertyDescriptor(process, "platform");
     const userData = mkdtempSync(path.join(os.tmpdir(), "neore-desktop-test-"));
+
+    temporaryDirectories.push(userData);
     const file = path.join(userData, WINDOW_STATE_FILE);
     const first = fake().windows.length;
 
@@ -1256,6 +1347,58 @@ describe("main window reveal and saved state", () => {
         });
     });
 
+    describe("revealed while another window of ours has the focus", () => {
+        afterEach(() => {
+            fake().focusedWindow = null;
+        });
+
+        it("leaves the focus there, and maximizes as saved only when the user comes to the window", async () => {
+            const { file, win } = await restart("win32", { maximized: true });
+
+            // Another window of ours, as a dictation window would be: a lost focus ends a dictation.
+            fake().focusedWindow = fake().windows.at(-1) as FakeWindow;
+            readyToShow(win);
+            expect(win.calls).toStrictEqual(["showInactive"]);
+
+            // A close before that still keeps the saved maximized state.
+            closeWindow(win);
+            expect(readSaved(file).maximized).toBe(true);
+
+            win.handlers.get("focus")?.({ preventDefault: () => {} }, "");
+            expect(win.calls).toStrictEqual(["showInactive", "maximize"]);
+        });
+
+        it("shows a thread window without the focus", () => {
+            fake().focusedWindow = mainWindow();
+            fake().ipc.get("neore:open-thread-window")?.(siteSender(), "thread-inactive");
+
+            const win = fake().windows.at(-1) as FakeWindow;
+
+            readyToShow(win);
+            expect(win.calls).toStrictEqual(["showInactive"]);
+        });
+
+        it("still focuses a window brought forward", () => {
+            fake().focusedWindow = mainWindow();
+
+            const openThread = fake().ipc.get("neore:open-thread-window");
+
+            openThread?.(siteSender(), "thread-forward");
+
+            const win = fake().windows.at(-1) as FakeWindow;
+
+            openThread?.(siteSender(), "thread-forward");
+            expect(win.calls).toStrictEqual(["show"]);
+        });
+    });
+
+    it("focuses a window revealed while no window of ours has the focus, as at a first launch", async () => {
+        const { win } = await restart("win32", { maximized: true });
+
+        readyToShow(win);
+        expect(win.calls).toStrictEqual(["maximize", "show"]);
+    });
+
     it("reveals a main window brought forward before its first paint once, maximized, with no second show later", async () => {
         const { win } = await restart("linux", { maximized: true });
 
@@ -1311,6 +1454,67 @@ describe("main window reveal and saved state", () => {
 
             fake().ipc.get("neore:open-thread-window")?.(topFrameOf(win, `${SITE}/chat`), "thread-theme");
             expect(fake().windows.at(-1)?.options).toMatchObject({ backgroundColor: "#212121" });
+        });
+
+        it("follows a theme toggle without a reload, until the window leaves the site, loads another page or is destroyed", async () => {
+            fake().systemDark = false;
+            fake().pageDark = false;
+
+            const { userData, win } = await restart("linux");
+            const appearanceFile = path.join(userData, APPEARANCE_FILE);
+            const saved = (): unknown => (JSON.parse(readFileSync(appearanceFile, "utf8")) as { dark: unknown }).dark;
+            const watches = () => fake().themeWatches.filter((watch) => watch.window === win.id);
+            const load = (url: string): void => {
+                win.webContents.loadURL(url);
+                guardOf(win, "did-navigate")?.({ preventDefault: () => {} }, url);
+                guardOf(win, "did-finish-load")?.({ preventDefault: () => {} }, "");
+            };
+            /** Every answer the main process could act on has been acted on. */
+            const settled = async (): Promise<void> =>
+                new Promise((resolve) => {
+                    setImmediate(resolve);
+                });
+
+            load(`${SITE}/chat`);
+            await vi.waitFor(() => expect(watches()).toHaveLength(1));
+            expect(saved()).toBe(false);
+
+            // Each toggle is kept, and the page is watched again.
+            watches()[0]?.resolve(true);
+            await vi.waitFor(() => expect(watches()).toHaveLength(2));
+            expect(saved()).toBe(true);
+            watches()[1]?.resolve(false);
+            await vi.waitFor(() => expect(watches()).toHaveLength(3));
+            expect(saved()).toBe(false);
+
+            // Another site document: the earlier one's late answer is neither kept nor watched again.
+            load(`${SITE}/chat/other`);
+            await vi.waitFor(() => expect(watches()).toHaveLength(4));
+            watches()[2]?.resolve(true);
+            await settled();
+            expect(watches()).toHaveLength(4);
+            expect(saved()).toBe(false);
+
+            // Off the site (the recovery page): nothing is asked of it, and the pending watch ends with the document.
+            load("data:text/html,recovery");
+            watches()[3]?.resolve(true);
+            await settled();
+            expect(watches()).toHaveLength(4);
+            expect(saved()).toBe(false);
+
+            // A rejected watch (a navigation, a closing window) ends there, and a destroyed window's late answer starts nothing.
+            load(`${SITE}/chat`);
+            await vi.waitFor(() => expect(watches()).toHaveLength(5));
+            watches()[4]?.reject(new Error("Script failed to execute"));
+            await settled();
+            expect(watches()).toHaveLength(5);
+            load(`${SITE}/chat`);
+            await vi.waitFor(() => expect(watches()).toHaveLength(6));
+            win.destroyed = true;
+            watches()[5]?.resolve(true);
+            await settled();
+            expect(watches()).toHaveLength(6);
+            expect(saved()).toBe(false);
         });
     });
 

@@ -37,6 +37,27 @@ export const APPEARANCE_FILE = "appearance.json";
 /** Run in a loaded site page: whether it is dark (the `dark` class the web app's theme sets on the root element). */
 export const PAGE_IS_DARK_SCRIPT = `document.documentElement.classList.contains("dark")`;
 
+/**
+ * Run in a loaded site page whose theme was last seen as `dark`: a promise of the new state, settled once the root
+ * element's `class` no longer says `dark` (at once if it already differs). Its observer goes after that one answer; a
+ * document that unloads first takes the observer with it, and the promise never settles.
+ */
+export const pageThemeChangeScript = (dark: boolean): string => `new Promise((resolve) => {
+    const root = document.documentElement;
+    const known = ${String(dark)};
+    if (root.classList.contains("dark") !== known) {
+        resolve(!known);
+        return;
+    }
+    const observer = new MutationObserver(() => {
+        if (root.classList.contains("dark") !== known) {
+            observer.disconnect();
+            resolve(!known);
+        }
+    });
+    observer.observe(root, { attributeFilter: ["class"], attributes: true });
+})`;
+
 /** Anything but `{ dark: boolean }` (no file, a torn one) is `undefined`: the system theme decides. */
 export const readAppearance = (file: string): Appearance | undefined => {
     try {

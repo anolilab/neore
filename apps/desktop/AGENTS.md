@@ -68,10 +68,15 @@
 - **Window look** (`appearance.ts`, `app-menu.ts`, `menu-delivery.ts`): site windows start hidden; `maximize()` SHOWS a
   hidden window on Windows and Linux, so the saved maximized state is applied at the reveal, and an early bring-forward
   runs that reveal (`bringForward`), never a bare `show()`. A main window closed (hidden) before its reveal stays hidden
-  through `ready-to-show` and the fallback timer; only `bringForward` reveals it. The live accent event is `accent-color-changed` on Windows and
+  through `ready-to-show` and the fallback timer; only `bringForward` reveals it. A reveal nobody asked for never takes the
+  focus from another window of ours (`showInactive`; `show` focuses on Windows, and a blurred dictation ends); a main
+  window saved maximized then maximizes at its first focus, since `maximize` activates on Windows. The live accent event is `accent-color-changed` on Windows and
   Linux only; macOS needs `subscribeNotification("AppleColorPreferencesChangedNotification")`. Vibrancy shows only through
   a fully transparent `backgroundColor`. The pre-paint fill follows `<userData>/appearance.json`, the `dark` class the
-  last loaded site page showed (the site has its own theme setting), else `nativeTheme`. The deployed site ships apart from the shell, so a menu command waits until the
+  last site page showed (the site has its own theme setting), else `nativeTheme`: sampled at `did-finish-load`, then
+  followed by an `executeJavaScript` promise that settles at the next change (no IPC channel), re-armed per document
+  until the webContents is destroyed, leaves the site or commits another document. A window not revealed when its load
+  fails is shown at the recovery page's `did-finish-load` (`ready-to-show` does not fire again), or `SHOW_FALLBACK_MS` later. The deployed site ships apart from the shell, so a menu command waits until the
   page's `onMenuCommand` sends `menu-commands-ready` (per document); 2 s after a load without it, New Chat loads the URL and
   the rest is dropped. A committed non-site document (the recovery page) queues nothing: New Chat loads the site over it,
   the rest is dropped. Commands queue from `did-start-navigation` (main frame, cross-document) to the NEW page's ready: a

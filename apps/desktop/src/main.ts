@@ -14,7 +14,7 @@ import { app, BrowserWindow, globalShortcut, ipcMain, Menu, nativeImage, nativeT
 
 import type { MenuCommand } from "./app-menu.js";
 import { buildAppMenuTemplate } from "./app-menu.js";
-import { accentHex, APPEARANCE_FILE, PAGE_IS_DARK_SCRIPT, readAppearance, SHOW_FALLBACK_MS, supportsVibrancy, windowBackground, writeAppearance } from "./appearance.js";
+import { accentHex, APPEARANCE_FILE, PAGE_IS_DARK_SCRIPT, pageThemeChangeScript, readAppearance, SHOW_FALLBACK_MS, supportsVibrancy, windowBackground, writeAppearance } from "./appearance.js";
 import { createSetBadgeHandler } from "./badge.js";
 import { CAPABILITIES_ARG, CHANNEL, SITE_ORIGIN_ARG } from "./channels.js";
 import { registerDeviceIpc } from "./device/index.js";
@@ -313,34 +313,81 @@ const appearanceFile = (): string => path.join(app.getPath("userData"), APPEARAN
 const siteBackground = (withVibrancy: boolean): string =>
     windowBackground({ dark: readAppearance(appearanceFile())?.dark ?? nativeTheme.shouldUseDarkColors, vibrancy: withVibrancy });
 
-/** Keeps the theme a loaded site page shows, for the next window's pre-paint fill. A failure is logged, never thrown. */
-const rememberSiteTheme = async (contents: WebContents): Promise<void> => {
-    try {
-        const dark: unknown = await contents.executeJavaScript(PAGE_IS_DARK_SCRIPT);
+const saveSiteTheme = (dark: boolean): void => {
+    if (readAppearance(appearanceFile())?.dark !== dark) {
+        writeAppearance(appearanceFile(), { dark });
+    }
+};
 
-        if (typeof dark === "boolean" && readAppearance(appearanceFile())?.dark !== dark) {
-            writeAppearance(appearanceFile(), { dark });
+/** The latest document of each site webContents: a watch started for an earlier one ends at its next answer. */
+const siteDocuments = new WeakMap<WebContents, number>();
+
+const nextSiteDocument = (contents: WebContents): number => {
+    const next = (siteDocuments.get(contents) ?? 0) + 1;
+
+    siteDocuments.set(contents, next);
+
+    return next;
+};
+
+const isCurrentSiteDocument = (contents: WebContents, siteDocument: number): boolean =>
+    !contents.isDestroyed() && siteDocuments.get(contents) === siteDocument && isTrustedUrl(origin, contents.getURL());
+
+/**
+ * Keeps the theme a loaded site page shows, for the next window's pre-paint fill, and follows it while the document
+ * stays: each answer arms the next watch, so a toggle without a reload is kept too. One watch per document; it ends
+ * when the window is destroyed, leaves the site, or commits another document. A failure is logged, never thrown.
+ */
+const followSiteTheme = async (contents: WebContents, siteDocument: number, script: string = PAGE_IS_DARK_SCRIPT): Promise<void> => {
+    try {
+        const dark: unknown = await contents.executeJavaScript(script);
+
+        if (typeof dark !== "boolean" || !isCurrentSiteDocument(contents, siteDocument)) {
+            return;
         }
+
+        saveSiteTheme(dark);
+        followSiteTheme(contents, siteDocument, pageThemeChangeScript(dark));
     } catch (error) {
-        log(`could not keep the page's theme: ${String(error)}`);
+        // A navigation or a closed window ends the pending watch this way: only a live document's failure is news.
+        if (isCurrentSiteDocument(contents, siteDocument)) {
+            log(`could not keep the page's theme: ${String(error)}`);
+        }
     }
 };
 
 /** The reveal of each window that has not been shown yet. A window without an entry has been revealed. */
-const pendingReveals = new WeakMap<BrowserWindow, () => void>();
+const pendingReveals = new WeakMap<BrowserWindow, (focus?: boolean) => void>();
+
+/** Main windows revealed without the focus, saved maximized: they maximize at their first focus, and count as maximized. */
+const maximizeAtFocus = new WeakSet<BrowserWindow>();
 
 /** Windows hidden on purpose before their first reveal: neither the first paint nor the fallback timer shows them. */
 const hiddenBeforeReveal = new WeakSet<BrowserWindow>();
 
 const isRevealed = (win: BrowserWindow): boolean => !pendingReveals.has(win);
 
+/** Windows not revealed yet that are loading the recovery page: they are shown once it is drawn, not empty before. */
+const awaitingRecoveryDraw = new WeakSet<BrowserWindow>();
+
+/**
+ * Whether a reveal nobody asked for may take the focus: not from another window of ours. A dictation ends when its
+ * window loses the focus, and `show` focuses the window it shows on Windows.
+ */
+const mayTakeFocus = (win: BrowserWindow): boolean => {
+    const focused = BrowserWindow.getFocusedWindow();
+
+    return focused === null || focused === win;
+};
+
 /**
  * Windows are created hidden and shown at their first paint, so nobody sees an empty frame. A page that never paints
  * (a hung load, a failure the recovery page replaces) is shown anyway: by the returned function, or after a timeout.
+ * `show` is told whether to focus: always when asked to (`bringForward`), else only if no other window of ours has it.
  */
-const showWhenReady = (win: BrowserWindow, show: () => void = () => win.show()): () => void => {
+const showWhenReady = (win: BrowserWindow, show: (focus: boolean) => void = (focus) => (focus ? win.show() : win.showInactive())): ((focus?: boolean) => void) => {
     let shown = false;
-    const reveal = (): void => {
+    const reveal = (focus?: boolean): void => {
         // Closed (hidden) before it was ever shown: only `bringForward` may show it now.
         if (shown || win.isDestroyed() || hiddenBeforeReveal.has(win)) {
             return;
@@ -349,12 +396,17 @@ const showWhenReady = (win: BrowserWindow, show: () => void = () => win.show()):
         shown = true;
         pendingReveals.delete(win);
         clearTimeout(timer);
-        show();
+        show(focus ?? mayTakeFocus(win));
     };
-    const timer = setTimeout(reveal, SHOW_FALLBACK_MS);
+    // A window waiting for its recovery page has a fallback of its own, from the start of that load.
+    const timer = setTimeout(() => {
+        if (!awaitingRecoveryDraw.has(win)) {
+            reveal();
+        }
+    }, SHOW_FALLBACK_MS);
 
     pendingReveals.set(win, reveal);
-    win.on("ready-to-show", reveal);
+    win.on("ready-to-show", () => reveal());
 
     return reveal;
 };
@@ -369,7 +421,7 @@ const bringForward = (win: BrowserWindow): void => {
 
     if (reveal !== undefined) {
         hiddenBeforeReveal.delete(win);
-        reveal();
+        reveal(true);
 
         return;
     }
@@ -396,7 +448,7 @@ const saveWindowState = (win: BrowserWindow): void => {
     const { height, width, x, y } = win.getNormalBounds();
 
     try {
-        writeWindowState(windowStateFile(), { bounds: { height, width, x, y }, maximized: win.isMaximized() });
+        writeWindowState(windowStateFile(), { bounds: { height, width, x, y }, maximized: win.isMaximized() || maximizeAtFocus.has(win) });
     } catch (error) {
         log(`could not save the window state: ${String(error)}`);
     }
@@ -416,7 +468,7 @@ const siteWebPreferences = (isMain: boolean): WebPreferences => {
 };
 
 /** Popups, navigation and webviews of a site window: same-origin stays in the app, sign-in goes to the system browser, the rest is refused. */
-const guardSiteWindow = (win: BrowserWindow, reveal: () => void): void => {
+const guardSiteWindow = (win: BrowserWindow, reveal: (focus?: boolean) => void): void => {
     const contents = win.webContents;
 
     siteWindows.add(win);
@@ -481,18 +533,38 @@ const guardSiteWindow = (win: BrowserWindow, reveal: () => void): void => {
             menuDelivery.navigationAbandoned(win);
         }
     });
-    contents.on("did-navigate", (_event, url: string) => menuDelivery.navigated(win, isTrustedUrl(origin, url)));
+    contents.on("did-navigate", (_event, url: string) => {
+        // A committed document ends the theme watch of the one before it.
+        nextSiteDocument(contents);
+        menuDelivery.navigated(win, isTrustedUrl(origin, url));
+    });
     contents.on("did-stop-loading", () => menuDelivery.loaded(win));
 
     // A site that cannot be loaded or a renderer that died leaves a blank window with no way forward: show our own page.
+    const recover = async (page: string): Promise<void> => {
+        // `ready-to-show` does not fire again for the recovery page; the timer covers a recovery load that never finishes.
+        if (!isRevealed(win)) {
+            awaitingRecoveryDraw.add(win);
+            setTimeout(() => {
+                awaitingRecoveryDraw.delete(win);
+                reveal();
+            }, SHOW_FALLBACK_MS);
+        }
+
+        try {
+            await contents.loadURL(page);
+        } catch (error) {
+            log(`could not show the recovery page: ${String(error)}`);
+        }
+    };
+
     contents.on("did-fail-load", (_event, errorCode: number, description: string, validatedUrl: string, isMainFrame: boolean) => {
         if (!shouldRecoverFromLoadFailure(errorCode, isMainFrame, validatedUrl)) {
             return;
         }
 
         log(`the page failed to load (${errorCode} ${description})`);
-        reveal();
-        contents.loadURL(recoveryPageUrl("unreachable", newChatUrl(origin).href, `${description} (${errorCode})`));
+        recover(recoveryPageUrl("unreachable", newChatUrl(origin).href, `${description} (${errorCode})`));
     });
     contents.on("render-process-gone", (_event, details: { reason: string }) => {
         if (!shouldRecoverFromRendererGone(details.reason)) {
@@ -500,11 +572,14 @@ const guardSiteWindow = (win: BrowserWindow, reveal: () => void): void => {
         }
 
         log(`the page process ended (${details.reason})`);
-        reveal();
-        contents.loadURL(recoveryPageUrl("crashed", newChatUrl(origin).href, details.reason));
+        recover(recoveryPageUrl("crashed", newChatUrl(origin).href, details.reason));
     });
 
     contents.on("did-finish-load", () => {
+        if (awaitingRecoveryDraw.delete(win)) {
+            reveal();
+        }
+
         // Only the site gets the strip and is asked its theme: the page is ours, and the scripts are ours too.
         if (!isTrustedUrl(origin, contents.getURL())) {
             return;
@@ -514,7 +589,7 @@ const guardSiteWindow = (win: BrowserWindow, reveal: () => void): void => {
             contents.executeJavaScript(TITLE_BAR_SCRIPT);
         }
 
-        rememberSiteTheme(contents);
+        followSiteTheme(contents, nextSiteDocument(contents));
     });
 };
 
@@ -638,8 +713,24 @@ const createMainWindow = (): BrowserWindow => {
         x: saved?.bounds.x,
         y: saved?.bounds.y,
     });
-    // `maximize` shows a hidden window on Windows and Linux, so it waits for the first paint too.
-    const reveal = showWhenReady(win, () => {
+    // `maximize` shows a hidden window on Windows and Linux, so it waits for the first paint too. It also activates the
+    // window on Windows, so a reveal that must leave the focus where it is maximizes when the user comes to the window.
+    const reveal = showWhenReady(win, (focus) => {
+        if (!focus) {
+            win.showInactive();
+
+            if (saved?.maximized) {
+                maximizeAtFocus.add(win);
+                win.once("focus", () => {
+                    if (maximizeAtFocus.delete(win)) {
+                        win.maximize();
+                    }
+                });
+            }
+
+            return;
+        }
+
         if (saved?.maximized) {
             win.maximize();
         }

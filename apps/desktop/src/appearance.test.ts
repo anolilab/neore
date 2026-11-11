@@ -1,8 +1,8 @@
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
 import { accentHex, DARK_BACKGROUND, LIGHT_BACKGROUND, readAppearance, windowBackground, writeAppearance } from "./appearance.js";
 
@@ -29,8 +29,20 @@ describe(windowBackground, () => {
 });
 
 describe(readAppearance, () => {
+    const directories: string[] = [];
+
+    afterEach(() => {
+        for (const directory of directories) {
+            rmSync(directory, { force: true, recursive: true });
+        }
+
+        directories.length = 0;
+    });
+
     it("reads back what was written, and is undefined for no file or a torn one", () => {
         const directory = mkdtempSync(path.join(os.tmpdir(), "neore-appearance-"));
+
+        directories.push(directory);
         const file = path.join(directory, "appearance.json");
 
         expect(readAppearance(file)).toBeUndefined();
