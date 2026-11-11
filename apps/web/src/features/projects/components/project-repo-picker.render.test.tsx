@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { useState } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import ProjectRepoPicker from "./project-repo-picker";
@@ -138,5 +139,49 @@ describe("ProjectRepoPicker", () => {
         expect(project.textContent).toContain("No project");
         await waitFor(() => expect(screen.getByRole("combobox", { name: "Project" }).textContent).toContain("Far"));
         await waitFor(() => expect(screen.getByRole("combobox", { name: "Project repository" }).textContent).toContain("acme/api"));
+    });
+
+    it("drops the project found for a reopened run once its repository is edited before a project is picked", async () => {
+        const client = new QueryClient();
+        const picker = (repoUrl: string) => (
+            <QueryClientProvider client={client}>
+                <ProjectRepoPicker branch="" onPick={vi.fn()} projects={[{ _id: "p_web", title: "Web" }]} repoUrl={repoUrl} />
+            </QueryClientProvider>
+        );
+        const { rerender } = render(picker("acme/api"));
+
+        await waitFor(() => expect(screen.getByRole("combobox", { name: "Project" }).textContent).toContain("Far"));
+
+        rerender(picker("acme/other"));
+
+        await waitFor(() => expect(screen.getByRole("combobox", { name: "Project" }).textContent).toContain("No project"));
+    });
+
+    it("keeps the project found for a reopened run when another of its repositories is picked", async () => {
+        const client = new QueryClient();
+        // The task form writes the picked repository into the run, as `task-form-dialog.tsx` does.
+        const Form = () => {
+            const [repoUrl, setRepoUrl] = useState("acme/api");
+
+            return (
+                <QueryClientProvider client={client}>
+                    <ProjectRepoPicker
+                        branch=""
+                        onPick={(repo: { url: string }) => setRepoUrl(repo.url)}
+                        projects={[{ _id: "p_web", title: "Web" }]}
+                        repoUrl={repoUrl}
+                    />
+                </QueryClientProvider>
+            );
+        };
+
+        render(<Form />);
+        await waitFor(() => expect(screen.getByRole("combobox", { name: "Project" }).textContent).toContain("Far"));
+
+        fireEvent.click(await screen.findByRole("combobox", { name: "Project repository" }));
+        fireEvent.keyDown(await screen.findByRole("option", { name: "acme/web" }), { key: "Enter" });
+
+        await waitFor(() => expect(screen.getByRole("combobox", { name: "Project repository" }).textContent).toContain("acme/web"));
+        expect(screen.getByRole("combobox", { name: "Project" }).textContent).toContain("Far");
     });
 });

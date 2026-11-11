@@ -575,14 +575,26 @@ interface ProjectOwner {
     userId?: string;
 }
 
-/** Writes (or renews) the marker of a project delete in progress, stamped like the project's rows so a sweep reaches it. */
-const markDeleteUnderway = async (context: MutationCtx, projectId: Id<"projects">, { organizationId, userId }: ProjectOwner): Promise<void> => {
-    const marker = await context.db.projectRepositories.findFirst({ consistency: "primary", where: { projectId, url: DELETION_MARKER_URL } });
+/** Renews a delete's marker with a stamp after the one it holds, so each delete's stamp is its own. */
+const renewDeleteMarker = async (context: MutationCtx, marker: Doc<"projectRepositories">): Promise<number> => {
+    const stamp = Math.max(context.now, (marker.deletingAt ?? 0) + 1);
+
+    await context.db.patch("projectRepositories", marker._id, { deletingAt: stamp });
+
+    return stamp;
+};
+
+/**
+ * Writes (or renews) the marker of a project delete in progress, stamped like the project's rows so a sweep reaches it.
+ * Returns this delete's stamp: a renewal always stamps later than the marker held, even within one millisecond, so a
+ * delete that fails takes back only its own stamp (`releaseDeleteMarker`), never one a later delete renewed.
+ */
+const markDeleteUnderway = async (context: MutationCtx, projectId: Id<"projects">, { organizationId, userId }: ProjectOwner): Promise<number> => {
+    const readMarker = async () => await context.db.projectRepositories.findFirst({ consistency: "primary", where: { projectId, url: DELETION_MARKER_URL } });
+    const marker = await readMarker();
 
     if (marker) {
-        await context.db.patch("projectRepositories", marker._id, { deletingAt: context.now });
-
-        return;
+        return await renewDeleteMarker(context, marker);
     }
 
     try {
@@ -594,11 +606,17 @@ const markDeleteUnderway = async (context: MutationCtx, projectId: Id<"projects"
             ...(organizationId && { organizationId }),
             ...(userId && { userId }),
         });
+
+        return context.now;
     } catch (error) {
-        // A second delete of the same project (a double click) wrote the marker first: it serves both.
         if (!isUniqueViolation(error)) {
             throw error;
         }
+
+        // A second delete of the same project (a double click) wrote the marker first: renew it with a stamp of our own.
+        const written = await readMarker();
+
+        return written ? await renewDeleteMarker(context, written) : context.now;
     }
 };
 
@@ -619,9 +637,7 @@ const releaseDeleteMarker = async (context: MutationCtx, projectId: Id<"projects
  * with it. Taking the marker back never hides the delete's own error.
  */
 export const underDeleteMarker = async <T>(context: MutationCtx, projectId: Id<"projects">, owner: ProjectOwner, run: () => Promise<T>): Promise<T> => {
-    await markDeleteUnderway(context, projectId, owner);
-
-    const markedAt = context.now;
+    const markedAt = await markDeleteUnderway(context, projectId, owner);
 
     try {
         return await run();

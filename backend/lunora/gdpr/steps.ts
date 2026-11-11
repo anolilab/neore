@@ -4,7 +4,7 @@ import { PROJECT_SKILL_KEY } from "../usage/activity-logic";
 import { collectAcpSessionPages } from "../acp/gdpr";
 import { collectAllTriggers } from "../triggers/export-pages";
 import { collectAllRepositories } from "../projects/export-pages";
-import { repositoriesReadBudget, triggerReadBudget } from "./read-budget";
+import { projectDetailsReadBudget, repositoriesReadBudget, triggerReadBudget } from "./read-budget";
 import { internal } from "../_generated/internal";
 import type { Doc, Id } from "../_generated/dataModel";
 import { internalAction, internalQuery } from "../_generated/server";
@@ -610,6 +610,8 @@ export const generateExportFile = internalAction
                     userId: args.userId,
                 }),
             repositoriesReadBudget(acpReadBytes),
+            // The rows have a floor, the details none: past what the ACP sessions left they are marked as left out.
+            projectDetailsReadBudget(acpReadBytes),
         );
         const projectRepositories = { projectRepositories: repositories.projectRepositories };
         // The projects read for their details count too: a row is read whole, however little of it is exported.

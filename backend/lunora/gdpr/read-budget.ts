@@ -24,5 +24,11 @@ export const REPOSITORIES_READ_FLOOR_BYTES = 256 * 1024;
  */
 export const repositoriesReadBudget = (used: number): number => Math.max(REPOSITORIES_READ_FLOOR_BYTES, ACTION_READ_BYTES - used - READ_MARGIN_BYTES);
 
+/**
+ * What the repositories' project details may read after `used` bytes, the repository rows included. No floor: the
+ * details can be left out (each marked as such), so they never read past the action's budget.
+ */
+export const projectDetailsReadBudget = (used: number): number => Math.max(0, ACTION_READ_BYTES - used - READ_MARGIN_BYTES);
+
 /** What the trigger history may read after every other section read `used` bytes; 0 leaves it all out, marked as cut. */
 export const triggerReadBudget = (used: number): number => Math.max(0, Math.min(TRIGGER_READ_BYTES, ACTION_READ_BYTES - used - READ_MARGIN_BYTES));

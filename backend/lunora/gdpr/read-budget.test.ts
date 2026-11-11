@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
     ACTION_READ_BYTES,
+    projectDetailsReadBudget,
     REPOSITORIES_READ_FLOOR_BYTES,
     repositoriesReadBudget,
     READ_MARGIN_BYTES,
@@ -24,5 +25,10 @@ describe("export read budget", () => {
     it("gives the repositories what is left after earlier sections, never less than a small floor", () => {
         expect(repositoriesReadBudget(4 * MIB)).toBe(ACTION_READ_BYTES - 4 * MIB - READ_MARGIN_BYTES);
         expect(repositoriesReadBudget(ACTION_READ_BYTES)).toBe(REPOSITORIES_READ_FLOOR_BYTES);
+    });
+
+    it("gives the projects' details no floor: once earlier sections used the budget, they read nothing", () => {
+        expect(projectDetailsReadBudget(4 * MIB)).toBe(ACTION_READ_BYTES - 4 * MIB - READ_MARGIN_BYTES);
+        expect(projectDetailsReadBudget(ACTION_READ_BYTES - READ_MARGIN_BYTES)).toBe(0);
     });
 });

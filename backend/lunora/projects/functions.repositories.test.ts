@@ -20,7 +20,7 @@ import {
     updateProjectRepo,
 } from "./functions";
 import { eraseOrganizationRepositories, sweepOrphanedOrganizationRepositories } from "./gdpr";
-import { MAX_PROJECT_REPOSITORIES } from "./repositories";
+import { DELETION_MARKER_URL, MAX_PROJECT_REPOSITORIES } from "./repositories";
 
 const OWNER = "user-owner";
 const STRANGER = "user-stranger";
@@ -344,6 +344,29 @@ describe("project repositories", () => {
         });
 
         expect(rows.map((row: { organizationId?: string }) => row.organizationId)).toStrictEqual(["org-2"]);
+    });
+
+    it("keeps the marker a later delete renewed in the same millisecond when the earlier delete fails", async () => {
+        const projectId = await projectOf({ userId: OWNER });
+
+        // One mutation context, so both deletes stamp at the same `now`: the second renews while the first still runs.
+        await harness.run(async (ctx: any) => {
+            await expect(
+                underDeleteMarker(ctx, projectId as never, { userId: OWNER }, async () => {
+                    await underDeleteMarker(ctx, projectId as never, { userId: OWNER }, async () => undefined);
+
+                    throw new Error("first delete failed");
+                }),
+            ).rejects.toThrow("first delete failed");
+        });
+
+        const markers = await harness.run(async (ctx: any) => {
+            const { page } = await ctx.db.projectRepositories.findMany({ where: { projectId, url: DELETION_MARKER_URL } });
+
+            return page;
+        });
+
+        expect(markers).toHaveLength(1);
     });
 
     it("moves a project's repositories with it when the project changes organization", async () => {

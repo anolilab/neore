@@ -53,9 +53,13 @@ const ProjectRepoPicker: FC<ProjectRepoPickerProps> = ({ branch, onPick, paging,
     const [pickedProjectId, setProjectId] = useState<string | undefined>(undefined);
     const [openedUrl] = useState(() => repoUrl.trim());
     const { data: openedProject } = useQuery(
-        crpc.projects.functions.findRepoProject.queryOptions(pickedProjectId === undefined && openedUrl ? { url: openedUrl } : skipToken, { live: false }),
+        // Kept after a pick too: a repository picked inside the found project keeps that project, and its title comes from here.
+        crpc.projects.functions.findRepoProject.queryOptions(openedUrl ? { url: openedUrl } : skipToken, { live: false }),
     );
-    const projectId = pickedProjectId ?? openedProject?.projectId ?? NO_PROJECT;
+    // The project found for the run as opened, while its repository field still holds that repository: once edited,
+    // the found project no longer says anything about it.
+    const stillOpened = storedRepoUrl(repoUrl) === storedRepoUrl(openedUrl);
+    const projectId = pickedProjectId ?? (stillOpened ? openedProject?.projectId : undefined) ?? NO_PROJECT;
     // Moves on every pick, every change to the run's repository or branch, and on unmount: a slower answer never
     // preselects over a later pick, over a repository or branch typed in while it was loading, or into a form that no
     // longer shows the picker.
@@ -179,6 +183,8 @@ const ProjectRepoPicker: FC<ProjectRepoPickerProps> = ({ branch, onPick, paging,
                             if (picked) {
                                 // Even a pick of what the fields already hold must win over a project default still loading.
                                 pickGeneration.current += 1;
+                                // A repository picked here is the shown project's, found for a reopened run or not: keep it.
+                                setProjectId(projectId);
                                 onPick(picked);
                             }
                         }}

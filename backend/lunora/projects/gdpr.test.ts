@@ -15,7 +15,11 @@ const B = "user-b";
 
 let harness: ReturnType<typeof lunoraTest>;
 
-const exportFor = async (userId: string, maxBytes = Infinity): Promise<{ detailReads: number; pages: number; projectRepositories: unknown[] }> => {
+const exportFor = async (
+    userId: string,
+    maxBytes = Infinity,
+    detailsMaxBytes = maxBytes,
+): Promise<{ detailReads: number; pages: number; projectRepositories: unknown[] }> => {
     let pages = 0;
     let detailReads = 0;
     const { projectRepositories } = await collectAllRepositories(
@@ -30,6 +34,7 @@ const exportFor = async (userId: string, maxBytes = Infinity): Promise<{ detailR
             return await harness.run((async (ctx: any) => await ctx.runQuery(collectProjectDetailsForExport, { projectIds, userId })) as never);
         },
         maxBytes,
+        detailsMaxBytes,
     );
 
     return { detailReads, pages, projectRepositories };
@@ -99,6 +104,20 @@ describe("project repositories in the GDPR export", () => {
         expect(capped.projectRepositories).toHaveLength(6);
         expect(capped.projectRepositories.filter((row) => "title" in (row as { project: object }).project)).toHaveLength(2);
         expect(capped.projectRepositories.filter((row) => "detailsOmitted" in (row as { project: object }).project)).toHaveLength(4);
+    });
+
+    it("still exports every repository when earlier sections left the details nothing, reading no project", async () => {
+        await harness.run((async (ctx: any) => {
+            const projectId = await ctx.db.insert("projects", { createdAt: 1, title: "Web", userId: A });
+
+            await ctx.db.insert("projectRepositories", { createdAt: 1, projectId, url: "https://github.com/o/web.git", userId: A });
+        }) as never);
+
+        // The rows keep their floor; the details' budget is spent before the first read.
+        const { detailReads, projectRepositories } = await exportFor(A, Infinity, 0);
+
+        expect(detailReads).toBe(0);
+        expect(projectRepositories).toMatchObject([{ project: { detailsOmitted: true }, url: "https://github.com/o/web.git" }]);
     });
 
     it("pages past one page (230 rows over 3 pages of 100) and reports done only after the last", async () => {
