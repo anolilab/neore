@@ -47,7 +47,6 @@ const setup = (options: { answer?: boolean; deviceId?: string | null; hosts?: Ho
         hostMakeDir: vi.fn(async (_id: string, folder: string) => {
             return { created: true, path: folder };
         }),
-        hostProbe: vi.fn(async () => { return {}; }),
         setRoots: vi.fn(),
         settings: () => ({ hosts: state.hosts }) as never,
         sshHosts: () => options.ssh ?? [ssh("build")],
@@ -71,7 +70,8 @@ describe("list", () => {
         ]);
         expect(rows[0]?.id).toBe("desk-1");
         expect(rows[1]?.id).toBe("srv-1");
-        expect(rows[2]?.disabledReason).toContain("Pair this server");
+        expect(rows[2]?.disabledReason).toBeNull();
+        expect(rows[2]?.spec).toEqual({ address: "new.example.com", identityFile: null, name: "new", port: 2200, user: "deploy" });
         expect(rows[3]?.disabledReason).toBe("uses ProxyJump");
     });
 
@@ -103,19 +103,23 @@ describe("connect", () => {
         expect(deps.hostConnect).toHaveBeenCalledWith("srv-1");
     });
 
-    it("passes HostName, User, Port and IdentityFile explicitly for a host that is not paired", async () => {
-        const { deps, machines } = setup({ hosts: [], ssh: [ssh("box", { identityFile: "/k/id", port: 2222 })] });
+    it("refuses to connect a server that is not paired yet, and connects nothing", async () => {
+        const { deps, machines } = setup({ hosts: [], ssh: [ssh("box")] });
 
-        await expect(machines.connect("box")).resolves.toMatchObject({ status: "unpaired" });
-        expect(deps.hostProbe).toHaveBeenCalledWith({ address: "box.example.com", identityFile: "/k/id", name: "box", port: 2222, user: "deploy" });
+        await expect(machines.connect("box")).rejects.toThrow("pair this server first");
+        expect(deps.hostConnect).not.toHaveBeenCalled();
     });
 
-    it("uses the local user and port 22 when the config names neither", async () => {
-        const { deps, machines } = setup({ hosts: [], ssh: [ssh("box", { hostName: null, user: null })] });
+    it("gives an unpaired server the address, port, user and key file its config names", () => {
+        const [, box] = setup({ hosts: [], ssh: [ssh("box", { identityFile: "/k/id", port: 2222 })] }).machines.list();
 
-        await machines.connect("box");
+        expect(box?.spec).toEqual({ address: "box.example.com", identityFile: "/k/id", name: "box", port: 2222, user: "deploy" });
+    });
 
-        expect(deps.hostProbe).toHaveBeenCalledWith({ address: "box", name: "box", port: 22, user: "me" });
+    it("uses the local user and port 22 in the pairing when the config names neither", () => {
+        const [, box] = setup({ hosts: [], ssh: [ssh("box", { hostName: null, user: null })] }).machines.list();
+
+        expect(box?.spec).toEqual({ address: "box", identityFile: null, name: "box", port: 22, user: "me" });
     });
 
     it("refuses an alias the reader did not return and a disabled host, connecting nothing", async () => {
@@ -123,7 +127,7 @@ describe("connect", () => {
 
         await expect(machines.connect("other")).rejects.toThrow("not in ~/.ssh/config");
         await expect(machines.connect("jump")).rejects.toThrow("uses ProxyJump");
-        expect(deps.hostProbe).not.toHaveBeenCalled();
+        expect(deps.hostConnect).not.toHaveBeenCalled();
         expect(deps.hostConnect).not.toHaveBeenCalled();
     });
 });

@@ -8,9 +8,9 @@ import type { Dirent, Stats } from "node:fs";
 import { mkdir, readdir, realpath, stat } from "node:fs/promises";
 import path from "node:path";
 
-import type { AddProjectMachine, CreatedMachineFolder, MachineFolderPage, SharedMachineFolder } from "../add-project-machines.types";
+import type { AddProjectMachine, CreatedMachineFolder, MachineFolderPage, MachineServerSpec, SharedMachineFolder } from "../add-project-machines.types";
 import type { SshHost } from "./ssh-config";
-import type { BrowsePage, CreatedFolder, DeviceStatus, HostSpec, HostView, SettingsView } from "./types";
+import type { BrowsePage, CreatedFolder, DeviceStatus, HostView, SettingsView } from "./types";
 
 /** The same page size and scan cap as the host's `browse`. */
 const PAGE_ENTRIES = 2000;
@@ -23,7 +23,6 @@ export interface MachineDependencies {
     hostBrowse: (deviceId: string, folder: string, after?: string) => Promise<BrowsePage>;
     hostConnect: (deviceId: string) => Promise<unknown>;
     hostMakeDir: (deviceId: string, folder: string) => Promise<CreatedFolder>;
-    hostProbe: (spec: HostSpec) => Promise<unknown>;
     /** Replaces one server's shared folders. */
     setRoots: (deviceId: string, roots: string[]) => void;
     settings: () => SettingsView;
@@ -155,29 +154,34 @@ export const createAddProjectMachines = (dependencies: MachineDependencies): Add
             .settings()
             .hosts.find((host) => host.address === (entry.hostName ?? entry.alias) && host.port === (entry.port ?? 22) && (entry.user === null || host.user === entry.user));
 
+    /** What pairing an ssh host needs: the same address, port and user the transport would use. */
+    const specFor = (entry: SshHost): MachineServerSpec => {
+        return {
+            address: entry.hostName ?? entry.alias,
+            identityFile: entry.identityFile,
+            name: entry.alias,
+            port: entry.port ?? 22,
+            user: entry.user ?? dependencies.username(),
+        };
+    };
+
     const rowFor = (entry: SshHost): AddProjectMachine => {
         const base = { kind: "server" as const, name: entry.alias, sshAlias: entry.alias };
 
         if (entry.disabledReason !== null) {
-            return { ...base, disabledReason: entry.disabledReason, id: null, label: `SSH · ${entry.alias}`, status: "disabled" };
+            return { ...base, disabledReason: entry.disabledReason, id: null, label: `SSH · ${entry.alias}`, spec: null, status: "disabled" };
         }
 
         const paired = pairedFor(entry);
         const waiting = `SSH · ${entry.alias} · not connected yet`;
 
         if (paired === undefined) {
-            return {
-                ...base,
-                disabledReason: "Pair this server in the desktop's device window first.",
-                id: null,
-                label: waiting,
-                status: "unpaired",
-            };
+            return { ...base, disabledReason: null, id: null, label: waiting, spec: specFor(entry), status: "unpaired" };
         }
 
         return paired.connected
-            ? { ...base, disabledReason: null, id: paired.deviceId, label: "Connected", status: "connected" }
-            : { ...base, disabledReason: null, id: paired.deviceId, label: waiting, status: "not-connected" };
+            ? { ...base, disabledReason: null, id: paired.deviceId, label: "Connected", spec: null, status: "connected" }
+            : { ...base, disabledReason: null, id: paired.deviceId, label: waiting, spec: null, status: "not-connected" };
     };
 
     const list = (): AddProjectMachine[] => {
@@ -188,6 +192,7 @@ export const createAddProjectMachines = (dependencies: MachineDependencies): Add
             kind: "this-computer",
             label: "This computer",
             name: "This computer",
+            spec: null,
             sshAlias: null,
             status: own === null ? "disabled" : "this-computer",
         };
@@ -195,20 +200,16 @@ export const createAddProjectMachines = (dependencies: MachineDependencies): Add
         return [computer, ...dependencies.sshHosts().map((entry) => rowFor(entry))];
     };
 
+    /** Connects a paired server again. A server that is not paired yet is paired by the page first, with the shell's prompts. */
     const connect = async (sshAlias: string): Promise<AddProjectMachine> => {
         const entry = entryFor(sshAlias);
         const paired = pairedFor(entry);
 
         if (paired === undefined) {
-            // Not paired with the backend yet: connecting asks to trust its key and for a passphrase, in the local window.
-            await dependencies.hostProbe({
-                address: entry.hostName ?? entry.alias,
-                name: entry.alias,
-                port: entry.port ?? 22,
-                user: entry.user ?? dependencies.username(),
-                ...entry.identityFile !== null && { identityFile: entry.identityFile },
-            });
-        } else if (!paired.connected) {
+            throw new Error("device: pair this server first");
+        }
+
+        if (!paired.connected) {
             await dependencies.hostConnect(paired.deviceId);
         }
 
