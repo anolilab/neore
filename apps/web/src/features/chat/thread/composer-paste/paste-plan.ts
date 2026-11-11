@@ -12,9 +12,10 @@ const LANGUAGE = /class=["']?[^"'>]*(?:language|lang|highlight)-/i;
 // Formatting the Markdown can carry. A `<pre>` alone is not in it: terminals and code editors wrap their text in one.
 const FORMATTING = [
     /<(?:h[1-6]|ul|ol|table|blockquote)[\s>]/i,
-    /<(?:[bis]|strong|em|del|strike|code|kbd)[\s>]/i,
+    /<(?:[bis]|strong|em|del|strike|code|kbd|math|img)[\s>]/i,
     LINK,
     /font-weight\s*:\s*(?:bold|[6-9]00)|font-style\s*:\s*italic/i,
+    /text-decoration[\w-]*\s*:[^;"]*line-through/i,
 ];
 // Paragraphs, lists, headings and tables are a document, even in a monospace block.
 const STRUCTURE = /<(?:h[1-6]|ul|ol|table|blockquote|p)[\s>]/i;
@@ -110,18 +111,20 @@ export const planPaste = (data: Pick<DataTransfer, "getData">, { plainOnly, sele
 
     const vscode = data.getData("vscode-editor-data");
 
-    // A long copy becomes an attachment, which holds the code as copied, without fence lines.
-    if (vscode !== "" && plain.trim().includes("\n") && !isLongPaste(plain)) {
+    // A copy that is long once fenced becomes an attachment, which holds the code as copied, without fence lines.
+    if (vscode !== "" && plain.trim().includes("\n")) {
         const language = vscodeLanguage(vscode);
+        const fenced = language === undefined ? "" : fenceCode(plain, language);
 
-        if (language !== undefined) {
-            return { kind: "text", text: fenceCode(plain, language) };
+        if (fenced !== "" && !isLongPaste(fenced)) {
+            return { kind: "text", text: fenced };
         }
     }
 
     const html = data.getData("text/html");
 
-    if (html.trim() === "") {
+    // A quote chip copied from a composer: the editor rebuilds it from its HTML.
+    if (html.trim() === "" || html.includes("data-quote-chip")) {
         return { kind: "default" };
     }
 
@@ -134,8 +137,8 @@ export const planText = async (plan: Exclude<PastePlan, { kind: "default" }>): P
         return plan.text;
     }
 
-    // A page this big becomes an attachment whatever its form; converting it would only hold up the tab.
-    if (plan.html.length > MAX_CONVERTED_HTML) {
+    // A page this big becomes an attachment whatever its form; converting it would only hold up the tab, unless it is the only text.
+    if (plan.html.length > MAX_CONVERTED_HTML && plan.plain !== "") {
         return plan.plain;
     }
 

@@ -64,6 +64,11 @@ describe("composer paste", () => {
         const long = Array.from({ length: 12 }, (_: unknown, index: number) => `const line${index} = ${index};`).join("\n");
 
         await expect(paste({ ...vscode, "text/plain": long })).resolves.toBe(long);
+
+        // So does one that is long only with its fence lines.
+        const nine = long.split("\n").slice(0, 9).join("\n");
+
+        await expect(paste({ ...vscode, "text/plain": nine })).resolves.toBe(nine);
     });
 
     it("pastes a styled Word paragraph and a terminal copy as their plain text", async () => {
@@ -91,6 +96,26 @@ describe("composer paste", () => {
         await expect(paste({ "text/html": googleDocs, "text/plain": "Ship the beta" }, { plainOnly: true, selectedText: "x" })).resolves.toBe("Ship the beta");
         // An HTML-only clipboard is not handed to the editor's rich paste.
         expect(planPaste(clipboard({ "text/html": googleDocs }), { plainOnly: true, selectedText: "" })).toStrictEqual({ kind: "text", text: "" });
+    });
+
+    it("converts HTML too big to convert when it is the only text, and leaves a composer quote chip to the editor", async () => {
+        await expect(paste({ "text/html": `<p>Hello</p><!--${"x".repeat(1_000_000)}-->` })).resolves.toBe("Hello");
+        expect(
+            planPaste(
+                clipboard({
+                    "text/html": '<div data-quote-chip="" data-message-id="m1"><blockquote><p>quoted</p></blockquote></div>',
+                    "text/plain": "> quoted",
+                }),
+                {
+                    plainOnly: false,
+                    selectedText: "",
+                },
+            ),
+        ).toStrictEqual({ kind: "default" });
+    });
+
+    it("pastes a table whose spans would fill too many cells as its text", () => {
+        expect(htmlToMarkdown(`<table>${"<tr><td colspan=1000>x</td></tr>".repeat(200)}</table>`)).toBe("x\n".repeat(200).trim());
     });
 
     it("measures a huge HTML paste by its Markdown, so it becomes an attachment", async () => {
@@ -138,6 +163,17 @@ describe("composer paste", () => {
             "| A | B | C |\n| --- | --- | --- |\n| ab |  | c |\n| a | b | c |\n|  | b2 | c2 |",
         ],
         [
+            "hidden table rows and cells are left out",
+            '<table><tr><th>A</th><th style="display:none">S</th><th>B</th></tr><tr style="display:none"><td>secret</td></tr><tbody hidden><tr><td>secret</td></tr></tbody><tr><td>a</td><td aria-hidden="true">secret</td><td>b</td></tr></table>',
+            "| A | B |\n| --- | --- |\n| a | b |",
+        ],
+        ["a table keeps its caption", "<table><caption>Prices</caption><tr><th>A</th></tr><tr><td>1</td></tr></table>", "Prices\n\n| A |\n| --- |\n| 1 |"],
+        [
+            "a numbered list keeps a zero start and an item's own number",
+            '<ol start="0"><li>zero</li><li>one</li></ol><ol><li>a</li><li value="5">five</li><li>six</li></ol>',
+            "0. zero\n1. one\n\n1. a\n5. five\n6. six",
+        ],
+        [
             "emoji and formulas drawn as images keep their text",
             '<p>Ship <img alt="🎉"> <img alt=":tada:"> <img class="mwe-math-fallback-image-inline" alt="E=mc^2"> <img alt="A chart"></p>',
             "Ship 🎉 :tada: $E=mc^2$",
@@ -155,6 +191,9 @@ describe("composer paste", () => {
         ["inline code in a sentence", 'Call <code style="font-family:ui-monospace,monospace">foo()</code> now', false],
         ["a lone code block with a language", '<pre class="language-js">x()</pre>', false],
         ["a lone code block with a language in single quotes", "<pre class='language-js'>x()</pre>", false],
+        ["a strikethrough style", '<span style="text-decoration:line-through">old</span> price', false],
+        ["a MathML formula", "<math><mi>x</mi></math>", false],
+        ["an emoji drawn as an image", '<span>Ship <img alt="🎉"></span>', false],
         [
             "a JetBrains copy with bold keywords",
             '<pre style="font-family:\'JetBrains Mono\',monospace"><span style="font-weight:bold">fun</span> x()</pre>',

@@ -239,6 +239,13 @@ describe("ComposerTiptapEditor paste", () => {
         });
 
         expect(ref.current!.isPlainPaste({ timeStamp: keydown.timeStamp + 10 })).toBe(true);
+        // The next paste is a normal one.
+        expect(ref.current!.isPlainPaste({ timeStamp: keydown.timeStamp + 20 })).toBe(false);
+
+        act(() => {
+            element.dispatchEvent(keydown);
+        });
+
         expect(ref.current!.isPlainPaste({ timeStamp: keydown.timeStamp + 5000 })).toBe(false);
     });
 });

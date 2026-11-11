@@ -66,11 +66,15 @@ const WORD_LIST_BULLET = /mso-list\s*:\s*ignore/i;
 const HEADING = /^H[1-6]$/;
 const BLANK_LINES = /\n{3,}/g;
 const PLACEHOLDER = /\0(\d+)\0/g;
+/** Grid cells all tables of a paste may fill: spans multiply a cell, and past this a table is pasted as its text. */
+const MAX_TABLE_CELLS = 100_000;
 
 interface Context {
     /** Fenced code blocks, put back at the end so whitespace clean-up never touches them. */
     code: string[];
     inTable: boolean;
+    /** Grid cells the tables still left to convert may fill. */
+    tableCells: number;
 }
 
 const isSpace = (char: string | undefined): boolean => char === " " || char === "\t";
@@ -220,12 +224,29 @@ const cellText = (cell: Element, context: Context): string =>
         .trim()
         .replaceAll("|", String.raw`\|`);
 
+/** Whether `node` or a parent of it below `root` is hidden. */
+const isHiddenIn = (node: Element, root: Element): boolean => {
+    for (let current: Element | null = node; current && current !== root; current = current.parentElement) {
+        if (isHidden(current)) {
+            return true;
+        }
+    }
+
+    return false;
+};
+
 const table = (element: Element, context: Context): string => {
-    const rows = [...element.querySelectorAll("tr")].filter((row: Element) => row.closest("table") === element);
+    const rows = [...element.querySelectorAll("tr")].filter((row: Element) => row.closest("table") === element && !isHiddenIn(row, element));
+    const caption = element.querySelector(":scope > caption");
+    const title = caption && !isHidden(caption) ? oneLine(children(caption, context)).trim() : "";
+    const texts: string[][] = [];
+    let width = 0;
+    let overflow = false;
     // Rows each column is still covered for by a cell above that spans down: a spanning cell keeps the cells after it under their own headers.
     const covered: number[] = [];
     const cells = rows.map((row: Element) => {
         const line: string[] = [];
+        const rowTexts: string[] = [];
         let column = 0;
         const skipCovered = (): void => {
             while ((covered[column] ?? 0) > 0) {
@@ -236,12 +257,25 @@ const table = (element: Element, context: Context): string => {
         };
 
         for (const cell of row.children) {
-            if (!(cell instanceof HTMLTableCellElement)) {
+            if (!(cell instanceof HTMLTableCellElement) || isHidden(cell)) {
+                continue;
+            }
+
+            rowTexts.push(cellText(cell, context));
+
+            if (overflow) {
                 continue;
             }
 
             skipCovered();
-            line[column] = cellText(cell, context);
+            width = Math.max(width, column + cell.colSpan);
+            overflow = width * rows.length > context.tableCells;
+
+            if (overflow) {
+                continue;
+            }
+
+            line[column] = rowTexts.at(-1) ?? "";
 
             // The DOM clamps both spans; `rowspan="0"` runs to the end.
             for (let offset = 0; offset < cell.colSpan; offset += 1) {
@@ -252,27 +286,38 @@ const table = (element: Element, context: Context): string => {
             column += cell.colSpan;
         }
 
-        while (column < covered.length) {
+        while (!overflow && column < covered.length) {
             skipCovered();
             column += 1;
         }
 
+        texts.push(rowTexts);
+
         return line;
     });
-    let width = 0;
+    const before = title === "" ? "\n\n" : `\n\n${title}\n\n`;
 
-    for (const row of cells) {
-        width = Math.max(width, row.length);
+    if (overflow) {
+        return `${before}${texts.map((row: string[]) => row.filter((text: string) => text !== "").join(" ")).join("\n")}\n\n`;
     }
 
     if (width === 0) {
-        return "";
+        return before;
     }
+
+    context.tableCells -= width * rows.length;
 
     const line = (row: string[]): string => `| ${Array.from({ length: width }, (_: unknown, index: number) => row[index] ?? "").join(" | ")} |`;
     const [head = [], ...body] = cells;
 
-    return `\n\n${[line(head), `|${" --- |".repeat(width)}`, ...body.map((row: string[]) => line(row))].join("\n")}\n\n`;
+    return `${before}${[line(head), `|${" --- |".repeat(width)}`, ...body.map((row: string[]) => line(row))].join("\n")}\n\n`;
+};
+
+/** An `<ol start>` or `<li value>` number Markdown can write: 0 counts. */
+const listNumber = (value: string | null): number | undefined => {
+    const number = Number.parseInt(value ?? "", 10);
+
+    return number >= 0 ? number : undefined;
 };
 
 const list = (element: Element, context: Context): string => {
@@ -288,7 +333,10 @@ const list = (element: Element, context: Context): string => {
 
         const ariaLevel = Number.parseInt(item.getAttribute("aria-level") ?? "1", 10) || 1;
         const level = Math.min(Math.max(ariaLevel, 1), 6);
-        const number = numbers[level - 1] ?? (level === 1 ? Number.parseInt(element.getAttribute("start") ?? "1", 10) || 1 : 1);
+        const number =
+            (ordered ? listNumber(item.getAttribute("value")) : undefined) ??
+            numbers[level - 1] ??
+            (level === 1 ? (listNumber(element.getAttribute("start")) ?? 1) : 1);
 
         numbers.length = level;
         numbers[level - 1] = number + 1;
@@ -499,7 +547,7 @@ function children(node: Node, context: Context): string {
 /** The Markdown for a clipboard `text/html` payload; empty when it holds no text. */
 export const htmlToMarkdown = (html: string): string => {
     const parsed = new DOMParser().parseFromString(html, "text/html");
-    const context: Context = { code: [], inTable: false };
+    const context: Context = { code: [], inTable: false, tableCells: MAX_TABLE_CELLS };
 
     return children(parsed.body, context)
         .split("\n")

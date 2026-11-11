@@ -426,7 +426,14 @@ const ComposerTiptapEditor = ({
             blur: () => editor?.commands.blur(),
             focus: () => editor?.commands.focus(),
             getEditor: () => editor,
-            isPlainPaste: (event: { timeStamp: number }) => event.timeStamp - plainPasteKeyAt.current < PLAIN_PASTE_WINDOW_MS,
+            // One shortcut, one paste: a normal paste right after it keeps its formatting.
+            isPlainPaste: (event: { timeStamp: number }) => {
+                const plain = event.timeStamp - plainPasteKeyAt.current < PLAIN_PASTE_WINDOW_MS;
+
+                plainPasteKeyAt.current = -Infinity;
+
+                return plain;
+            },
             pasteText: (text: string, at?: EditorState) => (editor && !editor.isDestroyed ? pastePlainText(editor, text, at) : false),
         };
     }, [editor]);
