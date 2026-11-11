@@ -2,7 +2,7 @@ import type { Id } from "../../_generated/dataModel";
 import type { MutationCtx } from "../../_generated/server";
 import { patchRow } from "../../lib/patch";
 
-/** Projects one mutation clears; a revoke with more than this continues in a scheduled run (`clearDeviceProjects`). */
+/** Projects one scheduled run clears; a run that clears a full batch schedules the next (`clearDeviceProjects`). */
 export const PROJECT_CLEAR_BATCH = 100;
 
 /**

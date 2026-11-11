@@ -357,9 +357,9 @@ const assertAccountMayPair = async (ctx: QueryCtx, userId: string): Promise<void
 };
 
 /**
- * The rest of a revoked device's project clearing (`revokeDevice`): one batch per run, and a run that cleared a full
- * batch schedules the next. Needs no device row, which the revoke has already deleted. Running it again, or a second
- * run for the same machine, is harmless: a run finds fewer rows or none, and an empty batch schedules nothing.
+ * Clears a revoked device's machine and folder from the owner's projects (scheduled by `revokeDevice`): one batch per
+ * run, and a run that cleared a full batch schedules the next. Needs no device row, which the revoke has already
+ * deleted. Running it again, or a second run for the same machine, is harmless: a run finds fewer rows or none.
  */
 export const clearDeviceProjects = internalMutation
     .input({ machineId: v.id("devices"), userId: v.string() })

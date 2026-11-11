@@ -34,7 +34,6 @@ import {
     MAX_MANIFEST_BYTES,
 } from "./lib/constants";
 import { isAppVersion } from "./lib/app-version";
-import { clearProjectsBatch } from "./lib/clear-projects";
 import { assertRoomForDevice, insertDevice } from "./lib/register";
 import { parseAcpOffers, parseManifestTools } from "./lib/manifest";
 import { filterOwnProjectIds } from "./lib/scope";
@@ -277,17 +276,10 @@ export const revokeDevice = authMutation
             await expireOpenCalls(ctx, revoked._id, "The device was removed");
             await endHostSessionsOfDevice(ctx, revoked._id, ctx.now);
             await deleteShardRoute(ctx, "device", revoked._id as string);
-            // A large set continues in a scheduled run, so one revoke never writes past a mutation's limit. The scheduler
-            // call commits with this mutation. If it cannot be queued, the revoke still goes through, and the remaining
-            // projects keep a machine id that no longer exists; the failure is logged.
-            if (await clearProjectsBatch(ctx, userId, revoked._id)) {
-                try {
-                    await ctx.scheduler.runAfter(0, internal.devices.internal.clearDeviceProjects, { machineId: revoked._id, userId });
-                } catch (error) {
-                    ctx.log.event("devices.clear_projects_not_scheduled", { error: String(error) });
-                }
-            }
-
+            // The projects live in D1, outside this mutation's transaction, so the revoke writes none of them: a failed
+            // device delete would leave them cleared. A scheduled run clears them instead, and the scheduler call commits
+            // with the revoke, so a revoke that fails queues nothing and can be retried.
+            await ctx.scheduler.runAfter(0, internal.devices.internal.clearDeviceProjects, { machineId: revoked._id, userId });
             await ctx.db.delete("devices", revoked._id);
         }
 
