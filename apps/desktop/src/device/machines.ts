@@ -166,7 +166,13 @@ export const createAddProjectMachines = (dependencies: MachineDependencies): Add
         const waiting = `SSH · ${entry.alias} · not connected yet`;
 
         if (paired === undefined) {
-            return { ...base, disabledReason: null, id: null, label: waiting, status: "unpaired" };
+            return {
+                ...base,
+                disabledReason: "Pair this server in the desktop's device window first.",
+                id: null,
+                label: waiting,
+                status: "unpaired",
+            };
         }
 
         return paired.connected
@@ -238,6 +244,10 @@ export const createAddProjectMachines = (dependencies: MachineDependencies): Add
 
             if (existing !== null && !existing.isDirectory()) {
                 throw new Error("device: that path is a file");
+            }
+
+            if (existing === null && !await ask({ detail: `Folder: ${JSON.stringify(folder)}`, message: "Create a new folder on this computer?" })) {
+                throw declined();
             }
 
             await mkdir(folder, { recursive: true });

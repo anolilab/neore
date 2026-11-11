@@ -14,7 +14,7 @@ export interface AddProjectMachine {
     /** The device id: this computer's own, or the paired server's. Null for an ssh host not paired with this computer yet. */
     id: string | null;
     kind: MachineKind;
-    /** "This computer", "Connected", or "SSH · &lt;alias> · not connected yet". */
+    /** "This computer", "Connected", or "SSH · &lt;alias&gt; · not connected yet". */
     label: string;
     name: string;
     /** The `Host` alias in ~/.ssh/config; null for this computer. */
