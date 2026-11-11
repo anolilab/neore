@@ -32,10 +32,28 @@ afterEach(() => {
 const seedThread = async (extra: Record<string, unknown> = {}) =>
     (await harness.run(async (ctx: any) => await ctx.db.insert("threads", { title: "Inbox", userId: OWNER, ...extra }))) as string;
 
-const write = async (threadId: string, userId = OWNER) =>
-    await harness.run(
+/** An assistant reply row on the thread, at `order`, as a run saves it. Returns its id. */
+const seedReply = async (threadId: string, order: number) =>
+    (await harness.run(
         async (ctx: any) =>
-            await appendLoopStopNoticeRow(ctx, { notice: "I stopped this reply.", replyRowId: "missing-row", threadId: threadId as never, userId }),
+            await ctx.db.insert("messages", {
+                message: { content: [{ text: "Here is the answer.", type: "text" }], role: "assistant" },
+                order,
+                status: "success",
+                stepOrder: 0,
+                text: "Here is the answer.",
+                threadId,
+                userId: OWNER,
+            }),
+    )) as string;
+
+/** Makes `replyId` the thread's active leaf, as a reply that landed on the active path does. */
+const makeLeaf = async (threadId: string, replyId: string) =>
+    await harness.run(async (ctx: any) => await ctx.db.patch("threads", threadId, { activeLeafMessageId: replyId }));
+
+const write = async (threadId: string, replyRowId: string, userId = OWNER) =>
+    await harness.run(
+        async (ctx: any) => await appendLoopStopNoticeRow(ctx, { notice: "I stopped this reply.", replyRowId, threadId: threadId as never, userId }),
     );
 
 const assistantRowsOf = async (threadId: string) =>
@@ -46,31 +64,52 @@ const assistantRowsOf = async (threadId: string) =>
     });
 
 describe("writing the closing line of a stopped loop", () => {
-    it("writes nothing into a locked thread", async () => {
-        const threadId = await seedThread({ lockedAt: 1 });
-
-        expect(await write(threadId)).toBe(false);
-        expect(await assistantRowsOf(threadId)).toStrictEqual([]);
-    });
-
-    it("writes nothing into a deleted thread", async () => {
-        const threadId = await seedThread({ deleted: true });
-
-        expect(await write(threadId)).toBe(false);
-        expect(await assistantRowsOf(threadId)).toStrictEqual([]);
-    });
-
-    it("writes nothing into another user's thread", async () => {
+    it("writes the line under the last reply of a thread that never branched", async () => {
         const threadId = await seedThread();
+        const reply = await seedReply(threadId, 1);
 
-        expect(await write(threadId, STRANGER)).toBe(false);
-        expect(await assistantRowsOf(threadId)).toStrictEqual([]);
+        expect(await write(threadId, reply)).toBe(true);
+        expect(await assistantRowsOf(threadId)).toHaveLength(2);
+    });
+
+    it("writes nothing into a locked thread, whose reply is the active leaf", async () => {
+        const threadId = await seedThread({ lockedAt: 1 });
+        const reply = await seedReply(threadId, 1);
+
+        await makeLeaf(threadId, reply);
+
+        expect(await write(threadId, reply)).toBe(false);
+        expect(await assistantRowsOf(threadId)).toHaveLength(1);
+    });
+
+    it("writes nothing into a deleted thread, whose reply is the active leaf", async () => {
+        const threadId = await seedThread({ deleted: true });
+        const reply = await seedReply(threadId, 1);
+
+        await makeLeaf(threadId, reply);
+
+        expect(await write(threadId, reply)).toBe(false);
+        expect(await assistantRowsOf(threadId)).toHaveLength(1);
+    });
+
+    it("writes nothing into another user's thread, whose reply is the active leaf", async () => {
+        const threadId = await seedThread();
+        const reply = await seedReply(threadId, 1);
+
+        await makeLeaf(threadId, reply);
+
+        expect(await write(threadId, reply, STRANGER)).toBe(false);
+        expect(await assistantRowsOf(threadId)).toHaveLength(1);
     });
 
     it("writes nothing when the reply is not the thread's active leaf", async () => {
         const threadId = await seedThread();
+        const first = await seedReply(threadId, 1);
+        const second = await seedReply(threadId, 2);
 
-        expect(await write(threadId)).toBe(false);
-        expect(await assistantRowsOf(threadId)).toStrictEqual([]);
+        await makeLeaf(threadId, second);
+
+        expect(await write(threadId, first)).toBe(false);
+        expect(await assistantRowsOf(threadId)).toHaveLength(2);
     });
 });

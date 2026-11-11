@@ -19,7 +19,7 @@ export const registerApprovalActions = async (): Promise<void> => {
 };
 
 /** Answers approve and deny taps on this device's approval alerts. The caller calls `remove` when the account signs out. */
-export const listenForApprovalTaps = (answer: (value: ApprovalAnswer) => Promise<void>): ApprovalTapListener =>
+export const listenForApprovalTaps = (answer: (value: ApprovalAnswer) => Promise<boolean | void>): ApprovalTapListener =>
     attachApprovalTapListener(
         {
             addListener: (listener) => addNotificationResponseReceivedListener((response: NotificationResponse) => listener(response)),

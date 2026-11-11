@@ -11,6 +11,7 @@ import { internal } from "../_generated/internal";
 import { type ActionCtx, internalMutation, type MutationCtx } from "../_generated/server";
 import { resolveLeafRow } from "../agent/branch-rows";
 import { addMessagesHandler } from "../agent/messages";
+import { STORAGE_ORDER_DESC } from "../agent/thread-summaries";
 import { streamLogger } from "../lib/logger";
 import { isThreadLocked } from "../lib/thread-lock";
 import { type LoopFinding, loopNoticeText } from "./lib/repeated-call-guard";
@@ -65,7 +66,13 @@ export const appendLoopStopNoticeRow = async (
         return false;
     }
 
-    const leaf = thread.activeLeafMessageId ? await resolveLeafRow(ctx, thread._id, thread.activeLeafMessageId) : null;
+    // A thread that never branched has no stored leaf: its last row by storage order is the one the linear read path shows.
+    const leaf = thread.activeLeafMessageId
+        ? await resolveLeafRow(ctx, thread._id, thread.activeLeafMessageId)
+        : await ctx.db.messages.findFirst({
+              orderBy: [...STORAGE_ORDER_DESC],
+              where: { threadId: thread._id },
+          });
 
     // The reply's last row must still be the active leaf: otherwise another message has moved the branch, and the notice would
     // land under the wrong reply.

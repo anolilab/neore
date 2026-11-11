@@ -1,7 +1,7 @@
 import { api } from "@neore/backend/api";
 import type { Id } from "@neore/backend/dataModel";
 import { addPushTokenListener } from "expo-notifications";
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import { AppState } from "react-native";
 
 import { useAuth } from "../auth/auth-state";
@@ -10,13 +10,17 @@ import { listenForApprovalTaps } from "./approval-actions";
 import { backendPushServer, configurePhoneNotifications, deviceLocale, devicePushPlatform, pushRegistrations } from "./phone-push";
 import { createForegroundGate, createPromptOffer, createTokenChangeFilter, registerPhoneForPush } from "./push-registration";
 
-/** Push is best-effort: a failure is logged (never the token) and never breaks the screen that asked. */
-const quietly = async (message: string, work: () => Promise<unknown>): Promise<void> => {
+/**
+ * Runs the notification setup, the approval category included, before a registration. Push is best-effort: a failed step is logged
+ * and retried by the next attempt (a message, the app coming back to the front, a token rotation), but it never stops the
+ * registration, so the phone keeps its token and its ordinary alerts even while the approve and deny actions are missing.
+ */
+const setUp = async (): Promise<void> => {
     try {
-        await work();
+        await configurePhoneNotifications();
     } catch (error) {
         // eslint-disable-next-line no-console -- no logger in the app; a failed setup must not be silent
-        console.warn(message, error);
+        console.warn("Could not set up notifications.", error);
     }
 };
 
@@ -80,6 +84,9 @@ export const offerPhonePush = async (userId: string): Promise<void> => {
     }
 
     const { account } = signedIn;
+
+    await setUp();
+
     const { didRun } = await register(true, () => account?.isCurrent === true);
 
     if (!didRun) {
@@ -96,12 +103,10 @@ export const usePhonePush = (): void => {
     const { hasToken, status, user } = useAuth();
     const userId = status === "signed-in" && hasToken ? user?.id : undefined;
 
-    // The setup, the approval category included, that a phone's first registration waits for: an alert that arrives as the
-    // phone registers must already carry its approve and deny actions.
-    const setup = useRef<Promise<void>>(Promise.resolve());
-
+    // The setup, the approval category included, runs before any registration: an alert that arrives as the phone registers
+    // must already carry its approve and deny actions.
     useEffect(() => {
-        setup.current = quietly("Could not set up notifications.", configurePhoneNotifications);
+        setUp();
     }, []);
 
     useEffect(() => {
@@ -111,9 +116,10 @@ export const usePhonePush = (): void => {
 
         // A tap on an approval alert answers it as the signed-in account, through the procedure the chat's own card uses.
         // Offline it is refused, never queued (`onlineOnly`). Once that account's sign-out has begun, no tap is answered.
+        // Returns `false` when sign-out began first: that tap is not answered, so it is not recorded and a new tap can answer it.
         const subscription = listenForApprovalTaps(async (answer) => {
             if (signedIn.account?.isCurrent !== true) {
-                return;
+                return false;
             }
 
             await getClient().mutation(
@@ -121,6 +127,8 @@ export const usePhonePush = (): void => {
                 { approvalId: answer.approvalId, decision: answer.decision, threadId: answer.threadId as Id<"threads"> },
                 { onlineOnly: true },
             );
+
+            return true;
         });
 
         return () => {
@@ -139,6 +147,8 @@ export const usePhonePush = (): void => {
         const foreground = createForegroundGate(FOREGROUND_REGISTER_INTERVAL_MS);
         const isRotation = createTokenChangeFilter();
         const registerSilently = async (): Promise<boolean> => {
+            await setUp();
+
             const { isRegistered } = await register(false, isCurrent);
 
             return isRegistered;
@@ -149,11 +159,7 @@ export const usePhonePush = (): void => {
         pushRegistrations.open();
         signedIn.account = account;
         promptOffer.begin(userId);
-        foreground.run(async () => {
-            await setup.current;
-
-            return await registerSilently();
-        });
+        foreground.run(registerSilently);
 
         const tokenSubscription = addPushTokenListener(({ data }) => {
             if (typeof data === "string" && isRotation(data)) {
@@ -164,8 +170,6 @@ export const usePhonePush = (): void => {
             if (state !== "active") {
                 return;
             }
-
-            quietly("Could not set up notifications.", configurePhoneNotifications);
 
             foreground.run(registerSilently);
         });

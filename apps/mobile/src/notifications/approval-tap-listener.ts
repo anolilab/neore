@@ -54,7 +54,7 @@ const tapKey = (response: TapResponse): string => `${response.notification.reque
  */
 export const attachApprovalTapListener = (
     source: TapSource,
-    answer: (value: ApprovalAnswer) => Promise<void>,
+    answer: (value: ApprovalAnswer) => Promise<boolean | void>,
     answered: Set<string> = answeredTaps,
     replayed: Set<string> = replayedLaunches,
 ): ApprovalTapListener => {

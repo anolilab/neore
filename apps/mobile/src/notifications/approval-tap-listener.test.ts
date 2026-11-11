@@ -107,6 +107,23 @@ describe("attachApprovalTapListener", () => {
         expect(answer).toHaveBeenCalledTimes(2);
     });
 
+    it("leaves a skipped tap unanswered, so a later delivery of it is answered and then recorded", async () => {
+        const answered = new Set<string>();
+        const replayed = new Set<string>();
+        const answer = vi
+            .fn<(value: unknown) => Promise<boolean | void>>()
+            .mockResolvedValueOnce(false)
+            .mockResolvedValue(true);
+        const source = fakeSource(null);
+
+        attachApprovalTapListener(source, answer as never, answered, replayed);
+        await source.fire(tap("n5", "approve"));
+        await source.fire(tap("n5", "approve"));
+        await source.fire(tap("n5", "approve"));
+
+        expect(answer).toHaveBeenCalledTimes(2);
+    });
+
     it("does not let a default tap block a later approve on the same notification", async () => {
         const answer = vi.fn(async () => undefined);
         const source = fakeSource(tap("n4", "expo.modules.notifications.actions.DEFAULT"));

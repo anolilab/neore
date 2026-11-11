@@ -75,12 +75,14 @@ const insertRequest = async (approvalId: string, toolName: string) => {
 // Run as the owner's shard, where a notification for the owner is written here rather than handed to another shard.
 const sweep = async (now: number) => await harness.run(async (ctx: any) => await runInShard("u1", () => remindPendingApprovals(ctx, now)));
 
-const approvalPushes = async () =>
+const pushesOfType = async (type: string) =>
     await harness.run(async (ctx: any) => {
         const rows = await ctx.db.query("notifications").collect();
 
-        return rows.filter((row: { type: string }) => row.type === "tool_approval");
+        return rows.filter((row: { type: string }) => row.type === type);
     });
+
+const approvalPushes = async () => await pushesOfType("tool_approval");
 
 const reminderOf = async (approvalId: string) =>
     await harness.run(async (ctx: any) => {
@@ -221,23 +223,14 @@ describe("the four-hour approval reminder", () => {
         expect(await approvalPushes()).toHaveLength(0);
     });
 
-    it("does not push a reminder for a question, which is answered in the chat, and still marks it", async () => {
-        await insertThread();
-        await insertRequest("q1", "askUser");
-        await insertRun({ approvalId: "q1", createdAt: DUE, threadId });
-
-        expect(await sweep(NOW)).toBe(1);
-        expect(await approvalPushes()).toHaveLength(0);
-        expect(await reminderOf("q1")).toBe(NOW);
-    });
-
-    it("does not push a reminder for a secret request", async () => {
+    it("pushes a generic reminder for a secret request, and no approval push", async () => {
         await insertThread();
         await insertRequest("s1", "requestSecret");
         await insertRun({ approvalId: "s1", createdAt: DUE, threadId });
 
         expect(await sweep(NOW)).toBe(1);
         expect(await approvalPushes()).toHaveLength(0);
+        expect(await pushesOfType("secret_request")).toHaveLength(1);
     });
 
     it("pushes for an approval that follows a question in the same pause, and marks both rows", async () => {
@@ -273,5 +266,26 @@ describe("the four-hour approval reminder", () => {
         expect(await sweep(NOW)).toBe(150);
         expect(await reminderOf("b149")).toBe(NOW);
         expect(await approvalPushes()).toHaveLength(1);
+    });
+
+    it("decides a pause from all its requests when they straddle a page boundary: one approval push, no question push", async () => {
+        await insertThread();
+
+        // 999 older rows fill the first page, so the question is that page's last row and the approval opens the second page.
+        for (let index = 0; index < 999; index += 1) {
+            await insertRun({ approvalId: `f${index}`, createdAt: DUE - MINUTE, threadId });
+        }
+
+        await insertRequest("q1", "askUser");
+        await insertRequest("a1", "webSearch");
+        await insertRun({ approvalId: "q1", createdAt: DUE, pauseId: "pause-1", threadId });
+        await insertRun({ approvalId: "a1", createdAt: DUE, pauseId: "pause-1", threadId });
+
+        await sweep(NOW);
+
+        expect(await approvalPushes()).toHaveLength(1);
+        expect(await pushesOfType("ask_user")).toHaveLength(0);
+        expect(await reminderOf("q1")).toBe(NOW);
+        expect(await reminderOf("a1")).toBe(NOW);
     });
 });

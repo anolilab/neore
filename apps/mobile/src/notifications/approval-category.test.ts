@@ -17,8 +17,16 @@ describe("registerApprovalActionsWith", () => {
         expect(calls).toHaveLength(1);
         expect(calls[0]?.identifier).toBe(TOOL_APPROVAL_CATEGORY);
         expect(calls[0]?.actions).toStrictEqual([
-            { buttonTitle: "Approve", identifier: APPROVE_ACTION, options: { opensAppToForeground: false } },
-            { buttonTitle: "Deny", identifier: DENY_ACTION, options: { isDestructive: true, opensAppToForeground: false } },
+            {
+                buttonTitle: "Approve",
+                identifier: APPROVE_ACTION,
+                options: { isAuthenticationRequired: true, opensAppToForeground: false },
+            },
+            {
+                buttonTitle: "Deny",
+                identifier: DENY_ACTION,
+                options: { isAuthenticationRequired: true, isDestructive: true, opensAppToForeground: false },
+            },
         ]);
     });
 
