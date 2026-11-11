@@ -1055,7 +1055,9 @@ export interface InternalApiTypes {
         };
         update_apply: {
             beginUpdate: FunctionReference<"mutation", { installId: string; targetVersion: string; userId: string }, number>;
+            detachChild: FunctionReference<"mutation", { entryKey: string; generation: number; installId: string; userId: string }, null>;
             finishUpdate: FunctionReference<"mutation", { contentHash: string; generation: number; installId: string; version: string }, null>;
+            removeChild: FunctionReference<"mutation", { entryKey: string; generation: number; installId: string; userId: string }, null>;
             updateSkillChild: FunctionReference<"mutation", { category?: string; config?: unknown; contentHash: string; description: string; entryKey: string; generation: number; icon?: string; installId: string; instructions: string; name: string; tags?: Array<string>; variables?: unknown; version?: string; userId: string }, null>;
             updateTriggerChild: FunctionReference<"mutation", { contentHash: string; cronExpression?: string; description?: string; entryKey: string; generation: number; inputTemplate?: string; installId: string; model: string; name: string; searchMode?: string; systemPrompt?: string; timezone?: string; userId: string }, null>;
         };
@@ -2405,7 +2407,9 @@ export const internal: InternalApiTypes = {
         },
         update_apply: {
             beginUpdate: { __lunoraRef: "plugins_update_apply:beginUpdate" },
+            detachChild: { __lunoraRef: "plugins_update_apply:detachChild" },
             finishUpdate: { __lunoraRef: "plugins_update_apply:finishUpdate" },
+            removeChild: { __lunoraRef: "plugins_update_apply:removeChild" },
             updateSkillChild: { __lunoraRef: "plugins_update_apply:updateSkillChild" },
             updateTriggerChild: { __lunoraRef: "plugins_update_apply:updateTriggerChild" },
         },
