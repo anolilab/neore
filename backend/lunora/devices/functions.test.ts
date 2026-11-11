@@ -1087,6 +1087,10 @@ describe("releaseDeviceCall", () => {
 
 describe("revokeDevice", () => {
     // The harness does not dispatch scheduled jobs, so a test runs the clearing body with the job's own args.
+    const remainingOn = async (deviceId: string) =>
+        (await harness.run(
+            async (ctx: any) => (await ctx.db.projects.findMany({ limit: 1000, where: { machineId: deviceId, userId: ownerId } })).page.length,
+        )) as number;
     const clearScheduled = async (args: unknown) => await harness.run(async (ctx: any) => await ctx.runMutation(internals.clearDeviceProjects, args as never));
 
     it("clears the machine and folder of the owner's projects on the device, in a scheduled run, and leaves other users' projects alone", async () => {
@@ -1120,18 +1124,13 @@ describe("revokeDevice", () => {
             await insertProject(ownerId, { machineId: deviceId, path: `/home/me/app-${index}` });
         }
 
-        const remaining = async () =>
-            (await harness.run(
-                async (ctx: any) => (await ctx.db.projects.findMany({ limit: 1000, where: { machineId: deviceId, userId: ownerId } })).page.length,
-            )) as number;
-
         await as(ownerId).mutation(functions.revokeDevice as never, { deviceId } as never);
 
         for (let run = 1; run <= 3; run += 1) {
             await clearScheduled(harness.scheduler.list()[run - 1]?.args);
         }
 
-        expect(await remaining()).toBe(0);
+        expect(await remainingOn(deviceId)).toBe(0);
         expect(harness.scheduler.list()).toHaveLength(3);
     });
 
@@ -1142,24 +1141,19 @@ describe("revokeDevice", () => {
             await insertProject(ownerId, { machineId: deviceId, path: `/home/me/app-${index}` });
         }
 
-        const remaining = async () =>
-            (await harness.run(
-                async (ctx: any) => (await ctx.db.projects.findMany({ limit: 1000, where: { machineId: deviceId, userId: ownerId } })).page.length,
-            )) as number;
-
         await as(ownerId).mutation(functions.revokeDevice as never, { deviceId } as never);
 
-        expect(await remaining()).toBe(PROJECT_CLEAR_BATCH + 1);
+        expect(await remainingOn(deviceId)).toBe(PROJECT_CLEAR_BATCH + 1);
         expect(harness.scheduler.list()).toHaveLength(1);
 
         await clearScheduled(harness.scheduler.list()[0]?.args);
 
-        expect(await remaining()).toBe(1);
+        expect(await remainingOn(deviceId)).toBe(1);
         expect(harness.scheduler.list()).toHaveLength(2);
 
         await clearScheduled(harness.scheduler.list()[1]?.args);
 
-        expect(await remaining()).toBe(0);
+        expect(await remainingOn(deviceId)).toBe(0);
         expect(harness.scheduler.list()).toHaveLength(2);
     });
 
