@@ -20,8 +20,11 @@
   servers. CLI flags are cited in `buildAgentCommand`; re-check them when
   bumping `npmVersion`. E2B itself is unit-tested against a fake only.
 - **Project repositories** — a project lists the repositories its runs pick
-  from, one `projectRepositories` row each, written only by the per-row
-  procedures in `projects/functions.ts` (never by a project edit or pin):
+  from, one `projectRepositories` row each, added and edited only by the
+  per-row procedures in `projects/functions.ts`; a project delete and the
+  erasures in `projects/gdpr.ts` remove rows. Each row copies its project's
+  `organizationId`: a move re-stamps it (`updateProject`), and an organization
+  erase or the daily sweep re-stamps a row whose project has moved on.
   `url` is `parseRepoUrl(..).cloneUrl`, so it compares equal to a run's
   `repoUrl`; the default is the row with the latest `defaultAt`, else the
   first (`withDefault`). The table is `.global()` (D1, no transactions), so an

@@ -16,8 +16,10 @@ vi.mock("@lingui/react/macro", () => {
     };
 });
 
-const { repositories } = vi.hoisted(() => {
+// `gate.open` holds every repository-list answer back until it resolves.
+const { gate, repositories } = vi.hoisted(() => {
     return {
+        gate: { open: Promise.resolve() },
         repositories: [
             { id: "repo_a", isDefault: false, url: "https://github.com/acme/web.git" },
             { defaultBranch: "develop", id: "repo_b", isDefault: true, url: "https://github.com/acme/api.git" },
@@ -46,7 +48,16 @@ vi.mock("@/lib/lunora/crpc", async () => {
                         },
                         listProjectRepos: {
                             queryOptions: (args: unknown) =>
-                                args === skip ? { queryFn: skip, queryKey: ["repos"] } : { queryFn: async () => repositories, queryKey: ["repos", args] },
+                                args === skip
+                                    ? { queryFn: skip, queryKey: ["repos"] }
+                                    : {
+                                          queryFn: async () => {
+                                              await gate.open;
+
+                                              return repositories;
+                                          },
+                                          queryKey: ["repos", args],
+                                      },
                         },
                     },
                 },
@@ -56,6 +67,7 @@ vi.mock("@/lib/lunora/crpc", async () => {
 });
 
 beforeEach(() => {
+    gate.open = Promise.resolve();
     // The popup positions itself with these; jsdom lacks getAnimations, and the setup's observer mock (re-installed before every test) is not constructible.
     Element.prototype.getAnimations = () => [];
     vi.stubGlobal(
@@ -84,6 +96,34 @@ describe("ProjectRepoPicker", () => {
         fireEvent.keyDown(await screen.findByRole("option", { name: "Web" }), { key: "Enter" });
 
         await waitFor(() => expect(onPick).toHaveBeenCalledWith(repositories[1]));
+    });
+
+    it("never preselects into a form that no longer shows the picker", async () => {
+        let release: () => void = () => undefined;
+
+        // eslint-disable-next-line unicorn/prefer-promise-with-resolvers
+        gate.open = new Promise<void>((resolve) => {
+            release = resolve;
+        });
+
+        const onPick = vi.fn();
+        const { unmount } = render(
+            <QueryClientProvider client={new QueryClient()}>
+                <ProjectRepoPicker branch="" onPick={onPick} projects={[{ _id: "p_web", title: "Web" }]} repoUrl="" />
+            </QueryClientProvider>,
+        );
+
+        fireEvent.click(screen.getByRole("combobox", { name: "Project" }));
+        fireEvent.keyDown(await screen.findByRole("option", { name: "Web" }), { key: "Enter" });
+        // The run's assignee changes before the project's repositories arrive: the picker is gone.
+        unmount();
+        release();
+        await gate.open;
+        await new Promise((resolve) => {
+            setTimeout(resolve, 0);
+        });
+
+        expect(onPick).not.toHaveBeenCalled();
     });
 
     it("reopened on a saved run, shows the project that lists its repository, typed in short form", async () => {

@@ -56,13 +56,22 @@ const ProjectRepoPicker: FC<ProjectRepoPickerProps> = ({ branch, onPick, paging,
         crpc.projects.functions.findRepoProject.queryOptions(pickedProjectId === undefined && openedUrl ? { url: openedUrl } : skipToken, { live: false }),
     );
     const projectId = pickedProjectId ?? openedProject?.projectId ?? NO_PROJECT;
-    // Moves on every pick and every change to the run's repository or branch: a slower answer never preselects over a
-    // later pick, or over a repository or branch typed in while it was loading.
+    // Moves on every pick, every change to the run's repository or branch, and on unmount: a slower answer never
+    // preselects over a later pick, over a repository or branch typed in while it was loading, or into a form that no
+    // longer shows the picker.
     const pickGeneration = useRef(0);
 
     useEffect(() => {
         pickGeneration.current += 1;
     }, [repoUrl, branch]);
+
+    useEffect(() => {
+        const generation = pickGeneration;
+
+        return () => {
+            generation.current += 1;
+        };
+    }, []);
     const listFor = (id: string) => crpc.projects.functions.listProjectRepos.queryOptions({ projectId: id as Id<"projects"> });
     const {
         data: repositories = [],
@@ -142,7 +151,7 @@ const ProjectRepoPicker: FC<ProjectRepoPickerProps> = ({ branch, onPick, paging,
                     <Button
                         aria-busy={paging.isLoadingMore}
                         aria-disabled={paging.isLoadingMore}
-                        onClick={paging.loadMore}
+                        onClick={paging.isLoadingMore ? undefined : paging.loadMore}
                         size="sm"
                         type="button"
                         variant="ghost"
@@ -168,6 +177,8 @@ const ProjectRepoPicker: FC<ProjectRepoPickerProps> = ({ branch, onPick, paging,
                             const picked = repositories.find((repo) => repo.id === value);
 
                             if (picked) {
+                                // Even a pick of what the fields already hold must win over a project default still loading.
+                                pickGeneration.current += 1;
                                 onPick(picked);
                             }
                         }}
