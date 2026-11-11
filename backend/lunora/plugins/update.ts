@@ -13,8 +13,9 @@ import { authAction, rateLimit } from "../lib/crpc";
 import { MAX_LENGTH } from "../lib/validators";
 import { planFor } from "../skills/bundle";
 import { assertNoToolConfig, checkPluginFile } from "./install-action";
-import { entryHash, skillContent, skillRowHash, triggerRowHash } from "./entry-hash";
-import { diffUpdate, isDowngrade, markerFor } from "./logic";
+import { entryHash, skillContent } from "./entry-hash";
+import { liveHashOf } from "./live-hash";
+import { diffUpdate, isDowngrade } from "./logic";
 import type { UpdateAction } from "./logic";
 import { vPluginItemKind } from "./validators";
 
@@ -61,20 +62,7 @@ export const loadInstalledForUpdate = internalQuery
         const children: Array<{ contentHash: string; currentHash: string; entryKey: string; kind: "group" | "skill" | "trigger" }> = [];
 
         for (const link of page) {
-            let currentHash = "unknown";
-
-            if (link.kind === "skill") {
-                const skill = await ctx.db.skills.findFirst({ where: { pluginMarker: markerFor(installId, link.entryKey) } });
-
-                currentHash = skill ? await skillRowHash(skill) : "missing";
-            } else if (link.kind === "trigger") {
-                const trigger = await ctx.db
-                    .query("triggers")
-                    .withIndex("by_plugin_marker", (q) => q.eq("pluginMarker", markerFor(installId, link.entryKey)))
-                    .first();
-
-                currentHash = trigger ? await triggerRowHash(trigger) : "missing";
-            }
+            const currentHash = await liveHashOf(ctx, installId, link);
 
             children.push({ contentHash: link.contentHash, currentHash, entryKey: link.entryKey, kind: link.kind });
         }
