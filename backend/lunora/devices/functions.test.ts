@@ -1113,6 +1113,28 @@ describe("revokeDevice", () => {
         expect(harness.scheduler.list()).toHaveLength(1);
     });
 
+    it("keeps scheduling full batches until a run clears a partial one", async () => {
+        const { deviceId } = await pairedDevice(ownerId);
+
+        for (let index = 0; index < PROJECT_CLEAR_BATCH * 2 + 1; index += 1) {
+            await insertProject(ownerId, { machineId: deviceId, path: `/home/me/app-${index}` });
+        }
+
+        const remaining = async () =>
+            (await harness.run(
+                async (ctx: any) => (await ctx.db.projects.findMany({ limit: 1000, where: { machineId: deviceId, userId: ownerId } })).page.length,
+            )) as number;
+
+        await as(ownerId).mutation(functions.revokeDevice as never, { deviceId } as never);
+
+        for (let run = 1; run <= 3; run += 1) {
+            await clearScheduled(harness.scheduler.list()[run - 1]?.args);
+        }
+
+        expect(await remaining()).toBe(0);
+        expect(harness.scheduler.list()).toHaveLength(3);
+    });
+
     it("clears a large set one batch per scheduled run, and a run that clears a partial batch schedules nothing", async () => {
         const { deviceId } = await pairedDevice(ownerId);
 
