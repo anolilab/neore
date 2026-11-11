@@ -6,6 +6,7 @@ import { registeredApi, registerModule } from "../../test/registered-api";
 
 import { MAX_PROJECT_PATH_BYTES } from "./machine-location";
 import { createProject, getProject, listPinnedProjects, listProjects } from "./functions";
+import { listPinnedProjects as listAgentPinnedProjects, listProjects as listAgentProjects } from "../agent/projects";
 import schema from "../schema";
 
 const registry = vi.hoisted(() => new Map<string, unknown>());
@@ -177,6 +178,30 @@ describe("createProject machine and folder", () => {
             }
 
             expect(ownerPage.page[0]).toMatchObject({ machineId, path: PATH });
+        });
+
+        it("omits them from a member's agent listings, and keeps them for the owner's", async () => {
+            const { machineId, member, owner } = await seed();
+            const paginationOptions = { cursor: null, numItems: 10 };
+            const memberPage = (await as(member).query(listAgentProjects as never, { organizationId: ORG, paginationOpts: paginationOptions } as never)) as {
+                page: Record<string, unknown>[];
+            };
+            const memberPinned = (await as(member).query(listAgentPinnedProjects as never, { organizationId: ORG } as never)) as Record<string, unknown>[];
+            const ownerPage = (await as(owner).query(listAgentProjects as never, { organizationId: ORG, paginationOpts: paginationOptions } as never)) as {
+                page: Record<string, unknown>[];
+            };
+            const ownerPinned = (await as(owner).query(listAgentPinnedProjects as never, { organizationId: ORG } as never)) as Record<string, unknown>[];
+
+            expect(memberPage.page).toHaveLength(1);
+            expect(memberPinned).toHaveLength(1);
+
+            for (const row of [...memberPage.page, ...memberPinned]) {
+                expect(row).not.toHaveProperty("machineId");
+                expect(row).not.toHaveProperty("path");
+            }
+
+            expect(ownerPage.page[0]).toMatchObject({ machineId, path: PATH });
+            expect(ownerPinned[0]).toMatchObject({ machineId, path: PATH });
         });
     });
 
