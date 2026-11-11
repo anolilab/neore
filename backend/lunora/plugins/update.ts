@@ -177,6 +177,28 @@ export const updatePlugin = authAction
 
             const entry = entries.find((candidate) => candidate.key === step.entryKey);
 
+            if (step.action === "update" && entry?.plan?.kind === "trigger" && entry.plan.create.type === "schedule") {
+                const create = entry.plan.create;
+
+                await ctx.runMutation(internal.plugins.update_apply.updateTriggerChild, {
+                    contentHash: await entryHash(entry),
+                    cronExpression: create.cronExpression,
+                    description: create.description,
+                    entryKey: step.entryKey,
+                    generation,
+                    inputTemplate: create.inputTemplate,
+                    installId: installed.installId,
+                    model: create.model,
+                    name: create.name,
+                    searchMode: create.searchMode,
+                    systemPrompt: create.systemPrompt,
+                    timezone: create.timezone,
+                    userId,
+                });
+                applied.push(step.entryKey);
+                continue;
+            }
+
             if (step.action !== "update" || entry?.plan?.kind !== "skill") {
                 skipped.push(step);
                 continue;
