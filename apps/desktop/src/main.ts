@@ -380,12 +380,22 @@ const mayTakeFocus = (win: BrowserWindow): boolean => {
     return focused === null || focused === win;
 };
 
+interface RevealOptions {
+    /** The user asked for this window (a thread, a popup, New Chat): its reveal takes the focus like `bringForward`. */
+    focusOnReveal?: boolean;
+    show?: (focus: boolean) => void;
+}
+
 /**
  * Windows are created hidden and shown at their first paint, so nobody sees an empty frame. A page that never paints
  * (a hung load, a failure the recovery page replaces) is shown anyway: by the returned function, or after a timeout.
- * `show` is told whether to focus: always when asked to (`bringForward`), else only if no other window of ours has it.
+ * `show` is told whether to focus: always when asked to (`bringForward`) or when the user opened the window
+ * (`focusOnReveal`), else only if no other window of ours has it.
  */
-const showWhenReady = (win: BrowserWindow, show: (focus: boolean) => void = (focus) => (focus ? win.show() : win.showInactive())): ((focus?: boolean) => void) => {
+const showWhenReady = (
+    win: BrowserWindow,
+    { focusOnReveal = false, show = (focus) => (focus ? win.show() : win.showInactive()) }: RevealOptions = {},
+): ((focus?: boolean) => void) => {
     let shown = false;
     const reveal = (focus?: boolean): void => {
         // Closed (hidden) before it was ever shown: only `bringForward` may show it now.
@@ -396,7 +406,7 @@ const showWhenReady = (win: BrowserWindow, show: (focus: boolean) => void = (foc
         shown = true;
         pendingReveals.delete(win);
         clearTimeout(timer);
-        show(focus ?? mayTakeFocus(win));
+        show(focus ?? (focusOnReveal || mayTakeFocus(win)));
     };
     // A window waiting for its recovery page has a fallback of its own, from the start of that load.
     const timer = setTimeout(() => {
@@ -542,12 +552,17 @@ const guardSiteWindow = (win: BrowserWindow, reveal: (focus?: boolean) => void):
     // A stop while still loading is a replaced navigation's: the newer one keeps what is held for its page.
     contents.on("did-stop-loading", () => menuDelivery.loaded(win, contents.isLoading()));
 
+    // The fallback of the latest recovery load: a newer failure replaces the page, so it replaces the timer too.
+    let recoveryFallback: ReturnType<typeof setTimeout> | undefined;
+
     // A site that cannot be loaded or a renderer that died leaves a blank window with no way forward: show our own page.
     const recover = async (page: string): Promise<void> => {
         // `ready-to-show` does not fire again for the recovery page; the timer covers a recovery load that never finishes.
         if (!isRevealed(win)) {
             awaitingRecoveryDraw.add(win);
-            setTimeout(() => {
+            clearTimeout(recoveryFallback);
+            recoveryFallback = setTimeout(() => {
+                recoveryFallback = undefined;
                 awaitingRecoveryDraw.delete(win);
                 reveal();
             }, SHOW_FALLBACK_MS);
@@ -579,6 +594,8 @@ const guardSiteWindow = (win: BrowserWindow, reveal: (focus?: boolean) => void):
 
     contents.on("did-finish-load", () => {
         if (awaitingRecoveryDraw.delete(win)) {
+            clearTimeout(recoveryFallback);
+            recoveryFallback = undefined;
             reveal();
         }
 
@@ -610,8 +627,8 @@ const quitWhenNoSiteWindow = (): void => {
 };
 
 /**
- * A site page in its own window (a thread, or a same-origin popup): no state file, no tray, and
- * closing it really closes it.
+ * A site page in its own window (a thread, a same-origin popup, New Chat for a page that does not listen): no state
+ * file, no tray, and closing it really closes it. Each is opened by the user, so its reveal takes the focus.
  */
 const openSiteWindow = (url: URL): BrowserWindow => {
     const win = new BrowserWindow({
@@ -628,7 +645,7 @@ const openSiteWindow = (url: URL): BrowserWindow => {
         width: DEFAULT_SIZE.width,
     });
 
-    guardSiteWindow(win, showWhenReady(win));
+    guardSiteWindow(win, showWhenReady(win, { focusOnReveal: true }));
     win.loadURL(url.href);
 
     return win;
@@ -690,7 +707,7 @@ const openArtifactWindow = (url: URL): void => {
     contents.on("will-navigate", (event) => event.preventDefault());
     contents.on("will-redirect", (event) => event.preventDefault());
     contents.on("will-attach-webview", (event) => event.preventDefault());
-    showWhenReady(win);
+    showWhenReady(win, { focusOnReveal: true });
     win.loadURL(url.href);
 };
 
@@ -717,7 +734,7 @@ const createMainWindow = (): BrowserWindow => {
     });
     // `maximize` shows a hidden window on Windows and Linux, so it waits for the first paint too. It also activates the
     // window on Windows, so a reveal that must leave the focus where it is maximizes when the user comes to the window.
-    const reveal = showWhenReady(win, (focus) => {
+    const showMain = (focus: boolean): void => {
         if (!focus) {
             win.showInactive();
 
@@ -738,7 +755,8 @@ const createMainWindow = (): BrowserWindow => {
         }
 
         win.show();
-    });
+    };
+    const reveal = showWhenReady(win, { show: showMain });
 
     // Move and resize fire many times a second; one write after the last one is enough.
     const stateSaver = createDebouncer(() => saveWindowState(win), SAVE_DEBOUNCE_MS);

@@ -766,6 +766,38 @@ describe("look and application menu", () => {
             expect(win.calls).toStrictEqual(["show"]);
         });
 
+        it("is shown by the latest recovery load only, not by the fallback of an earlier failure", () => {
+            vi.useFakeTimers();
+
+            const { fail, finished, win } = openFailing("thread-twice");
+
+            fail();
+            vi.advanceTimersByTime(1000);
+            fail();
+            // The first failure's fallback would end here: the second recovery page is still loading.
+            vi.advanceTimersByTime(SHOW_FALLBACK_MS - 1000);
+            expect(win.shown).toBe(false);
+
+            finished();
+            expect(win.calls).toStrictEqual(["show"]);
+            vi.advanceTimersByTime(SHOW_FALLBACK_MS);
+            expect(win.calls).toStrictEqual(["show"]);
+        });
+
+        it("is shown by the latest failure's own fallback when its recovery page never finishes", () => {
+            vi.useFakeTimers();
+
+            const { fail, win } = openFailing("thread-twice-hung");
+
+            fail();
+            vi.advanceTimersByTime(1000);
+            fail();
+            vi.advanceTimersByTime(SHOW_FALLBACK_MS - 1);
+            expect(win.shown).toBe(false);
+            vi.advanceTimersByTime(1);
+            expect(win.calls).toStrictEqual(["show"]);
+        });
+
         it("leaves a window already shown as it is", () => {
             vi.useFakeTimers();
 
@@ -1396,14 +1428,50 @@ describe("main window reveal and saved state", () => {
             expect(win.calls).toStrictEqual(["showInactive", "maximize"]);
         });
 
-        it("shows a thread window without the focus", () => {
+        it("focuses a thread window the user opened from the focused main window", () => {
             fake().focusedWindow = mainWindow();
-            fake().ipc.get("neore:open-thread-window")?.(siteSender(), "thread-inactive");
+            fake().ipc.get("neore:open-thread-window")?.(siteSender(), "thread-opened");
 
             const win = fake().windows.at(-1) as FakeWindow;
 
             readyToShow(win);
-            expect(win.calls).toStrictEqual(["showInactive"]);
+            expect(win.calls).toStrictEqual(["show"]);
+        });
+
+        it("focuses a same-origin popup and the artifact preview the user opened", () => {
+            fake().focusedWindow = mainWindow();
+
+            for (const url of [`${SITE}/settings`, `${SITE}/artifact-preview#focus`]) {
+                mainWindow().webContents.windowOpen?.({ url });
+
+                const win = fake().windows.at(-1) as FakeWindow;
+
+                readyToShow(win);
+                expect(win.calls).toStrictEqual(["show"]);
+            }
+        });
+
+        it("focuses a thread window the user opened even when it is revealed by its recovery page", () => {
+            vi.useFakeTimers();
+
+            try {
+                fake().focusedWindow = mainWindow();
+                fake().ipc.get("neore:open-thread-window")?.(siteSender(), "thread-opened-failing");
+
+                const win = fake().windows.at(-1) as FakeWindow;
+
+                (guardOf(win, "did-fail-load") as unknown as (event: unknown, code: number, text: string, url: string, isMainFrame: boolean) => void)(
+                    {},
+                    -105,
+                    "ERR_NAME_NOT_RESOLVED",
+                    `${SITE}/chat/thread-opened-failing`,
+                    true,
+                );
+                vi.advanceTimersByTime(SHOW_FALLBACK_MS);
+                expect(win.calls).toStrictEqual(["show"]);
+            } finally {
+                vi.useRealTimers();
+            }
         });
 
         it("still focuses a window brought forward", () => {
