@@ -565,3 +565,19 @@ describe("a link whose tag quotes an angle bracket", () => {
         );
     });
 });
+
+describe("lists nested in the page's list items", () => {
+    it("stay tight: no blank line between an item's text and its sub-list", () => {
+        expect(htmlToMarkdown("<ul><li>a<ul><li>b</li></ul></li><li>c</li></ul>")).toBe("- a\n  - b\n- c");
+    });
+});
+
+describe("a code block of deeply nested spans", () => {
+    it("is read once, however many elements wrap its text", () => {
+        const html = `<pre>${"<span>".repeat(400)}${"x".repeat(200_000)}${"</span>".repeat(400)}</pre>`;
+        const started = performance.now();
+
+        expect(htmlToMarkdown(html).length).toBeGreaterThan(200_000);
+        expect(performance.now() - started).toBeLessThan(2000);
+    });
+});

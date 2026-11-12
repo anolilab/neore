@@ -89,6 +89,8 @@ interface Context {
     depth: number;
     /** Characters quotes and list items may still re-indent. */
     indentWork: number;
+    /** Inside a list item: a list there follows the item's text on the next line, so the outer list stays tight. */
+    inListItem?: boolean;
     inTable: boolean;
     /** Grid cells the tables still left to convert may fill. */
     tableCells: number;
@@ -158,8 +160,8 @@ const isHidden = (element: Element): boolean =>
 
 /** The text of code as shown, whitespace kept: no hidden parts, and a line per `<br>` and per line block. */
 const codeText = (node: Node): string => {
-    // Parts joined once, with the last character tracked: `endsWith` on a string built by `+=` flattens all of it on each
-    // call, which made a `<pre>` of many line elements quadratic.
+    // One list of parts for the whole block, nested elements included, with the last character tracked: joining per element
+    // rebuilt a text run once per element around it, and `endsWith` on a string built by `+=` flattens all of it.
     const parts: string[] = [];
     let endsWithNewline = false;
     // A line element ends its line: what follows it, text or another element, starts the next one.
@@ -177,26 +179,36 @@ const codeText = (node: Node): string => {
         parts.push(part);
         endsWithNewline = part.endsWith("\n");
     };
-
-    for (const child of node.childNodes) {
-        if (child.nodeType === Node.TEXT_NODE) {
-            push((child.nodeValue ?? "").replaceAll("\0", ""));
-        } else if (child.nodeType === Node.ELEMENT_NODE && !isHidden(child as Element)) {
-            const { tagName } = child as Element;
-            const inner = tagName === "BR" ? "\n" : codeText(child);
-
-            const isLine = BLOCKS.has(tagName) || LINE_BLOCKS.has(tagName);
-
-            if (isLine && parts.length > 0 && !endsWithNewline) {
-                // The one break between the two lines: the one the line before asked for is this one.
-                lineEnded = false;
-                push("\n");
-            }
-
-            push(inner);
-            lineEnded ||= isLine;
+    const walk = (parent: Node, depth: number): void => {
+        if (depth >= MAX_DEPTH) {
+            throw new RangeError("Nested too deep to convert");
         }
-    }
+
+        for (const child of parent.childNodes) {
+            if (child.nodeType === Node.TEXT_NODE) {
+                push((child.nodeValue ?? "").replaceAll("\0", ""));
+            } else if (child.nodeType === Node.ELEMENT_NODE && !isHidden(child as Element)) {
+                const { tagName } = child as Element;
+                const isLine = BLOCKS.has(tagName) || LINE_BLOCKS.has(tagName);
+
+                if (isLine && parts.length > 0 && !endsWithNewline) {
+                    // The one break between the two lines: the one the line before asked for is this one.
+                    lineEnded = false;
+                    push("\n");
+                }
+
+                if (tagName === "BR") {
+                    push("\n");
+                } else {
+                    walk(child, depth + 1);
+                }
+
+                lineEnded ||= isLine;
+            }
+        }
+    };
+
+    walk(node, 0);
 
     return parts.join("");
 };
@@ -592,10 +604,16 @@ const list = (listElement: Element, context: Context): string => {
             const childElement = child as Element;
             const previous = entries.at(-1);
 
+            const { inListItem } = context;
+
             if (childElement.tagName === "LI") {
+                context.inListItem = true;
                 entries.push({ body: children(childElement, context), item: childElement });
+                context.inListItem = inListItem;
             } else if ((childElement.tagName === "UL" || childElement.tagName === "OL") && previous) {
+                context.inListItem = true;
                 previous.body += element(childElement, context);
+                context.inListItem = inListItem;
             } else {
                 const body = element(childElement, context);
 
@@ -640,7 +658,11 @@ const list = (listElement: Element, context: Context): string => {
         items.push(listItem(body.replaceAll(BLANK_LINES, "\n\n").trim(), level, ordered ? `${number}. ` : "- ", context));
     }
 
-    return `\n\n${items.join("\n")}\n\n`;
+    // In an item, one break: a blank line between the item's text and its sub-list would make the whole outer list loose.
+    // A numbered list not starting at 1 cannot interrupt the text, so it keeps the blank line.
+    const tight = context.inListItem === true && (!ordered || firstNumber === 1);
+
+    return `${tight ? "\n" : "\n\n"}${items.join("\n")}\n\n`;
 };
 
 /** A list item at depth `level` (from 1): every line of it indented to that depth, code blocks included. */
