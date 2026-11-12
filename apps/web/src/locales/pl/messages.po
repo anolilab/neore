@@ -35862,6 +35862,10 @@ msgstr "Zmienne:"
 msgid "Vault"
 msgstr "Sejf"
 
+#: src/features/chat/thread/composer-tiptap/file-mention-popup.tsx
+msgid "In this project"
+msgstr "W tym projekcie"
+
 #: src/features/chat/thread/composer-tiptap/file-mention-popup.tsx:392
 msgid "Vault files"
 msgstr "Pliki w sejfie"

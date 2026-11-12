@@ -37,7 +37,7 @@ vi.mock("@/features/auth/lib/auth-ui-provider", () => {
             return {
                 hooks: {
                     useSession: () => {
-                        return { data: { user: { id: "owner" } } };
+                        return { data: { session: { activeOrganizationId: null }, user: { id: "owner" } } };
                     },
                 },
             };
