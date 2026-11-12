@@ -63,6 +63,20 @@ describe("keep and remove on built-in tags (upstream #455)", () => {
         expect(service.turndown("<p>a<b></b>c</p>")).toBe("ac");
     });
 
+    it("the blank rule comes before keep, so a blank kept tag gives nothing", () => {
+        const service = new TurndownService();
+
+        service.keep(["p"]);
+        expect(service.turndown("<p></p>a")).toBe("a");
+    });
+
+    it("the blank rule comes before addRule, so a blank element is not passed to the added rule", () => {
+        const service = new TurndownService();
+
+        service.addRule("bracket", { filter: "p", replacement: (content) => `[${content}]` });
+        expect(service.turndown("<p></p>a")).toBe("a");
+    });
+
     it("remove does not convert the removed content, so its link definitions are not emitted", () => {
         const service = new TurndownService({ linkStyle: "referenced" });
 
@@ -104,6 +118,16 @@ describe("keep and remove on built-in tags (upstream #455)", () => {
 
         service.keep(["span"]);
         expect(service.turndown(`<span><a href="x">l</a></span>`)).toBe("{[l][1]}\n\n[1]: x");
+    });
+
+    it("a custom keepReplacement that ignores content still converts the children, so the link keeps its definition", () => {
+        const service = new TurndownService({
+            keepReplacement: (_content, node) => node.outerHTML,
+            linkStyle: "referenced",
+        });
+
+        service.keep(["span"]);
+        expect(service.turndown(`<span><a href="x">l</a></span>`)).toBe(`<span><a href="x">l</a></span>\n\n[1]: x`);
     });
 });
 
