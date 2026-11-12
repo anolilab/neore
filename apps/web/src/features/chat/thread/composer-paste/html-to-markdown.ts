@@ -992,12 +992,14 @@ const cellList = (listElement: Element, context: Context): string => {
     const items: string[] = [];
 
     for (const child of listElement.children) {
-        if (child.tagName === "LI" && !isHidden(child)) {
-            const text = oneLine(children(child, context)).trim();
+        if (child.tagName !== "LI" || isHidden(child)) {
+            continue;
+        }
 
-            if (text !== "") {
-                items.push(text);
-            }
+        const text = oneLine(children(child, context)).trim();
+
+        if (text !== "") {
+            items.push(text);
         }
     }
 
@@ -1174,6 +1176,7 @@ const element = (node: Element, context: Context): string => {
             .map((line: string) => line.trim())
             .filter(Boolean)
             .join(" ");
+
         // A table cell holds inline content only: a heading there is its text, in bold.
         if (context.inTable) {
             return text === "" ? "" : ` ${wrapLine(text, "**")} `;
