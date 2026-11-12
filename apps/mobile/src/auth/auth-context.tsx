@@ -40,8 +40,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const [config] = useState(loadConfig);
     const [client] = useState(getClient);
 
-    // The stored user is on the device: reading it needs no network, so it paints the signed-in app at once. A sign-out
-    // or a mint that lands first wins (the reducer ignores a late read).
+    // The stored user is on the device: reading it needs no network, so it paints the signed-in app at once. A sign-out,
+    // a mint or a sign-in that starts first wins (the reducer ignores a late read).
     useEffect(() => {
         let isCancelled = false;
 
@@ -131,6 +131,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }, [client, config.lunoraUrl, refreshTick]);
 
     const signIn = useCallback(async () => {
+        dispatch({ type: "sign-in-started" });
         await signInWithBrowser({ appUrl: config.appUrl, lunoraUrl: config.lunoraUrl });
         setRefreshTick(nextTick);
     }, [config.appUrl, config.lunoraUrl]);

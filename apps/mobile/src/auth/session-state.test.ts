@@ -18,7 +18,13 @@ const run = (...events: SessionEvent[]): SessionState => {
 
 describe(reduceSession, () => {
     it("signs a returning person in from the stored user before the mint answers, without a token and not offline", () => {
-        expect(run({ type: "stored-user", user: USER })).toStrictEqual({ hasToken: false, isConfirming: true, status: "signed-in", user: USER });
+        expect(run({ type: "stored-user", user: USER })).toStrictEqual({
+            hasToken: false,
+            isConfirming: true,
+            isStoredUserCurrent: true,
+            status: "signed-in",
+            user: USER,
+        });
     });
 
     it("stays loading when nobody is stored, so the mint decides", () => {
@@ -29,19 +35,25 @@ describe(reduceSession, () => {
         expect(run({ type: "stored-user", user: USER }, { type: "token", user: USER })).toStrictEqual({
             hasToken: true,
             isConfirming: false,
+            isStoredUserCurrent: false,
             status: "signed-in",
             user: USER,
         });
     });
 
     it("ends the optimistic start when the server answers no session (expired, revoked)", () => {
-        expect(run({ type: "stored-user", user: USER }, { type: "signed-out" })).toStrictEqual({ ...INITIAL_SESSION, status: "signed-out" });
+        expect(run({ type: "stored-user", user: USER }, { type: "signed-out" })).toStrictEqual({
+            ...INITIAL_SESSION,
+            isStoredUserCurrent: false,
+            status: "signed-out",
+        });
     });
 
     it("turns a mint with no answer into the offline state: still signed in, no token, no longer confirming", () => {
         expect(run({ type: "stored-user", user: USER }, { type: "unreachable", user: USER })).toStrictEqual({
             hasToken: false,
             isConfirming: false,
+            isStoredUserCurrent: true,
             status: "signed-in",
             user: USER,
         });
@@ -50,6 +62,8 @@ describe(reduceSession, () => {
     it.each<[string, SessionEvent[]]>([
         ["a sign-out", [{ type: "signed-out" }]],
         ["a mint for another account", [{ type: "token", user: OTHER }]],
+        // The browser sign-in of another account, whose mint is still out: the old account must not be painted meanwhile.
+        ["the start of a sign-in", [{ type: "sign-in-started" }]],
     ])("ignores a stored read that lands after %s", (_name, before) => {
         const settled = run(...before);
 

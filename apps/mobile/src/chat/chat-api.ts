@@ -16,9 +16,13 @@ export interface StartChatBody {
 }
 
 export class ChatError extends Error {
-    public constructor(message: string) {
+    /** The gateway answered and refused the start (a non-2xx status): the prompt was not taken. */
+    public readonly isRefusal: boolean;
+
+    public constructor(message: string, options: { isRefusal?: boolean } = {}) {
         super(message);
         this.name = "ChatError";
+        this.isRefusal = options.isRefusal ?? false;
     }
 }
 
@@ -62,13 +66,14 @@ export const startChat = async (input: { body: StartChatBody; fetch: Fetch; gate
                 // A body that is not JSON keeps the status-based message.
             }
 
-            throw new ChatError(errorMessage(body) ?? `Could not send (${response.status}).`);
+            throw new ChatError(errorMessage(body) ?? `Could not send (${response.status}).`, { isRefusal: true });
         }
 
         return (await response.json()) as StartedChat;
     } catch (error) {
         if (controller.signal.aborted) {
-            throw new ChatError("The gateway did not answer in time. Try again.");
+            // The request may have reached the gateway before the deadline: not a refusal.
+            throw new ChatError("The gateway did not answer in time.");
         }
 
         throw error;

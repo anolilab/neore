@@ -47,6 +47,23 @@ describe("followLive", () => {
         expect(seen.latest().rows).toEqual(["p1"]);
     });
 
+    it("reports each answer with rows as a successful read, and an error as none", () => {
+        const fake = fakeWatch();
+        let answered = 0;
+
+        followLive("a:projects", fake.watch, recorder().publish, () => {
+            answered += 1;
+        });
+        fake.error("FORBIDDEN");
+        expect(answered).toBe(0);
+
+        for (const rows of [["p1"], []]) {
+            fake.push(rows);
+        }
+
+        expect(answered).toBe(2);
+    });
+
     it("drops the rows when the subscription fails", () => {
         const fake = fakeWatch();
         const seen = recorder();

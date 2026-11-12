@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 
 import { useAuth } from "@/auth/auth-state";
 import { getClient } from "@/lib/lunora";
+import { useOffline } from "@/offline/offline-context";
 
 import type { Live, Scoped } from "./live-follow";
 import { EMPTY_LIVE, followLive, liveFor } from "./live-follow";
@@ -10,10 +11,12 @@ import { watchProject, watchProjects, watchProjectThreads } from "./projects-api
 
 /**
  * Follows one live query while the user is signed in with a token; the subscription ends with the screen. A start that
- * is still confirming the stored user holds none yet, and a subscription opened without one would be refused.
+ * is still confirming the stored user holds none yet, and a subscription opened without one would be refused. Its answers
+ * count as successful reads, so a project screen opened on its own gets its write controls back after a reconnect.
  */
 const useLive = <T>(watch: (onRows: (rows: T[]) => void, onError: (message: string) => void) => () => void, key: string): Live<T> => {
     const { hasToken, status, user } = useAuth();
+    const { reportRead } = useOffline();
     const scope = status === "signed-in" && hasToken && user ? `${user.id}:${key}` : undefined;
     const [live, setLive] = useState<Scoped<T>>({ ...EMPTY_LIVE, scope: "" });
 
@@ -24,9 +27,9 @@ const useLive = <T>(watch: (onRows: (rows: T[]) => void, onError: (message: stri
             return undefined;
         }
 
-        return followLive(scope, watch, setLive);
-        // `scope` stands for the user and everything `watch` closes over.
-    }, [scope]);
+        return followLive(scope, watch, setLive, () => reportRead("succeeded"));
+        // `scope` stands for the user and everything `watch` closes over; `reportRead` is stable.
+    }, [reportRead, scope]);
 
     return liveFor(live, scope);
 };

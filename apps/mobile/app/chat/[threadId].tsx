@@ -17,7 +17,8 @@ import { displayTextOf, shareTextOf } from "@/chat/message-parts";
 import { isScrolledToEnd, scrollToLatestLabel, scrollToLatestText, shouldShowScrollToLatest } from "@/chat/scroll-to-latest";
 import { shareableMessageText, shareLabel } from "@/chat/share-message";
 import { relayReply } from "@/chat/stream";
-import { draftAfterUnsent, withoutUnsentRows } from "@/chat/unsent-send";
+import type { SendStage } from "@/chat/unsent-send";
+import { draftAfterUnsent, failedSendMessage, failedSendOutcome, withoutUnsentRows } from "@/chat/unsent-send";
 import { useReplyConfirmation } from "@/chat/use-reply-confirmation";
 import { loadConfig } from "@/lib/config";
 import { DEFAULT_CHAT_MODEL } from "@/lib/defaults";
@@ -406,14 +407,29 @@ const Chat = () => {
         }
     }, [confirmTick, hasToken, loadMessages, refreshTick, sending, status, threadId]);
 
-    // A send the server never accepted gives its prompt back and drops its local rows: no read will confirm them.
-    const giveBackUnsent = ({ ids, isAccepted, prompt }: { ids: string[]; isAccepted: boolean; prompt: string }) => {
-        if (isAccepted) {
-            return;
+    // A send the server never accepted gives its prompt back and drops its local rows: no read will confirm them. One that
+    // may have reached it keeps its prompt row for the next read to confirm or remove, and drops only the empty reply row.
+    const settleFailedSend = ({
+        error: failure,
+        ids,
+        prompt,
+        stage,
+    }: {
+        error: unknown;
+        ids: { assistant: string; user: string };
+        prompt: string;
+        stage: SendStage;
+    }) => {
+        const outcome = failedSendOutcome(stage, failure);
+
+        if (outcome === "give-back") {
+            setDraft((current) => draftAfterUnsent(current, prompt));
+            writeRows((current) => withoutUnsentRows(current, [ids.user, ids.assistant]));
+        } else if (outcome === "possibly-sent") {
+            writeRows((current) => current.filter((row) => row.id !== ids.assistant || row.text !== ""));
         }
 
-        setDraft((current) => draftAfterUnsent(current, prompt));
-        writeRows((current) => withoutUnsentRows(current, ids));
+        return outcome;
     };
 
     const send = async () => {
@@ -450,8 +466,8 @@ const Chat = () => {
             localRow(assistantId, "assistant", threadId ?? NEW_THREAD, ""),
         ]);
 
-        // Until the server accepts the prompt, a failure gives it back (`giveBackUnsent`).
-        let isAccepted = false;
+        // How far the send got decides whether a failure gives the prompt back (`settleFailedSend`).
+        let stage: SendStage = "before-request";
 
         try {
             const config = loadConfig();
@@ -464,15 +480,18 @@ const Chat = () => {
             getClient().setAuthToken(jwt);
 
             // Nothing is held back for later: a send that finds the app offline is refused, not queued.
-            const started = await requireOnline({ isOffline: sendControl.disabled }, () =>
-                startChat({
+            const started = await requireOnline({ isOffline: sendControl.disabled }, () => {
+                stage = "requested";
+
+                return startChat({
                     body: { model: DEFAULT_CHAT_MODEL, prompt, threadId },
                     fetch,
                     gatewayUrl: config.gatewayUrl,
                     jwt,
-                }));
+                });
+            });
 
-            isAccepted = true;
+            stage = "accepted";
             setThreadId(started.threadId);
 
             // A reply, a question or an approval may now arrive while the app is in the background.
@@ -542,11 +561,11 @@ const Chat = () => {
 
             AccessibilityInfo.announceForAccessibility("Reply finished");
         } catch (error_) {
-            giveBackUnsent({ ids: [userId, assistantId], isAccepted, prompt });
+            const outcome = settleFailedSend({ error: error_, ids: { assistant: assistantId, user: userId }, prompt, stage });
 
             // The abort error of a send stopped on purpose is not shown: its notice is.
             if (!controller.signal.aborted) {
-                setError(error_ instanceof Error ? error_.message : "Could not send.");
+                setError(failedSendMessage(error_, outcome));
             }
         } finally {
             setSending(false);
