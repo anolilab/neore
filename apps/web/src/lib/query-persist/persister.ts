@@ -27,6 +27,9 @@ export const MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 /** Live pushes come in bursts; the record only needs the latest state, at most once a second. */
 export const WRITE_THROTTLE_MS = 1000;
 
+/** Whether data stamped `stamp` is within the age limit at `at`: not older than it, and not stamped ahead of `at`. */
+const isWithinAge = (stamp: number, at: number): boolean => stamp <= at && at - stamp <= MAX_AGE_MS;
+
 /** How often a withdrawn seal's removal is tried at once before the next save tries it again. */
 const WITHDRAW_TRIES = 3;
 
@@ -200,14 +203,16 @@ export const startQueryPersistence = (options: PersistenceOptions): PersistenceC
             return;
         }
 
+        const savedAt = now();
         const keep = policy.select(queryClient.getQueryCache().getAll(), userId);
         const dehydrated = dehydrate(queryClient, {
             shouldDehydrateMutation: () => false,
-            // A read older than the cache's age limit is not carried into a fresh record: it would outlive the limit.
+            // A read older than the cache's age limit is not carried into a fresh record: it would outlive the limit. Nor
+            // one stamped ahead of the clock (a clock set back since): its age cannot be told, so it could outlive it too.
             shouldDehydrateQuery: (query: Query) =>
-                keep(query) && (isReadSinceStart(query) || isRestored(query)) && now() - query.state.dataUpdatedAt <= MAX_AGE_MS,
+                keep(query) && (isReadSinceStart(query) || isRestored(query)) && isWithinAge(query.state.dataUpdatedAt, savedAt),
         });
-        const record: StoredClient = { buster, clientState: asSettled(policy.sanitize(dehydrated, userId)), timestamp: now(), userId };
+        const record: StoredClient = { buster, clientState: asSettled(policy.sanitize(dehydrated, userId)), timestamp: savedAt, userId };
 
         const seal = await sealRecord(store, userId, JSON.stringify(record), record.timestamp);
 
@@ -277,10 +282,13 @@ export const startQueryPersistence = (options: PersistenceOptions): PersistenceC
             return false;
         }
 
-        const cutoff = now() - MAX_AGE_MS;
+        const restoredAt = now();
         const clientState = asSettled(
             policy.sanitize(
-                { ...parsed.clientState, queries: parsed.clientState.queries.filter((query: DehydratedQuery) => query.state.dataUpdatedAt >= cutoff) },
+                {
+                    ...parsed.clientState,
+                    queries: parsed.clientState.queries.filter((query: DehydratedQuery) => isWithinAge(query.state.dataUpdatedAt, restoredAt)),
+                },
                 userId,
             ),
         );

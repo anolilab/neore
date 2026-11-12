@@ -1,7 +1,7 @@
 // @vitest-environment node
 // Node: WebCrypto and a structured clone that keeps `CryptoKey`, as IndexedDB does.
 import type { DehydratedState } from "@tanstack/query-core";
-import { QueryClient, QueryObserver } from "@tanstack/query-core";
+import { dehydrate, QueryClient, QueryObserver } from "@tanstack/query-core";
 import { IDBFactory } from "fake-indexeddb";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -841,7 +841,10 @@ describe("saving", () => {
         unsubscribe();
     });
 
-    it("does not carry a read older than the age limit into a new record", async () => {
+    it.each([
+        ["older than the age limit", -MAX_AGE_MS - 1],
+        ["stamped ahead of a clock set back since", 365 * 24 * 60 * 60 * 1000],
+    ])("does not carry a read %s into a new record", async (_name, offset) => {
         const memory = memoryStore();
         const queryClient = new QueryClient();
         const controller = start(memory.store, ALICE, queryClient);
@@ -855,7 +858,7 @@ describe("saving", () => {
             await memory.settled();
             written.done = true;
         })();
-        queryClient.setQueryData(OTHER_KEY, { text: "old" }, { updatedAt: Date.now() - MAX_AGE_MS - 1 });
+        queryClient.setQueryData(OTHER_KEY, { text: "old" }, { updatedAt: Date.now() + offset });
         queryClient.setQueryData(KEY, { text: "fresh" });
 
         await untilDone(written);
@@ -867,6 +870,21 @@ describe("saving", () => {
         const stored = JSON.parse(opened?.text ?? "{}") as { clientState?: DehydratedState };
 
         expect(stored.clientState?.queries.map((query) => query.queryKey)).toStrictEqual([KEY]);
+    });
+
+    it("does not restore a read stamped ahead of the clock from a record stamped now", async () => {
+        const memory = memoryStore();
+        const source = new QueryClient();
+
+        source.setQueryData(KEY, { text: "kept" });
+        source.setQueryData(OTHER_KEY, { text: "from the future" }, { updatedAt: Date.now() + 365 * 24 * 60 * 60 * 1000 });
+        await sealRecord(memory.store, ALICE, JSON.stringify({ buster: BUSTER, clientState: dehydrate(source), timestamp: Date.now(), userId: ALICE }));
+
+        const restored = new QueryClient();
+
+        await start(memory.store, ALICE, restored).restored;
+        expect(textOf(restored, KEY)).toBe("kept");
+        expect(restored.getQueryData(OTHER_KEY)).toBeUndefined();
     });
 
     it("a record the store failed to read is never replaced by a save, and is restored on the next try", async () => {
