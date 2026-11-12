@@ -66,8 +66,9 @@ vi.mock("./lib/daily-limit", () => {
         },
     };
 });
-vi.mock("./lib/get-agent", () => {
+vi.mock("./lib/get-agent", async (importOriginal) => {
     return {
+        ...(await importOriginal<typeof import("./lib/get-agent")>()),
         default: async () => {
             if (failsAt("agent")) {
                 throw new Error("no agent");

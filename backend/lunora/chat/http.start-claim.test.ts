@@ -5,6 +5,7 @@
  * runs with no nested mutation (one would commit on its own); the runtime around the handler is faked as in
  * `http.guest-note.test.ts`.
  */
+import { DEFAULT_CHAT_MODEL } from "@neore/ai/constants";
 import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -31,10 +32,14 @@ const state = vi.hoisted(() => {
         charges: 0,
         /** The next queue submission fails, once. */
         enqueueFails: false,
+        /** The next goal start fails, once: the send dies between its save and its goal. */
+        goalFails: false,
         /** The ids of every prompt the no-id path saved from the HTTP action. */
         legacySaves: 0,
         /** The references the HTTP scheduler was handed. */
         scheduled: [] as string[],
+        /** What each scheduled job was handed, in the same order. */
+        scheduledArgs: [] as Record<string, unknown>[],
         /** How long the stream creation takes: the clock moves on by this before it runs. */
         streamDelayMs: 0,
         /** The next stream creation fails, once. */
@@ -91,8 +96,9 @@ vi.mock("../lib/http-scheduler", () => {
     return {
         httpScheduler: () => {
             return {
-                runAfter: async (_delay: number, reference: { __lunoraRef: string }) => {
+                runAfter: async (_delay: number, reference: { __lunoraRef: string }, args: Record<string, unknown>) => {
                     state.scheduled.push(reference.__lunoraRef);
+                    state.scheduledArgs.push(args);
                 },
             };
         },
@@ -117,8 +123,9 @@ const fakeAgent = {
 };
 
 // The no-id path saves from the HTTP action, through a harness transaction of its own.
-vi.mock("./lib/get-agent", () => {
+vi.mock("./lib/get-agent", async (importOriginal) => {
     return {
+        ...(await importOriginal<typeof import("./lib/get-agent")>()),
         default: async () => {
             return {
                 saveMessage: async (_ctx: unknown, args: { message: unknown; threadId: string }) => {
@@ -153,7 +160,15 @@ const HANDLERS: Record<string, (args: any) => Promise<unknown>> = {
     "chat_functions:createThreadWithInitialMessage": async (args) =>
         await run(async (ctx) => await (createThreadWithInitialMessage as any).handler(withoutNestedMutations(ctx), args)),
     "chat_functions:gateThreadAction": async (args) => await run(async (ctx) => await gateThreadActionHandler(ctx, args)),
-    "chat_goals_internal:startGoal": async (args) => await run(async (ctx) => await (startGoal as any).handler(withoutNestedMutations(ctx), args)),
+    "chat_goals_internal:startGoal": async (args) => {
+        if (state.goalFails) {
+            state.goalFails = false;
+
+            throw new Error("the goal could not be started");
+        }
+
+        return await run(async (ctx) => await (startGoal as any).handler(withoutNestedMutations(ctx), args));
+    },
     "chat_start_claim:claimChatStart": async (args) => await run(async (ctx) => await ctx.runMutation(claimChatStart, args)),
     "chat_start_claim:releaseChatStart": async (args) => await run(async (ctx) => await ctx.runMutation(releaseChatStart, args)),
     "chat_start_claim:saveStartPrompt": async (args) => await run(async (ctx) => await (saveStartPrompt as any).handler(withoutNestedMutations(ctx), args)),
@@ -202,8 +217,10 @@ beforeEach(async () => {
     state.agentModel = null;
     state.charges = 0;
     state.enqueueFails = false;
+    state.goalFails = false;
     state.legacySaves = 0;
     state.scheduled.length = 0;
+    state.scheduledArgs.length = 0;
     state.streamDelayMs = 0;
     state.streamFails = false;
     vi.mocked(enqueueJob).mockClear();
@@ -363,6 +380,58 @@ describe("/chat/start with clientMessageId", () => {
         expect(await run(async (ctx) => await ctx.db.get("threadGoals", olderGoal))).toMatchObject({ status: "stopped", stopReason: "superseded" });
     });
 
+    it("ends the goal of a prompt saved in the same millisecond as a newer send's", async () => {
+        expect((await send({ clientMessageId: "tie-goal", goal: { text: "Ship the report" }, prompt: "Make the report", threadId })).status).toBe(200);
+
+        const [goal] = await run(async (ctx) => await ctx.db.query("threadGoals").collect());
+
+        // No clock moved: the goal and the next prompt carry the same millisecond.
+        expect((await send({ clientMessageId: "tie-next", threadId })).status).toBe(200);
+        expect(await run(async (ctx) => await ctx.db.get("threadGoals", goal._id))).toMatchObject({ status: "stopped", stopReason: "superseded" });
+    });
+
+    it("ends an older prompt's goal that started after a newer send saved its prompt", async () => {
+        const olderGoal = { goal: { text: "Ship the report" }, prompt: "Make the report" };
+
+        state.goalFails = true;
+        await expect(send({ clientMessageId: "older-goal", threadId, ...olderGoal })).rejects.toThrow("the goal could not be started");
+        vi.setSystemTime(Date.now() + 1000);
+        state.streamFails = true;
+        await expect(send({ clientMessageId: "newer", threadId })).rejects.toThrow("the stream could not be made");
+        vi.setSystemTime(Date.now() + CHAT_START_LEASE_MS);
+
+        // The older send's goal starts now, after the newer prompt was saved, and runs until the newer send's stream.
+        expect((await send({ clientMessageId: "older-goal", threadId, ...olderGoal })).status).toBe(200);
+
+        const { goalId } = await startRecord("older-goal");
+
+        expect(await run(async (ctx) => await ctx.db.get("threadGoals", goalId))).toMatchObject({ status: "active" });
+        expect((await send({ clientMessageId: "newer", threadId })).status).toBe(200);
+        expect(await run(async (ctx) => await ctx.db.get("threadGoals", goalId))).toMatchObject({ status: "stopped", stopReason: "superseded" });
+    });
+
+    it("leaves a later prompt's goal running when it resumes an older goal send, and starts no second active goal", async () => {
+        state.goalFails = true;
+        await expect(send({ clientMessageId: "older-goal", goal: { text: "Ship the report" }, prompt: "Make the report", threadId })).rejects.toThrow(
+            "the goal could not be started",
+        );
+        vi.setSystemTime(Date.now() + 1000);
+        expect((await send({ clientMessageId: "newer-goal", goal: { text: "Ship the slides" }, prompt: "Make the slides", threadId })).status).toBe(200);
+
+        const [newerGoal] = await run(async (ctx) => await ctx.db.query("threadGoals").collect());
+
+        vi.setSystemTime(Date.now() + CHAT_START_LEASE_MS);
+
+        const resumed = await send({ clientMessageId: "older-goal", goal: { text: "Ship the report" }, prompt: "Make the report", threadId });
+
+        // The older prompt is answered as an ordinary turn: its goal is not started beside the later one.
+        expect(resumed.status).toBe(200);
+        expect(await run(async (ctx) => await ctx.db.get("threadGoals", newerGoal._id))).toMatchObject({ status: "active" });
+        expect(await countRows("threadGoals")).toBe(1);
+        expect(await startRecord("older-goal")).toMatchObject({ streamId: resumed.json.streamId });
+        expect((await startRecord("older-goal")).goalId).toBeUndefined();
+    });
+
     it("renews the claim's expiry when it resumes a send late in its day, so the stream it makes still finds the claim", async () => {
         state.streamFails = true;
 
@@ -436,6 +505,38 @@ describe("/chat/start with clientMessageId", () => {
         expect(await countRows("messages")).toBe(1);
     });
 
+    it("schedules a new chat's title and category once when a resend recovers a run whose queue submission failed", async () => {
+        state.enqueueFails = true;
+
+        await expect(send({ clientMessageId: "unqueued-chat" })).rejects.toThrow("the queue refused the run");
+        expect(state.scheduled).toStrictEqual([]);
+
+        const recovered = await send({ clientMessageId: "unqueued-chat" });
+
+        expect(recovered.json).toMatchObject({ duplicate: true, streamId: expect.any(String) });
+        expect(state.scheduled.toSorted((left, right) => left.localeCompare(right, "en"))).toStrictEqual([
+            "chat_functions:createCategoryChat",
+            "chat_functions:createTitleChat",
+        ]);
+
+        // The run still waits for the queue: another resend queues it again, but schedules no second paid title or category.
+        expect((await send({ clientMessageId: "unqueued-chat" })).json).toMatchObject({ duplicate: true });
+        expect(enqueueJob).toHaveBeenCalledTimes(3);
+        expect(state.scheduled).toHaveLength(2);
+    });
+
+    it("gives a claimed send's title job one billing key, so a recovering resend never pays for a second title", async () => {
+        const first = await send({ clientMessageId: "titled" });
+
+        // The run was queued but no worker took it yet: a resend queues it again and may schedule the title again.
+        await send({ clientMessageId: "titled" });
+
+        const titleJobs = state.scheduledArgs.filter((_args, index) => state.scheduled[index] === "chat_functions:createTitleChat");
+
+        expect(titleJobs.length).toBeGreaterThan(0);
+        expect(new Set(titleJobs.map((job) => job.jobId))).toStrictEqual(new Set([first.json.messageId]));
+    });
+
     it("schedules a new chat's title when it resumes the send that died before its stream", async () => {
         state.streamFails = true;
 
@@ -445,6 +546,21 @@ describe("/chat/start with clientMessageId", () => {
         expect((await send({ clientMessageId: "untitled" })).status).toBe(200);
         expect(state.scheduled).toContain("chat_functions:createTitleChat");
         expect(await countRows("threads")).toBe(2);
+    });
+
+    it("stamps a new chat's prompt with the agent that runs it: the model, a custom endpoint's id, or the fallback for a model outside the registry", async () => {
+        for (const [model, agentName] of [
+            [MODEL, MODEL],
+            ["custom:my-endpoint/llama-3", "custom:my-endpoint/llama-3"],
+            ["retired/model-that-is-gone", DEFAULT_CHAT_MODEL],
+        ] as const) {
+            for (const clientMessageId of [undefined, `agent-${String(agentName.length)}-${model.length}`]) {
+                const sent = await send({ ...(clientMessageId !== undefined && { clientMessageId }), model });
+                const prompt = await run(async (ctx) => await ctx.db.get("messages", sent.json.messageId));
+
+                expect(prompt).toMatchObject({ agentName });
+            }
+        }
     });
 
     it("refuses a malformed id and an id on a regenerate", async () => {
@@ -466,8 +582,16 @@ describe("/chat/start with clientMessageId", () => {
 describe("chatStartFingerprint", () => {
     it("digests the same settings alike whatever order their keys were written in, and different values apart", async () => {
         const request = { contentType: "video" as const, prompt: "a shot", threadId: "thread-1" };
-        const written = await chatStartFingerprint({ ...request, settings: { cinemaSettings: { camera: "dolly", lens: "35mm" }, model: "m" } });
-        const reordered = await chatStartFingerprint({ ...request, settings: { cinemaSettings: { camera: "dolly", lens: "35mm" }, model: "m" } });
+        const settings = { cinemaSettings: { camera: "dolly", lens: "35mm" }, model: "m" };
+        // The same keys inserted in reverse, outside and inside `cinemaSettings` (a literal would be key-sorted by the formatter).
+        const reversed = <T extends object>(value: T): T => Object.fromEntries(Object.entries(value).toReversed()) as T;
+        const reorderedSettings = reversed({ ...settings, cinemaSettings: reversed(settings.cinemaSettings) });
+
+        expect(Object.keys(reorderedSettings)).toStrictEqual(["model", "cinemaSettings"]);
+        expect(Object.keys(reorderedSettings.cinemaSettings)).toStrictEqual(["lens", "camera"]);
+
+        const written = await chatStartFingerprint({ ...request, settings });
+        const reordered = await chatStartFingerprint({ ...request, settings: reorderedSettings });
         const changed = await chatStartFingerprint({ ...request, settings: { cinemaSettings: { camera: "dolly", lens: "50mm" }, model: "m" } });
 
         expect(reordered).toBe(written);

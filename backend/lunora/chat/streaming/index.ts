@@ -151,11 +151,12 @@ export const createStreamWithMessage = internalMutation
         // A new message in a thread ends the goal it was working toward (a goal's own rounds never come through here).
         // A goal-starting message skips it: `startGoal` ended the others with its insert, and a late stream must not end a later goal.
         if (!goalId) {
-            // A send under a claim may be a resumed one, whose prompt was saved before its sender died: it ends only goals
-            // older than that prompt, never one a later message started meanwhile. The claim is checked below, in this transaction.
+            // A send under a claim may be a resumed one, whose prompt was saved before its sender died: it ends the goals of
+            // prompts saved before its own, even one that started later, and never the goal of a later prompt. The claim is
+            // checked below, in this transaction.
             const prompt = startClaim ? await context.db.get("messages", messageId as Id<"messages">) : null;
 
-            await endActiveGoals(context, threadId as Id<"threads">, "superseded", prompt ? { startedBefore: prompt._creationTime } : {});
+            await endActiveGoals(context, threadId as Id<"threads">, "superseded", prompt ? { before: prompt } : {});
         }
 
         // A reply paused on a request that this message moves the conversation past is abandoned: drop what it kept through the pause.

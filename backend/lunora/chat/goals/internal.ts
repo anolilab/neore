@@ -122,7 +122,8 @@ export const startGoal = internalMutation
         threadId: v.id("threads"),
         userId: v.string().max(MAX_LENGTH.id),
     })
-    .output(v.union(v.object({ goalId: v.id("threadGoals"), ok: v.literal(true) }), v.object({ error: v.string(), ok: v.literal(false) })))
+    // No `goalId` when a resumed send's goal is outrun by a later prompt's: the send's prompt is answered as an ordinary turn.
+    .output(v.union(v.object({ goalId: v.optional(v.id("threadGoals")), ok: v.literal(true) }), v.object({ error: v.string(), ok: v.literal(false) })))
     .mutation(async ({ args, ctx }) => {
         if (args.startClaim) {
             // Throws before the supersede below: a dead sender must not end the goal its retry started.
@@ -160,7 +161,18 @@ export const startGoal = internalMutation
         }
 
         // A goal replaces the thread's previous one here, with the insert: the later of two concurrent starts is the one left active.
-        await endActiveGoals(ctx, args.threadId, "superseded");
+        // A send under a claim may be a resumed one: it replaces only the goals of prompts saved before its own
+        // (`comparePromptPositions`). A goal a later prompt started stays, and this one is not started: the later prompt
+        // moved the conversation past it, and a thread runs one goal at a time.
+        const prompt = args.startClaim ? await ctx.db.get("messages", args.promptMessageId as Id<"messages">) : null;
+
+        await endActiveGoals(ctx, args.threadId, "superseded", prompt ? { before: prompt } : {});
+
+        const outrun = prompt === null ? [] : await activeGoalsOf(ctx, args.threadId);
+
+        if (outrun.length > 0) {
+            return { ok: true as const };
+        }
 
         const { now } = ctx;
         const goalId = await ctx.db.insert("threadGoals", {

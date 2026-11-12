@@ -20,20 +20,44 @@ export const stopGoalRow = async (ctx: GoalCtx, goal: Doc<"threadGoals">, reason
     await ctx.db.patch("threadGoals", goal._id, { endedAt: ctx.now, status: "stopped", stopReason: reason, updatedAt: ctx.now });
 };
 
+/** Where a prompt sits in save order. */
+export type PromptPosition = Pick<Doc<"messages">, "_creationTime" | "_id" | "order" | "stepOrder">;
+
 /**
- * Ends every active goal of the thread, or with `startedBefore` only those created before it. Returns whether one was
- * ended. Plain function: the stop mutation, `startGoal` and the run-failure path call it inside their own
- * transaction. A goal ended here never reviews or continues: the review job and
- * `recordGoalVerdict` both check the status.
+ * Negative when `left` was saved before `right`. Creation time first; two prompts saved in the same millisecond fall
+ * back to their place in the thread (a send that branches from no prompt is saved after the thread's last row), then to
+ * their ids, so two different prompts never compare equal.
+ */
+export const comparePromptPositions = (left: PromptPosition, right: PromptPosition): number =>
+    left._creationTime - right._creationTime || left.order - right.order || left.stepOrder - right.stepOrder || left._id.localeCompare(right._id, "en");
+
+/** Whether the goal's starting prompt was saved before `prompt`. A goal whose prompt is gone counts as older. */
+const startedBefore = async (ctx: Pick<QueryCtx, "db">, goal: Doc<"threadGoals">, prompt: PromptPosition): Promise<boolean> => {
+    const start = await ctx.db.get("messages", goal.startMessageId as Id<"messages">);
+
+    return start === null || comparePromptPositions(start, prompt) < 0;
+};
+
+/**
+ * Ends every active goal of the thread, or with `before` only the goals whose starting prompt was saved before that
+ * prompt, whenever the goal itself started. Returns whether one was ended. Plain function: the stop mutation,
+ * `startGoal` and the run-failure path call it inside their own transaction. A goal ended here never reviews or
+ * continues: the review job and `recordGoalVerdict` both check the status.
  */
 export const endActiveGoals = async (
     ctx: GoalCtx,
     threadId: Id<"threads">,
     reason: GoalStopReason,
-    { startedBefore }: { startedBefore?: number } = {},
+    { before }: { before?: PromptPosition } = {},
 ): Promise<boolean> => {
     const active = await activeGoalsOf(ctx, threadId);
-    const goals = startedBefore === undefined ? active : active.filter((goal) => goal.createdAt < startedBefore);
+    const goals = [];
+
+    for (const goal of active) {
+        if (before === undefined || (await startedBefore(ctx, goal, before))) {
+            goals.push(goal);
+        }
+    }
 
     for (const goal of goals) {
         await stopGoalRow(ctx, goal, reason);

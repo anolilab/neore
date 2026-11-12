@@ -3,6 +3,7 @@ import type { ModelMessage } from "ai";
 import type { Id } from "../../_generated/dataModel";
 import type { MutationCtx } from "../../_generated/server";
 import { addMessagesHandler } from "../../agent/messages";
+import { agentNameFor } from "./get-agent";
 import { serializeMessage } from "../../agent/mapping";
 import { vMessageWithMetadata } from "../../agent/validators";
 import { parse } from "../../lib/validators";
@@ -27,7 +28,7 @@ export const savePromptInTransaction = async (
         fileIds?: string[];
         /** A person sent it into an existing thread (`threads.lastUserMessageAt`). */
         fromUser?: boolean;
-        /** The agent name the agent client stamps: the run's model. */
+        /** The run's model: the prompt is stamped with the agent name an agent client would give it (`agentNameFor`). */
         model: string;
         parentId?: string;
         threadId: string;
@@ -37,7 +38,7 @@ export const savePromptInTransaction = async (
     const { fileIds: inlineFileIds, message } = await serializeMessage(ctx, { content, role: "user" });
     const allFileIds = [...(fileIds ?? []), ...(inlineFileIds ?? [])];
     const { messages } = await addMessagesHandler(ctx, {
-        agentName: model,
+        agentName: await agentNameFor(model),
         ...(fromUser === true && { fromUser: true }),
         messages: [parse(vMessageWithMetadata, { message, ...(allFileIds.length > 0 && { fileIds: allFileIds }) }) as never],
         ...(parentId !== undefined && { promptMessageId: parentId as Id<"messages"> }),

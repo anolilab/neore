@@ -962,14 +962,70 @@ const runChatStartOnShard = async (
         });
     };
 
+    // Title/category jobs, scheduled only once the agent run is enqueued. Text
+    // prompts only: they are LLM calls, and only text was charged above
+    // (`chat/lib/start-title-jobs.ts`).
+    const titleJobs: (() => Promise<unknown>)[] = [];
+    const scheduleTitleJobs = (titleThreadId: string, promptId: string, isNewThread: boolean): void => {
+        // Capped where it is sent: the title is generated from the first characters of the prompt only.
+        const prompt = capTitlePrompt(body.prompt ?? " ");
+
+        for (const job of startTitleJobs(contentType, isNewThread)) {
+            if (job === "title") {
+                // A fresh id per scheduled title job: its retries carry the same id (and so the same billing key), a later message's job does not.
+                // A send with a client id is keyed by its prompt, so a resend that schedules the title again shares the first one's charge.
+                const jobId = body.clientMessageId === undefined ? crypto.randomUUID() : promptId;
+
+                // The prompt's id: the job refuses to title from a prompt deleted before it runs.
+                titleJobs.push(
+                    async () =>
+                        await httpScheduler(context).runAfter(0, internal.chat.functions.createTitleChat, {
+                            jobId,
+                            prompt,
+                            promptId,
+                            threadId: titleThreadId,
+                        }),
+                );
+            } else {
+                titleJobs.push(
+                    async () => await httpScheduler(context).runAfter(0, internal.chat.functions.createCategoryChat, { prompt, threadId: titleThreadId }),
+                );
+            }
+        }
+    };
+
+    // Titles and categories last: they are LLM calls on the one-at-a-time
+    // scheduler, and the reply must not queue behind them. Scheduled together —
+    // neither waits on the other, and the response waits on both.
+    // The turn is already saved, charged and queued: a title job that cannot be scheduled must not fail the
+    // request, or a retry (and an idempotency key) would run the turn a second time.
+    const runTitleJobs = async (): Promise<void> => {
+        const titled = await Promise.allSettled(titleJobs.map(async (scheduleTitleJob) => await scheduleTitleJob()));
+
+        for (const outcome of titled) {
+            if (outcome.status === "rejected") {
+                chatLogger.warn("Failed to schedule a title job after the turn was queued:", outcome.reason);
+            }
+        }
+    };
+
     if (startOutcome?.outcome === "duplicate") {
         // The stream token attaches to the first send's run as a reconnect does; a run that ended reads from the thread.
         const { messageId, streamId: duplicateStreamId, threadId } = startOutcome;
 
         // The first send recorded its stream but its run never started (its queue submission failed, or is still in flight):
         // submitted again, so the reply is not lost.
-        if (duplicateStreamId !== undefined && startOutcome.streamUnclaimed === true) {
-            await enqueueRun({ messageId, streamId: duplicateStreamId, threadId });
+        try {
+            if (duplicateStreamId !== undefined && startOutcome.streamUnclaimed === true) {
+                await enqueueRun({ messageId, streamId: duplicateStreamId, threadId });
+            }
+        } finally {
+            // The first send's title jobs follow its run, so a failed submission skipped them: handed to one resend (`claimChatStart`).
+            // A guest note's text never reaches the title model.
+            if (startOutcome.recoverTitles === true && !isGuestSend) {
+                scheduleTitleJobs(threadId, messageId, startOutcome.newThread === true);
+                await runTitleJobs();
+            }
         }
 
         return Response.json(
@@ -1078,36 +1134,6 @@ const runChatStartOnShard = async (
     // Create or continue thread
     let threadId: string;
     let messageId: string;
-    // Title/category jobs, scheduled only once the agent run is enqueued. Text
-    // prompts only: they are LLM calls, and only text was charged above
-    // (`chat/lib/start-title-jobs.ts`).
-    const titleJobs: (() => Promise<unknown>)[] = [];
-    const scheduleTitleJobs = (titleThreadId: string, isNewThread: boolean): void => {
-        // Capped where it is sent: the title is generated from the first characters of the prompt only.
-        const prompt = capTitlePrompt(body.prompt ?? " ");
-
-        for (const job of startTitleJobs(contentType, isNewThread)) {
-            if (job === "title") {
-                // A fresh id per scheduled title job: its retries carry the same id (and so the same billing key), a later message's job does not.
-                const jobId = crypto.randomUUID();
-
-                // The prompt's id: the job refuses to title from a prompt deleted before it runs.
-                titleJobs.push(
-                    async () =>
-                        await httpScheduler(context).runAfter(0, internal.chat.functions.createTitleChat, {
-                            jobId,
-                            prompt,
-                            promptId: messageId,
-                            threadId: titleThreadId,
-                        }),
-                );
-            } else {
-                titleJobs.push(
-                    async () => await httpScheduler(context).runAfter(0, internal.chat.functions.createCategoryChat, { prompt, threadId: titleThreadId }),
-                );
-            }
-        }
-    };
 
     if (resumed) {
         threadId = resumed.threadId;
@@ -1126,7 +1152,7 @@ const runChatStartOnShard = async (
             }
         } else {
             // The dead send's title jobs were to be scheduled after its run, which it never queued.
-            scheduleTitleJobs(threadId, resumed.newThread === true);
+            scheduleTitleJobs(threadId, messageId, resumed.newThread === true);
         }
     } else if (validThreadId && body.regenerate && body.parentId) {
         // Regenerate: a SIBLING reply to the same prompt row (see
@@ -1230,7 +1256,7 @@ const runChatStartOnShard = async (
         // Title generation for existing threads too — scheduled after the agent run below.
         // A guest note's text never reaches the title model.
         if (!isGuestSend) {
-            scheduleTitleJobs(threadId, false);
+            scheduleTitleJobs(threadId, messageId, false);
         }
     } else {
         // New thread: batched creation
@@ -1264,7 +1290,7 @@ const runChatStartOnShard = async (
         messageId = result.messageId;
 
         // Title + category generation — scheduled after the agent run below.
-        scheduleTitleJobs(threadId, true);
+        scheduleTitleJobs(threadId, messageId, true);
     }
 
     // Create persistent stream + schedule agent (text content only)
@@ -1316,18 +1342,7 @@ const runChatStartOnShard = async (
         // `createStreamWithMessage`.
     }
 
-    // Titles and categories last: they are LLM calls on the one-at-a-time
-    // scheduler, and the reply must not queue behind them. Scheduled together —
-    // neither waits on the other, and the response waits on both.
-    // The turn is already saved, charged and queued: a title job that cannot be scheduled must not fail the
-    // request, or a retry (and an idempotency key) would run the turn a second time.
-    const titled = await Promise.allSettled(titleJobs.map(async (scheduleTitleJob) => await scheduleTitleJob()));
-
-    for (const outcome of titled) {
-        if (outcome.status === "rejected") {
-            chatLogger.warn("Failed to schedule a title job after the turn was queued:", outcome.reason);
-        }
-    }
+    await runTitleJobs();
 
     return Response.json(
         {

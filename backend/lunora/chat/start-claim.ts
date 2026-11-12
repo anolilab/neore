@@ -117,6 +117,8 @@ interface StartRecord {
     newThread?: boolean;
     streamId?: string;
     threadId?: string;
+    /** A resend that queued the run again was handed the title jobs: no later resend is. */
+    titlesRecovered?: boolean;
 }
 
 type SavedRecord = StartRecord & { messageId: string; threadId: string };
@@ -129,7 +131,13 @@ const vClaimOutcome = v.union(
     v.object({
         messageId: v.string(),
         model: v.optional(v.string()),
+        newThread: v.optional(v.boolean()),
         outcome: v.literal("duplicate"),
+        /**
+         * The caller schedules the title jobs, which follow the run and so were skipped with a failed queue submission.
+         * Handed to one resend only; a title job keyed by the prompt (`autoTitleChargeKey`) is charged once anyway.
+         */
+        recoverTitles: v.optional(v.boolean()),
         streamId: v.optional(v.string()),
         /** The stream has no run yet (its queue submission may have failed): the caller queues it again, which a run claims once. */
         streamUnclaimed: v.optional(v.boolean()),
@@ -179,13 +187,20 @@ export const claimChatStart = internalMutation
         }
 
         if (isSaved(record) && (!streams || record.streamId !== undefined)) {
-            const { messageId, model, streamId, threadId } = record;
+            const { messageId, model, newThread, streamId, threadId } = record;
+            const unclaimed = streamId !== undefined && (await streamUnclaimed(ctx, streamId));
+            const recoverTitles = unclaimed && record.titlesRecovered !== true;
+
+            if (recoverTitles && existing) {
+                await patchRow(ctx.db, "idempotencyClaims", existing, { result: JSON.stringify({ ...record, titlesRecovered: true } satisfies StartRecord) });
+            }
 
             return {
                 messageId,
                 ...(model !== undefined && { model }),
+                ...(recoverTitles && { recoverTitles: true, ...(newThread === true && { newThread: true }) }),
                 outcome: "duplicate" as const,
-                ...(streamId !== undefined && { streamId, ...((await streamUnclaimed(ctx, streamId)) && { streamUnclaimed: true }) }),
+                ...(streamId !== undefined && { streamId, ...(unclaimed && { streamUnclaimed: true }) }),
                 threadId,
             };
         }
