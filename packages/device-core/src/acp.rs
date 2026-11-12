@@ -330,14 +330,23 @@ pub(crate) fn changes_program(name: &str) -> bool {
             .any(|prefix| upper.starts_with(prefix))
 }
 
+/// The keys Claude Code is registered under: the ACP registry's id, and the plain name.
+const CLAUDE_AGENT_KEYS: [&str; 2] = ["claude-acp", "claude"];
+
 /// The full environment of one agent: built, then the global variables, then the agent's own.
 /// Every user variable is validated again here, so a hand-edited `device.json` cannot slip a reserved name in.
+/// Claude Code is also told it runs under Neore (its `User-Agent` says so), unless the person set the name.
 pub fn agent_env(
+    agent_key: &str,
     built: BTreeMap<String, String>,
     global: &EnvVars,
     agent: &EnvVars,
 ) -> Result<EnvVars, String> {
     let mut env = built;
+
+    if CLAUDE_AGENT_KEYS.contains(&agent_key) {
+        env.insert("CLAUDE_CODE_ENTRYPOINT".to_owned(), "neore".to_owned());
+    }
 
     for layer in [global, agent] {
         for (name, value) in &layer.0 {
@@ -652,6 +661,7 @@ impl DeviceState {
             None => probe_folder()?,
         };
         let env = agent_env(
+            agent_key,
             built_env(app_vars(std::env::vars_os())),
             &settings.acp_env,
             &agent.env,
@@ -965,7 +975,38 @@ mod tests {
             .0
             .insert("ELECTRON_RUN_AS_NODE".into(), "1".into());
 
-        assert!(agent_env(BTreeMap::new(), &stored.acp_env, &EnvVars::default()).is_err());
+        assert!(agent_env("a", BTreeMap::new(), &stored.acp_env, &EnvVars::default()).is_err());
+    }
+
+    #[test]
+    fn claude_code_is_told_it_runs_under_neore_unless_the_person_says_otherwise() {
+        let none = EnvVars::default();
+        let entrypoint = |key: &str, global: &EnvVars, agent: &EnvVars| {
+            agent_env(key, BTreeMap::new(), global, agent)
+                .unwrap()
+                .0
+                .get("CLAUDE_CODE_ENTRYPOINT")
+                .cloned()
+        };
+        let own = EnvVars(BTreeMap::from([(
+            "CLAUDE_CODE_ENTRYPOINT".to_owned(),
+            "mine".to_owned(),
+        )]));
+
+        assert_eq!(
+            entrypoint("claude-acp", &none, &none).as_deref(),
+            Some("neore")
+        );
+        assert_eq!(entrypoint("claude", &none, &none).as_deref(), Some("neore"));
+        assert_eq!(entrypoint("codex-acp", &none, &none), None);
+        assert_eq!(
+            entrypoint("claude-acp", &own, &none).as_deref(),
+            Some("mine")
+        );
+        assert_eq!(
+            entrypoint("claude-acp", &none, &own).as_deref(),
+            Some("mine")
+        );
     }
 
     #[test]

@@ -336,7 +336,7 @@ impl DeviceState {
         }
 
         let global = self.settings().acp_env;
-        let env = crate::acp::agent_env(BTreeMap::new(), &global, &agent.env)?;
+        let env = crate::acp::agent_env(agent_key, BTreeMap::new(), &global, &agent.env)?;
         let secret_names: BTreeSet<String> =
             global.0.keys().chain(agent.env.0.keys()).cloned().collect();
         let plan = SpawnPlan {
@@ -807,8 +807,11 @@ mod tests {
 
         let started = link.started.lock().unwrap();
 
-        // Only the person's variables travel: the host builds the environment from its own.
-        assert_eq!(started[0]["env"], json!({}));
+        // Only the person's variables and Claude Code's entrypoint travel: the host builds the rest from its own.
+        assert_eq!(
+            started[0]["env"],
+            json!({ "CLAUDE_CODE_ENTRYPOINT": "neore" })
+        );
         assert_eq!(started[0]["cwd"], "/srv/app");
         assert_eq!(started[0]["roots"], json!(["/srv/app"]));
         assert_eq!(started[0]["args"], json!(["--acp"]));
