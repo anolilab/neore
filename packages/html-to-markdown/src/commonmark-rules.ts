@@ -542,18 +542,62 @@ function splitBreaks(content: string, marker: string): { core: string; lead: str
 }
 
 /**
+ * Steps taken by the emphasis walks: each sibling visited and each child checked for a block.
+ * The scale tests read it to show that a long run costs work in proportion to its length.
+ */
+export const emphasisSteps = { count: 0 };
+
+/** Each member's walk to one side, per side, so a run is walked once rather than once from every member. */
+const leftRuns = new WeakMap<Node, EmphasisRun>();
+const rightRuns = new WeakMap<Node, EmphasisRun>();
+
+/**
  * Walks from an emphasis element to one side, over the emphasis elements that
  * are output directly beside it. The walk stops at whitespace, at a line break,
  * and at the first node that outputs something else.
  */
 function emphasisRun(node: AnnotatedNode, side: Side, names: ReadonlySet<string>, options: Options): EmphasisRun {
-    let count = 0;
-    let gap = separation(node, side);
+    const known = side === "left" ? leftRuns : rightRuns;
+    const chain: AnnotatedNode[] = [];
+    let current = node;
+    let run = known.get(current);
+
+    while (!run) {
+        const step = scanRun(current, side, names, options);
+
+        if ("run" in step) {
+            run = step.run;
+            known.set(current, run);
+        } else {
+            chain.push(current);
+            current = step.member;
+            run = known.get(current);
+        }
+    }
+
+    // Each node in the chain has one more member after it than the node that follows it.
+    for (let index = chain.length - 1; index >= 0; index -= 1) {
+        run = { count: run.count + 1, wordEdge: run.wordEdge };
+        known.set(chain[index] as AnnotatedNode, run);
+    }
+
+    return run;
+}
+
+/**
+ * One step of an emphasis walk: either the next member, whose own walk continues the run,
+ * or the end of the run. A member's answer depends only on that member, so `emphasisRun`
+ * can store it.
+ */
+function scanRun(node: AnnotatedNode, side: Side, names: ReadonlySet<string>, options: Options): { member: AnnotatedNode } | { run: EmphasisRun } {
+    const gap = separation(node, side);
     let sibling = neighbour(node, side);
     // An element with a block inside it never merges, because the block would end the delimiter.
     const canMerge = !hasBlockDescendant(node);
 
     while (sibling && gap !== Infinity) {
+        emphasisSteps.count += 1;
+
         if (canMerge && isRunMember(sibling, names, options)) {
             const member = annotationOf(sibling, options);
 
@@ -562,25 +606,24 @@ function emphasisRun(node: AnnotatedNode, side: Side, names: ReadonlySet<string>
                 break;
             }
 
-            count += 1;
-            gap = separation(member, side);
-        } else {
-            // A break keeps the next output apart from the run, so it cannot touch a word.
-            if (gap > 0) {
-                break;
-            }
+            return { member };
+        }
 
-            const edge = edgeCharacter(sibling, side, options);
+        // A break keeps the next output apart from the run, so it cannot touch a word.
+        if (gap > 0) {
+            break;
+        }
 
-            if (edge !== null) {
-                return { count, wordEdge: WORD_CHARACTER.test(edge) };
-            }
+        const edge = edgeCharacter(sibling, side, options);
+
+        if (edge !== null) {
+            return { run: { count: 0, wordEdge: WORD_CHARACTER.test(edge) } };
         }
 
         sibling = neighbour(sibling, side);
     }
 
-    return { count, wordEdge: false };
+    return { run: { count: 0, wordEdge: false } };
 }
 
 /**
@@ -628,6 +671,9 @@ function hasBlockDescendant(node: Node): boolean {
     return false;
 }
 
+/** Whether each node has a printing block descendant, stored because every child of a same-kind parent asks. */
+const printingBlockDescendants = new WeakMap<Node, boolean>();
+
 /**
  * True when a block sits inside the node, at any depth. A blank block still counts: its
  * separator (see `blankReplacement`) is a paragraph break, which splits the parent's
@@ -635,17 +681,30 @@ function hasBlockDescendant(node: Node): boolean {
  * prints nothing and so cannot split them.
  */
 function hasPrintingBlockDescendant(node: Node, options: Options): boolean {
+    const known = printingBlockDescendants.get(node);
+
+    if (known !== undefined) {
+        return known;
+    }
+
+    let hasPrinting = false;
+
     for (const child of node.childNodes) {
         if (child.nodeType !== 1) {
             continue;
         }
 
+        emphasisSteps.count += 1;
+
         if (isBlock(child) || (!annotationOf(child, options).isBlank && hasPrintingBlockDescendant(child, options))) {
-            return true;
+            hasPrinting = true;
+            break;
         }
     }
 
-    return false;
+    printingBlockDescendants.set(node, hasPrinting);
+
+    return hasPrinting;
 }
 
 /**
