@@ -3,14 +3,7 @@ import annotateNode from "./node";
 import rootNode from "./root-node";
 import Rules from "./rules";
 import type { AnnotatedNode, Options, Rule } from "./types";
-import {
-    escapeMarkdown,
-    isBlock,
-    trimKeepingBreaks,
-    trimLeadingBreaks,
-    trimLeadingNewlines,
-    trimTrailingNewlines,
-} from "./utilities";
+import { escapeMarkdown, isBlock, trimKeepingBreaks, trimLeadingBreaks, trimLeadingNewlines, trimTrailingNewlines } from "./utilities";
 
 export type TurndownInput = string | Node;
 
