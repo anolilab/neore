@@ -329,7 +329,7 @@ const NavUser: FC<NavUserProperties> = ({ trigger }) => {
                         className="text-brand-black dark:text-brand-white"
                         render={
                             isAnonymous ? (
-                                <SidebarMenuButton className="hover:bg-sidebar-accent data-[popup-open]:bg-sidebar-accent" name="login" size="lg">
+                                <SidebarMenuButton className="web:hover:bg-sidebar-accent data-[popup-open]:bg-sidebar-accent" name="login" size="lg">
                                     <UserRound className="size-5 shrink-0" />
                                     <div className="grid flex-1 text-left text-sm leading-tight">
                                         <span className="truncate font-medium">{t`Guest`}</span>
@@ -337,7 +337,7 @@ const NavUser: FC<NavUserProperties> = ({ trigger }) => {
                                     <ChevronsUpDown className="text-brand-black/60 dark:text-brand-white/50 ml-auto size-4" />
                                 </SidebarMenuButton>
                             ) : (
-                                <SidebarMenuButton className="hover:bg-sidebar-accent data-[popup-open]:bg-sidebar-accent" name="login" size="lg">
+                                <SidebarMenuButton className="web:hover:bg-sidebar-accent data-[popup-open]:bg-sidebar-accent" name="login" size="lg">
                                     <div className="grid flex-1 text-left text-sm leading-tight">
                                         <span className="truncate font-medium">{hidePersonalInfo ? t`User` : user?.name || t`User`}</span>
                                         <span className="text-brand-black/60 dark:text-brand-white/60 truncate text-xs">
