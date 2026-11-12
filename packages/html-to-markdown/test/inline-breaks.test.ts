@@ -90,6 +90,18 @@ describe("nested emphasis of the same kind (review)", () => {
     });
 });
 
+describe("blank blocks split nested emphasis (review)", () => {
+    // A blank block prints a paragraph break, so it splits the parent's delimiters, as upstream does.
+    it.each([
+        "<em><em>a</em><p></p>b</em>",
+        "<b>x<p></p><b>y</b></b>",
+        "<em><em>a</em><p><span> </span></p></em>",
+        "<b><strong>><h3>  </h3></strong><i></i>(</b>",
+    ])("matches upstream when a blank block sits inside the emphasis: %s", (html) => {
+        expect(convert(html)).toBe(upstream(html));
+    });
+});
+
 describe("whitespace-only emphasis (review)", () => {
     it("ends a run, as upstream does", () => {
         expect(convert("<b>a</b><strong> </strong><b>c</b>")).toBe("**a** **c**");

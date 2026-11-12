@@ -60,8 +60,8 @@ function isChangedOnPurpose(html: string, options: Partial<Options>): boolean {
             return true;
         }
 
-        // An emphasis element with no text writes no delimiters of its own, unless a block inside it writes a separator.
-        if (EMPHASIS_NAMES.has(element.nodeName) && hasOutput(element) && isNestedInSameKind(element)) {
+        // A blank emphasis element writes nothing; a block inside it still writes a separator, so it is not blank.
+        if (EMPHASIS_NAMES.has(element.nodeName) && !isBlankElement(element) && isNestedInSameKind(element)) {
             return true;
         }
 
@@ -118,14 +118,20 @@ function isNestedInSameKind(element: Element): boolean {
     return parent !== null && EMPHASIS_KIND.get(parent.nodeName) === EMPHASIS_KIND.get(element.nodeName) && !hasPrintingBlockDescendant(parent);
 }
 
-/** True when the element has text, or a block inside it (which writes a separator even when blank). */
-function hasOutput(element: Element): boolean {
-    return element.textContent !== "" || [...element.querySelectorAll("*")].some((descendant) => isBlock(descendant));
-}
-
-/** True when a block that prints something sits inside the element, at any depth (`hasPrintingBlockDescendant` in src/commonmark-rules.ts). */
+/**
+ * True when a block sits inside the element, at any depth, mirroring `hasPrintingBlockDescendant`
+ * in src/commonmark-rules.ts: a blank block counts, and a blank non-block element is skipped with its contents.
+ */
 function hasPrintingBlockDescendant(element: Element): boolean {
-    return [...element.querySelectorAll("*")].some((descendant) => isBlock(descendant) && !isBlankElement(descendant));
+    return [...element.childNodes].some((node) => {
+        if (node.nodeType !== 1) {
+            return false;
+        }
+
+        const child = node as Element;
+
+        return isBlock(child) || (!isBlankElement(child) && hasPrintingBlockDescendant(child));
+    });
 }
 
 /** The converter's blank test (`isBlank` in src/node.ts): only whitespace text, and no void or meaningful element. */
@@ -168,11 +174,11 @@ function isWordNeighbour(sibling: Node | null, side: (typeof SIDES)[number]): bo
     return facing !== undefined && WORD_CHARACTER.test(facing);
 }
 
-// Measured: 1397 of the 1500 documents are compared (was 1403 before the blank-block rule:
-// six more documents now write no delimiters where upstream does, so they are excluded).
+// Measured: 1403 of the 1500 documents are compared. A blank block counts as a printing block
+// in the predicate too, so a parent with one keeps its delimiters and is compared like upstream.
 // The floor is that count, so an exclusion that grows (a regression hidden as an intended
 // change) fails the test.
-const MIN_COMPARED = 1397;
+const MIN_COMPARED = 1403;
 
 // Mulberry32: a small seeded PRNG, so a failure reproduces exactly.
 function createRandom(seed: number): () => number {
