@@ -172,6 +172,24 @@ export const clearComposerDrafts = (userId?: string): void => {
 };
 
 /**
+ * An account switch's drafts: the departing account's go once the switch has gone through, so a failed one keeps the in-memory
+ * ones. When its session was not read, whose stored drafts are whose cannot be told: every account's go as the switch starts, as
+ * on a sign-out that cannot read who signs out (the next account's included, never the departing one's left behind).
+ */
+export const clearDraftsForSessionSwitch = (phase: "after" | "before", departingUserId: string | undefined): void => {
+    if (phase === "before") {
+        if (departingUserId === undefined) {
+            dropStoredDrafts();
+        }
+
+        return;
+    }
+
+    // "" removes no stored drafts: an unknown departing account's were removed before the switch.
+    clearComposerDrafts(departingUserId ?? "");
+};
+
+/**
  * The clears so far; with `userId`, those that removed its drafts. A write-back captures it when it starts and drops itself when
  * the value has moved on.
  */

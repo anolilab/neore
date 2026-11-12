@@ -30,7 +30,7 @@ import LoginPromptHost from "@/features/auth/components/auth/login-prompt-host";
 import { AuthQueryProvider } from "@/features/auth/lib/auth-query-provider";
 import AuthUIProviderTanstack from "@/features/auth/lib/tanstack/auth-ui-provider-tanstack";
 import { closeSidePanelForSessionSwitch } from "@/features/chat/core/stores/chat-ui-store";
-import { clearComposerDrafts } from "@/features/chat/split/composer-drafts";
+import { clearComposerDrafts, clearDraftsForSessionSwitch } from "@/features/chat/split/composer-drafts";
 import ConnectionProvider from "@/features/connection/components/connection-provider";
 import OfflineScreen from "@/features/connection/components/offline-screen";
 import { useUIStateStore } from "@/features/layout/stores/ui-state-store";
@@ -420,13 +420,10 @@ const RootComponent = () => {
 
     // The side panel may show the previous account's document or PDF. A PDF (a signed link, nothing unsaved) closes as a switch
     // starts; a document, whose editor may hold unsaved edits, only once the switch has gone through, so a failed one keeps them.
-    // The departing account's drafts go too; "" when its session was not read: then nothing is removed, not the next account's.
+    // The departing account's drafts go too (`clearDraftsForSessionSwitch`).
     const closeSidePanel = useCallback((phase: "after" | "before", departingUserId: string | undefined) => {
         closeSidePanelForSessionSwitch(phase);
-
-        if (phase === "after") {
-            clearComposerDrafts(departingUserId ?? "");
-        }
+        clearDraftsForSessionSwitch(phase, departingUserId);
     }, []);
 
     const handleSessionChange = useCallback(async () => {

@@ -203,6 +203,12 @@ const state = {
     prefillSending: false,
 
     /**
+     * Untouched prefilled messages parked with their pane (focus moved away), by chat: no chat's draft, so they are not written over
+     * the chat's saved one, and they are a prefill again once their pane has focus.
+     */
+    parkedPrefills: new Map<string, string>(),
+
+    /**
      * Set while the composer that owned the binding is unmounted (`releaseStoredDrafts`), to the chat its text was stored under:
      * nothing the shared composer gets meanwhile is stored, and that chat's entry stays.
      */
@@ -216,7 +222,8 @@ const snapshot = (owner: string): Map<string, StoredDraft> => {
     const drafts = new Map<string, StoredDraft>();
 
     for (const threadId of useParkedDraftStore.getState().threadIds) {
-        const draft = toStoredDraft(peekComposerDraft(threadId));
+        const parked = peekComposerDraft(threadId);
+        const draft = parked?.composerText === state.parkedPrefills.get(threadId) ? undefined : toStoredDraft(parked);
 
         if (draft) {
             drafts.set(threadId, draft);
@@ -459,10 +466,25 @@ const listen = (): void => {
                 state.mine.delete(state.released);
                 state.carried = true;
                 state.carriedFrom = undefined;
-            } else if (next.composerText !== "" && next.composerText === draftOwnership.prefill) {
+            } else if (
+                next.composerText !== "" &&
+                (next.composerText === draftOwnership.prefill || (binding && next.composerText === state.parkedPrefills.get(binding.owner)))
+            ) {
+                // A prefill, or one parked untouched with its pane coming back with focus.
+                draftOwnership.prefill = next.composerText;
+
+                if (binding) {
+                    state.parkedPrefills.delete(binding.owner);
+                }
+
                 holdPrefill(binding?.owner);
             } else {
                 const emptied = state.prefill && !hasDraftContent(next);
+
+                // Parked with its pane, not sent or cleared: it stays no chat's draft there.
+                if (emptied && binding && draftOwnership.prefill !== undefined && peekComposerDraft(binding.owner)?.composerText === draftOwnership.prefill) {
+                    state.parkedPrefills.set(binding.owner, draftOwnership.prefill);
+                }
 
                 state.prefill = false;
                 state.carried = false;
@@ -573,6 +595,7 @@ export const resetStoredDraftsForTests = (): void => {
     state.mine.clear();
     state.prefill = false;
     state.prefillSending = false;
+    state.parkedPrefills.clear();
     state.released = undefined;
     state.started = false;
     listening.stop?.();

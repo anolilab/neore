@@ -679,6 +679,31 @@ describe("switching split panes", () => {
         expect(text("thread-b")).toBe("pane b");
     });
 
+    it("does not write a pane's untouched prefill over its chat's saved draft when focus moves, and holds it again on return", () => {
+        put("thread-a", "saved draft");
+        bindStoredDrafts("thread-a", "user-1", false);
+        draftOwnership.prefill = "from the link";
+        type("from the link");
+        saveComposerDraft("thread-b", { composerText: "pane b" });
+        flushStoredDrafts();
+
+        useSplitLayoutStore.getState().dispatch({ index: 1, type: "focus" });
+        restoreLiveComposerFor("thread-b");
+        bindStoredDrafts("thread-b", "user-1", false);
+        vi.advanceTimersByTime(DRAFT_WRITE_DELAY_MS);
+
+        expect(text("thread-a")).toBe("saved draft");
+
+        useSplitLayoutStore.getState().dispatch({ index: 0, type: "focus" });
+        restoreLiveComposerFor("thread-a");
+        bindStoredDrafts("thread-a", "user-1", false);
+        vi.advanceTimersByTime(DRAFT_WRITE_DELAY_MS);
+
+        expect(useChatUIStore.getState().composerText).toBe("from the link");
+        expect(text("thread-a")).toBe("saved draft");
+        expect(text("thread-b")).toBe("pane b");
+    });
+
     it("keeps each chat's draft its own when split view closes on another chat than the focused pane's", () => {
         bindStoredDrafts("thread-a", "user-1", false);
         type("pane a");

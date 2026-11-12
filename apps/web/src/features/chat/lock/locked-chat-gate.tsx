@@ -4,7 +4,7 @@ import { forgetUnlockProof, isThreadLockedError, onUnlockExpired, useUnlockProof
 import { Button } from "@neore/ui/components/button";
 import { useQuery } from "@tanstack/react-query";
 import type { ReactNode } from "react";
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
 import { DEFAULT_MESSAGE_OPTS } from "@/features/chat/core/constants/query-options";
 import { useCRPC } from "@/lib/lunora/crpc";
@@ -64,18 +64,24 @@ export const LockedChatGate = ({ children, lockedExtras, threadId }: { children:
     const refused = isThreadLockedError(error);
     const relockedAndPending = proof === undefined && relocked && !isSuccess && !error;
 
-    // The chat's composer never mounts while the gate holds, so its draft stored before the lock is removed from here.
-    // A chunk that loads after the chat unlocked does nothing: the unlocked composer may already be storing its draft.
+    // Which chat the gate shows now, and whether it still refuses it: read when the storage chunk arrives, after any unmount too.
+    const shown = useRef({ refused, threadId });
+
+    useEffect(() => {
+        shown.current = { refused, threadId };
+    }, [refused, threadId]);
+
+    // The chat's composer never mounts while the gate holds, so its draft stored before the lock is removed from here, even when the
+    // gate unmounted meanwhile (the chat is still locked). Only a chunk that loads after this chat unlocked does nothing: the
+    // unlocked composer may already be storing its draft.
     useEffect(() => {
         if (!refused) {
-            return undefined;
+            return;
         }
-
-        let current = true;
 
         void import("@/features/chat/split/stored-drafts")
             .then(({ lockStoredDraft }) => {
-                if (current) {
+                if (shown.current.threadId !== threadId || shown.current.refused) {
                     lockStoredDraft(threadId);
                 }
 
@@ -84,10 +90,6 @@ export const LockedChatGate = ({ children, lockedExtras, threadId }: { children:
             .catch(() => {
                 // The chunk did not load: the chat's composer removes it once it mounts.
             });
-
-        return () => {
-            current = false;
-        };
     }, [refused, threadId]);
 
     if (!refused && !relockedAndPending) {

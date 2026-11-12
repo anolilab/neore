@@ -144,6 +144,28 @@ describe("a locked chat behind its gate", () => {
         expect(draftKeys()).toStrictEqual(["neore-draft:user-1:thread-1"]);
     });
 
+    it("still removes the locked chat's draft when the gate is left before the storage code loaded", async () => {
+        const chunk = { loaded: false };
+
+        vi.doMock("@/features/chat/split/stored-drafts", async (importOriginal) => {
+            await vi.waitUntil(() => chunk.loaded);
+
+            return importOriginal();
+        });
+        draft("thread-1", "secret");
+
+        const view = renderGate();
+
+        await promptHeading();
+        // The user goes elsewhere while the chunk is still loading: the chat is still locked.
+        view.unmount();
+        chunk.loaded = true;
+        await import("@/features/chat/split/stored-drafts");
+        await settle();
+
+        expect(draftKeys()).toStrictEqual([]);
+    });
+
     it("shows the unlock prompt, not the chat, while no proof is in memory", async () => {
         renderGate();
 
