@@ -16,6 +16,12 @@ describe("link destinations", () => {
         expect(convert(String.raw`<a href="a\(b">x</a>`)).toBe(String.raw`[x](a\\\(b)`);
     });
 
+    it("writes a backslash before an opening parenthesis the same way with safeLinks, which doubles every backslash", () => {
+        // Both modes write the same Markdown, which CommonMark unescapes to the raw destination `a\(b`.
+        expect(convert(String.raw`<a href="a\(b">x</a>`, { safeLinks: true })).toBe(convert(String.raw`<a href="a\(b">x</a>`));
+        expect(convert(String.raw`<a href="a\(b">x</a>`, { safeLinks: true })).toBe(String.raw`[x](a\\\(b)`);
+    });
+
     it("escapes a trailing backslash, which would otherwise escape the closing parenthesis", () => {
         expect(convert(String.raw`<a href="a\">x</a>`)).toBe(String.raw`[x](a\\)`);
     });
