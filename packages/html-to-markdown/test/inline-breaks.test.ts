@@ -240,6 +240,17 @@ describe("emphasis beside an anchor that prints plain text (Qodo)", () => {
     });
 });
 
+describe("a leading break in emphasis, with trailing space, is written once (Qodo)", () => {
+    // The trailing space makes the edge trim run. The break must come out once, not twice.
+    it("writes the leading break of emphasis once, before the delimiter", () => {
+        expect(convert("<p>p<em><br>x </em>next</p>")).toBe("p  \n_x_ next");
+    });
+
+    it("writes the leading break of strong once, before the delimiter", () => {
+        expect(convert("<p>p<strong><br>x </strong>next</p>")).toBe("p  \n**x** next");
+    });
+});
+
 describe("headings keep the block separators when the break marker is empty (Qodo)", () => {
     it("flattens a break in a heading but keeps the paragraph breaks around a block", () => {
         expect(convert("<h2>a<p>b</p>c<br>d</h2>", { br: "" })).toBe("a\n\nb\n\nc d\n---------");
