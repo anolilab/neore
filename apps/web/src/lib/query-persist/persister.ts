@@ -1,0 +1,245 @@
+/**
+ * The per-account query cache: restores the account's last kept reads into the QueryClient and keeps its record
+ * current while the app runs. Meant to be loaded on demand, never on the first load.
+ *
+ * The server stays authoritative. Restored data keeps the `dataUpdatedAt` it was saved with and is marked invalid,
+ * so a screen that mounts it refetches, and a live seed replaces it (`hydrate` never overwrites newer data).
+ *
+ * What is kept, and how it is cleaned, is the caller's `policy`; whether a save may reach disk at all (a sign-out
+ * holds every write until the identity changes) is its `gate`. The record is encrypted (`encrypted-store.ts`).
+ */
+import type { DehydratedState, Query, QueryClient } from "@tanstack/query-core";
+import { dehydrate, hydrate } from "@tanstack/query-core";
+
+import type { RecordStore } from "./encrypted-store";
+import { openRecord, removeRecord, sealRecord } from "./encrypted-store";
+
+/** A record not written for this long is dropped, and so is a kept read not refreshed for this long. */
+export const MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+
+/** Live pushes come in bursts; the record only needs the latest state, at most once a second. */
+export const WRITE_THROTTLE_MS = 1000;
+
+export interface PersistPolicy {
+    /** What a state is reduced to on its way to disk, and again on its way back in (the rules may have tightened since). */
+    sanitize: (state: DehydratedState, userId: string) => DehydratedState;
+    /** Called once per save with the whole cache: the filter for the queries this save keeps. */
+    select: (queries: ReadonlyArray<Query>, userId: string) => (query: Query) => boolean;
+}
+
+export interface WriteGate {
+    canWrite: (userId: string) => boolean;
+    /** Bumped by every clear: a save scheduled before a clear drops itself, and one sealed during a clear takes its record back out. */
+    generation: () => number;
+}
+
+export interface PersistenceOptions {
+    /** Bump when the shape of a kept read changes: a record written under another value is dropped, never shown. */
+    buster: string;
+    gate: WriteGate;
+    /** The clock the query cache stamps `dataUpdatedAt` with. */
+    now?: () => number;
+    policy: PersistPolicy;
+    queryClient: QueryClient;
+    store: RecordStore;
+    userId: string;
+}
+
+export interface PersistenceController {
+    /** Starts saving: the session is confirmed to be this account's own (not a guest, not impersonated). */
+    enableWrites: () => void;
+    /** Resolves once the restore has finished or failed; never rejects. */
+    readonly restored: Promise<void>;
+    /** The session turned out not to be one to keep: stop, and drop what was restored and not yet refreshed. */
+    revoke: () => void;
+    stop: () => void;
+    readonly userId: string;
+}
+
+interface StoredClient {
+    buster: string;
+    clientState: DehydratedState;
+    timestamp: number;
+    userId: string;
+}
+
+const isStoredClient = (value: unknown, userId: string): value is StoredClient => {
+    const candidate = value as Partial<StoredClient> | null;
+
+    return (
+        typeof candidate === "object" &&
+        candidate !== null &&
+        candidate.userId === userId &&
+        typeof candidate.buster === "string" &&
+        typeof candidate.timestamp === "number" &&
+        typeof candidate.clientState === "object" &&
+        Array.isArray(candidate.clientState?.queries)
+    );
+};
+
+const CACHE_EVENTS: ReadonlySet<string> = new Set(["added", "removed", "updated"]);
+
+/**
+ * One seal at a time per account in this tab, across controllers: a slow seal must not land after a newer one, and the
+ * removal a stale one does after a clear must run before the next session's first seal, not in the middle of it.
+ */
+const sealing = new Map<string, Promise<void>>();
+
+const serialized = async (userId: string, task: () => Promise<void>): Promise<void> => {
+    // What is stored never rejects, so a failed seal does not stop the next one.
+    const run = (sealing.get(userId) ?? Promise.resolve()).then(task);
+    const settled = run.catch(() => undefined);
+
+    sealing.set(userId, settled);
+    await run.finally(() => {
+        if (sealing.get(userId) === settled) {
+            sealing.delete(userId);
+        }
+    });
+};
+
+/** A kept read is settled data: a query saved mid-fetch must not come back as fetching with nothing in flight. */
+const asSettled = (state: DehydratedState): DehydratedState => {
+    return {
+        mutations: [],
+        queries: state.queries.map((query) => {
+            return { ...query, promise: undefined, state: { ...query.state, fetchStatus: "idle" as const } };
+        }),
+    };
+};
+
+/**
+ * Starts the account's cache. The caller starts it only once the previous account's reads can no longer land: their
+ * fetches cancelled and their live subscriptions closed (`live-queries.ts` does both as a new token arrives). Data
+ * stamped after this start counts as this account's.
+ */
+export const startQueryPersistence = (options: PersistenceOptions): PersistenceController => {
+    const { buster, gate, now = Date.now, policy, queryClient, store, userId } = options;
+
+    /**
+     * Data older than this start came in before this account's token: across an account switch that is the previous
+     * account's, read under the old token. Only data read since, or restored, is kept.
+     */
+    const startedAt = now();
+    /** What the restore handed over, by query hash: its `dataUpdatedAt` tells a restored entry from a refreshed one. */
+    const restoredAt = new Map<string, number>();
+    const isRestored = (query: Query): boolean => restoredAt.get(query.queryHash) === query.state.dataUpdatedAt;
+    const state = { isRestoreDone: false, stopped: false, writes: false };
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let unsubscribe: (() => void) | undefined;
+
+    const mayWrite = (generation: number): boolean => !state.stopped && state.writes && generation === gate.generation() && gate.canWrite(userId);
+
+    const write = async (generation: number): Promise<void> => {
+        if (!mayWrite(generation)) {
+            return;
+        }
+
+        const keep = policy.select(queryClient.getQueryCache().getAll(), userId);
+        const dehydrated = dehydrate(queryClient, {
+            shouldDehydrateMutation: () => false,
+            shouldDehydrateQuery: (query) => keep(query) && (query.state.dataUpdatedAt >= startedAt || isRestored(query)),
+        });
+        const record: StoredClient = { buster, clientState: asSettled(policy.sanitize(dehydrated, userId)), timestamp: now(), userId };
+
+        await sealRecord(store, userId, JSON.stringify(record));
+
+        // A clear landed while the record was sealed: it must not survive it.
+        if (generation !== gate.generation() || !gate.canWrite(userId)) {
+            await removeRecord(store, userId);
+        }
+    };
+
+    const schedule = (): void => {
+        if (timer !== undefined || !state.isRestoreDone || !mayWrite(gate.generation())) {
+            return;
+        }
+
+        const generation = gate.generation();
+
+        timer = setTimeout(() => {
+            timer = undefined;
+
+            serialized(userId, async () => await write(generation)).catch(() => {
+                // Quota, a blocked store, a lost key: the cache just is not kept this time.
+            });
+        }, WRITE_THROTTLE_MS);
+    };
+
+    const restore = async (): Promise<void> => {
+        const generation = gate.generation();
+        const text = await openRecord(store, userId);
+
+        if (text === undefined) {
+            return;
+        }
+
+        const parsed: unknown = JSON.parse(text);
+
+        if (!isStoredClient(parsed, userId) || parsed.buster !== buster || parsed.timestamp < now() - MAX_AGE_MS) {
+            await removeRecord(store, userId);
+
+            return;
+        }
+
+        // Stopped (an account switch) or cleared (a sign-out) while the record was read: it is no longer this screen's to show.
+        if (state.stopped || generation !== gate.generation() || !gate.canWrite(userId)) {
+            return;
+        }
+
+        const cutoff = now() - MAX_AGE_MS;
+        const clientState = asSettled(
+            policy.sanitize({ ...parsed.clientState, queries: parsed.clientState.queries.filter((query) => query.state.dataUpdatedAt >= cutoff) }, userId),
+        );
+
+        for (const query of clientState.queries) {
+            restoredAt.set(query.queryHash, query.state.dataUpdatedAt);
+        }
+
+        // A restored entry nobody watches yet must outlive the default five minutes, or the next save forgets it.
+        hydrate(queryClient, clientState, { defaultOptions: { queries: { gcTime: MAX_AGE_MS } } });
+        // Restored data is old: a screen that mounts it fetches (a live read's `staleTime` is infinite, so only this makes it).
+        await queryClient.invalidateQueries({ predicate: isRestored, refetchType: "none" });
+    };
+
+    const restored = (async () => {
+        try {
+            await restore();
+        } catch {
+            // Unreadable (a lost key, another shape): drop it, and the network fills the cache.
+            await removeRecord(store, userId).catch(() => undefined);
+        }
+
+        state.isRestoreDone = true;
+
+        if (!state.stopped) {
+            unsubscribe = queryClient.getQueryCache().subscribe((event) => {
+                if (CACHE_EVENTS.has(event.type)) {
+                    schedule();
+                }
+            });
+            schedule();
+        }
+    })();
+
+    const stop = (): void => {
+        state.stopped = true;
+        clearTimeout(timer);
+        timer = undefined;
+        unsubscribe?.();
+    };
+
+    return {
+        enableWrites: () => {
+            state.writes = true;
+            schedule();
+        },
+        restored,
+        revoke: () => {
+            stop();
+            void restored.then(() => queryClient.removeQueries({ predicate: isRestored }));
+        },
+        stop,
+        userId,
+    };
+};
