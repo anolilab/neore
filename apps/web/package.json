@@ -216,6 +216,7 @@
         "eslint-plugin-testing-library": "catalog:lint",
         "eslint-plugin-validate-jsx-nesting": "catalog:lint",
         "eslint-plugin-zod": "catalog:lint",
+        "fake-indexeddb": "catalog:test",
         "fumadocs-mdx": "catalog:fumadocs",
         "jsdom": "catalog:test",
         "msw": "catalog:test",
