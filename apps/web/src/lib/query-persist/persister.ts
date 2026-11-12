@@ -27,6 +27,9 @@ export const MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 /** Live pushes come in bursts; the record only needs the latest state, at most once a second. */
 export const WRITE_THROTTLE_MS = 1000;
 
+/** How often a withdrawn seal's removal is tried at once before the next save tries it again. */
+const WITHDRAW_TRIES = 3;
+
 export interface PersistPolicy {
     /** What a state is reduced to on its way to disk, and again on its way back in (the rules may have tightened since). */
     sanitize: (state: DehydratedState, userId: string) => DehydratedState;
@@ -166,9 +169,30 @@ export const startQueryPersistence = (options: PersistenceOptions): PersistenceC
     let timerGeneration = -1;
     let unsubscribe: (() => void) | undefined;
 
+    /** A seal a stop, a clear or the closed gate withdrew, whose removal the store refused: the next save removes it first. */
+    let pendingWithdrawal: string | undefined;
+
+    /** Removes `seal` (only while it is still the stored record), a few times over: a refused removal is kept for later. */
+    const withdraw = async (seal: string): Promise<void> => {
+        for (let tries = 0; tries < WITHDRAW_TRIES; tries += 1) {
+            try {
+                await removeRecord(store, userId, seal);
+                pendingWithdrawal = pendingWithdrawal === seal ? undefined : pendingWithdrawal;
+
+                return;
+            } catch {
+                pendingWithdrawal = seal;
+            }
+        }
+    };
+
     const mayWrite = (generation: number): boolean => !state.stopped && state.writes && generation === gate.generation() && gate.canWrite(userId);
 
     const write = async (generation: number): Promise<void> => {
+        if (pendingWithdrawal !== undefined) {
+            await withdraw(pendingWithdrawal);
+        }
+
         if (!mayWrite(generation)) {
             // Only the gate closed (no clear, no stop): this change is offered again when it opens.
             state.isHeldByGate = !state.stopped && state.writes && generation === gate.generation() && !gate.canWrite(userId);
@@ -190,16 +214,17 @@ export const startQueryPersistence = (options: PersistenceOptions): PersistenceC
         // Stopped, or a clear landed, while the record was sealed: it must not survive that. Only this seal goes, never
         // a record another tab wrote after it.
         if (seal !== undefined && (state.stopped || generation !== gate.generation() || !gate.canWrite(userId))) {
-            await removeRecord(store, userId, seal);
-
-            // Only the gate closed meanwhile: the record it withdrew is written again when the gate opens (or now, had it
-            // opened during the removal: its listener found nothing held).
+            // Only the gate closed meanwhile: the record withdrawn here is written again when it opens. Marked before the
+            // removal, so a gate that opens during it, or a removal that fails, still finds the save held.
             if (!state.stopped && generation === gate.generation()) {
-                if (gate.canWrite(userId)) {
-                    state.isDirty = true;
-                } else {
-                    state.isHeldByGate = true;
-                }
+                state.isHeldByGate = true;
+            }
+
+            await withdraw(seal);
+
+            if (state.isHeldByGate && gate.canWrite(userId)) {
+                state.isHeldByGate = false;
+                state.isDirty = true;
             }
         }
     };
@@ -427,6 +452,14 @@ export const startQueryPersistence = (options: PersistenceOptions): PersistenceC
         timer = undefined;
         unsubscribe?.();
         unsubscribeLive();
+
+        // No save follows a stop: a removal the store refused is tried once more now.
+        const seal = pendingWithdrawal;
+
+        if (seal !== undefined) {
+            void serialized(userId, async () => await withdraw(seal));
+        }
+
         unsubscribeGate?.();
     };
 

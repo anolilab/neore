@@ -205,6 +205,7 @@ describe("encryption", () => {
         const memory = memoryStore();
 
         await saveTexts(memory, ALICE, [[KEY, SECRET_TEXT]]);
+        await expect(openRecord(memory.store, ALICE)).resolves.toMatchObject({ text: expect.stringContaining(SECRET_TEXT) });
 
         const bob = new QueryClient();
 
@@ -216,6 +217,9 @@ describe("encryption", () => {
         memory.stores.entries.set(BOB, memory.stores.entries.get(ALICE));
         const moved = await openRecord(memory.store, BOB);
 
+        // The record is there under Bob's name; it only does not open.
+        expect(moved).toBeDefined();
+        expect(moved?.seal).toStrictEqual(expect.any(String));
         expect(moved?.text).toBeUndefined();
     });
 });
@@ -915,6 +919,24 @@ describe("saving", () => {
         controller.stop();
     });
 
+    /** A store call that is refused, as a busy or failing IndexedDB refuses it, while `failures.left` counts down. */
+    const refusals = () => {
+        const failures = { left: 0 };
+
+        return {
+            failures,
+            refuse: async (): Promise<void> => {
+                if (failures.left <= 0) {
+                    return;
+                }
+
+                failures.left -= 1;
+
+                throw new DOMException("busy", "UnknownError");
+            },
+        };
+    };
+
     /** A session whose save waits on the store until `release()`; `release` resolves once a removal has run after it. */
     const heldSave = async (onRemove: () => Promise<void> = async () => undefined) => {
         const memory = memoryStore();
@@ -1077,6 +1099,50 @@ describe("saving", () => {
 
         expect(memory.stores.entries.has(ALICE)).toBe(false);
         controller.stop();
+    });
+
+    it("a withdrawn seal whose removal the store refused at first is still removed, and the gate still resaves", async () => {
+        const { failures, refuse } = refusals();
+        const { controller, gate, memory, open, puts, reopen } = await heldSave(refuse);
+
+        // The gate closes while the save is sealed; the store refuses every removal at once.
+        failures.left = 1000;
+        gate.allowed = false;
+        open();
+        await untilDone({
+            get done() {
+                return memory.stores.entries.has(ALICE) && failures.left < 1000;
+            },
+        });
+
+        // The store recovers and the gate opens: the next save goes ahead, with the withdrawn seal removed first.
+        failures.left = 0;
+
+        const putsBefore = puts.count;
+
+        reopen();
+        await untilDone({
+            get done() {
+                return puts.count > putsBefore;
+            },
+        });
+        expect(puts.count).toBeGreaterThan(putsBefore);
+        controller.stop();
+    });
+
+    it("a seal withdrawn by a stop is removed even when the store refuses the first removals", async () => {
+        const { failures, refuse } = refusals();
+        const { controller, memory, open } = await heldSave(refuse);
+
+        failures.left = 2;
+        controller.stop();
+        open();
+        await untilDone({
+            get done() {
+                return failures.left === 0 && !memory.stores.entries.has(ALICE);
+            },
+        });
+        expect(memory.stores.entries.has(ALICE)).toBe(false);
     });
 
     it("changes while a save is sealing are saved once after it, with the latest state", async () => {
