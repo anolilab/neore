@@ -43,11 +43,16 @@ export interface Options {
     strongDelimiter: string;
 }
 
-export type FilterFunction = (this: Rule, node: AnnotatedNode, options: Options) => boolean;
+/** Asks whether a custom, keep or remove rule claims a node. Passed to filters and replacements. */
+export interface RuleLookup {
+    hasRuleFor: (node: Node) => boolean;
+}
+
+export type FilterFunction = (this: Rule, node: AnnotatedNode, options: Options, rules: RuleLookup) => boolean;
 
 export interface Rule {
     append?: (options: Options) => string;
     filter?: string | string[] | FilterFunction;
     references?: string[];
-    replacement: (this: Rule, content: string, node: AnnotatedNode, options: Options) => string;
+    replacement: (this: Rule, content: string, node: AnnotatedNode, options: Options, rules: RuleLookup) => string;
 }

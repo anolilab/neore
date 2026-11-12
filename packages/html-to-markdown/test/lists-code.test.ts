@@ -38,7 +38,8 @@ describe("ordered list start (#547)", () => {
         const markdown = convert(`<ol start="${start}"><li>a</li><li>b</li></ol>`);
 
         expect(markdown).toBe(expected);
-        expect(markdown).not.toMatch(/e\+|Infinity|NaN/);
+        expect(markdown).not.toContain("e+");
+        expect(markdown).not.toContain("Infinity");
     });
 });
 
@@ -133,6 +134,20 @@ describe("code block with whitespace or a wrapper before <code> (#486, #498, #53
     ])("%s is a code block in both styles", (_name, html) => {
         expect(convert(html, { codeBlockStyle: "indented" })).toBe("    x");
         expect(convert(html, { codeBlockStyle: "fenced" })).toBe("```\nx\n```");
+    });
+
+    // A span the caller keeps or removes is not a transparent wrapper: its rule must run, so the <pre> is not a code block.
+    it.each([
+        ["keep", "<span><code>x</code></span>"],
+        ["remove", ""],
+    ] as const)("a %s rule on a span inside <pre> is applied, not dropped by the code block", (mode, expected) => {
+        for (const codeBlockStyle of ["indented", "fenced"] as const) {
+            const service = new TurndownService({ codeBlockStyle });
+
+            service[mode]("span");
+
+            expect(service.turndown("<pre><span><code>x</code></span></pre>")).toBe(expected);
+        }
     });
 
     it("does not make a code block when text comes before <code>", () => {

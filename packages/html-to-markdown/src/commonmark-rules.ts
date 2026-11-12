@@ -1,4 +1,4 @@
-import type { AnnotatedNode, Options, Rule } from "./types";
+import type { AnnotatedNode, Options, Rule, RuleLookup } from "./types";
 import { escapeMarkdown, parseListStart, repeat, trimNewlines } from "./utilities";
 
 const LINE_START = /^/gm;
@@ -131,12 +131,12 @@ const rules: Record<string, Rule> = {
     },
 
     fencedCodeBlock: {
-        filter(node, options) {
-            return options.codeBlockStyle === "fenced" && node.nodeName === "PRE" && preCodeElement(node) !== null;
+        filter(node, options, lookup) {
+            return options.codeBlockStyle === "fenced" && node.nodeName === "PRE" && preCodeElement(node, lookup) !== null;
         },
 
-        replacement(_content, node, options) {
-            const codeElement = preCodeElement(node);
+        replacement(_content, node, options, lookup) {
+            const codeElement = preCodeElement(node, lookup);
             const className = codeElement?.getAttribute("class") ?? "";
             const language = (LANGUAGE_CLASS.exec(className) ?? [null, ""])[1];
             const code = codeElement?.textContent ?? "";
@@ -199,12 +199,12 @@ const rules: Record<string, Rule> = {
     },
 
     indentedCodeBlock: {
-        filter(node, options) {
-            return options.codeBlockStyle === "indented" && node.nodeName === "PRE" && preCodeElement(node) !== null;
+        filter(node, options, lookup) {
+            return options.codeBlockStyle === "indented" && node.nodeName === "PRE" && preCodeElement(node, lookup) !== null;
         },
 
-        replacement(_content, node) {
-            const code = preCodeElement(node)?.textContent ?? "";
+        replacement(_content, node, _options, lookup) {
+            const code = preCodeElement(node, lookup)?.textContent ?? "";
 
             return `\n\n    ${code.replaceAll(NEWLINE, "\n    ")}\n\n`;
         },
@@ -268,7 +268,7 @@ const rules: Record<string, Rule> = {
             const parent = node.parentNode as Element | null;
 
             if (parent?.nodeName === "OL") {
-                const start = parseListStart(parent.getAttribute("start")) ?? BigInt(1);
+                const start = parseListStart(parent.getAttribute("start")) ?? 1n;
                 const index = Array.prototype.indexOf.call(parent.children, node);
 
                 prefix = `${start + BigInt(index)}.  `;
@@ -413,21 +413,22 @@ function hasTextAfter(node: Node): boolean {
  * a code block. A `<pre>` whose first child is `<code>` is one. Otherwise the
  * `<pre>` must hold a single `<code>`, apart from whitespace, possibly wrapped in
  * `<div>` or `<span>` elements that hold nothing else. Any other content, such as
- * a link around the code, keeps the `<pre>` as text.
+ * a link around the code, keeps the `<pre>` as text. A wrapper that a custom, keep
+ * or remove rule claims is not transparent, so its rule's output is not dropped.
  */
-function preCodeElement(pre: Node): Element | null {
+function preCodeElement(pre: Node, lookup: RuleLookup): Element | null {
     if (pre.firstChild?.nodeName === "CODE") {
         return pre.firstChild as Element;
     }
 
-    return soleCodeElement(pre);
+    return soleCodeElement(pre, lookup);
 }
 
 // Elements with no rule of their own here. Any other element changes the output
 // (a link, bold text), so it is not a wrapper.
 const WRAPPER_ELEMENTS = new Set(["DIV", "SPAN"]);
 
-function soleCodeElement(parent: Node): Element | null {
+function soleCodeElement(parent: Node, lookup: RuleLookup): Element | null {
     let only: Node | null = null;
 
     for (let child = parent.firstChild; child; child = child.nextSibling) {
@@ -451,7 +452,7 @@ function soleCodeElement(parent: Node): Element | null {
         return only as Element;
     }
 
-    return WRAPPER_ELEMENTS.has(only.nodeName) ? soleCodeElement(only) : null;
+    return WRAPPER_ELEMENTS.has(only.nodeName) && !lookup.hasRuleFor(only) ? soleCodeElement(only, lookup) : null;
 }
 
 function cleanAttribute(attribute: string | null): string {
