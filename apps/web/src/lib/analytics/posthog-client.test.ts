@@ -465,6 +465,26 @@ describe("startPostHog", () => {
         }
     });
 
+    it.each([
+        ["a sign-out that succeeded", (client: Awaited<ReturnType<typeof loadClientModule>>) => client.forgetPostHogIdentity("key")],
+        ["a sign-out that failed", (client: Awaited<ReturnType<typeof loadClientModule>>) => client.dropPendingCaptures()],
+    ])("keeps the sign-out event through the drop of %s, and sends it signed out on the next page", async (_name, drop) => {
+        const client = await loadClientModule();
+
+        client.setAnalyticsIdentity({ user: { id: "user-1" } });
+        client.queueEvent("thread_opened", {});
+        client.queueEvent("signed_out", {});
+        drop(client);
+
+        // The next page of this tab, which starts PostHog signed out.
+        const next = await loadClientModule();
+
+        next.startPostHog(await next.loadPostHog(), () => {});
+        next.setAnalyticsIdentity({});
+
+        expect(posthog.capture.mock.calls.map(([event]) => event)).toStrictEqual(["signed_out"]);
+    });
+
     it("resets the stored identity before the flush when the session ended while startup waited for it", async () => {
         const client = await loadClientModule();
 

@@ -145,6 +145,24 @@ const dropPendingEvents = (): void => {
     storeEvents([]);
 };
 
+/** The event a sign-out tracks just before it drops the queue: it survives the drop (`dropForSignOut`). */
+const SIGN_OUT_EVENT = "signed_out";
+
+/**
+ * A sign-out's drop: what the account that left queued goes, except the sign-out itself, kept as a signed-out event
+ * (`userId: null`), so it is sent, after the reset, by whichever page next starts PostHog in this tab.
+ */
+const dropForSignOut = (): void => {
+    const kept = pendingEvents()
+        .filter(({ event }) => event === SIGN_OUT_EVENT)
+        .map((event: PendingEvent) => {
+            return { ...event, userId: null };
+        });
+
+    queueState.events = kept;
+    storeEvents(kept);
+};
+
 // The measurement consent `PostHogConsentSync` read from c15t; `undefined` until its first effect has run.
 const consentState: { measurement?: boolean } = {};
 
@@ -393,7 +411,7 @@ export const discardPendingCaptures = (): void => {
  */
 export const dropPendingCaptures = (): void => {
     pendingExceptions.length = 0;
-    dropPendingEvents();
+    dropForSignOut();
     landingState.pageview = undefined;
 };
 
@@ -427,8 +445,8 @@ export const forgetPostHogIdentity = (token: string): void => {
     // Startup waits for the next identity the session publishes; the one that left is not applied after the reset.
     departIdentity();
     // Tracked and caught as the account that left: sent after the reset they would count for whoever this browser is
-    // next. Later ones still queue, for the signed-out session.
-    dropPendingEvents();
+    // next. Later ones still queue, for the signed-out session; so does the sign-out itself, as a signed-out event.
+    dropForSignOut();
     pendingExceptions.length = 0;
     landingState.pageview = undefined;
 
@@ -701,7 +719,8 @@ export const useFeatureFlagReader = (): ((flag: string) => boolean | undefined) 
         },
         [posthog],
     );
-    const readLoads = useCallback(() => (posthog ? flagStoreOf(posthog).loads : 0), [posthog]);
+    // Read only: the listener is registered by `subscribe`, never by a render React may throw away.
+    const readLoads = useCallback(() => (posthog ? (flagStores.get(posthog)?.loads ?? 0) : 0), [posthog]);
     const loads = useSyncExternalStore(subscribe, readLoads, noLoads);
 
     return useCallback(
