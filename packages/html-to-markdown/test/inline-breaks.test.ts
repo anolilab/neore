@@ -78,6 +78,16 @@ describe("nested emphasis of the same kind (review)", () => {
             expect(convert(html)).toBe(upstream(html));
         },
     );
+
+    // A block that prints nothing does not keep the inner element's delimiters. Each output renders
+    // as the inner text in one emphasis (CommonMark: <em>a</em>, <strong>a</strong>, <em>[</em>).
+    it.each([
+        ["<em><em>a</em><span><p></p></span></em>", "_a_"],
+        ["<strong><strong>a</strong><span><div></div></span></strong>", "**a**"],
+        ["<i><em>[</em><br><b><p></p></b></i>", String.raw`_\[_`],
+    ])("writes an inner element without delimiters when its parent's block prints nothing: %s", (html, expected) => {
+        expect(convert(html)).toBe(expected);
+    });
 });
 
 describe("whitespace-only emphasis (review)", () => {
@@ -129,6 +139,10 @@ describe("line breaks at the edge of an element (#509, #436, #405)", () => {
 
     it("moves a trailing break outside em delimiters (#405)", () => {
         expect(convert("<em>foo<br/></em>")).toBe("_foo_");
+    });
+
+    it("moves a trailing break outside strong delimiters past an empty element", () => {
+        expect(convert("<strong>a<br><span></span></strong>b")).toBe("**a**  \nb");
     });
 
     it("keeps a break that is the only content of emphasis", () => {

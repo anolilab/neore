@@ -494,10 +494,10 @@ interface EmphasisRun {
  */
 function wrapRun(content: string, node: AnnotatedNode, options: Options, style: RunStyle): string {
     // A same-kind parent writes the delimiters for the whole run, so a nested element writes none.
-    // A parent with a block inside never shares its delimiters, so the nested element keeps its own.
+    // A parent with a block that prints something never shares its delimiters, so the nested element keeps its own.
     const parent = node.parentNode;
 
-    if (parent && style.names.has(parent.nodeName.toLowerCase()) && !hasBlockDescendant(parent)) {
+    if (parent && style.names.has(parent.nodeName.toLowerCase()) && !hasPrintingBlockDescendant(parent, options)) {
         return wrapInline(content, options, "", "");
     }
 
@@ -619,6 +619,25 @@ function annotationOf(node: Node, options: Options): AnnotatedNode {
 function hasBlockDescendant(node: Node): boolean {
     for (const child of node.childNodes) {
         if (child.nodeType === 1 && (isBlock(child) || hasBlockDescendant(child))) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+/**
+ * True when a block that prints something sits inside the node, at any depth. A blank block
+ * prints nothing but its separator (see `blankReplacement`), so it does not count. A blank
+ * element holds only blank blocks, so the walk skips it.
+ */
+function hasPrintingBlockDescendant(node: Node, options: Options): boolean {
+    for (const child of node.childNodes) {
+        if (child.nodeType !== 1 || annotationOf(child, options).isBlank) {
+            continue;
+        }
+
+        if (isBlock(child) || hasPrintingBlockDescendant(child, options)) {
             return true;
         }
     }
