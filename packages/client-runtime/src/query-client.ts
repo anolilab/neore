@@ -8,7 +8,7 @@
  */
 import { getErrorCode, isForbiddenError, isRateLimitedError } from "@lunora/react";
 import type { Query } from "@tanstack/react-query";
-import { defaultShouldDehydrateQuery, QueryCache, QueryClient } from "@tanstack/react-query";
+import { defaultShouldDehydrateQuery, environmentManager, QueryCache, QueryClient } from "@tanstack/react-query";
 
 import { isAuthError } from "./auth-errors";
 import { THREAD_QUERY_GC_TIME_MS, THREAD_QUERY_PATHS } from "./thread-queries";
@@ -72,7 +72,12 @@ export const createQueryClient = (): QueryClient => {
     });
 
     // Thread reads only, matched by key prefix: a longer life for everything would keep every visited
-    // screen's data in memory for the session.
+    // screen's data in memory for the session. Browser only: a server render's client lives for one request, and
+    // there TanStack's default gcTime (Infinity) starts no timer, where 30 minutes would hold the request's data.
+    if (environmentManager.isServer()) {
+        return queryClient;
+    }
+
     for (const path of THREAD_QUERY_PATHS) {
         queryClient.setQueryDefaults(["lunora", path], { gcTime: THREAD_QUERY_GC_TIME_MS });
     }

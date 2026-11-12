@@ -1,7 +1,8 @@
 import { lunoraQueryOptions } from "@lunora/react";
-import { dehydrate, hashKey, hydrate, QueryClient, QueryObserver, skipToken } from "@tanstack/react-query";
+import { dehydrate, environmentManager, hashKey, hydrate, QueryClient, QueryObserver, skipToken } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { seedHydratedAuthToken } from "./hydrate-auth-token";
 import type { LiveQueryClient } from "./live-queries";
 import {
     FIRST_VALUE_TIMEOUT_MS,
@@ -52,6 +53,13 @@ const createClient = () => {
                 return () => tokenListeners.delete(listener);
             },
             query: vi.fn(async (_reference: never, _args: never) => "rpc"),
+            setAuthToken: (next: string | null) => {
+                token = next;
+
+                for (const listener of tokenListeners) {
+                    listener(next);
+                }
+            },
             setWsToken: vi.fn(),
             subscribe: vi.fn((reference: never, args: never, onData: OnData, options?: { onError?: OnError }) => {
                 const subscription: FakeSubscription = {
@@ -411,7 +419,10 @@ describe(LiveQueryManager, () => {
     });
 
     it("closes a thread read's subscription after the linger while the app's client keeps its value for the thread gcTime", () => {
+        environmentManager.setIsServer(() => false);
         const appClient = createQueryClient();
+
+        environmentManager.setIsServer(() => typeof window === "undefined");
         const appManager = new LiveQueryManager(fake.client as unknown as LiveQueryClient, appClient, mintWsTicket);
         const threadKey = key("chat_functions:getThread", { threadId: "t1" });
 
@@ -452,16 +463,55 @@ describe(LiveQueryManager, () => {
         unobserve();
     });
 
-    it("keeps the thread reads a page was rendered with when its first token arrives, and drops them on sign-out", () => {
+    it("keeps the thread reads a page was rendered with when its first token arrives, and drops them on sign-out", async () => {
         const threadKey = key("chat_functions:getThread", { threadId: "t1" });
+        const server = new QueryClient();
 
         // Hydrated from the server render, before any component observes it.
-        queryClient.setQueryData(threadKey, { title: "server-rendered" });
-        fake.setToken(jwt("alice"));
+        await server.prefetchQuery({ queryFn: async () => ({ title: "server-rendered" }), queryKey: threadKey });
+        hydrate(queryClient, dehydrate(server));
+        vi.stubGlobal("window", globalThis);
+        seedHydratedAuthToken(fake.client, jwt("alice"));
+        vi.unstubAllGlobals();
 
         expect(queryClient.getQueryData(threadKey)).toStrictEqual({ title: "server-rendered" });
 
         fake.setToken(null);
+
+        expect(queryClient.getQueryData(threadKey)).toBeUndefined();
+    });
+
+    it("drops a cookie session's thread reads when the page then adopts another account's token", () => {
+        const threadKey = key("chat_functions:getThread", { threadId: "t1" });
+        const listKey = key("chat_composite:getThreadListData");
+
+        // A cookie session (no bearer) read alice's chats; one is on screen, one is not.
+        queryClient.setQueryData(threadKey, { title: "alice's" });
+        queryClient.setQueryData(listKey, ["alice's list"]);
+        const unobserve = observe(listKey);
+
+        fake.client.query.mockRejectedValue(new Error("FORBIDDEN"));
+        fake.setToken(jwt("bob"));
+
+        expect(queryClient.getQueryData(threadKey)).toBeUndefined();
+        expect(queryClient.getQueryData(listKey)).toBeUndefined();
+
+        unobserve();
+    });
+
+    it("keeps hydrated threads only for the token the page was rendered with, and only as its first", async () => {
+        const threadKey = key("chat_functions:getThread", { threadId: "t1" });
+        const server = new QueryClient();
+
+        await server.prefetchQuery({ queryFn: async () => ({ title: "alice's" }), queryKey: threadKey });
+        hydrate(queryClient, dehydrate(server));
+        vi.stubGlobal("window", globalThis);
+        // The server rendered for alice, but bob's token lands first: a different account.
+        fake.setToken(jwt("bob"));
+        fake.setToken(null);
+        hydrate(queryClient, dehydrate(server));
+        seedHydratedAuthToken(fake.client, jwt("alice"));
+        vi.unstubAllGlobals();
 
         expect(queryClient.getQueryData(threadKey)).toBeUndefined();
     });
@@ -483,6 +533,50 @@ describe(LiveQueryManager, () => {
         expect(fake.subscriptions).toHaveLength(2);
 
         fake.subscriptions[1]!.onError!({ code: "FORBIDDEN", message: "not bob's" });
+        await vi.runAllTimersAsync();
+
+        expect(queryClient.getQueryState(threadKey)).toMatchObject({ data: undefined, status: "error" });
+
+        unobserve();
+    });
+
+    it("blanks an observed thread read seeded with the loader's initialData, which a reset would bring back", async () => {
+        const threadKey = key("chat_functions:getThread", { threadId: "t1" });
+
+        fake.setToken(jwt("alice"));
+        // `chat-context.tsx` hands `getThread` the route loader's row as `initialData`: the query's initial state.
+        const unobserve = observe(threadKey, { initialData: { title: "alice's" } });
+
+        fake.client.query.mockRejectedValue(new Error("FORBIDDEN"));
+        fake.setToken(jwt("bob"));
+
+        expect(queryClient.getQueryData(threadKey)).toBeUndefined();
+
+        fake.subscriptions.at(-1)!.onError!({ code: "FORBIDDEN", message: "not bob's" });
+        await vi.runAllTimersAsync();
+
+        expect(queryClient.getQueryState(threadKey)).toMatchObject({ data: undefined, status: "error" });
+
+        unobserve();
+    });
+
+    it("blanks an observed thread read hydrated from the server on an account switch, and a failed read never brings it back", async () => {
+        const threadKey = key("chat_functions:getThread", { threadId: "t1" });
+        const server = new QueryClient();
+
+        await server.prefetchQuery({ queryFn: async () => ({ title: "alice's" }), queryKey: threadKey });
+        hydrate(queryClient, dehydrate(server));
+        vi.stubGlobal("window", globalThis);
+        seedHydratedAuthToken(fake.client, jwt("alice"));
+        vi.unstubAllGlobals();
+        const unobserve = observe(threadKey);
+
+        fake.client.query.mockRejectedValue(new Error("FORBIDDEN"));
+        fake.setToken(jwt("bob"));
+
+        expect(queryClient.getQueryData(threadKey)).toBeUndefined();
+
+        fake.subscriptions.at(-1)!.onError!({ code: "FORBIDDEN", message: "not bob's" });
         await vi.runAllTimersAsync();
 
         expect(queryClient.getQueryState(threadKey)).toMatchObject({ data: undefined, status: "error" });

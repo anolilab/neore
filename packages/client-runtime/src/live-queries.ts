@@ -33,6 +33,7 @@
 import type { LunoraClient } from "@lunora/client";
 import type { Query, QueryCacheNotifyEvent, QueryClient, QueryKey } from "@tanstack/react-query";
 
+import { hydratedAuthTokenOf } from "./hydrate-auth-token";
 import { Entry, NO_VALUE } from "./live-query-entry";
 import { resetShardRegistry } from "./shard-routing";
 import { THREAD_QUERY_PATHS } from "./thread-queries";
@@ -178,6 +179,9 @@ export class LiveQueryManager {
         this.client.setWsToken(this.wsTokenProvider());
 
         let subject = tokenSubject(this.client.getAuthToken());
+        // Until the first identity change, the cache holds what the server rendered: the one change that keeps it is
+        // the client adopting the very token the server rendered with (`seedHydratedAuthToken`).
+        let firstChange = true;
 
         this.disconnectUnlock = onUnlockExpired((threadId, proof) => {
             this.dropThreadCache(threadId, proof);
@@ -192,8 +196,9 @@ export class LiveQueryManager {
                 return;
             }
 
-            const previous = subject;
+            const adoptsHydratedToken = firstChange && subject === null && token !== null && token === hydratedAuthTokenOf(this.client);
 
+            firstChange = false;
             subject = next;
             // Another user's grants are not this one's: shared objects re-resolve.
             resetShardRegistry();
@@ -202,9 +207,9 @@ export class LiveQueryManager {
             // Nor another user's prompt outline. Remove it rather than invalidate: an invalidated query keeps its old data
             // while the new account's read runs or fails, and that would show the previous account's prompts.
             this.queryClient.removeQueries({ predicate: (query) => isLunoraKey(query.queryKey) && query.queryKey[1] === PROMPT_OUTLINE_REF });
-            // Nor the threads they read. From no subject there is no one's to drop: a hydrating page's first token
-            // (`seedHydratedAuthToken`) belongs to the account the server rendered its threads for.
-            if (previous !== null) {
+            // Nor the threads they read. Only a hydrating page's first token, the one the server rendered its threads
+            // with, keeps them. Any other token from none may follow a cookie session of another account.
+            if (!adoptsHydratedToken) {
                 this.forgetThreadReads();
             }
 
@@ -217,6 +222,7 @@ export class LiveQueryManager {
         // With a token the subject decides: without a user id, Lunora reads a token refresh as an identity change too.
         this.disconnectIdentity = this.client.onIdentityChange(() => {
             if (subject === null && this.client.getAuthToken() === null) {
+                firstChange = false;
                 this.forgetThreadReads();
             }
         });
@@ -320,6 +326,7 @@ export class LiveQueryManager {
      * Drops an account's thread reads (`THREAD_QUERY_PATHS`), which the long thread gcTime would keep after it
      * signed out. An unobserved read goes. An observed one loses its value and its subscription and subscribes
      * again: kept, the old account's thread would stay on screen until the new read lands, and for good if it fails.
+     * It is emptied outright, not reset: a reset returns a query to its initial state, which `initialData` fills.
      */
     private forgetThreadReads(): void {
         const cache = this.queryClient.getQueryCache();
@@ -331,9 +338,25 @@ export class LiveQueryManager {
                 cache.remove(query);
             } else {
                 this.release(query.queryHash);
+                // The old account's read in flight must not land after the blank.
+                void query.cancel({ silent: true });
+                query.setState({
+                    data: undefined,
+                    dataUpdateCount: 0,
+                    dataUpdatedAt: 0,
+                    error: null,
+                    errorUpdateCount: 0,
+                    errorUpdatedAt: 0,
+                    fetchFailureCount: 0,
+                    fetchFailureReason: null,
+                    fetchMeta: null,
+                    fetchStatus: "idle",
+                    isInvalidated: true,
+                    status: "pending",
+                });
                 this.reconcile(query);
-                // Errors land in the query's state; `resetQueries` does not throw them.
-                void this.queryClient.resetQueries({ exact: true, queryKey: query.queryKey });
+                // Errors land in the query's state; `refetchQueries` does not throw them.
+                void this.queryClient.refetchQueries({ exact: true, queryKey: query.queryKey });
             }
         }
     }
