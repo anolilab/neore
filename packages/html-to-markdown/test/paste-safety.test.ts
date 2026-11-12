@@ -143,13 +143,13 @@ describe("non-content elements emit nothing", () => {
 
     // Removed before blank detection, so the empty item loses its bullet, as it does when the item holds an HTML script.
     it("drops an x:script from an empty list item, as it drops an HTML script", () => {
-        const document = createDocument("<ul><li>x</li><li></li></ul>");
+        const document = createDocument("<p>a<span> </span>b</p><ul><li>x</li><li></li></ul>");
         const emptyItem = document.querySelectorAll("li")[1] as HTMLElement;
-        const script = document.createElementNS("https://example.com/x", "x:script");
+        const script = document.createElementNS("http://www.w3.org/1999/xhtml", "x:script");
 
         emptyItem.appendChild(script);
 
-        expect(new TurndownService().turndown(document.body as unknown as Node)).toBe("*   x");
+        expect(new TurndownService().turndown(document.body as unknown as Node)).toBe("a b\n\n*   x");
     });
     /* eslint-enable unicorn/prefer-dom-node-append */
 
