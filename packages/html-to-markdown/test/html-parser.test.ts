@@ -13,6 +13,8 @@ const CASES = [
 
 const NO_PARSER_ERROR = /^@neore\/html-to-markdown: no HTML parser\..*setHTMLParser/;
 
+const MARKER = "from the supplied parser";
+
 afterEach(() => {
     vi.unstubAllGlobals();
     setHTMLParser(createDocument);
@@ -26,7 +28,7 @@ describe("HTML parser", () => {
         expect(() => new TurndownService().turndown("<p>a</p>")).toThrowError(NO_PARSER_ERROR);
     });
 
-    it("gives the same output with a supplied parser as with DOMParser", () => {
+    it("uses the supplied parser instead of DOMParser when both are available", () => {
         const parseFromString = vi.fn((html: string): Document => createDocument(html));
 
         class DOMParserStub {
@@ -37,13 +39,25 @@ describe("HTML parser", () => {
         setHTMLParser(undefined);
         const withDOMParser = CASES.map((html) => new TurndownService().turndown(html));
 
-        const supplied = vi.fn((html: string): Document => createDocument(html));
+        // Wraps domino's parse and prepends a text node to the root element the converter reads, so
+        // the output shows which parser ran.
+        const supplied = vi.fn((html: string): Document => {
+            const document = createDocument(html);
+            const root = document.querySelector("#turndown-root") as Element;
+
+            root.insertBefore(document.createTextNode(MARKER), root.firstChild);
+
+            return document;
+        });
 
         setHTMLParser(supplied);
         const withSupplied = CASES.map((html) => new TurndownService().turndown(html));
 
         expect(parseFromString).toHaveBeenCalledTimes(CASES.length);
         expect(supplied).toHaveBeenCalledTimes(CASES.length);
-        expect(withSupplied).toEqual(withDOMParser);
+        withSupplied.forEach((markdown, index) => {
+            expect(markdown).toContain(MARKER);
+            expect(withDOMParser[index]).not.toContain(MARKER);
+        });
     });
 });
