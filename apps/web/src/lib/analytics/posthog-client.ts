@@ -323,7 +323,15 @@ export const flushPendingCaptures = (posthog: PostHog): void => {
  * Analytics will not start on this page: development or no PostHog key (`discardPendingCaptures`), or its chunk could
  * not load after the retries. Flags then never arrive, so nothing waits for them (`useFeatureFlagsKnown`).
  */
-const availability = { isUnavailable: false, listeners: new Set<() => void>() };
+const availability = {
+    /**
+     * A start failed (or never runs) on this page. Unlike `isUnavailable`, a retry does not clear it: until a client is
+     * provided, flags keep answering from the server-rendered ones instead of going back to pending.
+     */
+    hasFailed: false,
+    isUnavailable: false,
+    listeners: new Set<() => void>(),
+};
 
 const setUnavailable = (isUnavailable: boolean): void => {
     if (availability.isUnavailable === isUnavailable) {
@@ -331,6 +339,7 @@ const setUnavailable = (isUnavailable: boolean): void => {
     }
 
     availability.isUnavailable = isUnavailable;
+    availability.hasFailed ||= isUnavailable;
 
     for (const listener of availability.listeners) {
         listener();
@@ -531,6 +540,14 @@ export const setAnalyticsIdentity = (identity: AnalyticsIdentity): void => {
         return;
     }
 
+    // The session ended or switched accounts before PostHog started: the client may still hold that account's identity
+    // from an earlier page, so the startup resets it before anything queued is sent.
+    const previousUserId = identityState.current?.user?.id;
+
+    if (!startup.isStarted && previousUserId !== undefined && previousUserId !== identity.user?.id) {
+        resetState.pending = true;
+    }
+
     identityState.departedUserId = undefined;
     identityState.current = identity;
 
@@ -568,7 +585,13 @@ const subscribeAvailability = (onChange: () => void): (() => void) => {
 };
 
 const readUnavailable = (): boolean => availability.isUnavailable;
+/** With no client: whether flags answer from the server-rendered ones (a start failed, even while a retry runs). */
+const readFallsBack = (): boolean => availability.hasFailed;
 const notKnown = (): false => false;
+
+/** How often each client's flags loaded or reloaded (`useFeatureFlagReader`'s version). */
+const flagLoads = new WeakMap<PostHog, number>();
+const noLoads = (): number => 0;
 
 // Clients whose flags have arrived (fetched, persisted, bootstrapped, or failed to load): `onFeatureFlags` answers at
 // once for flags it already has.
@@ -619,7 +642,20 @@ const readBootstrapFlag = (flag: string): boolean => {
  */
 export const useFeatureFlagReader = (): ((flag: string) => boolean | undefined) => {
     const posthog = usePostHog();
-    const isUnavailable = useSyncExternalStore(subscribeAvailability, readUnavailable, notKnown);
+    const fallsBack = useSyncExternalStore(subscribeAvailability, readFallsBack, notKnown);
+    // Counts the client's flag loads and reloads, so the reader changes with them and a memo over it recomputes.
+    const subscribe = useCallback(
+        (onChange: () => void) =>
+            posthog
+                ? posthog.onFeatureFlags(() => {
+                      flagLoads.set(posthog, (flagLoads.get(posthog) ?? 0) + 1);
+                      onChange();
+                  })
+                : noSubscription(),
+        [posthog],
+    );
+    const readLoads = useCallback(() => (posthog ? (flagLoads.get(posthog) ?? 0) : 0), [posthog]);
+    const loads = useSyncExternalStore(subscribe, readLoads, noLoads);
 
     return useCallback(
         (flag: string) => {
@@ -627,9 +663,11 @@ export const useFeatureFlagReader = (): ((flag: string) => boolean | undefined) 
                 return posthog.isFeatureEnabled(flag);
             }
 
-            return isUnavailable ? readBootstrapFlag(flag) : undefined;
+            return fallsBack ? readBootstrapFlag(flag) : undefined;
         },
-        [posthog, isUnavailable],
+        // `loads` is the reader's version: the flags it reads changed.
+
+        [posthog, fallsBack, loads],
     );
 };
 
@@ -640,10 +678,10 @@ export const useFeatureFlagReader = (): ((flag: string) => boolean | undefined) 
  */
 export const useFeatureFlagEnabled = (flag: string): boolean | undefined => {
     const posthog = usePostHog();
-    const isUnavailable = useSyncExternalStore(subscribeAvailability, readUnavailable, notKnown);
+    const fallsBack = useSyncExternalStore(subscribeAvailability, readFallsBack, notKnown);
     const subscribe = useCallback((onChange: () => void) => (posthog ? posthog.onFeatureFlags(onChange) : noSubscription()), [posthog]);
     const read = useCallback(() => posthog?.isFeatureEnabled(flag), [posthog, flag]);
     const enabled = useSyncExternalStore(subscribe, read, notLoaded);
 
-    return posthog === undefined && isUnavailable ? readBootstrapFlag(flag) : enabled;
+    return posthog === undefined && fallsBack ? readBootstrapFlag(flag) : enabled;
 };

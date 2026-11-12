@@ -1,7 +1,7 @@
 import { act, renderHook } from "@testing-library/react";
 import type { PostHog } from "posthog-js";
 import type { ReactNode } from "react";
-import { createElement } from "react";
+import { createElement, useMemo } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const posthog = vi.hoisted(() => {
@@ -444,6 +444,20 @@ describe("startPostHog", () => {
         expect(posthog.group).toHaveBeenCalledExactlyOnceWith("organization", "org-1", { name: "Acme" });
     });
 
+    it("resets the stored identity before the flush when the session ended while startup waited for it", async () => {
+        const client = await loadClientModule();
+
+        client.queueEvent("after_expiry", {});
+        client.startPostHog(await client.loadPostHog(), () => {});
+        // Signed in, waiting for the organization; then the session expires before it answers.
+        client.setAnalyticsIdentity({ isOrganizationPending: true, user: { id: "user-1" } });
+        client.setAnalyticsIdentity({});
+
+        expect(client.getStartedPostHog()).toBe(posthog);
+        expect(posthog.reset).toHaveBeenCalled();
+        expect(order(posthog.reset)).toBeLessThan(order(posthog.capture));
+    });
+
     it("runs onStarted (the first launch report) after the reset and the identity", async () => {
         const client = await loadClientModule();
         const onStarted = vi.fn();
@@ -583,6 +597,68 @@ describe("useFeatureFlagsKnown", () => {
 });
 
 describe("useFeatureFlagReader", () => {
+    it("follows a flag reload on the same client, so a memo over it recomputes without a parent render", async () => {
+        const client = await loadClientModule();
+        const flags = new Set<string>();
+        const listeners: (() => void)[] = [];
+        const fake = {
+            isFeatureEnabled: (flag: string) => flags.has(flag),
+            onFeatureFlags: (callback: () => void) => {
+                listeners.push(callback);
+
+                return () => {};
+            },
+        } as unknown as PostHog;
+        const wrapper = ({ children }: { children: ReactNode }) => createElement(client.PostHogClientContext, { value: fake }, children);
+        const { result } = renderHook(
+            () => {
+                const read = client.useFeatureFlagReader();
+
+                return useMemo(() => read("code-mode"), [read]);
+            },
+            { wrapper },
+        );
+
+        expect(result.current).toBe(false);
+
+        act(() => {
+            flags.add("code-mode");
+
+            for (const listener of listeners) {
+                listener();
+            }
+        });
+
+        expect(result.current).toBe(true);
+    });
+
+    it("keeps answering from the server-rendered flags while a retry runs after coming back online", async () => {
+        const client = await loadClientModule();
+        const wrapper = ({ children }: { children: ReactNode }) => createElement(client.PostHogClientContext, { value: undefined }, children);
+
+        client.setBootstrapFlags({ "code-mode": true });
+
+        const { result } = renderHook(
+            () => [client.useFeatureFlagReader()("code-mode"), client.useFeatureFlagEnabled("code-mode"), client.useFeatureFlagsKnown()],
+            {
+                wrapper,
+            },
+        );
+
+        act(() => {
+            client.markPostHogUnavailable();
+        });
+
+        expect(result.current).toStrictEqual([true, true, true]);
+
+        act(() => {
+            client.markPostHogRetrying();
+        });
+
+        // The flags stay as the server rendered them; only what waits for final flags waits again.
+        expect(result.current).toStrictEqual([true, true, false]);
+    });
+
     it("reads pending while PostHog loads, the server-rendered flags once it will not start, and the client once there is one", async () => {
         const client = await loadClientModule();
         const state: { client?: PostHog } = {};
@@ -602,7 +678,7 @@ describe("useFeatureFlagReader", () => {
         expect(result.current("code-mode")).toBe(true);
         expect(result.current("other")).toBe(false);
 
-        state.client = { isFeatureEnabled: (flag: string) => flag === "other" } as unknown as PostHog;
+        state.client = { isFeatureEnabled: (flag: string) => flag === "other", onFeatureFlags: () => () => {} } as unknown as PostHog;
         rerender();
 
         expect(result.current("code-mode")).toBe(false);
