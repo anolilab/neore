@@ -1,3 +1,4 @@
+import { createDocument } from "@mixmark-io/domino";
 import { describe, expect, it, vi } from "vitest";
 
 import type { Rule } from "../src/index";
@@ -5,6 +6,40 @@ import TurndownService from "../src/index";
 
 const NULL_INPUT_ERROR = /null is not a string/;
 const UNDEFINED_INPUT_ERROR = /undefined is not a string/;
+
+const CDATA_SECTION_NODE = 4;
+
+/**
+ * Appends a CDATA section to an element. Domino has no CDATA node and never
+ * yields one from HTML, so this text node is retyped to CDATA_SECTION_NODE, the
+ * shape a browser DOM gives. Its clone keeps the type, since turndown clones
+ * every DOM input before it converts it.
+ */
+function appendCdataSection(parent: Element, data: string): void {
+    const htmlDocument = parent.ownerDocument as Document;
+
+    const retype = (node: Text): void => {
+        Object.defineProperties(node, {
+            clone: {
+                value: () => {
+                    const copy = htmlDocument.createTextNode(data);
+
+                    retype(copy);
+
+                    return copy;
+                },
+            },
+            nodeType: { value: CDATA_SECTION_NODE },
+        });
+    };
+
+    const text = htmlDocument.createTextNode(data);
+
+    // Domino has no ParentNode.append().
+    // eslint-disable-next-line unicorn/prefer-dom-node-append
+    parent.appendChild(text);
+    retype(text);
+}
 
 const strikeRule: Rule = {
     filter: ["del", "s", "strike"],
@@ -143,5 +178,33 @@ describe("turndown service API", () => {
         service.keep(["del", "ins"]);
         service.remove(["del", "ins"]);
         expect(service.turndown("<p>Hello <del>world</del><ins>World</ins></p>")).toBe("Hello <del>world</del><ins>World</ins>");
+    });
+});
+
+describe("CDATA sections in DOM input", () => {
+    it("converts the text of a CDATA section in a paragraph", () => {
+        const htmlDocument = createDocument("<p>before </p>");
+        const paragraph = htmlDocument.querySelector("p") as Element;
+
+        appendCdataSection(paragraph, "a *b* & c");
+        expect(new TurndownService().turndown(paragraph)).toBe(String.raw`before a \*b\* & c`);
+    });
+
+    it("keeps the text of a CDATA section in code unescaped, as for text nodes", () => {
+        // Domino's textContent skips CDATA, so a code element holding only a CDATA
+        // section reads as blank. The leading text node keeps it non-blank here.
+        const withText = createDocument("<p><code>a </code></p>").querySelector("p") as Element;
+        const withCdata = createDocument("<p><code>a </code></p>").querySelector("p") as Element;
+
+        const textCode = withText.querySelector("code") as Element;
+
+        // eslint-disable-next-line unicorn/prefer-dom-node-append -- domino has no ParentNode.append()
+        textCode.appendChild(textCode.ownerDocument.createTextNode("*b* & c"));
+        appendCdataSection(withCdata.querySelector("code") as Element, "*b* & c");
+
+        const service = new TurndownService();
+
+        expect(service.turndown(withCdata)).toBe(service.turndown(withText));
+        expect(service.turndown(withCdata)).toBe("`a *b* & c`");
     });
 });

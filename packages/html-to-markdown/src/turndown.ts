@@ -112,7 +112,8 @@ function process(service: TurndownService, parentNode: Node): string[] {
 
         let replacement = "";
 
-        if (node.nodeType === 3) {
+        // Node.TEXT_NODE or Node.CDATA_SECTION_NODE: collapseWhitespace keeps both.
+        if (node.nodeType === 3 || node.nodeType === 4) {
             const text = node.nodeValue ?? "";
 
             replacement = node.isCode ? text : service.escape(text);
