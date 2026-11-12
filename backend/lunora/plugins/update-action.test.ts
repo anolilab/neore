@@ -2,7 +2,7 @@
  * The update procedures through the real action path: the session is mocked the way the install tests mock it, and the
  * procedures and the internal functions they call are registered by module, so a call reaches the code, not the sign-in.
  *
- * The cases change only the last skill of the file, so a skill keeps its entry key whichever way entry keys are assigned.
+ * Each skill declares its key in the file, so a change elsewhere in the file leaves every other skill's entry key as it was.
  */
 import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -81,7 +81,11 @@ const skill = (slug: string) => ({ description: `${slug} skill`, instructions: `
 
 /** A plugin file with one skill per slug, at `version`. The header carries the hash of the body, as the install needs. */
 const fileOf = async (slugs: string[], version: string) => {
-    const body = buildBundleMarkdown({ description: "", items: slugs.map((slug) => ({ kind: "skill" as const, skill: skill(slug) })), name: "Daily brief" });
+    const body = buildBundleMarkdown({
+        description: "",
+        items: slugs.map((slug) => ({ key: slug, kind: "skill" as const, skill: skill(slug) })),
+        name: "Daily brief",
+    });
     const contentHash = await bodyHash(body);
 
     return { contentHash, markdown: withPluginHeader(body, { contentHash, slug: SLUG, version }) };
@@ -125,12 +129,12 @@ describe("plugin update action", () => {
         const preview = (await as().action(procedureAt("plugins_update", "previewUpdate"), { markdown: next.markdown } as never)) as PreviewResult;
 
         expect(preview).toMatchObject({ downgrade: false, installedVersion: "1.0.0", targetVersion: "1.1.0" });
-        expect(preview.plan).toContainEqual({ action: "create", entryKey: "skill:2" });
+        expect(preview.plan).toContainEqual({ action: "create", entryKey: "skill:reviewer" });
 
         const result = await updateTo(["analyst", "critic", "reviewer"], "1.1.0");
 
         expect(result).toMatchObject({ skipped: [], version: "1.1.0" });
-        expect(result.applied).toContain("skill:2");
+        expect(result.applied).toContain("skill:reviewer");
 
         const names = (await skillsNamed()).map((row: { name: string }) => row.name);
 
@@ -143,11 +147,11 @@ describe("plugin update action", () => {
             markdown: (await fileOf(["analyst"], "1.1.0")).markdown,
         } as never)) as PreviewResult;
 
-        expect(preview.plan).toContainEqual({ action: "delete", entryKey: "skill:1" });
+        expect(preview.plan).toContainEqual({ action: "delete", entryKey: "skill:critic" });
 
         const result = await updateTo(["analyst"], "1.1.0");
 
-        expect(result.applied).toContain("skill:1");
+        expect(result.applied).toContain("skill:critic");
 
         const names = (await skillsNamed()).map((row: { name: string }) => row.name);
 
@@ -161,10 +165,53 @@ describe("plugin update action", () => {
 
         const result = await updateTo(["analyst"], "1.1.0");
 
-        expect(result.applied).toContain("skill:1");
+        expect(result.applied).toContain("skill:critic");
 
         const kept = (await skillsNamed()).find((row: { name: string }) => row.name === "critic");
 
         expect(kept).toMatchObject({ instructions: "Changed by the owner.", pluginInstallId: "", pluginMarker: "" });
+    });
+
+    it("inserts a skill in the middle of the file, and no other skill's entry key changes", async () => {
+        const next = await fileOf(["analyst", "reviewer", "critic"], "1.1.0");
+
+        const preview = (await as().action(procedureAt("plugins_update", "previewUpdate"), { markdown: next.markdown } as never)) as PreviewResult;
+
+        expect(preview.plan).toContainEqual({ action: "create", entryKey: "skill:reviewer" });
+        expect(preview.plan).toContainEqual({ action: "same", entryKey: "skill:critic" });
+        expect(preview.plan).not.toContainEqual(expect.objectContaining({ action: "delete" }));
+
+        const result = await updateTo(["analyst", "reviewer", "critic"], "1.1.0");
+
+        expect(result.applied).toStrictEqual(["skill:reviewer"]);
+        expect(result.skipped).toStrictEqual([]);
+    });
+
+    it("a skill whose key changes but whose slug stays gets a slug the install does not hold, and the old skill is removed", async () => {
+        const body = buildBundleMarkdown({
+            description: "",
+            items: [
+                { key: "analyst", kind: "skill", skill: skill("analyst") },
+                { key: "critic-two", kind: "skill", skill: skill("critic") },
+            ],
+            name: "Daily brief",
+        });
+        const contentHash = await bodyHash(body);
+        const markdown = withPluginHeader(body, { contentHash, slug: SLUG, version: "1.1.0" });
+
+        const preview = (await as().action(procedureAt("plugins_update", "previewUpdate"), { markdown } as never)) as PreviewResult;
+
+        expect(preview.plan).toContainEqual({ action: "create", entryKey: "skill:critic-two" });
+        expect(preview.plan).toContainEqual({ action: "delete", entryKey: "skill:critic" });
+
+        const result = (await as().action(procedureAt("plugins_update", "updatePlugin"), {
+            confirmDowngrade: false,
+            contentHash,
+            markdown,
+        } as never)) as UpdateResult;
+
+        expect(result.skipped).toStrictEqual([]);
+        expect(result.applied).toEqual(expect.arrayContaining(["skill:critic-two", "skill:critic"]));
+        expect((await skillsNamed()).map((row: { slug: string }) => row.slug).toSorted()).toStrictEqual(["analyst", "critic-2"]);
     });
 });

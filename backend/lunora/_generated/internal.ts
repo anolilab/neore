@@ -1037,7 +1037,7 @@ export interface InternalApiTypes {
     };
     plugins: {
         export: {
-            pluginForSelection: FunctionReference<"query", { groupChatIds: Array<string>; skillIds: Array<string>; triggerIds: Array<string>; userId: string }, null | { slug: string; version: string }>;
+            pluginForSelection: FunctionReference<"query", { groupChatIds: Array<string>; skillIds: Array<string>; triggerIds: Array<string>; userId: string }, null | { keys: Array<{ id: string; key: string }>; slug: string; version: string }>;
         };
         install_steps: {
             createInstallRow: FunctionReference<"mutation", { contentHash: string; pluginSlug: string; userId: string; version: string }, { generation: number; installId: string }>;
@@ -1056,7 +1056,7 @@ export interface InternalApiTypes {
             finishUninstall: FunctionReference<"mutation", { generation: number; installId: string }, null>;
         };
         update: {
-            loadInstalledForUpdate: FunctionReference<"query", { pluginSlug: string; userId: string }, null | { children: Array<{ contentHash: string; currentHash: string; entryKey: string; kind: "skill" | "trigger" | "group" }>; installId: string; status: string; version: string }>;
+            loadInstalledForUpdate: FunctionReference<"query", { pluginSlug: string; userId: string }, null | { children: Array<{ contentHash: string; currentHash: string; entryKey: string; kind: "skill" | "trigger" | "group" }>; installId: string; ownSlugs: Array<{ entryKey: string; slug: string }>; status: string; version: string }>;
         };
         update_apply: {
             beginUpdate: FunctionReference<"mutation", { installId: string; targetVersion: string; userId: string }, number>;

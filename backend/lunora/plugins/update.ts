@@ -17,7 +17,7 @@ import { planFor } from "../skills/bundle";
 import { assertNoToolConfig, checkPluginFile } from "./install-action";
 import { entryHash, skillContent } from "./entry-hash";
 import { liveHashOf } from "./live-hash";
-import { diffUpdate, isDowngrade } from "./logic";
+import { diffUpdate, isDowngrade, markerFor } from "./logic";
 import type { UpdateAction } from "./logic";
 import { vPluginItemKind } from "./validators";
 
@@ -47,6 +47,7 @@ export const loadInstalledForUpdate = internalQuery
                     }),
                 ),
                 installId: v.string(),
+                ownSlugs: v.array(v.object({ entryKey: v.string(), slug: v.string() })),
                 status: v.string(),
                 version: v.string(),
             }),
@@ -62,14 +63,23 @@ export const loadInstalledForUpdate = internalQuery
         const installId = install._id as string;
         const { page } = await ctx.db.pluginItems.findMany({ where: { installId } });
         const children: Array<{ contentHash: string; currentHash: string; entryKey: string; kind: "group" | "skill" | "trigger" }> = [];
+        const ownSlugs: Array<{ entryKey: string; slug: string }> = [];
 
         for (const link of page) {
             const currentHash = await liveHashOf(ctx, installId, link);
 
             children.push({ contentHash: link.contentHash, currentHash, entryKey: link.entryKey, kind: link.kind });
+
+            if (link.kind === "skill") {
+                const skill = await ctx.db.skills.findFirst({ where: { pluginMarker: markerFor(installId, link.entryKey) } });
+
+                if (skill) {
+                    ownSlugs.push({ entryKey: link.entryKey, slug: skill.slug });
+                }
+            }
         }
 
-        return { children, installId, status: install.status, version: install.version };
+        return { children, installId, ownSlugs, status: install.status, version: install.version };
     });
 
 export const previewUpdate = authAction
@@ -101,7 +111,7 @@ export const previewUpdate = authAction
             throw new LunoraError("CONFLICT", `The plugin "${header.slug}" is ${installed.status}, not installed. Repair it first.`);
         }
 
-        const { entries } = await planFor(ctx, args.markdown, undefined);
+        const { entries } = await planFor(ctx, args.markdown, undefined, { ownSlugs: installed.ownSlugs });
         assertNoToolConfig(entries);
         const incoming = await Promise.all(entries.map(async (entry) => ({ contentHash: await entryHash(entry), entryKey: entry.key, kind: entry.kind })));
         const plan: Array<{ action: UpdateAction; entryKey: string }> = diffUpdate(installed.children, incoming);
@@ -158,7 +168,7 @@ export const updatePlugin = authAction
             );
         }
 
-        const { entries } = await planFor(ctx, args.markdown, undefined);
+        const { entries } = await planFor(ctx, args.markdown, undefined, { ownSlugs: installed.ownSlugs });
         assertNoToolConfig(entries);
         const incoming = await Promise.all(entries.map(async (entry) => ({ contentHash: await entryHash(entry), entryKey: entry.key, kind: entry.kind })));
         const plan = diffUpdate(installed.children, incoming);

@@ -90,8 +90,8 @@ const body = () =>
     buildBundleMarkdown({
         description: "",
         items: [
-            { kind: "skill", skill: ANALYST },
-            { kind: "skill", skill: REVIEWER },
+            { key: "analyst", kind: "skill", skill: ANALYST },
+            { key: "reviewer", kind: "skill", skill: REVIEWER },
         ],
         name: "Pair",
     });
@@ -139,6 +139,6 @@ describe("a rate limit part-way through an install", () => {
         } as never);
 
         expect(result).toMatchObject({ status: "installed" });
-        expect((await skillNames()).sort()).toEqual(["analyst", "reviewer"]);
+        expect((await skillNames()).toSorted()).toEqual(["analyst", "reviewer"]);
     });
 });

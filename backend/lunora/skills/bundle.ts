@@ -482,7 +482,24 @@ export const exportBundle = authAction
             slugById.set(skillId, slug);
         }
 
-        const items: BundleItem[] = [...skillSources].map(([skillId, skill]) => skillItemOf(skill, { isKnownTool, slug: slugById.get(skillId) }));
+        // A selection that is exactly one installed plugin's unedited children is exported as that plugin's own file, with each
+        // item under the key its install gave it. The lookup runs first, because a plugin file's body carries the keys.
+        const plugin = await ctx.runQuery(internal.plugins.export.pluginForSelection, {
+            groupChatIds: groupChatIds,
+            skillIds: skillIds,
+            triggerIds: triggerIds,
+            userId,
+        });
+        const keyById = new Map((plugin?.keys ?? []).map((child) => [child.id, child.key] as const));
+        const keyed = <T extends BundleItem>(item: T, id: string): T => {
+            const key = keyById.get(id);
+
+            return key === undefined ? item : { ...item, key };
+        };
+
+        const items: BundleItem[] = [...skillSources].map(([skillId, skill]) =>
+            keyed(skillItemOf(skill, { isKnownTool, slug: slugById.get(skillId) }), skillId),
+        );
 
         for (const trigger of sources.triggers) {
             const result = triggerItemOf(trigger);
@@ -491,7 +508,7 @@ export const exportBundle = authAction
                 throw new LunoraError("BAD_REQUEST", `"${trigger.name}" cannot be exported. ${result.reason}`);
             }
 
-            items.push(result.item);
+            items.push(keyed(result.item, trigger.id));
         }
 
         for (const group of sources.groupChats) {
@@ -501,12 +518,14 @@ export const exportBundle = authAction
                 throw new LunoraError("BAD_REQUEST", `"${group.title ?? "A group chat"}" cannot be exported. ${result.reason}`);
             }
 
-            items.push(result.item);
+            items.push(keyed(result.item, group.id));
         }
 
         const name = args.name.trim() || "Team bundle";
         const built = buildBundleMarkdown({ description: args.description ?? "", items, name });
-        const check = parseBundleMarkdown(built);
+        const markdown = plugin ? withPluginHeader(built, { contentHash: await bodyHash(built), slug: plugin.slug, version: plugin.version }) : built;
+        // The check reads the file that is returned, so a plugin file is checked with its header and its keys.
+        const check = parseBundleMarkdown(markdown);
 
         if (!check.ok) {
             throw new LunoraError("BAD_REQUEST", check.errors.join("; "));
@@ -517,15 +536,6 @@ export const exportBundle = authAction
         if (unreadable) {
             throw new LunoraError("BAD_REQUEST", `"${unreadable.label}" cannot be exported: ${unreadable.problems.join(" ")}`);
         }
-
-        // A selection that is exactly one installed plugin's unedited children is exported as that plugin's own file.
-        const plugin = await ctx.runQuery(internal.plugins.export.pluginForSelection, {
-            groupChatIds: groupChatIds,
-            skillIds: skillIds,
-            triggerIds: triggerIds,
-            userId,
-        });
-        const markdown = plugin ? withPluginHeader(built, { contentHash: await bodyHash(built), slug: plugin.slug, version: plugin.version }) : built;
 
         ctx.log.event("skills.bundle_export", { groupChats: sources.groupChats.length, skills: skillSources.size, triggers: sources.triggers.length });
 
@@ -627,6 +637,8 @@ export const planFor = async (
     },
     markdown: string,
     selected: ReadonlySet<string> | undefined,
+    // `ownSlugs`: the slug each of the plugin's installed skills holds, by entry key. An update may keep it under that key only.
+    options: { ownSlugs?: ReadonlyArray<{ entryKey: string; slug: string }> } = {},
 ): Promise<{ bundle: { description: string; name: string }; entries: PlanEntry[]; env: PlanEnv }> => {
     const parsed = parseBundleMarkdown(markdown);
 
@@ -642,6 +654,7 @@ export const planFor = async (
         isKnownTool: (name) => knownTools.has(name),
         isModelRunnable: isRunnableModel,
         now: Date.now(),
+        ownSlugByKey: new Map((options.ownSlugs ?? []).map((own) => [own.entryKey, own.slug] as const)),
         skillLimit: skillLimitFor(ctx.user),
     };
 
