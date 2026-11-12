@@ -811,3 +811,19 @@ describe("lists numbered with letters or roman numerals", () => {
         expect(htmlToMarkdown('<ol type="1"><li>one</li></ol>')).toBe("1. one");
     });
 });
+
+describe("a URL pasted over a selection with spaces around it", () => {
+    it("links the word and keeps the spaces outside the link", () => {
+        expect(planPaste(clipboard({ "text/plain": "https://example.com/" }), { plainOnly: false, selectedText: "docs " })).toStrictEqual({
+            kind: "text",
+            markdown: true,
+            text: "[docs](https://example.com/) ",
+        });
+    });
+});
+
+describe("text hidden from assistive technology in any case", () => {
+    it("stays out of the paste", () => {
+        expect(htmlToMarkdown('<p>shown<span aria-hidden="TRUE"> secret</span></p>')).toBe("shown");
+    });
+});

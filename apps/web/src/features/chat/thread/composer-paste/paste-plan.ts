@@ -595,7 +595,15 @@ export const planPaste = (data: Pick<DataTransfer, "getData">, { inFence = false
 
     // A URL pasted over a URL replaces it.
     if (selectedText.trim() !== "" && !selectedText.includes("\n") && URL_ONLY.test(url) && !URL_ONLY.test(selectedText.trim())) {
-        return { kind: "text", markdown: true, text: markdownLink(selectedText, url) };
+        // The spaces a double-click takes along stay outside the link, as for a pasted `<a>`.
+        const label = selectedText.trim();
+        const start = selectedText.indexOf(label);
+
+        return {
+            kind: "text",
+            markdown: true,
+            text: selectedText.slice(0, start) + markdownLink(label, url) + selectedText.slice(start + label.length),
+        };
     }
 
     const vscode = data.getData("vscode-editor-data");

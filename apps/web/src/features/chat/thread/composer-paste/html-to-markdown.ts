@@ -175,7 +175,7 @@ const isHidden = (element: Element): boolean =>
     declares(styleOf(element), "mso-list", "ignore") ||
     HIDDEN_CLASS.test(element.getAttribute("class") ?? "") ||
     element.hasAttribute("hidden") ||
-    element.getAttribute("aria-hidden") === "true";
+    element.getAttribute("aria-hidden")?.trim().toLowerCase() === "true";
 
 /** Elements a page shows on lines of their own besides the blocks: read only as page text, as code rarely holds them. */
 const PAGE_LINES = new Set(["BLOCKQUOTE", "H1", "H2", "H3", "H4", "H5", "H6", "LI", "OL", "PRE", "TABLE", "TR", "UL"]);
