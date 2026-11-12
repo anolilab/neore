@@ -295,3 +295,21 @@ describe("review: reference labels that two links share", () => {
         );
     });
 });
+
+describe("review: email addresses in angle brackets", () => {
+    it("escapes a < before an email address that starts with a digit, so it is not an autolink", () => {
+        expect(convert("&lt;1a@b.co&gt;")).toBe(String.raw`\<1a@b.co>`);
+    });
+
+    it("escapes a < at the end of a text node when the next text starts with an email address", () => {
+        expect(convert("&lt;<span>1a@b.co&gt;</span>")).toBe(String.raw`\<1a@b.co>`);
+    });
+
+    it("guard, passes before and after: a < between spaces is not escaped", () => {
+        expect(convert("1 &lt; 2")).toBe("1 < 2");
+    });
+
+    it("guard, passes before and after: a < before a digit with no @ after it is not escaped", () => {
+        expect(convert("a&lt;1")).toBe("a<1");
+    });
+});

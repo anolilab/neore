@@ -128,8 +128,8 @@ function process(service: TurndownService, parentNode: Node): string[] {
     return output;
 }
 
-// The characters after `<` that open raw HTML or an autolink.
-const HTML_OPENER = /^[a-z/!?]/i;
+// The text after `<` that opens raw HTML or an email autolink: a letter, `/`, `!` or `?`, or a local part and an `@`.
+const HTML_OPENER = /^(?:[a-z/!?]|[a-z0-9.!#$%&'+/=?^{|}~-]+@)/i;
 
 /**
  * Escapes a text node. `escapeMarkdown` sees only this node, so a `<` at its end is

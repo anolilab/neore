@@ -7,7 +7,7 @@ import { escapeMarkdown } from "../src/utilities";
  * the rewrite must agree with it on every string.
  *
  * Two escapes were added with the `<` and `)` fixes. A `<` is escaped only before a
- * letter, `/`, `!` or `?`, the characters that can open raw HTML or an autolink. An
+ * letter, `/`, `!` or `?`, the characters that can open raw HTML, or a local part and `@` (an email autolink). An
  * ordered-list delimiter is `.` or `)`, so both are escaped after a number that ends
  * the string or precedes a space, a tab or a line end. A `<` at the end of a text node is escaped by the
  * text rule in turndown.ts, which can see the next node.
@@ -26,11 +26,11 @@ function referenceEscape(string: string): string {
         .replaceAll("]", String.raw`\]`)
         .replaceAll(/^>/g, String.raw`\>`)
         .replaceAll("_", String.raw`\_`)
-        .replaceAll(/<(?=[a-z/!?])/gi, String.raw`\<`)
+        .replaceAll(/<(?=[a-z/!?]|[a-z0-9.!#$%&'+/=?^{|}~-]+@)/gi, String.raw`\<`)
         .replaceAll(/^(\d+)([.)])(?=[ \t\n]|$)/g, String.raw`$1\$2`);
 }
 
-const ALPHABET = ["\\", "*", "`", "[", "]", "_", "-", "+", " ", "=", "#", "~", ">", "1", "9", ".", "a", "(", "\n", "\t", " ", ")", "<", "!", "/"];
+const ALPHABET = ["\\", "*", "`", "[", "]", "_", "-", "+", " ", "=", "#", "~", ">", "1", "9", ".", "a", "(", "\n", "\t", " ", ")", "<", "!", "/", "@"];
 
 // Park-Miller generator: arithmetic only, so the sequence is the same on every run.
 const MODULUS = 2_147_483_647;
