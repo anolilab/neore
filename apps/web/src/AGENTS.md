@@ -68,6 +68,8 @@ The rules for working in `apps/web/src`. The detail, reasoning and code examples
 - Keep shell-only code off the first load (`scripts/check-web-bundle.ts`): mount it with `lazyShellChunk`
   (`lib/native/shell-chunk.tsx`); one needed offline also goes in `OFFLINE_SHELL_CHUNKS` (`scripts/generate-sw.mjs`).
   Use `toScriptLiteral` in inline scripts.
+- PostHog loads after mount: read it through `lib/analytics/posthog-client.ts` (`usePostHog`, `useFeatureFlagEnabled`,
+  `getPostHog`), never `posthog-js`/`posthog-js/react`/`@posthog/react` in eagerly loaded code (~115 KiB gzip).
 
 ## CONVENTIONS
 
