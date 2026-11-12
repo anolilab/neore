@@ -15,6 +15,7 @@ import {
     flushStoredDrafts,
     LEGACY_DRAFTS_KEY,
     lockStoredDraft,
+    MAX_STORED_DRAFT_CHARS,
     MAX_STORED_DRAFTS,
     NEW_CHAT_DRAFT_KEY,
     releaseStoredDrafts,
@@ -170,6 +171,21 @@ describe("writing", () => {
         vi.advanceTimersByTime(DRAFT_WRITE_DELAY_MS);
 
         expect(entry("thread-a")?.v.a).toHaveLength(1);
+    });
+
+    it("keeps no draft longer than the limit, and removes this page's earlier entry for it", () => {
+        bindStoredDrafts("thread-a", "user-1", false);
+        type("short");
+        flushStoredDrafts();
+        type("x".repeat(MAX_STORED_DRAFT_CHARS + 1));
+        vi.advanceTimersByTime(DRAFT_WRITE_DELAY_MS);
+
+        expect(draftKeys()).toStrictEqual([]);
+
+        type("x".repeat(MAX_STORED_DRAFT_CHARS));
+        vi.advanceTimersByTime(DRAFT_WRITE_DELAY_MS);
+
+        expect(text("thread-a")).toHaveLength(MAX_STORED_DRAFT_CHARS);
     });
 });
 

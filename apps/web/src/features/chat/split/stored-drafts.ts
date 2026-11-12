@@ -33,6 +33,8 @@ import {
 export const DRAFT_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 export const MAX_STORED_DRAFTS = 50;
 export const DRAFT_WRITE_DELAY_MS = 400;
+/** The longest text a stored draft keeps: a longer one (a log, a file's contents) is not kept, so one draft never fills the origin's storage. */
+export const MAX_STORED_DRAFT_CHARS = 100_000;
 export const NEW_CHAT_DRAFT_KEY = "new";
 /** How far ahead of this clock a saved time may be (another device's clock, a correction): later ones are unreadable. */
 export const DRAFT_CLOCK_SKEW_MS = 24 * 60 * 60 * 1000;
@@ -184,6 +186,11 @@ const toStoredDraft = (content: Partial<Content> | undefined): StoredDraft | und
         .filter((stored) => stored !== undefined);
     const r = (content?.attachedReferences ?? []).filter(isReference);
     const t = content?.composerText ?? "";
+
+    // Not kept at all: an entry this page wrote for it earlier is removed, so a shorter, stale copy does not come back.
+    if (t.length > MAX_STORED_DRAFT_CHARS) {
+        return undefined;
+    }
 
     return t === "" && a.length === 0 && r.length === 0 ? undefined : { a, r, t };
 };
