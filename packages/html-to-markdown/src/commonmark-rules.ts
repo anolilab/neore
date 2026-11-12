@@ -431,7 +431,8 @@ function soleCodeElement(parent: Node): Element | null {
     let only: Node | null = null;
 
     for (let child = parent.firstChild; child; child = child.nextSibling) {
-        if (child.nodeType === 3 && !NON_BLANK.test(child.nodeValue ?? "")) {
+        // A comment (node type 8) is not content, like blank text.
+        if (child.nodeType === 8 || (child.nodeType === 3 && !NON_BLANK.test(child.nodeValue ?? ""))) {
             continue;
         }
 

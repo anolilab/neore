@@ -126,6 +126,15 @@ describe("code block with whitespace or a wrapper before <code> (#486, #498, #53
         expect(new TurndownUpstream({ codeBlockStyle }).turndown(html)).toBe("`x`");
     });
 
+    // A comment is not content, so it must not stop the <code> from making a block, as blank text does not.
+    it.each([
+        ["a comment inside a wrapper", "<pre><div><!-- x --><code>x</code></div></pre>"],
+        ["a comment before <code>", "<pre><!-- x --><code>x</code></pre>"],
+    ])("%s is a code block in both styles", (_name, html) => {
+        expect(convert(html, { codeBlockStyle: "indented" })).toBe("    x");
+        expect(convert(html, { codeBlockStyle: "fenced" })).toBe("```\nx\n```");
+    });
+
     it("does not make a code block when text comes before <code>", () => {
         const html = "<pre>note <code>x = 1</code></pre>";
         const upstream = new TurndownUpstream({ codeBlockStyle: "indented" }).turndown(html);
