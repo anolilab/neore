@@ -1,8 +1,8 @@
 import { TransportError } from "@lunora/client";
 import { describe, expect, it } from "vitest";
 
-import type { CheckResult, PossiblySent } from "./possibly-sent";
-import { checkPossiblySent, createPossiblySentStore, entriesFor, hasPrompt, POSSIBLY_SENT_WINDOW_MS } from "./possibly-sent";
+import type { CheckResult, PossiblySent, ReadPage, SentMessage } from "./possibly-sent";
+import { checkPossiblySent, createPossiblySentStore, entriesFor, foundAction, hasPrompt, POSSIBLY_SENT_WINDOW_MS } from "./possibly-sent";
 
 const SENT_AT = 1_000_000;
 
@@ -32,52 +32,95 @@ describe(hasPrompt, () => {
     });
 });
 
+/** One page of a read: `next` names the following page's cursor, none means the last page. */
+const pageOf = <T>(page: T[], next?: string): ReadPage<T> => {
+    return { continueCursor: next ?? null, isDone: next === undefined, page };
+};
+
+const prompt = (createdAt: number, id = "m1"): SentMessage => {
+    return { createdAt, id, role: "user", text: "hello" };
+};
+
 describe(checkPossiblySent, () => {
-    it("finds a new chat by its first message, reading only chats created since the send", async () => {
+    it("finds a new chat by its first message on a later page, reading only chats created since the send", async () => {
         const read: string[] = [];
         const result = await checkPossiblySent(entry(), {
-            newestMessages: async (threadId) => {
+            messages: async (threadId) => {
                 read.push(threadId);
 
-                return threadId === "t-new" ? [{ createdAt: SENT_AT + 1000, id: "m1", role: "user", text: "hello" }] : [];
+                return pageOf(threadId === "t-new" ? [prompt(SENT_AT + 1000)] : []);
             },
-            newestThreads: async () => [
-                { createdAt: SENT_AT + 2000, id: "t-other" },
-                { createdAt: SENT_AT + 1000, id: "t-new" },
-                { createdAt: SENT_AT - 600_000, id: "t-old" },
-            ],
+            threads: async (cursor) => {
+                if (cursor === null) {
+                    return pageOf([{ createdAt: SENT_AT + 2000, id: "t-other" }, { createdAt: SENT_AT - 600_000, id: "t-old" }], "2");
+                }
+
+                return pageOf([{ createdAt: SENT_AT + 1000, id: "t-new" }]);
+            },
         });
 
         expect(result).toStrictEqual({ kind: "found", threadId: "t-new" });
         expect(read).toStrictEqual(["t-other", "t-new"]);
     });
 
-    it("reads the chat itself for a send to an existing chat", async () => {
+    it("reads a chat's messages back to the send, and no further", async () => {
+        const cursors: (string | null)[] = [];
         const result = await checkPossiblySent(entry({ threadId: "t1" }), {
-            newestMessages: async () => [{ createdAt: SENT_AT + 1000, id: "m1", role: "user", text: "hello" }],
-            newestThreads: async () => {
+            messages: async (_threadId, cursor) => {
+                cursors.push(cursor);
+
+                return cursor === null ? pageOf([{ ...prompt(SENT_AT + 9000, "m9"), text: "later" }], "2") : pageOf([prompt(SENT_AT - 600_000, "m0")], "3");
+            },
+            threads: async () => {
                 throw new Error("not read");
             },
         });
 
-        expect(result).toStrictEqual({ kind: "found", threadId: "t1" });
+        expect(result).toStrictEqual({ kind: "absent" });
+        expect(cursors).toStrictEqual([null, "2"]);
     });
 
-    it("counts only a network failure as no answer; a refusal answers that the prompt is not there", async () => {
+    it("proves nothing from an error or from more pages than a check reads", async () => {
         const failing = (error: Error) => {
             return {
-                newestMessages: async () => [],
-                newestThreads: async () => {
+                messages: async () => pageOf<SentMessage>([]),
+                threads: async () => {
                     throw error;
                 },
             };
         };
+        const endless = {
+            messages: async () => pageOf<SentMessage>([]),
+            threads: async () => pageOf([{ createdAt: SENT_AT - 600_000, id: "t-old" }], "more"),
+        };
 
         const offline = failing(new TransportError("offline"));
-        const refused = failing(new Error("FORBIDDEN"));
+        const refused = failing(new Error("UNAUTHORIZED"));
 
-        await expect(checkPossiblySent(entry(), offline)).resolves.toStrictEqual({ kind: "unreachable" });
-        await expect(checkPossiblySent(entry(), refused)).resolves.toStrictEqual({ kind: "absent" });
+        await expect(checkPossiblySent(entry(), offline)).resolves.toStrictEqual({ kind: "inconclusive" });
+        await expect(checkPossiblySent(entry(), refused)).resolves.toStrictEqual({ kind: "inconclusive" });
+        await expect(checkPossiblySent(entry(), endless)).resolves.toStrictEqual({ kind: "inconclusive" });
+    });
+
+    it("proves the prompt absent when every page answered", async () => {
+        const result = await checkPossiblySent(entry(), {
+            messages: async () => pageOf([prompt(SENT_AT + 1000, "old")]),
+            threads: async () => pageOf([{ createdAt: SENT_AT + 1000, id: "t-other" }]),
+        });
+
+        expect(result).toStrictEqual({ kind: "absent" });
+    });
+});
+
+describe(foundAction, () => {
+    it.each([
+        ["another account's prompt", entry({ accountId: "b" }), true, undefined, "ignore"],
+        ["another chat's prompt", entry({ threadId: "t2" }), true, "t1", "ignore"],
+        ["an existing chat's prompt", entry({ threadId: "t1" }), false, "t1", "reload"],
+        ["a new chat's prompt on screen", entry(), true, undefined, "open"],
+        ["a new chat's prompt on a screen left behind", entry(), false, undefined, "leave-to-list"],
+    ] as const)("%s: %s", (_name, held, isFocused, threadId, expected) => {
+        expect(foundAction(held, { accountId: "a", isFocused, threadId })).toBe(expected);
     });
 });
 
@@ -109,7 +152,7 @@ describe(createPossiblySentStore, () => {
         store.onFound((held, threadId) => {
             found.push(`${held.id}:${threadId}`);
         });
-        const tracking = store.track(entry());
+        const tracking = store.track(entry(), 0);
 
         expect(entriesFor(store.snapshot(), "a", undefined).map((held) => held.state)).toStrictEqual(["pending"]);
         await tracking;
@@ -121,7 +164,7 @@ describe(createPossiblySentStore, () => {
     it("gives the prompt back only after a check that answered past the window", async () => {
         const { checks, store } = storeAnswering([{ kind: "absent" }], 20_000);
 
-        await store.track(entry());
+        await store.track(entry(), 0);
 
         expect(checks()).toBe(POSSIBLY_SENT_WINDOW_MS / 20_000);
         expect(entriesFor(store.snapshot(), "a", undefined).map((held) => held.state)).toStrictEqual(["unsent"]);
@@ -141,21 +184,32 @@ describe(createPossiblySentStore, () => {
         expect(store.snapshot()).toStrictEqual([]);
     });
 
-    it("keeps checking while the server does not answer, even past the window", async () => {
+    it("keeps checking while no check proves anything, even past the window", async () => {
         const { checks, store } = storeAnswering(
-            [{ kind: "unreachable" }, { kind: "unreachable" }, { kind: "unreachable" }, { kind: "unreachable" }, { kind: "absent" }],
+            [{ kind: "inconclusive" }, { kind: "inconclusive" }, { kind: "inconclusive" }, { kind: "inconclusive" }, { kind: "absent" }],
             60_000,
         );
 
-        await store.track(entry());
+        await store.track(entry(), 0);
 
         expect(checks()).toBe(5);
         expect(store.snapshot().map((held) => held.state)).toStrictEqual(["unsent"]);
     });
 
+    it("holds nothing for a send that settles after a sign-out", async () => {
+        const { checks, store } = storeAnswering([{ kind: "absent" }], 1000);
+        const session = store.session();
+
+        store.clear();
+        await store.track(entry(), session);
+
+        expect(checks()).toBe(0);
+        expect(store.snapshot()).toStrictEqual([]);
+    });
+
     it("stops checking at sign-out", async () => {
         const { checks, store } = storeAnswering([{ kind: "absent" }], 1000);
-        const tracking = store.track(entry());
+        const tracking = store.track(entry(), 0);
 
         store.clear();
         await tracking;

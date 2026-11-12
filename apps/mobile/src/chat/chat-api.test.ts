@@ -24,11 +24,15 @@ describe("startChat", () => {
         await assertion;
     });
 
-    it("marks an answered non-2xx as a refusal", async () => {
-        const fetch: Fetch = async () => Response.json({ error: { code: "RATE_LIMITED", message: "Slow down" } }, { status: 429 });
+    it.each([
+        [429, true],
+        [500, false],
+        [502, false],
+    ])("an answered %i is a refusal: %s", async (status, isRefusal) => {
+        const fetch: Fetch = async () => Response.json({ error: { code: "X", message: "Slow down" } }, { status });
 
         await expect(startChat({ body: { model: "m", prompt: "p" }, fetch, gatewayUrl: "https://gw", jwt: "j" })).rejects.toMatchObject({
-            isRefusal: true,
+            isRefusal,
             message: "Slow down",
         });
     });

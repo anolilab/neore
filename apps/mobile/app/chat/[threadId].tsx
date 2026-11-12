@@ -14,7 +14,7 @@ import { secureGrantStore } from "@/auth/secure-store";
 import { ChatError, startChat } from "@/chat/chat-api";
 import { forgetLastThread, rememberLastThread } from "@/chat/last-thread-store";
 import { displayTextOf, shareTextOf } from "@/chat/message-parts";
-import { entriesFor } from "@/chat/possibly-sent";
+import { entriesFor, foundAction } from "@/chat/possibly-sent";
 import { possiblySent } from "@/chat/possibly-sent-store";
 import { isScrolledToEnd, scrollToLatestLabel, scrollToLatestText, shouldShowScrollToLatest } from "@/chat/scroll-to-latest";
 import { shareableMessageText, shareLabel } from "@/chat/share-message";
@@ -439,20 +439,23 @@ const Chat = () => {
         [accountId, threadId],
     );
 
-    // A prompt the checks found: a new chat opens the chat that started, an existing one reads its messages again.
+    // A prompt the checks found: a new chat on screen opens the chat that started (one left behind leaves it to the list,
+    // since `setParams` would change the route on screen), an existing one reads its messages again.
     useEffect(
         () =>
             possiblySent.onFound((entry, foundThreadId) => {
-                if (entry.accountId !== accountId || entry.threadId !== threadIdRef.current) {
+                const action = foundAction(entry, { accountId, isFocused: isFocusedRef.current, threadId: threadIdRef.current });
+
+                if (action === "ignore") {
                     return;
                 }
 
                 setError(withoutPossiblySent);
 
-                if (entry.threadId === undefined) {
+                if (action === "open") {
                     setThreadId(foundThreadId);
                     router.setParams({ threadId: foundThreadId });
-                } else {
+                } else if (action === "reload") {
                     loadMessages(foundThreadId);
                 }
             }),
@@ -467,12 +470,15 @@ const Chat = () => {
         ids,
         prompt,
         sentAt,
+        session,
         stage,
     }: {
         error: unknown;
         ids: { assistant: string; user: string };
         prompt: string;
         sentAt: number;
+        /** `possiblySent.session()` when the send started: a sign-out since then holds nothing. */
+        session: number;
         stage: SendStage;
     }) => {
         const outcome = failedSendOutcome(stage, failure);
@@ -485,7 +491,7 @@ const Chat = () => {
             const knownMessageIds = new Set(rowsRef.current.filter((row) => row.status !== "local").map((row) => row.id));
 
             writeRows((current) => withoutUnsentRows(current, [ids.user, ids.assistant]));
-            settleQuietly(possiblySent.track({ accountId, failedAt: Date.now(), id: ids.user, knownMessageIds, prompt, sentAt, threadId }));
+            settleQuietly(possiblySent.track({ accountId, failedAt: Date.now(), id: ids.user, knownMessageIds, prompt, sentAt, threadId }, session));
         }
 
         return outcome;
@@ -507,6 +513,7 @@ const Chat = () => {
         const controller = new AbortController();
         // The account that sends: the offer below is its, even if another account is signed in by the time it lands.
         const sender = accountId;
+        const session = possiblySent.session();
 
         sendAbort.current = controller;
         setSending(true);
@@ -620,7 +627,7 @@ const Chat = () => {
 
             AccessibilityInfo.announceForAccessibility("Reply finished");
         } catch (error_) {
-            const outcome = settleFailedSend({ error: error_, ids: { assistant: assistantId, user: userId }, prompt, sentAt: stamp, stage });
+            const outcome = settleFailedSend({ error: error_, ids: { assistant: assistantId, user: userId }, prompt, sentAt: stamp, session, stage });
 
             // The abort error of a send stopped on purpose is not shown: its notice is.
             if (!controller.signal.aborted) {

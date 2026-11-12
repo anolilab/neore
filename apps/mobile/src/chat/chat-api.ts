@@ -16,7 +16,7 @@ export interface StartChatBody {
 }
 
 export class ChatError extends Error {
-    /** The gateway answered and refused the start (a non-2xx status): the prompt was not taken. */
+    /** The gateway answered and refused the start (a 4xx status): the prompt was not taken. A 5xx may come after it was. */
     public readonly isRefusal: boolean;
 
     public constructor(message: string, options: { isRefusal?: boolean } = {}) {
@@ -66,7 +66,8 @@ export const startChat = async (input: { body: StartChatBody; fetch: Fetch; gate
                 // A body that is not JSON keeps the status-based message.
             }
 
-            throw new ChatError(errorMessage(body) ?? `Could not send (${response.status}).`, { isRefusal: true });
+            // A 5xx can come after the backend saved the prompt (a failed stream setup, a lost relay): not a refusal.
+            throw new ChatError(errorMessage(body) ?? `Could not send (${response.status}).`, { isRefusal: response.status < 500 });
         }
 
         return (await response.json()) as StartedChat;
