@@ -16,11 +16,8 @@ const MIN_DELAY_MS = 30_000;
 /** Retry delay after a failed or inconclusive renewal. The current token keeps working until it expires. */
 export const TOKEN_RETRY_DELAY_MS = 60_000;
 
-/**
- * Milliseconds to wait before renewing `token`, or `undefined` when its claims can't say.
- * `nowMs` is the moment the delay is measured from; it defaults to the device clock.
- */
-export const tokenRefreshDelayMs = (token: string, nowMs: number = Date.now()): number | undefined => {
+/** `exp` and `iat` in seconds, or `undefined` when the token is not a JWT with a sane pair of them. */
+const lifetimeClaims = (token: string): { exp: number; iat: number } | undefined => {
     const payload = token.split(".", 2)[1];
 
     if (!payload) {
@@ -34,12 +31,39 @@ export const tokenRefreshDelayMs = (token: string, nowMs: number = Date.now()): 
             return undefined;
         }
 
-        const lifetimeMs = (claims.exp - claims.iat) * 1000;
-        const remainingMs = claims.exp * 1000 - nowMs;
-        const delayMs = REFRESH_FRACTION * Math.min(lifetimeMs, remainingMs);
-
-        return Math.max(MIN_DELAY_MS, Math.floor(delayMs));
+        return { exp: claims.exp, iat: claims.iat };
     } catch {
         return undefined;
     }
+};
+
+/**
+ * Milliseconds to wait before renewing `token`, or `undefined` when its claims can't say.
+ * `nowMs` is the moment the delay is measured from; it defaults to the device clock.
+ */
+export const tokenRefreshDelayMs = (token: string, nowMs: number = Date.now()): number | undefined => {
+    const claims = lifetimeClaims(token);
+
+    if (!claims) {
+        return undefined;
+    }
+
+    const lifetimeMs = (claims.exp - claims.iat) * 1000;
+    const remainingMs = claims.exp * 1000 - nowMs;
+    const delayMs = REFRESH_FRACTION * Math.min(lifetimeMs, remainingMs);
+
+    return Math.max(MIN_DELAY_MS, Math.floor(delayMs));
+};
+
+/** How much life a token must have left to be reused without asking the server. */
+export const TOKEN_REUSE_MARGIN_MS = 60_000;
+
+/**
+ * Whether `token` still has at least `TOKEN_REUSE_MARGIN_MS` before it expires. A token whose
+ * claims can't say counts as not valid, so the caller asks the server.
+ */
+export const tokenStillValid = (token: string, nowMs: number = Date.now()): boolean => {
+    const claims = lifetimeClaims(token);
+
+    return claims !== undefined && claims.exp * 1000 - nowMs > TOKEN_REUSE_MARGIN_MS;
 };

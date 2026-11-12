@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { tokenRefreshDelayMs } from "./token-refresh";
+import { tokenRefreshDelayMs, tokenStillValid } from "./token-refresh";
 
 const encode = (value: unknown) => btoa(JSON.stringify(value)).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "");
 
@@ -30,5 +30,18 @@ describe("tokenRefreshDelayMs", () => {
         expect(tokenRefreshDelayMs("not-a-jwt", at(NOW_S))).toBeUndefined();
         expect(tokenRefreshDelayMs(jwt({ exp: NOW_S, iat: NOW_S + 900 }), at(NOW_S))).toBeUndefined();
         expect(tokenRefreshDelayMs(jwt({ sub: "user" }), at(NOW_S))).toBeUndefined();
+    });
+});
+
+describe(tokenStillValid, () => {
+    it("holds while more than a minute is left", () => {
+        expect(tokenStillValid(jwt({ exp: NOW_S + 61, iat: NOW_S - 600 }), at(NOW_S))).toBe(true);
+    });
+
+    it("fails for an expired or nearly expired token, and for one whose claims can't say", () => {
+        expect(tokenStillValid(jwt({ exp: NOW_S + 60, iat: NOW_S - 600 }), at(NOW_S))).toBe(false);
+        expect(tokenStillValid(jwt({ exp: NOW_S - 1, iat: NOW_S - 900 }), at(NOW_S))).toBe(false);
+        expect(tokenStillValid("not-a-jwt", at(NOW_S))).toBe(false);
+        expect(tokenStillValid(jwt({ sub: "user" }), at(NOW_S))).toBe(false);
     });
 });

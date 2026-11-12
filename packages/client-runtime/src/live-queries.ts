@@ -35,6 +35,7 @@ import type { Query, QueryCacheNotifyEvent, QueryClient, QueryKey } from "@tanst
 
 import { Entry, NO_VALUE } from "./live-query-entry";
 import { resetShardRegistry } from "./shard-routing";
+import { THREAD_QUERY_PATHS } from "./thread-queries";
 import { forgetAllUnlockProofs, onUnlockExpired } from "./unlock-proofs";
 import type { WsTicketMinter } from "./ws-ticket";
 
@@ -143,8 +144,11 @@ export class LiveQueryManager {
     /** Server pushes per query hash — lets an in-flight RPC detect it lost a race. */
     private readonly pushes = new Map<string, number>();
 
-    /** Entries waiting for a seed slot, in the order their queries asked. */
+    /** Entries waiting for a seed slot, in the order their queries asked. Thread reads go first (`THREAD_QUERY_PATHS`). */
     private readonly queue: string[] = [];
+
+    /** How many entries at the head of `queue` are thread reads. */
+    private queuedThreadReads = 0;
 
     private seeding = 0;
 
@@ -350,13 +354,22 @@ export class LiveQueryManager {
         const path = query.queryKey[1] as string;
 
         this.entries.set(query.queryHash, new Entry(path, argsOf(query), query.queryKey));
-        this.queue.push(query.queryHash);
+
+        // A thread switch waits on the thread and the list, not on the sidebar's or the settings' other reads.
+        if (THREAD_QUERY_PATHS.has(path)) {
+            this.queue.splice(this.queuedThreadReads, 0, query.queryHash);
+            this.queuedThreadReads += 1;
+        } else {
+            this.queue.push(query.queryHash);
+        }
+
         this.pump();
     }
 
     /** Starts queued subscriptions while seed slots are free. */
     private pump(): void {
         while (this.seeding < MAX_CONCURRENT_SEEDS && this.queue.length > 0) {
+            this.queuedThreadReads = Math.max(0, this.queuedThreadReads - 1);
             // A released entry is gone from `entries`; `start` skips it.
             this.start(this.queue.shift() as string);
         }

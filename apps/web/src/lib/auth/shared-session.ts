@@ -18,8 +18,16 @@ const BETTER_AUTH_BROADCAST_KEY = "better-auth.message";
 /** Where better-auth is mounted on the app origin (proxied to the backend, `routes/api/auth/$.ts`). */
 const AUTH_BASE_PATH = "/api/auth";
 
-/** Created on first use, once per page. */
-const singleton: { shared?: SharedSessionRead } = {};
+/** Created on first use, once per page. `changes` counts invalidations: see `sessionChangeCount`. */
+const singleton: { changes: number; shared?: SharedSessionRead } = { changes: 0 };
+
+/**
+ * How many times this page has seen the session possibly change: a sign-in, sign-out or other
+ * session-changing auth request (counted when it starts and when it ends), or another tab's
+ * better-auth broadcast. A reader that remembers this number can tell whether what it last read
+ * may be out of date (`root-before-load.ts`). Always 0 on the server.
+ */
+export const sessionChangeCount = (): number => singleton.changes;
 
 export const getSharedSessionRead = (): SharedSessionRead | undefined => {
     if (globalThis.window === undefined) {
@@ -28,10 +36,17 @@ export const getSharedSessionRead = (): SharedSessionRead | undefined => {
 
     if (!singleton.shared) {
         const sessionUrl = `${globalThis.location.origin}${AUTH_BASE_PATH}/get-session`;
-        const instance = createSharedSessionRead({
+        const shared = createSharedSessionRead({
             // Through the app's own origin, with the session cookie — the read better-auth's client makes.
             readSession: async () => await fetch(sessionUrl, { credentials: "include", method: "GET" }),
         });
+        const instance: SharedSessionRead = {
+            invalidate: () => {
+                singleton.changes += 1;
+                shared.invalidate();
+            },
+            read: shared.read,
+        };
 
         // Another tab's sign-out / user update: better-auth re-reads on this event, and must not get our cached copy.
         // This listener must run BEFORE better-auth's (a microtask checkpoint follows each listener, so its

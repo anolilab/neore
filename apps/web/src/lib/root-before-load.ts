@@ -1,11 +1,42 @@
+import { tokenStillValid } from "@neore/client-runtime";
+
 import { getSessionAuthState } from "@/lib/auth/server-functions";
+import { sessionChangeCount } from "@/lib/auth/shared-session";
 import { OFFLINE_SHELL_PATH, offlineShellRootContext } from "@/lib/offline-shell";
 import { readRequestContext } from "@/lib/request-context";
 
 interface RootBeforeLoadOptions {
-    context: { lunoraClient: { setAuthToken: (token: string) => void } };
+    context: { lunoraClient: { getAuthToken: () => string | null; setAuthToken: (token: string) => void } };
     location: { pathname: string };
 }
+
+/**
+ * Browser only: the `sessionChangeCount()` at which the session was last read and found
+ * signed in. The page starts at 0 with the token the server rendered it with
+ * (`seedHydratedAuthToken`), which is that read.
+ */
+const confirmed: { changes: number | undefined } = { changes: 0 };
+
+/**
+ * The token a client navigation may keep without asking the server: the one the client holds,
+ * while it has more than a minute left and no session-changing request or other tab's
+ * broadcast has happened since the session was last read as signed in. Anything else (no
+ * token, near expiry, a sign-in or sign-out since) reads the session as the first load does.
+ *
+ * What this skips is one server-function round trip per navigation, nothing the backend
+ * checks: every RPC still carries the token, which the backend verifies. `AuthRecovery`
+ * renews the token and drops it when the session has ended, and the next navigation then
+ * reads the session again.
+ */
+const reusableToken = (client: RootBeforeLoadOptions["context"]["lunoraClient"]): string | undefined => {
+    if (import.meta.env.SSR || confirmed.changes !== sessionChangeCount()) {
+        return undefined;
+    }
+
+    const token = client.getAuthToken();
+
+    return token && tokenStillValid(token) ? token : undefined;
+};
 
 /**
  * The root route's `beforeLoad` (`src/routes/__root.tsx`), here so it can be
@@ -19,6 +50,17 @@ const rootBeforeLoad = async (options: RootBeforeLoadOptions) => {
 
         return offlineShellRootContext(nonce);
     }
+
+    const reused = reusableToken(options.context.lunoraClient);
+
+    if (reused) {
+        const { nonce, posthog } = await readRequestContext(options);
+
+        return { authStatus: "authenticated" as const, isAuthenticated: true, nonce, token: reused, posthog };
+    }
+
+    // Taken before the read: a change while it is out leaves the answer unconfirmed.
+    const changesAtRead = sessionChangeCount();
 
     // CSP nonce (security-middleware) and PostHog flags (posthog-middleware)
     // arrive as `serverContext`, not on the router context — see
@@ -35,6 +77,11 @@ const rootBeforeLoad = async (options: RootBeforeLoadOptions) => {
 
     if (token) {
         options.context.lunoraClient.setAuthToken(token);
+    }
+
+    // Only a signed-in answer is reused; `unknown` and `unauthenticated` are asked again next time.
+    if (!import.meta.env.SSR) {
+        confirmed.changes = authStatus === "authenticated" && token ? changesAtRead : undefined;
     }
 
     return {

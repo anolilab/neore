@@ -12,6 +12,7 @@ import {
     SEED_SLOT_TIMEOUT_MS,
     tokenSubject,
 } from "./live-queries";
+import { THREAD_QUERY_GC_TIME_MS } from "./thread-queries";
 import { currentUnlockProof, rememberUnlockProof } from "./unlock-proofs";
 
 type OnData = (value: unknown) => void;
@@ -365,6 +366,52 @@ describe(LiveQueryManager, () => {
         for (const stop of unobserve) {
             stop();
         }
+    });
+
+    it("seeds thread reads before the queued others, in the order they asked", () => {
+        const first = Array.from({ length: MAX_CONCURRENT_SEEDS }, (_, index) => observe(key(`x:q${String(index)}`)));
+        const later = [
+            observe(key("x:sidebar")),
+            observe(key("chat_composite:getThreadListData")),
+            observe(key("x:settings")),
+            observe(key("chat_functions:getThread", { threadId: "t1" })),
+        ];
+
+        for (const subscription of fake.subscriptions.slice(0, MAX_CONCURRENT_SEEDS)) {
+            subscription.onData("seeded");
+        }
+
+        fake.subscriptions.at(-1)!.onData("seeded");
+
+        expect(fake.subscriptions.map((subscription) => subscription.path)).toStrictEqual([
+            "x:q0",
+            "x:q1",
+            "x:q2",
+            "chat_composite:getThreadListData",
+            "chat_functions:getThread",
+            "x:sidebar",
+            "x:settings",
+        ]);
+
+        for (const stop of [...first, ...later]) {
+            stop();
+        }
+    });
+
+    it("closes a thread read's subscription after the linger while its cached value stays for the thread gcTime", () => {
+        const threadKey = key("chat_functions:getThread", { threadId: "t1" });
+        const unobserve = observe(threadKey, { gcTime: THREAD_QUERY_GC_TIME_MS });
+
+        fake.subscriptions[0]!.onData({ title: "t1" });
+        unobserve();
+        vi.advanceTimersByTime(LINGER_MS);
+
+        expect(manager.size).toBe(0);
+        expect(fake.subscriptions[0]!.unsubscribe).toHaveBeenCalledOnce();
+
+        vi.advanceTimersByTime(10 * 60 * 1000);
+
+        expect(queryClient.getQueryData(threadKey)).toStrictEqual({ title: "t1" });
     });
 
     it("gives a slot back when a seed never answers, and skips queued entries that were released", () => {
