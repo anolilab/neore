@@ -29,7 +29,7 @@ const userIdOf = (token: string | null): string | undefined => {
  * snapshot is `null`, so neither the server render nor the hydration render
  * reads the cache; the client snapshot lands right after hydration.
  */
-const useCacheUserId = (): string | undefined => {
+export const useCacheUserId = (): string | undefined => {
     const client = useCRPCClient();
     const token = useSyncExternalStore(
         (onChange) => client.onAuthTokenChange(onChange),

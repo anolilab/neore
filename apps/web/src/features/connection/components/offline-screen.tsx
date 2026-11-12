@@ -6,6 +6,7 @@ import { Button } from "@neore/ui/components/button";
 import { WifiOff } from "lucide-react";
 
 import { useConnection } from "../hooks/use-connection";
+import useHasCachedAppData from "../lib/use-has-cached-app-data";
 
 const PROBE_TIMEOUT_MS = 5000;
 
@@ -32,14 +33,18 @@ const reloadWhenReachable = async (): Promise<void> => {
 };
 
 /**
- * Full-screen cover for the native shell when the app has been unreachable for a while, in place of
- * a blank window. It overlays the routes and does not replace them, so page state survives. The
+ * Full-screen cover for the native shell when there is nothing cached to show, in place of a blank
+ * window or a skeleton: at once on an offline start, after a while when a running app loses the
+ * network or the server. With cached data the app stays on screen under the banner (`OfflineBanner`) instead.
+ * It overlays the routes and does not replace them, so page state survives. The
  * alert dialog takes focus and keeps it until the connection is back. The live region stays mounted
  * and only the dialog is conditional, so the message is announced.
  */
 const OfflineScreen = () => {
     const { t } = useLingui();
-    const { screen: lapsedView } = useConnection();
+    const { screen } = useConnection();
+    const hasCachedAppData = useHasCachedAppData();
+    const lapsedView = screen !== null && !hasCachedAppData ? screen : null;
 
     let message = "";
 

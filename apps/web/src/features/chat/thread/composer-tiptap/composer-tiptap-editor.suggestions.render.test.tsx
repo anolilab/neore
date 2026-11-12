@@ -6,6 +6,7 @@
  */
 import { act, render, waitFor } from "@testing-library/react";
 import { closeHistory } from "@tiptap/pm/history";
+import type { EditorProps } from "@tiptap/pm/view";
 import { createRef } from "react";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -261,5 +262,25 @@ describe("ComposerTiptapEditor paste", () => {
         });
 
         expect(ref.current!.isPlainPaste({ timeStamp: cyrillic.timeStamp + 10 })).toBe(true);
+    });
+
+    it("submits through the latest onSubmit on Enter, not the one the editor was built with", async () => {
+        const ref = createRef<ComposerTiptapEditorRef>();
+        const first = vi.fn();
+        const latest = vi.fn();
+        const view = render(<ComposerTiptapEditor onChange={() => {}} onSubmit={first} ref={ref} value="" />);
+
+        view.rerender(<ComposerTiptapEditor onChange={() => {}} onSubmit={latest} ref={ref} value="" />);
+        await typeInto(ref, "hello");
+        act(() => {
+            const editorView = ref.current!.getEditor()!.view;
+
+            editorView.someProp("handleKeyDown", (handle: NonNullable<EditorProps["handleKeyDown"]>) =>
+                handle(editorView, new KeyboardEvent("keydown", { key: "Enter" })),
+            );
+        });
+
+        expect(latest).toHaveBeenCalledOnce();
+        expect(first).not.toHaveBeenCalled();
     });
 });

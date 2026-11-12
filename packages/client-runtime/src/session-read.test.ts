@@ -10,6 +10,7 @@ import {
     isSessionReadRequest,
     keepRetryingFailedSessionReads,
     readWithRetry,
+    rereadFailedSessionRead,
     retryAfterMs,
     SessionReadFailedError,
 } from "./session-read";
@@ -51,6 +52,7 @@ const scripted = (...answers: (Error | (() => Response))[]) => {
 const noSleep = vi.fn(async (_ms: number) => {});
 
 afterEach(() => {
+    vi.unstubAllGlobals();
     noSleep.mockClear();
 });
 
@@ -90,6 +92,18 @@ describe(readWithRetry, () => {
 
         expect(response.status).toBe(200);
         expect(noSleep.mock.calls.map(([ms]) => ms)).toStrictEqual([100, 200]);
+    });
+
+    it("stops at the first network failure when the browser is offline, so the first paint does not wait out the backoff", async () => {
+        const { fetchImpl } = scripted(new TypeError("fetch failed"), signedIn);
+        vi.stubGlobal("navigator", { onLine: false });
+
+        await expect(readWithRetry(async () => await fetchImpl(SESSION_URL), { policy: POLICY, sleep: noSleep })).rejects.toBeInstanceOf(
+            SessionReadFailedError,
+        );
+
+        expect(fetchImpl).toHaveBeenCalledOnce();
+        expect(noSleep).not.toHaveBeenCalled();
     });
 
     it("caps a long server wait at the policy's ceiling", async () => {
@@ -317,6 +331,90 @@ describe(keepRetryingFailedSessionReads, () => {
         set({ error: { status: 401 } });
 
         expect(clock.pending).toHaveLength(0);
+    });
+});
+
+describe(rereadFailedSessionRead, () => {
+    type State = ReturnType<SessionAtomLike["get"]>;
+
+    const fakeAtom = (initial: Partial<State>) => {
+        let state: State = { error: null, isPending: false, isRefetching: false, refetch: vi.fn(), ...initial };
+        const listeners = new Set<() => void>();
+
+        return {
+            atom: {
+                get: () => state,
+                listen: (listener: () => void) => {
+                    listeners.add(listener);
+
+                    return () => listeners.delete(listener);
+                },
+            } satisfies SessionAtomLike,
+            listeners,
+            set: (next: Partial<State>) => {
+                state = { ...state, ...next };
+
+                for (const listener of listeners) {
+                    listener();
+                }
+            },
+            state: () => state,
+        };
+    };
+
+    it("re-reads a failed read at once", async () => {
+        const { atom, state } = fakeAtom({ error: { status: 503 } });
+
+        await rereadFailedSessionRead(atom);
+
+        expect(state().refetch).toHaveBeenCalledOnce();
+    });
+
+    it("leaves a 401 and a session in hand alone", async () => {
+        const unauthorized = fakeAtom({ error: { status: 401 } });
+        const answered = fakeAtom({});
+
+        await rereadFailedSessionRead(unauthorized.atom);
+        await rereadFailedSessionRead(answered.atom);
+
+        expect(unauthorized.state().refetch).not.toHaveBeenCalled();
+        expect(answered.state().refetch).not.toHaveBeenCalled();
+    });
+
+    it("waits for a read still in flight, then re-reads it when it settles as a failure", async () => {
+        const { atom, listeners, set, state } = fakeAtom({ isPending: true, isRefetching: true });
+        const reread = rereadFailedSessionRead(atom);
+
+        expect(state().refetch).not.toHaveBeenCalled();
+
+        set({ error: { status: 503 }, isPending: false, isRefetching: false });
+        await reread;
+
+        expect(state().refetch).toHaveBeenCalledOnce();
+        expect(listeners.size).toBe(0);
+    });
+
+    it("does not re-read a read in flight that succeeds", async () => {
+        const { atom, set, state } = fakeAtom({ isPending: true, isRefetching: true });
+        const reread = rereadFailedSessionRead(atom);
+
+        set({ isPending: false, isRefetching: false });
+        await reread;
+
+        expect(state().refetch).not.toHaveBeenCalled();
+    });
+
+    it("stops waiting, and re-reads nothing, once aborted", async () => {
+        const { atom, listeners, set, state } = fakeAtom({ isPending: true, isRefetching: true });
+        const abort = new AbortController();
+        const reread = rereadFailedSessionRead(atom, abort.signal);
+
+        abort.abort();
+        await reread;
+        set({ error: { status: 503 }, isPending: false, isRefetching: false });
+
+        expect(state().refetch).not.toHaveBeenCalled();
+        expect(listeners.size).toBe(0);
     });
 });
 

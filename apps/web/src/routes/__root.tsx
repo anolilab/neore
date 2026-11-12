@@ -35,6 +35,7 @@ import { closeSidePanelForSessionSwitch } from "@/features/chat/core/stores/chat
 import { clearPromptQueues } from "@/features/chat/core/stores/prompt-queue-session";
 import { clearComposerDrafts, clearDraftsForSessionSwitch } from "@/features/chat/split/composer-drafts";
 import ConnectionProvider from "@/features/connection/components/connection-provider";
+import OfflineBanner from "@/features/connection/components/offline-banner";
 import { useUIStateStore } from "@/features/layout/stores/ui-state-store";
 import type { SettingsTab } from "@/features/settings/lib/settings-navigation";
 import usePostHogIdentity from "@/hooks/use-posthog-identity";
@@ -533,6 +534,8 @@ const RootComponent = () => {
                                                                 <OfflineScreen />
                                                             </Suspense>
                                                         )}
+                                                        {/* Above every layout and its auth gates: the app stays on screen while offline. */}
+                                                        <OfflineBanner />
                                                         <ScreenSizeDebug />
                                                         <Outlet />
                                                     </ConnectionProvider>

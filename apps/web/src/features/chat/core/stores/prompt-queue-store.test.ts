@@ -171,3 +171,15 @@ describe("prompt queues written before the session is confirmed", () => {
         expect(sessionStorage.getItem("neore:prompt-queue:thread-6")).toContain("queued before the session was confirmed");
     });
 });
+
+describe("offline send requests after the session ends", () => {
+    it("drops every held send with the queues, so a later queue under the same thread asks again", async () => {
+        const store = await reload();
+        const { clearPromptQueues } = await import("./prompt-queue-store");
+
+        store.getState().holdOffline("thread-7", true);
+        clearPromptQueues();
+
+        expect(store.getState().takeOfflineHold("thread-7")).toBeUndefined();
+    });
+});

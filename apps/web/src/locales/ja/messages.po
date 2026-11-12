@@ -26268,7 +26268,7 @@ msgstr "プルリクエストをリンクするには、設定で Git ホスト�
 msgid "Reconnecting"
 msgstr "再接続中"
 
-#: src/features/connection/components/connection-banner.tsx:25
+#: src/features/connection/components/offline-banner.tsx:24
 msgid "Reconnecting to the server…"
 msgstr "サーバーに再接続しています…"
 
@@ -37382,10 +37382,6 @@ msgstr "現在ユーザーになりすましています"
 msgid "You are not watching any repository."
 msgstr "リポジトリを監視していません。"
 
-#: src/features/connection/components/connection-banner.tsx:23
-msgid "You are offline."
-msgstr "オフラインです。"
-
 #: src/features/connection/components/offline-screen.tsx:47
 msgid "You are offline. Neore will reconnect when the network is back."
 msgstr "オフラインです。ネットワークが戻ると Neore が再接続します。"
@@ -38006,3 +38002,15 @@ msgstr "チューリッヒ"
 #: src/features/evals/components/run-comparison.tsx:150
 msgid "Δ points"
 msgstr "Δ ポイント"
+
+#: src/features/connection/components/offline-banner.tsx:22
+msgid "Offline – reconnecting…"
+msgstr "オフライン – 再接続中…"
+
+#: src/features/connection/components/offline-banner.tsx:26
+msgid "Back online"
+msgstr "オンラインに戻りました"
+
+#: src/features/chat/thread/composer-input.tsx:1058
+msgid "You are offline. Your message stays here; send it once you are back online."
+msgstr "オフラインです。メッセージはここに残ります。オンラインに戻ったら送信してください。"

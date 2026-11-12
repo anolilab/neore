@@ -3,6 +3,7 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import type { QueuedChatPrompt } from "@/features/chat/core/stores/prompt-queue-store";
 import { usePromptQueueStore } from "@/features/chat/core/stores/prompt-queue-store";
 import { EMPTY_PROMPT_QUEUE, serializePromptQueue } from "@/features/chat/core/utils/prompt-queue";
 
@@ -39,6 +40,7 @@ const chat = vi.hoisted(() => {
         saving: false,
         sendMessage: vi.fn(),
         threadId: "thread-1",
+        view: "online" as "offline" | "online" | "reconnecting",
     };
 });
 const withdrawSteer = vi.hoisted(() => vi.fn());
@@ -89,9 +91,14 @@ vi.mock("@/lib/lunora/crpc", () => {
         },
     };
 });
-vi.mock("@/lib/toast", () => {
-    return { showError: vi.fn() };
+vi.mock("@/features/connection/hooks/use-connection", () => {
+    return { useConnectionView: () => chat.view };
 });
+const toast = vi.hoisted(() => {
+    return { showError: vi.fn(), showInfo: vi.fn() };
+});
+
+vi.mock("@/lib/toast", () => toast);
 vi.mock("@/features/chat/core/context/chat-context", () => {
     return {
         useChatActions: () => {
@@ -138,8 +145,10 @@ describe("composer prompt queue", () => {
         chat.liveSaving = false;
         chat.saving = false;
         chat.sendMessage.mockReset();
+        chat.view = "online";
         withdrawSteer.mockReset();
-        usePromptQueueStore.setState({ queues: {} });
+        toast.showInfo.mockReset();
+        usePromptQueueStore.setState({ offlineHolds: {}, queues: {} });
         // Marks the thread as hydrated, so the (empty) stored queue is not read over ours.
         usePromptQueueStore.getState().hydrate(chat.threadId);
     });
@@ -179,6 +188,183 @@ describe("composer prompt queue", () => {
         view.rerender(<ComposerPromptQueue />);
 
         await waitFor(() => expect(chat.sendMessage).toHaveBeenCalledTimes(1));
+    });
+
+    it("holds a queued prompt while the browser is offline, and sends it once the network is back", async () => {
+        chat.error = undefined;
+        chat.isStreaming = true;
+        chat.view = "offline";
+        usePromptQueueStore.getState().enqueue(chat.threadId, { attachments: [], text: "queued" });
+
+        const view = render(<ComposerPromptQueue />);
+
+        chat.isStreaming = false;
+        view.rerender(<ComposerPromptQueue />);
+        await act(async () => {
+            await Promise.resolve();
+        });
+        expect(chat.sendMessage).not.toHaveBeenCalled();
+
+        // Only the live socket is down: messages go over HTTP, so the held prompt goes.
+        chat.view = "reconnecting";
+        view.rerender(<ComposerPromptQueue />);
+
+        await waitFor(() => expect(chat.sendMessage).toHaveBeenCalledWith("queued", []));
+    });
+
+    it("sends a Send next clicked offline once the network is back, though a steer withdrawal still held the queue then", async () => {
+        chat.error = undefined;
+
+        let finish: (value: { outcome: "withdrawn" }) => void = () => {};
+
+        // The lib target has no `Promise.withResolvers` yet.
+        // eslint-disable-next-line unicorn/prefer-promise-with-resolvers
+        const promise = new Promise<{ outcome: "withdrawn" }>((resolve: (value: PromiseLike<{ outcome: "withdrawn" }> | { outcome: "withdrawn" }) => void) => {
+            finish = resolve;
+        });
+
+        withdrawSteer.mockReturnValue(promise);
+
+        const view = render(<ComposerPromptQueue />);
+
+        await act(async () => {
+            const { enqueue } = usePromptQueueStore.getState();
+
+            enqueue(chat.threadId, { attachments: [], steer: { id: "steer-1", streamId: "stream-1" }, text: "steered" });
+            enqueue(chat.threadId, { attachments: [], text: "queued" });
+        });
+        expect(withdrawSteer).toHaveBeenCalledTimes(1);
+
+        chat.view = "offline";
+        view.rerender(<ComposerPromptQueue />);
+        fireEvent.click(screen.getByRole("button", { name: "Send next" }));
+        expect(toast.showInfo).toHaveBeenCalledWith(expect.stringContaining("You are offline"), { id: "composer-offline-send" });
+
+        // Back online while the withdrawal still holds the queue: the held send waits for it, it is not dropped.
+        chat.view = "online";
+        view.rerender(<ComposerPromptQueue />);
+
+        await act(async () => {
+            finish({ outcome: "withdrawn" });
+        });
+
+        // The withdrawn steer goes; the held Send next waits for its reply, so two turns never run at once.
+        await waitFor(() => expect(chat.sendMessage).toHaveBeenCalledTimes(1));
+        expect(chat.sendMessage).toHaveBeenLastCalledWith("steered", []);
+
+        chat.isStreaming = true;
+        view.rerender(<ComposerPromptQueue />);
+        expect(chat.sendMessage).toHaveBeenCalledTimes(1);
+
+        chat.isStreaming = false;
+        view.rerender(<ComposerPromptQueue />);
+
+        await waitFor(() => expect(chat.sendMessage).toHaveBeenCalledTimes(2));
+        expect(chat.sendMessage).toHaveBeenLastCalledWith("queued", []);
+    });
+
+    it("keeps a prompt when the network goes during its steer withdrawal, and sends it once it is back", async () => {
+        chat.error = undefined;
+
+        let finish: (value: { outcome: "withdrawn" }) => void = () => {};
+
+        // The lib target has no `Promise.withResolvers` yet.
+        // eslint-disable-next-line unicorn/prefer-promise-with-resolvers
+        const promise = new Promise<{ outcome: "withdrawn" }>((resolve: (value: PromiseLike<{ outcome: "withdrawn" }> | { outcome: "withdrawn" }) => void) => {
+            finish = resolve;
+        });
+
+        withdrawSteer.mockReturnValue(promise);
+
+        const view = render(<ComposerPromptQueue />);
+
+        await act(async () => {
+            usePromptQueueStore.getState().enqueue(chat.threadId, { attachments: [], steer: { id: "steer-1", streamId: "stream-1" }, text: "steered" });
+        });
+
+        chat.view = "offline";
+        view.rerender(<ComposerPromptQueue />);
+
+        await act(async () => {
+            finish({ outcome: "withdrawn" });
+        });
+
+        expect(chat.sendMessage).not.toHaveBeenCalled();
+        expect(usePromptQueueStore.getState().queues[chat.threadId]?.items.map((item: QueuedChatPrompt) => item.text)).toStrictEqual(["steered"]);
+
+        chat.view = "online";
+        view.rerender(<ComposerPromptQueue />);
+
+        await waitFor(() => expect(chat.sendMessage).toHaveBeenCalledWith("steered", []));
+    });
+
+    it("keeps a Send next asked for offline while a reply streams on reconnect, and sends it when that reply ends, even in an error", async () => {
+        chat.error = undefined;
+        chat.view = "offline";
+        usePromptQueueStore.getState().enqueue(chat.threadId, { attachments: [], text: "queued" });
+
+        const view = render(<ComposerPromptQueue />);
+
+        fireEvent.click(screen.getByRole("button", { name: "Send next" }));
+
+        // A reply is streaming when the network comes back: the request is kept for its end, not dropped.
+        chat.isStreaming = true;
+        view.rerender(<ComposerPromptQueue />);
+        chat.view = "online";
+        view.rerender(<ComposerPromptQueue />);
+        await act(async () => {
+            await Promise.resolve();
+        });
+        expect(chat.sendMessage).not.toHaveBeenCalled();
+
+        chat.error = new Error("the reply failed");
+        chat.isStreaming = false;
+        view.rerender(<ComposerPromptQueue />);
+
+        await waitFor(() => expect(chat.sendMessage).toHaveBeenCalledWith("queued", []));
+    });
+
+    it("does not send a held Send next into a queue paused since, when the reply ends", async () => {
+        chat.error = undefined;
+        chat.view = "offline";
+        usePromptQueueStore.getState().enqueue(chat.threadId, { attachments: [], text: "queued" });
+
+        const view = render(<ComposerPromptQueue />);
+
+        fireEvent.click(screen.getByRole("button", { name: "Send next" }));
+        chat.isStreaming = true;
+        view.rerender(<ComposerPromptQueue />);
+        chat.view = "online";
+        view.rerender(<ComposerPromptQueue />);
+
+        await act(async () => {
+            usePromptQueueStore.getState().setPaused(chat.threadId, true);
+        });
+
+        chat.isStreaming = false;
+        view.rerender(<ComposerPromptQueue />);
+        await act(async () => {
+            await Promise.resolve();
+        });
+
+        expect(chat.sendMessage).not.toHaveBeenCalled();
+    });
+
+    it("sends a prompt held offline when its thread's composer mounts again online", async () => {
+        chat.error = undefined;
+        chat.view = "offline";
+        usePromptQueueStore.getState().enqueue(chat.threadId, { attachments: [], text: "queued" });
+
+        const view = render(<ComposerPromptQueue />);
+
+        fireEvent.click(screen.getByRole("button", { name: "Send next" }));
+        view.unmount();
+        expect(chat.sendMessage).not.toHaveBeenCalled();
+
+        chat.view = "online";
+        render(<ComposerPromptQueue />);
+
+        await waitFor(() => expect(chat.sendMessage).toHaveBeenCalledWith("queued", []));
     });
 
     it("holds a prompt when a mode save begins after the last render, while a steer withdrawal settles", async () => {
