@@ -90,6 +90,30 @@ describe("code block with whitespace or a wrapper before <code> (#486, #498, #53
         expect(convert(html, { codeBlockStyle })).toBe("[`x`](u)");
     });
 
+    it.each([
+        ["bold", "<pre><b><code>x</code></b></pre>", "**`x`**"],
+        ["emphasis", "<pre><em><code>x</code></em></pre>", "_`x`_"],
+        ["paragraph", "<pre><p><code>x</code></p></pre>", "`x`"],
+    ])("a %s element around <code> matches upstream in both styles", (_name, html, expected) => {
+        for (const codeBlockStyle of ["indented", "fenced"] as const) {
+            expect(convert(html, { codeBlockStyle })).toBe(expected);
+            expect(new TurndownUpstream({ codeBlockStyle }).turndown(html)).toBe(expected);
+        }
+    });
+
+    // Upstream 7.2.5 only makes a code block when the first child of <pre> is <code>, so it
+    // gives inline code here. The port treats a span as a wrapper (WRAPPER_ELEMENTS). The
+    // expected output is the port's, and the upstream output is pinned to show the difference.
+    it.each([
+        ["indented", "    x"],
+        ["fenced", "```\nx\n```"],
+    ])("a span around <code> makes a code block in %s style, unlike upstream", (codeBlockStyle, expected) => {
+        const html = "<pre><span><code>x</code></span></pre>";
+
+        expect(convert(html, { codeBlockStyle })).toBe(expected);
+        expect(new TurndownUpstream({ codeBlockStyle }).turndown(html)).toBe("`x`");
+    });
+
     it("does not make a code block when text comes before <code>", () => {
         const html = "<pre>note <code>x = 1</code></pre>";
         const upstream = new TurndownUpstream({ codeBlockStyle: "indented" }).turndown(html);
