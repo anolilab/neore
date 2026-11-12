@@ -294,7 +294,8 @@ const ComposerTiptapEditor = ({
             // then leaves that paste alone, so a long text is never both attached and inserted.
             handlePaste: (_view, event) => event.defaultPrevented,
             handleKeyDown: (_view, event) => {
-                if (event.shiftKey && (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "v") {
+                // `code` is the physical key: on a Cyrillic or Greek layout `key` is not "v" for the same shortcut.
+                if (event.shiftKey && (event.ctrlKey || event.metaKey) && (event.code === "KeyV" || event.key.toLowerCase() === "v")) {
                     plainPasteKeyAt.current = event.timeStamp;
                 }
 

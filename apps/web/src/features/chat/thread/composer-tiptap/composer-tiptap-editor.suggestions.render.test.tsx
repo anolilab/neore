@@ -252,5 +252,14 @@ describe("ComposerTiptapEditor paste", () => {
         });
 
         expect(ref.current!.isPlainPaste({ timeStamp: keydown.timeStamp + 5000 })).toBe(false);
+
+        // A Cyrillic layout: the same physical key reads as "м".
+        const cyrillic = new KeyboardEvent("keydown", { bubbles: true, code: "KeyV", ctrlKey: true, key: "м", shiftKey: true });
+
+        act(() => {
+            element.dispatchEvent(cyrillic);
+        });
+
+        expect(ref.current!.isPlainPaste({ timeStamp: cyrillic.timeStamp + 10 })).toBe(true);
     });
 });
