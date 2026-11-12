@@ -278,8 +278,6 @@ const NavUser: FC<NavUserProperties> = ({ trigger }) => {
                 onClick={async () => {
                     // Before the request, and it holds writes until the page reloads or the next sign-in: the sidebar stays mounted meanwhile.
                     clearThreadListCache();
-                    clearLastAccountHint();
-                    clearPromptQueues();
                     // Push first, while the session still authenticates the server call.
                     await releasePush();
                     await authClient.signOut({
@@ -298,6 +296,9 @@ const NavUser: FC<NavUserProperties> = ({ trigger }) => {
                                 });
                             },
                             onSuccess: async () => {
+                                // Only once the session has ended: a failed sign-out keeps the queued prompts and the hint.
+                                clearLastAccountHint();
+                                clearPromptQueues();
                                 resetAnalyticsIdentity();
                                 // Only after the session ends: a failed sign-out keeps the badge.
                                 await setNativeBadge(0);
