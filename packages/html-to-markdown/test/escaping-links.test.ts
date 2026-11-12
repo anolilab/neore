@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { Options } from "../src/index";
 import TurndownService from "../src/index";
+import { htmlOpenerSteps } from "../src/turndown";
 import { escapeMarkdown } from "../src/utilities";
 
 function convert(html: string, options: Partial<Options> = {}): string {
@@ -357,5 +358,32 @@ describe("review: turning escaping off", () => {
         service.escape = (text: string) => text;
 
         expect(service.turndown("<p>a&lt;<span>b</span></p>")).toBe("a<b");
+    });
+});
+
+describe("review: deeply nested text after a <", () => {
+    // Each level is a `<` text followed by a span that holds the next level. The count of nodes read
+    // must grow in proportion to the depth: the walk reads each level's first text and stops there.
+    const STEPS_PER_LEVEL = 20;
+
+    function nestedLessThan(depth: number): string {
+        let html = "x";
+
+        for (let level = 0; level < depth; level += 1) {
+            html = `<span>&lt;${html}</span>`;
+        }
+
+        return html;
+    }
+
+    it.each([250, 500])("reads the text after each < in a bounded number of steps at depth %i", (depth) => {
+        htmlOpenerSteps.count = 0;
+
+        const output = new TurndownService().turndown(nestedLessThan(depth));
+
+        // The innermost `<` is followed by the letter `x`, which it would open raw HTML before, so it is escaped.
+        expect(output).toBe(`${"<".repeat(depth - 1)}\\<x`);
+        expect(htmlOpenerSteps.count).toBeGreaterThanOrEqual(depth);
+        expect(htmlOpenerSteps.count).toBeLessThan(STEPS_PER_LEVEL * depth);
     });
 });

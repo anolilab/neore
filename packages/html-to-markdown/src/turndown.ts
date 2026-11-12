@@ -128,8 +128,17 @@ function process(service: TurndownService, parentNode: Node): string[] {
     return output;
 }
 
-// The text after `<` that opens raw HTML or an email autolink: a letter, `/`, `!` or `?`, or a local part and an `@`.
-const HTML_OPENER = /^(?:[a-z/!?]|[a-z0-9.!#$%&'+/=?^{|}~-]+@)/i;
+// The character that opens raw HTML after a `<`, and a character of an email local part. An email
+// autolink opens with a local part and then an `@`.
+const HTML_START = /[a-z/!?]/i;
+const LOCAL_PART = /[a-z0-9.!#$%&'+/=?^{|}~-]/i;
+const WHITESPACE_CHAR = /\s/;
+
+/**
+ * Steps taken while reading the text after a `<`: each node visited. The scale test reads it to show
+ * that a deeply nested run costs work in proportion to its size.
+ */
+export const htmlOpenerSteps = { count: 0 };
 
 /**
  * Escapes a text node. `escapeMarkdown` sees only this node, so a `<` at its end is
@@ -150,35 +159,72 @@ function escapeText(service: TurndownService, node: Node, text: string): string 
 }
 
 /**
- * True when the output after the node may begin with a character that opens raw HTML.
- * It looks at the next sibling, then past the end of an inline parent. A link that the
- * rules print ends the search: it closes with `]`. A block ends it too, since a block
- * starts on a new line. An `<a>` that prints no link is looked past, like any inline
- * parent. A sibling whose text is blank may print nothing, so it is looked past too.
- * The check is conservative: a `<` that cannot open HTML may still be escaped.
+ * True when the output after the node may begin with a character that opens raw HTML, or with an
+ * email autolink. It reads the following text (see `followingText`) only as far as the first
+ * character that decides: a letter, `/`, `!` or `?` decides at once, and a local part decides at
+ * its `@`. The check is conservative: a `<` that cannot open HTML may still be escaped.
  */
 function isFollowedByHtmlOpener(node: Node, options: Options): boolean {
+    let inLocalPart = false;
+
+    for (const piece of followingText(node, options)) {
+        for (const char of piece) {
+            if (inLocalPart) {
+                if (char === "@") {
+                    return true;
+                }
+
+                if (!LOCAL_PART.test(char)) {
+                    return false;
+                }
+            } else if (HTML_START.test(char)) {
+                return true;
+            } else if (LOCAL_PART.test(char)) {
+                inLocalPart = true;
+            } else if (!WHITESPACE_CHAR.test(char)) {
+                return false;
+            }
+        }
+    }
+
+    return false;
+}
+
+/**
+ * The text that the output after the node is made of, in order. It looks at the next sibling, then
+ * past the end of an inline parent. A link that the rules print ends the search: it closes with `]`.
+ * A block ends it too, since a block starts on a new line. An `<a>` that prints no link is looked
+ * past, like any inline parent.
+ */
+function* followingText(node: Node, options: Options): Generator<string> {
     let current: Node | null = node;
 
     while (current) {
         for (let sibling = current.nextSibling; sibling; sibling = sibling.nextSibling) {
-            const text = sibling.nodeType === 8 ? "" : (sibling.textContent ?? "").trimStart();
-
-            if (text) {
-                return HTML_OPENER.test(text);
-            }
+            yield* textOf(sibling);
         }
 
         const parent: Node | null = current.parentNode;
 
         if (!parent || isLinkElement(parent, options) || isBlock(parent)) {
-            return false;
+            return;
         }
 
         current = parent;
     }
+}
 
-    return false;
+/** The text nodes under a node, in order. A comment prints nothing, so it is skipped. */
+function* textOf(node: Node): Generator<string> {
+    htmlOpenerSteps.count += 1;
+
+    if (node.nodeType === 3 || node.nodeType === 4) {
+        yield node.nodeValue ?? "";
+    } else if (node.nodeType === 1) {
+        for (let child = node.firstChild; child; child = child.nextSibling) {
+            yield* textOf(child);
+        }
+    }
 }
 
 /**
