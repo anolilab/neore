@@ -631,6 +631,25 @@ describe("startPostHog", () => {
         expect(posthog.captureException).not.toHaveBeenCalled();
     });
 
+    it("does not send the kept sign-out event as an account that signed in before PostHog started", async () => {
+        const client = await loadClientModule();
+
+        client.setMeasurementConsent(true);
+        client.setAnalyticsIdentity({ user: { id: "user-1" } });
+        client.queueEvent("signed_out", {});
+        client.forgetPostHogIdentity("key");
+
+        const next = await loadClientModule();
+
+        next.setMeasurementConsent(true);
+        next.queueEvent("thread_opened", {});
+        next.startPostHog(await next.loadPostHog(), () => {});
+        // Someone signs in on the sign-in page before PostHog started there.
+        next.setAnalyticsIdentity({ user: { id: "user-2" } });
+
+        expect(posthog.capture.mock.calls.map(([event]) => event)).toStrictEqual(["thread_opened"]);
+    });
+
     it("resets the stored identity before the flush when the session ended while startup waited for it", async () => {
         const client = await loadClientModule();
 

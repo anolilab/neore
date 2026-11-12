@@ -349,7 +349,14 @@ export const flushPendingCaptures = (posthog: PostHog): void => {
 
     const isOptedOut = posthog.has_opted_out_capturing();
     const appliedUserId = identityState.applied?.userId;
-    const sendable = isOptedOut ? [] : events.filter(({ userId }) => typeof userId !== "string" || userId === appliedUserId);
+    const sendable = isOptedOut
+        ? []
+        : events.filter(
+              ({ event, userId }) =>
+                  (typeof userId !== "string" || userId === appliedUserId) &&
+                  // The sign-out kept through its drop is the account that left: sent signed out, never as whoever signed in next.
+                  (event !== SIGN_OUT_EVENT || appliedUserId === undefined),
+          );
 
     const isLandingTheirs = typeof landing?.userId !== "string" || landing.userId === appliedUserId;
 
