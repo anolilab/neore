@@ -1062,7 +1062,12 @@ const ComposerInput = ({
         }
 
         // A follow-up while a reply streams only joins the local queue, which waits for the network before it sends.
-        const queuesLocally = isStreaming && isThreadComposer && !isComparisonValid && Boolean(threadId) && !(draftAttachments.length === 0 && (isCompactCommand(draftText) || isClearCommand(draftText)));
+        const queuesLocally =
+            isStreaming &&
+            isThreadComposer &&
+            !isComparisonValid &&
+            Boolean(threadId) &&
+            !(draftAttachments.length === 0 && (isCompactCommand(draftText) || isClearCommand(draftText)));
 
         if (isOffline && !queuesLocally) {
             showInfo(t`You are offline. Your message stays here; send it once you are back online.`, { id: "composer-offline-send" });
