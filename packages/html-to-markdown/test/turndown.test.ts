@@ -73,13 +73,11 @@ describe("turndown service API", () => {
         expect(service.addRule("strikethrough", strikeRule)).toBe(service);
     });
 
-    it("#addRule adds the rule", () => {
-        const service = new TurndownService();
-        const add = vi.fn();
+    it("#addRule changes the Markdown output of matching elements", () => {
+        const input = "<p><del>gone</del> kept</p>";
 
-        service.rules.add = add;
-        service.addRule("strikethrough", strikeRule);
-        expect(add).toHaveBeenCalledWith("strikethrough", strikeRule);
+        expect(new TurndownService().turndown(input)).toBe("gone kept");
+        expect(new TurndownService().addRule("strikethrough", strikeRule).turndown(input)).toBe("~~gone~~ kept");
     });
 
     it("#use returns the instance for chaining", () => {
