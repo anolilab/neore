@@ -81,6 +81,9 @@ const shardOptionsOfKey = (queryKey: QueryKey): { shardKey?: string } => (typeof
 /** The `__lunoraRef` of `chat.prompt_outline.getThreadPromptOutline`, the key's function slot. */
 const PROMPT_OUTLINE_REF = "chat_prompt_outline:getThreadPromptOutline";
 
+/** The `__lunoraRef` of `chat.composite.getThreadListData`, the sidebar's thread list. */
+const THREAD_LIST_REF = "chat_composite:getThreadListData";
+
 const isLunoraKey = (queryKey: QueryKey): queryKey is readonly ["lunora", string, unknown, string | null] =>
     queryKey[0] === "lunora" && typeof queryKey[1] === "string";
 
@@ -172,6 +175,8 @@ export class LiveQueryManager {
         this.client.setWsToken(this.wsTokenProvider());
 
         let subject = tokenSubject(this.client.getAuthToken());
+        // The last signed-in subject, kept across a token-less gap (an expiry, a sign-out) so a later sign-in can tell it is another account.
+        let lastUser = subject;
 
         this.disconnectUnlock = onUnlockExpired((threadId, proof) => {
             this.dropThreadCache(threadId, proof);
@@ -194,6 +199,18 @@ export class LiveQueryManager {
             // Nor another user's prompt outline. Remove it rather than invalidate: an invalidated query keeps its old data
             // while the new account's read runs or fails, and that would show the previous account's prompts.
             this.queryClient.removeQueries({ predicate: (query) => isLunoraKey(query.queryKey) && query.queryKey[1] === PROMPT_OUTLINE_REF });
+
+            // Nor another account's thread list: its key carries no account. Removed here, as the new bearer lands, rather than
+            // at the account switch, since a refetch between the two still goes out with the old bearer and would bring it back.
+            // The first token of a load (no user before it) keeps a list the server rendered for it.
+            if (next !== null) {
+                if (lastUser !== null && lastUser !== next) {
+                    this.queryClient.removeQueries({ predicate: (query) => isLunoraKey(query.queryKey) && query.queryKey[1] === THREAD_LIST_REF });
+                }
+
+                lastUser = next;
+            }
+
             // A NEW function identity is what makes `setWsToken` close the open
             // sockets; the client resends every subscription on reconnect.
             this.client.setWsToken(this.wsTokenProvider());

@@ -26328,7 +26328,7 @@ msgstr "Reconnect your Git host in settings to link a pull request."
 msgid "Reconnecting"
 msgstr "Reconnecting"
 
-#: src/features/connection/components/connection-banner.tsx:25
+#: src/features/connection/components/offline-banner.tsx:24
 msgid "Reconnecting to the server…"
 msgstr "Reconnecting to the server…"
 
@@ -37502,10 +37502,6 @@ msgstr "You are currently impersonating a user"
 msgid "You are not watching any repository."
 msgstr "You are not watching any repository."
 
-#: src/features/connection/components/connection-banner.tsx:23
-msgid "You are offline."
-msgstr "You are offline."
-
 #: src/features/connection/components/offline-screen.tsx:47
 msgid "You are offline. Neore will reconnect when the network is back."
 msgstr "You are offline. Neore will reconnect when the network is back."
@@ -38126,3 +38122,15 @@ msgstr "Zurich"
 #: src/features/evals/components/run-comparison.tsx:150
 msgid "Δ points"
 msgstr "Δ points"
+
+#: src/features/connection/components/offline-banner.tsx:22
+msgid "Offline – reconnecting…"
+msgstr "Offline – reconnecting…"
+
+#: src/features/connection/components/offline-banner.tsx:26
+msgid "Back online"
+msgstr "Back online"
+
+#: src/features/chat/thread/composer-input.tsx:1058
+msgid "You are offline. Your message stays here; send it once you are back online."
+msgstr "You are offline. Your message stays here; send it once you are back online."

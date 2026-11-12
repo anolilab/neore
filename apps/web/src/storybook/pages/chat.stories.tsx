@@ -207,7 +207,7 @@ export const ReadOnlyShare: Story = {
     },
 };
 
-/** The connection to the backend dropped: the banner above the composer. */
+/** The connection to the backend dropped: the banner at the top of the app. */
 export const Reconnecting: Story = {
     play: async ({ canvas }) => {
         const banner = await canvas.findByText("Reconnecting to the server…", undefined, STATE_WAIT);
@@ -224,7 +224,7 @@ export const Offline: Story = {
         // The "offline" view comes from the browser's offline event, not the live status: fire it once the page has mounted.
         await canvas.findByRole("textbox", { name: "Message" }, PAGE_WAIT);
         globalThis.dispatchEvent(new Event("offline"));
-        const banner = await canvas.findByText("You are offline.", undefined, STATE_WAIT);
+        const banner = await canvas.findByText("Offline – reconnecting…", undefined, STATE_WAIT);
 
         await expect(banner).toBeInTheDocument();
         await bannerShown(banner);

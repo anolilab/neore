@@ -26268,7 +26268,7 @@ msgstr "Verbinde deinen Git-Host in den Einstellungen erneut, um einen Pull Requ
 msgid "Reconnecting"
 msgstr "Verbindung wird wiederhergestellt"
 
-#: src/features/connection/components/connection-banner.tsx:25
+#: src/features/connection/components/offline-banner.tsx:24
 msgid "Reconnecting to the server…"
 msgstr "Verbindung zum Server wird wiederhergestellt…"
 
@@ -37378,10 +37378,6 @@ msgstr "Du nimmst gerade die Identität eines Benutzers an"
 msgid "You are not watching any repository."
 msgstr "Du beobachtest kein Repository."
 
-#: src/features/connection/components/connection-banner.tsx:23
-msgid "You are offline."
-msgstr "Du bist offline."
-
 #: src/features/connection/components/offline-screen.tsx:47
 msgid "You are offline. Neore will reconnect when the network is back."
 msgstr "Du bist offline. Neore verbindet sich wieder, sobald das Netzwerk verfügbar ist."
@@ -38002,3 +37998,15 @@ msgstr "Zürich"
 #: src/features/evals/components/run-comparison.tsx:150
 msgid "Δ points"
 msgstr "Δ Punkte"
+
+#: src/features/connection/components/offline-banner.tsx:22
+msgid "Offline – reconnecting…"
+msgstr "Offline – Verbindung wird wiederhergestellt…"
+
+#: src/features/connection/components/offline-banner.tsx:26
+msgid "Back online"
+msgstr "Wieder online"
+
+#: src/features/chat/thread/composer-input.tsx:1058
+msgid "You are offline. Your message stays here; send it once you are back online."
+msgstr "Du bist offline. Deine Nachricht bleibt hier; sende sie, sobald du wieder online bist."

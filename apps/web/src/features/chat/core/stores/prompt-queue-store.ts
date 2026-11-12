@@ -57,10 +57,19 @@ interface PromptQueueStore {
     enqueue: (threadId: string, prompt: Omit<QueuedChatPrompt, "id"> & { id?: string }) => void;
     /** Puts the prompt first and lifts a pause, so it is the next one sent. */
     enqueueNext: (threadId: string, prompt: Omit<QueuedChatPrompt, "id"> & { id?: string }) => void;
+
+    /**
+     * Keeps a send asked for while the browser was offline, so it goes once the network is back, even if the thread's
+     * composer unmounted meanwhile. `explicit` (the Send next button) sticks. Memory only: a reload restores the queue paused.
+     */
+    holdOffline: (threadId: string, explicit: boolean) => void;
+
     /** Loads a thread's queue from sessionStorage once per page load, if memory has none. */
     hydrate: (threadId: string) => void;
     /** Moves a queued message to `toIndex`, or one place up (`-1`) or down (`1`). */
     move: (threadId: string, id: string, to: number | { step: -1 | 1 }) => void;
+    /** Sends asked for offline, by thread. */
+    offlineHolds: Record<string, { explicit: boolean }>;
     queues: Record<string, ThreadQueue>;
     remove: (threadId: string, id: string) => void;
     setPaused: (threadId: string, paused: boolean) => void;
@@ -70,6 +79,8 @@ interface PromptQueueStore {
     setTried: (threadId: string, id: string, tried: boolean) => void;
     /** Removes and returns the oldest queued prompt. */
     shift: (threadId: string) => QueuedChatPrompt | undefined;
+    /** Removes and returns the thread's offline-held send, if any. */
+    takeOfflineHold: (threadId: string) => { explicit: boolean } | undefined;
 }
 
 const generatePromptId = () => `queued-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
@@ -131,7 +142,8 @@ const writeStoredQueue = (threadId: string, queue: ThreadQueue): void => {
 export const usePromptQueueStore = create<PromptQueueStore>()((set, get) => {
     // `clearPromptQueues` lives apart from the store (`prompt-queue-session`) and drops what is in memory through this.
     registerPromptQueueReset(() => {
-        set({ queues: {} });
+        // The ended session's held sends go too: a later queue under the same thread id must not inherit its request.
+        set({ offlineHolds: {}, queues: {} });
     });
 
     const update = (threadId: string, next: (queue: ThreadQueue) => ThreadQueue) => {
@@ -194,8 +206,13 @@ export const usePromptQueueStore = create<PromptQueueStore>()((set, get) => {
             });
             writeStoredQueue(threadId, merged);
         },
+        holdOffline: (threadId, explicit) =>
+            set((state: PromptQueueStore) => {
+                return { offlineHolds: { ...state.offlineHolds, [threadId]: { explicit: explicit || state.offlineHolds[threadId]?.explicit === true } } };
+            }),
         move: (threadId, id, to) =>
             update(threadId, (queue) => (typeof to === "number" ? moveQueuedPrompt(queue, id, to) : stepQueuedPrompt(queue, id, to.step))),
+        offlineHolds: {},
         queues: {},
         remove: (threadId, id) => update(threadId, (queue) => removeQueuedPrompt(queue, id)),
         setPaused: (threadId, paused) => update(threadId, (queue) => (queue.paused === paused ? queue : { ...queue, paused })),
@@ -218,6 +235,21 @@ export const usePromptQueueStore = create<PromptQueueStore>()((set, get) => {
             }
 
             return next;
+        },
+        takeOfflineHold: (threadId) => {
+            const held = get().offlineHolds[threadId];
+
+            if (held) {
+                set((state: PromptQueueStore) => {
+                    const offlineHolds = { ...state.offlineHolds };
+
+                    delete offlineHolds[threadId];
+
+                    return { offlineHolds };
+                });
+            }
+
+            return held;
         },
     };
 });

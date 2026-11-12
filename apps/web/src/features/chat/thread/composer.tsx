@@ -56,7 +56,6 @@ import HostComposer from "@/features/chat/host/host-composer";
 import PromptImprovementPanel from "@/features/chat/prompt-improvement/components/prompt-improvement-panel";
 import { draftOwnership } from "@/features/chat/split/composer-drafts";
 import { restoreLiveComposerFor } from "@/features/chat/split/pane-state";
-import ConnectionBanner from "@/features/connection/components/connection-banner";
 import useFeatureFlaggedModels from "@/hooks/use-feature-flagged-models";
 import { useCRPC } from "@/lib/lunora/crpc";
 
@@ -684,8 +683,6 @@ const Composer: FC<ComposerProps> = ({
     return (
         <LazyMotion features={domAnimation}>
             <div className={cn("relative w-full", className)}>
-                <ConnectionBanner />
-
                 {/* Disclaimer */}
                 {!minimal && (
                     <div className="text-foreground absolute top-full w-full pt-2 text-center text-xs">{t`Neore can make mistakes. Check important information.`}</div>
