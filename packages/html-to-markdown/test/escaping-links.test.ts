@@ -345,3 +345,17 @@ describe("review: a backslash hard break in link text", () => {
         expect(service.turndown(`<a href="/x">one<br><span>x</span></a>`)).toBe("[one  - x](/x)");
     });
 });
+
+describe("review: turning escaping off", () => {
+    it("escapes a < before text that is an HTML opener by default", () => {
+        expect(convert("<p>a&lt;<span>b</span></p>")).toBe(String.raw`a\<b`);
+    });
+
+    it("writes no backslash when a custom escape is a no-op, so the output holds only the text", () => {
+        const service = new TurndownService();
+
+        service.escape = (text: string) => text;
+
+        expect(service.turndown("<p>a&lt;<span>b</span></p>")).toBe("a<b");
+    });
+});

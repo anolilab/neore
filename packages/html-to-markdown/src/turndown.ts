@@ -136,11 +136,13 @@ const HTML_OPENER = /^(?:[a-z/!?]|[a-z0-9.!#$%&'+/=?^{|}~-]+@)/i;
  * left alone there. Here the next output is known from the DOM: a `<` is escaped when
  * that output may begin with one of the characters that open raw HTML or an autolink.
  * A `<` followed by a space, a line break or the end of its block stays as it is.
+ * This `<` escape belongs to the default escaper. A custom `escape` decides every escape itself, so
+ * nothing is added after it.
  */
 function escapeText(service: TurndownService, node: Node, text: string): string {
     const escaped = service.escape(text);
 
-    if (text.endsWith("<") && escaped.endsWith("<") && isFollowedByHtmlOpener(node, service.options)) {
+    if (service.escape === escapeMarkdown && text.endsWith("<") && escaped.endsWith("<") && isFollowedByHtmlOpener(node, service.options)) {
         return `${escaped.slice(0, -1)}${String.raw`\<`}`;
     }
 
