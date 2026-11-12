@@ -33,8 +33,8 @@ const memoryStore = () => {
     };
     const store: RecordStore = {
         get: async (name, key) => structuredClone(stores[name].get(key)),
-        putEntry: async (userId, entry, isKeyCurrent) => {
-            if (!isKeyCurrent(structuredClone(stores.keys.get(userId)))) {
+        putEntry: async (userId, entry, mayReplace) => {
+            if (!mayReplace(structuredClone(stores.keys.get(userId)), structuredClone(stores.entries.get(userId)))) {
                 return false;
             }
 
@@ -327,6 +327,29 @@ describe("restore", () => {
         expect(memory.stores.entries.has(ALICE)).toBe(true);
     });
 
+    it("a read that arrives while the record is read is never replaced by it, even when stamped earlier", async () => {
+        const memory = memoryStore();
+        const savedAt = Date.now();
+
+        await saveTexts(memory, ALICE, [[KEY, "kept"]]);
+
+        const held = heldReads(memory.store, "entries");
+        const queryClient = new QueryClient();
+        const controller = start(held.store, ALICE, queryClient);
+
+        await held.reached;
+        // A server-stamped or clock-skewed live read: older than the saved value, but this session's.
+        queryClient.setQueryData(KEY, { text: "live" }, { updatedAt: savedAt - 1 });
+        held.release();
+        await controller.restored;
+        expect(textOf(queryClient, KEY)).toBe("live");
+
+        // Not counted as restored either: a revoke keeps it.
+        controller.revoke();
+        await controller.restored;
+        expect(textOf(queryClient, KEY)).toBe("live");
+    });
+
     it("a session that turns out impersonated or a guest drops what was restored, not what it read since", async () => {
         const memory = memoryStore();
 
@@ -429,12 +452,14 @@ describe("saving", () => {
         const storeGate = new EventTarget();
         const opened = nextEvent(storeGate, "open");
         const removals = new EventTarget();
+        const puts = { count: 0 };
         const slowStore: RecordStore = {
             ...memory.store,
-            putEntry: async (userId, entry, isKeyCurrent) => {
+            putEntry: async (userId, entry, mayReplace) => {
+                puts.count += 1;
                 await opened;
 
-                return await memory.store.putEntry(userId, entry, isKeyCurrent);
+                return await memory.store.putEntry(userId, entry, mayReplace);
             },
             remove: async (userIds, shouldRemove) => {
                 await onRemove();
@@ -455,6 +480,11 @@ describe("saving", () => {
             controller,
             gate,
             memory,
+            open: () => {
+                storeGate.dispatchEvent(new Event("open"));
+            },
+            puts,
+            queryClient,
             // Not the restore's prune: only a removal after the save is let through counts.
             release: async () => {
                 const removed = nextEvent(removals, "removed");
@@ -483,6 +513,45 @@ describe("saving", () => {
         await release();
         expect(memory.stores.entries.has(ALICE)).toBe(false);
         controller.stop();
+    });
+
+    it("changes while a save is sealing are saved once after it, with the latest state", async () => {
+        const { controller, memory, open, puts, queryClient } = await heldSave();
+
+        /**
+         * Resolves once every save of Alice's queued in this tab so far is done: dropping an unreadable record of hers
+         * (from a store of its own) queues behind them.
+         */
+        const drained = async (): Promise<void> => {
+            const other = memoryStore();
+
+            other.stores.entries.set(ALICE, "unreadable");
+
+            const barrier = start(other.store, ALICE, new QueryClient());
+
+            await barrier.restored;
+            barrier.stop();
+        };
+
+        // The first save waits on the store while the cache keeps changing for several intervals.
+        for (const text of ["second", "third", "fourth"]) {
+            queryClient.setQueryData(KEY, { text });
+            await vi.advanceTimersByTimeAsync(WRITE_THROTTLE_MS);
+        }
+
+        open();
+        await drained();
+        expect(puts.count).toBe(1);
+
+        await vi.advanceTimersByTimeAsync(WRITE_THROTTLE_MS);
+        await drained();
+        expect(puts.count).toBe(2);
+        controller.stop();
+
+        const restored = new QueryClient();
+
+        await start(memory.store, ALICE, restored).restored;
+        expect(textOf(restored, KEY)).toBe("fourth");
     });
 
     it("taking a stale save back out never takes the record another tab wrote after it", async () => {
@@ -569,5 +638,25 @@ describe("IndexedDB store", () => {
         const kept = await openRecord(store, ALICE);
 
         expect(kept?.text).toBe(otherTab);
+    });
+
+    it("a slow tab's older state never replaces a record another tab took later", async () => {
+        const store = indexedDatabaseStore();
+
+        expect(store).toBeDefined();
+
+        if (!store) {
+            return;
+        }
+
+        const takenAt = Date.now();
+
+        await sealRecord(store, ALICE, "newer", takenAt + 1);
+        await expect(sealRecord(store, ALICE, "older", takenAt)).resolves.toBeUndefined();
+        await expect(openRecord(store, ALICE)).resolves.toMatchObject({ text: "newer" });
+
+        // Taken the same millisecond: as fresh, so it is written.
+        await expect(sealRecord(store, ALICE, "as fresh", takenAt + 1)).resolves.toBeDefined();
+        await expect(openRecord(store, ALICE)).resolves.toMatchObject({ text: "as fresh" });
     });
 });

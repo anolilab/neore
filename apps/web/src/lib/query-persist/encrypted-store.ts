@@ -26,10 +26,11 @@ export interface RecordStore {
     get: (store: StoreName, key: string) => Promise<unknown>;
 
     /**
-     * In one transaction over both stores (a clear may land between the key's read and the write otherwise): stores
-     * `entry` as the account's entry only while its stored key passes `isKeyCurrent`, and answers whether it did.
+     * In one transaction over both stores (a clear, or another tab's save, may land between the reads and the write
+     * otherwise): stores `entry` as the account's entry only while the stored key and entry pass `mayReplace`, and
+     * answers whether it did.
      */
-    putEntry: (userId: string, entry: unknown, isKeyCurrent: (storedKey: unknown) => boolean) => Promise<boolean>;
+    putEntry: (userId: string, entry: unknown, mayReplace: (storedKey: unknown, storedEntry: unknown) => boolean) => Promise<boolean>;
     /** Stores `value` unless the key holds one already, in one transaction (another tab may race), and answers what is stored. */
     putIfAbsent: (store: StoreName, key: string, value: unknown) => Promise<unknown>;
 
@@ -175,14 +176,16 @@ export const indexedDatabaseStore = (): RecordStore | undefined => {
 
             return await settle(opened.transaction(store, "readonly").objectStore(store).get(key));
         },
-        putEntry: async (userId, entry, isKeyCurrent) => {
+        putEntry: async (userId, entry, mayReplace) => {
             const opened = await open();
             const transaction = opened.transaction([ENTRIES, KEYS], "readwrite");
             const storedKey = transaction.objectStore(KEYS).get(userId);
+            // Requests in a transaction settle in order: the key is read by the time the entry is.
+            const storedEntry = transaction.objectStore(ENTRIES).get(userId);
             let isWritten = false;
 
-            storedKey.addEventListener("success", () => {
-                if (!isKeyCurrent(storedKey.result)) {
+            storedEntry.addEventListener("success", () => {
+                if (!mayReplace(storedKey.result, storedEntry.result)) {
                     return;
                 }
 
@@ -217,7 +220,11 @@ export const indexedDatabaseStore = (): RecordStore | undefined => {
 interface SealedRecord {
     data: ArrayBuffer;
     iv: Uint8Array;
-    /** When it was sealed, in the clear: lets {@link pruneRecords} drop an account nobody opens without reading it. */
+
+    /**
+     * When the sealed state was taken, in the clear: lets {@link pruneRecords} drop an account nobody opens without
+     * reading it, and keeps a slow tab's older state from replacing a newer one.
+     */
     writtenAt: number;
 }
 
@@ -273,7 +280,8 @@ const additionalData = (userId: string): Uint8Array<ArrayBuffer> => new TextEnco
 /**
  * Encrypts `text` under the account's key (made on first use) and stores it as the account's one record. Answers which
  * write it stored, for {@link removeRecord}, or `undefined` when it stored nothing: the key was removed (a clear, a
- * prune) or replaced while the text was sealed, and ciphertext under a key no longer stored could never be opened.
+ * prune) or replaced while the text was sealed, and ciphertext under a key no longer stored could never be opened; or
+ * the stored record was taken after `writtenAt`.
  */
 export const sealRecord = async (store: RecordStore, userId: string, text: string, writtenAt: number = Date.now()): Promise<string | undefined> => {
     const sealingKey = await accountKey(store, userId, true);
@@ -285,7 +293,13 @@ export const sealRecord = async (store: RecordStore, userId: string, text: strin
     const iv = crypto.getRandomValues(new Uint8Array(12));
     const data = await crypto.subtle.encrypt({ additionalData: additionalData(userId), iv, name: "AES-GCM" }, sealingKey.key, new TextEncoder().encode(text));
     const entry: SealedRecord = { data, iv, writtenAt };
-    const isWritten = await store.putEntry(userId, entry, (storedKey) => isAccountKey(storedKey) && storedKey.id === sealingKey.id);
+    // Not over a record another tab took later while this one was sealed. One taken the same millisecond is as fresh.
+    const isWritten = await store.putEntry(
+        userId,
+        entry,
+        (storedKey, storedEntry) =>
+            isAccountKey(storedKey) && storedKey.id === sealingKey.id && !(isSealedRecord(storedEntry) && storedEntry.writtenAt > writtenAt),
+    );
 
     return isWritten ? sealOf(entry) : undefined;
 };

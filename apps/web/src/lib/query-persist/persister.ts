@@ -135,7 +135,7 @@ export const startQueryPersistence = (options: PersistenceOptions): PersistenceC
     /** What the restore handed over, with its data count then: any later data, even stamped the same millisecond, counts it up. */
     const restoredCount = new WeakMap<Query, number>();
     const isRestored = (query: Query): boolean => restoredCount.get(query) === query.state.dataUpdateCount;
-    const state = { isRestoreDone: false, stopped: false, writes: false };
+    const state = { isDirty: false, isRestoreDone: false, isSaving: false, stopped: false, writes: false };
     let timer: ReturnType<typeof setTimeout> | undefined;
     let unsubscribe: (() => void) | undefined;
 
@@ -167,14 +167,35 @@ export const startQueryPersistence = (options: PersistenceOptions): PersistenceC
             return;
         }
 
+        // One save queued or sealing at a time: a change meanwhile is saved once after it, not once per interval it waited.
+        if (state.isSaving) {
+            state.isDirty = true;
+
+            return;
+        }
+
         const generation = gate.generation();
 
         timer = setTimeout(() => {
             timer = undefined;
+            state.isSaving = true;
 
-            serialized(userId, async () => await write(generation)).catch(() => {
-                // Quota, a blocked store, a lost key: the cache just is not kept this time.
-            });
+            void serialized(userId, async () => {
+                // The save takes the cache as it is now: only a change after this needs another.
+                state.isDirty = false;
+                await write(generation);
+            })
+                .catch(() => {
+                    // Quota, a blocked store, a lost key: the cache just is not kept this time.
+                })
+                .finally(() => {
+                    state.isSaving = false;
+
+                    if (state.isDirty) {
+                        state.isDirty = false;
+                        schedule();
+                    }
+                });
         }, WRITE_THROTTLE_MS);
     };
 
@@ -231,10 +252,17 @@ export const startQueryPersistence = (options: PersistenceOptions): PersistenceC
         );
 
         const queryCache = queryClient.getQueryCache();
-        const before = new Map(clientState.queries.map((query) => [query.queryHash, queryCache.get(query.queryHash)?.state]));
+        // A read that arrived since this start is live, whatever its stamp (a clock that stepped back, a server time):
+        // the saved value never replaces it. `hydrate` alone keeps only one stamped later than the saved value.
+        const restorable = clientState.queries.filter((query) => {
+            const existing = queryCache.get(query.queryHash);
+
+            return existing === undefined || !isReadSinceStart(existing);
+        });
+        const before = new Map(restorable.map((query) => [query.queryHash, queryCache.get(query.queryHash)?.state]));
 
         // A restored entry nobody watches yet must outlive the default five minutes, or the next save forgets it.
-        hydrate(queryClient, clientState, { defaultOptions: { queries: { gcTime: MAX_AGE_MS } } });
+        hydrate(queryClient, { ...clientState, queries: restorable }, { defaultOptions: { queries: { gcTime: MAX_AGE_MS } } });
 
         // `hydrate` skips an entry the cache holds newer data for: only one whose state it replaced is restored.
         for (const [queryHash, previous] of before) {
