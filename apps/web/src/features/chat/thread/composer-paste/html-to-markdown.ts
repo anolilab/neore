@@ -248,6 +248,67 @@ const escapeRun = (run: string, atEnd: boolean): string => {
     return run.slice(0, end).replaceAll(/./g, String.raw`\$&`) + run.slice(end);
 };
 
+/** `[`, `]` and backslashes in `text` escaped for a link label, a backslash tail too: the end of `text` is the label's or a backtick's. */
+const escapeLabelText = (text: string): string =>
+    text.replaceAll(/[\\[\]]+/g, (run: string, offset: number, whole: string) => escapeRun(run, offset + run.length === whole.length));
+
+/**
+ * A link label escaped outside its code spans: Markdown reads a backslash in a code span as itself. A span runs from a
+ * backtick run to the next run of the same length; one with no partner is text. Linear: the partner of each run is
+ * found in one pass from the end.
+ */
+const escapeLinkLabel = (label: string): string => {
+    // Where each backtick run starts and ends.
+    const starts: number[] = [];
+    const ends: number[] = [];
+
+    let index = label.indexOf("`");
+
+    while (index !== -1) {
+        let end = index + 1;
+
+        while (label[end] === "`") {
+            end += 1;
+        }
+
+        starts.push(index);
+        ends.push(end);
+        index = label.indexOf("`", end);
+    }
+
+    const partner: (number | undefined)[] = [];
+    const nextOfLength = new Map<number, number>();
+
+    for (let run = starts.length - 1; run >= 0; run -= 1) {
+        const length = (ends[run] ?? 0) - (starts[run] ?? 0);
+
+        partner[run] = nextOfLength.get(length);
+        nextOfLength.set(length, run);
+    }
+
+    let result = "";
+    let textStart = 0;
+    let run = 0;
+
+    while (run < starts.length) {
+        const close = partner[run];
+
+        if (close === undefined) {
+            run += 1;
+            continue;
+        }
+
+        const start = starts[run] ?? 0;
+        const end = ends[close] ?? 0;
+
+        result += escapeLabelText(label.slice(textStart, start)) + label.slice(start, end);
+        textStart = end;
+        run = close + 1;
+    }
+
+    return result + escapeLabelText(label.slice(textStart));
+};
+
 /** A cell's text on one line. The context is shared, not copied, so cells of tables nested in it count against the budget. */
 const cellText = (cell: Element, context: Context): string => {
     const { inTable } = context;
@@ -263,20 +324,37 @@ const cellText = (cell: Element, context: Context): string => {
         .replaceAll(/[\\|]+/g, (run: string) => escapeRun(run, false));
 };
 
-/** Whether `node` or a parent of it below `root` is hidden. */
-const isHiddenIn = (node: Element, root: Element): boolean => {
-    for (let current: Element | null = node; current && current !== root; current = current.parentElement) {
-        if (isHidden(current)) {
-            return true;
+const ROW_GROUPS = new Set(["TBODY", "TFOOT", "THEAD"]);
+
+/**
+ * The shown rows of `table` itself, read from its children and row groups: a selector would list the rows of every table
+ * nested in it too, once per table around them, which grows with the square of the nesting.
+ */
+const ownRows = (table: Element): Element[] => {
+    const rows: Element[] = [];
+
+    for (const child of table.children) {
+        if (isHidden(child)) {
+            continue;
+        }
+
+        if (child.tagName === "TR") {
+            rows.push(child);
+        } else if (ROW_GROUPS.has(child.tagName)) {
+            for (const row of child.children) {
+                if (row.tagName === "TR" && !isHidden(row)) {
+                    rows.push(row);
+                }
+            }
         }
     }
 
-    return false;
+    return rows;
 };
 
 const table = (element: Element, context: Context): string => {
-    const rows = [...element.querySelectorAll("tr")].filter((row: Element) => row.closest("table") === element && !isHiddenIn(row, element));
-    const caption = element.querySelector(":scope > caption");
+    const rows = ownRows(element);
+    const caption = [...element.children].find((child: Element) => child.tagName === "CAPTION");
     const title = caption && !isHidden(caption) ? oneLine(children(caption, context)).trim() : "";
     const texts: string[][] = [];
     let width = 0;
@@ -356,11 +434,7 @@ const table = (element: Element, context: Context): string => {
 const nestedTable = (element: Element, context: Context): string => {
     const texts: string[] = [];
 
-    for (const row of element.querySelectorAll("tr")) {
-        if (row.closest("table") !== element || isHiddenIn(row, element)) {
-            continue;
-        }
-
+    for (const row of ownRows(element)) {
         for (const cell of row.children) {
             if (!(cell instanceof HTMLTableCellElement) || isHidden(cell)) {
                 continue;
@@ -455,9 +529,7 @@ const element = (node: Element, context: Context): string => {
                 return text;
             }
 
-            const label = text
-                .trim()
-                .replaceAll(/[\\[\]]+/g, (run: string, offset: number, whole: string) => escapeRun(run, offset + run.length === whole.length));
+            const label = escapeLinkLabel(text.trim());
 
             return label === href ? href : `[${label}](${href})`;
         }

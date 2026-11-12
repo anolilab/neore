@@ -1,0 +1,35 @@
+import type { Editor } from "@tiptap/core";
+import { Fragment, Slice } from "@tiptap/pm/model";
+import type { EditorState } from "@tiptap/pm/state";
+
+const LINE_BREAK = /\r\n?|\n/;
+
+/**
+ * The paste the editor would make of `text/plain`, but with every line kept: its own parser merges blank lines. With
+ * `at` (a paste that waited for its conversion) it replaces the selection of `at`, and only while the text is unchanged
+ * since: after an edit that selection is gone and the current one is the user's newer choice, so it returns false and
+ * the caller places the text itself.
+ */
+export const pastePlainText = (editor: Editor, text: string, at?: EditorState): boolean => {
+    const { schema, tr } = editor.state;
+    const { paragraph } = schema.nodes;
+
+    if (!paragraph) {
+        return false;
+    }
+
+    if (at) {
+        if (at.doc !== tr.doc) {
+            return false;
+        }
+
+        tr.setSelection(at.selection);
+    }
+
+    const paragraphs = text.split(LINE_BREAK).map((line: string) => paragraph.create(null, line === "" ? null : schema.text(line)));
+    const slice = new Slice(Fragment.from(paragraphs), 1, 1);
+
+    editor.view.dispatch(tr.replaceSelection(slice).scrollIntoView().setMeta("paste", true).setMeta("uiEvent", "paste"));
+
+    return true;
+};

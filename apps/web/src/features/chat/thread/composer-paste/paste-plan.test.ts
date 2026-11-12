@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { insertPastedText } from "../composer-draft-file";
 import githubTable from "./__fixtures__/github-readme-table.html?raw";
@@ -187,6 +187,25 @@ describe("composer paste", () => {
         expect(htmlToMarkdown(`${"<blockquote>".repeat(3)}a`)).toBe("> > > a");
     });
 
+    it("reads the rows of tables nested in cells once each, not once per table around them", () => {
+        const depth = 200;
+        const html = `${"<table><tr><td>".repeat(depth)}<table>${"<tr><td>r</td></tr>".repeat(500)}</table>${"</td></tr></table>".repeat(depth)}`;
+        const elements = new DOMParser().parseFromString(html, "text/html").body.querySelectorAll("*").length;
+        // Spies call through: they count the rows a selector lists and the climbs to an enclosing table.
+        const select = vi.spyOn(Element.prototype, "querySelectorAll");
+        const climb = vi.spyOn(Element.prototype, "closest");
+
+        try {
+            expect(htmlToMarkdown(html)).toBe(`| ${"r ".repeat(500).trim()} |\n| --- |`);
+            const visited = climb.mock.calls.length + select.mock.results.reduce((sum: number, result) => sum + (result.value as NodeList).length, 0);
+
+            expect(visited).toBeLessThan(elements);
+        } finally {
+            select.mockRestore();
+            climb.mockRestore();
+        }
+    });
+
     it("pastes a table whose spans would fill too many cells as its text", () => {
         expect(htmlToMarkdown(`<table>${"<tr><td colspan=1000>x</td></tr>".repeat(200)}</table>`)).toBe("x\n".repeat(200).trim());
     });
@@ -255,6 +274,11 @@ describe("composer paste", () => {
             "a backslash in a cell or a link label never escapes the Markdown around it",
             String.raw`<table><tr><th>A</th><th>B</th></tr><tr><td>a\|b</td><td>c</td></tr></table><p><a href="https://x.y/">C:\dir\</a> <a href="https://x.y/">a\]b</a></p>`,
             ["| A | B |", "| --- | --- |", String.raw`| a\\\|b | c |`, "", String.raw`[C:\dir\\](https://x.y/) [a\\\]b](https://x.y/)`].join("\n"),
+        ],
+        [
+            "code in a link label is kept as written, and a backslash before it never escapes its backtick",
+            '<p><a href="https://x.y/"><code>arr[0]</code> and a[1]</a> <a href="https://x.y/">C:\\<code>x\\y</code></a> <a href="https://x.y/">a`b[</a></p>',
+            "[`arr[0]` and a\\[1\\]](https://x.y/) [C:\\\\`x\\y`](https://x.y/) [a`b\\[](https://x.y/)",
         ],
         ["a table keeps its caption", "<table><caption>Prices</caption><tr><th>A</th></tr><tr><td>1</td></tr></table>", "Prices\n\n| A |\n| --- |\n| 1 |"],
         [

@@ -19,7 +19,6 @@
 import { useLingui } from "@lingui/react/macro";
 import type { Editor } from "@tiptap/core";
 import PlaceholderExtension from "@tiptap/extension-placeholder";
-import { Fragment, Slice } from "@tiptap/pm/model";
 import type { EditorState } from "@tiptap/pm/state";
 import { Selection } from "@tiptap/pm/state";
 import { EditorContent, useEditor } from "@tiptap/react";
@@ -53,6 +52,7 @@ import type { VaultFileRef } from "./file-mention-popup";
 import FileMentionPopup from "./file-mention-popup";
 import type { GhostController, GhostEligibility, GhostRequest } from "./ghost-completion-controller";
 import { createGhostController, shouldAnnounceGhost } from "./ghost-completion-controller";
+import { pastePlainText } from "./paste-plain-text";
 import { plainTextToHtml } from "./plain-text";
 import SlashCommandPopup from "./slash-command-popup";
 import VariableAutocompletePopup from "./variable-autocomplete-popup";
@@ -130,36 +130,9 @@ export interface ComposerTiptapEditorRef {
     getEditor: () => Editor | null;
     /** Whether `event` is a paste made with Ctrl/Cmd+Shift+V, which keeps the text exactly as copied. */
     isPlainPaste: (event: { timeStamp: number }) => boolean;
-    /** Inserts `text` over the selection as one undoable paste, a paragraph per line; false without an editor. */
+    /** Inserts `text` over the selection (of `at` when given) as one undoable paste, a paragraph per line; false without an editor or when the text changed since `at`. */
     pasteText: (text: string, at?: EditorState) => boolean;
 }
-
-const LINE_BREAK = /\r\n?|\n/;
-
-/**
- * The paste the editor would make of `text/plain`, but with every line kept: its own parser merges blank lines. It
- * replaces the selection of `at` when the text is unchanged since (a paste that waited for its conversion), else the
- * current one.
- */
-const pastePlainText = (editor: Editor, text: string, at?: EditorState): boolean => {
-    const { schema, tr } = editor.state;
-    const { paragraph } = schema.nodes;
-
-    if (!paragraph) {
-        return false;
-    }
-
-    if (at?.doc === tr.doc) {
-        tr.setSelection(at.selection);
-    }
-
-    const paragraphs = text.split(LINE_BREAK).map((line: string) => paragraph.create(null, line === "" ? null : schema.text(line)));
-    const slice = new Slice(Fragment.from(paragraphs), 1, 1);
-
-    editor.view.dispatch(tr.replaceSelection(slice).scrollIntoView().setMeta("paste", true).setMeta("uiEvent", "paste"));
-
-    return true;
-};
 
 // ============================================================================
 // Constants — hoisted to avoid new references on every render
