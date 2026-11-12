@@ -33,6 +33,7 @@ import { mediaThreadTitle, startTitleJobs } from "./lib/start-title-jobs";
 import { documentTextPart, guestNoteIdOfMessage, guestTextPart } from "./lib/attached-text";
 import { unsendableGuestText } from "./lib/guest-link-store";
 import { formatPageContextPart, parsePageContext } from "./lib/page-context";
+import { isValidClientMessageId } from "./start-claim";
 import { createStreamToken } from "./streaming/persistent/stream-token";
 
 const SAFE_TOKEN_RE = /^[\w-]+$/;
@@ -353,6 +354,11 @@ export interface ChatStartBody {
     /** New thread only: each send routes to a model the gateway picks (`chat/lib/auto-model.ts`). An existing thread keeps its own setting. */
     autoModel?: boolean;
     cinemaSettings?: CinemaSettings;
+    /**
+     * The client's own id for this send (`chat/start-claim.ts`), so a resend after an ambiguous failure saves nothing
+     * twice: it is answered with the first send's ids and `duplicate: true`. 1–128 of `[A-Za-z0-9_-]`; not with `regenerate`.
+     */
+    clientMessageId?: string;
     customSystemPrompt?: string;
     duration?: number;
     enabledFeatures?: string[];
@@ -479,6 +485,10 @@ export const runChatStart = async (
         return Response.json({ error: "Invalid guestMessageId" }, { status: 400 });
     }
 
+    if (body.clientMessageId !== undefined && (!isValidClientMessageId(body.clientMessageId) || body.regenerate)) {
+        return Response.json({ error: "Invalid clientMessageId" }, { status: 400 });
+    }
+
     if (body.guestMessageId !== undefined && body.goal !== undefined) {
         return Response.json({ error: "GUEST_NOTE_AS_GOAL", message: "A guest's message cannot be sent as a goal." }, { status: 400 });
     }
@@ -524,6 +534,10 @@ const GUEST_NOTE_REFUSALS: Record<"being-sent" | "ended" | "missing" | "sent", {
     missing: { error: "GUEST_NOTE_NOT_SENDABLE", message: "That guest note cannot be sent in this chat.", status: 400 },
     sent: { error: "GUEST_NOTE_ALREADY_SENT", message: "That guest note was already sent.", status: 409 },
 };
+
+/** A send whose `clientMessageId` another request holds and has not saved yet: the client retries shortly. */
+const startInProgressResponse = (): Response =>
+    Response.json({ error: "CHAT_START_IN_PROGRESS", message: "This message is still being sent." }, { status: 409 });
 
 const guestNoteRefused = (reason: keyof typeof GUEST_NOTE_REFUSALS): Response => {
     const { error, message, status } = GUEST_NOTE_REFUSALS[reason];
@@ -839,15 +853,74 @@ const runChatStartOnShard = async (
     // runs — `/chat/media`, which the client calls next with this prompt's id —
     // because that route can be called again for the same prompt; a charge here
     // would count the prompt, not the generations.
+    // A send with a client id is taken before the charge too: a resend is answered with the first send's ids, uncharged.
+    const startOutcome =
+        body.clientMessageId === undefined
+            ? undefined
+            : await context.runMutation(internal.chat.start_claim.claimChatStart, {
+                  clientMessageId: body.clientMessageId,
+                  streams: contentType === "text",
+                  userId,
+              });
+
+    if (startOutcome?.outcome === "in_progress") {
+        return startInProgressResponse();
+    }
+
+    if (startOutcome?.outcome === "duplicate") {
+        // The stream token attaches to the first send's run as a reconnect does; a run that ended reads from the thread.
+        const { messageId, streamId: duplicateStreamId, threadId } = startOutcome;
+
+        return Response.json(
+            {
+                contentType,
+                duplicate: true,
+                messageId,
+                streamId: duplicateStreamId ?? null,
+                streaming: duplicateStreamId !== undefined,
+                ...(duplicateStreamId !== undefined && { streamToken: await createStreamToken(duplicateStreamId, userId, threadId, signingSecret) }),
+                ...(contentType !== "text" && { streamingConfig }),
+                threadId,
+            },
+            { status: 200 },
+        );
+    }
+
+    const startClaim = startOutcome?.claim;
+    // A text turn whose first send saved its prompt and died before its stream: this request makes the stream and run only.
+    const resumed = startOutcome?.outcome === "resume" ? startOutcome : undefined;
+
+    // Never throws, like the guest send's release: kept when the save recorded its ids.
+    const releaseStartClaim = async (): Promise<void> => {
+        if (startClaim === undefined) {
+            return;
+        }
+
+        try {
+            await context.runMutation(internal.chat.start_claim.releaseChatStart, { claim: startClaim });
+        } catch (releaseError) {
+            chatLogger.error("Could not release a chat send's claim:", releaseError);
+        }
+    };
+
     // A held note's send is taken before the charge, so one concurrent send wins and only it is charged (`settleSend` after).
-    const guestClaim = guestNote
-        ? await context.runMutation(internal.chat.guest_links.claimGuestNoteSend, {
-              messageId: body.guestMessageId as Id<"threadGuestMessages">,
-              userId,
-          })
-        : undefined;
+    const guestClaim =
+        guestNote && !resumed
+            ? await context
+                  .runMutation(internal.chat.guest_links.claimGuestNoteSend, {
+                      messageId: body.guestMessageId as Id<"threadGuestMessages">,
+                      userId,
+                  })
+                  .catch(async (error: unknown) => {
+                      await releaseStartClaim();
+
+                      throw error;
+                  })
+            : undefined;
 
     if (guestClaim && "refused" in guestClaim) {
+        await releaseStartClaim();
+
         return guestNoteRefused(guestClaim.refused);
     }
 
@@ -855,6 +928,8 @@ const runChatStartOnShard = async (
 
     // Never throws: a failed release must not hide why the send failed. The lease settles the send later.
     const releaseGuestSend = async (): Promise<void> => {
+        await releaseStartClaim();
+
         if (guestSend === undefined) {
             return;
         }
@@ -869,8 +944,13 @@ const runChatStartOnShard = async (
         }
     };
 
-    if (contentType === "text") {
-        const dailyLimit = await chargeDailyLimit(context, user, "Text");
+    // A resumed send was charged by its first try.
+    if (contentType === "text" && !resumed) {
+        const dailyLimit = await chargeDailyLimit(context, user, "Text").catch(async (error: unknown) => {
+            await releaseGuestSend();
+
+            throw error;
+        });
 
         if (!dailyLimit.ok) {
             await releaseGuestSend();
@@ -920,7 +1000,10 @@ const runChatStartOnShard = async (
         }
     };
 
-    if (validThreadId && body.regenerate && body.parentId) {
+    if (resumed) {
+        threadId = resumed.threadId;
+        messageId = resumed.messageId;
+    } else if (validThreadId && body.regenerate && body.parentId) {
         // Regenerate: a SIBLING reply to the same prompt row (see
         // `agent/branch-tree.ts`). This used to save a copy of the prompt, which
         // appended a duplicate turn at the end and left the old reply behind it.
@@ -964,36 +1047,41 @@ const runChatStartOnShard = async (
         // Existing thread: use agent to continue and save message
         // An HTTP action has no `ctx.services`: this agent only SAVES the user's
         // message. The reply is generated by `runStreamingAgent` on the jobs queue.
-        const agent = await getAgent(effectiveModel, { gateway: NO_SERVICE_FETCH, userId }).catch(async (error: unknown) => {
-            await releaseGuestSend();
-
-            throw error;
-        });
-
-        // `agent.continueThread(context, { threadId: validThreadId })` used to run
-        // here. It builds a Thread object with a dozen bound methods — and the only
-        // thing read off it was `thread.threadId`, which is the id that was just
-        // passed in. Removing it also removes the ctx problem: `continueThread`
-        // requires a full `ActionCtx` because the Thread it returns can generate
-        // text, and an HTTP handler's ctx has no `storage`.
-
         // Save message. `metadata.fileIds` is the attachment channel `saveMessages` reads
         // (see `SaveMessagesArgs.metadata` -> `base?.fileIds`), so it is typed, not `any`.
         const attachmentFileIds = body.fileIds && body.fileIds.length > 0 ? body.fileIds : undefined;
-        const result = await agent
-            .saveMessage(context, {
+        // A send with a client id saves in the mutation that checks its claim and records the ids on it.
+        const savePrompt = async (): Promise<{ messageId: string }> => {
+            if (startClaim !== undefined) {
+                return await context.runMutation(internal.chat.start_claim.saveStartPrompt, {
+                    claim: startClaim,
+                    ...(attachmentFileIds && { fileIds: attachmentFileIds }),
+                    messageContent,
+                    model: effectiveModel,
+                    ...(body.parentId !== undefined && { parentId: body.parentId }),
+                    threadId: validThreadId,
+                    userId,
+                });
+            }
+
+            // An HTTP action has no `ctx.services`: this agent only SAVES the user's
+            // message. The reply is generated by `runStreamingAgent` on the jobs queue.
+            const agent = await getAgent(effectiveModel, { gateway: NO_SERVICE_FETCH, userId });
+
+            return await agent.saveMessage(context, {
                 fromUser: true,
                 message: { content: messageContent, role: "user" },
                 ...(attachmentFileIds && { metadata: { fileIds: attachmentFileIds } }),
                 promptMessageId: body.parentId,
                 threadId: validThreadId,
-            })
-            .catch(async (error: unknown) => {
-                // Released, or marked sent if the save committed after all.
-                await releaseGuestSend();
-
-                throw error;
             });
+        };
+        const result = await savePrompt().catch(async (error: unknown) => {
+            // Released, or marked sent if the save committed after all.
+            await releaseGuestSend();
+
+            throw error;
+        });
 
         threadId = validThreadId;
         messageId = result.messageId;
@@ -1022,24 +1110,31 @@ const runChatStartOnShard = async (
         }
     } else {
         // New thread: batched creation
-        const result = await context.runMutation(internal.chat.functions.createThreadWithInitialMessage, {
-            // A plain hosted text thread only: a guest, a media thread and a custom endpoint have nothing to route.
-            ...(body.autoModel === true && contentType === "text" && !isAnonymous && MODEL_LOOKUP.has(effectiveModel) && { autoModel: true }),
-            customSystemPrompt: body.customSystemPrompt,
-            enabledFeatures: body.enabledFeatures,
-            fileIds: body.fileIds,
-            language: body.language,
-            messageContent,
-            mode: body.mode,
-            model: effectiveModel,
-            reasoningEffort: body.reasoningEffort,
-            statelessMode: body.statelessMode,
-            // Temporary only when the client asked for it; the composer applies the user's default itself.
-            ...(body.temporary === true && { retentionHours: body.retentionHours, temporary: true }),
-            // A media thread is titled from its prompt, with no model call.
-            ...(contentType !== "text" && { title: mediaThreadTitle(body.prompt) }),
-            userId,
-        });
+        const result = await context
+            .runMutation(internal.chat.functions.createThreadWithInitialMessage, {
+                // A plain hosted text thread only: a guest, a media thread and a custom endpoint have nothing to route.
+                ...(body.autoModel === true && contentType === "text" && !isAnonymous && MODEL_LOOKUP.has(effectiveModel) && { autoModel: true }),
+                customSystemPrompt: body.customSystemPrompt,
+                enabledFeatures: body.enabledFeatures,
+                fileIds: body.fileIds,
+                language: body.language,
+                messageContent,
+                mode: body.mode,
+                model: effectiveModel,
+                reasoningEffort: body.reasoningEffort,
+                statelessMode: body.statelessMode,
+                // Temporary only when the client asked for it; the composer applies the user's default itself.
+                ...(body.temporary === true && { retentionHours: body.retentionHours, temporary: true }),
+                ...(startClaim !== undefined && { startClaim }),
+                // A media thread is titled from its prompt, with no model call.
+                ...(contentType !== "text" && { title: mediaThreadTitle(body.prompt) }),
+                userId,
+            })
+            .catch(async (error: unknown) => {
+                await releaseStartClaim();
+
+                throw error;
+            });
 
         threadId = result.threadId;
         messageId = result.messageId;
@@ -1078,6 +1173,7 @@ const runChatStartOnShard = async (
         streamId = await context.runMutation(internal.chat.streaming.createStreamWithMessage, {
             ...(goalId && { goalId }),
             messageId,
+            ...(startClaim !== undefined && { startClaim }),
             streamingConfig,
             threadId,
             userId,

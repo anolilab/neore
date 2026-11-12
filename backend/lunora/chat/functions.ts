@@ -106,6 +106,7 @@ import {
     falVideoOptionInput,
 } from "./lib/fal-reference-mapping";
 import { getAgentForUser } from "./lib/thread-helpers";
+import { assertStartClaimHeld, recordStartSaved, vStartClaim } from "./start-claim";
 import { FETCH_TIMEOUT_LONG_MS, fetchOk, fetchWithDeadline } from "../lib/fetch-timeout";
 import { systemDb } from "../lib/rls/scope";
 import { deleteThreadShardRoutes } from "../lib/shard-routes";
@@ -647,6 +648,8 @@ export const createThreadWithInitialMessage = internalMutation
         reasoningEffort: v.optional(v.number()),
         /** Hours until expiry when `temporary`; the client sends a preset from the temporary-chat control. */
         retentionHours: v.optional(v.number().check((value) => value >= 1 && value <= 168, { message: "Invalid retention" })),
+        /** A send with a `clientMessageId` (`chat/start-claim.ts`): checked before anything is written, its ids recorded with the save. */
+        startClaim: v.optional(vStartClaim),
         statelessMode: v.optional(v.boolean()),
         temporary: v.optional(v.boolean()),
         /** A title known up front (a media prompt's); otherwise the default, replaced by `createTitleChat`. */
@@ -666,6 +669,7 @@ export const createThreadWithInitialMessage = internalMutation
                 model,
                 reasoningEffort,
                 retentionHours,
+                startClaim,
                 statelessMode,
                 temporary,
                 title,
@@ -673,6 +677,10 @@ export const createThreadWithInitialMessage = internalMutation
             },
             ctx: context,
         }) => {
+            if (startClaim) {
+                await assertStartClaimHeld(context, startClaim);
+            }
+
             const agent = await getAgentForUser(context, userId, model);
 
             // Create thread with minimal required fields
@@ -727,6 +735,10 @@ export const createThreadWithInitialMessage = internalMutation
                 threadId,
                 ...(Object.keys(messageMetadata).length > 0 && { metadata: messageMetadata }),
             });
+
+            if (startClaim) {
+                await recordStartSaved(context, startClaim, { messageId: result.messageId, threadId });
+            }
 
             return {
                 messageId: result.messageId,

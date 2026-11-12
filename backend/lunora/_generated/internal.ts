@@ -386,7 +386,7 @@ export interface InternalApiTypes {
             createCategoryChat: FunctionReference<"action", { prompt: string; threadId: string }, void>;
             createSummarizeChat: FunctionReference<"action", { threadId: string; userId: string }, void>;
             createThreadRelationship: FunctionReference<"mutation", { branchPoint?: number; branchType?: "branch" | "continuation" | "comparison"; parentThreadId: string; threadId: string }, void>;
-            createThreadWithInitialMessage: FunctionReference<"mutation", { autoModel?: boolean; customSystemPrompt?: string; enabledFeatures?: Array<string>; fileIds?: Array<string>; language?: string; messageContent: Array<Record<string, unknown>>; mode?: "text" | "image" | "video"; model: string; reasoningEffort?: number; retentionHours?: number; statelessMode?: boolean; temporary?: boolean; title?: string; userId: string }, { messageId: string; threadId: string; }>;
+            createThreadWithInitialMessage: FunctionReference<"mutation", { autoModel?: boolean; customSystemPrompt?: string; enabledFeatures?: Array<string>; fileIds?: Array<string>; language?: string; messageContent: Array<Record<string, unknown>>; mode?: "text" | "image" | "video"; model: string; reasoningEffort?: number; retentionHours?: number; startClaim?: { claimedAt: number; key: string }; statelessMode?: boolean; temporary?: boolean; title?: string; userId: string }, { messageId: string; threadId: string; }>;
             createTitleChat: FunctionReference<"action", { jobId?: string; prompt: string; promptId?: string; threadId: string }, void>;
             deleteThreadRelationship: FunctionReference<"mutation", { threadId: string }, null>;
             editImage: FunctionReference<"action", { imageUrl: string; mask?: string; operation: string; prompt?: string }, { resultUrl: string; }>;
@@ -500,11 +500,16 @@ export interface InternalApiTypes {
                 updateSlide: FunctionReference<"mutation", { htmlContent?: string; presentationId: Id<"presentations">; slideNumber: number; threadId: Id<"threads">; title?: string; userId: string }, { slideId: Id<"presentationSlides"> }>;
             };
         };
+        start_claim: {
+            claimChatStart: FunctionReference<"mutation", { clientMessageId: string; streams: boolean; userId: string }, { claim: { claimedAt: number; key: string }; outcome: "claimed" } | { outcome: "in_progress" } | { messageId: string; outcome: "duplicate"; streamId?: string; threadId: string } | { claim: { claimedAt: number; key: string }; messageId: string; outcome: "resume"; threadId: string }>;
+            releaseChatStart: FunctionReference<"mutation", { claim: { claimedAt: number; key: string } }, null>;
+            saveStartPrompt: FunctionReference<"mutation", { claim: { claimedAt: number; key: string }; fileIds?: Array<string>; messageContent: Array<Record<string, unknown>>; model: string; parentId?: string; threadId: string; userId: string }, { messageId: string }>;
+        };
         steering: {
             deliverSteers: FunctionReference<"mutation", { pendingMessageId: string; streamId: Id<"persistentStreams">; threadId: Id<"threads">; userId: string }, null | { messageId: string; text: string }>;
         };
         streaming: {
-            createStreamWithMessage: FunctionReference<"mutation", { goalId?: Id<"threadGoals">; messageId: string; streamingConfig: { contentType: string; customSystemPrompt?: string; enabledFeatures?: Array<string>; imageSize?: string; model: string; reasoningEffort?: number; searchMode?: string; statelessMode?: boolean }; threadId: string; userId: string }, string>;
+            createStreamWithMessage: FunctionReference<"mutation", { goalId?: Id<"threadGoals">; messageId: string; startClaim?: { claimedAt: number; key: string }; streamingConfig: { contentType: string; customSystemPrompt?: string; enabledFeatures?: Array<string>; imageSize?: string; model: string; reasoningEffort?: number; searchMode?: string; statelessMode?: boolean }; threadId: string; userId: string }, string>;
             streamRunThread: FunctionReference<"query", { streamId: Id<"persistentStreams">; userId: string }, ({ activeAgent?: ({} & { kind: "model"; model: string; }) | undefined; activeLeafMessageId?: string | undefined; awaitingInput?: "approval" | "question" | undefined; botId?: string | undefined; contextResetMessageId?: string | undefined; createdAt?: number | undefined; groupChat?: ({ debateRounds?: number | undefined; stopRequestedAt?: number | undefined; synthesizerSkillId?: string | undefined; } & { mode: "supervisor" | "round-robin" | "mention-only" | "parallel" | "debate"; participants: ({} & { addedAt: number; skillId: string; })[]; }) | undefined; hasContextReset?: boolean | undefined; hasHandoff?: boolean | undefined; lastReplyAt?: number | undefined; lastUserMessageAt?: number | undefined; lastViewedAt?: number | undefined; lockedAt?: number | undefined; order?: number | undefined; permissionMode?: "full" | "supervised" | "auto" | undefined; runner?: "host" | undefined; snoozeChosenAt?: number | undefined; snoozedUntil?: number | undefined; summaryEpoch?: number | undefined; summaryPathTooLongAt?: number | undefined; tagIds?: string[] | undefined; workerPolicy?: ({ maxDispatchesPerHour?: number | undefined; } & { allowedSources: ("user" | "lead" | "outside_agent" | "trigger" | "messenger")[]; hostDispatch: "ask"; }) | undefined; autoModel?: boolean | undefined; category?: string | undefined; createdBy?: string | undefined; customSystemPrompt?: string | undefined; deleted?: boolean | undefined; deletedAt?: number | undefined; dictationLanguage?: string | undefined; enabledFeatures?: string[] | undefined; externalThreadId?: string | undefined; isPublic?: boolean | undefined; isTemporary?: boolean | undefined; language?: string | undefined; lastCompressionStartedAt?: number | undefined; messengerConnectionId?: string | undefined; mode?: "text" | "image" | "video" | undefined; model?: string | undefined; multiChat?: boolean | undefined; organizationId?: string | undefined; parentThreadIds?: string[] | undefined; pinnedAt?: number | undefined; projectId?: string | undefined; publicAccessToken?: string | undefined; reasoningEffort?: number | undefined; source?: string | undefined; statelessMode?: boolean | undefined; summary?: string | undefined; tags?: string[] | undefined; teamId?: string | undefined; title?: string | undefined; updatedAt?: number | undefined; userId?: string | undefined; } & { _creationTime: number; _id: string; status: "running" | "error" | "active" | "archived" | "abort" | "finish"; }) | null>;
             persistent: {
                 crons: {
@@ -1818,6 +1823,11 @@ export const internal: InternalApiTypes = {
                 updatePresentationStatus: { __lunoraRef: "chat_slides_internal:updatePresentationStatus" },
                 updateSlide: { __lunoraRef: "chat_slides_internal:updateSlide" },
             },
+        },
+        start_claim: {
+            claimChatStart: { __lunoraRef: "chat_start_claim:claimChatStart" },
+            releaseChatStart: { __lunoraRef: "chat_start_claim:releaseChatStart" },
+            saveStartPrompt: { __lunoraRef: "chat_start_claim:saveStartPrompt" },
         },
         steering: {
             deliverSteers: { __lunoraRef: "chat_steering:deliverSteers" },
