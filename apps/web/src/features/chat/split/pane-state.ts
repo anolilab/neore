@@ -7,7 +7,7 @@ import { useUIStateStore } from "@/features/layout/stores/ui-state-store";
 
 import type { ComposerDraft } from "./composer-drafts";
 import {
-    draftOwnership,
+    handOverDraftOwnership,
     hasDraftContent,
     peekComposerDraft,
     peekParkedModelState,
@@ -248,7 +248,7 @@ export const leaveSplitView = (focusedThreadId: string | undefined, routeThreadI
     if (isPreferenceOff && routeThreadId !== undefined) {
         // Stored now, while the composer is empty and still the focused pane's: once the routed chat's draft is back in it, it is
         // that chat's, not text carried from the focused pane.
-        draftOwnership.handOver?.(routeThreadId);
+        handOverDraftOwnership(routeThreadId);
         restoreLiveComposerFor(routeThreadId);
 
         // Restored here, not when the single chat's provider loads: the model choices are back before its composer is first shown.
@@ -275,7 +275,7 @@ export const watchPaneFocus = (): (() => void) =>
             parkModelState(before);
             parkLiveComposer(before);
             // Stored now, while the composer is empty: once the incoming pane's draft is back in it, it is that pane's.
-            draftOwnership.handOver?.(after);
+            handOverDraftOwnership(after);
             // The outgoing chat's comparison is not the incoming one's: its own parent turns comparison back on when it has focus.
             useModelStore.setState({ comparisonMode: false, selectedModelsForComparison: [] });
         }

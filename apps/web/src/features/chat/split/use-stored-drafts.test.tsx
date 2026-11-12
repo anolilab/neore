@@ -3,7 +3,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
 
-import { clearComposerDrafts, dropStoredDrafts } from "./composer-drafts";
+import { clearComposerDrafts, draftOwnership, dropStoredDrafts, saveComposerDraft, setSplitViewMounted } from "./composer-drafts";
+import { leaveSplitView } from "./pane-state";
 import { draftKey, flushStoredDrafts, resetStoredDraftsForTests } from "./stored-drafts";
 import useStoredDrafts, { keepsStoredDraft } from "./use-stored-drafts";
 
@@ -20,6 +21,9 @@ beforeEach(() => {
     resetStoredDraftsForTests();
     clearComposerDrafts();
     useChatUIStore.getState().clearComposer();
+    // A fresh page: the storage module has not loaded, so nothing is bound and no hand-over is installed.
+    draftOwnership.first = undefined;
+    draftOwnership.handOver = undefined;
 });
 
 describe("useStoredDrafts", () => {
@@ -90,6 +94,30 @@ describe("keepsStoredDraft", () => {
         flushStoredDrafts();
 
         expect(storedText("thread-a")).toBe("draft a");
+    });
+
+    it("keeps each chat's draft its own when split view closes on another chat before the storage code loaded", async () => {
+        setSplitViewMounted(true);
+
+        const { rerender } = renderHook(
+            ({ owner }) => {
+                useStoredDrafts(owner, "user-1", false);
+            },
+            { initialProps: { owner: "thread-a" } },
+        );
+
+        useChatUIStore.getState().setComposerText("pane a");
+        saveComposerDraft("thread-b", { composerText: "pane b" });
+        // The preference is off and the route shows pane b: its draft comes back to the single chat's composer.
+        leaveSplitView("thread-a", "thread-b");
+        setSplitViewMounted(false);
+        rerender({ owner: "thread-b" });
+        await vi.dynamicImportSettled();
+        flushStoredDrafts();
+
+        expect(useChatUIStore.getState().composerText).toBe("pane b");
+        expect(storedText("thread-a")).toBe("pane a");
+        expect(storedText("thread-b")).toBe("pane b");
     });
 
     it("keeps the draft of a known cloud chat and of a new one", () => {

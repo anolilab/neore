@@ -38,6 +38,19 @@ export const draftOwnership: {
 } = {};
 
 /**
+ * The live composer is `owner`'s from now on (focus moved to its pane, or split view closed on it). The storage module writes the
+ * parked drafts and moves its binding; before it has loaded, the chat the composer's text belongs to (`first`) moves instead, so
+ * the binding it makes later does not count the next chat's restored text as carried from the previous one.
+ */
+export const handOverDraftOwnership = (owner: string | undefined): void => {
+    if (draftOwnership.handOver) {
+        draftOwnership.handOver(owner);
+    } else if (draftOwnership.first && owner !== undefined) {
+        draftOwnership.first = { ...draftOwnership.first, owner };
+    }
+};
+
+/**
  * `neore-draft-cleared:<userId | *>`: `<ms>:<random>`, written each time a tab removes that account's drafts (every account's for
  * `*`). Not a draft key. Tabs compare the whole value, never its time, so a clock set back cannot pass an old clear off as new.
  */
