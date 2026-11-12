@@ -71,7 +71,8 @@ const HEADING = /^H[1-6]$/;
 const BLANK_LINES = /\n{3,}/g;
 // The whitespace HTML collapses: ASCII only. `\s` would also take the non-breaking spaces Word and Google Docs indent with.
 const HTML_SPACE = /[\t\n\f\r ]+/g;
-const EDGE_HTML_SPACE = /^[\t\n\f\r ]+|[\t\n\f\r ]+$/g;
+// After collapsing, an edge holds at most one plain space.
+const EDGE_SPACE = /^ | $/g;
 const PLACEHOLDER = /\0(\d+)\0/g;
 /** Grid cells all tables of a paste may fill: spans multiply a cell, and past this a table is pasted as its text. */
 const MAX_TABLE_CELLS = 100_000;
@@ -563,7 +564,7 @@ const list = (listElement: Element, context: Context): string => {
 
     for (const child of listElement.childNodes) {
         if (child.nodeType === Node.TEXT_NODE) {
-            const text = (child.nodeValue ?? "").replaceAll("\0", "").replaceAll(HTML_SPACE, " ").replaceAll(EDGE_HTML_SPACE, "");
+            const text = (child.nodeValue ?? "").replaceAll("\0", "").replaceAll(HTML_SPACE, " ").replaceAll(EDGE_SPACE, "");
 
             if (text !== "") {
                 entries.push({ body: text });
