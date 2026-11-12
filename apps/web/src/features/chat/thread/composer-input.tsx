@@ -856,7 +856,7 @@ const ComposerInput = ({
 
     // The paste did not land in the draft, so say where it went and let the person take it back.
     const announcePasteAttached = useCallback(
-        (attachmentId: string, pastedText: string) => {
+        (attachmentId: string, pastedText: string, converted: boolean) => {
             const toastId = showInfo(t`Long text was attached as a file.`, {
                 action: {
                     label: t`Undo`,
@@ -869,6 +869,7 @@ const ComposerInput = ({
 
                         undoLongPaste({
                             attachmentId,
+                            converted,
                             getAttachmentIds: () => useChatUIStore.getState().composerAttachments.map((attachment) => attachment.id),
                             getDraft: () => useChatUIStore.getState().composerText,
                             pastedText,
@@ -963,7 +964,9 @@ const ComposerInput = ({
                 const draft = useChatUIStore.getState().composerText;
                 const inserted = converted ? onOwnLines(pastedText, selection.textBefore, selection.textAfter) : pastedText;
 
-                if (inputAreaRef.current?.getEditor()?.pasteText(inserted, stateAtPaste)) {
+                // Into the editor only while the store still holds the draft the paste was made in: an update the editor has not
+                // caught up with yet would otherwise be written over by the stale document's next change.
+                if (draft === draftAtPaste && inputAreaRef.current?.getEditor()?.pasteText(inserted, stateAtPaste)) {
                     return;
                 }
 
@@ -989,7 +992,7 @@ const ComposerInput = ({
                 getChatKey,
                 getDraft: () => useChatUIStore.getState().composerText,
                 onAttached: (attachmentId) => {
-                    announcePasteAttached(attachmentId, pastedText);
+                    announcePasteAttached(attachmentId, pastedText, converted);
                 },
                 onNotInserted: () => {
                     showError(t`The pasted text could not be attached and was not inserted.`);

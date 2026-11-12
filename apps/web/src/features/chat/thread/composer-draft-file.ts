@@ -87,27 +87,6 @@ export const moveDraftToFile = async ({ attach, clearDraft, discard, getAttachme
     return true;
 };
 
-interface UndoLongPasteOptions {
-    attachmentId: string;
-    getAttachmentIds: () => string[];
-    getDraft: () => string;
-    pastedText: string;
-    removeAttachment: (attachmentId: string) => void;
-    setDraft: (text: string) => void;
-}
-
-/** Puts a pasted text back in the draft and drops its file, unless the file is already gone (sent or removed): then there is nothing to undo. */
-export const undoLongPaste = ({ attachmentId, getAttachmentIds, getDraft, pastedText, removeAttachment, setDraft }: UndoLongPasteOptions): boolean => {
-    if (!getAttachmentIds().includes(attachmentId)) {
-        return false;
-    }
-
-    removeAttachment(attachmentId);
-    setDraft(getDraft() + pastedText);
-
-    return true;
-};
-
 /** `text` spliced into `draft` over the offsets `start` to `end`, as a normal paste would; offsets past the end land at the end. */
 export const insertPastedText = (draft: string, text: string, start: number, end: number): string => {
     const from = Math.min(start, draft.length);
@@ -132,6 +111,37 @@ export const appendPastedText = (draft: string, text: string, breaks = 1): strin
     }
 
     return draft + "\n".repeat(breaks - trailing) + text;
+};
+
+interface UndoLongPasteOptions {
+    attachmentId: string;
+    /** Whether `pastedText` is converted Markdown: put back, a table, fence or list it opens with goes on a line of its own. */
+    converted?: boolean;
+    getAttachmentIds: () => string[];
+    getDraft: () => string;
+    pastedText: string;
+    removeAttachment: (attachmentId: string) => void;
+    setDraft: (text: string) => void;
+}
+
+/** Puts a pasted text back in the draft and drops its file, unless the file is already gone (sent or removed): then there is nothing to undo. */
+export const undoLongPaste = ({
+    attachmentId,
+    converted = false,
+    getAttachmentIds,
+    getDraft,
+    pastedText,
+    removeAttachment,
+    setDraft,
+}: UndoLongPasteOptions): boolean => {
+    if (!getAttachmentIds().includes(attachmentId)) {
+        return false;
+    }
+
+    removeAttachment(attachmentId);
+    setDraft(converted ? appendPastedText(getDraft(), pastedText, breaksBefore(pastedText)) : getDraft() + pastedText);
+
+    return true;
 };
 
 interface AttachLongPasteOptions {

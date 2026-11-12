@@ -239,6 +239,22 @@ describe("draftFitsAsFile", () => {
 });
 
 describe("undoLongPaste", () => {
+    it("puts a converted table back on lines of its own after the draft's last line", () => {
+        const setDraft = vi.fn();
+
+        undoLongPaste({
+            attachmentId: "a1",
+            converted: true,
+            getAttachmentIds: () => ["a1"],
+            getDraft: () => "Before:",
+            pastedText: "| A | B |\n| --- | --- |",
+            removeAttachment: vi.fn(),
+            setDraft,
+        });
+
+        expect(setDraft).toHaveBeenCalledWith("Before:\n\n| A | B |\n| --- | --- |");
+    });
+
     it("puts the text back and drops the file while the file is attached", () => {
         const removeAttachment = vi.fn();
         const setDraft = vi.fn();
