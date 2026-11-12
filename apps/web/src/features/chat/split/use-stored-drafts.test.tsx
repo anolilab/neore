@@ -123,7 +123,7 @@ describe("keepsStoredDraft", () => {
     it("keeps the routed chat's saved draft when split view closes after the focused pane's composer unmounted", async () => {
         setSplitViewMounted(true);
 
-        const paneA = renderHook(() => {
+        const { unmount: unmountPaneA } = renderHook(() => {
             useStoredDrafts("thread-a", "user-1", false);
         });
 
@@ -136,7 +136,7 @@ describe("keepsStoredDraft", () => {
         expect(storedText("thread-b")).toBe("pane b");
 
         // Split view closes: the focused pane's composer unmounts first, then the view hands the route's chat its draft.
-        paneA.unmount();
+        unmountPaneA();
         leaveSplitView("thread-a", "thread-b");
         setSplitViewMounted(false);
         renderHook(() => {
