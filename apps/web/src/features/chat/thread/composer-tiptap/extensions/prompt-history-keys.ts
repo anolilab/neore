@@ -6,8 +6,9 @@
  * - ArrowDown with a collapsed cursor at the very end;
  * - Escape, only while a recalled entry is showing.
  * Everywhere else the key falls through, so moving between lines of a
- * multi-line draft is untouched. Open suggestion popups (slash, @, {{) are
- * checked by the `onNavigate` owner, which answers `null` to decline.
+ * multi-line draft is untouched. An open suggestion popup (slash, @, {{)
+ * takes the arrows and Escape on `window` before the editor sees them;
+ * `onNavigate` answers `null` to decline.
  *
  * Registered BEFORE SubmitOnEnter so Escape restores the draft before it can
  * cancel a running stream.
@@ -37,11 +38,10 @@ const isCollapsedAt = (editor: Editor, edge: "end" | "start"): boolean => {
 
 const show = (editor: Editor, text: string, cursor: "end" | "start"): void => {
     // emitUpdate so the composer store (and `onChange`) see the recalled text.
-    editor
-        .chain()
-        .setContent(text ? plainTextToHtml(text) : "", { emitUpdate: true })
-        .focus(cursor)
-        .run();
+    editor.commands.setContent(text ? plainTextToHtml(text) : "", { emitUpdate: true });
+    // A separate command, not chained: in a chain `focus` compares against the selection from before the new content
+    // and, finding the cursor already at "start" of the empty document, leaves it where `setContent` put it (the end).
+    editor.commands.focus(cursor);
 };
 
 const PromptHistoryKeys = Extension.create<PromptHistoryKeysOptions>({
