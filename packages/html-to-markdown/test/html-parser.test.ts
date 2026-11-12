@@ -43,7 +43,8 @@ describe("HTML parser", () => {
         // the output shows which parser ran.
         const supplied = vi.fn((html: string): Document => {
             const document = createDocument(html);
-            const root = document.querySelector("#turndown-root") as Element;
+            // The wrapper's id carries a random token per call, so match its prefix.
+            const root = document.querySelector("[id^='turndown-root-']") as Element;
 
             root.insertBefore(document.createTextNode(MARKER), root.firstChild);
 
