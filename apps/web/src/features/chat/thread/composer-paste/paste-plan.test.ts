@@ -916,3 +916,17 @@ describe("a URL ending in a backslash pasted over a selection", () => {
         });
     });
 });
+
+describe("a style declared twice", () => {
+    it("reads as CSS does: the last declaration wins, unless an earlier one is important", () => {
+        expect(htmlToMarkdown('<p><span style="font-weight:bold; font-weight:normal">text</span></p>')).toBe("text");
+        expect(htmlToMarkdown('<p><span style="font-weight:bold !important; font-weight:normal">text</span></p>')).toBe("**text**");
+        expect(htmlToMarkdown('<p><span style="font-style:italic; font-style:normal">text</span></p>')).toBe("text");
+    });
+});
+
+describe("negative list numbers", () => {
+    it("keep their numbers as text, since Markdown numbers only from 0", () => {
+        expect(htmlToMarkdown('<ol start="-2"><li>alpha</li><li>beta</li><li>gamma</li></ol>')).toBe("- -2. alpha\n- -1. beta\n0. gamma");
+    });
+});

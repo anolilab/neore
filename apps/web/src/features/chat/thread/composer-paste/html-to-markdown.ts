@@ -53,9 +53,8 @@ const BLOCKS = new Set([
 const LINE_BLOCKS = new Set(["CAPTION", "DIV"]);
 const LINK_PROTOCOLS = new Set(["http:", "https:", "mailto:"]);
 const LANGUAGE_CLASS = /(?:^|\s)(?:language|lang|highlight-source|highlight)-([\w#+.-]{1,30})/;
-const BOLD_STYLE = /font-weight\s*:\s*(?:bold|[6-9]00)/i;
-const NORMAL_WEIGHT = /font-weight\s*:\s*(?:normal|[1-4]00)/i;
-const ITALIC_STYLE = /font-style\s*:\s*italic/i;
+const BOLD_WEIGHT = /^(?:bold|bolder|[6-9]00)$/;
+const NORMAL_WEIGHT = /^(?:normal|lighter|[1-4]00)$/;
 const STRIKE_STYLE = /text-decoration[\w-]{0,20}\s*:[^;]{0,200}line-through/i;
 const HIDDEN_CLASS = /(?:^|\s)(?:sr-only|visually-?hidden)(?:\s|$)/i;
 const EMOJI_NAME = /^:[\w+-]{1,40}:$/;
@@ -167,6 +166,37 @@ const declares = (style: string, property: string, value: string): boolean =>
                 .toLowerCase() === value
         );
     });
+
+/**
+ * The value `style` gives `property`, as CSS reads it: the last declaration wins, unless an earlier one is `!important`
+ * and the later one is not. Lower case, without `!important`; empty when it sets none.
+ */
+const declared = (style: string, property: string): string => {
+    let value = "";
+    let important = false;
+
+    for (const declaration of style.split(";")) {
+        const colon = declaration.indexOf(":");
+
+        if (colon === -1 || declaration.slice(0, colon).trim().toLowerCase() !== property) {
+            continue;
+        }
+
+        const raw = declaration.slice(colon + 1);
+        const isImportant = IMPORTANT.test(raw);
+
+        if (isImportant || !important) {
+            value = raw.replace(IMPORTANT, "").trim().toLowerCase();
+            important = isImportant;
+        }
+    }
+
+    return value;
+};
+
+const isBoldStyle = (style: string): boolean => BOLD_WEIGHT.test(declared(style, "font-weight"));
+const isNormalWeight = (style: string): boolean => NORMAL_WEIGHT.test(declared(style, "font-weight"));
+const isItalicStyle = (style: string): boolean => ["italic", "oblique"].includes(declared(style, "font-style"));
 
 /** Word's list bullet, written as text the page does not show. */
 const isWordBullet = (element: Element): boolean => element.tagName === "SPAN" && declares(styleOf(element), "mso-list", "ignore");
@@ -736,11 +766,11 @@ const nestedTable = (element: Element, context: Context): string => {
     return text === "" ? "" : `\n${text}\n`;
 };
 
-/** An `<ol start>` or `<li value>` number Markdown can write: 0 counts. */
+/** An `<ol start>` or `<li value>` number: 0 and negative ones count (Markdown cannot write the latter: see `listMarker`). */
 const listNumber = (value: string | null): number | undefined => {
     const number = Number.parseInt(value ?? "", 10);
 
-    return number >= 0 ? number : undefined;
+    return Number.isNaN(number) ? undefined : number;
 };
 
 const ROMAN: [number, string][] = [
@@ -794,6 +824,11 @@ const listLabel = (number: number, type: string): string => {
 const listMarker = (ordered: boolean, type: string, number: number): string => {
     if (!ordered) {
         return "- ";
+    }
+
+    // Markdown numbers only from 0 up: a negative number is kept as text on a bullet, like a letter.
+    if (number < 0) {
+        return `- ${String(number)}. `;
     }
 
     return type === "1" || !"aAiI".includes(type) || type === "" ? `${number}. ` : `- ${listLabel(number, type)}. `;
@@ -881,8 +916,8 @@ const list = (listElement: Element, context: Context): string => {
         const number = (ordered && item ? listNumber(item.getAttribute("value")) : undefined) ?? numbers[level - 1] ?? (level === 1 ? firstNumber : 1);
 
         numbers.length = level;
-        // Markdown has no negative numbers: a reversed list stops counting at 0.
-        numbers[level - 1] = reversed && level === 1 ? Math.max(number - 1, 0) : number + 1;
+        // A reversed list counts on below 0: such numbers are kept as text (`listMarker`).
+        numbers[level - 1] = reversed && level === 1 ? number - 1 : number + 1;
         items.push(listItem(body.replaceAll(BLANK_LINES, "\n\n").trim(), level, listMarker(ordered, listType, number), context));
     }
 
@@ -933,7 +968,7 @@ const wordListItem = (element: Element, inner: string, context: Context): string
 /** The Markdown for the child nodes, with the bold, italics or strikethrough the element's own style gives them. */
 function styledChildren(node: Element, context: Context): string {
     const style = styleOf(node);
-    const isBold = BOLD_STYLE.test(style);
+    const isBold = isBoldStyle(style);
 
     context.bold += isBold ? 1 : 0;
 
@@ -943,11 +978,11 @@ function styledChildren(node: Element, context: Context): string {
 
     if (isBold) {
         inner = wrap(inner, "**", context, node);
-    } else if (NORMAL_WEIGHT.test(style)) {
+    } else if (isNormalWeight(style)) {
         inner = unbold(inner, context);
     }
 
-    inner = ITALIC_STYLE.test(style) ? wrap(inner, "*", context, node) : inner;
+    inner = isItalicStyle(style) ? wrap(inner, "*", context, node) : inner;
 
     return STRIKE_STYLE.test(style) ? wrap(inner, "~~", context, node) : inner;
 }
@@ -992,7 +1027,7 @@ const element = (node: Element, context: Context): string => {
         case "B":
         case "STRONG": {
             // Google Docs wraps the whole copy in `<b style="font-weight:normal">`.
-            if (NORMAL_WEIGHT.test(style)) {
+            if (isNormalWeight(style)) {
                 return unbold(children(node, context), context);
             }
 
