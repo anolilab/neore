@@ -165,6 +165,7 @@
         "streamdown": "catalog:markdown",
         "tailwindcss": "catalog:style",
         "unified": "catalog:markdown",
+        "web-vitals": "catalog:analytics",
         "workbox-window": "catalog:build",
         "zod": "catalog:utils",
         "zustand": "catalog:state"

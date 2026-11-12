@@ -58,6 +58,7 @@ import ThreadTagsMenu from "@/features/chat/tags/thread-tags-menu";
 import { usePullRequestCount } from "@/features/develop/components/pull-request-counts";
 import { useUIStateStore } from "@/features/layout/stores/ui-state-store";
 import { useHasOpened } from "@/hooks/use-has-opened";
+import { LOAD_MARKS, useLoadMark } from "@/lib/analytics/load-marks";
 import { createLunoraQueryOptions, useCRPC, useLunora } from "@/lib/lunora/crpc";
 import { openThreadWindow, supportsThreadWindows } from "@/lib/native/bridge";
 import { showError, showWarning } from "@/lib/toast";
@@ -241,6 +242,9 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
     const { i18n, t } = useLingui();
     const crpc = useCRPC();
     const lunoraClient = useLunora();
+
+    // The first row painted is when the sidebar list became visible (real-user load timing, `lib/analytics/load-marks.ts`).
+    useLoadMark(LOAD_MARKS.sidebarListVisible);
     const router = useRouter();
     const location = useLocation();
     const queryClient = useQueryClient();

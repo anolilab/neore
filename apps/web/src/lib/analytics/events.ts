@@ -146,6 +146,24 @@ export interface OnboardingSkippedProperties {
     at_step: string;
 }
 
+// ── Performance ─────────────────────────────────────────────────────────────
+/** Milliseconds from navigation start, per page load (`load-timing/report-load-timing.ts`). Absent when not measured. */
+export interface PageLoadTimingProperties {
+    /** The composer first painted, before any user input. */
+    composer_visible_ms?: number;
+    fcp_ms?: number;
+    /** Interaction to Next Paint, the slowest interaction's latency, not a time from navigation start. */
+    inp_ms?: number;
+    lcp_ms?: number;
+    /** web-vitals' navigation type: navigate, reload, back-forward, back-forward-cache, prerender, restore. */
+    navigation_type?: string;
+    /** The first path segment only (`chat`, `settings`); ids never leave the browser. */
+    route_section: string;
+    /** The sidebar thread list first painted rows, before any user input. */
+    sidebar_list_visible_ms?: number;
+    ttfb_ms?: number;
+}
+
 // ── Event map ───────────────────────────────────────────────────────────────
 
 export interface AnalyticsEventMap {
@@ -176,6 +194,7 @@ export interface AnalyticsEventMap {
     onboarding_skipped: OnboardingSkippedProperties;
     onboarding_started: Record<string, never>;
     onboarding_step_completed: OnboardingStepCompletedProperties;
+    page_load_timing: PageLoadTimingProperties;
     settings_changed: SettingsChangedProperties;
     signed_in: SignedInProperties;
     signed_out: Record<string, never>;

@@ -274,6 +274,9 @@ catalogs:
     posthog-node:
       specifier: 5.63.1
       version: 5.63.1
+    web-vitals:
+      specifier: 6.2.3
+      version: 6.2.3
   animation:
     '@rive-app/react-webgl2':
       specifier: 4.38.1
@@ -2288,6 +2291,9 @@ importers:
       unified:
         specifier: catalog:markdown
         version: 11.0.5
+      web-vitals:
+        specifier: catalog:analytics
+        version: 6.2.3
       workbox-window:
         specifier: catalog:build
         version: 7.4.1

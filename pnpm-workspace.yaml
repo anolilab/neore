@@ -93,6 +93,8 @@ catalogs:
     "@posthog/react": 1.11.3
     posthog-js: 1.447.3
     posthog-node: 5.63.1
+    # The real-user load timing reporter (apps/web lib/analytics/load-timing); the version posthog-js already pulls in.
+    web-vitals: 6.2.3
   animation:
     "@rive-app/react-webgl2": 4.38.1
     motion: 14.10.1

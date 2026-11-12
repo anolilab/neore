@@ -56,6 +56,17 @@ export const POSTHOG_OPTIONS = {
     person_profiles: "always",
 } as const satisfies Partial<PostHogConfig>;
 
+/**
+ * Real-user load timing (`lib/analytics/load-timing/report-load-timing.ts`). Its code and `web-vitals` load once the
+ * browser is idle, so they stay out of the first-load bundle; the browser buffers the entries it reads.
+ */
+const startLoadTiming = (): void => {
+    void import("@/lib/analytics/load-timing/report-load-timing")
+        .then(({ reportLoadTiming }) => reportLoadTiming())
+        // A chunk that fails to load (offline, a deploy in between) only costs this page's timings.
+        .catch(() => undefined);
+};
+
 /** PostHog's `loaded` callback: applies the consent state that arrived before `posthog.init` finished. */
 export const onPostHogLoaded = (ph: PostHogInterface): void => {
     if (import.meta.env.DEV) {
@@ -70,6 +81,12 @@ export const onPostHogLoaded = (ph: PostHogInterface): void => {
 
     // Here, not in an effect: AnalyticsProvider wraps the app, so child effects run before PostHog loads.
     reportFirstNativeLaunch();
+
+    if (typeof globalThis.requestIdleCallback === "function") {
+        globalThis.requestIdleCallback(startLoadTiming, { timeout: 5000 });
+    } else {
+        setTimeout(startLoadTiming, 3000);
+    }
 };
 
 const AnalyticsProvider: FC<PropsWithChildren> = ({ children }) => {
