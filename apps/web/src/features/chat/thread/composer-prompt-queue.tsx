@@ -204,6 +204,8 @@ const useQueueActions = () => {
             }
 
             busyRef.current = true;
+            // Whether this call sent a prompt: its reply has not started in the rendered state yet, so nothing else may send now.
+            let sent = false;
 
             try {
                 const { remove, settleSteer, setPaused } = usePromptQueueStore.getState();
@@ -236,6 +238,7 @@ const useQueueActions = () => {
                 });
 
                 if (next?.kind === "send") {
+                    sent = true;
                     sendQueuedPrompt(next.prompt);
                 } else if (next?.kind === "failed") {
                     setPaused(threadId, true);
@@ -247,7 +250,11 @@ const useQueueActions = () => {
                 // A send starts a reply, and the next one waits for its end.
                 sendRequestedRef.current = undefined;
                 removeRequestedMeanwhile();
-                replayOfflineHold();
+
+                // A held send waits for this one's reply to end, like any other: it stays held until then.
+                if (!sent) {
+                    replayOfflineHold();
+                }
             }
         },
         [holdOffline, queryClient, removeRequestedMeanwhile, replayOfflineHold, sendQueuedPrompt, withdraw],

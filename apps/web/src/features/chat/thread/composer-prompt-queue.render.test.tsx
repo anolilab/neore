@@ -221,9 +221,19 @@ describe("composer prompt queue", () => {
             finish({ outcome: "withdrawn" });
         });
 
-        // The withdrawn steer goes, then the held Send next: the mocked send starts no reply that would hold it back.
+        // The withdrawn steer goes; the held Send next waits for its reply, so two turns never run at once.
+        await waitFor(() => expect(chat.sendMessage).toHaveBeenCalledTimes(1));
+        expect(chat.sendMessage).toHaveBeenLastCalledWith("steered", []);
+
+        chat.isStreaming = true;
+        view.rerender(<ComposerPromptQueue />);
+        expect(chat.sendMessage).toHaveBeenCalledTimes(1);
+
+        chat.isStreaming = false;
+        view.rerender(<ComposerPromptQueue />);
+
         await waitFor(() => expect(chat.sendMessage).toHaveBeenCalledTimes(2));
-        expect(chat.sendMessage.mock.calls.map(([text]) => text)).toStrictEqual(["steered", "queued"]);
+        expect(chat.sendMessage).toHaveBeenLastCalledWith("queued", []);
     });
 
     it("keeps a prompt when the network goes during its steer withdrawal, and sends it once it is back", async () => {
