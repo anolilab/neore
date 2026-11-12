@@ -340,6 +340,19 @@ describe("restoring", () => {
         expect(draftKeys()).toStrictEqual([draftKey("user-1", "thread-b")]);
     });
 
+    it("reads the account's stored drafts again only when a write adds an entry, not on every typing pause", () => {
+        bindStoredDrafts("thread-a", "user-1", false);
+        type("first");
+        flushStoredDrafts();
+        const getItem = vi.spyOn(Storage.prototype, "getItem");
+
+        put("thread-b", "another tab's");
+        type("first edit");
+        vi.advanceTimersByTime(DRAFT_WRITE_DELAY_MS);
+
+        expect(getItem.mock.calls.map(([key]) => key)).not.toContain(draftKey("user-1", "thread-b"));
+    });
+
     it("keeps only each account's most recent drafts", () => {
         const now = Date.now();
 

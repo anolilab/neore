@@ -331,6 +331,8 @@ export const flushStoredDrafts = (): void => {
     }
 
     const now = Date.now();
+    // Whether an entry this page had not written before was added: only then can the account go over its cap.
+    let added = false;
 
     for (const [owner, draft] of current) {
         const content = JSON.stringify(draft);
@@ -355,6 +357,7 @@ export const flushStoredDrafts = (): void => {
 
             try {
                 store.setItem(key, JSON.stringify({ t: now, v: draft, w }));
+                added ||= mine === undefined;
                 state.mine.set(owner, { content, w });
             } catch {
                 // Full: this chat's older entry from this page must not come back stale on a reload.
@@ -368,7 +371,11 @@ export const flushStoredDrafts = (): void => {
     }
 
     state.edited.clear();
-    prune(draftKeyPrefix(binding.userId), now);
+
+    // Not on every typing pause: the cleanup parses every stored draft of the account. Expired ones go on the first use after a load.
+    if (added) {
+        prune(draftKeyPrefix(binding.userId), now);
+    }
 };
 
 const schedule = (): void => {
