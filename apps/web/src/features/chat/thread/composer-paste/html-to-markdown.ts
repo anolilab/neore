@@ -674,9 +674,13 @@ const element = (node: Element, context: Context): string => {
                 return text;
             }
 
-            const label = escapeLinkLabel(text.trim());
+            const core = text.trim();
+            const label = escapeLinkLabel(core);
+            const start = text.indexOf(core);
+            const link = label === href ? href : `[${label}](${href})`;
 
-            return label === href ? href : `[${label}](${href})`;
+            // The spaces around the label stay outside the link: they part it from the words beside it.
+            return text.slice(0, start) + link + text.slice(start + core.length);
         }
         case "B":
         case "STRONG": {

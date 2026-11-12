@@ -267,6 +267,10 @@ describe("composer paste", () => {
         }
     });
 
+    it("keeps the spaces inside a link's tag around the link", () => {
+        expect(htmlToMarkdown('<p>Read<a href="https://example.com/"> docs </a>today</p>')).toBe("Read [docs](https://example.com/) today");
+    });
+
     it("keeps task boxes whatever the case of their type", () => {
         expect(htmlToMarkdown('<ul><li><input type="CHECKBOX" checked>done</li><li><input type="Checkbox">open</li></ul>')).toBe("- [x] done\n- [ ] open");
     });
