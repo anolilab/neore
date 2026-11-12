@@ -52,7 +52,7 @@ import type { VaultFileRef } from "./file-mention-popup";
 import FileMentionPopup from "./file-mention-popup";
 import type { GhostController, GhostEligibility, GhostRequest } from "./ghost-completion-controller";
 import { createGhostController, shouldAnnounceGhost } from "./ghost-completion-controller";
-import { appendPlainLines, composerCoreExtensionOptions, pastePlainText } from "./paste-plain-text";
+import { appendPlainText, composerCoreExtensionOptions, pastePlainText } from "./paste-plain-text";
 import { plainTextToHtml } from "./plain-text";
 import SlashCommandPopup from "./slash-command-popup";
 import useMentionPrefetch from "./use-mention-prefetch";
@@ -126,8 +126,8 @@ export interface ComposerTiptapEditorProps {
 }
 
 export interface ComposerTiptapEditorRef {
-    /** Lines added as paragraphs after the last block, the document otherwise untouched; false when the editor cannot take them. */
-    appendLines: (lines: string[]) => boolean;
+    /** `text` typed at the document's end, the blocks before it untouched; false when the editor cannot take it. */
+    appendText: (text: string) => boolean;
     blur: () => void;
     focus: () => void;
     getEditor: () => Editor | null;
@@ -427,7 +427,7 @@ const ComposerTiptapEditor = ({
 
                 return plain;
             },
-            appendLines: (lines: string[]) => (editor && !editor.isDestroyed ? appendPlainLines(editor, lines) : false),
+            appendText: (text: string) => (editor && !editor.isDestroyed ? appendPlainText(editor, text) : false),
             pasteText: (text: string, at?: EditorState) => (editor && !editor.isDestroyed ? pastePlainText(editor, text, at) : false),
         };
     }, [editor]);

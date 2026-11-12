@@ -25,7 +25,7 @@ import { formatNumber } from "@neore/ui/utils/locale-format";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { AlertTriangleIcon, EditIcon, InfoIcon, XIcon } from "lucide-react";
 import type { ChangeEvent, DragEvent, FC } from "react";
-import { memo, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { memo, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 
 import useInviteOnly from "@/features/auth/hooks/use-invite-only";
 import { isCompactCommand } from "@/features/chat/compaction/compaction-logic";
@@ -503,10 +503,11 @@ const ComposerInput = ({
             composerStateRef.current = { ...composerStateRef.current, mounted: false };
         };
     }, [threadId]);
-    // Read by a paste once its conversion is done: the composer may have been disabled meanwhile.
+    // Read by a paste once its conversion is done: the composer may have been disabled meanwhile. Synced in the commit
+    // itself: a passive effect runs later, and a conversion that resumes in between would still read `false`.
     const disabledRef = useRef(disabled);
 
-    useEffect(() => {
+    useLayoutEffect(() => {
         disabledRef.current = disabled;
     }, [disabled]);
     // The thread a draft was last checked against, so the check below runs when the chat changes, not on every keystroke.
@@ -1016,11 +1017,10 @@ const ComposerInput = ({
                 const shown = now?.getEditor();
 
                 if (
-                    appended.startsWith(`${draft}\n`) &&
                     shown &&
                     !shown.isDestroyed &&
                     shown.state.doc.textBetween(0, shown.state.doc.content.size, "\n") === draft &&
-                    now?.appendLines(appended.slice(draft.length + 1).split("\n"))
+                    now?.appendText(appended.slice(draft.length))
                 ) {
                     return;
                 }

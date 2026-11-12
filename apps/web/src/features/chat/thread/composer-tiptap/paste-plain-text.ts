@@ -49,18 +49,25 @@ export const pastePlainText = (editor: Editor, text: string, at?: EditorState): 
 };
 
 /**
- * `lines` as paragraphs after the last block, the rest of the document untouched: a quote chip stays a chip, where
- * rebuilding the draft from its text would turn it into plain text. Its own undo step.
+ * `text` at the document's end as if typed there: its first line ends the last block, each line after it is a paragraph
+ * of its own, and the blocks before are untouched, so a quote chip stays a chip where rebuilding the draft from its text
+ * would turn it into plain text. False when the first line has no text block to end. Its own undo step.
  */
-export const appendPlainLines = (editor: Editor, lines: string[]): boolean => {
+export const appendPlainText = (editor: Editor, text: string): boolean => {
     const { schema, tr } = editor.state;
     const { paragraph } = schema.nodes;
+    const [first = "", ...rest] = text.split(LINE_BREAK);
+    const last = tr.doc.lastChild;
 
-    if (!paragraph || !editor.isEditable) {
+    if (!paragraph || !editor.isEditable || (first !== "" && !last?.isTextblock)) {
         return false;
     }
 
-    const paragraphs = lines.map((line: string) => paragraph.create(null, line === "" ? null : schema.text(line)));
+    if (first !== "") {
+        tr.insertText(first, tr.doc.content.size - 1);
+    }
+
+    const paragraphs = rest.map((line: string) => paragraph.create(null, line === "" ? null : schema.text(line)));
 
     editor.view.dispatch(closeHistory(tr).insert(tr.doc.content.size, paragraphs).scrollIntoView().setMeta("paste", true).setMeta("uiEvent", "paste"));
 

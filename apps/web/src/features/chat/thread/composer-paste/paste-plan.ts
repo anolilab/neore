@@ -10,6 +10,8 @@ const URL_ONLY = /^https?:\/\/\S+$/i;
 // Repetitions are bounded and tags are found with indexOf: the clipboard HTML is untrusted, and a regex that rescans to
 // the end from every `<` or `class=` would take quadratic time on a crafted copy.
 const LINK_START = /<a\s/gi;
+const DIV_START = /<div\s/gi;
+const QUOTE_CHIP_ATTRIBUTE = "data-quote-chip";
 const HREF = /href/i;
 // HTML allows space around the `=`: `class = "language-js"` names a language too.
 const LANGUAGE = /class\s{0,20}=\s{0,20}["']?[^"'>]{0,200}(?:language|lang|highlight)-/i;
@@ -174,6 +176,71 @@ const withoutComments = (html: string): string => {
     parts.push(html.slice(index));
 
     return parts.join("");
+};
+
+/** Whether the tag from `open` to its `>` at `end` has the attribute `name`: as a name, not in a quoted value. */
+const hasAttribute = (html: string, open: number, end: number, name: string): boolean => {
+    let afterEquals = false;
+    let afterSpace = false;
+
+    let index = open + 1;
+
+    while (index < end) {
+        const char = html[index] ?? "";
+
+        if ((char === '"' || char === "'") && afterEquals) {
+            index = html.indexOf(char, index + 1);
+            afterEquals = false;
+            afterSpace = false;
+        } else if (HTML_SPACE_CHAR.has(char)) {
+            afterSpace = true;
+        } else {
+            const next = html[index + name.length] ?? "";
+
+            if (
+                afterSpace &&
+                !afterEquals &&
+                html.slice(index, index + name.length).toLowerCase() === name &&
+                (next === "=" || next === "/" || next === ">" || HTML_SPACE_CHAR.has(next))
+            ) {
+                return true;
+            }
+
+            afterEquals = char === "=";
+            afterSpace = false;
+        }
+
+        index += 1;
+    }
+
+    return false;
+};
+
+/** Whether `html` has a quote chip copied from a composer: a `<div>` shown (not in a comment) with `data-quote-chip`. */
+const hasQuoteChip = (markup: string): boolean => {
+    // Attribute names are not case-sensitive: `DATA-QUOTE-CHIP` names one too.
+    if (!markup.toLowerCase().includes(QUOTE_CHIP_ATTRIBUTE)) {
+        return false;
+    }
+
+    const html = withoutComments(markup);
+    const starts = new RegExp(DIV_START);
+
+    for (let start = starts.exec(html); start; start = starts.exec(html)) {
+        const end = tagEnd(html, start.index);
+
+        if (end === -1) {
+            return false;
+        }
+
+        if (hasAttribute(html, start.index, end, QUOTE_CHIP_ATTRIBUTE)) {
+            return true;
+        }
+
+        starts.lastIndex = end;
+    }
+
+    return false;
 };
 
 /** The first content element's tag name and attributes, as `<name …>` up to the first `>` after it. */
@@ -343,7 +410,7 @@ export const planPaste = (data: Pick<DataTransfer, "getData">, { inFence = false
     const html = data.getData("text/html");
 
     // A quote chip copied from a composer: the editor rebuilds it from its HTML.
-    if (html.trim() === "" || html.includes("data-quote-chip")) {
+    if (html.trim() === "" || hasQuoteChip(html)) {
         return { kind: "default" };
     }
 

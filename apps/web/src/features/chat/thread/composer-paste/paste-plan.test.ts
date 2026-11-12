@@ -205,6 +205,17 @@ describe("composer paste", () => {
         ).toStrictEqual({ kind: "default" });
     });
 
+    it("converts formatting whose HTML only mentions a quote chip, and leaves a real chip to the editor", () => {
+        const plan = (html: string) => planPaste(clipboard({ "text/html": html, "text/plain": "bold" }), { plainOnly: false, selectedText: "" }).kind;
+
+        expect(plan("<!-- <div data-quote-chip> --><strong>bold</strong>")).toBe("html");
+        expect(plan('<div title="data-quote-chip"><strong>bold</strong></div>')).toBe("html");
+        expect(plan("<div data-quote-chip-x><strong>bold</strong></div>")).toBe("html");
+        expect(plan("<p>data-quote-chip <strong>bold</strong></p>")).toBe("html");
+        expect(plan('<div class="x" DATA-QUOTE-CHIP data-message-id="m1"><blockquote><p>bold</p></blockquote></div>')).toBe("default");
+        expect(plan('<meta charset="utf-8"><div data-x=\'a>b\' data-quote-chip=""><blockquote><p>bold</p></blockquote></div>')).toBe("default");
+    });
+
     it("keeps a less-than sign that starts no tag in the text of HTML too big to convert", async () => {
         await expect(paste({ "text/html": `<p>2 < 3 <= 4 <3</p><!--${"x".repeat(1_000_000)}-->` })).resolves.toBe("2 < 3 <= 4 <3");
     });

@@ -5,7 +5,7 @@ import { TextSelection } from "@tiptap/pm/state";
 import StarterKitExtension from "@tiptap/starter-kit";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { appendPlainLines, composerCoreExtensionOptions, pastePlainText } from "./paste-plain-text";
+import { appendPlainText, composerCoreExtensionOptions, pastePlainText } from "./paste-plain-text";
 
 const editors: Editor[] = [];
 
@@ -93,7 +93,7 @@ describe(pastePlainText, () => {
     });
 });
 
-describe(appendPlainLines, () => {
+describe(appendPlainText, () => {
     afterEach(() => {
         for (const editor of editors) {
             editor.destroy();
@@ -105,11 +105,29 @@ describe(appendPlainLines, () => {
     it("adds the lines after the last block and leaves the blocks before it as they are", () => {
         const editor = editorWith("<blockquote><p>quoted</p></blockquote><p>draft</p>");
 
-        expect(appendPlainLines(editor, ["", "pasted"])).toBe(true);
+        expect(appendPlainText(editor, "\n\npasted")).toBe(true);
         expect(editor.state.doc.firstChild?.type.name).toBe("blockquote");
         expect(editor.state.doc.childCount).toBe(4);
         expect(editor.state.doc.child(1).textContent).toBe("draft");
         expect(editor.state.doc.child(2).textContent).toBe("");
+        expect(editor.state.doc.lastChild?.textContent).toBe("pasted");
+    });
+
+    it("puts the first line in a draft's trailing empty line, as appending to its text does", () => {
+        // `quoted\n`: the draft ends on an empty line, so the paste is appended with no break of its own.
+        const editor = editorWith("<blockquote><p>quoted</p></blockquote><p></p>");
+
+        expect(appendPlainText(editor, "pasted\nmore")).toBe(true);
+        expect(editor.state.doc.firstChild?.type.name).toBe("blockquote");
+        expect(editor.state.doc.textBetween(0, editor.state.doc.content.size, "\n")).toBe("quoted\npasted\nmore");
+        expect(editor.state.doc.childCount).toBe(3);
+    });
+
+    it("leaves a first line with no text block to end to the caller", () => {
+        const editor = editorWith("<p>draft</p><hr>");
+
+        expect(appendPlainText(editor, "pasted")).toBe(false);
+        expect(appendPlainText(editor, "\npasted")).toBe(true);
         expect(editor.state.doc.lastChild?.textContent).toBe("pasted");
     });
 
@@ -118,7 +136,7 @@ describe(appendPlainLines, () => {
 
         editor.setEditable(false);
 
-        expect(appendPlainLines(editor, ["pasted"])).toBe(false);
+        expect(appendPlainText(editor, "pasted")).toBe(false);
         expect(pastePlainText(editor, "pasted")).toBe(false);
         expect(text(editor)).toBe("draft");
     });
