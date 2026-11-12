@@ -8,19 +8,22 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@neore/ui/components/switch";
 import { CheckIcon } from "lucide-react";
 import type { FC } from "react";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { useAppearanceSettings, useLayoutState } from "@/features/layout/hooks/use-ui-state";
+import { watchNativeSystemAccentColor } from "@/lib/native/system-accent";
+import { useIsNativeShell, useNativeCapability } from "@/lib/native/use-native-capability";
 
 import type { AccentId } from "../lib/accent-presets";
-import { ACCENT_PRESETS, isAccentId } from "../lib/accent-presets";
+import { ACCENT_PRESETS } from "../lib/accent-presets";
 import type { ChatTextSize } from "../lib/chat-text-size";
 import { CHAT_TEXT_SIZES, isChatTextSize } from "../lib/chat-text-size";
 import type { CodeHighlightThemeId, MermaidThemeId } from "../lib/code-themes";
 import { CODE_HIGHLIGHT_THEME_IDS, isCodeHighlightThemeId, isMermaidThemeId, MERMAID_THEME_IDS } from "../lib/code-themes";
 import type { ContrastId, DensityId, MainFontId } from "../lib/display-preferences";
 import { DEFAULT_CONTRAST, isContrastId, isDensityId, isMainFontId } from "../lib/display-preferences";
+import { effectiveAccent, effectiveMainFont, isAccentChoice, isExplicit, SYSTEM_ACCENT } from "../lib/native-appearance";
 
 const ACCENT_LABEL_ID = "accent-color-label";
 const CONTRAST_LABEL_ID = "ui-contrast-label";
@@ -76,13 +79,14 @@ const ChoiceRadioGroup = <T extends string>({
 const AppearanceControls: FC = () => {
     const { t } = useLingui();
     const {
-        accentColor,
+        accentColor: storedAccent,
         capLongCodeBlocks,
         codeHighlightTheme,
         codeLineNumbers,
         contrast,
         density,
-        mainFont,
+        explicit,
+        mainFont: storedMainFont,
         mermaidTheme,
         setAccentColor,
         setCapLongCodeBlocks,
@@ -93,6 +97,21 @@ const AppearanceControls: FC = () => {
         setMainFont,
         setMermaidTheme,
     } = useAppearanceSettings();
+    const isNative = useIsNativeShell();
+    const hasSystemAccent = useNativeCapability("system-accent");
+    // What is painted, so the shell's own defaults (OS accent, system font) show as selected.
+    const accentColor = effectiveAccent(storedAccent, isExplicit(explicit?.accentColor), hasSystemAccent);
+    const mainFont = effectiveMainFont(storedMainFont, isExplicit(explicit?.mainFont), isNative);
+    const [systemAccentHex, setSystemAccentHex] = useState<string | null>(null);
+
+    // The swatch shows the OS colour even while a preset is chosen.
+    useEffect(() => {
+        if (!hasSystemAccent) {
+            return undefined;
+        }
+
+        return watchNativeSystemAccentColor(setSystemAccentHex);
+    }, [hasSystemAccent]);
 
     const contrastOptions = useMemo<{ id: ContrastId; label: string }[]>(
         () => [
@@ -114,13 +133,14 @@ const AppearanceControls: FC = () => {
 
     const fontOptions = useMemo<{ id: MainFontId; label: string }[]>(
         () => [
-            { id: "inter", label: t`Sans (default)` },
+            // In the shell an untouched font is the system face (`effectiveMainFont`), so that one is the default.
+            { id: "inter", label: isNative ? t`Sans` : t`Sans (default)` },
             { id: "serif", label: t`Serif` },
             { id: "mono", label: t`Monospace` },
-            { id: "system", label: t`System UI` },
+            { id: "system", label: isNative ? t`System UI (default)` : t`System UI` },
             { id: "dyslexic", label: t`Dyslexia-friendly` },
         ],
-        [t],
+        [isNative, t],
     );
 
     const { fontSize, setFontSize } = useLayoutState();
@@ -136,14 +156,15 @@ const AppearanceControls: FC = () => {
     const accentLabels = useMemo<Record<AccentId, string>>(() => {
         return {
             blue: t`Blue`,
-            default: t`Lime (default)`,
+            // Where the OS accent is offered, an untouched accent is the OS accent (`effectiveAccent`).
+            default: hasSystemAccent ? t`Lime` : t`Lime (default)`,
             green: t`Green`,
             orange: t`Orange`,
             rose: t`Rose`,
             teal: t`Teal`,
             violet: t`Violet`,
         };
-    }, [t]);
+    }, [hasSystemAccent, t]);
 
     const codeThemeLabels = useMemo<Record<CodeHighlightThemeId, string>>(() => {
         return {
@@ -178,7 +199,7 @@ const AppearanceControls: FC = () => {
                     aria-labelledby={ACCENT_LABEL_ID}
                     className="flex flex-wrap gap-x-4 gap-y-3"
                     onValueChange={(value) => {
-                        if (!isAccentId(value)) {
+                        if (!isAccentChoice(value)) {
                             return;
                         }
 
@@ -187,6 +208,22 @@ const AppearanceControls: FC = () => {
                     }}
                     value={accentColor}
                 >
+                    {hasSystemAccent && (
+                        // eslint-disable-next-line jsx-a11y/label-has-associated-control -- Radio.Root renders the control inside this label
+                        <label className="group flex cursor-pointer items-center gap-2 text-sm">
+                            <Radio.Root
+                                className="border-border data-checked:ring-foreground focus-visible:outline-ring data-checked:ring-offset-background relative flex size-7 shrink-0 items-center justify-center rounded-full border outline-offset-4 focus-visible:outline-2 data-checked:ring-2 data-checked:ring-offset-2"
+                                // A neutral swatch while the OS has no accent colour.
+                                style={{ background: systemAccentHex ?? "var(--muted)" }}
+                                value={SYSTEM_ACCENT}
+                            >
+                                <Radio.Indicator className="bg-background text-foreground flex size-4 items-center justify-center rounded-full">
+                                    <CheckIcon aria-hidden="true" className="size-3" />
+                                </Radio.Indicator>
+                            </Radio.Root>
+                            <span className="group-has-data-checked:font-medium">{t`System (default)`}</span>
+                        </label>
+                    )}
                     {ACCENT_PRESETS.map((preset) => (
                         // eslint-disable-next-line jsx-a11y/label-has-associated-control -- Radio.Root renders the control inside this label
                         <label className="group flex cursor-pointer items-center gap-2 text-sm" key={preset.id}>

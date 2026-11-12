@@ -64,3 +64,13 @@
   revision's shell, whose precached chunks are gone. Only `activate` prunes other revisions. The cached response keeps
   its own CSP header, whose nonce matches its HTML. It only helps after one online run, and only for route chunks that
   run loaded (`bundle-assets`). Detection is `Electron/` in the worker's user agent: keep the default user agent. The recovery page stays for a first run.
+
+- **Window look** (`appearance.ts`, `app-menu.ts`, `menu-delivery.ts`; the event order is in their headers): site windows
+  start hidden. Never a bare `show()` on an unrevealed window (`maximize()` shows one on Windows and Linux): reveal through
+  `bringForward`, which applies the saved maximized state. A window closed before its reveal stays hidden until
+  `bringForward`. An unrequested reveal (main window at launch) uses `showInactive`; a window the user opened is shown with
+  `focusOnReveal`. A failed load reveals at the recovery page's `did-finish-load` (`ready-to-show` fires once).
+  Vibrancy needs a fully transparent `backgroundColor`. The live accent event is `accent-color-changed` on Windows and
+  Linux; macOS needs `subscribeNotification("AppleColorPreferencesChangedNotification")`. The pre-paint fill follows
+  `<userData>/appearance.json`. Menu commands wait for the page's `menu-commands-ready` (per document); 2 s after a load
+  without it, New Chat opens a NEW site window and the rest is dropped. ⌘N is `registerAccelerator: false`: the site binds it.

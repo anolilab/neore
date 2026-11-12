@@ -8,13 +8,36 @@
 import { LunoraError, v } from "lunorash/server";
 
 import type { Id } from "../_generated/dataModel";
-import { internalQuery, type QueryCtx } from "../_generated/server";
+import { internalQuery, type MutationCtx, type QueryCtx } from "../_generated/server";
 import { authMutation } from "../lib/crpc";
 
 export const vAccessLevel = v.union(v.literal("read_only"), v.literal("read_write"), v.literal("none"));
 
 /** Longest connector slug a setting may name; a real slug is a short word. */
 const SLUG_MAX = 200;
+
+/** Settings one teammate may hold, and the most a run reads. Bounded so every read is complete. */
+export const MAX_SETTINGS_PER_TEAMMATE = 200;
+
+/**
+ * Removes every setting of a teammate being deleted, in batches, so none is left to a retained thread. Called by `deleteBot`.
+ */
+export const deleteBotConnectorAccess = async (ctx: Pick<MutationCtx, "db">, botId: Id<"bots">): Promise<void> => {
+    for (;;) {
+        const rows = await ctx.db
+            .query("teammateConnectorAccess")
+            .withIndex("by_botId_connectorSlug", (q) => q.eq("botId", botId))
+            .take(MAX_SETTINGS_PER_TEAMMATE);
+
+        if (rows.length === 0) {
+            return;
+        }
+
+        for (const row of rows) {
+            await ctx.db.delete("teammateConnectorAccess", row._id);
+        }
+    }
+};
 
 /** Sets one connection's level for one teammate of the caller. A teammate the caller does not own is not found. */
 export const setTeammateConnectorAccess = authMutation
@@ -35,6 +58,17 @@ export const setTeammateConnectorAccess = authMutation
         if (existing) {
             await ctx.db.patch("teammateConnectorAccess", existing._id, { level: args.level, updatedAt: ctx.now });
         } else {
+            // A run reads at most MAX_SETTINGS_PER_TEAMMATE of a teammate's settings. Past that a read would miss some and treat them
+            // as unset, so the setter refuses the new one instead.
+            const settings = await ctx.db
+                .query("teammateConnectorAccess")
+                .withIndex("by_botId_connectorSlug", (q) => q.eq("botId", args.botId))
+                .take(MAX_SETTINGS_PER_TEAMMATE);
+
+            if (settings.length >= MAX_SETTINGS_PER_TEAMMATE) {
+                throw new LunoraError("BAD_REQUEST", `A teammate can have at most ${MAX_SETTINGS_PER_TEAMMATE} connection settings`);
+            }
+
             await ctx.db.insert("teammateConnectorAccess", {
                 botId: args.botId,
                 connectorSlug: args.connectorSlug,
@@ -62,10 +96,15 @@ export const threadConnectorAccess = async (
         return [];
     }
 
+    // A teammate that was deleted keeps its old threads, but its settings do not restrict them: the plain assistant has none.
+    if ((await ctx.db.get("bots", botId)) === null) {
+        return [];
+    }
+
     const rows = await ctx.db
         .query("teammateConnectorAccess")
         .withIndex("by_botId_connectorSlug", (q) => q.eq("botId", botId))
-        .take(200);
+        .take(MAX_SETTINGS_PER_TEAMMATE);
 
     return rows.map((row) => {
         return { connectorSlug: row.connectorSlug, level: row.level };
