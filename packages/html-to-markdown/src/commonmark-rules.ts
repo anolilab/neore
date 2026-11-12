@@ -511,7 +511,7 @@ interface EmphasisRun {
  */
 function wrapRun(content: string, node: AnnotatedNode, options: Options, style: RunStyle): string {
     // A same-kind parent writes the delimiters for the whole run, so a nested element writes none.
-    // A parent with a block that prints something never shares its delimiters, so the nested element keeps its own.
+    // A parent with a block (even a blank one, which prints a break) never shares its delimiters, so the nested element keeps its own.
     const parent = node.parentNode;
 
     if (parent && style.names.has(parent.nodeName.toLowerCase()) && !hasPrintingBlockDescendant(parent, options)) {
@@ -644,17 +644,18 @@ function hasBlockDescendant(node: Node): boolean {
 }
 
 /**
- * True when a block that prints something sits inside the node, at any depth. A blank block
- * prints nothing but its separator (see `blankReplacement`), so it does not count. A blank
- * element holds only blank blocks, so the walk skips it.
+ * True when a block sits inside the node, at any depth. A blank block still counts: its
+ * separator (see `blankReplacement`) is a paragraph break, which splits the parent's
+ * delimiters. A blank element that is not a block is skipped, with its contents, because it
+ * prints nothing and so cannot split them.
  */
 function hasPrintingBlockDescendant(node: Node, options: Options): boolean {
     for (const child of node.childNodes) {
-        if (child.nodeType !== 1 || annotationOf(child, options).isBlank) {
+        if (child.nodeType !== 1) {
             continue;
         }
 
-        if (isBlock(child) || hasPrintingBlockDescendant(child, options)) {
+        if (isBlock(child) || (!annotationOf(child, options).isBlank && hasPrintingBlockDescendant(child, options))) {
             return true;
         }
     }
