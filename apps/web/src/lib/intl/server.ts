@@ -1,5 +1,7 @@
 import { parse, serialize } from "cookie-es";
 
+import { OFFLINE_SHELL_PATH } from "@/lib/offline-shell";
+
 import { DEFAULT_LOCALE, extractLocaleFromPath, isLocaleValid, shouldIgnorePath } from "./shared";
 
 const EN_PREFIX_RE = /^\/en(?:\/|$)/;
@@ -16,6 +18,12 @@ const getLocaleFromRequest = (request: Request): LocaleResult => {
     const { headers } = request;
     const url = new URL(request.url);
     const { pathname } = url;
+
+    // The offline shell is kept for every locale: rendered in the default one, which the client hydrates before it
+    // switches to the window's (`router-plugin.tsx`). No cookie: the response is cached, not anyone's.
+    if (pathname === OFFLINE_SHELL_PATH) {
+        return { locale: DEFAULT_LOCALE };
+    }
 
     // Step 1: /en/* -> redirect to strip the redundant /en prefix (prevents duplicate content)
     if (EN_PREFIX_RE.test(pathname)) {

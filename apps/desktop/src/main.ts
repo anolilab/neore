@@ -9,9 +9,12 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
-import type { BrowserWindowConstructorOptions, IpcMainInvokeEvent, WebPreferences } from "electron";
-import { app, BrowserWindow, globalShortcut, ipcMain, Menu, nativeImage, Notification, screen, session, shell, Tray } from "electron";
+import type { BrowserWindowConstructorOptions, IpcMainInvokeEvent, WebContents, WebPreferences } from "electron";
+import { app, BrowserWindow, globalShortcut, ipcMain, Menu, nativeImage, nativeTheme, Notification, screen, session, shell, systemPreferences, Tray } from "electron";
 
+import type { MenuCommand } from "./app-menu.js";
+import { buildAppMenuTemplate } from "./app-menu.js";
+import { accentHex, APPEARANCE_FILE, PAGE_IS_DARK_SCRIPT, pageThemeChangeScript, readAppearance, SHOW_FALLBACK_MS, supportsVibrancy, windowBackground, writeAppearance } from "./appearance.js";
 import { createSetBadgeHandler } from "./badge.js";
 import { CAPABILITIES_ARG, CHANNEL, SITE_ORIGIN_ARG } from "./channels.js";
 import { registerDeviceIpc } from "./device/index.js";
@@ -20,6 +23,7 @@ import { createDictation } from "./dictation/index.js";
 import type { DroppedFile } from "./dropped-files.js";
 import { queueDroppedFiles, readDroppedFiles } from "./dropped-files.js";
 import { loginItemMenuState } from "./login-item.js";
+import { createMenuDelivery } from "./menu-delivery.js";
 import { recoveryPageUrl, shouldRecoverFromLoadFailure, shouldRecoverFromRendererGone } from "./recovery.js";
 import type { PendingSignIn, SignInHandoff } from "./sign-in.js";
 import { beginSignIn, completeSignIn, isFlowState, parseSignInCallback } from "./sign-in.js";
@@ -81,6 +85,19 @@ const TITLE_BAR_SCRIPT = `(() => {
 .min-h-svh, .min-h-screen { min-height: calc(100dvh - ${TITLE_BAR_HEIGHT}px) !important; }\`;
     document.head.append(style);
 })();`;
+
+/**
+ * The site windows draw the sidebar material behind the page; the page makes its sidebar see-through only when told
+ * (the `vibrancy` capability), so its main pane stays opaque.
+ */
+const VIBRANCY = supportsVibrancy(process.platform);
+const vibrancy: BrowserWindowConstructorOptions = VIBRANCY ? { vibrancy: "sidebar", visualEffectState: "followWindow" } : {};
+
+/**
+ * Windows and Linux put the menu bar above the page's own top bar; hidden, it is one Alt press away and its accelerators
+ * still work. macOS keeps its menu in the system bar.
+ */
+const hiddenMenuBar: BrowserWindowConstructorOptions = process.platform === "darwin" ? {} : { autoHideMenuBar: true };
 // URL schemes are case-insensitive and the parser lowercases them, so the command-line filters compare case-insensitively too.
 const SCHEME_PREFIX = `${SCHEME}://`;
 
@@ -171,30 +188,31 @@ const openWebLinkExternally = (url: URL | undefined): void => {
     }
 };
 
-const guardNavigation = (event: { preventDefault: () => void }, url: string): void => {
+/** Cancels a navigation that leaves the site and hands it elsewhere; answers whether it did. */
+const guardNavigation = (event: { preventDefault: () => void }, url: string): boolean => {
     switch (classifyUrl(origin, url)) {
         case "artifact": {
             event.preventDefault();
             openArtifactWindow(new URL(url));
 
-            break;
+            return true;
         }
         case "external": {
             event.preventDefault();
             openWebLinkExternally(URL.parse(url) ?? undefined);
 
-            break;
+            return true;
         }
         case "oauth": {
             // Google refuses embedded webviews: cancel, and run the flow in the system browser.
             event.preventDefault();
             startBrowserSignIn();
 
-            break;
+            return true;
         }
         default: {
             // "site": an ordinary page of ours navigates in place.
-            break;
+            return false;
         }
     }
 };
@@ -206,7 +224,15 @@ const guardNavigation = (event: { preventDefault: () => void }, url: string): vo
  * that claimed a call would return its result to a window that may close.
  */
 const siteCapabilities = (isMain: boolean): string[] => {
-    const capabilities = ["notifications", "compose", "sign-in", "thread-windows"];
+    const capabilities = ["notifications", "compose", "sign-in", "thread-windows", "menu-commands"];
+
+    if (VIBRANCY) {
+        capabilities.push("vibrancy");
+    }
+
+    if (hasSystemAccent()) {
+        capabilities.push("system-accent");
+    }
 
     if (isMain && state.deviceReady && existsSync(path.join(__dirname, "device-window", "device.html"))) {
         capabilities.push("device");
@@ -219,18 +245,225 @@ const siteCapabilities = (isMain: boolean): string[] => {
     return capabilities;
 };
 
+/**
+ * The accent colour as `#rrggbb`, or `null`. macOS and Windows always have one; Linux answers only on some desktops, and
+ * an Electron without the method, or a desktop that throws, has none.
+ */
+const readSystemAccent = (): string | null => {
+    try {
+        return typeof systemPreferences.getAccentColor === "function" ? accentHex(systemPreferences.getAccentColor()) : null;
+    } catch {
+        return null;
+    }
+};
+
+/** What macOS posts to every app when the user picks another accent (or highlight) colour. */
+// eslint-disable-next-line no-secrets/no-secrets -- a macOS notification name, not a credential
+const MAC_ACCENT_NOTIFICATION = "AppleColorPreferencesChangedNotification";
+
+const hasSystemAccent = (): boolean => process.platform === "darwin" || process.platform === "win32" || readSystemAccent() !== null;
+
+/** Every open site window (main, thread, same-origin popup): what the accent colour and menu commands are sent to. */
+const siteWindows = new Set<BrowserWindow>();
+
+/** A window that is destroyed or is showing something other than the site (the recovery page) gets nothing. */
+const isShowingSite = (win: BrowserWindow): boolean => !win.isDestroyed() && isTrustedUrl(origin, win.webContents.getURL());
+
+/**
+ * Menu commands wait for the page to listen. A page that never does (an older site) gets New Chat in a window of its
+ * own: loading it over the current page would cut off a reply that is still streaming there. The recovery page holds no
+ * work, so New Chat loads the site over it.
+ */
+const menuDelivery = createMenuDelivery<BrowserWindow>({
+    fallback: (win, command) => {
+        if (command === "new-chat") {
+            // Always a fresh window: even a page at the new-chat path may hold a draft (`/chat?prompt=…`).
+            openSiteWindow(newChatUrl(origin));
+        } else {
+            log(`the page does not listen for menu commands; "${command}" dropped`);
+        }
+    },
+    isShowingSite,
+    offSite: async (win, command) => {
+        if (command === "new-chat") {
+            // The site is likely unreachable here: `did-fail-load` shows the recovery page again.
+            try {
+                await win.loadURL(newChatUrl(origin).href);
+            } catch (error) {
+                log(`could not open New Chat: ${String(error)}`);
+            }
+        } else {
+            log(`the window shows no site page; "${command}" dropped`);
+        }
+    },
+    send: (win, command) => win.webContents.send(CHANNEL.menuCommand, command),
+});
+
+const broadcastSystemAccent = (): void => {
+    const accent = readSystemAccent();
+
+    for (const win of siteWindows) {
+        if (isShowingSite(win)) {
+            win.webContents.send(CHANNEL.systemAccentColor, accent);
+        }
+    }
+};
+
+const appearanceFile = (): string => path.join(app.getPath("userData"), APPEARANCE_FILE);
+
+/**
+ * Filled with the page's own background until its first paint; with vibrancy, left clear so the material shows. The
+ * site has a theme setting of its own, so the theme its last load showed wins over the system's.
+ */
+const siteBackground = (withVibrancy: boolean): string =>
+    windowBackground({ dark: readAppearance(appearanceFile())?.dark ?? nativeTheme.shouldUseDarkColors, vibrancy: withVibrancy });
+
+const saveSiteTheme = (dark: boolean): void => {
+    if (readAppearance(appearanceFile())?.dark !== dark) {
+        writeAppearance(appearanceFile(), { dark });
+    }
+};
+
+/** The latest document of each site webContents: a watch started for an earlier one ends at its next answer. */
+const siteDocuments = new WeakMap<WebContents, number>();
+
+const nextSiteDocument = (contents: WebContents): number => {
+    const next = (siteDocuments.get(contents) ?? 0) + 1;
+
+    siteDocuments.set(contents, next);
+
+    return next;
+};
+
+const isCurrentSiteDocument = (contents: WebContents, siteDocument: number): boolean =>
+    !contents.isDestroyed() && siteDocuments.get(contents) === siteDocument && isTrustedUrl(origin, contents.getURL());
+
+/**
+ * Keeps the theme a loaded site page shows, for the next window's pre-paint fill, and follows it while the document
+ * stays: each answer arms the next watch, so a toggle without a reload is kept too. One watch per document; it ends
+ * when the window is destroyed, leaves the site, or commits another document. A failure is logged, never thrown.
+ */
+const followSiteTheme = async (contents: WebContents, siteDocument: number, script: string = PAGE_IS_DARK_SCRIPT): Promise<void> => {
+    try {
+        const dark: unknown = await contents.executeJavaScript(script);
+
+        if (typeof dark !== "boolean" || !isCurrentSiteDocument(contents, siteDocument)) {
+            return;
+        }
+
+        saveSiteTheme(dark);
+        followSiteTheme(contents, siteDocument, pageThemeChangeScript(dark));
+    } catch (error) {
+        // A navigation or a closed window ends the pending watch this way: only a live document's failure is news.
+        if (isCurrentSiteDocument(contents, siteDocument)) {
+            log(`could not keep the page's theme: ${String(error)}`);
+        }
+    }
+};
+
+/** The reveal of each window that has not been shown yet. A window without an entry has been revealed. */
+const pendingReveals = new WeakMap<BrowserWindow, (focus?: boolean) => void>();
+
+/** Main windows revealed without the focus, saved maximized: they maximize at their first focus, and count as maximized. */
+const maximizeAtFocus = new WeakSet<BrowserWindow>();
+
+/** Windows hidden on purpose before their first reveal: neither the first paint nor the fallback timer shows them. */
+const hiddenBeforeReveal = new WeakSet<BrowserWindow>();
+
+const isRevealed = (win: BrowserWindow): boolean => !pendingReveals.has(win);
+
+/** Windows not revealed yet that are loading the recovery page: they are shown once it is drawn, not empty before. */
+const awaitingRecoveryDraw = new WeakSet<BrowserWindow>();
+
+/**
+ * Whether a reveal nobody asked for may take the focus: not from another window of ours. A dictation ends when its
+ * window loses the focus, and `show` focuses the window it shows on Windows.
+ */
+const mayTakeFocus = (win: BrowserWindow): boolean => {
+    const focused = BrowserWindow.getFocusedWindow();
+
+    return focused === null || focused === win;
+};
+
+interface RevealOptions {
+    /** The user asked for this window (a thread, a popup, New Chat): its reveal takes the focus like `bringForward`. */
+    focusOnReveal?: boolean;
+    show?: (focus: boolean) => void;
+}
+
+/**
+ * Windows are created hidden and shown at their first paint, so nobody sees an empty frame. A page that never paints
+ * (a hung load, a failure the recovery page replaces) is shown anyway: by the returned function, or after a timeout.
+ * `show` is told whether to focus: always when asked to (`bringForward`) or when the user opened the window
+ * (`focusOnReveal`), else only if no other window of ours has it.
+ */
+const showWhenReady = (
+    win: BrowserWindow,
+    { focusOnReveal = false, show = (focus) => (focus ? win.show() : win.showInactive()) }: RevealOptions = {},
+): ((focus?: boolean) => void) => {
+    let shown = false;
+    const reveal = (focus?: boolean): void => {
+        // Closed (hidden) before it was ever shown: only `bringForward` may show it now.
+        if (shown || win.isDestroyed() || hiddenBeforeReveal.has(win)) {
+            return;
+        }
+
+        shown = true;
+        pendingReveals.delete(win);
+        clearTimeout(timer);
+        show(focus ?? (focusOnReveal || mayTakeFocus(win)));
+    };
+    // A window waiting for its recovery page has a fallback of its own, from the start of that load.
+    const timer = setTimeout(() => {
+        if (!awaitingRecoveryDraw.has(win)) {
+            reveal();
+        }
+    }, SHOW_FALLBACK_MS);
+
+    pendingReveals.set(win, reveal);
+    win.on("ready-to-show", () => reveal());
+
+    return reveal;
+};
+
+/**
+ * Brings a window forward. One not revealed yet is revealed now, through its own reveal: a plain `show` would leave the
+ * reveal to run again at `ready-to-show`, and on Windows and Linux its `maximize` would then resize the window and take
+ * the focus a second time.
+ */
+const bringForward = (win: BrowserWindow): void => {
+    const reveal = pendingReveals.get(win);
+
+    if (reveal !== undefined) {
+        hiddenBeforeReveal.delete(win);
+        reveal(true);
+
+        return;
+    }
+
+    if (win.isMinimized()) {
+        win.restore();
+    }
+
+    win.show();
+    win.focus();
+};
+
 const windowStateFile = (): string => path.join(app.getPath("userData"), WINDOW_STATE_FILE);
 
-/** Writes the main window's normal (not maximized) bounds. A failed write is logged; it never stops a close. */
+/**
+ * Writes the main window's normal (not maximized) bounds. A failed write is logged; it never stops a close.
+ * Before its reveal the window has not been maximized yet, so nothing is written: the saved state stays as it was.
+ */
 const saveWindowState = (win: BrowserWindow): void => {
-    if (win.isDestroyed()) {
+    if (win.isDestroyed() || !isRevealed(win)) {
         return;
     }
 
     const { height, width, x, y } = win.getNormalBounds();
 
     try {
-        writeWindowState(windowStateFile(), { bounds: { height, width, x, y }, maximized: win.isMaximized() });
+        writeWindowState(windowStateFile(), { bounds: { height, width, x, y }, maximized: win.isMaximized() || maximizeAtFocus.has(win) });
     } catch (error) {
         log(`could not save the window state: ${String(error)}`);
     }
@@ -250,8 +483,14 @@ const siteWebPreferences = (isMain: boolean): WebPreferences => {
 };
 
 /** Popups, navigation and webviews of a site window: same-origin stays in the app, sign-in goes to the system browser, the rest is refused. */
-const guardSiteWindow = (win: BrowserWindow): void => {
+const guardSiteWindow = (win: BrowserWindow, reveal: (focus?: boolean) => void): void => {
     const contents = win.webContents;
+
+    siteWindows.add(win);
+    win.on("closed", () => {
+        siteWindows.delete(win);
+        menuDelivery.forget(win);
+    });
 
     contents.setWindowOpenHandler(({ url }) => {
         switch (classifyUrl(origin, url)) {
@@ -281,18 +520,73 @@ const guardSiteWindow = (win: BrowserWindow): void => {
         return { action: "deny" };
     });
 
-    contents.on("will-navigate", (event, url) => guardNavigation(event, url));
-    contents.on("will-redirect", (event, url) => guardNavigation(event, url));
+    // Both come after `did-start-navigation` (`will-navigate` from Electron's navigation throttle): a navigation cancelled
+    // here was counted as started, and the page that stays gets its menu commands back at once.
+    contents.on("will-navigate", (event, url) => {
+        if (guardNavigation(event, url)) {
+            menuDelivery.navigationCancelled(win);
+        }
+    });
+    contents.on("will-redirect", (event, url) => {
+        if (guardNavigation(event, url) && event.isMainFrame) {
+            menuDelivery.navigationCancelled(win);
+        }
+    });
     contents.on("will-attach-webview", (event) => event.preventDefault());
 
+    // Each committed document has to subscribe to menu commands again (an in-page route change is not a `did-navigate`).
+    // From the start of a cross-document navigation the departing page gets nothing: it may unload before it acts.
+    // One that never commits (cancelled, a download) ends in `did-fail-provisional-load`, and the page stays; one that
+    // ends with no word at all is settled at `did-stop-loading` once nothing is loading, which also ends a load that failed
+    // or was stopped.
+    contents.on("did-start-navigation", (details) => {
+        if (details.isMainFrame && !details.isSameDocument) {
+            menuDelivery.navigationStarted(win);
+        }
+    });
+    contents.on("did-fail-provisional-load", (_event, _code, _description, _url, isMainFrame: boolean) => {
+        if (isMainFrame) {
+            menuDelivery.navigationAbandoned(win);
+        }
+    });
+    contents.on("did-navigate", (_event, url: string) => {
+        // A committed document ends the theme watch of the one before it.
+        nextSiteDocument(contents);
+        menuDelivery.navigated(win, isTrustedUrl(origin, url));
+    });
+    // A stop while still loading is a replaced navigation's: the newer one keeps what is held for its page.
+    contents.on("did-stop-loading", () => menuDelivery.loaded(win, contents.isLoading()));
+
+    // The fallback of the latest recovery load: a newer failure replaces the page, so it replaces the timer too.
+    let recoveryFallback: ReturnType<typeof setTimeout> | undefined;
+
     // A site that cannot be loaded or a renderer that died leaves a blank window with no way forward: show our own page.
+    const recover = async (page: string): Promise<void> => {
+        // `ready-to-show` does not fire again for the recovery page; the timer covers a recovery load that never finishes.
+        if (!isRevealed(win)) {
+            awaitingRecoveryDraw.add(win);
+            clearTimeout(recoveryFallback);
+            recoveryFallback = setTimeout(() => {
+                recoveryFallback = undefined;
+                awaitingRecoveryDraw.delete(win);
+                reveal();
+            }, SHOW_FALLBACK_MS);
+        }
+
+        try {
+            await contents.loadURL(page);
+        } catch (error) {
+            log(`could not show the recovery page: ${String(error)}`);
+        }
+    };
+
     contents.on("did-fail-load", (_event, errorCode: number, description: string, validatedUrl: string, isMainFrame: boolean) => {
         if (!shouldRecoverFromLoadFailure(errorCode, isMainFrame, validatedUrl)) {
             return;
         }
 
         log(`the page failed to load (${errorCode} ${description})`);
-        contents.loadURL(recoveryPageUrl("unreachable", newChatUrl(origin).href, `${description} (${errorCode})`));
+        recover(recoveryPageUrl("unreachable", newChatUrl(origin).href, `${description} (${errorCode})`));
     });
     contents.on("render-process-gone", (_event, details: { reason: string }) => {
         if (!shouldRecoverFromRendererGone(details.reason)) {
@@ -300,17 +594,27 @@ const guardSiteWindow = (win: BrowserWindow): void => {
         }
 
         log(`the page process ended (${details.reason})`);
-        contents.loadURL(recoveryPageUrl("crashed", newChatUrl(origin).href, details.reason));
+        recover(recoveryPageUrl("crashed", newChatUrl(origin).href, details.reason));
     });
 
-    if (process.platform === "darwin") {
-        contents.on("did-finish-load", () => {
-            // Only the site gets the strip: the page is ours, and the script is ours too.
-            if (isTrustedUrl(origin, contents.getURL())) {
-                contents.executeJavaScript(TITLE_BAR_SCRIPT);
-            }
-        });
-    }
+    contents.on("did-finish-load", () => {
+        if (awaitingRecoveryDraw.delete(win)) {
+            clearTimeout(recoveryFallback);
+            recoveryFallback = undefined;
+            reveal();
+        }
+
+        // Only the site gets the strip and is asked its theme: the page is ours, and the scripts are ours too.
+        if (!isTrustedUrl(origin, contents.getURL())) {
+            return;
+        }
+
+        if (process.platform === "darwin") {
+            contents.executeJavaScript(TITLE_BAR_SCRIPT);
+        }
+
+        followSiteTheme(contents, nextSiteDocument(contents));
+    });
 };
 
 /**
@@ -328,21 +632,25 @@ const quitWhenNoSiteWindow = (): void => {
 };
 
 /**
- * A site page in its own window (a thread, or a same-origin popup): no state file, no tray, and
- * closing it really closes it.
+ * A site page in its own window (a thread, a same-origin popup, New Chat for a page that does not listen): no state
+ * file, no tray, and closing it really closes it. Each is opened by the user, so its reveal takes the focus.
  */
 const openSiteWindow = (url: URL): BrowserWindow => {
     const win = new BrowserWindow({
+        backgroundColor: siteBackground(VIBRANCY),
         height: DEFAULT_SIZE.height,
         minHeight: 560,
         minWidth: 420,
+        show: false,
         title: "Neore",
         ...macTitleBar,
+        ...vibrancy,
+        ...hiddenMenuBar,
         webPreferences: siteWebPreferences(false),
         width: DEFAULT_SIZE.width,
     });
 
-    guardSiteWindow(win);
+    guardSiteWindow(win, showWhenReady(win, { focusOnReveal: true }));
     win.loadURL(url.href);
 
     return win;
@@ -355,12 +663,7 @@ const openOrFocusThreadWindow = (url: URL): void => {
     const open = threadWindows.get(url.href);
 
     if (open !== undefined && !open.isDestroyed()) {
-        if (open.isMinimized()) {
-            open.restore();
-        }
-
-        open.show();
-        open.focus();
+        bringForward(open);
 
         return;
     }
@@ -383,10 +686,13 @@ const openOrFocusThreadWindow = (url: URL): void => {
  */
 const openArtifactWindow = (url: URL): void => {
     const win = new BrowserWindow({
+        backgroundColor: siteBackground(false),
         height: DEFAULT_SIZE.height,
         minHeight: 560,
         minWidth: 420,
+        show: false,
         title: "Neore preview",
+        ...hiddenMenuBar,
         webPreferences: {
             contextIsolation: true,
             nodeIntegration: false,
@@ -406,6 +712,7 @@ const openArtifactWindow = (url: URL): void => {
     contents.on("will-navigate", (event) => event.preventDefault());
     contents.on("will-redirect", (event) => event.preventDefault());
     contents.on("will-attach-webview", (event) => event.preventDefault());
+    showWhenReady(win, { focusOnReveal: true });
     win.loadURL(url.href);
 };
 
@@ -416,20 +723,45 @@ const createMainWindow = (): BrowserWindow => {
         screen.getAllDisplays().map((display) => display.workArea),
     );
     const win = new BrowserWindow({
+        backgroundColor: siteBackground(VIBRANCY),
         height: saved?.bounds.height ?? DEFAULT_SIZE.height,
         minHeight: 560,
         minWidth: 420,
+        show: false,
         title: "Neore",
         ...macTitleBar,
+        ...vibrancy,
+        ...hiddenMenuBar,
         webPreferences: siteWebPreferences(true),
         width: saved?.bounds.width ?? DEFAULT_SIZE.width,
         x: saved?.bounds.x,
         y: saved?.bounds.y,
     });
+    // `maximize` shows a hidden window on Windows and Linux, so it waits for the first paint too. It also activates the
+    // window on Windows, so a reveal that must leave the focus where it is maximizes when the user comes to the window.
+    const showMain = (focus: boolean): void => {
+        if (!focus) {
+            win.showInactive();
 
-    if (saved?.maximized) {
-        win.maximize();
-    }
+            if (saved?.maximized) {
+                maximizeAtFocus.add(win);
+                win.once("focus", () => {
+                    if (maximizeAtFocus.delete(win)) {
+                        win.maximize();
+                    }
+                });
+            }
+
+            return;
+        }
+
+        if (saved?.maximized) {
+            win.maximize();
+        }
+
+        win.show();
+    };
+    const reveal = showWhenReady(win, { show: showMain });
 
     // Move and resize fire many times a second; one write after the last one is enough.
     const stateSaver = createDebouncer(() => saveWindowState(win), SAVE_DEBOUNCE_MS);
@@ -437,7 +769,7 @@ const createMainWindow = (): BrowserWindow => {
     win.on("move", () => stateSaver.call());
     win.on("resize", () => stateSaver.call());
 
-    guardSiteWindow(win);
+    guardSiteWindow(win, reveal);
 
     win.on("close", (event) => {
         // Saved here too: a hide keeps the window alive, but the next launch should still start where it was left.
@@ -449,6 +781,11 @@ const createMainWindow = (): BrowserWindow => {
         }
 
         event.preventDefault();
+
+        if (!isRevealed(win)) {
+            hiddenBeforeReveal.add(win);
+        }
+
         win.hide();
     });
 
@@ -472,12 +809,42 @@ const focusMain = (): void => {
         return;
     }
 
-    if (mainWindow.isMinimized()) {
-        mainWindow.restore();
+    bringForward(mainWindow);
+};
+
+/**
+ * A menu command goes to the site window in front. With none in front (the Quick Composer, a local window, a window on
+ * the recovery page, or no window at all) the main window is brought forward and takes it, once its page listens.
+ */
+const sendMenuCommand = (command: MenuCommand): void => {
+    const focused = BrowserWindow.getFocusedWindow();
+    const target = focused !== null && siteWindows.has(focused) && isShowingSite(focused) ? focused : undefined;
+
+    if (target === undefined) {
+        focusMain();
     }
 
-    mainWindow.show();
-    mainWindow.focus();
+    const win = target ?? state.mainWindow;
+
+    if (win !== undefined) {
+        menuDelivery.deliver(win, command);
+    }
+};
+
+const documentationUrl = (): URL => new URL("/docs", origin);
+
+const installAppMenu = (): void => {
+    Menu.setApplicationMenu(
+        Menu.buildFromTemplate(
+            buildAppMenuTemplate({
+                appName: app.name,
+                isPackaged: app.isPackaged,
+                onCommand: sendMenuCommand,
+                onOpenDocumentation: () => openWebLinkExternally(documentationUrl()),
+                platform: process.platform,
+            }),
+        ),
+    );
 };
 
 /** Like `handOffCompose`: the files are held for `takePendingFiles`, and the event only tells the page to ask. */
@@ -773,6 +1140,44 @@ const registerIpc = (): void => {
         openOrFocusThreadWindow(url);
     });
 
+    // Sent, not invoked: the page has nothing to wait for.
+    ipcMain.on(CHANNEL.menuCommandsReady, (event): void => {
+        if (!isTrusted(event)) {
+            log("menu-commands-ready: ignored an untrusted sender");
+
+            return;
+        }
+
+        const win = [...siteWindows].find((candidate) => !candidate.isDestroyed() && candidate.webContents === event.sender);
+
+        if (win !== undefined) {
+            menuDelivery.ready(win);
+        }
+    });
+
+    // The page's last `onMenuCommand` subscriber left: its commands are held again, as for a page that has not listened.
+    ipcMain.on(CHANNEL.menuCommandsUnready, (event): void => {
+        if (!isTrusted(event)) {
+            log("menu-commands-unready: ignored an untrusted sender");
+
+            return;
+        }
+
+        const win = [...siteWindows].find((candidate) => !candidate.isDestroyed() && candidate.webContents === event.sender);
+
+        if (win !== undefined) {
+            menuDelivery.unready(win);
+        }
+    });
+
+    ipcMain.handle(CHANNEL.getSystemAccentColor, (event): string | null => {
+        if (!isTrusted(event)) {
+            throw new Error("system-accent-color: untrusted sender");
+        }
+
+        return readSystemAccent();
+    });
+
     ipcMain.handle(CHANNEL.takePendingCompose, (event): string | undefined => {
         if (!isMainWindow(event)) {
             return undefined;
@@ -961,6 +1366,15 @@ const start = (): void => {
 
     registerIpc();
     registerSchemeInDev();
+    installAppMenu();
+
+    // `accent-color-changed` is Windows and Linux only; macOS posts a distributed notification instead.
+    if (process.platform === "darwin") {
+        systemPreferences.subscribeNotification(MAC_ACCENT_NOTIFICATION, broadcastSystemAccent);
+    } else {
+        systemPreferences.on("accent-color-changed", broadcastSystemAccent);
+    }
+
     createMainWindow();
     createQuickComposer();
     createTray();
