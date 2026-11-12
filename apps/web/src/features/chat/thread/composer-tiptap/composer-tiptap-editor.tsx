@@ -126,7 +126,6 @@ export interface ComposerTiptapEditorProps {
 }
 
 export interface ComposerTiptapEditorRef {
-    /** Inserts `text` over the selection (of `at` when given) as one undoable paste, a paragraph per line; false without an editor or when the text changed since `at`. */
     /** Lines added as paragraphs after the last block, the document otherwise untouched; false when the editor cannot take them. */
     appendLines: (lines: string[]) => boolean;
     blur: () => void;
@@ -134,6 +133,7 @@ export interface ComposerTiptapEditorRef {
     getEditor: () => Editor | null;
     /** Whether `event` is a paste made with Ctrl/Cmd+Shift+V, which keeps the text exactly as copied. */
     isPlainPaste: (event: { timeStamp: number }) => boolean;
+    /** Inserts `text` over the selection (of `at` when given) as one undoable paste, a paragraph per line; false without an editor or when the text changed since `at`. */
     pasteText: (text: string, at?: EditorState) => boolean;
 }
 

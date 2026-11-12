@@ -393,6 +393,11 @@ describe("composer paste", () => {
             '<p>Ship <img alt="🎉"> <img alt="👍🏽"> <img alt="👨‍👩‍👧"> <img alt=":tada:"> <img class="mwe-math-fallback-image-inline" alt="E=mc^2"> <img alt="A chart"> <img alt="Report 🎉"></p>',
             "Ship 🎉 👍🏽 👨‍👩‍👧 :tada: $E=mc^2$",
         ],
+        [
+            "a MathML formula without TeX keeps its visible text, not its other annotations",
+            '<p>Area <math><semantics><mrow><mi>a</mi><mo>+</mo><mi>b</mi></mrow><annotation encoding="StarMath">a + b</annotation></semantics></math> here</p>',
+            "Area a+b here",
+        ],
     ])("%s", (_label: string, html: string, markdown: string) => {
         expect(htmlToMarkdown(html)).toBe(markdown);
     });
@@ -406,6 +411,7 @@ describe("composer paste", () => {
         ["inline code in a sentence", 'Call <code style="font-family:ui-monospace,monospace">foo()</code> now', false],
         ["a lone code block with a language", '<pre class="language-js">x()</pre>', false],
         ["a lone code block with a language in single quotes", "<pre class='language-js'>x()</pre>", false],
+        ["a lone code block with a language and spaces around the equals sign", '<pre class = "language-js">x()</pre>', false],
         ["a strikethrough style", '<span style="text-decoration:line-through">old</span> price', false],
         ["a MathML formula", "<math><mi>x</mi></math>", false],
         ["an emoji drawn as an image", '<span>Ship <img alt="🎉"></span>', false],
@@ -446,6 +452,16 @@ describe("pasted blocks beside text", () => {
         const markdown = await paste({ "text/html": table, "text/plain": "a\tb\n1\t2" });
 
         await expect(pasteInto("Hi\n", 3, { "text/html": table, "text/plain": "a\tb\n1\t2" })).resolves.toBe(`Hi\n${markdown}`);
+    });
+
+    it("keeps the language of a code block written with spaces around its class's equals sign", async () => {
+        await expect(paste({ "text/html": '<pre class = "language-js">x()</pre>', "text/plain": "x()" })).resolves.toBe("```js\nx()\n```");
+    });
+
+    it("keeps a MathML formula without TeX in a paste with other formatting", async () => {
+        await expect(paste({ "text/html": "<p><b>Sum</b>: <math><mi>x</mi><mo>+</mo><mn>1</mn></math></p>", "text/plain": "Sum: x+1" })).resolves.toBe(
+            "**Sum**: x+1",
+        );
     });
 
     it("puts a code block pasted mid-line on lines of its own", async () => {

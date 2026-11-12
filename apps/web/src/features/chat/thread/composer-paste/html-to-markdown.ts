@@ -10,6 +10,9 @@
 import { fenceCode, longestBacktickRun } from "./paste-plan";
 
 const SKIPPED = new Set([
+    // A formula's source in another notation: MathML does not show it.
+    "ANNOTATION",
+    "ANNOTATION-XML",
     "AUDIO",
     "BUTTON",
     "CANVAS",
@@ -781,7 +784,12 @@ const element = (node: Element, context: Context): string => {
         case "MATH": {
             const tex = node.querySelector('annotation[encoding="application/x-tex"]')?.textContent?.trim();
 
-            return tex ? `$${tex}$` : "";
+            if (tex) {
+                return `$${tex}$`;
+            }
+
+            // No TeX source: the formula's visible text, as the page shows it.
+            break;
         }
         case "OL":
         case "UL": {

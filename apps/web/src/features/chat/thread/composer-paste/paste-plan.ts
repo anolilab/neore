@@ -11,7 +11,8 @@ const URL_ONLY = /^https?:\/\/\S+$/i;
 // the end from every `<` or `class=` would take quadratic time on a crafted copy.
 const LINK_START = /<a\s/gi;
 const HREF = /href/i;
-const LANGUAGE = /class=["']?[^"'>]{0,200}(?:language|lang|highlight)-/i;
+// HTML allows space around the `=`: `class = "language-js"` names a language too.
+const LANGUAGE = /class\s{0,20}=\s{0,20}["']?[^"'>]{0,200}(?:language|lang|highlight)-/i;
 // Formatting the Markdown can carry. A `<pre>` alone is not in it: terminals and code editors wrap their text in one.
 const FORMATTING = [
     /<(?:h[1-6]|ul|ol|table|blockquote|hr)[\s/>]/i,

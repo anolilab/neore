@@ -74,6 +74,7 @@ import type { ComposerInputAreaRef } from "./composer-input-area";
 import ComposerInputArea from "./composer-input-area";
 import ComposerLongTextPrompt from "./composer-long-text-prompt";
 import { breaksBefore, inOpenFence, isLongPaste, onOwnLines, planPaste, planText } from "./composer-paste/paste-plan";
+import { takesPaste } from "./composer-paste/paste-target";
 import ComposerPromptQueue from "./composer-prompt-queue";
 import { isEditable, TextAttachmentEditorDialog } from "./composer-text-attachment-editor";
 import { quoteRestoreDraft } from "./composer-tiptap/extensions/quote-chip";
@@ -502,6 +503,12 @@ const ComposerInput = ({
             composerStateRef.current = { ...composerStateRef.current, mounted: false };
         };
     }, [threadId]);
+    // Read by a paste once its conversion is done: the composer may have been disabled meanwhile.
+    const disabledRef = useRef(disabled);
+
+    useEffect(() => {
+        disabledRef.current = disabled;
+    }, [disabled]);
     // The thread a draft was last checked against, so the check below runs when the chat changes, not on every keystroke.
     const draftThread = useRef<string | null | undefined>(undefined);
     // Invite-only: a guest's comparison send is held for sign-in (a plain send is held in `ChatProvider`).
@@ -935,7 +942,7 @@ const ComposerInput = ({
             const editor = editorHandle?.getEditor();
 
             // A disabled composer takes no paste: left to the editor, which refuses it.
-            if (disabled || (editor && !editor.isDestroyed && !editor.isEditable)) {
+            if (!takesPaste(disabled, editor)) {
                 return;
             }
 
@@ -970,6 +977,11 @@ const ComposerInput = ({
             if (getChatKey() !== chatKey) {
                 showError(t`The chat changed before the paste was ready, so it was not inserted.`);
 
+                return;
+            }
+
+            // The composer was disabled while the paste was converted: nothing is written, through the editor or the store.
+            if (!takesPaste(disabledRef.current, inputAreaRef.current?.getEditor()?.getEditor())) {
                 return;
             }
 
