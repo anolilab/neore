@@ -4,8 +4,11 @@
  * nothing is sent, the draft stays, and the sign-in prompt opens.
  */
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen } from "@testing-library/react";
-import type { ReactNode } from "react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { Editor } from "@tiptap/core";
+import { StarterKit } from "@tiptap/starter-kit";
+import type { ReactNode, Ref } from "react";
+import { useImperativeHandle } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useLoginPromptStore } from "@/features/auth/stores/login-prompt-store";
@@ -13,12 +16,21 @@ import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
 import type { QueuedChatPrompt } from "@/features/chat/core/stores/prompt-queue-store";
 import { usePromptQueueStore } from "@/features/chat/core/stores/prompt-queue-store";
 
+import type { ComposerInputAreaRef } from "./composer-input-area";
+import type { ComposerTiptapEditorRef } from "./composer-tiptap/composer-tiptap-editor";
+import QuoteChip from "./composer-tiptap/extensions/quote-chip";
+import { appendPlainText, composerCoreExtensionOptions, pastePlainText } from "./composer-tiptap/paste-plain-text";
+
 const harness = vi.hoisted(() => {
     return {
         isStreaming: false,
         mustSignIn: true,
         sendComparisonMessage: vi.fn(async () => undefined),
         sendMessage: vi.fn(async () => undefined),
+        /** The input row's editor; none by default, as a composer before the editor loads. */
+        editor: null as ComposerTiptapEditorRef | null,
+        showError: vi.fn(),
+        showInfo: vi.fn(),
         threadId: undefined as string | undefined,
         view: "online" as "offline" | "online" | "reconnecting",
     };
@@ -100,6 +112,10 @@ vi.mock("@/lib/auth/server-functions", () => {
     return { default: vi.fn() };
 });
 
+vi.mock("@/lib/toast", async (importOriginal) => {
+    return { ...(await importOriginal<typeof import("@/lib/toast")>()), showError: harness.showError, showInfo: harness.showInfo };
+});
+
 vi.mock("@/lib/env", () => {
     return { default: { VITE_LUNORA_URL: "http://localhost:8788" } };
 });
@@ -124,18 +140,36 @@ vi.mock("./composer-tiptap/use-composer-autocomplete", () => {
     return { default: () => undefined };
 });
 
-// The input row stands in with its contract: the draft and the submit control.
+const InputArea = ({
+    onPaste,
+    onSubmit,
+    ref,
+    value,
+}: {
+    onPaste?: (event: unknown) => void;
+    onSubmit: () => void;
+    ref?: Ref<ComposerInputAreaRef>;
+    value: string;
+}) => {
+    useImperativeHandle(ref, () => {
+        return { blur: () => undefined, focus: () => undefined, getEditor: () => harness.editor };
+    });
+
+    return (
+        <div>
+            <output aria-label="Draft" onPaste={onPaste}>
+                {value}
+            </output>
+            <button onClick={onSubmit} type="button">
+                Send message
+            </button>
+        </div>
+    );
+};
+
+// The input row stands in with its contract: the draft, the submit control and the editor.
 vi.mock("./composer-input-area", () => {
-    return {
-        default: ({ onSubmit, value }: { onSubmit: () => void; value: string }) => (
-            <div>
-                <output aria-label="Draft">{value}</output>
-                <button onClick={onSubmit} type="button">
-                    Send message
-                </button>
-            </div>
-        ),
-    };
+    return { default: InputArea };
 });
 
 for (const path of [
@@ -198,6 +232,142 @@ describe("ComposerInput under invite-only", () => {
 
         expect(onSubmitOverride).toHaveBeenCalledWith("compare these", []);
         expect(useLoginPromptStore.getState().isOpen).toBe(false);
+    });
+});
+
+describe("ComposerInput paste", () => {
+    afterEach(() => {
+        harness.threadId = undefined;
+        useChatUIStore.getState().clearComposer();
+        vi.clearAllMocks();
+    });
+
+    it("tells the user, and inserts nothing, when another chat opens while a paste is converted", async () => {
+        harness.mustSignIn = false;
+        harness.threadId = "chat-a";
+
+        const view = renderComposer();
+        const data: Record<string, string> = { "text/html": "<p><b>bold</b> text</p>", "text/plain": "bold text" };
+
+        fireEvent.paste(screen.getByLabelText("Draft"), { clipboardData: { getData: (type: string) => data[type] ?? "", items: [] } });
+        harness.threadId = "chat-b";
+        view.rerender(
+            <QueryClientProvider client={new QueryClient()}>
+                <ComposerInput />
+            </QueryClientProvider>,
+        );
+
+        await waitFor(() => {
+            expect(harness.showError).toHaveBeenCalledWith("The chat changed before the paste was ready, so it was not inserted.");
+        });
+        expect(useChatUIStore.getState().composerText).toBe("");
+    });
+
+    it("tells the user, and inserts nothing, when the composer is locked while a paste is converted", async () => {
+        harness.mustSignIn = false;
+
+        const view = renderComposer();
+        const data: Record<string, string> = { "text/html": "<p><b>bold</b> text</p>", "text/plain": "bold text" };
+
+        fireEvent.paste(screen.getByLabelText("Draft"), { clipboardData: { getData: (type: string) => data[type] ?? "", items: [] } });
+        view.rerender(
+            <QueryClientProvider client={new QueryClient()}>
+                <ComposerInput disabled />
+            </QueryClientProvider>,
+        );
+
+        await waitFor(() => {
+            expect(harness.showInfo).toHaveBeenCalledWith("The composer was locked before the paste was ready, so it was not inserted.");
+        });
+        expect(useChatUIStore.getState().composerText).toBe("");
+    });
+});
+
+describe("ComposerInput paste into an editor with a quote chip", () => {
+    let editor: Editor | undefined;
+
+    afterEach(() => {
+        editor?.destroy();
+        editor = undefined;
+        harness.editor = null;
+        useChatUIStore.getState().clearComposer();
+        vi.clearAllMocks();
+    });
+
+    /**
+     * An editor holding `content`, as plain as the composer's, the store's draft set to its text as the editor's own updates
+     * set it. Without `trailingNode` a chip can end the document.
+     */
+    const editorWith = (content: object[], trailingNode = true): Editor => {
+        const plain = { blockquote: false, bold: false, code: false, codeBlock: false, heading: false, italic: false, strike: false } as const;
+        const instance = new Editor({
+            content: { content, type: "doc" },
+            coreExtensionOptions: composerCoreExtensionOptions,
+            extensions: [
+                StarterKit.configure(trailingNode ? plain : { ...plain, trailingNode: false }),
+                QuoteChip.configure({
+                    labels: () => {
+                        return { goToReply: "Go to reply" };
+                    },
+                }),
+            ],
+        });
+
+        editor = instance;
+        harness.editor = {
+            appendText: (text: string) => appendPlainText(instance, text),
+            blur: () => undefined,
+            focus: () => undefined,
+            getEditor: () => instance,
+            isPlainPaste: () => false,
+            pasteText: (text: string, at?: Parameters<typeof pastePlainText>[2]) => pastePlainText(instance, text, at),
+        };
+        useChatUIStore.getState().setComposerText(instance.getText({ blockSeparator: "\n" }));
+
+        return instance;
+    };
+
+    const chip = { attrs: { messageId: "m1", text: "quoted" }, type: "quoteChip" };
+    const pasteFormatted = (): void => {
+        const data: Record<string, string> = { "text/html": "<p><b>bold</b> text</p>", "text/plain": "bold text" };
+
+        fireEvent.paste(screen.getByLabelText("Draft"), { clipboardData: { getData: (type: string) => data[type] ?? "", items: [] } });
+    };
+
+    it("keeps the chip when the document changed but its text did not while the paste was converted", async () => {
+        harness.mustSignIn = false;
+
+        renderComposer();
+
+        const instance = editorWith([chip, { content: [{ text: "hi", type: "text" }], type: "paragraph" }]);
+
+        pasteFormatted();
+        // Typed and deleted meanwhile: the same text in a new document.
+        instance.commands.insertContentAt(instance.state.doc.content.size - 1, "x");
+        instance.commands.deleteRange({ from: instance.state.doc.content.size - 2, to: instance.state.doc.content.size - 1 });
+
+        await waitFor(() => {
+            expect(instance.getText({ blockSeparator: "\n" })).toBe("> quoted\n\nhi\n**bold** text");
+        });
+        expect(instance.state.doc.firstChild?.type.name).toBe("quoteChip");
+    });
+
+    it("keeps a chip that ends the draft when the document changed while the paste was converted", async () => {
+        harness.mustSignIn = false;
+
+        renderComposer();
+
+        const instance = editorWith([chip], false);
+
+        pasteFormatted();
+        // The chip put back meanwhile: the same text in a new document.
+        instance.view.dispatch(instance.state.tr.replaceWith(0, instance.state.doc.content.size, instance.schema.nodeFromJSON(chip)));
+
+        await waitFor(() => {
+            expect(instance.state.doc.lastChild?.textContent).toBe("**bold** text");
+        });
+        expect(instance.state.doc.firstChild?.type.name).toBe("quoteChip");
+        expect(instance.state.doc.childCount).toBe(2);
     });
 });
 

@@ -19,6 +19,7 @@
 import { useLingui } from "@lingui/react/macro";
 import type { Editor } from "@tiptap/core";
 import PlaceholderExtension from "@tiptap/extension-placeholder";
+import type { EditorState } from "@tiptap/pm/state";
 import { Selection } from "@tiptap/pm/state";
 import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKitExtension from "@tiptap/starter-kit";
@@ -51,6 +52,7 @@ import type { VaultFileRef } from "./file-mention-popup";
 import FileMentionPopup from "./file-mention-popup";
 import type { GhostController, GhostEligibility, GhostRequest } from "./ghost-completion-controller";
 import { createGhostController, shouldAnnounceGhost } from "./ghost-completion-controller";
+import { appendPlainText, composerCoreExtensionOptions, pastePlainText } from "./paste-plain-text";
 import { plainTextToHtml } from "./plain-text";
 import SlashCommandPopup from "./slash-command-popup";
 import useMentionPrefetch from "./use-mention-prefetch";
@@ -124,9 +126,15 @@ export interface ComposerTiptapEditorProps {
 }
 
 export interface ComposerTiptapEditorRef {
+    /** `text` typed at the document's end, the blocks before it untouched; false when the editor cannot take it. */
+    appendText: (text: string) => boolean;
     blur: () => void;
     focus: () => void;
     getEditor: () => Editor | null;
+    /** Whether `event` is a paste made with Ctrl/Cmd+Shift+V, which keeps the text exactly as copied. */
+    isPlainPaste: (event: { timeStamp: number }) => boolean;
+    /** Inserts `text` over the selection (of `at` when given) as one undoable paste, a paragraph per line; false without an editor or when the text changed since `at`. */
+    pasteText: (text: string, at?: EditorState) => boolean;
 }
 
 // ============================================================================
@@ -136,6 +144,9 @@ export interface ComposerTiptapEditorRef {
 
 const EMPTY_BANNED_MATCHES: BannedWordMatch[] = [];
 const EMPTY_VARIABLES: PromptVariable[] = [];
+
+/** A paste this soon after Ctrl/Cmd+Shift+V came from it: the paste event itself does not say. */
+const PLAIN_PASTE_WINDOW_MS = 1000;
 
 /** How long the "suggestion available" announcement stays in the live region. */
 const ANNOUNCEMENT_CLEAR_MS = 4000;
@@ -260,6 +271,8 @@ const ComposerTiptapEditor = ({
         historyRecalledRef.current = isHistoryRecalled;
     }, [isVimEnabled, isHistoryRecalled]);
 
+    const plainPasteKeyAt = useRef(-Infinity);
+
     // The key handlers the extensions call. Tiptap's `extension.options` is a getter that returns a fresh object, and
     // shortcuts read the options captured when the editor was built, so a handler assigned onto it later is lost; the
     // extensions read this ref at key time instead. No popup check here: an open popup (one with items) takes Enter, the
@@ -273,12 +286,21 @@ const ComposerTiptapEditor = ({
     // Create editor
     const editor = useEditor({
         autofocus: autoFocus ? "end" : false,
+        coreExtensionOptions: composerCoreExtensionOptions,
         editable: !disabled,
         editorProps: {
             attributes: composerEditorAttributes({ describedBy, invalid, label: t`Message` }),
             // The composer's paste handler runs first (capture phase) and prevents a paste it turns into a file; the editor
             // then leaves that paste alone, so a long text is never both attached and inserted.
             handlePaste: (_view, event) => event.defaultPrevented,
+            handleKeyDown: (_view, event) => {
+                // `code` is the physical key: on a Cyrillic or Greek layout `key` is not "v" for the same shortcut.
+                if (event.shiftKey && (event.ctrlKey || event.metaKey) && (event.code === "KeyV" || event.key.toLowerCase() === "v")) {
+                    plainPasteKeyAt.current = event.timeStamp;
+                }
+
+                return false;
+            },
         },
         extensions: [
             StarterKitExtension.configure({
@@ -397,6 +419,16 @@ const ComposerTiptapEditor = ({
             blur: () => editor?.commands.blur(),
             focus: () => editor?.commands.focus(),
             getEditor: () => editor,
+            // One shortcut, one paste: a normal paste right after it keeps its formatting.
+            isPlainPaste: (event: { timeStamp: number }) => {
+                const plain = event.timeStamp - plainPasteKeyAt.current < PLAIN_PASTE_WINDOW_MS;
+
+                plainPasteKeyAt.current = -Infinity;
+
+                return plain;
+            },
+            appendText: (text: string) => (editor && !editor.isDestroyed ? appendPlainText(editor, text) : false),
+            pasteText: (text: string, at?: EditorState) => (editor && !editor.isDestroyed ? pastePlainText(editor, text, at) : false),
         };
     }, [editor]);
 

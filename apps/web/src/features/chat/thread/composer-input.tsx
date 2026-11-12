@@ -25,7 +25,7 @@ import { formatNumber } from "@neore/ui/utils/locale-format";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { AlertTriangleIcon, EditIcon, InfoIcon, XIcon } from "lucide-react";
 import type { ChangeEvent, DragEvent, FC } from "react";
-import { memo, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { memo, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 
 import useInviteOnly from "@/features/auth/hooks/use-invite-only";
 import { isCompactCommand } from "@/features/chat/compaction/compaction-logic";
@@ -70,10 +70,12 @@ import type { ChatReference } from "./chat-reference";
 import { buildChatTranscript, chatReferenceFileName } from "./chat-reference";
 import CompletionSound from "./completion-sound";
 import type { TextFileResult } from "./composer-draft-file";
-import { attachLongPaste, draftFitsAsFile, moveDraftToFile, pasteHasText, undoLongPaste } from "./composer-draft-file";
+import { appendPastedText, attachLongPaste, draftFitsAsFile, insertPastedText, moveDraftToFile, pasteHasText, undoLongPaste } from "./composer-draft-file";
 import type { ComposerInputAreaRef } from "./composer-input-area";
 import ComposerInputArea from "./composer-input-area";
 import ComposerLongTextPrompt from "./composer-long-text-prompt";
+import { breaksBefore, inOpenFence, isLongPaste, onOwnLines, planPaste, planText } from "./composer-paste/paste-plan";
+import { takesPaste } from "./composer-paste/paste-target";
 import ComposerPromptQueue from "./composer-prompt-queue";
 import { composerSubmitIntent } from "./composer-submit-intent";
 import { isEditable, TextAttachmentEditorDialog } from "./composer-text-attachment-editor";
@@ -503,6 +505,13 @@ const ComposerInput = ({
             composerStateRef.current = { ...composerStateRef.current, mounted: false };
         };
     }, [threadId]);
+    // Read by a paste once its conversion is done: the composer may have been disabled meanwhile. Synced in the commit
+    // itself: a passive effect runs later, and a conversion that resumes in between would still read `false`.
+    const disabledRef = useRef(disabled);
+
+    useLayoutEffect(() => {
+        disabledRef.current = disabled;
+    }, [disabled]);
     // The thread a draft was last checked against, so the check below runs when the chat changes, not on every keystroke.
     const draftThread = useRef<string | null | undefined>(undefined);
     // Invite-only: a guest's comparison send is held for sign-in (a plain send is held in `ChatProvider`).
@@ -837,26 +846,44 @@ const ComposerInput = ({
     }, [attachTextAsFile, removeAttachment, setText]);
 
     // The paste position as offsets into the plain draft text (the editor joins blocks with "\n"); the end when unknown.
-    const pasteSelection = useCallback((): { end: number; start: number } => {
+    // `textBefore` and `textAfter`: whether the caret's line has text on that side of it.
+    const pasteSelection = useCallback((): {
+        end: number;
+        lineAfter?: boolean;
+        lineBefore?: boolean;
+        start: number;
+        textAfter: boolean;
+        textBefore: boolean;
+    } => {
         const editor = inputAreaRef.current?.getEditor()?.getEditor();
 
         if (!editor || editor.isDestroyed) {
-            const { length } = useChatUIStore.getState().composerText;
+            const draft = useChatUIStore.getState().composerText;
 
-            return { end: length, start: length };
+            return { end: draft.length, start: draft.length, textAfter: false, textBefore: draft !== "" && !draft.endsWith("\n") };
         }
 
         const { doc, selection } = editor.state;
+        const isText = (node: { type: { name: string } } | null): boolean => node !== null && node.type.name !== "hardBreak";
+
+        const { $from, $to } = selection;
+        // The line just above or below the caret's own: the block before or after its paragraph, when that has text.
+        const lineBefore = $from.parentOffset === 0 && $from.depth > 0 && Boolean(doc.resolve($from.before()).nodeBefore?.textContent);
+        const lineAfter = $to.parentOffset === $to.parent.content.size && $to.depth > 0 && Boolean(doc.resolve($to.after()).nodeAfter?.textContent);
 
         return {
             end: doc.textBetween(0, selection.to, "\n").length,
+            lineAfter,
+            lineBefore,
             start: doc.textBetween(0, selection.from, "\n").length,
+            textAfter: isText($to.nodeAfter),
+            textBefore: isText($from.nodeBefore),
         };
     }, []);
 
     // The paste did not land in the draft, so say where it went and let the person take it back.
     const announcePasteAttached = useCallback(
-        (attachmentId: string, pastedText: string) => {
+        (attachmentId: string, pastedText: string, converted: boolean) => {
             const toastId = showInfo(t`Long text was attached as a file.`, {
                 action: {
                     label: t`Undo`,
@@ -869,6 +896,7 @@ const ComposerInput = ({
 
                         undoLongPaste({
                             attachmentId,
+                            converted,
                             getAttachmentIds: () => useChatUIStore.getState().composerAttachments.map((attachment) => attachment.id),
                             getDraft: () => useChatUIStore.getState().composerText,
                             pastedText,
@@ -916,45 +944,116 @@ const ComposerInput = ({
                 }
             }
 
-            // Check for long text content
-            const { removed: pasteRemoved, text: pastedText } = stripHiddenText(e.clipboardData.getData("text/plain"));
+            const editorHandle = inputAreaRef.current?.getEditor();
+            const editor = editorHandle?.getEditor();
 
-            // Auto-convert if text is long (>500 chars or >10 lines)
-            if (pastedText && (pastedText.length > 500 || pastedText.split("\n").length > 10)) {
-                e.preventDefault();
+            // A disabled composer takes no paste: left to the editor, which refuses it.
+            if (!takesPaste(disabled, editor)) {
+                return;
+            }
 
-                // Read before the upload: the caret moves while it runs.
-                const selection = pasteSelection();
+            const live = editor && !editor.isDestroyed ? editor.state : undefined;
+            const plan = planPaste(e.clipboardData, {
+                inFence: inOpenFence(live ? live.doc.textBetween(0, live.selection.from, "\n") : useChatUIStore.getState().composerText),
+                plainOnly: editorHandle?.isPlainPaste(e) ?? false,
+                selectedText: live ? live.doc.textBetween(live.selection.from, live.selection.to, "\n") : "",
+            });
+            const plainText = e.clipboardData.getData("text/plain");
 
-                if (pasteRemoved > 0) {
-                    useChatUIStore.getState().noteComposerHiddenRemoved(pasteRemoved);
+            // Plain text the editor can paste itself: it does, as it always has.
+            if (plan.kind === "default" && !isLongPaste(stripHiddenText(plainText).text)) {
+                return;
+            }
+
+            e.preventDefault();
+
+            // Read before the conversion and the upload: the caret moves while they run.
+            const selection = pasteSelection();
+            const stateAtPaste = editor?.state;
+            const draftAtPaste = useChatUIStore.getState().composerText;
+            const chatKey = getChatKey();
+            // Converted text is measured as it lands: a short web page can be a long table.
+            // Converted Markdown that opens or ends with a table, fence, heading, list or quote keeps it off the text beside the
+            // caret; text as copied, including a conversion's plain-text fallback, goes in as it is.
+            const { markdown: converted, text: planned } = plan.kind === "default" ? { markdown: false, text: plainText } : await planText(plan);
+            const { removed: pasteRemoved, text: pastedText } = stripHiddenText(planned);
+
+            if (!pastedText) {
+                return;
+            }
+
+            // Another chat opened while the paste was converted: it is not written there, and the user is told so.
+            if (getChatKey() !== chatKey) {
+                showError(t`The chat changed before the paste was ready, so it was not inserted.`);
+
+                return;
+            }
+
+            // The composer was disabled while the paste was converted: nothing is written, through the editor or the store,
+            // and the user is told so.
+            if (!takesPaste(disabledRef.current, inputAreaRef.current?.getEditor()?.getEditor())) {
+                showInfo(t`The composer was locked before the paste was ready, so it was not inserted.`);
+
+                return;
+            }
+
+            if (pasteRemoved > 0) {
+                useChatUIStore.getState().noteComposerHiddenRemoved(pasteRemoved);
+            }
+
+            if (!isLongPaste(pastedText)) {
+                const draft = useChatUIStore.getState().composerText;
+                const inserted = converted ? onOwnLines(pastedText, selection.textBefore, selection.textAfter, selection) : pastedText;
+                const appended = appendPastedText(draft, pastedText, converted ? breaksBefore(pastedText) : 1);
+                const now = inputAreaRef.current?.getEditor();
+                const shown = now?.getEditor();
+
+                // While the editor shows the store's draft, the paste goes in only through an editor transaction, so its quote
+                // chips stay chips; a rebuild from the text would flatten them. Over the paste-time selection while the document
+                // is the one the paste was made in, otherwise at the end, on a line of its own: an edit meanwhile moved the text
+                // the caret was in, and the first line gets the breaks it needs there rather than those worked out for the caret.
+                if (now && shown && !shown.isDestroyed && shown.state.doc.textBetween(0, shown.state.doc.content.size, "\n") === draft) {
+                    if (!(stateAtPaste && now.pasteText(inserted, stateAtPaste)) && !now.appendText(appended.slice(draft.length))) {
+                        showInfo(t`The composer was locked before the paste was ready, so it was not inserted.`);
+                    }
+
+                    return;
                 }
 
-                await attachLongPaste({
-                    attach: attachTextAsFile,
-                    discard: removeAttachment,
-                    getAttachmentIds: () => useChatUIStore.getState().composerAttachments.map((attachment) => attachment.id),
-                    getChatKey,
-                    getDraft: () => useChatUIStore.getState().composerText,
-                    onAttached: (attachmentId) => {
-                        announcePasteAttached(attachmentId, pastedText);
-                    },
-                    onNotInserted: () => {
-                        showError(t`The pasted text could not be attached and was not inserted.`);
-                    },
-                    // A recognised failure was toasted where it was worded; the text is back in the composer.
-                    onFailure: (error) => {
-                        if (!toastedMessages.has(error)) {
-                            showError(error);
-                        }
-                    },
-                    pastedText,
-                    selection,
-                    setDraft: setText,
-                });
+                // No editor, or one the store's draft has not reached yet (it is rebuilt from that text next): the store takes
+                // it. A draft changed since the paste would otherwise be written over by the stale document's next change.
+                setText(draft === draftAtPaste ? insertPastedText(draft, inserted, selection.start, selection.end) : appended);
+
+                return;
             }
+
+            await attachLongPaste({
+                attach: attachTextAsFile,
+                canInsert: () => takesPaste(disabledRef.current, inputAreaRef.current?.getEditor()?.getEditor()),
+                converted,
+                discard: removeAttachment,
+                draftAtPaste,
+                getAttachmentIds: () => useChatUIStore.getState().composerAttachments.map((attachment) => attachment.id),
+                getChatKey,
+                getDraft: () => useChatUIStore.getState().composerText,
+                onAttached: (attachmentId) => {
+                    announcePasteAttached(attachmentId, pastedText, converted);
+                },
+                onNotInserted: () => {
+                    showError(t`The pasted text could not be attached and was not inserted.`);
+                },
+                // A recognised failure was toasted where it was worded; the text is back in the composer.
+                onFailure: (error) => {
+                    if (!toastedMessages.has(error)) {
+                        showError(error);
+                    }
+                },
+                pastedText,
+                selection,
+                setDraft: setText,
+            });
         },
-        [handleFileSelect, announcePasteAttached, attachTextAsFile, getChatKey, pasteSelection, removeAttachment, setText, t],
+        [handleFileSelect, announcePasteAttached, attachTextAsFile, disabled, getChatKey, pasteSelection, removeAttachment, setText, t],
     );
 
     // Handle text change — clear banned content error when user edits.
