@@ -40,26 +40,71 @@ export function lineBreakMarker(br: string): string {
 }
 
 const BLANK_TEXT = /^\s*$/;
+const WHITESPACE = /\s/;
 
 /**
  * Trims the whitespace at both ends of an element's content, as `trim` does, and
  * then writes back the hard line breaks that the element starts and ends with.
- * Those breaks are whitespace in the content, so `trim` would remove them. They
- * are counted from the DOM, not found in the string, because text can hold the
- * same characters as a break.
+ * Those breaks are whitespace in the content, so `trim` would remove them. The DOM
+ * says how many breaks each edge holds, but a break is written back only where the
+ * trim removed its marker from the content: a break that a child already writes
+ * inside a link stays there, and a marker that trim keeps is not written twice.
+ * The DOM count also keeps text that holds the same characters as a break from
+ * being taken for one.
  */
 export function trimKeepingBreaks(content: string, node: Node, br: string): string {
     const marker = lineBreakMarker(br);
-    const core = content.trim();
     const lead = edgeBreaks(node, "left");
     const trail = edgeBreaks(node, "right");
+    const edges = splitEdgeMarkers(content, marker, lead, trail);
 
     // An element that holds only breaks has the same breaks at both ends, so they are written once.
-    if (core === "") {
-        return marker.repeat(Math.max(lead, trail));
+    if (edges.core === "") {
+        const all = splitEdgeMarkers(content, marker, Infinity, 0);
+
+        return marker.repeat(Math.min(Math.max(lead, trail), all.lead));
     }
 
-    return marker.repeat(lead) + core + marker.repeat(trail);
+    return marker.repeat(edges.lead) + edges.core + marker.repeat(edges.trail);
+}
+
+/**
+ * Trims the whitespace at both ends of content and splits off up to `leadBudget` and
+ * `trailBudget` break markers, the number of breaks the DOM says each edge holds. A
+ * marker is split off only while the budget lasts, so text that holds the same
+ * characters as a marker is left in the core unless the DOM counted a break there.
+ * A marker is matched before whitespace is skipped, because a marker can start or end
+ * with whitespace.
+ */
+function splitEdgeMarkers(content: string, marker: string, leadBudget: number, trailBudget: number): { core: string; lead: number; trail: number } {
+    let start = 0;
+    let end = content.length;
+    let lead = 0;
+    let trail = 0;
+
+    while (start < end) {
+        if (lead < leadBudget && content.startsWith(marker, start)) {
+            lead += 1;
+            start += marker.length;
+        } else if (WHITESPACE.test(content.charAt(start))) {
+            start += 1;
+        } else {
+            break;
+        }
+    }
+
+    while (end > start) {
+        if (trail < trailBudget && end - marker.length >= start && content.startsWith(marker, end - marker.length)) {
+            trail += 1;
+            end -= marker.length;
+        } else if (WHITESPACE.test(content.charAt(end - 1))) {
+            end -= 1;
+        } else {
+            break;
+        }
+    }
+
+    return { core: content.slice(start, end), lead, trail };
 }
 
 /**
