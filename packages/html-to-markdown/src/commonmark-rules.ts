@@ -45,7 +45,7 @@ interface RunStyle {
 // A backslash escapes the ASCII punctuation character after it, and at the end of
 // the destination it would escape the closing parenthesis. Such a backslash is
 // doubled. Any other backslash is literal, so it is left alone.
-const BACKSLASH_BEFORE_PUNCTUATION = /\\(?=[!"#$%&'()*+,./:;<=>?@[\\\]^_`{|}~]|$)/g;
+const BACKSLASH_BEFORE_PUNCTUATION = /\\(?=[!"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~]|$)/g;
 // The hard break is `options.br` followed by a line break. CommonMark reads a line that ends in
 // two or more spaces, or in an unescaped backslash, as a hard break. The marker may hold other
 // text before that ending, as in ` \`. An even run of backslashes is escaped pairs, not a break.

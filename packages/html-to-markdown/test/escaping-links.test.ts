@@ -313,3 +313,13 @@ describe("review: email addresses in angle brackets", () => {
         expect(convert("a&lt;1")).toBe("a<1");
     });
 });
+
+describe("review: backslashes before a hyphen in a destination", () => {
+    it("escapes a backslash before a hyphen, which is ASCII punctuation that CommonMark would unescape", () => {
+        expect(convert(String.raw`<a href="a\-b">x</a>`)).toBe(String.raw`[x](a\\-b)`);
+    });
+
+    it("guard, passes before and after: a backslash before a letter is still left alone", () => {
+        expect(convert(String.raw`<a href="a\-b\c">x</a>`)).toBe(String.raw`[x](a\\-b\c)`);
+    });
+});
