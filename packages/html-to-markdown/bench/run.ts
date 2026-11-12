@@ -3,9 +3,13 @@ import { dirname, join } from "node:path";
 import { performance } from "node:perf_hooks";
 import { fileURLToPath } from "node:url";
 
+import { createDocument } from "@mixmark-io/domino";
 import UpstreamTurndown from "turndown";
 
-import TurndownService from "../src/index";
+import TurndownService, { setHTMLParser } from "../src/index";
+
+// Node has no DOMParser, so this port parses strings with domino, as the tests do.
+setHTMLParser(createDocument);
 
 /*
  * `pnpm test:bench`: this port against upstream turndown 7.2.5 (the devDependency),

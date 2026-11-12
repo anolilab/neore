@@ -2880,14 +2880,13 @@ importers:
         version: 3.10.12(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.2)(@types/node@26.6.6)(supports-color@10.2.2)
 
   packages/html-to-markdown:
-    dependencies:
-      '@mixmark-io/domino':
-        specifier: 2.2.0
-        version: 2.2.0
     devDependencies:
       '@anolilab/eslint-config':
         specifier: catalog:lint
         version: 30.0.7(4c784f9093c46cdd365bfecee9e9733f)
+      '@mixmark-io/domino':
+        specifier: 2.2.0
+        version: 2.2.0
       '@types/node':
         specifier: catalog:types
         version: 26.6.6

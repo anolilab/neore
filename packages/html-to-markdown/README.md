@@ -32,7 +32,8 @@ differential test covers each of them.
 
 ## Known limits (fixed in later steps)
 
-- `@mixmark-io/domino` is still the Node parser. It is dropped when the converter moves onto an internal tree.
+- Node has no default parser: tests and the bench pass `@mixmark-io/domino` to `setHTMLParser`. Domino is dropped when the
+  converter moves onto an internal tree.
 - Node's DOM is still mutated during conversion (upstream's design).
 - Reference-style links keep their state on a shared rule object, as upstream does.
 - Unsafe `javascript:` hrefs are not filtered, and `<style>`, `<script>` and `display:none` content is not removed.

@@ -19,11 +19,9 @@
         "test": "vitest run",
         "test:bench": "tsx bench/run.ts"
     },
-    "dependencies": {
-        "@mixmark-io/domino": "2.2.0"
-    },
     "devDependencies": {
         "@anolilab/eslint-config": "catalog:lint",
+        "@mixmark-io/domino": "2.2.0",
         "@types/node": "catalog:types",
         "eslint": "catalog:lint",
         "tsx": "catalog:iac",
