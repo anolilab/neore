@@ -63,6 +63,10 @@ vi.mock("./file-mention-popup", () => {
     return { default: () => null };
 });
 
+vi.mock("./use-mention-prefetch", () => {
+    return { default: () => false };
+});
+
 vi.mock("./variable-autocomplete-popup", () => {
     return { default: () => null };
 });
