@@ -12,6 +12,7 @@
     },
     "scripts": {
         "bench": "tsx bench/run.ts",
+        "build": "tsc --noEmit",
         "lint:eslint": "eslint . --cache --cache-location .eslint.cache.json",
         "lint:eslint:fix": "eslint . --fix --cache --cache-location .eslint.cache.json",
         "lint:types": "tsc --noEmit",
