@@ -43,21 +43,42 @@ export default function rootNode(input: string | Node, options: Options): Node {
  * namespace, so an SVG `<script>` or `<style>` is removed too.
  */
 const NON_CONTENT_NAMES = new Set(["noscript", "script", "style", "template", "title"]);
-const NON_CONTENT_SELECTOR = [...NON_CONTENT_NAMES].join(", ");
 
 /** Removes the non-content elements under `root`. A root that is itself one of them is emptied. */
 function removeNonContent(root: Node): void {
-    if (root.nodeType === 1 && NON_CONTENT_NAMES.has((root as Element).localName.toLowerCase())) {
+    if (isNonContent(root)) {
         while (root.firstChild) {
-            root.firstChild.remove();
+            root.removeChild(root.firstChild);
         }
 
         return;
     }
 
-    for (const element of (root as ParentNode).querySelectorAll(NON_CONTENT_SELECTOR)) {
-        element.remove();
+    removeNonContentBelow(root);
+}
+
+/**
+ * Walks the children through the Node API, so a fragment without selector methods works too. The next sibling is read
+ * before a match is removed, so the walk goes on past it.
+ */
+function removeNonContentBelow(parent: Node): void {
+    let child = parent.firstChild;
+
+    while (child) {
+        const next = child.nextSibling;
+
+        if (isNonContent(child)) {
+            parent.removeChild(child);
+        } else {
+            removeNonContentBelow(child);
+        }
+
+        child = next;
     }
+}
+
+function isNonContent(node: Node): boolean {
+    return node.nodeType === 1 && NON_CONTENT_NAMES.has((node as Element).localName.toLowerCase());
 }
 
 function isPreOrCode(node: Node): boolean {
