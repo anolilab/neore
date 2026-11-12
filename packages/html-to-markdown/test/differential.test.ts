@@ -106,7 +106,7 @@ function hasSharedLabel(root: Element): boolean {
 
     for (const link of root.querySelectorAll("a[href]")) {
         const label = (link.textContent ?? "").replaceAll(/\s+/g, " ").trim().toLowerCase();
-        const definition = `${link.getAttribute("href") ?? ""}\u0000${link.getAttribute("title") ?? ""}`;
+        const definition = `${link.getAttribute("href") ?? ""}\u{0}${link.getAttribute("title") ?? ""}`;
         const seen = definitions.get(label);
 
         if (seen !== undefined && seen !== definition) {

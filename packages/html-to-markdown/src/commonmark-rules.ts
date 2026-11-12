@@ -56,14 +56,72 @@ const REGEXP_SPECIAL = /[.*+?^${}()|[\]\\]/g;
 function escapeRegExp(text: string): string {
     return text.replaceAll(REGEXP_SPECIAL, String.raw`\$&`);
 }
+
 // The tag names of CommonMark's HTML block type 6. A tag with one of these names may interrupt a
 // paragraph. Any other tag (an inline one such as `<em>`) cannot, so it does not start a block.
-const HTML_BLOCK_TAGS =
-    "address|article|aside|base|basefont|blockquote|body|caption|center|col|colgroup|dd|details|dialog|dir|div|dl|dt|fieldset|figcaption|figure|footer|form|frame|frameset|h[1-6]|head|header|hr|html|iframe|legend|li|link|main|menu|menuitem|nav|noframes|ol|optgroup|option|p|param|search|section|summary|table|tbody|td|tfoot|th|thead|title|tr|track|ul";
+const HTML_BLOCK_TAGS = [
+    "address",
+    "article",
+    "aside",
+    "base",
+    "basefont",
+    "blockquote",
+    "body",
+    "caption",
+    "center",
+    "col",
+    "colgroup",
+    "dd",
+    "details",
+    "dialog",
+    "dir",
+    "div",
+    "dl",
+    "dt",
+    "fieldset",
+    "figcaption",
+    "figure",
+    "footer",
+    "form",
+    "frame",
+    "frameset",
+    "h[1-6]",
+    "head",
+    "header",
+    "hr",
+    "html",
+    "iframe",
+    "legend",
+    "li",
+    "link",
+    "main",
+    "menu",
+    "menuitem",
+    "nav",
+    "noframes",
+    "ol",
+    "optgroup",
+    "option",
+    "p",
+    "param",
+    "search",
+    "section",
+    "summary",
+    "table",
+    "tbody",
+    "td",
+    "tfoot",
+    "th",
+    "thead",
+    "title",
+    "tr",
+    "track",
+    "ul",
+].join("|");
 // The HTML blocks that can interrupt a paragraph (CommonMark types 1 to 6): comments, declarations,
 // processing instructions, the block tags above, and the raw-text tags `script`, `pre`, `style` and
 // `textarea`. Each needs a word end after its name, so `<divide>` is not a block.
-const HTML_BLOCK_START = new RegExp(`<(?:[!?]|/?(?:${HTML_BLOCK_TAGS})(?=[\\t\\n\\r />]|$)|(?:script|pre|style|textarea)(?=[\\t\\n\\r >]|$))`, "iy");
+const HTML_BLOCK_START = new RegExp(String.raw`<(?:[!?]|/?(?:${HTML_BLOCK_TAGS})(?=[\t\n\r />]|$)|(?:script|pre|style|textarea)(?=[\t\n\r >]|$))`, "iy");
 // The line starts that CommonMark lets interrupt a paragraph: a quote, an ATX heading, a
 // fence, a bullet followed by a space, a setext underline, a thematic break, an ordered
 // item that starts at 1, and an HTML block. Only `1` can start an ordered item that
@@ -81,6 +139,17 @@ const BLOCK_OPENERS: ReadonlyArray<RegExp> = [
     /1[.)](?=[ \t\n]|$)/y,
     HTML_BLOCK_START,
 ];
+
+/** The next numbered id after `count` references, skipping any number that a label already names. */
+function nextReferenceId(count: number, labels: ReadonlyMap<string, string>): number {
+    let id = count + 1;
+
+    while (labels.has(String(id))) {
+        id += 1;
+    }
+
+    return id;
+}
 
 const WHITESPACE_RUN = /\s+/g;
 
@@ -154,23 +223,12 @@ class ReferenceLinkRule implements Rule {
             return options.linkReferenceStyle === "collapsed" ? `[${text}][]` : `[${text}]`;
         }
 
-        const id = this.nextId();
+        const id = nextReferenceId(this.references.length, this.labels);
 
         this.labels.set(String(id), definition);
         this.references.push(`[${id}]: ${definition}`);
 
         return `[${text}][${id}]`;
-    }
-
-    /** The next numbered id, skipping any number that a label already names. */
-    private nextId(): number {
-        let id = this.references.length + 1;
-
-        while (this.labels.has(String(id))) {
-            id += 1;
-        }
-
-        return id;
     }
 
     append(): string {
@@ -911,7 +969,7 @@ function linkText(content: string, hardBreak: string): string {
     const hasHardBreaks = HARD_BREAK.test(hardBreak);
     const closed = `${content}]`;
     // A line break, with the marker that the rule writes in front of it when the marker is there.
-    const lineBreak = new RegExp(`(${escapeRegExp(hardBreak)})?\\n\\s*`, "g");
+    const lineBreak = new RegExp(String.raw`(${escapeRegExp(hardBreak)})?\n\s*`, "g");
 
     return closed
         .replaceAll(lineBreak, (match: string, marker: string | undefined, offset: number, whole: string) => {
@@ -941,9 +999,9 @@ function isKeptHardBreak(run: string, offset: number, whole: string, hardBreak: 
     const isAfterMarker = markerStart >= 0 && whole.startsWith(hardBreak, markerStart);
     const isSingle = !run.includes("\n", 1);
     // A line indented by four columns or more is a paragraph continuation, so it cannot open a block.
-    const cannotOpenBlock = indentWidth(run) >= 4;
+    const isCannotOpenBlock = indentWidth(run) >= 4;
 
-    return isAfterMarker && isSingle && (cannotOpenBlock || !isBlockStartAt(whole, offset + run.length));
+    return isAfterMarker && isSingle && (isCannotOpenBlock || !isBlockStartAt(whole, offset + run.length));
 }
 
 /** The columns of indentation after a line break. A tab reaches the next multiple of four. */

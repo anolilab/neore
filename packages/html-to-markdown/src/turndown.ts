@@ -165,29 +165,49 @@ function escapeText(service: TurndownService, node: Node, text: string): string 
  * its `@`. The check is conservative: a `<` that cannot open HTML may still be escaped.
  */
 function isFollowedByHtmlOpener(node: Node, options: Options): boolean {
-    let inLocalPart = false;
+    let isInLocalPart = false;
 
     for (const piece of followingText(node, options)) {
         for (const char of piece) {
-            if (inLocalPart) {
-                if (char === "@") {
-                    return true;
-                }
+            const step: Step = isInLocalPart ? stepInLocalPart(char) : stepAfterLessThan(char);
 
-                if (!LOCAL_PART.test(char)) {
-                    return false;
-                }
-            } else if (HTML_START.test(char)) {
+            if (step === "opens") {
                 return true;
-            } else if (LOCAL_PART.test(char)) {
-                inLocalPart = true;
-            } else if (!WHITESPACE_CHAR.test(char)) {
+            }
+
+            if (step === "ends") {
                 return false;
             }
+
+            isInLocalPart = step === "local";
         }
     }
 
     return false;
+}
+
+/** What one character after a `<` decides: it opens markup, it ends the search, it starts a local part, or it is skipped. */
+type Step = "opens" | "ends" | "local" | "skip";
+
+function stepAfterLessThan(char: string): Step {
+    if (HTML_START.test(char)) {
+        return "opens";
+    }
+
+    if (LOCAL_PART.test(char)) {
+        return "local";
+    }
+
+    return WHITESPACE_CHAR.test(char) ? "skip" : "ends";
+}
+
+/** Inside a local part, an `@` opens an email autolink, and any other character that is not part of one ends the search. */
+function stepInLocalPart(char: string): Step {
+    if (char === "@") {
+        return "opens";
+    }
+
+    return LOCAL_PART.test(char) ? "local" : "ends";
 }
 
 /**

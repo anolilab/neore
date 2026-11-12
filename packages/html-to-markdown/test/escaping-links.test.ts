@@ -259,11 +259,11 @@ describe("review: indented lines after a hard break in link text", () => {
     }
 
     it("keeps a hard break before a line indented four spaces, which is a continuation and not a list item", () => {
-        expect(indentedSpan("    ").turndown(`<a href="/x">one<br><span>x</span></a>`)).toBe("[one  \n    - text](/x)");
+        expect(indentedSpan(" ".repeat(4)).turndown(`<a href="/x">one<br><span>x</span></a>`)).toBe("[one  \n    - text](/x)");
     });
 
     it("guard, passes before and after: a hard break before a line indented three spaces still ends the line for a list item", () => {
-        expect(indentedSpan("   ").turndown(`<a href="/x">one<br><span>x</span></a>`)).not.toContain("one  \n");
+        expect(indentedSpan(" ".repeat(3)).turndown(`<a href="/x">one<br><span>x</span></a>`)).not.toContain("one  \n");
     });
 });
 
@@ -279,19 +279,19 @@ describe("review: formatted text after a hard break in link text", () => {
 
 describe("review: reference labels that two links share", () => {
     it("gives a second collapsed link its own id when its label names another destination", () => {
-        expect(convert(`<a href="/a">one</a> <a href="/b">one</a>`, { linkStyle: "referenced", linkReferenceStyle: "collapsed" })).toBe(
+        expect(convert(`<a href="/a">one</a> <a href="/b">one</a>`, { linkReferenceStyle: "collapsed", linkStyle: "referenced" })).toBe(
             "[one][] [one][2]\n\n[one]: /a\n[2]: /b",
         );
     });
 
     it("treats labels that differ only in case as the same label, so a shortcut link gets its own id", () => {
-        expect(convert(`<a href="/a">one</a> <a href="/b">One</a>`, { linkStyle: "referenced", linkReferenceStyle: "shortcut" })).toBe(
+        expect(convert(`<a href="/a">one</a> <a href="/b">One</a>`, { linkReferenceStyle: "shortcut", linkStyle: "referenced" })).toBe(
             "[one] [One][2]\n\n[one]: /a\n[2]: /b",
         );
     });
 
     it("guard, passes before and after: two links to one destination under one label share one label", () => {
-        expect(convert(`<a href="/a">one</a> <a href="/a">one</a>`, { linkStyle: "referenced", linkReferenceStyle: "collapsed" })).toBe(
+        expect(convert(`<a href="/a">one</a> <a href="/a">one</a>`, { linkReferenceStyle: "collapsed", linkStyle: "referenced" })).toBe(
             "[one][] [one][]\n\n[one]: /a\n[one]: /a",
         );
     });
@@ -382,7 +382,7 @@ describe("review: deeply nested text after a <", () => {
         const output = new TurndownService().turndown(nestedLessThan(depth));
 
         // The innermost `<` is followed by the letter `x`, which it would open raw HTML before, so it is escaped.
-        expect(output).toBe(`${"<".repeat(depth - 1)}\\<x`);
+        expect(output).toBe(String.raw`${"<".repeat(depth - 1)}\<x`);
         expect(htmlOpenerSteps.count).toBeGreaterThanOrEqual(depth);
         expect(htmlOpenerSteps.count).toBeLessThan(STEPS_PER_LEVEL * depth);
     });
