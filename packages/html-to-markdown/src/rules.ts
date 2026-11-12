@@ -55,15 +55,24 @@ export default class Rules {
             return this.blankRule;
         }
 
-        for (const rules of [this.array, this.keepList, this.removeList]) {
-            const rule = findRule(rules, node, this.options);
+        // Lowercased once for the node, not once per rule.
+        const nodeName = node.nodeName.toLowerCase();
 
-            if (rule) {
-                return rule;
-            }
+        const fromRules = findRule(this.array, node, nodeName, this.options);
+
+        if (fromRules) {
+            return fromRules;
         }
 
-        return this.defaultRule;
+        const fromKeep = findRule(this.keepList, node, nodeName, this.options);
+
+        if (fromKeep) {
+            return fromKeep;
+        }
+
+        const fromRemove = findRule(this.removeList, node, nodeName, this.options);
+
+        return fromRemove ?? this.defaultRule;
     }
 
     forEach(visit: (rule: Rule, index: number) => void): void {
@@ -73,9 +82,8 @@ export default class Rules {
     }
 }
 
-function isFilterMatch(rule: Rule, node: AnnotatedNode, options: Options): boolean {
+function isFilterMatch(rule: Rule, node: AnnotatedNode, nodeName: string, options: Options): boolean {
     const { filter } = rule;
-    const nodeName = node.nodeName.toLowerCase();
 
     if (typeof filter === "string") {
         return filter === nodeName;
@@ -92,6 +100,18 @@ function isFilterMatch(rule: Rule, node: AnnotatedNode, options: Options): boole
     throw new TypeError("`filter` needs to be a string, array, or function");
 }
 
-function findRule(rules: Rule[], node: AnnotatedNode, options: Options): Rule | undefined {
-    return rules.find((rule) => isFilterMatch(rule, node, options));
+function findRule(rules: Rule[], node: AnnotatedNode, nodeName: string, options: Options): Rule | undefined {
+    // A filter may add rules to this same list. Bounding the search by the length
+    // at the start keeps it to the rules that existed, as Array.find did.
+    const { length } = rules;
+
+    for (let index = 0; index < length; index += 1) {
+        const rule = rules[index];
+
+        if (rule && isFilterMatch(rule, node, nodeName, options)) {
+            return rule;
+        }
+    }
+
+    return undefined;
 }

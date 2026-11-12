@@ -1,5 +1,5 @@
 import type { AnnotatedNode, Options } from "./types";
-import { hasMeaningfulWhenBlank, hasVoid, isBlock, isMeaningfulWhenBlank, isVoid } from "./utilities";
+import { hasVoidOrMeaningfulDescendant, isBlock, isMeaningfulWhenBlank, isVoid } from "./utilities";
 
 const BLANK = /^\s*$/;
 const SPACE_CHAR = /\s/;
@@ -31,7 +31,54 @@ export default function annotateNode(node: Node, options: Options): AnnotatedNod
 }
 
 function isBlank(node: Node): boolean {
-    return !isVoid(node) && !isMeaningfulWhenBlank(node) && BLANK.test(node.textContent ?? "") && !hasVoid(node) && !hasMeaningfulWhenBlank(node);
+    return !isVoid(node) && !isMeaningfulWhenBlank(node) && hasBlankText(node) && !hasVoidOrMeaningfulDescendant(node);
+}
+
+/**
+ * True when the node's textContent is only whitespace. Checks the text pieces one at a
+ * time and stops at the first that has content, rather than building the whole string.
+ * A text or comment node's textContent is its own data.
+ */
+function hasBlankText(node: Node): boolean {
+    if (node.nodeType !== 1) {
+        return BLANK.test(node.textContent ?? "");
+    }
+
+    // A CDATA section counts toward textContent in some hosts and not in others
+    // (domino skips it). Those trees take the host's own textContent answer.
+    return hasOnlyBlankText(node) ?? BLANK.test(node.textContent ?? "");
+}
+
+/**
+ * Returns false at the first text piece with content, true when every piece is
+ * blank, and undefined when a CDATA section is reached before any content.
+ */
+function hasOnlyBlankText(parent: Node): boolean | undefined {
+    for (let child = parent.firstChild; child; child = child.nextSibling) {
+        const verdict = blankPieceVerdict(child);
+
+        if (verdict !== true) {
+            return verdict;
+        }
+    }
+
+    return true;
+}
+
+function blankPieceVerdict(node: Node): boolean | undefined {
+    if (node.nodeType === 3) {
+        return BLANK.test(node.nodeValue ?? "");
+    }
+
+    if (node.nodeType === 4) {
+        return undefined;
+    }
+
+    if (node.nodeType === 1) {
+        return hasOnlyBlankText(node);
+    }
+
+    return true;
 }
 
 function flankingWhitespace(node: AnnotatedNode, options: Options): { leading: string; trailing: string } {

@@ -69,14 +69,21 @@ export default function collapseWhitespace(options: CollapseOptions): void {
                 continue;
             }
 
-            characterData.data = text;
+            // Written only when changed: DOM setters do bookkeeping even for equal values.
+            if (characterData.data !== text) {
+                characterData.data = text;
+            }
 
             previousText = characterData;
         } else if (node.nodeType === 1) {
             // Node.ELEMENT_NODE
             if (isBlock(node) || node.nodeName === "BR") {
                 if (previousText) {
-                    previousText.data = previousText.data.replace(TRAILING_SPACE, "");
+                    const trimmed = previousText.data.replace(TRAILING_SPACE, "");
+
+                    if (trimmed !== previousText.data) {
+                        previousText.data = trimmed;
+                    }
                 }
 
                 previousText = null;
