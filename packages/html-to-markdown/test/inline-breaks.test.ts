@@ -225,6 +225,12 @@ describe("emphasis beside an anchor that prints plain text (Qodo)", () => {
         expect(convert("<em>x</em><a>y</a>")).toBe("*x*y");
     });
 
+    // Both emphasis elements read the anchor's text, on their left and right sides. Each run keeps its own
+    // intraword delimiter, so the two spans stay apart. The left-hand read is pinned here, not only the right-hand one.
+    it("keeps two emphasis spans apart around an anchor with no href", () => {
+        expect(convert("<em>a</em><a>Q</a><em>b</em>")).toBe("*a*Q*b*");
+    });
+
     it("reads the text of an unsafe link when safe links are on", () => {
         expect(convert("<em>x</em><a href=javascript:alert(1)>y</a>", { safeLinks: true })).toBe("*x*y");
     });
