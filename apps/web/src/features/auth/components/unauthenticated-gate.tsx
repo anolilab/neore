@@ -7,6 +7,7 @@ import AutoGuestSignIn from "@/features/auth/components/auto-guest-signin";
 import useSignInMethods from "@/features/auth/hooks/use-sign-in-methods";
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 import { adoptSessionTokenWhileShut } from "@/features/auth/lib/guest-session";
+import { useConnectionView } from "@/features/connection/hooks/use-connection";
 import getSessionToken from "@/lib/auth/server-functions";
 import { useLunora } from "@/lib/lunora/crpc";
 
@@ -32,6 +33,9 @@ const AdoptSession: FC<{ children: ReactNode }> = ({ children }) => {
     return children;
 };
 
+/** A session read that failed, as opposed to one the server answered: a 401 is "no session", not a failure. */
+const isUnanswered = (error: unknown): boolean => error != null && (error as { status?: unknown }).status !== 401;
+
 /**
  * What a route under `<Unauthenticated>` (the RPC client has no token) shows.
  *
@@ -40,14 +44,23 @@ const AdoptSession: FC<{ children: ReactNode }> = ({ children }) => {
  * `signedOut` instead. Until the backend has said which
  * (`useSignInMethods().inviteOnly`), and while the session read is pending,
  * `loading`, so no guest is made early and no signed-out page flashes over a
- * session that exists. A failed read with no session shows `signedOut`.
+ * session that exists. A failed read with no session shows `signedOut`, except
+ * while the connection is down: a read that failed offline is no answer, so it
+ * stays `loading` (the offline screen or the banner says why) and never shows
+ * the signed-out page, redirects to sign-in or makes a guest. An answered "no
+ * session" is still signed out, offline or not.
  */
 const UnauthenticatedGate: FC<{ loading: ReactNode; signedOut: ReactNode }> = ({ loading, signedOut }) => {
     const { inviteOnly } = useSignInMethods();
     const { hooks } = useAuth();
-    const { data: sessionData, isPending: isSessionPending } = hooks.useSession();
+    const { data: sessionData, error: sessionError, isPending: isSessionPending } = hooks.useSession();
+    const connectionView = useConnectionView();
 
     if (inviteOnly === undefined) {
+        return loading;
+    }
+
+    if (connectionView !== "online" && !sessionData?.user && isUnanswered(sessionError)) {
         return loading;
     }
 

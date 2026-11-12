@@ -51,6 +51,7 @@ const scripted = (...answers: (Error | (() => Response))[]) => {
 const noSleep = vi.fn(async (_ms: number) => {});
 
 afterEach(() => {
+    vi.unstubAllGlobals();
     noSleep.mockClear();
 });
 
@@ -90,6 +91,18 @@ describe(readWithRetry, () => {
 
         expect(response.status).toBe(200);
         expect(noSleep.mock.calls.map(([ms]) => ms)).toStrictEqual([100, 200]);
+    });
+
+    it("stops at the first network failure when the browser is offline, so the first paint does not wait out the backoff", async () => {
+        const { fetchImpl } = scripted(new TypeError("fetch failed"), signedIn);
+        vi.stubGlobal("navigator", { onLine: false });
+
+        await expect(readWithRetry(async () => await fetchImpl(SESSION_URL), { policy: POLICY, sleep: noSleep })).rejects.toBeInstanceOf(
+            SessionReadFailedError,
+        );
+
+        expect(fetchImpl).toHaveBeenCalledOnce();
+        expect(noSleep).not.toHaveBeenCalled();
     });
 
     it("caps a long server wait at the policy's ceiling", async () => {

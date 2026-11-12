@@ -259,6 +259,11 @@ const ComposerTiptapEditor = ({
         historyRecalledRef.current = isHistoryRecalled;
     }, [isVimEnabled, isHistoryRecalled]);
 
+    // The key handlers below read the latest props through this ref. tiptap copies an extension's options when the
+    // editor is built (`extension.options` is a fresh copy on every read), so assigning to them later changes nothing:
+    // Enter kept calling the first render's submit handler.
+    const keyHandlersRef = useRef({ isPopupOpen: false, isStreaming, onCancel, onHistoryNavigate, onSubmit });
+
     // Create editor
     const editor = useEditor({
         autofocus: autoFocus ? "end" : false,
@@ -292,13 +297,24 @@ const ComposerTiptapEditor = ({
                 placeholder: () => placeholderRef.current ?? "",
             }),
             // Before SubmitOnEnter: Escape restores a recalled prompt's draft first.
-            PromptHistoryKeys,
+            // eslint-disable-next-line react-hooks/refs -- tiptap calls these options from key events, never during render
+            PromptHistoryKeys.configure({
+                onNavigate: (direction: PromptHistoryDirection) => {
+                    const { isPopupOpen, onHistoryNavigate: navigate } = keyHandlersRef.current;
+
+                    return isPopupOpen || !navigate ? null : navigate(direction);
+                },
+            }),
+            // eslint-disable-next-line react-hooks/refs -- tiptap calls these options from key events, never during render
             SubmitOnEnter.configure({
-                isStreaming: () => isStreaming,
-                onCancel,
+                // Escape cancels only with a cancel handler to call; otherwise it is left to the page.
+                isStreaming: () => Boolean(keyHandlersRef.current.isStreaming && keyHandlersRef.current.onCancel),
+                onCancel: () => keyHandlersRef.current.onCancel?.(),
                 onSubmit: () => {
-                    // Initial handler - will be kept in sync via useEffect
-                    onSubmit();
+                    // A popup (slash command, file mention, variable) takes Enter for itself.
+                    if (!keyHandlersRef.current.isPopupOpen) {
+                        keyHandlersRef.current.onSubmit();
+                    }
                 },
             }),
             BannedWordDecoration,
@@ -449,39 +465,16 @@ const ComposerTiptapEditor = ({
         editor.commands.setBannedWordMatches(bannedWordMatches);
     }, [bannedWordMatches, editor]);
 
-    // Update submit/cancel handlers - guard against submitting when a popup is open
+    // Keep the key handlers current; Enter must never submit while a popup is open.
     useEffect(() => {
-        if (!editor) {
-            return;
-        }
-
-        for (const extension of editor.extensionManager.extensions) {
-            if (extension.name === "promptHistoryKeys") {
-                // eslint-disable-next-line react-hooks/immutability -- tiptap reads extension options at event time; reassigning them is its documented way to swap a handler without recreating the editor
-                extension.options.onNavigate = (direction: PromptHistoryDirection) => {
-                    if (slashMatch || fileMentionMatch || variableMatch || !onHistoryNavigate) {
-                        return null;
-                    }
-
-                    return onHistoryNavigate(direction);
-                };
-            }
-
-            if (extension.name !== "submitOnEnter") {
-                continue;
-            }
-
-            extension.options.onSubmit = () => {
-                if (slashMatch || fileMentionMatch || variableMatch) {
-                    return;
-                }
-
-                onSubmit();
-            };
-            extension.options.onCancel = onCancel;
-            extension.options.isStreaming = () => isStreaming;
-        }
-    }, [onSubmit, onCancel, onHistoryNavigate, isStreaming, slashMatch, fileMentionMatch, variableMatch, editor]);
+        keyHandlersRef.current = {
+            isPopupOpen: Boolean(slashMatch || fileMentionMatch || variableMatch),
+            isStreaming,
+            onCancel,
+            onHistoryNavigate,
+            onSubmit,
+        };
+    }, [onSubmit, onCancel, onHistoryNavigate, isStreaming, slashMatch, fileMentionMatch, variableMatch]);
 
     // ---- Ghost-text autocomplete -------------------------------------------
     const [ghostAnnouncement, setGhostAnnouncement] = useState("");

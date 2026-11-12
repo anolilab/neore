@@ -6,6 +6,8 @@
 import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { ConnectionContext } from "@/features/connection/hooks/use-connection";
+
 import UnauthenticatedGate from "./unauthenticated-gate";
 
 const harness = vi.hoisted(() => {
@@ -49,6 +51,8 @@ vi.mock("@/lib/lunora/crpc", () => {
 });
 
 const gate = () => <UnauthenticatedGate loading={<p>loading</p>} signedOut={<p>signed out</p>} />;
+
+const OFFLINE = { backOnline: false, banner: "offline", screen: "offline", view: "offline" } as const;
 
 describe("UnauthenticatedGate", () => {
     beforeEach(() => {
@@ -106,6 +110,34 @@ describe("UnauthenticatedGate", () => {
         harness.session = { data: undefined as never, error: new Error("429"), isPending: false };
 
         render(gate());
+
+        expect(screen.getByText("signed out")).toBeTruthy();
+    });
+
+    it("never shows the signed-out page (and its sign-in redirect) for a session read that failed offline", () => {
+        harness.inviteOnly = true;
+        harness.session = { data: null, error: { status: 503 }, isPending: false };
+
+        render(<ConnectionContext value={OFFLINE}>{gate()}</ConnectionContext>);
+
+        expect(screen.getByText("loading")).toBeTruthy();
+        expect(screen.queryByText("signed out")).toBeNull();
+    });
+
+    it("makes no guest session for a read that failed offline, even with registration open", () => {
+        harness.inviteOnly = false;
+        harness.session = { data: null, error: { status: 503 }, isPending: false };
+
+        render(<ConnectionContext value={OFFLINE}>{gate()}</ConnectionContext>);
+
+        expect(screen.getByText("loading")).toBeTruthy();
+        expect(screen.queryByText("guest sign-in")).toBeNull();
+    });
+
+    it("still shows the signed-out page offline when the server had answered there is no session", () => {
+        harness.inviteOnly = true;
+
+        render(<ConnectionContext value={OFFLINE}>{gate()}</ConnectionContext>);
 
         expect(screen.getByText("signed out")).toBeTruthy();
     });

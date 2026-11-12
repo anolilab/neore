@@ -32,6 +32,7 @@ import AuthUIProviderTanstack from "@/features/auth/lib/tanstack/auth-ui-provide
 import { closeSidePanelForSessionSwitch } from "@/features/chat/core/stores/chat-ui-store";
 import { clearComposerDrafts } from "@/features/chat/split/composer-drafts";
 import ConnectionProvider from "@/features/connection/components/connection-provider";
+import OfflineBanner from "@/features/connection/components/offline-banner";
 import { useUIStateStore } from "@/features/layout/stores/ui-state-store";
 import type { SettingsTab } from "@/features/settings/lib/settings-navigation";
 import usePostHogIdentity from "@/hooks/use-posthog-identity";
@@ -488,6 +489,8 @@ const RootComponent = () => {
                                                                 <OfflineScreen />
                                                             </Suspense>
                                                         )}
+                                                        {/* Above every layout and its auth gates: the app stays on screen while offline. */}
+                                                        <OfflineBanner />
                                                         <ScreenSizeDebug />
                                                         <Outlet />
                                                     </ConnectionProvider>

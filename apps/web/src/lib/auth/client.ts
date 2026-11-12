@@ -97,6 +97,15 @@ const sessionAtom = authClient.$store.atoms.session as SessionAtomLike | undefin
 
 if (globalThis.window !== undefined && sessionAtom) {
     keepRetryingFailedSessionReads(sessionAtom);
+
+    // A read made offline fails at once (`readWithRetry`); re-read as soon as the network is back rather than at the next backoff step.
+    globalThis.addEventListener("online", () => {
+        const { error, refetch } = sessionAtom.get();
+
+        if (error) {
+            void Promise.resolve(refetch?.()).catch(() => undefined);
+        }
+    });
 }
 
 export type AuthClient = typeof authClient;

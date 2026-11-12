@@ -58,6 +58,7 @@ import { onComposerAttachRequest, onComposerSubmitRequest } from "@/features/cha
 import ComposerPromptImprovementButton from "@/features/chat/prompt-improvement/components/composer-prompt-improvement-button";
 import AutoReadReplies from "@/features/chat/voice-mode/auto-read-replies";
 import VoiceModeButton from "@/features/chat/voice-mode/voice-mode-button";
+import { useConnectionView } from "@/features/connection/hooks/use-connection";
 import { useUserPreferences } from "@/features/layout/hooks/use-ui-state";
 import { useUIStateStore } from "@/features/layout/stores/ui-state-store";
 import { trackEvent } from "@/lib/analytics";
@@ -550,6 +551,8 @@ const ComposerInput = ({
     // The comparison parent fans out through `onSubmitOverride`, and the compact
     // landing bar has no thread to recall from or queue against.
     const isThreadComposer = !onSubmitOverride && !compact && Boolean(threadId);
+    // Sending needs the server; offline the draft stays where it is, and the send says why instead of hanging.
+    const connectionView = useConnectionView();
 
     const getComposerText = useCallback(() => useChatUIStore.getState().composerText, []);
     const promptHistory = usePromptHistory(getComposerText);
@@ -992,6 +995,12 @@ const ComposerInput = ({
             return;
         }
 
+        if (connectionView !== "online") {
+            showInfo(t`You are offline. Your message stays here; send it once you are back online.`, { id: "composer-offline-send" });
+
+            return;
+        }
+
         promptHistory.reset();
         clear();
 
@@ -1019,7 +1028,7 @@ const ComposerInput = ({
             .then(() => settleSteer(threadId, steerId, "accepted"))
             .catch((error: unknown) => settleSteer(threadId, steerId, wasRefused(error) ? "refused" : "accepted"))
             .finally(() => clearTimeout(unanswered));
-    }, [canSteer, cancelStream, clear, disabled, followUp, promptHistory, sseStreamState, steerRun, text, threadId]);
+    }, [canSteer, cancelStream, clear, connectionView, disabled, followUp, promptHistory, sseStreamState, steerRun, t, text, threadId]);
 
     // Handle submit — fully synchronous, fire-and-forget network call.
     // Optimistic state (user message + Thinking...) is shown immediately inside
@@ -1048,6 +1057,12 @@ const ComposerInput = ({
         const pendingAttachments = draftAttachments.filter((a) => a.status !== "complete");
 
         if (pendingAttachments.length > 0) {
+            return;
+        }
+
+        if (connectionView !== "online") {
+            showInfo(t`You are offline. Your message stays here; send it once you are back online.`, { id: "composer-offline-send" });
+
             return;
         }
 
@@ -1138,6 +1153,8 @@ const ComposerInput = ({
 
         onSubmitProp?.();
     }, [
+        connectionView,
+        t,
         disabled,
         mustSignIn,
         sendMessage,

@@ -135,7 +135,16 @@ export const retryDelayMs = (policy: SessionReadRetryPolicy, retry: number, serv
     return Math.min(serverAskMs ?? backoff, policy.maxDelayMs);
 };
 
+/**
+ * The browser says it has no network. Nothing a retry could reach, so a failed read stops at once
+ * instead of holding the first paint for the whole backoff; the session is re-read once it is back
+ * (`lib/auth/client.ts`). Never true where `navigator.onLine` does not exist (the server, React Native).
+ */
+const isBrowserOffline = (): boolean => (globalThis as { navigator?: { onLine?: boolean } }).navigator?.onLine === false;
+
 export interface ReadWithRetryOptions {
+    /** Whether the device is known to be offline; a network failure then ends the retries. */
+    isOffline?: () => boolean;
     policy: SessionReadRetryPolicy;
     /** The caller's abort: stops the retries, rejecting with its reason. */
     signal?: AbortSignal | null;
@@ -149,7 +158,10 @@ export interface ReadWithRetryOptions {
  * 401). Rejects with `SessionReadFailedError` when every attempt failed — the
  * caller decides what a failure means, but it is never an empty session.
  */
-export const readWithRetry = async (read: () => Promise<Response>, { policy, signal, sleep = defaultSleep }: ReadWithRetryOptions): Promise<Response> => {
+export const readWithRetry = async (
+    read: () => Promise<Response>,
+    { isOffline = isBrowserOffline, policy, signal, sleep = defaultSleep }: ReadWithRetryOptions,
+): Promise<Response> => {
     let lastFailure: SessionReadFailedError | undefined;
 
     for (let attempt = 0; attempt < policy.attempts; attempt += 1) {
@@ -177,6 +189,10 @@ export const readWithRetry = async (read: () => Promise<Response>, { policy, sig
             }
 
             lastFailure = new SessionReadFailedError(undefined, error);
+
+            if (isOffline()) {
+                throw lastFailure;
+            }
         }
 
         if (attempt < policy.attempts - 1) {
