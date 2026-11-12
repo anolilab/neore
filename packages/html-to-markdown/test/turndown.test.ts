@@ -10,6 +10,8 @@ const INVALID_INPUT_MESSAGE = /is not a string, or an element\/document\/fragmen
 
 const CDATA_SECTION_NODE = 4;
 
+const BLANK_TEXT = /^\s*$/;
+
 /**
  * Appends a CDATA section to an element. Domino has no CDATA node and never
  * yields one from HTML, so this text node is retyped to CDATA_SECTION_NODE, the
@@ -204,6 +206,16 @@ describe("input that contains the wrapper's closing tag", () => {
     });
 });
 
+describe("unclosed raw-text elements in string input", () => {
+    it("does not write the wrapper's closing tag into an unclosed textarea", () => {
+        expect(new TurndownService().turndown("<textarea>hello")).toBe("hello");
+    });
+
+    it("does not write the wrapper's closing tag into an unclosed plaintext element", () => {
+        expect(new TurndownService().turndown("<plaintext>hello")).toBe("hello");
+    });
+});
+
 describe("CDATA sections in DOM input", () => {
     it("converts the text of a CDATA section in a paragraph", () => {
         const htmlDocument = createDocument("<p>before </p>");
@@ -229,5 +241,28 @@ describe("CDATA sections in DOM input", () => {
 
         expect(service.turndown(withCdata)).toBe(service.turndown(withText));
         expect(service.turndown(withCdata)).toBe("`a *b* & c`");
+    });
+
+    it("blanks a code element holding only a CDATA section exactly when its textContent is blank", () => {
+        const code = createDocument("<p><code></code></p>").querySelector("code") as Element;
+
+        appendCdataSection(code, "*b* & c");
+
+        // Domino's textContent skips CDATA, so this reads blank there; a browser's does not.
+        const expected = BLANK_TEXT.test(code.textContent ?? "") ? "" : "`*b* & c`";
+
+        expect(new TurndownService().turndown(code.parentElement as Element)).toBe(expected);
+    });
+
+    it("blanks a paragraph holding only a CDATA section exactly when its textContent is blank", () => {
+        // The paragraph is a child, so its blankness decides the rule it takes.
+        const container = createDocument("<div><p></p></div>").querySelector("div") as Element;
+        const paragraph = container.querySelector("p") as Element;
+
+        appendCdataSection(paragraph, "text");
+
+        const expected = BLANK_TEXT.test(paragraph.textContent ?? "") ? "" : "text";
+
+        expect(new TurndownService().turndown(container)).toBe(expected);
     });
 });
