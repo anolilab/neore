@@ -41,6 +41,7 @@ export function lineBreakMarker(br: string): string {
 
 const BLANK_TEXT = /^\s*$/;
 const WHITESPACE = /\s/;
+const NEWLINE_RUN = /(\n+)/;
 
 /**
  * Trims the whitespace at both ends of an element's content, as `trim` does, and
@@ -182,10 +183,18 @@ function trimSpaces(text: string): string {
  * Replaces each break marker with a space, for text that must stay on one line.
  * A marker followed by a newline sits next to a block, so it becomes a newline
  * and the block separator keeps its newlines. Spaces next to a marker are trimmed.
+ *
+ * With an empty `br` the marker is a bare newline, which a block separator also
+ * uses. When the content holds blocks, only a single newline is a break; a run of
+ * two or more newlines is a block separator and stays.
  */
-export function flattenBreaks(content: string, marker: string): string {
+export function flattenBreaks(content: string, marker: string, hasBlocks = false): string {
     if (!marker || !content.includes(marker)) {
         return content;
+    }
+
+    if (hasBlocks && marker === "\n") {
+        return flattenSingleNewlines(content);
     }
 
     const [first = "", ...parts] = content.split(marker);
@@ -198,6 +207,43 @@ export function flattenBreaks(content: string, marker: string): string {
     }
 
     return trimSpaces(text);
+}
+
+/** Flattens each single newline to a space and keeps each run of two or more newlines. */
+function flattenSingleNewlines(content: string): string {
+    // Splitting on a capturing group puts each newline run at an odd index.
+    const pieces = content.split(NEWLINE_RUN);
+    let text = "";
+
+    pieces.forEach((piece, index) => {
+        if (index % 2 === 1) {
+            text = trimTrailingSpaces(text) + (piece.length === 1 ? " " : piece);
+        } else {
+            text += index === 0 ? piece : trimLeadingSpaces(piece);
+        }
+    });
+
+    return trimSpaces(text);
+}
+
+function trimTrailingSpaces(text: string): string {
+    let end = text.length;
+
+    while (end > 0 && text[end - 1] === " ") {
+        end -= 1;
+    }
+
+    return text.slice(0, end);
+}
+
+function trimLeadingSpaces(text: string): string {
+    let start = 0;
+
+    while (start < text.length && text[start] === " ") {
+        start += 1;
+    }
+
+    return text.slice(start);
 }
 
 /**

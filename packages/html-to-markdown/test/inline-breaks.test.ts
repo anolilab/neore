@@ -233,3 +233,13 @@ describe("emphasis beside an anchor that prints plain text (Qodo)", () => {
         expect(convert("<em>x</em><a href=/u>y</a>")).toBe("_x_[y](/u)");
     });
 });
+
+describe("headings keep the block separators when the break marker is empty (Qodo)", () => {
+    it("flattens a break in a heading but keeps the paragraph breaks around a block", () => {
+        expect(convert("<h2>a<p>b</p>c<br>d</h2>", { br: "" })).toBe("a\n\nb\n\nc d\n---------");
+    });
+
+    it("still flattens every break in a heading with no block", () => {
+        expect(convert("<h1>a<br><br>b</h1>", { br: "" })).toBe("a b\n===");
+    });
+});
