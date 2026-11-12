@@ -62,7 +62,8 @@ const PICTOGRAPHIC = /\p{Extended_Pictographic}/u;
 const EMOJI_ONLY = /^[\p{Extended_Pictographic}\p{Emoji_Component}\s]+$/u;
 const MATH_CLASS = /math/i;
 const WORD_LIST_LEVEL = /mso-list\s*:[^;]{0,200}level(\d)/i;
-const WORD_ORDERED_MARKER = /^\s*\w{1,4}[.)]/;
+// Up to nine characters: a list numbered past 9999 keeps its numbers (still bounded, it runs on one marker's text).
+const WORD_ORDERED_MARKER = /^\s*\w{1,9}[.)]/;
 const IMPORTANT = /!\s{0,20}important\s{0,20}$/i;
 const HEADING = /^H[1-6]$/;
 const BLANK_LINES = /\n{3,}/g;
@@ -151,21 +152,35 @@ const isHidden = (element: Element): boolean =>
 
 /** The text of code as shown, whitespace kept: no hidden parts, and a line per `<br>` and per line block. */
 const codeText = (node: Node): string => {
-    let text = "";
+    // Parts joined once, with the last character tracked: `endsWith` on a string built by `+=` flattens all of it on each
+    // call, which made a `<pre>` of many line elements quadratic.
+    const parts: string[] = [];
+    let endsWithNewline = false;
+    const push = (part: string): void => {
+        if (part === "") {
+            return;
+        }
+
+        parts.push(part);
+        endsWithNewline = part.endsWith("\n");
+    };
 
     for (const child of node.childNodes) {
         if (child.nodeType === Node.TEXT_NODE) {
-            text += (child.nodeValue ?? "").replaceAll("\0", "");
+            push((child.nodeValue ?? "").replaceAll("\0", ""));
         } else if (child.nodeType === Node.ELEMENT_NODE && !isHidden(child as Element)) {
             const { tagName } = child as Element;
             const inner = tagName === "BR" ? "\n" : codeText(child);
-            const onNewLine = (BLOCKS.has(tagName) || LINE_BLOCKS.has(tagName)) && text !== "" && !text.endsWith("\n");
 
-            text += onNewLine ? `\n${inner}` : inner;
+            if ((BLOCKS.has(tagName) || LINE_BLOCKS.has(tagName)) && parts.length > 0 && !endsWithNewline) {
+                push("\n");
+            }
+
+            push(inner);
         }
     }
 
-    return text;
+    return parts.join("");
 };
 
 /** `**`, `*` or `~~` around inline content, with its outer spaces kept outside; nothing around content that spans lines. */

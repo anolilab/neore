@@ -58,6 +58,20 @@ describe("composer paste", () => {
         expect(htmlToMarkdown(`<p>Steps</p><div style="display:none">${item(1, "secret")}</div>${item(3, "a")}`)).toBe("Steps\n\n- a");
     });
 
+    it("keeps the number of a Word list item numbered past 9999", () => {
+        expect(htmlToMarkdown(`<p style="mso-list:l0 level1 lfo1"><span style="mso-list:Ignore">10000.</span>ten thousand</p>`)).toBe("10000. ten thousand");
+    });
+
+    it("converts a code block of many line elements in linear time", () => {
+        // 30,000 lines: about 0.8 s here, against about 4 s when each line re-read the text built so far.
+        const html = `<pre>${"<div>let a = 1;</div>".repeat(30_000)}</pre>`;
+        const started = performance.now();
+        const markdown = htmlToMarkdown(html);
+
+        expect(markdown.split("\n").filter((line) => line === "let a = 1;")).toHaveLength(30_000);
+        expect(performance.now() - started).toBeLessThan(3000);
+    });
+
     it("takes a Word item's number only from a marker it shows", () => {
         const hiddenMarker = '<span style="display:none"><span style="mso-list:Ignore">9.</span></span>';
 
