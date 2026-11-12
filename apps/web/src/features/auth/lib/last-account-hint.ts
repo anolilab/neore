@@ -8,6 +8,8 @@
  * expiry, revocation) and when sign-out starts. Every storage access is guarded: a blocked store reads as "no hint".
  */
 
+import type { SessionAuthStatus } from "@neore/client-runtime";
+
 const STORAGE_KEY = "neore-last-account";
 
 const listeners = new Set<() => void>();
@@ -59,6 +61,13 @@ export const clearLastAccountHint = (): void => {
         // Nothing stored that could be read either.
     }
 };
+
+/**
+ * Whether the chat layout paints as signed in before Lunora's identity probe answers: the server read a session, or
+ * the last account is remembered and the server has not ANSWERED "no session" (`unknown` is a failed read).
+ */
+export const startsSignedIn = (serverAuthStatus: SessionAuthStatus | undefined, hasHint: boolean): boolean =>
+    serverAuthStatus === "authenticated" || (hasHint && serverAuthStatus !== "unauthenticated");
 
 /** For `useSyncExternalStore`; other tabs' writes arrive through the `storage` event. */
 export const subscribeLastAccountHint = (listener: () => void): (() => void) => {

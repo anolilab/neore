@@ -35,10 +35,12 @@ const AuthUIProviderTanstack = ({
             ...merged,
             setActiveSession: async (...parameters: Parameters<typeof setActiveSession>) => {
                 onSessionSwitch?.("before");
-                // The account being left is no longer "the last one signed in"; the new one writes it when confirmed.
-                clearLastAccountHint();
 
                 const result = await setActiveSession(...parameters);
+
+                // Only once the switch went through: the account left is no longer "the last one signed in", and the
+                // new one writes it when confirmed. A failed switch keeps it, since that account is still signed in.
+                clearLastAccountHint();
 
                 onSessionSwitch?.("after");
 

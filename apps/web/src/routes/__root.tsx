@@ -10,6 +10,7 @@ import geistLatinFont from "@fontsource-variable/geist/files/geist-latin-wght-no
 import { msg } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { useAuth } from "@lunora/react";
+import type { SessionAuthStatus } from "@neore/client-runtime";
 import { seedHydratedAuthToken, TOKEN_RETRY_DELAY_MS, tokenRefreshDelayMs } from "@neore/client-runtime";
 import { IconSpriteSheet } from "@neore/ui/components/ai-elements/provider-icon";
 import { CSPProvider } from "@neore/ui/components/csp-provider";
@@ -27,7 +28,7 @@ import { ACCENT_BOOT_SCRIPT } from "@/features/appearance/lib/accent-boot-script
 import { CHAT_TEXT_SIZE_BOOT_SCRIPT } from "@/features/appearance/lib/chat-text-size";
 import LoginPromptHost from "@/features/auth/components/auth/login-prompt-host";
 import { AuthQueryProvider } from "@/features/auth/lib/auth-query-provider";
-import { clearLastAccountHint, hasLastAccountHint, writeLastAccountHint } from "@/features/auth/lib/last-account-hint";
+import { clearLastAccountHint, hasLastAccountHint, startsSignedIn, writeLastAccountHint } from "@/features/auth/lib/last-account-hint";
 import AuthUIProviderTanstack from "@/features/auth/lib/tanstack/auth-ui-provider-tanstack";
 import { closeSidePanelForSessionSwitch } from "@/features/chat/core/stores/chat-ui-store";
 import { clearComposerDrafts } from "@/features/chat/split/composer-drafts";
@@ -157,7 +158,7 @@ const CONSENT_MODE = env.VITE_C15T_MODE === "c15t" && env.VITE_C15T_BACKEND_URL 
  * 4. Session is refreshed
  * Must be rendered inside CRPCProvider / LunoraProvider.
  */
-const AuthRecovery = ({ children, startedSignedIn }: { children: ReactNode; startedSignedIn: boolean }) => {
+const AuthRecovery = ({ children, serverAuthStatus }: { children: ReactNode; serverAuthStatus: SessionAuthStatus | undefined }) => {
     const { isLoading, isAuthenticated } = useLunoraAuth();
     // Whether the RPC client actually holds a token. NOT the same as
     // `isAuthenticated`: Lunora's identity probe answers from the session
@@ -272,7 +273,7 @@ const AuthRecovery = ({ children, startedSignedIn }: { children: ReactNode; star
         if (wasAuthenticated === null && !isAuthenticated) {
             // The chat layout may have painted optimistically (`OptimisticAuthGate`) with what the server sent
             // for a session that is now gone: drop it all, as for a sign-out.
-            if (startedSignedIn || hasLastAccountHint()) {
+            if (startsSignedIn(serverAuthStatus, hasLastAccountHint())) {
                 clearEndedSession();
             } else {
                 void setNativeBadge(0);
@@ -308,7 +309,7 @@ const AuthRecovery = ({ children, startedSignedIn }: { children: ReactNode; star
 
         previousAuthStateRef.current = isAuthenticated;
         previousIsAnonymousRef.current = userIsAnonymous;
-    }, [isLoading, isAuthenticated, userIsAnonymous, queryClient, startedSignedIn]);
+    }, [isLoading, isAuthenticated, userIsAnonymous, queryClient, serverAuthStatus]);
 
     // The last confirmed account, so the next start paints the chat layout before the identity probe answers
     // (`OptimisticAuthGate`). Another account confirmed here replaces it.
@@ -480,7 +481,7 @@ const RootComponent = () => {
                     <DirectionProvider direction={direction}>
                         <QueryClientProvider client={context.queryClient}>
                             <CRPCProvider client={context.lunoraClient} queryClient={context.queryClient}>
-                                <AuthRecovery startedSignedIn={context.authStatus === "authenticated"}>
+                                <AuthRecovery serverAuthStatus={context.authStatus}>
                                     <AuthQueryProvider>
                                         <AuthUIProviderTanstack
                                             apiKey={API_KEY_CONFIG}

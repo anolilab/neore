@@ -5,7 +5,7 @@ import type { SessionAuthStatus } from "@neore/client-runtime";
 import type { FC, ReactNode } from "react";
 import { useSyncExternalStore } from "react";
 
-import { hasLastAccountHint, subscribeLastAccountHint } from "@/features/auth/lib/last-account-hint";
+import { hasLastAccountHint, startsSignedIn, subscribeLastAccountHint } from "@/features/auth/lib/last-account-hint";
 
 const noHintOnServer = (): boolean => false;
 
@@ -41,7 +41,7 @@ const OptimisticAuthGate: FC<{
         return unauthenticated;
     }
 
-    if (serverAuthStatus === "authenticated" || (hasHint && serverAuthStatus !== "unauthenticated")) {
+    if (startsSignedIn(serverAuthStatus, hasHint)) {
         return authenticated;
     }
 
