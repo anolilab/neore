@@ -69,7 +69,9 @@ const BLOCK_OPENERS: ReadonlyArray<RegExp> = [
     /[*+-](?=[ \t\n]|$)/y,
     /-+(?=[ \t]*(?:\n|$))/y,
     /=+(?=[ \t]*(?:\n|$))/y,
-    /([*_-])(?:[ \t]*\1){2}/y,
+    // A thematic break is three or more markers and nothing else on the line. Text that starts with
+    // three markers, such as emphasis around a word, is not one.
+    /([*_-])(?:[ \t]*\1){2}[ \t]*(?=\n|$)/y,
     /1[.)](?=[ \t\n]|$)/y,
     HTML_BLOCK_START,
 ];

@@ -265,3 +265,13 @@ describe("review: indented lines after a hard break in link text", () => {
         expect(indentedSpan("   ").turndown(`<a href="/x">one<br><span>x</span></a>`)).not.toContain("one  \n");
     });
 });
+
+describe("review: formatted text after a hard break in link text", () => {
+    it("keeps a hard break before text that starts with three emphasis markers, which is not a thematic break", () => {
+        expect(convert(`<a href="/x">one<br><strong><em>text</em></strong></a>`, { emDelimiter: "*" })).toBe("[one  \n***text***](/x)");
+    });
+
+    it("guard, passes before and after: a hard break before a real thematic break is still replaced", () => {
+        expect(convert(`<a href="/x">one<br><hr>two</a>`)).not.toContain("one  \n");
+    });
+});
