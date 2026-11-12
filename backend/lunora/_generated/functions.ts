@@ -4161,7 +4161,7 @@ export interface Caller {
             };
         };
         start_claim: {
-            claimChatStart: (args: { clientMessageId: string; fingerprint: string; streams: boolean; userId: string }) => Promise<{ claim: { claimedAt: number; key: string }; outcome: "claimed" } | { outcome: "in_progress" } | { outcome: "mismatch" } | { messageId: string; outcome: "duplicate"; streamId?: string; streamUnclaimed?: boolean; threadId: string } | { claim: { claimedAt: number; key: string }; messageId: string; newThread?: boolean; outcome: "resume"; threadId: string }>;
+            claimChatStart: (args: { clientMessageId: string; fingerprint: string; streams: boolean; userId: string }) => Promise<{ claim: { claimedAt: number; key: string }; outcome: "claimed" } | { outcome: "in_progress" } | { outcome: "mismatch" } | { messageId: string; model?: string; outcome: "duplicate"; streamId?: string; streamUnclaimed?: boolean; threadId: string } | { claim: { claimedAt: number; key: string }; messageId: string; model?: string; newThread?: boolean; outcome: "resume"; threadId: string }>;
             releaseChatStart: (args: { claim: { claimedAt: number; key: string } }) => Promise<null>;
             saveStartPrompt: (args: { claim: { claimedAt: number; key: string }; fileIds?: Array<string>; messageContent: Array<Record<string, unknown>>; model: string; parentId?: string; threadId: string }) => Promise<{ messageId: string }>;
         };

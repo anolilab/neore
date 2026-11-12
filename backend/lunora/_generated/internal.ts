@@ -502,7 +502,7 @@ export interface InternalApiTypes {
             };
         };
         start_claim: {
-            claimChatStart: FunctionReference<"mutation", { clientMessageId: string; fingerprint: string; streams: boolean; userId: string }, { claim: { claimedAt: number; key: string }; outcome: "claimed" } | { outcome: "in_progress" } | { outcome: "mismatch" } | { messageId: string; outcome: "duplicate"; streamId?: string; streamUnclaimed?: boolean; threadId: string } | { claim: { claimedAt: number; key: string }; messageId: string; newThread?: boolean; outcome: "resume"; threadId: string }>;
+            claimChatStart: FunctionReference<"mutation", { clientMessageId: string; fingerprint: string; streams: boolean; userId: string }, { claim: { claimedAt: number; key: string }; outcome: "claimed" } | { outcome: "in_progress" } | { outcome: "mismatch" } | { messageId: string; model?: string; outcome: "duplicate"; streamId?: string; streamUnclaimed?: boolean; threadId: string } | { claim: { claimedAt: number; key: string }; messageId: string; model?: string; newThread?: boolean; outcome: "resume"; threadId: string }>;
             releaseChatStart: FunctionReference<"mutation", { claim: { claimedAt: number; key: string } }, null>;
             saveStartPrompt: FunctionReference<"mutation", { claim: { claimedAt: number; key: string }; fileIds?: Array<string>; messageContent: Array<Record<string, unknown>>; model: string; parentId?: string; threadId: string }, { messageId: string }>;
         };

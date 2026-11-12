@@ -111,6 +111,8 @@ interface StartRecord {
     /** The goal the send started: a resumed send runs it, and starts no second one. */
     goalId?: string;
     messageId?: string;
+    /** The model the prompt was saved with: a resend runs on it, whatever the thread's agent resolves to by then. */
+    model?: string;
     /** The save created the thread: a resumed send schedules a new chat's title jobs. */
     newThread?: boolean;
     streamId?: string;
@@ -126,6 +128,7 @@ const vClaimOutcome = v.union(
     v.object({ outcome: v.literal("mismatch") }),
     v.object({
         messageId: v.string(),
+        model: v.optional(v.string()),
         outcome: v.literal("duplicate"),
         streamId: v.optional(v.string()),
         /** The stream has no run yet (its queue submission may have failed): the caller queues it again, which a run claims once. */
@@ -136,6 +139,7 @@ const vClaimOutcome = v.union(
     v.object({
         claim: vStartClaim,
         messageId: v.string(),
+        model: v.optional(v.string()),
         newThread: v.optional(v.boolean()),
         outcome: v.literal("resume"),
         threadId: v.string(),
@@ -175,10 +179,11 @@ export const claimChatStart = internalMutation
         }
 
         if (isSaved(record) && (!streams || record.streamId !== undefined)) {
-            const { messageId, streamId, threadId } = record;
+            const { messageId, model, streamId, threadId } = record;
 
             return {
                 messageId,
+                ...(model !== undefined && { model }),
                 outcome: "duplicate" as const,
                 ...(streamId !== undefined && { streamId, ...((await streamUnclaimed(ctx, streamId)) && { streamUnclaimed: true }) }),
                 threadId,
@@ -190,12 +195,14 @@ export const claimChatStart = internalMutation
         }
 
         if (existing && isSaved(record)) {
-            // A new fence: the dead sender's goal or stream, if it ever comes, finds the claim moved and refuses.
-            await patchRow(ctx.db, "idempotencyClaims", existing, { claimedAt: ctx.now });
+            // A new fence: the dead sender's goal or stream, if it ever comes, finds the claim moved and refuses. A new day
+            // with it, so a takeover late in the first one still finds its claim when it makes the goal and the stream.
+            await patchRow(ctx.db, "idempotencyClaims", existing, { claimedAt: ctx.now, expiresAt: ctx.now + CHAT_START_CLAIM_TTL_MS });
 
             return {
                 claim: { claimedAt: ctx.now, key },
                 messageId: record.messageId,
+                ...(record.model !== undefined && { model: record.model }),
                 ...(record.newThread === true && { newThread: true }),
                 outcome: "resume" as const,
                 threadId: record.threadId,
@@ -258,7 +265,7 @@ export const assertStartClaimHeld = async (ctx: Pick<MutationCtx, "db">, claim: 
 export const recordStartSaved = async (
     ctx: Pick<MutationCtx, "db">,
     claim: StartClaim,
-    saved: { messageId: string; newThread?: boolean; threadId: string },
+    saved: { messageId: string; model: string; newThread?: boolean; threadId: string },
 ): Promise<void> => {
     const { existing, record } = await heldClaim(ctx, claim);
 
@@ -333,7 +340,7 @@ export const saveStartPrompt = internalMutation
             threadId,
         });
 
-        await recordStartSaved(ctx, claim, { messageId, threadId });
+        await recordStartSaved(ctx, claim, { messageId, model, threadId });
 
         return { messageId };
     });

@@ -718,7 +718,7 @@ export const createThreadWithInitialMessage = internalMutation
             });
 
             if (startClaim) {
-                await recordStartSaved(context, startClaim, { messageId, newThread: true, threadId });
+                await recordStartSaved(context, startClaim, { messageId, model, newThread: true, threadId });
             }
 
             return { messageId, threadId };

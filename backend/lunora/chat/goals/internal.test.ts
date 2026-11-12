@@ -170,7 +170,7 @@ describe("startGoal", () => {
             const send = { clientMessageId: "goal-send", fingerprint: "f", streams: true, userId: OWNER };
             const dead = await run(claimChatStart, send);
 
-            await harness.run(async (ctx: any) => await recordStartSaved(ctx, dead.claim, { messageId: promptId, threadId }));
+            await harness.run(async (ctx: any) => await recordStartSaved(ctx, dead.claim, { messageId: promptId, model: "m", threadId }));
             vi.setSystemTime(Date.now() + CHAT_START_LEASE_MS);
 
             const retry = await run(claimChatStart, send);
@@ -194,7 +194,7 @@ describe("startGoal", () => {
             const send = { clientMessageId: "stopped-goal", fingerprint: "f", streams: true, userId: OWNER };
             const first = await run(claimChatStart, send);
 
-            await harness.run(async (ctx: any) => await recordStartSaved(ctx, first.claim, { messageId: promptId, threadId }));
+            await harness.run(async (ctx: any) => await recordStartSaved(ctx, first.claim, { messageId: promptId, model: "m", threadId }));
 
             const goalId = await start({ startClaim: first.claim });
 

@@ -21,13 +21,19 @@ export const stopGoalRow = async (ctx: GoalCtx, goal: Doc<"threadGoals">, reason
 };
 
 /**
- * Ends every active goal of the thread. Returns whether one was ended. Plain function:
- * the stop mutation, `startGoal` and the run-failure path call it inside their own
+ * Ends every active goal of the thread, or with `startedBefore` only those created before it. Returns whether one was
+ * ended. Plain function: the stop mutation, `startGoal` and the run-failure path call it inside their own
  * transaction. A goal ended here never reviews or continues: the review job and
  * `recordGoalVerdict` both check the status.
  */
-export const endActiveGoals = async (ctx: GoalCtx, threadId: Id<"threads">, reason: GoalStopReason): Promise<boolean> => {
-    const goals = await activeGoalsOf(ctx, threadId);
+export const endActiveGoals = async (
+    ctx: GoalCtx,
+    threadId: Id<"threads">,
+    reason: GoalStopReason,
+    { startedBefore }: { startedBefore?: number } = {},
+): Promise<boolean> => {
+    const active = await activeGoalsOf(ctx, threadId);
+    const goals = startedBefore === undefined ? active : active.filter((goal) => goal.createdAt < startedBefore);
 
     for (const goal of goals) {
         await stopGoalRow(ctx, goal, reason);

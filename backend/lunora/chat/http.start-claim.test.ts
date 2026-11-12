@@ -13,11 +13,21 @@ import { createThreadWithInitialMessage, gateThreadActionHandler } from "./funct
 import { startGoal } from "./goals/internal";
 import { runChatStart } from "./http";
 import { enqueueJob } from "../lib/job-queue";
-import { CHAT_START_LEASE_MS, CHAT_START_SCOPE, chatStartFingerprint, claimChatStart, releaseChatStart, saveStartPrompt } from "./start-claim";
+import {
+    CHAT_START_CLAIM_TTL_MS,
+    CHAT_START_LEASE_MS,
+    CHAT_START_SCOPE,
+    chatStartFingerprint,
+    claimChatStart,
+    releaseChatStart,
+    saveStartPrompt,
+} from "./start-claim";
 import { createStreamWithMessage } from "./streaming";
 
 const state = vi.hoisted(() => {
     return {
+        /** What the thread's agent switch resolves the run's model to (`getRunAgentModel`), when the thread was switched. */
+        agentModel: null as string | null,
         charges: 0,
         /** The next queue submission fails, once. */
         enqueueFails: false,
@@ -25,6 +35,8 @@ const state = vi.hoisted(() => {
         legacySaves: 0,
         /** The references the HTTP scheduler was handed. */
         scheduled: [] as string[],
+        /** How long the stream creation takes: the clock moves on by this before it runs. */
+        streamDelayMs: 0,
         /** The next stream creation fails, once. */
         streamFails: false,
         userId: "owner-user",
@@ -136,6 +148,7 @@ const withoutNestedMutations = (ctx: any): any =>
     });
 
 const HANDLERS: Record<string, (args: any) => Promise<unknown>> = {
+    "agent_agent_switch:getRunAgentModel": async () => state.agentModel,
     "agent_threads:getThreadInternal": async (args) => await run(async (ctx) => await ctx.db.get("threads", args.threadId)),
     "chat_functions:createThreadWithInitialMessage": async (args) =>
         await run(async (ctx) => await (createThreadWithInitialMessage as any).handler(withoutNestedMutations(ctx), args)),
@@ -145,6 +158,8 @@ const HANDLERS: Record<string, (args: any) => Promise<unknown>> = {
     "chat_start_claim:releaseChatStart": async (args) => await run(async (ctx) => await ctx.runMutation(releaseChatStart, args)),
     "chat_start_claim:saveStartPrompt": async (args) => await run(async (ctx) => await (saveStartPrompt as any).handler(withoutNestedMutations(ctx), args)),
     "chat_streaming:createStreamWithMessage": async (args) => {
+        vi.setSystemTime(Date.now() + state.streamDelayMs);
+
         if (state.streamFails) {
             state.streamFails = false;
 
@@ -184,10 +199,12 @@ const startRecord = async (clientMessageId: string): Promise<{ goalId?: string; 
 beforeEach(async () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(Date.UTC(2026, 0, 15, 12));
+    state.agentModel = null;
     state.charges = 0;
     state.enqueueFails = false;
     state.legacySaves = 0;
     state.scheduled.length = 0;
+    state.streamDelayMs = 0;
     state.streamFails = false;
     vi.mocked(enqueueJob).mockClear();
     state.userId = OWNER;
@@ -314,6 +331,70 @@ describe("/chat/start with clientMessageId", () => {
         expect(await countRows("threadGoals")).toBe(1);
         expect(await run(async (ctx) => await ctx.db.get("threadGoals", firstGoal._id))).toMatchObject({ status: "active" });
         expect(await startRecord("goal")).toMatchObject({ goalId: firstGoal._id, streamId: resumed.json.streamId });
+    });
+
+    it("leaves a goal a later message started running when it resumes an older send, and still ends one started before it", async () => {
+        const goal = async (clientMessageId: string): Promise<string> => {
+            expect((await send({ clientMessageId, goal: { text: "Ship the report" }, prompt: `Goal ${clientMessageId}`, threadId })).status).toBe(200);
+
+            const goals = await run(async (ctx) => await ctx.db.query("threadGoals").collect());
+
+            return goals.at(-1)._id;
+        };
+
+        const olderGoal = await goal("older-goal");
+
+        vi.setSystemTime(Date.now() + 1000);
+        state.streamFails = true;
+        await expect(send({ clientMessageId: "older", threadId })).rejects.toThrow("the stream could not be made");
+        vi.setSystemTime(Date.now() + 1000);
+
+        // A goal another message started while the older send lay dead: it ends the goal before it, and runs.
+        const newerGoal = await goal("newer-goal");
+
+        expect(await run(async (ctx) => await ctx.db.get("threadGoals", olderGoal))).toMatchObject({ status: "stopped", stopReason: "superseded" });
+
+        // The older send's goal-less stream would have ended a goal before its prompt, never a later one: the earlier goal is active again to check both.
+        await run(async (ctx) => await ctx.db.patch("threadGoals", olderGoal, { status: "active" }));
+        vi.setSystemTime(Date.now() + CHAT_START_LEASE_MS);
+
+        expect((await send({ clientMessageId: "older", threadId })).status).toBe(200);
+        expect(await run(async (ctx) => await ctx.db.get("threadGoals", newerGoal))).toMatchObject({ status: "active" });
+        expect(await run(async (ctx) => await ctx.db.get("threadGoals", olderGoal))).toMatchObject({ status: "stopped", stopReason: "superseded" });
+    });
+
+    it("renews the claim's expiry when it resumes a send late in its day, so the stream it makes still finds the claim", async () => {
+        state.streamFails = true;
+
+        await expect(send({ clientMessageId: "late", threadId })).rejects.toThrow("the stream could not be made");
+
+        // Resumed a second before the claim expires; making the stream takes two.
+        vi.setSystemTime(Date.now() + CHAT_START_CLAIM_TTL_MS - 1000);
+        state.streamDelayMs = 2000;
+
+        const resumed = await send({ clientMessageId: "late", threadId });
+
+        expect(resumed.status).toBe(200);
+        expect(await startRecord("late")).toMatchObject({ messageId: resumed.json.messageId, streamId: resumed.json.streamId });
+        expect(await countRows("messages")).toBe(1);
+    });
+
+    it("runs a resumed send on the model its first try saved its prompt with, though the thread's agent changed since", async () => {
+        const OTHER_MODEL = "anthropic/claude-haiku-4.5";
+
+        state.streamFails = true;
+        await expect(send({ clientMessageId: "switched", threadId })).rejects.toThrow("the stream could not be made");
+
+        // The thread was switched to another agent while the send lay dead.
+        await run(async (ctx) => await ctx.db.patch("threads", threadId, { activeAgent: { kind: "model", model: OTHER_MODEL } }));
+        state.agentModel = OTHER_MODEL;
+        vi.setSystemTime(Date.now() + CHAT_START_LEASE_MS);
+
+        const resumed = await send({ clientMessageId: "switched", threadId });
+
+        expect(resumed.status).toBe(200);
+        expect(await run(async (ctx) => await ctx.db.get("persistentStreams", resumed.json.streamId))).toMatchObject({ streamingConfig: { model: MODEL } });
+        expect(vi.mocked(enqueueJob).mock.calls.at(-1)?.[1]).toMatchObject({ streamId: resumed.json.streamId, streamingConfig: { model: MODEL } });
     });
 
     it("refuses the same id on a different send, and never answers it with the first send's thread", async () => {

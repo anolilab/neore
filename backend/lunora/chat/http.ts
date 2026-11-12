@@ -603,7 +603,7 @@ const runChatStartOnShard = async (
 ): Promise<Response> => {
     // Force anonymous users onto free model
     const isAnonymous = user.isAnonymous === true;
-    // Reassigned once, below, when the thread belongs to a bot.
+    // Reassigned below for a bot's thread or a switched one, and for a resend, to the model its prompt was saved with.
     let effectiveModel = isAnonymous ? ANONYMOUS_FREE_MODEL : body.model;
 
     // Determine content type
@@ -927,6 +927,14 @@ const runChatStartOnShard = async (
 
     if (startOutcome?.outcome === "in_progress") {
         return startInProgressResponse();
+    }
+
+    // A resend runs on the model its first try saved the prompt with: the thread's agent may have been switched since.
+    const savedModel = startOutcome?.outcome === "duplicate" || startOutcome?.outcome === "resume" ? startOutcome.model : undefined;
+
+    if (savedModel !== undefined) {
+        effectiveModel = savedModel;
+        streamingConfig.model = savedModel;
     }
 
     // The run of a text turn, on the jobs queue. A queue redelivery, or a second submission, is harmless: the run claims its stream first.
@@ -1269,7 +1277,8 @@ const runChatStartOnShard = async (
 
         if (body.goal !== undefined && goalConfig?.ok) {
             const started = await context.runMutation(internal.chat.goals.internal.startGoal, {
-                config: goalConfig.value,
+                // The goal's config was checked with the resolved model; a resumed send runs on its saved one.
+                config: { ...goalConfig.value, model: effectiveModel },
                 ...(typeof body.goal.maxRounds === "number" && { maxRounds: body.goal.maxRounds }),
                 ...(activeOrganizationId && { organizationId: activeOrganizationId }),
                 promptMessageId: messageId,
