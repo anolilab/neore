@@ -399,6 +399,16 @@ describe("accounts", () => {
 });
 
 describe("after a clear", () => {
+    it("keeps saving after a sign-out when the clock is set back, until another clear comes", () => {
+        dropStoredDrafts("user-1");
+        vi.setSystemTime(Date.now() - DAY_MS);
+        bindStoredDrafts("thread-a", "user-1", false);
+        type("after the clock went back");
+        vi.advanceTimersByTime(DRAFT_WRITE_DELAY_MS);
+
+        expect(text("thread-a")).toBe("after the clock went back");
+    });
+
     it("does not write an account's drafts back after another tab signed it out", () => {
         bindStoredDrafts("thread-a", "user-1", false);
         type("before sign-out");

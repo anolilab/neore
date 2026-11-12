@@ -37,16 +37,19 @@ export const draftOwnership: {
     prefill?: string;
 } = {};
 
-/** `neore-draft-cleared:<userId | *>`: when a tab last removed that account's drafts (every account's for `*`). Not a draft key. */
+/**
+ * `neore-draft-cleared:<userId | *>`: `<ms>:<random>`, written each time a tab removes that account's drafts (every account's for
+ * `*`). Not a draft key. Tabs compare the whole value, never its time, so a clock set back cannot pass an old clear off as new.
+ */
 const CLEARED_KEY_PREFIX = "neore-draft-cleared:";
 const ALL_ACCOUNTS = "*";
 
-/** When any tab last removed `userId`'s drafts, in ms; 0 when never or unreadable. */
-export const draftsClearedAt = (userId: string): number => {
+/** The clear markers that concern `userId` (its own, then every account's), "" for none or unreadable. A change is a new clear. */
+export const draftClearMarks = (userId: string): string[] => {
     try {
-        return Math.max(0, ...[userId, ALL_ACCOUNTS].map((account) => Number(globalThis.localStorage.getItem(`${CLEARED_KEY_PREFIX}${account}`)) || 0));
+        return [userId, ALL_ACCOUNTS].map((account) => globalThis.localStorage.getItem(`${CLEARED_KEY_PREFIX}${account}`) ?? "");
     } catch {
-        return 0;
+        return ["", ""];
     }
 };
 
@@ -61,7 +64,7 @@ export const pruneClearMarkers = (maxAgeMs: number, now = Date.now()): void => {
                 continue;
             }
 
-            const at = Number(globalThis.localStorage.getItem(key));
+            const at = Number.parseInt(globalThis.localStorage.getItem(key) ?? "", 10);
 
             if (!Number.isFinite(at) || at < now - maxAgeMs) {
                 globalThis.localStorage.removeItem(key);
@@ -95,8 +98,8 @@ export const dropStoredDrafts = (userId?: string): void => {
 
     // After the removal, which frees the space it needs, and on its own: a full storage never keeps the drafts in place.
     try {
-        // Other tabs of the account read it before their next write (`draftsClearedAt`): their drafts must not come back either.
-        globalThis.localStorage.setItem(`${CLEARED_KEY_PREFIX}${userId ?? ALL_ACCOUNTS}`, String(Date.now()));
+        // Other tabs of the account read it before their next write (`draftClearMarks`): their drafts must not come back either.
+        globalThis.localStorage.setItem(`${CLEARED_KEY_PREFIX}${userId ?? ALL_ACCOUNTS}`, `${Date.now()}:${Math.random().toString(36).slice(2)}`);
     } catch {
         // Blocked or full: the other tabs forget the account when their own sign-out runs.
     }

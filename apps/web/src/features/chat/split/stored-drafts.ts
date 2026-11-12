@@ -6,9 +6,9 @@ import type { StoredAttachment } from "@/features/chat/core/utils/prompt-queue";
 
 import type { ComposerDraft } from "./composer-drafts";
 import {
+    draftClearMarks,
     draftGeneration,
     draftOwnership,
-    draftsClearedAt,
     hasDraftContent,
     peekComposerDraft,
     pruneClearMarkers,
@@ -177,9 +177,9 @@ const toStoredDraft = (content: Partial<Content> | undefined): StoredDraft | und
  * nothing is written for it.
  */
 interface Binding {
-    /** When it was made: a clear another tab marked after it (`draftsClearedAt`) forgets it too. */
-    at: number;
     generation: number;
+    /** The clear markers when it was made (`draftClearMarks`): a clear another tab marks after it forgets it too. */
+    marks: string[];
     owner: string;
     userId: string;
 }
@@ -245,7 +245,14 @@ const snapshot = (owner: string): Map<string, StoredDraft> => {
  * binding's own account counts: the next account's composer may bind before the switch drops the departing account's drafts.
  */
 const forgetIfCleared = (): void => {
-    if (!state.binding || (draftGeneration(state.binding.userId) === state.binding.generation && draftsClearedAt(state.binding.userId) <= state.binding.at)) {
+    // A marker that is gone (pruned once old) is no new clear; only one written since the binding is.
+    const marks = state.binding ? draftClearMarks(state.binding.userId) : [];
+
+    if (
+        !state.binding ||
+        (draftGeneration(state.binding.userId) === state.binding.generation &&
+            marks.every((mark, index) => mark === "" || mark === state.binding?.marks[index]))
+    ) {
         return;
     }
 
@@ -527,7 +534,7 @@ export const bindStoredDrafts = (owner: string, userId: string, locked: boolean)
         state.carriedFrom = switchedUser ? undefined : from;
     }
 
-    state.binding = { at: Date.now(), generation: draftGeneration(userId), owner, userId };
+    state.binding = { generation: draftGeneration(userId), marks: draftClearMarks(userId), owner, userId };
     listen();
 
     if (locked) {
