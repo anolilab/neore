@@ -1,5 +1,5 @@
 /**
- * The "@" menu opens with its data: focusing the composer prefetches the menu's reads under the menu's own query keys,
+ * The "@" menu opens with its data: typing in the composer prefetches the menu's reads under the menu's own query keys,
  * so opening it renders from the cache and fetches nothing. The menu lists the current chat's project first, and its
  * motion is short and off under reduced motion. `crpc` is stood in for with keys shaped like the real ones.
  */
@@ -106,18 +106,28 @@ const { POPUP_ENTER_MOTION } = await import("./popup-motion");
 const { default: useMentionPrefetch } = await import("./use-mention-prefetch");
 
 const fakeEditor = () => {
-    const listeners = new Set<() => void>();
+    const listeners = new Map<string, Set<() => void>>();
+    const emit = (event: string) => {
+        const registered = listeners.get(event) ?? [];
+
+        for (const listener of registered) {
+            listener();
+        }
+    };
 
     return {
+        /** The user types: tiptap's `update`. */
+        edit: () => {
+            emit("update");
+        },
         editor: {
-            isFocused: false,
-            off: (_event: string, listener: () => void) => listeners.delete(listener),
-            on: (_event: string, listener: () => void) => listeners.add(listener),
+            off: (event: string, listener: () => void) => listeners.get(event)?.delete(listener),
+            on: (event: string, listener: () => void) => {
+                listeners.set(event, (listeners.get(event) ?? new Set()).add(listener));
+            },
         } as unknown as Editor,
         focus: () => {
-            for (const listener of listeners) {
-                listener();
-            }
+            emit("focus");
         },
     };
 };
@@ -177,18 +187,31 @@ const openPopup = (wrapper: (props: { children: ReactNode }) => ReactNode) =>
     );
 
 describe("FileMentionPopup prefetch", () => {
-    it("prefetches the menu's reads once the composer is focused, then opens from the cache", async () => {
+    it("prefetches nothing on focus alone: the composer takes focus on every chat load", async () => {
         expect.hasAssertions();
 
         const { wrapper } = setup();
         const { editor, focus } = fakeEditor();
+
+        renderHook(() => useMentionPrefetch(editor, true), { wrapper });
+        act(focus);
+
+        await Promise.resolve();
+        expect(harness.calls).toStrictEqual({ files: 0, search: 0, threads: 0 });
+    });
+
+    it("prefetches the menu's reads once the user types, then opens from the cache", async () => {
+        expect.hasAssertions();
+
+        const { wrapper } = setup();
+        const { edit, editor } = fakeEditor();
         const { result } = renderHook(() => useMentionPrefetch(editor, true), { wrapper });
 
         expect(harness.calls.files).toBe(0);
         expect(result.current).toBe(false);
 
-        act(focus);
-        act(focus);
+        act(edit);
+        act(edit);
 
         await waitFor(() => {
             expect(harness.calls).toStrictEqual({ files: 1, search: 0, threads: 1 });
@@ -207,10 +230,10 @@ describe("FileMentionPopup prefetch", () => {
         expect.hasAssertions();
 
         const { wrapper } = setup();
-        const { editor, focus } = fakeEditor();
+        const { edit, editor } = fakeEditor();
 
         renderHook(() => useMentionPrefetch(editor, false), { wrapper });
-        act(focus);
+        act(edit);
 
         await Promise.resolve();
         expect(harness.calls).toStrictEqual({ files: 0, search: 0, threads: 0 });
@@ -219,12 +242,12 @@ describe("FileMentionPopup prefetch", () => {
 
 describe("FileMentionPopup prefetch follows the cache", () => {
     const focused = (wrapper: (props: { children: ReactNode }) => ReactNode) => {
-        const { editor, focus } = fakeEditor();
+        const { edit, editor } = fakeEditor();
         const view = renderHook(() => useMentionPrefetch(editor, true), { wrapper });
 
-        act(focus);
+        act(edit);
 
-        return { focus, view };
+        return { edit, view };
     };
 
     it("does not fetch again for the next chat's composer while the cache holds the reads", async () => {
@@ -249,7 +272,7 @@ describe("FileMentionPopup prefetch follows the cache", () => {
         expect.hasAssertions();
 
         const { queryClient, wrapper } = setup();
-        const { focus } = focused(wrapper);
+        const { edit } = focused(wrapper);
 
         await waitFor(() => {
             expect(harness.calls.files).toBe(1);
@@ -257,7 +280,7 @@ describe("FileMentionPopup prefetch follows the cache", () => {
 
         // What garbage collection does to an entry left unobserved past its `gcTime`.
         queryClient.removeQueries({ queryKey: ["lunora", "vault_functions:getAttachmentsForUser"] });
-        act(focus);
+        act(edit);
 
         await waitFor(() => {
             expect(harness.calls.files).toBe(2);
@@ -285,23 +308,23 @@ describe("FileMentionPopup prefetch follows the cache", () => {
         expect(next.view.result.current).toBe(true);
     });
 
-    it("waits for the client's token, then warms the focused composer", async () => {
+    it("waits for the client's token, then warms on the next edit", async () => {
         expect.hasAssertions();
 
         const { wrapper } = setup();
 
         harness.token = null;
 
-        const { editor } = fakeEditor();
+        const { edit, editor } = fakeEditor();
         const view = renderHook(() => useMentionPrefetch(editor, true), { wrapper });
 
-        (editor as { isFocused: boolean }).isFocused = true;
-        view.rerender();
+        act(edit);
         await Promise.resolve();
         expect(harness.calls).toStrictEqual({ files: 0, search: 0, threads: 0 });
 
         harness.token = "token";
         view.rerender();
+        act(edit);
 
         await waitFor(() => {
             expect(harness.calls).toStrictEqual({ files: 1, search: 0, threads: 1 });
@@ -309,21 +332,21 @@ describe("FileMentionPopup prefetch follows the cache", () => {
         expect(view.result.current).toBe(true);
     });
 
-    it("tries a failed prefetch again on the next focus", async () => {
+    it("tries a failed prefetch again on the next edit", async () => {
         expect.hasAssertions();
 
         const { queryClient, wrapper } = setup();
 
         harness.filesFail = true;
 
-        const { focus } = focused(wrapper);
+        const { edit } = focused(wrapper);
 
         await waitFor(() => {
             expect(queryClient.getQueryState(["lunora", "vault_functions:getAttachmentsForUser", "{}", null])?.status).toBe("error");
         });
 
         harness.filesFail = false;
-        act(focus);
+        act(edit);
 
         await waitFor(() => {
             expect(queryClient.getQueryData(["lunora", "vault_functions:getAttachmentsForUser", "{}", null])).toStrictEqual(harness.files);

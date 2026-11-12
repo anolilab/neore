@@ -13,14 +13,15 @@ import { useCRPC } from "@/lib/lunora/crpc";
 /**
  * Warms what the "@" and "/" menus show before they open, so they open with it.
  *
- * Once the composer has focus and first paint has passed (`use-after-first-paint.ts`: the menus' reads must not join
+ * Once the user types in the composer and first paint has passed (`use-after-first-paint.ts`: the menus' reads must not join
  * first paint's burst, `e2e/first-paint.e2e.test.ts`), it prefetches the "@" menu's unfiltered reads with the options
  * and keys `file-mention-popup.tsx` and `use-all-threads-data.ts` use. A prefetch has no observer, so it opens no live
  * subscription: that starts when the menu mounts its query, as before, and answers from this cache.
  *
  * The cache decides, not a flag: a read is fetched when the cache has no answer and none on its way. So a composer
  * remounted by a chat switch fetches nothing, while a cache cleared at sign-out, an entry collected after five unobserved
- * minutes, or a failed prefetch is fetched again on the next focus. It waits for the client's token: the cookie-backed
+ * minutes, or a failed prefetch is fetched again on the next edit. Typing, not focus: the composer takes focus on every chat
+ * load, and the files read (up to 500 rows, each with a signed URL) is not worth it for someone who only reads. It waits for the client's token: the cookie-backed
  * `isAuthenticated` reads true before the token is adopted, and a tokenless read fails.
  *
  * Returns `true` once this composer found the files read missing: its "/" menu loads the prompts and skills (actions the
@@ -46,7 +47,7 @@ const useMentionPrefetch = (editor: Editor | null, enabled: boolean): boolean =>
             return state?.data !== undefined || state?.fetchStatus === "fetching";
         };
 
-        // A failed prefetch is not an error to show: it leaves the cache empty, so the next focus or the menu tries again.
+        // A failed prefetch is not an error to show: it leaves the cache empty, so the next edit or the menu tries again.
         const prefetch = () => {
             const files = crpc.vault.functions.getAttachmentsForUser.queryOptions({});
             const threads = crpc.chat.composite.getThreadListData.queryOptions({ paginationOpts: THREAD_LIST_PAGINATION_OPTS });
@@ -61,14 +62,10 @@ const useMentionPrefetch = (editor: Editor | null, enabled: boolean): boolean =>
             }
         };
 
-        if (editor.isFocused) {
-            prefetch();
-        }
-
-        editor.on("focus", prefetch);
+        editor.on("update", prefetch);
 
         return () => {
-            editor.off("focus", prefetch);
+            editor.off("update", prefetch);
         };
     }, [ready, editor, crpc, queryClient]);
 
