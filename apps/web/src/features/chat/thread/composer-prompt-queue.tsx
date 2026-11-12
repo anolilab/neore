@@ -49,7 +49,7 @@ import type { QueuedSteer, SteerWithdrawal } from "@/features/chat/core/utils/pr
 import { decideAutoSend, deliveredSteerItems, takeNextToSend } from "@/features/chat/core/utils/prompt-queue";
 import { useConnectionView } from "@/features/connection/hooks/use-connection";
 import { useCRPC } from "@/lib/lunora/crpc";
-import { showError } from "@/lib/toast";
+import { showError, showInfo } from "@/lib/toast";
 
 import { permissionModeSaveKey, usePermissionModeSaving } from "./composer-permission-mode";
 
@@ -98,12 +98,21 @@ const useQueueActions = () => {
     const busyRef = useRef(false);
     // What an `await` in here must re-read afterwards, not close over.
     const latestRef = useRef({ hasError: Boolean(error), isStreaming, offline, threadId: currentThreadId });
-    // A send asked for while the browser was offline: it waits for the network instead of failing.
-    const heldOfflineRef = useRef<{ explicit: boolean; threadId: string } | undefined>(undefined);
     // A thread whose send was asked for while a removal held `busyRef`; `explicit` is the Send next button, which outranks a reply's error.
     const sendRequestedRef = useRef<{ explicit: boolean; threadId: string } | undefined>(undefined);
     // Chips whose removal was asked for while another call held `busyRef`.
     const removalsRequestedRef = useRef<{ id: string; threadId: string }[]>([]);
+    const holdOffline = useCallback(
+        (threadId: string, explicit: boolean) => {
+            usePromptQueueStore.getState().holdOffline(threadId, explicit);
+
+            // The Send next button says why nothing moved, as the composer does for a send offline.
+            if (explicit) {
+                showInfo(t`You are offline. Your message stays here; send it once you are back online.`, { id: "composer-offline-send" });
+            }
+        },
+        [t],
+    );
     const removePromptRef = useRef<(threadId: string, id: string) => Promise<void>>(async () => {});
     const sendNextPromptRef = useRef<(threadId: string, options?: { explicit?: boolean }) => Promise<void>>(async () => {});
 
@@ -135,6 +144,45 @@ const useQueueActions = () => {
         [withdrawSteer],
     );
 
+    /** Once `busyRef` is free: runs the send that was asked for meanwhile, if the thread still allows one. */
+    const sendRequestedMeanwhile = useCallback(() => {
+        const requested = sendRequestedRef.current;
+
+        sendRequestedRef.current = undefined;
+
+        if (!requested) {
+            return;
+        }
+
+        const { explicit, threadId } = requested;
+
+        const { hasError, isStreaming: streaming, threadId: shown } = latestRef.current;
+        const queue = usePromptQueueStore.getState().queues[threadId];
+
+        if (shown === threadId && !streaming && queue && !queue.paused && queue.items.length > 0 && (explicit || !hasError)) {
+            void sendNextPromptRef.current(threadId, { explicit });
+        }
+    }, []);
+
+    /**
+     * Once online with `busyRef` free: runs the shown thread's send that waited for the network. While another call holds
+     * the flag it stays held, and that call runs it when it lets go — its own `finally` must not swallow it.
+     */
+    const replayOfflineHold = useCallback(() => {
+        const { offline: isOffline, threadId } = latestRef.current;
+
+        if (isOffline || busyRef.current || !threadId) {
+            return;
+        }
+
+        const held = usePromptQueueStore.getState().takeOfflineHold(threadId);
+
+        if (held) {
+            sendRequestedRef.current = { explicit: held.explicit, threadId };
+            sendRequestedMeanwhile();
+        }
+    }, [sendRequestedMeanwhile]);
+
     /**
      * Sends the thread's next prompt. One whose withdrawal failed stays first, and the queue pauses.
      * An automatic send leaves the queue for the user to review when the reply ended in an error,
@@ -143,7 +191,7 @@ const useQueueActions = () => {
     const sendNextPrompt = useCallback(
         async (threadId: string, { explicit = false }: { explicit?: boolean } = {}): Promise<void> => {
             if (latestRef.current.offline) {
-                heldOfflineRef.current = { explicit: explicit || heldOfflineRef.current?.explicit === true, threadId };
+                holdOffline(threadId, explicit);
 
                 return;
             }
@@ -168,6 +216,8 @@ const useQueueActions = () => {
                         return (
                             latest.threadId === threadId &&
                             !latest.isStreaming &&
+                            // The withdrawal's await can outlast the network: then the prompt stays and is held for it.
+                            !latest.offline &&
                             // Read from the cache, not the rendered flag: a save that began after the last render is not in that flag yet,
                             // and this check runs after the withdrawal's await, so it could send under the old mode.
                             queryClient.isMutating({ exact: true, mutationKey: permissionModeSaveKey(threadId) }) === 0 &&
@@ -189,51 +239,30 @@ const useQueueActions = () => {
                     sendQueuedPrompt(next.prompt);
                 } else if (next?.kind === "failed") {
                     setPaused(threadId, true);
+                } else if (next?.kind === "blocked" && latestRef.current.offline) {
+                    holdOffline(threadId, explicit);
                 }
             } finally {
                 busyRef.current = false;
                 // A send starts a reply, and the next one waits for its end.
                 sendRequestedRef.current = undefined;
                 removeRequestedMeanwhile();
+                replayOfflineHold();
             }
         },
-        [queryClient, removeRequestedMeanwhile, sendQueuedPrompt, withdraw],
+        [holdOffline, queryClient, removeRequestedMeanwhile, replayOfflineHold, sendQueuedPrompt, withdraw],
     );
 
     useEffect(() => {
         sendNextPromptRef.current = sendNextPrompt;
     }, [sendNextPrompt]);
 
-    /** After a removal: runs the send that was asked for meanwhile, if the thread still allows one. */
-    const sendRequestedMeanwhile = useCallback(() => {
-        const requested = sendRequestedRef.current;
-
-        sendRequestedRef.current = undefined;
-
-        if (!requested) {
-            return;
-        }
-
-        const { explicit, threadId } = requested;
-
-        const { hasError, isStreaming: streaming, threadId: shown } = latestRef.current;
-        const queue = usePromptQueueStore.getState().queues[threadId];
-
-        if (shown === threadId && !streaming && queue && !queue.paused && queue.items.length > 0 && (explicit || !hasError)) {
-            void sendNextPromptRef.current(threadId, { explicit });
-        }
-    }, []);
-
-    // Back online: the send that waited for the network goes, if the thread still allows one.
+    // Back online, or back on a thread whose send waited for the network while it was away: that send goes now.
     useEffect(() => {
-        if (offline || !heldOfflineRef.current) {
-            return;
+        if (!offline) {
+            replayOfflineHold();
         }
-
-        sendRequestedRef.current = heldOfflineRef.current;
-        heldOfflineRef.current = undefined;
-        sendRequestedMeanwhile();
-    }, [offline, sendRequestedMeanwhile]);
+    }, [currentThreadId, offline, replayOfflineHold]);
 
     /** Removes a chip. A steered one leaves only once its run no longer holds the message. */
     const removePrompt = useCallback(
@@ -275,9 +304,10 @@ const useQueueActions = () => {
                 busyRef.current = false;
                 removeRequestedMeanwhile();
                 sendRequestedMeanwhile();
+                replayOfflineHold();
             }
         },
-        [removeRequestedMeanwhile, sendRequestedMeanwhile, t, withdraw],
+        [removeRequestedMeanwhile, replayOfflineHold, sendRequestedMeanwhile, t, withdraw],
     );
 
     useEffect(() => {

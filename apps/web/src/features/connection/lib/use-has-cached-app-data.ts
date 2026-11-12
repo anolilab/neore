@@ -1,5 +1,5 @@
 import { useAuthState } from "@lunora/react";
-import type { QueryClient } from "@tanstack/react-query";
+import type { QueryCacheNotifyEvent, QueryClient } from "@tanstack/react-query";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useSyncExternalStore } from "react";
 
@@ -10,6 +10,11 @@ const THREAD_LIST_KEY = ["lunora", "chat_composite:getThreadListData"] as const;
 
 const hasCachedThreadList = (queryClient: QueryClient): boolean =>
     queryClient.getQueriesData({ queryKey: THREAD_LIST_KEY }).some(([, data]) => data !== undefined);
+
+/** Only what can change the answer: a thread-list query added, removed, or given new data. Live pushes to other queries are not. */
+const CHANGES: ReadonlySet<QueryCacheNotifyEvent["type"]> = new Set(["added", "removed", "updated"]);
+
+const changesThreadList = (event: QueryCacheNotifyEvent): boolean => CHANGES.has(event.type) && event.query.queryKey[1] === THREAD_LIST_KEY[1];
 
 const getServerSnapshot = (): boolean => false;
 
@@ -28,7 +33,15 @@ const useHasCachedAppData = (): boolean => {
     const queryClient = useQueryClient();
     const { isAuthenticated, isLoading } = useAuthState();
     const persisted = useThreadListPlaceholder();
-    const subscribe = useCallback((onChange: () => void) => queryClient.getQueryCache().subscribe(onChange), [queryClient]);
+    const subscribe = useCallback(
+        (onChange: () => void) =>
+            queryClient.getQueryCache().subscribe((event: QueryCacheNotifyEvent) => {
+                if (changesThreadList(event)) {
+                    onChange();
+                }
+            }),
+        [queryClient],
+    );
     const cached = useSyncExternalStore(subscribe, () => hasCachedThreadList(queryClient), getServerSnapshot);
 
     return isAuthenticated && !isLoading && (cached || persisted !== undefined);
