@@ -232,6 +232,8 @@ const state = {
      * nothing the shared composer gets meanwhile is stored, and that chat's entry stays.
      */
     released: undefined as string | undefined,
+    /** Whether the composer that owned the binding is unmounted; `released` alone cannot say so, as it may name no chat. */
+    isReleased: false,
     started: false,
     timer: undefined as ReturnType<typeof setTimeout> | undefined,
 };
@@ -251,7 +253,7 @@ const snapshot = (owner: string): Map<string, StoredDraft> => {
 
     // Carried text stays its first chat's; an untouched prefill is no chat's.
     const liveOwner = state.carried ? state.carriedFrom : owner;
-    const live = state.prefill || state.released !== undefined ? undefined : toStoredDraft(useChatUIStore.getState());
+    const live = state.prefill || state.isReleased ? undefined : toStoredDraft(useChatUIStore.getState());
 
     // An empty composer does not hide the chat's parked draft: focus moving to another pane parks it, then empties the composer.
     if (live && liveOwner !== undefined) {
@@ -380,6 +382,7 @@ const handOver = (owner: string | undefined): void => {
         // The outgoing pane's composer is parked: what comes back into the live one is `owner`'s, not text without a chat (a
         // release by the unmounting pane) nor carried from the outgoing one.
         state.released = undefined;
+        state.isReleased = false;
         state.carried = false;
         state.carriedFrom = undefined;
     }
@@ -492,10 +495,13 @@ const listen = (): void => {
         ) {
             const { binding } = state;
 
-            if (state.released !== undefined) {
+            if (state.isReleased) {
                 // Edited with no chat's composer on the page: no chat's draft. The released chat's entry stays its draft, and is no
                 // longer this page's to remove.
-                state.mine.delete(state.released);
+                if (state.released !== undefined) {
+                    state.mine.delete(state.released);
+                }
+
                 state.carried = true;
                 state.carriedFrom = undefined;
             } else if (
@@ -582,6 +588,7 @@ export const bindStoredDrafts = (owner: string, userId: string, locked: boolean)
 
     state.prefill = false;
     state.released = undefined;
+    state.isReleased = false;
 
     if (ui.composerText !== "" && ui.composerText === draftOwnership.prefill) {
         holdPrefill(owner);
@@ -620,6 +627,7 @@ export const releaseStoredDrafts = (owner: string): void => {
 
     flushStoredDrafts();
     state.released = state.carried ? state.carriedFrom : owner;
+    state.isReleased = true;
 };
 
 /** For tests: forgets this page's state and stops listening. */
@@ -636,6 +644,7 @@ export const resetStoredDraftsForTests = (): void => {
     state.prefillSending = false;
     state.parkedPrefills.clear();
     state.released = undefined;
+    state.isReleased = false;
     state.started = false;
     listening.stop?.();
 };

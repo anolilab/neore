@@ -17,6 +17,7 @@ import {
     lockStoredDraft,
     MAX_STORED_DRAFTS,
     NEW_CHAT_DRAFT_KEY,
+    releaseStoredDrafts,
     resetStoredDraftsForTests,
 } from "./stored-drafts";
 
@@ -450,6 +451,21 @@ describe("accounts", () => {
 
         expect(draftKeys()).toStrictEqual([draftKey("user-2", "new")]);
         expect(text("new", "user-2")).toBe("user two's text");
+    });
+});
+
+describe("a released composer", () => {
+    it("stores nothing under the chat it left when its text came from another account", () => {
+        bindStoredDrafts("thread-a", "user-1", false);
+        type("first account's text");
+        // An account switch without a reload: the text stays in the composer and is no chat's.
+        bindStoredDrafts("thread-a", "user-2", false);
+        releaseStoredDrafts("thread-a");
+        type("typed with no chat's composer on the page");
+        vi.advanceTimersByTime(DRAFT_WRITE_DELAY_MS);
+        flushStoredDrafts();
+
+        expect(text("thread-a", "user-2")).toBeUndefined();
     });
 });
 
