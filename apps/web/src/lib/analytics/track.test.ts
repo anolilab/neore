@@ -1,7 +1,22 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { PENDING_EVENTS_KEY } from "./posthog-client";
-import { resetAnalyticsIdentity, trackEvent } from "./track";
+import { getPostHog, loadPostHog, PENDING_EVENTS_KEY, setAnalyticsIdentity, startPostHog } from "./posthog-client";
+import { reportCaughtError, resetAnalyticsIdentity, trackEvent } from "./track";
+
+const posthog = vi.hoisted(() => {
+    return {
+        __loaded: true,
+        capture: vi.fn(),
+        captureException: vi.fn(),
+        has_opted_out_capturing: vi.fn(() => false),
+        register: vi.fn(),
+        reset: vi.fn(),
+    };
+});
+
+vi.mock("./posthog-js", () => {
+    return { posthog };
+});
 
 describe(resetAnalyticsIdentity, () => {
     beforeEach(() => {
@@ -40,5 +55,19 @@ describe(trackEvent, () => {
     it("queues an event tracked before PostHog has loaded and answers that it was not sent yet", () => {
         expect(trackEvent("onboarding_started", {})).toBe(false);
         expect(JSON.parse(sessionStorage.getItem(PENDING_EVENTS_KEY) ?? "[]")).toMatchObject([{ event: "onboarding_started", properties: {} }]);
+    });
+});
+
+describe(reportCaughtError, () => {
+    it("queues an error caught before PostHog has started and sends it once it has", async () => {
+        const error = new Error("paste failed");
+
+        expect(getPostHog()).toBeUndefined();
+        expect(reportCaughtError(error, { feature: "composer-paste" })).toBe(false);
+
+        setAnalyticsIdentity({});
+        startPostHog(await loadPostHog(), () => {});
+
+        expect(posthog.captureException).toHaveBeenCalledExactlyOnceWith(error, { feature: "composer-paste" });
     });
 });

@@ -1,74 +1,42 @@
 "use client";
 
 /**
- * Keeps PostHog identity in sync with the Better Auth session.
- *
- * - Calls `posthog.identify()` when the user signs in
- * - Calls `posthog.group("organization", orgId)` when the org changes
- * - Calls `posthog.reset()` when the user signs out
+ * Publishes the Better Auth session's identity for PostHog (`setAnalyticsIdentity`): who is signed in and their
+ * active organization. `posthog-client.ts` applies it, `identify`, `group("organization", …)` and `reset()` on
+ * sign-out, both when PostHog starts (before anything queued is sent) and on every later change.
  */
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
-import { usePostHog } from "@/lib/analytics/posthog-client";
+import { setAnalyticsIdentity } from "@/lib/analytics/posthog-client";
 
 const usePostHogIdentity = (): void => {
-    const posthog = usePostHog();
     const { hooks } = useAuth();
 
-    const { data: sessionData } = hooks.useSession();
+    const { data: sessionData, isPending: isSessionPending } = hooks.useSession();
     const user = sessionData?.user;
-    const isAnonymous = user?.isAnonymous ?? true;
+    const isSignedIn = Boolean(user && !user.isAnonymous);
 
-    const { data: orgData } = hooks.useActiveOrganization();
-    const activeOrgId = orgData?.id;
-    const activeOrgName = orgData?.name;
+    // Without a session this read is skipped and stays pending, so it is waited for only when there is one.
+    const { data: orgData, isPending: isOrgPending } = hooks.useActiveOrganization();
+    const isKnown = !isSessionPending && !(user && isOrgPending);
 
-    const previousUserIdRef = useRef<string | null>(null);
-    const previousOrgIdRef = useRef<string | null>(null);
+    const userId = isSignedIn ? user?.id : undefined;
+    const email = user?.email;
+    const name = user?.name;
+    const orgId = orgData?.id;
+    const orgName = orgData?.name;
 
-    // Identify / reset user and set super properties
     useEffect(() => {
-        if (!posthog) {
+        if (!isKnown) {
             return;
         }
 
-        // Register is_anonymous as a super property so it's attached to every event
-        posthog.register({ is_anonymous: isAnonymous });
-
-        const userId = user?.id ?? null;
-        const wasIdentified = previousUserIdRef.current;
-
-        // User signed in (or anonymous → authenticated)
-        if (userId && !isAnonymous && wasIdentified !== userId) {
-            posthog.identify(userId, {
-                email: user?.email,
-                name: user?.name,
-            });
-        }
-
-        // User signed out (was identified, now is not)
-        if (wasIdentified && (!userId || isAnonymous)) {
-            posthog.reset();
-        }
-
-        previousUserIdRef.current = isAnonymous ? null : userId;
-    }, [posthog, user?.id, user?.email, user?.name, isAnonymous]);
-
-    // Set organization group
-    useEffect(() => {
-        if (!posthog) {
-            return;
-        }
-
-        if (activeOrgId && activeOrgId !== previousOrgIdRef.current) {
-            posthog.group("organization", activeOrgId, {
-                name: activeOrgName,
-            });
-        }
-
-        previousOrgIdRef.current = activeOrgId ?? null;
-    }, [posthog, activeOrgId, activeOrgName]);
+        setAnalyticsIdentity({
+            organization: orgId ? { id: orgId, name: orgName } : undefined,
+            user: userId ? { email, id: userId, name } : undefined,
+        });
+    }, [isKnown, userId, email, name, orgId, orgName]);
 };
 
 export default usePostHogIdentity;

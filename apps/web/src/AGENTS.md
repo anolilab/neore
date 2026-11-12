@@ -70,7 +70,7 @@ The rules for working in `apps/web/src`. The detail, reasoning and code examples
   Use `toScriptLiteral` in inline scripts.
 - PostHog loads after mount: read it through `lib/analytics/posthog-client.ts` (`usePostHog`, `useFeatureFlagEnabled`,
   `getPostHog`), never `posthog-js`/`posthog-js/react`/`@posthog/react` in eagerly loaded code (~115 KiB gzip).
-  Report caught errors with its `captureException` (queued until PostHog loads); load it only via `posthog-js.ts`.
+  Report caught errors with its `captureException` (queued until `startPostHog` ran); load it only via `posthog-js.ts`.
 
 ## CONVENTIONS
 

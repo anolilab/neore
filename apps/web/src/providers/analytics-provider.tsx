@@ -6,21 +6,26 @@ import { useEffect, useState } from "react";
 import { reportFirstNativeLaunch } from "@/lib/analytics/first-native-launch";
 import {
     discardPendingCaptures,
-    flushPendingCaptures,
     getMeasurementConsent,
     getPostHog,
+    getStartedPostHog,
     loadPostHog,
     PostHogClientContext,
+    setIdentityExpected,
     setMeasurementConsent,
-    takePendingPostHogReset,
+    startPostHog,
 } from "@/lib/analytics/posthog-client";
 import { redactPromptFromEvent } from "@/lib/analytics/redact-prompt";
 
 const applyMeasurementConsent = (posthog: PostHogInterface, granted: boolean): void => {
     if (granted) {
         posthog.opt_in_capturing();
-        // A launch that happened before consent is reported now; its stored flag keeps it from repeating.
-        reportFirstNativeLaunch();
+
+        // A launch that happened before consent is reported now; its stored flag keeps it from repeating. Before
+        // PostHog has started, `startPostHog` reports it, after any reset and the identity.
+        if (getStartedPostHog()) {
+            reportFirstNativeLaunch();
+        }
     } else {
         posthog.opt_out_capturing();
     }
@@ -77,9 +82,6 @@ export const onPostHogLoaded = (ph: PostHogInterface): void => {
     if (measurement !== undefined) {
         applyMeasurementConsent(ph, measurement);
     }
-
-    // Here, not in an effect: AnalyticsProvider wraps the app, so child effects run before PostHog loads.
-    reportFirstNativeLaunch();
 };
 
 /** How long a failed analytics start waits before its one retry while the window is online. */
@@ -120,6 +122,8 @@ const AnalyticsProvider: FC<PropsWithChildren> = ({ children }) => {
 
         let isCancelled = false;
 
+        setIdentityExpected(true);
+
         // Initialize PostHog with cookieless mode for GDPR compliance
         // PostHog will operate in cookieless mode until consent is granted
         const start = async (): Promise<void> => {
@@ -142,24 +146,18 @@ const AnalyticsProvider: FC<PropsWithChildren> = ({ children }) => {
                     ...POSTHOG_OPTIONS,
                     loaded: onPostHogLoaded,
                 });
-
-                // Signed out while the chunk loaded, on a page that has not reloaded: drop the bootstrapped identity too.
-                if (takePendingPostHogReset()) {
-                    posthog.reset();
-                }
             }
 
-            // An unmount cancels only the provided client, not `init` and the flush: the global error boundary
-            // unmounts this provider when it shows its fallback, and the crash it caught is queued for PostHog.
+            // Flags are read from the client as soon as `init` ran; captures wait for `startPostHog`.
+            // An unmount cancels only the provided client, not the startup: the global error boundary unmounts this
+            // provider when it shows its fallback, and the crash it caught is queued for PostHog.
             if (!isCancelled) {
                 setClient(posthog);
             }
 
-            if (isFirstInit) {
-                // Events tracked and errors caught while the chunk loaded; after `init`, whose `loaded` callback applied
-                // the consent state.
-                flushPendingCaptures(posthog);
-            }
+            // Reset after a sign-out, then the session's identity, then the queued captures and the first launch
+            // report; see `startPostHog`. Runs once per page.
+            startPostHog(posthog, reportFirstNativeLaunch);
         };
 
         // A start that failed (the chunk's retries exhausted, or `init` threw) is tried once more after
@@ -191,6 +189,8 @@ const AnalyticsProvider: FC<PropsWithChildren> = ({ children }) => {
 
         return () => {
             isCancelled = true;
+            // The session that would publish the identity unmounts with this tree.
+            setIdentityExpected(false);
             clearTimeout(retryTimer);
             globalThis.removeEventListener("online", attempt);
         };

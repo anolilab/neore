@@ -1,5 +1,6 @@
 import { act, render, screen } from "@testing-library/react";
 import type { PostHogInterface } from "posthog-js";
+import type { FC } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const permissions = vi.hoisted(() => {
@@ -10,13 +11,17 @@ const posthogMock = vi.hoisted(() => {
         __loaded: false,
         captureException: vi.fn(),
         debug: vi.fn(),
+        group: vi.fn(),
         has_opted_out_capturing: vi.fn(() => false),
-        init: vi.fn(() => {
-            // Like posthog-js: `init` marks the singleton loaded.
+        identify: vi.fn(),
+        init: vi.fn((_key: string, config: { loaded?: (posthog: unknown) => void }) => {
+            // Like posthog-js: `init` marks the singleton loaded and calls `loaded`.
             posthogMock.__loaded = true;
+            config.loaded?.(posthogMock);
         }),
         opt_in_capturing: vi.fn(),
         opt_out_capturing: vi.fn(),
+        register: vi.fn(),
         reset: vi.fn(),
     };
 });
@@ -26,15 +31,23 @@ vi.mock("@c15t/react", () => {
 });
 const loadPostHog = vi.hoisted(() => vi.fn());
 
-vi.mock("@/lib/analytics/posthog-client", async (importOriginal) => {
-    return { ...(await importOriginal<typeof import("@/lib/analytics/posthog-client")>()), getPostHog: () => posthogMock, loadPostHog };
-});
+const reportFirstNativeLaunch = vi.hoisted(() => vi.fn());
+
 vi.mock("@/lib/analytics/first-native-launch", () => {
-    return { reportFirstNativeLaunch: vi.fn() };
+    return { reportFirstNativeLaunch };
 });
 
-const { default: AnalyticsProvider, onPostHogLoaded, PostHogConsentSync, START_RETRY_DELAY_MS } = await import("./analytics-provider");
-const { captureException, forgetPostHogIdentity, setMeasurementConsent, usePostHog } = await import("@/lib/analytics/posthog-client");
+/** Fresh modules, as on a new page: PostHog starts once per page. */
+const loadModules = async () => {
+    vi.resetModules();
+    vi.doMock("@/lib/analytics/posthog-client", async (importOriginal) => {
+        return { ...(await importOriginal<typeof import("@/lib/analytics/posthog-client")>()), getPostHog: () => posthogMock, loadPostHog };
+    });
+
+    return { ...(await import("./analytics-provider")), ...(await import("@/lib/analytics/posthog-client")) };
+};
+
+const { onPostHogLoaded, PostHogConsentSync, START_RETRY_DELAY_MS } = await loadModules();
 
 describe("PostHog consent sync", () => {
     beforeEach(() => {
@@ -73,18 +86,31 @@ describe("PostHog consent sync", () => {
     });
 });
 
-const ClientState = () => <p>{usePostHog() ? "analytics on" : "analytics off"}</p>;
-
 describe("AnalyticsProvider", () => {
+    let modules: Awaited<ReturnType<typeof loadModules>>;
+    let AnalyticsProvider: (typeof modules)["default"];
+    let ClientState: FC;
+
     beforeEach(() => {
         vi.stubEnv("DEV", false);
         vi.stubEnv("VITE_POSTHOG_API_KEY", "key");
         vi.stubEnv("VITE_POSTHOG_HOST", "https://posthog.test");
         loadPostHog.mockReset();
         posthogMock.__loaded = false;
-        setMeasurementConsent(true);
         posthogMock.init.mockClear();
         posthogMock.reset.mockClear();
+        posthogMock.captureException.mockClear();
+        reportFirstNativeLaunch.mockClear();
+    });
+
+    beforeEach(async () => {
+        modules = await loadModules();
+        modules.setMeasurementConsent(true);
+        const { usePostHog } = modules;
+
+        AnalyticsProvider = modules.default;
+
+        ClientState = () => <p>{usePostHog() ? "analytics on" : "analytics off"}</p>;
     });
 
     afterEach(() => {
@@ -93,7 +119,6 @@ describe("AnalyticsProvider", () => {
         vi.restoreAllMocks();
     });
 
-    // First: the queue is flushed once per page, by whichever case initialises PostHog first.
     it("reports an error caught before its chunk loaded, even when the global boundary unmounted the provider meanwhile", async () => {
         let resolveChunk: (posthog: typeof posthogMock) => void = () => {};
 
@@ -112,7 +137,7 @@ describe("AnalyticsProvider", () => {
         const crash = new Error("crashed on first render");
 
         // The global boundary reports the crash, then its fallback replaces the tree this provider is in.
-        captureException(crash, { errorBoundary: "global" });
+        modules.captureException(crash, { errorBoundary: "global" });
         unmount();
 
         await act(async () => {
@@ -200,7 +225,8 @@ describe("AnalyticsProvider", () => {
 
     it("resets the identity it was bootstrapped with when a sign-out came before its chunk loaded", async () => {
         loadPostHog.mockResolvedValue(posthogMock);
-        forgetPostHogIdentity("key");
+        modules.forgetPostHogIdentity("key");
+        modules.setAnalyticsIdentity({});
 
         render(
             <AnalyticsProvider>
@@ -218,5 +244,28 @@ describe("AnalyticsProvider", () => {
         const [resetOrder = 0] = posthogMock.reset.mock.invocationCallOrder;
 
         expect(resetOrder).toBeGreaterThan(initOrder);
+    });
+
+    it("reports a first native launch only after the reset a sign-out during the load asked for", async () => {
+        loadPostHog.mockResolvedValue(posthogMock);
+        modules.forgetPostHogIdentity("key");
+        modules.setAnalyticsIdentity({});
+
+        render(
+            <AnalyticsProvider>
+                <ClientState />
+            </AnalyticsProvider>,
+        );
+
+        await act(async () => {
+            await Promise.resolve();
+        });
+
+        expect(posthogMock.reset).toHaveBeenCalledOnce();
+        expect(reportFirstNativeLaunch).toHaveBeenCalledOnce();
+        const [resetOrder = 0] = posthogMock.reset.mock.invocationCallOrder;
+        const [reportOrder = 0] = reportFirstNativeLaunch.mock.invocationCallOrder;
+
+        expect(reportOrder).toBeGreaterThan(resetOrder);
     });
 });

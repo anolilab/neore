@@ -5,7 +5,11 @@ const posthog = vi.hoisted(() => {
         __loaded: false,
         capture: vi.fn(),
         captureException: vi.fn(),
+        group: vi.fn(),
         has_opted_out_capturing: vi.fn(() => false),
+        identify: vi.fn(),
+        register: vi.fn(),
+        reset: vi.fn(),
     };
 });
 
@@ -31,7 +35,7 @@ describe("captureException before PostHog initialises", () => {
         vi.restoreAllMocks();
     });
 
-    it("queues what is caught while the chunk loads and sends it, in order, once the client is flushed", async () => {
+    it("queues what is caught while the chunk loads and sends it, in order, once PostHog has started", async () => {
         const client = await loadClientModule();
         const early = new Error("hydration failed");
 
@@ -43,14 +47,15 @@ describe("captureException before PostHog initialises", () => {
         const loaded = await client.loadPostHog();
 
         loaded.__loaded = true;
-        client.flushPendingCaptures(loaded);
+        client.setAnalyticsIdentity({});
+        client.startPostHog(loaded, () => {});
 
         expect(posthog.captureException.mock.calls).toStrictEqual([
             [early, { errorBoundary: "global" }],
             ["rejected", undefined],
         ]);
 
-        // Initialised: later exceptions go straight to PostHog, nothing is queued.
+        // Started: later exceptions go straight to PostHog, nothing is queued.
         client.captureException("later");
 
         expect(posthog.captureException).toHaveBeenLastCalledWith("later", undefined);
@@ -201,15 +206,87 @@ describe("events tracked before PostHog initialises", () => {
         expect(posthog.capture).toHaveBeenCalledOnce();
         expect(sessionStorage.getItem(next.PENDING_EVENTS_KEY)).toBeNull();
     });
+});
 
-    it("drops what the account that signed out tracked", async () => {
+describe("startPostHog", () => {
+    beforeEach(() => {
+        posthog.__loaded = true;
+        posthog.has_opted_out_capturing.mockReturnValue(false);
+
+        for (const method of [posthog.capture, posthog.captureException, posthog.group, posthog.identify, posthog.register, posthog.reset]) {
+            method.mockReset();
+        }
+    });
+
+    afterEach(() => {
+        sessionStorage.clear();
+    });
+
+    const order = (method: { mock: { invocationCallOrder: number[] } }): number => method.mock.invocationCallOrder[0] ?? 0;
+
+    it("after a sign-out while the chunk loaded, resets first and sends nothing the account that left queued", async () => {
         const client = await loadClientModule();
 
         client.queueEvent("before the sign-out", {});
+        client.captureException("caught before the sign-out");
         client.forgetPostHogIdentity("key");
         client.queueEvent("after the sign-out", {});
-        client.flushPendingCaptures(await client.loadPostHog());
+        client.captureException("caught after the sign-out");
+        client.setAnalyticsIdentity({});
+        client.startPostHog(await client.loadPostHog(), () => {});
 
         expect(posthog.capture.mock.calls.map(([event]) => event)).toStrictEqual(["after the sign-out"]);
+        expect(posthog.captureException.mock.calls.map(([error]) => error)).toStrictEqual(["caught after the sign-out"]);
+        expect(posthog.reset).toHaveBeenCalledOnce();
+        expect(order(posthog.reset)).toBeLessThan(order(posthog.capture));
+        expect(order(posthog.reset)).toBeLessThan(order(posthog.captureException));
+    });
+
+    it("sends a signed-in user's queued event only once the session's identity and organization are applied", async () => {
+        const client = await loadClientModule();
+        const onStarted = vi.fn();
+
+        client.queueEvent("onboarding_started", {});
+        client.startPostHog(await client.loadPostHog(), onStarted);
+
+        // The session has not answered yet: nothing is sent, and events still queue.
+        expect(client.getStartedPostHog()).toBeUndefined();
+        expect(posthog.capture).not.toHaveBeenCalled();
+
+        client.setAnalyticsIdentity({ organization: { id: "org-1", name: "Acme" }, user: { email: "a@example.com", id: "user-1", name: "A" } });
+
+        expect(posthog.identify).toHaveBeenCalledExactlyOnceWith("user-1", { email: "a@example.com", name: "A" });
+        expect(posthog.group).toHaveBeenCalledExactlyOnceWith("organization", "org-1", { name: "Acme" });
+        expect(posthog.capture).toHaveBeenCalledOnce();
+        expect(order(posthog.identify)).toBeLessThan(order(posthog.capture));
+        expect(order(posthog.group)).toBeLessThan(order(posthog.capture));
+        expect(onStarted).toHaveBeenCalledOnce();
+    });
+
+    it("runs onStarted (the first launch report) after the reset and the identity", async () => {
+        const client = await loadClientModule();
+        const onStarted = vi.fn();
+
+        client.forgetPostHogIdentity("key");
+        client.startPostHog(await client.loadPostHog(), onStarted);
+
+        expect(onStarted).not.toHaveBeenCalled();
+
+        client.setAnalyticsIdentity({ user: { id: "user-2" } });
+
+        expect(order(posthog.reset)).toBeLessThan(order(posthog.identify));
+        expect(order(posthog.identify)).toBeLessThan(order(onStarted));
+    });
+
+    it("follows later sign-ins and sign-outs once started", async () => {
+        const client = await loadClientModule();
+
+        client.setAnalyticsIdentity({ user: { id: "user-1" } });
+        client.startPostHog(await client.loadPostHog(), () => {});
+        client.setAnalyticsIdentity({});
+
+        expect(posthog.identify).toHaveBeenCalledOnce();
+        expect(posthog.reset).toHaveBeenCalledOnce();
+        expect(posthog.register).toHaveBeenLastCalledWith({ is_anonymous: true });
     });
 });
