@@ -17,7 +17,7 @@ const harness = vi.hoisted(() => {
         finishReread: undefined as (() => void) | undefined,
         reread: vi.fn(
             async () =>
-                await new Promise<void>((resolve) => {
+                await new Promise<void>((resolve: (value: PromiseLike<void> | void) => void) => {
                     harness.finishReread = resolve;
                 }),
         ),

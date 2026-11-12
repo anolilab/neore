@@ -5,6 +5,7 @@
  * handed; the editor, its extensions and the match logic are the real ones.
  */
 import { act, render, waitFor } from "@testing-library/react";
+import type { EditorProps } from "@tiptap/pm/view";
 import { createRef } from "react";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -220,7 +221,9 @@ describe("ComposerTiptapEditor paste", () => {
         act(() => {
             const editorView = ref.current!.getEditor()!.view;
 
-            editorView.someProp("handleKeyDown", (handle) => handle(editorView, new KeyboardEvent("keydown", { key: "Enter" })));
+            editorView.someProp("handleKeyDown", (handle: NonNullable<EditorProps["handleKeyDown"]>) =>
+                handle(editorView, new KeyboardEvent("keydown", { key: "Enter" })),
+            );
         });
 
         expect(latest).toHaveBeenCalledOnce();

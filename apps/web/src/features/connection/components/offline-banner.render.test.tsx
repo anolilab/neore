@@ -97,7 +97,7 @@ describe("offline presentation", () => {
 
         setBrowserOnline(false);
 
-        expect(screen.getAllByRole("status").some((status) => status.textContent === "Offline – reconnecting…")).toBe(true);
+        expect(screen.getAllByRole("status").some((status: HTMLElement) => status.textContent === "Offline – reconnecting…")).toBe(true);
         expect(screen.queryByRole("alertdialog")).toBeNull();
     });
 
@@ -153,7 +153,7 @@ describe("offline presentation", () => {
     it.each([
         ["has no token", { isAuthenticated: false, isLoading: false }],
         ["is still resolving its token", { isAuthenticated: true, isLoading: true }],
-    ])("covers the window when the auth gate %s, whatever is cached", (_label, state) => {
+    ])("covers the window when the auth gate %s, whatever is cached", (_label: string, state: typeof auth.state) => {
         client.initial = "connecting";
         auth.state = state;
         auth.persisted = { threads: { page: [] } };
@@ -173,13 +173,13 @@ describe("offline presentation", () => {
 
         setBrowserOnline(true);
 
-        expect(screen.getAllByRole("status").some((status) => status.textContent === "Back online")).toBe(true);
+        expect(screen.getAllByRole("status").some((status: HTMLElement) => status.textContent === "Back online")).toBe(true);
 
         act(() => {
             vi.advanceTimersByTime(CONNECTION_THRESHOLDS_MS.backOnline);
         });
 
-        expect(screen.getAllByRole("status").every((status) => status.textContent === "")).toBe(true);
+        expect(screen.getAllByRole("status").every((status: HTMLElement) => status.textContent === "")).toBe(true);
     });
 
     it("stays up while the socket reconnects after the network is back, then says back online", () => {
@@ -191,13 +191,13 @@ describe("offline presentation", () => {
 
         setBrowserOnline(true);
 
-        expect(screen.getAllByRole("status").some((status) => status.textContent === "Reconnecting to the server…")).toBe(true);
+        expect(screen.getAllByRole("status").some((status: HTMLElement) => status.textContent === "Reconnecting to the server…")).toBe(true);
 
         act(() => {
             client.emit("connected");
         });
 
-        expect(screen.getAllByRole("status").some((status) => status.textContent === "Back online")).toBe(true);
+        expect(screen.getAllByRole("status").some((status: HTMLElement) => status.textContent === "Back online")).toBe(true);
     });
 
     it("on an offline start, keeps saying reconnecting after the network is back until the socket connects", () => {
@@ -207,14 +207,14 @@ describe("offline presentation", () => {
 
         setBrowserOnline(true);
 
-        expect(screen.getAllByRole("status").some((status) => status.textContent === "Reconnecting to the server…")).toBe(true);
-        expect(screen.getAllByRole("status").some((status) => status.textContent === "Back online")).toBe(false);
+        expect(screen.getAllByRole("status").some((status: HTMLElement) => status.textContent === "Reconnecting to the server…")).toBe(true);
+        expect(screen.getAllByRole("status").some((status: HTMLElement) => status.textContent === "Back online")).toBe(false);
 
         act(() => {
             client.emit("connected");
         });
 
-        expect(screen.getAllByRole("status").some((status) => status.textContent === "Back online")).toBe(true);
+        expect(screen.getAllByRole("status").some((status: HTMLElement) => status.textContent === "Back online")).toBe(true);
     });
 
     it("clears the banner without claiming back online when the network returns and no socket is open", () => {
@@ -224,7 +224,7 @@ describe("offline presentation", () => {
 
         setBrowserOnline(true);
 
-        expect(screen.getAllByRole("status").every((status) => status.textContent === "")).toBe(true);
+        expect(screen.getAllByRole("status").every((status: HTMLElement) => status.textContent === "")).toBe(true);
     });
 
     it("does not announce a socket bounce the banner never showed", () => {
@@ -237,6 +237,6 @@ describe("offline presentation", () => {
             client.emit("connected");
         });
 
-        expect(screen.getAllByRole("status").every((status) => status.textContent === "")).toBe(true);
+        expect(screen.getAllByRole("status").every((status: HTMLElement) => status.textContent === "")).toBe(true);
     });
 });

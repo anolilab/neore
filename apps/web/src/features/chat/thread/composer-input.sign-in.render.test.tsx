@@ -10,6 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useLoginPromptStore } from "@/features/auth/stores/login-prompt-store";
 import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
+import type { QueuedChatPrompt } from "@/features/chat/core/stores/prompt-queue-store";
 import { usePromptQueueStore } from "@/features/chat/core/stores/prompt-queue-store";
 
 const harness = vi.hoisted(() => {
@@ -241,6 +242,6 @@ describe("ComposerInput while the connection is down", () => {
         fireEvent.click(screen.getByRole("button", { name: "Send message" }));
 
         expect(harness.sendMessage).not.toHaveBeenCalled();
-        expect(usePromptQueueStore.getState().queues["thread-1"]?.items.map((item) => item.text)).toStrictEqual(["a follow-up"]);
+        expect(usePromptQueueStore.getState().queues["thread-1"]?.items.map((item: QueuedChatPrompt) => item.text)).toStrictEqual(["a follow-up"]);
     });
 });

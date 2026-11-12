@@ -207,7 +207,7 @@ export const usePromptQueueStore = create<PromptQueueStore>()((set, get) => {
             writeStoredQueue(threadId, merged);
         },
         holdOffline: (threadId, explicit) =>
-            set((state) => {
+            set((state: PromptQueueStore) => {
                 return { offlineHolds: { ...state.offlineHolds, [threadId]: { explicit: explicit || state.offlineHolds[threadId]?.explicit === true } } };
             }),
         move: (threadId, id, to) =>
@@ -240,7 +240,7 @@ export const usePromptQueueStore = create<PromptQueueStore>()((set, get) => {
             const held = get().offlineHolds[threadId];
 
             if (held) {
-                set((state) => {
+                set((state: PromptQueueStore) => {
                     const offlineHolds = { ...state.offlineHolds };
 
                     delete offlineHolds[threadId];

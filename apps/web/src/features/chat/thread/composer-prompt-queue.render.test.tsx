@@ -3,6 +3,7 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import type { QueuedChatPrompt } from "@/features/chat/core/stores/prompt-queue-store";
 import { usePromptQueueStore } from "@/features/chat/core/stores/prompt-queue-store";
 import { EMPTY_PROMPT_QUEUE, serializePromptQueue } from "@/features/chat/core/utils/prompt-queue";
 
@@ -218,7 +219,7 @@ describe("composer prompt queue", () => {
 
         // The lib target has no `Promise.withResolvers` yet.
         // eslint-disable-next-line unicorn/prefer-promise-with-resolvers
-        const promise = new Promise<{ outcome: "withdrawn" }>((resolve) => {
+        const promise = new Promise<{ outcome: "withdrawn" }>((resolve: (value: PromiseLike<{ outcome: "withdrawn" }> | { outcome: "withdrawn" }) => void) => {
             finish = resolve;
         });
 
@@ -269,7 +270,7 @@ describe("composer prompt queue", () => {
 
         // The lib target has no `Promise.withResolvers` yet.
         // eslint-disable-next-line unicorn/prefer-promise-with-resolvers
-        const promise = new Promise<{ outcome: "withdrawn" }>((resolve) => {
+        const promise = new Promise<{ outcome: "withdrawn" }>((resolve: (value: PromiseLike<{ outcome: "withdrawn" }> | { outcome: "withdrawn" }) => void) => {
             finish = resolve;
         });
 
@@ -289,7 +290,7 @@ describe("composer prompt queue", () => {
         });
 
         expect(chat.sendMessage).not.toHaveBeenCalled();
-        expect(usePromptQueueStore.getState().queues[chat.threadId]?.items.map((item) => item.text)).toStrictEqual(["steered"]);
+        expect(usePromptQueueStore.getState().queues[chat.threadId]?.items.map((item: QueuedChatPrompt) => item.text)).toStrictEqual(["steered"]);
 
         chat.view = "online";
         view.rerender(<ComposerPromptQueue />);
