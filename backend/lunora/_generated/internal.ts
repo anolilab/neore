@@ -502,7 +502,8 @@ export interface InternalApiTypes {
             };
         };
         start_claim: {
-            claimChatStart: FunctionReference<"mutation", { clientMessageId: string; fingerprint: string; streams: boolean; userId: string }, { claim: { claimedAt: number; key: string }; outcome: "claimed" } | { outcome: "in_progress" } | { outcome: "mismatch" } | { messageId: string; model?: string; newThread?: boolean; outcome: "duplicate"; recoverTitles?: boolean; streamId?: string; streamUnclaimed?: boolean; threadId: string } | { claim: { claimedAt: number; key: string }; messageId: string; model?: string; newThread?: boolean; outcome: "resume"; threadId: string }>;
+            claimChatStart: FunctionReference<"mutation", { clientMessageId: string; fingerprint: string; streams: boolean; userId: string }, { claim: { claimedAt: number; key: string }; outcome: "claimed" } | { outcome: "in_progress" } | { outcome: "mismatch" } | { messageId: string; model?: string; newThread?: boolean; outcome: "duplicate"; titlesClaim?: { claimedAt: number; key: string }; streamId?: string; streamUnclaimed?: boolean; threadId: string } | { claim: { claimedAt: number; key: string }; messageId: string; model?: string; newThread?: boolean; outcome: "resume"; threadId: string }>;
+            recordStartTitlesScheduled: FunctionReference<"mutation", { claim: { claimedAt: number; key: string }; messageId: string }, null>;
             releaseChatStart: FunctionReference<"mutation", { claim: { claimedAt: number; key: string } }, null>;
             saveStartPrompt: FunctionReference<"mutation", { claim: { claimedAt: number; key: string }; fileIds?: Array<string>; messageContent: Array<Record<string, unknown>>; model: string; parentId?: string; threadId: string }, { messageId: string }>;
         };
@@ -1828,6 +1829,7 @@ export const internal: InternalApiTypes = {
         },
         start_claim: {
             claimChatStart: { __lunoraRef: "chat_start_claim:claimChatStart" },
+            recordStartTitlesScheduled: { __lunoraRef: "chat_start_claim:recordStartTitlesScheduled" },
             releaseChatStart: { __lunoraRef: "chat_start_claim:releaseChatStart" },
             saveStartPrompt: { __lunoraRef: "chat_start_claim:saveStartPrompt" },
         },

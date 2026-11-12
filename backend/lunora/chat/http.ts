@@ -999,7 +999,8 @@ const runChatStartOnShard = async (
     // neither waits on the other, and the response waits on both.
     // The turn is already saved, charged and queued: a title job that cannot be scheduled must not fail the
     // request, or a retry (and an idempotency key) would run the turn a second time.
-    const runTitleJobs = async (): Promise<void> => {
+    // Whether every job was scheduled.
+    const runTitleJobs = async (): Promise<boolean> => {
         const titled = await Promise.allSettled(titleJobs.map(async (scheduleTitleJob) => await scheduleTitleJob()));
 
         for (const outcome of titled) {
@@ -1007,6 +1008,8 @@ const runChatStartOnShard = async (
                 chatLogger.warn("Failed to schedule a title job after the turn was queued:", outcome.reason);
             }
         }
+
+        return titled.every((outcome) => outcome.status === "fulfilled");
     };
 
     if (startOutcome?.outcome === "duplicate") {
@@ -1020,11 +1023,21 @@ const runChatStartOnShard = async (
                 await enqueueRun({ messageId, streamId: duplicateStreamId, threadId });
             }
         } finally {
-            // The first send's title jobs follow its run, so a failed submission skipped them: handed to one resend (`claimChatStart`).
+            // The first send's title jobs follow its run, so a failed submission skipped them. Recorded once all are scheduled: a
+            // resend that fails to schedule one, or dies first, leaves them to the next (`claimChatStart`).
             // A guest note's text never reaches the title model.
-            if (startOutcome.recoverTitles === true && !isGuestSend) {
+            const { titlesClaim } = startOutcome;
+
+            if (titlesClaim !== undefined && !isGuestSend) {
                 scheduleTitleJobs(threadId, messageId, startOutcome.newThread === true);
-                await runTitleJobs();
+
+                if (await runTitleJobs()) {
+                    await context
+                        .runMutation(internal.chat.start_claim.recordStartTitlesScheduled, { claim: titlesClaim, messageId })
+                        .catch((error: unknown) => {
+                            chatLogger.warn("Could not record a resend's title jobs as scheduled:", error);
+                        });
+                }
             }
         }
 

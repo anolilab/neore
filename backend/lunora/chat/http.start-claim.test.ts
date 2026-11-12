@@ -20,6 +20,7 @@ import {
     CHAT_START_SCOPE,
     chatStartFingerprint,
     claimChatStart,
+    recordStartTitlesScheduled,
     releaseChatStart,
     saveStartPrompt,
 } from "./start-claim";
@@ -40,6 +41,8 @@ const state = vi.hoisted(() => {
         scheduled: [] as string[],
         /** What each scheduled job was handed, in the same order. */
         scheduledArgs: [] as Record<string, unknown>[],
+        /** The next submission of this reference to the HTTP scheduler fails, once. */
+        scheduleFails: undefined as string | undefined,
         /** How long the stream creation takes: the clock moves on by this before it runs. */
         streamDelayMs: 0,
         /** The next stream creation fails, once. */
@@ -97,6 +100,12 @@ vi.mock("../lib/http-scheduler", () => {
         httpScheduler: () => {
             return {
                 runAfter: async (_delay: number, reference: { __lunoraRef: string }, args: Record<string, unknown>) => {
+                    if (state.scheduleFails === reference.__lunoraRef) {
+                        state.scheduleFails = undefined;
+
+                        throw new Error("the scheduler refused the job");
+                    }
+
                     state.scheduled.push(reference.__lunoraRef);
                     state.scheduledArgs.push(args);
                 },
@@ -170,6 +179,7 @@ const HANDLERS: Record<string, (args: any) => Promise<unknown>> = {
         return await run(async (ctx) => await (startGoal as any).handler(withoutNestedMutations(ctx), args));
     },
     "chat_start_claim:claimChatStart": async (args) => await run(async (ctx) => await ctx.runMutation(claimChatStart, args)),
+    "chat_start_claim:recordStartTitlesScheduled": async (args) => await run(async (ctx) => await ctx.runMutation(recordStartTitlesScheduled, args)),
     "chat_start_claim:releaseChatStart": async (args) => await run(async (ctx) => await ctx.runMutation(releaseChatStart, args)),
     "chat_start_claim:saveStartPrompt": async (args) => await run(async (ctx) => await (saveStartPrompt as any).handler(withoutNestedMutations(ctx), args)),
     "chat_streaming:createStreamWithMessage": async (args) => {
@@ -221,6 +231,7 @@ beforeEach(async () => {
     state.legacySaves = 0;
     state.scheduled.length = 0;
     state.scheduledArgs.length = 0;
+    state.scheduleFails = undefined;
     state.streamDelayMs = 0;
     state.streamFails = false;
     vi.mocked(enqueueJob).mockClear();
@@ -523,6 +534,33 @@ describe("/chat/start with clientMessageId", () => {
         expect((await send({ clientMessageId: "unqueued-chat" })).json).toMatchObject({ duplicate: true });
         expect(enqueueJob).toHaveBeenCalledTimes(3);
         expect(state.scheduled).toHaveLength(2);
+    });
+
+    it("hands the title jobs to the next resend when the recovering one could not schedule them all", async () => {
+        state.enqueueFails = true;
+
+        await expect(send({ clientMessageId: "unscheduled-chat" })).rejects.toThrow("the queue refused the run");
+
+        // The recovering resend queues the run, but the scheduler refuses the category job.
+        state.scheduleFails = "chat_functions:createCategoryChat";
+        expect((await send({ clientMessageId: "unscheduled-chat" })).json).toMatchObject({ duplicate: true });
+        expect(state.scheduled).toStrictEqual(["chat_functions:createTitleChat"]);
+
+        // The next resend schedules both again, the title under the same billing key; the one after schedules nothing.
+        const resent = await send({ clientMessageId: "unscheduled-chat" });
+
+        expect(state.scheduled.toSorted((left, right) => left.localeCompare(right, "en"))).toStrictEqual([
+            "chat_functions:createCategoryChat",
+            "chat_functions:createTitleChat",
+            "chat_functions:createTitleChat",
+        ]);
+
+        const titleJobIds = state.scheduledArgs.filter((_args, index) => state.scheduled[index] === "chat_functions:createTitleChat").map((job) => job.jobId);
+
+        expect(new Set(titleJobIds)).toStrictEqual(new Set([resent.json.messageId]));
+
+        await send({ clientMessageId: "unscheduled-chat" });
+        expect(state.scheduled).toHaveLength(3);
     });
 
     it("gives a claimed send's title job one billing key, so a recovering resend never pays for a second title", async () => {
