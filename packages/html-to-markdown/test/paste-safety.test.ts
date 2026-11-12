@@ -16,7 +16,6 @@ const NON_CONTENT_CASES: [string, string][] = [
     ["script", "<script>alert(1)</script><p>a</p>"],
     ["style", "<style>p{color:red}</style><p>a</p>"],
     ["noscript", "<noscript><p>fallback</p></noscript><p>a</p>"],
-    ["template", "<template><p>tpl</p></template><p>a</p>"],
     ["title", "<title>Doc title</title><p>a</p>"],
 ];
 
@@ -27,6 +26,11 @@ const UNSAFE_DESTINATIONS = [
     "java\tscript:alert(1)",
     "java\nscript:alert(1)",
     "\u{1}javascript:alert(1)",
+    // Character references and backslash escapes: CommonMark decodes them in a destination, so the scheme is checked after that.
+    "javascript&amp;#58;alert(1)",
+    "javascript&amp;#x3a;alert(1)",
+    "javascript&amp;colon;alert(1)",
+    String.raw`javascript\:alert(1)`,
     "data:text/html,<p>hi</p>",
     "vbscript:msgbox(1)",
     "file:///etc/passwd",
@@ -66,6 +70,24 @@ describe("non-content elements emit nothing", () => {
         expect(new TurndownService().turndown("<p>a <script>x()</script> b</p>")).toBe("a b");
     });
 
+    // The HTML parser moves a template's children into `.content`, so a string input never has them as direct children.
+    // This node is built in code, so the template's text is a direct child and only the removal can drop it.
+    it("drops a template whose children are direct children of the template", () => {
+        const document = createDocument("<div></div>");
+        const div = document.querySelector("div") as HTMLElement;
+        const template = document.createElement("template");
+        const paragraph = document.createElement("p");
+
+        /* eslint-disable unicorn/prefer-dom-node-append -- domino has no append(), so appendChild is the only way here */
+        paragraph.appendChild(document.createTextNode("tpl"));
+        template.appendChild(paragraph);
+        div.appendChild(template);
+        div.appendChild(document.createTextNode("a"));
+        /* eslint-enable unicorn/prefer-dom-node-append */
+
+        expect(new TurndownService().turndown(div as unknown as Node)).toBe("a");
+    });
+
     // The Word wrapper leaves whitespace before the paragraph. Upstream keeps that too, so these tests trim only the
     // whitespace; the style text must still be absent.
     it("drops the Word style sheet from the Word paragraph fixture", () => {
@@ -84,6 +106,23 @@ describe("non-content elements emit nothing", () => {
 describe("safeLinks", () => {
     it("keeps a javascript: destination by default, as upstream does", () => {
         expect(new TurndownService().turndown(anchor("javascript:alert(1)"))).toBe(String.raw`[x](javascript:alert\(1\))`);
+    });
+
+    it("keeps a query's & unescaped by default, as upstream does", () => {
+        expect(new TurndownService().turndown(anchor("https://example.com/?a=1&b=2"))).toBe("[x](https://example.com/?a=1&b=2)");
+    });
+
+    it("escapes & in a safe destination so the rendered href keeps the query", () => {
+        expect(new TurndownService({ safeLinks: true }).turndown(anchor("https://example.com/?a=1&b=2"))).toBe("[x](https://example.com/?a=1&amp;b=2)");
+    });
+
+    it("drops a relative destination with & before its first slash, query or fragment", () => {
+        expect(new TurndownService({ safeLinks: true }).turndown(anchor("page&amp;x.html"))).toBe("x");
+    });
+
+    // Images are out of scope for safeLinks: an image does not run script, so its src is kept as it was before.
+    it("keeps a javascript: image source with safeLinks, as the option does not cover images", () => {
+        expect(new TurndownService({ safeLinks: true }).turndown(`<img src="javascript:alert(1)">`)).toBe(String.raw`![](javascript:alert\(1\))`);
     });
 
     it.each(UNSAFE_DESTINATIONS)("renders %j as its text only", (href) => {

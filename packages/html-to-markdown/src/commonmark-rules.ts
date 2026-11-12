@@ -32,7 +32,7 @@ class ReferenceLinkRule implements Rule {
             return content;
         }
 
-        const href = escapeLinkDestination(rawHref);
+        const href = escapeLinkDestination(rawHref, options.safeLinks);
         let title = cleanAttribute(node.getAttribute("title"));
 
         if (title) {
@@ -220,7 +220,7 @@ const rules: Record<string, Rule> = {
                 return content;
             }
 
-            const href = escapeLinkDestination(rawHref);
+            const href = escapeLinkDestination(rawHref, options.safeLinks);
             const title = escapeLinkTitle(cleanAttribute(node.getAttribute("title")));
             const titlePart = title ? ` "${title}"` : "";
 
@@ -335,20 +335,40 @@ function isSpacePadded(text: string): boolean {
 
 const SCHEME = /^([a-z][\d+.a-z-]*):/i;
 const TAB_OR_NEWLINE = /[\t\n\r]/g;
+const BACKSLASH_ESCAPE = /\\([!"#$%&'()*+,./:;<=>?@[\\\]^_`{|}~-])/g;
+const NUMERIC_REFERENCE = /&#(?:(\d+)|x([\da-f]+));?/gi;
+const HEAD_END = /[/?#]/;
 const SAFE_SCHEMES = new Set(["http", "https", "mailto", "tel"]);
 
 /**
  * True when a link destination has a scheme outside `SAFE_SCHEMES` (`javascript:`, `data:`, `vbscript:`, `file:`...).
  * A destination with no scheme is relative and kept.
  *
- * The scheme is read the way a browser reads an `href`: leading and trailing C0 controls and spaces are dropped, and
- * tabs and line breaks are removed everywhere, before the scheme is matched. A plain scheme regular expression is used
- * instead of `new URL`, which throws on a relative URL and on some schemes with a bad host; those must not pass as relative.
+ * The destination is read the way CommonMark decodes it (backslash escapes and numeric character references), then the
+ * way a browser reads an `href` (leading and trailing C0 controls and spaces dropped, tabs and line breaks removed).
+ * A named reference such as `&colon;` is not decoded, so a `&` before the first `/`, `?` or `#` makes the destination
+ * unsafe: it could spell a scheme. A plain scheme regular expression is used instead of `new URL`, which throws on a
+ * relative URL and on some schemes with a bad host; those must not pass as relative.
  */
 function isUnsafeDestination(href: string): boolean {
-    const scheme = SCHEME.exec(stripUrlNoise(href))?.[1];
+    const decoded = stripUrlNoise(decodeDestination(href));
+    const head = decoded.split(HEAD_END, 1)[0] ?? "";
+
+    if (head.includes("&")) {
+        return true;
+    }
+
+    const scheme = SCHEME.exec(decoded)?.[1];
 
     return scheme !== undefined && !SAFE_SCHEMES.has(scheme.toLowerCase());
+}
+
+function decodeDestination(href: string): string {
+    return href.replaceAll(BACKSLASH_ESCAPE, "$1").replaceAll(NUMERIC_REFERENCE, (_match, decimal?: string, hex?: string) => {
+        const codePoint = decimal === undefined ? Number.parseInt(hex ?? "", 16) : Number(decimal);
+
+        return codePoint > 0 && codePoint <= 1_114_111 ? String.fromCodePoint(codePoint) : "�";
+    });
 }
 
 function stripUrlNoise(href: string): string {
@@ -372,8 +392,12 @@ function cleanAttribute(attribute: string | null): string {
     return attribute ? attribute.replaceAll(LINE_BREAK_RUN, "\n") : "";
 }
 
-function escapeLinkDestination(destination: string): string {
-    const escaped = destination
+/**
+ * With `safeLinks`, `\` and `&` are escaped too, so the rendered destination is exactly the text that was checked and no
+ * escape or character reference is decoded after the check.
+ */
+function escapeLinkDestination(destination: string, isSafeLinks = false): string {
+    const escaped = (isSafeLinks ? destination.replaceAll("\\", "\\\\").replaceAll("&", "&amp;") : destination)
         .replaceAll("<", String.raw`\<`)
         .replaceAll(">", String.raw`\>`)
         .replaceAll("(", String.raw`\(`)
