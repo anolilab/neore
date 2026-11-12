@@ -53,6 +53,7 @@ import type { GhostController, GhostEligibility, GhostRequest } from "./ghost-co
 import { createGhostController, shouldAnnounceGhost } from "./ghost-completion-controller";
 import { plainTextToHtml } from "./plain-text";
 import SlashCommandPopup from "./slash-command-popup";
+import useMentionPrefetch from "./use-mention-prefetch";
 import VariableAutocompletePopup from "./variable-autocomplete-popup";
 import type { VimMode as VimModeName } from "./vim-keys";
 
@@ -355,6 +356,9 @@ const ComposerTiptapEditor = ({
         },
     });
 
+    // The "@" and "/" menus' data, loaded on the first edit that leaves text in the composer, so they open with it.
+    const suggestionsWarm = useMentionPrefetch(editor, suggestions);
+
     // Sync placeholder ref + trigger a decoration re-render (with a brief fade) when placeholder changes.
     useEffect(() => {
         if (!editor) {
@@ -616,6 +620,7 @@ const ComposerTiptapEditor = ({
                 onDismiss={handleDismissSlash}
                 onReplace={handleReplace}
                 readDraft={readDraft}
+                warm={suggestionsWarm}
             />
 
             {/* File mention popup */}
