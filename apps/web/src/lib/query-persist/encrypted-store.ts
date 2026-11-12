@@ -315,12 +315,16 @@ export const sealRecord = async (store: RecordStore, userId: string, text: strin
     const iv = crypto.getRandomValues(new Uint8Array(12));
     const data = await crypto.subtle.encrypt({ additionalData: additionalData(userId), iv, name: "AES-GCM" }, sealingKey.key, new TextEncoder().encode(text));
     const entry: SealedRecord = { data, iv, writtenAt };
-    // Not over a record another tab took later while this one was sealed. One taken the same millisecond is as fresh.
+    // Not over a record another tab took later while this one was sealed. One taken the same millisecond is as fresh. A
+    // record stamped after the moment this write commits came from a clock that has since been set back: it is not newer,
+    // and keeping it would block every save until the clock caught up.
     const isWritten = await store.putEntry(
         userId,
         entry,
         (storedKey: unknown, storedEntry: unknown) =>
-            isAccountKey(storedKey) && storedKey.id === sealingKey.id && !(isSealedRecord(storedEntry) && storedEntry.writtenAt > writtenAt),
+            isAccountKey(storedKey) &&
+            storedKey.id === sealingKey.id &&
+            !(isSealedRecord(storedEntry) && storedEntry.writtenAt > writtenAt && storedEntry.writtenAt <= Date.now()),
     );
 
     return isWritten ? sealOf(entry) : undefined;

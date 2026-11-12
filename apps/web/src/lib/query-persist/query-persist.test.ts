@@ -635,6 +635,16 @@ describe("saving", () => {
         expect(textOf(next, KEY)).toBe("fresh");
     });
 
+    it("saves over a record stamped by a clock that was later set back", async () => {
+        const memory = memoryStore();
+
+        // Saved while the clock ran an hour ahead.
+        await sealRecord(memory.store, ALICE, "from the future", Date.now() + 60 * 60 * 1000);
+
+        await expect(sealRecord(memory.store, ALICE, "now", Date.now())).resolves.toBeDefined();
+        await expect(openRecord(memory.store, ALICE)).resolves.toMatchObject({ text: "now" });
+    });
+
     it("does not carry a read older than the age limit into a new record", async () => {
         const memory = memoryStore();
         const queryClient = new QueryClient();
@@ -940,14 +950,15 @@ describe("IndexedDB store", () => {
             return;
         }
 
+        // The other tab's record is no later than now; this tab's state was taken a millisecond before it.
         const takenAt = Date.now();
 
-        await sealRecord(store, ALICE, "newer", takenAt + 1);
-        await expect(sealRecord(store, ALICE, "older", takenAt)).resolves.toBeUndefined();
+        await sealRecord(store, ALICE, "newer", takenAt);
+        await expect(sealRecord(store, ALICE, "older", takenAt - 1)).resolves.toBeUndefined();
         await expect(openRecord(store, ALICE)).resolves.toMatchObject({ text: "newer" });
 
         // Taken the same millisecond: as fresh, so it is written.
-        await expect(sealRecord(store, ALICE, "as fresh", takenAt + 1)).resolves.toBeDefined();
+        await expect(sealRecord(store, ALICE, "as fresh", takenAt)).resolves.toBeDefined();
         await expect(openRecord(store, ALICE)).resolves.toMatchObject({ text: "as fresh" });
     });
 });
