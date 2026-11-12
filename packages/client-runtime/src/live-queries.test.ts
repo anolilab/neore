@@ -367,6 +367,41 @@ describe(LiveQueryManager, () => {
         expect(fake.client.setWsToken).toHaveBeenCalledTimes(4);
     });
 
+    it("drops the thread list when another account's token lands, not on the server-rendered first token or a refresh", () => {
+        const threadList = key("chat_composite:getThreadListData");
+        const other = key("tasks_functions:getTaskBoard");
+
+        queryClient.setQueryData(threadList, ["rendered for user-1"]);
+        queryClient.setQueryData(other, ["kept"]);
+
+        vi.stubGlobal("window", globalThis);
+        seedHydratedAuthToken(fake.client, jwt("user-1"));
+        vi.unstubAllGlobals();
+        fake.setToken(jwt("user-1", 2));
+
+        expect(queryClient.getQueryData(threadList)).toStrictEqual(["rendered for user-1"]);
+
+        fake.setToken(jwt("user-2"));
+
+        expect(queryClient.getQueryData(threadList)).toBeUndefined();
+        expect(queryClient.getQueryData(other)).toStrictEqual(["kept"]);
+
+        // Across a token-less gap, the next account is still another one.
+        queryClient.setQueryData(threadList, ["user-2's"]);
+        fake.setToken(null);
+        fake.setToken(jwt("user-3"));
+
+        expect(queryClient.getQueryData(threadList)).toBeUndefined();
+
+        // The same account back after a gap reads its list again: what was read without a bearer may be another
+        // account's cookie session.
+        fake.setToken(null);
+        queryClient.setQueryData(threadList, ["read without a bearer"]);
+        fake.setToken(jwt("user-3", 2));
+
+        expect(queryClient.getQueryData(threadList)).toBeUndefined();
+    });
+
     it("seeds at most MAX_CONCURRENT_SEEDS subscriptions at once", () => {
         const unobserve = Array.from({ length: MAX_CONCURRENT_SEEDS + 2 }, (_, index) => observe(key(`x:q${String(index)}`)));
 

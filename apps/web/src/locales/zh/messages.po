@@ -26268,7 +26268,7 @@ msgstr "请在设置中重新连接 Git 托管服务，以关联拉取请求。"
 msgid "Reconnecting"
 msgstr "正在重新连接"
 
-#: src/features/connection/components/connection-banner.tsx:25
+#: src/features/connection/components/offline-banner.tsx:24
 msgid "Reconnecting to the server…"
 msgstr "正在重新连接服务器…"
 
@@ -35862,6 +35862,10 @@ msgstr "变量："
 msgid "Vault"
 msgstr "保险库"
 
+#: src/features/chat/thread/composer-tiptap/file-mention-popup.tsx
+msgid "In this project"
+msgstr "在此项目中"
+
 #: src/features/chat/thread/composer-tiptap/file-mention-popup.tsx:392
 msgid "Vault files"
 msgstr "文件库文件"
@@ -37374,10 +37378,6 @@ msgstr "你当前正在模拟登录某个用户"
 msgid "You are not watching any repository."
 msgstr "你没有监视任何仓库。"
 
-#: src/features/connection/components/connection-banner.tsx:23
-msgid "You are offline."
-msgstr "你已离线。"
-
 #: src/features/connection/components/offline-screen.tsx:47
 msgid "You are offline. Neore will reconnect when the network is back."
 msgstr "你已离线。网络恢复后，Neore 将重新连接。"
@@ -37998,3 +37998,15 @@ msgstr "苏黎世"
 #: src/features/evals/components/run-comparison.tsx:150
 msgid "Δ points"
 msgstr "Δ 分数"
+
+#: src/features/connection/components/offline-banner.tsx:22
+msgid "Offline – reconnecting…"
+msgstr "离线 – 正在重新连接…"
+
+#: src/features/connection/components/offline-banner.tsx:26
+msgid "Back online"
+msgstr "已恢复在线"
+
+#: src/features/chat/thread/composer-input.tsx:1058
+msgid "You are offline. Your message stays here; send it once you are back online."
+msgstr "你已离线。你的消息会保留在这里；恢复在线后再发送。"

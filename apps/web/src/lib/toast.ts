@@ -212,18 +212,6 @@ export const promptToast = {
  * Network-related toasts
  */
 export const networkToast = {
-    offline: () =>
-        showWarning(localized(msg`You're offline. Some features may not work.`), {
-            duration: 0, // Persistent until dismissed
-            id: "offline-warning",
-        }),
-
-    online: () => {
-        dismissToast("offline-warning");
-
-        return showSuccess(localized(msg`Connection restored!`), { duration: 3000 });
-    },
-
     serverError: () =>
         showError(localized(msg`Server error. Please try again later.`), {
             duration: 6000,

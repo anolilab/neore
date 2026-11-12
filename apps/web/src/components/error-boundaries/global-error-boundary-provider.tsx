@@ -7,7 +7,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { ErrorUtilities } from "@/lib/errors";
 import { UserErrorMessage } from "@/lib/localized-message";
-import { networkToast, showError } from "@/lib/toast";
+import { showError } from "@/lib/toast";
 
 import { ErrorBoundary } from "../error-boundary";
 
@@ -23,20 +23,13 @@ const GlobalErrorBoundaryProvider = ({ children }: GlobalErrorBoundaryProviderPr
     const [errorId, setErrorId] = useState<string | null>(null);
     const posthog = usePostHog();
 
-    // Monitor network status
+    // Network status for the fallback's note. The banner (`OfflineBanner`) tells a working app it is offline.
     useEffect(() => {
         // Read the real state after mount: `navigator` is not the same on the server.
         setIsOnline(navigator.onLine);
 
-        const handleOnline = () => {
-            setIsOnline(true);
-            networkToast.online();
-        };
-
-        const handleOffline = () => {
-            setIsOnline(false);
-            networkToast.offline();
-        };
+        const handleOnline = () => setIsOnline(true);
+        const handleOffline = () => setIsOnline(false);
 
         globalThis.addEventListener("online", handleOnline);
         globalThis.addEventListener("offline", handleOffline);

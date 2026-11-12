@@ -10,6 +10,7 @@ import geistLatinFont from "@fontsource-variable/geist/files/geist-latin-wght-no
 import { msg } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { useAuth } from "@lunora/react";
+import type { SessionAuthStatus } from "@neore/client-runtime";
 import { seedHydratedAuthToken, TOKEN_RETRY_DELAY_MS, tokenRefreshDelayMs } from "@neore/client-runtime";
 import { IconSpriteSheet } from "@neore/ui/components/ai-elements/provider-icon";
 import { CSPProvider } from "@neore/ui/components/csp-provider";
@@ -22,16 +23,19 @@ import { ThemeProvider } from "next-themes";
 import type { ReactNode } from "react";
 import { lazy, Suspense, useCallback, useEffect, useEffectEvent, useRef, useState } from "react";
 
-import ImpersonationBanner from "@/features/admin/components/impersonation-banner";
+import ImpersonationBannerGate from "@/features/admin/components/impersonation-banner-gate";
 import AppearanceSync from "@/features/appearance/components/appearance-sync";
 import { ACCENT_BOOT_SCRIPT } from "@/features/appearance/lib/accent-boot-script";
 import { CHAT_TEXT_SIZE_BOOT_SCRIPT } from "@/features/appearance/lib/chat-text-size";
 import LoginPromptHost from "@/features/auth/components/auth/login-prompt-host";
 import { AuthQueryProvider } from "@/features/auth/lib/auth-query-provider";
+import { clearLastAccountHint, hasLastAccountHint, startsSignedIn, writeLastAccountHint } from "@/features/auth/lib/last-account-hint";
 import AuthUIProviderTanstack from "@/features/auth/lib/tanstack/auth-ui-provider-tanstack";
 import { closeSidePanelForSessionSwitch } from "@/features/chat/core/stores/chat-ui-store";
-import { clearComposerDrafts } from "@/features/chat/split/composer-drafts";
+import { clearPromptQueues } from "@/features/chat/core/stores/prompt-queue-session";
+import { clearComposerDrafts, clearDraftsForSessionSwitch } from "@/features/chat/split/composer-drafts";
 import ConnectionProvider from "@/features/connection/components/connection-provider";
+import OfflineBanner from "@/features/connection/components/offline-banner";
 import { useUIStateStore } from "@/features/layout/stores/ui-state-store";
 import type { SettingsTab } from "@/features/settings/lib/settings-navigation";
 import usePostHogIdentity from "@/hooks/use-posthog-identity";
@@ -159,6 +163,9 @@ const CONSENT_CATEGORIES: ("experience" | "functionality" | "marketing" | "measu
 // the browser with no geolocation, so every visitor is treated as an unknown location and asked to opt in.
 const CONSENT_MODE = env.VITE_C15T_MODE === "c15t" && env.VITE_C15T_BACKEND_URL ? hosted({ backendURL: env.VITE_C15T_BACKEND_URL }) : local();
 
+// The last signed-in user (set in an effect, so browser only).
+const signedInUser: { id?: string } = {};
+
 /**
  * Handles data refetching after authentication changes.
  * Monitors auth state transitions and refetches queries when:
@@ -168,12 +175,12 @@ const CONSENT_MODE = env.VITE_C15T_MODE === "c15t" && env.VITE_C15T_BACKEND_URL 
  * 4. Session is refreshed
  * Must be rendered inside CRPCProvider / LunoraProvider.
  */
-const AuthRecovery = ({ children }: { children: ReactNode }) => {
+const AuthRecovery = ({ children, serverAuthStatus }: { children: ReactNode; serverAuthStatus: SessionAuthStatus | undefined }) => {
     const { isLoading, isAuthenticated } = useLunoraAuth();
     // Whether the RPC client actually holds a token. NOT the same as
     // `isAuthenticated`: Lunora's identity probe answers from the session
     // cookie, so `isAuthenticated` can read true while every RPC goes out bare.
-    const { token: rpcToken } = useAuth();
+    const { status: identityStatus, token: rpcToken, user: identityUser } = useAuth();
     const queryClient = useQueryClient();
     const lunoraClient = useLunora();
     const { data: sessionData } = authClient.useSession();
@@ -269,9 +276,34 @@ const AuthRecovery = ({ children }: { children: ReactNode }) => {
         const wasAuthenticated = previousAuthStateRef.current;
         const wasAnonymous = previousIsAnonymousRef.current;
 
+        const clearEndedSession = () => {
+            queryClient.clear();
+            // The side panel's document or PDF was the ended session's: whoever signs in next, without a reload, must not find it.
+            closeSidePanelForSessionSwitch("after");
+            // Parked drafts and model choices (split view) are the ended session's too; every account's when it is not known whose.
+            clearComposerDrafts(signedInUser.id);
+            // Queued prompts in this tab's sessionStorage too: the optimistic layout must not restore them for the next visitor.
+            clearPromptQueues();
+            // An expired session skips both sign-out handlers, so the dock badge is cleared here.
+            void setNativeBadge(0);
+        };
+
         // A reload after the session ended starts signed out, so no transition shows it: clear the badge here too.
         if (wasAuthenticated === null && !isAuthenticated) {
-            void setNativeBadge(0);
+            // The chat layout may have painted optimistically (`OptimisticAuthGate`) with what the server sent
+            // for a session that is now gone: drop it all, as for a sign-out.
+            if (startsSignedIn(serverAuthStatus, hasLastAccountHint())) {
+                clearEndedSession();
+            } else {
+                // A session that expired before the reload left its queued prompts in this tab: the next account must not get them.
+                clearPromptQueues();
+                void setNativeBadge(0);
+            }
+        }
+
+        // Answered "no session" (sign-out, expiry, revocation): the next start must not paint the signed-in layout.
+        if (!isAuthenticated) {
+            clearLastAccountHint();
         }
 
         // User just logged in (was not authenticated, now is)
@@ -293,18 +325,23 @@ const AuthRecovery = ({ children }: { children: ReactNode }) => {
         // User logged out (was authenticated, now is not)
         else if (wasAuthenticated === true && !isAuthenticated) {
             console.log("[AuthRecovery] User logged out - clearing queries");
-            queryClient.clear();
-            // The side panel's document or PDF was the ended session's: whoever signs in next, without a reload, must not find it.
-            closeSidePanelForSessionSwitch("after");
-            // Parked drafts and model choices (split view) are the ended session's too.
-            clearComposerDrafts();
-            // An expired session skips both sign-out handlers, so the dock badge is cleared here.
-            void setNativeBadge(0);
+            clearEndedSession();
         }
 
         previousAuthStateRef.current = isAuthenticated;
         previousIsAnonymousRef.current = userIsAnonymous;
-    }, [isLoading, isAuthenticated, userIsAnonymous, queryClient]);
+    }, [isLoading, isAuthenticated, userIsAnonymous, queryClient, serverAuthStatus]);
+
+    // A confirmed session, so the next start paints the chat layout before the identity probe answers
+    // (`OptimisticAuthGate`). A marker only: which account is not kept. The id is a dependency so an account switch,
+    // which clears the marker while the status stays "authenticated", writes it again for the account switched to.
+    const identityUserId = identityUser?.id;
+
+    useEffect(() => {
+        if (identityStatus === "authenticated" && identityUserId) {
+            writeLastAccountHint();
+        }
+    }, [identityStatus, identityUserId]);
 
     /**
      * Adopt an existing session that the Lunora client has no token for.
@@ -318,6 +355,11 @@ const AuthRecovery = ({ children }: { children: ReactNode }) => {
      */
     useEffect(() => {
         const userId = sessionData?.user?.id;
+
+        // Kept once the session ends: an expired session's drafts are its user's.
+        if (userId) {
+            signedInUser.id = userId;
+        }
 
         // Depend on the id, never on `sessionData.user` — that object is a fresh
         // identity on every render, so an effect keyed on it re-runs forever.
@@ -426,11 +468,13 @@ const RootComponent = () => {
 
     // The side panel may show the previous account's document or PDF. A PDF (a signed link, nothing unsaved) closes as a switch
     // starts; a document, whose editor may hold unsaved edits, only once the switch has gone through, so a failed one keeps them.
-    const closeSidePanel = useCallback((phase: "after" | "before") => {
+    // The departing account's drafts go too (`clearDraftsForSessionSwitch`).
+    const closeSidePanel = useCallback((phase: "after" | "before", departingUserId: string | undefined) => {
         closeSidePanelForSessionSwitch(phase);
+        clearDraftsForSessionSwitch(phase, departingUserId);
 
         if (phase === "after") {
-            clearComposerDrafts();
+            clearPromptQueues();
         }
     }, []);
 
@@ -464,7 +508,7 @@ const RootComponent = () => {
                     <DirectionProvider direction={direction}>
                         <QueryClientProvider client={context.queryClient}>
                             <CRPCProvider client={context.lunoraClient} queryClient={context.queryClient}>
-                                <AuthRecovery>
+                                <AuthRecovery serverAuthStatus={context.authStatus}>
                                     <AuthQueryProvider>
                                         <AuthUIProviderTanstack
                                             apiKey={API_KEY_CONFIG}
@@ -481,13 +525,17 @@ const RootComponent = () => {
                                             <ThemeProvider attribute="class" defaultTheme="system" enableSystem nonce={context.nonce}>
                                                 <ConsentProvider options={{ consentCategories: CONSENT_CATEGORIES, mode: CONSENT_MODE, nonce: context.nonce }}>
                                                     <PostHogConsentSync />
-                                                    <ImpersonationBanner />
+                                                    <Suspense fallback={null}>
+                                                        <ImpersonationBannerGate />
+                                                    </Suspense>
                                                     <ConnectionProvider>
                                                         {isNative && (
                                                             <Suspense fallback={null}>
                                                                 <OfflineScreen />
                                                             </Suspense>
                                                         )}
+                                                        {/* Above every layout and its auth gates: the app stays on screen while offline. */}
+                                                        <OfflineBanner />
                                                         <ScreenSizeDebug />
                                                         <Outlet />
                                                     </ConnectionProvider>

@@ -56,8 +56,10 @@ import type { ComposerRestoreFile } from "@/features/chat/core/utils/composer-re
 import { loadRestoreFile, onComposerRestore, textAfterRestore } from "@/features/chat/core/utils/composer-restore";
 import { onComposerAttachRequest, onComposerSubmitRequest } from "@/features/chat/core/utils/composer-submit";
 import ComposerPromptImprovementButton from "@/features/chat/prompt-improvement/components/composer-prompt-improvement-button";
+import { draftOwnership } from "@/features/chat/split/composer-drafts";
 import AutoReadReplies from "@/features/chat/voice-mode/auto-read-replies";
 import VoiceModeButton from "@/features/chat/voice-mode/voice-mode-button";
+import { useConnectionView } from "@/features/connection/hooks/use-connection";
 import { useUserPreferences } from "@/features/layout/hooks/use-ui-state";
 import { useUIStateStore } from "@/features/layout/stores/ui-state-store";
 import { trackEvent } from "@/lib/analytics";
@@ -73,6 +75,7 @@ import type { ComposerInputAreaRef } from "./composer-input-area";
 import ComposerInputArea from "./composer-input-area";
 import ComposerLongTextPrompt from "./composer-long-text-prompt";
 import ComposerPromptQueue from "./composer-prompt-queue";
+import { composerSubmitIntent } from "./composer-submit-intent";
 import { isEditable, TextAttachmentEditorDialog } from "./composer-text-attachment-editor";
 import { quoteRestoreDraft } from "./composer-tiptap/extensions/quote-chip";
 import useComposerAutocomplete from "./composer-tiptap/use-composer-autocomplete";
@@ -550,6 +553,9 @@ const ComposerInput = ({
     // The comparison parent fans out through `onSubmitOverride`, and the compact
     // landing bar has no thread to recall from or queue against.
     const isThreadComposer = !onSubmitOverride && !compact && Boolean(threadId);
+    // Sending needs the network; offline the draft stays where it is, and the send says why instead of hanging. A dropped
+    // live socket alone ("reconnecting") does not block: messages go over HTTP.
+    const isOffline = useConnectionView() === "offline";
 
     const getComposerText = useCallback(() => useChatUIStore.getState().composerText, []);
     const promptHistory = usePromptHistory(getComposerText);
@@ -992,6 +998,12 @@ const ComposerInput = ({
             return;
         }
 
+        if (isOffline) {
+            showInfo(t`You are offline. Your message stays here; send it once you are back online.`, { id: "composer-offline-send" });
+
+            return;
+        }
+
         promptHistory.reset();
         clear();
 
@@ -1019,7 +1031,7 @@ const ComposerInput = ({
             .then(() => settleSteer(threadId, steerId, "accepted"))
             .catch((error: unknown) => settleSteer(threadId, steerId, wasRefused(error) ? "refused" : "accepted"))
             .finally(() => clearTimeout(unanswered));
-    }, [canSteer, cancelStream, clear, disabled, followUp, promptHistory, sseStreamState, steerRun, text, threadId]);
+    }, [canSteer, cancelStream, clear, isOffline, disabled, followUp, promptHistory, sseStreamState, steerRun, t, text, threadId]);
 
     // Handle submit — fully synchronous, fire-and-forget network call.
     // Optimistic state (user message + Thinking...) is shown immediately inside
@@ -1051,12 +1063,28 @@ const ComposerInput = ({
             return;
         }
 
+        const intent = composerSubmitIntent({
+            hasAttachments: draftAttachments.length > 0,
+            isComparisonValid,
+            isStreaming,
+            isThreadComposer,
+            text: draftText,
+            threadId,
+        });
+
+        // A follow-up while a reply streams only joins the local queue, which waits for the network before it sends.
+        if (isOffline && intent !== "queue") {
+            showInfo(t`You are offline. Your message stays here; send it once you are back online.`, { id: "composer-offline-send" });
+
+            return;
+        }
+
         promptHistory.reset();
 
         // `/compact` is a command, not a message: it condenses the thread's context and sends nothing. It runs before the
         // size guard below, because a chat too large to send is the one that most needs compacting.
         // A new chat has no thread yet: the command still runs, and answers that there is nothing to compact.
-        if ((isThreadComposer || !threadId) && draftAttachments.length === 0 && isCompactCommand(draftText)) {
+        if (intent === "compact") {
             clear();
             void compactThread();
 
@@ -1065,7 +1093,7 @@ const ComposerInput = ({
 
         // `/clear` starts a fresh context in this thread and sends nothing, as `/compact` does. A new chat has no thread: the
         // command stays in the draft and the hook says why. The draft is cleared only once the reset is written.
-        if ((isThreadComposer || !threadId) && draftAttachments.length === 0 && isClearCommand(draftText)) {
+        if (intent === "clear") {
             const startedThreadId = threadId;
             const finishClear = async () => {
                 if (!(await clearThreadContext())) {
@@ -1091,16 +1119,14 @@ const ComposerInput = ({
         }
 
         // A turn is still running: queue instead of sending. The queue sends it
-        // when the stream finishes (see ComposerPromptQueue).
-        if (isStreaming) {
-            if (!isThreadComposer || isComparisonValid || !threadId) {
-                return;
+        // when the stream finishes (see ComposerPromptQueue). A composer without a queue waits.
+        if (intent === "queue" || intent === "wait") {
+            if (intent === "queue" && threadId) {
+                usePromptQueueStore
+                    .getState()
+                    .enqueue(threadId, { attachments: draftAttachments, references: useChatUIStore.getState().attachedReferences, text: draftText });
+                clear();
             }
-
-            usePromptQueueStore
-                .getState()
-                .enqueue(threadId, { attachments: draftAttachments, references: useChatUIStore.getState().attachedReferences, text: draftText });
-            clear();
 
             return;
         }
@@ -1138,6 +1164,8 @@ const ComposerInput = ({
 
         onSubmitProp?.();
     }, [
+        isOffline,
+        t,
         disabled,
         mustSignIn,
         sendMessage,
@@ -1172,6 +1200,9 @@ const ComposerInput = ({
         }
 
         return onComposerSubmitRequest(({ text: requested }) => {
+            // Sent from outside the chat (the Quick Composer): like a route's prefill, it is not stored over the chat's saved
+            // draft, which comes back once the send ends (`stored-drafts.ts`).
+            draftOwnership.prefill = requested;
             autoSubmitTextRef.current = requested;
             setText(requested);
             setAutoSubmitRequest((count) => count + 1);
@@ -1181,6 +1212,7 @@ const ComposerInput = ({
     // The message a visitor sent before signing in (invite-only), sent once a real account's token is on the client.
     // The new-chat composer and a thread's composer both take it: sign-in returns to the URL it started from.
     usePendingSend(!onSubmitOverride && !compact, (pending) => {
+        draftOwnership.prefill = pending;
         autoSubmitTextRef.current = pending;
         setText(pending);
         setAutoSubmitRequest((count) => count + 1);

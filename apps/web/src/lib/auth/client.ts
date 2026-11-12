@@ -17,6 +17,7 @@ import {
     isCredentialRequest,
     isSessionChangingRequest,
     keepRetryingFailedSessionReads,
+    rereadFailedSessionRead,
     trackCredentialRequest,
 } from "@neore/client-runtime";
 import { adminClient, anonymousClient, emailOTPClient, magicLinkClient, organizationClient, twoFactorClient } from "better-auth/client/plugins";
@@ -95,8 +96,29 @@ export const authClient = createAuthClient({
 // (focus refetch is off above), so keep re-reading until a read succeeds.
 const sessionAtom = authClient.$store.atoms.session as SessionAtomLike | undefined;
 
+/**
+ * Re-read a failed session read now, for a connection that has come back; a read
+ * still in flight is waited for first and re-read if it failed. Resolves once
+ * that re-read has settled. See `rereadFailedSessionRead`.
+ */
+export const rereadFailedSession = async (signal?: AbortSignal): Promise<void> => {
+    if (globalThis.window !== undefined && sessionAtom) {
+        await rereadFailedSessionRead(sessionAtom, signal);
+    }
+};
+
 if (globalThis.window !== undefined && sessionAtom) {
     keepRetryingFailedSessionReads(sessionAtom);
+
+    // A read made offline fails at once (`readWithRetry`); re-read as soon as the network is back rather than at the next
+    // backoff step, also when that read is still settling. A newer `online` event takes over from an earlier one still waiting.
+    let reconnect: AbortController | undefined;
+
+    globalThis.addEventListener("online", () => {
+        reconnect?.abort();
+        reconnect = new AbortController();
+        void rereadFailedSession(reconnect.signal);
+    });
 }
 
 export type AuthClient = typeof authClient;

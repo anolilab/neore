@@ -1,6 +1,14 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { clearComposerDrafts, draftGeneration, peekParkedModelState, peekWorkerDraft, saveParkedModelState, saveWorkerDraft } from "./composer-drafts";
+import {
+    clearComposerDrafts,
+    clearDraftsForSessionSwitch,
+    draftGeneration,
+    peekParkedModelState,
+    peekWorkerDraft,
+    saveParkedModelState,
+    saveWorkerDraft,
+} from "./composer-drafts";
 
 beforeEach(() => {
     clearComposerDrafts();
@@ -30,5 +38,35 @@ describe("worker drafts (#11)", () => {
         saveWorkerDraft("worker-1", "");
 
         expect(peekWorkerDraft("worker-1")).toBeUndefined();
+    });
+});
+
+describe("an account switch", () => {
+    const keys = (): string[] =>
+        Object.keys(localStorage)
+            .filter((key) => key.startsWith("neore-draft:"))
+            .toSorted((left, right) => left.localeCompare(right));
+
+    beforeEach(() => {
+        localStorage.clear();
+        localStorage.setItem("neore-draft:alice:thread-a", "{}");
+        localStorage.setItem("neore-draft:bob:thread-b", "{}");
+    });
+
+    it("removes only the departing account's drafts, once the switch has gone through", () => {
+        clearDraftsForSessionSwitch("before", "alice");
+
+        expect(keys()).toStrictEqual(["neore-draft:alice:thread-a", "neore-draft:bob:thread-b"]);
+
+        clearDraftsForSessionSwitch("after", "alice");
+
+        expect(keys()).toStrictEqual(["neore-draft:bob:thread-b"]);
+    });
+
+    it("removes every account's drafts as the switch starts when the departing account is unknown", () => {
+        clearDraftsForSessionSwitch("before", undefined);
+        clearDraftsForSessionSwitch("after", undefined);
+
+        expect(keys()).toStrictEqual([]);
     });
 });

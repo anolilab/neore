@@ -26268,7 +26268,7 @@ msgstr "Reconecta tu host de Git en los ajustes para vincular una pull request."
 msgid "Reconnecting"
 msgstr "Reconectando"
 
-#: src/features/connection/components/connection-banner.tsx:25
+#: src/features/connection/components/offline-banner.tsx:24
 msgid "Reconnecting to the server…"
 msgstr "Reconectando con el servidor…"
 
@@ -35862,6 +35862,10 @@ msgstr "Variables:"
 msgid "Vault"
 msgstr "Bóveda"
 
+#: src/features/chat/thread/composer-tiptap/file-mention-popup.tsx
+msgid "In this project"
+msgstr "En este proyecto"
+
 #: src/features/chat/thread/composer-tiptap/file-mention-popup.tsx:392
 msgid "Vault files"
 msgstr "Archivos de la bóveda"
@@ -37374,10 +37378,6 @@ msgstr "Estás suplantando a un usuario"
 msgid "You are not watching any repository."
 msgstr "No estás vigilando ningún repositorio."
 
-#: src/features/connection/components/connection-banner.tsx:23
-msgid "You are offline."
-msgstr "Estás sin conexión."
-
 #: src/features/connection/components/offline-screen.tsx:47
 msgid "You are offline. Neore will reconnect when the network is back."
 msgstr "Estás sin conexión. Neore se reconectará cuando vuelva la red."
@@ -37998,3 +37998,15 @@ msgstr "Zúrich"
 #: src/features/evals/components/run-comparison.tsx:150
 msgid "Δ points"
 msgstr "Δ puntos"
+
+#: src/features/connection/components/offline-banner.tsx:22
+msgid "Offline – reconnecting…"
+msgstr "Sin conexión – reconectando…"
+
+#: src/features/connection/components/offline-banner.tsx:26
+msgid "Back online"
+msgstr "De nuevo en línea"
+
+#: src/features/chat/thread/composer-input.tsx:1058
+msgid "You are offline. Your message stays here; send it once you are back online."
+msgstr "Estás sin conexión. Tu mensaje se queda aquí; envíalo cuando vuelvas a estar en línea."
