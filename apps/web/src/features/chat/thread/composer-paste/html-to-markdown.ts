@@ -62,8 +62,10 @@ const PICTOGRAPHIC = /\p{Extended_Pictographic}/u;
 const EMOJI_ONLY = /^[\p{Extended_Pictographic}\p{Emoji_Component}\s]+$/u;
 const MATH_CLASS = /math/i;
 const WORD_LIST_LEVEL = /mso-list\s*:[^;]{0,200}level(\d)/i;
-// Up to nine characters: a list numbered past 9999 keeps its numbers (still bounded, it runs on one marker's text).
-const WORD_ORDERED_MARKER = /^\s*\w{1,9}[.)]/;
+// Up to nine digits, the most a Markdown marker takes: a list numbered past 9999 keeps its numbers.
+const WORD_ORDERED_MARKER = /^\d{1,9}[.)]$/;
+// A letter or roman numeral Word numbers a level with (`a.`, `iv)`): Markdown has no such marker, so it is kept as text.
+const WORD_LETTERED_MARKER = /^[a-z]{1,9}[.)]$/i;
 const IMPORTANT = /!\s{0,20}important\s{0,20}$/i;
 const HEADING = /^H[1-6]$/;
 const BLANK_LINES = /\n{3,}/g;
@@ -183,15 +185,32 @@ const codeText = (node: Node): string => {
     return parts.join("");
 };
 
-/** `**`, `*` or `~~` around inline content, with its outer spaces kept outside; nothing around content that spans lines. */
-const wrap = (inner: string, marker: string): string => {
-    const core = inner.trim();
+/** `marker` around one line's text, with its outer spaces kept outside. */
+const wrapLine = (line: string, marker: string): string => {
+    const core = line.trim();
 
-    if (core === "" || inner.includes("\n")) {
+    if (core === "") {
+        return line;
+    }
+
+    const start = line.indexOf(core);
+
+    return line.slice(0, start) + marker + core + marker + line.slice(start + core.length);
+};
+
+/**
+ * `**`, `*` or `~~` around inline content, with its outer spaces kept outside. Content broken by `<br>` is marked line by
+ * line, as Markdown emphasis cannot span lines; content holding blocks (a blank line) is left as it is.
+ */
+const wrap = (inner: string, marker: string): string => {
+    if (inner.includes("\n\n")) {
         return inner;
     }
 
-    return inner.slice(0, inner.indexOf(core)) + marker + core + marker + inner.slice(inner.indexOf(core) + core.length);
+    return inner
+        .split("\n")
+        .map((line) => wrapLine(line, marker))
+        .join("\n");
 };
 
 /**
@@ -292,11 +311,11 @@ const escapeLabelText = (text: string): string =>
     text.replaceAll(/[\\[\]]+/g, (run: string, offset: number, whole: string) => escapeRun(run, offset + run.length === whole.length));
 
 /**
- * A link label escaped outside its code spans: Markdown reads a backslash in a code span as itself. A span runs from a
- * backtick run to the next run of the same length; one with no partner is text. Linear: the partner of each run is
- * found in one pass from the end.
+ * `text` with `escapeText` applied outside its code spans and `escapeCode` to them: Markdown reads a backslash in a code
+ * span as itself. A span runs from a backtick run to the next run of the same length; one with no partner is text.
+ * Linear: the partner of each run is found in one pass from the end.
  */
-const escapeLinkLabel = (label: string): string => {
+const escapeOutsideCode = (label: string, escapeText: (text: string) => string, escapeCode: (span: string) => string = (span) => span): string => {
     // Where each backtick run starts and ends.
     const starts: number[] = [];
     const ends: number[] = [];
@@ -340,13 +359,19 @@ const escapeLinkLabel = (label: string): string => {
         const start = starts[run] ?? 0;
         const end = ends[close] ?? 0;
 
-        result += escapeLabelText(label.slice(textStart, start)) + label.slice(start, end);
+        result += escapeText(label.slice(textStart, start)) + escapeCode(label.slice(start, end));
         textStart = end;
         run = close + 1;
     }
 
-    return result + escapeLabelText(label.slice(textStart));
+    return result + escapeText(label.slice(textStart));
 };
+
+const escapeLinkLabel = (label: string): string => escapeOutsideCode(label, escapeLabelText);
+
+/** Backslashes and pipes in a cell's text escaped; a backslash tail too when a code span follows, so it never escapes its backtick. */
+const escapeCellText = (text: string): string =>
+    text.replaceAll(/[\\|]+/g, (run: string, offset: number, whole: string) => escapeRun(run, offset + run.length === whole.length));
 
 /** A cell's text on one line. The context is shared, not copied, so cells of tables nested in it count against the budget. */
 const cellText = (cell: Element, context: Context): string => {
@@ -358,9 +383,9 @@ const cellText = (cell: Element, context: Context): string => {
 
     context.inTable = inTable;
 
-    return oneLine(text)
-        .trim()
-        .replaceAll(/[\\|]+/g, (run: string) => escapeRun(run, false));
+    // GFM splits a row on every unescaped pipe, inside code spans too, and reads `\|` there as a pipe; a backslash in a
+    // span is its own character, so only the pipes are escaped there.
+    return escapeOutsideCode(oneLine(text).trim(), escapeCellText, (span) => span.replaceAll("|", String.raw`\|`));
 };
 
 const ROW_GROUPS = new Set(["TBODY", "TFOOT", "THEAD"]);
@@ -574,6 +599,9 @@ const list = (listElement: Element, context: Context): string => {
 
     const items: string[] = [];
     let level = 1;
+    // A reversed list counts down from its start, or from its number of top-level items.
+    const reversed = ordered && listElement.hasAttribute("reversed");
+    const firstNumber = listNumber(listElement.getAttribute("start")) ?? (reversed ? ariaLevels.filter((ariaLevel) => ariaLevel === topLevel).length : 1);
 
     for (const [index, { body, item }] of entries.entries()) {
         const ariaLevel = ariaLevels[index];
@@ -581,13 +609,11 @@ const list = (listElement: Element, context: Context): string => {
         // Text outside an item stays at the depth of the item before it.
         level = ariaLevel === undefined ? level : ariaLevel - topLevel + 1;
 
-        const number =
-            (ordered && item ? listNumber(item.getAttribute("value")) : undefined) ??
-            numbers[level - 1] ??
-            (level === 1 ? (listNumber(listElement.getAttribute("start")) ?? 1) : 1);
+        const number = (ordered && item ? listNumber(item.getAttribute("value")) : undefined) ?? numbers[level - 1] ?? (level === 1 ? firstNumber : 1);
 
         numbers.length = level;
-        numbers[level - 1] = number + 1;
+        // Markdown has no negative numbers: a reversed list stops counting at 0.
+        numbers[level - 1] = reversed && level === 1 ? Math.max(number - 1, 0) : number + 1;
         items.push(listItem(body.replaceAll(BLANK_LINES, "\n\n").trim(), level, ordered ? `${number}. ` : "- ", context));
     }
 
@@ -620,8 +646,13 @@ const wordListItem = (element: Element, inner: string, context: Context): string
         },
     });
     const bullet = (walker.nextNode()?.textContent ?? "").trim();
-    const number = bullet.endsWith(")") ? `${bullet.slice(0, -1)}.` : bullet;
-    const marker = WORD_ORDERED_MARKER.test(bullet) ? `${number} ` : "- ";
+    let marker = "- ";
+
+    if (WORD_ORDERED_MARKER.test(bullet)) {
+        marker = `${bullet.slice(0, -1)}. `;
+    } else if (WORD_LETTERED_MARKER.test(bullet)) {
+        marker = `- ${bullet} `;
+    }
 
     return `\n${listItem(inner.trim(), Math.max(Number(level[1]) - context.wordTopLevel + 1, 1), marker, context)}\n`;
 };

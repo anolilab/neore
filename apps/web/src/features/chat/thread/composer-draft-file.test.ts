@@ -91,6 +91,26 @@ describe("attachLongPaste", () => {
         expect(state.text).toBe("beforeTYPED after\nPASTED");
     });
 
+    it("puts a converted table back on lines of its own, at the paste position or appended, when the upload failed", async () => {
+        const table = "| A |\n| --- |\n| 1 |";
+        const atCaret = setup({ attachmentId: "a1", error: "Too big" });
+
+        expect(
+            await attachLongPaste({
+                ...atCaret.options,
+                converted: true,
+                pastedText: table,
+                selection: { end: 6, start: 6, textAfter: true, textBefore: true },
+            }),
+        ).toBe(false);
+        expect(atCaret.state.text).toBe(`before\n\n${table}\n\n after`);
+
+        const appended = setup({ attachmentId: "a1", error: "Too big" }, "beforeTYPED after");
+
+        expect(await attachLongPaste({ ...appended.options, converted: true, draftAtPaste: "before after", pastedText: table })).toBe(false);
+        expect(appended.state.text).toBe(`beforeTYPED after\n\n${table}`);
+    });
+
     it("leaves another chat's draft alone and says the text was not inserted when the chat changed during the upload", async () => {
         const { options, state } = setup({ attachmentId: "a1", error: "Too big" });
 

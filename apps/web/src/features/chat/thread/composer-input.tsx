@@ -955,10 +955,11 @@ const ComposerInput = ({
                 useChatUIStore.getState().noteComposerHiddenRemoved(pasteRemoved);
             }
 
+            // Converted Markdown that opens or ends with a table, fence, heading, list or quote keeps it off the text beside the caret.
+            const converted = plan.kind === "html" || (plan.kind === "text" && plan.text !== plainText);
+
             if (!isLongPaste(pastedText)) {
                 const draft = useChatUIStore.getState().composerText;
-                // Converted Markdown that opens or ends with a table, fence, heading, list or quote keeps it off the text beside the caret.
-                const converted = plan.kind === "html" || (plan.kind === "text" && plan.text !== plainText);
                 const inserted = converted ? onOwnLines(pastedText, selection.textBefore, selection.textAfter) : pastedText;
 
                 if (inputAreaRef.current?.getEditor()?.pasteText(inserted, stateAtPaste)) {
@@ -980,6 +981,7 @@ const ComposerInput = ({
 
             await attachLongPaste({
                 attach: attachTextAsFile,
+                converted,
                 discard: removeAttachment,
                 draftAtPaste,
                 getAttachmentIds: () => useChatUIStore.getState().composerAttachments.map((attachment) => attachment.id),

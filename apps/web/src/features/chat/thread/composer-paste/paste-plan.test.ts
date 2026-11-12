@@ -62,6 +62,26 @@ describe("composer paste", () => {
         expect(htmlToMarkdown(`<p style="mso-list:l0 level1 lfo1"><span style="mso-list:Ignore">10000.</span>ten thousand</p>`)).toBe("10000. ten thousand");
     });
 
+    it("keeps a lettered or roman Word marker as text on a list item of its own", () => {
+        const item = (level: number, marker: string, text: string): string =>
+            `<p style="mso-list:l0 level${level} lfo1"><span style="mso-list:Ignore">${marker}</span>${text}</p>`;
+
+        expect(htmlToMarkdown(item(1, "1.", "First") + item(2, "a.", "Sub") + item(3, "i.", "Deep"))).toBe(
+            ["1. First", "    - a. Sub", "        - i. Deep"].join("\n"),
+        );
+        expect(htmlToMarkdown(item(1, "a)", "one") + item(1, "b)", "two"))).toBe("- a) one\n- b) two");
+    });
+
+    it("counts a reversed list down, from its start or its number of items", () => {
+        expect(htmlToMarkdown("<ol reversed><li>b</li><li>a</li></ol>")).toBe("2. b\n1. a");
+        expect(htmlToMarkdown('<ol reversed start="10"><li>j</li><li value="4">d</li><li>c</li></ol>')).toBe("10. j\n4. d\n3. c");
+        expect(htmlToMarkdown('<ol reversed start="1"><li>a</li><li>z</li></ol>')).toBe("1. a\n0. z");
+    });
+
+    it("marks formatted text broken by a line break on each of its lines", () => {
+        expect(htmlToMarkdown("<p><b>one<br>two</b> <i>three<br></i><s> four<br>five</s></p>")).toBe("**one**\n**two** *three*\n~~four~~\n~~five~~");
+    });
+
     it("converts a code block of many line elements in linear time", () => {
         // 30,000 lines: about 0.8 s here, against about 4 s when each line re-read the text built so far.
         const html = `<pre>${"<div>let a = 1;</div>".repeat(30_000)}</pre>`;
@@ -329,6 +349,11 @@ describe("composer paste", () => {
             "a backslash in a cell or a link label never escapes the Markdown around it",
             String.raw`<table><tr><th>A</th><th>B</th></tr><tr><td>a\|b</td><td>c</td></tr></table><p><a href="https://x.y/">C:\dir\</a> <a href="https://x.y/">a\]b</a></p>`,
             ["| A | B |", "| --- | --- |", String.raw`| a\\\|b | c |`, "", String.raw`[C:\dir\\](https://x.y/) [a\\\]b](https://x.y/)`].join("\n"),
+        ],
+        [
+            "code in a table cell keeps its backslashes, escapes its pipes for the row, and a backslash before it never escapes its backtick",
+            String.raw`<table><tr><th>A</th></tr><tr><td><code>C:\tmp</code> or <code>a|b</code> in C:\<code>x</code></td></tr></table>`,
+            "| A |\n| --- |\n| `C:\\tmp` or `a\\|b` in C:\\\\`x` |",
         ],
         [
             "code in a link label is kept as written, and a backslash before it never escapes its backtick",

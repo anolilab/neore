@@ -1,3 +1,5 @@
+import { breaksBefore, onOwnLines } from "./composer-paste/paste-plan";
+
 /** What a text-to-file conversion came back with: the attachment's id, and the reason it failed (absent on success). */
 export interface TextFileResult {
     attachmentId: string;
@@ -134,6 +136,8 @@ export const appendPastedText = (draft: string, text: string, breaks = 1): strin
 
 interface AttachLongPasteOptions {
     attach: (text: string) => Promise<TextFileResult>;
+    /** Whether `pastedText` is converted Markdown: put back, its tables, fences and lists then go on lines of their own. */
+    converted?: boolean;
     discard: (attachmentId: string) => void;
     /** The draft when the paste was made, if that was before this call (a conversion ran in between); `selection` points into it. */
     draftAtPaste?: string;
@@ -149,8 +153,8 @@ interface AttachLongPasteOptions {
     /** Called instead of `onFailure` when the user left the chat meanwhile: the text went nowhere, the other chat's draft is untouched. */
     onNotInserted: (error: string) => void;
     pastedText: string;
-    /** Where the paste landed in the draft, read before the upload started. */
-    selection: { end: number; start: number };
+    /** Where the paste landed in the draft, read before the upload started, and whether the caret's line has text on either side. */
+    selection: { end: number; start: number; textAfter?: boolean; textBefore?: boolean };
     setDraft: (text: string) => void;
 }
 
@@ -162,6 +166,7 @@ interface AttachLongPasteOptions {
  */
 export const attachLongPaste = async ({
     attach,
+    converted = false,
     discard,
     draftAtPaste: givenDraft,
     getAttachmentIds,
@@ -197,7 +202,15 @@ export const attachLongPaste = async ({
 
     const draft = getDraft();
 
-    setDraft(draft === draftAtPaste ? insertPastedText(draft, pastedText, selection.start, selection.end) : appendPastedText(draft, pastedText));
+    // The same line handling as a short paste: at the old caret its neighbours decide, appended the first line does.
+    if (draft === draftAtPaste) {
+        const text = converted ? onOwnLines(pastedText, selection.textBefore ?? false, selection.textAfter ?? false) : pastedText;
+
+        setDraft(insertPastedText(draft, text, selection.start, selection.end));
+    } else {
+        setDraft(appendPastedText(draft, pastedText, converted ? breaksBefore(pastedText) : 1));
+    }
+
     onFailure(error);
 
     return false;
