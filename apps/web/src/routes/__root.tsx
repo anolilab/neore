@@ -22,12 +22,12 @@ import { ThemeProvider } from "next-themes";
 import type { ReactNode } from "react";
 import { lazy, Suspense, useCallback, useEffect, useEffectEvent, useRef, useState } from "react";
 
-import ImpersonationBanner from "@/features/admin/components/impersonation-banner";
 import AppearanceSync from "@/features/appearance/components/appearance-sync";
 import { ACCENT_BOOT_SCRIPT } from "@/features/appearance/lib/accent-boot-script";
 import { CHAT_TEXT_SIZE_BOOT_SCRIPT } from "@/features/appearance/lib/chat-text-size";
 import LoginPromptHost from "@/features/auth/components/auth/login-prompt-host";
 import { AuthQueryProvider } from "@/features/auth/lib/auth-query-provider";
+import { clearLastAccountHint, hasLastAccountHint, writeLastAccountHint } from "@/features/auth/lib/last-account-hint";
 import AuthUIProviderTanstack from "@/features/auth/lib/tanstack/auth-ui-provider-tanstack";
 import { closeSidePanelForSessionSwitch } from "@/features/chat/core/stores/chat-ui-store";
 import { clearComposerDrafts } from "@/features/chat/split/composer-drafts";
@@ -84,6 +84,8 @@ const SettingsModal = lazy(() =>
         return { default: m.SettingsModal };
     }),
 );
+// Off the first load: it renders nothing unless an admin is impersonating someone.
+const ImpersonationBanner = lazy(() => import("@/features/admin/components/impersonation-banner"));
 const SwUpdatePrompt = lazy(() => import("@/components/sw-update-prompt"));
 const ChangelogCard = lazy(() => import("@/features/changelog/components/changelog-card"));
 const ChangelogPanel = lazy(() => import("@/features/changelog/components/changelog-panel"));
@@ -155,12 +157,12 @@ const CONSENT_MODE = env.VITE_C15T_MODE === "c15t" && env.VITE_C15T_BACKEND_URL 
  * 4. Session is refreshed
  * Must be rendered inside CRPCProvider / LunoraProvider.
  */
-const AuthRecovery = ({ children }: { children: ReactNode }) => {
+const AuthRecovery = ({ children, startedSignedIn }: { children: ReactNode; startedSignedIn: boolean }) => {
     const { isLoading, isAuthenticated } = useLunoraAuth();
     // Whether the RPC client actually holds a token. NOT the same as
     // `isAuthenticated`: Lunora's identity probe answers from the session
     // cookie, so `isAuthenticated` can read true while every RPC goes out bare.
-    const { token: rpcToken } = useAuth();
+    const { status: identityStatus, token: rpcToken, user: identityUser } = useAuth();
     const queryClient = useQueryClient();
     const lunoraClient = useLunora();
     const { data: sessionData } = authClient.useSession();
@@ -256,9 +258,30 @@ const AuthRecovery = ({ children }: { children: ReactNode }) => {
         const wasAuthenticated = previousAuthStateRef.current;
         const wasAnonymous = previousIsAnonymousRef.current;
 
+        const clearEndedSession = () => {
+            queryClient.clear();
+            // The side panel's document or PDF was the ended session's: whoever signs in next, without a reload, must not find it.
+            closeSidePanelForSessionSwitch("after");
+            // Parked drafts and model choices (split view) are the ended session's too.
+            clearComposerDrafts();
+            // An expired session skips both sign-out handlers, so the dock badge is cleared here.
+            void setNativeBadge(0);
+        };
+
         // A reload after the session ended starts signed out, so no transition shows it: clear the badge here too.
         if (wasAuthenticated === null && !isAuthenticated) {
-            void setNativeBadge(0);
+            // The chat layout may have painted optimistically (`OptimisticAuthGate`) with what the server sent
+            // for a session that is now gone: drop it all, as for a sign-out.
+            if (startedSignedIn || hasLastAccountHint()) {
+                clearEndedSession();
+            } else {
+                void setNativeBadge(0);
+            }
+        }
+
+        // Answered "no session" (sign-out, expiry, revocation): the next start must not paint the signed-in layout.
+        if (!isAuthenticated) {
+            clearLastAccountHint();
         }
 
         // User just logged in (was not authenticated, now is)
@@ -280,18 +303,22 @@ const AuthRecovery = ({ children }: { children: ReactNode }) => {
         // User logged out (was authenticated, now is not)
         else if (wasAuthenticated === true && !isAuthenticated) {
             console.log("[AuthRecovery] User logged out - clearing queries");
-            queryClient.clear();
-            // The side panel's document or PDF was the ended session's: whoever signs in next, without a reload, must not find it.
-            closeSidePanelForSessionSwitch("after");
-            // Parked drafts and model choices (split view) are the ended session's too.
-            clearComposerDrafts();
-            // An expired session skips both sign-out handlers, so the dock badge is cleared here.
-            void setNativeBadge(0);
+            clearEndedSession();
         }
 
         previousAuthStateRef.current = isAuthenticated;
         previousIsAnonymousRef.current = userIsAnonymous;
-    }, [isLoading, isAuthenticated, userIsAnonymous, queryClient]);
+    }, [isLoading, isAuthenticated, userIsAnonymous, queryClient, startedSignedIn]);
+
+    // The last confirmed account, so the next start paints the chat layout before the identity probe answers
+    // (`OptimisticAuthGate`). Another account confirmed here replaces it.
+    const identityUserId = identityUser?.id;
+
+    useEffect(() => {
+        if (identityStatus === "authenticated" && identityUserId) {
+            writeLastAccountHint(identityUserId);
+        }
+    }, [identityStatus, identityUserId]);
 
     /**
      * Adopt an existing session that the Lunora client has no token for.
@@ -418,6 +445,8 @@ const RootComponent = () => {
 
         if (phase === "after") {
             clearComposerDrafts();
+            // The switched-to account rewrites it once Lunora confirms it (`AuthRecovery`).
+            clearLastAccountHint();
         }
     }, []);
 
@@ -451,7 +480,7 @@ const RootComponent = () => {
                     <DirectionProvider direction={direction}>
                         <QueryClientProvider client={context.queryClient}>
                             <CRPCProvider client={context.lunoraClient} queryClient={context.queryClient}>
-                                <AuthRecovery>
+                                <AuthRecovery startedSignedIn={context.authStatus === "authenticated"}>
                                     <AuthQueryProvider>
                                         <AuthUIProviderTanstack
                                             apiKey={API_KEY_CONFIG}
@@ -468,7 +497,9 @@ const RootComponent = () => {
                                             <ThemeProvider attribute="class" defaultTheme="system" enableSystem nonce={context.nonce}>
                                                 <ConsentProvider options={{ consentCategories: CONSENT_CATEGORIES, mode: CONSENT_MODE, nonce: context.nonce }}>
                                                     <PostHogConsentSync />
-                                                    <ImpersonationBanner />
+                                                    <Suspense fallback={null}>
+                                                        <ImpersonationBanner />
+                                                    </Suspense>
                                                     <ConnectionProvider>
                                                         {/* Eager, not lazy: a lazy chunk cannot load while the app is offline, which is when this screen is needed. */}
                                                         {isNative && <OfflineScreen />}

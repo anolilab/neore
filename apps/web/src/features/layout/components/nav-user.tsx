@@ -24,6 +24,7 @@ import { useListDeviceSessions } from "@/features/auth/hooks/device-session-mana
 import { useSession } from "@/features/auth/hooks/session-user-management";
 import useIsAnonymous from "@/features/auth/hooks/use-is-anonymous";
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
+import { clearLastAccountHint } from "@/features/auth/lib/last-account-hint";
 import { getLocalizedError } from "@/features/auth/lib/utilities";
 import useCheckout from "@/features/billing/hooks/use-checkout";
 import { clearThreadListCache, releaseThreadListWrites } from "@/features/chat/thread-list/lib/thread-list-cache";
@@ -276,6 +277,7 @@ const NavUser: FC<NavUserProperties> = ({ trigger }) => {
                 onClick={async () => {
                     // Before the request, and it holds writes until the page reloads or the next sign-in: the sidebar stays mounted meanwhile.
                     clearThreadListCache();
+                    clearLastAccountHint();
                     // Push first, while the session still authenticates the server call.
                     await releasePush();
                     await authClient.signOut({

@@ -58,7 +58,7 @@ The rules for working in `apps/web/src`. The detail, reasoning and code examples
   names (`lib/auth/README.md`). `import type` from `.server.ts` is safe.
 - Guard layout routes with `requireSession(context, location)` (`@/lib/auth/route-guard`) in `beforeLoad`, not by
   checking `context.isAuthenticated`; loaders return early while `!context.isAuthenticated`. There is no
-  `_authenticated/` layout; `(chat)/route.tsx` uses `<Authenticated>`.
+  `_authenticated/` layout; `(chat)/route.tsx` uses `OptimisticAuthGate` (`features/auth/AGENTS.md`).
 - Throw/handle the error classes from `lib/errors/index.ts` (`ServerError`, `ValidationError`, …), switching on `code`.
 - Access browser APIs only after hydration: track `isHydrated` (`features/auth/hooks/use-last-signin-method.ts`).
 

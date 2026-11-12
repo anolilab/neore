@@ -2,6 +2,7 @@ import { useCallback, useMemo } from "react";
 
 import type { AuthUIProviderProps } from "../auth-ui-provider";
 import { AuthUIProvider } from "../auth-ui-provider";
+import { clearLastAccountHint } from "../last-account-hint";
 import useTanstackOptions from "./use-tanstack-options";
 
 const AuthUIProviderTanstack = ({
@@ -34,6 +35,8 @@ const AuthUIProviderTanstack = ({
             ...merged,
             setActiveSession: async (...parameters: Parameters<typeof setActiveSession>) => {
                 onSessionSwitch?.("before");
+                // The account being left is no longer "the last one signed in"; the new one writes it when confirmed.
+                clearLastAccountHint();
 
                 const result = await setActiveSession(...parameters);
 

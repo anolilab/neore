@@ -1,13 +1,13 @@
-import { Authenticated, AuthLoading, Unauthenticated } from "@lunora/react";
 import { api } from "@neore/backend/api";
 import type { Id } from "@neore/backend/dataModel";
 import { LUNORA_ID_SOURCE } from "@neore/client-runtime";
-import { createFileRoute, Outlet, useLocation } from "@tanstack/react-router";
+import { createFileRoute, Outlet, useLocation, useRouteContext } from "@tanstack/react-router";
 import { lazy, Suspense } from "react";
 
 import GlobalCommandPalette from "@/components/command-palette";
 import { ModelPickerPopup } from "@/components/model-picker";
 import ProgrammableSidebarProvider from "@/components/programmable-sidebar-provider";
+import OptimisticAuthGate from "@/features/auth/components/optimistic-auth-gate";
 import SignInRedirect from "@/features/auth/components/sign-in-redirect";
 import UnauthenticatedGate from "@/features/auth/components/unauthenticated-gate";
 import { DEFAULT_PAGINATION_OPTS } from "@/features/chat/core/constants/query-options";
@@ -48,32 +48,38 @@ const SignedOutRoute = () => {
     );
 };
 
-const RouteComponent = () => {
+const SignedInLayout = () => {
     const handleShortcut = useKeyboardShortcutHandler();
 
     return (
         <>
-            <AuthLoading>
-                <ChatLoadingSkeleton />
-            </AuthLoading>
-            <Unauthenticated>
-                {/* A guest session when registration is open; the signed-out chat when it is invite-only. */}
-                <UnauthenticatedGate loading={<ChatLoadingSkeleton />} signedOut={<SignedOutRoute />} />
-            </Unauthenticated>
-            <Authenticated>
-                <GlobalCommandPalette />
-                <ModelPickerPopup />
-                <PresentationViewerRoot />
-                <Suspense fallback={null}>
-                    <OnboardingDialog />
-                </Suspense>
-                <KeyboardShortcutsManager onShortcut={handleShortcut}>
-                    <ProgrammableSidebarProvider defaultOpen={chatDefaultOpen} sidebarNames={chatSidebarNames} style={chatSidebarStyle}>
-                        <Outlet />
-                    </ProgrammableSidebarProvider>
-                </KeyboardShortcutsManager>
-            </Authenticated>
+            <GlobalCommandPalette />
+            <ModelPickerPopup />
+            <PresentationViewerRoot />
+            <Suspense fallback={null}>
+                <OnboardingDialog />
+            </Suspense>
+            <KeyboardShortcutsManager onShortcut={handleShortcut}>
+                <ProgrammableSidebarProvider defaultOpen={chatDefaultOpen} sidebarNames={chatSidebarNames} style={chatSidebarStyle}>
+                    <Outlet />
+                </ProgrammableSidebarProvider>
+            </KeyboardShortcutsManager>
         </>
+    );
+};
+
+/** Paints the signed-in layout while Lunora's identity probe is still out, when the session is known (`OptimisticAuthGate`). */
+const RouteComponent = () => {
+    const authStatus = useRouteContext({ from: "__root__", select: (context) => context.authStatus });
+
+    return (
+        <OptimisticAuthGate
+            authenticated={<SignedInLayout />}
+            loading={<ChatLoadingSkeleton />}
+            serverAuthStatus={authStatus}
+            // A guest session when registration is open; the signed-out chat when it is invite-only.
+            unauthenticated={<UnauthenticatedGate loading={<ChatLoadingSkeleton />} signedOut={<SignedOutRoute />} />}
+        />
     );
 };
 

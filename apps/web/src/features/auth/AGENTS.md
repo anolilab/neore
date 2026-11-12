@@ -92,3 +92,9 @@ apps/web/src/features/auth/
   module load). A new way of changing the session outside `authClient` must
   call `getSharedSessionRead()?.invalidate()`. Browser only: on the server the
   module is shared across requests. `session-single-read.test.ts` counts.
+- **The chat layout paints optimistically** (`components/optimistic-auth-gate.tsx`): while Lunora is "loading" it
+  shows the signed-in layout when the dehydrated `authStatus` is `authenticated` or the `neore-last-account` hint
+  (`lib/last-account-hint.ts`, a user id only) exists; the skeleton only otherwise. The hint grants nothing: it never
+  keys a cache. `AuthRecovery` writes it on a confirmed identity and clears it (with the query cache) on an answered
+  "no session"; sign-out and account switch clear it too. A revoked session shows the server-sent view until the probe
+  answers, then redirects.
