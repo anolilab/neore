@@ -9,11 +9,13 @@ const permissions = vi.hoisted(() => {
 const posthogMock = vi.hoisted(() => {
     return {
         __loaded: false,
+        capture: vi.fn(),
         captureException: vi.fn(),
         debug: vi.fn(),
         group: vi.fn(),
         has_opted_out_capturing: vi.fn(() => false),
         identify: vi.fn(),
+        is_capturing: vi.fn(() => true),
         // Flags that never arrive: only a start that failed for good settles them here.
         onFeatureFlags: vi.fn(() => () => {}),
         init: vi.fn((_key: string, config: { loaded?: (posthog: unknown) => void }) => {
@@ -101,6 +103,7 @@ describe("AnalyticsProvider", () => {
         posthogMock.__loaded = false;
         posthogMock.init.mockClear();
         posthogMock.reset.mockClear();
+        posthogMock.capture.mockClear();
         posthogMock.captureException.mockClear();
         reportFirstNativeLaunch.mockClear();
     });
@@ -158,6 +161,42 @@ describe("AnalyticsProvider", () => {
         const [captureOrder = 0] = posthogMock.captureException.mock.invocationCallOrder;
 
         expect(captureOrder).toBeGreaterThan(initOrder);
+    });
+
+    it("sends the page it mounted on as the first page view, not the one the visitor reached while the chunk loaded", async () => {
+        let resolveChunk: (posthog: typeof posthogMock) => void = () => {};
+
+        loadPostHog.mockReturnValue(
+            // eslint-disable-next-line unicorn/prefer-promise-with-resolvers -- the web lib target has no Promise.withResolvers
+            new Promise((resolve) => {
+                resolveChunk = resolve;
+            }),
+        );
+        globalThis.history.replaceState(null, "", "/pricing?utm_source=newsletter");
+
+        render(
+            <AnalyticsProvider>
+                <ClientState />
+            </AnalyticsProvider>,
+        );
+
+        // An in-app link followed before posthog-js arrived.
+        globalThis.history.replaceState(null, "", "/chat");
+
+        await act(async () => {
+            resolveChunk(posthogMock);
+            await Promise.resolve();
+        });
+        // The signed-out session answers; PostHog starts.
+        modules.setAnalyticsIdentity({});
+        globalThis.history.replaceState(null, "", "/");
+
+        expect(posthogMock.init).toHaveBeenCalledWith("key", expect.objectContaining({ capture_pageleave: true, capture_pageview: false }));
+        expect(posthogMock.capture).toHaveBeenCalledExactlyOnceWith(
+            "$pageview",
+            expect.objectContaining({ $current_url: `${globalThis.location.origin}/pricing?utm_source=newsletter`, $pathname: "/pricing" }),
+            { timestamp: expect.any(Date) },
+        );
     });
 
     it("logs a failed start and, while online, tries once more after a short wait", async () => {

@@ -1,4 +1,4 @@
-import type { CaptureResult } from "posthog-js";
+import type { CaptureResult, Properties } from "posthog-js";
 
 /**
  * A prompt link (`/chat?prompt=…`) carries a person's text in its address, and the page view PostHog captures names that address
@@ -103,3 +103,6 @@ const redactValue = <T>(value: T): T => {
 };
 
 export const redactPromptFromEvent = (event: CaptureResult | null): CaptureResult | null => (event === null ? null : redactValue(event));
+
+/** An event's properties as `redactPromptFromEvent` would send them, for an event kept in the browser before it is sent. */
+export const redactPromptFromProperties = (properties: Properties): Properties => redactValue(properties);

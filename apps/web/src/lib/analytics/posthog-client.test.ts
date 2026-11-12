@@ -12,6 +12,7 @@ const posthog = vi.hoisted(() => {
         group: vi.fn(),
         has_opted_out_capturing: vi.fn(() => false),
         identify: vi.fn(),
+        is_capturing: vi.fn(() => true),
         register: vi.fn(),
         reset: vi.fn(),
     };
@@ -251,6 +252,102 @@ describe("events tracked before PostHog initialises", () => {
             $referrer: "$direct",
             method: "email",
         });
+    });
+
+    it("stores no prompt link's text or fragment, from the address, the referrer or a property", async () => {
+        const client = await loadClientModule();
+        const referrer = vi.spyOn(document, "referrer", "get").mockReturnValue("https://neore.test/chat?prompt=secret%20referrer#token");
+
+        globalThis.history.replaceState(null, "", "/chat?prompt=secret%20address&model=a#token");
+        client.queueEvent("chat_opened", { link: "/chat?prompt=secret%20property", redirectTo: "%2Fchat%3Fprompt%3Dsecret%2520nested" });
+        globalThis.history.replaceState(null, "", "/");
+        referrer.mockRestore();
+
+        const stored = sessionStorage.getItem(client.PENDING_EVENTS_KEY) ?? "";
+
+        expect(stored).not.toContain("secret");
+        expect(stored).not.toContain("token");
+        expect(JSON.parse(stored)).toStrictEqual([
+            expect.objectContaining({
+                properties: expect.objectContaining({
+                    $current_url: `${globalThis.location.origin}/chat?prompt=redacted&model=a`,
+                    $referrer: "https://neore.test/chat?prompt=redacted",
+                    link: "/chat?prompt=redacted",
+                }),
+            }),
+        ]);
+    });
+});
+
+describe("the landing page view", () => {
+    beforeEach(() => {
+        vi.useFakeTimers({ now: new Date("2026-11-12T10:00:00.000Z"), toFake: ["Date"] });
+        posthog.capture.mockReset();
+        posthog.has_opted_out_capturing.mockReturnValue(false);
+        posthog.is_capturing.mockReturnValue(true);
+    });
+
+    afterEach(() => {
+        vi.useRealTimers();
+        globalThis.history.replaceState(null, "", "/");
+        sessionStorage.clear();
+    });
+
+    it("names the page recorded at mount and goes in order with the queued events, once", async () => {
+        const client = await loadClientModule();
+
+        client.queueEvent("before", {});
+        vi.setSystemTime(new Date("2026-11-12T10:00:01.000Z"));
+        globalThis.history.replaceState(null, "", "/pricing?utm_source=newsletter&prompt=secret");
+        client.recordLandingPageview();
+        vi.setSystemTime(new Date("2026-11-12T10:00:02.000Z"));
+        globalThis.history.replaceState(null, "", "/chat");
+        // React's second effect run, or a remount, records nothing more.
+        client.recordLandingPageview();
+        client.queueEvent("after", {});
+        client.flushPendingCaptures(await client.loadPostHog());
+
+        expect(posthog.capture.mock.calls.map(([event]) => event)).toStrictEqual(["before", "$pageview", "after"]);
+        expect(posthog.capture.mock.calls[1]).toStrictEqual([
+            "$pageview",
+            {
+                $current_url: `${globalThis.location.origin}/pricing?utm_source=newsletter&prompt=redacted`,
+                $host: globalThis.location.host,
+                $pathname: "/pricing",
+                $referrer: "$direct",
+            },
+            { timestamp: new Date("2026-11-12T10:00:01.000Z") },
+        ]);
+    });
+
+    it("is sent cookieless after a refusal, as PostHog's own was, and not when PostHog captures nothing", async () => {
+        const refused = await loadClientModule();
+
+        refused.recordLandingPageview();
+        refused.setMeasurementConsent(false);
+        refused.queueEvent("while refused", {});
+        posthog.has_opted_out_capturing.mockReturnValue(true);
+        refused.flushPendingCaptures(await refused.loadPostHog());
+
+        expect(posthog.capture.mock.calls.map(([event]) => event)).toStrictEqual(["$pageview"]);
+
+        const pending = await loadClientModule();
+
+        pending.recordLandingPageview();
+        posthog.is_capturing.mockReturnValue(false);
+        pending.flushPendingCaptures(await pending.loadPostHog());
+
+        expect(posthog.capture).toHaveBeenCalledOnce();
+    });
+
+    it("is dropped with what a signed-out account queued", async () => {
+        const client = await loadClientModule();
+
+        client.recordLandingPageview();
+        client.forgetPostHogIdentity("token");
+        client.flushPendingCaptures(await client.loadPostHog());
+
+        expect(posthog.capture).not.toHaveBeenCalled();
     });
 });
 

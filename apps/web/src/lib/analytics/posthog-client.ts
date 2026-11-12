@@ -7,6 +7,7 @@
 import type { PostHog, Properties } from "posthog-js";
 import { createContext, useCallback, useContext, useSyncExternalStore } from "react";
 
+import { redactPromptFromProperties } from "@/lib/analytics/redact-prompt";
 import { retryChunk } from "@/lib/native/shell-chunk";
 
 const chunk: { loaded?: PostHog; loading?: Promise<PostHog> } = {};
@@ -67,6 +68,12 @@ interface PendingEvent {
 
 const pendingExceptions: { error: unknown; properties: ExceptionProperties }[] = [];
 const queueState: { closed: boolean; events?: PendingEvent[] } = { closed: false };
+
+/**
+ * The `$pageview` of the page this load landed on (`recordLandingPageview`). In memory only: unlike the queued events it
+ * is also sent cookieless after a refusal, as PostHog's own initial page view was, so it is never stored.
+ */
+const landingState: { isRecorded: boolean; pageview?: PendingEvent } = { isRecorded: false };
 
 const isPlainRecord = (value: unknown): value is Partial<Record<keyof PendingEvent, unknown>> =>
     typeof value === "object" && value !== null && !Array.isArray(value);
@@ -196,7 +203,8 @@ const pageProperties = (): Properties => {
     }
 
     return {
-        // Without the fragment, as `disable_capture_url_hashes` has PostHog do; `before_send` redacts a prompt parameter.
+        // Without the fragment, as `disable_capture_url_hashes` has PostHog do. Callers redact a prompt parameter before
+        // keeping it (`redactPromptFromProperties`); `before_send` is the backstop.
         $current_url: `${location.origin}${location.pathname}${location.search}`,
         $host: location.host,
         $pathname: location.pathname,
@@ -207,7 +215,7 @@ const pageProperties = (): Properties => {
 /**
  * Keeps an event tracked before PostHog started, up to `MAX_PENDING_EVENTS`, under the same rules as
  * `captureException`'s queue; `flushPendingCaptures` sends it with the time it was tracked. It outlives a page load in
- * this tab (`PENDING_EVENTS_KEY`).
+ * this tab (`PENDING_EVENTS_KEY`), so a prompt link's text and every fragment are redacted before it is stored.
  */
 export const queueEvent = (event: string, properties: Properties): void => {
     if (queueState.closed || consentState.measurement === false) {
@@ -220,7 +228,7 @@ export const queueEvent = (event: string, properties: Properties): void => {
 
     events.push({
         event,
-        properties: { ...pageProperties(), ...properties },
+        properties: redactPromptFromProperties({ ...pageProperties(), ...properties }),
         timestamp: new Date().toISOString(),
         userId: current ? (current.user?.id ?? null) : undefined,
     });
@@ -233,37 +241,67 @@ export const queueEvent = (event: string, properties: Properties): void => {
 };
 
 /**
+ * Records the page this load landed on, at mount, before the `posthog-js` chunk loads: PostHog's automatic initial page
+ * view (`capture_pageview`) would name wherever the visitor is once `init` runs, which can be seconds and an in-app
+ * navigation later. `flushPendingCaptures` sends it as the `$pageview`, with the time it was recorded, in order with the
+ * queued events. Once per page.
+ */
+export const recordLandingPageview = (): void => {
+    if (landingState.isRecorded || queueState.closed) {
+        return;
+    }
+
+    landingState.isRecorded = true;
+    landingState.pageview = {
+        event: "$pageview",
+        properties: redactPromptFromProperties(pageProperties()),
+        timestamp: new Date().toISOString(),
+    };
+};
+
+const capturePending = (posthog: PostHog, { event, properties, timestamp }: PendingEvent): void => {
+    try {
+        posthog.capture(event, properties, { timestamp: new Date(timestamp) });
+    } catch (captureError) {
+        // eslint-disable-next-line no-console -- the only trace of an event that never left
+        console.warn("[PostHog] Could not send a queued event:", captureError);
+    }
+};
+
+/**
  * Sends what was queued before `posthog` initialised, events first and then exceptions, unless the user opted out;
  * then queues nothing more. A capture that throws is logged and skipped, so the rest are still sent. An event a
  * signed-in user tracked is sent only under that user: one another account (or a sign-out) has replaced since is
  * dropped. One tracked signed out or before the session answered goes to whoever is identified, as PostHog's own
- * anonymous events do.
+ * anonymous events do. The landing page view (`recordLandingPageview`) goes in at the time it was recorded, whenever
+ * PostHog captures at all: also cookieless after a refusal, as its own initial page view did.
  */
 export const flushPendingCaptures = (posthog: PostHog): void => {
     const events = [...pendingEvents()];
     const exceptions = [...pendingExceptions];
+    const landing = landingState.pageview;
 
     dropPendingEvents();
     pendingExceptions.length = 0;
+    landingState.pageview = undefined;
     queueState.closed = true;
 
-    if (posthog.has_opted_out_capturing()) {
-        return;
+    const isOptedOut = posthog.has_opted_out_capturing();
+    const appliedUserId = identityState.applied?.userId;
+    const sendable = isOptedOut ? [] : events.filter(({ userId }) => typeof userId !== "string" || userId === appliedUserId);
+
+    if (landing && posthog.is_capturing()) {
+        const later = sendable.findIndex(({ timestamp }) => Date.parse(timestamp) > Date.parse(landing.timestamp));
+
+        sendable.splice(later === -1 ? sendable.length : later, 0, landing);
     }
 
-    const appliedUserId = identityState.applied?.userId;
+    for (const event of sendable) {
+        capturePending(posthog, event);
+    }
 
-    for (const { event, properties, timestamp, userId } of events) {
-        if (typeof userId === "string" && userId !== appliedUserId) {
-            continue;
-        }
-
-        try {
-            posthog.capture(event, properties, { timestamp: new Date(timestamp) });
-        } catch (captureError) {
-            // eslint-disable-next-line no-console -- the only trace of an event that never left
-            console.warn("[PostHog] Could not send a queued event:", captureError);
-        }
+    if (isOptedOut) {
+        return;
     }
 
     for (const { error, properties } of exceptions) {
@@ -299,6 +337,7 @@ export const markPostHogUnavailable = (): void => {
 export const discardPendingCaptures = (): void => {
     pendingExceptions.length = 0;
     dropPendingEvents();
+    landingState.pageview = undefined;
     queueState.closed = true;
     markPostHogUnavailable();
 };
@@ -311,6 +350,7 @@ export const discardPendingCaptures = (): void => {
 export const dropPendingCaptures = (): void => {
     pendingExceptions.length = 0;
     dropPendingEvents();
+    landingState.pageview = undefined;
 };
 
 /** The session's user left: the identity applied or waiting is forgotten, and that user is not applied again. */
@@ -346,6 +386,7 @@ export const forgetPostHogIdentity = (token: string): void => {
     // next. Later ones still queue, for the signed-out session.
     dropPendingEvents();
     pendingExceptions.length = 0;
+    landingState.pageview = undefined;
 
     const prefix = `ph_${token.replaceAll("+", "PL").replaceAll("/", "SL").replaceAll("=", "EQ")}_`;
 

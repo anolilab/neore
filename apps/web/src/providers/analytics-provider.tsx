@@ -12,6 +12,7 @@ import {
     loadPostHog,
     markPostHogUnavailable,
     PostHogClientContext,
+    recordLandingPageview,
     setIdentityExpected,
     setMeasurementConsent,
     startPostHog,
@@ -61,7 +62,11 @@ export const PostHogConsentSync: FC = () => {
 export const POSTHOG_OPTIONS = {
     // A prompt link's text, and every address's fragment, never leave the browser in an event (`lib/analytics/redact-prompt.ts`).
     before_send: redactPromptFromEvent,
-    capture_pageview: true,
+    // `$pageleave` would otherwise follow `capture_pageview` off ('if_capture_pageview').
+    capture_pageleave: true,
+    // `init` runs once the chunk has loaded, maybe on another page by then: the landing page is recorded at mount and
+    // sent as the first `$pageview` instead (`recordLandingPageview`). `true` never captured later SPA navigations either.
+    capture_pageview: false,
     // PostHog will not set any cookies until the user has given consent
     cookieless_mode: "on_reject",
     // A guest link carries its bearer token in the fragment (`/guest#<token>`): PostHog keeps no address's fragment, not in
@@ -123,6 +128,8 @@ const AnalyticsProvider: FC<PropsWithChildren> = ({ children }) => {
 
         let isCancelled = false;
 
+        // Before the chunk loads, while `location` is still the page this load landed on.
+        recordLandingPageview();
         setIdentityExpected(true);
 
         // Initialize PostHog with cookieless mode for GDPR compliance
