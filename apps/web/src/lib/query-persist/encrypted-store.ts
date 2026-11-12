@@ -3,7 +3,8 @@
  *
  * The record is AES-GCM ciphertext under a key made for that account in this
  * browser. The key is a NON-EXTRACTABLE `CryptoKey`, stored as the object itself
- * (IndexedDB clones it structurally), so its bytes never exist in script: what is
+ * (IndexedDB clones it structurally) beside a random id that tells one key from the
+ * next, so its bytes never exist in script: what is
  * on disk is useless without this browser profile's key store. The record's name
  * is the additional data, so a record moved to another account's name fails to
  * decrypt. Removing an account removes its key as well as its record, in one transaction. The time a record was
@@ -23,7 +24,12 @@ export const entryName = (userId: string): string => `neore-qc:v1:${userId}`;
 /** The slice of IndexedDB this needs, so tests can stand in for it. Values are stored by structured clone. */
 export interface RecordStore {
     get: (store: StoreName, key: string) => Promise<unknown>;
-    put: (store: StoreName, key: string, value: unknown) => Promise<void>;
+
+    /**
+     * In one transaction over both stores (a clear may land between the key's read and the write otherwise): stores
+     * `entry` as the account's entry only while its stored key passes `isKeyCurrent`, and answers whether it did.
+     */
+    putEntry: (userId: string, entry: unknown, isKeyCurrent: (storedKey: unknown) => boolean) => Promise<boolean>;
     /** Stores `value` unless the key holds one already, in one transaction (another tab may race), and answers what is stored. */
     putIfAbsent: (store: StoreName, key: string, value: unknown) => Promise<unknown>;
 
@@ -169,8 +175,23 @@ export const indexedDatabaseStore = (): RecordStore | undefined => {
 
             return await settle(opened.transaction(store, "readonly").objectStore(store).get(key));
         },
-        put: async (store, key, value) => {
-            await write(store, (objectStore) => objectStore.put(value, key));
+        putEntry: async (userId, entry, isKeyCurrent) => {
+            const opened = await open();
+            const transaction = opened.transaction([ENTRIES, KEYS], "readwrite");
+            const storedKey = transaction.objectStore(KEYS).get(userId);
+            let isWritten = false;
+
+            storedKey.addEventListener("success", () => {
+                if (!isKeyCurrent(storedKey.result)) {
+                    return;
+                }
+
+                transaction.objectStore(ENTRIES).put(entry, userId);
+                isWritten = true;
+            });
+            await committed(transaction);
+
+            return isWritten;
         },
         putIfAbsent: async (store, key, value) => {
             let stored: unknown = value;
@@ -216,12 +237,23 @@ const sealOf = (entry: unknown): string | undefined => {
     return isSealedRecord(entry) ? Array.from(entry.iv, (byte) => byte.toString(16).padStart(2, "0")).join("") : "unreadable";
 };
 
-const isCryptoKey = (value: unknown): value is CryptoKey => typeof CryptoKey !== "undefined" && value instanceof CryptoKey;
+interface AccountKey {
+    /** Tells this key from one made after it was removed: a stored clone is never the same object. */
+    id: string;
+    key: CryptoKey;
+}
 
-const accountKey = async (store: RecordStore, userId: string, create: boolean): Promise<CryptoKey | undefined> => {
+const isAccountKey = (value: unknown): value is AccountKey =>
+    typeof value === "object" &&
+    value !== null &&
+    typeof (value as AccountKey).id === "string" &&
+    typeof CryptoKey !== "undefined" &&
+    (value as AccountKey).key instanceof CryptoKey;
+
+const accountKey = async (store: RecordStore, userId: string, create: boolean): Promise<AccountKey | undefined> => {
     const stored = await store.get(KEYS, userId);
 
-    if (isCryptoKey(stored)) {
+    if (isAccountKey(stored)) {
         return stored;
     }
 
@@ -231,25 +263,31 @@ const accountKey = async (store: RecordStore, userId: string, create: boolean): 
 
     const key = await crypto.subtle.generateKey({ length: 256, name: "AES-GCM" }, false, ["encrypt", "decrypt"]);
     // Another tab of the same account may have made one meanwhile: both must seal under the same key.
-    const kept = await store.putIfAbsent(KEYS, userId, key);
+    const kept = await store.putIfAbsent(KEYS, userId, { id: crypto.randomUUID(), key } satisfies AccountKey);
 
-    return isCryptoKey(kept) ? kept : undefined;
+    return isAccountKey(kept) ? kept : undefined;
 };
 
 const additionalData = (userId: string): Uint8Array<ArrayBuffer> => new TextEncoder().encode(entryName(userId));
 
-/** Encrypts `text` under the account's key (made on first use) and stores it as the account's one record. */
-export const sealRecord = async (store: RecordStore, userId: string, text: string, writtenAt: number = Date.now()): Promise<void> => {
-    const key = await accountKey(store, userId, true);
+/**
+ * Encrypts `text` under the account's key (made on first use) and stores it as the account's one record. Answers which
+ * write it stored, for {@link removeRecord}, or `undefined` when it stored nothing: the key was removed (a clear, a
+ * prune) or replaced while the text was sealed, and ciphertext under a key no longer stored could never be opened.
+ */
+export const sealRecord = async (store: RecordStore, userId: string, text: string, writtenAt: number = Date.now()): Promise<string | undefined> => {
+    const sealingKey = await accountKey(store, userId, true);
 
-    if (!key) {
-        return;
+    if (!sealingKey) {
+        return undefined;
     }
 
     const iv = crypto.getRandomValues(new Uint8Array(12));
-    const data = await crypto.subtle.encrypt({ additionalData: additionalData(userId), iv, name: "AES-GCM" }, key, new TextEncoder().encode(text));
+    const data = await crypto.subtle.encrypt({ additionalData: additionalData(userId), iv, name: "AES-GCM" }, sealingKey.key, new TextEncoder().encode(text));
+    const entry: SealedRecord = { data, iv, writtenAt };
+    const isWritten = await store.putEntry(userId, entry, (storedKey) => isAccountKey(storedKey) && storedKey.id === sealingKey.id);
 
-    await store.put(ENTRIES, userId, { data, iv, writtenAt } satisfies SealedRecord);
+    return isWritten ? sealOf(entry) : undefined;
 };
 
 export interface OpenedRecord {
@@ -268,16 +306,16 @@ export const openRecord = async (store: RecordStore, userId: string): Promise<Op
         return undefined;
     }
 
-    const key = await accountKey(store, userId, false);
+    const openingKey = await accountKey(store, userId, false);
 
-    if (!key || !isSealedRecord(sealed)) {
+    if (!openingKey || !isSealedRecord(sealed)) {
         return { seal, text: undefined };
     }
 
     try {
         const plain = await crypto.subtle.decrypt(
             { additionalData: additionalData(userId), iv: sealed.iv as Uint8Array<ArrayBuffer>, name: "AES-GCM" },
-            key,
+            openingKey.key,
             sealed.data,
         );
 

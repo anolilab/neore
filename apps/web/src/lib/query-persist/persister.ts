@@ -3,13 +3,14 @@
  * current while the app runs. Meant to be loaded on demand, never on the first load.
  *
  * The server stays authoritative. Restored data keeps the `dataUpdatedAt` it was saved with and is marked invalid,
- * so a screen that mounts it refetches, and a live seed replaces it (`hydrate` never overwrites newer data).
+ * so a screen that mounts it refetches (one already showing it refetches at once), and a live seed replaces it
+ * (`hydrate` never overwrites newer data).
  *
  * What is kept, and how it is cleaned, is the caller's `policy`; whether a save may reach disk at all (a sign-out
  * holds every write until the identity changes) is its `gate`. The record is encrypted (`encrypted-store.ts`).
  */
 import type { DehydratedState, Query, QueryClient } from "@tanstack/query-core";
-import { dehydrate, hydrate } from "@tanstack/query-core";
+import { dehydrate, hydrate, QueryObserver } from "@tanstack/query-core";
 
 import type { RecordStore } from "./encrypted-store";
 import { openRecord, pruneRecords, removeRecord, sealRecord } from "./encrypted-store";
@@ -152,11 +153,12 @@ export const startQueryPersistence = (options: PersistenceOptions): PersistenceC
         });
         const record: StoredClient = { buster, clientState: asSettled(policy.sanitize(dehydrated, userId)), timestamp: now(), userId };
 
-        await sealRecord(store, userId, JSON.stringify(record), record.timestamp);
+        const seal = await sealRecord(store, userId, JSON.stringify(record), record.timestamp);
 
-        // A clear landed while the record was sealed: it must not survive it.
-        if (generation !== gate.generation() || !gate.canWrite(userId)) {
-            await removeRecord(store, userId);
+        // Stopped, or a clear landed, while the record was sealed: it must not survive that. Only this seal goes, never
+        // a record another tab wrote after it.
+        if (seal !== undefined && (state.stopped || generation !== gate.generation() || !gate.canWrite(userId))) {
+            await removeRecord(store, userId, seal);
         }
     };
 
@@ -181,6 +183,19 @@ export const startQueryPersistence = (options: PersistenceOptions): PersistenceC
             return text === undefined ? undefined : JSON.parse(text);
         } catch {
             return undefined;
+        }
+    };
+
+    /**
+     * `hydrate`'s `gcTime` reaches only a query it creates: one already in the cache keeps its own, and its collection
+     * may be counting down under it already. An observer that comes and goes restarts that count under the new time;
+     * not while the query fetches (that restarts it when done, and an observer leaving could cancel the fetch).
+     */
+    const keepRestored = (query: Query): void => {
+        query.setOptions({ ...query.options, gcTime: MAX_AGE_MS });
+
+        if (query.getObserversCount() === 0 && query.state.fetchStatus === "idle") {
+            new QueryObserver(queryClient, { ...query.options, enabled: false, queryKey: query.queryKey }).subscribe(() => undefined)();
         }
     };
 
@@ -229,11 +244,17 @@ export const startQueryPersistence = (options: PersistenceOptions): PersistenceC
                 // Counted from here: data arriving later makes it a read of this session's, whatever the replaced count was.
                 atStart.set(query, query.state.dataUpdateCount);
                 restoredCount.set(query, query.state.dataUpdateCount);
+
+                if (previous !== undefined) {
+                    keepRestored(query);
+                }
             }
         }
 
-        // Restored data is old: a screen that mounts it fetches (a live read's `staleTime` is infinite, so only this makes it).
-        await queryClient.invalidateQueries({ predicate: isRestored, refetchType: "none" });
+        // Restored data is old: a screen that mounts it fetches (a live read's `staleTime` is infinite, so only this makes
+        // it), and one already showing it fetches now. Not awaited: the restore is done once the data shows, not once the
+        // network answers. A fetch already in flight is kept, not restarted.
+        void queryClient.invalidateQueries({ predicate: isRestored, refetchType: "active" }, { cancelRefetch: false });
     };
 
     const restored = (async () => {

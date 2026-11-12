@@ -2,10 +2,11 @@
 // Node: WebCrypto and a structured clone that keeps `CryptoKey`, as IndexedDB does.
 import type { DehydratedState } from "@tanstack/query-core";
 import { QueryClient, QueryObserver } from "@tanstack/query-core";
+import { IDBFactory } from "fake-indexeddb";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { RecordStore } from "./encrypted-store";
-import { openRecord, sealRecord } from "./encrypted-store";
+import { indexedDatabaseStore, openRecord, removeRecord, sealRecord } from "./encrypted-store";
 import type { PersistPolicy, WriteGate } from "./persister";
 import { MAX_AGE_MS, startQueryPersistence, WRITE_THROTTLE_MS } from "./persister";
 
@@ -32,12 +33,15 @@ const memoryStore = () => {
     };
     const store: RecordStore = {
         get: async (name, key) => structuredClone(stores[name].get(key)),
-        put: async (name, key, value) => {
-            stores[name].set(key, structuredClone(value));
-
-            if (name === "entries") {
-                changed();
+        putEntry: async (userId, entry, isKeyCurrent) => {
+            if (!isKeyCurrent(structuredClone(stores.keys.get(userId)))) {
+                return false;
             }
+
+            stores.entries.set(userId, structuredClone(entry));
+            changed();
+
+            return true;
         },
         putIfAbsent: async (name, key, value) => {
             if (!stores[name].has(key)) {
@@ -163,7 +167,7 @@ describe("encryption", () => {
         const sealed = stores.entries.get(ALICE) as { data: ArrayBuffer };
 
         expect(new TextDecoder().decode(sealed.data)).not.toContain(SECRET_TEXT);
-        expect(stores.keys.get(ALICE)).toMatchObject({ extractable: false });
+        expect(stores.keys.get(ALICE)).toMatchObject({ key: { extractable: false } });
     });
 
     it("keeps accounts apart: a record never opens as another account's", async () => {
@@ -197,6 +201,8 @@ describe("restore", () => {
         // The browser's default gcTime (Node's is infinite, as on a server).
         const queryClient = new QueryClient({ defaultOptions: { queries: { gcTime: 5 * 60 * 1000 } } });
 
+        // Already in the cache, older and unwatched: `hydrate` replaces its data but not its five-minute collection.
+        queryClient.setQueryData(OTHER_KEY, { text: "older" }, { updatedAt: Date.now() - 60_000 });
         await start(memory.store, ALICE, queryClient).restored;
 
         const observer = new QueryObserver(queryClient, { enabled: false, queryKey: KEY });
@@ -211,7 +217,8 @@ describe("restore", () => {
         expect(textOf(queryClient, KEY)).toBe("live");
         unsubscribe();
 
-        // Nobody watches either now: both outlive the default five-minute collection, the restored one untouched.
+        // Nobody watches either now: both outlive the default five-minute collection, the restored one untouched, though it
+        // was in the cache before the restore.
         await vi.advanceTimersByTimeAsync(10 * 60 * 1000);
         expect(textOf(queryClient, KEY)).toBe("live");
         expect(textOf(queryClient, OTHER_KEY)).toBe("kept");
@@ -340,6 +347,41 @@ describe("restore", () => {
         expect(queryClient.getQueryData(KEY)).toBeUndefined();
         expect(textOf(queryClient, OTHER_KEY)).toBe("live");
     });
+
+    it("a screen already showing an entry when it is restored fetches it at once", async () => {
+        const memory = memoryStore();
+
+        await saveTexts(memory, ALICE, [[KEY, "kept"]]);
+
+        const queryClient = new QueryClient();
+        let fetches = 0;
+        const observer = new QueryObserver(queryClient, {
+            queryFn: async () => {
+                fetches += 1;
+
+                if (fetches === 1) {
+                    throw new Error("offline");
+                }
+
+                return { text: "live" };
+            },
+            queryKey: KEY,
+            retry: false,
+            staleTime: Infinity,
+        });
+        // Mounted before the restore: its mount fetch has failed, so the restored value replaces the empty entry it shows.
+        const unsubscribe = observer.subscribe(() => undefined);
+
+        await vi.advanceTimersByTimeAsync(0);
+        expect(observer.getCurrentResult().status).toBe("error");
+
+        await start(memory.store, ALICE, queryClient).restored;
+        await vi.advanceTimersByTimeAsync(0);
+
+        expect(fetches).toBe(2);
+        expect((observer.getCurrentResult().data as { text: string }).text).toBe("live");
+        unsubscribe();
+    });
 });
 
 describe("saving", () => {
@@ -381,15 +423,23 @@ describe("saving", () => {
         controller.stop();
     });
 
-    it("a clear that lands while a save is being sealed still leaves no record", async () => {
+    /** A session whose save waits on the store until `release()`; `release` resolves once a removal has run after it. */
+    const heldSave = async (onRemove: () => Promise<void> = async () => undefined) => {
         const memory = memoryStore();
         const storeGate = new EventTarget();
         const opened = nextEvent(storeGate, "open");
+        const removals = new EventTarget();
         const slowStore: RecordStore = {
             ...memory.store,
-            put: async (name, key, value) => {
+            putEntry: async (userId, entry, isKeyCurrent) => {
                 await opened;
-                await memory.store.put(name, key, value);
+
+                return await memory.store.putEntry(userId, entry, isKeyCurrent);
+            },
+            remove: async (userIds, shouldRemove) => {
+                await onRemove();
+                await memory.store.remove(userIds, shouldRemove);
+                removals.dispatchEvent(new Event("removed"));
             },
         };
         const { gate, writeGate } = openGate();
@@ -401,17 +451,56 @@ describe("saving", () => {
         controller.enableWrites();
         await vi.advanceTimersByTimeAsync(WRITE_THROTTLE_MS);
 
-        // The save is waiting on the store; a sign-out clears and holds.
-        gate.generation += 1;
-        gate.allowed = false;
+        return {
+            controller,
+            gate,
+            memory,
+            // Not the restore's prune: only a removal after the save is let through counts.
+            release: async () => {
+                const removed = nextEvent(removals, "removed");
 
-        const sealed = memory.settled();
+                storeGate.dispatchEvent(new Event("open"));
+                await removed;
+            },
+        };
+    };
 
-        storeGate.dispatchEvent(new Event("open"));
-        await sealed;
-        // The sealed record did land after the clear; the save takes it back out.
-        await memory.settled();
+    it.each([
+        ["cleared (a sign-out)", "clear"],
+        ["stopped (an account switch, a revoke)", "stop"],
+    ])("a save being sealed when the session is %s leaves no record", async (_name, how) => {
+        const { controller, gate, memory, release } = await heldSave();
+
+        // The save is waiting on the store.
+        if (how === "clear") {
+            gate.generation += 1;
+            gate.allowed = false;
+        } else {
+            controller.stop();
+        }
+
+        // The sealed record did land after it; the save takes it back out.
+        await release();
         expect(memory.stores.entries.has(ALICE)).toBe(false);
+        controller.stop();
+    });
+
+    it("taking a stale save back out never takes the record another tab wrote after it", async () => {
+        let memoryRef: ReturnType<typeof memoryStore> | undefined;
+        const { controller, gate, memory, release } = await heldSave(async () => {
+            // Another tab saves between this tab's seal landing and its removal.
+            if (memoryRef) {
+                await sealRecord(memoryRef.store, ALICE, "fresh");
+            }
+        });
+
+        memoryRef = memory;
+        gate.generation += 1;
+        await release();
+
+        const kept = await openRecord(memory.store, ALICE);
+
+        expect(kept?.text).toBe("fresh");
         controller.stop();
     });
 
@@ -419,7 +508,7 @@ describe("saving", () => {
         const blocked = async (): Promise<never> => {
             throw new DOMException("blocked", "InvalidStateError");
         };
-        const failing: RecordStore = { get: blocked, put: blocked, putIfAbsent: blocked, remove: blocked };
+        const failing: RecordStore = { get: blocked, putEntry: blocked, putIfAbsent: blocked, remove: blocked };
         const queryClient = new QueryClient();
 
         queryClient.setQueryData(KEY, { text: "kept" });
@@ -431,5 +520,54 @@ describe("saving", () => {
         await vi.advanceTimersByTimeAsync(WRITE_THROTTLE_MS * 2);
         expect(textOf(queryClient, KEY)).toBe("kept");
         controller.stop();
+    });
+});
+
+describe("IndexedDB store", () => {
+    beforeEach(() => {
+        vi.stubGlobal("indexedDB", new IDBFactory());
+    });
+
+    afterEach(() => {
+        vi.unstubAllGlobals();
+    });
+
+    it.each([
+        ["removed", undefined],
+        ["removed and made anew by another tab", "fresh"],
+    ])("a seal whose key is %s before its record is written writes nothing", async (_name, otherTab) => {
+        const store = indexedDatabaseStore();
+
+        expect(store).toBeDefined();
+
+        if (!store) {
+            return;
+        }
+
+        await sealRecord(store, ALICE, "first");
+
+        // The key is read, then a clear (and maybe another tab's save) lands before the record is written.
+        const racing: RecordStore = {
+            ...store,
+            get: async (name, key) => {
+                const value = await store.get(name, key);
+
+                if (name === "keys") {
+                    await removeRecord(store, key);
+
+                    if (otherTab !== undefined) {
+                        await sealRecord(store, ALICE, otherTab);
+                    }
+                }
+
+                return value;
+            },
+        };
+
+        await expect(sealRecord(racing, ALICE, SECRET_TEXT)).resolves.toBeUndefined();
+
+        const kept = await openRecord(store, ALICE);
+
+        expect(kept?.text).toBe(otherTab);
     });
 });
