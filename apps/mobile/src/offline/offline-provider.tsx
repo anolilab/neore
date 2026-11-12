@@ -73,11 +73,13 @@ export const OfflineProvider = ({ children }: { children: ReactNode }) => {
 
     // Signed in with no token: the server could not be reached to mint one, which is offline whatever the device says.
     // A start still confirming the stored user has not failed yet, so it shows no offline banner.
+    // It has no token to write with either, so its write controls wait as they do while a connection is checked.
     const isTokenMissing = status === "signed-in" && !hasToken && !isConfirming;
+    const isTokenPending = status === "signed-in" && !hasToken && isConfirming;
 
     useEffect(() => {
-        dispatch({ missing: isTokenMissing, type: "token" });
-    }, [isTokenMissing]);
+        dispatch({ missing: isTokenMissing, pending: isTokenPending, type: "token" });
+    }, [isTokenMissing, isTokenPending]);
 
     useEffect(() => {
         refresher.current.update(isOffline);

@@ -4,7 +4,7 @@ import "@/lib/splash-boot";
 import { Link, Stack, useRouter, useSegments } from "expo-router";
 import { hideAsync } from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
-import { useEffect } from "react";
+import { useEffect, useSyncExternalStore } from "react";
 import { Pressable, Text, View } from "react-native";
 
 import { AuthProvider } from "@/auth/auth-context";
@@ -16,6 +16,7 @@ import { crashReportStore } from "@/lib/crash-report-store";
 import { applyStoredCrashReportChoice, startCrashReporting } from "@/lib/crash-reporting";
 import { installMarker } from "@/lib/install-marker";
 import { createPostHogClient } from "@/lib/posthog-client";
+import { canHideSplash, listReady } from "@/lib/splash-gate";
 import { usePhonePush } from "@/notifications/use-phone-push";
 import { OfflineProvider } from "@/offline/offline-provider";
 import { settleQuietly } from "@/offline/quietly";
@@ -26,9 +27,13 @@ const SPLASH_MAX_MS = 2000;
 /** Hiding twice, or after a failed prevent, is harmless. */
 const hideSplash = (): void => settleQuietly(hideAsync());
 
-/** Hides the splash once the session is known, or after {@link SPLASH_MAX_MS} whatever it is. */
+/** Hides the splash once the first screen can paint (`canHideSplash`), or after {@link SPLASH_MAX_MS} whatever it is. */
 const SplashGate = () => {
     const { status } = useAuth();
+    const segments = useSegments();
+    const first: string | undefined = segments[0];
+    const isOnList = first === undefined || first === "index";
+    const isListReady = useSyncExternalStore(listReady.subscribe, listReady.isReady);
 
     useEffect(() => {
         const timer = setTimeout(hideSplash, SPLASH_MAX_MS);
@@ -37,10 +42,10 @@ const SplashGate = () => {
     }, []);
 
     useEffect(() => {
-        if (status !== "loading") {
+        if (canHideSplash({ isListReady, isOnList, status })) {
             hideSplash();
         }
-    }, [status]);
+    }, [isListReady, isOnList, status]);
 
     return null;
 };

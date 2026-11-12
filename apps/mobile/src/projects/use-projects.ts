@@ -39,12 +39,3 @@ export const useProject = (projectId: string): Live<ProjectRow> =>
 
 export const useProjectThreads = (projectId: string): Live<ProjectThreadRow> =>
     useLive((onRows, onError) => watchProjectThreads(getClient(), projectId, onRows, onError), `threads:${projectId}`);
-
-/** True while the client has no connection. Writes are refused then, never queued. */
-export const useIsOffline = (): boolean => {
-    const [isOffline, setIsOffline] = useState(false);
-
-    useEffect(() => getClient().onConnectionStatus((status) => setIsOffline(status === "offline")), []);
-
-    return isOffline;
-};

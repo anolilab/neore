@@ -17,6 +17,7 @@ import { displayTextOf, shareTextOf } from "@/chat/message-parts";
 import { isScrolledToEnd, scrollToLatestLabel, scrollToLatestText, shouldShowScrollToLatest } from "@/chat/scroll-to-latest";
 import { shareableMessageText, shareLabel } from "@/chat/share-message";
 import { relayReply } from "@/chat/stream";
+import { draftAfterUnsent, withoutUnsentRows } from "@/chat/unsent-send";
 import { useReplyConfirmation } from "@/chat/use-reply-confirmation";
 import { loadConfig } from "@/lib/config";
 import { DEFAULT_CHAT_MODEL } from "@/lib/defaults";
@@ -405,6 +406,16 @@ const Chat = () => {
         }
     }, [confirmTick, hasToken, loadMessages, refreshTick, sending, status, threadId]);
 
+    // A send the server never accepted gives its prompt back and drops its local rows: no read will confirm them.
+    const giveBackUnsent = ({ ids, isAccepted, prompt }: { ids: string[]; isAccepted: boolean; prompt: string }) => {
+        if (isAccepted) {
+            return;
+        }
+
+        setDraft((current) => draftAfterUnsent(current, prompt));
+        writeRows((current) => withoutUnsentRows(current, ids));
+    };
+
     const send = async () => {
         const prompt = draft.trim();
 
@@ -439,6 +450,9 @@ const Chat = () => {
             localRow(assistantId, "assistant", threadId ?? NEW_THREAD, ""),
         ]);
 
+        // Until the server accepts the prompt, a failure gives it back (`giveBackUnsent`).
+        let isAccepted = false;
+
         try {
             const config = loadConfig();
             const jwt = await fetchAccessToken({ fetch, lunoraUrl: config.lunoraUrl, store: secureGrantStore });
@@ -458,6 +472,7 @@ const Chat = () => {
                     jwt,
                 }));
 
+            isAccepted = true;
             setThreadId(started.threadId);
 
             // A reply, a question or an approval may now arrive while the app is in the background.
@@ -527,6 +542,8 @@ const Chat = () => {
 
             AccessibilityInfo.announceForAccessibility("Reply finished");
         } catch (error_) {
+            giveBackUnsent({ ids: [userId, assistantId], isAccepted, prompt });
+
             // The abort error of a send stopped on purpose is not shown: its notice is.
             if (!controller.signal.aborted) {
                 setError(error_ instanceof Error ? error_.message : "Could not send.");

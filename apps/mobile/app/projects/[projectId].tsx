@@ -3,22 +3,25 @@ import { useState } from "react";
 import { AccessibilityInfo, FlatList, Pressable, Text } from "react-native";
 
 import { getClient } from "@/lib/lunora";
+import { useOffline, useWriteControl } from "@/offline/offline-context";
 import { isWriteBlocked, startProjectThread, writeErrorMessage } from "@/projects/projects-api";
-import { useIsOffline, useProject, useProjectThreads } from "@/projects/use-projects";
+import { useProject, useProjectThreads } from "@/projects/use-projects";
 
 const ProjectScreen = () => {
     const { projectId } = useLocalSearchParams<{ projectId: string }>();
     const router = useRouter();
     const { error: projectError, rows: projectRows } = useProject(projectId);
     const { error: loadError, rows: threads } = useProjectThreads(projectId);
-    const isOffline = useIsOffline();
+    const { isOffline } = useOffline();
+    // Off while offline and while the first token mint is out: the write carries the token and would be refused without one.
+    const startControl = useWriteControl("start");
     const [starting, setStarting] = useState(false);
     const [error, setError] = useState<string | null>(null);
     // Read by id: the list is capped at 100 and empty until it answers, and the server prefers the model sent here over the project's own.
     const project = projectRows?.[0];
 
     const startThread = async () => {
-        if (!project || isWriteBlocked({ busy: starting, offline: isOffline })) {
+        if (!project || isWriteBlocked({ busy: starting, offline: startControl.disabled })) {
             return;
         }
 
@@ -39,7 +42,7 @@ const ProjectScreen = () => {
         }
     };
 
-    const blocked = isWriteBlocked({ busy: starting, offline: isOffline }) || !project;
+    const blocked = isWriteBlocked({ busy: starting, offline: startControl.disabled }) || !project;
     const shownError = error ?? projectError ?? (projectRows?.length === 0 ? "This project is not available." : undefined) ?? loadError;
 
     return (

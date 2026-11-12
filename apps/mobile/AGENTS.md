@@ -14,8 +14,9 @@
   server (`auth/sign-out.ts`), so a failing or hanging request leaves nothing behind. Locked threads are never cached,
   and a chat the server refuses (`FORBIDDEN`/`NOT_FOUND`/`THREAD_LOCKED`, not a lapsed sign-in) is forgotten with its
   statuses and cleared from the screen (`message-read.ts`). Every start signs the stored user in before the first
-  token mint answers (`session-state.ts`, `isConfirming`: not offline yet; the splash holds until the session is known, at
-  most 2 s). A mint with no answer keeps them signed in without a JWT, which counts as offline; an answered "no session"
+  token mint answers (`session-state.ts`, `isConfirming`: not offline yet, but every write control waits for the token like a
+  connection being checked; the splash holds until the chat list has read its saved rows, at most 2 s,
+  `splash-gate.ts`). A send the server never accepted gives its prompt back (`unsent-send.ts`). A mint with no answer keeps them signed in without a JWT, which counts as offline; an answered "no session"
   signs out and empties the cache. Live queries wait for a JWT.
   **Stamps and races:** a read stamps its rows with the moment it STARTED (`syncedAt`), and only the newest read of a
   screen may paint or save (`createMessageReadGate`), because messages carry no server version. A thread missing from

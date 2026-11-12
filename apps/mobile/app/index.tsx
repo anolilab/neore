@@ -7,6 +7,7 @@ import { useAuth } from "@/auth/auth-state";
 import { lastChatToReopen } from "@/chat/last-thread-store";
 import { canClaimLaunchReopen } from "@/chat/launch-reopen";
 import { getClient } from "@/lib/lunora";
+import { listReady } from "@/lib/splash-gate";
 import { isNetworkFailure } from "@/offline/connectivity";
 import { displayStatus } from "@/offline/labels";
 import { mergeRows } from "@/offline/merge";
@@ -104,6 +105,11 @@ const ThreadList = () => {
 
                 // Not "checked" while the account's cache is still binding: nothing is known about what is saved yet.
                 setCacheChecked(cache !== undefined);
+
+                // The saved rows are in this render: the launch splash may go.
+                if (cache !== undefined) {
+                    listReady.mark();
+                }
             }
         };
 
