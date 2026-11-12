@@ -94,11 +94,19 @@ function hasEdgeBreak(element: Element): boolean {
     return isBreak(first) || isBreak(last);
 }
 
-/** True when the element's direct parent is emphasis of the same kind, so the nested one writes no delimiters. */
+/**
+ * True when the element's direct parent is emphasis of the same kind and has no block inside,
+ * so the nested one writes no delimiters. A parent with a block keeps its delimiters, so the
+ * nested element matches upstream there.
+ */
 function isNestedInSameKind(element: Element): boolean {
     const parent = element.parentElement;
 
-    return parent !== null && EMPHASIS_KIND.get(parent.nodeName) === EMPHASIS_KIND.get(element.nodeName);
+    return parent !== null && EMPHASIS_KIND.get(parent.nodeName) === EMPHASIS_KIND.get(element.nodeName) && !hasBlock(parent);
+}
+
+function hasBlock(element: Element): boolean {
+    return [...element.querySelectorAll("*")].some((descendant) => isBlock(descendant));
 }
 
 function hasEdgeSpace(element: Element): boolean {
@@ -132,9 +140,9 @@ function isWordNeighbour(sibling: Node | null, side: (typeof SIDES)[number]): bo
     return facing !== undefined && WORD_CHARACTER.test(facing);
 }
 
-// Measured: 1389 of the 1500 documents are compared. The floor is that count, so an
+// Measured: 1403 of the 1500 documents are compared. The floor is that count, so an
 // exclusion that grows (a regression hidden as an intended change) fails the test.
-const MIN_COMPARED = 1389;
+const MIN_COMPARED = 1403;
 
 // Mulberry32: a small seeded PRNG, so a failure reproduces exactly.
 function createRandom(seed: number): () => number {
