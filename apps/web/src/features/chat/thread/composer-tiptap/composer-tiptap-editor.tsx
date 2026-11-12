@@ -23,7 +23,7 @@ import { Selection } from "@tiptap/pm/state";
 import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKitExtension from "@tiptap/starter-kit";
 import clsx from "clsx";
-import { useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
+import { useCallback, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState } from "react";
 
 import { useUserSettings } from "@/features/auth/hooks/use-user-settings";
 import useFavoriteModels from "@/features/chat/core/hooks/use-favorite-models";
@@ -259,10 +259,15 @@ const ComposerTiptapEditor = ({
         historyRecalledRef.current = isHistoryRecalled;
     }, [isVimEnabled, isHistoryRecalled]);
 
-    // The key handlers below read the latest props through this ref. tiptap copies an extension's options when the
-    // editor is built (`extension.options` is a fresh copy on every read), so assigning to them later changes nothing:
-    // Enter kept calling the first render's submit handler.
-    const keyHandlersRef = useRef({ isPopupOpen: false, isStreaming, onCancel, onHistoryNavigate, onSubmit });
+    // The key handlers the extensions call. Tiptap's `extension.options` is a getter that returns a fresh object, and
+    // shortcuts read the options captured when the editor was built, so a handler assigned onto it later is lost; the
+    // extensions read this ref at key time instead. No popup check here: an open popup (one with items) takes Enter, the
+    // arrows and Escape on `window` in the capture phase, and a match without items must still let Enter send.
+    const keyHandlersRef = useRef({ isStreaming, onCancel, onHistoryNavigate, onSubmit });
+
+    useLayoutEffect(() => {
+        keyHandlersRef.current = { isStreaming, onCancel, onHistoryNavigate, onSubmit };
+    }, [isStreaming, onCancel, onHistoryNavigate, onSubmit]);
 
     // Create editor
     const editor = useEditor({
@@ -297,25 +302,16 @@ const ComposerTiptapEditor = ({
                 placeholder: () => placeholderRef.current ?? "",
             }),
             // Before SubmitOnEnter: Escape restores a recalled prompt's draft first.
-            // eslint-disable-next-line react-hooks/refs -- tiptap calls these options from key events, never during render
+            // eslint-disable-next-line react-hooks/refs -- tiptap calls these options from editor events, never during render
             PromptHistoryKeys.configure({
-                onNavigate: (direction: PromptHistoryDirection) => {
-                    const { isPopupOpen, onHistoryNavigate: navigate } = keyHandlersRef.current;
-
-                    return isPopupOpen || !navigate ? null : navigate(direction);
-                },
+                onNavigate: (direction: PromptHistoryDirection) => keyHandlersRef.current.onHistoryNavigate?.(direction) ?? null,
             }),
-            // eslint-disable-next-line react-hooks/refs -- tiptap calls these options from key events, never during render
+            // eslint-disable-next-line react-hooks/refs -- tiptap calls these options from editor events, never during render
             SubmitOnEnter.configure({
-                // Escape cancels only with a cancel handler to call; otherwise it is left to the page.
-                isStreaming: () => Boolean(keyHandlersRef.current.isStreaming && keyHandlersRef.current.onCancel),
+                // Escape cancels only with a cancel handler to call; otherwise it falls through.
+                isStreaming: () => keyHandlersRef.current.isStreaming && keyHandlersRef.current.onCancel !== undefined,
                 onCancel: () => keyHandlersRef.current.onCancel?.(),
-                onSubmit: () => {
-                    // A popup (slash command, file mention, variable) takes Enter for itself.
-                    if (!keyHandlersRef.current.isPopupOpen) {
-                        keyHandlersRef.current.onSubmit();
-                    }
-                },
+                onSubmit: () => keyHandlersRef.current.onSubmit(),
             }),
             BannedWordDecoration,
             QuoteChip.configure({
@@ -464,17 +460,6 @@ const ComposerTiptapEditor = ({
         // transaction to make it take effect.
         editor.commands.setBannedWordMatches(bannedWordMatches);
     }, [bannedWordMatches, editor]);
-
-    // Keep the key handlers current; Enter must never submit while a popup is open.
-    useEffect(() => {
-        keyHandlersRef.current = {
-            isPopupOpen: Boolean(slashMatch || fileMentionMatch || variableMatch),
-            isStreaming,
-            onCancel,
-            onHistoryNavigate,
-            onSubmit,
-        };
-    }, [onSubmit, onCancel, onHistoryNavigate, isStreaming, slashMatch, fileMentionMatch, variableMatch]);
 
     // ---- Ghost-text autocomplete -------------------------------------------
     const [ghostAnnouncement, setGhostAnnouncement] = useState("");

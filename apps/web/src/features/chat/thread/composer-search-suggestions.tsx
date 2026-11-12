@@ -12,7 +12,7 @@ import { useLingui } from "@lingui/react/macro";
 import cn from "@neore/ui/utils/cn";
 import { AnimatePresence, motion } from "motion/react";
 import type { FC } from "react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 
 import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
 import { useModelStore } from "@/features/chat/core/stores/model-store";
@@ -24,30 +24,34 @@ const DEBOUNCE_MS = 200;
 
 const ComposerSearchSuggestions: FC = () => {
     const { t } = useLingui();
-    const composerText = useChatUIStore((state) => state.composerText);
     const setComposerText = useChatUIStore((state) => state.setComposerText);
     const searchMode = useModelStore((state) => state.searchMode) as SearchMode;
     const [suggestions, setSuggestions] = useState<SearchSuggestion[]>([]);
-    const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
-    // Debounced suggestion generation
+    // Debounced suggestion generation. The draft is followed through a store subscription, not a selector: this re-renders
+    // when the suggestions change, not on every keystroke.
     useEffect(() => {
-        if (debounceRef.current) {
-            clearTimeout(debounceRef.current);
-        }
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        const schedule = (text: string) => {
+            clearTimeout(timer);
+            timer = setTimeout(() => {
+                setSuggestions(generateSearchSuggestions(text, searchMode));
+            }, DEBOUNCE_MS);
+        };
 
-        debounceRef.current = setTimeout(() => {
-            const results = generateSearchSuggestions(composerText, searchMode);
+        schedule(useChatUIStore.getState().composerText);
 
-            setSuggestions(results);
-        }, DEBOUNCE_MS);
+        const unsubscribe = useChatUIStore.subscribe((state, previous) => {
+            if (state.composerText !== previous.composerText) {
+                schedule(state.composerText);
+            }
+        });
 
         return () => {
-            if (debounceRef.current) {
-                clearTimeout(debounceRef.current);
-            }
+            unsubscribe();
+            clearTimeout(timer);
         };
-    }, [composerText, searchMode]);
+    }, [searchMode]);
 
     const handleSuggestionClick = (suggestion: SearchSuggestion) => {
         setComposerText(suggestion.text);
