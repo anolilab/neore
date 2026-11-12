@@ -959,3 +959,21 @@ describe("a code block inside a heading", () => {
         expect(htmlToMarkdown("<h2>Use <code>npm</code></h2>")).toBe("## Use `npm`");
     });
 });
+
+describe("a line indented four spaces before backticks", () => {
+    it("is indented code, not a fence, so the caret after it is not in one", () => {
+        expect(inOpenFence("    ```\ncode")).toBe(false);
+        expect(inOpenFence("   ```\ncode")).toBe(true);
+        expect(inOpenFence("> ```md\ncode")).toBe(true);
+    });
+});
+
+describe("block content in a pasted table cell", () => {
+    it("goes on the cell's line without block markers", () => {
+        expect(
+            htmlToMarkdown(
+                "<table><tr><th>A</th></tr><tr><td><ul><li>a</li><li>b</li></ul></td></tr><tr><td><h2>Title</h2></td></tr><tr><td><blockquote>q</blockquote></td></tr></table>",
+            ),
+        ).toBe("| A |\n| --- |\n| a; b |\n| **Title** |\n| q |");
+    });
+});

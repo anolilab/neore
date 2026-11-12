@@ -522,7 +522,8 @@ const markdownLink = (label: string, url: string): string =>
 
 // Quote and list markers before a line's content, so a fence in a quote or list item counts.
 const CONTAINER_PREFIX = /^(?:[ \t]*(?:>|[-+*][ \t]|\d{1,9}[.)][ \t]))*/;
-const FENCE_LINE = /^[ \t]*(`{3,}|~{3,})/;
+// At most three spaces before it: four or more make the line indented code, not a fence.
+const FENCE_LINE = /^ {0,3}(`{3,}|~{3,})/;
 
 /**
  * Whether `textBefore` (the draft before the caret) leaves a code fence open. As in CommonMark, a fence closes only on a

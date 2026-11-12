@@ -987,6 +987,23 @@ function styledChildren(node: Element, context: Context): string {
     return STRIKE_STYLE.test(style) ? wrap(inner, "~~", context, node) : inner;
 }
 
+/** A list inside a table cell: its shown items' text on one line, separated by "; ". */
+const cellList = (listElement: Element, context: Context): string => {
+    const items: string[] = [];
+
+    for (const child of listElement.children) {
+        if (child.tagName === "LI" && !isHidden(child)) {
+            const text = oneLine(children(child, context)).trim();
+
+            if (text !== "") {
+                items.push(text);
+            }
+        }
+    }
+
+    return ` ${items.join("; ")} `;
+};
+
 const element = (node: Element, context: Context): string => {
     const tag = node.tagName.toUpperCase();
     const style = styleOf(node);
@@ -1040,6 +1057,11 @@ const element = (node: Element, context: Context): string => {
             return wrap(inner, "**", context, node);
         }
         case "BLOCKQUOTE": {
+            // A table cell holds inline content only: a quote there is its text.
+            if (context.inTable) {
+                return ` ${children(node, context)} `;
+            }
+
             const inner = children(node, context).replaceAll(BLANK_LINES, "\n\n").trim();
 
             return `\n\n${prefixLines(inner, "> ", "> ", ">", context)}\n\n`;
@@ -1104,7 +1126,8 @@ const element = (node: Element, context: Context): string => {
         }
         case "OL":
         case "UL": {
-            return list(node, context);
+            // A table cell holds inline content only: its list items go on the cell's line, apart.
+            return context.inTable ? cellList(node, context) : list(node, context);
         }
         case "PRE": {
             const code = codeText(node);
@@ -1151,6 +1174,11 @@ const element = (node: Element, context: Context): string => {
             .map((line: string) => line.trim())
             .filter(Boolean)
             .join(" ");
+        // A table cell holds inline content only: a heading there is its text, in bold.
+        if (context.inTable) {
+            return text === "" ? "" : ` ${wrapLine(text, "**")} `;
+        }
+
         const heading = text === "" ? "" : `\n\n${"#".repeat(Number(tag[1]))} ${text}\n\n`;
 
         return heading + blocks.map((block: string) => `\n\n${block}\n\n`).join("");
