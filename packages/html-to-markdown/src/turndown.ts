@@ -3,7 +3,7 @@ import annotateNode from "./node";
 import rootNode from "./root-node";
 import Rules from "./rules";
 import type { AnnotatedNode, Options, Rule } from "./types";
-import { escapeMarkdown, trimLeadingBreaks, trimLeadingNewlines, trimTrailingNewlines } from "./utilities";
+import { escapeMarkdown, trimKeepingBreaks, trimLeadingBreaks, trimLeadingNewlines, trimTrailingNewlines } from "./utilities";
 
 export type TurndownInput = string | Node;
 
@@ -151,7 +151,8 @@ function replacementForNode(service: TurndownService, node: AnnotatedNode): stri
     const whitespace = node.flankingWhitespace;
 
     if (whitespace.leading || whitespace.trailing) {
-        content = content.trim();
+        // A plain trim would also remove a hard line break at either end of the content.
+        content = trimKeepingBreaks(content, node, service.options.br);
     }
 
     return whitespace.leading + rule.replacement(content, node, service.options) + whitespace.trailing;

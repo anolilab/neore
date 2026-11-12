@@ -1,0 +1,105 @@
+import { describe, expect, it } from "vitest";
+
+import type { Options } from "../src/index";
+import TurndownService from "../src/index";
+
+function convert(html: string, options: Partial<Options> = {}): string {
+    return new TurndownService(options).turndown(html);
+}
+
+/*
+ * Inline emphasis and line breaks. Each block is one reported issue (upstream
+ * numbers in the names). The "unchanged" cases pin output the fixes must not touch.
+ */
+
+describe("adjacent emphasis (#512, #442)", () => {
+    it("merges adjacent emphasis into one run", () => {
+        expect(convert("<i>1</i><i>2</i><em>3</em><em>4</em>")).toBe("_1234_");
+    });
+
+    it("merges emphasis split inside a paragraph", () => {
+        expect(convert("<p>An <em>emphas</em><em>is</em></p>")).toBe("An _emphasis_");
+    });
+
+    it("uses the emphasis delimiter option for a merged run", () => {
+        expect(convert("<em>a</em><em>b</em>", { emDelimiter: "*" })).toBe("*ab*");
+    });
+
+    it("keeps a hard break inside a merged run", () => {
+        expect(convert("<em>a<br></em><em>b</em>")).toBe("_a  \nb_");
+    });
+
+    it("does not merge across two breaks, which would be a blank line", () => {
+        expect(convert("<em>a<br></em><em><br>b</em>")).toBe("_a_  \n  \n_b_");
+    });
+
+    it("merges adjacent strong into one run", () => {
+        expect(convert("<strong>a</strong><b>b</b>")).toBe("**ab**");
+    });
+
+    it("unchanged: emphasis separated by a space stays separate", () => {
+        expect(convert("<em>a</em> <em>b</em>")).toBe("_a_ _b_");
+    });
+});
+
+describe("intraword emphasis (#441)", () => {
+    it("uses * when the emphasis touches a word character", () => {
+        expect(convert("Bru<em>ss</em>el<em>s</em>")).toBe("Bru*ss*el*s*");
+    });
+
+    it("uses * for a merged run that touches a word character", () => {
+        expect(convert("Bru<em>ss</em><em>el</em>x")).toBe("Bru*ssel*x");
+    });
+
+    it("unchanged: emphasis next to punctuation and spaces keeps _", () => {
+        expect(convert("a <em>b</em>, c")).toBe("a _b_, c");
+    });
+
+    it("unchanged: emphasis after strong keeps _", () => {
+        expect(convert("<strong>1</strong><em>2</em>")).toBe("**1**_2_");
+    });
+});
+
+describe("line breaks at the edge of an element (#509, #436, #405)", () => {
+    it("keeps a trailing break when the element has leading space (#509)", () => {
+        expect(convert("<span>abc</span><span> def<br></span><span>ghi</span>")).toBe("abc def  \nghi");
+    });
+
+    it("moves a leading and trailing break outside strong delimiters (#436)", () => {
+        expect(convert("<p>Before<strong><br>Strong Text<br></strong></p>")).toBe("Before  \n**Strong Text**");
+    });
+
+    it("moves a leading break outside strong delimiters at the start (#436)", () => {
+        expect(convert("<strong><br>Strong Text<br></strong>")).toBe("  \n**Strong Text**");
+    });
+
+    it("moves a trailing break outside em delimiters (#405)", () => {
+        expect(convert("<em>foo<br/></em>")).toBe("_foo_");
+    });
+
+    it("keeps a break that is the only content of emphasis", () => {
+        expect(convert("<p>a<em><br></em>b</p>")).toBe("a  \nb");
+    });
+});
+
+describe("line breaks in headings (#555)", () => {
+    it("replaces a break in an ATX heading with a space", () => {
+        expect(convert("<h3>Chapter 1<br>The Beginning</h3>")).toBe("### Chapter 1 The Beginning");
+    });
+
+    it("replaces a break in a setext heading with a space, and sizes the underline to it", () => {
+        expect(convert("<h1>Chapter 1<br>The Beginning</h1>")).toBe(`Chapter 1 The Beginning\n${"=".repeat(23)}`);
+    });
+});
+
+describe("line breaks inside code blocks (#514)", () => {
+    const html = "<div><pre><code>First line<br>Second line<br>Third line</code></pre></div>";
+
+    it("writes each break as a newline in an indented code block", () => {
+        expect(convert(html)).toBe("    First line\n    Second line\n    Third line");
+    });
+
+    it("writes each break as a newline in a fenced code block", () => {
+        expect(convert(html, { codeBlockStyle: "fenced" })).toBe("```\nFirst line\nSecond line\nThird line\n```");
+    });
+});
