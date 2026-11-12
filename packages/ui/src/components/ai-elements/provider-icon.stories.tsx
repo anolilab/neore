@@ -27,8 +27,16 @@ export const Large: Story = { args: { className: "size-12" } };
 
 export const NoIcon: Story = {
     args: { providerIcon: null },
-    play: async ({ canvas }) => {
-        await expect(canvas.getByText("AN")).toBeVisible();
+    // The initials are drawn, not text: inside a control named after the model, text would be visible content missing from its name.
+    play: async ({ canvas, canvasElement }) => {
+        const initials = canvasElement.querySelector<HTMLElement>("[data-initials]");
+
+        if (!initials) {
+            throw new Error("The badge has no initials");
+        }
+
+        await expect(getComputedStyle(initials, "::before").content).toBe('"AN"');
+        await expect(canvas.queryByText("AN")).toBeNull();
     },
 };
 
