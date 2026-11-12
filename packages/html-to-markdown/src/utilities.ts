@@ -1,4 +1,3 @@
-const LEADING_NEWLINES = /^\n*/;
 const TRAILING_NEWLINE_BLOCK_START = /^[\t\r\n]+/;
 
 export function repeat(character: string, count: number): string {
@@ -6,7 +5,13 @@ export function repeat(character: string, count: number): string {
 }
 
 export function trimLeadingNewlines(string: string): string {
-    return string.replace(LEADING_NEWLINES, "");
+    let indexStart = 0;
+
+    while (indexStart < string.length && string[indexStart] === "\n") {
+        indexStart += 1;
+    }
+
+    return indexStart === 0 ? string : string.slice(indexStart);
 }
 
 export function trimTrailingNewlines(string: string): string {
@@ -114,24 +119,46 @@ export function isMeaningfulWhenBlank(node: Node): boolean {
     return meaningfulWhenBlankElements.has(node.nodeName);
 }
 
-export function hasVoid(node: Node): boolean {
-    return hasDescendant(node, voidElements);
+const voidOrMeaningfulNames = new Set<string>(voidElements);
+
+for (const name of meaningfulWhenBlankElements) {
+    voidOrMeaningfulNames.add(name);
 }
 
-export function hasMeaningfulWhenBlank(node: Node): boolean {
-    return hasDescendant(node, meaningfulWhenBlankElements);
-}
+type DescendantScan = "match" | "none" | "unknown";
 
-function hasDescendant(node: Node, tagNames: Set<string>): boolean {
+/**
+ * True when the node has a descendant that is void or meaningful when blank.
+ *
+ * Walks the tree rather than querying it: domino compiles a selector on every
+ * query. A name lookup is exact for upper-case names without a prefix, which is
+ * every element the HTML parsers create. Anything else (a prefixed name, which a
+ * type selector matches by local name, or a foreign name in another case) is
+ * decided by upstream's own per-name queries, so the answer is upstream's in
+ * both environments.
+ */
+export function hasVoidOrMeaningfulDescendant(node: Node): boolean {
     if (!("querySelector" in node) || typeof node.querySelector !== "function") {
         return false;
     }
 
-    const element = node as Element;
+    const scan = scanDescendants(node);
 
-    for (const tagName of tagNames) {
+    if (scan === "unknown") {
+        return hasListedDescendantByName(node as Element);
+    }
+
+    return scan === "match";
+}
+
+/**
+ * One query per name, as upstream does. A joined selector list gives a different
+ * answer for prefixed elements under domino, so it is not used.
+ */
+function hasListedDescendantByName(element: Element): boolean {
+    for (const name of voidOrMeaningfulNames) {
         // Truthiness, not `!== null`: domino returns undefined when nothing matches.
-        if (element.querySelector(tagName)) {
+        if (element.querySelector(name)) {
             return true;
         }
     }
@@ -139,23 +166,71 @@ function hasDescendant(node: Node, tagNames: Set<string>): boolean {
     return false;
 }
 
+function scanDescendants(parent: Node): DescendantScan {
+    for (let child = parent.firstChild; child; child = child.nextSibling) {
+        if (child.nodeType !== 1) {
+            continue;
+        }
+
+        const { nodeName } = child;
+        const upperName = nodeName.toUpperCase();
+
+        // A prefixed name is matched by its local name, so the name here says nothing about it.
+        // A foreign name in other case is listed only when upper-cased, and the case
+        // rules then decide it. Any other name cannot match in either environment.
+        if (nodeName.includes(":") || (nodeName !== upperName && voidOrMeaningfulNames.has(upperName))) {
+            return "unknown";
+        }
+
+        if (voidOrMeaningfulNames.has(nodeName)) {
+            return "match";
+        }
+
+        const inside = scanDescendants(child);
+
+        if (inside !== "none") {
+            return inside;
+        }
+    }
+
+    return "none";
+}
+
+const INLINE_SYNTAX = /[\\*`[\]_]/g;
+const LINE_START_CHARACTER = /^[-+=#~>\d]/;
+const DASH_START = /^-/g;
+const PLUS_SPACE_START = /^\+ /g;
+const EQUALS_START = /^(=+)/g;
+const HASH_START = /^(#{1,6}) /g;
+const TILDE_FENCE_START = /^~~~/g;
+const QUOTE_START = /^>/g;
+const ORDERED_START = /^(\d+)\. /g;
+
 /**
  * Escapes text so that it cannot start a Markdown block or open an inline
- * construct. Order matters: the backslash is escaped first.
+ * construct.
+ *
+ * Every inline character gets one backslash in a single pass. The backslash is
+ * one of those characters, so this equals escaping it first, as upstream does.
+ * The line-start rules anchor at the start of the string, and each one starts
+ * with a character the inline pass never changes, so the order does not matter.
  */
 export function escapeMarkdown(string: string): string {
-    return string
-        .replaceAll("\\", "\\\\")
-        .replaceAll("*", String.raw`\*`)
-        .replaceAll(/^-/g, String.raw`\-`)
-        .replaceAll(/^\+ /g, String.raw`\+ `)
-        .replaceAll(/^(=+)/g, String.raw`\$1`)
-        .replaceAll(/^(#{1,6}) /g, String.raw`\$1 `)
-        .replaceAll("`", "\\`")
-        .replaceAll(/^~~~/g, String.raw`\~~~`)
-        .replaceAll("[", String.raw`\[`)
-        .replaceAll("]", String.raw`\]`)
-        .replaceAll(/^>/g, String.raw`\>`)
-        .replaceAll("_", String.raw`\_`)
-        .replaceAll(/^(\d+)\. /g, String.raw`$1\. `);
+    const inline = string.replaceAll(INLINE_SYNTAX, String.raw`\$&`);
+
+    // Only these characters can start a line-start rule. After the inline pass a
+    // string that starts with a backslash can match none of them, so the check
+    // is exact, and it avoids seven scans of the whole string in the common case.
+    if (!LINE_START_CHARACTER.test(inline)) {
+        return inline;
+    }
+
+    return inline
+        .replaceAll(DASH_START, String.raw`\-`)
+        .replaceAll(PLUS_SPACE_START, String.raw`\+ `)
+        .replaceAll(EQUALS_START, String.raw`\$1`)
+        .replaceAll(HASH_START, String.raw`\$1 `)
+        .replaceAll(TILDE_FENCE_START, String.raw`\~~~`)
+        .replaceAll(QUOTE_START, String.raw`\>`)
+        .replaceAll(ORDERED_START, String.raw`$1\. `);
 }
