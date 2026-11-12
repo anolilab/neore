@@ -1,17 +1,20 @@
 /* eslint-disable unicorn/no-await-expression-member */
 /**
  * `/chat/start` with `clientMessageId`: a resend saves nothing twice and creates no second thread; it is answered with
- * the first send's ids. The claim, the thread creation, the save and the rows are real, and the saves run with no
- * nested mutation (one would commit on its own); the runtime around the handler is faked as in `http.guest-note.test.ts`.
+ * the first send's ids. The claim, the thread creation, the save, the goal, the stream and the rows are real, and each
+ * runs with no nested mutation (one would commit on its own); the runtime around the handler is faked as in
+ * `http.guest-note.test.ts`.
  */
 import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import schema from "../schema";
 import { createThreadWithInitialMessage, gateThreadActionHandler } from "./functions";
+import { startGoal } from "./goals/internal";
 import { runChatStart } from "./http";
 import { enqueueJob } from "../lib/job-queue";
-import { CHAT_START_LEASE_MS, chatStartFingerprint, claimChatStart, recordStartStream, releaseChatStart, saveStartPrompt } from "./start-claim";
+import { CHAT_START_LEASE_MS, CHAT_START_SCOPE, chatStartFingerprint, claimChatStart, releaseChatStart, saveStartPrompt } from "./start-claim";
+import { createStreamWithMessage } from "./streaming";
 
 const state = vi.hoisted(() => {
     return {
@@ -28,6 +31,15 @@ const state = vi.hoisted(() => {
     };
 });
 
+// `user` is a `.global()` (D1) table the in-memory harness cannot write: a goal's account is looked up here.
+vi.mock("../auth/lib/better-auth-queries", async (importOriginal) => {
+    return {
+        ...(await importOriginal<typeof import("../auth/lib/better-auth-queries")>()),
+        getUser: async (_ctx: unknown, userId: string) => {
+            return { _id: userId, isAnonymous: false };
+        },
+    };
+});
 vi.mock("../auth/lib/helper", () => {
     return {
         getCurrentUserInternal: async () => {
@@ -124,9 +136,11 @@ const withoutNestedMutations = (ctx: any): any =>
     });
 
 const HANDLERS: Record<string, (args: any) => Promise<unknown>> = {
+    "agent_threads:getThreadInternal": async (args) => await run(async (ctx) => await ctx.db.get("threads", args.threadId)),
     "chat_functions:createThreadWithInitialMessage": async (args) =>
         await run(async (ctx) => await (createThreadWithInitialMessage as any).handler(withoutNestedMutations(ctx), args)),
     "chat_functions:gateThreadAction": async (args) => await run(async (ctx) => await gateThreadActionHandler(ctx, args)),
+    "chat_goals_internal:startGoal": async (args) => await run(async (ctx) => await (startGoal as any).handler(withoutNestedMutations(ctx), args)),
     "chat_start_claim:claimChatStart": async (args) => await run(async (ctx) => await ctx.runMutation(claimChatStart, args)),
     "chat_start_claim:releaseChatStart": async (args) => await run(async (ctx) => await ctx.runMutation(releaseChatStart, args)),
     "chat_start_claim:saveStartPrompt": async (args) => await run(async (ctx) => await (saveStartPrompt as any).handler(withoutNestedMutations(ctx), args)),
@@ -137,23 +151,7 @@ const HANDLERS: Record<string, (args: any) => Promise<unknown>> = {
             throw new Error("the stream could not be made");
         }
 
-        // What `createStreamWithMessage` does for a send: its stream row and, in the same transaction, the claim's record of it.
-        return await run(async (ctx) => {
-            const streamId = await ctx.db.insert("persistentStreams", {
-                expiresAt: Number.MAX_SAFE_INTEGER,
-                messageId: args.messageId,
-                status: "pending",
-                streamingConfig: { contentType: "text", model: MODEL },
-                threadId: args.threadId,
-                userId: args.userId,
-            });
-
-            if (args.startClaim) {
-                await recordStartStream(ctx, args.startClaim, streamId);
-            }
-
-            return streamId;
-        });
+        return await run(async (ctx) => await (createStreamWithMessage as any).handler(withoutNestedMutations(ctx), args));
     },
 };
 
@@ -169,7 +167,19 @@ const send = async (body: Record<string, unknown>): Promise<{ json: any; status:
     return { json: await response.json(), status: response.status };
 };
 
-const countRows = async (table: "messages" | "threads") => await run(async (ctx) => (await ctx.db.query(table).collect()).length);
+const countRows = async (table: "messages" | "persistentStreams" | "threadGoals" | "threads") =>
+    await run(async (ctx) => (await ctx.db.query(table).collect()).length);
+
+/** What the send's claim recorded. */
+const startRecord = async (clientMessageId: string): Promise<{ goalId?: string; messageId?: string; streamId?: string; threadId?: string }> =>
+    await run(async (ctx) => {
+        const rows = await ctx.db.query("idempotencyClaims").collect();
+        const row = rows.find(
+            (claim: { key: string; scope: string }) => claim.scope === CHAT_START_SCOPE && claim.key === `${state.userId}:${clientMessageId}`,
+        );
+
+        return JSON.parse(row.result);
+    });
 
 beforeEach(async () => {
     vi.useFakeTimers({ toFake: ["Date"] });
@@ -208,6 +218,13 @@ describe("/chat/start with clientMessageId", () => {
         });
         expect(await countRows("messages")).toBe(1);
         expect(state.charges).toBe(1);
+
+        // The stream row and the claim's record of it are the same stream, written by the real `createStreamWithMessage`.
+        const stream = await run(async (ctx) => await ctx.db.get("persistentStreams", first.json.streamId));
+
+        expect(stream).toMatchObject({ messageId: first.json.messageId, status: "pending", threadId });
+        expect(await startRecord("send-1")).toMatchObject({ messageId: first.json.messageId, streamId: first.json.streamId, threadId });
+        expect(await countRows("persistentStreams")).toBe(1);
     });
 
     it("creates one thread for a resend of a new chat's first message", async () => {
@@ -274,6 +291,29 @@ describe("/chat/start with clientMessageId", () => {
         expect(again.json).toMatchObject({ duplicate: true, messageId: resumed.json.messageId, streamId: resumed.json.streamId });
         expect(await countRows("messages")).toBe(1);
         expect(state.charges).toBe(1);
+        expect(await startRecord("half")).toMatchObject({ streamId: resumed.json.streamId });
+        expect(await countRows("persistentStreams")).toBe(1);
+    });
+
+    it("runs the goal a resumed send's first try started, and starts no second one", async () => {
+        state.streamFails = true;
+
+        const goal = { goal: { text: "Ship the report" }, prompt: "Make the report" };
+
+        await expect(send({ clientMessageId: "goal", threadId, ...goal })).rejects.toThrow("the stream could not be made");
+
+        const [firstGoal] = await run(async (ctx) => await ctx.db.query("threadGoals").collect());
+
+        expect(firstGoal).toMatchObject({ status: "active" });
+
+        vi.setSystemTime(Date.now() + CHAT_START_LEASE_MS);
+
+        const resumed = await send({ clientMessageId: "goal", threadId, ...goal });
+
+        expect(resumed.status).toBe(200);
+        expect(await countRows("threadGoals")).toBe(1);
+        expect(await run(async (ctx) => await ctx.db.get("threadGoals", firstGoal._id))).toMatchObject({ status: "active" });
+        expect(await startRecord("goal")).toMatchObject({ goalId: firstGoal._id, streamId: resumed.json.streamId });
     });
 
     it("refuses the same id on a different send, and never answers it with the first send's thread", async () => {

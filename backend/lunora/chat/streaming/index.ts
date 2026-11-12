@@ -17,6 +17,7 @@ import { deliveredSteerIds, type SteerEntry } from "../lib/steer-queue";
 import { discardPausedThreadSecrets } from "../lib/secret-requests";
 import { lockedAfterCreation, streamLockedAfterStart } from "../lib/thread-gate";
 import { recordStartStream, vStartClaim } from "../start-claim";
+import { insertPersistentStream } from "./persistent/library";
 
 /**
  * Persistent Text Streaming Helper
@@ -156,7 +157,9 @@ export const createStreamWithMessage = internalMutation
         // A reply paused on a request that this message moves the conversation past is abandoned: drop what it kept through the pause.
         await discardPausedThreadSecrets(context, { threadId: threadId as Id<"threads"> });
 
-        const streamId = await persistentTextStreaming.createStream(context, {
+        // Inserted here, not through `persistentTextStreaming.createStream`: that is a nested mutation, which commits on its
+        // own, so a refused claim below would leave its stream behind.
+        const streamId = await insertPersistentStream(context, {
             messageId,
             streamingConfig,
             threadId,

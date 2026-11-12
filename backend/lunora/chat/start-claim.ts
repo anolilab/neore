@@ -7,7 +7,8 @@
  * ({@link chatStartFingerprint}): the same id on a different send is refused, never answered with the first send's ids.
  * The save checks the claim and records the saved ids on it in the SAME transaction as the thread and the prompt, with no
  * nested mutation (`createThreadWithInitialMessage`, {@link saveStartPrompt}), so a claim either has its ids or saved
- * nothing; a text turn's stream is recorded the same way, in `createStreamWithMessage` ({@link recordStartStream}). A
+ * nothing; a text turn's goal and stream are recorded the same way, in `startGoal` ({@link recordStartGoal}) and
+ * `createStreamWithMessage` ({@link recordStartStream}). A
  * later request with the id is answered from the record: a duplicate, with a fresh token for the turn's stream (the
  * reconnect path), or `in_progress` while the first has not finished. After {@link CHAT_START_LEASE_MS} an unfinished
  * send counts as dead: one with nothing saved is taken over from scratch, a text turn saved without a stream is resumed
@@ -76,9 +77,11 @@ export const vStartClaim = v.object({ claimedAt: v.number(), key: v.string().max
 
 export type StartClaim = Infer<typeof vStartClaim>;
 
-/** The claim's `result`: the send's fingerprint from the claim on, its ids with the save, then its stream with the stream (a text turn). */
+/** The claim's `result`: the send's fingerprint from the claim on, its ids with the save, then its goal and stream with them (a text turn). */
 interface StartRecord {
     fingerprint: string;
+    /** The goal the send started: a resumed send runs it, and starts no second one. */
+    goalId?: string;
     messageId?: string;
     /** The save created the thread: a resumed send schedules a new chat's title jobs. */
     newThread?: boolean;
@@ -246,6 +249,23 @@ export const assertStartStreamable = async (ctx: Pick<MutationCtx, "db">, claim:
     }
 
     return held;
+};
+
+/**
+ * In `startGoal`'s transaction, before it starts one: the goal a takeover of this send already started, if any. A
+ * resumed send runs that goal; superseding it with a copy would end the goal its prompt opened.
+ */
+export const startedGoalOf = async (ctx: Pick<MutationCtx, "db">, claim: StartClaim): Promise<Id<"threadGoals"> | undefined> => {
+    const { record } = await assertStartStreamable(ctx, claim);
+
+    return record.goalId as Id<"threadGoals"> | undefined;
+};
+
+/** In `startGoal`'s transaction, after its insert: the goal is recorded on the claim, so a resumed send reuses it. */
+export const recordStartGoal = async (ctx: Pick<MutationCtx, "db">, claim: StartClaim, goalId: string): Promise<void> => {
+    const { existing, record } = await assertStartStreamable(ctx, claim);
+
+    await patchRow(ctx.db, "idempotencyClaims", existing, { result: JSON.stringify({ ...record, goalId } satisfies StartRecord) });
 };
 
 /**

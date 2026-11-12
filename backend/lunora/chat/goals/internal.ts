@@ -32,7 +32,7 @@ import { withoutUndefined } from "../../lib/patch";
 import { MAX_LENGTH } from "../../lib/validators";
 import { chargeRound, loadTaskAccount, taskAccessProblem } from "../../tasks/account";
 import { insertPersistentStream } from "../streaming/persistent/library";
-import { assertStartStreamable, vStartClaim } from "../start-claim";
+import { recordStartGoal, startedGoalOf, vStartClaim } from "../start-claim";
 import {
     buildGoalContinuationPrompt,
     buildGoalTranscript,
@@ -126,7 +126,12 @@ export const startGoal = internalMutation
     .mutation(async ({ args, ctx }) => {
         if (args.startClaim) {
             // Throws before the supersede below: a dead sender must not end the goal its retry started.
-            await assertStartStreamable(ctx, args.startClaim);
+            const started = await startedGoalOf(ctx, args.startClaim);
+
+            // A resumed send whose first try started its goal before its stream failed: that goal goes on.
+            if (started !== undefined) {
+                return { goalId: started, ok: true as const };
+            }
         }
 
         const text = args.text.trim();
@@ -175,6 +180,10 @@ export const startGoal = internalMutation
             userId: args.userId,
             verdicts: [],
         });
+
+        if (args.startClaim) {
+            await recordStartGoal(ctx, args.startClaim, goalId);
+        }
 
         return { goalId, ok: true as const };
     });
