@@ -131,6 +131,26 @@ describe("keep and remove on built-in tags (upstream #455)", () => {
     });
 });
 
+describe("removing formatting does not leave raw HTML behind (PR #723 review)", () => {
+    it.each([
+        ["a removed span", ["span"], "<p>a &lt;<span>,</span>script&gt;</p>"],
+        ["a removed built-in tag", ["b"], "<p>a &lt;<b>,</b>script&gt;</p>"],
+        ["a removed element nested in an inline parent", ["b"], "<p>a &lt;<span><b>,</b></span>script&gt;</p>"],
+    ])("a < before %s does not join the text after it into raw HTML", (_name, removed, html) => {
+        const service = new TurndownService();
+
+        service.remove(removed);
+        expect(service.turndown(html)).toBe(String.raw`a \<script>`);
+    });
+
+    it("a < before a removed element with nothing after it keeps its output", () => {
+        const service = new TurndownService();
+
+        service.remove(["span"]);
+        expect(service.turndown("<p>a &lt;<span>,</span></p>")).toBe("a <");
+    });
+});
+
 describe("behaviour that already holds (regression tests, no code change)", () => {
     it("a form input named parentNode does not break a string input (upstream #508)", () => {
         expect(new TurndownService().turndown(`<form><input name="parentNode"></form>text`)).toBe("text");
