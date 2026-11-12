@@ -190,8 +190,8 @@ describe("createCategoryChat scheduled by two concurrent resends for one prompt"
             expect(calls).toBe(1);
         });
 
-        // The second ends without a call (left to the scheduler's retry), or, without a claim, reaches the model too.
-        const second = deliver().catch(() => undefined);
+        // The second ends without a call, refused as in flight for the scheduler's retry; without a claim it reaches the model too.
+        const second: Promise<unknown> = deliver().catch((error: unknown) => error);
 
         await Promise.race([
             second,
@@ -200,8 +200,10 @@ describe("createCategoryChat scheduled by two concurrent resends for one prompt"
             }),
         ]);
         answered = true;
-        await Promise.all([first, second]);
+        await first;
 
+        // Only the in-flight conflict, never any other failure, counts as the second delivery standing back.
+        expect(await second).toMatchObject({ code: "CONFLICT" });
         expect(calls).toBe(1);
         expect(await categoryOf()).toBe("coding");
     });
