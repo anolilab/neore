@@ -88,6 +88,7 @@ describe("non-content elements emit nothing", () => {
         expect(new TurndownService().turndown(div as unknown as Node)).toBe("a");
     });
 
+    /* eslint-disable unicorn/prefer-dom-node-append -- domino has no append(), so appendChild is the only way here */
     // Domino's cloneNode lowercases the local name of an HTML element, so a plain domino root is emptied either way. A
     // browser keeps the name it was created with. The stub keeps this root's name through the clone, as a browser does.
     it("drops the text of an HTML SCRIPT root whose local name is upper case", () => {
@@ -122,7 +123,7 @@ describe("non-content elements emit nothing", () => {
 
         paragraph.appendChild(document.createTextNode("a"));
         fragment.appendChild(paragraph);
-        Object.defineProperties(fragment, { querySelectorAll: { value: undefined }, cloneNode: { value: () => fragment } });
+        Object.defineProperties(fragment, { cloneNode: { value: () => fragment }, querySelectorAll: { value: undefined } });
 
         expect(new TurndownService().turndown(fragment as unknown as Node)).toBe("a");
     });
@@ -130,7 +131,7 @@ describe("non-content elements emit nothing", () => {
     it("drops a prefixed x:script inside a paragraph, and its text", () => {
         const document = createDocument("<div></div>");
         const paragraph = document.createElement("p");
-        const script = document.createElementNS("http://example.com/x", "x:script");
+        const script = document.createElementNS("https://example.com/x", "x:script");
 
         script.appendChild(document.createTextNode("secret()"));
         paragraph.appendChild(document.createTextNode("a "));
@@ -144,12 +145,13 @@ describe("non-content elements emit nothing", () => {
     it("drops an x:script from an empty list item, as it drops an HTML script", () => {
         const document = createDocument("<ul><li>x</li><li></li></ul>");
         const emptyItem = document.querySelectorAll("li")[1] as HTMLElement;
-        const script = document.createElementNS("http://example.com/x", "x:script");
+        const script = document.createElementNS("https://example.com/x", "x:script");
 
         emptyItem.appendChild(script);
 
         expect(new TurndownService().turndown(document.body as unknown as Node)).toBe("*   x");
     });
+    /* eslint-enable unicorn/prefer-dom-node-append */
 
     // The Word wrapper leaves whitespace before the paragraph. Upstream keeps that too, so these tests trim only the
     // whitespace; the style text must still be absent.
