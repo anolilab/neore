@@ -114,6 +114,24 @@ export const insertPastedText = (draft: string, text: string, start: number, end
     return draft.slice(0, from) + text + draft.slice(to);
 };
 
+/**
+ * `text` after `draft` on a line of its own, `breaks` line breaks after the draft's last text: a paste whose caret was
+ * lost to an edit goes at the end, and neither joins the last word nor, as a block, the last line.
+ */
+export const appendPastedText = (draft: string, text: string, breaks = 1): string => {
+    if (draft === "") {
+        return text;
+    }
+
+    let trailing = 0;
+
+    while (trailing < breaks && draft[draft.length - 1 - trailing] === "\n") {
+        trailing += 1;
+    }
+
+    return draft + "\n".repeat(breaks - trailing) + text;
+};
+
 interface AttachLongPasteOptions {
     attach: (text: string) => Promise<TextFileResult>;
     discard: (attachmentId: string) => void;
@@ -139,7 +157,7 @@ interface AttachLongPasteOptions {
 /**
  * Moves a pasted text (whose default paste was prevented) into a file. When that fails the text goes into the composer at
  * the paste position instead and the failed chip goes, so the paste is never in neither place. If the draft changed during
- * the upload the text is appended, since the saved offsets no longer point at the same characters; if the chat changed,
+ * the upload the text is appended on a line of its own, since the saved offsets no longer point at the same characters; if the chat changed,
  * nothing is written at all.
  */
 export const attachLongPaste = async ({
@@ -179,7 +197,7 @@ export const attachLongPaste = async ({
 
     const draft = getDraft();
 
-    setDraft(draft === draftAtPaste ? insertPastedText(draft, pastedText, selection.start, selection.end) : draft + pastedText);
+    setDraft(draft === draftAtPaste ? insertPastedText(draft, pastedText, selection.start, selection.end) : appendPastedText(draft, pastedText));
     onFailure(error);
 
     return false;

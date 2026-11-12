@@ -165,6 +165,9 @@ const blockBreak = (line: string, side: "after" | "before"): string => {
     return HEADING.test(line) ? "\n" : "\n\n";
 };
 
+/** The line breaks `markdown` takes after text it is appended to: one, or two before a block that needs a blank line. */
+export const breaksBefore = (markdown: string): number => Math.max(blockBreak(markdown.split("\n", 1)[0] ?? "", "before").length, 1);
+
 /** `markdown` with line breaks where its first or last line is a block that would join the text beside the caret. */
 export const onOwnLines = (markdown: string, textBefore: boolean, textAfter: boolean): string => {
     const lines = markdown.split("\n");

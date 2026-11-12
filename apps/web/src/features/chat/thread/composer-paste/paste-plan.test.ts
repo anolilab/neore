@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { insertPastedText } from "../composer-draft-file";
+import { appendPastedText, insertPastedText } from "../composer-draft-file";
 import githubTable from "./__fixtures__/github-readme-table.html?raw";
 import googleDocs from "./__fixtures__/google-docs-list.html?raw";
 import googleDocsNumbered from "./__fixtures__/google-docs-numbered.html?raw";
@@ -9,7 +9,7 @@ import terminalHtml from "./__fixtures__/terminal.html?raw";
 import vscodeHtml from "./__fixtures__/vscode.html?raw";
 import wordHtml from "./__fixtures__/word-paragraph.html?raw";
 import { htmlToMarkdown } from "./html-to-markdown";
-import { inOpenFence, isLongPaste, isPlainHtml, longestBacktickRun, onOwnLines, planPaste, planText } from "./paste-plan";
+import { breaksBefore, inOpenFence, isLongPaste, isPlainHtml, longestBacktickRun, onOwnLines, planPaste, planText } from "./paste-plan";
 
 const clipboard = (data: Record<string, string>): Pick<DataTransfer, "getData"> => {
     return { getData: (type: string) => data[type] ?? "" };
@@ -39,6 +39,21 @@ describe("composer paste", () => {
         expect(htmlToMarkdown('<ul><li aria-level="2">a</li><li aria-level="3">b</li><li aria-level="2">c</li></ul>')).toBe(
             ["- a", "    - b", "- c"].join("\n"),
         );
+    });
+
+    it("keeps a list or text placed straight in a list, nesting a list under the item before it", () => {
+        expect(htmlToMarkdown("<ul><li>a</li><ul><li>b</li></ul><li>c</li>d</ul>")).toBe(
+            `${htmlToMarkdown("<ul><li>a<ul><li>b</li></ul></li><li>c</li></ul>")}\n- d`,
+        );
+        expect(htmlToMarkdown("<ol><li>a</li><ol><li>b</li></ol><li>c</li></ol>")).toBe(htmlToMarkdown("<ol><li>a<ol><li>b</li></ol></li><li>c</li></ol>"));
+        expect(htmlToMarkdown("<ul><li>a</li><ul><li>b</li></ul></ul>")).toContain("- b");
+    });
+
+    it("starts a Word list copied from a nested level at the left edge, keeping its nesting", () => {
+        const item = (level: number, text: string): string =>
+            `<p class=MsoListParagraph style='mso-list:l0 level${level} lfo1'><span style='mso-list:Ignore'>o</span>${text}</p>`;
+
+        expect(htmlToMarkdown(item(2, "a") + item(3, "b") + item(2, "c"))).toBe(["- a", "    - b", "- c"].join("\n"));
     });
 
     it("keeps the spaces at both ends of inline code", () => {
@@ -182,6 +197,7 @@ describe("composer paste", () => {
 
         expect(() => htmlToMarkdown(quotes)).toThrow(RangeError);
         expect(() => htmlToMarkdown(`${"<div>".repeat(600)}a`)).toThrow(RangeError);
+        expect(() => htmlToMarkdown("<ul><li>a</li>".repeat(600))).toThrow(RangeError);
         await expect(paste({ "text/html": quotes, "text/plain": "plain" })).resolves.toBe("plain");
         await expect(paste({ "text/html": `${"<ul><li>".repeat(600)}deep` })).resolves.toBe("deep");
         expect(htmlToMarkdown(`${"<blockquote>".repeat(3)}a`)).toBe("> > > a");
@@ -359,6 +375,16 @@ describe("pasted blocks beside text", () => {
         ["a heading", "<h2>Title</h2>", "foo \n## Title\nbar"],
     ])("keeps the text after %s out of it", async (_label: string, html: string, draft: string) => {
         await expect(pasteInto("foo bar", 4, { "text/html": html, "text/plain": "x" })).resolves.toBe(draft);
+    });
+
+    it.each([
+        ["a table", table, "typed\n\n| a | b |\n| --- | --- |\n| 1 | 2 |"],
+        ["a list", "<ul><li>a</li><li>b</li></ul>", "typed\n- a\n- b"],
+        ["a link", '<a href="https://example.com/docs">docs</a>', "typed\n[docs](https://example.com/docs)"],
+    ])("starts %s appended to a draft edited while it converted on a line of its own", async (_label: string, html: string, draft: string) => {
+        const text = (await paste({ "text/html": html, "text/plain": "x" })) ?? "";
+
+        expect(appendPastedText("typed", text, breaksBefore(text))).toBe(draft);
     });
 
     it("keeps an inline paste inline", async () => {

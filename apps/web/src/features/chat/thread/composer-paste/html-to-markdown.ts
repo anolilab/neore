@@ -84,6 +84,8 @@ interface Context {
     inTable: boolean;
     /** Grid cells the tables still left to convert may fill. */
     tableCells: number;
+    /** The shallowest Word list level in the paste: a copy that starts at a nested item starts at the left edge. */
+    wordTopLevel: number;
 }
 
 const isSpace = (char: string | undefined): boolean => char === " " || char === "\t";
@@ -457,34 +459,77 @@ const listNumber = (value: string | null): number | undefined => {
     return number >= 0 ? number : undefined;
 };
 
-const list = (element: Element, context: Context): string => {
-    const ordered = element.tagName === "OL";
+const list = (listElement: Element, context: Context): string => {
+    // A list straight in a list skips children(), so it counts its own depth.
+    if (context.depth >= MAX_DEPTH) {
+        throw new RangeError("Nested too deep to convert");
+    }
+
+    const ordered = listElement.tagName === "OL";
     // A number per depth: Google Docs keeps nested items in a flat list and marks their depth with aria-level.
     const numbers: number[] = [];
-    const items: string[] = [];
-    const listItems = [...element.children].filter((item: Element) => item.tagName === "LI" && !isHidden(item));
-    const ariaLevels = listItems.map((item: Element) => {
-        const ariaLevel = Number.parseInt(item.getAttribute("aria-level") ?? "1", 10) || 1;
+    // The shown children in order. A list or text placed straight in the list, not in an item, is shown too: a list goes
+    // under the item before it, anything else is an item of its own.
+    const entries: { body: string; item?: Element }[] = [];
 
-        return Math.min(Math.max(ariaLevel, 1), 6);
+    context.depth += 1;
+
+    for (const child of listElement.childNodes) {
+        if (child.nodeType === Node.TEXT_NODE) {
+            const text = (child.nodeValue ?? "").replaceAll("\0", "").replaceAll(/\s+/g, " ").trim();
+
+            if (text !== "") {
+                entries.push({ body: text });
+            }
+        } else if (child.nodeType === Node.ELEMENT_NODE && !isHidden(child as Element)) {
+            const childElement = child as Element;
+            const previous = entries.at(-1);
+
+            if (childElement.tagName === "LI") {
+                entries.push({ body: children(childElement, context), item: childElement });
+            } else if ((childElement.tagName === "UL" || childElement.tagName === "OL") && previous) {
+                previous.body += element(childElement, context);
+            } else {
+                const body = element(childElement, context);
+
+                if (body.trim() !== "") {
+                    entries.push({ body });
+                }
+            }
+        }
+    }
+
+    context.depth -= 1;
+
+    const ariaLevels = entries.map(({ item }) => {
+        const ariaLevel = item ? Number.parseInt(item.getAttribute("aria-level") ?? "1", 10) || 1 : undefined;
+
+        return ariaLevel === undefined ? undefined : Math.min(Math.max(ariaLevel, 1), 6);
     });
     // A copy that starts at a nested item keeps its nesting, but from the left edge: deeper is a code block in Markdown.
     let topLevel = 6;
 
     for (const ariaLevel of ariaLevels) {
-        topLevel = Math.min(topLevel, ariaLevel);
+        topLevel = Math.min(topLevel, ariaLevel ?? topLevel);
     }
 
-    for (const [index, item] of listItems.entries()) {
-        const level = (ariaLevels[index] ?? 1) - topLevel + 1;
+    const items: string[] = [];
+    let level = 1;
+
+    for (const [index, { body, item }] of entries.entries()) {
+        const ariaLevel = ariaLevels[index];
+
+        // Text outside an item stays at the depth of the item before it.
+        level = ariaLevel === undefined ? level : ariaLevel - topLevel + 1;
+
         const number =
-            (ordered ? listNumber(item.getAttribute("value")) : undefined) ??
+            (ordered && item ? listNumber(item.getAttribute("value")) : undefined) ??
             numbers[level - 1] ??
-            (level === 1 ? (listNumber(element.getAttribute("start")) ?? 1) : 1);
+            (level === 1 ? (listNumber(listElement.getAttribute("start")) ?? 1) : 1);
 
         numbers.length = level;
         numbers[level - 1] = number + 1;
-        items.push(listItem(children(item, context).replaceAll(BLANK_LINES, "\n\n").trim(), level, ordered ? `${number}. ` : "- ", context));
+        items.push(listItem(body.replaceAll(BLANK_LINES, "\n\n").trim(), level, ordered ? `${number}. ` : "- ", context));
     }
 
     return `\n\n${items.join("\n")}\n\n`;
@@ -509,7 +554,7 @@ const wordListItem = (element: Element, inner: string, context: Context): string
     const number = bullet.endsWith(")") ? `${bullet.slice(0, -1)}.` : bullet;
     const marker = WORD_ORDERED_MARKER.test(bullet) ? `${number} ` : "- ";
 
-    return `\n${listItem(inner.trim(), Number(level[1]), marker, context)}\n`;
+    return `\n${listItem(inner.trim(), Math.max(Number(level[1]) - context.wordTopLevel + 1, 1), marker, context)}\n`;
 };
 
 const element = (node: Element, context: Context): string => {
@@ -702,7 +747,15 @@ function children(node: Node, context: Context): string {
 /** The Markdown for a clipboard `text/html` payload; empty when it holds no text. */
 export const htmlToMarkdown = (html: string): string => {
     const parsed = new DOMParser().parseFromString(html, "text/html");
-    const context: Context = { code: [], depth: 0, indentWork: MAX_INDENT_WORK, inTable: false, tableCells: MAX_TABLE_CELLS };
+    const context: Context = { code: [], depth: 0, indentWork: MAX_INDENT_WORK, inTable: false, tableCells: MAX_TABLE_CELLS, wordTopLevel: 9 };
+
+    for (const paragraph of parsed.querySelectorAll("p[style*='mso-list']")) {
+        const level = WORD_LIST_LEVEL.exec(styleOf(paragraph));
+
+        if (level && !isHidden(paragraph)) {
+            context.wordTopLevel = Math.min(context.wordTopLevel, Number(level[1]));
+        }
+    }
 
     return children(parsed.body, context)
         .split("\n")

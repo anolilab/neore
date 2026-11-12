@@ -68,11 +68,11 @@ import type { ChatReference } from "./chat-reference";
 import { buildChatTranscript, chatReferenceFileName } from "./chat-reference";
 import CompletionSound from "./completion-sound";
 import type { TextFileResult } from "./composer-draft-file";
-import { attachLongPaste, draftFitsAsFile, insertPastedText, moveDraftToFile, pasteHasText, undoLongPaste } from "./composer-draft-file";
+import { appendPastedText, attachLongPaste, draftFitsAsFile, insertPastedText, moveDraftToFile, pasteHasText, undoLongPaste } from "./composer-draft-file";
 import type { ComposerInputAreaRef } from "./composer-input-area";
 import ComposerInputArea from "./composer-input-area";
 import ComposerLongTextPrompt from "./composer-long-text-prompt";
-import { inOpenFence, isLongPaste, onOwnLines, planPaste, planText } from "./composer-paste/paste-plan";
+import { breaksBefore, inOpenFence, isLongPaste, onOwnLines, planPaste, planText } from "./composer-paste/paste-plan";
 import ComposerPromptQueue from "./composer-prompt-queue";
 import { isEditable, TextAttachmentEditorDialog } from "./composer-text-attachment-editor";
 import { quoteRestoreDraft } from "./composer-tiptap/extensions/quote-chip";
@@ -961,9 +961,19 @@ const ComposerInput = ({
                 const converted = plan.kind === "html" || (plan.kind === "text" && plan.text !== plainText);
                 const inserted = converted ? onOwnLines(pastedText, selection.textBefore, selection.textAfter) : pastedText;
 
-                if (!inputAreaRef.current?.getEditor()?.pasteText(inserted, stateAtPaste)) {
-                    setText(draft === draftAtPaste ? insertPastedText(draft, inserted, selection.start, selection.end) : draft + inserted);
+                if (inputAreaRef.current?.getEditor()?.pasteText(inserted, stateAtPaste)) {
+                    return;
                 }
+
+                if (draft === draftAtPaste) {
+                    setText(insertPastedText(draft, inserted, selection.start, selection.end));
+
+                    return;
+                }
+
+                // An edit meanwhile moved the text the caret was in: the paste goes at the end, on a line of its own, with the
+                // breaks its first line needs there rather than those worked out for the old caret.
+                setText(appendPastedText(draft, pastedText, converted ? breaksBefore(pastedText) : 1));
 
                 return;
             }

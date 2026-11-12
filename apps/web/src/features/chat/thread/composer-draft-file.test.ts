@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { attachLongPaste, draftFitsAsFile, insertPastedText, moveDraftToFile, pasteHasText, undoLongPaste } from "./composer-draft-file";
+import { appendPastedText, attachLongPaste, draftFitsAsFile, insertPastedText, moveDraftToFile, pasteHasText, undoLongPaste } from "./composer-draft-file";
 
 describe("attachLongPaste", () => {
     const setup = (result: { attachmentId: string; error?: string }, draft = "before after") => {
@@ -80,7 +80,7 @@ describe("attachLongPaste", () => {
         });
 
         expect(await attachLongPaste(options)).toBe(false);
-        expect(state.text).toBe("beforeTYPED afterPASTED");
+        expect(state.text).toBe("beforeTYPED after\nPASTED");
         expect(options.onFailure).toHaveBeenCalledWith("Too big");
     });
 
@@ -88,7 +88,7 @@ describe("attachLongPaste", () => {
         const { options, state } = setup({ attachmentId: "a1", error: "Too big" }, "beforeTYPED after");
 
         expect(await attachLongPaste({ ...options, draftAtPaste: "before after" })).toBe(false);
-        expect(state.text).toBe("beforeTYPED afterPASTED");
+        expect(state.text).toBe("beforeTYPED after\nPASTED");
     });
 
     it("leaves another chat's draft alone and says the text was not inserted when the chat changed during the upload", async () => {
@@ -107,6 +107,13 @@ describe("attachLongPaste", () => {
         expect(options.discard).toHaveBeenCalledWith("a1");
         expect(options.onNotInserted).toHaveBeenCalledWith("Too big");
         expect(options.onFailure).not.toHaveBeenCalled();
+    });
+
+    it("appends a paste on a line of its own, reusing the line breaks the draft already ends with", () => {
+        expect(appendPastedText("typed", "PASTED")).toBe("typed\nPASTED");
+        expect(appendPastedText("typed\n", "PASTED")).toBe("typed\nPASTED");
+        expect(appendPastedText("typed\n", "| a |", 2)).toBe("typed\n\n| a |");
+        expect(appendPastedText("", "| a |", 2)).toBe("| a |");
     });
 
     it("replaces a selection and clamps an offset past the end", () => {
