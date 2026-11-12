@@ -1,5 +1,5 @@
 /**
- * The "@" menu opens with its data: typing in the composer prefetches the menu's reads under the menu's own query keys,
+ * The "@" menu opens with its data: the first text typed in the composer prefetches the menu's reads under the menu's own query keys,
  * so opening it renders from the cache and fetches nothing. The menu lists the current chat's project first, and its
  * motion is short and off under reduced motion. `crpc` is stood in for with keys shaped like the real ones.
  */
@@ -14,6 +14,7 @@ const harness = vi.hoisted(() => {
         calls: { files: 0, search: 0, threads: 0 },
         files: [] as unknown[],
         filesFail: false,
+        painted: true,
         threads: [] as unknown[],
         token: "token" as null | string,
     };
@@ -37,7 +38,7 @@ vi.mock("@lunora/react", async (importOriginal) => {
 });
 
 vi.mock("@/hooks/use-after-first-paint", () => {
-    return { default: () => true };
+    return { default: () => harness.painted };
 });
 
 vi.mock("@/features/chat/group/use-group-chat", () => {
@@ -107,6 +108,7 @@ const { default: useMentionPrefetch } = await import("./use-mention-prefetch");
 
 const fakeEditor = () => {
     const listeners = new Map<string, Set<() => void>>();
+    const state = { isEmpty: true };
     const emit = (event: string) => {
         const registered = listeners.get(event) ?? [];
 
@@ -116,11 +118,20 @@ const fakeEditor = () => {
     };
 
     return {
+        /** A send empties the draft: `clearContent()` emits tiptap's `update` too. */
+        clear: () => {
+            state.isEmpty = true;
+            emit("update");
+        },
         /** The user types: tiptap's `update`. */
         edit: () => {
+            state.isEmpty = false;
             emit("update");
         },
         editor: {
+            get isEmpty() {
+                return state.isEmpty;
+            },
             off: (event: string, listener: () => void) => listeners.get(event)?.delete(listener),
             on: (event: string, listener: () => void) => {
                 listeners.set(event, (listeners.get(event) ?? new Set()).add(listener));
@@ -159,6 +170,7 @@ beforeEach(() => {
 const setup = () => {
     harness.calls = { files: 0, search: 0, threads: 0 };
     harness.filesFail = false;
+    harness.painted = true;
     harness.token = "token";
     harness.threads = [
         thread("current", "Current chat", 50, "project-a"),
@@ -268,7 +280,7 @@ describe("FileMentionPopup prefetch follows the cache", () => {
         expect(next.view.result.current).toBe(false);
     });
 
-    it("fetches again once the files entry is collected", async () => {
+    it("warms once per composer: later edits send nothing, even once the entry is gone", async () => {
         expect.hasAssertions();
 
         const { queryClient, wrapper } = setup();
@@ -278,13 +290,25 @@ describe("FileMentionPopup prefetch follows the cache", () => {
             expect(harness.calls.files).toBe(1);
         });
 
-        // What garbage collection does to an entry left unobserved past its `gcTime`.
+        // What garbage collection does to an entry left unobserved past its `gcTime`: the menu's own query fetches it.
         queryClient.removeQueries({ queryKey: ["lunora", "vault_functions:getAttachmentsForUser"] });
         act(edit);
 
-        await waitFor(() => {
-            expect(harness.calls.files).toBe(2);
-        });
+        await Promise.resolve();
+        expect(harness.calls.files).toBe(1);
+    });
+
+    it("does not count an edit that empties the draft", async () => {
+        expect.hasAssertions();
+
+        const { wrapper } = setup();
+        const { clear, editor } = fakeEditor();
+
+        renderHook(() => useMentionPrefetch(editor, true), { wrapper });
+        act(clear);
+
+        await Promise.resolve();
+        expect(harness.calls).toStrictEqual({ files: 0, search: 0, threads: 0 });
     });
 
     it("warms a later sign-in's composer after sign-out cleared the cache", async () => {
@@ -308,12 +332,31 @@ describe("FileMentionPopup prefetch follows the cache", () => {
         expect(next.view.result.current).toBe(true);
     });
 
-    it("waits for the client's token, then warms on the next edit", async () => {
+    it.each([
+        {
+            close: () => {
+                harness.token = null;
+            },
+            gate: "the client's token",
+            open: () => {
+                harness.token = "token";
+            },
+        },
+        {
+            close: () => {
+                harness.painted = false;
+            },
+            gate: "first paint",
+            open: () => {
+                harness.painted = true;
+            },
+        },
+    ])("remembers an edit made before $gate, then warms without another", async ({ close, open }) => {
         expect.hasAssertions();
 
         const { wrapper } = setup();
 
-        harness.token = null;
+        close();
 
         const { edit, editor } = fakeEditor();
         const view = renderHook(() => useMentionPrefetch(editor, true), { wrapper });
@@ -322,9 +365,8 @@ describe("FileMentionPopup prefetch follows the cache", () => {
         await Promise.resolve();
         expect(harness.calls).toStrictEqual({ files: 0, search: 0, threads: 0 });
 
-        harness.token = "token";
+        open();
         view.rerender();
-        act(edit);
 
         await waitFor(() => {
             expect(harness.calls).toStrictEqual({ files: 1, search: 0, threads: 1 });
@@ -332,7 +374,7 @@ describe("FileMentionPopup prefetch follows the cache", () => {
         expect(view.result.current).toBe(true);
     });
 
-    it("tries a failed prefetch again on the next edit", async () => {
+    it("does not send a failed read again as the user keeps typing; the next composer tries once more", async () => {
         expect.hasAssertions();
 
         const { queryClient, wrapper } = setup();
@@ -345,8 +387,13 @@ describe("FileMentionPopup prefetch follows the cache", () => {
             expect(queryClient.getQueryState(["lunora", "vault_functions:getAttachmentsForUser", "{}", null])?.status).toBe("error");
         });
 
-        harness.filesFail = false;
         act(edit);
+        act(edit);
+        await Promise.resolve();
+        expect(harness.calls.files).toBe(1);
+
+        harness.filesFail = false;
+        focused(wrapper);
 
         await waitFor(() => {
             expect(queryClient.getQueryData(["lunora", "vault_functions:getAttachmentsForUser", "{}", null])).toStrictEqual(harness.files);

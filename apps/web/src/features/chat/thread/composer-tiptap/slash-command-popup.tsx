@@ -51,7 +51,7 @@ interface SlashCommandPopupProps {
     onReplace: (from: number, to: number, replacement: string) => void;
     /** The editor's whole text now; a `/clear` that finished reads it, so an edit the menu has not seen yet is not cut. */
     readDraft: () => string;
-    /** The composer has focus after first paint: load the prompts and skills now, so "/prompt" and "/skill" open with them. */
+    /** The person has typed in the composer (`use-mention-prefetch.ts`): load the prompts and skills now, so "/prompt" and "/skill" open with them. */
     warm?: boolean;
 }
 
@@ -166,7 +166,10 @@ const SlashCommandPopup: FC<SlashCommandPopupProps> = ({
     const { mutateAsync: getSkills } = useMutation({ ...useLunoraActionOptions(api.skills.functions.getSkills), networkMode: "always" });
     const [prompts, setPrompts] = useState<Doc<"prompts">[]>([]);
     const [skills, setSkills] = useState<Doc<"skills">[]>([]);
-    const loadedRef = useRef({ prompts: false, skills: false });
+    // Both follow the session's active organization, so a switch drops what was loaded for the previous one.
+    const organizationId = sessionData?.session.activeOrganizationId ?? null;
+    const loadedRef = useRef({ organizationId, prompts: false, skills: false });
+    const [loadOrganizationId, setLoadOrganizationId] = useState(organizationId);
 
     // Loaded when the composer is warm (`use-mention-prefetch.ts`) or on the first "/" — not on mount: the editor mounts
     // this popup permanently, and two actions on every first paint of /chat queued on the one `__root__` shard (see
@@ -179,6 +182,13 @@ const SlashCommandPopup: FC<SlashCommandPopupProps> = ({
         setLoadMenuKey(menuKey);
     }
 
+    if (loadOrganizationId !== organizationId) {
+        setLoadOrganizationId(organizationId);
+        setPrompts([]);
+        setSkills([]);
+        setLoad("idle");
+    }
+
     if ((load === "idle" && (menuKey !== null || warm)) || (load === "failed" && menuKey !== null && menuKey !== loadMenuKey)) {
         setLoad("pending");
     }
@@ -189,6 +199,11 @@ const SlashCommandPopup: FC<SlashCommandPopupProps> = ({
         }
 
         let isCancelled = false;
+
+        if (loadedRef.current.organizationId !== organizationId) {
+            loadedRef.current = { organizationId, prompts: false, skills: false };
+        }
+
         const loaded = loadedRef.current;
         const promptsLoad = loaded.prompts ? undefined : getPrompts({});
         const skillsLoad = loaded.skills ? undefined : getSkills({ sortBy: "recent" });
@@ -216,7 +231,7 @@ const SlashCommandPopup: FC<SlashCommandPopupProps> = ({
         return () => {
             isCancelled = true;
         };
-    }, [getPrompts, getSkills, load]);
+    }, [getPrompts, getSkills, load, organizationId]);
 
     const [selectedIndex, setSelectedIndex] = useState(0);
     const commandListRef = useRef<HTMLDivElement | null>(null);

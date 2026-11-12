@@ -344,7 +344,7 @@ const ComposerTiptapEditor = ({
         },
     });
 
-    // The "@" and "/" menus' data, loaded once the composer has focus so they open with it.
+    // The "@" and "/" menus' data, loaded on the first edit that leaves text in the composer, so they open with it.
     const suggestionsWarm = useMentionPrefetch(editor, suggestions);
 
     // Sync placeholder ref + trigger a decoration re-render (with a brief fade) when placeholder changes.

@@ -1,7 +1,7 @@
 /**
  * The "/" menu's prompts and skills: loaded when the composer is warm, so "/prompt" and "/skill" open with them. A load
  * that failed is tried again when the menu opens, only for what failed, and offline it fails at once instead of waiting
- * for the network to come back.
+ * for the network to come back. Both follow the active organization, so a switch loads them again for the new one.
  */
 import { onlineManager, QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, render, screen, waitFor } from "@testing-library/react";
@@ -12,7 +12,7 @@ import type { SlashCommandMatch } from "./extensions/slash-command";
 import SlashCommandPopup from "./slash-command-popup";
 
 const harness = vi.hoisted(() => {
-    return { calls: { prompts: 0, skills: 0 }, skillsFail: false };
+    return { calls: { prompts: 0, skills: 0 }, organizationId: null as null | string, skillsFail: false };
 });
 
 vi.mock("@lingui/core/macro", () => {
@@ -38,7 +38,7 @@ vi.mock("@/features/auth/lib/auth-ui-provider", () => {
             return {
                 hooks: {
                     useSession: () => {
-                        return { data: { user: { id: "owner" } } };
+                        return { data: { session: { activeOrganizationId: harness.organizationId }, user: { id: "owner" } } };
                     },
                 },
             };
@@ -87,7 +87,9 @@ vi.mock("@/lib/lunora/crpc", async () => {
                 throw new Error("unavailable");
             }
 
-            return [{ _id: "s1", description: "Reviews code", name: "Code review", slug: "review" }];
+            return harness.organizationId === null
+                ? [{ _id: "s1", description: "Reviews code", name: "Code review", slug: "review" }]
+                : [{ _id: "s2", description: "Writes release notes", name: "Release notes", slug: "release" }];
         },
     };
 
@@ -118,6 +120,7 @@ const popup = (client: QueryClient, match: SlashCommandMatch | null, warm: boole
 
 beforeEach(() => {
     harness.calls = { prompts: 0, skills: 0 };
+    harness.organizationId = null;
     harness.skillsFail = false;
     Object.defineProperty(Element.prototype, "getAnimations", { configurable: true, value: () => [] });
     vi.stubGlobal(
@@ -173,6 +176,24 @@ describe("SlashCommandPopup prompts and skills", () => {
         view.rerender(popup(client, skillMatch, true));
 
         expect(harness.calls).toStrictEqual({ prompts: 1, skills: 1 });
+    });
+
+    it("drops what it loaded when the active organization changes, and loads the new one's", async () => {
+        expect.hasAssertions();
+
+        const client = new QueryClient();
+        const view = render(popup(client, null, true));
+
+        await waitFor(() => {
+            expect(harness.calls).toStrictEqual({ prompts: 1, skills: 1 });
+        });
+
+        harness.organizationId = "org-b";
+        view.rerender(popup(client, skillMatch, true));
+
+        expect(await screen.findByText("Release notes")).toBeTruthy();
+        expect(screen.queryByText("Code review")).toBeNull();
+        expect(harness.calls).toStrictEqual({ prompts: 2, skills: 2 });
     });
 
     it("runs the load while offline instead of holding it for reconnect", async () => {
