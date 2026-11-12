@@ -44,6 +44,9 @@ export default class Rules implements RuleLookup {
     /** Rules whose replacement ignores the children, so converting them is wasted work. */
     private readonly skipChildrenRules = new WeakSet<Rule>();
 
+    /** Rules that drop the element and its content, as `remove` builds them. */
+    private readonly removalRules = new WeakSet<Rule>();
+
     private readonly options: Options;
 
     private readonly blankRule: Rule;
@@ -89,7 +92,15 @@ export default class Rules implements RuleLookup {
         };
 
         this.skipChildrenRules.add(rule);
+        this.removalRules.add(rule);
         this.removeList.unshift(rule);
+    }
+
+    /**
+     * True when the rule is a remove filter, so the element prints nothing at all.
+     */
+    isRemoval(rule: Rule): boolean {
+        return this.removalRules.has(rule);
     }
 
     /**
@@ -141,7 +152,9 @@ export default class Rules implements RuleLookup {
         const annotated = annotateNode(node, this.options);
         const nodeName = annotated.nodeName.toLowerCase();
 
-        return [this.customRules, this.builtInRules, this.keepList, this.removeList].some((list) => findRule(list, annotated, nodeName, this.options, this) !== undefined);
+        return [this.customRules, this.builtInRules, this.keepList, this.removeList].some(
+            (list) => findRule(list, annotated, nodeName, this.options, this) !== undefined,
+        );
     }
 
     forEach(visit: (rule: Rule, index: number) => void): void {

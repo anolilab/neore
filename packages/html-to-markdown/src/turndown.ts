@@ -41,6 +41,12 @@ export default class TurndownService {
      */
     escape: (string: string) => string;
 
+    /**
+     * The rule chosen for each element in the running conversion. The escape lookahead can ask about an
+     * element before the converter reaches it, so the rule is kept here and each filter runs once.
+     */
+    ruleCache = new WeakMap<Node, Rule>();
+
     constructor(options?: Partial<Options>) {
         this.options = { ...DEFAULT_OPTIONS, ...options };
         this.rules = new Rules(this.options);
@@ -58,6 +64,8 @@ export default class TurndownService {
         if (input === "") {
             return "";
         }
+
+        this.ruleCache = new WeakMap();
 
         const output = process(this, rootNode(input, this.options));
 
@@ -149,7 +157,7 @@ export const htmlOpenerSteps = { count: 0 };
 function escapeText(service: TurndownService, node: Node, text: string): string {
     const escaped = service.escape(text);
 
-    if (service.escape === escapeMarkdown && text.endsWith("<") && escaped.endsWith("<") && isFollowedByHtmlOpener(node, service.options)) {
+    if (service.escape === escapeMarkdown && text.endsWith("<") && escaped.endsWith("<") && isFollowedByHtmlOpener(node, service)) {
         return `${escaped.slice(0, -1)}${String.raw`\<`}`;
     }
 
@@ -162,10 +170,10 @@ function escapeText(service: TurndownService, node: Node, text: string): string 
  * character that decides: a letter, `/`, `!` or `?` decides at once, and a local part decides at
  * its `@`. The check is conservative: a `<` that cannot open HTML may still be escaped.
  */
-function isFollowedByHtmlOpener(node: Node, options: Options): boolean {
+function isFollowedByHtmlOpener(node: Node, service: TurndownService): boolean {
     let isInLocalPart = false;
 
-    for (const piece of followingText(node, options)) {
+    for (const piece of followingText(node, service)) {
         for (const char of piece) {
             const step: Step = isInLocalPart ? stepInLocalPart(char) : stepAfterLessThan(char);
 
@@ -214,17 +222,17 @@ function stepInLocalPart(char: string): Step {
  * A block ends it too, since a block starts on a new line. An `<a>` that prints no link is looked
  * past, like any inline parent.
  */
-function* followingText(node: Node, options: Options): Generator<string> {
+function* followingText(node: Node, service: TurndownService): Generator<string> {
     let current: Node | null = node;
 
     while (current) {
         for (let sibling = current.nextSibling; sibling; sibling = sibling.nextSibling) {
-            yield* textOf(sibling);
+            yield* textOf(sibling, service);
         }
 
         const parent: Node | null = current.parentNode;
 
-        if (!parent || isLinkElement(parent, options) || isBlock(parent)) {
+        if (!parent || isLinkElement(parent, service.options) || isBlock(parent)) {
             return;
         }
 
@@ -232,17 +240,39 @@ function* followingText(node: Node, options: Options): Generator<string> {
     }
 }
 
-/** The text nodes under a node, in order. A comment prints nothing, so it is skipped. */
-function* textOf(node: Node): Generator<string> {
+/**
+ * The text nodes under a node, in order. A comment prints nothing, so it is skipped. A removed element
+ * prints nothing and drops its content, so its text is skipped too.
+ */
+function* textOf(node: Node, service: TurndownService): Generator<string> {
     htmlOpenerSteps.count += 1;
 
     if (node.nodeType === 3 || node.nodeType === 4) {
         yield node.nodeValue ?? "";
-    } else if (node.nodeType === 1) {
+    } else if (node.nodeType === 1 && !isRemoved(service, node)) {
         for (let child = node.firstChild; child; child = child.nextSibling) {
-            yield* textOf(child);
+            yield* textOf(child, service);
         }
     }
+}
+
+/** True when a remove filter drops the element, so it prints nothing. */
+function isRemoved(service: TurndownService, node: Node): boolean {
+    const rule = service.ruleCache.get(node) ?? ruleFor(service, annotateNode(node, service.options));
+
+    return service.rules.isRemoval(rule);
+}
+
+/** The rule for an annotated element. A filter runs once per element in a conversion: the result is cached. */
+function ruleFor(service: TurndownService, node: AnnotatedNode): Rule {
+    let rule = service.ruleCache.get(node);
+
+    if (rule === undefined) {
+        rule = service.rules.forNode(node);
+        service.ruleCache.set(node, rule);
+    }
+
+    return rule;
 }
 
 /**
@@ -263,7 +293,7 @@ function postProcess(service: TurndownService, output: string[]): string {
  * Converts an element node to its Markdown equivalent.
  */
 function replacementForNode(service: TurndownService, node: AnnotatedNode): string {
-    const rule = service.rules.forNode(node);
+    const rule = ruleFor(service, node);
     let content = service.rules.skipsChildren(rule) ? "" : process(service, node).join("");
     const whitespace = node.flankingWhitespace;
 
