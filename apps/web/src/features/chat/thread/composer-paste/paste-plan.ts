@@ -276,7 +276,8 @@ export const planPaste = (data: Pick<DataTransfer, "getData">, { inFence = false
     return plain !== "" && html.length <= MAX_CONVERTED_HTML && isPlainHtml(html) ? { kind: "text", text: plain } : { html, kind: "html", plain };
 };
 
-const QUOTE_AFTER_EQUALS = /=\s*$/;
+// The whitespace HTML allows around an attribute's `=`.
+const HTML_SPACE_CHAR = new Set([" ", "\t", "\n", "\f", "\r"]);
 
 /**
  * The `>` that ends the tag opening at `open`, or -1: a `>` inside a quoted attribute value does not end it. Each
@@ -284,16 +285,18 @@ const QUOTE_AFTER_EQUALS = /=\s*$/;
  */
 const tagEnd = (html: string, open: number): number => {
     let index = open + 1;
+    // Whether the last character that was not a space is `=`: a quote opens a value only there (`<p>don't` has no
+    // attribute to skip), however much space HTML allows between the two.
+    let afterEquals = false;
 
     while (index < html.length) {
-        const char = html[index];
+        const char = html[index] ?? "";
 
         if (char === ">") {
             return index;
         }
 
-        // A quote opens a value only right after `=`: `<p>don't` has no attribute to skip.
-        if ((char === '"' || char === "'") && QUOTE_AFTER_EQUALS.test(html.slice(Math.max(open, index - 20), index))) {
+        if ((char === '"' || char === "'") && afterEquals) {
             const closeQuote = html.indexOf(char, index + 1);
 
             if (closeQuote === -1) {
@@ -301,6 +304,11 @@ const tagEnd = (html: string, open: number): number => {
             }
 
             index = closeQuote;
+            afterEquals = false;
+        } else if (char === "=") {
+            afterEquals = true;
+        } else if (!HTML_SPACE_CHAR.has(char)) {
+            afterEquals = false;
         }
 
         index += 1;

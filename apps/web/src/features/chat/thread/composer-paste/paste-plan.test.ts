@@ -523,3 +523,19 @@ describe("plain-looking HTML that still carries Markdown", () => {
         await expect(paste({ "text/html": "<div>a</div><hr><div>b</div>", "text/plain": "a\nb" })).resolves.toContain("---");
     });
 });
+
+describe("HTML past the conversion cap", () => {
+    it("skips a quoted attribute value however much space comes after its equals sign", async () => {
+        const html = `<p title=${" ".repeat(40)}"a > b">kept</p>${"<p>x</p>".repeat(140_000)}`;
+        const text = await paste({ "text/html": html });
+
+        expect(text?.startsWith("kept")).toBe(true);
+        expect(text).not.toContain('b"');
+    });
+});
+
+describe("code blocks of line elements", () => {
+    it("keeps text after a line element on a line of its own", () => {
+        expect(htmlToMarkdown("<pre><div>first</div>tail</pre>")).toBe("```\nfirst\ntail\n```");
+    });
+});

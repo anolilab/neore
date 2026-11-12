@@ -162,11 +162,18 @@ const codeText = (node: Node): string => {
     // call, which made a `<pre>` of many line elements quadratic.
     const parts: string[] = [];
     let endsWithNewline = false;
+    // A line element ends its line: what follows it, text or another element, starts the next one.
+    let lineEnded = false;
     const push = (part: string): void => {
         if (part === "") {
             return;
         }
 
+        if (lineEnded && !endsWithNewline) {
+            parts.push("\n");
+        }
+
+        lineEnded = false;
         parts.push(part);
         endsWithNewline = part.endsWith("\n");
     };
@@ -178,11 +185,16 @@ const codeText = (node: Node): string => {
             const { tagName } = child as Element;
             const inner = tagName === "BR" ? "\n" : codeText(child);
 
-            if ((BLOCKS.has(tagName) || LINE_BLOCKS.has(tagName)) && parts.length > 0 && !endsWithNewline) {
+            const isLine = BLOCKS.has(tagName) || LINE_BLOCKS.has(tagName);
+
+            if (isLine && parts.length > 0 && !endsWithNewline) {
+                // The one break between the two lines: the one the line before asked for is this one.
+                lineEnded = false;
                 push("\n");
             }
 
             push(inner);
+            lineEnded ||= isLine;
         }
     }
 
