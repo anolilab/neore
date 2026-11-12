@@ -21,6 +21,8 @@ let trace: Entry[];
 let failOn: ((entry: Entry) => boolean) | undefined;
 let answer: (ref: string, round: number, args: Record<string, unknown>) => unknown;
 const rounds = new Map<string, number>();
+/** The durations of the workflow's sleeps, in order: a test of a wait checks that the wait happened, and how long. */
+const sleeps: string[] = [];
 
 const refOf = (reference: unknown): string => (reference as { __lunoraRef: string }).__lunoraRef;
 
@@ -51,7 +53,8 @@ const workflowContext = () => {
 
                 return await callback();
             },
-            sleep: async (name: string) => {
+            sleep: async (name: string, duration: string) => {
+                sleeps.push(duration);
                 trace.push({ kind: "step", name });
             },
         },
@@ -513,6 +516,10 @@ describe("account deletion workflow: replay", () => {
 });
 
 describe("account deletion workflow: usage exports", () => {
+    beforeEach(() => {
+        sleeps.length = 0;
+    });
+
     const isPurge = (ref: string): boolean => ref.endsWith("purgeUserUsageFiles");
 
     it("waits while a usage export is live, purges again once it has ended, and then completes", async () => {
@@ -525,6 +532,7 @@ describe("account deletion workflow: usage exports", () => {
         const purges = runs().filter((entry) => isPurge(entry.ref));
 
         expect(purges.map((entry) => entry.args["force"])).toStrictEqual([false, false, false]);
+        expect(sleeps).toStrictEqual(["1 minute", "1 minute"]);
         expect(completionIndex()).toBeGreaterThan(-1);
     });
 
@@ -540,6 +548,8 @@ describe("account deletion workflow: usage exports", () => {
 
         expect(purges).toHaveLength(121);
         expect(purges.at(-1)?.args["force"]).toBe(true);
+        expect(sleeps).toHaveLength(120);
+        expect(sleeps.every((duration) => duration === "1 minute")).toBe(true);
         expect(completionIndex()).toBeGreaterThan(-1);
     });
 });

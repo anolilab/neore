@@ -7,11 +7,29 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { backfillUsageExportRunDeleteAt } from "../migrations";
 import schema from "../schema";
-import { clearUsageExportPieces, EXPORT_PIECE_TTL_MS, eraseUsageForUser, keyedUsageRuns, releaseUsageKey, sweepUsageExportPieces } from "./gdpr";
+import {
+    clearUsageExportPieces,
+    EXPORT_PIECE_BATCH,
+    EXPORT_PIECE_TTL_MS,
+    eraseUsageForUser,
+    keyedUsageRuns,
+    releaseUsageKey,
+    sweepUsageExportPieces,
+} from "./gdpr";
 
 /** Object keys the purges were scheduled for, captured in place of the scheduler. */
 const scheduled = vi.hoisted(() => {
-    return { keys: [] as string[] };
+    return { armed: [] as number[], keys: [] as string[] };
+});
+
+// The shard's due time, captured in place of the census: the test reads the time a shard was armed for.
+vi.mock("../lib/shard-housekeeping", async (importOriginal) => {
+    return {
+        ...(await importOriginal<typeof import("../lib/shard-housekeeping")>()),
+        noteShardDue: async (_ctx: unknown, dueAt: number) => {
+            scheduled.armed.push(dueAt);
+        },
+    };
 });
 
 vi.mock("../lib/shard-scheduler", async (importOriginal) => {
@@ -86,6 +104,7 @@ beforeEach(() => {
     vi.setSystemTime(new Date("2026-11-12T12:00:00.000Z"));
     harness = lunoraTest(schema as never);
     scheduled.keys = [];
+    scheduled.armed = [];
 });
 
 afterEach(() => {
@@ -278,6 +297,38 @@ describe("the purge's record", () => {
     });
 });
 
+describe("a retried erasure", () => {
+    it("does not repeat the deletes of an erasure that finished", async () => {
+        await harness.run(async (ctx: any) => {
+            for (let index = 0; index < 3; index += 1) {
+                await ctx.db.insert("usageDaily", usageRow(A, "2026-02-01", index));
+            }
+
+            await ctx.db.insert("usageExportPieces", piece("done:1", A));
+            await ctx.db.insert("usageExportRuns", { createdAt: 1, deleteAt: 0, requestId: "done:1", userId: A });
+        });
+
+        await eraseAll(A);
+
+        const retry = await harness.run(async (ctx: any) => {
+            let deletes = 0;
+            const remove = ctx.db.delete.bind(ctx.db);
+
+            ctx.db.delete = async (...args: unknown[]) => {
+                deletes += 1;
+
+                return await remove(...args);
+            };
+
+            const result = await eraseUsageForUser(ctx, A);
+
+            return { deletes, hasMore: result.hasMore };
+        });
+
+        expect(retry).toEqual({ deletes: 0, hasMore: false });
+    });
+});
+
 describe("the sweep and the clear", () => {
     it("sweeps a run stored without a due time once the backfill has given it one, at a time a time to live after its creation", async () => {
         const t0 = Date.now();
@@ -353,6 +404,88 @@ describe("the sweep and the clear", () => {
         const run = await harness.run(async (ctx: any) => await ctx.db.usageExportRuns.findFirst({ where: { userId: A } }));
 
         expect(run?.deleteAt).toBe(t0 + EXPORT_PIECE_TTL_MS);
+    });
+
+    it("reads at most one batch of pieces per sweep, however many dead runs are due, and finishes them over later sweeps", async () => {
+        const old = Date.now() - EXPORT_PIECE_TTL_MS - 60_000;
+
+        await harness.run(async (ctx: any) => {
+            for (let run = 0; run < 3; run += 1) {
+                await ctx.db.insert("usageExportRuns", { createdAt: old, deleteAt: old, requestId: `budget:${String(run)}`, userId: A });
+
+                for (let seq = 0; seq < EXPORT_PIECE_BATCH; seq += 1) {
+                    await ctx.db.insert("usageExportPieces", { ...piece(`budget:${String(run)}`, A, seq), createdAt: old });
+                }
+            }
+        });
+
+        await harness.run(async (ctx: any) => await ctx.runMutation(sweepUsageExportPieces, {}));
+        expect(await countOf("usageExportPieces", A)).toBe(2 * EXPORT_PIECE_BATCH);
+
+        await harness.run(async (ctx: any) => await ctx.runMutation(sweepUsageExportPieces, {}));
+        await harness.run(async (ctx: any) => await ctx.runMutation(sweepUsageExportPieces, {}));
+        expect(await countOf("usageExportPieces", A)).toBe(0);
+    });
+
+    it("keeps a live run without a key when erasure reaches it, so the sweep removes it once its export has ended", async () => {
+        const request = await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("gdprRequests", { requestedAt: 1, requestType: "export", status: "processing", userEmail: "a@example.com", userId: A }),
+        );
+
+        await harness.run(async (ctx: any) => {
+            await ctx.db.insert("usageExportRuns", { createdAt: 1, deleteAt: 0, requestId: `${request}:1`, userId: A });
+        });
+
+        await eraseAll(A);
+        expect(await countOf("usageExportRuns", A)).toBe(1);
+
+        await harness.run(async (ctx: any) => await ctx.db.patch("gdprRequests", request, { status: "failed" }));
+        await harness.run(async (ctx: any) => await ctx.runMutation(sweepUsageExportPieces, {}));
+        expect(await countOf("usageExportRuns", A)).toBe(0);
+    });
+
+    it("removes a live export's pieces in erasure, and keeps its keyed record for the purge to wait on", async () => {
+        const request = await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("gdprRequests", { requestedAt: 1, requestType: "export", status: "processing", userEmail: "a@example.com", userId: A }),
+        );
+
+        await harness.run(async (ctx: any) => {
+            await ctx.db.insert("usageExportRuns", {
+                createdAt: 1,
+                deleteAt: 0,
+                requestId: `${request}:1`,
+                usageKey: "gdpr-exports/live-keyed.json",
+                userId: A,
+            });
+            await ctx.db.insert("usageExportPieces", piece(`${request}:1`, A));
+        });
+
+        await eraseAll(A);
+
+        expect(await countOf("usageExportPieces", A)).toBe(0);
+        expect(await keyedRunsOf(A)).toEqual([{ key: "gdpr-exports/live-keyed.json", live: true, runId: expect.any(String) }]);
+    });
+
+    it("arms an idle shard for the time its live run is due again, so the root tick reaches it without any traffic", async () => {
+        const t0 = Date.now();
+
+        await harness.run(async (ctx: any) => {
+            const live = await ctx.db.insert("gdprRequests", {
+                requestedAt: 1,
+                requestType: "export",
+                status: "processing",
+                userEmail: "a@example.com",
+                userId: A,
+            });
+
+            await ctx.db.insert("usageExportRuns", { createdAt: t0, deleteAt: t0, requestId: `${live}:1`, userId: A });
+        });
+
+        await harness.run(async (ctx: any) => await ctx.runMutation(sweepUsageExportPieces, {}));
+
+        expect(scheduled.armed).toEqual([t0 + EXPORT_PIECE_TTL_MS]);
     });
 
     it("does not let a keyed run whose purge keeps failing block the expired runs behind it", async () => {

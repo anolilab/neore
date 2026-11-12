@@ -12,6 +12,7 @@ import { internal } from "../_generated/internal";
 import { internalAction, internalMutation, internalQuery, type MutationCtx, type QueryCtx } from "../_generated/server";
 import { BATCH, full, type BatchResult } from "../gdpr/batch";
 import { patchRow } from "../lib/patch";
+import { noteShardDue } from "../lib/shard-housekeeping";
 import { runAfterOnShard } from "../lib/shard-scheduler";
 import { MAX_LENGTH } from "../lib/validators";
 import { RECORD_RETRY } from "./activity-logic";
@@ -149,6 +150,11 @@ export const eraseUsageForUser = async (
                 continue;
             }
 
+            // A live run keeps its record: its export has not ended, and the sweep removes the record once it has.
+            if (await isRunLive(ctx, run.requestId, userId)) {
+                continue;
+            }
+
             await ctx.db.delete("usageExportRuns", run._id);
         }
 
@@ -210,10 +216,20 @@ const isRunLive = async (ctx: MutationCtx | QueryCtx, runKey: string, userId: st
 };
 
 /**
+ * Sets a run's due time, and arms its shard for the root tick at that time. The tick reaches a shard by its due time, not by its
+ * traffic, so an idle shard's runs are still acted on.
+ */
+const armRun = async (ctx: MutationCtx, runId: Id<"usageExportRuns">, deleteAt: number): Promise<void> => {
+    await ctx.db.patch("usageExportRuns", runId, { deleteAt });
+    await noteShardDue(ctx, deleteAt);
+};
+
+/**
  * Acts on the export runs that are due, one batch per run of the shard's housekeeping (`lib/shard-housekeeping.ts`). A run is due at its
  * `deleteAt`. A run found live is set one time to live ahead, so a run that dies at any point before then is found dead at that time:
- * its pieces and index rows go then. A dead run's pieces are read here, and only here, a batch at a time; a keyed run keeps its row
- * until its purge has released it, and waits a time to live before its next purge.
+ * its pieces and index rows go then. A sweep reads at most one batch of pieces in all, however many runs are due, so its reads stay
+ * within the transaction's read limit; a run with pieces left is due again at once. A keyed run keeps its row until its purge has
+ * released it, and waits a time to live before its next purge.
  */
 export const sweepUsageExportPieces = internalMutation
     .input({})
@@ -229,29 +245,33 @@ export const sweepUsageExportPieces = internalMutation
         let cursor: string | null = null;
         let handled = 0;
         let scanned = 0;
+        let piecesLeft = EXPORT_PIECE_BATCH;
 
-        while (handled < EXPORT_PIECE_BATCH && scanned < SWEEP_SCAN_LIMIT) {
+        while (handled < EXPORT_PIECE_BATCH && scanned < SWEEP_SCAN_LIMIT && piecesLeft > 0) {
             const result = await dueAt(cursor);
 
             scanned += result.page.length;
 
             for (const run of result.page) {
-                if (handled >= EXPORT_PIECE_BATCH) {
+                if (handled >= EXPORT_PIECE_BATCH || piecesLeft === 0) {
                     break;
                 }
 
                 if (await isRunLive(ctx, run.requestId, run.userId)) {
-                    await ctx.db.patch("usageExportRuns", run._id, { deleteAt: ctx.now + EXPORT_PIECE_TTL_MS });
+                    await armRun(ctx, run._id, ctx.now + EXPORT_PIECE_TTL_MS);
                     continue;
                 }
 
+                const limit = piecesLeft;
                 const pieces = await ctx.db.usageExportPieces.findMany({
                     consistency: "primary",
-                    limit: EXPORT_PIECE_BATCH,
+                    limit,
                     where: { requestId: run.requestId, userId: run.userId },
                 });
 
                 await Promise.all(pieces.page.map(async (piece) => await ctx.db.delete("usageExportPieces", piece._id)));
+
+                piecesLeft -= pieces.page.length;
 
                 const projects = await ctx.db.usageExportProjects.findMany({
                     consistency: "primary",
@@ -261,7 +281,7 @@ export const sweepUsageExportPieces = internalMutation
 
                 await Promise.all(projects.page.map(async (row) => await ctx.db.delete("usageExportProjects", row._id)));
 
-                const more = fullPieces(pieces.page) || fullPieces(projects.page);
+                const more = pieces.page.length >= limit || fullPieces(projects.page);
 
                 if (run.usageKey !== undefined) {
                     await schedulePurge(ctx, run);
@@ -271,7 +291,7 @@ export const sweepUsageExportPieces = internalMutation
                     await ctx.db.delete("usageExportRuns", run._id);
                 } else {
                     // Pieces remain, so the run is due again at once. A keyed run waits for its purge a time to live from now.
-                    await ctx.db.patch("usageExportRuns", run._id, { deleteAt: more ? ctx.now : ctx.now + EXPORT_PIECE_TTL_MS });
+                    await armRun(ctx, run._id, more ? ctx.now : ctx.now + EXPORT_PIECE_TTL_MS);
                 }
 
                 handled += 1;
