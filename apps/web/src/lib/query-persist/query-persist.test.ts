@@ -663,10 +663,17 @@ describe("saving", () => {
         };
         const settleReads = async (count: number): Promise<void> => {
             // WebCrypto runs outside the fake clock: let real ticks pass until the record was read and decrypted.
-            for (let tick = 0; tick < 200 && reads.done < count; tick += 1) {
+            const deadline = performance.now() + 5000;
+
+            while (reads.done < count && performance.now() < deadline) {
                 await new Promise((resolve) => {
                     setImmediate(resolve);
                 });
+            }
+
+            // The read this step depends on must have happened, or the test would pass without the race it is about.
+            if (reads.done < count) {
+                throw new Error(`The record was read ${String(reads.done)} times, not ${String(count)}`);
             }
 
             for (let tick = 0; tick < 20; tick += 1) {
@@ -885,6 +892,40 @@ describe("saving", () => {
         await start(memory.store, ALICE, restored).restored;
         expect(textOf(restored, KEY)).toBe("kept");
         expect(restored.getQueryData(OTHER_KEY)).toBeUndefined();
+    });
+
+    it("a stop cancels a restored entry's refetch, so the stopped account's answer never lands", async () => {
+        const memory = memoryStore();
+
+        await saveTexts(memory, ALICE, [[KEY, "kept"]]);
+
+        const queryClient = new QueryClient();
+        const controller = start(memory.store, ALICE, queryClient);
+
+        await controller.restored;
+
+        // A screen mounts the restored entry: it is old, so it refetches under Alice's token.
+        const pending: { answer?: (value: { text: string }) => void } = {};
+        const observer = new QueryObserver(queryClient, {
+            queryFn: async () =>
+                await new Promise<{ text: string }>((resolve) => {
+                    pending.answer = resolve;
+                }),
+            queryKey: KEY,
+            staleTime: Infinity,
+        });
+        const unsubscribe = observer.subscribe(() => undefined);
+
+        await vi.advanceTimersByTimeAsync(0);
+        expect(pending.answer).toBeDefined();
+
+        // The account switches; Alice's answer arrives only after.
+        controller.stop();
+        pending.answer?.({ text: "alice's late answer" });
+        await vi.advanceTimersByTimeAsync(0);
+
+        expect(textOf(queryClient, KEY)).not.toBe("alice's late answer");
+        unsubscribe();
     });
 
     it("a record the store failed to read is never replaced by a save, and is restored on the next try", async () => {
@@ -1221,7 +1262,7 @@ describe("saving", () => {
         controller.stop();
     });
 
-    it("an unavailable or full store degrades to no cache, silently", async () => {
+    it("an unavailable store degrades to no cache, silently", async () => {
         const blocked = async (): Promise<never> => {
             throw new DOMException("blocked", "InvalidStateError");
         };
@@ -1233,9 +1274,34 @@ describe("saving", () => {
         const controller = start(failing, ALICE, queryClient);
 
         await expect(controller.restored).resolves.toBeUndefined();
-        controller.enableWrites();
-        await vi.advanceTimersByTimeAsync(WRITE_THROTTLE_MS * 2);
         expect(textOf(queryClient, KEY)).toBe("kept");
+        controller.stop();
+    });
+
+    it("a full store refuses the save silently, and what the session read stays in memory", async () => {
+        const memory = memoryStore();
+        const writes = { refused: 0 };
+        const full = async (): Promise<never> => {
+            writes.refused += 1;
+
+            throw new DOMException("full", "QuotaExceededError");
+        };
+        const queryClient = new QueryClient();
+        const controller = start({ ...memory.store, putEntry: full, putIfAbsent: full }, ALICE, queryClient);
+
+        // The read works: the restore finishes, and the save is reached.
+        await expect(controller.restored).resolves.toBeUndefined();
+        controller.enableWrites();
+        queryClient.setQueryData(KEY, { text: "live" });
+        await untilDone({
+            get done() {
+                return writes.refused > 0;
+            },
+        });
+
+        expect(writes.refused).toBeGreaterThan(0);
+        expect(memory.stores.entries.size).toBe(0);
+        expect(textOf(queryClient, KEY)).toBe("live");
         controller.stop();
     });
 });

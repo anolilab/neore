@@ -461,6 +461,11 @@ export const startQueryPersistence = (options: PersistenceOptions): PersistenceC
         unsubscribe?.();
         unsubscribeLive();
 
+        // A restored entry still fetching (the restore's refetch, or a screen that mounted it) asks under this session's
+        // token: its answer must not land once another account's session starts. Cancelled now, before that session
+        // can start a request of its own; the next session refetches what it needs.
+        void queryClient.cancelQueries({ predicate: (query: Query) => isRestored(query) && query.state.fetchStatus === "fetching" });
+
         // No save follows a stop: a removal the store refused is tried once more now.
         const seal = pendingWithdrawal;
 
