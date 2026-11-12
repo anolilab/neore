@@ -452,10 +452,10 @@ const INLINE_SYNTAX = /[\\*`[\]_]|<(?=[a-z/!?])/gi;
 const INLINE_SYNTAX_PRESENT = /[\\*`[\]_]|<[a-z/!?]/i;
 
 // The line-start markers, anchored and non-global. Their first characters differ, so
-// at most one can match. An ordered-list number is handled apart: its `.` or `)` is escaped,
-// whether or not a space follows it, since a number alone on a line is an empty item.
+// at most one can match. An ordered-list number is handled apart: its `.` or `)` is escaped
+// when a space, a tab or a line end follows it, since CommonMark makes each of them a list item.
 const LINE_START = /^(?:-|\+ |=+|#{1,6} |~~~|>)/;
-const ORDERED_START = /^(\d+)([.)])(?= |$)/;
+const ORDERED_START = /^(\d+)([.)])(?=[ \t\n]|$)/;
 
 /**
  * Escapes text so that it cannot start a Markdown block or open an inline

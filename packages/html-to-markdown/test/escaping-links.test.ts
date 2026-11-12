@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { Options } from "../src/index";
 import TurndownService from "../src/index";
+import { escapeMarkdown } from "../src/utilities";
 
 function convert(html: string, options: Partial<Options> = {}): string {
     return new TurndownService(options).turndown(html);
@@ -226,5 +227,23 @@ describe("review: inline tags after a hard break in link text", () => {
 
     it("guard, passes before and after: a hard break before a block tag is still replaced, as a block starts a line", () => {
         expect(convert(`<a href="/x">one<br><div>two</div></a>`)).not.toContain("one  \n");
+    });
+});
+
+describe("review: ordered-list lookalikes followed by a tab or a line end", () => {
+    it("escapes a closing parenthesis after a leading number when a tab follows, which CommonMark reads as a list item", () => {
+        expect(escapeMarkdown("1)\titem")).toBe("1\\)\titem");
+    });
+
+    it("escapes a period after a leading number when a tab follows", () => {
+        expect(escapeMarkdown("2.\titem")).toBe("2\\.\titem");
+    });
+
+    it("escapes a number that ends a line, which is an empty list item", () => {
+        expect(escapeMarkdown("3.\nitem")).toBe("3\\.\nitem");
+    });
+
+    it("guard, passes before and after: a number followed by a letter is not a list item", () => {
+        expect(escapeMarkdown("1)item")).toBe("1)item");
     });
 });

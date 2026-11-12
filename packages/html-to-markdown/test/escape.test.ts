@@ -9,7 +9,7 @@ import { escapeMarkdown } from "../src/utilities";
  * Two escapes were added with the `<` and `)` fixes. A `<` is escaped only before a
  * letter, `/`, `!` or `?`, the characters that can open raw HTML or an autolink. An
  * ordered-list delimiter is `.` or `)`, so both are escaped after a number that ends
- * the string or precedes a space. A `<` at the end of a text node is escaped by the
+ * the string or precedes a space, a tab or a line end. A `<` at the end of a text node is escaped by the
  * text rule in turndown.ts, which can see the next node.
  */
 function referenceEscape(string: string): string {
@@ -27,10 +27,10 @@ function referenceEscape(string: string): string {
         .replaceAll(/^>/g, String.raw`\>`)
         .replaceAll("_", String.raw`\_`)
         .replaceAll(/<(?=[a-z/!?])/gi, String.raw`\<`)
-        .replaceAll(/^(\d+)([.)])(?= |$)/g, String.raw`$1\$2`);
+        .replaceAll(/^(\d+)([.)])(?=[ \t\n]|$)/g, String.raw`$1\$2`);
 }
 
-const ALPHABET = ["\\", "*", "`", "[", "]", "_", "-", "+", " ", "=", "#", "~", ">", "1", "9", ".", "a", "(", "\n", " ", ")", "<", "!", "/"];
+const ALPHABET = ["\\", "*", "`", "[", "]", "_", "-", "+", " ", "=", "#", "~", ">", "1", "9", ".", "a", "(", "\n", "\t", " ", ")", "<", "!", "/"];
 
 // Park-Miller generator: arithmetic only, so the sequence is the same on every run.
 const MODULUS = 2_147_483_647;
