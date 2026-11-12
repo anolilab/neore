@@ -75,6 +75,7 @@ import type { ComposerInputAreaRef } from "./composer-input-area";
 import ComposerInputArea from "./composer-input-area";
 import ComposerLongTextPrompt from "./composer-long-text-prompt";
 import ComposerPromptQueue from "./composer-prompt-queue";
+import { composerSubmitIntent } from "./composer-submit-intent";
 import { isEditable, TextAttachmentEditorDialog } from "./composer-text-attachment-editor";
 import { quoteRestoreDraft } from "./composer-tiptap/extensions/quote-chip";
 import useComposerAutocomplete from "./composer-tiptap/use-composer-autocomplete";
@@ -1062,15 +1063,17 @@ const ComposerInput = ({
             return;
         }
 
-        // A follow-up while a reply streams only joins the local queue, which waits for the network before it sends.
-        const queuesLocally =
-            isStreaming &&
-            isThreadComposer &&
-            !isComparisonValid &&
-            Boolean(threadId) &&
-            !(draftAttachments.length === 0 && (isCompactCommand(draftText) || isClearCommand(draftText)));
+        const intent = composerSubmitIntent({
+            hasAttachments: draftAttachments.length > 0,
+            isComparisonValid,
+            isStreaming,
+            isThreadComposer,
+            text: draftText,
+            threadId,
+        });
 
-        if (isOffline && !queuesLocally) {
+        // A follow-up while a reply streams only joins the local queue, which waits for the network before it sends.
+        if (isOffline && intent !== "queue") {
             showInfo(t`You are offline. Your message stays here; send it once you are back online.`, { id: "composer-offline-send" });
 
             return;
@@ -1081,7 +1084,7 @@ const ComposerInput = ({
         // `/compact` is a command, not a message: it condenses the thread's context and sends nothing. It runs before the
         // size guard below, because a chat too large to send is the one that most needs compacting.
         // A new chat has no thread yet: the command still runs, and answers that there is nothing to compact.
-        if ((isThreadComposer || !threadId) && draftAttachments.length === 0 && isCompactCommand(draftText)) {
+        if (intent === "compact") {
             clear();
             void compactThread();
 
@@ -1090,7 +1093,7 @@ const ComposerInput = ({
 
         // `/clear` starts a fresh context in this thread and sends nothing, as `/compact` does. A new chat has no thread: the
         // command stays in the draft and the hook says why. The draft is cleared only once the reset is written.
-        if ((isThreadComposer || !threadId) && draftAttachments.length === 0 && isClearCommand(draftText)) {
+        if (intent === "clear") {
             const startedThreadId = threadId;
             const finishClear = async () => {
                 if (!(await clearThreadContext())) {
@@ -1116,16 +1119,14 @@ const ComposerInput = ({
         }
 
         // A turn is still running: queue instead of sending. The queue sends it
-        // when the stream finishes (see ComposerPromptQueue).
-        if (isStreaming) {
-            if (!isThreadComposer || isComparisonValid || !threadId) {
-                return;
+        // when the stream finishes (see ComposerPromptQueue). A composer without a queue waits.
+        if (intent === "queue" || intent === "wait") {
+            if (intent === "queue" && threadId) {
+                usePromptQueueStore
+                    .getState()
+                    .enqueue(threadId, { attachments: draftAttachments, references: useChatUIStore.getState().attachedReferences, text: draftText });
+                clear();
             }
-
-            usePromptQueueStore
-                .getState()
-                .enqueue(threadId, { attachments: draftAttachments, references: useChatUIStore.getState().attachedReferences, text: draftText });
-            clear();
 
             return;
         }
