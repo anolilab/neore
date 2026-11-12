@@ -100,6 +100,57 @@ describe("non-content elements emit nothing", () => {
         expect(new TurndownService().turndown(script as unknown as Node)).toBe("");
     });
 
+    it("drops a script from a real document fragment", () => {
+        const document = createDocument("<div></div>");
+        const fragment = document.createDocumentFragment();
+        const paragraph = document.createElement("p");
+        const script = document.createElement("script");
+
+        script.appendChild(document.createTextNode("x()"));
+        paragraph.appendChild(document.createTextNode("a"));
+        fragment.appendChild(script);
+        fragment.appendChild(paragraph);
+
+        expect(new TurndownService().turndown(fragment as unknown as Node)).toBe("a");
+    });
+
+    // The stub hides querySelectorAll and keeps itself through the clone, so only a walk over the child APIs can clean it.
+    it("converts a document fragment without querySelectorAll", () => {
+        const document = createDocument("<div></div>");
+        const fragment = document.createDocumentFragment();
+        const paragraph = document.createElement("p");
+
+        paragraph.appendChild(document.createTextNode("a"));
+        fragment.appendChild(paragraph);
+        Object.defineProperties(fragment, { querySelectorAll: { value: undefined }, cloneNode: { value: () => fragment } });
+
+        expect(new TurndownService().turndown(fragment as unknown as Node)).toBe("a");
+    });
+
+    it("drops a prefixed x:script inside a paragraph, and its text", () => {
+        const document = createDocument("<div></div>");
+        const paragraph = document.createElement("p");
+        const script = document.createElementNS("http://example.com/x", "x:script");
+
+        script.appendChild(document.createTextNode("secret()"));
+        paragraph.appendChild(document.createTextNode("a "));
+        paragraph.appendChild(script);
+        paragraph.appendChild(document.createTextNode(" b"));
+
+        expect(new TurndownService().turndown(paragraph as unknown as Node)).toBe("a b");
+    });
+
+    // Removed before blank detection, so the empty item loses its bullet, as it does when the item holds an HTML script.
+    it("drops an x:script from an empty list item, as it drops an HTML script", () => {
+        const document = createDocument("<ul><li>x</li><li></li></ul>");
+        const emptyItem = document.querySelectorAll("li")[1] as HTMLElement;
+        const script = document.createElementNS("http://example.com/x", "x:script");
+
+        emptyItem.appendChild(script);
+
+        expect(new TurndownService().turndown(document.body as unknown as Node)).toBe("*   x");
+    });
+
     // The Word wrapper leaves whitespace before the paragraph. Upstream keeps that too, so these tests trim only the
     // whitespace; the style text must still be absent.
     it("drops the Word style sheet from the Word paragraph fixture", () => {
