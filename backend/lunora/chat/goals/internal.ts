@@ -32,6 +32,7 @@ import { withoutUndefined } from "../../lib/patch";
 import { MAX_LENGTH } from "../../lib/validators";
 import { chargeRound, loadTaskAccount, taskAccessProblem } from "../../tasks/account";
 import { insertPersistentStream } from "../streaming/persistent/library";
+import { assertStartStreamable, vStartClaim } from "../start-claim";
 import {
     buildGoalContinuationPrompt,
     buildGoalTranscript,
@@ -115,12 +116,19 @@ export const startGoal = internalMutation
         maxRounds: v.optional(v.number()),
         organizationId: v.optional(v.string().max(MAX_LENGTH.id)),
         promptMessageId: v.string().max(MAX_LENGTH.id),
+        /** A send with a `clientMessageId` (`chat/start-claim.ts`): a sender whose send was taken over starts nothing. */
+        startClaim: v.optional(vStartClaim),
         text: v.string().max(GOAL_TEXT_MAX),
         threadId: v.id("threads"),
         userId: v.string().max(MAX_LENGTH.id),
     })
     .output(v.union(v.object({ goalId: v.id("threadGoals"), ok: v.literal(true) }), v.object({ error: v.string(), ok: v.literal(false) })))
     .mutation(async ({ args, ctx }) => {
+        if (args.startClaim) {
+            // Throws before the supersede below: a dead sender must not end the goal its retry started.
+            await assertStartStreamable(ctx, args.startClaim);
+        }
+
         const text = args.text.trim();
 
         if (text.length === 0) {

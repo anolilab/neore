@@ -59,7 +59,9 @@ import {
     resolveThreadReadAccess,
     type ThreadPermission,
 } from "../agent/thread-read-access";
-import { publicThread, threadForViewer } from "../agent/threads";
+import { insertTemporaryThread, publicThread, threadForViewer } from "../agent/threads";
+import { insertThread } from "../agent/table-writes";
+import { withoutUndefined } from "../lib/patch";
 import { isThreadLocked, throwThreadLocked } from "../lib/thread-lock";
 import { readChildThreads } from "./lib/child-threads";
 import { lockedAfterCreation, threadGateOutcome, threadRowForList, throwUnlessGranted, type ThreadGateOutcome } from "./lib/thread-gate";
@@ -107,6 +109,7 @@ import {
 } from "./lib/fal-reference-mapping";
 import { getAgentForUser } from "./lib/thread-helpers";
 import { assertStartClaimHeld, recordStartSaved, vStartClaim } from "./start-claim";
+import { savePromptInTransaction } from "./lib/save-prompt";
 import { FETCH_TIMEOUT_LONG_MS, fetchOk, fetchWithDeadline } from "../lib/fetch-timeout";
 import { systemDb } from "../lib/rls/scope";
 import { deleteThreadShardRoutes } from "../lib/shard-routes";
@@ -681,30 +684,18 @@ export const createThreadWithInitialMessage = internalMutation
                 await assertStartClaimHeld(context, startClaim);
             }
 
-            const agent = await getAgentForUser(context, userId, model);
-
-            // Create thread with minimal required fields
-            const { threadId } = await agent.createThread(context, {
+            // Every write below is in THIS transaction, with no nested mutation (each would commit on its own): a send with
+            // a `clientMessageId` must leave either the thread, its prompt and the claim's record, or none of them.
+            const threadId = await insertThread(context.db, {
+                ...withoutUndefined({ customSystemPrompt, enabledFeatures, language, mode, reasoningEffort, statelessMode }),
+                ...(autoModel === true && { autoModel }),
+                createdAt: context.now,
+                model,
+                status: "running", // Running from the start: no separate status write
+                tags: ["chat"],
                 title: title ?? DEFAULT_THREAD_TITLE,
+                updatedAt: context.now,
                 userId,
-            });
-
-            // Batch all settings + status update in one mutation (much faster than separate calls)
-            await context.runMutation(internal.agent.threads.updateThread, {
-                patch: {
-                    ...(autoModel === true && { autoModel }),
-                    customSystemPrompt,
-                    enabledFeatures,
-                    language,
-                    mode,
-                    model,
-                    reasoningEffort,
-                    statelessMode,
-                    status: "running", // Set running status immediately - no separate mutation needed
-                    tags: ["chat"],
-                    updatedAt: context.now,
-                },
-                threadId: threadId as Id<"threads">,
             });
 
             // A composer chat created as temporary gets the same record as the temporary-chat control writes.
@@ -715,35 +706,22 @@ export const createThreadWithInitialMessage = internalMutation
                     .unique();
                 const hours = retentionHours ?? storedRetentionHours(userSettings?.temporaryChatRetentionHours);
 
-                await context.runMutation(internal.agent.threads.createTemporaryThread, {
-                    expiresAt: context.now + hours * 60 * 60 * 1000,
-                    retentionHours: hours,
-                    threadId: threadId as Id<"threads">,
-                });
+                await insertTemporaryThread(context, { expiresAt: context.now + hours * 60 * 60 * 1000, retentionHours: hours, threadId });
             }
 
-            // Save user message
-            const messageMetadata = fileIds && fileIds.length > 0 ? { fileIds } : {};
-            const result = await agent.saveMessage(context, {
-                message: {
-                    // Wire boundary: `messageContent` is declared as untyped records
-                    // (`v.array(v.record(v.string(), v.any()))`) because the caller sends
-                    // AI SDK content parts the validator cannot express.
-                    content: messageContent as unknown as Extract<ModelMessage, { role: "user" }>["content"],
-                    role: "user",
-                },
+            const messageId = await savePromptInTransaction(context, {
+                // Wire boundary: `messageContent` is declared as untyped records, the AI SDK content parts the validator cannot express.
+                content: messageContent as unknown as Parameters<typeof savePromptInTransaction>[1]["content"],
+                ...(fileIds && fileIds.length > 0 && { fileIds }),
+                model,
                 threadId,
-                ...(Object.keys(messageMetadata).length > 0 && { metadata: messageMetadata }),
             });
 
             if (startClaim) {
-                await recordStartSaved(context, startClaim, { messageId: result.messageId, threadId });
+                await recordStartSaved(context, startClaim, { messageId, newThread: true, threadId });
             }
 
-            return {
-                messageId: result.messageId,
-                threadId,
-            };
+            return { messageId, threadId };
         },
     );
 

@@ -25,6 +25,7 @@ import {
     startGoal,
     touchGoal,
 } from "./internal";
+import { CHAT_START_LEASE_MS, claimChatStart, recordStartSaved } from "../start-claim";
 import { GOAL_MAX_COST_MICRODOLLARS } from "./logic";
 import { GOAL_CONTINUATION_AGENT, parseGoalReviewNote } from "./shared";
 
@@ -160,6 +161,30 @@ describe("startGoal", () => {
         expect(await run(startGoal, { config: CONFIG, promptMessageId: promptId, text: "x", threadId, userId: "other" })).toMatchObject({ ok: false });
         expect(await run(startGoal, { config: CONFIG, promptMessageId: promptId, text: " ".repeat(3), threadId, userId: OWNER })).toMatchObject({ ok: false });
         expect(await count("threadGoals")).toBe(0);
+    });
+
+    it("starts nothing for a send whose claim a retry took over, so it never supersedes the retry's goal", async () => {
+        vi.useFakeTimers({ toFake: ["Date"] });
+
+        try {
+            const send = { clientMessageId: "goal-send", fingerprint: "f", streams: true, userId: OWNER };
+            const dead = await run(claimChatStart, send);
+
+            await harness.run(async (ctx: any) => await recordStartSaved(ctx, dead.claim, { messageId: promptId, threadId }));
+            vi.setSystemTime(Date.now() + CHAT_START_LEASE_MS);
+
+            const retry = await run(claimChatStart, send);
+
+            expect(retry.outcome).toBe("resume");
+
+            const retryGoal = await start({ startClaim: retry.claim });
+
+            await expect(start({ startClaim: dead.claim })).rejects.toThrow("already sent");
+            expect(await read(retryGoal)).toMatchObject({ status: "active" });
+            expect(await count("threadGoals")).toBe(1);
+        } finally {
+            vi.useRealTimers();
+        }
     });
 });
 

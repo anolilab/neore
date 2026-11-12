@@ -11,9 +11,10 @@ import { claimRow, GUEST_SEND_LEASE_MS, GUEST_SEND_SCOPE } from "../lib/claim-on
 import { enqueueJob } from "../lib/job-queue";
 import schema from "../schema";
 import { gateThreadActionHandler } from "./functions";
-import { claimGuestNoteSend, getGuestNoteForSend, recordGuestNoteSent, releaseGuestNoteSend } from "./guest-links";
+import { claimGuestNoteSend, getGuestNoteForSend, recordGuestNoteSent, recordResumedGuestNoteSent, releaseGuestNoteSend } from "./guest-links";
 import { runChatStart } from "./http";
 import { guestTextPart } from "./lib/attached-text";
+import { CHAT_START_LEASE_MS, claimChatStart, recordStartStream, releaseChatStart, saveStartPrompt } from "./start-claim";
 
 const saved = vi.hoisted(() => {
     return {
@@ -147,6 +148,51 @@ const fakeContext = (extra: typeof HANDLERS = {}): any => {
     return { auth: { getIdentity: async () => null }, runMutation: call, runQuery: call };
 };
 
+/**
+ * A send with a `clientMessageId`: the claim, its save and its stream are real (`chat/start-claim.ts`). `streamFails` makes
+ * the next stream creation fail, once, as a send that died between its save and its stream.
+ */
+const claimedSend = { streamFails: false };
+
+const CLAIMED_HANDLERS: typeof HANDLERS = {
+    "chat_guest_links:recordResumedGuestNoteSent": async (args) => await run(async (ctx) => await ctx.runMutation(recordResumedGuestNoteSent, args)),
+    "chat_start_claim:claimChatStart": async (args) => await run(async (ctx) => await ctx.runMutation(claimChatStart, args)),
+    "chat_start_claim:releaseChatStart": async (args) => await run(async (ctx) => await ctx.runMutation(releaseChatStart, args)),
+    "chat_start_claim:saveStartPrompt": async (args) => await run(async (ctx) => await ctx.runMutation(saveStartPrompt, args)),
+    "chat_streaming:createStreamWithMessage": async (args) => {
+        if (claimedSend.streamFails) {
+            claimedSend.streamFails = false;
+
+            throw new Error("the stream could not be made");
+        }
+
+        return await run(async (ctx) => {
+            const streamId = await ctx.db.insert("persistentStreams", {
+                expiresAt: Number.MAX_SAFE_INTEGER,
+                messageId: args.messageId,
+                status: "pending",
+                streamingConfig: { contentType: "text", model: MODEL },
+                threadId: args.threadId,
+                userId: args.userId,
+            });
+
+            await recordStartStream(ctx, args.startClaim, streamId);
+
+            return streamId;
+        });
+    },
+};
+
+const sendNoteOnce = async (): Promise<{ json: any; status: number }> => {
+    const response = await runChatStart(
+        fakeContext(CLAIMED_HANDLERS),
+        { clientMessageId: "note-send", guestMessageId: noteId, model: MODEL, prompt: "the composer's own text", threadId } as never,
+        "secret",
+    );
+
+    return { json: await response.json(), status: response.status };
+};
+
 const sendNote = async (): Promise<Response> =>
     await runChatStart(fakeContext(), { guestMessageId: noteId, model: MODEL, prompt: "the composer's own text", threadId } as never, "secret");
 
@@ -159,6 +205,7 @@ beforeEach(async () => {
     saved.scheduled.length = 0;
     saved.charges = 0;
     saved.releaseFails = false;
+    claimedSend.streamFails = false;
     saved.store = async (message) =>
         await run(
             async (ctx) =>
@@ -330,5 +377,56 @@ describe("/chat/start with a held guest note", () => {
         saved.releaseFails = true;
 
         await expect(sendNote()).rejects.toThrow("the save failed");
+    });
+});
+
+describe("/chat/start with a held guest note and a clientMessageId", () => {
+    const savedNotes = async () =>
+        (await run(async (ctx) => await ctx.db.query("messages").collect())).filter((row: any) =>
+            JSON.stringify(row.message?.content).includes("please call me back"),
+        );
+
+    it("answers a resend of a note it sent with the first send's ids, not as already sent", async () => {
+        const first = await sendNoteOnce();
+        const resent = await sendNoteOnce();
+
+        expect(first.status).toBe(200);
+        expect(resent.status).toBe(200);
+        expect(resent.json).toMatchObject({ duplicate: true, messageId: first.json.messageId, streamId: first.json.streamId });
+        expect(await savedNotes()).toHaveLength(1);
+        expect(saved.charges).toBe(1);
+    });
+
+    it("still refuses a note another send already sent, under a new id", async () => {
+        expect((await sendNoteOnce()).status).toBe(200);
+
+        const other = await runChatStart(
+            fakeContext(CLAIMED_HANDLERS),
+            { clientMessageId: "another-send", guestMessageId: noteId, model: MODEL, prompt: "x", threadId } as never,
+            "secret",
+        );
+
+        expect(other.status).toBe(409);
+        expect(await other.json()).toMatchObject({ error: "GUEST_NOTE_ALREADY_SENT" });
+        expect(await savedNotes()).toHaveLength(1);
+    });
+
+    it("marks the note sent when it resumes a send that saved it but died before its record and its stream", async () => {
+        saved.fail = "record";
+        claimedSend.streamFails = true;
+
+        await expect(sendNoteOnce()).rejects.toThrow("the stream could not be made");
+        expect(await noteStatus()).toBe("held");
+
+        vi.setSystemTime(Date.now() + CHAT_START_LEASE_MS);
+
+        const resumed = await sendNoteOnce();
+
+        expect(resumed.status).toBe(200);
+        expect(resumed.json.streamId).toEqual(expect.any(String));
+        expect(await noteStatus()).toBe("sent");
+        expect((await run(async (ctx) => await claimRow(ctx, GUEST_SEND_SCOPE, noteId)))?.result).toBe(resumed.json.messageId);
+        expect(await savedNotes()).toHaveLength(1);
+        expect(saved.charges).toBe(1);
     });
 });

@@ -386,7 +386,7 @@ export interface InternalApiTypes {
             createCategoryChat: FunctionReference<"action", { prompt: string; threadId: string }, void>;
             createSummarizeChat: FunctionReference<"action", { threadId: string; userId: string }, void>;
             createThreadRelationship: FunctionReference<"mutation", { branchPoint?: number; branchType?: "branch" | "continuation" | "comparison"; parentThreadId: string; threadId: string }, void>;
-            createThreadWithInitialMessage: FunctionReference<"mutation", { autoModel?: boolean; customSystemPrompt?: string; enabledFeatures?: Array<string>; fileIds?: Array<string>; language?: string; messageContent: Array<Record<string, unknown>>; mode?: "text" | "image" | "video"; model: string; reasoningEffort?: number; retentionHours?: number; startClaim?: { claimedAt: number; key: string }; statelessMode?: boolean; temporary?: boolean; title?: string; userId: string }, { messageId: string; threadId: string; }>;
+            createThreadWithInitialMessage: FunctionReference<"mutation", { autoModel?: boolean; customSystemPrompt?: string; enabledFeatures?: Array<string>; fileIds?: Array<string>; language?: string; messageContent: Array<Record<string, unknown>>; mode?: "text" | "image" | "video"; model: string; reasoningEffort?: number; retentionHours?: number; startClaim?: { claimedAt: number; key: string }; statelessMode?: boolean; temporary?: boolean; title?: string; userId: string }, { messageId: string; threadId: Id<"threads">; }>;
             createTitleChat: FunctionReference<"action", { jobId?: string; prompt: string; promptId?: string; threadId: string }, void>;
             deleteThreadRelationship: FunctionReference<"mutation", { threadId: string }, null>;
             editImage: FunctionReference<"action", { imageUrl: string; mask?: string; operation: string; prompt?: string }, { resultUrl: string; }>;
@@ -435,7 +435,7 @@ export interface InternalApiTypes {
                 reapStalledGoals: FunctionReference<"mutation", {}, number>;
                 recordGoalVerdict: FunctionReference<"mutation", { anchorOrder?: number; costMicrodollars: number; goalId: Id<"threadGoals">; lastMessage?: { id: string; order: number }; met: boolean; reason: string; round: number; taintedBy?: Array<string> }, { next?: { config: { customSystemPrompt?: string; enabledFeatures?: Array<string>; mcpServerNames?: Array<string>; model: string; origin?: "outside_agent"; reasoningEffort?: number; researchDepth?: "speed" | "balanced" | "thorough"; searchMode?: string; skill?: { rawArgs: string; slug: string }; statelessMode?: boolean }; messageId: string; organizationId?: string; streamId: string }; outcome: "continue" | "ended" | "ignored" }>;
                 roundTranscript: FunctionReference<"query", { goalId: Id<"threadGoals"> }, { costMicrodollars: number; lastMessage?: { id: string; order: number }; lastOrder?: number; taintedBy?: Array<string>; transcript: string }>;
-                startGoal: FunctionReference<"mutation", { config: { customSystemPrompt?: string; enabledFeatures?: Array<string>; mcpServerNames?: Array<string>; model: string; origin?: "outside_agent"; reasoningEffort?: number; researchDepth?: "speed" | "balanced" | "thorough"; searchMode?: string; skill?: { rawArgs: string; slug: string }; statelessMode?: boolean }; maxRounds?: number; organizationId?: string; promptMessageId: string; text: string; threadId: Id<"threads">; userId: string }, { goalId: Id<"threadGoals">; ok: true } | { error: string; ok: false }>;
+                startGoal: FunctionReference<"mutation", { config: { customSystemPrompt?: string; enabledFeatures?: Array<string>; mcpServerNames?: Array<string>; model: string; origin?: "outside_agent"; reasoningEffort?: number; researchDepth?: "speed" | "balanced" | "thorough"; searchMode?: string; skill?: { rawArgs: string; slug: string }; statelessMode?: boolean }; maxRounds?: number; organizationId?: string; promptMessageId: string; startClaim?: { claimedAt: number; key: string }; text: string; threadId: Id<"threads">; userId: string }, { goalId: Id<"threadGoals">; ok: true } | { error: string; ok: false }>;
                 touchGoal: FunctionReference<"mutation", { threadId: Id<"threads"> }, boolean>;
             };
         };
@@ -460,6 +460,7 @@ export interface InternalApiTypes {
             listGuestNotesForExport: FunctionReference<"query", { cursor: string | null; threadId: Id<"threads"> }, { continueCursor: string | null; isDone: boolean; page: Array<{ createdAt: number; status: "held" | "sent"; text: string }> }>;
             readGuestView: FunctionReference<"query", { guestHash: string; linkHash: string }, { expiresAt: number; messages: Array<{ createdAt: number; status: "held" | "sent"; text: string }> } | null>;
             recordGuestNoteSent: FunctionReference<"mutation", { claimedAt: number; messageId: Id<"threadGuestMessages">; savedMessageId: string }, boolean>;
+            recordResumedGuestNoteSent: FunctionReference<"mutation", { messageId: Id<"threadGuestMessages">; savedMessageId: string; userId: string }, boolean>;
             releaseGuestNoteSend: FunctionReference<"mutation", { claimedAt: number; messageId: Id<"threadGuestMessages"> }, null>;
             sweepGuestLinks: FunctionReference<"mutation", {}, null>;
         };
@@ -501,9 +502,9 @@ export interface InternalApiTypes {
             };
         };
         start_claim: {
-            claimChatStart: FunctionReference<"mutation", { clientMessageId: string; streams: boolean; userId: string }, { claim: { claimedAt: number; key: string }; outcome: "claimed" } | { outcome: "in_progress" } | { messageId: string; outcome: "duplicate"; streamId?: string; threadId: string } | { claim: { claimedAt: number; key: string }; messageId: string; outcome: "resume"; threadId: string }>;
+            claimChatStart: FunctionReference<"mutation", { clientMessageId: string; fingerprint: string; streams: boolean; userId: string }, { claim: { claimedAt: number; key: string }; outcome: "claimed" } | { outcome: "in_progress" } | { outcome: "mismatch" } | { messageId: string; outcome: "duplicate"; streamId?: string; streamUnclaimed?: boolean; threadId: string } | { claim: { claimedAt: number; key: string }; messageId: string; newThread?: boolean; outcome: "resume"; threadId: string }>;
             releaseChatStart: FunctionReference<"mutation", { claim: { claimedAt: number; key: string } }, null>;
-            saveStartPrompt: FunctionReference<"mutation", { claim: { claimedAt: number; key: string }; fileIds?: Array<string>; messageContent: Array<Record<string, unknown>>; model: string; parentId?: string; threadId: string; userId: string }, { messageId: string }>;
+            saveStartPrompt: FunctionReference<"mutation", { claim: { claimedAt: number; key: string }; fileIds?: Array<string>; messageContent: Array<Record<string, unknown>>; model: string; parentId?: string; threadId: string }, { messageId: string }>;
         };
         steering: {
             deliverSteers: FunctionReference<"mutation", { pendingMessageId: string; streamId: Id<"persistentStreams">; threadId: Id<"threads">; userId: string }, null | { messageId: string; text: string }>;
@@ -1784,6 +1785,7 @@ export const internal: InternalApiTypes = {
             listGuestNotesForExport: { __lunoraRef: "chat_guest_links:listGuestNotesForExport" },
             readGuestView: { __lunoraRef: "chat_guest_links:readGuestView" },
             recordGuestNoteSent: { __lunoraRef: "chat_guest_links:recordGuestNoteSent" },
+            recordResumedGuestNoteSent: { __lunoraRef: "chat_guest_links:recordResumedGuestNoteSent" },
             releaseGuestNoteSend: { __lunoraRef: "chat_guest_links:releaseGuestNoteSend" },
             sweepGuestLinks: { __lunoraRef: "chat_guest_links:sweepGuestLinks" },
         },
