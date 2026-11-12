@@ -309,7 +309,8 @@ impl DeviceState {
     }
 
     /// What to start for `agent_key` on a server, in `folder`: the variables the person set (the computer's global ones,
-    /// then the agent's own). The server builds the rest of the environment itself, from its own. The pair must be one
+    /// then the agent's own), and for Claude Code its entrypoint name. The server builds the rest of the environment
+    /// itself, from its own. The pair must be one
     /// the person approved for this server.
     pub fn acp_host_spawn_plan(
         &self,
@@ -336,7 +337,21 @@ impl DeviceState {
         }
 
         let global = self.settings().acp_env;
-        let env = crate::acp::agent_env(agent_key, BTreeMap::new(), &global, &agent.env)?;
+        let mut env = crate::acp::agent_env(
+            crate::acp::runs_claude_code(agent),
+            BTreeMap::new(),
+            &global,
+            &agent.env,
+        )?;
+
+        // The entrypoint is the one value the desktop adds: a fixed name, nothing of this machine. It never takes a
+        // start that fits the server's cap over it.
+        if env.0.len() > crate::agent_host::MAX_ENV_VARS
+            && !global.0.contains_key("CLAUDE_CODE_ENTRYPOINT")
+            && !agent.env.0.contains_key("CLAUDE_CODE_ENTRYPOINT")
+        {
+            env.0.remove("CLAUDE_CODE_ENTRYPOINT");
+        }
         let secret_names: BTreeSet<String> =
             global.0.keys().chain(agent.env.0.keys()).cloned().collect();
         let plan = SpawnPlan {
@@ -951,6 +966,34 @@ mod tests {
         assert!(state
             .acp_host_spawn_plan(host, "claude", "/srv/app")
             .is_err());
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn claude_codes_entrypoint_never_takes_a_full_server_start_over_its_cap() {
+        let (state, dir, _) = engine("env-cap", None);
+        let host = "ha-env-cap-host";
+        let set = |agent_key: Option<&str>, name: String| AcpUpdate::SetEnv {
+            agent_key: agent_key.map(Into::into),
+            name,
+            value: "v".into(),
+        };
+
+        // The person's variables fill the server's cap exactly.
+        for i in 0..50 {
+            state.acp_update(set(None, format!("GLOBAL_{i}"))).unwrap();
+            state
+                .host_acp_update(host, set(Some("claude"), format!("AGENT_{i}")))
+                .unwrap();
+        }
+
+        let (plan, _) = state
+            .acp_host_spawn_plan(host, "claude", "/srv/app")
+            .unwrap();
+
+        assert_eq!(plan.env.0.len(), crate::agent_host::MAX_ENV_VARS);
+        assert!(!plan.env.0.contains_key("CLAUDE_CODE_ENTRYPOINT"));
 
         let _ = std::fs::remove_dir_all(&dir);
     }

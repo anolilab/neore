@@ -330,21 +330,40 @@ pub(crate) fn changes_program(name: &str) -> bool {
             .any(|prefix| upper.starts_with(prefix))
 }
 
-/// The keys Claude Code is registered under: the ACP registry's id, and the plain name.
-const CLAUDE_AGENT_KEYS: [&str; 2] = ["claude-acp", "claude"];
+/// The keys Claude Code is registered under: the ACP registry's id, the plain name, and what the "Add agent" forms
+/// make of the label "Claude Code".
+const CLAUDE_AGENT_KEYS: [&str; 3] = ["claude-acp", "claude", "claude-code"];
+/// The Claude Code ACP adapter's programs and packages, current and earlier, for an agent added under another key.
+const CLAUDE_ADAPTERS: [&str; 2] = ["claude-agent-acp", "claude-code-acp"];
+
+/// Whether `agent` runs Claude Code: by its key, or by an adapter named in its command or arguments. A false match
+/// costs nothing, since another program ignores the variable.
+pub(crate) fn runs_claude_code(agent: &AcpAgent) -> bool {
+    let names_adapter = |text: &str| {
+        let lower = text.to_ascii_lowercase();
+
+        CLAUDE_ADAPTERS
+            .iter()
+            .any(|adapter| lower.contains(adapter))
+    };
+
+    CLAUDE_AGENT_KEYS.contains(&agent.key.as_str())
+        || names_adapter(&agent.command)
+        || agent.args.iter().any(|arg| names_adapter(arg))
+}
 
 /// The full environment of one agent: built, then the global variables, then the agent's own.
 /// Every user variable is validated again here, so a hand-edited `device.json` cannot slip a reserved name in.
 /// Claude Code is also told it runs under Neore (its `User-Agent` says so), unless the person set the name.
 pub fn agent_env(
-    agent_key: &str,
+    claude_code: bool,
     built: BTreeMap<String, String>,
     global: &EnvVars,
     agent: &EnvVars,
 ) -> Result<EnvVars, String> {
     let mut env = built;
 
-    if CLAUDE_AGENT_KEYS.contains(&agent_key) {
+    if claude_code {
         env.insert("CLAUDE_CODE_ENTRYPOINT".to_owned(), "neore".to_owned());
     }
 
@@ -661,7 +680,7 @@ impl DeviceState {
             None => probe_folder()?,
         };
         let env = agent_env(
-            agent_key,
+            runs_claude_code(agent),
             built_env(app_vars(std::env::vars_os())),
             &settings.acp_env,
             &agent.env,
@@ -975,14 +994,14 @@ mod tests {
             .0
             .insert("ELECTRON_RUN_AS_NODE".into(), "1".into());
 
-        assert!(agent_env("a", BTreeMap::new(), &stored.acp_env, &EnvVars::default()).is_err());
+        assert!(agent_env(false, BTreeMap::new(), &stored.acp_env, &EnvVars::default()).is_err());
     }
 
     #[test]
     fn claude_code_is_told_it_runs_under_neore_unless_the_person_says_otherwise() {
         let none = EnvVars::default();
-        let entrypoint = |key: &str, global: &EnvVars, agent: &EnvVars| {
-            agent_env(key, BTreeMap::new(), global, agent)
+        let entrypoint = |claude_code: bool, global: &EnvVars, agent: &EnvVars| {
+            agent_env(claude_code, BTreeMap::new(), global, agent)
                 .unwrap()
                 .0
                 .get("CLAUDE_CODE_ENTRYPOINT")
@@ -993,20 +1012,44 @@ mod tests {
             "mine".to_owned(),
         )]));
 
-        assert_eq!(
-            entrypoint("claude-acp", &none, &none).as_deref(),
-            Some("neore")
-        );
-        assert_eq!(entrypoint("claude", &none, &none).as_deref(), Some("neore"));
-        assert_eq!(entrypoint("codex-acp", &none, &none), None);
-        assert_eq!(
-            entrypoint("claude-acp", &own, &none).as_deref(),
-            Some("mine")
-        );
-        assert_eq!(
-            entrypoint("claude-acp", &none, &own).as_deref(),
-            Some("mine")
-        );
+        assert_eq!(entrypoint(true, &none, &none).as_deref(), Some("neore"));
+        assert_eq!(entrypoint(false, &none, &none), None);
+        assert_eq!(entrypoint(true, &own, &none).as_deref(), Some("mine"));
+        assert_eq!(entrypoint(true, &none, &own).as_deref(), Some("mine"));
+    }
+
+    #[test]
+    fn claude_code_is_known_by_its_key_or_by_its_adapter() {
+        let agent = |key: &str, command: &str, args: &[&str]| AcpAgent {
+            args: args.iter().map(|arg| (*arg).to_owned()).collect(),
+            command: command.to_owned(),
+            env: EnvVars::default(),
+            install: None,
+            key: key.to_owned(),
+            label: key.to_owned(),
+        };
+
+        for key in ["claude-acp", "claude", "claude-code"] {
+            assert!(runs_claude_code(&agent(key, "/bin/x", &[])), "{key}");
+        }
+
+        // Added by hand under another name: the adapter's program, or the package it is run from.
+        assert!(runs_claude_code(&agent(
+            "mine",
+            "/usr/local/bin/claude-agent-acp",
+            &[]
+        )));
+        assert!(runs_claude_code(&agent(
+            "mine",
+            "npx",
+            &["-y", "@zed-industries/claude-code-acp"]
+        )));
+        assert!(!runs_claude_code(&agent("codex-acp", "codex-acp", &[])));
+        assert!(!runs_claude_code(&agent(
+            "gemini",
+            "gemini",
+            &["--experimental-acp"]
+        )));
     }
 
     #[test]
