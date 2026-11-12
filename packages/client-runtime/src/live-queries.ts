@@ -223,6 +223,9 @@ export class LiveQueryManager {
         this.disconnectIdentity = this.client.onIdentityChange(() => {
             if (subject === null && this.client.getAuthToken() === null) {
                 firstChange = false;
+                // The open sockets were authenticated as the previous account: a new provider closes them, so the
+                // subscriptions below go out on a socket under the current cookie, not the old one.
+                this.client.setWsToken(this.wsTokenProvider());
                 this.forgetThreadReads();
             }
         });

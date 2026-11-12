@@ -623,9 +623,13 @@ describe(LiveQueryManager, () => {
         const threadKey = key("chat_functions:getThread", { threadId: "t1" });
 
         queryClient.setQueryData(threadKey, { title: "cookie user's" });
+        const reconnects = fake.client.setWsToken.mock.calls.length;
+
         fake.changeIdentity();
 
         expect(queryClient.getQueryData(threadKey)).toBeUndefined();
+        // The sockets reconnect under the current cookie before the reads subscribe again.
+        expect(fake.client.setWsToken).toHaveBeenCalledTimes(reconnects + 1);
 
         // With a token the subject decides: Lunora reports a refresh without a user id as an identity change too.
         fake.setToken(jwt("alice"));
