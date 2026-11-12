@@ -638,3 +638,14 @@ describe("named references in HTML past the conversion cap", () => {
         expect(text?.split("\n", 1)[0]).toBe("café… ¬aname; &zz;");
     });
 });
+
+describe("an HTML-only copy pasted inside a code fence", () => {
+    it("goes in as its visible text, with no Markdown added", () => {
+        const plan = planPaste(
+            { getData: (type: string) => (type === "text/html" ? "<p><b>const</b> a = 1;</p><p>b()</p>" : "") },
+            { inFence: true, plainOnly: false, selectedText: "" },
+        );
+
+        expect(plan).toStrictEqual({ kind: "text", text: "const a = 1;\nb()" });
+    });
+});

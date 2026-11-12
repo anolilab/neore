@@ -427,60 +427,6 @@ export const inOpenFence = (textBefore: string): boolean => {
     return open !== "";
 };
 
-interface PasteOptions {
-    /** The caret is in a code block the person typed: what is pasted is code, never Markdown. */
-    inFence?: boolean;
-    /** Ctrl/Cmd+Shift+V: the text exactly as copied. */
-    plainOnly: boolean;
-    /** The composer text the paste replaces. */
-    selectedText: string;
-}
-
-export const planPaste = (data: Pick<DataTransfer, "getData">, { inFence = false, plainOnly, selectedText }: PasteOptions): PastePlan => {
-    const plain = data.getData("text/plain");
-
-    if (plainOnly || inFence) {
-        // Without text/plain the editor would paste the HTML with its formatting; a plain paste then inserts nothing.
-        return plain === "" && data.getData("text/html").trim() === "" ? { kind: "default" } : { kind: "text", text: plain };
-    }
-
-    const url = plain.trim();
-
-    // A URL pasted over a URL replaces it.
-    if (selectedText.trim() !== "" && !selectedText.includes("\n") && URL_ONLY.test(url) && !URL_ONLY.test(selectedText.trim())) {
-        return { kind: "text", text: markdownLink(selectedText, url) };
-    }
-
-    const vscode = data.getData("vscode-editor-data");
-
-    // A copy that is long once fenced becomes an attachment, which holds the code as copied, without fence lines.
-    if (vscode !== "" && plain.trim().includes("\n")) {
-        const language = vscodeLanguage(vscode);
-        const fenced = language === undefined ? "" : fenceCode(plain, language);
-
-        if (fenced !== "" && !isLongPaste(fenced)) {
-            return { kind: "text", text: fenced };
-        }
-    }
-
-    const html = data.getData("text/html");
-
-    if (html.trim() === "") {
-        return { kind: "default" };
-    }
-
-    const { chips, rest } = splitQuoteChips(html);
-
-    // A quote chip copied from a composer: the editor rebuilds it from its HTML, while the text beside it is plain. Beside
-    // formatting the whole paste is converted, the chip to the quoted lines it stands for in the draft.
-    if (chips) {
-        return isPlainHtml(rest) ? { kind: "default" } : { html, kind: "html", plain };
-    }
-
-    // HTML past the cap is never converted (planText), so it need not be checked.
-    return plain !== "" && html.length <= MAX_CONVERTED_HTML && isPlainHtml(html) ? { kind: "text", text: plain } : { html, kind: "html", plain };
-};
-
 /**
  * The text of HTML too big to parse, in one pass: every `<…>` and script, style, noscript and template dropped, a line
  * break for a paragraph, div, line, list item, row or heading tag and a space for a cell, the common entities decoded.
@@ -542,6 +488,67 @@ const stripTags = (html: string): string => {
         .replaceAll(ENTITY, (entity: string) => decodeEntity(entity))
         .replaceAll(LINE_RUNS, "\n")
         .trim();
+};
+
+interface PasteOptions {
+    /** The caret is in a code block the person typed: what is pasted is code, never Markdown. */
+    inFence?: boolean;
+    /** Ctrl/Cmd+Shift+V: the text exactly as copied. */
+    plainOnly: boolean;
+    /** The composer text the paste replaces. */
+    selectedText: string;
+}
+
+export const planPaste = (data: Pick<DataTransfer, "getData">, { inFence = false, plainOnly, selectedText }: PasteOptions): PastePlan => {
+    const plain = data.getData("text/plain");
+
+    if (plainOnly || inFence) {
+        const html = data.getData("text/html");
+
+        if (plain === "" && html.trim() === "") {
+            return { kind: "default" };
+        }
+
+        // In a code fence an HTML-only copy goes in as its visible text, no Markdown added; the plain-paste shortcut takes
+        // text/plain exactly as copied (without it, nothing: the editor would paste the HTML with its formatting).
+        return { kind: "text", text: plain === "" && inFence && !plainOnly ? stripTags(html) : plain };
+    }
+
+    const url = plain.trim();
+
+    // A URL pasted over a URL replaces it.
+    if (selectedText.trim() !== "" && !selectedText.includes("\n") && URL_ONLY.test(url) && !URL_ONLY.test(selectedText.trim())) {
+        return { kind: "text", text: markdownLink(selectedText, url) };
+    }
+
+    const vscode = data.getData("vscode-editor-data");
+
+    // A copy that is long once fenced becomes an attachment, which holds the code as copied, without fence lines.
+    if (vscode !== "" && plain.trim().includes("\n")) {
+        const language = vscodeLanguage(vscode);
+        const fenced = language === undefined ? "" : fenceCode(plain, language);
+
+        if (fenced !== "" && !isLongPaste(fenced)) {
+            return { kind: "text", text: fenced };
+        }
+    }
+
+    const html = data.getData("text/html");
+
+    if (html.trim() === "") {
+        return { kind: "default" };
+    }
+
+    const { chips, rest } = splitQuoteChips(html);
+
+    // A quote chip copied from a composer: the editor rebuilds it from its HTML, while the text beside it is plain. Beside
+    // formatting the whole paste is converted, the chip to the quoted lines it stands for in the draft.
+    if (chips) {
+        return isPlainHtml(rest) ? { kind: "default" } : { html, kind: "html", plain };
+    }
+
+    // HTML past the cap is never converted (planText), so it need not be checked.
+    return plain !== "" && html.length <= MAX_CONVERTED_HTML && isPlainHtml(html) ? { kind: "text", text: plain } : { html, kind: "html", plain };
 };
 
 /** The text a paste inserts: the Markdown for HTML, or `plain` when the converter cannot load (a deploy since the page opened) or finds no text. */
