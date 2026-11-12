@@ -4,7 +4,6 @@ import { useLingui } from "@lingui/react/macro";
 import { Button } from "@neore/ui/components/button";
 import { Dialog, DialogPopup, DialogTitle } from "@neore/ui/components/dialog";
 import cn from "@neore/ui/utils/cn";
-import { createPostHogPlugin } from "@onboardjs/posthog-plugin";
 import type { OnboardingError } from "@onboardjs/react";
 import { OnboardingErrorBoundary, OnboardingProvider, useOnboarding } from "@onboardjs/react";
 import { ArrowLeft, ArrowRight, BrainCircuit, Check, FileText, Image, Loader2, MessageSquare, Repeat, Search, Sparkles } from "lucide-react";
@@ -15,8 +14,8 @@ import useIsAnonymous from "@/features/auth/hooks/use-is-anonymous";
 import { useUserPreferences } from "@/features/layout/hooks/use-ui-state";
 import { LANDING_MESSAGE_KEY } from "@/features/marketing/stores/landing-store";
 import { trackEvent } from "@/lib/analytics";
-import { getPostHog } from "@/lib/analytics/posthog-client";
 
+import useOnboardingPlugins from "../hooks/use-onboarding-plugins";
 import { shouldShowOnboarding } from "../should-show-onboarding";
 import type { NeoreOnboardingPayload } from "../steps";
 import { ONBOARDING_FLOW_ID, ONBOARDING_PERSISTENCE_KEY, onboardingSteps } from "../steps";
@@ -439,33 +438,7 @@ const OnboardingDialog = () => {
         }
     };
 
-    // A lazy `useState` initializer, not `useMemo`: React may discard a memo
-    // cache at any time, and re-creating the plugin would re-register its
-    // PostHog listeners.
-    const [plugins] = useState(() => {
-        const posthog = getPostHog();
-
-        if (typeof window === "undefined" || !posthog?.__loaded) {
-            return [];
-        }
-
-        return [
-            createPostHogPlugin({
-                churnTimeoutMs: 30_000,
-                debug: import.meta.env.DEV,
-                enableChurnDetection: true,
-                enablePerformanceTracking: true,
-                enableProgressMilestones: true,
-                excludePersonalData: true,
-                milestonePercentages: [25, 50, 75, 100],
-                performanceThresholds: {
-                    slowRenderMs: 500,
-                    slowStepMs: 10_000,
-                },
-                posthogInstance: posthog,
-            }),
-        ];
-    });
+    const plugins = useOnboardingPlugins();
 
     if (!shouldShowOnboarding({ onboardingCompleted, user })) {
         return null;

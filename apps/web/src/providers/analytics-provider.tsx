@@ -74,7 +74,7 @@ export const onPostHogLoaded = (ph: PostHogInterface): void => {
 };
 
 const AnalyticsProvider: FC<PropsWithChildren> = ({ children }) => {
-    // Provided once initialised; until then (and for good when its chunk never loads) the app runs without analytics.
+    // Provided once initialised; until then (and while its chunk cannot load) the app runs without analytics.
     const [client, setClient] = useState<PostHog | undefined>(undefined);
 
     useEffect(() => {
@@ -132,12 +132,20 @@ const AnalyticsProvider: FC<PropsWithChildren> = ({ children }) => {
             setClient(posthog);
         };
 
-        start().catch(() => {
-            // The chunk never loaded: the app runs without analytics this session.
-        });
+        // A chunk that never loaded (retries exhausted, e.g. offline) is tried again once the window is back online.
+        const attempt = (): void => {
+            start().catch(() => {
+                if (!isCancelled) {
+                    globalThis.addEventListener("online", attempt, { once: true });
+                }
+            });
+        };
+
+        attempt();
 
         return () => {
             isCancelled = true;
+            globalThis.removeEventListener("online", attempt);
         };
     }, []);
 

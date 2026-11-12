@@ -20,6 +20,14 @@ interface CapturedError {
     error: unknown;
 }
 
+const attachCause = (target: Error, cause: Error): void => {
+    try {
+        Object.defineProperty(target, "cause", { configurable: true, value: cause, writable: true });
+    } catch {
+        // Not extensible, or `cause` is non-configurable: leave the error as thrown.
+    }
+};
+
 /**
  * Hands React's component stack to PostHog as the error's innermost `cause`, named `React ErrorBoundary <name>`, as
  * `@posthog/react`'s boundary does, so the exception groups as it did before this boundary replaced that one.
@@ -56,7 +64,8 @@ const withComponentStack = (error: unknown, componentStack: string): unknown => 
                 Object.defineProperty(stackError, "cause", { configurable: true, value: current.cause, writable: true });
             }
 
-            Object.defineProperty(current, "cause", { configurable: true, value: stackError, writable: true });
+            // A frozen error, or one whose `cause` cannot be redefined, is reported without the component stack.
+            attachCause(current, stackError);
 
             return error;
         }
@@ -65,6 +74,15 @@ const withComponentStack = (error: unknown, componentStack: string): unknown => 
     }
 
     return error;
+};
+
+/** Reports a caught render error; a failure here must never keep the boundary from rendering its fallback. */
+const captureRenderError = (error: unknown, componentStack: string): void => {
+    try {
+        getPostHog()?.captureException(withComponentStack(error, componentStack));
+    } catch {
+        // Reporting is best-effort.
+    }
 };
 
 /**
@@ -80,7 +98,7 @@ class PostHogCapturingBoundary extends React.Component<
     public override componentDidCatch(error: unknown, errorInfo: ErrorInfo): void {
         const componentStack = errorInfo.componentStack ?? "";
 
-        getPostHog()?.captureException(withComponentStack(error, componentStack));
+        captureRenderError(error, componentStack);
         this.setState({ captured: { componentStack, error } });
     }
 
