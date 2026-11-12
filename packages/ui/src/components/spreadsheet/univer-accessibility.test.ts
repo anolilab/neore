@@ -9,7 +9,7 @@ describe(observeUniverAccessibility, () => {
         document.body.replaceChildren();
     });
 
-    it("resets a canvas's positive tabindex that Univer writes after inserting it", async () => {
+    it("resets a canvas's positive tabindex that Univer writes after inserting it, before the next frame", async () => {
         vi.useFakeTimers({ toFake: ["requestAnimationFrame"] });
 
         const root = document.createElement("div");
@@ -23,7 +23,6 @@ describe(observeUniverAccessibility, () => {
         // No node is added here: only the attribute changes.
         canvas.setAttribute("tabindex", "1");
         await Promise.resolve();
-        vi.advanceTimersToNextFrame();
 
         expect(canvas.getAttribute("tabindex")).toBe("0");
         stop();
