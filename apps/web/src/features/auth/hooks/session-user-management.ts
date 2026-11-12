@@ -62,7 +62,18 @@ export const useSession = <TAuthClient extends AnyAuthClient>(authClient: TAuthC
     const isHydrated = useIsHydrated();
 
     if (!isHydrated) {
-        return { ...result, data: undefined, isPending: true, isSuccess: false, session: undefined, status: "pending" as const, user: undefined };
+        // Its error too: a read that failed before this subtree hydrated must not make it draw an unknown session here.
+        return {
+            ...result,
+            data: undefined,
+            error: null,
+            isError: false,
+            isPending: true,
+            isSuccess: false,
+            session: undefined,
+            status: "pending" as const,
+            user: undefined,
+        };
     }
 
     return {

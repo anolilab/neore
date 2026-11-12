@@ -21,7 +21,11 @@ const SESSION = {
 const authClient = { getSession: vi.fn(async () => SESSION) } as unknown as AuthClient;
 
 const Username = () => {
-    const { user } = useSession(authClient);
+    const { error, user } = useSession(authClient);
+
+    if (error) {
+        return <span>unknown</span>;
+    }
 
     return <span>{user?.name ?? "nobody"}</span>;
 };
@@ -55,6 +59,32 @@ describe("useSession while hydrating", () => {
 
         expect(recoverable).not.toHaveBeenCalled();
         expect(host.textContent).toBe("Ada");
+
+        act(() => {
+            root.unmount();
+        });
+        host.remove();
+    });
+
+    it("draws the server's empty state in the hydration render when the session read has already failed", async () => {
+        const view = renderToString(app(new QueryClient()));
+        const browserClient = new QueryClient({ defaultOptions: { queries: { retry: false, retryOnMount: false, staleTime: Infinity } } });
+
+        browserClient
+            .getQueryCache()
+            .build(browserClient, { queryKey: ["session"] })
+            .setState({ error: new Error("offline"), status: "error" });
+
+        const host = document.createElement("div");
+        const recoverable = vi.fn();
+
+        host.innerHTML = view;
+        document.body.appendChild(host);
+
+        const root = await act(async () => hydrateRoot(host, app(browserClient), { onRecoverableError: recoverable }));
+
+        expect(recoverable).not.toHaveBeenCalled();
+        expect(host.textContent).toBe("unknown");
 
         act(() => {
             root.unmount();
