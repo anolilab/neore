@@ -6,6 +6,7 @@ import { useEffect, useRef } from "react";
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 import { clearLastAccountHint } from "@/features/auth/lib/last-account-hint";
 import { clearPromptQueues } from "@/features/chat/core/stores/prompt-queue-store";
+import { dropStoredDrafts } from "@/features/chat/split/composer-drafts";
 import { clearThreadListCache } from "@/features/chat/thread-list/lib/thread-list-cache";
 import { useReleasePushOnSignOut } from "@/features/notifications/hooks/use-release-push-on-sign-out";
 import { resetAnalyticsIdentity, trackEvent } from "@/lib/analytics";
@@ -31,6 +32,9 @@ const SignOut = () => {
         // The sign-in page that follows must not paint the chat layout optimistically for this account.
         clearLastAccountHint();
         clearPromptQueues();
+        // The unsent drafts are this account's too; the page leaves without the sign-out handler that would drop them. Read from
+        // the session, as no composer may have shown on this page load; when it cannot tell whose, every account's go.
+        dropStoredDrafts(authClient.$store.atoms.session?.get().data?.user.id);
 
         // A full load of sign-in, not a reload: reloading `/auth/sign-out` would
         // mount this view again and sign out in a loop. A full load (rather than

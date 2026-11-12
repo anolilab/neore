@@ -103,7 +103,8 @@ export const observeUniverAccessibility = (root: HTMLElement): (() => void) => {
         target.click();
     };
 
-    observer.observe(root, { childList: true, subtree: true });
+    // `tabindex` too: Univer can set a canvas's positive tabindex after inserting it, which adds no node.
+    observer.observe(root, { attributeFilter: ["tabindex"], attributes: true, childList: true, subtree: true });
     root.addEventListener("keydown", onKeyDown);
 
     return () => {

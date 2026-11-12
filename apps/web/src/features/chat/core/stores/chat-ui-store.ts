@@ -637,15 +637,18 @@ export const useCanvasState = () => {
     };
 };
 
+/**
+ * One message row's hover and copied state. Each row of a long thread calls this, and every store subscription runs on
+ * every store write (a keystroke in the composer too), so it subscribes to the two booleans only; the setters never
+ * change and are read at call time.
+ */
 export const useMessageInteractionState = (messageId: string) => {
     // Use separate selectors to avoid creating new object references
     const isHovered = useChatUIStore((state) => state.hoveredMessageId === messageId);
     const isCopied = useChatUIStore((state) => state.copiedMessageId === messageId);
-    const setHoveredMessageId = useChatUIStore((state) => state.setHoveredMessageId);
-    const setCopiedMessageId = useChatUIStore((state) => state.setCopiedMessageId);
 
-    const setHovered = (hovered: boolean) => setHoveredMessageId(hovered ? messageId : null);
-    const setCopied = () => setCopiedMessageId(messageId);
+    const setHovered = (hovered: boolean) => useChatUIStore.getState().setHoveredMessageId(hovered ? messageId : null);
+    const setCopied = () => useChatUIStore.getState().setCopiedMessageId(messageId);
 
     return { isCopied, isHovered, setCopied, setHovered };
 };

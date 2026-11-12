@@ -28,19 +28,15 @@ interface LandingStickyBarProps {
 
 const LandingStickyBar: FC<LandingStickyBarProps> = ({ className, visible }) => {
     const prefersReducedMotion = useReducedMotion();
-    const composerText = useChatUIStore((state) => state.composerText);
 
     const [isExpanded, setIsExpanded] = useState(false);
     const containerRef = useRef<HTMLDivElement>(null);
 
-    // Handle click outside to collapse
+    // Handle click outside to collapse, only while no text is entered. The draft is read at click time: subscribing to it
+    // would re-render the whole composer below on every keystroke.
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
-            if (
-                containerRef.current &&
-                !containerRef.current.contains(event.target as Node) && // Only collapse if no text entered
-                !composerText.trim()
-            ) {
+            if (containerRef.current && !containerRef.current.contains(event.target as Node) && !useChatUIStore.getState().composerText.trim()) {
                 setIsExpanded(false);
             }
         };
@@ -52,7 +48,7 @@ const LandingStickyBar: FC<LandingStickyBarProps> = ({ className, visible }) => 
         }
 
         return undefined;
-    }, [isExpanded, composerText]);
+    }, [isExpanded]);
 
     const handleFocus = () => {
         setIsExpanded(true);

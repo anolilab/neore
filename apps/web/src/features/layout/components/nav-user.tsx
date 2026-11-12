@@ -28,6 +28,7 @@ import { clearLastAccountHint } from "@/features/auth/lib/last-account-hint";
 import { getLocalizedError } from "@/features/auth/lib/utilities";
 import useCheckout from "@/features/billing/hooks/use-checkout";
 import { clearPromptQueues } from "@/features/chat/core/stores/prompt-queue-store";
+import { dropStoredDrafts } from "@/features/chat/split/composer-drafts";
 import { clearThreadListCache, releaseThreadListWrites } from "@/features/chat/thread-list/lib/thread-list-cache";
 import { useUserPreferences } from "@/features/layout/hooks/use-ui-state";
 import { useReleasePushOnSignOut } from "@/features/notifications/hooks/use-release-push-on-sign-out";
@@ -278,6 +279,9 @@ const NavUser: FC<NavUserProperties> = ({ trigger }) => {
                 onClick={async () => {
                     // Before the request, and it holds writes until the page reloads or the next sign-in: the sidebar stays mounted meanwhile.
                     clearThreadListCache();
+                    // Read before the session ends; when it cannot tell whose drafts they are, every account's go.
+                    const departing = user?.id;
+
                     // Push first, while the session still authenticates the server call.
                     await releasePush();
                     await authClient.signOut({
@@ -296,9 +300,11 @@ const NavUser: FC<NavUserProperties> = ({ trigger }) => {
                                 });
                             },
                             onSuccess: async () => {
-                                // Only once the session has ended: a failed sign-out keeps the queued prompts and the hint.
+                                // Only once the session ended (a failed sign-out keeps them and their saving), and before the reload,
+                                // which comes before the handler that drops them would run.
                                 clearLastAccountHint();
                                 clearPromptQueues();
+                                dropStoredDrafts(departing);
                                 resetAnalyticsIdentity();
                                 // Only after the session ends: a failed sign-out keeps the badge.
                                 await setNativeBadge(0);
