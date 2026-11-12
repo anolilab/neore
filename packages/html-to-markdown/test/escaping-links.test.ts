@@ -210,3 +210,21 @@ describe("review: custom hard breaks in link text", () => {
         expect(convert(`<a href="/x">one<br>two</a>`, { br: "  " })).toBe("[one  \ntwo](/x)");
     });
 });
+
+describe("review: inline tags after a hard break in link text", () => {
+    it("keeps a hard break before a kept inline tag, which cannot interrupt a paragraph", () => {
+        const service = new TurndownService();
+
+        service.keep(["span"]);
+
+        expect(service.turndown(`<a href="/x">one<br><span class="s">two</span></a>`)).toBe(`[one  \n<span class="s">two</span>](/x)`);
+    });
+
+    it("keeps a hard break before an emphasis tag", () => {
+        expect(convert(`<a href="/x">one<br><em>two</em></a>`)).toBe("[one  \n_two_](/x)");
+    });
+
+    it("guard, passes before and after: a hard break before a block tag is still replaced, as a block starts a line", () => {
+        expect(convert(`<a href="/x">one<br><div>two</div></a>`)).not.toContain("one  \n");
+    });
+});

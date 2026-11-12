@@ -50,11 +50,18 @@ const BACKSLASH_BEFORE_PUNCTUATION = /\\(?=[!"#$%&'()*+,./:;<=>?@[\\\]^_`{|}~]|$
 // two or more spaces, or in an unescaped backslash, as a hard break. The marker may hold other
 // text before that ending, as in ` \`. An even run of backslashes is escaped pairs, not a break.
 const HARD_BREAK = / {2}$|(?:^|[^\\])(?:\\\\)*\\$/;
+// The tag names of CommonMark's HTML block type 6. A tag with one of these names may interrupt a
+// paragraph. Any other tag (an inline one such as `<em>`) cannot, so it does not start a block.
+const HTML_BLOCK_TAGS =
+    "address|article|aside|base|basefont|blockquote|body|caption|center|col|colgroup|dd|details|dialog|dir|div|dl|dt|fieldset|figcaption|figure|footer|form|frame|frameset|h[1-6]|head|header|hr|html|iframe|legend|li|link|main|menu|menuitem|nav|noframes|ol|optgroup|option|p|param|search|section|summary|table|tbody|td|tfoot|th|thead|title|tr|track|ul";
+// The HTML blocks that can interrupt a paragraph (CommonMark types 1 to 6): comments, declarations,
+// processing instructions, the block tags above, and the raw-text tags `script`, `pre`, `style` and
+// `textarea`. Each needs a word end after its name, so `<divide>` is not a block.
+const HTML_BLOCK_START = new RegExp(`<(?:[!?]|/?(?:${HTML_BLOCK_TAGS})(?=[\\t\\n\\r />]|$)|(?:script|pre|style|textarea)(?=[\\t\\n\\r >]|$))`, "iy");
 // The line starts that CommonMark lets interrupt a paragraph: a quote, an ATX heading, a
 // fence, a bullet followed by a space, a setext underline, a thematic break, an ordered
-// item that starts at 1, and an HTML tag. Only `1` can start an ordered item that
-// interrupts a paragraph. The check is conservative: a tag opener is matched without
-// the tag name. Sticky, so each one tests at a single index and copies nothing.
+// item that starts at 1, and an HTML block. Only `1` can start an ordered item that
+// interrupts a paragraph. Sticky, so each one tests at a single index and copies nothing.
 const BLOCK_OPENERS: ReadonlyArray<RegExp> = [
     />/y,
     /#{1,6}(?=[ \t\n]|$)/y,
@@ -64,7 +71,7 @@ const BLOCK_OPENERS: ReadonlyArray<RegExp> = [
     /=+(?=[ \t]*(?:\n|$))/y,
     /([*_-])(?:[ \t]*\1){2}/y,
     /1[.)](?=[ \t\n]|$)/y,
-    /<[a-z/!?]/iy,
+    HTML_BLOCK_START,
 ];
 
 function hasHref(node: Node): boolean {
