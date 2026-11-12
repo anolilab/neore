@@ -112,11 +112,18 @@ const readStoredEvents = (): PendingEvent[] => {
     }
 };
 
+// The measurement consent `PostHogConsentSync` read from c15t; `undefined` until its first effect has run.
+const consentState: { measurement?: boolean } = {};
+
+/**
+ * Writes the queue to sessionStorage, only once measurement consent is granted: before that what is tracked waits in
+ * memory alone (`setMeasurementConsent` stores it on a grant, drops it on a refusal). Emptying it always goes through.
+ */
 const storeEvents = (events: PendingEvent[]): void => {
     try {
         if (events.length === 0) {
             globalThis.sessionStorage.removeItem(PENDING_EVENTS_KEY);
-        } else {
+        } else if (consentState.measurement === true) {
             globalThis.sessionStorage.setItem(PENDING_EVENTS_KEY, JSON.stringify(events));
         }
     } catch {
@@ -163,9 +170,6 @@ const dropForSignOut = (): void => {
     storeEvents(kept);
 };
 
-// The measurement consent `PostHogConsentSync` read from c15t; `undefined` until its first effect has run.
-const consentState: { measurement?: boolean } = {};
-
 /** The measurement consent last applied, or `undefined` before the consent state has been read. */
 export const getMeasurementConsent = (): boolean | undefined => consentState.measurement;
 
@@ -176,6 +180,13 @@ export const setMeasurementConsent = (granted: boolean): void => {
     if (!granted) {
         pendingExceptions.length = 0;
         dropPendingEvents();
+
+        return;
+    }
+
+    // Granted: what waited in memory for it is kept across a navigation from now on.
+    if (queueState.events !== undefined && !queueState.closed) {
+        storeEvents(queueState.events);
     }
 };
 

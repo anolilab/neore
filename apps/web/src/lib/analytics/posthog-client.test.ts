@@ -179,12 +179,16 @@ describe("events tracked before PostHog initialises", () => {
     it("keeps them across a full page load in the tab, up to MAX_PENDING_EVENTS", async () => {
         const before = await loadClientModule();
 
+        before.setMeasurementConsent(true);
+
         for (let index = 0; index < before.MAX_PENDING_EVENTS + 1; index += 1) {
             before.queueEvent(`event ${index}`, {});
         }
 
         // The desktop sign-in tracks, then loads `/chat` before PostHog could load.
         const after = await loadClientModule();
+
+        after.setMeasurementConsent(true);
 
         after.flushPendingCaptures(await after.loadPostHog());
 
@@ -256,6 +260,8 @@ describe("events tracked before PostHog initialises", () => {
 
     it("stores no prompt link's text or fragment, from the address, the referrer or a property", async () => {
         const client = await loadClientModule();
+
+        client.setMeasurementConsent(true);
         const referrer = vi.spyOn(document, "referrer", "get").mockReturnValue("https://neore.test/chat?prompt=secret%20referrer#token");
 
         globalThis.history.replaceState(null, "", "/chat?prompt=secret%20address&model=a#token");
@@ -444,11 +450,25 @@ describe("startPostHog", () => {
         expect(posthog.group).toHaveBeenCalledExactlyOnceWith("organization", "org-1", { name: "Acme" });
     });
 
+    it("keeps what is tracked before measurement consent is known in memory only, and stores it once consent is granted", async () => {
+        const client = await loadClientModule();
+
+        client.queueEvent("onboarding_started", {});
+
+        expect(sessionStorage.getItem(client.PENDING_EVENTS_KEY)).toBeNull();
+
+        client.setMeasurementConsent(true);
+
+        expect(JSON.parse(sessionStorage.getItem(client.PENDING_EVENTS_KEY) ?? "[]")).toMatchObject([{ event: "onboarding_started" }]);
+    });
+
     it("drops a queued event past the age limit from storage, and never sends it", async () => {
         vi.useFakeTimers({ now: new Date("2026-11-12T10:00:00Z"), toFake: ["Date"] });
 
         try {
             const client = await loadClientModule();
+
+            client.setMeasurementConsent(true);
 
             client.queueEvent("too_old", {});
             vi.setSystemTime(Date.now() + client.PENDING_EVENT_MAX_AGE_MS + 1);
@@ -471,6 +491,8 @@ describe("startPostHog", () => {
     ])("keeps the sign-out event through the drop of %s, and sends it signed out on the next page", async (_name, drop) => {
         const client = await loadClientModule();
 
+        client.setMeasurementConsent(true);
+
         client.setAnalyticsIdentity({ user: { id: "user-1" } });
         client.queueEvent("thread_opened", {});
         client.queueEvent("signed_out", {});
@@ -478,6 +500,8 @@ describe("startPostHog", () => {
 
         // The next page of this tab, which starts PostHog signed out.
         const next = await loadClientModule();
+
+        next.setMeasurementConsent(true);
 
         next.startPostHog(await next.loadPostHog(), () => {});
         next.setAnalyticsIdentity({});
@@ -560,6 +584,8 @@ describe("startPostHog", () => {
     it("sends an event queued under one account only to that account, and a signed-out one to whoever signs in", async () => {
         const before = await loadClientModule();
 
+        before.setMeasurementConsent(true);
+
         before.setAnalyticsIdentity({ user: { id: "user-1" } });
         before.queueEvent("tracked as user-1", {});
         before.setAnalyticsIdentity({});
@@ -567,6 +593,8 @@ describe("startPostHog", () => {
 
         // A failed sign-out navigated with the queue kept; the next page is another account's.
         const after = await loadClientModule();
+
+        after.setMeasurementConsent(true);
 
         after.setAnalyticsIdentity({ user: { id: "user-2" } });
         after.startPostHog(await after.loadPostHog(), () => {});

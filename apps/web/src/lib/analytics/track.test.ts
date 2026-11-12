@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { getPostHog, loadPostHog, PENDING_EVENTS_KEY, setAnalyticsIdentity, startPostHog } from "./posthog-client";
+import { getPostHog, loadPostHog, PENDING_EVENTS_KEY, setAnalyticsIdentity, setMeasurementConsent, startPostHog } from "./posthog-client";
 import { reportCaughtError, resetAnalyticsIdentity, trackEvent } from "./track";
 
 const posthog = vi.hoisted(() => {
@@ -53,6 +53,7 @@ describe(trackEvent, () => {
     });
 
     it("queues an event tracked before PostHog has loaded and answers that it was not sent yet", () => {
+        setMeasurementConsent(true);
         expect(trackEvent("onboarding_started", {})).toBe(false);
         expect(JSON.parse(sessionStorage.getItem(PENDING_EVENTS_KEY) ?? "[]")).toMatchObject([{ event: "onboarding_started", properties: {} }]);
     });
