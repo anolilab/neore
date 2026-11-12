@@ -142,6 +142,26 @@ const trimSpacesStart = (text: string): string => {
     return text.slice(start);
 };
 
+const HTML_SPACE_CHARS = new Set([" ", "\t", "\n", "\f", "\r"]);
+
+const isHtmlSpace = (char: string | undefined): boolean => char !== undefined && HTML_SPACE_CHARS.has(char);
+
+/** `text` without the whitespace HTML collapses at its ends: a non-breaking space the page shows stays. */
+const trimHtmlSpace = (text: string): string => {
+    let start = 0;
+    let end = text.length;
+
+    while (start < end && isHtmlSpace(text[start])) {
+        start += 1;
+    }
+
+    while (end > start && isHtmlSpace(text[end - 1])) {
+        end -= 1;
+    }
+
+    return text.slice(start, end);
+};
+
 /** The lines of `text` trimmed and joined with spaces: a table cell, a heading or inline code is one line. */
 const oneLine = (text: string): string =>
     text
@@ -934,7 +954,9 @@ const list = (listElement: Element, context: Context): string => {
         // Markdown reads only the first item's number and counts up from it: a reversed list keeps its numbers as text.
         const marker = reversed && level === 1 ? `- ${listLabel(number, listType)}. ` : listMarker(ordered, listType, number);
 
-        items.push(listItem(body.replaceAll(BLANK_LINES, "\n\n").trim(), level, marker, context));
+        const itemBody = trimHtmlSpace(body.replaceAll(BLANK_LINES, "\n\n"));
+
+        items.push(listItem(itemBody, level, marker, context));
     }
 
     // In an item, one break: a blank line between the item's text and its sub-list would make the whole outer list loose.
@@ -978,7 +1000,7 @@ const wordListItem = (element: Element, inner: string, context: Context): string
         marker = `- ${bullet} `;
     }
 
-    return `\n${listItem(inner.trim(), Math.max(Number(level[1]) - context.wordTopLevel + 1, 1), marker, context)}\n`;
+    return `\n${listItem(trimHtmlSpace(inner), Math.max(Number(level[1]) - context.wordTopLevel + 1, 1), marker, context)}\n`;
 };
 
 /** The Markdown for the child nodes, with the bold, italics or strikethrough the element's own style gives them. */
@@ -1080,7 +1102,7 @@ const element = (node: Element, context: Context): string => {
                 return ` ${children(node, context)} `;
             }
 
-            const inner = children(node, context).replaceAll(BLANK_LINES, "\n\n").trim();
+            const inner = trimHtmlSpace(children(node, context).replaceAll(BLANK_LINES, "\n\n"));
 
             return `\n\n${prefixLines(inner, "> ", "> ", ">", context)}\n\n`;
         }
@@ -1213,10 +1235,10 @@ const element = (node: Element, context: Context): string => {
     }
 
     if (BLOCKS.has(tag)) {
-        return `\n\n${inner.trim()}\n\n`;
+        return `\n\n${trimHtmlSpace(inner)}\n\n`;
     }
 
-    return LINE_BLOCKS.has(tag) || tag === "LI" || tag === "TR" ? `\n${inner.trim()}\n` : inner;
+    return LINE_BLOCKS.has(tag) || tag === "LI" || tag === "TR" ? `\n${trimHtmlSpace(inner)}\n` : inner;
 };
 
 /** The Markdown for the child nodes, without the spaces that collapsed HTML whitespace leaves around line breaks. */
@@ -1322,13 +1344,16 @@ export const htmlToMarkdown = (html: string): string => {
         }
     }
 
-    return (
+    const body = trimHtmlSpace(
         children(parsed.body, context)
             .split("\n")
             .map((line: string) => trimSpacesEnd(line))
             .join("\n")
-            .replaceAll(BLANK_LINES, "\n\n")
-            .trim()
+            .replaceAll(BLANK_LINES, "\n\n"),
+    );
+
+    return (
+        body
             .replaceAll(PLACEHOLDER, (_: string, index: string) => context.code[Number(index)] ?? "")
             // Marks in text bold never reached (a link label in a table cell is set aside before it).
             .replaceAll(NORMAL_START, "")

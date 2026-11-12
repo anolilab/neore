@@ -983,3 +983,9 @@ describe("an HTML-only copy with an emoji picture, pasted plain", () => {
         await expect(paste({ "text/html": '<p>Done <img alt="🎉" src="x.png"></p>' }, { plainOnly: true, selectedText: "" })).resolves.toBe("Done 🎉");
     });
 });
+
+describe("non-breaking spaces at the edge of a block", () => {
+    it("stay, outside the formatting marks", () => {
+        expect(htmlToMarkdown("<p><strong>&nbsp;Warning&nbsp;</strong></p>")).toBe("\u{A0}**Warning**\u{A0}");
+    });
+});
