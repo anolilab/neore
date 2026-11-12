@@ -59,6 +59,8 @@ const HIDDEN_STYLE = /display\s*:\s*none|visibility\s*:\s*hidden|mso-list\s*:\s*
 const HIDDEN_CLASS = /(?:^|\s)(?:sr-only|visually-?hidden)(?:\s|$)/i;
 const EMOJI_NAME = /^:[\w+-]{1,40}:$/;
 const PICTOGRAPHIC = /\p{Extended_Pictographic}/u;
+// Only emoji: pictographs and the joiners, modifiers, selectors and flag letters that build them.
+const EMOJI_ONLY = /^[\p{Extended_Pictographic}\p{Emoji_Component}\s]+$/u;
 const MATH_CLASS = /math/i;
 const WORD_LIST_LEVEL = /mso-list\s*:[^;]{0,200}level(\d)/i;
 const WORD_ORDERED_MARKER = /^\s*\w{1,4}[.)]/;
@@ -500,7 +502,7 @@ const element = (node: Element, context: Context): string => {
                 return `$${alt}$`;
             }
 
-            return EMOJI_NAME.test(alt) || (alt.length <= 16 && PICTOGRAPHIC.test(alt)) ? alt : "";
+            return EMOJI_NAME.test(alt) || (alt.length <= 16 && PICTOGRAPHIC.test(alt) && EMOJI_ONLY.test(alt)) ? alt : "";
         }
         case "INPUT": {
             if (node.getAttribute("type") !== "checkbox") {

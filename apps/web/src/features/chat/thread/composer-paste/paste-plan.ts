@@ -26,8 +26,23 @@ const FIRST_ELEMENT = /<(?![!/]|(?:html|head|body|meta|title|style)\b)([a-z][\w-
 const MONOSPACE_FONT = /font-family\s*:[^;">]{0,200}(?:mono|consolas|menlo|courier)/i;
 const MAX_CONVERTED_HTML = 1_000_000;
 const BACKTICK_RUNS = /`+/g;
-const ENTITY = /&(?:amp|gt|lt|nbsp|quot|#39);/g;
-const ENTITIES: Record<string, string> = { "&#39;": "'", "&amp;": "&", "&gt;": ">", "&lt;": "<", "&nbsp;": " ", "&quot;": '"' };
+// Bounded digit runs: the longest valid reference is `&#1114111;` or `&#x10FFFF;`.
+const ENTITY = /&(?:amp|gt|lt|nbsp|quot|#\d{1,7}|#[Xx][\dA-Fa-f]{1,6});/g;
+const ENTITIES: Record<string, string> = { "&amp;": "&", "&gt;": ">", "&lt;": "<", "&nbsp;": " ", "&quot;": '"' };
+
+/** A named entity from ENTITIES or a decimal or hex character reference; one that names no character stays as written. */
+const decodeEntity = (entity: string): string => {
+    const named = ENTITIES[entity];
+
+    if (named !== undefined) {
+        return named;
+    }
+
+    const hex = entity[2] === "x" || entity[2] === "X";
+    const code = Number.parseInt(entity.slice(hex ? 3 : 2, -1), hex ? 16 : 10);
+
+    return code > 0 && code <= 0x10_ff_ff && (code < 0xd8_00 || code > 0xdf_ff) ? String.fromCodePoint(code) : entity;
+};
 // Elements whose content is not text the page shows.
 const RAW_TEXT = /<(script|style|noscript|template)[\s/>]/iy;
 // Tags whose text stands apart from its neighbours': on a line of its own, or a cell away.
@@ -128,32 +143,65 @@ export const isLongPaste = (text: string): boolean => text.length > 500 || text.
 
 // Markdown lines that only parse at a line's start: a table row, a fence, a heading, a list item, a quote.
 const BLOCK_LINE = /^(?:\||`{3}|~{3}|#{1,6}\s|[-*+]\s|\d+[.)]\s|>)/;
-// A table or fence also takes a blank line, or the text beside it is read as part of it.
-const BLANK_LINE_BLOCK = /^(?:\||`{3}|~{3})/;
+// A table or fence also takes a blank line before it, or the text before is read as part of it. So does a numbered list
+// that does not start at 1: it cannot interrupt a paragraph.
+const BLANK_LINE_BEFORE = /^(?:\||`{3}|~{3})/;
+const ORDERED_START = /^(\d{1,9})[.)]\s/;
+// Only a heading ends at its line: text after a table row, a list item or a quote continues it.
+const HEADING = /^#{1,6}\s/;
 
-/** The line breaks that keep `line` apart from text beside it on the same line. */
-const blockBreak = (line: string): string => {
+/** The line breaks that keep `line` apart from the text on the same line before it or after it. */
+const blockBreak = (line: string, side: "after" | "before"): string => {
     if (!BLOCK_LINE.test(line)) {
         return "";
     }
 
-    return BLANK_LINE_BLOCK.test(line) ? "\n\n" : "\n";
+    if (side === "before") {
+        const start = ORDERED_START.exec(line)?.[1];
+
+        return BLANK_LINE_BEFORE.test(line) || (start !== undefined && Number(start) !== 1) ? "\n\n" : "\n";
+    }
+
+    return HEADING.test(line) ? "\n" : "\n\n";
 };
 
 /** `markdown` with line breaks where its first or last line is a block that would join the text beside the caret. */
 export const onOwnLines = (markdown: string, textBefore: boolean, textAfter: boolean): string => {
     const lines = markdown.split("\n");
 
-    return (textBefore ? blockBreak(lines[0] ?? "") : "") + markdown + (textAfter ? blockBreak(lines.at(-1) ?? "") : "");
+    return (textBefore ? blockBreak(lines[0] ?? "", "before") : "") + markdown + (textAfter ? blockBreak(lines.at(-1) ?? "", "after") : "");
 };
 
 const markdownLink = (label: string, url: string): string =>
     `[${label.replaceAll(/[[\]\\]/g, String.raw`\$&`)}](${url.replaceAll("(", "%28").replaceAll(")", "%29")})`;
 
-const FENCE_LINE = /^ {0,3}(?:`{3}|~{3})/;
+const FENCE_LINE = /^ {0,3}(`{3,}|~{3,})/;
 
-/** Whether `textBefore` (the draft before the caret) leaves a code fence open: an odd number of fence lines. */
-export const inOpenFence = (textBefore: string): boolean => textBefore.split("\n").filter((line: string) => FENCE_LINE.test(line)).length % 2 === 1;
+/**
+ * Whether `textBefore` (the draft before the caret) leaves a code fence open. As in CommonMark, a fence closes only on a
+ * run of its own character at least as long, with nothing after it; a backtick fence's info string has no backticks.
+ */
+export const inOpenFence = (textBefore: string): boolean => {
+    let open = "";
+
+    for (const line of textBefore.split("\n")) {
+        const [fence = "", run = ""] = FENCE_LINE.exec(line) ?? [];
+
+        if (run === "") {
+            continue;
+        }
+
+        const rest = line.slice(fence.length);
+
+        if (open === "") {
+            open = run[0] === "`" && rest.includes("`") ? "" : run;
+        } else if (run[0] === open[0] && run.length >= open.length && rest.trim() === "") {
+            open = "";
+        }
+    }
+
+    return open !== "";
+};
 
 interface PasteOptions {
     /** The caret is in a code block the person typed: what is pasted is code, never Markdown. */
@@ -282,7 +330,7 @@ const stripTags = (html: string): string => {
 
     return parts
         .join("")
-        .replaceAll(ENTITY, (entity: string) => ENTITIES[entity] ?? entity)
+        .replaceAll(ENTITY, (entity: string) => decodeEntity(entity))
         .replaceAll(LINE_RUNS, "\n")
         .trim();
 };

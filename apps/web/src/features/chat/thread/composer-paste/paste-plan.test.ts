@@ -114,6 +114,10 @@ describe("composer paste", () => {
 
     it("takes the text of HTML too big to convert when it is the only text, and leaves a composer quote chip to the editor", async () => {
         await expect(paste({ "text/html": `<p>Hello</p><!--${"x".repeat(1_000_000)}-->` })).resolves.toBe("Hello");
+        // Numeric references are decoded; one that names no character stays as written.
+        await expect(paste({ "text/html": `<p>Caf&#233; &#X1F389; &#39;q&#39; &#0; &#xD800;</p><!--${"x".repeat(1_000_000)}-->` })).resolves.toBe(
+            "Café 🎉 'q' &#0; &#xD800;",
+        );
         // What the page does not show stays out: script, style, noscript and template content, in any case, closed or not.
         await expect(
             paste({
@@ -260,8 +264,8 @@ describe("composer paste", () => {
         ],
         [
             "emoji and formulas drawn as images keep their text",
-            '<p>Ship <img alt="🎉"> <img alt=":tada:"> <img class="mwe-math-fallback-image-inline" alt="E=mc^2"> <img alt="A chart"></p>',
-            "Ship 🎉 :tada: $E=mc^2$",
+            '<p>Ship <img alt="🎉"> <img alt="👍🏽"> <img alt="👨‍👩‍👧"> <img alt=":tada:"> <img class="mwe-math-fallback-image-inline" alt="E=mc^2"> <img alt="A chart"> <img alt="Report 🎉"></p>',
+            "Ship 🎉 👍🏽 👨‍👩‍👧 :tada: $E=mc^2$",
         ],
     ])("%s", (_label: string, html: string, markdown: string) => {
         expect(htmlToMarkdown(html)).toBe(markdown);
@@ -324,6 +328,15 @@ describe("pasted blocks beside text", () => {
         );
     });
 
+    it.each([
+        ["a list pasted mid-line", "<ul><li>a</li><li>b</li></ul>", "foo \n- a\n- b\n\nbar"],
+        ["a quote pasted mid-line", "<blockquote><p>q</p></blockquote>", "foo \n> q\n\nbar"],
+        ["a numbered list starting at 3", '<ol start="3"><li>c</li></ol>', "foo \n\n3. c\n\nbar"],
+        ["a heading", "<h2>Title</h2>", "foo \n## Title\nbar"],
+    ])("keeps the text after %s out of it", async (_label: string, html: string, draft: string) => {
+        await expect(pasteInto("foo bar", 4, { "text/html": html, "text/plain": "x" })).resolves.toBe(draft);
+    });
+
     it("keeps an inline paste inline", async () => {
         await expect(pasteInto("see  here", 4, { "text/html": '<a href="https://example.com/docs">docs</a>', "text/plain": "docs" })).resolves.toBe(
             "see [docs](https://example.com/docs) here",
@@ -336,6 +349,13 @@ describe("a paste inside a code block the person typed", () => {
         expect(inOpenFence("Look:\n```ts\nconst a = 1;\n")).toBe(true);
         expect(inOpenFence("```\nx\n```\nafter ")).toBe(false);
         expect(inOpenFence("no fence")).toBe(false);
+    });
+
+    it("closes a fence only on a bare run of its own character at least as long", () => {
+        expect(inOpenFence("````md\n```\nnested\n")).toBe(true);
+        expect(inOpenFence("```\n~~~\n```js\nx\n")).toBe(true);
+        expect(inOpenFence("````md\n```\n````  \nafter ")).toBe(false);
+        expect(inOpenFence("``` a`b\ntext")).toBe(false);
     });
 
     it("inserts code as copied, without a fence of its own or Markdown", async () => {
