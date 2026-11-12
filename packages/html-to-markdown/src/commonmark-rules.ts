@@ -46,9 +46,10 @@ interface RunStyle {
 // the destination it would escape the closing parenthesis. Such a backslash is
 // doubled. Any other backslash is literal, so it is left alone.
 const BACKSLASH_BEFORE_PUNCTUATION = /\\(?=[!"#$%&'()*+,./:;<=>?@[\\\]^_`{|}~]|$)/g;
-// The hard break is `options.br` followed by a line break. CommonMark reads two or more
-// spaces, or a backslash, before a line break as a hard break.
-const HARD_BREAK = /^(?: {2,}|\\)$/;
+// The hard break is `options.br` followed by a line break. CommonMark reads a line that ends in
+// two or more spaces, or in an unescaped backslash, as a hard break. The marker may hold other
+// text before that ending, as in ` \`. An even run of backslashes is escaped pairs, not a break.
+const HARD_BREAK = / {2}$|(?:^|[^\\])(?:\\\\)*\\$/;
 // The line starts that CommonMark lets interrupt a paragraph: a quote, an ATX heading, a
 // fence, a bullet followed by a space, a setext underline, a thematic break, an ordered
 // item that starts at 1, and an HTML tag. Only `1` can start an ordered item that
@@ -916,9 +917,7 @@ function isBlockStartAt(text: string, index: number): boolean {
  */
 function escapeLinkDestination(destination: string, isSafeLinks = false): string {
     const oneLine = destination.replaceAll(LINE_BREAKS, "");
-    const escaped = (
-        isSafeLinks ? oneLine.replaceAll("\\", "\\\\").replaceAll("&", "&amp;") : oneLine.replaceAll(BACKSLASH_BEFORE_PUNCTUATION, String.raw`\\`)
-    )
+    const escaped = (isSafeLinks ? oneLine.replaceAll("\\", "\\\\").replaceAll("&", "&amp;") : oneLine.replaceAll(BACKSLASH_BEFORE_PUNCTUATION, String.raw`\\`))
         .replaceAll("<", String.raw`\<`)
         .replaceAll(">", String.raw`\>`)
         .replaceAll("(", String.raw`\(`)

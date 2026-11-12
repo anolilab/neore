@@ -200,3 +200,13 @@ describe("block elements inside a link (#278, #409, #332)", () => {
         expect(convert(`<a href="/x">one<br>+ x</a>`)).toBe("[one  \n\\+ x](/x)");
     });
 });
+
+describe("review: custom hard breaks in link text", () => {
+    it("keeps a configured break that is a space then a backslash, so the link keeps its line break", () => {
+        expect(convert(`<a href="/x">one<br>two</a>`, { br: " \\" })).toBe("[one \\\ntwo](/x)");
+    });
+
+    it("keeps a configured break of two spaces, the default form", () => {
+        expect(convert(`<a href="/x">one<br>two</a>`, { br: "  " })).toBe("[one  \ntwo](/x)");
+    });
+});
