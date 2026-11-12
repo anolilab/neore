@@ -397,10 +397,12 @@ function cleanAttribute(attribute: string | null): string {
 /**
  * With `safeLinks`, `\` and `&` are escaped too. CommonMark undoes those added escapes, so the rendered destination is
  * the raw attribute, not the decoded copy. The check already covers the raw attribute: `isUnsafeDestination` runs on a
- * decoded copy of that same text.
+ * decoded copy of that same text. Line breaks are dropped first, as a browser drops them from an `href`, so the
+ * destination stays on one line and cannot start a reference definition.
  */
 function escapeLinkDestination(destination: string, isSafeLinks = false): string {
-    const escaped = (isSafeLinks ? destination.replaceAll("\\", "\\\\").replaceAll("&", "&amp;") : destination)
+    const oneLine = destination.replaceAll(LINE_BREAKS, "");
+    const escaped = (isSafeLinks ? oneLine.replaceAll("\\", "\\\\").replaceAll("&", "&amp;") : oneLine)
         .replaceAll("<", String.raw`\<`)
         .replaceAll(">", String.raw`\>`)
         .replaceAll("(", String.raw`\(`)
