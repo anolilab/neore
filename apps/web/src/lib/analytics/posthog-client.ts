@@ -825,12 +825,17 @@ const hasFlagsOf = (posthog: PostHog | undefined): boolean => posthog !== undefi
  */
 export const useFeatureFlagsKnown = (): boolean => {
     const posthog = usePostHog();
+    const started = useStartedPostHog();
     const isUnavailable = useSyncExternalStore(subscribeAvailability, readUnavailable, notKnown);
     const subscribe = useMemo(() => subscribeFlags(posthog), [posthog]);
     const read = useCallback(() => hasFlagsOf(posthog), [posthog]);
     const hasFlags = useSyncExternalStore(subscribe, read, notKnown);
+    // The client this module loads answers for the signed-in account only once it has started (the reset and the
+    // session's identity applied): before, its flags are the bootstrapped ones. A client provided otherwise (Storybook's)
+    // is never started here, and its flags are final as they come.
+    const isOwnClient = posthog !== undefined && posthog === getPostHog();
 
-    return hasFlags || isUnavailable;
+    return (hasFlags && (!isOwnClient || started === posthog)) || isUnavailable;
 };
 
 /** The flags the server rendered into the page (`posthog-data`), for when PostHog itself never loads. */

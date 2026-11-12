@@ -13,6 +13,12 @@ const posthog = vi.hoisted(() => {
         has_opted_out_capturing: vi.fn(() => false),
         identify: vi.fn(),
         is_capturing: vi.fn(() => true),
+        // As posthog-js holding bootstrapped flags: a new listener is answered at once.
+        onFeatureFlags: vi.fn((callback: () => void) => {
+            callback();
+
+            return () => {};
+        }),
         register: vi.fn(),
         reset: vi.fn(),
     };
@@ -965,6 +971,25 @@ describe("useFeatureFlagReader", () => {
 
         expect(result.current("code-mode")).toBe(false);
         expect(result.current("other")).toBe(true);
+    });
+});
+
+describe("useFeatureFlagsKnown on the client this module loads", () => {
+    it("waits for PostHog to start (the account's identity applied), not only for the bootstrapped flags", async () => {
+        const client = await loadClientModule();
+        const loaded = await client.loadPostHog();
+        const wrapper = ({ children }: { children: ReactNode }) => createElement(client.PostHogClientContext, { value: loaded }, children);
+        const { result } = renderHook(() => client.useFeatureFlagsKnown(), { wrapper });
+
+        // The bootstrapped flags are there, but they may be another identity's.
+        expect(result.current).toBe(false);
+
+        act(() => {
+            client.startPostHog(loaded, () => {});
+            client.setAnalyticsIdentity({ user: { id: "user-1" } });
+        });
+
+        expect(result.current).toBe(true);
     });
 });
 
