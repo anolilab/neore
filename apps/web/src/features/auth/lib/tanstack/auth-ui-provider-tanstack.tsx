@@ -1,5 +1,7 @@
 import { useCallback, useMemo } from "react";
 
+import { authClient as sessionSource } from "@/lib/auth/client";
+
 import type { AuthUIProviderProps } from "../auth-ui-provider";
 import { AuthUIProvider } from "../auth-ui-provider";
 import useTanstackOptions from "./use-tanstack-options";
@@ -15,9 +17,10 @@ const AuthUIProviderTanstack = ({
 }: AuthUIProviderProps & {
     /**
      * For state that must not outlive the old account: called with "before" as an account switch starts (it may still fail),
-     * and with "after" once the switch has gone through. A sign-in is not a switch and calls neither.
+     * and with "after" once the switch has gone through, each with the departing user (read before the switch; undefined when
+     * the session was not read). A sign-in is not a switch and calls neither.
      */
-    onSessionSwitch?: (phase: "after" | "before") => void;
+    onSessionSwitch?: (phase: "after" | "before", departingUserId: string | undefined) => void;
 }) => {
     const { hooks: contextHooks, mutators: contextMutators, onSessionChange, optimistic } = useTanstackOptions({ authClient });
 
@@ -33,11 +36,14 @@ const AuthUIProviderTanstack = ({
         return {
             ...merged,
             setActiveSession: async (...parameters: Parameters<typeof setActiveSession>) => {
-                onSessionSwitch?.("before");
+                // The app's session (the client passed in is the same one), read without making the mutators depend on it.
+                const departing = sessionSource.$store.atoms.session?.get().data?.user.id;
+
+                onSessionSwitch?.("before", departing);
 
                 const result = await setActiveSession(...parameters);
 
-                onSessionSwitch?.("after");
+                onSessionSwitch?.("after", departing);
 
                 return result;
             },
