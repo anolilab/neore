@@ -495,6 +495,89 @@ describe("saving", () => {
         expect(textOf(next, OTHER_KEY)).toBe("kept");
     });
 
+    it("saves a change the closed gate held back once the gate says it opened", async () => {
+        const memory = memoryStore();
+        const listeners = new Set<() => void>();
+        const { gate, writeGate } = openGate();
+        const queryClient = new QueryClient();
+        const controller = start(memory.store, ALICE, queryClient, {
+            gate: {
+                ...writeGate,
+                subscribe: (listener) => {
+                    listeners.add(listener);
+
+                    return () => listeners.delete(listener);
+                },
+            },
+        });
+
+        await controller.restored;
+        controller.enableWrites();
+        gate.allowed = false;
+        queryClient.setQueryData(KEY, { text: "held" });
+        await vi.advanceTimersByTimeAsync(WRITE_THROTTLE_MS * 2);
+        expect(memory.stores.entries.size).toBe(0);
+
+        const written = { done: false };
+
+        void (async () => {
+            await memory.settled();
+            written.done = true;
+        })();
+        gate.allowed = true;
+
+        for (const listener of listeners) {
+            listener();
+        }
+
+        while (!written.done) {
+            await vi.advanceTimersByTimeAsync(WRITE_THROTTLE_MS);
+        }
+
+        controller.stop();
+
+        const next = new QueryClient();
+
+        await start(memory.store, ALICE, next).restored;
+        expect(textOf(next, KEY)).toBe("held");
+    });
+
+    it("drops a record holding a malformed read, and saves again", async () => {
+        const memory = memoryStore();
+
+        await sealRecord(
+            memory.store,
+            ALICE,
+            JSON.stringify({ buster: BUSTER, clientState: { mutations: [], queries: [{ queryKey: KEY }] }, timestamp: Date.now(), userId: ALICE }),
+            Date.now(),
+        );
+
+        const queryClient = new QueryClient();
+        const controller = start(memory.store, ALICE, queryClient);
+
+        await controller.restored;
+        controller.enableWrites();
+
+        const written = { done: false };
+
+        void (async () => {
+            await memory.settled();
+            written.done = true;
+        })();
+        queryClient.setQueryData(KEY, { text: "fresh" });
+
+        while (!written.done) {
+            await vi.advanceTimersByTimeAsync(WRITE_THROTTLE_MS);
+        }
+
+        controller.stop();
+
+        const next = new QueryClient();
+
+        await start(memory.store, ALICE, next).restored;
+        expect(textOf(next, KEY)).toBe("fresh");
+    });
+
     it("does not carry a read older than the age limit into a new record", async () => {
         const memory = memoryStore();
         const queryClient = new QueryClient();

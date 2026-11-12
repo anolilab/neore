@@ -35,6 +35,8 @@ export interface WriteGate {
     canWrite: (userId: string) => boolean;
     /** Bumped by every clear: a save scheduled before a clear drops itself, and one sealed during a clear takes its record back out. */
     generation: () => number;
+    /** Calls `listener` when `canWrite` may have changed; returns the unsubscribe. A save the closed gate held back is offered again then. */
+    subscribe?: (listener: () => void) => () => void;
 }
 
 export interface PersistenceOptions {
@@ -81,7 +83,15 @@ const isStoredClient = (value: unknown, userId: string): value is StoredClient =
         typeof candidate.buster === "string" &&
         typeof candidate.timestamp === "number" &&
         typeof candidate.clientState === "object" &&
-        Array.isArray(candidate.clientState?.queries)
+        Array.isArray(candidate.clientState?.queries) &&
+        // Every saved read as `restore` reads it: a malformed one makes the whole record unreadable, dropped like a damaged one.
+        candidate.clientState.queries.every(
+            (query: unknown) =>
+                typeof query === "object" &&
+                query !== null &&
+                Array.isArray((query as { queryKey?: unknown }).queryKey) &&
+                typeof (query as { state?: { dataUpdatedAt?: unknown } }).state?.dataUpdatedAt === "number",
+        )
     );
 };
 
@@ -139,7 +149,7 @@ export const startQueryPersistence = (options: PersistenceOptions): PersistenceC
     /** What the restore handed over, with its data count then: any later data, even stamped the same millisecond, counts it up. */
     const restoredCount = new WeakMap<Query, number>();
     const isRestored = (query: Query): boolean => restoredCount.get(query) === query.state.dataUpdateCount;
-    const state = { isDirty: false, isRestoreDone: false, isRestoring: true, isSaving: false, stopped: false, writes: false };
+    const state = { isDirty: false, isHeldByGate: false, isRestoreDone: false, isRestoring: true, isSaving: false, stopped: false, writes: false };
     let timer: ReturnType<typeof setTimeout> | undefined;
     let unsubscribe: (() => void) | undefined;
 
@@ -147,6 +157,9 @@ export const startQueryPersistence = (options: PersistenceOptions): PersistenceC
 
     const write = async (generation: number): Promise<void> => {
         if (!mayWrite(generation)) {
+            // Only the gate closed (no clear, no stop): this change is offered again when it opens.
+            state.isHeldByGate = !state.stopped && state.writes && generation === gate.generation() && !gate.canWrite(userId);
+
             return;
         }
 
@@ -281,7 +294,14 @@ export const startQueryPersistence = (options: PersistenceOptions): PersistenceC
     };
 
     const schedule = (): void => {
-        if (timer !== undefined || !mayWrite(gate.generation())) {
+        if (timer !== undefined) {
+            return;
+        }
+
+        if (!mayWrite(gate.generation())) {
+            // A change while only the gate is closed is offered again when it opens.
+            state.isHeldByGate ||= !state.stopped && state.writes && !gate.canWrite(userId);
+
             return;
         }
 
@@ -346,11 +366,21 @@ export const startQueryPersistence = (options: PersistenceOptions): PersistenceC
         }
     })();
 
+    const unsubscribeGate = gate.subscribe?.(() => {
+        if (!(state.isHeldByGate && gate.canWrite(userId))) {
+            return;
+        }
+
+        state.isHeldByGate = false;
+        schedule();
+    });
+
     const stop = (): void => {
         state.stopped = true;
         clearTimeout(timer);
         timer = undefined;
         unsubscribe?.();
+        unsubscribeGate?.();
     };
 
     return {
