@@ -198,7 +198,7 @@ describe("line breaks inside code blocks (#514)", () => {
 
 describe("edge breaks are restored only when trimming removed them (Qodo)", () => {
     it("does not add a break before a link that already starts with one", () => {
-        expect(convert('x<span><a href="/u"><br>foo</a> </span>y')).toBe("x[  \nfoo](/u) y");
+        expect(convert("x<span><a href=/u><br>foo</a> </span>y")).toBe("x[  \nfoo](/u) y");
     });
 
     it("writes a custom break marker once when the element ends with one", () => {
@@ -212,10 +212,24 @@ describe("emphasis looks past void elements that print nothing (Qodo)", () => {
     });
 
     it("reads past an image with no source, which prints nothing", () => {
-        expect(convert('Brus<img alt=""><em>sel</em><img alt="">s')).toBe("Brus*sel*s");
+        expect(convert("Brus<img><em>sel</em><img>s")).toBe("Brus*sel*s");
     });
 
     it("keeps the plain delimiter beside an image with a source, which prints markup", () => {
-        expect(convert('<em>a</em><img src="x.png">b')).toBe("_a_![](x.png)b");
+        expect(convert("<em>a</em><img src=x.png>b")).toBe("_a_![](x.png)b");
+    });
+});
+
+describe("emphasis beside an anchor that prints plain text (Qodo)", () => {
+    it("reads the text of an anchor with no href", () => {
+        expect(convert("<em>x</em><a>y</a>")).toBe("*x*y");
+    });
+
+    it("reads the text of an unsafe link when safe links are on", () => {
+        expect(convert("<em>x</em><a href=javascript:alert(1)>y</a>", { safeLinks: true })).toBe("*x*y");
+    });
+
+    it("keeps the plain delimiter beside a link, which prints brackets", () => {
+        expect(convert("<em>x</em><a href=/u>y</a>")).toBe("_x_[y](/u)");
     });
 });
