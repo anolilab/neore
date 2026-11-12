@@ -3,6 +3,6 @@ declare module "turndown" {
     export default class TurndownUpstream {
         constructor(options?: { readonly [option: string]: unknown });
 
-        turndown(input: string): string;
+        turndown(input: string | Node): string;
     }
 }

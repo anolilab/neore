@@ -1,5 +1,5 @@
 import type { AnnotatedNode, Options } from "./types";
-import { hasMeaningfulWhenBlank, hasVoid, isBlock, isMeaningfulWhenBlank, isVoid } from "./utilities";
+import { hasVoidOrMeaningfulDescendant, isBlock, isMeaningfulWhenBlank, isVoid } from "./utilities";
 
 const BLANK = /^\s*$/;
 const SPACE_CHAR = /\s/;
@@ -31,7 +31,34 @@ export default function annotateNode(node: Node, options: Options): AnnotatedNod
 }
 
 function isBlank(node: Node): boolean {
-    return !isVoid(node) && !isMeaningfulWhenBlank(node) && BLANK.test(node.textContent ?? "") && !hasVoid(node) && !hasMeaningfulWhenBlank(node);
+    return !isVoid(node) && !isMeaningfulWhenBlank(node) && hasBlankText(node) && !hasVoidOrMeaningfulDescendant(node);
+}
+
+/**
+ * True when the node's textContent is only whitespace. Checks the text pieces one at a
+ * time and stops at the first that has content, rather than building the whole string.
+ * A text or comment node's textContent is its own data.
+ */
+function hasBlankText(node: Node): boolean {
+    if (node.nodeType !== 1) {
+        return BLANK.test(node.textContent ?? "");
+    }
+
+    return hasOnlyBlankText(node);
+}
+
+function hasOnlyBlankText(parent: Node): boolean {
+    for (let child = parent.firstChild; child; child = child.nextSibling) {
+        if (child.nodeType === 3 || child.nodeType === 4) {
+            if (!BLANK.test(child.nodeValue ?? "")) {
+                return false;
+            }
+        } else if (child.nodeType === 1 && !hasOnlyBlankText(child)) {
+            return false;
+        }
+    }
+
+    return true;
 }
 
 function flankingWhitespace(node: AnnotatedNode, options: Options): { leading: string; trailing: string } {
