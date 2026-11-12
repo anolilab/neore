@@ -899,8 +899,29 @@ function isKeptHardBreak(run: string, offset: number, whole: string, hardBreak: 
     const markerStart = offset - hardBreak.length;
     const isAfterMarker = markerStart >= 0 && whole.startsWith(hardBreak, markerStart);
     const isSingle = !run.includes("\n", 1);
+    // A line indented by four columns or more is a paragraph continuation, so it cannot open a block.
+    const cannotOpenBlock = indentWidth(run) >= 4;
 
-    return isAfterMarker && isSingle && !isBlockStartAt(whole, offset + run.length);
+    return isAfterMarker && isSingle && (cannotOpenBlock || !isBlockStartAt(whole, offset + run.length));
+}
+
+/** The columns of indentation after a line break. A tab reaches the next multiple of four. */
+function indentWidth(run: string): number {
+    let width = 0;
+
+    for (let index = 1; index < run.length; index += 1) {
+        const char = run.charAt(index);
+
+        if (char === " ") {
+            width += 1;
+        } else if (char === "\t") {
+            width += 4 - (width % 4);
+        } else {
+            break;
+        }
+    }
+
+    return width;
 }
 
 function isBlockStartAt(text: string, index: number): boolean {

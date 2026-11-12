@@ -247,3 +247,21 @@ describe("review: ordered-list lookalikes followed by a tab or a line end", () =
         expect(escapeMarkdown("1)item")).toBe("1)item");
     });
 });
+
+describe("review: indented lines after a hard break in link text", () => {
+    function indentedSpan(indent: string): TurndownService {
+        const service = new TurndownService();
+
+        service.addRule("indentedSpan", { filter: "span", replacement: () => `${indent}- text` });
+
+        return service;
+    }
+
+    it("keeps a hard break before a line indented four spaces, which is a continuation and not a list item", () => {
+        expect(indentedSpan("    ").turndown(`<a href="/x">one<br><span>x</span></a>`)).toBe("[one  \n    - text](/x)");
+    });
+
+    it("guard, passes before and after: a hard break before a line indented three spaces still ends the line for a list item", () => {
+        expect(indentedSpan("   ").turndown(`<a href="/x">one<br><span>x</span></a>`)).not.toContain("one  \n");
+    });
+});
