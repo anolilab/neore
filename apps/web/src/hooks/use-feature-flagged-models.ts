@@ -3,7 +3,7 @@
 import type { GatewayModel } from "@neore/ai/models";
 import { useQuery } from "@tanstack/react-query";
 
-import { useFeatureFlagsKnown, usePostHog } from "@/lib/analytics/posthog-client";
+import { useFeatureFlagReader, useFeatureFlagsKnown } from "@/lib/analytics/posthog-client";
 import { useCRPC } from "@/lib/lunora/crpc";
 
 import { useGatewayModels, useGatewayModelsSettled } from "./use-gateway-models";
@@ -23,7 +23,7 @@ import { useFilteredModels } from "./use-model-filter-rules";
  *    message badges and the Models settings page, still resolve every model.
  */
 const useFeatureFlaggedModels = (options?: { applyUserOverrides?: boolean }): GatewayModel[] => {
-    const posthog = usePostHog();
+    const isFlagEnabled = useFeatureFlagReader();
     const crpc = useCRPC();
     const gatewayModels = useGatewayModels();
     const { data: aiPreferences } = useQuery(crpc.auth.functions.getAIUserPreferences.queryOptions({}));
@@ -38,7 +38,7 @@ const useFeatureFlaggedModels = (options?: { applyUserOverrides?: boolean }): Ga
             return true;
         }
 
-        return posthog?.isFeatureEnabled(m.featureFlag) === true;
+        return isFlagEnabled(m.featureFlag) === true;
     });
 
     // Apply user's model filter rules (region, provider, model block lists)

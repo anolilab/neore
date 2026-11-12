@@ -582,6 +582,34 @@ describe("useFeatureFlagsKnown", () => {
     });
 });
 
+describe("useFeatureFlagReader", () => {
+    it("reads pending while PostHog loads, the server-rendered flags once it will not start, and the client once there is one", async () => {
+        const client = await loadClientModule();
+        const state: { client?: PostHog } = {};
+        const wrapper = ({ children }: { children: ReactNode }) => createElement(client.PostHogClientContext, { value: state.client }, children);
+
+        client.setBootstrapFlags({ "code-mode": true });
+
+        const { rerender, result } = renderHook(() => client.useFeatureFlagReader(), { wrapper });
+
+        expect(result.current("code-mode")).toBeUndefined();
+
+        act(() => {
+            client.markPostHogUnavailable();
+        });
+
+        // A model or a nav link behind `code-mode` stays, as the server rendered it; one behind another flag goes.
+        expect(result.current("code-mode")).toBe(true);
+        expect(result.current("other")).toBe(false);
+
+        state.client = { isFeatureEnabled: (flag: string) => flag === "other" } as unknown as PostHog;
+        rerender();
+
+        expect(result.current("code-mode")).toBe(false);
+        expect(result.current("other")).toBe(true);
+    });
+});
+
 describe("useFeatureFlagEnabled", () => {
     it("is pending while PostHog loads, and answers from the server-rendered flags once it will not start", async () => {
         const client = await loadClientModule();

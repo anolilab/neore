@@ -613,6 +613,27 @@ const readBootstrapFlag = (flag: string): boolean => {
 };
 
 /**
+ * Reads flags as `useFeatureFlagEnabled` does, for a list that checks many: the client's answer, or once PostHog will
+ * not start on this page, the server-rendered flag (else off); `undefined` while the client may still come. The reader
+ * changes when the client or its availability does, so a memo or filter over it follows.
+ */
+export const useFeatureFlagReader = (): ((flag: string) => boolean | undefined) => {
+    const posthog = usePostHog();
+    const isUnavailable = useSyncExternalStore(subscribeAvailability, readUnavailable, notKnown);
+
+    return useCallback(
+        (flag: string) => {
+            if (posthog) {
+                return posthog.isFeatureEnabled(flag);
+            }
+
+            return isUnavailable ? readBootstrapFlag(flag) : undefined;
+        },
+        [posthog, isUnavailable],
+    );
+};
+
+/**
  * Whether `flag` is on; `undefined` while PostHog or its flags have not loaded. Follows later flag reloads. When PostHog
  * will not start on this page (its chunk failed for good, blocked, no key), the server-rendered flag answers, or `false`:
  * what is gated shows its "not available" state instead of waiting for ever.

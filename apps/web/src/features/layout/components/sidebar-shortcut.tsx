@@ -41,7 +41,7 @@ import NavUser from "@/features/layout/components/nav-user";
 import { useModalState, useUserPreferences } from "@/features/layout/hooks/use-ui-state";
 import NotificationBell from "@/features/notifications/components/notification-bell";
 import useAfterFirstPaint from "@/hooks/use-after-first-paint";
-import { usePostHog } from "@/lib/analytics/posthog-client";
+import { useFeatureFlagReader } from "@/lib/analytics/posthog-client";
 
 // ---------------------------------------------------------------------------
 // Static nav configuration — add / remove / reorder entries here only.
@@ -149,7 +149,7 @@ export const NAV_LINK_DEFS: NavLinkDef[] = [
 export const useNavLinks = () => {
     const { isAnonymous } = useIsAnonymous();
     const userSettings = useUserSettings();
-    const posthog = usePostHog();
+    const isFlagEnabled = useFeatureFlagReader();
     const chatLink = userSettings?.data?.lastChatId ? `/chat/${userSettings.data.lastChatId}` : "/chat";
 
     return useMemo(
@@ -159,7 +159,7 @@ export const useNavLinks = () => {
                     return false;
                 }
 
-                if (def.featureFlag && !posthog?.isFeatureEnabled(def.featureFlag)) {
+                if (def.featureFlag && !isFlagEnabled(def.featureFlag)) {
                     return false;
                 }
 
@@ -170,7 +170,7 @@ export const useNavLinks = () => {
                     to: def.useChatLink ? chatLink : def.to,
                 };
             }),
-        [isAnonymous, chatLink, posthog],
+        [isAnonymous, chatLink, isFlagEnabled],
     );
 };
 
