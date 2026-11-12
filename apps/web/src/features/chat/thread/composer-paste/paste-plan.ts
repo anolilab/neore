@@ -28,8 +28,10 @@ const DIV_START = /<div\s/gi;
 const TAG_START = /<\/?[a-z]/iy;
 const DIV_TAG_NAME = /^<(\/?)div[\s/>]/i;
 const QUOTE_CHIP_ATTRIBUTE = "data-quote-chip";
-// HTML allows space around the `=`: `class = "language-js"` names a language too.
+// HTML allows space around the `=`: `class = "language-js"` names a language too. LANGUAGE finds a candidate anywhere;
+// LANGUAGE_VALUE reads the value after a `class` attribute's name, inside its quotes.
 const LANGUAGE = /class\s{0,20}=\s{0,20}["']?[^"'>]{0,200}(?:language|lang|highlight)-/i;
+const LANGUAGE_VALUE = /\s{0,20}=\s{0,20}(?:"[^"]{0,200}|'[^']{0,200}|[^\s"'>]{0,200})(?:language|lang|highlight)-/iy;
 // Formatting the Markdown can carry. A `<pre>` alone is not in it: terminals and code editors wrap their text in one.
 const FORMATTING = [
     /<(?:h[1-6]|ul|ol|table|blockquote|hr)[\s/>]/i,
@@ -264,8 +266,8 @@ const withoutComments = (html: string): string => {
     return parts.join("");
 };
 
-/** Whether the tag from `open` to its `>` at `end` has the attribute `name`: as a name, not in a quoted value. */
-const hasAttribute = (html: string, open: number, end: number, name: string): boolean => {
+/** Where the tag from `open` to its `>` at `end` has the attribute `name`, or -1: as a name, not in a quoted value. */
+const attributeAt = (html: string, open: number, end: number, name: string): number => {
     let afterEquals = false;
     let afterSpace = false;
 
@@ -289,7 +291,7 @@ const hasAttribute = (html: string, open: number, end: number, name: string): bo
                 html.slice(index, index + name.length).toLowerCase() === name &&
                 (next === "=" || next === "/" || next === ">" || HTML_SPACE_CHAR.has(next))
             ) {
-                return true;
+                return index;
             }
 
             afterEquals = char === "=";
@@ -297,6 +299,47 @@ const hasAttribute = (html: string, open: number, end: number, name: string): bo
         }
 
         index += 1;
+    }
+
+    return -1;
+};
+
+/**
+ * Whether a tag in `html` has a class naming a language: not text or another attribute's value that only reads like one.
+ * Tag by tag, each read once to its own `>`.
+ */
+const hasLanguageClass = (markup: string): boolean => {
+    if (!LANGUAGE.test(markup)) {
+        return false;
+    }
+
+    const html = withoutComments(markup);
+    const tagStart = new RegExp(TAG_START);
+    const value = new RegExp(LANGUAGE_VALUE);
+
+    for (let index = html.indexOf("<"); index !== -1;) {
+        tagStart.lastIndex = index;
+
+        if (tagStart.test(html)) {
+            const close = tagEnd(html, index);
+
+            if (close === -1) {
+                return false;
+            }
+
+            const name = attributeAt(html, index, close, "class");
+
+            value.lastIndex = name + 5;
+
+            if (name !== -1 && value.test(html)) {
+                return true;
+            }
+
+            index = html.indexOf("<", close + 1);
+        } else {
+            // A `<` not opening a tag (`1 < 2`) is text.
+            index = html.indexOf("<", index + 1);
+        }
     }
 
     return false;
@@ -364,12 +407,12 @@ const splitQuoteChips = (markup: string): { chips: boolean; rest: string } => {
             break;
         }
 
-        if (hasAttribute(html, start.index, end, QUOTE_CHIP_ATTRIBUTE)) {
+        if (attributeAt(html, start.index, end, QUOTE_CHIP_ATTRIBUTE) === -1) {
+            starts.lastIndex = end;
+        } else {
             rest.push(html.slice(kept, start.index));
             kept = divEnd(html, end);
             starts.lastIndex = kept;
-        } else {
-            starts.lastIndex = end;
         }
     }
 
@@ -391,7 +434,7 @@ const firstElement = (markup: string): [tag: string, attributes: string] => {
  * never loaded for it.
  */
 export const isPlainHtml = (html: string): boolean => {
-    if (LANGUAGE.test(html)) {
+    if (hasLanguageClass(html)) {
         return false;
     }
 
@@ -643,8 +686,13 @@ export const planPaste = (data: Pick<DataTransfer, "getData">, { inFence = false
         return isPlainHtml(rest) ? { kind: "default" } : { html, kind: "html", plain };
     }
 
-    // HTML past the cap is never converted (planText), so it need not be checked.
-    return plain !== "" && html.length <= MAX_CONVERTED_HTML && isPlainHtml(html) ? { kind: "text", text: plain } : { html, kind: "html", plain };
+    // HTML past the cap is never converted (planText), so it need not be checked. Plain HTML with no text/plain goes in as
+    // its visible text, as the converter would fence a monospace block.
+    if (html.length > MAX_CONVERTED_HTML || !isPlainHtml(html)) {
+        return { html, kind: "html", plain };
+    }
+
+    return plain === "" ? { html, kind: "html", plain, textOnly: true } : { kind: "text", text: plain };
 };
 
 const asCopied = (plan: { html: string; plain: string }): PastedText => {

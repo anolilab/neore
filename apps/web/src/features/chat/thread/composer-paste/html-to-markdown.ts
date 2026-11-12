@@ -239,6 +239,13 @@ const codeText = (node: Node, page = false): string => {
 
                 if (tagName === "BR") {
                     push("\n");
+                } else if (tagName === "DETAILS" && !(child as Element).hasAttribute("open")) {
+                    // A closed one shows its summary alone.
+                    const summary = [...(child as Element).children].find((nested: Element) => nested.tagName === "SUMMARY");
+
+                    if (summary && !isHidden(summary)) {
+                        walk(summary, depth + 1, inPre);
+                    }
                 } else {
                     walk(child, depth + 1, inPre || tagName === "PRE");
                 }
@@ -564,7 +571,7 @@ const cellText = (cell: Element, context: Context): string => {
 
     context.inTable = true;
 
-    const text = children(cell, context);
+    const text = styledChildren(cell, context);
 
     context.inTable = inTable;
 
@@ -821,7 +828,7 @@ const list = (listElement: Element, context: Context): string => {
 
             if (childElement.tagName === "LI") {
                 context.inListItem = true;
-                entries.push({ body: children(childElement, context), item: childElement });
+                entries.push({ body: styledChildren(childElement, context), item: childElement });
                 context.inListItem = inListItem;
             } else if ((childElement.tagName === "UL" || childElement.tagName === "OL") && previous) {
                 context.inListItem = true;
@@ -914,6 +921,28 @@ const wordListItem = (element: Element, inner: string, context: Context): string
 
     return `\n${listItem(inner.trim(), Math.max(Number(level[1]) - context.wordTopLevel + 1, 1), marker, context)}\n`;
 };
+
+/** The Markdown for the child nodes, with the bold, italics or strikethrough the element's own style gives them. */
+function styledChildren(node: Element, context: Context): string {
+    const style = styleOf(node);
+    const isBold = BOLD_STYLE.test(style);
+
+    context.bold += isBold ? 1 : 0;
+
+    let inner = children(node, context);
+
+    context.bold -= isBold ? 1 : 0;
+
+    if (isBold) {
+        inner = wrap(inner, "**", context, node);
+    } else if (NORMAL_WEIGHT.test(style)) {
+        inner = unbold(inner, context);
+    }
+
+    inner = ITALIC_STYLE.test(style) ? wrap(inner, "*", context, node) : inner;
+
+    return STRIKE_STYLE.test(style) ? wrap(inner, "~~", context, node) : inner;
+}
 
 const element = (node: Element, context: Context): string => {
     const tag = node.tagName.toUpperCase();
@@ -1053,31 +1082,16 @@ const element = (node: Element, context: Context): string => {
         }
     }
 
-    const isSpan = tag === "SPAN" || tag === "FONT";
-    const isBold = isSpan && BOLD_STYLE.test(style);
-
-    context.bold += isBold ? 1 : 0;
-
-    let inner = children(node, context);
-
-    context.bold -= isBold ? 1 : 0;
-
     if (HEADING.test(tag)) {
-        const text = oneLine(inner).trim();
+        const text = oneLine(children(node, context)).trim();
 
         return text === "" ? "" : `\n\n${"#".repeat(Number(tag[1]))} ${text}\n\n`;
     }
 
-    if (isSpan) {
-        if (isBold) {
-            inner = wrap(inner, "**", context, node);
-        } else if (NORMAL_WEIGHT.test(style)) {
-            inner = unbold(inner, context);
-        }
+    const inner = styledChildren(node, context);
 
-        inner = ITALIC_STYLE.test(style) ? wrap(inner, "*", context, node) : inner;
-
-        return STRIKE_STYLE.test(style) ? wrap(inner, "~~", context, node) : inner;
+    if (tag === "SPAN" || tag === "FONT") {
+        return inner;
     }
 
     if (tag === "P") {

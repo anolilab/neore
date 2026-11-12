@@ -283,7 +283,13 @@ describe("composer paste", () => {
 
         // No wall-clock gate (docs/agents/testing.md): a pattern that rescans from every match takes minutes here, past the
         // test timeout.
-        for (const html of ["class=".repeat(500_000), "<b ".repeat(1_000_000), "<a ".repeat(1_000_000), "text-decoration".repeat(200_000)]) {
+        for (const html of [
+            "class=".repeat(500_000),
+            "<b ".repeat(1_000_000),
+            "<a ".repeat(1_000_000),
+            "text-decoration".repeat(200_000),
+            '<i title="class=language-x">'.repeat(35_000),
+        ]) {
             expect(planPaste(clipboard({ "text/html": html, "text/plain": "plain" }), plain).kind).not.toBe("default");
             // Under the cap the formatting checks run on all of it.
             expect(typeof isPlainHtml(html.slice(0, 1_000_000))).toBe("boolean");
@@ -834,5 +840,45 @@ describe("a URL pasted over a selection with spaces around it", () => {
 describe("text hidden from assistive technology in any case", () => {
     it("stays out of the paste", () => {
         expect(htmlToMarkdown('<p>shown<span aria-hidden="TRUE"> secret</span></p>')).toBe("shown");
+    });
+});
+
+describe("emphasis styled on a block element", () => {
+    it("marks the text of a paragraph, list item or table cell, not a heading's", () => {
+        expect(
+            htmlToMarkdown(
+                [
+                    '<p style="font-weight:bold">Important</p>',
+                    '<ul><li style="font-style:italic">item</li></ul>',
+                    '<table><tr><th>A</th></tr><tr><td style="text-decoration:line-through">old</td></tr></table>',
+                    '<h2 style="font-weight:bold">Title</h2>',
+                ].join(""),
+            ),
+        ).toBe("**Important**\n\n- *item*\n\n| A |\n| --- |\n| ~~old~~ |\n\n## Title");
+    });
+});
+
+describe("a language class only in text or another attribute's value", () => {
+    it("does not stop a monospace copy from pasting as its plain text", () => {
+        expect(isPlainHtml('<pre title="class = language-js">let x=1;</pre>')).toBe(true);
+        expect(isPlainHtml('<pre style="font-family:monospace">&lt;code class="language-js"&gt;</pre>')).toBe(true);
+        expect(isPlainHtml('<pre data-x="1" CLASS="hljs language-js">x()</pre>')).toBe(false);
+    });
+});
+
+describe("an HTML-only plain monospace copy", () => {
+    it("goes in as its visible text, without a fence", async () => {
+        await expect(paste({ "text/html": "<pre>let x = 1;\nlet y = 2;</pre>" })).resolves.toBe("let x = 1;\nlet y = 2;");
+    });
+});
+
+describe("visible text of a closed details", () => {
+    it("is its summary alone, as in the Markdown", async () => {
+        await expect(
+            paste(
+                { "text/html": "<details><summary>Logs</summary><p>hidden line</p></details><details open><summary>Shown</summary><p>body</p></details>" },
+                { plainOnly: true },
+            ),
+        ).resolves.toBe("Logs\nShown\nbody");
     });
 });
