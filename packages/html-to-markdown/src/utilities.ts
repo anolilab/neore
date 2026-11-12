@@ -197,14 +197,12 @@ function scanDescendants(parent: Node): DescendantScan {
 }
 
 const INLINE_SYNTAX = /[\\*`[\]_]/g;
-const LINE_START_CHARACTER = /^[-+=#~>\d]/;
-const DASH_START = /^-/g;
-const PLUS_SPACE_START = /^\+ /g;
-const EQUALS_START = /^(=+)/g;
-const HASH_START = /^(#{1,6}) /g;
-const TILDE_FENCE_START = /^~~~/g;
-const QUOTE_START = /^>/g;
-const ORDERED_START = /^(\d+)\. /g;
+const INLINE_SYNTAX_PRESENT = /[\\*`[\]_]/;
+
+// The line-start markers, anchored and non-global. Their first characters differ, so
+// at most one can match. An ordered-list number is handled apart: its dot is escaped.
+const LINE_START = /^(?:-|\+ |=+|#{1,6} |~~~|>)/;
+const ORDERED_START = /^(\d+)\. /;
 
 /**
  * Escapes text so that it cannot start a Markdown block or open an inline
@@ -216,21 +214,13 @@ const ORDERED_START = /^(\d+)\. /g;
  * with a character the inline pass never changes, so the order does not matter.
  */
 export function escapeMarkdown(string: string): string {
-    const inline = string.replaceAll(INLINE_SYNTAX, String.raw`\$&`);
+    const inline = INLINE_SYNTAX_PRESENT.test(string) ? string.replaceAll(INLINE_SYNTAX, String.raw`\$&`) : string;
 
-    // Only these characters can start a line-start rule. After the inline pass a
-    // string that starts with a backslash can match none of them, so the check
-    // is exact, and it avoids seven scans of the whole string in the common case.
-    if (!LINE_START_CHARACTER.test(inline)) {
-        return inline;
+    // After the inline pass, a string that starts with a backslash matches no
+    // line-start rule, so matching on the escaped string is exact.
+    if (ORDERED_START.test(inline)) {
+        return inline.replace(ORDERED_START, String.raw`$1\. `);
     }
 
-    return inline
-        .replaceAll(DASH_START, String.raw`\-`)
-        .replaceAll(PLUS_SPACE_START, String.raw`\+ `)
-        .replaceAll(EQUALS_START, String.raw`\$1`)
-        .replaceAll(HASH_START, String.raw`\$1 `)
-        .replaceAll(TILDE_FENCE_START, String.raw`\~~~`)
-        .replaceAll(QUOTE_START, String.raw`\>`)
-        .replaceAll(ORDERED_START, String.raw`$1\. `);
+    return inline.replace(LINE_START, String.raw`\$&`);
 }
