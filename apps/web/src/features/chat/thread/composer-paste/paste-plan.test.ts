@@ -557,3 +557,11 @@ describe("a plain Word list", () => {
         await expect(paste({ "text/html": item("one") + item("two"), "text/plain": "·\tone\n·\ttwo" })).resolves.toBe("- one\n- two");
     });
 });
+
+describe("a link whose tag quotes an angle bracket", () => {
+    it("still counts as formatting, so the link is kept", async () => {
+        await expect(paste({ "text/html": '<a title="2 > 1" href="https://example.com/">docs</a>', "text/plain": "docs" })).resolves.toBe(
+            "[docs](https://example.com/)",
+        );
+    });
+});

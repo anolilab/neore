@@ -89,14 +89,56 @@ export const fenceCode = (code: string, language = ""): string => {
     return `${fence}${language}\n${code.slice(0, end)}\n${fence}`;
 };
 
+// The whitespace HTML allows around an attribute's `=`.
+const HTML_SPACE_CHAR = new Set([" ", "\t", "\n", "\f", "\r"]);
+
+/**
+ * The `>` that ends the tag opening at `open`, or -1: a `>` inside a quoted attribute value does not end it. Each
+ * character is read once.
+ */
+const tagEnd = (html: string, open: number): number => {
+    let index = open + 1;
+    // Whether the last character that was not a space is `=`: a quote opens a value only there (`<p>don't` has no
+    // attribute to skip), however much space HTML allows between the two.
+    let afterEquals = false;
+
+    while (index < html.length) {
+        const char = html[index] ?? "";
+
+        if (char === ">") {
+            return index;
+        }
+
+        if ((char === '"' || char === "'") && afterEquals) {
+            const closeQuote = html.indexOf(char, index + 1);
+
+            if (closeQuote === -1) {
+                return -1;
+            }
+
+            index = closeQuote;
+            afterEquals = false;
+        } else if (char === "=") {
+            afterEquals = true;
+        } else if (!HTML_SPACE_CHAR.has(char)) {
+            afterEquals = false;
+        }
+
+        index += 1;
+    }
+
+    return -1;
+};
+
 /** Whether an `<a>` tag in `html` has an `href`. One pass: each tag's attributes are read once, up to its `>`. */
 const hasLink = (html: string): boolean => {
     const starts = new RegExp(LINK_START);
 
     for (let start = starts.exec(html); start; start = starts.exec(html)) {
-        const end = html.indexOf(">", start.index);
+        // Its own `>`, not one inside a quoted value (`title="2 > 1"`).
+        const end = tagEnd(html, start.index);
 
-        // No `>` after this `<a`: none after any later one either.
+        // No end after this `<a`: none after any later one either.
         if (end === -1) {
             return false;
         }
@@ -283,47 +325,6 @@ export const planPaste = (data: Pick<DataTransfer, "getData">, { inFence = false
 
     // HTML past the cap is never converted (planText), so it need not be checked.
     return plain !== "" && html.length <= MAX_CONVERTED_HTML && isPlainHtml(html) ? { kind: "text", text: plain } : { html, kind: "html", plain };
-};
-
-// The whitespace HTML allows around an attribute's `=`.
-const HTML_SPACE_CHAR = new Set([" ", "\t", "\n", "\f", "\r"]);
-
-/**
- * The `>` that ends the tag opening at `open`, or -1: a `>` inside a quoted attribute value does not end it. Each
- * character is read once.
- */
-const tagEnd = (html: string, open: number): number => {
-    let index = open + 1;
-    // Whether the last character that was not a space is `=`: a quote opens a value only there (`<p>don't` has no
-    // attribute to skip), however much space HTML allows between the two.
-    let afterEquals = false;
-
-    while (index < html.length) {
-        const char = html[index] ?? "";
-
-        if (char === ">") {
-            return index;
-        }
-
-        if ((char === '"' || char === "'") && afterEquals) {
-            const closeQuote = html.indexOf(char, index + 1);
-
-            if (closeQuote === -1) {
-                return -1;
-            }
-
-            index = closeQuote;
-            afterEquals = false;
-        } else if (char === "=") {
-            afterEquals = true;
-        } else if (!HTML_SPACE_CHAR.has(char)) {
-            afterEquals = false;
-        }
-
-        index += 1;
-    }
-
-    return -1;
 };
 
 /**
