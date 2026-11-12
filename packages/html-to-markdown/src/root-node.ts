@@ -75,8 +75,18 @@ function removeNonContentBelow(parent: Node): void {
     }
 }
 
+/**
+ * The HTML parser keeps a prefix in localName (`x:script`), so the name is compared after its last colon, as a type
+ * selector matches a prefixed element by its local name.
+ */
 function isNonContent(node: Node): boolean {
-    return node.nodeType === 1 && NON_CONTENT_NAMES.has((node as Element).localName.toLowerCase());
+    if (node.nodeType !== 1) {
+        return false;
+    }
+
+    const name = (node as Element).localName.toLowerCase();
+
+    return NON_CONTENT_NAMES.has(name.slice(name.lastIndexOf(":") + 1));
 }
 
 function isPreOrCode(node: Node): boolean {

@@ -141,6 +141,11 @@ describe("non-content elements emit nothing", () => {
         expect(new TurndownService().turndown(paragraph as unknown as Node)).toBe("a b");
     });
 
+    // The HTML parser keeps the prefix in localName ("x:script"), unlike createElementNS, so this is the case a parsed string takes.
+    it("drops a prefixed x:script that the HTML parser creates, and its text", () => {
+        expect(new TurndownService().turndown("<p>a <x:script>secret()</x:script> b</p>")).toBe("a b");
+    });
+
     // Removed before blank detection, so the empty item loses its bullet, as it does when the item holds an HTML script.
     it("drops an x:script from an empty list item, as it drops an HTML script", () => {
         const document = createDocument("<p>a<span> </span>b</p><ul><li>x</li><li></li></ul>");
