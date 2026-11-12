@@ -29,6 +29,8 @@ const LATEST_MESSAGE_WINDOW = 20;
 interface StoredPart {
     approvalId?: string;
     input?: unknown;
+    /** Real server and tool names stamped on an MCP, connector or device call (`lib/mcp-tool-labels.ts`). */
+    providerOptions?: { neore?: { mcpServerName?: unknown; mcpToolName?: unknown } };
     toolCallId?: string;
     toolName?: string;
     type?: string;
@@ -62,6 +64,8 @@ export const findPendingApprovalOnLatestTurn = async (
 /** An unanswered request on a thread's latest assistant turn: the call's id, tool and arguments. */
 export interface PendingToolRequest {
     input: unknown;
+    /** The call's stamped server and tool, as the chat's own card shows them; `null` for a built-in tool. */
+    label: { server: string; tool: string } | null;
     toolCallId: string | null;
     toolName: string | null;
 }
@@ -94,7 +98,10 @@ const unansweredRequests = (parts: ReadonlyArray<StoredPart>, answered: Readonly
 
         const call = parts.find((p) => p.type === "tool-call" && p.toolCallId === request.toolCallId);
 
-        open.set(request.approvalId, { input: call?.input, toolCallId: call?.toolCallId ?? null, toolName: call?.toolName ?? null });
+        const { mcpServerName: server, mcpToolName: tool } = call?.providerOptions?.neore ?? {};
+        const label = typeof server === "string" && typeof tool === "string" ? { server, tool } : null;
+
+        open.set(request.approvalId, { input: call?.input, label, toolCallId: call?.toolCallId ?? null, toolName: call?.toolName ?? null });
     }
 
     return open;

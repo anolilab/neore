@@ -1985,18 +1985,6 @@ const SUB_AGENT_APPROVALS_LISTED_MAX = 10;
 /** Characters of a request's tool input sent to the card: approving runs the whole call, and the card says how much is cut. */
 const SUB_AGENT_APPROVAL_INPUT_MAX = 4000;
 
-/** The server and the bare tool name of an MCP tool's permission key (`mcp:<server>:<tool>`), or `null` for any other tool. */
-const mcpNamesOfPermissionKey = (key: string | undefined): { server: string; tool: string } | null => {
-    if (!key?.startsWith("mcp:")) {
-        return null;
-    }
-
-    const rest = key.slice("mcp:".length);
-    const separator = rest.lastIndexOf(":");
-
-    return separator > 0 ? { server: rest.slice(0, separator), tool: rest.slice(separator + 1) } : null;
-};
-
 /** The first `max` UTF-16 units of `text`, one fewer when the cut would split a surrogate pair. */
 const cutAt = (text: string, max: number): string => {
     const cut = text.slice(0, max);
@@ -2029,7 +2017,6 @@ const approvalView = (run: RunDoc, row: Doc<"toolApprovalRuns">, request: Pendin
     }
 
     const shown = cutAt(input, SUB_AGENT_APPROVAL_INPUT_MAX);
-    const mcp = mcpNamesOfPermissionKey(request.toolName === null ? undefined : row.config.toolPermissionKeys?.[request.toolName]);
 
     return {
         approvalId: row.approvalId,
@@ -2038,26 +2025,28 @@ const approvalView = (run: RunDoc, row: Doc<"toolApprovalRuns">, request: Pendin
         // Characters as the card counts them: code points, not UTF-16 units.
         omittedCharacters: [...input].length - [...shown].length,
         runId: run._id,
-        server: mcp?.server ?? null,
+        // The labels the pause stamped on the call (MCP, connector or device), as the chat's own card shows them.
+        server: request.label?.server ?? null,
         skillSlug: run.skillSlug ?? null,
-        toolName: mcp?.tool ?? request.toolName,
+        toolName: request.label?.tool ?? request.toolName,
     };
 };
 
 /**
- * Up to `room` open requests of one waiting run; none for a child that is not the caller's or is locked. Reads the
- * child, its latest turn once (through a reader keyed on the child alone; it returns at most `LATEST_MESSAGE_WINDOW`
- * rows) and, by id, the approval row of each open request on that turn until `room` of them are listed.
+ * Up to `room` open requests of one waiting run, and whether the cap dropped one (`cut`: the card says more wait in the
+ * child's thread); none for a child that is not the caller's or is locked. Reads the child, its latest turn once
+ * (through a reader keyed on the child alone; it returns at most `LATEST_MESSAGE_WINDOW` rows) and, by id, the approval
+ * row of each open request on that turn until one passes past the cap.
  */
-const openRequestsOfRun = async (ctx: QueryCtx, run: RunDoc, userId: string, room: number): Promise<SubAgentApproval[]> => {
-    if (room <= 0 || run.userId !== userId || run.childThreadId === undefined) {
-        return [];
+const openRequestsOfRun = async (ctx: QueryCtx, run: RunDoc, userId: string, room: number): Promise<{ cut: boolean; requests: SubAgentApproval[] }> => {
+    if (run.userId !== userId || run.childThreadId === undefined) {
+        return { cut: false, requests: [] };
     }
 
     const child = await ctx.db.get("threads", run.childThreadId as Id<"threads">);
 
     if (!child || child.deleted === true || child.userId !== userId || isThreadLocked(child)) {
-        return [];
+        return { cut: false, requests: [] };
     }
 
     // Proven the caller's own above: its rows (and a grantee's replies in it) are theirs to read through it.
@@ -2067,36 +2056,38 @@ const openRequestsOfRun = async (ctx: QueryCtx, run: RunDoc, userId: string, roo
     const open = openRequestsOfLatestTurn(await latestTurnRows(admittedThreadMessages(ctx, child._id), child._id, child.activeLeafMessageId));
     const requests: SubAgentApproval[] = [];
 
-    // Filtered first, then capped: a row left out takes no slot.
+    // Filtered first, then capped: a row left out takes no slot, and `cut` means a listable request was dropped.
     for (const [approvalId, request] of open) {
-        if (requests.length >= room) {
-            break;
-        }
-
         const row = await ctx.db
             .query("toolApprovalRuns")
             .withIndex("by_approvalId", (q) => q.eq("approvalId", approvalId))
             .first();
 
-        if (row?.threadId === child._id && row.status === "pending" && row.userId === userId && row.config.subAgentRunId === run._id) {
-            requests.push(approvalView(run, row, request));
+        if (row?.threadId !== child._id || row.status !== "pending" || row.userId !== userId || row.config.subAgentRunId !== run._id) {
+            continue;
         }
+
+        if (requests.length >= room) {
+            return { cut: true, requests };
+        }
+
+        requests.push(approvalView(run, row, request));
     }
 
-    return requests;
+    return { cut: false, requests };
 };
 
 /**
  * The open approval requests of the sub-agents waiting in a conversation, for the cards in that (parent) conversation.
  * Bounded: at most `AWAITING_RUNS_READ` runs, each costing its child, one latest-turn read and one approval row by id
  * per open request on that turn (the requests of one assistant message); ten requests
- * listed in all. Its owner only: a stranger's parent answers NOT_FOUND, a locked parent asks for its unlock proof, and a locked child's
+ * listed in all, with the runs the cap cut short in `cut`. Its owner only: a stranger's parent answers NOT_FOUND, a locked parent asks for its unlock proof, and a locked child's
  * requests stay out (its owner unlocks the child to answer). The answer goes through `respondToToolApproval` on the
  * child thread, so the claim there decides it.
  */
 export const listSubAgentApprovals = authQuery
     .input({ parentThreadId: v.id("threads"), unlockProof: v.optional(v.string().max(MAX_LENGTH.short)) })
-    .output(v.array(vSubAgentApproval))
+    .output(v.object({ cut: v.array(v.id("subAgentRuns")), requests: v.array(vSubAgentApproval) }))
     .query(async ({ args, ctx }) => {
         const { userId } = ctx.user;
         const parent = await requireOwnedThread(ctx, args.parentThreadId, userId, args.unlockProof);
@@ -2109,13 +2100,21 @@ export const listSubAgentApprovals = authQuery
             .query("subAgentRuns")
             .withIndex("by_parentThreadId_and_status", (q) => q.eq("parentThreadId", parent._id).eq("status", "awaiting"))
             .take(AWAITING_RUNS_READ);
-        const approvals: SubAgentApproval[] = [];
+        const requests: SubAgentApproval[] = [];
+        // Runs whose requests the cap left out: their cards point to the child's thread.
+        const cut: Id<"subAgentRuns">[] = [];
 
         for (const run of runs) {
-            approvals.push(...(await openRequestsOfRun(ctx, run, userId, SUB_AGENT_APPROVALS_LISTED_MAX - approvals.length)));
+            const listed = await openRequestsOfRun(ctx, run, userId, SUB_AGENT_APPROVALS_LISTED_MAX - requests.length);
+
+            requests.push(...listed.requests);
+
+            if (listed.cut) {
+                cut.push(run._id);
+            }
         }
 
-        return approvals;
+        return { cut, requests };
     });
 
 /**

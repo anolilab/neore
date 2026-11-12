@@ -56261,71 +56261,88 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "items": {
-                    "properties": {
-                      "approvalId": {
-                        "type": "string"
-                      },
-                      "childThreadId": {
-                        "description": "Id<\"threads\">",
-                        "type": "string",
-                        "x-lunora-table": "threads"
-                      },
-                      "input": {
-                        "type": "string"
-                      },
-                      "omittedCharacters": {
-                        "type": "number"
-                      },
-                      "runId": {
+                  "properties": {
+                    "cut": {
+                      "items": {
                         "description": "Id<\"subAgentRuns\">",
                         "type": "string",
                         "x-lunora-table": "subAgentRuns"
                       },
-                      "server": {
-                        "anyOf": [
-                          {
-                            "type": "string"
-                          },
-                          {
-                            "type": "null"
-                          }
-                        ]
-                      },
-                      "skillSlug": {
-                        "anyOf": [
-                          {
-                            "type": "string"
-                          },
-                          {
-                            "type": "null"
-                          }
-                        ]
-                      },
-                      "toolName": {
-                        "anyOf": [
-                          {
-                            "type": "string"
-                          },
-                          {
-                            "type": "null"
-                          }
-                        ]
-                      }
+                      "type": "array"
                     },
-                    "required": [
-                      "approvalId",
-                      "childThreadId",
-                      "input",
-                      "omittedCharacters",
-                      "runId",
-                      "server",
-                      "skillSlug",
-                      "toolName"
-                    ],
-                    "type": "object"
+                    "requests": {
+                      "items": {
+                        "properties": {
+                          "approvalId": {
+                            "type": "string"
+                          },
+                          "childThreadId": {
+                            "description": "Id<\"threads\">",
+                            "type": "string",
+                            "x-lunora-table": "threads"
+                          },
+                          "input": {
+                            "type": "string"
+                          },
+                          "omittedCharacters": {
+                            "type": "number"
+                          },
+                          "runId": {
+                            "description": "Id<\"subAgentRuns\">",
+                            "type": "string",
+                            "x-lunora-table": "subAgentRuns"
+                          },
+                          "server": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "skillSlug": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "toolName": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "approvalId",
+                          "childThreadId",
+                          "input",
+                          "omittedCharacters",
+                          "runId",
+                          "server",
+                          "skillSlug",
+                          "toolName"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    }
                   },
-                  "type": "array"
+                  "required": [
+                    "cut",
+                    "requests"
+                  ],
+                  "type": "object"
                 }
               }
             },

@@ -9,7 +9,7 @@ import { lunora, lunoraError, lunoraHandlers } from "@/storybook/lunora";
 
 import SubAgentApprovals from "./sub-agent-approvals";
 
-type Request = ReturnOf<typeof api.sub_agents.functions.listSubAgentApprovals>[number];
+type Request = ReturnOf<typeof api.sub_agents.functions.listSubAgentApprovals>["requests"][number];
 
 const RUN_ID = "run-1" as Request["runId"];
 const CHILD_ID = "thread-child" as Request["childThreadId"];
@@ -31,7 +31,7 @@ const answers: ArgsOf<typeof api.chat.tool_permissions.respondToToolApproval>[] 
 const handlers = (...fixtures: LunoraFixture[]) =>
     lunoraHandlers(
         ...userFixtures(),
-        lunora(api.sub_agents.functions.listSubAgentApprovals, [REQUEST]),
+        lunora(api.sub_agents.functions.listSubAgentApprovals, { cut: [], requests: [REQUEST] }),
         lunora(api.chat.tool_permissions.respondToToolApproval, (args) => {
             answers.push(args);
 
@@ -52,6 +52,7 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 const ALLOWED_FOR_A_PERIOD = /for 1 hour|for today/iu;
+const MORE_WAITING = "More requests are waiting in the sub-agent's thread.";
 
 /** The sub-agent waits: its request names it, the tool and the server, and offers allow once, deny and always allow, never an allow for a period. */
 export const Waiting: Story = {
@@ -65,6 +66,7 @@ export const Waiting: Story = {
         await expect(canvas.getByRole("button", { name: "Always allow delete" })).toBeEnabled();
         // The claim refuses a timed allow for a sub-agent's request, so the card does not offer one.
         await expect(canvas.queryByRole("button", { name: ALLOWED_FOR_A_PERIOD })).not.toBeInTheDocument();
+        await expect(canvas.queryByText(MORE_WAITING)).not.toBeInTheDocument();
     },
 };
 
@@ -105,18 +107,22 @@ export const Refused: Story = {
     },
 };
 
-/** A long tool input, cut by the server: the card says how much it does not show. */
+/** A long tool input, cut by the server: the card says how much it does not show, in the locale's number format. */
 export const LongInput: Story = {
     parameters: {
         msw: {
-            handlers: { lunora: handlers(lunora(api.sub_agents.functions.listSubAgentApprovals, [{ ...REQUEST, omittedCharacters: 1200, skillSlug: null }])) },
+            handlers: {
+                lunora: handlers(
+                    lunora(api.sub_agents.functions.listSubAgentApprovals, { cut: [], requests: [{ ...REQUEST, omittedCharacters: 1200, skillSlug: null }] }),
+                ),
+            },
         },
     },
     play: async ({ canvas }) => {
         await canvas.findByRole("group", { name: 'The sub-agent wants to run "delete"' });
         await userEvent.click(canvas.getByText("Show what it will send"));
 
-        await expect(canvas.getByText(/1200 more characters not shown; approving runs the whole call/u)).toBeVisible();
+        await expect(canvas.getByText(/1,200 more characters not shown; approving runs the whole call/u)).toBeVisible();
     },
 };
 
@@ -128,5 +134,16 @@ export const LoadError: Story = {
     play: async ({ canvas }) => {
         await expect(await canvas.findByRole("alert")).toHaveTextContent("Could not load the sub-agent's requests.");
         await expect(canvas.queryByRole("button", { name: "Approve delete once" })).not.toBeInTheDocument();
+    },
+};
+
+/** The list's cap dropped some of this run's requests: the card says more wait in the child's thread. */
+export const CutShort: Story = {
+    parameters: {
+        msw: { handlers: { lunora: handlers(lunora(api.sub_agents.functions.listSubAgentApprovals, { cut: [RUN_ID], requests: [REQUEST] })) } },
+    },
+    play: async ({ canvas }) => {
+        await canvas.findByRole("group", { name: '/tidy wants to run "delete"' });
+        await expect(canvas.getByText(MORE_WAITING)).toBeVisible();
     },
 };

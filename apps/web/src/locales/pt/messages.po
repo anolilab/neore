@@ -37,9 +37,9 @@ msgstr "-- NORMAL --"
 msgid ", unread"
 msgstr ", não lida"
 
-#: src/features/sub-agents/components/sub-agent-approvals.tsx:50
-msgid "… ({omitted} more characters not shown; approving runs the whole call)"
-msgstr "… (mais {omitted} caracteres não exibidos; aprovar executa a chamada inteira)"
+#: src/features/sub-agents/components/sub-agent-approvals.tsx:55
+msgid "… ({omitted, plural, one {# more character not shown} other {# more characters not shown}}; approving runs the whole call)"
+msgstr "… ({omitted, plural, one {mais # caractere não exibido} other {mais # caracteres não exibidos}}; aprovar executa a chamada inteira)"
 
 #. placeholder {0}: state.conversations.length - 10
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:373
@@ -1234,7 +1234,7 @@ msgstr "{name} removido dos favoritos"
 msgid "{name} resumed"
 msgstr "{name} retomado"
 
-#: src/features/sub-agents/components/sub-agent-approvals.tsx:57
+#: src/features/sub-agents/components/sub-agent-approvals.tsx:63
 msgid "{name} wants to run \"{tool}\""
 msgstr "{name} quer executar \"{tool}\""
 
@@ -1935,7 +1935,7 @@ msgstr "Um modelo adiciona os participantes às suas habilidades, onde você pod
 msgid "A thread gets a reply"
 msgstr "Uma conversa recebe uma resposta"
 
-#: src/features/sub-agents/components/sub-agent-approvals.tsx:47
+#: src/features/sub-agents/components/sub-agent-approvals.tsx:50
 msgid "a tool"
 msgstr "uma ferramenta"
 
@@ -3270,11 +3270,11 @@ msgstr ""
 msgid "All Users"
 msgstr "Todos os usuários"
 
-#: src/features/chat/thread/tool-approval.tsx:175
+#: src/features/chat/thread/tool-approval.tsx:170
 msgid "Allow \"{tool}\" from {server}?"
 msgstr "Permitir \"{tool}\" de {server}?"
 
-#: src/features/chat/thread/tool-approval.tsx:175
+#: src/features/chat/thread/tool-approval.tsx:170
 msgid "Allow \"{tool}\"?"
 msgstr "Permitir \"{tool}\"?"
 
@@ -3282,19 +3282,19 @@ msgstr "Permitir \"{tool}\"?"
 msgid "Allow \"delete_files\" from the drafts server?"
 msgstr ""
 
-#: src/features/chat/thread/tool-approval.tsx:143
+#: src/features/chat/thread/tool-approval.tsx:138
 msgid "Allow {tool} for 1 hour"
 msgstr "Permitir {tool} por 1 hora"
 
-#: src/features/chat/thread/tool-approval.tsx:147
+#: src/features/chat/thread/tool-approval.tsx:142
 msgid "Allow {tool} for today"
 msgstr "Permitir {tool} por hoje"
 
-#: src/features/chat/thread/tool-approval.tsx:145
+#: src/features/chat/thread/tool-approval.tsx:140
 msgid "Allow for 1 hour"
 msgstr "Permitir por 1 hora"
 
-#: src/features/chat/thread/tool-approval.tsx:149
+#: src/features/chat/thread/tool-approval.tsx:144
 msgid "Allow for today"
 msgstr "Permitir por hoje"
 
@@ -3345,12 +3345,12 @@ msgstr "Já vinculado a esta conversa."
 msgid "Also viewing"
 msgstr "Também visualizando"
 
-#: src/features/chat/thread/tool-approval.tsx:139
+#: src/features/chat/thread/tool-approval.tsx:134
 #: src/features/marketing/use-cases/visuals/approvals-visual.tsx:35
 msgid "Always allow"
 msgstr "Sempre permitir"
 
-#: src/features/chat/thread/tool-approval.tsx:137
+#: src/features/chat/thread/tool-approval.tsx:132
 msgid "Always allow {tool}"
 msgstr "Sempre permitir {tool}"
 
@@ -3789,14 +3789,14 @@ msgid "Approvals in Neore: a tool you set to Ask stops before it runs, and you d
 msgstr ""
 
 #: src/features/auth/components/device-approval.tsx:242
-#: src/features/chat/thread/tool-approval.tsx:131
+#: src/features/chat/thread/tool-approval.tsx:126
 #: src/features/develop/components/review-panel.tsx:64
 #: src/features/marketing/use-cases/visuals/approvals-visual.tsx:32
 #: src/features/tasks/components/task-detail-dialog.tsx:104
 msgid "Approve"
 msgstr "Aprovar"
 
-#: src/features/chat/thread/tool-approval.tsx:129
+#: src/features/chat/thread/tool-approval.tsx:124
 msgid "Approve {tool} once"
 msgstr "Aprovar {tool} uma vez"
 
@@ -3820,7 +3820,7 @@ msgstr ""
 msgid "Approved"
 msgstr ""
 
-#: src/features/chat/thread/tool-approval.tsx:88
+#: src/features/chat/thread/tool-approval.tsx:83
 #: src/features/marketing/use-cases/visuals/approvals-visual.tsx:23
 msgid "Approved — running tool"
 msgstr "Aprovado — executando ferramenta"
@@ -8399,7 +8399,7 @@ msgstr "Não foi possível carregar a divisão por projeto."
 msgid "Could not load the skill breakdown."
 msgstr "Não foi possível carregar o detalhamento por habilidade."
 
-#: src/features/sub-agents/components/sub-agent-approvals.tsx:38
+#: src/features/sub-agents/components/sub-agent-approvals.tsx:40
 msgid "Could not load the sub-agent's requests."
 msgstr "Não foi possível carregar as solicitações do subagente."
 
@@ -8585,7 +8585,7 @@ msgid "Could not send your answer."
 msgstr "Não foi possível enviar sua resposta."
 
 #: src/features/chat/thread/ask-user-prompt.tsx:116
-#: src/features/chat/thread/tool-approval.tsx:77
+#: src/features/chat/thread/tool-approval.tsx:72
 msgid "Could not send your answer. Please try again."
 msgstr "Não foi possível enviar sua resposta. Tente novamente."
 
@@ -10054,7 +10054,7 @@ msgstr "Tarefas exigentes em que a máxima capacidade de IA e o raciocínio refi
 msgid "Denied"
 msgstr "Negado"
 
-#: src/features/chat/thread/tool-approval.tsx:86
+#: src/features/chat/thread/tool-approval.tsx:81
 msgid "Denied — continuing without it"
 msgstr "Negado — continuando sem ela"
 
@@ -10075,12 +10075,12 @@ msgid "Density updated"
 msgstr "Densidade atualizada"
 
 #: src/features/auth/components/device-approval.tsx:233
-#: src/features/chat/thread/tool-approval.tsx:135
+#: src/features/chat/thread/tool-approval.tsx:130
 #: src/features/marketing/use-cases/visuals/approvals-visual.tsx:34
 msgid "Deny"
 msgstr "Negar"
 
-#: src/features/chat/thread/tool-approval.tsx:133
+#: src/features/chat/thread/tool-approval.tsx:128
 msgid "Deny {tool}"
 msgstr "Negar {tool}"
 
@@ -20415,6 +20415,10 @@ msgstr "Mais opções"
 msgid "More pages"
 msgstr "Mais páginas"
 
+#: src/features/sub-agents/components/sub-agent-approvals.tsx:77
+msgid "More requests are waiting in the sub-agent's thread."
+msgstr "Há mais solicitações aguardando na conversa do subagente."
+
 #: src/features/workflow/components/nodes/advanced-controls-node.tsx:172
 msgid "More steps = higher quality, longer generation"
 msgstr "Mais passos = mais qualidade, geração mais demorada"
@@ -29461,7 +29465,7 @@ msgstr "Mostrar data e hora"
 msgid "Show up to {rowLimit} rows ({byteCount} bytes)"
 msgstr "Mostrar até {rowLimit} linhas ({byteCount} bytes)"
 
-#: src/features/chat/thread/tool-approval.tsx:120
+#: src/features/chat/thread/tool-approval.tsx:115
 msgid "Show what it will send"
 msgstr "Mostrar o que será enviado"
 
@@ -32998,7 +33002,7 @@ msgstr "O servidor ainda não lista nenhum modelo — baixe ou carregue um prime
 msgid "The skill could not be imported."
 msgstr "Não foi possível importar a habilidade."
 
-#: src/features/sub-agents/components/sub-agent-approvals.tsx:46
+#: src/features/sub-agents/components/sub-agent-approvals.tsx:49
 msgid "The sub-agent"
 msgstr "O subagente"
 
@@ -36603,7 +36607,7 @@ msgstr "Aguardando o proprietário"
 msgid "Waiting for the owner to answer"
 msgstr "Aguardando a resposta do proprietário"
 
-#: src/features/chat/thread/tool-approval.tsx:83
+#: src/features/chat/thread/tool-approval.tsx:78
 msgid "Waiting for the owner to approve"
 msgstr "Aguardando a aprovação do proprietário"
 
@@ -36631,7 +36635,7 @@ msgstr "Aguardando sua resposta em {0}"
 
 #: src/features/chat/thread-list/thread-node.tsx:634
 #: src/features/chat/thread-list/thread-node.tsx:641
-#: src/features/chat/thread/tool-approval.tsx:83
+#: src/features/chat/thread/tool-approval.tsx:78
 #: src/features/home/components/home-page.tsx:114
 #: src/features/marketing/use-cases/visuals/approvals-visual.tsx:20
 #: src/features/sub-agents/components/sub-agent-tool-view.tsx:57

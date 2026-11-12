@@ -4,9 +4,11 @@
  * A waiting sub-agent's requests, shown on its card in the parent conversation: the owner allows once, always allows or
  * denies from here. The answer is `respondToToolApproval` on the CHILD's thread, the same claim its own chat uses, so a
  * sub-agent's request offers no allow for a period (the claim refuses one). A locked child's requests are not listed;
- * its owner unlocks the child to answer.
+ * its owner unlocks the child to answer. When the list's cap dropped some, the card says more wait in the child's
+ * thread (linked on the sub-agent's card), where every request can be answered.
  */
 
+import { plural } from "@lingui/core/macro";
 import { useLingui } from "@lingui/react/macro";
 import type { Id } from "@neore/backend/dataModel";
 import { useUnlockProof } from "@neore/client-runtime";
@@ -40,14 +42,18 @@ const SubAgentApprovals: FC<{ parentThreadId: string; runId: string }> = ({ pare
         );
     }
 
-    const requests = (data ?? []).filter((request) => request.runId === runId);
+    const requests = (data?.requests ?? []).filter((request) => request.runId === runId);
+    const isCut = data?.cut.includes(runId as Id<"subAgentRuns">) === true;
 
-    return requests.map((request) => {
+    const cards = requests.map((request) => {
         const name = request.skillSlug ? `/${request.skillSlug}` : t`The sub-agent`;
         const tool = request.toolName ?? t`a tool`;
         const omitted = request.omittedCharacters;
         // A cut preview says so: approving runs the whole call, so the owner must see that more is not shown.
-        const input = omitted > 0 ? `${request.input}\n${t`… (${omitted} more characters not shown; approving runs the whole call)`}` : request.input;
+        const input =
+            omitted > 0
+                ? `${request.input}\n${t`… (${plural(omitted, { one: "# more character not shown", other: "# more characters not shown" })}; approving runs the whole call)`}`
+                : request.input;
 
         return (
             <div className="mt-2" key={request.approvalId}>
@@ -64,6 +70,13 @@ const SubAgentApprovals: FC<{ parentThreadId: string; runId: string }> = ({ pare
             </div>
         );
     });
+
+    return (
+        <>
+            {cards}
+            {isCut && <p className="text-muted-foreground mt-2 text-xs">{t`More requests are waiting in the sub-agent's thread.`}</p>}
+        </>
+    );
 };
 
 export default SubAgentApprovals;

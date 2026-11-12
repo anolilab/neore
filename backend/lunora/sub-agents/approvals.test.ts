@@ -108,8 +108,13 @@ const pendingRequests = async (): Promise<any[]> =>
 const answer = async (approvalId: string, decision: string): Promise<unknown> =>
     await as(OWNER).mutation(respondToToolApproval as never, { approvalId, decision, threadId: childId } as never);
 const continuations = () => jobsQueueMessages.filter((message) => message.body.functionPath.includes("continueAfterToolApproval"));
-const listed = async (userId = OWNER, threadId = parentId): Promise<any[]> =>
-    (await as(userId).query(listSubAgentApprovals as never, { parentThreadId: threadId } as never)) as any[];
+const listing = async (userId = OWNER, threadId = parentId): Promise<{ cut: string[]; requests: any[] }> =>
+    (await as(userId).query(listSubAgentApprovals as never, { parentThreadId: threadId } as never)) as never;
+const listed = async (userId?: string, threadId?: string): Promise<any[]> => {
+    const { requests } = await listing(userId, threadId);
+
+    return requests;
+};
 const runStatus = async (): Promise<string> => {
     const row = await runRow();
 
@@ -169,10 +174,23 @@ beforeEach(async () => {
         await context.db.insert("messages", {
             message: {
                 content: [
-                    { input: { path: "/tmp/old.txt" }, toolCallId: "call-1", toolName: TOOL, type: "tool-call" },
+                    // The labels a pause stamps on the call: a tool name may hold a colon, and a connector has no `mcp:` key.
+                    {
+                        input: { path: "/tmp/old.txt" },
+                        providerOptions: { neore: { mcpServerName: "Files", mcpToolName: "files:delete" } },
+                        toolCallId: "call-1",
+                        toolName: TOOL,
+                        type: "tool-call",
+                    },
                     { approvalId: APPROVAL_ID, toolCallId: "call-1", type: "tool-approval-request" },
                     // A sibling: the same step asked for a second tool at once.
-                    { input: { path: "/tmp/other.txt" }, toolCallId: "call-2", toolName: TOOL, type: "tool-call" },
+                    {
+                        input: { path: "/tmp/other.txt" },
+                        providerOptions: { neore: { mcpServerName: "GitHub", mcpToolName: "create_issue" } },
+                        toolCallId: "call-2",
+                        toolName: TOOL,
+                        type: "tool-call",
+                    },
                     { approvalId: SIBLING_ID, toolCallId: "call-2", type: "tool-approval-request" },
                 ],
                 role: "assistant",
@@ -558,8 +576,8 @@ describe("a child that waited on a request", () => {
 });
 
 describe("a waiting child's requests in its parent conversation", () => {
-    it("lists nothing while the child runs, then each request with its tool, server and input once it waits", async () => {
-        expect(await listed()).toStrictEqual([]);
+    it("lists nothing while the child runs, then each request with the tool and server stamped on its call, and its input", async () => {
+        expect(await listing()).toStrictEqual({ cut: [], requests: [] });
 
         await run(async (context) => await markRunAwaiting(context, runId));
 
@@ -577,8 +595,9 @@ describe("a waiting child's requests in its parent conversation", () => {
             runId,
             server: "Files",
             skillSlug: null,
-            toolName: "delete",
+            toolName: "files:delete",
         });
+        expect(requests.find((request) => request.approvalId === SIBLING_ID)).toMatchObject({ server: "GitHub", toolName: "create_issue" });
     });
 
     it("answers the parent's owner alone: a stranger's read is NOT_FOUND, a locked parent needs its unlock, a locked child is left out", async () => {
@@ -664,8 +683,8 @@ describe("a waiting child's requests in its parent conversation", () => {
             for (const approvalId of ids) {
                 await context.db.insert("toolApprovalRuns", {
                     approvalId,
-                    // Another run's request among the first ten: it takes no slot.
-                    config: approvalId === "approval-many-2" ? { ...CONFIG(), subAgentRunId: undefined } : CONFIG(),
+                    // Another run's requests, among the first ten (it takes no slot) and last (dropping it cuts nothing).
+                    config: ["approval-many-2", "approval-many-11"].includes(approvalId) ? { ...CONFIG(), subAgentRunId: undefined } : CONFIG(),
                     createdAt: Date.now(),
                     status: "pending",
                     threadId: childId,
@@ -716,15 +735,19 @@ describe("a waiting child's requests in its parent conversation", () => {
             });
         });
 
-        const requests = await listed();
+        const { cut, requests } = await listing();
         const byId = new Map(requests.map((request) => [request.approvalId, request]));
 
         expect(requests).toHaveLength(10);
+        // Only the second run's card says more is waiting: the first run's last request was not its own.
+        expect(cut).toHaveLength(1);
+        expect(cut).not.toContain(runId);
         expect([...byId.keys()]).not.toContain("approval-many-2");
         expect([...byId.keys()]).toContain("approval-many-10");
         // 1,000 emoji left out: characters, not UTF-16 units.
         expect(byId.get("approval-many-0")).toMatchObject({ input: "x".repeat(3999), omittedCharacters: 1000 });
-        expect(byId.get("approval-many-1")).toMatchObject({ input: "", omittedCharacters: 0 });
+        // An unlabelled call shows its runtime name and no server.
+        expect(byId.get("approval-many-1")).toMatchObject({ input: "", omittedCharacters: 0, server: null, toolName: TOOL });
     });
 
     it("reads each child's latest turn on its own, past newer messages in the parent conversation", async () => {
