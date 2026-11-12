@@ -53,14 +53,21 @@ const EDGE_WHITESPACE = /^\s|\s$/;
  * the changes pinned in test/inline-breaks.test.ts: a break inside code or a heading; a
  * break at the edge of emphasis (or of an element whose text is trimmed); emphasis next to
  * other emphasis, which merges into a run; emphasis that touches a word character, which
- * uses `*`; and emphasis nested directly in the same kind inside a parent with no printing
- * block, which writes no delimiters. Every other document must match upstream.
+ * uses `*`; emphasis nested directly in the same kind inside a parent with no printing
+ * block, which writes no delimiters; and links that share a reference label with different
+ * destinations, which get their own ids (test/escaping-links.test.ts). Every other document
+ * must match upstream.
  */
 function isChangedOnPurpose(html: string, options: Partial<Options>): boolean {
     // The converter's own DOM, with whitespace collapsed, so the checks see the same text it does.
     const root = rootNode(html, new TurndownService(options).options) as Element;
 
     if (root.querySelector(BREAK_IN_CODE_OR_HEADING)) {
+        return true;
+    }
+
+    // Two links that share a label but not a destination: upstream sends both to the first definition.
+    if (isNamedReference(options) && hasSharedLabel(root)) {
         return true;
     }
 
@@ -80,6 +87,33 @@ function isChangedOnPurpose(html: string, options: Partial<Options>): boolean {
         if (EMPHASIS_NAMES.has(element.nodeName) && hasOutput(element) && hasChangedNeighbour(element)) {
             return true;
         }
+    }
+
+    return false;
+}
+
+function isNamedReference(options: Partial<Options>): boolean {
+    return options.linkStyle === "referenced" && (options.linkReferenceStyle === "collapsed" || options.linkReferenceStyle === "shortcut");
+}
+
+/**
+ * True when two links with a destination have the same text, ignoring case and whitespace runs, but
+ * different destinations or titles. The text is the DOM's, which only over-matches the label the rule
+ * writes, so a document is skipped only when a shared label could occur.
+ */
+function hasSharedLabel(root: Element): boolean {
+    const definitions = new Map<string, string>();
+
+    for (const link of root.querySelectorAll("a[href]")) {
+        const label = (link.textContent ?? "").replaceAll(/\s+/g, " ").trim().toLowerCase();
+        const definition = `${link.getAttribute("href") ?? ""}\u0000${link.getAttribute("title") ?? ""}`;
+        const seen = definitions.get(label);
+
+        if (seen !== undefined && seen !== definition) {
+            return true;
+        }
+
+        definitions.set(label, definition);
     }
 
     return false;
@@ -194,11 +228,12 @@ function isWordNeighbour(sibling: Node | null, side: (typeof SIDES)[number]): bo
     return facing !== undefined && WORD_CHARACTER.test(facing);
 }
 
-// Measured: 1383 of the 1500 documents are compared. A blank block counts as a printing block
+// Measured: 1380 of the 1500 documents are compared. A blank block counts as a printing block
 // in the predicate too, so a parent with one keeps its delimiters and is compared like upstream.
 // The floor is that count, so an exclusion that grows (a regression hidden as an intended
-// change) fails the test.
-const MIN_COMPARED = 1383;
+// change) fails the test. The 3 documents lost since 1383 are links that share a reference
+// label with different destinations, the intended change in test/escaping-links.test.ts.
+const MIN_COMPARED = 1380;
 
 // Mulberry32: a small seeded PRNG, so a failure reproduces exactly.
 function createRandom(seed: number): () => number {

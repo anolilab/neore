@@ -275,3 +275,23 @@ describe("review: formatted text after a hard break in link text", () => {
         expect(convert(`<a href="/x">one<br><hr>two</a>`)).not.toContain("one  \n");
     });
 });
+
+describe("review: reference labels that two links share", () => {
+    it("gives a second collapsed link its own id when its label names another destination", () => {
+        expect(convert(`<a href="/a">one</a> <a href="/b">one</a>`, { linkStyle: "referenced", linkReferenceStyle: "collapsed" })).toBe(
+            "[one][] [one][2]\n\n[one]: /a\n[2]: /b",
+        );
+    });
+
+    it("treats labels that differ only in case as the same label, so a shortcut link gets its own id", () => {
+        expect(convert(`<a href="/a">one</a> <a href="/b">One</a>`, { linkStyle: "referenced", linkReferenceStyle: "shortcut" })).toBe(
+            "[one] [One][2]\n\n[one]: /a\n[2]: /b",
+        );
+    });
+
+    it("guard, passes before and after: two links to one destination under one label share one label", () => {
+        expect(convert(`<a href="/a">one</a> <a href="/a">one</a>`, { linkStyle: "referenced", linkReferenceStyle: "collapsed" })).toBe(
+            "[one][] [one][]\n\n[one]: /a\n[one]: /a",
+        );
+    });
+});

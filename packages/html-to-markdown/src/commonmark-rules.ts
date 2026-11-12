@@ -76,6 +76,16 @@ const BLOCK_OPENERS: ReadonlyArray<RegExp> = [
     HTML_BLOCK_START,
 ];
 
+const WHITESPACE_RUN = /\s+/g;
+
+/**
+ * A reference label as CommonMark matches it: leading and trailing whitespace dropped, each run of
+ * whitespace read as one space, and case ignored.
+ */
+function normalizeLabel(text: string): string {
+    return text.replaceAll(WHITESPACE_RUN, " ").trim().toLowerCase();
+}
+
 function hasHref(node: Node): boolean {
     return node.nodeName === "A" && Boolean((node as Element).getAttribute("href"));
 }
@@ -101,6 +111,12 @@ function isReferencedLink(node: AnnotatedNode, options: Options): boolean {
 class ReferenceLinkRule implements Rule {
     references: string[] = [];
 
+    /**
+     * The destination (with its title) that each label names, so a second link with the same label
+     * and another destination is not sent to the first. Keys are labels as CommonMark matches them.
+     */
+    labels = new Map<string, string>();
+
     filter = isReferencedLink;
 
     replacement(content: string, node: AnnotatedNode, options: Options): string {
@@ -118,31 +134,37 @@ class ReferenceLinkRule implements Rule {
             title = ` "${escapeLinkTitle(title)}"`;
         }
 
-        let replacement: string;
-        let reference: string;
+        const definition = `${href}${title}`;
+        const isInline = options.linkReferenceStyle === "collapsed" || options.linkReferenceStyle === "shortcut";
+        const label = normalizeLabel(text);
+        const owner = isInline ? this.labels.get(label) : undefined;
 
-        switch (options.linkReferenceStyle) {
-            case "collapsed": {
-                replacement = `[${text}][]`;
-                reference = `[${text}]: ${href}${title}`;
-                break;
-            }
-            case "shortcut": {
-                replacement = `[${text}]`;
-                reference = `[${text}]: ${href}${title}`;
-                break;
-            }
-            default: {
-                const id = this.references.length + 1;
+        // A label that another link names with a different destination cannot name this one, so it
+        // takes a numbered id. The same destination under the same label is one definition either way.
+        if (isInline && (owner === undefined || owner === definition)) {
+            this.labels.set(label, definition);
+            this.references.push(`[${text}]: ${definition}`);
 
-                replacement = `[${text}][${id}]`;
-                reference = `[${id}]: ${href}${title}`;
-            }
+            return options.linkReferenceStyle === "collapsed" ? `[${text}][]` : `[${text}]`;
         }
 
-        this.references.push(reference);
+        const id = this.nextId();
 
-        return replacement;
+        this.labels.set(String(id), definition);
+        this.references.push(`[${id}]: ${definition}`);
+
+        return `[${text}][${id}]`;
+    }
+
+    /** The next numbered id, skipping any number that a label already names. */
+    private nextId(): number {
+        let id = this.references.length + 1;
+
+        while (this.labels.has(String(id))) {
+            id += 1;
+        }
+
+        return id;
     }
 
     append(): string {
@@ -151,6 +173,7 @@ class ReferenceLinkRule implements Rule {
         if (this.references.length > 0) {
             references = `\n\n${this.references.join("\n")}\n\n`;
             this.references = []; // Reset references
+            this.labels = new Map(); // and the labels they name
         }
 
         return references;
