@@ -834,7 +834,14 @@ const ComposerInput = ({
 
     // The paste position as offsets into the plain draft text (the editor joins blocks with "\n"); the end when unknown.
     // `textBefore` and `textAfter`: whether the caret's line has text on that side of it.
-    const pasteSelection = useCallback((): { end: number; start: number; textAfter: boolean; textBefore: boolean } => {
+    const pasteSelection = useCallback((): {
+        end: number;
+        lineAfter?: boolean;
+        lineBefore?: boolean;
+        start: number;
+        textAfter: boolean;
+        textBefore: boolean;
+    } => {
         const editor = inputAreaRef.current?.getEditor()?.getEditor();
 
         if (!editor || editor.isDestroyed) {
@@ -846,11 +853,18 @@ const ComposerInput = ({
         const { doc, selection } = editor.state;
         const isText = (node: { type: { name: string } } | null): boolean => node !== null && node.type.name !== "hardBreak";
 
+        const { $from, $to } = selection;
+        // The line just above or below the caret's own: the block before or after its paragraph, when that has text.
+        const lineBefore = $from.parentOffset === 0 && $from.depth > 0 && Boolean(doc.resolve($from.before()).nodeBefore?.textContent);
+        const lineAfter = $to.parentOffset === $to.parent.content.size && $to.depth > 0 && Boolean(doc.resolve($to.after()).nodeAfter?.textContent);
+
         return {
             end: doc.textBetween(0, selection.to, "\n").length,
+            lineAfter,
+            lineBefore,
             start: doc.textBetween(0, selection.from, "\n").length,
-            textAfter: isText(selection.$to.nodeAfter),
-            textBefore: isText(selection.$from.nodeBefore),
+            textAfter: isText($to.nodeAfter),
+            textBefore: isText($from.nodeBefore),
         };
     }, []);
 
@@ -962,7 +976,7 @@ const ComposerInput = ({
 
             if (!isLongPaste(pastedText)) {
                 const draft = useChatUIStore.getState().composerText;
-                const inserted = converted ? onOwnLines(pastedText, selection.textBefore, selection.textAfter) : pastedText;
+                const inserted = converted ? onOwnLines(pastedText, selection.textBefore, selection.textAfter, selection) : pastedText;
 
                 // Into the editor only while the store still holds the draft the paste was made in: an update the editor has not
                 // caught up with yet would otherwise be written over by the stale document's next change.

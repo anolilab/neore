@@ -164,7 +164,7 @@ interface AttachLongPasteOptions {
     onNotInserted: (error: string) => void;
     pastedText: string;
     /** Where the paste landed in the draft, read before the upload started, and whether the caret's line has text on either side. */
-    selection: { end: number; start: number; textAfter?: boolean; textBefore?: boolean };
+    selection: { end: number; lineAfter?: boolean; lineBefore?: boolean; start: number; textAfter?: boolean; textBefore?: boolean };
     setDraft: (text: string) => void;
 }
 
@@ -214,7 +214,7 @@ export const attachLongPaste = async ({
 
     // The same line handling as a short paste: at the old caret its neighbours decide, appended the first line does.
     if (draft === draftAtPaste) {
-        const text = converted ? onOwnLines(pastedText, selection.textBefore ?? false, selection.textAfter ?? false) : pastedText;
+        const text = converted ? onOwnLines(pastedText, selection.textBefore ?? false, selection.textAfter ?? false, selection) : pastedText;
 
         setDraft(insertPastedText(draft, text, selection.start, selection.end));
     } else {

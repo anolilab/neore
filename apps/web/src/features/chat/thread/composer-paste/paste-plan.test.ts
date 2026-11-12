@@ -503,3 +503,23 @@ describe("a paste inside a code block the person typed", () => {
         await expect(paste(vscode)).resolves.toBe(`\`\`\`typescript\n${code}\n\`\`\``);
     });
 });
+
+describe("a converted block pasted on a line of its own", () => {
+    it("takes the blank line a table needs beside text on the line below or above", () => {
+        const table = "| A |\n| --- |";
+
+        expect(onOwnLines(table, false, false, { lineAfter: true })).toBe(`${table}\n`);
+        expect(onOwnLines(table, false, false, { lineBefore: true })).toBe(`\n${table}`);
+        expect(onOwnLines("# Title", false, false, { lineAfter: true })).toBe("# Title");
+        expect(onOwnLines(table, false, false)).toBe(table);
+    });
+});
+
+describe("plain-looking HTML that still carries Markdown", () => {
+    it("converts a horizontal rule or a task box outside a list instead of taking the plain text", async () => {
+        await expect(paste({ "text/html": '<div><input type="checkbox" checked>Finish report</div>', "text/plain": "Finish report" })).resolves.toBe(
+            "[x] Finish report",
+        );
+        await expect(paste({ "text/html": "<div>a</div><hr><div>b</div>", "text/plain": "a\nb" })).resolves.toContain("---");
+    });
+});

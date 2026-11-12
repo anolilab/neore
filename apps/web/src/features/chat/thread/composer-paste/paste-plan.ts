@@ -14,7 +14,9 @@ const HREF = /href/i;
 const LANGUAGE = /class=["']?[^"'>]{0,200}(?:language|lang|highlight)-/i;
 // Formatting the Markdown can carry. A `<pre>` alone is not in it: terminals and code editors wrap their text in one.
 const FORMATTING = [
-    /<(?:h[1-6]|ul|ol|table|blockquote)[\s>]/i,
+    /<(?:h[1-6]|ul|ol|table|blockquote|hr)[\s/>]/i,
+    // A task box outside a list: `<input>` has no closing tag, so its type is looked for within the tag only.
+    /<input[^>]{0,200}checkbox/i,
     /<(?:[bis]|strong|em|del|strike|code|kbd|math|img)[\s>]/i,
     /font-weight\s*:\s*(?:bold|[6-9]00)|font-style\s*:\s*italic/i,
     /text-decoration[\w-]{0,20}\s*:[^;"]{0,100}line-through/i,
@@ -171,10 +173,29 @@ const blockBreak = (line: string, side: "after" | "before"): string => {
 export const breaksBefore = (markdown: string): number => Math.max(blockBreak(markdown.split("\n", 1)[0] ?? "", "before").length, 1);
 
 /** `markdown` with line breaks where its first or last line is a block that would join the text beside the caret. */
-export const onOwnLines = (markdown: string, textBefore: boolean, textAfter: boolean): string => {
+export const onOwnLines = (
+    markdown: string,
+    textBefore: boolean,
+    textAfter: boolean,
+    { lineAfter = false, lineBefore = false }: { lineAfter?: boolean; lineBefore?: boolean } = {},
+): string => {
     const lines = markdown.split("\n");
+    const first = lines[0] ?? "";
+    const last = lines.at(-1) ?? "";
+    let before = textBefore ? blockBreak(first, "before") : "";
+    let after = textAfter ? blockBreak(last, "after") : "";
 
-    return (textBefore ? blockBreak(lines[0] ?? "", "before") : "") + markdown + (textAfter ? blockBreak(lines.at(-1) ?? "", "after") : "");
+    // On a line of its own, with text on the line just above or below: the draft already has one break there, a block
+    // that needs a blank line beside that text takes one more.
+    if (!textBefore && lineBefore && blockBreak(first, "before") === "\n\n") {
+        before = "\n";
+    }
+
+    if (!textAfter && lineAfter && blockBreak(last, "after") === "\n\n") {
+        after = "\n";
+    }
+
+    return before + markdown + after;
 };
 
 const markdownLink = (label: string, url: string): string =>
