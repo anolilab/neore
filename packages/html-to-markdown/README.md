@@ -17,12 +17,15 @@ Options and extension points (`addRule`, `use`) are the same as upstream's, with
 - `escape` is an instance property, so overriding `TurndownService.prototype.escape` has no effect.
 - Only own rules of `options.rules` are read, not inherited ones (upstream read inherited enumerable keys too).
 - Built-in rules no longer win over `keep` and `remove`, so `keep("p")` on `<p>Hello world</p>` gives `<p>Hello world</p>`,
-  where upstream gives `Hello world`, and `remove("i")` drops an `<i>` and its content. The order is: rules added with
-  `addRule` (newest first), then `keep`, then `remove`, then the built-in rules. So an `addRule` rule still comes first,
-  and a tag in both `keep` and `remove` is kept. `remove` does not convert the removed element's children. `keep` does,
-  so a custom `keepReplacement` receives the converted content. The default `keepReplacement` ignores its content, so
-  the children of a kept element are not converted either. This keeps a referenced link inside a kept element from
-  leaving an orphan `[1]: x` definition.
+  where upstream gives `Hello world`, and `remove("i")` drops an `<i>` and its content. The order is: the blank rule,
+  rules added with `addRule` (newest first), then `keep`, then `remove`, then the built-in rules. A blank element goes to
+  the blank rule first, even past `addRule` and `keep`, so `keep(["p"])` on `<p></p>a` gives `a`. An `addRule` rule still
+  comes before `keep`, and a tag in both `keep` and `remove` is kept. `remove` does not convert the removed element's
+  children. `keep` does, so a custom `keepReplacement` receives the converted content. The default `keepReplacement`
+  ignores its content, so the children of a kept element are not converted either. With the default, a referenced link
+  inside a kept element leaves no orphan `[1]: x` definition. A custom `keepReplacement` that ignores `content` still
+  converts the children, so `<span><a href="x">l</a></span>` with `linkStyle: "referenced"` and
+  `keepReplacement: (c, n) => n.outerHTML` gives `<span><a href="x">l</a></span>\n\n[1]: x`.
 
 Keeping or removing a structural tag drops its Markdown. The tag is output as HTML, or removed, so no list markers or
 code fences are left:

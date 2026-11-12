@@ -15,20 +15,21 @@ export function defaultKeepReplacement(_content: string, node: AnnotatedNode): s
 }
 
 /**
- * Manages the rules used to convert HTML to Markdown. For an element that is
- * not blank, the first match wins, in this order:
+ * Manages the rules used to convert HTML to Markdown. The first match wins, in
+ * this order:
  *
- * 1. rules added with `addRule`, newest first;
- * 2. keep filters, newest first (rendered as HTML);
- * 3. remove filters, newest first (dropped with their content);
- * 4. the built-in rules;
- * 5. the default rule.
+ * 1. the blank rule, for a blank element (only whitespace, no meaningful content);
+ * 2. rules added with `addRule`, newest first;
+ * 3. keep filters, newest first (rendered as HTML);
+ * 4. remove filters, newest first (dropped with their content);
+ * 5. the built-in rules;
+ * 6. the default rule.
  *
  * Keep and remove sit above the built-in rules, so `keep(['b'])` and
  * `remove(['i'])` also work for built-in tags (upstream #455). Upstream's
  * documentation says the built-in rules win, and this changes that on purpose.
- * The blank rule still comes first, as upstream documents, because a blank
- * element has no content to keep or remove.
+ * The blank rule comes first, as upstream documents, because a blank element
+ * has no content to keep or remove.
  */
 export default class Rules {
     private readonly customRules: Rule[] = [];
