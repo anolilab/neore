@@ -3560,17 +3560,20 @@ export const schema = defineSchema({
         .index("by_userId", ["userId"])
         .index("by_request_project", ["requestId", "pass", "projectId"]),
     // One small row per export run: its key, its owner, when it began, and the key of the usage JSON object it stored, if any. The
-    // row is that object's record: kept until the object is confirmed deleted, so the sweep can retry the purge from it. The sweep
-    // scans these rows, which hold no payloads, to find dead runs.
+    // row is that object's record: kept until the object is confirmed deleted, so the sweep can retry the purge from it. `deleteAt` is
+    // the time the sweep next acts on the run: each sweep that finds the run live sets it one time to live ahead, so a dead run's pieces
+    // go at that time. The sweep reads these rows, which hold no payloads.
     usageExportRuns: defineTable({
         createdAt: v.number(),
+        deleteAt: v.optional(v.number()),
         requestId: v.string(),
         usageKey: v.optional(v.string()),
         userId: v.string(),
     })
         .shardBy("userId")
-        .index("by_userId", ["userId"])
         .index("by_createdAt", ["createdAt"])
+        .index("by_deleteAt", ["deleteAt"])
+        .index("by_userId", ["userId"])
         .index("by_requestId", ["requestId"]),
 
     // The replies already in `usageDaily`, keyed by the reply's first row id:

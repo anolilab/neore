@@ -29491,6 +29491,12 @@
           "optional": false,
           "unique": false
         },
+        "deleteAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "requestId": {
           "kind": "string",
           "nullable": false,
@@ -29514,6 +29520,12 @@
         "by_createdAt": {
           "fields": [
             "createdAt"
+          ],
+          "unique": false
+        },
+        "by_deleteAt": {
+          "fields": [
+            "deleteAt"
           ],
           "unique": false
         },

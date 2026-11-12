@@ -1914,12 +1914,14 @@ export const usageExportRuns = sqliteTable("usageExportRuns", {
     _id: text("_id").primaryKey(),
     _creationTime: integer("_creationTime").notNull(),
     createdAt: real("createdAt").notNull(),
+    deleteAt: real("deleteAt"),
     requestId: text("requestId").notNull(),
     usageKey: text("usageKey"),
     userId: text("userId").notNull(),
 }, (t) => ({
-    by_userId: index("by_userId").on(t.userId),
     by_createdAt: index("by_createdAt").on(t.createdAt),
+    by_deleteAt: index("by_deleteAt").on(t.deleteAt),
+    by_userId: index("by_userId").on(t.userId),
     by_requestId: index("by_requestId").on(t.requestId),
 }));
 

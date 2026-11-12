@@ -2147,6 +2147,7 @@ export interface Doc_usageExportRuns {
     _id: Id<"usageExportRuns">;
     _creationTime: number;
     createdAt: number;
+    deleteAt?: number;
     requestId: string;
     usageKey?: string;
     userId: string;
@@ -2713,7 +2714,7 @@ export interface IndexNamesByTable {
     usageDaily: "by_user_skill_date" | "by_user_date" | "by_user_project_date" | "by_date";
     usageExportPieces: "by_userId" | "by_createdAt" | "by_request";
     usageExportProjects: "by_userId" | "by_request_project";
-    usageExportRuns: "by_userId" | "by_createdAt" | "by_requestId";
+    usageExportRuns: "by_createdAt" | "by_deleteAt" | "by_userId" | "by_requestId";
     usageReplies: "by_user_reply" | "by_recordedAt";
     user: "email_name" | "name" | "role" | "userId" | "by_isAnonymous";
     userConnectors: "by_user_and_definition" | "by_organization" | "by_status" | "by_connectorDefinitionId";
@@ -5345,6 +5346,7 @@ export interface Insert_usageExportRuns {
     _id?: Id<"usageExportRuns">;
     _creationTime?: number;
     createdAt: number;
+    deleteAt?: number;
     requestId: string;
     usageKey?: string;
     userId: string;
