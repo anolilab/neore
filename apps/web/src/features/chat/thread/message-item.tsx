@@ -270,7 +270,6 @@ const DefaultActionBar: FC<ActionBarProps> = memo(({ isCopied, isHovered, isStre
     const { model: currentModel, threadId } = useChatThread();
     const models = useFeatureFlaggedModels();
     const crpc = useCRPC();
-    const setActiveRightSidebarTab = useChatUIStore((state) => state.setActiveRightSidebarTab);
     const { createBranch } = useThreadManager(true);
     const [isForkDialogOpen, setIsForkDialogOpen] = useState(false);
     const { mutate: createPin } = useMutation(crpc.chat.pins.functions.createPin.mutationOptions());
@@ -332,7 +331,7 @@ const DefaultActionBar: FC<ActionBarProps> = memo(({ isCopied, isHovered, isStre
                 onError: (error) => showError(error as Error),
                 onSuccess: () => {
                     trackEvent("message_pinned", { has_note: false });
-                    setActiveRightSidebarTab("pins");
+                    useChatUIStore.getState().setActiveRightSidebarTab("pins");
                 },
             },
         );
@@ -494,9 +493,6 @@ const MessageItem: FC<MessageItemProps> = memo(
         // Actions
         const { copyMessage, reloadMessage } = useChatActions();
 
-        // Edit state - use separate selectors to avoid creating new objects
-        const startEditing = useChatUIStore((state) => state.startEditing);
-
         const messageIsStreaming = isStreaming || message.status === "streaming";
 
         // Handlers
@@ -523,8 +519,8 @@ const MessageItem: FC<MessageItemProps> = memo(
         }, [reloadMessage, message.id]);
 
         const handleEdit = useCallback(() => {
-            startEditing(message.id, message.role === "user" ? getVisibleUserText(message) : message.text);
-        }, [startEditing, message]);
+            useChatUIStore.getState().startEditing(message.id, message.role === "user" ? getVisibleUserText(message) : message.text);
+        }, [message]);
 
         // Render content
         const content = (
