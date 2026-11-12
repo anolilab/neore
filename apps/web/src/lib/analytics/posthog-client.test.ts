@@ -485,6 +485,30 @@ describe("startPostHog", () => {
         }
     });
 
+    it("gives a user who switched in while the first one's organization was pending a full wait of their own", async () => {
+        vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+
+        try {
+            const client = await loadClientModule();
+
+            client.startPostHog(await client.loadPostHog(), () => {});
+            client.setAnalyticsIdentity({ isOrganizationPending: true, user: { id: "user-a" } });
+            vi.advanceTimersByTime(client.ORGANIZATION_WAIT_MS - 1);
+
+            client.setAnalyticsIdentity({ isOrganizationPending: true, user: { id: "user-b" } });
+            vi.advanceTimersByTime(1);
+
+            // A's deadline passed, not B's.
+            expect(client.getStartedPostHog()).toBeUndefined();
+
+            vi.advanceTimersByTime(client.ORGANIZATION_WAIT_MS);
+
+            expect(client.getStartedPostHog()).toBe(posthog);
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
     it("waits for a signed-in user's pending organization before it starts, then applies both", async () => {
         const client = await loadClientModule();
 

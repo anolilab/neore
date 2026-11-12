@@ -565,7 +565,8 @@ const syncIdentity = (posthog: PostHog): void => {
  */
 export const ORGANIZATION_WAIT_MS = 5000;
 
-const organizationWait: { isOver: boolean; timer?: ReturnType<typeof setTimeout> } = { isOver: false };
+/** The bounded wait for one user's organization: another user starts a wait of their own. */
+const organizationWait: { isOver: boolean; timer?: ReturnType<typeof setTimeout>; userId?: string } = { isOver: false };
 
 const finishStartup = (): void => {
     const { client } = startup;
@@ -612,17 +613,23 @@ export const startPostHog = (posthog: PostHog, onStarted: () => void): void => {
 
 /** Starts the bound on a pending organization, once per wait; an answer (or no user to wait for) ends it. */
 const waitForOrganization = (identity: AnalyticsIdentity): void => {
+    const userId = identity.user?.id;
+    const isSameWait = organizationWait.userId === userId && (organizationWait.timer !== undefined || organizationWait.isOver);
+
+    if (identity.isOrganizationPending && !startup.isStarted && isSameWait) {
+        return;
+    }
+
+    clearTimeout(organizationWait.timer);
+    organizationWait.timer = undefined;
+    organizationWait.isOver = false;
+    organizationWait.userId = undefined;
+
     if (!identity.isOrganizationPending || startup.isStarted) {
-        clearTimeout(organizationWait.timer);
-        organizationWait.timer = undefined;
-        organizationWait.isOver = false;
-
         return;
     }
 
-    if (organizationWait.timer !== undefined || organizationWait.isOver) {
-        return;
-    }
+    organizationWait.userId = userId;
 
     organizationWait.timer = setTimeout(() => {
         organizationWait.timer = undefined;
