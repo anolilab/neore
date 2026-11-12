@@ -51,7 +51,7 @@ const MessageSearchMatches: FC<MessageSearchMatchesProps> = ({ matches, searchQu
                     <li key={match._id}>
                         <button
                             aria-label={t`Go to message: ${snippet}`}
-                            className="text-muted-foreground hover:bg-sidebar-accent hover:text-foreground focus-visible:ring-ring/50 flex w-full min-w-0 items-start gap-1 rounded px-1.5 py-0.5 text-left text-xs outline-none focus-visible:ring-2"
+                            className="text-muted-foreground web:hover:bg-sidebar-accent hover:text-foreground focus-visible:ring-ring/50 flex w-full min-w-0 items-start gap-1 rounded px-1.5 py-0.5 text-left text-xs outline-none focus-visible:ring-2"
                             onClick={() => handleOpen(match)}
                             type="button"
                         >

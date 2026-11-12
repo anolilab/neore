@@ -35,7 +35,7 @@ vi.mock("sonner", () => {
     return { toast: { error: toastError } };
 });
 
-vi.mock("@/lib/native/bridge", () => {
+vi.mock("@/lib/native/device-bridge", () => {
     return {
         disconnectNativeHost: vi.fn(),
         executeOnNativeDevice: vi.fn(),

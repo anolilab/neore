@@ -542,9 +542,11 @@ describe("generate-sw.mjs", () => {
             join(dir, ".vite", "manifest.json"),
             JSON.stringify({
                 "client.tsx": { file: entryFile, isEntry: true },
+                "src/features/connection/components/offline-screen.tsx": { file: "assets/offline-screen-Ij90Kl12.js", isDynamicEntry: true },
                 "src/locales/en/messages.po": { file: "assets/messages-Ab12Cd34.js", isDynamicEntry: true },
             }),
         );
+        writeFileSync(join(dir, "assets", "offline-screen-Ij90Kl12.js"), "export default () => null;");
         writeFileSync(join(dir, "assets", "messages-Ab12Cd34.js"), "export const messages = {};");
         writeFileSync(join(dir, entryFile), "export {};");
         writeFileSync(join(dir, "offline.html"), "<html>offline</html>");
@@ -563,6 +565,8 @@ describe("generate-sw.mjs", () => {
         expect(sw.indexOf("self.__NEORE_OFFLINE_SHELL__ = ")).toBe(0);
         expect(sw.indexOf("define(")).toBeGreaterThan(0);
         expect(sw).toMatch(/importScripts\([^)]*"offline-shell-sw\.js"/u);
+        // The desktop's offline screen is lazy on the web, but an offline start needs it: it is precached with the shell.
+        expect(sw).toContain("assets/offline-screen-Ij90Kl12.js");
     });
 
     it("shifts sw.js.map down one line for the config line put in front of sw.js", () => {
