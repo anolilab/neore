@@ -2,9 +2,14 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { draftGeneration } from "@/features/chat/split/composer-drafts";
 import { releaseThreadListWrites, writeThreadListCache } from "@/features/chat/thread-list/lib/thread-list-cache";
 
 import NavUser from "./nav-user";
+
+// The signed-in user (`auth.session`) is "alice".
+const MINE = "neore-draft:alice:thread-a";
+const THEIRS = "neore-draft:user-2:thread-a";
 
 const auth = vi.hoisted(() => {
     const session = { data: { user: { email: "a@example.com", id: "alice", name: "Alice" } }, isPending: false };
@@ -153,6 +158,44 @@ describe("NavUser sign-out", () => {
             threads: { page: [{ _id: "t1", title: "Still signed in" }] },
         });
         expect(localStorage).toHaveLength(1);
+    });
+
+    it("keeps the unsent drafts, and their saving, when the sign-out fails", async () => {
+        localStorage.setItem(MINE, "{}");
+
+        const generation = draftGeneration();
+
+        auth.signOut.mockImplementation(async ({ fetchOptions }: { fetchOptions: { onError: () => void } }) => {
+            fetchOptions.onError();
+        });
+        render(<NavUser />);
+
+        fireEvent.click(screen.getByText("Log out"));
+
+        await vi.waitFor(() => {
+            expect(auth.signOut).toHaveBeenCalled();
+        });
+        expect(localStorage.getItem(MINE)).toBe("{}");
+        expect(draftGeneration()).toBe(generation);
+    });
+
+    it("drops the signed-in account's unsent drafts once the sign-out succeeded, with no composer shown, and leaves another account's", async () => {
+        localStorage.setItem(MINE, "{}");
+        localStorage.setItem(THEIRS, "{}");
+        vi.stubGlobal("location", { reload: vi.fn() });
+        auth.signOut.mockImplementation(async ({ fetchOptions }: { fetchOptions: { onSuccess: () => Promise<void> } }) => {
+            await fetchOptions.onSuccess();
+        });
+        render(<NavUser />);
+
+        fireEvent.click(screen.getByText("Log out"));
+
+        await vi.waitFor(() => {
+            expect(globalThis.location.reload).toHaveBeenCalled();
+        });
+        vi.unstubAllGlobals();
+        expect(localStorage.getItem(MINE)).toBeNull();
+        expect(localStorage.getItem(THEIRS)).toBe("{}");
     });
 
     it("clears it before the request is made", async () => {
