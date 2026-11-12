@@ -1914,7 +1914,7 @@ export const usageExportRuns = sqliteTable("usageExportRuns", {
     _id: text("_id").primaryKey(),
     _creationTime: integer("_creationTime").notNull(),
     createdAt: real("createdAt").notNull(),
-    deleteAt: real("deleteAt"),
+    deleteAt: real("deleteAt").notNull(),
     requestId: text("requestId").notNull(),
     usageKey: text("usageKey"),
     userId: text("userId").notNull(),

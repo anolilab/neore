@@ -3522,7 +3522,7 @@ export const schema = defineSchema({
         closed: v.optional(v.object({ cost: v.number(), replies: v.number(), rows: v.number(), tokens: v.number() })),
         // Rows of the page dated before the cutoff, which the recount of the pass must match.
         closedRows: v.optional(v.number()),
-        // When the piece was written: the sweep removes a run's pieces once they are older than its time to live.
+        // When the piece was written. The sweep does not read it: a run's pieces go at the run's `deleteAt`.
         createdAt: v.optional(v.number()),
         // The day the export's recount is taken before (YYYY-MM-DD): rows dated before it are counted, later ones are not.
         cutoff: v.optional(v.string()),
@@ -3562,10 +3562,10 @@ export const schema = defineSchema({
     // One small row per export run: its key, its owner, when it began, and the key of the usage JSON object it stored, if any. The
     // row is that object's record: kept until the object is confirmed deleted, so the sweep can retry the purge from it. `deleteAt` is
     // the time the sweep next acts on the run: each sweep that finds the run live sets it one time to live ahead, so a dead run's pieces
-    // go at that time. The sweep reads these rows, which hold no payloads.
+    // go at that time. A run is stored with its `deleteAt`, so the sweep finds every run. The sweep reads these rows, which hold no payloads.
     usageExportRuns: defineTable({
         createdAt: v.number(),
-        deleteAt: v.optional(v.number()),
+        deleteAt: v.number(),
         requestId: v.string(),
         usageKey: v.optional(v.string()),
         userId: v.string(),

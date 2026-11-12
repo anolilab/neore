@@ -5,6 +5,7 @@
 import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { backfillUsageExportRunDeleteAt } from "../migrations";
 import schema from "../schema";
 import { clearUsageExportPieces, EXPORT_PIECE_TTL_MS, eraseUsageForUser, keyedUsageRuns, releaseUsageKey, sweepUsageExportPieces } from "./gdpr";
 
@@ -98,13 +99,14 @@ describe("eraseUsageForUser", () => {
             for (let index = 0; index < 10; index += 1) {
                 await ctx.db.insert("usageExportRuns", {
                     createdAt: 1,
+                    deleteAt: 0,
                     requestId: `keyed:${String(index)}`,
                     usageKey: `gdpr-exports/keyed-${String(index)}.json`,
                     userId: A,
                 });
             }
 
-            await ctx.db.insert("usageExportRuns", { createdAt: 2, requestId: "plain:1", userId: A });
+            await ctx.db.insert("usageExportRuns", { createdAt: 2, deleteAt: 0, requestId: "plain:1", userId: A });
         });
 
         await eraseAll(A);
@@ -121,7 +123,7 @@ describe("eraseUsageForUser", () => {
             }
 
             await ctx.db.insert("usageExportPieces", piece("gone:1", A));
-            await ctx.db.insert("usageExportRuns", { createdAt: 1, requestId: "gone:1", userId: A });
+            await ctx.db.insert("usageExportRuns", { createdAt: 1, deleteAt: 0, requestId: "gone:1", userId: A });
             await ctx.db.insert("usageDaily", usageRow(B, "2026-02-01"));
             await ctx.db.insert("usageExportPieces", piece("kept:1", B));
         });
@@ -177,13 +179,14 @@ describe("erasure of the run scan", () => {
             for (let index = 0; index < 510; index += 1) {
                 await ctx.db.insert("usageExportRuns", {
                     createdAt: 1,
+                    deleteAt: 0,
                     requestId: `many:${String(index)}`,
                     usageKey: `gdpr-exports/many-${String(index)}.json`,
                     userId: A,
                 });
             }
 
-            await ctx.db.insert("usageExportRuns", { createdAt: 2, requestId: "last:1", userId: A });
+            await ctx.db.insert("usageExportRuns", { createdAt: 2, deleteAt: 0, requestId: "last:1", userId: A });
         });
 
         await eraseAll(A);
@@ -208,7 +211,7 @@ describe("erasure of the run scan", () => {
 describe("the purge's record", () => {
     it("keeps a keyed run's row while it holds a piece or an index row, and removes it once neither is left", async () => {
         await harness.run(async (ctx: any) => {
-            await ctx.db.insert("usageExportRuns", { createdAt: 1, requestId: "rel:1", usageKey: "gdpr-exports/rel-1.json", userId: A });
+            await ctx.db.insert("usageExportRuns", { createdAt: 1, deleteAt: 0, requestId: "rel:1", usageKey: "gdpr-exports/rel-1.json", userId: A });
             await ctx.db.insert("usageExportPieces", piece("rel:1", A));
             await ctx.db.insert("usageExportProjects", { pass: 1, projectId: "p1", requestId: "rel:1", userId: A });
         });
@@ -246,10 +249,10 @@ describe("the purge's record", () => {
     it("finds keyed runs past a page of unkeyed ones, so erasure reaches every stored object", async () => {
         await harness.run(async (ctx: any) => {
             for (let index = 0; index < 25; index += 1) {
-                await ctx.db.insert("usageExportRuns", { createdAt: 1, requestId: `plain:${String(index)}`, userId: A });
+                await ctx.db.insert("usageExportRuns", { createdAt: 1, deleteAt: 0, requestId: `plain:${String(index)}`, userId: A });
             }
 
-            await ctx.db.insert("usageExportRuns", { createdAt: 2, requestId: "keyed:1", usageKey: "gdpr-exports/keyed-1.json", userId: A });
+            await ctx.db.insert("usageExportRuns", { createdAt: 2, deleteAt: 0, requestId: "keyed:1", usageKey: "gdpr-exports/keyed-1.json", userId: A });
         });
 
         expect(await keyedRunsOf(A)).toEqual([{ key: "gdpr-exports/keyed-1.json", live: false, runId: expect.any(String) }]);
@@ -268,7 +271,7 @@ describe("the purge's record", () => {
         );
 
         await harness.run(async (ctx: any) => {
-            await ctx.db.insert("usageExportRuns", { createdAt: 1, requestId: `${request}:1`, usageKey: "gdpr-exports/live-1.json", userId: A });
+            await ctx.db.insert("usageExportRuns", { createdAt: 1, deleteAt: 0, requestId: `${request}:1`, usageKey: "gdpr-exports/live-1.json", userId: A });
         });
 
         expect(await keyedRunsOf(A)).toEqual([{ key: "gdpr-exports/live-1.json", live: true, runId: expect.any(String) }]);
@@ -276,6 +279,32 @@ describe("the purge's record", () => {
 });
 
 describe("the sweep and the clear", () => {
+    it("sweeps a run stored without a due time once the backfill has given it one, at a time a time to live after its creation", async () => {
+        const t0 = Date.now();
+        const up = backfillUsageExportRunDeleteAt.up as (document: Record<string, unknown>) => Record<string, unknown> | undefined;
+
+        await harness.run(async (ctx: any) => {
+            const dead = await ctx.db.insert("gdprRequests", {
+                requestedAt: 1,
+                requestType: "export",
+                status: "failed",
+                userEmail: "a@example.com",
+                userId: A,
+            });
+            const legacy = up({ _id: "legacy", createdAt: t0, requestId: `${dead}:1`, userId: A });
+
+            await ctx.db.insert("usageExportRuns", legacy);
+            await ctx.db.insert("usageExportPieces", { ...piece(`${dead}:1`, A), createdAt: t0 });
+        });
+
+        await harness.run(async (ctx: any) => await ctx.runMutation(sweepUsageExportPieces, {}));
+        expect(await countOf("usageExportPieces", A)).toBe(1);
+
+        vi.setSystemTime(new Date(t0 + EXPORT_PIECE_TTL_MS));
+        await harness.run(async (ctx: any) => await ctx.runMutation(sweepUsageExportPieces, {}));
+        expect(await countOf("usageExportPieces", A)).toBe(0);
+    });
+
     it("removes a dead run's pieces at the time its last live sweep set, and not before", async () => {
         const t0 = Date.now();
         const setAt = t0 + EXPORT_PIECE_TTL_MS;
@@ -457,7 +486,7 @@ describe("the sweep and the clear", () => {
                 await ctx.db.insert("usageExportProjects", { pass: 1, projectId: `p${String(index)}`, requestId: "clr:1", userId: A });
             }
 
-            await ctx.db.insert("usageExportRuns", { createdAt: 1, requestId: "clr:1", userId: A });
+            await ctx.db.insert("usageExportRuns", { createdAt: 1, deleteAt: 0, requestId: "clr:1", userId: A });
         });
 
         const first = await harness.run(async (ctx: any) => await ctx.runMutation(clearUsageExportPieces, { requestId: "clr:1", userId: A }));
