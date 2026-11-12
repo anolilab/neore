@@ -823,6 +823,35 @@ describe("useFeatureFlagEnabled", () => {
         expect(result.current).toStrictEqual([true, true, false, false]);
     });
 
+    it("stays pending on a provided client until its flags arrive, then follows them", async () => {
+        const client = await loadClientModule();
+        const flags = new Set<string>();
+        const listeners: (() => void)[] = [];
+        const fake = {
+            isFeatureEnabled: (flag: string) => flags.has(flag),
+            onFeatureFlags: (callback: () => void) => {
+                listeners.push(callback);
+
+                return () => {};
+            },
+        } as unknown as PostHog;
+        const wrapper = ({ children }: { children: ReactNode }) => createElement(client.PostHogClientContext, { value: fake }, children);
+        const { result } = renderHook(() => client.useFeatureFlagEnabled("code-mode"), { wrapper });
+
+        // Initialised, flags not loaded: an "off" now would show the workspace as denied.
+        expect(result.current).toBeUndefined();
+
+        act(() => {
+            flags.add("code-mode");
+
+            for (const listener of listeners) {
+                listener();
+            }
+        });
+
+        expect(result.current).toBe(true);
+    });
+
     it("reads as off, not pending, on a page whose PostHog never loads and that had no server-rendered flags", async () => {
         const client = await loadClientModule();
         const wrapper = ({ children }: { children: ReactNode }) => createElement(client.PostHogClientContext, { value: undefined }, children);

@@ -757,8 +757,18 @@ export const useFeatureFlagReader = (): ((flag: string) => boolean | undefined) 
 export const useFeatureFlagEnabled = (flag: string): boolean | undefined => {
     const posthog = usePostHog();
     const fallsBack = useSyncExternalStore(subscribeAvailability, readFallsBack, notKnown);
-    const subscribe = useCallback((onChange: () => void) => (posthog ? posthog.onFeatureFlags(onChange) : noSubscription()), [posthog]);
-    const read = useCallback(() => posthog?.isFeatureEnabled(flag), [posthog, flag]);
+    const subscribe = useCallback(
+        (onChange: () => void) =>
+            posthog
+                ? posthog.onFeatureFlags(() => {
+                      clientsWithFlags.add(posthog);
+                      onChange();
+                  })
+                : noSubscription(),
+        [posthog],
+    );
+    // A client whose flags have not arrived reads every flag as off: that is not an answer yet, so it stays pending.
+    const read = useCallback(() => (posthog && clientsWithFlags.has(posthog) ? posthog.isFeatureEnabled(flag) : undefined), [posthog, flag]);
     const enabled = useSyncExternalStore(subscribe, read, notLoaded);
 
     return posthog === undefined && fallsBack ? readBootstrapFlag(flag) : enabled;
