@@ -17,6 +17,13 @@ import { hasVoidOrMeaningfulDescendant, isBlock, isMeaningfulWhenBlank, isVoid }
  * Several regular expressions were replaced by linear scans (edge whitespace,
  * code padding, attribute line breaks, trailing whitespace); this test is the
  * evidence that the output did not change.
+ *
+ * Three fixes change output on purpose: `<` before a letter is escaped, a `)`
+ * after a leading number is escaped, and a block element inside a link is made
+ * into link text. The generator does not produce those inputs (a `<` text piece
+ * is always followed by a space, and no block or `<hr>` sits inside a link), so
+ * the comparison stays exact for everything else. escaping-links.test.ts covers
+ * the three fixes.
  */
 
 const SEED = 20_261_112;
@@ -219,7 +226,7 @@ const TEXT_PIECES = [
     ">",
     "=",
     "~~~",
-    "<",
+    "< ",
     "&amp;",
     "\u{2028}",
     "\u{2029}",
@@ -268,20 +275,29 @@ const HREFS = ["https://x.y/z", "a b", "(x)", "<y>", "", "javascript:alert(1)"];
 const TITLES = ["", `a "quoted" title`, "line\nbreak\n\n  title"];
 const VOID_ELEMENTS = ["<br>", "<hr>", `<img alt="a_b" src="i.png">`, `<img src="">`];
 
+// Inside a link, `<hr>` and the block elements are left out (see the note at the top).
+// Inside `script` and `iframe` the content is raw text, so only text is generated there.
+const BLOCK_ELEMENTS = new Set(["blockquote", "div", "figure", "h1", "h2", "h3", "li", "ol", "p", "pre", "section", "table", "td", "th", "tr", "ul"]);
+const INLINE_ELEMENTS = ELEMENTS.filter((tag) => !BLOCK_ELEMENTS.has(tag));
+const INLINE_VOID_ELEMENTS = VOID_ELEMENTS.filter((element) => element !== "<hr>");
+const RAW_TEXT_ELEMENTS = new Set(["iframe", "script"]);
+
+type Context = "flow" | "link" | "raw";
+
 function pick<T>(items: ReadonlyArray<T>, random: () => number): T {
     return items[Math.floor(random() * items.length)] as T;
 }
 
-function randomHtml(random: () => number, depth: number): string {
-    if (depth > 3 || random() < 0.35) {
+function randomHtml(random: () => number, depth: number, context: Context = "flow"): string {
+    if (context === "raw" || depth > 3 || random() < 0.35) {
         return pick(TEXT_PIECES, random);
     }
 
     if (random() < 0.06) {
-        return pick(VOID_ELEMENTS, random);
+        return pick(context === "link" ? INLINE_VOID_ELEMENTS : VOID_ELEMENTS, random);
     }
 
-    const tag = pick(ELEMENTS, random);
+    const tag = pick(context === "link" ? INLINE_ELEMENTS : ELEMENTS, random);
     let attributes = "";
 
     switch (tag) {
@@ -305,11 +321,19 @@ function randomHtml(random: () => number, depth: number): string {
         }
     }
 
+    let childContext: Context = context;
+
+    if (tag === "a") {
+        childContext = "link";
+    } else if (RAW_TEXT_ELEMENTS.has(tag)) {
+        childContext = "raw";
+    }
+
     const childCount = Math.floor(random() * 4);
     let inner = "";
 
     for (let index = 0; index < childCount; index += 1) {
-        inner += randomHtml(random, depth + 1);
+        inner += randomHtml(random, depth + 1, childContext);
     }
 
     return `<${tag}${attributes}>${inner}</${tag}>`;

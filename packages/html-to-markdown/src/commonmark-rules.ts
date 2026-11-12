@@ -42,6 +42,10 @@ interface RunStyle {
     plain: string;
 }
 
+// A line break, then whitespace that holds another line break. Linear: the scan starts
+// only at a line break, and the whitespace after it is consumed once.
+const BLANK_LINE = /\n\s*\n/g;
+
 /**
  * Reference-style links collect their definitions here and append them after
  * the document (see `append`). The state lives on this rule object, as in
@@ -63,6 +67,7 @@ class ReferenceLinkRule implements Rule {
             return content;
         }
 
+        const text = linkText(content);
         const href = escapeLinkDestination(rawHref, options.safeLinks);
         let title = cleanAttribute(node.getAttribute("title"));
 
@@ -75,19 +80,19 @@ class ReferenceLinkRule implements Rule {
 
         switch (options.linkReferenceStyle) {
             case "collapsed": {
-                replacement = `[${content}][]`;
-                reference = `[${content}]: ${href}${title}`;
+                replacement = `[${text}][]`;
+                reference = `[${text}]: ${href}${title}`;
                 break;
             }
             case "shortcut": {
-                replacement = `[${content}]`;
-                reference = `[${content}]: ${href}${title}`;
+                replacement = `[${text}]`;
+                reference = `[${text}]: ${href}${title}`;
                 break;
             }
             default: {
                 const id = this.references.length + 1;
 
-                replacement = `[${content}][${id}]`;
+                replacement = `[${text}][${id}]`;
                 reference = `[${id}]: ${href}${title}`;
             }
         }
@@ -254,7 +259,7 @@ const rules: Record<string, Rule> = {
             const title = escapeLinkTitle(cleanAttribute(node.getAttribute("title")));
             const titlePart = title ? ` "${title}"` : "";
 
-            return `[${content}](${href}${titlePart})`;
+            return `[${linkText(content)}](${href}${titlePart})`;
         },
     },
 
@@ -722,12 +727,31 @@ function cleanAttribute(attribute: string | null): string {
 }
 
 /**
+ * Link text cannot hold a blank line, which ends the paragraph and leaves the
+ * brackets as plain text. A block element inside a link puts one there, so each
+ * blank line becomes a space. A single line break stays: CommonMark keeps link
+ * text across it.
+ */
+function linkText(content: string): string {
+    return content.replaceAll(BLANK_LINE, " ");
+}
+
+/**
+ * A backslash escapes the ASCII punctuation character after it, and at the end of
+ * the destination it would escape the closing parenthesis. Such a backslash is
+ * doubled. Any other backslash is literal, so it is left alone.
+ */
+const BACKSLASH_BEFORE_PUNCTUATION = /\\(?=[!"#$%&'()*+,./:;<=>?@[\\\]^_`{|}~]|$)/g;
+
+/**
  * With `safeLinks`, `\` and `&` are escaped too. CommonMark undoes those added escapes, so the rendered destination is
  * the raw attribute, not the decoded copy. The check already covers the raw attribute: `isUnsafeDestination` runs on a
- * decoded copy of that same text.
+ * decoded copy of that same text. Every backslash is doubled in that mode, so the punctuation rule is not applied on top.
  */
 function escapeLinkDestination(destination: string, isSafeLinks = false): string {
-    const escaped = (isSafeLinks ? destination.replaceAll("\\", "\\\\").replaceAll("&", "&amp;") : destination)
+    const escaped = (
+        isSafeLinks ? destination.replaceAll("\\", "\\\\").replaceAll("&", "&amp;") : destination.replaceAll(BACKSLASH_BEFORE_PUNCTUATION, String.raw`\\`)
+    )
         .replaceAll("<", String.raw`\<`)
         .replaceAll(">", String.raw`\>`)
         .replaceAll("(", String.raw`\(`)

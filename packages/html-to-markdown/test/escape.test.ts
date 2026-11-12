@@ -5,6 +5,10 @@ import { escapeMarkdown } from "../src/utilities";
 /*
  * The escape chain as it was before the single-pass rewrite. It is the reference:
  * the rewrite must agree with it on every string.
+ *
+ * Two escapes were added with the `<` and `)` fixes. A `<` is escaped only before a
+ * letter, `/`, `!` or `?`, the characters that can open raw HTML or an autolink. An
+ * ordered-list delimiter is `.` or `)`, so both are escaped after a number.
  */
 function referenceEscape(string: string): string {
     return string
@@ -20,10 +24,11 @@ function referenceEscape(string: string): string {
         .replaceAll("]", String.raw`\]`)
         .replaceAll(/^>/g, String.raw`\>`)
         .replaceAll("_", String.raw`\_`)
-        .replaceAll(/^(\d+)\. /g, String.raw`$1\. `);
+        .replaceAll(/<(?=[a-z/!?])/gi, String.raw`\<`)
+        .replaceAll(/^(\d+)([.)]) /g, String.raw`$1\$2 `);
 }
 
-const ALPHABET = ["\\", "*", "`", "[", "]", "_", "-", "+", " ", "=", "#", "~", ">", "1", "9", ".", "a", "(", "\n", " "];
+const ALPHABET = ["\\", "*", "`", "[", "]", "_", "-", "+", " ", "=", "#", "~", ">", "1", "9", ".", "a", "(", "\n", " ", ")", "<", "!", "/"];
 
 // Park-Miller generator: arithmetic only, so the sequence is the same on every run.
 const MODULUS = 2_147_483_647;
