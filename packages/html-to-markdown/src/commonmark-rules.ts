@@ -6,6 +6,7 @@ import {
     escapeMarkdown,
     flattenBreaks,
     hasOnlyBreaks,
+    isBlock,
     isVoid,
     lineBreakMarker,
     parseListStart,
@@ -509,6 +510,11 @@ interface EmphasisRun {
  * cannot open or close inside a word.
  */
 function wrapRun(content: string, node: AnnotatedNode, options: Options, style: RunStyle): string {
+    // A same-kind parent writes the delimiters for the whole run, so a nested element writes none.
+    if (style.names.has(node.parentNode?.nodeName.toLowerCase() ?? "")) {
+        return wrapInline(content, options, "", "");
+    }
+
     const before = emphasisRun(node, "left", style.names, options);
     const after = emphasisRun(node, "right", style.names, options);
     const delimiter = before.wordEdge || after.wordEdge ? style.intraword : style.plain;
@@ -556,10 +562,12 @@ function emphasisRun(node: AnnotatedNode, side: Side, names: ReadonlySet<string>
     let count = 0;
     let gap = separation(node, side);
     let sibling = neighbour(node, side);
+    // An element with a block inside it never merges, because the block would end the delimiter.
+    const canMerge = !hasBlockDescendant(node);
 
     while (sibling && gap !== Infinity) {
-        if (isRunMember(sibling, names, options)) {
-            const member = annotateNode(sibling, options);
+        if (canMerge && isRunMember(sibling, names, options)) {
+            const member = annotationOf(sibling, options);
 
             // Two emphasis elements join across at most one break; two breaks would be a blank line.
             if (gap + separation(member, opposite(side)) > 1) {
@@ -601,7 +609,35 @@ function isRunMember(node: Node, names: ReadonlySet<string>, options: Options): 
         return false;
     }
 
-    return !annotateNode(node, options).isBlank && !hasOnlyBreaks(node);
+    return !annotationOf(node, options).isBlank && !hasOnlyBreaks(node) && !hasBlockDescendant(node);
+}
+
+const annotations = new WeakMap<Node, AnnotatedNode>();
+
+/**
+ * The annotation of a node, computed once. A run walks the same siblings from each of its
+ * members, and annotating a node reads its text, so an uncached walk is quadratic.
+ */
+function annotationOf(node: Node, options: Options): AnnotatedNode {
+    let annotated = annotations.get(node);
+
+    if (!annotated) {
+        annotated = annotateNode(node, options);
+        annotations.set(node, annotated);
+    }
+
+    return annotated;
+}
+
+/** True when a block element sits inside the node, at any depth. */
+function hasBlockDescendant(node: Node): boolean {
+    for (const child of node.childNodes) {
+        if (child.nodeType === 1 && (isBlock(child) || hasBlockDescendant(child))) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 /**
@@ -619,14 +655,19 @@ function edgeCharacter(node: Node, side: Side, options: Options): string | null 
     }
 
     const element = node as Element;
-    const annotated = annotateNode(element, options);
+    const annotated = annotationOf(element, options);
 
     if (annotated.isBlock || isVoid(element)) {
         return "";
     }
 
     if (DELIMITED_NAMES.has(element.nodeName.toLowerCase())) {
-        return annotated.isBlank ? null : "";
+        // A blank element that outputs a space ends a run like a space does; an empty one outputs nothing.
+        if (annotated.isBlank) {
+            return element.textContent ? " " : null;
+        }
+
+        return "";
     }
 
     return childEdge(element, side, options);

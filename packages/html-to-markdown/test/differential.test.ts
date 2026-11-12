@@ -9,6 +9,8 @@ import { describe, expect, it } from "vitest";
 
 import type { Options } from "../src/index";
 import TurndownService from "../src/index";
+import rootNode from "../src/root-node";
+import { isBlock, isVoid } from "../src/utilities";
 
 /*
  * Differential check against upstream turndown 7.2.5 on seeded random HTML.
@@ -21,14 +23,118 @@ const SEED = 20_261_112;
 const CASES = 1500;
 const NON_BLANK = /\S/;
 
+const EMPHASIS_NAMES = new Set(["B", "EM", "I", "STRONG"]);
+const BREAK_IN_CODE_OR_HEADING = "pre br, code br, h1 br, h2 br, h3 br, h4 br, h5 br, h6 br";
+const EMPHASIS_KIND = new Map([
+    ["B", "strong"],
+    ["EM", "em"],
+    ["I", "em"],
+    ["STRONG", "strong"],
+]);
+const WORD_CHARACTER = /^[^\s\p{P}\p{S}]$/u;
+const NO_WORD_EDGE = new Set(["A", "CODE"]);
+const SIDES = ["previousSibling", "nextSibling"] as const;
+const BLANK_TEXT = /^\s*$/;
+const EDGE_WHITESPACE = /^\s|\s$/;
+
 /*
- * Documents with a line break or emphasis are not compared with upstream: those
- * constructs change on purpose (adjacent and intraword emphasis and strong, breaks
- * at the edges of an element), and test/inline-breaks.test.ts pins their output.
+ * True for a document whose output is meant to differ from upstream. Each case is one of
+ * the changes pinned in test/inline-breaks.test.ts: a break inside code or a heading; a
+ * break at the edge of emphasis (or of an element whose text is trimmed); emphasis next to
+ * other emphasis, which merges into a run; emphasis that touches a word character, which
+ * uses `*`; and emphasis nested directly in the same kind, which writes no delimiters.
+ * Every other document must match upstream.
  */
-const CHANGED_ON_PURPOSE = /<(?:br|em|i|strong|b)[\s/>]/;
-// About 55% of the seeded documents have no such construct; the floor guards against the exclusion swallowing the test.
-const MIN_COMPARED = 800;
+function isChangedOnPurpose(html: string, options: Partial<Options>): boolean {
+    // The converter's own DOM, with whitespace collapsed, so the checks see the same text it does.
+    const root = rootNode(html, new TurndownService(options).options) as Element;
+
+    if (root.querySelector(BREAK_IN_CODE_OR_HEADING)) {
+        return true;
+    }
+
+    for (const element of root.querySelectorAll("*")) {
+        // An edge break changes output inside emphasis, and inside any element whose text is
+        // trimmed (it has whitespace at an edge). Elsewhere it is written as upstream writes it.
+        if ((EMPHASIS_NAMES.has(element.nodeName) || hasEdgeSpace(element)) && hasEdgeBreak(element)) {
+            return true;
+        }
+
+        // An empty emphasis element writes nothing, so it has no delimiters to place.
+        if (EMPHASIS_NAMES.has(element.nodeName) && element.textContent !== "" && (isNestedInSameKind(element) || hasChangedNeighbour(element))) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+function isEmptyNode(node: Node): boolean {
+    return node.nodeName !== "BR" && (node.textContent ?? "") === "";
+}
+
+function nearest(node: Node, side: (typeof SIDES)[number]): Node | null {
+    let sibling = node[side];
+
+    while (sibling && isEmptyNode(sibling)) {
+        sibling = sibling[side];
+    }
+
+    return sibling;
+}
+
+/** True when a break is the first or last thing in the element, looking through nested elements. */
+function hasEdgeBreak(element: Element): boolean {
+    const children = [...element.childNodes].filter((child) => !(child.nodeType === 3 && BLANK_TEXT.test(child.nodeValue ?? "")));
+    const first = children[0];
+    const last = children.at(-1);
+
+    const isBreak = (child: ChildNode | undefined): boolean => child?.nodeName === "BR" || (child?.nodeType === 1 && hasEdgeBreak(child as Element));
+
+    return isBreak(first) || isBreak(last);
+}
+
+/** True when the element's direct parent is emphasis of the same kind, so the nested one writes no delimiters. */
+function isNestedInSameKind(element: Element): boolean {
+    const parent = element.parentElement;
+
+    return parent !== null && EMPHASIS_KIND.get(parent.nodeName) === EMPHASIS_KIND.get(element.nodeName);
+}
+
+function hasEdgeSpace(element: Element): boolean {
+    return EDGE_WHITESPACE.test(element.textContent ?? "");
+}
+
+function hasChangedNeighbour(element: Element): boolean {
+    return SIDES.some((side) => {
+        const next = nearest(element, side);
+        // Adjacent emphasis, with at most one break between, merges into one run.
+        const afterBreak = next?.nodeName === "BR" ? nearest(next, side) : next;
+
+        return Boolean(afterBreak && EMPHASIS_NAMES.has(afterBreak.nodeName)) || isWordNeighbour(next, side);
+    });
+}
+
+/**
+ * True when the sibling's facing character is a word character, which makes the emphasis
+ * intraword. A break is not a word, and a block, a void element, a link or code shows a
+ * delimiter or a boundary there, never a word character.
+ */
+function isWordNeighbour(sibling: Node | null, side: (typeof SIDES)[number]): boolean {
+    if (!sibling || sibling.nodeName === "BR" || isBlock(sibling) || isVoid(sibling) || NO_WORD_EDGE.has(sibling.nodeName)) {
+        return false;
+    }
+
+    const text = sibling.textContent ?? "";
+    const characters = [...text];
+    const facing = side === "previousSibling" ? characters.at(-1) : characters.at(0);
+
+    return facing !== undefined && WORD_CHARACTER.test(facing);
+}
+
+// Measured: 1389 of the 1500 documents are compared. The floor is that count, so an
+// exclusion that grows (a regression hidden as an intended change) fails the test.
+const MIN_COMPARED = 1389;
 
 // Mulberry32: a small seeded PRNG, so a failure reproduces exactly.
 function createRandom(seed: number): () => number {
@@ -222,7 +328,7 @@ describe("differential against upstream turndown 7.2.5", () => {
 
             const options = pick(OPTION_SETS, random);
 
-            if (!CHANGED_ON_PURPOSE.test(html)) {
+            if (!isChangedOnPurpose(html, options)) {
                 compared += 1;
 
                 const expected = new TurndownUpstream(options).turndown(html);
