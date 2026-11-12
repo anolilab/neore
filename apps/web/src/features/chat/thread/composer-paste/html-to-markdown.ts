@@ -331,7 +331,7 @@ const unbold = (inner: string, context: Context): string => {
 const wrapLines = (inner: string, marker: string): string =>
     inner
         .split("\n")
-        .map((line) => wrapLine(line, marker))
+        .map((line: string) => wrapLine(line, marker))
         .join("\n");
 
 /** `**` around each run of `inner` outside text marked normal weight (`unbold`), which stays as it is. */
@@ -708,6 +708,62 @@ const listNumber = (value: string | null): number | undefined => {
     return number >= 0 ? number : undefined;
 };
 
+const ROMAN: [number, string][] = [
+    [1000, "m"],
+    [900, "cm"],
+    [500, "d"],
+    [400, "cd"],
+    [100, "c"],
+    [90, "xc"],
+    [50, "l"],
+    [40, "xl"],
+    [10, "x"],
+    [9, "ix"],
+    [5, "v"],
+    [4, "iv"],
+    [1, "i"],
+];
+
+/** `number` as an `<ol type>` shows it: `a`…`z`, `aa`…, or lower-case roman numerals (up to 3999; past that, digits). */
+const listLabel = (number: number, type: string): string => {
+    if (number < 1) {
+        return String(number);
+    }
+
+    if (type === "a" || type === "A") {
+        let label = "";
+
+        for (let rest = number; rest > 0; rest = Math.floor((rest - 1) / 26)) {
+            label = String.fromCodePoint(97 + ((rest - 1) % 26)) + label;
+        }
+
+        return type === "A" ? label.toUpperCase() : label;
+    }
+
+    if ((type === "i" || type === "I") && number < 4000) {
+        let label = "";
+        let rest = number;
+
+        for (const [value, numeral] of ROMAN) {
+            label += numeral.repeat(Math.floor(rest / value));
+            rest %= value;
+        }
+
+        return type === "I" ? label.toUpperCase() : label;
+    }
+
+    return String(number);
+};
+
+/** The marker of an item: a bullet, a Markdown number, or a bullet with the list's letter or numeral as text (as for Word). */
+const listMarker = (ordered: boolean, type: string, number: number): string => {
+    if (!ordered) {
+        return "- ";
+    }
+
+    return type === "1" || !"aAiI".includes(type) || type === "" ? `${number}. ` : `- ${listLabel(number, type)}. `;
+};
+
 const list = (listElement: Element, context: Context): string => {
     // A list straight in a list skips children(), so it counts its own depth.
     if (context.depth >= MAX_DEPTH) {
@@ -715,6 +771,8 @@ const list = (listElement: Element, context: Context): string => {
     }
 
     const ordered = listElement.tagName === "OL";
+    // `type="a"`, `"A"`, `"i"` or `"I"`: Markdown numbers only in digits, so such a list keeps its letters as text.
+    const listType = ordered ? (listElement.getAttribute("type") ?? "1") : "1";
     // A number per depth: Google Docs keeps nested items in a flat list and marks their depth with aria-level.
     const numbers: number[] = [];
     // The shown children in order. A list or text placed straight in the list, not in an item, is shown too: a list goes
@@ -790,7 +848,7 @@ const list = (listElement: Element, context: Context): string => {
         numbers.length = level;
         // Markdown has no negative numbers: a reversed list stops counting at 0.
         numbers[level - 1] = reversed && level === 1 ? Math.max(number - 1, 0) : number + 1;
-        items.push(listItem(body.replaceAll(BLANK_LINES, "\n\n").trim(), level, ordered ? `${number}. ` : "- ", context));
+        items.push(listItem(body.replaceAll(BLANK_LINES, "\n\n").trim(), level, listMarker(ordered, listType, number), context));
     }
 
     // In an item, one break: a blank line between the item's text and its sub-list would make the whole outer list loose.

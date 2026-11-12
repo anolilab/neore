@@ -777,7 +777,7 @@ describe("text set back to normal weight inside bold", () => {
         ["bold again inside it", '<b>a <span style="font-weight:normal">b <b>c</b> d</span> e</b>', "**a** b **c** d **e**"],
         ["across lines", '<b>a<br><span style="font-weight:normal">b</span><br>c</b>', "**a**\nb\n**c**"],
         ["with no bold around it", '<p>a <span style="font-weight:normal">b</span> <i>c</i></p>', "a b *c*"],
-    ])("stays out of the bold: %s", (_, html, markdown) => {
+    ])("stays out of the bold: %s", (_: string, html: string, markdown: string) => {
         expect(htmlToMarkdown(html)).toBe(markdown);
     });
 });
@@ -788,7 +788,7 @@ describe("formatting on part of an emoji sequence", () => {
         ["the last emoji italic", "<p>👩\u{200D}<em>👧</em></p>", "👩\u{200D}👧"],
         ["the joiner inside the bold", "<p><b>👩\u{200D}</b>👩</p>", "👩\u{200D}👩"],
         ["an emoji with its selector", '<p><span style="font-weight:bold">❤\u{FE0F}</span>\u{200D}🔥</p>', "❤\u{FE0F}\u{200D}🔥"],
-    ])("keeps the joiner beside its emoji: %s", (_, html, markdown) => {
+    ])("keeps the joiner beside its emoji: %s", (_: string, html: string, markdown: string) => {
         expect(htmlToMarkdown(html)).toBe(markdown);
     });
 
@@ -801,5 +801,13 @@ describe("an anchor without its own href", () => {
     it("does not count as a link, so a code editor's copy keeps its plain text", () => {
         expect(isPlainHtml('<pre style="font-family:monospace"><a data-href="x" title="see href=y">fn</a>()</pre>')).toBe(true);
         expect(isPlainHtml('<p><a class="x" href="https://example.com/">docs</a></p>')).toBe(false);
+    });
+});
+
+describe("lists numbered with letters or roman numerals", () => {
+    it("keep their markers as text, since Markdown numbers only in digits", () => {
+        expect(htmlToMarkdown('<ol type="A"><li>one</li><li>two</li></ol>')).toBe("- A. one\n- B. two");
+        expect(htmlToMarkdown('<ol type="i" start="3"><li>three</li><li>four</li></ol>')).toBe("- iii. three\n- iv. four");
+        expect(htmlToMarkdown('<ol type="1"><li>one</li></ol>')).toBe("1. one");
     });
 });
