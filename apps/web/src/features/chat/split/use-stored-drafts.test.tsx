@@ -31,7 +31,7 @@ describe("useStoredDrafts", () => {
         storeDrafts({ "thread-a": "draft a", "thread-b": "draft b" });
 
         const { rerender } = renderHook(
-            ({ owner }) => {
+            ({ owner }: { owner: string }) => {
                 useStoredDrafts(owner, "user-1", false);
             },
             { initialProps: { owner: "thread-a" } },
@@ -45,7 +45,7 @@ describe("useStoredDrafts", () => {
 
     it("stores text typed before the storage code loaded under the chat it was typed in, not the one navigated to", async () => {
         const { rerender } = renderHook(
-            ({ owner }) => {
+            ({ owner }: { owner: string }) => {
                 useStoredDrafts(owner, "user-1", false);
             },
             { initialProps: { owner: "thread-a" } },
@@ -69,14 +69,14 @@ describe("useStoredDrafts", () => {
         await vi.dynamicImportSettled();
         flushStoredDrafts();
 
-        expect(Object.keys(localStorage).filter((key) => key.startsWith("neore-draft:"))).toStrictEqual([]);
+        expect(Object.keys(localStorage).filter((key: string) => key.startsWith("neore-draft:"))).toStrictEqual([]);
     });
 });
 
 describe("keepsStoredDraft", () => {
     it("stores nothing under a chat whose composer left when the shared composer is edited elsewhere, and keeps its draft", async () => {
         const { rerender } = renderHook(
-            ({ userId }) => {
+            ({ userId }: { userId: string | undefined }) => {
                 useStoredDrafts("thread-a", userId, false);
             },
             { initialProps: { userId: "user-1" as string | undefined } },
@@ -100,7 +100,7 @@ describe("keepsStoredDraft", () => {
         setSplitViewMounted(true);
 
         const { rerender } = renderHook(
-            ({ owner }) => {
+            ({ owner }: { owner: string }) => {
                 useStoredDrafts(owner, "user-1", false);
             },
             { initialProps: { owner: "thread-a" } },

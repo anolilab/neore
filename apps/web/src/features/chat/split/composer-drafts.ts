@@ -89,6 +89,22 @@ export const pruneClearMarkers = (maxAgeMs: number, now = Date.now()): void => {
 };
 
 /**
+ * Removes `owner`'s stored draft for every account, without the storage module: a locked chat's gate calls it when that module's
+ * chunk cannot load, since the chat's composer (the other path) stays unmounted while the gate refuses it.
+ */
+export const removeStoredDraftsOf = (owner: string): void => {
+    try {
+        for (const key of Object.keys(globalThis.localStorage)) {
+            if (key.startsWith("neore-draft:") && key.endsWith(`:${owner}`)) {
+                globalThis.localStorage.removeItem(key);
+            }
+        }
+    } catch {
+        // Blocked storage holds nothing to remove.
+    }
+};
+
+/**
  * Removes `userId`'s stored drafts, never another account's; every account's when `userId` is undefined (a sign-out that could
  * not read who signs out). For sign-out and an account switch: the drafts are the account's, not the browser's. It moves the
  * account's generation on, so a write scheduled before it drops itself.

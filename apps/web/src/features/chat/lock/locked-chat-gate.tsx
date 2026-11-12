@@ -7,6 +7,7 @@ import type { ReactNode } from "react";
 import { useEffect, useId, useRef, useState } from "react";
 
 import { DEFAULT_MESSAGE_OPTS } from "@/features/chat/core/constants/query-options";
+import { removeStoredDraftsOf } from "@/features/chat/split/composer-drafts";
 import { useCRPC } from "@/lib/lunora/crpc";
 
 import { ThreadLockDialog } from "./thread-lock-dialog";
@@ -79,16 +80,21 @@ export const LockedChatGate = ({ children, lockedExtras, threadId }: { children:
             return;
         }
 
+        const stillLocked = (): boolean => shown.current.threadId !== threadId || shown.current.refused;
+
         void import("@/features/chat/split/stored-drafts")
-            .then(({ lockStoredDraft }) => {
-                if (shown.current.threadId !== threadId || shown.current.refused) {
+            .then(({ lockStoredDraft }: typeof import("@/features/chat/split/stored-drafts")) => {
+                if (stillLocked()) {
                     lockStoredDraft(threadId);
                 }
 
                 return undefined;
             })
             .catch(() => {
-                // The chunk did not load: the chat's composer removes it once it mounts.
+                // The chunk did not load, and the chat's composer stays unmounted while the gate refuses it: remove the draft here.
+                if (stillLocked()) {
+                    removeStoredDraftsOf(threadId);
+                }
             });
     }, [refused, threadId]);
 
