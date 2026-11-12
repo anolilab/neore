@@ -195,3 +195,13 @@ describe("line breaks inside code blocks (#514)", () => {
         expect(convert(html, { codeBlockStyle: "fenced" })).toBe("```\nFirst line\nSecond line\nThird line\n```");
     });
 });
+
+describe("edge breaks are restored only when trimming removed them (Qodo)", () => {
+    it("does not add a break before a link that already starts with one", () => {
+        expect(convert('x<span><a href="/u"><br>foo</a> </span>y')).toBe("x[  \nfoo](/u) y");
+    });
+
+    it("writes a custom break marker once when the element ends with one", () => {
+        expect(convert("<p>x<span> y<br> </span>z</p>", { br: "<br>" })).toBe("x y<br>\nz");
+    });
+});
