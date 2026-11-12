@@ -250,8 +250,9 @@ const rules: Record<string, Rule> = {
                 }
 
                 // Text after the list needs a blank line. Without one, CommonMark reads the
-                // text as a lazy continuation of the last sub-item's paragraph. A paragraph
-                // item already ends in a line break and its indent, so it needs one more.
+                // text as a lazy continuation of the last sub-item's paragraph. An item that
+                // ends in a block or a `<br>` already ends in a line break and its indent, so
+                // it needs one more.
                 return `\n${content}${TRAILING_INDENTED_BREAK.test(content) ? "\n" : "\n\n"}`;
             }
 
