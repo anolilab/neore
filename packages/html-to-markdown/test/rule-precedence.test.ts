@@ -92,6 +92,13 @@ describe("keep and remove on built-in tags (upstream #455)", () => {
         expect(service.turndown(`<a href="y">m<div><a href="x">n</a></div></a>`)).toBe("[m][1]\n\n[1]: y");
     });
 
+    it("the default keepReplacement skips the children, so a referenced link inside leaves no orphan definition", () => {
+        const service = new TurndownService({ linkStyle: "referenced" });
+
+        service.keep(["p"]);
+        expect(service.turndown(`<p><a href="x">l</a></p>`)).toBe(`<p><a href="x">l</a></p>`);
+    });
+
     it("a custom keepReplacement still converts the children, so a referenced link keeps its definition", () => {
         const service = new TurndownService({ keepReplacement: (content) => `{${content}}`, linkStyle: "referenced" });
 

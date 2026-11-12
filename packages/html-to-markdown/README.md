@@ -11,15 +11,38 @@ const markdown = new TurndownService().turndown("<p>Hello <strong>world</strong>
 // "Hello **world**"
 ```
 
-Options and extension points (`keep`, `remove`, `addRule`, `use`) are the same as upstream's, with three API differences:
+Options and extension points (`addRule`, `use`) are the same as upstream's, with four API differences:
 
 - `TurndownService` must be constructed with `new` (upstream also allowed a call without it).
 - `escape` is an instance property, so overriding `TurndownService.prototype.escape` has no effect.
 - Only own rules of `options.rules` are read, not inherited ones (upstream read inherited enumerable keys too).
+- Built-in rules no longer win over `keep` and `remove`, so `keep("p")` on `<p>Hello world</p>` gives `<p>Hello world</p>`,
+  where upstream gives `Hello world`, and `remove("i")` drops an `<i>` and its content. The order is: rules added with
+  `addRule` (newest first), then `keep`, then `remove`, then the built-in rules. So an `addRule` rule still comes first,
+  and a tag in both `keep` and `remove` is kept. `remove` does not convert the removed element's children. `keep` does,
+  so a custom `keepReplacement` receives the converted content. The default `keepReplacement` ignores its content, so
+  the children of a kept element are not converted either. This keeps a referenced link inside a kept element from
+  leaving an orphan `[1]: x` definition.
+
+Keeping or removing a structural tag drops its Markdown. The tag is output as HTML, or removed, so no list markers or
+code fences are left:
+
+```ts
+const service = new TurndownService();
+
+service.keep(["li"]);
+service.turndown("<ul><li>a</li><li>b</li></ul>"); // "<li>a</li>\n\n<li>b</li>"
+
+const pre = new TurndownService();
+
+pre.keep(["pre"]);
+pre.turndown("<pre><code>x</code></pre>"); // "<pre><code>x</code></pre>", raw HTML, not a code block
+```
 
 ## Status
 
-This is the first step of the fork: a behaviour-preserving TypeScript port. Its output matches upstream 7.2.5 on:
+This is the first step of the fork: a behaviour-preserving TypeScript port, except for `keep` and `remove` on built-in
+tags (see the API differences). Its output matches upstream 7.2.5 on:
 
 - the 147 upstream golden cases, with their per-case options (`test/golden.test.ts`);
 - the upstream API tests, ported (`test/turndown.test.ts`) and the edge-whitespace internals (`test/edge-whitespace.test.ts`);

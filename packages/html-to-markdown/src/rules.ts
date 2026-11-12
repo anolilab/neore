@@ -2,6 +2,20 @@ import annotateNode from "./node";
 import type { AnnotatedNode, Options, ReplacementFunction, Rule, RuleLookup } from "./types";
 
 /**
+ * The default `keepReplacement`. It ignores its content and outputs the
+ * element's HTML, so the converter skips the children of a kept element when
+ * this is the replacement in use. A custom `keepReplacement` still gets the
+ * converted children.
+ */
+export function defaultKeepReplacement(_content: string, node: AnnotatedNode): string {
+    if (node.isBlock) {
+        return `\n\n${node.outerHTML}\n\n`;
+    }
+
+    return node.outerHTML;
+}
+
+/**
  * Manages the rules used to convert HTML to Markdown. For an element that is
  * not blank, the first match wins, in this order:
  *
@@ -26,7 +40,8 @@ export default class Rules implements RuleLookup {
 
     private readonly removeList: Rule[] = [];
 
-    private readonly removalRules = new WeakSet<Rule>();
+    /** Rules whose replacement ignores the children, so converting them is wasted work. */
+    private readonly skipChildrenRules = new WeakSet<Rule>();
 
     private readonly options: Options;
 
@@ -54,10 +69,16 @@ export default class Rules implements RuleLookup {
     }
 
     keep(filter: Rule["filter"]): void {
-        this.keepList.unshift({
+        const rule: Rule = {
             filter,
             replacement: this.keepReplacement,
-        });
+        };
+
+        if (this.keepReplacement === defaultKeepReplacement) {
+            this.skipChildrenRules.add(rule);
+        }
+
+        this.keepList.unshift(rule);
     }
 
     remove(filter: Rule["filter"]): void {
@@ -66,17 +87,18 @@ export default class Rules implements RuleLookup {
             replacement: () => "",
         };
 
-        this.removalRules.add(rule);
+        this.skipChildrenRules.add(rule);
         this.removeList.unshift(rule);
     }
 
     /**
-     * True when the rule drops the element and its content. The converter then
-     * skips the children: converting them would only throw the output away, and
+     * True when the converter should not convert the element's children: a
+     * removed element, or a kept one with the default `keepReplacement`, since
+     * neither uses them. Converting them would only throw the output away, and
      * could still leave side effects such as reference-link definitions.
      */
-    isRemoval(rule: Rule): boolean {
-        return this.removalRules.has(rule);
+    skipsChildren(rule: Rule): boolean {
+        return this.skipChildrenRules.has(rule);
     }
 
     forNode(node: AnnotatedNode): Rule {
