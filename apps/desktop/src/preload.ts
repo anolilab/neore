@@ -7,6 +7,7 @@
 import type { IpcRendererEvent } from "electron";
 import { contextBridge, ipcRenderer } from "electron";
 
+import type { MenuCommand } from "./app-menu.js";
 import { CAPABILITIES_ARG, CHANNEL, SITE_ORIGIN_ARG } from "./channels.js";
 import { DEVICE_CHANNEL } from "./device/channels.js";
 
@@ -49,17 +50,55 @@ const deviceRelay = {
     status: () => ipcRenderer.invoke(DEVICE_CHANNEL.status),
 };
 
+/** Live `onMenuCommand` subscriptions of this document: the main process holds its commands while there are none. */
+const menuSubscriptions = new Set<() => void>();
+
+const subscribeToMenuCommands = (handler: (command: MenuCommand) => void): () => void => {
+    const unsubscribe = listen(CHANNEL.menuCommand, handler);
+
+    menuSubscriptions.add(unsubscribe);
+    // The main process holds the window's commands until this arrives.
+    ipcRenderer.send(CHANNEL.menuCommandsReady);
+
+    return () => {
+        // Calling the same unsubscribe twice must not count another subscriber out.
+        if (!menuSubscriptions.delete(unsubscribe)) {
+            return;
+        }
+
+        unsubscribe();
+
+        if (menuSubscriptions.size === 0) {
+            ipcRenderer.send(CHANNEL.menuCommandsUnready);
+        }
+    };
+};
+
 if (siteOrigin !== undefined && document.location.origin === siteOrigin) {
     contextBridge.exposeInMainWorld("neoreNative", {
         /** What this build can do. The web side must read this, not assume it. */
         capabilities,
         device: capabilities.includes("device") ? deviceRelay : undefined,
+        /** The system accent colour as `#rrggbb`, or `null`. Exposed only with the `system-accent` capability. */
+        getSystemAccentColor: capabilities.includes("system-accent")
+            ? (): Promise<string | null> => ipcRenderer.invoke(CHANNEL.getSystemAccentColor)
+            : undefined,
         notify: (title: string, body?: string) => ipcRenderer.invoke(CHANNEL.notify, { body, title }),
         onCompose: (handler: () => void): () => void => listen(CHANNEL.compose, () => handler()),
         /** A deep link's text for the composer, which is not sent. Pair with `takePendingDraft`. */
         onDraft: (handler: () => void): () => void => listen(CHANNEL.draft, () => handler()),
         onFiles: (handler: () => void): () => void => listen(CHANNEL.files, () => handler()),
+
+        /**
+         * The application menu's New Chat and Settings… items; subscribing tells the main process this page listens, and
+         * the last unsubscribe that it stopped.
+         */
+        onMenuCommand: capabilities.includes("menu-commands") ? subscribeToMenuCommands : undefined,
         onSignIn: (handler: () => void): () => void => listen(CHANNEL.signIn, () => handler()),
+        /** The system accent colour changed. Exposed only with the `system-accent` capability. */
+        onSystemAccentColor: capabilities.includes("system-accent")
+            ? (handler: (hex: string | null) => void): () => void => listen(CHANNEL.systemAccentColor, handler)
+            : undefined,
         /** Opens a thread in its own window. Exposed only with the `thread-windows` capability. */
         openThreadWindow: (threadId: string): Promise<void> => ipcRenderer.invoke(CHANNEL.openThreadWindow, threadId),
         /** Unread count for the dock / launcher badge; the main process clamps it to 0..999. */

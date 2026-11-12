@@ -17,7 +17,18 @@ type TextareaProps = React.ComponentProps<"textarea"> & {
     unstyled?: boolean;
 };
 
-const Textarea = ({ className, expandable = false, expandableDialogTitle, onChange, size = "default", unstyled = false, value, ...props }: TextareaProps) => {
+// `spellCheck` defaults on explicitly: the desktop shell turns it off on <html>, and a textarea is long-form text.
+const Textarea = ({
+    className,
+    expandable = false,
+    expandableDialogTitle,
+    onChange,
+    size = "default",
+    spellCheck = true,
+    unstyled = false,
+    value,
+    ...props
+}: TextareaProps) => {
     const { t } = useLingui();
     const [isExpanded, setIsExpanded] = useState(false);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -96,6 +107,7 @@ const Textarea = ({ className, expandable = false, expandableDialogTitle, onChan
                     {...mergeProps(defaultProps, {
                         ...props,
                         onKeyDown: handleTextareaKeyDown,
+                        spellCheck,
                         ...(onChange && { onChange }),
                         ...(value !== undefined && { value }),
                     })}
@@ -162,6 +174,7 @@ const Textarea = ({ className, expandable = false, expandableDialogTitle, onChan
                                     data-slot="textarea"
                                     onChange={onChange}
                                     ref={expandedTextareaRef}
+                                    spellCheck={spellCheck}
                                     value={value}
                                     {...props}
                                 />

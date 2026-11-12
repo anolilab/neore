@@ -7,6 +7,7 @@ describe("composerEditorAttributes", () => {
         const attributes = composerEditorAttributes();
 
         expect(attributes.dir).toBe("auto");
+        expect(attributes.spellcheck).toBe("true");
         expect(attributes).not.toHaveProperty("aria-describedby");
         expect(attributes).not.toHaveProperty("aria-invalid");
     });
