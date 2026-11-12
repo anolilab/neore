@@ -4,7 +4,14 @@ import type { FC, PropsWithChildren } from "react";
 import { useEffect, useState } from "react";
 
 import { reportFirstNativeLaunch } from "@/lib/analytics/first-native-launch";
-import { getPostHog, loadPostHog, PostHogClientContext, takePendingPostHogReset } from "@/lib/analytics/posthog-client";
+import {
+    discardPendingExceptions,
+    flushPendingExceptions,
+    getPostHog,
+    loadPostHog,
+    PostHogClientContext,
+    takePendingPostHogReset,
+} from "@/lib/analytics/posthog-client";
 import { redactPromptFromEvent } from "@/lib/analytics/redact-prompt";
 
 // The consent state PostHog should follow. `PostHogConsentSync` is a child of `AnalyticsProvider`, so its first
@@ -79,6 +86,8 @@ const AnalyticsProvider: FC<PropsWithChildren> = ({ children }) => {
 
     useEffect(() => {
         if (import.meta.env.DEV || !globalThis || !import.meta.env.VITE_POSTHOG_API_KEY || !import.meta.env.VITE_POSTHOG_HOST) {
+            discardPendingExceptions();
+
             return undefined;
         }
 
@@ -135,6 +144,8 @@ const AnalyticsProvider: FC<PropsWithChildren> = ({ children }) => {
                 posthog.reset();
             }
 
+            // Errors caught while the chunk loaded; after `init`, whose `loaded` callback applied the consent state.
+            flushPendingExceptions(posthog);
             setClient(posthog);
         };
 

@@ -8,7 +8,9 @@ const permissions = vi.hoisted(() => {
 const posthogMock = vi.hoisted(() => {
     return {
         __loaded: false,
+        captureException: vi.fn(),
         debug: vi.fn(),
+        has_opted_out_capturing: vi.fn(() => false),
         init: vi.fn(),
         opt_in_capturing: vi.fn(),
         opt_out_capturing: vi.fn(),
@@ -29,7 +31,7 @@ vi.mock("@/lib/analytics/first-native-launch", () => {
 });
 
 const { default: AnalyticsProvider, onPostHogLoaded, PostHogConsentSync } = await import("./analytics-provider");
-const { forgetPostHogIdentity, usePostHog } = await import("@/lib/analytics/posthog-client");
+const { captureException, forgetPostHogIdentity, usePostHog } = await import("@/lib/analytics/posthog-client");
 
 describe("PostHog consent sync", () => {
     beforeEach(() => {
@@ -82,6 +84,30 @@ describe("AnalyticsProvider", () => {
 
     afterEach(() => {
         vi.unstubAllEnvs();
+    });
+
+    // First: the queue is flushed once per page, by whichever case initialises PostHog first.
+    it("reports an error caught before its chunk loaded once PostHog has initialised", async () => {
+        loadPostHog.mockResolvedValue(posthogMock);
+        const early = new Error("crashed on first render");
+
+        captureException(early, { errorBoundary: "global" });
+
+        render(
+            <AnalyticsProvider>
+                <ClientState />
+            </AnalyticsProvider>,
+        );
+
+        await act(async () => {
+            await Promise.resolve();
+        });
+
+        expect(posthogMock.captureException).toHaveBeenCalledExactlyOnceWith(early, { errorBoundary: "global" });
+        const [initOrder = 0] = posthogMock.init.mock.invocationCallOrder;
+        const [captureOrder = 0] = posthogMock.captureException.mock.invocationCallOrder;
+
+        expect(captureOrder).toBeGreaterThan(initOrder);
     });
 
     it("loads PostHog again once the window is back online after its chunk failed to load", async () => {

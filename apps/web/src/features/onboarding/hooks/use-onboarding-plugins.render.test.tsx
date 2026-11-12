@@ -43,4 +43,23 @@ describe(useOnboardingPlugins, () => {
         expect(result.current[0]).toBe(plugin);
         expect(createPostHogPlugin).toHaveBeenCalledOnce();
     });
+
+    it("builds a plugin that touches nothing on the client until it is installed, so an abandoned render leaves no listeners", async () => {
+        const actual = await vi.importActual<typeof import("@onboardjs/posthog-plugin")>("@onboardjs/posthog-plugin");
+        const touched: PropertyKey[] = [];
+        const client = new Proxy(
+            {},
+            {
+                get: (_target, key) => {
+                    touched.push(key);
+
+                    return undefined;
+                },
+            },
+        ) as PostHog;
+
+        actual.createPostHogPlugin({ posthogInstance: client });
+
+        expect(touched).toStrictEqual([]);
+    });
 });

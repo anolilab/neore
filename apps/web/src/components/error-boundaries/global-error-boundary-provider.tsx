@@ -4,7 +4,7 @@ import { Trans } from "@lingui/react/macro";
 import type { ErrorInfo, ReactNode } from "react";
 import { useCallback, useEffect, useState } from "react";
 
-import { getPostHog } from "@/lib/analytics/posthog-client";
+import { captureException } from "@/lib/analytics/posthog-client";
 import { ErrorUtilities } from "@/lib/errors";
 import { UserErrorMessage } from "@/lib/localized-message";
 import { showError } from "@/lib/toast";
@@ -67,17 +67,13 @@ const GlobalErrorBoundaryProvider = ({ children }: GlobalErrorBoundaryProviderPr
             showError(error);
 
             // Send error to PostHog
-            const posthog = getPostHog();
-
-            if (posthog && typeof posthog.captureException === "function") {
-                posthog.captureException(error, {
-                    errorType: "unhandled-promise-rejection",
-                    isOnline,
-                    timestamp: new Date().toISOString(),
-                    url: globalThis.location.href,
-                    userAgent: navigator.userAgent,
-                });
-            }
+            captureException(error, {
+                errorType: "unhandled-promise-rejection",
+                isOnline,
+                timestamp: new Date().toISOString(),
+                url: globalThis.location.href,
+                userAgent: navigator.userAgent,
+            });
 
             // Prevent default browser error handling
             event.preventDefault();
@@ -112,20 +108,16 @@ const GlobalErrorBoundaryProvider = ({ children }: GlobalErrorBoundaryProviderPr
             showError(error);
 
             // Send error to PostHog
-            const posthog = getPostHog();
-
-            if (posthog && typeof posthog.captureException === "function") {
-                posthog.captureException(error, {
-                    colno: event.colno,
-                    errorType: "javascript-error",
-                    filename: event.filename,
-                    isOnline,
-                    lineno: event.lineno,
-                    timestamp: new Date().toISOString(),
-                    url: globalThis.location.href,
-                    userAgent: navigator.userAgent,
-                });
-            }
+            captureException(error, {
+                colno: event.colno,
+                errorType: "javascript-error",
+                filename: event.filename,
+                isOnline,
+                lineno: event.lineno,
+                timestamp: new Date().toISOString(),
+                url: globalThis.location.href,
+                userAgent: navigator.userAgent,
+            });
         };
 
         globalThis.addEventListener("error", handleError);
@@ -181,23 +173,19 @@ const GlobalErrorBoundaryProvider = ({ children }: GlobalErrorBoundaryProviderPr
         console.groupEnd();
 
         // Send comprehensive error report to PostHog
-        const posthog = getPostHog();
-
-        if (posthog && typeof posthog.captureException === "function") {
-            posthog.captureException(error, {
-                componentStack: errorInfo.componentStack,
-                context: {
-                    isOnline,
-                    localStorage: getLocalStorageSnapshot(),
-                    sessionStorage: getSessionStorageSnapshot(),
-                    timestamp: new Date().toISOString(),
-                    url: globalThis.location.href,
-                    userAgent: navigator.userAgent,
-                },
-                errorBoundary: "global",
-                errorType: "react-error-boundary",
-            });
-        }
+        captureException(error, {
+            componentStack: errorInfo.componentStack,
+            context: {
+                isOnline,
+                localStorage: getLocalStorageSnapshot(),
+                sessionStorage: getSessionStorageSnapshot(),
+                timestamp: new Date().toISOString(),
+                url: globalThis.location.href,
+                userAgent: navigator.userAgent,
+            },
+            errorBoundary: "global",
+            errorType: "react-error-boundary",
+        });
     };
 
     const renderGlobalFallback = (error: Error) => {

@@ -16,7 +16,7 @@ export const getPostHog = (): PostHog | undefined => chunk.loaded;
 
 const importPostHog = async (): Promise<PostHog> => {
     try {
-        const { posthog } = await retryChunk(async () => await import("posthog-js"));
+        const { posthog } = await retryChunk(async () => await import("./posthog-js"));
 
         chunk.loaded = posthog;
 
@@ -34,6 +34,63 @@ export const loadPostHog = async (): Promise<PostHog> => {
     chunk.loading ??= importPostHog();
 
     return await chunk.loading;
+};
+
+type ExceptionProperties = Parameters<PostHog["captureException"]>[1];
+
+/** How many exceptions caught before PostHog initialised are kept for it; the oldest go first. */
+export const MAX_PENDING_EXCEPTIONS = 20;
+
+const pendingExceptions: { error: unknown; properties: ExceptionProperties }[] = [];
+const queueState: { closed: boolean } = { closed: false };
+
+/**
+ * Reports a caught exception. Before PostHog has initialised (its chunk loads after mount, which can take seconds) the
+ * exception is queued, up to `MAX_PENDING_EXCEPTIONS`, and `AnalyticsProvider` sends the queue once `init` and
+ * consent have been applied (`flushPendingExceptions`). An opted-out user's are never sent.
+ */
+export const captureException = (error: unknown, properties?: ExceptionProperties): void => {
+    const posthog = chunk.loaded;
+
+    if (posthog?.__loaded) {
+        if (!posthog.has_opted_out_capturing()) {
+            posthog.captureException(error, properties);
+        }
+
+        return;
+    }
+
+    if (queueState.closed) {
+        return;
+    }
+
+    pendingExceptions.push({ error, properties });
+
+    if (pendingExceptions.length > MAX_PENDING_EXCEPTIONS) {
+        pendingExceptions.shift();
+    }
+};
+
+/** Sends what `captureException` queued before `posthog` initialised, unless the user opted out; then queues nothing more. */
+export const flushPendingExceptions = (posthog: PostHog): void => {
+    const pending = [...pendingExceptions];
+
+    pendingExceptions.length = 0;
+    queueState.closed = true;
+
+    if (posthog.has_opted_out_capturing()) {
+        return;
+    }
+
+    for (const { error, properties } of pending) {
+        posthog.captureException(error, properties);
+    }
+};
+
+/** Analytics will not load in this session (development, or no PostHog key): drop the queue and stop queueing. */
+export const discardPendingExceptions = (): void => {
+    pendingExceptions.length = 0;
+    queueState.closed = true;
 };
 
 const resetState: { pending: boolean } = { pending: false };

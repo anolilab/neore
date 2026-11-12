@@ -4,7 +4,7 @@ import { Trans } from "@lingui/react/macro";
 import type { ErrorInfo, ReactNode } from "react";
 import React from "react";
 
-import { getPostHog } from "@/lib/analytics/posthog-client";
+import { captureException } from "@/lib/analytics/posthog-client";
 import { UserErrorMessage } from "@/lib/localized-message";
 import { showError } from "@/lib/toast";
 
@@ -91,14 +91,16 @@ const withComponentStack = (error: unknown, componentStack: string): unknown => 
 /** Reports a caught render error; a failure here must never keep the boundary from rendering its fallback. */
 const captureRenderError = (error: unknown, componentStack: string): void => {
     try {
-        getPostHog()?.captureException(withComponentStack(error, componentStack));
-    } catch {
-        // Reporting is best-effort.
+        captureException(withComponentStack(error, componentStack));
+    } catch (reportError) {
+        // Best-effort, but a lost report should leave a trace.
+        // eslint-disable-next-line no-console -- the only trace of a report that never left
+        console.warn("[ErrorBoundary] Could not report a render error:", reportError);
     }
 };
 
 /**
- * Catches a render error, reports it to PostHog (once PostHog has loaded; `lib/analytics/posthog-client.ts`) and
+ * Catches a render error, reports it to PostHog (queued until PostHog has loaded; `lib/analytics/posthog-client.ts`) and
  * renders `fallback` in its place. Kept free of `@posthog/react`, which would put `posthog-js` on the first load.
  */
 class PostHogCapturingBoundary extends React.Component<

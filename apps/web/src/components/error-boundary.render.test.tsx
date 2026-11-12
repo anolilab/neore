@@ -5,9 +5,7 @@ const captureException = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/analytics/posthog-client", () => {
     return {
-        getPostHog: () => {
-            return { captureException };
-        },
+        captureException,
     };
 });
 vi.mock("@/lib/toast", () => {
@@ -34,6 +32,25 @@ describe(ErrorBoundary, () => {
 
         expect(screen.getByText("Recovered: frozen")).toBeTruthy();
         expect(captureException).toHaveBeenCalledWith(frozenError);
+    });
+
+    it("still renders its fallback, and warns, when reporting the error throws", () => {
+        vi.spyOn(console, "error").mockImplementation(() => {});
+        const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+        const reportFailure = new Error("report failed");
+
+        captureException.mockImplementationOnce(() => {
+            throw reportFailure;
+        });
+
+        render(
+            <ErrorBoundary fallback={(error: Error) => <p>{`Recovered: ${error.message}`}</p>}>
+                <Thrower />
+            </ErrorBoundary>,
+        );
+
+        expect(screen.getByText("Recovered: frozen")).toBeTruthy();
+        expect(warn).toHaveBeenCalledWith(expect.stringContaining("Could not report a render error"), reportFailure);
     });
 
     it("replaces the component stack it attached before when the same error is caught again", () => {

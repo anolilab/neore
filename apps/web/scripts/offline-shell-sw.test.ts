@@ -532,7 +532,7 @@ describe("generate-sw.mjs", () => {
     });
 
     /** Runs the generator on a minimal client build whose entry chunk is `entryFile`, and returns sw.js. */
-    const generate = (entryFile: string): string => {
+    const generate = (entryFile: string, { withPostHog = true }: { withPostHog?: boolean } = {}): string => {
         const dir = mkdtempSync(join(tmpdir(), "neore-generate-sw-"));
 
         dirs.push(dir);
@@ -543,10 +543,16 @@ describe("generate-sw.mjs", () => {
             JSON.stringify({
                 "client.tsx": { file: entryFile, isEntry: true },
                 "src/features/connection/components/offline-screen.tsx": { file: "assets/offline-screen-Ij90Kl12.js", isDynamicEntry: true },
+                ...(withPostHog && {
+                    "_module-Qr78St90.js": { file: "assets/module-Qr78St90.js" },
+                    "src/lib/analytics/posthog-js.ts": { file: "assets/posthog-js-Mn34Op56.js", imports: ["_module-Qr78St90.js"], isDynamicEntry: true },
+                }),
                 "src/locales/en/messages.po": { file: "assets/messages-Ab12Cd34.js", isDynamicEntry: true },
             }),
         );
         writeFileSync(join(dir, "assets", "offline-screen-Ij90Kl12.js"), "export default () => null;");
+        writeFileSync(join(dir, "assets", "posthog-js-Mn34Op56.js"), "export * from './module-Qr78St90.js';");
+        writeFileSync(join(dir, "assets", "module-Qr78St90.js"), "export const posthog = {};");
         writeFileSync(join(dir, "assets", "messages-Ab12Cd34.js"), "export const messages = {};");
         writeFileSync(join(dir, entryFile), "export {};");
         writeFileSync(join(dir, "offline.html"), "<html>offline</html>");
@@ -567,6 +573,16 @@ describe("generate-sw.mjs", () => {
         expect(sw).toMatch(/importScripts\([^)]*"offline-shell-sw\.js"/u);
         // The desktop's offline screen is lazy on the web, but an offline start needs it: it is precached with the shell.
         expect(sw).toContain("assets/offline-screen-Ij90Kl12.js");
+        // So is PostHog, whose stored flags gate UI an offline start shows, with the chunks it imports.
+        expect(sw).toContain("assets/posthog-js-Mn34Op56.js");
+        expect(sw).toContain("assets/module-Qr78St90.js");
+    });
+
+    it("builds without the PostHog chunk when the build has none (no PostHog key)", () => {
+        const sw = generate(ENTRY, { withPostHog: false });
+
+        expect(sw).toContain("assets/offline-screen-Ij90Kl12.js");
+        expect(sw).not.toContain("assets/posthog-js-Mn34Op56.js");
     });
 
     it("shifts sw.js.map down one line for the config line put in front of sw.js", () => {

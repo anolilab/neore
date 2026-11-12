@@ -49,9 +49,14 @@ const DEFAULT_CATALOG = "src/locales/en/messages.po";
  */
 /**
  * Lazy chunks an offline start still needs: the desktop shell's offline screen is kept off the web's first load
- * (`__root.tsx`), but it is shown exactly when the network is gone, so it is precached with the shell.
+ * (`__root.tsx`), but it is shown exactly when the network is gone, so it is precached with the shell. PostHog loads
+ * after mount (`src/lib/analytics/posthog-client.ts`), and the flags it keeps from the last session gate UI (the code
+ * workspace, navigation links), so an offline start needs it too.
  */
 const OFFLINE_SHELL_CHUNKS = ["src/features/connection/components/offline-screen.tsx"];
+
+/** As `OFFLINE_SHELL_CHUNKS`, but absent from some builds: one without a PostHog key drops the code that loads PostHog. */
+const OPTIONAL_OFFLINE_SHELL_CHUNKS = ["src/lib/analytics/posthog-js.ts"];
 
 const readAppShell = () => {
     const manifestDir = resolve(clientDir, ".vite");
@@ -98,6 +103,12 @@ const readAppShell = () => {
         }
 
         walk(key);
+    }
+
+    for (const key of OPTIONAL_OFFLINE_SHELL_CHUNKS) {
+        if (manifest[key]) {
+            walk(key);
+        }
     }
 
     if (entries.length !== 1) {

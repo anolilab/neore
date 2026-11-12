@@ -39,8 +39,10 @@ const buildPlugins = (client: PostHog | undefined): PluginState => {
 
 /**
  * The onboarding flow's PostHog plugin, once PostHog has loaded: PostHog loads after mount, so the dialog can open
- * first and gains the plugin when the client arrives. Kept in state, not a memo: React may drop a memo cache, and a
- * new plugin would register its PostHog listeners again. A new plugin is built only when the client changes.
+ * first and gains the plugin when the client arrives. Building one in render is safe: `createPostHogPlugin` only
+ * stores its config, and the plugin registers its listeners in `install`, which `OnboardingProvider` calls after
+ * commit, so a render React abandons leaves nothing behind. Kept in state, not a memo, so the plugin installed is
+ * the one rendered: React may drop a memo cache. A new plugin is built only when the client changes.
  */
 const useOnboardingPlugins = (): OnboardingPlugins => {
     const client = usePostHog();
