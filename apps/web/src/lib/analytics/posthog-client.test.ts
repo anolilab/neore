@@ -444,6 +444,27 @@ describe("startPostHog", () => {
         expect(posthog.group).toHaveBeenCalledExactlyOnceWith("organization", "org-1", { name: "Acme" });
     });
 
+    it("drops a queued event past the age limit from storage, and never sends it", async () => {
+        vi.useFakeTimers({ now: new Date("2026-11-12T10:00:00Z"), toFake: ["Date"] });
+
+        try {
+            const client = await loadClientModule();
+
+            client.queueEvent("too_old", {});
+            vi.setSystemTime(Date.now() + client.PENDING_EVENT_MAX_AGE_MS + 1);
+            client.queueEvent("fresh", {});
+
+            expect(globalThis.sessionStorage.getItem(client.PENDING_EVENTS_KEY)).not.toContain("too_old");
+
+            client.startPostHog(await client.loadPostHog(), () => {});
+            client.setAnalyticsIdentity({});
+
+            expect(posthog.capture.mock.calls.map(([event]) => event)).toStrictEqual(["fresh"]);
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
     it("resets the stored identity before the flush when the session ended while startup waited for it", async () => {
         const client = await loadClientModule();
 
@@ -630,6 +651,37 @@ describe("useFeatureFlagReader", () => {
         });
 
         expect(result.current).toBe(true);
+    });
+
+    it("mounting another reader re-renders none of those already mounted", async () => {
+        const client = await loadClientModule();
+        const fake = {
+            isFeatureEnabled: () => true,
+            // As PostHog: a listener added while it holds flags is called at once.
+            onFeatureFlags: (callback: () => void) => {
+                callback();
+
+                return () => {};
+            },
+        } as unknown as PostHog;
+        const wrapper = ({ children }: { children: ReactNode }) => createElement(client.PostHogClientContext, { value: fake }, children);
+        const renders = { count: 0 };
+
+        renderHook(
+            () => {
+                renders.count += 1;
+
+                return client.useFeatureFlagReader();
+            },
+            { wrapper },
+        );
+
+        const before = renders.count;
+
+        renderHook(() => client.useFeatureFlagReader(), { wrapper });
+        renderHook(() => client.useFeatureFlagReader(), { wrapper });
+
+        expect(renders.count).toBe(before);
     });
 
     it("keeps answering from the server-rendered flags while a retry runs after coming back online", async () => {

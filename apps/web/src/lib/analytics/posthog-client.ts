@@ -56,6 +56,13 @@ export const MAX_PENDING_EVENTS = 50;
  */
 export const PENDING_EVENTS_KEY = "neore:posthog-pending-events";
 
+/**
+ * How long a queued event waits for PostHog. One older is dropped, from memory and from sessionStorage, and never sent:
+ * a tab whose analytics stays blocked or offline does not keep what it tracked (its pages, who was signed in) for its
+ * whole life.
+ */
+export const PENDING_EVENT_MAX_AGE_MS = 60 * 60 * 1000;
+
 interface PendingEvent {
     event: string;
     /** With the page it was tracked on (`pageProperties`). */
@@ -117,11 +124,20 @@ const storeEvents = (events: PendingEvent[]): void => {
     }
 };
 
-/** The queued events, the ones an earlier page of this tab left included. */
+/** The queued events, the ones an earlier page of this tab left included; those past the age limit are dropped first. */
 const pendingEvents = (): PendingEvent[] => {
     queueState.events ??= readStoredEvents();
 
-    return queueState.events;
+    const { events } = queueState;
+    const oldest = Date.now() - PENDING_EVENT_MAX_AGE_MS;
+    const fresh = events.filter(({ timestamp }) => Date.parse(timestamp) >= oldest);
+
+    if (fresh.length !== events.length) {
+        events.splice(0, events.length, ...fresh);
+        storeEvents(events);
+    }
+
+    return events;
 };
 
 const dropPendingEvents = (): void => {
@@ -589,8 +605,33 @@ const readUnavailable = (): boolean => availability.isUnavailable;
 const readFallsBack = (): boolean => availability.hasFailed;
 const notKnown = (): false => false;
 
-/** How often each client's flags loaded or reloaded (`useFeatureFlagReader`'s version). */
-const flagLoads = new WeakMap<PostHog, number>();
+/**
+ * Each client's flag loads, from one `onFeatureFlags` listener per client: a reader that subscribes adds a listener to
+ * the set, and changes no count (PostHog answers a new `onFeatureFlags` at once when it holds flags already).
+ */
+const flagStores = new WeakMap<PostHog, { listeners: Set<() => void>; loads: number }>();
+
+const flagStoreOf = (posthog: PostHog): { listeners: Set<() => void>; loads: number } => {
+    const known = flagStores.get(posthog);
+
+    if (known) {
+        return known;
+    }
+
+    const store = { listeners: new Set<() => void>(), loads: 0 };
+
+    flagStores.set(posthog, store);
+    posthog.onFeatureFlags(() => {
+        store.loads += 1;
+
+        for (const listener of store.listeners) {
+            listener();
+        }
+    });
+
+    return store;
+};
+
 const noLoads = (): number => 0;
 
 // Clients whose flags have arrived (fetched, persisted, bootstrapped, or failed to load): `onFeatureFlags` answers at
@@ -645,16 +686,22 @@ export const useFeatureFlagReader = (): ((flag: string) => boolean | undefined) 
     const fallsBack = useSyncExternalStore(subscribeAvailability, readFallsBack, notKnown);
     // Counts the client's flag loads and reloads, so the reader changes with them and a memo over it recomputes.
     const subscribe = useCallback(
-        (onChange: () => void) =>
-            posthog
-                ? posthog.onFeatureFlags(() => {
-                      flagLoads.set(posthog, (flagLoads.get(posthog) ?? 0) + 1);
-                      onChange();
-                  })
-                : noSubscription(),
+        (onChange: () => void) => {
+            if (!posthog) {
+                return noSubscription();
+            }
+
+            const { listeners } = flagStoreOf(posthog);
+
+            listeners.add(onChange);
+
+            return () => {
+                listeners.delete(onChange);
+            };
+        },
         [posthog],
     );
-    const readLoads = useCallback(() => (posthog ? (flagLoads.get(posthog) ?? 0) : 0), [posthog]);
+    const readLoads = useCallback(() => (posthog ? flagStoreOf(posthog).loads : 0), [posthog]);
     const loads = useSyncExternalStore(subscribe, readLoads, noLoads);
 
     return useCallback(
