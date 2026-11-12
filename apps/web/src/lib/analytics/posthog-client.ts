@@ -4,7 +4,7 @@
  * page. Until it has loaded every reader sees `undefined`, which is what an uninitialised client answered anyway:
  * no flags, nothing captured.
  */
-import type { PostHog } from "posthog-js";
+import type { PostHog, Properties } from "posthog-js";
 import { createContext, useCallback, useContext, useSyncExternalStore } from "react";
 
 import { retryChunk } from "@/lib/native/shell-chunk";
@@ -41,8 +41,58 @@ type ExceptionProperties = Parameters<PostHog["captureException"]>[1];
 /** How many exceptions caught before PostHog initialised are kept for it; the oldest go first. */
 export const MAX_PENDING_EXCEPTIONS = 20;
 
+/** How many events tracked before PostHog initialised are kept for it; the oldest go first. */
+export const MAX_PENDING_EVENTS = 50;
+
+/**
+ * Where events tracked before PostHog initialised wait. sessionStorage, not memory: a sign-in that tracks and then
+ * loads the next page at once (the desktop shell's) would otherwise lose its event with the page.
+ */
+export const PENDING_EVENTS_KEY = "neore:posthog-pending-events";
+
+interface PendingEvent {
+    event: string;
+    properties: Properties;
+    /** When it was tracked (ISO 8601), sent as the event's time. */
+    timestamp: string;
+}
+
 const pendingExceptions: { error: unknown; properties: ExceptionProperties }[] = [];
-const queueState: { closed: boolean } = { closed: false };
+const queueState: { closed: boolean; events?: PendingEvent[] } = { closed: false };
+
+const readStoredEvents = (): PendingEvent[] => {
+    try {
+        const parsed: unknown = JSON.parse(globalThis.sessionStorage.getItem(PENDING_EVENTS_KEY) ?? "[]");
+
+        return Array.isArray(parsed) ? (parsed as PendingEvent[]) : [];
+    } catch {
+        return [];
+    }
+};
+
+const storeEvents = (events: PendingEvent[]): void => {
+    try {
+        if (events.length === 0) {
+            globalThis.sessionStorage.removeItem(PENDING_EVENTS_KEY);
+        } else {
+            globalThis.sessionStorage.setItem(PENDING_EVENTS_KEY, JSON.stringify(events));
+        }
+    } catch {
+        // Storage blocked or full: the events still wait in memory for this page.
+    }
+};
+
+/** The queued events, the ones an earlier page of this tab left included. */
+const pendingEvents = (): PendingEvent[] => {
+    queueState.events ??= readStoredEvents();
+
+    return queueState.events;
+};
+
+const dropPendingEvents = (): void => {
+    queueState.events = [];
+    storeEvents([]);
+};
 
 // The measurement consent `PostHogConsentSync` read from c15t; `undefined` until its first effect has run.
 const consentState: { measurement?: boolean } = {};
@@ -56,13 +106,14 @@ export const setMeasurementConsent = (granted: boolean): void => {
 
     if (!granted) {
         pendingExceptions.length = 0;
+        dropPendingEvents();
     }
 };
 
 /**
  * Reports a caught exception. Before PostHog has initialised (its chunk loads after mount, which can take seconds) the
  * exception is queued, up to `MAX_PENDING_EXCEPTIONS`, and `AnalyticsProvider` sends the queue once `init` and
- * consent have been applied (`flushPendingExceptions`). Nothing is queued while measurement consent is refused, and an
+ * consent have been applied (`flushPendingCaptures`). Nothing is queued while measurement consent is refused, and an
  * opted-out user's are never sent.
  */
 export const captureException = (error: unknown, properties?: ExceptionProperties): void => {
@@ -88,12 +139,35 @@ export const captureException = (error: unknown, properties?: ExceptionPropertie
 };
 
 /**
- * Sends what `captureException` queued before `posthog` initialised, unless the user opted out; then queues nothing
- * more. A report that throws is logged and skipped, so the rest are still sent.
+ * Keeps an event tracked before PostHog initialised, up to `MAX_PENDING_EVENTS`, under the same rules as
+ * `captureException`'s queue; `flushPendingCaptures` sends it with the time it was tracked. It outlives a page load in
+ * this tab (`PENDING_EVENTS_KEY`).
  */
-export const flushPendingExceptions = (posthog: PostHog): void => {
-    const pending = [...pendingExceptions];
+export const queueEvent = (event: string, properties: Properties): void => {
+    if (queueState.closed || consentState.measurement === false) {
+        return;
+    }
 
+    const events = pendingEvents();
+
+    events.push({ event, properties, timestamp: new Date().toISOString() });
+
+    if (events.length > MAX_PENDING_EVENTS) {
+        events.shift();
+    }
+
+    storeEvents(events);
+};
+
+/**
+ * Sends what was queued before `posthog` initialised, events first and then exceptions, unless the user opted out;
+ * then queues nothing more. A capture that throws is logged and skipped, so the rest are still sent.
+ */
+export const flushPendingCaptures = (posthog: PostHog): void => {
+    const events = [...pendingEvents()];
+    const exceptions = [...pendingExceptions];
+
+    dropPendingEvents();
     pendingExceptions.length = 0;
     queueState.closed = true;
 
@@ -101,7 +175,16 @@ export const flushPendingExceptions = (posthog: PostHog): void => {
         return;
     }
 
-    for (const { error, properties } of pending) {
+    for (const { event, properties, timestamp } of events) {
+        try {
+            posthog.capture(event, properties, { timestamp: new Date(timestamp) });
+        } catch (captureError) {
+            // eslint-disable-next-line no-console -- the only trace of an event that never left
+            console.warn("[PostHog] Could not send a queued event:", captureError);
+        }
+    }
+
+    for (const { error, properties } of exceptions) {
         try {
             posthog.captureException(error, properties);
         } catch (reportError) {
@@ -111,9 +194,10 @@ export const flushPendingExceptions = (posthog: PostHog): void => {
     }
 };
 
-/** Analytics will not load in this session (development, or no PostHog key): drop the queue and stop queueing. */
-export const discardPendingExceptions = (): void => {
+/** Analytics will not load in this session (development, or no PostHog key): drop the queues and stop queueing. */
+export const discardPendingCaptures = (): void => {
     pendingExceptions.length = 0;
+    dropPendingEvents();
     queueState.closed = true;
 };
 
@@ -133,10 +217,12 @@ const clearStorageKeys = (storage: Storage, prefix: string): void => {
  * the server, which reads the cookie) as the account that left. Removes what posthog-js persists under
  * `ph_<token>_…` (`parseName` in its `posthog-persistence`): the `ph_<token>_posthog` cookie on this host and every
  * parent domain it may have been set on, and the localStorage and sessionStorage entries. The client is also reset
- * once it initialises, for a page that did not reload.
+ * once it initialises, for a page that did not reload. Events still queued for PostHog are dropped with it.
  */
 export const forgetPostHogIdentity = (token: string): void => {
     resetState.pending = true;
+    // Tracked as the account that left: sent after the reset they would count for whoever this browser is next.
+    dropPendingEvents();
 
     const prefix = `ph_${token.replaceAll("+", "PL").replaceAll("/", "SL").replaceAll("=", "EQ")}_`;
 

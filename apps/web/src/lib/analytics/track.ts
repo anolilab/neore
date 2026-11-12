@@ -7,7 +7,7 @@
 import { useCallback } from "react";
 
 import type { AnalyticsEvent, AnalyticsEventMap } from "./events";
-import { forgetPostHogIdentity, getPostHog } from "./posthog-client";
+import { forgetPostHogIdentity, getPostHog, queueEvent } from "./posthog-client";
 
 /**
  * Forget the identified user before a sign-out reload, so later events from this
@@ -29,16 +29,19 @@ export const resetAnalyticsIdentity = (): void => {
 };
 
 /**
- * Fire a PostHog event if the SDK is initialised and the user has
- * not opted out of capturing.
+ * Send a PostHog event unless the user has opted out of capturing.
+ *
+ * Returns `true` when the event went to PostHog now, `false` when it did not: either it is queued until PostHog
+ * initialises (its chunk loads after mount; `queueEvent` keeps it across a page load in this tab, and it is sent then
+ * unless consent was refused meanwhile), or it is dropped (opted out, measurement refused, or analytics off in this
+ * session). A caller that records "sent" (`reportFirstNativeLaunch`) acts only on `true`.
  */
-
 export const trackEvent = <E extends AnalyticsEvent>(event: E, properties: AnalyticsEventMap[E]): boolean => {
-    // posthog-js is a singleton – if it was never loaded or initialised (e.g. in dev
-    // mode or when the env-var is missing) there is no client or its `__loaded` flag is falsy.
     const posthog = getPostHog();
 
     if (!posthog?.__loaded) {
+        queueEvent(event, properties);
+
         return false;
     }
 

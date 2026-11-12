@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { resetAnalyticsIdentity } from "./track";
+import { PENDING_EVENTS_KEY } from "./posthog-client";
+import { resetAnalyticsIdentity, trackEvent } from "./track";
 
 describe(resetAnalyticsIdentity, () => {
     beforeEach(() => {
@@ -28,5 +29,16 @@ describe(resetAnalyticsIdentity, () => {
         expect(document.cookie).not.toContain(name);
         expect(Object.keys(localStorage)).toStrictEqual(["ph_other_posthog"]);
         expect(sessionStorage).toHaveLength(0);
+    });
+});
+
+describe(trackEvent, () => {
+    afterEach(() => {
+        sessionStorage.clear();
+    });
+
+    it("queues an event tracked before PostHog has loaded and answers that it was not sent yet", () => {
+        expect(trackEvent("onboarding_started", {})).toBe(false);
+        expect(JSON.parse(sessionStorage.getItem(PENDING_EVENTS_KEY) ?? "[]")).toMatchObject([{ event: "onboarding_started", properties: {} }]);
     });
 });

@@ -5,8 +5,8 @@ import { useEffect, useState } from "react";
 
 import { reportFirstNativeLaunch } from "@/lib/analytics/first-native-launch";
 import {
-    discardPendingExceptions,
-    flushPendingExceptions,
+    discardPendingCaptures,
+    flushPendingCaptures,
     getMeasurementConsent,
     getPostHog,
     loadPostHog,
@@ -82,13 +82,16 @@ export const onPostHogLoaded = (ph: PostHogInterface): void => {
     reportFirstNativeLaunch();
 };
 
+/** How long a failed analytics start waits before its one retry while the window is online. */
+export const START_RETRY_DELAY_MS = 5000;
+
 const AnalyticsProvider: FC<PropsWithChildren> = ({ children }) => {
     // Provided once initialised; until then (and while its chunk cannot load) the app runs without analytics.
     const [client, setClient] = useState<PostHog | undefined>(undefined);
 
     useEffect(() => {
         if (import.meta.env.DEV || !globalThis || !import.meta.env.VITE_POSTHOG_API_KEY || !import.meta.env.VITE_POSTHOG_HOST) {
-            discardPendingExceptions();
+            discardPendingCaptures();
 
             return undefined;
         }
@@ -153,17 +156,34 @@ const AnalyticsProvider: FC<PropsWithChildren> = ({ children }) => {
             }
 
             if (isFirstInit) {
-                // Errors caught while the chunk loaded; after `init`, whose `loaded` callback applied the consent state.
-                flushPendingExceptions(posthog);
+                // Events tracked and errors caught while the chunk loaded; after `init`, whose `loaded` callback applied
+                // the consent state.
+                flushPendingCaptures(posthog);
             }
         };
 
-        // A chunk that never loaded (retries exhausted, e.g. offline) is tried again once the window is back online.
+        // A start that failed (the chunk's retries exhausted, or `init` threw) is tried once more after
+        // `START_RETRY_DELAY_MS` when the window is online, and again whenever it comes back online.
+        let backoffRetriesLeft = 1;
+        let retryTimer: ReturnType<typeof setTimeout> | undefined;
+
         const attempt = (): void => {
-            start().catch(() => {
-                if (!isCancelled) {
-                    globalThis.addEventListener("online", attempt, { once: true });
+            start().catch((error: unknown) => {
+                // eslint-disable-next-line no-console -- the only trace of why analytics did not start
+                console.warn("[PostHog] Analytics did not start:", error);
+
+                if (isCancelled) {
+                    return;
                 }
+
+                if (globalThis.navigator.onLine && backoffRetriesLeft > 0) {
+                    backoffRetriesLeft -= 1;
+                    retryTimer = setTimeout(attempt, START_RETRY_DELAY_MS);
+
+                    return;
+                }
+
+                globalThis.addEventListener("online", attempt, { once: true });
             });
         };
 
@@ -171,6 +191,7 @@ const AnalyticsProvider: FC<PropsWithChildren> = ({ children }) => {
 
         return () => {
             isCancelled = true;
+            clearTimeout(retryTimer);
             globalThis.removeEventListener("online", attempt);
         };
     }, []);

@@ -33,7 +33,7 @@ vi.mock("@/lib/analytics/first-native-launch", () => {
     return { reportFirstNativeLaunch: vi.fn() };
 });
 
-const { default: AnalyticsProvider, onPostHogLoaded, PostHogConsentSync } = await import("./analytics-provider");
+const { default: AnalyticsProvider, onPostHogLoaded, PostHogConsentSync, START_RETRY_DELAY_MS } = await import("./analytics-provider");
 const { captureException, forgetPostHogIdentity, setMeasurementConsent, usePostHog } = await import("@/lib/analytics/posthog-client");
 
 describe("PostHog consent sync", () => {
@@ -88,7 +88,9 @@ describe("AnalyticsProvider", () => {
     });
 
     afterEach(() => {
+        vi.useRealTimers();
         vi.unstubAllEnvs();
+        vi.restoreAllMocks();
     });
 
     // First: the queue is flushed once per page, by whichever case initialises PostHog first.
@@ -126,7 +128,51 @@ describe("AnalyticsProvider", () => {
         expect(captureOrder).toBeGreaterThan(initOrder);
     });
 
+    it("logs a failed start and, while online, tries once more after a short wait", async () => {
+        vi.useFakeTimers();
+        const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+        const failure = new Error("chunk failed");
+
+        loadPostHog.mockRejectedValueOnce(failure).mockRejectedValueOnce(failure).mockResolvedValue(posthogMock);
+
+        render(
+            <AnalyticsProvider>
+                <ClientState />
+            </AnalyticsProvider>,
+        );
+
+        await act(async () => {
+            await vi.advanceTimersByTimeAsync(0);
+        });
+
+        expect(warn).toHaveBeenCalledExactlyOnceWith("[PostHog] Analytics did not start:", failure);
+        expect(loadPostHog).toHaveBeenCalledOnce();
+
+        await act(async () => {
+            await vi.advanceTimersByTimeAsync(START_RETRY_DELAY_MS);
+        });
+
+        // The one retry failed too: no more timers, only the `online` event tries again.
+        expect(loadPostHog).toHaveBeenCalledTimes(2);
+
+        await act(async () => {
+            await vi.advanceTimersByTimeAsync(START_RETRY_DELAY_MS * 10);
+        });
+
+        expect(loadPostHog).toHaveBeenCalledTimes(2);
+
+        await act(async () => {
+            globalThis.dispatchEvent(new Event("online"));
+            await vi.advanceTimersByTimeAsync(0);
+        });
+
+        expect(posthogMock.init).toHaveBeenCalledOnce();
+        expect(screen.getByText("analytics on")).toBeTruthy();
+    });
+
     it("loads PostHog again once the window is back online after its chunk failed to load", async () => {
+        vi.spyOn(console, "warn").mockImplementation(() => {});
+        vi.spyOn(globalThis.navigator, "onLine", "get").mockReturnValue(false);
         loadPostHog.mockRejectedValueOnce(new Error("offline")).mockResolvedValue(posthogMock);
 
         render(
