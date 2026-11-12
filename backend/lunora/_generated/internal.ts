@@ -784,7 +784,7 @@ export interface InternalApiTypes {
                 deleteUserStreamingMessages: FunctionReference<"mutation", { userId: string }, { hasMore: boolean }>;
                 deleteUserSubAgentRuns: FunctionReference<"mutation", { userId: string }, { hasMore: boolean }>;
                 deleteUserThreadSummaries: FunctionReference<"mutation", { userId: string }, { hasMore: boolean }>;
-                deleteUserUsageDaily: FunctionReference<"mutation", { userId: string }, { hasMore: boolean }>;
+                deleteUserUsageDaily: FunctionReference<"mutation", { runCursor?: string | null; userId: string }, { hasMore: boolean; runCursor: string | null }>;
                 deleteUserWorkflowData: FunctionReference<"mutation", { userId: string }, { hasMore: boolean }>;
                 deregisterMessengerWebhooks: FunctionReference<"action", { userId: string }, null>;
                 killUserSandboxes: FunctionReference<"action", { userId: string }, null>;
@@ -792,7 +792,7 @@ export interface InternalApiTypes {
                 listSandboxIdsForDeletion: FunctionReference<"query", { userId: string }, Array<string>>;
                 minimiseGdprRecords: FunctionReference<"mutation", { retainEmailOf?: Id<"gdprRequests">; userId: string }, null>;
                 purgeUserDocumentHistory: FunctionReference<"mutation", { userId: string }, { hasMore: boolean }>;
-                purgeUserUsageFiles: FunctionReference<"action", { force?: boolean; userId: string }, { waiting: boolean }>;
+                purgeUserUsageFiles: FunctionReference<"action", { cursor?: string | null; force?: boolean; userId: string }, { cursor: string | null; waiting: boolean }>;
                 revokeUserConnectorGrants: FunctionReference<"action", { userId: string }, null>;
             };
         };

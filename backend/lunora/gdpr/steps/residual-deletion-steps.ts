@@ -207,6 +207,12 @@ export const killUserSandboxes = internalAction
 
 // --- Batched deletions -------------------------------------------------------
 
+/** One erasure batch: whether more remains, and where the run scan continues. */
+const vUsageErasure = v.object({ hasMore: v.boolean(), runCursor: v.union(v.string(), v.null()) });
+
+/** Pages of a user's keyed runs one purge call reads before it returns its cursor. */
+const PURGE_PAGES_PER_CALL = 50;
+
 /**
  * The usage page's per-day rollup (`usage/activity.ts`): one row per skill per
  * day, so an active year is hundreds of them — plus its bookkeeping, the keys
@@ -214,31 +220,27 @@ export const killUserSandboxes = internalAction
  * (`usageBackfill`), which a step still running finds gone and stops.
  */
 export const deleteUserUsageDaily = internalMutation
-    .input({ userId: v.string() })
-    .output(vBatchResult)
-    .mutation(async ({ args: { userId }, ctx: context }): Promise<BatchResult> => await eraseUsageForUser(context, userId));
+    .input({ runCursor: v.optional(v.union(v.string(), v.null())), userId: v.string() })
+    .output(vUsageErasure)
+    .mutation(async ({ args: { runCursor, userId }, ctx: context }) => await eraseUsageForUser(context, userId, runCursor ?? null));
 
 /**
- * Deletes the stored usage JSON of the user's export runs, and releases the record of each run whose export has ended. A run whose
- * export is still live keeps its record, so its write cannot land after the record is gone: `waiting` tells the workflow to purge
- * again once that export has ended. A failed delete throws, so the workflow retries the step.
+ * Deletes the stored usage JSON of the user's export runs, and releases the record of each run whose export has ended, a bounded part
+ * of the runs at a time: `cursor` continues the scan from the previous call. A run whose export is still live keeps its record, so its
+ * write cannot land after the record is gone: `waiting` tells the workflow to purge again once that export has ended. `force` releases
+ * the live runs too, once the workflow's wait is over. A failed delete throws, so the workflow retries the step.
  */
 export const purgeUserUsageFiles = internalAction
-    .input({ force: v.optional(v.boolean()), userId: v.string() })
-    .output(v.object({ waiting: v.boolean() }))
-    .action(async ({ args: { force, userId }, ctx: context }) => {
+    .input({ cursor: v.optional(v.union(v.string(), v.null())), force: v.optional(v.boolean()), userId: v.string() })
+    .output(v.object({ cursor: v.union(v.string(), v.null()), waiting: v.boolean() }))
+    .action(async ({ args: { cursor: start, force, userId }, ctx: context }) => {
         let waiting = false;
-        let cursor: string | null = null;
+        let cursor = start ?? null;
 
-        do {
-            const page: { cursor: string | null; keyed: { key: string; live: boolean; runId: Id<"usageExportRuns"> }[] } = await context.runQuery(
-                internal.usage.gdpr.keyedUsageRuns,
-                { cursor, userId },
-            );
+        for (let pages = 0; pages < PURGE_PAGES_PER_CALL; pages += 1) {
+            const page = await context.runQuery(internal.usage.gdpr.keyedUsageRuns, { cursor, userId });
 
             for (const run of page.keyed) {
-                // A live export's object and record are its own until the export ends: they are left alone, and the workflow
-                // purges again. Only a forced purge, after the workflow's bound, removes them while the export is live.
                 if (run.live && force !== true) {
                     waiting = true;
                     continue;
@@ -252,9 +254,13 @@ export const purgeUserUsageFiles = internalAction
             }
 
             cursor = page.cursor;
-        } while (cursor !== null);
 
-        return { waiting };
+            if (cursor === null) {
+                break;
+            }
+        }
+
+        return { cursor, waiting };
     });
 
 /**

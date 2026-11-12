@@ -44,7 +44,7 @@ const piece = (requestId: string, userId: string, seq = 0) => {
 /** How many rows of a table the user has, read the way the sweep reads them: one page, enough for these tests. */
 const countOf = async (table: string, userId: string): Promise<number> =>
     await harness.run(async (ctx: any) => {
-        const { page } = await ctx.db[table].findMany({ limit: 100, where: { userId } });
+        const { page } = await ctx.db[table].findMany({ limit: 1000, where: { userId } });
 
         return page.length;
     });
@@ -66,13 +66,30 @@ const keyedRunsOf = async (userId: string): Promise<{ key: string; live: boolean
     return keyed;
 };
 
+/** Erases the user the way the workflow drains the erasure: each batch's run cursor is where the next batch's scan starts. */
+const eraseAll = async (userId: string): Promise<void> => {
+    let runCursor: string | null = null;
+    let more = true;
+
+    while (more) {
+        const erased: { hasMore: boolean; runCursor: string | null } = await harness.run(async (ctx: any) => await eraseUsageForUser(ctx, userId, runCursor));
+
+        more = erased.hasMore;
+        runCursor = erased.runCursor;
+    }
+};
+
 beforeEach(() => {
+    // The sweep's 24-hour boundary is measured from the clock: it is pinned for each test, so the fixtures cannot drift between calls.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-11-12T12:00:00.000Z"));
     harness = lunoraTest(schema as never);
     scheduled.keys = [];
 });
 
 afterEach(() => {
     harness.close();
+    vi.useRealTimers();
 });
 
 describe("eraseUsageForUser", () => {
@@ -90,15 +107,7 @@ describe("eraseUsageForUser", () => {
             await ctx.db.insert("usageExportRuns", { createdAt: 2, requestId: "plain:1", userId: A });
         });
 
-        let more = true;
-
-        while (more) {
-            more = await harness.run(async (ctx: any) => {
-                const erased = await eraseUsageForUser(ctx, A);
-
-                return erased.hasMore;
-            });
-        }
+        await eraseAll(A);
 
         expect(await countOf("usageExportRuns", A)).toBe(10);
         expect(await keyedRunsOf(A)).toHaveLength(10);
@@ -117,15 +126,7 @@ describe("eraseUsageForUser", () => {
             await ctx.db.insert("usageExportPieces", piece("kept:1", B));
         });
 
-        let more = true;
-
-        while (more) {
-            more = await harness.run(async (ctx: any) => {
-                const erased = await eraseUsageForUser(ctx, A);
-
-                return erased.hasMore;
-            });
-        }
+        await eraseAll(A);
 
         expect(await countOf("usageDaily", A)).toBe(0);
         expect(await countOf("usageExportProjects", A)).toBe(0);
@@ -167,6 +168,40 @@ describe("eraseUsageForUser", () => {
         };
 
         await expect(eraseUsageForUser(failing as never, A)).rejects.toThrow("delete failed");
+    });
+});
+
+describe("erasure of the run scan", () => {
+    it("reaches an unkeyed run behind more than 500 keyed runs, scanning in batches", async () => {
+        await harness.run(async (ctx: any) => {
+            for (let index = 0; index < 510; index += 1) {
+                await ctx.db.insert("usageExportRuns", {
+                    createdAt: 1,
+                    requestId: `many:${String(index)}`,
+                    usageKey: `gdpr-exports/many-${String(index)}.json`,
+                    userId: A,
+                });
+            }
+
+            await ctx.db.insert("usageExportRuns", { createdAt: 2, requestId: "last:1", userId: A });
+        });
+
+        await eraseAll(A);
+
+        expect(await countOf("usageExportRuns", A)).toBe(510);
+        expect(await keyedRunsOf(A)).toHaveLength(510);
+    });
+
+    it("removes what was written after an earlier pass of the erasure, when the next pass runs", async () => {
+        await harness.run(async (ctx: any) => {
+            await ctx.db.insert("usageExportPieces", piece("early:1", A));
+            await eraseUsageForUser(ctx, A);
+            await ctx.db.insert("usageExportPieces", piece("late:1", A));
+        });
+
+        await eraseAll(A);
+
+        expect(await countOf("usageExportPieces", A)).toBe(0);
     });
 });
 

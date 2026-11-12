@@ -34,7 +34,7 @@ export const EXPORT_PIECE_TTL_MS = 24 * 60 * 60 * 1000;
 /** Runs the sweep reads, metadata only, while it looks for dead runs; so live runs cannot fill a whole batch. */
 const SWEEP_SCAN_LIMIT = 500;
 
-/** Pages of a user's run rows one erasure call reads: the unkeyed runs among them are removed in the same call. */
+/** Pages of a user's run rows one erasure call reads; the next call continues where this one stopped. */
 const RUN_PAGES_PER_ERASURE = 50;
 
 /**
@@ -105,7 +105,11 @@ export const releaseUsageKey = internalMutation
  * batch came back full. A failed delete throws: the erasure step fails, and its retry finds what is left, so it never reports done
  * early. A run row with an object is kept: its purge removes the object and then the row.
  */
-export const eraseUsageForUser = async (ctx: MutationCtx, userId: string): Promise<BatchResult> => {
+export const eraseUsageForUser = async (
+    ctx: MutationCtx,
+    userId: string,
+    runCursor: string | null = null,
+): Promise<BatchResult & { runCursor: string | null }> => {
     const [days, keys, backfills, pieces, projects] = await Promise.all([
         ctx.db
             .query("usageDaily")
@@ -132,13 +136,12 @@ export const eraseUsageForUser = async (ctx: MutationCtx, userId: string): Promi
     ]);
 
     // A run with an object keeps its row: the erasure's purge step deletes the object, then releases the row, so the erasure is not
-    // done while an object remains. A run without one has nothing left to keep, wherever its page sits among the keyed ones.
+    // done while an object remains. A run without one is removed wherever it sits. The scan carries its position from one call to the
+    // next, so keyed runs, however many, cannot hide an unkeyed run behind them.
     const runsAt = (cursor: string | null) => ctx.db.usageExportRuns.findMany({ consistency: "primary", cursor, limit: EXPORT_PIECE_BATCH, where: { userId } });
-    let unkeyed = 0;
-    let cursor: string | null = null;
-    let isDone = false;
+    let cursor = runCursor;
 
-    for (let pages = 0; !isDone && pages < RUN_PAGES_PER_ERASURE; pages += 1) {
+    for (let pages = 0; pages < RUN_PAGES_PER_ERASURE; pages += 1) {
         const runs = await runsAt(cursor);
 
         for (const run of runs.page) {
@@ -146,16 +149,19 @@ export const eraseUsageForUser = async (ctx: MutationCtx, userId: string): Promi
                 continue;
             }
 
-            unkeyed += 1;
             await ctx.db.delete("usageExportRuns", run._id);
         }
 
-        isDone = runs.isDone;
-        cursor = runs.continueCursor;
+        cursor = runs.isDone ? null : runs.continueCursor;
+
+        if (cursor === null) {
+            break;
+        }
     }
 
     return {
-        hasMore: full(days) || full(keys) || full(backfills) || fullPieces(pieces.page) || fullPieces(projects.page) || (!isDone && unkeyed > 0),
+        hasMore: full(days) || full(keys) || full(backfills) || fullPieces(pieces.page) || fullPieces(projects.page) || cursor !== null,
+        runCursor: cursor,
     };
 };
 
@@ -217,6 +223,7 @@ export const sweepUsageExportPieces = internalMutation
         const cutoff = ctx.now - EXPORT_PIECE_TTL_MS;
         const runsAt = (cursor: string | null) =>
             ctx.db.usageExportRuns.findMany({
+                consistency: "primary",
                 cursor,
                 limit: EXPORT_PIECE_BATCH,
                 orderBy: [{ createdAt: "asc" }],
