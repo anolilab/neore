@@ -32,7 +32,7 @@ import { AuthQueryProvider } from "@/features/auth/lib/auth-query-provider";
 import { clearLastAccountHint, hasLastAccountHint, startsSignedIn, writeLastAccountHint } from "@/features/auth/lib/last-account-hint";
 import AuthUIProviderTanstack from "@/features/auth/lib/tanstack/auth-ui-provider-tanstack";
 import { closeSidePanelForSessionSwitch } from "@/features/chat/core/stores/chat-ui-store";
-import { clearPromptQueues } from "@/features/chat/core/stores/prompt-queue-store";
+import { clearPromptQueues } from "@/features/chat/core/stores/prompt-queue-session";
 import { clearComposerDrafts, clearDraftsForSessionSwitch } from "@/features/chat/split/composer-drafts";
 import ConnectionProvider from "@/features/connection/components/connection-provider";
 import { useUIStateStore } from "@/features/layout/stores/ui-state-store";

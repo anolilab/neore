@@ -5,7 +5,7 @@
  * (`features/auth/components/optimistic-auth-gate.tsx`). It grants nothing, reads no data and names nobody: queries
  * still go out with the RPC token, and per-user caches key on the token's subject. Written when a session is
  * confirmed, removed on an account switch, when Lunora answers "no session" (sign-out, expiry, revocation) and when
- * sign-out starts. Every storage access is guarded: a blocked store reads as "no hint".
+ * sign-out succeeds. Every storage access is guarded: a blocked store reads as "no hint".
  */
 
 import type { SessionAuthStatus } from "@neore/client-runtime";

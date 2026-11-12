@@ -5,7 +5,7 @@ import { useEffect, useRef } from "react";
 
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 import { clearLastAccountHint } from "@/features/auth/lib/last-account-hint";
-import { clearPromptQueues } from "@/features/chat/core/stores/prompt-queue-store";
+import { clearPromptQueues } from "@/features/chat/core/stores/prompt-queue-session";
 import { dropStoredDrafts } from "@/features/chat/split/composer-drafts";
 import { clearThreadListCache } from "@/features/chat/thread-list/lib/thread-list-cache";
 import { useReleasePushOnSignOut } from "@/features/notifications/hooks/use-release-push-on-sign-out";
@@ -29,9 +29,6 @@ const SignOut = () => {
 
         // Before the sign-out call, so the error branch (an account the server already dropped) leaves none of this user's list behind either.
         clearThreadListCache();
-        // The sign-in page that follows must not paint the chat layout optimistically for this account.
-        clearLastAccountHint();
-        clearPromptQueues();
         // The unsent drafts are this account's too; the page leaves without the sign-out handler that would drop them. Read from
         // the session, as no composer may have shown on this page load; when it cannot tell whose, every account's go.
         dropStoredDrafts(authClient.$store.atoms.session?.get().data?.user.id);
@@ -52,10 +49,14 @@ const SignOut = () => {
                         clearThreadListCache();
                     },
                     onError: () => {
-                        // The session may still be active: keep the analytics identity.
+                        // The session may still be active: keep the analytics identity, the queued prompts and the hint. One
+                        // that had already ended is cleared by the signed-out start (`AuthRecovery` in `__root.tsx`).
                         globalThis.location.replace(signInPath);
                     },
                     onSuccess: async () => {
+                        // The sign-in page that follows must not paint the chat layout optimistically for this account.
+                        clearLastAccountHint();
+                        clearPromptQueues();
                         resetAnalyticsIdentity();
                         // Only after the session ends: a failed sign-out keeps the badge.
                         await setNativeBadge(0);

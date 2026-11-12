@@ -27,7 +27,7 @@ import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 import { clearLastAccountHint } from "@/features/auth/lib/last-account-hint";
 import { getLocalizedError } from "@/features/auth/lib/utilities";
 import useCheckout from "@/features/billing/hooks/use-checkout";
-import { clearPromptQueues } from "@/features/chat/core/stores/prompt-queue-store";
+import { clearPromptQueues } from "@/features/chat/core/stores/prompt-queue-session";
 import { dropStoredDrafts } from "@/features/chat/split/composer-drafts";
 import { clearThreadListCache, releaseThreadListWrites } from "@/features/chat/thread-list/lib/thread-list-cache";
 import { useUserPreferences } from "@/features/layout/hooks/use-ui-state";

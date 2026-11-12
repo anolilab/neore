@@ -38,6 +38,14 @@ import {
 } from "@/features/chat/core/utils/prompt-queue";
 
 import type { PendingAttachment } from "./chat-ui-store";
+import {
+    claimPromptQueueRestore,
+    isPromptQueueRestoreAllowed,
+    PROMPT_QUEUE_STORAGE_KEY_PREFIX as STORAGE_KEY_PREFIX,
+    registerPromptQueueReset,
+} from "./prompt-queue-session";
+
+export { allowPromptQueueRestore, clearPromptQueues } from "./prompt-queue-session";
 
 export type QueuedChatPrompt = QueuedPrompt<PendingAttachment>;
 type ThreadQueue = PromptQueueState<PendingAttachment>;
@@ -63,8 +71,6 @@ interface PromptQueueStore {
     /** Removes and returns the oldest queued prompt. */
     shift: (threadId: string) => QueuedChatPrompt | undefined;
 }
-
-const STORAGE_KEY_PREFIX = "neore:prompt-queue:";
 
 const generatePromptId = () => `queued-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 
@@ -122,22 +128,12 @@ const writeStoredQueue = (threadId: string, queue: ThreadQueue): void => {
     }
 };
 
-/** Threads already checked against storage this page load, so a drained queue is not resurrected. */
-const hydratedThreadIds = new Set<string>();
-
-/**
- * Whether a stored queue may be read back: only once Lunora confirmed the session (`allowPromptQueueRestore`). The chat layout
- * paints before that (`OptimisticAuthGate`), and a queue an ended session left is not the visitor's. Every path in reads it
- * through `hydrate`, so a write before then (`update`) restores nothing either.
- */
-const restore = { allowed: false };
-
-/** The session is confirmed: stored queues may be restored from now on, until the queues are cleared. */
-export const allowPromptQueueRestore = (): void => {
-    restore.allowed = true;
-};
-
 export const usePromptQueueStore = create<PromptQueueStore>()((set, get) => {
+    // `clearPromptQueues` lives apart from the store (`prompt-queue-session`) and drops what is in memory through this.
+    registerPromptQueueReset(() => {
+        set({ queues: {} });
+    });
+
     const update = (threadId: string, next: (queue: ThreadQueue) => ThreadQueue) => {
         // A write that beats the composer's hydrate effect must not clobber the stored queue.
         get().hydrate(threadId);
@@ -152,7 +148,12 @@ export const usePromptQueueStore = create<PromptQueueStore>()((set, get) => {
         set((state) => {
             return { queues: { ...state.queues, [threadId]: updated } };
         });
-        writeStoredQueue(threadId, updated);
+
+        // Before the session is confirmed, in memory only: storing it would replace the queue kept from before a reload,
+        // which `hydrate` merges in once it may be read.
+        if (isPromptQueueRestoreAllowed()) {
+            writeStoredQueue(threadId, updated);
+        }
     };
 
     return {
@@ -164,23 +165,34 @@ export const usePromptQueueStore = create<PromptQueueStore>()((set, get) => {
             }),
         hydrate: (threadId) => {
             // Not yet: not marked either, so the first read once the session is confirmed still restores it.
-            if (!restore.allowed || hydratedThreadIds.has(threadId)) {
+            if (!claimPromptQueueRestore(threadId)) {
                 return;
             }
 
-            hydratedThreadIds.add(threadId);
-
-            if (get().queues[threadId]?.items.length) {
-                return;
-            }
-
+            const current = get().queues[threadId];
             const restored = restorePromptQueue(readStoredQueue(threadId), fromStoredAttachment);
 
-            if (restored) {
-                set((state) => {
-                    return { queues: { ...state.queues, [threadId]: restored } };
-                });
+            if (!current?.items.length) {
+                if (restored) {
+                    set((state) => {
+                        return { queues: { ...state.queues, [threadId]: restored } };
+                    });
+                }
+
+                return;
             }
+
+            // Queued before the session was confirmed, so kept in memory only (`update`): the stored queue comes first, in
+            // its paused state, then what was queued since; then both are stored.
+            const restoredIds = new Set(restored?.items.map((item) => item.id));
+            const merged: ThreadQueue = restored
+                ? { ...restored, items: [...restored.items, ...current.items.filter((item) => !restoredIds.has(item.id))] }
+                : current;
+
+            set((state) => {
+                return { queues: { ...state.queues, [threadId]: merged } };
+            });
+            writeStoredQueue(threadId, merged);
         },
         move: (threadId, id, to) =>
             update(threadId, (queue) => (typeof to === "number" ? moveQueuedPrompt(queue, id, to) : stepQueuedPrompt(queue, id, to.step))),
@@ -209,29 +221,6 @@ export const usePromptQueueStore = create<PromptQueueStore>()((set, get) => {
         },
     };
 });
-
-/** Drops every queue, in memory and in this tab's sessionStorage: the session that queued them has ended. */
-export const clearPromptQueues = (): void => {
-    restore.allowed = false;
-    hydratedThreadIds.clear();
-    usePromptQueueStore.setState({ queues: {} });
-
-    try {
-        const storage = globalThis.sessionStorage;
-
-        if (!storage) {
-            return;
-        }
-
-        const keys = Array.from({ length: storage.length }, (_, index) => storage.key(index)).filter((key) => key?.startsWith(STORAGE_KEY_PREFIX));
-
-        for (const key of keys) {
-            storage.removeItem(key as string);
-        }
-    } catch {
-        // Blocked storage: nothing was stored to come back.
-    }
-};
 
 /** Selector for one thread's queue; returns a stable empty queue when there is none. */
 export const selectThreadQueue =

@@ -129,3 +129,45 @@ describe("prompt queues before the session is confirmed", () => {
         expect(after.getState().queues["thread-4"]?.items.map((item) => item.id)).toStrictEqual(["mine"]);
     });
 });
+
+describe("prompt queues across an account switch", () => {
+    it("restores what the next account queues, without the session being confirmed again", async () => {
+        const store = await reload();
+        const { clearPromptQueues } = await import("./prompt-queue-store");
+
+        store.getState().enqueue("thread-5", { attachments: [], id: "old", text: "the departing account's prompt" });
+        clearPromptQueues();
+
+        store.getState().enqueue("thread-5", { attachments: [], id: "new", text: "the next account's prompt" });
+        expect(sessionStorage.getItem("neore:prompt-queue:thread-5")).toContain("the next account's prompt");
+
+        const after = await reload();
+
+        after.getState().hydrate("thread-5");
+        expect(after.getState().queues["thread-5"]?.items.map((item) => item.id)).toStrictEqual(["new"]);
+    });
+});
+
+describe("prompt queues written before the session is confirmed", () => {
+    it("keeps the queue stored before the reload and what was queued since, the stored one first", async () => {
+        const before = await reload();
+
+        before.getState().enqueue("thread-6", { attachments: [], id: "stored", text: "queued before the reload" });
+
+        const after = await reload({ confirmed: false });
+
+        after.getState().enqueue("thread-6", { attachments: [], id: "early", text: "queued before the session was confirmed" });
+        expect(sessionStorage.getItem("neore:prompt-queue:thread-6")).not.toContain("queued before the session was confirmed");
+
+        const { allowPromptQueueRestore } = await import("./prompt-queue-store");
+
+        allowPromptQueueRestore();
+        after.getState().hydrate("thread-6");
+
+        const queue = after.getState().queues["thread-6"];
+
+        expect(queue?.items.map((item) => item.id)).toStrictEqual(["stored", "early"]);
+        expect(queue?.paused).toBe(true);
+        expect(sessionStorage.getItem("neore:prompt-queue:thread-6")).toContain("queued before the session was confirmed");
+    });
+});
