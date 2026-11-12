@@ -33,6 +33,8 @@ const state = vi.hoisted(() => {
         charges: 0,
         /** The next queue submission fails, once. */
         enqueueFails: false,
+        /** What `startGoal` reads of the account: an anonymous one is refused a goal. */
+        goalAccountAnonymous: false,
         /** The next goal start fails, once: the send dies between its save and its goal. */
         goalFails: false,
         /** The ids of every prompt the no-id path saved from the HTTP action. */
@@ -56,7 +58,7 @@ vi.mock("../auth/lib/better-auth-queries", async (importOriginal) => {
     return {
         ...(await importOriginal<typeof import("../auth/lib/better-auth-queries")>()),
         getUser: async (_ctx: unknown, userId: string) => {
-            return { _id: userId, isAnonymous: false };
+            return { _id: userId, isAnonymous: state.goalAccountAnonymous };
         },
     };
 });
@@ -227,6 +229,7 @@ beforeEach(async () => {
     state.agentModel = null;
     state.charges = 0;
     state.enqueueFails = false;
+    state.goalAccountAnonymous = false;
     state.goalFails = false;
     state.legacySaves = 0;
     state.scheduled.length = 0;
@@ -475,6 +478,26 @@ describe("/chat/start with clientMessageId", () => {
         expect(resumed.status).toBe(200);
         expect(await run(async (ctx) => await ctx.db.get("persistentStreams", resumed.json.streamId))).toMatchObject({ streamingConfig: { model: MODEL } });
         expect(vi.mocked(enqueueJob).mock.calls.at(-1)?.[1]).toMatchObject({ streamId: resumed.json.streamId, streamingConfig: { model: MODEL } });
+    });
+
+    it("answers every resend of a send whose goal was refused after its save with that refusal, and never runs it", async () => {
+        const goalSend = { clientMessageId: "refused-goal", goal: { text: "Ship the report" }, prompt: "Make the report", threadId };
+
+        state.goalAccountAnonymous = true;
+
+        const refused = await send(goalSend);
+
+        expect(refused.status).toBe(400);
+
+        // At once, and after the lease once the account may run goals: the same refusal, no stream and no second charge.
+        expect(await send(goalSend)).toStrictEqual(refused);
+        state.goalAccountAnonymous = false;
+        vi.setSystemTime(Date.now() + CHAT_START_LEASE_MS);
+        expect(await send(goalSend)).toStrictEqual(refused);
+        expect(await countRows("persistentStreams")).toBe(0);
+        expect(await countRows("threadGoals")).toBe(0);
+        expect(await countRows("messages")).toBe(1);
+        expect(state.charges).toBe(1);
     });
 
     it("refuses the same id on a different send, and never answers it with the first send's thread", async () => {

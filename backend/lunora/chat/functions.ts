@@ -92,7 +92,7 @@ import { TEXT_TO_VIDEO_PROVIDERS } from "./lib/video-providers";
 import { gatewayFetch, NO_SERVICE_FETCH, type ServiceFetch } from "../lib/services";
 import { assertPaidModel, requireEnabledModel } from "./lib/enabled-model";
 import getAgent from "./lib/get-agent";
-import { holdTtlFrom } from "../lib/claim-once";
+import { claimFence, claimRow, holdTtlFrom, recordClaimResult } from "../lib/claim-once";
 import { sha256Hex } from "../lib/crypto";
 import { capTitlePrompt } from "./lib/first-user-prompt";
 import { getMessageFileIds, loadNsfwStatuses, redactUIMessagesForPublicViewer } from "./lib/public-thread";
@@ -2329,6 +2329,42 @@ export const CATEGORY_CLAIM_SCOPE = "thread-category";
 /** A day: covers every resend of the prompt's send; a thread with its category set is skipped before the claim anyway. */
 const CATEGORY_CLAIM_TTL_MS = 24 * 60 * 60 * 1000;
 
+/**
+ * Takes the prompt's category claim before the model call, or says why not: `answered` when an earlier delivery's call
+ * answered (its category is kept on the claim, `recordCategoryAnswer`) but its write did not land, so this delivery writes
+ * that answer without a call; `in-flight` while an earlier delivery holds the claim with no answer yet.
+ */
+export const admitCategoryRun = internalMutation
+    .input({ key: v.string().max(MAX_LENGTH.short), userId: v.string().max(MAX_LENGTH.id) })
+    .output(
+        v.union(
+            v.object({ claimedAt: v.number(), outcome: v.literal("admitted") }),
+            v.object({ category: v.string(), outcome: v.literal("answered") }),
+            v.object({ outcome: v.literal("in-flight") }),
+        ),
+    )
+    .mutation(async ({ args: { key, userId }, ctx }) => {
+        const existing = await claimRow(ctx, CATEGORY_CLAIM_SCOPE, key);
+
+        if (existing) {
+            const answer = existing.result === undefined ? undefined : (JSON.parse(existing.result) as { category: string });
+
+            return answer ? { category: answer.category, outcome: "answered" as const } : { outcome: "in-flight" as const };
+        }
+
+        const claimedAt = await claimFence(ctx, CATEGORY_CLAIM_SCOPE, key, { ttlMs: CATEGORY_CLAIM_TTL_MS, userId });
+
+        return claimedAt === null ? { outcome: "in-flight" as const } : { claimedAt, outcome: "admitted" as const };
+    });
+
+/** Keeps the model's category on the prompt's claim, so a delivery after a failed write writes it without a second call. */
+export const recordCategoryAnswer = internalMutation
+    .input({ category: v.string().max(MAX_LENGTH.short), claimedAt: v.number(), key: v.string().max(MAX_LENGTH.short) })
+    .output(v.boolean())
+    .mutation(
+        async ({ args: { category, claimedAt, key }, ctx }) => await recordClaimResult(ctx, CATEGORY_CLAIM_SCOPE, key, claimedAt, JSON.stringify({ category })),
+    );
+
 export const createCategoryChat = internalAction
     .input({
         prompt: v.string(),
@@ -2383,28 +2419,28 @@ export const createCategoryChat = internalAction
         }
 
         // One paid call per prompt: a second delivery of this job (a resend scheduled it again) finds the claim and ends here,
-        // though the first has not written its category yet. Kept once the category is written; released when the call fails.
+        // though the first has not written its category yet. The answer is kept on the claim, so a delivery after a failed
+        // write writes it without a second call; only a failed call releases the claim for a later delivery.
         const claimKey = `${arguments_.threadId}:${arguments_.promptId ?? "thread"}`;
-        const claimedAt = await context.runMutation(internal.lib.claim_once.claimKeyFenced, {
-            key: claimKey,
-            scope: CATEGORY_CLAIM_SCOPE,
-            ttlMs: CATEGORY_CLAIM_TTL_MS,
-            userId: threadData.userId,
-        });
+        const admission = await context.runMutation(internal.chat.functions.admitCategoryRun, { key: claimKey, userId: threadData.userId });
 
-        if (claimedAt === null) {
+        if (admission.outcome === "in-flight") {
             context.log.event("chat.thread_category", { skipped: "in-flight" });
 
             return;
         }
 
-        let category: string;
-        let textResult: Awaited<ReturnType<typeof thread.generateText>>;
+        if (admission.outcome === "answered") {
+            await thread.updateMetadata({ category: admission.category });
+            context.log.event("chat.thread_category", { category: admission.category, model, resumed: true });
 
-        try {
-            const categoryList = THREAD_CATEGORIES.join(", ");
+            return;
+        }
 
-            textResult = await thread.generateText(
+        const { claimedAt } = admission;
+        const categoryList = THREAD_CATEGORIES.join(", ");
+        const textResult = await thread
+            .generateText(
                 {
                     prompt: `Classify this user message into exactly ONE category. Reply with ONLY the category name, nothing else.\n\nCategories: ${categoryList}\n\nUser message: "${arguments_.prompt}"\n\nCategory:`,
                 },
@@ -2413,26 +2449,30 @@ export const createCategoryChat = internalAction
                         saveMessages: "none",
                     },
                 },
-            );
+            )
+            .catch(async (error: unknown) => {
+                // No answer was paid for: a later delivery may call again.
+                await context
+                    .runMutation(internal.lib.claim_once.releaseKey, { claimedAt, key: claimKey, scope: CATEGORY_CLAIM_SCOPE })
+                    .catch((releaseError: unknown) => {
+                        console.error("[createCategoryChat] Could not release the category claim:", releaseError);
+                    });
 
-            // Parse and validate the category
-            const rawCategory = textResult.text.trim().toLowerCase();
-
-            category = (THREAD_CATEGORIES as ReadonlyArray<string>).includes(rawCategory) ? rawCategory : "general";
-
-            await thread.updateMetadata({
-                category,
+                throw error;
             });
-        } catch (error) {
-            // A later delivery may try again.
-            await context
-                .runMutation(internal.lib.claim_once.releaseKey, { claimedAt, key: claimKey, scope: CATEGORY_CLAIM_SCOPE })
-                .catch((releaseError: unknown) => {
-                    console.error("[createCategoryChat] Could not release the category claim:", releaseError);
-                });
 
-            throw error;
-        }
+        // Parse and validate the category
+        const rawCategory = textResult.text.trim().toLowerCase();
+        const category = (THREAD_CATEGORIES as ReadonlyArray<string>).includes(rawCategory) ? rawCategory : "general";
+
+        // Kept before the write, so a failed write is retried from it. A failed record keeps the claim: the call was paid for.
+        await context.runMutation(internal.chat.functions.recordCategoryAnswer, { category, claimedAt, key: claimKey }).catch((error: unknown) => {
+            console.error("[createCategoryChat] Could not keep the category answer:", error);
+        });
+
+        await thread.updateMetadata({
+            category,
+        });
 
         context.log.event("chat.thread_category", { category, inputTokens: textResult.usage.inputTokens, model, outputTokens: textResult.usage.outputTokens });
     });

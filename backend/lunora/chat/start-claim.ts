@@ -119,6 +119,8 @@ interface StartRecord {
     model?: string;
     /** The save created the thread: a resumed send schedules a new chat's title jobs. */
     newThread?: boolean;
+    /** The send's goal was refused after its save (`recordStartRefused`): every later request with the id gets the same 400, and nothing resumes it. */
+    refused?: { error: string };
     streamId?: string;
     threadId?: string;
     /** The send's title jobs each scheduled by some try, its first, a resume or a resend (`recordStartTitlesScheduled`): no resend schedules them again. */
@@ -132,6 +134,8 @@ const vClaimOutcome = v.union(
     v.object({ outcome: v.literal("in_progress") }),
     // The id was used for a different send.
     v.object({ outcome: v.literal("mismatch") }),
+    // The send's goal was refused after its save: the caller answers with the same 400, and makes no stream or run.
+    v.object({ error: v.string(), outcome: v.literal("refused") }),
     v.object({
         messageId: v.string(),
         model: v.optional(v.string()),
@@ -189,6 +193,10 @@ export const claimChatStart = internalMutation
 
         if (existing && record?.fingerprint !== fingerprint) {
             return { outcome: "mismatch" as const };
+        }
+
+        if (record?.refused !== undefined) {
+            return { error: record.refused.error, outcome: "refused" as const };
         }
 
         if (isSaved(record) && (!streams || record.streamId !== undefined)) {
@@ -317,11 +325,21 @@ export const recordStartSaved = async (
 export const assertStartStreamable = async (ctx: Pick<MutationCtx, "db">, claim: StartClaim) => {
     const held = await heldClaim(ctx, claim);
 
-    if (!isSaved(held.record) || held.record.streamId !== undefined) {
+    if (!isSaved(held.record) || held.record.streamId !== undefined || held.record.refused !== undefined) {
         throw new LunoraError("CONFLICT", "This message was already sent.");
     }
 
     return held;
+};
+
+/**
+ * In `startGoal`'s transaction, when it refuses a saved send's goal: the refusal is the send's answer. A later request with
+ * the id gets the same 400 (`claimChatStart`), and the saved prompt is never resumed into a run.
+ */
+export const recordStartRefused = async (ctx: Pick<MutationCtx, "db">, claim: StartClaim, error: string): Promise<void> => {
+    const { existing, record } = await assertStartStreamable(ctx, claim);
+
+    await patchRow(ctx.db, "idempotencyClaims", existing, { result: JSON.stringify({ ...record, refused: { error } } satisfies StartRecord) });
 };
 
 /**

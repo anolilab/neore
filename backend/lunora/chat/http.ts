@@ -930,6 +930,11 @@ const runChatStartOnShard = async (
         return startInProgressResponse();
     }
 
+    // The first send's goal was refused after its prompt was saved: the same answer, and no run.
+    if (startOutcome?.outcome === "refused") {
+        return Response.json({ error: startOutcome.error }, { status: 400 });
+    }
+
     // A resend runs on the model its first try saved the prompt with: the thread's agent may have been switched since.
     const savedModel = startOutcome?.outcome === "duplicate" || startOutcome?.outcome === "resume" ? startOutcome.model : undefined;
 

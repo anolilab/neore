@@ -383,6 +383,7 @@ export interface InternalApiTypes {
             runStreamingAgent: FunctionReference<"action", { isAnonymous?: boolean; messageId: string; organizationId?: string; origin?: "lead" | "outside_agent"; resume?: string; skill?: { rawArgs: string; slug: string }; streamId: string; streamingConfig: { contentType: string; customSystemPrompt?: string; enabledFeatures?: Array<string>; imageSize?: string; mcpServerNames?: Array<string>; model: string; reasoningEffort?: number; researchDepth?: string; searchMode?: string; shouldAutoContinue?: boolean; statelessMode?: boolean }; threadId: string; userId: string; userPrompt?: string }, void>;
         };
         functions: {
+            admitCategoryRun: FunctionReference<"mutation", { key: string; userId: string }, { claimedAt: number; outcome: "admitted" } | { category: string; outcome: "answered" } | { outcome: "in-flight" }>;
             createCategoryChat: FunctionReference<"action", { prompt: string; promptId?: string; threadId: string }, void>;
             createSummarizeChat: FunctionReference<"action", { threadId: string; userId: string }, void>;
             createThreadRelationship: FunctionReference<"mutation", { branchPoint?: number; branchType?: "branch" | "continuation" | "comparison"; parentThreadId: string; threadId: string }, void>;
@@ -415,6 +416,7 @@ export interface InternalApiTypes {
             improvePrompt: FunctionReference<"action", { improvementInstructions?: string; prompt: string; style?: string; threadId?: string; userId: string; userPlan?: "free" | "premium" }, { improvedPrompt: string; }>;
             iteratePrompt: FunctionReference<"action", { iterateInput: string; lastOptimizedPrompt: string; mode?: "user" | "system"; threadId?: string; userId: string; userPlan?: "free" | "premium" }, { improvedPrompt: string; }>;
             optimizeSystemPrompt: FunctionReference<"action", { improvementInstructions?: string; modelId?: string; prompt: string; style?: string; threadId?: string; userId: string; userPlan?: "free" | "premium" }, { improvedPrompt: string; }>;
+            recordCategoryAnswer: FunctionReference<"mutation", { category: string; claimedAt: number; key: string }, boolean>;
             regenerateTitleChat: FunctionReference<"action", { claimedAt: number; expectedTitleDigest?: string; threadId: string; userId: string }, void>;
             retryTitleWrite: FunctionReference<"action", { chargeKey: string; expectedTitleDigest: string; regenerateClaimedAt?: number; requestedBy?: string; threadId: string }, void>;
             streamAsync: FunctionReference<"action", { customSystemPrompt?: string; enabledFeatures?: Array<string>; jobId?: string; messageId: string; model: string; parentId?: string; prompt?: string; reasoningEffort?: number; statelessMode?: boolean; threadId: string }, null>;
@@ -502,7 +504,7 @@ export interface InternalApiTypes {
             };
         };
         start_claim: {
-            claimChatStart: FunctionReference<"mutation", { clientMessageId: string; fingerprint: string; streams: boolean; userId: string }, { claim: { claimedAt: number; key: string }; outcome: "claimed" } | { outcome: "in_progress" } | { outcome: "mismatch" } | { messageId: string; model?: string; outcome: "duplicate"; streamId?: string; streamUnclaimed?: boolean; threadId: string; titleJobs?: { claim: { claimedAt: number; key: string }; jobs: Array<"category" | "title"> } } | { claim: { claimedAt: number; key: string }; messageId: string; model?: string; newThread?: boolean; outcome: "resume"; threadId: string }>;
+            claimChatStart: FunctionReference<"mutation", { clientMessageId: string; fingerprint: string; streams: boolean; userId: string }, { claim: { claimedAt: number; key: string }; outcome: "claimed" } | { outcome: "in_progress" } | { outcome: "mismatch" } | { error: string; outcome: "refused" } | { messageId: string; model?: string; outcome: "duplicate"; streamId?: string; streamUnclaimed?: boolean; threadId: string; titleJobs?: { claim: { claimedAt: number; key: string }; jobs: Array<"category" | "title"> } } | { claim: { claimedAt: number; key: string }; messageId: string; model?: string; newThread?: boolean; outcome: "resume"; threadId: string }>;
             recordStartTitlesScheduled: FunctionReference<"mutation", { claim: { claimedAt: number; key: string }; jobs: Array<"category" | "title">; messageId: string }, null>;
             releaseChatStart: FunctionReference<"mutation", { claim: { claimedAt: number; key: string } }, null>;
             saveStartPrompt: FunctionReference<"mutation", { claim: { claimedAt: number; key: string }; fileIds?: Array<string>; messageContent: Array<Record<string, unknown>>; model: string; parentId?: string; threadId: string }, { messageId: string }>;
@@ -1709,6 +1711,7 @@ export const internal: InternalApiTypes = {
             runStreamingAgent: { __lunoraRef: "chat_execute:runStreamingAgent" },
         },
         functions: {
+            admitCategoryRun: { __lunoraRef: "chat_functions:admitCategoryRun" },
             createCategoryChat: { __lunoraRef: "chat_functions:createCategoryChat" },
             createSummarizeChat: { __lunoraRef: "chat_functions:createSummarizeChat" },
             createThreadRelationship: { __lunoraRef: "chat_functions:createThreadRelationship" },
@@ -1741,6 +1744,7 @@ export const internal: InternalApiTypes = {
             improvePrompt: { __lunoraRef: "chat_functions:improvePrompt" },
             iteratePrompt: { __lunoraRef: "chat_functions:iteratePrompt" },
             optimizeSystemPrompt: { __lunoraRef: "chat_functions:optimizeSystemPrompt" },
+            recordCategoryAnswer: { __lunoraRef: "chat_functions:recordCategoryAnswer" },
             regenerateTitleChat: { __lunoraRef: "chat_functions:regenerateTitleChat" },
             retryTitleWrite: { __lunoraRef: "chat_functions:retryTitleWrite" },
             streamAsync: { __lunoraRef: "chat_functions:streamAsync" },

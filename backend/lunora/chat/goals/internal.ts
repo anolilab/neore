@@ -32,7 +32,7 @@ import { withoutUndefined } from "../../lib/patch";
 import { MAX_LENGTH } from "../../lib/validators";
 import { chargeRound, loadTaskAccount, taskAccessProblem } from "../../tasks/account";
 import { insertPersistentStream } from "../streaming/persistent/library";
-import { recordStartGoal, startedGoalOf, vStartClaim } from "../start-claim";
+import { recordStartGoal, recordStartRefused, startedGoalOf, vStartClaim } from "../start-claim";
 import {
     buildGoalContinuationPrompt,
     buildGoalTranscript,
@@ -135,29 +135,38 @@ export const startGoal = internalMutation
             }
         }
 
+        // A refused goal is a saved send's answer: recorded on its claim in this transaction, so a resend gets the same refusal
+        // and the saved prompt is never resumed into a run.
+        const refuse = async (error: string) => {
+            if (args.startClaim) {
+                await recordStartRefused(ctx, args.startClaim, error);
+            }
+
+            return { error, ok: false as const };
+        };
         const text = args.text.trim();
 
         if (text.length === 0) {
-            return { error: "Say what the goal is.", ok: false as const };
+            return await refuse("Say what the goal is.");
         }
 
         const account = await loadTaskAccount(ctx, args.userId);
 
         if (account?.isAnonymous) {
-            return { error: ANONYMOUS_GOALS_MESSAGE, ok: false as const };
+            return await refuse(ANONYMOUS_GOALS_MESSAGE);
         }
 
         const problem = taskAccessProblem(account);
 
         if (problem) {
-            return { error: problem, ok: false as const };
+            return await refuse(problem);
         }
 
         const thread = await ctx.db.get("threads", args.threadId);
 
         // A goal keeps a chat running on the owner's budget: only the owner starts one.
         if (!thread || thread.userId !== args.userId) {
-            return { error: "A goal can only be set in your own chat.", ok: false as const };
+            return await refuse("A goal can only be set in your own chat.");
         }
 
         // A goal replaces the thread's previous one here, with the insert: the later of two concurrent starts is the one left active.

@@ -37,6 +37,7 @@ const REACHED = "getAgent reached";
 beforeAll(async () => {
     registerModule(registry, "agent_threads", await import("../agent/threads"));
     registerModule(registry, "auth_functions", await import("../auth/functions"));
+    registerModule(registry, "chat_functions", await import("./functions"));
     registerModule(registry, "lib_claim_once", await import("../lib/claim-once"));
 });
 
@@ -161,5 +162,83 @@ describe("createCategoryChat scheduled by two concurrent resends for one prompt"
         expect(calls).toBe(1);
         expect(updateMetadata).toHaveBeenCalledTimes(1);
         expect(updateMetadata).toHaveBeenCalledWith({ category: "coding" });
+    });
+});
+
+describe("createCategoryChat whose category write fails after the model answered", () => {
+    it("writes the stored answer on the next delivery, with one model call in all", async () => {
+        let calls = 0;
+        const updateMetadata = vi.fn(async () => {
+            if (updateMetadata.mock.calls.length === 1) {
+                throw new Error("the category write failed");
+            }
+        });
+
+        getAgent.mockReset();
+        getAgent.mockResolvedValue({
+            continueThread: async () => {
+                return {
+                    thread: {
+                        generateText: async () => {
+                            calls += 1;
+
+                            return { text: "coding", usage: { inputTokens: 1, outputTokens: 1 } };
+                        },
+                        // The failed write left no category behind.
+                        getMetadata: async () => {
+                            return {};
+                        },
+                        updateMetadata,
+                    },
+                };
+            },
+        });
+
+        const deliver = async () =>
+            await harness.action(async (context: any) => await context.runAction(createCategoryChat, { prompt: "hi", promptId: "prompt-1", threadId }));
+
+        await expect(deliver()).rejects.toThrow("the category write failed");
+        await expect(deliver()).resolves.toBeUndefined();
+
+        expect(calls).toBe(1);
+        expect(updateMetadata).toHaveBeenCalledTimes(2);
+        expect(updateMetadata).toHaveBeenLastCalledWith({ category: "coding" });
+    });
+
+    it("lets a later delivery call the model again when the call itself failed", async () => {
+        let calls = 0;
+        const updateMetadata = vi.fn(async () => undefined);
+
+        getAgent.mockReset();
+        getAgent.mockResolvedValue({
+            continueThread: async () => {
+                return {
+                    thread: {
+                        generateText: async () => {
+                            calls += 1;
+
+                            if (calls === 1) {
+                                throw new Error("the model call failed");
+                            }
+
+                            return { text: "math", usage: { inputTokens: 1, outputTokens: 1 } };
+                        },
+                        getMetadata: async () => {
+                            return {};
+                        },
+                        updateMetadata,
+                    },
+                };
+            },
+        });
+
+        const deliver = async () =>
+            await harness.action(async (context: any) => await context.runAction(createCategoryChat, { prompt: "hi", promptId: "prompt-2", threadId }));
+
+        await expect(deliver()).rejects.toThrow("the model call failed");
+        await expect(deliver()).resolves.toBeUndefined();
+
+        expect(calls).toBe(2);
+        expect(updateMetadata).toHaveBeenCalledExactlyOnceWith({ category: "math" });
     });
 });
