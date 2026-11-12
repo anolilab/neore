@@ -5,68 +5,114 @@
  * only way to reach IPC handlers without launching it.
  */
 import { createHash } from "node:crypto";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-import { beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
+import { APPEARANCE_FILE, SHOW_FALLBACK_MS } from "./appearance.js";
+import { CAPABILITIES_ARG } from "./channels.js";
 import { DICTATION_SHORTCUT } from "./dictation/hold.js";
+import { MENU_READY_GRACE_MS } from "./menu-delivery.js";
+import { WINDOW_STATE_FILE } from "./window-state.js";
 
 type Listener = (event: { preventDefault: () => void }, url: string) => void;
 
 interface FakeWindow {
+    /** `maximize`, `show` and `showInactive`, in the order the main process called them. */
+    calls: string[];
+    /** `isDestroyed()` of the window and its webContents. */
+    destroyed: boolean;
     focused: boolean;
     handlers: Map<string, Listener>;
     id: number;
     loaded: string[];
+    maximized: boolean;
+    options: Record<string, unknown>;
     sent: string[];
     shown: boolean;
     webContents: {
+        executeJavaScript: (code: string) => Promise<unknown>;
+        getURL: () => string;
         handlers: Map<string, Listener>;
         id: number;
+        isDestroyed: () => boolean;
+        isLoading: () => boolean;
+        /** What `isLoading()` answers: a navigation is still in progress. */
+        loading: boolean;
         loadURL: (url: string) => Promise<void>;
         mainFrame: { url: string };
         on: (event: string, listener: Listener) => void;
-        send: (channel: string) => void;
+        send: (channel: string, payload?: unknown) => void;
         setWindowOpenHandler: (listener: (details: { url: string }) => { action: string }) => void;
         windowOpen?: (details: { url: string }) => { action: string };
     };
 }
 
 interface Fake {
+    /** `systemPreferences.on("accent-color-changed")`: Windows and Linux. */
+    accentChangedListeners: (() => void)[];
+    accentColor: string;
     appHandlers: Map<string, (...args: unknown[]) => void>;
+    applicationMenu?: { template: { label?: string; role?: string; submenu?: { click?: () => void; label?: string }[] }[] };
+    focusedWindow: FakeWindow | null;
     ipc: Map<string, (event: unknown, payload?: unknown) => unknown>;
+    /** `systemPreferences.subscribeNotification`: macOS distributed notifications, by name. */
+    macNotifications: { callback: () => void; name: string | null }[];
     notificationFails: boolean;
     notifications: { body?: string; title: string }[];
     opened: string[];
+    /** What a site page answers to `executeJavaScript` (whether it is dark). */
+    pageDark: boolean;
+    payloads: { channel: string; payload: unknown; window: number }[];
     permissionCheck?: (wc: unknown, permission: string, requestingOrigin: string, details?: unknown) => boolean;
     permissionRequest?: (wc: unknown, permission: string, callback: (isAllowed: boolean) => void, details: { mediaTypes?: string[]; requestingUrl: string }) => void;
     shortcuts: Map<string, () => void>;
+    /** `nativeTheme.shouldUseDarkColors`. */
+    systemDark: boolean;
+    /** `nativeTheme.on(...)`, by event name. */
+    themeListeners: string[];
+    /** Each theme watch a page was given (`pageThemeChangeScript`), unsettled until a case settles it. */
+    themeWatches: { reject: (error: Error) => void; resolve: (dark: boolean) => void; window: number }[];
     trayFails: boolean;
     trays: number;
+    userData: string;
     windows: FakeWindow[];
 }
 
 vi.mock("electron", () => {
     const fakeElectron: Fake = {
+        accentChangedListeners: [],
+        accentColor: "0a84ffff",
         appHandlers: new Map(),
+        focusedWindow: null,
         ipc: new Map(),
+        macNotifications: [],
         notificationFails: false,
         notifications: [],
         opened: [],
+        pageDark: true,
+        payloads: [],
         shortcuts: new Map(),
+        systemDark: true,
+        themeListeners: [],
+        themeWatches: [],
         trayFails: false,
         trays: 0,
+        userData: path.join(os.tmpdir(), "neore-desktop-test"),
         windows: [],
     };
 
     /** A window record: its state and the methods `main.ts` calls, all on one object. */
-    const createWindow = (): FakeWindow => {
+    const createWindow = (options: Record<string, unknown> = {}): FakeWindow => {
         const id = fakeElectron.windows.length + 1;
         const handlers = new Map<string, Listener>();
         const webHandlers = new Map<string, Listener>();
         const window = {
+            calls: [] as string[],
             center: () => {},
+            destroyed: false,
             focus: () => {},
             focused: true,
             getNormalBounds: () => {
@@ -77,9 +123,9 @@ vi.mock("electron", () => {
                 window.shown = false;
             },
             id,
-            isDestroyed: () => false,
+            isDestroyed: () => window.destroyed,
             isFocused: () => window.focused,
-            isMaximized: () => false,
+            isMaximized: () => window.maximized,
             isMinimized: () => false,
             isVisible: () => window.shown,
             loaded: [] as string[],
@@ -88,21 +134,50 @@ vi.mock("electron", () => {
 
                 return Promise.resolve();
             },
-            maximize: () => {},
+            maximize: () => {
+                window.calls.push("maximize");
+                window.maximized = true;
+            },
+            maximized: false,
             on: (event: string, listener: Listener) => {
                 handlers.set(event, listener);
 
                 return window;
             },
+            once: (event: string, listener: Listener) => {
+                handlers.set(event, listener);
+
+                return window;
+            },
+            options,
             restore: () => {},
             sent: [] as string[],
             show: () => {
+                window.calls.push("show");
+                window.shown = true;
+            },
+            showInactive: () => {
+                window.calls.push("showInactive");
                 window.shown = true;
             },
             shown: false,
             webContents: {
+                executeJavaScript: async (code: string) => {
+                    if (!code.includes("MutationObserver")) {
+                        return fakeElectron.pageDark;
+                    }
+
+                    // A theme watch answers only when the page's theme changes: never, unless a case says so.
+                    return new Promise((resolve, reject) => {
+                        fakeElectron.themeWatches.push({ reject, resolve, window: id });
+                    });
+                },
+                getURL: () => window.loaded.at(-1) ?? "",
                 handlers: webHandlers,
                 id,
+                isDestroyed: () => window.destroyed,
+                isLoading: () => window.webContents.loading,
+                loading: false,
                 loadURL: (url: string) => {
                     window.loaded.push(url);
 
@@ -112,8 +187,9 @@ vi.mock("electron", () => {
                 on: (event: string, listener: Listener) => {
                     webHandlers.set(event, listener);
                 },
-                send: (channel: string) => {
+                send: (channel: string, payload?: unknown) => {
                     window.sent.push(channel);
+                    fakeElectron.payloads.push({ channel, payload, window: id });
                 },
                 setWindowOpenHandler: (listener: (details: { url: string }) => { action: string }) => {
                     window.webContents.windowOpen = listener;
@@ -128,9 +204,11 @@ vi.mock("electron", () => {
     };
 
     // Plain functions, not `vi.fn`: `main.ts` calls them with `new`, and they return the record.
-    const FakeBrowserWindow = function FakeBrowserWindow() {
-        return createWindow();
+    const FakeBrowserWindow = function FakeBrowserWindow(options: Record<string, unknown>) {
+        return createWindow(options);
     };
+
+    FakeBrowserWindow.getFocusedWindow = (): FakeWindow | null => fakeElectron.focusedWindow;
 
     const FakeTray = function FakeTray() {
         if (fakeElectron.trayFails) {
@@ -154,10 +232,11 @@ vi.mock("electron", () => {
 
     return {
         app: {
-            getPath: () => path.join(os.tmpdir(), "neore-desktop-test"),
+            getPath: () => fakeElectron.userData,
             getVersion: () => "0.0.0-test",
             isPackaged: false,
             isReady: () => true,
+            name: "Neore",
             on: (event: string, listener: (...args: unknown[]) => void) => fakeElectron.appHandlers.set(event, listener),
             quit: () => {},
             requestSingleInstanceLock: () => true,
@@ -174,11 +253,14 @@ vi.mock("electron", () => {
         },
         ipcMain: {
             handle: (channel: string, listener: (event: unknown, payload?: unknown) => unknown) => fakeElectron.ipc.set(channel, listener),
-            on: () => {},
+            on: (channel: string, listener: (event: unknown, payload?: unknown) => unknown) => fakeElectron.ipc.set(channel, listener),
         },
         Menu: {
-            buildFromTemplate: () => {
-                return {};
+            buildFromTemplate: (template: unknown) => {
+                return { template };
+            },
+            setApplicationMenu: (menu: Fake["applicationMenu"]) => {
+                fakeElectron.applicationMenu = menu;
             },
         },
         nativeImage: {
@@ -188,6 +270,14 @@ vi.mock("electron", () => {
                         return {};
                     },
                 };
+            },
+        },
+        nativeTheme: {
+            on: (event: string) => {
+                fakeElectron.themeListeners.push(event);
+            },
+            get shouldUseDarkColors() {
+                return fakeElectron.systemDark;
             },
         },
         Notification: FakeNotification,
@@ -209,6 +299,19 @@ vi.mock("electron", () => {
                 fakeElectron.opened.push(url);
             },
         },
+        systemPreferences: {
+            getAccentColor: () => fakeElectron.accentColor,
+            on: (event: string, listener: () => void) => {
+                if (event === "accent-color-changed") {
+                    fakeElectron.accentChangedListeners.push(listener);
+                }
+            },
+            subscribeNotification: (name: string | null, callback: () => void) => {
+                fakeElectron.macNotifications.push({ callback, name });
+
+                return fakeElectron.macNotifications.length;
+            },
+        },
         Tray: FakeTray,
     };
 });
@@ -225,6 +328,7 @@ const SAFE_TOKEN_PATTERN = /^[\w-]{43}$/u;
 const SITE_HTML_PATTERN = /^file:\/\/.*quick-composer\/index\.html$/u;
 const TITLE_200 = "t".repeat(200);
 const BLANK = " ".repeat(3);
+const RECOVERY_PAGE_PATTERN = /^data:text\/html/u;
 const sender = (url: string) => {
     const mainFrame = { url };
 
@@ -565,6 +669,494 @@ describe("IPC", () => {
     });
 });
 
+describe("look and application menu", () => {
+    /** A committed main-frame navigation of `win` to `url`, as Electron reports it. */
+    const navigate = (win: FakeWindow, url: string): void => {
+        win.webContents.loadURL(url);
+        guardOf(win, "did-navigate")?.({ preventDefault: () => {} }, url);
+    };
+    /** The page subscribed to menu commands (`onMenuCommand`), which the preload reports from its top frame. */
+    const listening = (win: FakeWindow): unknown => fake().ipc.get("neore:menu-commands-ready")?.(topFrameOf(win, win.webContents.getURL()));
+    const stoppedLoading = (win: FakeWindow): void => guardOf(win, "did-stop-loading")?.({ preventDefault: () => {} }, "");
+    /** The page's last `onMenuCommand` subscriber left, reported from its top frame. */
+    const stoppedListening = (win: FakeWindow): unknown => fake().ipc.get("neore:menu-commands-unready")?.(topFrameOf(win, win.webContents.getURL()));
+    /** A main-frame navigation of `win` started, not committed yet: `did-start-navigation` as Electron 45 reports it. */
+    const startNavigation = (win: FakeWindow, url: string, details: { isMainFrame?: boolean; isSameDocument?: boolean } = {}): void =>
+        (guardOf(win, "did-start-navigation") as unknown as (details: object) => void)({
+            frame: null,
+            isMainFrame: details.isMainFrame ?? true,
+            isSameDocument: details.isSameDocument ?? false,
+            preventDefault: () => {},
+            url,
+        });
+    /** The main window back on the site, its page listening: an earlier case left the recovery page in it. */
+    const onSite = (): FakeWindow => {
+        navigate(mainWindow(), `${SITE}/chat`);
+        listening(mainWindow());
+
+        return mainWindow();
+    };
+    /** Settings… sits in the app menu on macOS and in File elsewhere. */
+    const menuItem = (label: string) =>
+        fake()
+            .applicationMenu
+            ?.template
+            .flatMap((entry) => entry.submenu ?? [])
+            .find((item) => item.label === label);
+    const menuPayloads = () => fake().payloads.filter((sent) => sent.channel === "neore:menu-command");
+
+    it("creates the site windows hidden, on the dark background, and shows one at its first paint", () => {
+        fake().ipc.get("neore:open-thread-window")?.(siteSender(), "thread-ready");
+
+        const win = fake().windows.at(-1) as FakeWindow;
+
+        expect(mainWindow().options).toMatchObject({ backgroundColor: "#212121", show: false });
+        expect(win.options).toMatchObject({ backgroundColor: "#212121", show: false });
+        expect(win.shown).toBe(false);
+        (win.handlers.get("ready-to-show") as unknown as () => void)();
+        expect(win.shown).toBe(true);
+    });
+
+    describe("a window whose load fails", () => {
+        afterEach(() => {
+            vi.useRealTimers();
+        });
+
+        /** A thread window, opened and not painted yet, and its two load events. */
+        const openFailing = (thread: string) => {
+            fake().ipc.get("neore:open-thread-window")?.(siteSender(), thread);
+
+            const win = fake().windows.at(-1) as FakeWindow;
+            const failed = guardOf(win, "did-fail-load") as unknown as (event: unknown, code: number, text: string, url: string, isMainFrame: boolean) => void;
+
+            return {
+                fail: () => failed({}, -105, "ERR_NAME_NOT_RESOLVED", `${SITE}/chat/${thread}`, true),
+                finished: () => guardOf(win, "did-finish-load")?.({ preventDefault: () => {} }, ""),
+                win,
+            };
+        };
+
+        it("is shown once the recovery page is drawn, not empty before it, not even at the show fallback", () => {
+            vi.useFakeTimers();
+
+            const { fail, finished, win } = openFailing("thread-paint");
+
+            vi.advanceTimersByTime(SHOW_FALLBACK_MS - 1000);
+            fail();
+            expect(win.loaded.at(-1)).toMatch(RECOVERY_PAGE_PATTERN);
+            expect(win.shown).toBe(false);
+            vi.advanceTimersByTime(1000);
+            expect(win.shown).toBe(false);
+
+            finished();
+            expect(win.calls).toStrictEqual(["show"]);
+            vi.advanceTimersByTime(SHOW_FALLBACK_MS);
+            expect(win.calls).toStrictEqual(["show"]);
+        });
+
+        it("is shown SHOW_FALLBACK_MS after the failure when the recovery page never finishes loading", () => {
+            vi.useFakeTimers();
+
+            const { fail, win } = openFailing("thread-recovery-hung");
+
+            fail();
+            vi.advanceTimersByTime(SHOW_FALLBACK_MS - 1);
+            expect(win.shown).toBe(false);
+            vi.advanceTimersByTime(1);
+            expect(win.calls).toStrictEqual(["show"]);
+        });
+
+        it("is shown by the latest recovery load only, not by the fallback of an earlier failure", () => {
+            vi.useFakeTimers();
+
+            const { fail, finished, win } = openFailing("thread-twice");
+
+            fail();
+            vi.advanceTimersByTime(1000);
+            fail();
+            // The first failure's fallback would end here: the second recovery page is still loading.
+            vi.advanceTimersByTime(SHOW_FALLBACK_MS - 1000);
+            expect(win.shown).toBe(false);
+
+            finished();
+            expect(win.calls).toStrictEqual(["show"]);
+            vi.advanceTimersByTime(SHOW_FALLBACK_MS);
+            expect(win.calls).toStrictEqual(["show"]);
+        });
+
+        it("is shown by the latest failure's own fallback when its recovery page never finishes", () => {
+            vi.useFakeTimers();
+
+            const { fail, win } = openFailing("thread-twice-hung");
+
+            fail();
+            vi.advanceTimersByTime(1000);
+            fail();
+            vi.advanceTimersByTime(SHOW_FALLBACK_MS - 1);
+            expect(win.shown).toBe(false);
+            vi.advanceTimersByTime(1);
+            expect(win.calls).toStrictEqual(["show"]);
+        });
+
+        it("leaves a window already shown as it is", () => {
+            vi.useFakeTimers();
+
+            const { fail, finished, win } = openFailing("thread-shown");
+
+            (win.handlers.get("ready-to-show") as unknown as () => void)();
+            fail();
+            finished();
+            vi.advanceTimersByTime(SHOW_FALLBACK_MS);
+            expect(win.calls).toStrictEqual(["show"]);
+            expect(win.loaded.at(-1)).toMatch(RECOVERY_PAGE_PATTERN);
+        });
+    });
+
+    it("answers the accent colour as #rrggbb to the site only", () => {
+        const get = fake().ipc.get("neore:get-system-accent-color");
+
+        expect(get?.(siteSender())).toBe("#0a84ff");
+        expect(() => get?.(sender("https://example.org/"))).toThrow("untrusted");
+    });
+
+    it("installs an application menu whose New Chat and Settings reach the site window in front", () => {
+        const win = onSite();
+
+        fake().payloads.length = 0;
+        fake().focusedWindow = win;
+        menuItem("New Chat")?.click?.();
+        fake().focusedWindow = composer();
+        menuItem("Settings…")?.click?.();
+        fake().focusedWindow = null;
+
+        expect(fake().payloads).toStrictEqual([
+            { channel: "neore:menu-command", payload: "new-chat", window: win.id },
+            { channel: "neore:menu-command", payload: "settings", window: win.id },
+        ]);
+    });
+
+    it("sends a menu command to the main window when the focused thread window shows the recovery page", () => {
+        const main = onSite();
+
+        fake().ipc.get("neore:open-thread-window")?.(siteSender(), "thread-recovery");
+
+        const thread = fake().windows.at(-1) as FakeWindow;
+
+        navigate(thread, `${SITE}/chat/thread-recovery`);
+        listening(thread);
+        navigate(thread, "data:text/html,recovery");
+        fake().payloads.length = 0;
+        fake().focusedWindow = thread;
+        menuItem("New Chat")?.click?.();
+        fake().focusedWindow = null;
+
+        expect(fake().payloads).toStrictEqual([{ channel: "neore:menu-command", payload: "new-chat", window: main.id }]);
+    });
+
+    it("holds menu commands until the page listens, then sends each once", () => {
+        const win = mainWindow();
+
+        navigate(win, `${SITE}/chat`);
+        fake().payloads.length = 0;
+        menuItem("New Chat")?.click?.();
+        menuItem("New Chat")?.click?.();
+        menuItem("Settings…")?.click?.();
+        expect(menuPayloads()).toStrictEqual([]);
+
+        listening(win);
+        expect(menuPayloads()).toStrictEqual([
+            { channel: "neore:menu-command", payload: "new-chat", window: win.id },
+            { channel: "neore:menu-command", payload: "settings", window: win.id },
+        ]);
+    });
+
+    it("takes the readiness only from the top frame of a site window", () => {
+        const win = mainWindow();
+        const ready = fake().ipc.get("neore:menu-commands-ready");
+
+        navigate(win, `${SITE}/chat`);
+        fake().payloads.length = 0;
+        menuItem("New Chat")?.click?.();
+        ready?.({ sender: win.webContents, senderFrame: { url: `${SITE}/chat` } });
+        ready?.(topFrameOf(win, "https://example.org/"));
+        ready?.(composerSender());
+        expect(menuPayloads()).toStrictEqual([]);
+
+        listening(win);
+        expect(menuPayloads()).toStrictEqual([{ channel: "neore:menu-command", payload: "new-chat", window: win.id }]);
+    });
+
+    it("drops held commands when the window turns to the recovery page", () => {
+        const win = mainWindow();
+
+        navigate(win, `${SITE}/chat`);
+        fake().payloads.length = 0;
+        menuItem("New Chat")?.click?.();
+        navigate(win, "data:text/html,recovery");
+        navigate(win, `${SITE}/chat`);
+        listening(win);
+
+        expect(menuPayloads()).toStrictEqual([]);
+    });
+
+    it("holds a command chosen between a navigation's start and its commit for the new page, whatever the old page says", () => {
+        const win = onSite();
+
+        fake().payloads.length = 0;
+        startNavigation(win, `${SITE}/chat/thread-2`);
+        menuItem("New Chat")?.click?.();
+        // The departing document still answers to the window's top frame until the commit.
+        listening(win);
+        expect(menuPayloads()).toStrictEqual([]);
+
+        navigate(win, `${SITE}/chat/thread-2`);
+        expect(menuPayloads()).toStrictEqual([]);
+
+        listening(win);
+        expect(menuPayloads()).toStrictEqual([{ channel: "neore:menu-command", payload: "new-chat", window: win.id }]);
+    });
+
+    it("keeps sending to the page through a subframe's or an in-page navigation, and through one that never commits", () => {
+        const win = onSite();
+        const abandoned = guardOf(win, "did-fail-provisional-load") as unknown as (event: unknown, code: number, text: string, url: string, isMainFrame: boolean) => void;
+
+        fake().payloads.length = 0;
+        startNavigation(win, `${SITE}/embed`, { isMainFrame: false });
+        startNavigation(win, `${SITE}/chat/thread-3`, { isSameDocument: true });
+        menuItem("New Chat")?.click?.();
+        expect(menuPayloads()).toHaveLength(1);
+
+        startNavigation(win, `${SITE}/download.zip`);
+        menuItem("Settings…")?.click?.();
+        expect(menuPayloads()).toHaveLength(1);
+
+        abandoned({}, -3, "ERR_ABORTED", `${SITE}/download.zip`, true);
+        expect(menuPayloads()).toStrictEqual([
+            { channel: "neore:menu-command", payload: "new-chat", window: win.id },
+            { channel: "neore:menu-command", payload: "settings", window: win.id },
+        ]);
+    });
+
+    it("sends the commands held during a link click the shell cancelled to the page that stayed, once", () => {
+        const win = onSite();
+        const abandoned = guardOf(win, "did-fail-provisional-load") as unknown as (event: unknown, code: number, text: string, url: string, isMainFrame: boolean) => void;
+
+        fake().payloads.length = 0;
+        startNavigation(win, "https://example.org/");
+        menuItem("New Chat")?.click?.();
+        expect(menuPayloads()).toStrictEqual([]);
+
+        guardOf(win, "will-navigate")?.({ preventDefault: () => {} }, "https://example.org/");
+        expect(menuPayloads()).toStrictEqual([{ channel: "neore:menu-command", payload: "new-chat", window: win.id }]);
+
+        // Its own failure, when Electron reports it, changes nothing.
+        abandoned({}, -3, "ERR_ABORTED", "https://example.org/", true);
+        stoppedLoading(win);
+        menuItem("Settings…")?.click?.();
+        expect(menuPayloads()).toStrictEqual([
+            { channel: "neore:menu-command", payload: "new-chat", window: win.id },
+            { channel: "neore:menu-command", payload: "settings", window: win.id },
+        ]);
+    });
+
+    it("sends the commands held during a navigation that stopped loading without a commit to the page that stayed", () => {
+        const win = onSite();
+
+        fake().payloads.length = 0;
+        startNavigation(win, `${SITE}/export.csv`);
+        menuItem("Settings…")?.click?.();
+        expect(menuPayloads()).toStrictEqual([]);
+
+        stoppedLoading(win);
+        menuItem("New Chat")?.click?.();
+        expect(menuPayloads()).toStrictEqual([
+            { channel: "neore:menu-command", payload: "settings", window: win.id },
+            { channel: "neore:menu-command", payload: "new-chat", window: win.id },
+        ]);
+    });
+
+    it("holds commands once the page stops listening, until it listens again, and only on its own word", () => {
+        const win = onSite();
+        const unready = fake().ipc.get("neore:menu-commands-unready");
+
+        unready?.(topFrameOf(win, "https://example.org/"));
+        unready?.(composerSender());
+        fake().payloads.length = 0;
+        menuItem("Settings…")?.click?.();
+        expect(menuPayloads()).toHaveLength(1);
+
+        stoppedListening(win);
+        menuItem("New Chat")?.click?.();
+        expect(menuPayloads()).toHaveLength(1);
+
+        listening(win);
+        expect(menuPayloads()).toStrictEqual([
+            { channel: "neore:menu-command", payload: "settings", window: win.id },
+            { channel: "neore:menu-command", payload: "new-chat", window: win.id },
+        ]);
+    });
+
+    describe("a page that never listens", () => {
+        afterEach(() => {
+            vi.useRealTimers();
+            onSite();
+        });
+
+        it("gets New Chat in a new window once its grace period ends, never over its own page, and Settings is dropped", () => {
+            vi.useFakeTimers();
+
+            const win = mainWindow();
+            const windowCount = fake().windows.length;
+
+            navigate(win, `${SITE}/chat/thread-1`);
+            stoppedLoading(win);
+            fake().payloads.length = 0;
+            menuItem("New Chat")?.click?.();
+
+            vi.advanceTimersByTime(MENU_READY_GRACE_MS - 1);
+            expect(fake().windows).toHaveLength(windowCount);
+            vi.advanceTimersByTime(1);
+            // A reply may still be streaming on thread-1: that page is left alone.
+            expect(win.loaded.at(-1)).toBe(`${SITE}/chat/thread-1`);
+            expect(fake().windows).toHaveLength(windowCount + 1);
+            expect(fake().windows.at(-1)?.loaded.at(-1)).toBe(`${SITE}/chat`);
+
+            vi.advanceTimersByTime(MENU_READY_GRACE_MS);
+            menuItem("Settings…")?.click?.();
+
+            expect(win.loaded.at(-1)).toBe(`${SITE}/chat/thread-1`);
+            expect(menuPayloads()).toStrictEqual([]);
+        });
+
+        it("gets New Chat in a fresh window even when the page is at the new-chat path with a linked draft", () => {
+            vi.useFakeTimers();
+
+            const win = mainWindow();
+            const windowCount = fake().windows.length;
+
+            navigate(win, `${SITE}/chat?prompt=draft`);
+            stoppedLoading(win);
+            vi.advanceTimersByTime(MENU_READY_GRACE_MS);
+            menuItem("New Chat")?.click?.();
+
+            expect(fake().windows).toHaveLength(windowCount + 1);
+            expect(fake().windows.at(-1)?.loaded.at(-1)).toBe(`${SITE}/chat`);
+            expect(win.loaded.at(-1)).toBe(`${SITE}/chat?prompt=draft`);
+        });
+
+        it("falls back once the grace period ends for a loaded page that stopped listening", () => {
+            vi.useFakeTimers();
+
+            const win = mainWindow();
+            const windowCount = fake().windows.length;
+
+            navigate(win, `${SITE}/chat/thread-1`);
+            stoppedLoading(win);
+            listening(win);
+            stoppedListening(win);
+            menuItem("New Chat")?.click?.();
+            vi.advanceTimersByTime(MENU_READY_GRACE_MS - 1);
+            expect(fake().windows).toHaveLength(windowCount);
+
+            vi.advanceTimersByTime(1);
+            expect(fake().windows).toHaveLength(windowCount + 1);
+            expect(win.loaded.at(-1)).toBe(`${SITE}/chat/thread-1`);
+        });
+
+        it("gets the command itself when it starts listening within the grace period", () => {
+            vi.useFakeTimers();
+
+            const win = mainWindow();
+
+            navigate(win, `${SITE}/chat/thread-1`);
+            stoppedLoading(win);
+            fake().payloads.length = 0;
+            menuItem("New Chat")?.click?.();
+            vi.advanceTimersByTime(MENU_READY_GRACE_MS - 1);
+            listening(win);
+            vi.advanceTimersByTime(MENU_READY_GRACE_MS);
+
+            expect(win.loaded.at(-1)).toBe(`${SITE}/chat/thread-1`);
+            expect(menuPayloads()).toStrictEqual([{ channel: "neore:menu-command", payload: "new-chat", window: win.id }]);
+        });
+    });
+
+    it("sends neither a menu command nor the accent colour to a main window showing the recovery page", () => {
+        navigate(mainWindow(), "data:text/html,recovery");
+        fake().payloads.length = 0;
+        fake().focusedWindow = mainWindow();
+        menuItem("Settings…")?.click?.();
+        fake().focusedWindow = null;
+        fake().accentChangedListeners.forEach((listener) => listener());
+
+        expect(fake().payloads.filter((sent) => sent.window === mainWindow().id)).toStrictEqual([]);
+        onSite();
+    });
+
+    it("loads a new chat over the recovery page of the main window, and drops Settings", () => {
+        const win = mainWindow();
+        const windowCount = fake().windows.length;
+
+        navigate(win, "data:text/html,recovery");
+        fake().payloads.length = 0;
+        menuItem("Settings…")?.click?.();
+        expect(win.loaded.at(-1)).toBe("data:text/html,recovery");
+
+        menuItem("New Chat")?.click?.();
+        expect(win.loaded.at(-1)).toBe(`${SITE}/chat`);
+        expect(fake().windows).toHaveLength(windowCount);
+        expect(menuPayloads()).toStrictEqual([]);
+        onSite();
+    });
+
+    describe("the show fallback", () => {
+        afterEach(() => {
+            vi.useRealTimers();
+        });
+
+        it("shows a window that never paints after SHOW_FALLBACK_MS, and not again at a late first paint", () => {
+            vi.useFakeTimers();
+            fake().ipc.get("neore:open-thread-window")?.(siteSender(), "thread-hung");
+
+            const win = fake().windows.at(-1) as FakeWindow;
+
+            vi.advanceTimersByTime(SHOW_FALLBACK_MS - 1);
+            expect(win.shown).toBe(false);
+            vi.advanceTimersByTime(1);
+            expect(win.calls).toStrictEqual(["show"]);
+
+            (win.handlers.get("ready-to-show") as unknown as () => void)();
+            expect(win.calls).toStrictEqual(["show"]);
+        });
+    });
+
+    it("reveals a thread window asked for again before its first paint once, through its reveal", () => {
+        const openThread = fake().ipc.get("neore:open-thread-window");
+
+        openThread?.(siteSender(), "thread-early");
+
+        const win = fake().windows.at(-1) as FakeWindow;
+
+        expect(win.shown).toBe(false);
+        openThread?.(siteSender(), "thread-early");
+        expect(win.calls).toStrictEqual(["show"]);
+
+        (win.handlers.get("ready-to-show") as unknown as () => void)();
+        expect(win.calls).toStrictEqual(["show"]);
+    });
+
+    it("opens the docs in the system browser from Help", () => {
+        fake()
+            .applicationMenu
+            ?.template
+            .find((entry) => entry.role === "help")
+            ?.submenu?.[0]
+            ?.click?.();
+
+        expect(fake().opened.at(-1)).toBe(`${SITE}/docs`);
+    });
+});
+
 describe("browser sign-in", () => {
     /** Starts the flow the way the window does: Google's page is requested and cancelled. */
     const startFlow = (): URL => {
@@ -666,5 +1258,379 @@ describe("tray failure", () => {
 
         await expect(startWithoutTray("linux", true)).resolves.toEqual([]);
         expect(fake().shortcuts.has(COMPOSER_SHORTCUT)).toBe(true);
+    });
+});
+
+/** The `userData` folder of each restart: removed once every case has run, whether it passed or not. */
+const temporaryDirectories: string[] = [];
+
+afterAll(() => {
+    for (const directory of temporaryDirectories) {
+        rmSync(directory, { force: true, recursive: true });
+    }
+
+    temporaryDirectories.length = 0;
+});
+
+/**
+ * Starts the app again as `platform`, with `saved` as the window state on disk, and returns the new main window and the
+ * state file. Like `startWithoutTray`, it re-imports `main.js`; the windows of the earlier start stay in the fake.
+ */
+const restart = async (
+    platform: NodeJS.Platform,
+    saved?: { maximized: boolean },
+    appearance?: { dark: boolean },
+): Promise<{ file: string; userData: string; win: FakeWindow }> => {
+    const original = Object.getOwnPropertyDescriptor(process, "platform");
+    const userData = mkdtempSync(path.join(os.tmpdir(), "neore-desktop-test-"));
+
+    temporaryDirectories.push(userData);
+    const file = path.join(userData, WINDOW_STATE_FILE);
+    const first = fake().windows.length;
+
+    if (saved !== undefined) {
+        writeFileSync(file, JSON.stringify({ bounds: { height: 700, width: 1000, x: 10, y: 10 }, maximized: saved.maximized }));
+    }
+
+    if (appearance !== undefined) {
+        writeFileSync(path.join(userData, APPEARANCE_FILE), JSON.stringify(appearance));
+    }
+
+    fake().userData = userData;
+    Object.defineProperty(process, "platform", { value: platform });
+
+    try {
+        vi.resetModules();
+        await import("./main.js");
+        fake().appHandlers.get("ready")?.();
+    } finally {
+        if (original) {
+            Object.defineProperty(process, "platform", original);
+        }
+    }
+
+    return { file, userData, win: fake().windows[first] as FakeWindow };
+};
+
+const readSaved = (file: string): { maximized: boolean } => JSON.parse(readFileSync(file, "utf8")) as { maximized: boolean };
+const readyToShow = (win: FakeWindow): void => (win.handlers.get("ready-to-show") as unknown as () => void)();
+const closeWindow = (win: FakeWindow): void => win.handlers.get("close")?.({ preventDefault: () => {} }, "");
+const capabilitiesOf = (win: FakeWindow): string[] =>
+    ((win.options.webPreferences as { additionalArguments: string[] }).additionalArguments.find((argument) => argument.startsWith(CAPABILITIES_ARG)) ?? "")
+        .slice(CAPABILITIES_ARG.length)
+        .split(",");
+
+describe("main window reveal and saved state", () => {
+    it("maximizes a window saved maximized at its reveal, not at creation, and before showing it", async () => {
+        const { win } = await restart("linux", { maximized: true });
+
+        expect(win.options).toMatchObject({ height: 700, show: false, width: 1000 });
+        expect(win.calls).toStrictEqual([]);
+
+        readyToShow(win);
+        expect(win.calls).toStrictEqual(["maximize", "show"]);
+    });
+
+    it("does not maximize a window saved unmaximized", async () => {
+        const { win } = await restart("linux", { maximized: false });
+
+        readyToShow(win);
+        expect(win.calls).toStrictEqual(["show"]);
+    });
+
+    it("keeps the saved maximized state when the window closes before its reveal", async () => {
+        const { file, win } = await restart("linux", { maximized: true });
+
+        closeWindow(win);
+        expect(readSaved(file).maximized).toBe(true);
+
+        // Once revealed, a close saves what the window is.
+        fake().appHandlers.get("second-instance")?.({}, ["neore"]);
+        win.maximized = false;
+        closeWindow(win);
+        expect(readSaved(file).maximized).toBe(false);
+    });
+
+    describe("closed before its first paint", () => {
+        afterEach(() => {
+            vi.useRealTimers();
+        });
+
+        it("stays hidden at its first paint and at the show fallback", async () => {
+            vi.useFakeTimers();
+
+            const { win } = await restart("linux", { maximized: true });
+
+            closeWindow(win);
+            readyToShow(win);
+            vi.advanceTimersByTime(SHOW_FALLBACK_MS);
+
+            expect(win.calls).toStrictEqual([]);
+            expect(win.shown).toBe(false);
+        });
+
+        it("is revealed, maximized as saved, when it is brought forward", async () => {
+            vi.useFakeTimers();
+
+            const { win } = await restart("darwin", { maximized: true });
+
+            closeWindow(win);
+            vi.advanceTimersByTime(SHOW_FALLBACK_MS);
+            fake().appHandlers.get("second-instance")?.({}, ["neore"]);
+            expect(win.calls).toStrictEqual(["maximize", "show"]);
+
+            readyToShow(win);
+            expect(win.calls).toStrictEqual(["maximize", "show"]);
+        });
+    });
+
+    describe("revealed while another window of ours has the focus", () => {
+        afterEach(() => {
+            fake().focusedWindow = null;
+        });
+
+        it("leaves the focus there, and maximizes as saved only when the user comes to the window", async () => {
+            const { file, win } = await restart("win32", { maximized: true });
+
+            // Another window of ours, as a dictation window would be: a lost focus ends a dictation.
+            fake().focusedWindow = fake().windows.at(-1) as FakeWindow;
+            readyToShow(win);
+            expect(win.calls).toStrictEqual(["showInactive"]);
+
+            // A close before that still keeps the saved maximized state.
+            closeWindow(win);
+            expect(readSaved(file).maximized).toBe(true);
+
+            win.handlers.get("focus")?.({ preventDefault: () => {} }, "");
+            expect(win.calls).toStrictEqual(["showInactive", "maximize"]);
+        });
+
+        it("focuses a thread window the user opened from the focused main window", () => {
+            fake().focusedWindow = mainWindow();
+            fake().ipc.get("neore:open-thread-window")?.(siteSender(), "thread-opened");
+
+            const win = fake().windows.at(-1) as FakeWindow;
+
+            readyToShow(win);
+            expect(win.calls).toStrictEqual(["show"]);
+        });
+
+        it("focuses a same-origin popup and the artifact preview the user opened", () => {
+            fake().focusedWindow = mainWindow();
+
+            for (const url of [`${SITE}/settings`, `${SITE}/artifact-preview#focus`]) {
+                mainWindow().webContents.windowOpen?.({ url });
+
+                const win = fake().windows.at(-1) as FakeWindow;
+
+                readyToShow(win);
+                expect(win.calls).toStrictEqual(["show"]);
+            }
+        });
+
+        it("focuses a thread window the user opened even when it is revealed by its recovery page", () => {
+            vi.useFakeTimers();
+
+            try {
+                fake().focusedWindow = mainWindow();
+                fake().ipc.get("neore:open-thread-window")?.(siteSender(), "thread-opened-failing");
+
+                const win = fake().windows.at(-1) as FakeWindow;
+
+                (guardOf(win, "did-fail-load") as unknown as (event: unknown, code: number, text: string, url: string, isMainFrame: boolean) => void)(
+                    {},
+                    -105,
+                    "ERR_NAME_NOT_RESOLVED",
+                    `${SITE}/chat/thread-opened-failing`,
+                    true,
+                );
+                vi.advanceTimersByTime(SHOW_FALLBACK_MS);
+                expect(win.calls).toStrictEqual(["show"]);
+            } finally {
+                vi.useRealTimers();
+            }
+        });
+
+        it("still focuses a window brought forward", () => {
+            fake().focusedWindow = mainWindow();
+
+            const openThread = fake().ipc.get("neore:open-thread-window");
+
+            openThread?.(siteSender(), "thread-forward");
+
+            const win = fake().windows.at(-1) as FakeWindow;
+
+            openThread?.(siteSender(), "thread-forward");
+            expect(win.calls).toStrictEqual(["show"]);
+        });
+    });
+
+    it("focuses a window revealed while no window of ours has the focus, as at a first launch", async () => {
+        const { win } = await restart("win32", { maximized: true });
+
+        readyToShow(win);
+        expect(win.calls).toStrictEqual(["maximize", "show"]);
+    });
+
+    it("reveals a main window brought forward before its first paint once, maximized, with no second show later", async () => {
+        const { win } = await restart("linux", { maximized: true });
+
+        fake().appHandlers.get("second-instance")?.({}, ["neore"]);
+        expect(win.calls).toStrictEqual(["maximize", "show"]);
+
+        readyToShow(win);
+        expect(win.calls).toStrictEqual(["maximize", "show"]);
+    });
+
+    it("draws no vibrancy off macOS", async () => {
+        const { win } = await restart("linux");
+
+        expect(win.options).not.toHaveProperty("vibrancy");
+        expect(win.options).toMatchObject({ backgroundColor: "#212121" });
+        expect(capabilitiesOf(win)).not.toContain("vibrancy");
+    });
+
+    describe("the pre-paint fill on a light system", () => {
+        afterEach(() => {
+            fake().systemDark = true;
+            fake().pageDark = true;
+        });
+
+        it("follows the theme the site last showed, not the system's", async () => {
+            fake().systemDark = false;
+
+            const { win } = await restart("linux", undefined, { dark: true });
+
+            expect(win.options).toMatchObject({ backgroundColor: "#212121" });
+        });
+
+        it("keeps the theme a loaded site page shows for the next window, and asks no other page", async () => {
+            fake().systemDark = false;
+
+            const { userData, win } = await restart("linux");
+            const finished = (): void => guardOf(win, "did-finish-load")?.({ preventDefault: () => {} }, "");
+            const appearanceFile = path.join(userData, APPEARANCE_FILE);
+
+            expect(win.options).toMatchObject({ backgroundColor: "#f2f2f2" });
+
+            win.webContents.loadURL("data:text/html,recovery");
+            finished();
+            // Whatever the page might have answered has been written by now.
+            await new Promise((resolve) => {
+                setImmediate(resolve);
+            });
+            expect(() => readFileSync(appearanceFile, "utf8")).toThrow("ENOENT");
+
+            win.webContents.loadURL(`${SITE}/chat`);
+            finished();
+            await vi.waitFor(() => expect(JSON.parse(readFileSync(appearanceFile, "utf8"))).toStrictEqual({ dark: true }));
+
+            fake().ipc.get("neore:open-thread-window")?.(topFrameOf(win, `${SITE}/chat`), "thread-theme");
+            expect(fake().windows.at(-1)?.options).toMatchObject({ backgroundColor: "#212121" });
+        });
+
+        it("follows a theme toggle without a reload, until the window leaves the site, loads another page or is destroyed", async () => {
+            fake().systemDark = false;
+            fake().pageDark = false;
+
+            const { userData, win } = await restart("linux");
+            const appearanceFile = path.join(userData, APPEARANCE_FILE);
+            const saved = (): unknown => (JSON.parse(readFileSync(appearanceFile, "utf8")) as { dark: unknown }).dark;
+            const watches = () => fake().themeWatches.filter((watch) => watch.window === win.id);
+            const load = (url: string): void => {
+                win.webContents.loadURL(url);
+                guardOf(win, "did-navigate")?.({ preventDefault: () => {} }, url);
+                guardOf(win, "did-finish-load")?.({ preventDefault: () => {} }, "");
+            };
+            /** Every answer the main process could act on has been acted on. */
+            const settled = async (): Promise<void> =>
+                new Promise((resolve) => {
+                    setImmediate(resolve);
+                });
+
+            load(`${SITE}/chat`);
+            await vi.waitFor(() => expect(watches()).toHaveLength(1));
+            expect(saved()).toBe(false);
+
+            // Each toggle is kept, and the page is watched again.
+            watches()[0]?.resolve(true);
+            await vi.waitFor(() => expect(watches()).toHaveLength(2));
+            expect(saved()).toBe(true);
+            watches()[1]?.resolve(false);
+            await vi.waitFor(() => expect(watches()).toHaveLength(3));
+            expect(saved()).toBe(false);
+
+            // Another site document: the earlier one's late answer is neither kept nor watched again.
+            load(`${SITE}/chat/other`);
+            await vi.waitFor(() => expect(watches()).toHaveLength(4));
+            watches()[2]?.resolve(true);
+            await settled();
+            expect(watches()).toHaveLength(4);
+            expect(saved()).toBe(false);
+
+            // Off the site (the recovery page): nothing is asked of it, and the pending watch ends with the document.
+            load("data:text/html,recovery");
+            watches()[3]?.resolve(true);
+            await settled();
+            expect(watches()).toHaveLength(4);
+            expect(saved()).toBe(false);
+
+            // A rejected watch (a navigation, a closing window) ends there, and a destroyed window's late answer starts nothing.
+            load(`${SITE}/chat`);
+            await vi.waitFor(() => expect(watches()).toHaveLength(5));
+            watches()[4]?.reject(new Error("Script failed to execute"));
+            await settled();
+            expect(watches()).toHaveLength(5);
+            load(`${SITE}/chat`);
+            await vi.waitFor(() => expect(watches()).toHaveLength(6));
+            win.destroyed = true;
+            watches()[5]?.resolve(true);
+            await settled();
+            expect(watches()).toHaveLength(6);
+            expect(saved()).toBe(false);
+        });
+    });
+
+    it("on macOS draws the sidebar material through a transparent window and advertises it", async () => {
+        const { win } = await restart("darwin");
+
+        expect(win.options).toMatchObject({ backgroundColor: "#00000000", vibrancy: "sidebar", visualEffectState: "followWindow" });
+        expect(capabilitiesOf(win)).toContain("vibrancy");
+    });
+
+    it("off macOS follows the accent through accent-color-changed, not the theme, and sends it to the site windows", async () => {
+        const listenersBefore = fake().accentChangedListeners.length;
+        const notificationsBefore = fake().macNotifications.length;
+        const themeListenersBefore = fake().themeListeners.length;
+        const { win } = await restart("linux");
+        const added = fake().accentChangedListeners.slice(listenersBefore);
+
+        expect(added).toHaveLength(1);
+        expect(fake().macNotifications).toHaveLength(notificationsBefore);
+        expect(fake().themeListeners).toHaveLength(themeListenersBefore);
+
+        fake().payloads.length = 0;
+        fake().accentColor = "FF0000FF";
+        added[0]?.();
+        fake().accentColor = "0a84ffff";
+
+        expect(fake().payloads).toContainEqual({ channel: "neore:system-accent-color", payload: "#ff0000", window: win.id });
+    });
+
+    it("on macOS follows the accent through AppleColorPreferencesChangedNotification", async () => {
+        const listenersBefore = fake().accentChangedListeners.length;
+        const notificationsBefore = fake().macNotifications.length;
+        const { win } = await restart("darwin");
+        const subscribed = fake().macNotifications.slice(notificationsBefore);
+
+        expect(fake().accentChangedListeners).toHaveLength(listenersBefore);
+        expect(subscribed.map((entry) => entry.name)).toStrictEqual(["AppleColorPreferencesChangedNotification"]);
+
+        fake().payloads.length = 0;
+        fake().accentColor = "34c759ff";
+        subscribed[0]?.callback();
+        fake().accentColor = "0a84ffff";
+
+        expect(fake().payloads).toContainEqual({ channel: "neore:system-accent-color", payload: "#34c759", window: win.id });
     });
 });

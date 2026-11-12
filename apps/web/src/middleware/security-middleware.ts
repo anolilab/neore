@@ -2,6 +2,7 @@ import { createMiddleware } from "@tanstack/react-start";
 
 import { createPreviewShellResponse, isArtifactPreviewRequest } from "@/features/canvas/lib/preview-shell";
 import env from "@/lib/env";
+import { OFFLINE_SHELL_PATH } from "@/lib/offline-shell";
 
 import { applyDefaultCacheControl } from "./cache-headers";
 
@@ -274,6 +275,11 @@ const securityMiddleware = createMiddleware({ type: "request" }).server(async ({
 
     // Folded in here because this already rebuilds the response; see cache-headers.ts.
     applyDefaultCacheControl(response.headers, handlerType);
+
+    // The desktop worker's offline shell is an empty root page: never a search result (robots.txt disallows it too).
+    if (new URL(request.url).pathname === OFFLINE_SHELL_PATH) {
+        response.headers.set("X-Robots-Tag", "noindex, nofollow");
+    }
 
     return {
         ...result,

@@ -24,7 +24,10 @@ const SiteHeader: FC<
 
     return (
         <>
-            <header className="text-foreground relative flex h-(--header-height) w-full shrink-0 items-center gap-2 transition-[width,height] ease-linear">
+            <header
+                className="text-foreground relative flex h-(--header-height) w-full shrink-0 items-center gap-2 transition-[width,height] ease-linear"
+                data-chrome=""
+            >
                 <div className="relative z-20 flex h-full w-full items-center gap-1">
                     {trigger}
                     {(trigger || !workspaceSwitch) && <Separator className="mx-2 mt-2 data-[orientation=vertical]:h-6" orientation="vertical" />}

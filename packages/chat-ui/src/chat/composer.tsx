@@ -161,6 +161,7 @@ const Composer = memo(
                         placeholder={placeholder ?? t`Message...`}
                         ref={textareaRef}
                         rows={1}
+                        spellCheck
                         value={text}
                     />
 

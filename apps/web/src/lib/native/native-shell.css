@@ -1,0 +1,113 @@
+/* Unlayered on purpose: these must beat Tailwind's `cursor-pointer` utility and the base `button` rule, which are layered. */
+/* eslint-disable css/use-layers */
+
+/*
+ * The desktop shell (`data-native` / `data-native-vibrancy` on <html>, set before first paint by
+ * features/appearance/lib/accent-boot-script.ts). A browser never gets these attributes, so nothing here applies there.
+ * Hover backgrounds on list rows are gated in the components with the `web:` variant (packages/ui/src/global.css).
+ */
+
+/*
+ * Controls show the arrow, as native apps do; real hyperlinks in content keep the hand, text fields the I-beam. Only the
+ * hand is replaced: a control that asks for another cursor (`cursor-grab`, `active:cursor-grabbing`, …) keeps it, and
+ * the `:where()` keeps these rules below the disabled one.
+ */
+:root[data-native]
+    :is(
+        button,
+        summary,
+        select,
+        label,
+        a,
+        [role="button"],
+        [role="link"],
+        [role="tab"],
+        [role="menuitem"],
+        [role="menuitemcheckbox"],
+        [role="menuitemradio"],
+        [role="option"],
+        [role="switch"],
+        [role="checkbox"],
+        [role="radio"],
+        [role="treeitem"]
+    ):where(:not([class*="cursor-"])),
+:root[data-native] [class*="cursor-pointer"] {
+    cursor: default;
+}
+
+:root[data-native] :is(.message-text, .prose) :is(a[href], [data-streamdown="link"]),
+:root[data-native] a[href]:is(.underline, [class*="underline-offset"]) {
+    cursor: pointer;
+}
+
+:root[data-native]
+    :is(textarea, [contenteditable="true"], input:not([type="button"], [type="checkbox"], [type="radio"], [type="range"], [type="submit"], [type="file"])):not(
+        :disabled
+    ) {
+    cursor: text;
+}
+
+/*
+ * Interface chrome is not selectable: the thread sidebar (the right one holds content), the app's chrome headers (marked
+ * `data-chrome`: the site header, a split pane's title bar) and toolbars, menus, tabs, buttons, labels and navigation.
+ * A page's own `<header>` (a title and its description) is content and stays selectable.
+ * Message content, code, fields, dialogs' bodies and everything else outside these regions stays selectable, and
+ * fields and editors inside them (the thread search, the find bar) opt back in. Content is never chrome: a link
+ * Streamdown renders as `<button data-streamdown="link">` in a message stays selectable, and so does any element
+ * marked `select-text` (Tailwind's utility is layered, so it would lose to this rule without the exclusion).
+ */
+:root[data-native]
+    :is(
+        [data-slot="sidebar"][data-side="left"],
+        [data-chrome],
+        nav,
+        button,
+        label,
+        [role="button"],
+        [role="tab"],
+        [role="tablist"],
+        [role="toolbar"],
+        [role="menu"],
+        [role="menubar"],
+        [role="menuitem"],
+        [role="menuitemcheckbox"],
+        [role="menuitemradio"],
+        [role="tooltip"]
+    ):not(.select-text, :is(.message-text, .prose, [data-selectable]) *) {
+    user-select: none;
+}
+
+:root[data-native] :is(input, textarea, [contenteditable="true"], .message-text, .prose, pre, code, [data-selectable], .select-text) {
+    user-select: text;
+}
+
+/* A disabled control says so, as the components' `disabled:cursor-not-allowed` would without the rules above. */
+:root[data-native] :is(:disabled, [aria-disabled="true"], [data-disabled]) {
+    cursor: not-allowed;
+}
+
+/* No hover fades on chrome: a native control changes at once. */
+:root[data-native] :is([data-slot="sidebar"], [data-chrome], nav) :is(a, button, [role="button"], [role="menuitem"], [role="tab"]) {
+    transition-property: none;
+}
+
+/*
+ * macOS vibrancy: the window is transparent with the sidebar material behind it. The page and the left sidebar let
+ * it through (a faint tint keeps the text on it legible in both modes); the main pane and the right sidebar stay
+ * opaque so the chat is never see-through.
+ */
+:root[data-native-vibrancy],
+:root[data-native-vibrancy] body,
+:root[data-native-vibrancy] [data-slot="sidebar-wrapper"] {
+    background-color: transparent;
+}
+
+:root[data-native-vibrancy] [data-slot="sidebar"][data-side="left"] [data-slot="sidebar-inner"] {
+    /* eslint-disable-next-line css/no-invalid-properties -- `--background` is defined in packages/ui/src/global.css */
+    background-color: color-mix(in oklab, var(--background) 35%, transparent);
+}
+
+:root[data-native-vibrancy]:not(.dark) [data-slot="sidebar"][data-side="right"] [data-slot="sidebar-inner"] {
+    /* eslint-disable-next-line css/no-invalid-properties -- `--background` is defined in packages/ui/src/global.css */
+    background-color: var(--background);
+}

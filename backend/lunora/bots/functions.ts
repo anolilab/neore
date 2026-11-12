@@ -4,6 +4,7 @@ import { LunoraError, v } from "lunorash/server";
 import type { Id } from "../_generated/dataModel";
 import { internal } from "../_generated/internal";
 import { internalQuery } from "../_generated/server";
+import { deleteBotConnectorAccess } from "../connectors/access";
 import { authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { patchRow, withoutUndefined } from "../lib/patch";
 import { MAX_LENGTH } from "../lib/validators";
@@ -139,6 +140,9 @@ export const deleteBot = authMutation
 
         // The computer goes with the bot: its sandbox is killed, not paused.
         await context.runMutation(internal.sandbox.functions.retireBotComputers, { botId: bot._id });
+
+        // The teammate's connection settings go with it: a retained thread must not keep applying them.
+        await deleteBotConnectorAccess(context, bot._id);
 
         // Threads, routines and memories that name this bot keep the id. Readers
         // treat a missing bot as the plain assistant, so nothing is rewritten here.

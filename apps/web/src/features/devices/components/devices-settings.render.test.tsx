@@ -46,7 +46,7 @@ const { bridge } = vi.hoisted(() => {
     };
 });
 
-vi.mock("@/lib/native/bridge", () => {
+vi.mock("@/lib/native/device-bridge", () => {
     return {
         connectNativeHost: bridge.connect,
         disconnectNativeHost: bridge.disconnect,

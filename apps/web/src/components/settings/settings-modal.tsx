@@ -542,12 +542,12 @@ export const SettingsModal: FC = () => {
                                             const isActive = currentTab === item.tab;
                                             const isLocked = isAnonymous && item.requiresAuth;
 
-                                            let stateClassName = "text-muted-foreground hover:bg-muted hover:text-foreground";
+                                            let stateClassName = "text-muted-foreground web:hover:bg-muted hover:text-foreground";
 
                                             if (isActive) {
                                                 stateClassName = "bg-primary text-primary-foreground";
                                             } else if (isLocked) {
-                                                stateClassName = "text-muted-foreground/40 hover:bg-muted hover:text-muted-foreground";
+                                                stateClassName = "text-muted-foreground/40 web:hover:bg-muted hover:text-muted-foreground";
                                             }
 
                                             return (

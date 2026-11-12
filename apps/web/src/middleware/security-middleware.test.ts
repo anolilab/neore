@@ -71,6 +71,14 @@ describe("securityMiddleware", () => {
         expect(await response.text()).toBe("<html></html>");
     });
 
+    it("keeps the offline shell out of search results, and only it", async () => {
+        const { result: shell } = await invoke("https://app.example/offline-shell");
+        const { result: page } = await invoke("https://app.example/chat");
+
+        expect((shell as { response: Response }).response.headers.get("X-Robots-Tag")).toBe("noindex, nofollow");
+        expect((page as { response: Response }).response.headers.get("X-Robots-Tag")).toBeNull();
+    });
+
     it("mints a fresh nonce per request", async () => {
         const first = await invoke("https://app.example/");
         const second = await invoke("https://app.example/");
