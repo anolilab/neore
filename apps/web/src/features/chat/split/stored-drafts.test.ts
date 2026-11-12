@@ -225,6 +225,18 @@ describe("other tabs", () => {
         expect(text("thread-a")).toBe("tab one, edited");
     });
 
+    it("writes a draft edited away and back again when another tab wrote the chat's entry meanwhile", () => {
+        bindStoredDrafts("thread-a", "user-1", false);
+        type("mine");
+        flushStoredDrafts();
+        type("mine, changed");
+        put("thread-a", "the other tab's");
+        type("mine");
+        vi.advanceTimersByTime(DRAFT_WRITE_DELAY_MS);
+
+        expect(text("thread-a")).toBe("mine");
+    });
+
     it("does not remove another tab's draft of the same chat written in the same millisecond", () => {
         bindStoredDrafts("thread-a", "user-1", false);
         type("tab one");

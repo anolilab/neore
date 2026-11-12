@@ -120,6 +120,36 @@ describe("keepsStoredDraft", () => {
         expect(storedText("thread-b")).toBe("pane b");
     });
 
+    it("keeps the routed chat's saved draft when split view closes after the focused pane's composer unmounted", async () => {
+        setSplitViewMounted(true);
+
+        const paneA = renderHook(() => {
+            useStoredDrafts("thread-a", "user-1", false);
+        });
+
+        await vi.dynamicImportSettled();
+        // Pane b's draft, saved on this page earlier.
+        saveComposerDraft("thread-b", { composerText: "pane b" });
+        useChatUIStore.getState().setComposerText("pane a");
+        flushStoredDrafts();
+
+        expect(storedText("thread-b")).toBe("pane b");
+
+        // Split view closes: the focused pane's composer unmounts first, then the view hands the route's chat its draft.
+        paneA.unmount();
+        leaveSplitView("thread-a", "thread-b");
+        setSplitViewMounted(false);
+        renderHook(() => {
+            useStoredDrafts("thread-b", "user-1", false);
+        });
+        await vi.dynamicImportSettled();
+        flushStoredDrafts();
+
+        expect(useChatUIStore.getState().composerText).toBe("pane b");
+        expect(storedText("thread-a")).toBe("pane a");
+        expect(storedText("thread-b")).toBe("pane b");
+    });
+
     it("keeps the draft of a known cloud chat and of a new one", () => {
         expect(keepsStoredDraft(true, false, {}, false)).toBe(true);
         expect(keepsStoredDraft(true, true, undefined, false)).toBe(true);

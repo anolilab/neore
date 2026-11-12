@@ -195,6 +195,8 @@ const state = {
     carriedFrom: undefined as string | undefined,
     /** Chats seen locked this page load, until they bind unlocked: none of their drafts is stored. */
     locked: new Set<string>(),
+    /** Chats whose live draft was edited here since the last write. */
+    edited: new Set<string>(),
     /** What this page last wrote or restored, by chat: unchanged content is not written again, and only this write is removed. */
     mine: new Map<string, { content: string; w: string }>(),
     /** The composer holds a route's prefilled message nobody edited: it is no chat's draft, and the chat's stored one stays. */
@@ -268,6 +270,7 @@ const forgetIfCleared = (): void => {
     state.binding = undefined;
     state.carried = true;
     state.carriedFrom = undefined;
+    state.edited.clear();
     state.mine.clear();
 };
 
@@ -307,15 +310,16 @@ export const flushStoredDrafts = (): void => {
         const content = JSON.stringify(draft);
         const key = draftKey(binding.userId, owner);
 
-        // Unchanged since this page wrote it: an entry another tab wrote since stays.
-        if (state.mine.get(owner)?.content !== content) {
+        const mine = state.mine.get(owner);
+
+        // Unchanged since this page wrote it: an entry another tab wrote since stays. Edited here and back to the same text, it is
+        // this tab's latest draft: written again when another tab has written the entry since.
+        if (mine?.content !== content || (state.edited.has(owner) && readEntry(key)?.w !== mine.w)) {
             const w = newWriteId();
             const store = storage();
 
             // Storage out of reach is no write: the next flush tries again (an emptied content never matches a draft's).
             if (store === undefined) {
-                const mine = state.mine.get(owner);
-
                 if (mine) {
                     state.mine.set(owner, { ...mine, content: "" });
                 }
@@ -337,6 +341,7 @@ export const flushStoredDrafts = (): void => {
         }
     }
 
+    state.edited.clear();
     prune(draftKeyPrefix(binding.userId), now);
 };
 
@@ -355,6 +360,11 @@ const handOver = (owner: string | undefined): void => {
 
     if (state.binding && owner !== undefined) {
         state.binding = { ...state.binding, owner };
+        // The outgoing pane's composer is parked: what comes back into the live one is `owner`'s, not text without a chat (a
+        // release by the unmounting pane) nor carried from the outgoing one.
+        state.released = undefined;
+        state.carried = false;
+        state.carriedFrom = undefined;
     }
 };
 
@@ -494,6 +504,10 @@ const listen = (): void => {
                 state.prefill = false;
                 state.carried = false;
 
+                if (binding) {
+                    state.edited.add(binding.owner);
+                }
+
                 if (emptied && next.isSubmitting) {
                     // Sent: a failed send hands the text back, and it must stay the prefill, not overwrite the chat's draft. The
                     // draft comes back once the send ends (above).
@@ -596,6 +610,7 @@ export const resetStoredDraftsForTests = (): void => {
     state.binding = undefined;
     state.carried = false;
     state.carriedFrom = undefined;
+    state.edited.clear();
     state.locked.clear();
     state.mine.clear();
     state.prefill = false;
