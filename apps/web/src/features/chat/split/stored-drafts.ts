@@ -26,8 +26,8 @@ import {
  * removed or rewritten unless edited here. Two tabs editing the same chat are last-write-wins. Reads look only at the current
  * account's entries; sign-out and an account switch remove only the departing account's (`dropStoredDrafts`), or every
  * account's when a sign-out cannot tell whose. What is kept is the text, attachments that finished uploading (by file id, never
- * their bytes) and references with a web URL (never a `blob:` or `data:` one). Every storage access is guarded: a failure only
- * means the draft is not kept.
+ * their bytes) and references with a web URL (never a `blob:` or `data:` one; a signed one past its expiry is dropped on read).
+ * Every storage access is guarded: a failure only means the draft is not kept.
  */
 
 export const DRAFT_TTL_MS = 30 * 24 * 60 * 60 * 1000;
@@ -76,6 +76,19 @@ const isWebUrl = (url: unknown): url is string => typeof url === "string" && url
 const isReference = (value: unknown): value is ReferenceSelection =>
     isRecord(value) && typeof value.id === "string" && typeof value.mimeType === "string" && isWebUrl(value.url);
 
+const UNIX_SECONDS = /^\d+$/u;
+
+/** A signed URL past its `exp` (unix seconds): vault references are signed for hours, so one saved yesterday can no longer be shown or sent. */
+const hasExpired = (url: string, now: number): boolean => {
+    try {
+        const exp = new URL(url).searchParams.get("exp");
+
+        return exp !== null && UNIX_SECONDS.test(exp) && Number(exp) * 1000 <= now;
+    } catch {
+        return false;
+    }
+};
+
 const isAttachment = (value: unknown): value is StoredAttachment =>
     isRecord(value) &&
     typeof value.fileId === "string" &&
@@ -121,7 +134,8 @@ const readEntry = (key: string, now = Date.now()): Entry | undefined => {
         }
 
         const a = Array.isArray(parsed.v.a) ? parsed.v.a.filter(isAttachment) : [];
-        const r = Array.isArray(parsed.v.r) ? parsed.v.r.filter(isReference) : [];
+        // An expired reference is dropped, not restored: the rest of the draft comes back, and the image is picked again.
+        const r = Array.isArray(parsed.v.r) ? parsed.v.r.filter((value) => isReference(value) && !hasExpired(value.url, now)) : [];
 
         return parsed.v.t === "" && a.length === 0 && r.length === 0 ? undefined : { t: parsed.t, v: { a, r, t: parsed.v.t }, w: parsed.w };
     } catch {
@@ -131,7 +145,7 @@ const readEntry = (key: string, now = Date.now()): Entry | undefined => {
 
 /** Removes the expired and unreadable entries under `prefix`, and each account's beyond its {@link MAX_STORED_DRAFTS} newest. */
 const prune = (prefix: string, now = Date.now()): void => {
-    const byAccount = new Map<string, [string, number][]>();
+    const byAccount = new Map<string, [string, Entry][]>();
 
     for (const key of draftKeys(prefix)) {
         const entry = readEntry(key, now);
@@ -139,17 +153,20 @@ const prune = (prefix: string, now = Date.now()): void => {
         if (entry) {
             const account = key.slice(0, key.lastIndexOf(":"));
 
-            byAccount.set(account, [...(byAccount.get(account) ?? []), [key, entry.t]]);
+            byAccount.set(account, [...(byAccount.get(account) ?? []), [key, entry]]);
         } else {
             remove(key);
         }
     }
 
     for (const entries of byAccount.values()) {
-        const overCap = entries.toSorted(([, left], [, right]) => right - left).slice(MAX_STORED_DRAFTS);
+        const overCap = entries.toSorted(([, left], [, right]) => right.t - left.t).slice(MAX_STORED_DRAFTS);
 
-        for (const [key] of overCap) {
-            remove(key);
+        for (const [key, { w }] of overCap) {
+            // Another tab may have saved this draft since it was read: its newer write is not this cleanup's to remove.
+            if (readEntry(key, now)?.w === w) {
+                remove(key);
+            }
         }
     }
 };
@@ -554,7 +571,9 @@ export const bindStoredDrafts = (owner: string, userId: string, locked: boolean)
     const { first } = draftOwnership;
     const previous = state.binding ?? (first && first.generation !== draftGeneration(first.userId) ? { owner: "", userId: "" } : first);
     const switchedUser = previous !== undefined && previous.userId !== userId;
-    const moved = previous !== undefined && previous.owner !== owner && !useSplitViewMountedStore.getState().mounted;
+    // Split view hands the composer over on every focus change (`handOverDraftOwnership`), so a pane's own text is never carried
+    // there. The new-chat composer is no pane: its text that stays in the composer as split view opens is still its own.
+    const moved = previous !== undefined && previous.owner !== owner && (!useSplitViewMountedStore.getState().mounted || previous.owner === NEW_CHAT_DRAFT_KEY);
     const ui = useChatUIStore.getState();
 
     if (switchedUser) {

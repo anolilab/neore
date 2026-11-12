@@ -113,6 +113,8 @@ export const restoreLiveComposerFor = (threadId: string): void => {
         return;
     }
 
+    // An empty composer is this chat's from here on, whichever composer it was before: what comes back is not carried from there.
+    handOverDraftOwnership(threadId);
     ui.restoreComposer(takeComposerDraftState(threadId));
 };
 

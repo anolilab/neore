@@ -16,6 +16,7 @@ import {
     LEGACY_DRAFTS_KEY,
     lockStoredDraft,
     MAX_STORED_DRAFTS,
+    NEW_CHAT_DRAFT_KEY,
     resetStoredDraftsForTests,
 } from "./stored-drafts";
 
@@ -287,6 +288,17 @@ describe("restoring", () => {
         expect(useChatUIStore.getState().composerText).toBe("typing");
     });
 
+    it("drops a reference whose signed URL has expired, and brings the rest of the draft back", () => {
+        const expired = { id: "file:old", mimeType: "image/png", url: `https://files.example/a.png?exp=${String(Math.floor(Date.now() / 1000) - 60)}&sig=x` };
+        const valid = { id: "file:new", mimeType: "image/png", url: `https://files.example/b.png?exp=${String(Math.floor(Date.now() / 1000) + 3600)}&sig=y` };
+
+        localStorage.setItem(draftKey("user-1", "thread-a"), JSON.stringify({ t: Date.now(), v: { r: [expired, valid], t: "with images" }, w: "other" }));
+        bindStoredDrafts("thread-a", "user-1", false);
+
+        expect(useChatUIStore.getState().composerText).toBe("with images");
+        expect(useChatUIStore.getState().attachedReferences).toStrictEqual([valid]);
+    });
+
     it("treats a draft saved too far in the future as unreadable, so a clock set back cannot keep it past the TTL", () => {
         put("thread-a", "from the future", { at: Date.now() + 2 * DAY_MS });
         bindStoredDrafts("thread-a", "user-1", false);
@@ -329,6 +341,37 @@ describe("restoring", () => {
         expect(kept).toContain(draftKey("user-1", "thread-new"));
         expect(kept).toContain(draftKey("user-2", "thread-0"));
         expect(kept).not.toContain(draftKey("user-1", `thread-${String(MAX_STORED_DRAFTS - 1)}`));
+    });
+
+    it("does not remove a draft over the cap that another tab saved again while the cleanup ran", () => {
+        const now = Date.now();
+        const oldest = `thread-${String(MAX_STORED_DRAFTS - 1)}`;
+
+        for (let index = 0; index < MAX_STORED_DRAFTS; index += 1) {
+            put(`thread-${String(index)}`, "x", { at: now - 1000 - index });
+        }
+
+        bindStoredDrafts("thread-new", "user-1", false);
+        type("newest");
+
+        const getItem = localStorage.getItem.bind(localStorage);
+        let armed = true;
+
+        // The cleanup has read every entry (the newest last) when another tab saves the oldest one again.
+        vi.spyOn(Storage.prototype, "getItem").mockImplementation((key: string) => {
+            const value = getItem(key);
+
+            if (armed && value !== null && key === draftKey("user-1", "thread-new")) {
+                armed = false;
+                put(oldest, "saved again in another tab", { w: "tab-2" });
+            }
+
+            return value;
+        });
+        flushStoredDrafts();
+
+        expect(text(oldest)).toBe("saved again in another tab");
+        expect(armed).toBe(false);
     });
 });
 
@@ -727,6 +770,37 @@ describe("switching split panes", () => {
         expect(useChatUIStore.getState().composerText).toBe("from the link");
         expect(text("thread-a")).toBe("saved draft");
         expect(text("thread-b")).toBe("pane b");
+    });
+
+    it("keeps the new chat's text its own when split view opens on a chat with a saved draft", () => {
+        setSplitViewMounted(false);
+        put("thread-a", "draft of a");
+        bindStoredDrafts(NEW_CHAT_DRAFT_KEY, "user-1", false);
+        type("typed on /chat");
+        flushStoredDrafts();
+
+        setSplitViewMounted(true);
+        // The composer is not empty: the pane's draft does not come back over the text.
+        restoreLiveComposerFor("thread-a");
+        bindStoredDrafts("thread-a", "user-1", false);
+        vi.advanceTimersByTime(DRAFT_WRITE_DELAY_MS);
+
+        expect(text(NEW_CHAT_DRAFT_KEY)).toBe("typed on /chat");
+        expect(text("thread-a")).toBe("draft of a");
+    });
+
+    it("stores a pane's parked draft under its own chat when split view opens from an empty new-chat composer", () => {
+        setSplitViewMounted(false);
+        bindStoredDrafts(NEW_CHAT_DRAFT_KEY, "user-1", false);
+
+        setSplitViewMounted(true);
+        saveComposerDraft("thread-a", { composerText: "pane a" });
+        restoreLiveComposerFor("thread-a");
+        bindStoredDrafts("thread-a", "user-1", false);
+        vi.advanceTimersByTime(DRAFT_WRITE_DELAY_MS);
+
+        expect(text("thread-a")).toBe("pane a");
+        expect(text(NEW_CHAT_DRAFT_KEY)).toBeUndefined();
     });
 
     it("keeps each chat's draft its own when split view closes on another chat than the focused pane's", () => {
