@@ -17,26 +17,29 @@ const usePostHogIdentity = (): void => {
     const user = sessionData?.user;
     const isSignedIn = Boolean(user && !user.isAnonymous);
 
-    // Without a session this read is skipped and stays pending, so it is waited for only when there is one.
+    // Without a session this read is skipped and stays pending; only a signed-in user's organization is read at all, so
+    // a cached one never follows a sign-out onto the anonymous client.
     const { data: orgData, isPending: isOrgPending } = hooks.useActiveOrganization();
-    const isKnown = !isSessionPending && !(user && isOrgPending);
 
     const userId = isSignedIn ? user?.id : undefined;
     const email = user?.email;
     const name = user?.name;
-    const orgId = orgData?.id;
+    // The user is published as soon as the session knows them; the organization follows when it answers.
+    const isOrganizationPending = userId !== undefined && isOrgPending;
+    const orgId = userId === undefined || isOrganizationPending ? undefined : orgData?.id;
     const orgName = orgData?.name;
 
     useEffect(() => {
-        if (!isKnown) {
+        if (isSessionPending) {
             return;
         }
 
         setAnalyticsIdentity({
+            isOrganizationPending,
             organization: orgId ? { id: orgId, name: orgName } : undefined,
             user: userId ? { email, id: userId, name } : undefined,
         });
-    }, [isKnown, userId, email, name, orgId, orgName]);
+    }, [isSessionPending, isOrganizationPending, userId, email, name, orgId, orgName]);
 };
 
 export default usePostHogIdentity;

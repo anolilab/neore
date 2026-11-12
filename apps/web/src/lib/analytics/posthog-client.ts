@@ -175,6 +175,11 @@ export const captureException = (error: unknown, properties?: ExceptionPropertie
 
 /** Who the session says is signed in, as `usePostHogIdentity` publishes it. */
 export interface AnalyticsIdentity {
+    /**
+     * The signed-in user's organization has not answered yet. The startup waits for it, so what was queued goes out with
+     * its group; a started client takes the user now (events from here on are theirs) and the group once it answers.
+     */
+    isOrganizationPending?: boolean;
     organization?: { id: string; name?: string };
     /** `undefined` when signed out or a guest. */
     user?: { email?: string; id: string; name?: string };
@@ -466,6 +471,13 @@ const syncIdentity = (posthog: PostHog): void => {
         posthog.identify(current.user.id, { email: current.user.email, name: current.user.name });
     }
 
+    if (current.isOrganizationPending) {
+        // The group the client holds stays until the organization answers, unless a reset dropped it with the old user.
+        identityState.applied = { organizationId: isReset ? undefined : applied.organizationId, userId };
+
+        return;
+    }
+
     // A reset dropped the group too, even when the next user is in the same organization.
     if (current.organization && (isReset || organizationId !== applied.organizationId)) {
         posthog.group("organization", current.organization.id, { name: current.organization.name });
@@ -477,7 +489,9 @@ const syncIdentity = (posthog: PostHog): void => {
 const finishStartup = (): void => {
     const { client } = startup;
 
-    if (!client || startup.isStarted || (!identityState.current && !identityState.isAbandoned)) {
+    const isIdentityKnown = identityState.current !== undefined && !identityState.current.isOrganizationPending;
+
+    if (!client || startup.isStarted || (!isIdentityKnown && !identityState.isAbandoned)) {
         return;
     }
 

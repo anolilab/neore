@@ -406,6 +406,44 @@ describe("startPostHog", () => {
         expect(onStarted).toHaveBeenCalledOnce();
     });
 
+    it("waits for a signed-in user's pending organization before it starts, then applies both", async () => {
+        const client = await loadClientModule();
+
+        client.queueEvent("onboarding_started", {});
+        client.startPostHog(await client.loadPostHog(), () => {});
+        client.setAnalyticsIdentity({ isOrganizationPending: true, user: { id: "user-1" } });
+
+        expect(client.getStartedPostHog()).toBeUndefined();
+        expect(posthog.capture).not.toHaveBeenCalled();
+
+        client.setAnalyticsIdentity({ organization: { id: "org-1", name: "Acme" }, user: { id: "user-1" } });
+
+        expect(client.getStartedPostHog()).toBe(posthog);
+        expect(order(posthog.group)).toBeLessThan(order(posthog.capture));
+    });
+
+    it("identifies a switched account at once, without the old group, and adds the new group when it answers", async () => {
+        const client = await loadClientModule();
+
+        client.startPostHog(await client.loadPostHog(), () => {});
+        client.setAnalyticsIdentity({ organization: { id: "org-1", name: "Acme" }, user: { id: "user-1" } });
+        posthog.group.mockClear();
+        posthog.identify.mockClear();
+        posthog.reset.mockClear();
+
+        // The new account's session answered; its organization has not.
+        client.setAnalyticsIdentity({ isOrganizationPending: true, user: { id: "user-2" } });
+
+        expect(posthog.reset).toHaveBeenCalledOnce();
+        expect(posthog.identify).toHaveBeenCalledExactlyOnceWith("user-2", { email: undefined, name: undefined });
+        expect(posthog.group).not.toHaveBeenCalled();
+
+        client.setAnalyticsIdentity({ organization: { id: "org-1", name: "Acme" }, user: { id: "user-2" } });
+
+        // The reset dropped the group, so even the same organization is applied again.
+        expect(posthog.group).toHaveBeenCalledExactlyOnceWith("organization", "org-1", { name: "Acme" });
+    });
+
     it("runs onStarted (the first launch report) after the reset and the identity", async () => {
         const client = await loadClientModule();
         const onStarted = vi.fn();
