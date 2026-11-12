@@ -517,7 +517,8 @@ export const onOwnLines = (
 };
 
 const markdownLink = (label: string, url: string): string =>
-    `[${label.replaceAll(/[[\]\\]/g, String.raw`\$&`)}](${url.replaceAll("(", "%28").replaceAll(")", "%29")})`;
+    // A backslash is encoded too: left as it is, one at the end would escape the link's closing parenthesis.
+    `[${label.replaceAll(/[[\]\\]/g, String.raw`\$&`)}](${url.replaceAll("\\", "%5C").replaceAll("(", "%28").replaceAll(")", "%29")})`;
 
 const FENCE_LINE = /^ {0,3}(`{3,}|~{3,})/;
 

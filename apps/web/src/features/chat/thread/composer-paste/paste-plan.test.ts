@@ -882,3 +882,13 @@ describe("visible text of a closed details", () => {
         ).resolves.toBe("Logs\nShown\nbody");
     });
 });
+
+describe("a URL ending in a backslash pasted over a selection", () => {
+    it("still forms a link: the backslash is encoded", () => {
+        expect(planPaste(clipboard({ "text/plain": "https://example.com/path\\" }), { plainOnly: false, selectedText: "text" })).toStrictEqual({
+            kind: "text",
+            markdown: true,
+            text: "[text](https://example.com/path%5C)",
+        });
+    });
+});
