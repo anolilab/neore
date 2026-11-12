@@ -328,7 +328,7 @@ const PromptImprovementPanel: FC<PromptImprovementPanelProps> = ({ className }) 
                                             {t`Apply`}
                                         </Button>
                                     )}
-                                    <Button className="text-black" disabled={isImproving || !currentPrompt.trim()} onClick={handleImprove}>
+                                    <Button disabled={isImproving || !currentPrompt.trim()} onClick={handleImprove}>
                                         {isImproving ? (
                                             <>
                                                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />

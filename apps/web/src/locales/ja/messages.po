@@ -18302,6 +18302,10 @@ msgstr "思考機能を備えた Alibaba の小型モデルによる軽量な推
 msgid "Like General, but also specifies output format, validation rules, and examples."
 msgstr "一般と同様ですが、出力形式、検証ルール、例も指定します。"
 
+#: src/features/appearance/components/appearance-controls.tsx:160
+msgid "Lime"
+msgstr "ライム"
+
 #: src/features/appearance/components/appearance-controls.tsx:139
 msgid "Lime (default)"
 msgstr "ライム（既定）"
@@ -27941,6 +27945,10 @@ msgstr "サンプラー"
 msgid "Sandbox & Code Execution"
 msgstr "サンドボックスとコード実行"
 
+#: src/features/appearance/components/appearance-controls.tsx:137
+msgid "Sans"
+msgstr "サンセリフ"
+
 #: src/features/appearance/components/appearance-controls.tsx:117
 msgid "Sans (default)"
 msgstr "サンセリフ（デフォルト）"
@@ -31617,9 +31625,10 @@ msgstr "統合役（回答をまとめる）"
 msgid "Synthesizer (weighs both sides)"
 msgstr "統合役（双方を比較検討する）"
 
+#: src/features/appearance/components/appearance-controls.tsx:224
 #: src/features/auth/components/device-code-parts.tsx:126
 msgid "System"
-msgstr ""
+msgstr "システム"
 
 #: src/features/settings/components/chat/default-models-settings.tsx:81
 #: src/features/settings/components/chat/default-models-settings.tsx:119
@@ -31658,9 +31667,17 @@ msgstr "システムプロンプトのプリセット"
 msgid "System Prompts"
 msgstr "システムプロンプト"
 
+#: src/features/appearance/components/appearance-controls.tsx:224
+msgid "System (default)"
+msgstr "システム（既定）"
+
 #: src/features/appearance/components/appearance-controls.tsx:120
 msgid "System UI"
 msgstr "システム UI"
+
+#: src/features/appearance/components/appearance-controls.tsx:140
+msgid "System UI (default)"
+msgstr "システム UI（デフォルト）"
 
 #: ../../packages/ui/src/components/zoomable-image.tsx:386
 msgid "Tab to the zoom buttons, then plus and minus zoom, zero resets, and arrow keys pan when zoomed. Double-click or scroll to zoom, drag to pan."

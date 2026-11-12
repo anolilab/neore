@@ -5,6 +5,8 @@
 @plugin "@tailwindcss/typography";
 
 @custom-variant dark (&:is(.dark *));
+/* Outside the desktop shell (`data-native` on <html>): for hover backgrounds native list rows do not have. */
+@custom-variant web (&:where(:root:not([data-native]) *));
 
 @theme {
     /* Custom viewport height for framer */
@@ -88,6 +90,21 @@
     --primary-text: var(--primary);
 }
 
+/*
+ * The default Button's label: black on the brand lime and on every preset, as before. The OS accent can be dark, so
+ * there it follows the computed foreground (white or obsidian, `system-accent-tokens.ts`; high contrast included).
+ * Its hover: the fill at 80% over the surface. The OS accent overrides it with a solid shade that keeps the label's
+ * contrast (`accent-presets.css`, `contrast-presets.css`).
+ */
+:root {
+    --primary-label: #000000;
+    --primary-hover: color-mix(in oklab, var(--primary) 80%, transparent);
+}
+
+:root[data-accent="system"] {
+    --primary-label: var(--primary-foreground);
+}
+
 .dark {
     --background: var(--brand-charcoal);
     --foreground: var(--brand-frost);
@@ -142,6 +159,8 @@
     --color-primary: var(--primary);
     --color-primary-foreground: var(--primary-foreground);
     --color-primary-text: var(--primary-text);
+    --color-primary-label: var(--primary-label);
+    --color-primary-hover: var(--primary-hover);
     --color-secondary: var(--secondary);
     --color-secondary-foreground: var(--secondary-foreground);
     --color-muted: var(--muted);

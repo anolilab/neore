@@ -32,7 +32,6 @@ import AuthUIProviderTanstack from "@/features/auth/lib/tanstack/auth-ui-provide
 import { closeSidePanelForSessionSwitch } from "@/features/chat/core/stores/chat-ui-store";
 import { clearComposerDrafts, clearDraftsForSessionSwitch } from "@/features/chat/split/composer-drafts";
 import ConnectionProvider from "@/features/connection/components/connection-provider";
-import OfflineScreen from "@/features/connection/components/offline-screen";
 import { useUIStateStore } from "@/features/layout/stores/ui-state-store";
 import type { SettingsTab } from "@/features/settings/lib/settings-navigation";
 import usePostHogIdentity from "@/hooks/use-posthog-identity";
@@ -42,9 +41,10 @@ import env from "@/lib/env";
 import { DEFAULT_LOCALE } from "@/lib/intl/client";
 import { CRPCProvider, useLunora, useLunoraAuth } from "@/lib/lunora/crpc";
 import { isNativeShell, setNativeBadge } from "@/lib/native/bridge";
-import NativeBridge from "@/lib/native/native-bridge";
+import { lazyShellChunk } from "@/lib/native/shell-chunk";
 import { getClientPostHogState } from "@/lib/posthog/client-state";
-import { forgetClientPostHog, readRequestContext, rememberClientPostHog } from "@/lib/request-context";
+import { forgetClientPostHog, rememberClientPostHog } from "@/lib/request-context";
+import rootBeforeLoad from "@/lib/root-before-load";
 import { jsonLd, seo } from "@/lib/seo";
 import { PostHogConsentSync } from "@/providers/analytics-provider";
 import type { AppContext } from "@/router";
@@ -84,6 +84,20 @@ const SettingsModal = lazy(() =>
     }),
 );
 const SwUpdatePrompt = lazy(() => import("@/components/sw-update-prompt"));
+
+/**
+ * Only the desktop shell loads it: the web build never downloads the shell's listeners. A failed chunk load is retried
+ * and then renders nothing, so the app runs without the listeners rather than falling to the root error boundary,
+ * until the window is back online, when it loads again.
+ */
+const NativeBridge = lazyShellChunk(async () => await import("@/lib/native/native-bridge"));
+
+/**
+ * Shell-only too. It must still show offline, which is when it is needed: the shell fetches it on mount, and
+ * `scripts/generate-sw.mjs` precaches its chunk for an offline start. A load that failed anyway is tried again once
+ * the window is back online, so the screen is there for the next outage.
+ */
+const OfflineScreen = lazyShellChunk(async () => await import("@/features/connection/components/offline-screen"));
 const ChangelogCard = lazy(() => import("@/features/changelog/components/changelog-card"));
 const ChangelogPanel = lazy(() => import("@/features/changelog/components/changelog-panel"));
 
@@ -475,8 +489,11 @@ const RootComponent = () => {
                                                     <PostHogConsentSync />
                                                     <ImpersonationBanner />
                                                     <ConnectionProvider>
-                                                        {/* Eager, not lazy: a lazy chunk cannot load while the app is offline, which is when this screen is needed. */}
-                                                        {isNative && <OfflineScreen />}
+                                                        {isNative && (
+                                                            <Suspense fallback={null}>
+                                                                <OfflineScreen />
+                                                            </Suspense>
+                                                        )}
                                                         <ScreenSizeDebug />
                                                         <Outlet />
                                                     </ConnectionProvider>
@@ -489,7 +506,11 @@ const RootComponent = () => {
                                                         <SwUpdatePrompt />
                                                     </Suspense>
                                                     <Toaster />
-                                                    <NativeBridge />
+                                                    {isNative && (
+                                                        <Suspense fallback={null}>
+                                                            <NativeBridge />
+                                                        </Suspense>
+                                                    )}
                                                     <AppearanceSync />
                                                     <Suspense fallback={null}>
                                                         <ChangelogCard />
@@ -522,34 +543,7 @@ export const Route = createRootRouteWithContext<AppContext>()({
             settingsTab: search.settingsTab as SettingsTab | undefined,
         };
     },
-    beforeLoad: async (context) => {
-        // CSP nonce (security-middleware) and PostHog flags (posthog-middleware)
-        // arrive as `serverContext`, not on the router context — see
-        // `readRequestContext`. Read in parallel with the token: during SSR both
-        // are network round trips on the TTFB path.
-        // A failed token read (offline, 5xx, network) is `unknown`, not a thrown error: a throw
-        // here replaces the whole document with the error component.
-        const [{ status: authStatus, token }, { nonce, posthog }] = await Promise.all([
-            getSessionAuthState().catch(() => {
-                return { status: "unknown" as const, token: undefined };
-            }),
-            readRequestContext(context),
-        ]);
-
-        if (token) {
-            context.context.lunoraClient.setAuthToken(token);
-        }
-
-        return {
-            // `unknown` = the token fetch FAILED (429/5xx/network) for a request with a
-            // session cookie. Guards redirect only on `unauthenticated` — see `lib/auth/route-guard.ts`.
-            authStatus,
-            isAuthenticated: !!token,
-            nonce,
-            token,
-            posthog,
-        };
-    },
+    beforeLoad: rootBeforeLoad,
     component: RootComponent,
     head: ({ loaderData, match }) => {
         // Get PostHog data from loader.

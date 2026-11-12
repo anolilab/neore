@@ -3,7 +3,8 @@
     The service worker's answer to a navigation the network could not serve
     (scripts/generate-sw.mjs, `precacheFallback`). Static and user-agnostic by
     design: SSR HTML carries the viewer's dehydrated data and RPC token, so it
-    is never cached — this page is the only thing an offline start can show.
+    is never cached — this page is what an offline start shows in a browser.
+    The desktop shell gets the user-agnostic app shell first (offline-shell-sw.js).
 -->
 <html lang="en">
     <head>

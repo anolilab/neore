@@ -818,6 +818,7 @@ const HostComposerForThread: FC<{ className?: string; threadId: string }> = ({ c
                                             onChange={(event) => setEditing({ id: item.id, text: event.target.value })}
                                             ref={editorRef}
                                             rows={2}
+                                            spellCheck
                                             value={editing.text}
                                         />
                                         {onlyHidden && (
@@ -986,6 +987,7 @@ const HostComposerForThread: FC<{ className?: string; threadId: string }> = ({ c
                     placeholder={t`Message the agent on your computer`}
                     ref={boxRef}
                     rows={2}
+                    spellCheck
                     value={text}
                 />
                 {running && !steerOnSend && !interrupting && !anyTried && canInterruptAndSend() && (
