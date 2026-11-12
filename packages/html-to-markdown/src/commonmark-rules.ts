@@ -66,13 +66,26 @@ const BLOCK_OPENERS: ReadonlyArray<RegExp> = [
     /<[a-z/!?]/iy,
 ];
 
+function hasHref(node: Node): boolean {
+    return node.nodeName === "A" && Boolean((node as Element).getAttribute("href"));
+}
+
+/**
+ * True when a link rule turns this element into a link: an `<a>` with a non-empty `href`,
+ * in a link style that has a rule. Any other `<a>` prints its text with no brackets, so
+ * the text is not closed by a `]`.
+ */
+export function isLinkElement(node: Node, options: Options): boolean {
+    return (options.linkStyle === "inlined" || options.linkStyle === "referenced") && hasHref(node);
+}
+
 /**
  * Reference-style links collect their definitions here and append them after
  * the document (see `append`). The state lives on this rule object, as in
  * upstream; the rule is shared by every converter in the process.
  */
 function isReferencedLink(node: AnnotatedNode, options: Options): boolean {
-    return options.linkStyle === "referenced" && node.nodeName === "A" && Boolean(node.getAttribute("href"));
+    return options.linkStyle === "referenced" && hasHref(node);
 }
 
 class ReferenceLinkRule implements Rule {
@@ -265,7 +278,7 @@ const rules: Record<string, Rule> = {
 
     inlineLink: {
         filter(node, options) {
-            return options.linkStyle === "inlined" && node.nodeName === "A" && Boolean(node.getAttribute("href"));
+            return options.linkStyle === "inlined" && hasHref(node);
         },
 
         replacement(content, node, options) {
@@ -850,17 +863,24 @@ function cleanAttribute(attribute: string | null): string {
  *
  * A space that already precedes the break is not doubled, so a marker that the block
  * rule added (`> `) follows one space, not two.
+ *
+ * The closing `]` follows the text, so it is appended for the line checks and removed
+ * after. A lone `+` at the end of the text is then not a list item, and a hard break
+ * before it is kept.
  */
 function linkText(content: string, hardBreak: string): string {
     const hasHardBreaks = HARD_BREAK.test(hardBreak);
+    const closed = `${content}]`;
 
-    return content.replaceAll(LINE_BREAK_RUN, (run: string, offset: number, whole: string) => {
-        if (hasHardBreaks && isKeptHardBreak(run, offset, whole, hardBreak)) {
-            return run;
-        }
+    return closed
+        .replaceAll(LINE_BREAK_RUN, (run: string, offset: number, whole: string) => {
+            if (hasHardBreaks && isKeptHardBreak(run, offset, whole, hardBreak)) {
+                return run;
+            }
 
-        return offset > 0 && whole[offset - 1] === " " ? "" : " ";
-    });
+            return offset > 0 && whole[offset - 1] === " " ? "" : " ";
+        })
+        .slice(0, -1);
 }
 
 /**

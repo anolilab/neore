@@ -107,6 +107,30 @@ describe("text that could start raw HTML (#395, #106, #152)", () => {
     it("keeps a less-than sign followed by a digit or an equals sign", () => {
         expect(convert("<p>&lt;1&gt; &lt;= 3</p>")).toBe("<1> <= 3");
     });
+
+    it("escapes a less-than sign that ends an <a> without href, since its text prints with no brackets", () => {
+        expect(convert("<p><a>&lt;</a>b&gt;</p>")).toBe(String.raw`\<b>`);
+    });
+
+    it("escapes a less-than sign that ends an <a> with an empty href, since its text prints with no brackets", () => {
+        expect(convert(`<p><a href="">&lt;</a>script&gt;</p>`)).toBe(String.raw`\<script>`);
+    });
+
+    it("escapes a less-than sign that ends an <a> without href in reference-style links", () => {
+        expect(convert("<p><a>&lt;</a>b&gt;</p>", { linkStyle: "referenced" })).toBe(String.raw`\<b>`);
+    });
+
+    it("escapes a less-than sign that ends an <a> with an empty href in reference-style links", () => {
+        expect(convert(`<p><a href="">&lt;</a>script&gt;</p>`, { linkStyle: "referenced" })).toBe(String.raw`\<script>`);
+    });
+
+    it("keeps a less-than sign that ends a link, since the link's closing bracket follows it", () => {
+        expect(convert(`<p><a href="x">&lt;</a>b&gt;</p>`)).toBe("[<](x)b>");
+    });
+
+    it("keeps a less-than sign that ends a reference-style link, since the link's closing bracket follows it", () => {
+        expect(convert(`<p><a href="x">&lt;</a>b&gt;</p>`, { linkStyle: "referenced" })).toBe("[<][1]b>\n\n[1]: x");
+    });
 });
 
 describe("block elements inside a link (#278, #409, #332)", () => {
@@ -160,5 +184,13 @@ describe("block elements inside a link (#278, #409, #332)", () => {
 
     it("guard, passes before and after: a hard break before bold text is kept, since ** starts no block", () => {
         expect(convert(`<a href="/x">one<br><b>two</b></a>`)).toBe("[one  \n**two**](/x)");
+    });
+
+    it("keeps a hard break before a lone plus sign, which cannot be a list item before the closing bracket", () => {
+        expect(convert(`<a href="/x">one<br>+</a>`)).toBe("[one  \n+](/x)");
+    });
+
+    it("guard, passes before and after: a hard break before an escaped plus list marker is kept", () => {
+        expect(convert(`<a href="/x">one<br>+ x</a>`)).toBe("[one  \n\\+ x](/x)");
     });
 });
