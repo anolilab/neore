@@ -37,6 +37,7 @@ const REACHED = "getAgent reached";
 beforeAll(async () => {
     registerModule(registry, "agent_threads", await import("../agent/threads"));
     registerModule(registry, "auth_functions", await import("../auth/functions"));
+    registerModule(registry, "lib_claim_once", await import("../lib/claim-once"));
 });
 
 let harness: ReturnType<typeof lunoraTest>;
@@ -101,5 +102,64 @@ describe.each([
         await expect(run()).resolves.toBeUndefined();
 
         expect(getAgent).not.toHaveBeenCalled();
+    });
+});
+
+describe("createCategoryChat scheduled by two concurrent resends for one prompt", () => {
+    it("makes exactly one model call, though neither delivery has completed when the other starts", async () => {
+        let calls = 0;
+        // The model answers only once the test lets it: until then the first delivery is still inside its call.
+        let answered = false;
+        const updateMetadata = vi.fn(async () => undefined);
+
+        getAgent.mockReset();
+        getAgent.mockResolvedValue({
+            continueThread: async () => {
+                return {
+                    thread: {
+                        generateText: async () => {
+                            calls += 1;
+                            await vi.waitFor(
+                                () => {
+                                    expect(answered).toBe(true);
+                                },
+                                { timeout: 5000 },
+                            );
+
+                            return { text: "coding", usage: { inputTokens: 1, outputTokens: 1 } };
+                        },
+                        getMetadata: async () => {
+                            return {};
+                        },
+                        updateMetadata,
+                    },
+                };
+            },
+        });
+
+        // A resend scheduled the job again before the first delivery wrote its category.
+        const deliver = async () =>
+            await harness.action(async (context: any) => await context.runAction(createCategoryChat, { prompt: "hi", promptId: "prompt-1", threadId }));
+        const first = deliver();
+
+        await vi.waitFor(() => {
+            expect(calls).toBe(1);
+        });
+
+        const second = deliver();
+
+        // The second either ends without a call, or (without a claim) reaches the model too.
+        await Promise.race([
+            second,
+            vi.waitFor(() => {
+                expect(calls).toBe(2);
+            }),
+        ]);
+        answered = true;
+        await Promise.all([first, second]);
+
+        expect(calls).toBe(1);
+        expect(updateMetadata).toHaveBeenCalledTimes(1);
+        expect(updateMetadata).toHaveBeenCalledWith({ category: "coding" });
     });
 });

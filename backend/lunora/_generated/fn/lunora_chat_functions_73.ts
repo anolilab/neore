@@ -11,13 +11,6 @@ if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(
 if (typeof source["threadId"] !== "string") return DEFER;
 return { "threadId": source["threadId"] };
 });
-installCompiledValidatorMap(lunora_chat_functions_73.createCategoryChat.args, (source) => {
-if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
-if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
-if (typeof source["prompt"] !== "string") return DEFER;
-if (typeof source["threadId"] !== "string") return DEFER;
-return { "prompt": source["prompt"], "threadId": source["threadId"] };
-});
 installCompiledValidatorMap(lunora_chat_functions_73.createSummarizeChat.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;

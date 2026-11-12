@@ -30,6 +30,8 @@ import { sha256Hex } from "../lib/crypto";
 import { patchRow } from "../lib/patch";
 import { MAX_LENGTH } from "../lib/validators";
 import { savePromptInTransaction } from "./lib/save-prompt";
+import type { StartTitleJob } from "./lib/start-title-jobs";
+import { startTitleJobs } from "./lib/start-title-jobs";
 import { canClaimStreamRun } from "./streaming/persistent/library";
 
 /** The claim's scope. */
@@ -100,6 +102,8 @@ export const chatStartFingerprint = async (request: ChatStartRequest): Promise<s
         ),
     );
 
+const vStartTitleJob = v.union(v.literal("category"), v.literal("title"));
+
 /** The fence the save checks: the claim it took, by its key and `claimedAt`. */
 export const vStartClaim = v.object({ claimedAt: v.number(), key: v.string().max(MAX_LENGTH.short) });
 
@@ -117,8 +121,8 @@ interface StartRecord {
     newThread?: boolean;
     streamId?: string;
     threadId?: string;
-    /** The send's title jobs were all scheduled, by its first try or a resend (`recordStartTitlesScheduled`): no resend schedules them again. */
-    titlesScheduled?: boolean;
+    /** The send's title jobs each scheduled by some try, its first, a resume or a resend (`recordStartTitlesScheduled`): no resend schedules them again. */
+    titleJobsScheduled?: StartTitleJob[];
 }
 
 type SavedRecord = StartRecord & { messageId: string; threadId: string };
@@ -131,19 +135,18 @@ const vClaimOutcome = v.union(
     v.object({
         messageId: v.string(),
         model: v.optional(v.string()),
-        newThread: v.optional(v.boolean()),
         outcome: v.literal("duplicate"),
         streamId: v.optional(v.string()),
         /** The stream has no run yet (its queue submission may have failed): the caller queues it again, which a run claims once. */
         streamUnclaimed: v.optional(v.boolean()),
         threadId: v.string(),
         /**
-         * The caller schedules the title jobs, which no try has recorded scheduled (they follow the run, so a failed queue
-         * submission skipped them, or a scheduler submission failed), then records them under this fence
-         * (`recordStartTitlesScheduled`). Until then every resend gets it, whether or not a worker took the run; a title job
-         * keyed by the prompt (`autoTitleChargeKey`) is charged once anyway.
+         * The title jobs no try has recorded scheduled (they follow the run, so a failed queue submission skipped them, or a
+         * scheduler submission failed): the caller schedules these only, then records each one it scheduled under `claim`
+         * (`recordStartTitlesScheduled`). Until then every resend gets them, whether or not a worker took the run. Both are
+         * keyed by the prompt, so a job scheduled twice is charged once (`autoTitleChargeKey`, `createCategoryChat`'s claim).
          */
-        titlesClaim: v.optional(vStartClaim),
+        titleJobs: v.optional(v.object({ claim: vStartClaim, jobs: v.array(vStartTitleJob) })),
     }),
     // A text turn saved but never queued, and past its lease: the caller makes its stream and run, and saves nothing.
     v.object({
@@ -191,14 +194,16 @@ export const claimChatStart = internalMutation
         if (isSaved(record) && (!streams || record.streamId !== undefined)) {
             const { messageId, model, newThread, streamId, threadId } = record;
             const unclaimed = streamId !== undefined && (await streamUnclaimed(ctx, streamId));
-            // A text turn's title jobs, until a try records them all scheduled: whatever became of the run, a try that died or
-            // failed to schedule one leaves them to the next resend.
-            const recoverTitles = existing !== null && streams && record.titlesScheduled !== true;
+            // A text turn's title jobs that no try recorded scheduled: whatever became of the run, a try that died or failed to
+            // schedule one leaves it to the next resend.
+            const scheduled = record.titleJobsScheduled ?? [];
+            const pendingTitleJobs = existing !== null && streams ? startTitleJobs("text", newThread === true).filter((job) => !scheduled.includes(job)) : [];
 
             return {
                 messageId,
                 ...(model !== undefined && { model }),
-                ...(recoverTitles && { titlesClaim: { claimedAt: existing.claimedAt, key }, ...(newThread === true && { newThread: true }) }),
+                ...(existing !== null &&
+                    pendingTitleJobs.length > 0 && { titleJobs: { claim: { claimedAt: existing.claimedAt, key }, jobs: pendingTitleJobs } }),
                 outcome: "duplicate" as const,
                 ...(streamId !== undefined && { streamId, ...(unclaimed && { streamUnclaimed: true }) }),
                 threadId,
@@ -241,18 +246,20 @@ export const claimChatStart = internalMutation
         return { claim: { claimedAt, key }, outcome: "claimed" as const };
     });
 
-/** After a try scheduled all of a send's title jobs (its first, a resume or a resend): no resend schedules them again. Throws when the claim moved. */
+/** After a try scheduled some of a send's title jobs (its first, a resume or a resend): no resend schedules those again. Throws when the claim moved. */
 export const recordStartTitlesScheduled = internalMutation
-    .input({ claim: vStartClaim, messageId: v.string().max(MAX_LENGTH.id) })
+    .input({ claim: vStartClaim, jobs: v.array(vStartTitleJob), messageId: v.string().max(MAX_LENGTH.id) })
     .output(v.null())
-    .mutation(async ({ args: { claim, messageId }, ctx }) => {
+    .mutation(async ({ args: { claim, jobs, messageId }, ctx }) => {
         const { existing, record } = await heldClaim(ctx, claim);
 
         if (record.messageId !== messageId) {
             throw new LunoraError("CONFLICT", "This message was already sent.");
         }
 
-        await patchRow(ctx.db, "idempotencyClaims", existing, { result: JSON.stringify({ ...record, titlesScheduled: true } satisfies StartRecord) });
+        const titleJobsScheduled = [...new Set([...(record.titleJobsScheduled ?? []), ...jobs])].toSorted((left, right) => left.localeCompare(right, "en"));
+
+        await patchRow(ctx.db, "idempotencyClaims", existing, { result: JSON.stringify({ ...record, titleJobsScheduled } satisfies StartRecord) });
 
         return null;
     });

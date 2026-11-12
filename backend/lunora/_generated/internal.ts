@@ -383,7 +383,7 @@ export interface InternalApiTypes {
             runStreamingAgent: FunctionReference<"action", { isAnonymous?: boolean; messageId: string; organizationId?: string; origin?: "lead" | "outside_agent"; resume?: string; skill?: { rawArgs: string; slug: string }; streamId: string; streamingConfig: { contentType: string; customSystemPrompt?: string; enabledFeatures?: Array<string>; imageSize?: string; mcpServerNames?: Array<string>; model: string; reasoningEffort?: number; researchDepth?: string; searchMode?: string; shouldAutoContinue?: boolean; statelessMode?: boolean }; threadId: string; userId: string; userPrompt?: string }, void>;
         };
         functions: {
-            createCategoryChat: FunctionReference<"action", { prompt: string; threadId: string }, void>;
+            createCategoryChat: FunctionReference<"action", { prompt: string; promptId?: string; threadId: string }, void>;
             createSummarizeChat: FunctionReference<"action", { threadId: string; userId: string }, void>;
             createThreadRelationship: FunctionReference<"mutation", { branchPoint?: number; branchType?: "branch" | "continuation" | "comparison"; parentThreadId: string; threadId: string }, void>;
             createThreadWithInitialMessage: FunctionReference<"mutation", { autoModel?: boolean; customSystemPrompt?: string; enabledFeatures?: Array<string>; fileIds?: Array<string>; language?: string; messageContent: Array<Record<string, unknown>>; mode?: "text" | "image" | "video"; model: string; reasoningEffort?: number; retentionHours?: number; startClaim?: { claimedAt: number; key: string }; statelessMode?: boolean; temporary?: boolean; title?: string; userId: string }, { messageId: string; threadId: Id<"threads">; }>;
@@ -502,8 +502,8 @@ export interface InternalApiTypes {
             };
         };
         start_claim: {
-            claimChatStart: FunctionReference<"mutation", { clientMessageId: string; fingerprint: string; streams: boolean; userId: string }, { claim: { claimedAt: number; key: string }; outcome: "claimed" } | { outcome: "in_progress" } | { outcome: "mismatch" } | { messageId: string; model?: string; newThread?: boolean; outcome: "duplicate"; streamId?: string; streamUnclaimed?: boolean; threadId: string; titlesClaim?: { claimedAt: number; key: string } } | { claim: { claimedAt: number; key: string }; messageId: string; model?: string; newThread?: boolean; outcome: "resume"; threadId: string }>;
-            recordStartTitlesScheduled: FunctionReference<"mutation", { claim: { claimedAt: number; key: string }; messageId: string }, null>;
+            claimChatStart: FunctionReference<"mutation", { clientMessageId: string; fingerprint: string; streams: boolean; userId: string }, { claim: { claimedAt: number; key: string }; outcome: "claimed" } | { outcome: "in_progress" } | { outcome: "mismatch" } | { messageId: string; model?: string; outcome: "duplicate"; streamId?: string; streamUnclaimed?: boolean; threadId: string; titleJobs?: { claim: { claimedAt: number; key: string }; jobs: Array<"category" | "title"> } } | { claim: { claimedAt: number; key: string }; messageId: string; model?: string; newThread?: boolean; outcome: "resume"; threadId: string }>;
+            recordStartTitlesScheduled: FunctionReference<"mutation", { claim: { claimedAt: number; key: string }; jobs: Array<"category" | "title">; messageId: string }, null>;
             releaseChatStart: FunctionReference<"mutation", { claim: { claimedAt: number; key: string } }, null>;
             saveStartPrompt: FunctionReference<"mutation", { claim: { claimedAt: number; key: string }; fileIds?: Array<string>; messageContent: Array<Record<string, unknown>>; model: string; parentId?: string; threadId: string }, { messageId: string }>;
         };

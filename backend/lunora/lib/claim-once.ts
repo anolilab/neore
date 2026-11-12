@@ -23,6 +23,7 @@
  * | `switch-summary`   | `<threadId>`             | 2 min (`AGENT_SWITCH_SUMMARY_CLAIM_TTL_MS`) | `chat/agent-switch.ts` (one summary call in flight per thread) |
  * | `host-send`        | `<userId>:<requestId>`   | 24 h                          | `acp/send.ts` (`POST /hosts/send`) |
  * | `chat-start`       | `<userId>:<clientMessageId>` | 24 h (`CHAT_START_CLAIM_TTL_MS`); taken over when nothing was saved within `CHAT_START_LEASE_MS` | `chat/start-claim.ts` (`/chat/start` with `clientMessageId`): its `result` is the request's fingerprint from the claim on (another send under the id is refused), then the saved thread and message ids, recorded in the save's transaction |
+ * | `thread-category`  | `<threadId>:<promptId>` (`<threadId>:thread` without one) | 24 h (`CATEGORY_CLAIM_TTL_MS`; released when the call fails) | `chat/functions.ts` (`createCategoryChat`: one paid category call per prompt, however often a resend schedules the job) |
  * | `host-start`       | `<userId>:<clientId>`    | 24 h                          | `acp/remote.ts` (`startHostSession`) |
  * | `bundle-import` | `<userId>:<importId>` | 24 h (released when the import fails) | `skills/bundle.ts` (`importBundle`) |
  * | `public-api-idempotency` | `<sha256 of api key id + Idempotency-Key>` | 24 h        | `public-api/router.ts` (POSTs with an `Idempotency-Key`) |

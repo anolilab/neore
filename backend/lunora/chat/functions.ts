@@ -2323,74 +2323,119 @@ export const refusedBeforeDispatch = async (context: ActionContext, threadId: st
     return !thread || isThreadLocked(thread) || thread.deletedAt !== undefined;
 };
 
-export const createCategoryChat = internalAction.input({ prompt: v.string(), threadId: v.string() }).action(async ({ args: arguments_, ctx: context }) => {
-    // As in `createTitleChat`: a thread that is gone is skipped, not retried.
-    const threadData = await context.runQuery(internal.agent.threads.getThreadInternal, {
-        threadId: arguments_.threadId as Id<"threads">,
+/** The claim that lets one category job per prompt call the model (`lib/claim-once.ts`). */
+export const CATEGORY_CLAIM_SCOPE = "thread-category";
+
+/** A day: covers every resend of the prompt's send; a thread with its category set is skipped before the claim anyway. */
+const CATEGORY_CLAIM_TTL_MS = 24 * 60 * 60 * 1000;
+
+export const createCategoryChat = internalAction
+    .input({
+        prompt: v.string(),
+        /** The prompt the category is generated from: the claim's key, so a resend's second job never calls the model again. */
+        promptId: v.optional(v.string().max(MAX_LENGTH.id)),
+        threadId: v.string(),
+    })
+    .action(async ({ args: arguments_, ctx: context }) => {
+        // As in `createTitleChat`: a thread that is gone is skipped, not retried.
+        const threadData = await context.runQuery(internal.agent.threads.getThreadInternal, {
+            threadId: arguments_.threadId as Id<"threads">,
+        });
+
+        if (!threadData) {
+            console.warn(`[createCategoryChat] thread ${arguments_.threadId} not found; skipping`);
+
+            return;
+        }
+
+        if (isThreadLocked(threadData)) {
+            return;
+        }
+
+        // As for the title: the user's model filters decide the model, and a thread stays uncategorised when they allow none.
+        const background = await resolveBackgroundModel(context, threadData.userId, DEFAULT_TITLE_GENERATION_MODEL);
+
+        if (!background) {
+            context.log.event("chat.thread_category", { skipped: "no-allowed-model" });
+
+            return;
+        }
+
+        const { billedUserId, model, modelFilterRules } = background;
+        const agent = await getAgent(model, { gateway: gatewayFetch(context), modelFilterRules, userId: billedUserId });
+
+        const { thread } = await agent.continueThread(context, {
+            threadId: arguments_.threadId,
+        });
+
+        const metadata = await thread.getMetadata();
+
+        // Don't re-categorize if already set
+        if (metadata.category) {
+            return;
+        }
+
+        // Read again right before the call: the lock checked above ran before the model setup.
+        if (await refusedBeforeDispatch(context, arguments_.threadId)) {
+            context.log.event("chat.thread_category", { skipped: "refused-before-dispatch" });
+
+            return;
+        }
+
+        // One paid call per prompt: a second delivery of this job (a resend scheduled it again) finds the claim and ends here,
+        // though the first has not written its category yet. Kept once the category is written; released when the call fails.
+        const claimKey = `${arguments_.threadId}:${arguments_.promptId ?? "thread"}`;
+        const claimedAt = await context.runMutation(internal.lib.claim_once.claimKeyFenced, {
+            key: claimKey,
+            scope: CATEGORY_CLAIM_SCOPE,
+            ttlMs: CATEGORY_CLAIM_TTL_MS,
+            userId: threadData.userId,
+        });
+
+        if (claimedAt === null) {
+            context.log.event("chat.thread_category", { skipped: "in-flight" });
+
+            return;
+        }
+
+        let category: string;
+        let textResult: Awaited<ReturnType<typeof thread.generateText>>;
+
+        try {
+            const categoryList = THREAD_CATEGORIES.join(", ");
+
+            textResult = await thread.generateText(
+                {
+                    prompt: `Classify this user message into exactly ONE category. Reply with ONLY the category name, nothing else.\n\nCategories: ${categoryList}\n\nUser message: "${arguments_.prompt}"\n\nCategory:`,
+                },
+                {
+                    storageOptions: {
+                        saveMessages: "none",
+                    },
+                },
+            );
+
+            // Parse and validate the category
+            const rawCategory = textResult.text.trim().toLowerCase();
+
+            category = (THREAD_CATEGORIES as ReadonlyArray<string>).includes(rawCategory) ? rawCategory : "general";
+
+            await thread.updateMetadata({
+                category,
+            });
+        } catch (error) {
+            // A later delivery may try again.
+            await context
+                .runMutation(internal.lib.claim_once.releaseKey, { claimedAt, key: claimKey, scope: CATEGORY_CLAIM_SCOPE })
+                .catch((releaseError: unknown) => {
+                    console.error("[createCategoryChat] Could not release the category claim:", releaseError);
+                });
+
+            throw error;
+        }
+
+        context.log.event("chat.thread_category", { category, inputTokens: textResult.usage.inputTokens, model, outputTokens: textResult.usage.outputTokens });
     });
-
-    if (!threadData) {
-        console.warn(`[createCategoryChat] thread ${arguments_.threadId} not found; skipping`);
-
-        return;
-    }
-
-    if (isThreadLocked(threadData)) {
-        return;
-    }
-
-    // As for the title: the user's model filters decide the model, and a thread stays uncategorised when they allow none.
-    const background = await resolveBackgroundModel(context, threadData.userId, DEFAULT_TITLE_GENERATION_MODEL);
-
-    if (!background) {
-        context.log.event("chat.thread_category", { skipped: "no-allowed-model" });
-
-        return;
-    }
-
-    const { billedUserId, model, modelFilterRules } = background;
-    const agent = await getAgent(model, { gateway: gatewayFetch(context), modelFilterRules, userId: billedUserId });
-
-    const { thread } = await agent.continueThread(context, {
-        threadId: arguments_.threadId,
-    });
-
-    const metadata = await thread.getMetadata();
-
-    // Don't re-categorize if already set
-    if (metadata.category) {
-        return;
-    }
-
-    // Read again right before the call: the lock checked above ran before the model setup.
-    if (await refusedBeforeDispatch(context, arguments_.threadId)) {
-        context.log.event("chat.thread_category", { skipped: "refused-before-dispatch" });
-
-        return;
-    }
-
-    const categoryList = THREAD_CATEGORIES.join(", ");
-    const textResult = await thread.generateText(
-        {
-            prompt: `Classify this user message into exactly ONE category. Reply with ONLY the category name, nothing else.\n\nCategories: ${categoryList}\n\nUser message: "${arguments_.prompt}"\n\nCategory:`,
-        },
-        {
-            storageOptions: {
-                saveMessages: "none",
-            },
-        },
-    );
-
-    // Parse and validate the category
-    const rawCategory = textResult.text.trim().toLowerCase();
-    const category = (THREAD_CATEGORIES as ReadonlyArray<string>).includes(rawCategory) ? rawCategory : "general";
-
-    await thread.updateMetadata({
-        category,
-    });
-
-    context.log.event("chat.thread_category", { category, inputTokens: textResult.usage.inputTokens, model, outputTokens: textResult.usage.outputTokens });
-});
 
 export const createSummarizeChat = internalAction.input({ threadId: v.string(), userId: v.string() }).action(async ({ args: arguments_, ctx: context }) => {
     const threadData = await context.runQuery(internal.agent.threads.getThreadInternal, {
