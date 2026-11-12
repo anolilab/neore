@@ -74,7 +74,7 @@ import { appendPastedText, attachLongPaste, draftFitsAsFile, insertPastedText, m
 import type { ComposerInputAreaRef } from "./composer-input-area";
 import ComposerInputArea from "./composer-input-area";
 import ComposerLongTextPrompt from "./composer-long-text-prompt";
-import { breaksBefore, inOpenFence, isLongPaste, isMarkdownPlan, onOwnLines, planPaste, planText } from "./composer-paste/paste-plan";
+import { breaksBefore, inOpenFence, isLongPaste, onOwnLines, planPaste, planText } from "./composer-paste/paste-plan";
 import { takesPaste } from "./composer-paste/paste-target";
 import ComposerPromptQueue from "./composer-prompt-queue";
 import { composerSubmitIntent } from "./composer-submit-intent";
@@ -973,7 +973,10 @@ const ComposerInput = ({
             const draftAtPaste = useChatUIStore.getState().composerText;
             const chatKey = getChatKey();
             // Converted text is measured as it lands: a short web page can be a long table.
-            const { removed: pasteRemoved, text: pastedText } = stripHiddenText(plan.kind === "default" ? plainText : await planText(plan));
+            // Converted Markdown that opens or ends with a table, fence, heading, list or quote keeps it off the text beside the
+            // caret; text as copied, including a conversion's plain-text fallback, goes in as it is.
+            const { markdown: converted, text: planned } = plan.kind === "default" ? { markdown: false, text: plainText } : await planText(plan);
+            const { removed: pasteRemoved, text: pastedText } = stripHiddenText(planned);
 
             if (!pastedText) {
                 return;
@@ -997,9 +1000,6 @@ const ComposerInput = ({
             if (pasteRemoved > 0) {
                 useChatUIStore.getState().noteComposerHiddenRemoved(pasteRemoved);
             }
-
-            // Converted Markdown that opens or ends with a table, fence, heading, list or quote keeps it off the text beside the caret.
-            const converted = isMarkdownPlan(plan);
 
             if (!isLongPaste(pastedText)) {
                 const draft = useChatUIStore.getState().composerText;

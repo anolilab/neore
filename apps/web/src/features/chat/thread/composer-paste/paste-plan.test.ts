@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
+import { reportCaughtError } from "@/lib/analytics/track";
+
 import { appendPastedText, insertPastedText } from "../composer-draft-file";
 import githubTable from "./__fixtures__/github-readme-table.html?raw";
 import googleDocs from "./__fixtures__/google-docs-list.html?raw";
@@ -9,7 +11,26 @@ import terminalHtml from "./__fixtures__/terminal.html?raw";
 import vscodeHtml from "./__fixtures__/vscode.html?raw";
 import wordHtml from "./__fixtures__/word-paragraph.html?raw";
 import { htmlToMarkdown } from "./html-to-markdown";
-import { breaksBefore, inOpenFence, isLongPaste, isMarkdownPlan, isPlainHtml, longestBacktickRun, onOwnLines, planPaste, planText } from "./paste-plan";
+import type { PastedText } from "./paste-plan";
+import { breaksBefore, inOpenFence, isLongPaste, isPlainHtml, longestBacktickRun, onOwnLines, planPaste, planText } from "./paste-plan";
+
+vi.mock(import("@/lib/analytics/track"), () => {
+    return { reportCaughtError: vi.fn(() => true) };
+});
+// The real converter, which one test makes throw once.
+vi.mock(import("./html-to-markdown"), async (importOriginal) => {
+    const actual = await importOriginal();
+
+    return { ...actual, htmlToMarkdown: vi.fn(actual.htmlToMarkdown) };
+});
+
+const pasted = async (plan: ReturnType<typeof planPaste>): Promise<PastedText | undefined> => (plan.kind === "default" ? undefined : planText(plan));
+
+const isMarkdownPlan = async (plan: ReturnType<typeof planPaste>): Promise<boolean> => {
+    const result = await pasted(plan);
+
+    return result?.markdown === true;
+};
 
 const clipboard = (data: Record<string, string>): Pick<DataTransfer, "getData"> => {
     return { getData: (type: string) => data[type] ?? "" };
@@ -21,7 +42,13 @@ const paste = async (
 ): Promise<string | undefined> => {
     const plan = planPaste(clipboard(data), { inFence: options.inFence, plainOnly: options.plainOnly ?? false, selectedText: options.selectedText ?? "" });
 
-    return plan.kind === "default" ? undefined : planText(plan);
+    if (plan.kind === "default") {
+        return undefined;
+    }
+
+    const { text } = await planText(plan);
+
+    return text;
 };
 
 describe("composer paste", () => {
@@ -167,7 +194,8 @@ describe("composer paste", () => {
         // An HTML-only clipboard is not handed to the editor's rich paste: its visible text goes in, no Markdown added.
         const plan = planPaste(clipboard({ "text/html": googleDocs }), { plainOnly: true, selectedText: "" });
 
-        const text = plan.kind === "default" ? "" : await planText(plan);
+        const result = await pasted(plan);
+        const text = result?.text ?? "";
 
         expect(plan.kind).not.toBe("default");
         expect(text !== "" && !text.includes("**")).toBe(true);
@@ -668,8 +696,8 @@ describe("an HTML-only copy pasted inside a code fence", () => {
             { inFence: true, plainOnly: false, selectedText: "" },
         );
 
-        expect(plan.kind === "default" ? undefined : await planText(plan)).toBe("const a = 1;\nb()\n  if (x) {\n    y();\n  }");
-        expect(isMarkdownPlan(plan)).toBe(false);
+        await expect(pasted(plan)).resolves.toMatchObject({ text: "const a = 1;\nb()\n  if (x) {\n    y();\n  }" });
+        await expect(isMarkdownPlan(plan)).resolves.toBe(false);
     });
 });
 
@@ -681,9 +709,9 @@ describe("the plain-paste shortcut on an HTML-only copy", () => {
         ].join("");
         const plan = planPaste({ getData: (type: string) => (type === "text/html" ? html : "") }, { inFence: false, plainOnly: true, selectedText: "" });
 
-        expect(plan.kind === "default" ? undefined : await planText(plan)).toBe("bold text\na b\nc d\none\ntwo");
+        await expect(pasted(plan)).resolves.toMatchObject({ text: "bold text\na b\nc d\none\ntwo" });
         // Text as copied: no breaks are added to keep a block off the text beside the caret, even when it starts like one.
-        expect(isMarkdownPlan(plan)).toBe(false);
+        await expect(isMarkdownPlan(plan)).resolves.toBe(false);
     });
 
     it("takes the text of HTML too big to parse in one pass", () => {
@@ -695,16 +723,76 @@ describe("the plain-paste shortcut on an HTML-only copy", () => {
 });
 
 describe("which plans are Markdown the plan wrote", () => {
-    it("counts converted HTML, a fenced editor copy and a link over a selection, not text as copied", () => {
-        const plan = (data: Record<string, string>, selectedText = ""): boolean =>
+    it("counts converted HTML, a fenced editor copy and a link over a selection, not text as copied", async () => {
+        const plan = async (data: Record<string, string>, selectedText = ""): Promise<boolean> =>
             isMarkdownPlan(planPaste(clipboard(data), { plainOnly: false, selectedText }));
 
-        expect(plan({ "text/html": "<b>bold</b>", "text/plain": "bold" })).toBe(true);
-        expect(plan({ "text/plain": "a\nb", "vscode-editor-data": JSON.stringify({ mode: "typescript" }) })).toBe(true);
-        expect(plan({ "text/plain": "https://x.y/" }, "docs")).toBe(true);
-        expect(plan({ "text/html": "<p>| a |</p>", "text/plain": "| a |" })).toBe(false);
+        await expect(plan({ "text/html": "<b>bold</b>", "text/plain": "bold" })).resolves.toBe(true);
+        await expect(plan({ "text/plain": "a\nb", "vscode-editor-data": JSON.stringify({ mode: "typescript" }) })).resolves.toBe(true);
+        await expect(plan({ "text/plain": "https://x.y/" }, "docs")).resolves.toBe(true);
+        await expect(plan({ "text/html": "<p>| a |</p>", "text/plain": "| a |" })).resolves.toBe(false);
         const plainShortcut = planPaste(clipboard({ "text/plain": "| a |" }), { plainOnly: true, selectedText: "" });
 
-        expect(isMarkdownPlan(plainShortcut)).toBe(false);
+        await expect(isMarkdownPlan(plainShortcut)).resolves.toBe(false);
+    });
+
+    it("does not count the plain text a conversion falls back to, so it goes in as copied", async () => {
+        // Too deep to convert, and past the conversion cap: the text as copied, even when it starts like a block.
+        await expect(planText({ html: `${"<ul><li>".repeat(600)}deep`, kind: "html", plain: "- item" })).resolves.toStrictEqual({
+            markdown: false,
+            text: "- item",
+        });
+        await expect(planText({ html: `<b>x</b>${" ".repeat(1_100_000)}`, kind: "html", plain: "# x" })).resolves.toStrictEqual({
+            markdown: false,
+            text: "# x",
+        });
+        // Formatting that holds no text.
+        await expect(planText({ html: "<b></b>", kind: "html", plain: "> quote" })).resolves.toStrictEqual({ markdown: false, text: "> quote" });
+    });
+});
+
+describe("a converter that throws", () => {
+    it("reports a bug in it and pastes the plain text, without reporting HTML it refuses", async () => {
+        const bug = new TypeError("Cannot read properties of null");
+
+        vi.mocked(htmlToMarkdown).mockImplementationOnce(() => {
+            throw bug;
+        });
+
+        await expect(planText({ html: "<b>secret</b>", kind: "html", plain: "secret" })).resolves.toStrictEqual({ markdown: false, text: "secret" });
+        expect(reportCaughtError).toHaveBeenCalledExactlyOnceWith(bug, { feature: "composer-paste" });
+
+        vi.mocked(reportCaughtError).mockClear();
+
+        await expect(planText({ html: `${"<div>".repeat(600)}a`, kind: "html", plain: "a" })).resolves.toStrictEqual({ markdown: false, text: "a" });
+        expect(reportCaughtError).not.toHaveBeenCalled();
+    });
+});
+
+describe("text set back to normal weight inside bold", () => {
+    it.each([
+        ["a span", '<b>Bold <span style="font-weight:normal">normal</span> again</b>', "**Bold** normal **again**"],
+        ["a numeric weight inside a bold span", '<span style="font-weight:700">a<span style="font-weight:400">b</span>c</span>', "**a**b**c**"],
+        ["a normal-weight b", '<strong>one <b style="font-weight:normal">two</b></strong>', "**one** two"],
+        ["bold again inside it", '<b>a <span style="font-weight:normal">b <b>c</b> d</span> e</b>', "**a** b **c** d **e**"],
+        ["across lines", '<b>a<br><span style="font-weight:normal">b</span><br>c</b>', "**a**\nb\n**c**"],
+        ["with no bold around it", '<p>a <span style="font-weight:normal">b</span> <i>c</i></p>', "a b *c*"],
+    ])("stays out of the bold: %s", (_, html, markdown) => {
+        expect(htmlToMarkdown(html)).toBe(markdown);
+    });
+});
+
+describe("formatting on part of an emoji sequence", () => {
+    it.each([
+        ["the first emoji bold", "<p><strong>👩</strong>\u{200D}👩 hi</p>", "👩\u{200D}👩 hi"],
+        ["the last emoji italic", "<p>👩\u{200D}<em>👧</em></p>", "👩\u{200D}👧"],
+        ["the joiner inside the bold", "<p><b>👩\u{200D}</b>👩</p>", "👩\u{200D}👩"],
+        ["an emoji with its selector", '<p><span style="font-weight:bold">❤\u{FE0F}</span>\u{200D}🔥</p>', "❤\u{FE0F}\u{200D}🔥"],
+    ])("keeps the joiner beside its emoji: %s", (_, html, markdown) => {
+        expect(htmlToMarkdown(html)).toBe(markdown);
+    });
+
+    it("still marks a whole emoji or an emoji beside words", () => {
+        expect(htmlToMarkdown("<p><b>👩\u{200D}👩</b> and <b>🎉</b> <i>yay</i></p>")).toBe("**👩\u{200D}👩** and **🎉** *yay*");
     });
 });

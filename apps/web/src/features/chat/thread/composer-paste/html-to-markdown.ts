@@ -76,6 +76,13 @@ const HTML_SPACE = /[\t\n\f\r ]+/g;
 // After collapsing, an edge holds at most one plain space.
 const EDGE_SPACE = /^ | $/g;
 const PLACEHOLDER = /\0(\d+)\0/g;
+// Around text that restores normal weight inside bold: the bold around it is closed for it (`wrap`). Taken out of the
+// page's own text, with the placeholders' NUL, so only the converter writes them.
+const NORMAL_START = "\u{1}";
+const NORMAL_END = "\u{2}";
+const JOINER = "\u{200D}";
+// What a ZWJ emoji sequence joins: a pictograph, its emoji selector or a skin tone.
+const EMOJI_EDGE = /^[\p{Extended_Pictographic}\p{Emoji_Modifier}\u{FE0F}]$/u;
 // After blank-line runs are collapsed, an edge holds at most two line breaks.
 const LEADING_NEWLINE = /^\n{1,2}/;
 const TRAILING_NEWLINE = /\n{1,2}$/;
@@ -92,6 +99,8 @@ const MAX_DEPTH = 500;
 const NOT_WALKED = new Set(["CODE", "KBD", "MATH", "PRE", "SAMP", "TT"]);
 
 interface Context {
+    /** Bold elements around the node: text set back to normal weight inside one is marked to stay out of its `**`. */
+    bold: number;
     /** Fenced code blocks and links in table cells, put back at the end so clean-up and cell escaping never touch them. */
     code: string[];
     depth: number;
@@ -204,7 +213,7 @@ const codeText = (node: Node, page = false): string => {
 
         for (const child of parent.childNodes) {
             if (child.nodeType === Node.TEXT_NODE) {
-                const text = (child.nodeValue ?? "").replaceAll("\0", "");
+                const text = (child.nodeValue ?? "").replaceAll("\0", "").replaceAll(NORMAL_START, "").replaceAll(NORMAL_END, "");
 
                 if (!page || inPre) {
                     push(text);
@@ -257,13 +266,102 @@ const wrapLine = (line: string, marker: string): string => {
     return line.slice(0, start) + marker + core + marker + line.slice(start + core.length);
 };
 
+/** The text at the start of `node` (its first descendant's), or "": one step per level, so each element is read for its siblings only. */
+const firstText = (node: Node | null): string => {
+    let current = node;
+
+    while (current?.nodeType === Node.ELEMENT_NODE) {
+        current = current.firstChild;
+    }
+
+    return current?.nodeType === Node.TEXT_NODE ? (current.nodeValue ?? "") : "";
+};
+
+const lastText = (node: Node | null): string => {
+    let current = node;
+
+    while (current?.nodeType === Node.ELEMENT_NODE) {
+        current = current.lastChild;
+    }
+
+    return current?.nodeType === Node.TEXT_NODE ? (current.nodeValue ?? "") : "";
+};
+
+const firstCodePoint = (text: string): string => String.fromCodePoint(text.codePointAt(0) ?? 0);
+
+const lastCodePoint = (text: string): string => {
+    const low = text.codePointAt(text.length - 1) ?? 0;
+
+    return text.slice(low >= 0xdc_00 && low <= 0xdf_ff ? -2 : -1);
+};
+
+/**
+ * Whether the element's edge falls inside a ZWJ emoji sequence (`<b>👩</b>‍👩`). A marker there parts the joiner from an
+ * emoji, so hidden-text stripping would drop it; bold or italics show nothing on an emoji anyway, so it is left unmarked.
+ */
+const splitsEmoji = (node: Element, inner: string): boolean => {
+    const core = inner.trim();
+
+    if (core === "") {
+        return false;
+    }
+
+    if (core.startsWith(JOINER) || core.endsWith(JOINER)) {
+        return true;
+    }
+
+    return (
+        (EMOJI_EDGE.test(lastCodePoint(inner)) && firstText(node.nextSibling).startsWith(JOINER)) ||
+        (EMOJI_EDGE.test(firstCodePoint(inner)) && lastText(node.previousSibling).endsWith(JOINER))
+    );
+};
+
+/** Text set back to normal weight inside bold, marked so the bold around it leaves it out (`wrap`). */
+const unbold = (inner: string, context: Context): string => {
+    if (context.bold === 0 || inner.trim() === "") {
+        return inner;
+    }
+
+    context.wrapWork -= inner.length;
+
+    // Marks inside it are not needed: all of it is normal weight.
+    return NORMAL_START + inner.replaceAll(NORMAL_START, "").replaceAll(NORMAL_END, "") + NORMAL_END;
+};
+
+const wrapLines = (inner: string, marker: string): string =>
+    inner
+        .split("\n")
+        .map((line) => wrapLine(line, marker))
+        .join("\n");
+
+/** `**` around each run of `inner` outside text marked normal weight (`unbold`), which stays as it is. */
+const wrapBold = (inner: string): string => {
+    const parts: string[] = [];
+    let from = 0;
+
+    for (let start = inner.indexOf(NORMAL_START); start !== -1; start = inner.indexOf(NORMAL_START, from)) {
+        const end = inner.indexOf(NORMAL_END, start);
+        const normalEnd = end === -1 ? inner.length : end;
+
+        parts.push(wrapLines(inner.slice(from, start), "**"), inner.slice(start + 1, normalEnd));
+        from = normalEnd + 1;
+    }
+
+    parts.push(wrapLines(inner.slice(from), "**"));
+
+    return parts.join("");
+};
+
 /**
  * `**`, `*` or `~~` around inline content, with its outer spaces kept outside. Content broken by `<br>` is marked line by
- * line, as Markdown emphasis cannot span lines; content holding blocks (a blank line) is left as it is.
+ * line, as Markdown emphasis cannot span lines; content holding blocks (a blank line) is left as it is, and so is
+ * content whose edge is inside an emoji sequence (`splitsEmoji`). Bold leaves out text set back to normal weight.
  */
-const wrap = (inner: string, marker: string, context: Context): string => {
-    if (inner.includes("\n\n")) {
-        return inner;
+const wrap = (inner: string, marker: string, context: Context, node: Element): string => {
+    const isBold = marker === "**";
+
+    if (inner.includes("\n\n") || splitsEmoji(node, inner)) {
+        return isBold ? inner.replaceAll(NORMAL_START, "").replaceAll(NORMAL_END, "") : inner;
     }
 
     // Each formatting element around the same lines rebuilds them: deep nesting around many lines counts against the budget.
@@ -273,10 +371,7 @@ const wrap = (inner: string, marker: string, context: Context): string => {
         throw new RangeError("Nested too deep to convert");
     }
 
-    return inner
-        .split("\n")
-        .map((line) => wrapLine(line, marker))
-        .join("\n");
+    return isBold && inner.includes(NORMAL_START) ? wrapBold(inner) : wrapLines(inner, marker);
 };
 
 /**
@@ -630,7 +725,12 @@ const list = (listElement: Element, context: Context): string => {
 
     for (const child of listElement.childNodes) {
         if (child.nodeType === Node.TEXT_NODE) {
-            const text = (child.nodeValue ?? "").replaceAll("\0", "").replaceAll(HTML_SPACE, " ").replaceAll(EDGE_SPACE, "");
+            const text = (child.nodeValue ?? "")
+                .replaceAll("\0", "")
+                .replaceAll(NORMAL_START, "")
+                .replaceAll(NORMAL_END, "")
+                .replaceAll(HTML_SPACE, " ")
+                .replaceAll(EDGE_SPACE, "");
 
             if (text !== "") {
                 entries.push({ body: text });
@@ -776,10 +876,18 @@ const element = (node: Element, context: Context): string => {
         }
         case "B":
         case "STRONG": {
+            // Google Docs wraps the whole copy in `<b style="font-weight:normal">`.
+            if (NORMAL_WEIGHT.test(style)) {
+                return unbold(children(node, context), context);
+            }
+
+            context.bold += 1;
+
             const inner = children(node, context);
 
-            // Google Docs wraps the whole copy in `<b style="font-weight:normal">`.
-            return NORMAL_WEIGHT.test(style) ? inner : wrap(inner, "**", context);
+            context.bold -= 1;
+
+            return wrap(inner, "**", context, node);
         }
         case "BLOCKQUOTE": {
             const inner = children(node, context).replaceAll(BLANK_LINES, "\n\n").trim();
@@ -798,7 +906,7 @@ const element = (node: Element, context: Context): string => {
         case "DEL":
         case "S":
         case "STRIKE": {
-            return wrap(children(node, context), "~~", context);
+            return wrap(children(node, context), "~~", context, node);
         }
         case "DETAILS": {
             // A closed one shows its summary alone.
@@ -812,7 +920,7 @@ const element = (node: Element, context: Context): string => {
         }
         case "EM":
         case "I": {
-            return wrap(children(node, context), "*", context);
+            return wrap(children(node, context), "*", context, node);
         }
         case "HR": {
             return "\n\n---\n\n";
@@ -867,7 +975,14 @@ const element = (node: Element, context: Context): string => {
         }
     }
 
+    const isSpan = tag === "SPAN" || tag === "FONT";
+    const isBold = isSpan && BOLD_STYLE.test(style);
+
+    context.bold += isBold ? 1 : 0;
+
     let inner = children(node, context);
+
+    context.bold -= isBold ? 1 : 0;
 
     if (HEADING.test(tag)) {
         const text = oneLine(inner).trim();
@@ -875,11 +990,16 @@ const element = (node: Element, context: Context): string => {
         return text === "" ? "" : `\n\n${"#".repeat(Number(tag[1]))} ${text}\n\n`;
     }
 
-    if (tag === "SPAN" || tag === "FONT") {
-        inner = BOLD_STYLE.test(style) ? wrap(inner, "**", context) : inner;
-        inner = ITALIC_STYLE.test(style) ? wrap(inner, "*", context) : inner;
+    if (isSpan) {
+        if (isBold) {
+            inner = wrap(inner, "**", context, node);
+        } else if (NORMAL_WEIGHT.test(style)) {
+            inner = unbold(inner, context);
+        }
 
-        return STRIKE_STYLE.test(style) ? wrap(inner, "~~", context) : inner;
+        inner = ITALIC_STYLE.test(style) ? wrap(inner, "*", context, node) : inner;
+
+        return STRIKE_STYLE.test(style) ? wrap(inner, "~~", context, node) : inner;
     }
 
     if (tag === "P") {
@@ -915,7 +1035,7 @@ function children(node: Node, context: Context): string {
         const isBreak = child.nodeType === Node.ELEMENT_NODE && (child as Element).tagName === "BR";
 
         if (child.nodeType === Node.TEXT_NODE) {
-            next = (child.nodeValue ?? "").replaceAll("\0", "").replaceAll(HTML_SPACE, " ");
+            next = (child.nodeValue ?? "").replaceAll("\0", "").replaceAll(NORMAL_START, "").replaceAll(NORMAL_END, "").replaceAll(HTML_SPACE, " ");
         } else if (child.nodeType === Node.ELEMENT_NODE) {
             next = element(child as Element, context);
         }
@@ -969,6 +1089,7 @@ export const visibleText = (html: string): string =>
 export const htmlToMarkdown = (html: string): string => {
     const parsed = new DOMParser().parseFromString(html, "text/html");
     const context: Context = {
+        bold: 0,
         code: [],
         depth: 0,
         indentWork: MAX_INDENT_WORK,
@@ -999,11 +1120,16 @@ export const htmlToMarkdown = (html: string): string => {
         }
     }
 
-    return children(parsed.body, context)
-        .split("\n")
-        .map((line: string) => trimSpacesEnd(line))
-        .join("\n")
-        .replaceAll(BLANK_LINES, "\n\n")
-        .trim()
-        .replaceAll(PLACEHOLDER, (_: string, index: string) => context.code[Number(index)] ?? "");
+    return (
+        children(parsed.body, context)
+            .split("\n")
+            .map((line: string) => trimSpacesEnd(line))
+            .join("\n")
+            .replaceAll(BLANK_LINES, "\n\n")
+            .trim()
+            .replaceAll(PLACEHOLDER, (_: string, index: string) => context.code[Number(index)] ?? "")
+            // Marks in text bold never reached (a link label in a table cell is set aside before it).
+            .replaceAll(NORMAL_START, "")
+            .replaceAll(NORMAL_END, "")
+    );
 };

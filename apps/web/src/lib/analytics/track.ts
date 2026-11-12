@@ -44,6 +44,20 @@ export const trackEvent = <E extends AnalyticsEvent>(event: E, properties: Analy
 };
 
 /**
+ * Report an error the app caught and recovered from, as the error boundaries report theirs, under the same
+ * initialisation and consent checks as `trackEvent`. `properties` say where it was caught; never user content.
+ */
+export const reportCaughtError = (error: unknown, properties: Record<string, string>): boolean => {
+    if (!posthog.__loaded || posthog.has_opted_out_capturing()) {
+        return false;
+    }
+
+    posthog.captureException(error, properties);
+
+    return true;
+};
+
+/**
  * React hook that returns a stable `track` callback.
  *
  * ```tsx

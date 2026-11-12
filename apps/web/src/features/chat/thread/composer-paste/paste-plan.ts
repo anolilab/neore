@@ -2,6 +2,7 @@
  * What the composer does with a text paste. Kept small: it is on the composer's eager path, and the HTML converter it
  * points to is loaded only when a paste needs it.
  */
+import { reportCaughtError } from "@/lib/analytics/track";
 
 /**
  * Leave the paste to the editor, insert `text` as typed (`markdown` when the plan wrote Markdown into it), or convert
@@ -12,8 +13,11 @@ export type PastePlan =
     | { kind: "default" }
     | { kind: "text"; markdown?: boolean; text: string };
 
-/** Whether the paste is Markdown the plan wrote, whose blocks are kept off the text beside the caret; not text as copied. */
-export const isMarkdownPlan = (plan: PastePlan): boolean => (plan.kind === "html" ? plan.textOnly !== true : plan.kind === "text" && plan.markdown === true);
+/** What a paste inserts, and whether it is Markdown the plan wrote, whose blocks are kept off the text beside the caret; not text as copied. */
+export interface PastedText {
+    markdown: boolean;
+    text: string;
+}
 
 const URL_ONLY = /^https?:\/\/\S+$/i;
 // Repetitions are bounded and tags are found with indexOf: the clipboard HTML is untrusted, and a regex that rescans to
@@ -586,27 +590,47 @@ export const planPaste = (data: Pick<DataTransfer, "getData">, { inFence = false
     return plain !== "" && html.length <= MAX_CONVERTED_HTML && isPlainHtml(html) ? { kind: "text", text: plain } : { html, kind: "html", plain };
 };
 
-/** The text a paste inserts: the Markdown for HTML, or `plain` when the converter cannot load (a deploy since the page opened) or finds no text. */
-export const planText = async (plan: Exclude<PastePlan, { kind: "default" }>): Promise<string> => {
+const asCopied = (plan: { html: string; plain: string }): PastedText => {
+    return { markdown: false, text: plan.plain || stripTags(plan.html) };
+};
+
+/**
+ * The text a paste inserts: the Markdown for HTML, or `plain` as copied when the converter cannot load (a deploy since
+ * the page opened), refuses the HTML or finds no text.
+ */
+export const planText = async (plan: Exclude<PastePlan, { kind: "default" }>): Promise<PastedText> => {
     if (plan.kind === "text") {
-        return plan.text;
+        return { markdown: plan.markdown === true, text: plan.text };
     }
 
     // A page this big becomes an attachment whatever its form; converting it would only hold up the tab.
     if (plan.html.length > MAX_CONVERTED_HTML) {
-        return plan.plain || stripTags(plan.html);
+        return asCopied(plan);
+    }
+
+    let converter: typeof import("./html-to-markdown");
+
+    try {
+        converter = await import("./html-to-markdown");
+    } catch {
+        return asCopied(plan);
     }
 
     try {
-        const { htmlToMarkdown, visibleText } = await import("./html-to-markdown");
-
         if (plan.textOnly) {
-            return visibleText(plan.html);
+            return { markdown: false, text: converter.visibleText(plan.html) };
         }
 
-        return htmlToMarkdown(plan.html) || plan.plain;
-    } catch {
-        // Also HTML nested too deep to convert.
-        return plan.plain || stripTags(plan.html);
+        const markdown = converter.htmlToMarkdown(plan.html);
+
+        return markdown === "" ? { markdown: false, text: plan.plain } : { markdown: true, text: markdown };
+    } catch (error) {
+        // A RangeError is the converter refusing HTML nested too deep or past its work budgets. Anything else is a bug in it,
+        // reported without the clipboard's content.
+        if (!(error instanceof RangeError)) {
+            reportCaughtError(error, { feature: "composer-paste" });
+        }
+
+        return asCopied(plan);
     }
 };
