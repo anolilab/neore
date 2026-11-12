@@ -3,7 +3,14 @@ import annotateNode from "./node";
 import rootNode from "./root-node";
 import Rules from "./rules";
 import type { AnnotatedNode, Options, Rule } from "./types";
-import { escapeMarkdown, trimKeepingBreaks, trimLeadingBreaks, trimLeadingNewlines, trimTrailingNewlines } from "./utilities";
+import {
+    escapeMarkdown,
+    isBlock,
+    trimKeepingBreaks,
+    trimLeadingBreaks,
+    trimLeadingNewlines,
+    trimTrailingNewlines,
+} from "./utilities";
 
 export type TurndownInput = string | Node;
 
@@ -117,7 +124,7 @@ function process(service: TurndownService, parentNode: Node): string[] {
         if (node.nodeType === 3 || node.nodeType === 4) {
             const text = node.nodeValue ?? "";
 
-            replacement = node.isCode ? text : service.escape(text);
+            replacement = node.isCode ? text : escapeText(service, child, text);
         } else if (node.nodeType === 1) {
             replacement = replacementForNode(service, node);
         }
@@ -126,6 +133,56 @@ function process(service: TurndownService, parentNode: Node): string[] {
     }
 
     return output;
+}
+
+// The characters after `<` that open raw HTML or an autolink.
+const HTML_OPENER = /^[a-z/!?]/i;
+
+/**
+ * Escapes a text node. `escapeMarkdown` sees only this node, so a `<` at its end is
+ * left alone there. Here the next output is known from the DOM: a `<` is escaped when
+ * that output may begin with one of the characters that open raw HTML or an autolink.
+ * A `<` followed by a space, a line break or the end of its block stays as it is.
+ */
+function escapeText(service: TurndownService, node: Node, text: string): string {
+    const escaped = service.escape(text);
+
+    if (text.endsWith("<") && escaped.endsWith("<") && isFollowedByHtmlOpener(node)) {
+        return `${escaped.slice(0, -1)}${String.raw`\<`}`;
+    }
+
+    return escaped;
+}
+
+/**
+ * True when the output after the node may begin with a character that opens raw HTML.
+ * It looks at the next sibling, then past the end of an inline parent. A link or a
+ * block ends the search: a link closes with `]`, and a block starts on a new line.
+ * A sibling whose text is blank may print nothing, so it is looked past too. The
+ * check is conservative: a `<` that cannot open HTML may still be escaped.
+ */
+function isFollowedByHtmlOpener(node: Node): boolean {
+    let current: Node | null = node;
+
+    while (current) {
+        for (let sibling = current.nextSibling; sibling; sibling = sibling.nextSibling) {
+            const text = sibling.nodeType === 8 ? "" : (sibling.textContent ?? "").trimStart();
+
+            if (text) {
+                return HTML_OPENER.test(text);
+            }
+        }
+
+        const parent: Node | null = current.parentNode;
+
+        if (!parent || parent.nodeName === "A" || isBlock(parent)) {
+            return false;
+        }
+
+        current = parent;
+    }
+
+    return false;
 }
 
 /**

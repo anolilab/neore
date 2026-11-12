@@ -8,7 +8,9 @@ import { escapeMarkdown } from "../src/utilities";
  *
  * Two escapes were added with the `<` and `)` fixes. A `<` is escaped only before a
  * letter, `/`, `!` or `?`, the characters that can open raw HTML or an autolink. An
- * ordered-list delimiter is `.` or `)`, so both are escaped after a number.
+ * ordered-list delimiter is `.` or `)`, so both are escaped after a number that ends
+ * the string or precedes a space. A `<` at the end of a text node is escaped by the
+ * text rule in turndown.ts, which can see the next node.
  */
 function referenceEscape(string: string): string {
     return string
@@ -25,7 +27,7 @@ function referenceEscape(string: string): string {
         .replaceAll(/^>/g, String.raw`\>`)
         .replaceAll("_", String.raw`\_`)
         .replaceAll(/<(?=[a-z/!?])/gi, String.raw`\<`)
-        .replaceAll(/^(\d+)([.)]) /g, String.raw`$1\$2 `);
+        .replaceAll(/^(\d+)([.)])(?= |$)/g, String.raw`$1\$2`);
 }
 
 const ALPHABET = ["\\", "*", "`", "[", "]", "_", "-", "+", " ", "=", "#", "~", ">", "1", "9", ".", "a", "(", "\n", " ", ")", "<", "!", "/"];

@@ -18,12 +18,13 @@ import { hasVoidOrMeaningfulDescendant, isBlock, isMeaningfulWhenBlank, isVoid }
  * code padding, attribute line breaks, trailing whitespace); this test is the
  * evidence that the output did not change.
  *
- * Three fixes change output on purpose: `<` before a letter is escaped, a `)`
- * after a leading number is escaped, and a block element inside a link is made
- * into link text. The generator does not produce those inputs (a `<` text piece
- * is always followed by a space, and no block or `<hr>` sits inside a link), so
- * the comparison stays exact for everything else. escaping-links.test.ts covers
- * the three fixes.
+ * Four fixes change output on purpose: `<` before a letter is escaped, a `)` or `.`
+ * after a leading number is escaped (also when the number ends its block), and a
+ * block element inside a link is made into link text. The generator does not produce
+ * those inputs (the `< x` and `1. x` pieces keep text after their space, so a `<` or
+ * a bare number never ends a text node, since block-end and `<br>` trimming can
+ * remove the space; no block or `<hr>` sits inside a link). The comparison stays
+ * exact for everything else. escaping-links.test.ts covers the fixes.
  */
 
 const SEED = 20_261_112;
@@ -222,11 +223,11 @@ const TEXT_PIECES = [
     "#",
     "-",
     "+ ",
-    "1. ",
+    "1. x",
     ">",
     "=",
     "~~~",
-    "< ",
+    "< x",
     "&amp;",
     "\u{2028}",
     "\u{2029}",
