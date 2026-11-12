@@ -18,6 +18,8 @@ export const composerEditorAttributes = ({ describedBy, invalid = false, label }
         // Hebrew or Arabic typed into an LTR app lays out right to left. One direction for the whole message (the
         // first strong character decides), not per paragraph.
         dir: "auto",
+        // Explicit: the desktop shell turns spellcheck off on <html> for its chrome, and prose keeps it.
+        spellcheck: "true",
     };
 
     if (label) {

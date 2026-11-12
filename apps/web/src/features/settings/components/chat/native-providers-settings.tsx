@@ -653,6 +653,7 @@ const NativeProvidersSettings: FC = () => {
                                 id={fieldId("models")}
                                 onChange={(e) => update({ modelsText: e.target.value })}
                                 placeholder={modelsPlaceholder[form.type]}
+                                spellCheck={false}
                                 value={form.modelsText}
                             />
                             <p className="text-muted-foreground text-xs" id={fieldId("models-hint")}>

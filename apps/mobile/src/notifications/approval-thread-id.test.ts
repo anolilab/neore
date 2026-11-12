@@ -13,11 +13,13 @@ const tap = (threadId: unknown): NotificationTap => {
 describe("isThreadId", () => {
     it("accepts a bounded run of URL-safe characters", () => {
         expect(isThreadId("thread_01-AB")).toBe(true);
+        expect(isThreadId("a".repeat(64))).toBe(true);
     });
 
-    it("refuses an empty, over-long, or markup-bearing value", () => {
+    it("refuses an empty, over-long, dotted, or markup-bearing value", () => {
         expect(isThreadId("")).toBe(false);
         expect(isThreadId("a".repeat(65))).toBe(false);
+        expect(isThreadId("import.2024")).toBe(false);
         expect(isThreadId("<script>")).toBe(false);
         expect(isThreadId("a/b")).toBe(false);
     });

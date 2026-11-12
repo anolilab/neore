@@ -1,13 +1,15 @@
 "use client";
 
 import { setStreamdownAppearance } from "@neore/ui/hooks/use-streamdown-appearance";
-import { skipToken, useQuery } from "@tanstack/react-query";
+import { skipToken, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 
 import { useUIStateStore } from "@/features/layout/stores/ui-state-store";
 import useAfterFirstPaint from "@/hooks/use-after-first-paint";
 import { authClient } from "@/lib/auth/client";
 import { useCRPC } from "@/lib/lunora/crpc";
+import { hasNativeCapability, isNativeShell } from "@/lib/native/bridge";
+import { retryChunk } from "@/lib/native/shell-chunk";
 
 import { applyAccentAttribute, applyContrastAttribute, applyRootAttribute } from "../lib/accent-boot-script";
 import { DEFAULT_ACCENT, isAccentId } from "../lib/accent-presets";
@@ -25,6 +27,54 @@ import {
     isMainFontId,
     PREFERS_MORE_CONTRAST_QUERY,
 } from "../lib/display-preferences";
+import type { SystemAccentTokens } from "../lib/native-appearance";
+import {
+    adoptedMark,
+    applySystemAccentTokens,
+    cacheSystemAccentTokens,
+    effectiveAccent,
+    effectiveMainFont,
+    isExplicit,
+    SYSTEM_ACCENT,
+    withoutSyncedChoices,
+} from "../lib/native-appearance";
+
+/** Paints the OS accent tokens and caches them for the next boot; `null` (the OS has none) falls back to the default preset. */
+const paintSystemAccent = (tokens: SystemAccentTokens | null): void => {
+    applySystemAccentTokens(tokens);
+    cacheSystemAccentTokens(tokens);
+    applyAccentAttribute(tokens === null ? DEFAULT_ACCENT : SYSTEM_ACCENT);
+};
+
+/**
+ * Loads the OS accent's chunk and follows the OS accent; returns the function that stops (a pending retry too). A
+ * failed load keeps what is painted and is retried 1, 2 and 4 seconds later (`retryChunk`).
+ */
+const followSystemAccentChunk = (): (() => void) => {
+    let disposed = false;
+    let stop = (): void => {};
+
+    void retryChunk(async () => {
+        if (disposed) {
+            throw new Error("AppearanceSync unmounted");
+        }
+
+        return await import("../lib/system-accent-sync");
+    })
+        .then(({ followSystemAccent }) => {
+            if (!disposed) {
+                stop = followSystemAccent(paintSystemAccent);
+            }
+
+            return undefined;
+        })
+        .catch(() => {});
+
+    return () => {
+        disposed = true;
+        stop();
+    };
+};
 
 /**
  * Applies the Appearance settings app-wide; renders nothing.
@@ -32,17 +82,28 @@ import {
  * - The accent, density and font go on `<html>` as `data-accent`,
  *   `data-density` and `data-font` (the boot script already did so before first
  *   paint; this keeps them in step with later changes).
+ * - In the desktop shell, an untouched accent and font become the OS accent
+ *   (followed live) and the system face (`native-appearance.ts`).
  * - The chat text size goes on `<html data-chat-text-size>` the same way.
  * - The code / Mermaid themes are pushed to the Streamdown renderers.
  * - The account's stored choice (`userSettings`) is adopted when it arrives or
  *   changes, so it follows the user across devices. Deferred past first paint
  *   and skipped when signed out: localStorage already painted the right thing,
- *   and first paint's query budget is not spent on it.
+ *   and first paint's query budget is not spent on it. What it adopts is marked
+ *   `synced` for that account: another account signing in drops it, so the
+ *   shell's defaults apply again where that account stored nothing.
+ *
+ * Kept out of the React Compiler (`"use no memo"`): it renders nothing, so memoizing its effects saves no work, and
+ * the compiled form adds ~0.6 KiB gzip to the first load.
  */
 const AppearanceSync = () => {
-    const { accentColor, capLongCodeBlocks, codeHighlightTheme, codeLineNumbers, contrast, density, mainFont, mermaidTheme } = useUIStateStore(
+    "use no memo";
+
+    const { accentColor, capLongCodeBlocks, codeHighlightTheme, codeLineNumbers, contrast, density, explicit, mainFont, mermaidTheme } = useUIStateStore(
         (state) => state.appearance,
     );
+    const accentExplicit = isExplicit(explicit?.accentColor);
+    const fontExplicit = isExplicit(explicit?.mainFont);
     const setAppearance = useUIStateStore((state) => state.setAppearance);
     const chatTextSize = useUIStateStore((state) => state.layout.fontSize);
 
@@ -50,9 +111,22 @@ const AppearanceSync = () => {
         applyChatTextSize(chatTextSize);
     }, [chatTextSize]);
 
+    // The shell is read inside the effects, not through a hook: a hook reads "no shell" in the hydration pass, and an
+    // effect run with that value would undo the boot script's native font and accent for a frame.
     useEffect(() => {
-        applyAccentAttribute(isAccentId(accentColor) ? accentColor : DEFAULT_ACCENT);
-    }, [accentColor]);
+        const accent = effectiveAccent(accentColor, accentExplicit, hasNativeCapability("system-accent"));
+
+        if (accent !== SYSTEM_ACCENT) {
+            applyAccentAttribute(accent);
+            applySystemAccentTokens(null);
+
+            return undefined;
+        }
+
+        // The OS accent arrives over IPC; until then the boot script's cached copy (or the default preset) shows. The
+        // code that follows it loads only here, so the web build never downloads it.
+        return followSystemAccentChunk();
+    }, [accentColor, accentExplicit]);
 
     useEffect(() => {
         const systemPreference = globalThis.matchMedia(PREFERS_MORE_CONTRAST_QUERY);
@@ -69,8 +143,8 @@ const AppearanceSync = () => {
     }, [density]);
 
     useEffect(() => {
-        applyRootAttribute(FONT_ATTRIBUTE, isMainFontId(mainFont) ? mainFont : DEFAULT_MAIN_FONT, DEFAULT_MAIN_FONT);
-    }, [mainFont]);
+        applyRootAttribute(FONT_ATTRIBUTE, effectiveMainFont(mainFont, fontExplicit, isNativeShell()), DEFAULT_MAIN_FONT);
+    }, [mainFont, fontExplicit]);
 
     useEffect(() => {
         setStreamdownAppearance({
@@ -83,9 +157,23 @@ const AppearanceSync = () => {
     }, [capLongCodeBlocks, codeHighlightTheme, codeLineNumbers, mermaidTheme]);
 
     const crpc = useCRPC();
-    const { data: sessionData } = authClient.useSession();
+    const queryClient = useQueryClient();
+    const { data: sessionData, error: sessionError, isPending: sessionPending } = authClient.useSession();
+    const userId = sessionData?.user?.id;
+    // An answered "no session": not while the read is pending, and not when it failed.
+    const signedOut = !sessionPending && !sessionError && !sessionData?.user;
     const afterFirstPaint = useAfterFirstPaint();
-    const { data: userSettings } = useQuery(crpc.auth.functions.getUserSettings.queryOptions(afterFirstPaint && sessionData?.user?.id ? {} : skipToken));
+    const { data: settingsRow } = useQuery(crpc.auth.functions.getUserSettings.queryOptions(afterFirstPaint && userId ? {} : skipToken));
+    // The query key carries no user: right after an account switch it can still hold the last account's row, which is
+    // ignored here and refetched below.
+    const userSettings = settingsRow?.userId === userId ? settingsRow : undefined;
+    const holdsAnotherAccountsRow = userId !== undefined && settingsRow !== undefined && settingsRow !== null && settingsRow.userId !== userId;
+
+    useEffect(() => {
+        if (holdsAnotherAccountsRow) {
+            void queryClient.invalidateQueries({ queryKey: crpc.auth.functions.getUserSettings.queryKey({}) });
+        }
+    }, [crpc, holdsAnotherAccountsRow, queryClient]);
 
     const storedAccent = userSettings?.accentColor;
     const storedCodeTheme = userSettings?.codeHighlightTheme;
@@ -96,11 +184,34 @@ const AppearanceSync = () => {
     const storedCapLongCodeBlocks = userSettings?.capLongCodeBlocks;
     const storedCodeLineNumbers = userSettings?.codeLineNumbers;
 
+    // Before adopting the account's settings, in the same commit: another account's synced accent and font go first.
+    // Signing out drops them too; choices made on this device stay.
+    useEffect(() => {
+        const current = useUIStateStore.getState().appearance;
+
+        if (userId === undefined) {
+            if (signedOut && current.syncedUserId !== undefined) {
+                setAppearance({ ...withoutSyncedChoices(current.explicit), syncedUserId: undefined });
+            }
+
+            return;
+        }
+
+        if (current.syncedUserId !== userId) {
+            setAppearance({ ...withoutSyncedChoices(current.explicit), syncedUserId: userId });
+        }
+    }, [userId, signedOut, setAppearance]);
+
     useEffect(() => {
         const changes: Parameters<typeof setAppearance>[0] = {};
+        const current = useUIStateStore.getState().appearance;
+        const marked = { ...current.explicit };
 
-        if (isAccentId(storedAccent)) {
+        // A stored value is a choice the user made on some device. `system` is this device's own choice, so a
+        // synced preset does not replace it.
+        if (isAccentId(storedAccent) && current.accentColor !== SYSTEM_ACCENT) {
             changes.accentColor = storedAccent;
+            marked.accentColor = adoptedMark(current.explicit?.accentColor, current.accentColor, storedAccent, DEFAULT_ACCENT);
         }
 
         if (typeof storedCapLongCodeBlocks === "boolean") {
@@ -129,10 +240,11 @@ const AppearanceSync = () => {
 
         if (isMainFontId(storedMainFont)) {
             changes.mainFont = storedMainFont;
+            marked.mainFont = adoptedMark(current.explicit?.mainFont, current.mainFont, storedMainFont, DEFAULT_MAIN_FONT);
         }
 
         if (Object.keys(changes).length > 0) {
-            setAppearance(changes);
+            setAppearance({ ...changes, explicit: marked, syncedUserId: userId });
         }
     }, [
         storedAccent,
@@ -144,6 +256,8 @@ const AppearanceSync = () => {
         storedMainFont,
         storedMermaidTheme,
         setAppearance,
+        // A new account re-adopts its settings after the effect above dropped the last one's, even where they match.
+        userId,
     ]);
 
     return null;

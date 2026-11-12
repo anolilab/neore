@@ -162,6 +162,8 @@ const ChatSiteHeader: FC<{ threadId?: string }> = ({ threadId }) => {
                             className="focus-visible:ring-ring/50 h-7 min-w-[200px] border-none bg-transparent py-0 text-lg leading-tight font-bold shadow-none focus:outline-none focus-visible:ring-1"
                         />
                     )}
+                    // The title is prose: the desktop shell turns spellcheck off page-wide.
+                    spellCheck
                     value={isValid ? currentTitle : undefined}
                 />
                 {statelessMode && (
