@@ -4951,7 +4951,7 @@ export interface Caller {
     };
     plugins: {
         export: {
-            pluginForSelection: (args: { groupChatIds: Array<string>; skillIds: Array<string>; triggerIds: Array<string>; userId: string }) => Promise<null | { slug: string; version: string }>;
+            pluginForSelection: (args: { groupChatIds: Array<string>; skillIds: Array<string>; triggerIds: Array<string>; userId: string }) => Promise<null | { keys: Array<{ id: string; key: string }>; slug: string; version: string }>;
         };
         install_action: {
             installPlugin: (args: { contentHash: string; markdown: string }) => Promise<{ installId: string; items: Array<{ id: string; key: string; kind: "skill" | "trigger" | "group"; title: string }> }>;
@@ -4976,7 +4976,7 @@ export interface Caller {
             uninstallPlugin: (args: { pluginSlug: string }) => Promise<{ kept: Array<string>; removed: number }>;
         };
         update: {
-            loadInstalledForUpdate: (args: { pluginSlug: string; userId: string }) => Promise<null | { children: Array<{ contentHash: string; currentHash: string; entryKey: string; kind: "skill" | "trigger" | "group" }>; installId: string; status: string; version: string }>;
+            loadInstalledForUpdate: (args: { pluginSlug: string; userId: string }) => Promise<null | { children: Array<{ contentHash: string; currentHash: string; entryKey: string; kind: "skill" | "trigger" | "group" }>; installId: string; ownSlugs: Array<{ entryKey: string; slug: string }>; status: string; version: string }>;
             previewUpdate: (args: { markdown: string }) => Promise<{ downgrade: boolean; installedVersion: string; plan: Array<{ action: "create" | "delete" | "detach" | "keep-edited" | "report-group" | "same" | "update"; entryKey: string }>; targetVersion: string }>;
             updatePlugin: (args: { confirmDowngrade: boolean; contentHash: string; markdown: string }) => Promise<{ applied: Array<string>; skipped: Array<{ action: "create" | "delete" | "detach" | "keep-edited" | "report-group" | "same" | "update"; entryKey: string }>; version: string }>;
         };

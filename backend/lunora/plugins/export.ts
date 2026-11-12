@@ -12,6 +12,9 @@ import { internalQuery } from "../_generated/server";
 import { liveHashOf } from "./live-hash";
 import { isCompletePluginExport } from "./logic";
 
+/** An entry key whose part after the kind is a bare position: an install made before declared keys. */
+const POSITIONAL_KEY_RE = /^\d+$/u;
+
 export interface PluginHeader {
     contentHash: string;
     slug: string;
@@ -33,7 +36,7 @@ export const pluginForSelection = internalQuery
         triggerIds: v.array(v.string().max(128)),
         userId: v.string().max(128),
     })
-    .output(v.union(v.null(), v.object({ slug: v.string(), version: v.string() })))
+    .output(v.union(v.null(), v.object({ keys: v.array(v.object({ id: v.string(), key: v.string() })), slug: v.string(), version: v.string() })))
     .query(async ({ args, ctx }) => {
         const picked = [...args.skillIds, ...args.triggerIds, ...args.groupChatIds];
 
@@ -98,7 +101,29 @@ export const pluginForSelection = internalQuery
             children.push({ contentHash: link.contentHash, currentHash, id: link.itemId ?? "", pendingHash: link.pendingHash, state: link.state });
         }
 
-        const exact = isCompletePluginExport({ status: install.status }, children, new Set(picked));
+        const pickedSet = new Set(picked);
 
-        return exact ? { slug: install.pluginSlug, version: install.version } : null;
+        if (!isCompletePluginExport({ status: install.status }, children, pickedSet)) {
+            return null;
+        }
+
+        const keys: Array<{ id: string; key: string }> = [];
+
+        for (const link of links) {
+            if (link.itemId === undefined || !pickedSet.has(link.itemId)) {
+                continue;
+            }
+
+            // The entry key is `<kind>:<declared key>`. A bare position is an install made before declared keys: it has no
+            // stable key to write into a file, so the selection is exported as a plain bundle instead.
+            const key = link.entryKey.slice(link.kind.length + 1);
+
+            if (POSITIONAL_KEY_RE.test(key)) {
+                return null;
+            }
+
+            keys.push({ id: link.itemId, key });
+        }
+
+        return { keys, slug: install.pluginSlug, version: install.version };
     });

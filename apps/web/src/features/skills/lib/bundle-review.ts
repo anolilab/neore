@@ -81,8 +81,6 @@ export const toggleSelection = (selected: ReadonlySet<string>, key: string, entr
     return next;
 };
 
-const entryIndex = (entry: BundleReviewEntry): number => Number(entry.key.split(":", 2)[1]);
-
 /**
  * The review with each skill's slug the way the import will pick it for THIS selection (the server's preview reserves
  * every skill's slug, so an unticked skill would otherwise push a later one to a slug the import does not use). Mirrors
@@ -96,7 +94,8 @@ export const withSelectionSlugs = (
     const taken = new Set(existingSlugs);
     const slugs = new Map<string, string>();
 
-    const skillEntries = entries.filter((candidate) => candidate.skill).toSorted((a, b) => entryIndex(a) - entryIndex(b));
+    // The server sends the entries in the file's order, which is the order a slug is picked in.
+    const skillEntries = entries.filter((candidate) => candidate.skill);
 
     for (const entry of skillEntries) {
         const { baseSlug } = entry.skill!;
