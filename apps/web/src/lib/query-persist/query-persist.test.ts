@@ -495,6 +495,58 @@ describe("saving", () => {
         expect(textOf(next, OTHER_KEY)).toBe("kept");
     });
 
+    it("a record the store failed to read is never replaced by a save, and is restored on the next try", async () => {
+        const memory = memoryStore();
+
+        await saveTexts(memory, ALICE, [
+            [KEY, "kept"],
+            [OTHER_KEY, "kept"],
+        ]);
+
+        const reads = { failing: true };
+        const store: RecordStore = {
+            ...memory.store,
+            get: async (name, key) => {
+                if (name === "entries" && reads.failing) {
+                    throw new DOMException("busy", "UnknownError");
+                }
+
+                return await memory.store.get(name, key);
+            },
+        };
+        const queryClient = new QueryClient();
+        const controller = start(store, ALICE, queryClient);
+
+        await controller.restored;
+        controller.enableWrites();
+        queryClient.setQueryData(KEY, { text: "live" });
+        await vi.advanceTimersByTimeAsync(WRITE_THROTTLE_MS * 3);
+
+        // Nothing saved over the unread record: it still holds both queries.
+        reads.failing = false;
+
+        const before = new QueryClient();
+
+        await start(memory.store, ALICE, before).restored;
+        expect(textOf(before, OTHER_KEY)).toBe("kept");
+
+        // The next change reads it now, then saves it with the live value.
+        const written = { done: false };
+
+        void (async () => {
+            await memory.settled();
+            written.done = true;
+        })();
+        queryClient.setQueryData(KEY, { text: "live again" });
+
+        while (!written.done) {
+            await vi.advanceTimersByTimeAsync(WRITE_THROTTLE_MS);
+        }
+
+        expect(textOf(queryClient, OTHER_KEY)).toBe("kept");
+        controller.stop();
+    });
+
     /** A session whose save waits on the store until `release()`; `release` resolves once a removal has run after it. */
     const heldSave = async (onRemove: () => Promise<void> = async () => undefined) => {
         const memory = memoryStore();

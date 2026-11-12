@@ -259,13 +259,20 @@ export const startQueryPersistence = (options: PersistenceOptions): PersistenceC
     const attemptRestore = async (): Promise<void> => {
         state.isRestoring = true;
 
-        let isDone = true;
+        // A store that fails to read leaves the record unread: no save may replace it, and the next change tries again. An
+        // unreadable record (another key, damaged) is not a failure: `restore` drops it and counts it settled.
+        let isDone = false;
 
         try {
             isDone = await restore();
-            await pruneRecords(store, now() - MAX_AGE_MS);
         } catch {
             // A blocked or failing store: nothing is shown, and the network fills the cache.
+        }
+
+        try {
+            await pruneRecords(store, now() - MAX_AGE_MS);
+        } catch {
+            // Expired records go on a later start.
         }
 
         state.isRestoring = false;
@@ -283,7 +290,8 @@ export const startQueryPersistence = (options: PersistenceOptions): PersistenceC
                 void (async () => {
                     await attemptRestore();
 
-                    if (!state.stopped) {
+                    // Restored: the save that asked for it goes now. A failed read waits for the next change, not a loop.
+                    if (!state.stopped && state.isRestoreDone) {
                         schedule();
                     }
                 })();
