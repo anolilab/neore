@@ -539,3 +539,21 @@ describe("code blocks of line elements", () => {
         expect(htmlToMarkdown("<pre><div>first</div>tail</pre>")).toBe("```\nfirst\ntail\n```");
     });
 });
+
+describe("raw text in HTML past the conversion cap", () => {
+    it("ends a script only at its own end tag, not at a longer name", async () => {
+        const html = `<script>secret</scripture><p>leaked</p></script><p>kept</p>${"<p>x</p>".repeat(140_000)}`;
+        const text = await paste({ "text/html": html });
+
+        expect(text?.startsWith("kept")).toBe(true);
+        expect(text).not.toContain("leaked");
+    });
+});
+
+describe("a plain Word list", () => {
+    it("converts a Word list with no other formatting instead of taking its bulleted plain text", async () => {
+        const item = (text: string): string => `<p style="mso-list:l0 level1 lfo1"><span style="mso-list:Ignore">·</span>${text}</p>`;
+
+        await expect(paste({ "text/html": item("one") + item("two"), "text/plain": "·\tone\n·\ttwo" })).resolves.toBe("- one\n- two");
+    });
+});

@@ -20,6 +20,8 @@ const FORMATTING = [
     /<(?:[bis]|strong|em|del|strike|code|kbd|math|img)[\s>]/i,
     /font-weight\s*:\s*(?:bold|[6-9]00)|font-style\s*:\s*italic/i,
     /text-decoration[\w-]{0,20}\s*:[^;"]{0,100}line-through/i,
+    // Word's list paragraphs: plain text keeps only their bullet characters and tabs.
+    /mso-list\s{0,20}:/i,
 ];
 // Paragraphs, lists, headings and tables are a document, even in a monospace block.
 const STRUCTURE = /<(?:h[1-6]|ul|ol|table|blockquote|p)[\s>]/i;
@@ -47,6 +49,13 @@ const decodeEntity = (entity: string): string => {
 };
 // Elements whose content is not text the page shows.
 const RAW_TEXT = /<(script|style|noscript|template)[\s/>]/iy;
+// Where each raw-text element ends: its name followed by a space, `/` or `>` (`</scripture>` is not `</script>`).
+const RAW_TEXT_END: Record<string, RegExp> = {
+    noscript: /<\/noscript(?=[\s/>]|$)/gi,
+    script: /<\/script(?=[\s/>]|$)/gi,
+    style: /<\/style(?=[\s/>]|$)/gi,
+    template: /<\/template(?=[\s/>]|$)/gi,
+};
 // Tags whose text stands apart from its neighbours': on a line of its own, or a cell away.
 const LINE_TAG = /<\/?(?:p|div|br|li|tr|h[1-6])[\s/>]/iy;
 const CELL_TAG = /<t[dh][\s/>]/iy;
@@ -357,10 +366,14 @@ const stripTags = (html: string): string => {
         let from = open;
 
         if (raw) {
-            const end = new RegExp(`</${raw[1]}`, "gi");
+            const end = RAW_TEXT_END[(raw[1] ?? "").toLowerCase()];
 
-            end.lastIndex = RAW_TEXT.lastIndex;
-            from = end.exec(html)?.index ?? html.length;
+            if (end) {
+                end.lastIndex = RAW_TEXT.lastIndex;
+                from = end.exec(html)?.index ?? html.length;
+            } else {
+                from = html.length;
+            }
         }
 
         // A comment ends at `-->`, a tag at its first `>` outside a quoted value.
