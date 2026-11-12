@@ -150,4 +150,12 @@ describe("safeLinks", () => {
 
         expect(service.turndown(anchor("https://example.com/page"))).toBe("[x][1]\n\n[1]: https://example.com/page");
     });
+
+    // A line break in a destination would start a second reference definition, which would take over the next anchor's [2].
+    it("keeps a line break out of a reference destination, so a second definition cannot be written", () => {
+        const service = new TurndownService({ linkStyle: "referenced", safeLinks: true });
+        const html = `<p><a href="https://ok\n[2]: javascript:alert(1)">a</a> <a href="https://legit.example/">b</a></p>`;
+
+        expect(service.turndown(html)).toBe("[a][1] [b][2]\n\n[1]: <https://ok[2]: javascript:alert\\(1\\)>\n[2]: https://legit.example/");
+    });
 });
