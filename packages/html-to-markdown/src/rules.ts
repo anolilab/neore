@@ -2,15 +2,31 @@ import annotateNode from "./node";
 import type { AnnotatedNode, Options, ReplacementFunction, Rule, RuleLookup } from "./types";
 
 /**
- * Manages the rules used to convert HTML to Markdown: the built-in rules, then
- * the ones added with `addRule`, then keep/remove filters.
+ * Manages the rules used to convert HTML to Markdown. For an element that is
+ * not blank, the first match wins, in this order:
+ *
+ * 1. rules added with `addRule`, newest first;
+ * 2. keep filters, newest first (rendered as HTML);
+ * 3. remove filters, newest first (dropped with their content);
+ * 4. the built-in rules;
+ * 5. the default rule.
+ *
+ * Keep and remove sit above the built-in rules, so `keep(['b'])` and
+ * `remove(['i'])` also work for built-in tags (upstream #455). Upstream's
+ * documentation says the built-in rules win, and this changes that on purpose.
+ * The blank rule still comes first, as upstream documents, because a blank
+ * element has no content to keep or remove.
  */
 export default class Rules implements RuleLookup {
-    private readonly array: Rule[] = [];
+    private readonly customRules: Rule[] = [];
+
+    private readonly builtInRules: Rule[] = [];
 
     private readonly keepList: Rule[] = [];
 
     private readonly removeList: Rule[] = [];
+
+    private readonly removalRules = new WeakSet<Rule>();
 
     private readonly options: Options;
 
@@ -29,12 +45,12 @@ export default class Rules implements RuleLookup {
         const ruleTable: Record<string, Rule> = options.rules ?? {};
 
         for (const rule of Object.values(ruleTable)) {
-            this.array.push(rule);
+            this.builtInRules.push(rule);
         }
     }
 
     add(_key: string, rule: Rule): void {
-        this.array.unshift(rule);
+        this.customRules.unshift(rule);
     }
 
     keep(filter: Rule["filter"]): void {
@@ -45,10 +61,22 @@ export default class Rules implements RuleLookup {
     }
 
     remove(filter: Rule["filter"]): void {
-        this.removeList.unshift({
+        const rule: Rule = {
             filter,
             replacement: () => "",
-        });
+        };
+
+        this.removalRules.add(rule);
+        this.removeList.unshift(rule);
+    }
+
+    /**
+     * True when the rule drops the element and its content. The converter then
+     * skips the children: converting them would only throw the output away, and
+     * could still leave side effects such as reference-link definitions.
+     */
+    isRemoval(rule: Rule): boolean {
+        return this.removalRules.has(rule);
     }
 
     forNode(node: AnnotatedNode): Rule {
@@ -59,10 +87,10 @@ export default class Rules implements RuleLookup {
         // Lowercased once for the node, not once per rule.
         const nodeName = node.nodeName.toLowerCase();
 
-        const fromRules = findRule(this.array, node, nodeName, this.options, this);
+        const fromCustom = findRule(this.customRules, node, nodeName, this.options, this);
 
-        if (fromRules) {
-            return fromRules;
+        if (fromCustom) {
+            return fromCustom;
         }
 
         const fromKeep = findRule(this.keepList, node, nodeName, this.options, this);
@@ -73,7 +101,13 @@ export default class Rules implements RuleLookup {
 
         const fromRemove = findRule(this.removeList, node, nodeName, this.options, this);
 
-        return fromRemove ?? this.defaultRule;
+        if (fromRemove) {
+            return fromRemove;
+        }
+
+        const fromBuiltIn = findRule(this.builtInRules, node, nodeName, this.options, this);
+
+        return fromBuiltIn ?? this.defaultRule;
     }
 
     /**
@@ -84,11 +118,11 @@ export default class Rules implements RuleLookup {
         const annotated = annotateNode(node, this.options);
         const nodeName = annotated.nodeName.toLowerCase();
 
-        return [this.array, this.keepList, this.removeList].some((list) => findRule(list, annotated, nodeName, this.options, this) !== undefined);
+        return [this.customRules, this.builtInRules, this.keepList, this.removeList].some((list) => findRule(list, annotated, nodeName, this.options, this) !== undefined);
     }
 
     forEach(visit: (rule: Rule, index: number) => void): void {
-        this.array.forEach((rule, index) => {
+        [...this.customRules, ...this.builtInRules].forEach((rule, index) => {
             visit(rule, index);
         });
     }

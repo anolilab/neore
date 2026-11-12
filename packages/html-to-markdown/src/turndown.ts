@@ -266,7 +266,7 @@ function postProcess(service: TurndownService, output: string[]): string {
  */
 function replacementForNode(service: TurndownService, node: AnnotatedNode): string {
     const rule = service.rules.forNode(node);
-    let content = process(service, node).join("");
+    let content = service.rules.isRemoval(rule) ? "" : process(service, node).join("");
     const whitespace = node.flankingWhitespace;
 
     if (whitespace.leading || whitespace.trailing) {
