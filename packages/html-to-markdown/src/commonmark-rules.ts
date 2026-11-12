@@ -496,7 +496,10 @@ interface EmphasisRun {
  */
 function wrapRun(content: string, node: AnnotatedNode, options: Options, style: RunStyle): string {
     // A same-kind parent writes the delimiters for the whole run, so a nested element writes none.
-    if (style.names.has(node.parentNode?.nodeName.toLowerCase() ?? "")) {
+    // A parent with a block inside never shares its delimiters, so the nested element keeps its own.
+    const parent = node.parentNode;
+
+    if (parent && style.names.has(parent.nodeName.toLowerCase()) && !hasBlockDescendant(parent)) {
         return wrapInline(content, options, "", "");
     }
 

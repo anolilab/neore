@@ -1,3 +1,4 @@
+import TurndownUpstream from "turndown";
 import { describe, expect, it } from "vitest";
 
 import type { Options } from "../src/index";
@@ -5,6 +6,10 @@ import TurndownService from "../src/index";
 
 function convert(html: string, options: Partial<Options> = {}): string {
     return new TurndownService(options).turndown(html);
+}
+
+function upstream(html: string): string {
+    return new TurndownUpstream().turndown(html);
 }
 
 /*
@@ -66,6 +71,13 @@ describe("nested emphasis of the same kind (review)", () => {
     it("writes an inner element without delimiters inside its parent", () => {
         expect(convert("<em>a<em>b</em>c</em>")).toBe("_abc_");
     });
+
+    it.each(["<b>a<b>c</b><div>d</div></b>", "<strong>a<strong>b<div>c</div></strong></strong>", "<em><i>x</i><p>y</p></em>"])(
+        "keeps an inner element's delimiters when its same-kind parent holds a block: %s",
+        (html) => {
+            expect(convert(html)).toBe(upstream(html));
+        },
+    );
 });
 
 describe("whitespace-only emphasis (review)", () => {
