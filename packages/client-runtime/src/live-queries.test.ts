@@ -561,8 +561,15 @@ describe(LiveQueryManager, () => {
         await vi.runAllTimersAsync();
         fake.client.query.mockRejectedValueOnce(new Error("FORBIDDEN"));
 
+        // The sockets are swapped before the read subscribes again: no new subscription exists yet when they close.
+        const subscriptionsAtSwap: number[] = [];
+
+        fake.client.setWsToken.mockImplementation(() => {
+            subscriptionsAtSwap.push(fake.subscriptions.length);
+        });
         fake.setToken(jwt("bob"));
 
+        expect(subscriptionsAtSwap).toStrictEqual([1]);
         expect(queryClient.getQueryData(threadKey)).toBeUndefined();
         expect(fake.subscriptions[0]!.unsubscribe).toHaveBeenCalledOnce();
         expect(fake.subscriptions).toHaveLength(2);

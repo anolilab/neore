@@ -209,13 +209,14 @@ export class LiveQueryManager {
             this.queryClient.removeQueries({ predicate: (query) => isLunoraKey(query.queryKey) && query.queryKey[1] === PROMPT_OUTLINE_REF });
             // Nor the threads they read. Only a hydrating page's first token, the one the server rendered its threads
             // with, keeps them. Any other token from none may follow a cookie session of another account.
+            // A NEW function identity is what makes `setWsToken` close the open
+            // sockets; the client resends every subscription on reconnect. First: the thread reads below subscribe
+            // again at once, and on the previous account's socket a push could refill what they just emptied.
+            this.client.setWsToken(this.wsTokenProvider());
+
             if (!adoptsHydratedToken) {
                 this.forgetThreadReads();
             }
-
-            // A NEW function identity is what makes `setWsToken` close the open
-            // sockets; the client resends every subscription on reconnect.
-            this.client.setWsToken(this.wsTokenProvider());
         });
 
         // A cookie session's account change moves no token, so the subject above cannot see it; Lunora reports it here.

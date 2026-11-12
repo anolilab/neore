@@ -186,6 +186,26 @@ describe("rootBeforeLoad", () => {
             expect(getSessionAuthState).toHaveBeenCalledTimes(2);
         });
 
+        it("reads the session again when it changed while the read was out, and installs nothing of the overtaken answer", async () => {
+            const rootBeforeLoad = await loadRootBeforeLoad();
+            const navigation = options("/chat/abc", null);
+            let changed = false;
+
+            vi.mocked(sessionChangeCount).mockImplementation(() => (changed ? 1 : 0));
+            vi.mocked(getSessionAuthState)
+                .mockImplementationOnce(async () => {
+                    // A sign-in lands while the old cookie's read is out.
+                    changed = true;
+
+                    return { status: "unauthenticated", token: undefined };
+                })
+                .mockResolvedValueOnce({ status: "authenticated", token: "new" });
+
+            await expect(rootBeforeLoad(navigation)).resolves.toMatchObject({ authStatus: "authenticated", token: "new" });
+            expect(navigation.context.lunoraClient.setAuthToken).not.toHaveBeenCalledWith(null);
+            expect(getSessionAuthState).toHaveBeenCalledTimes(2);
+        });
+
         it("does not confirm a read that a session change overtook", async () => {
             const rootBeforeLoad = await loadRootBeforeLoad();
             const held = signedIn(jwt(600));

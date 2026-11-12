@@ -99,6 +99,12 @@ const rootBeforeLoad = async (options: RootBeforeLoadOptions) => {
         readRequestContext(options),
     ]);
 
+    // A sign-in, sign-out or switch while this read was out: its answer is the old session's. Neither installed nor
+    // returned to the guards; the session is read again under the new one.
+    if (!import.meta.env.SSR && sessionChangeCount() !== changesAtRead) {
+        return rootBeforeLoad(options);
+    }
+
     // In the browser only the newest read sets the client's bearer: an older signed-in answer landing after a newer
     // switch or sign-out must not put the previous account's token back. A newer "no session" clears it; a failed read
     // (`unknown`) keeps it. A server render has one read per request.
