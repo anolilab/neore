@@ -211,11 +211,18 @@ describe("rootBeforeLoad", () => {
                 .mockResolvedValueOnce({ status: "unauthenticated", token: undefined })
                 .mockResolvedValue({ status: "unauthenticated", token: undefined });
 
-            const older = rootBeforeLoad(options("/chat/abc", held));
+            const olderOptions = options("/chat/abc", held);
+            const older = rootBeforeLoad(olderOptions);
+            const newer = options("/chat/def", held);
 
-            await rootBeforeLoad(options("/chat/def", held));
+            await rootBeforeLoad(newer);
+            // The newer "no session" clears the bearer.
+            expect(newer.context.lunoraClient.setAuthToken).toHaveBeenCalledWith(null);
+
             answerOlder({ status: "authenticated", token: held });
             await older;
+            // The older signed-in answer does not put the token back.
+            expect(olderOptions.context.lunoraClient.setAuthToken).not.toHaveBeenCalled();
 
             await expect(rootBeforeLoad(options("/chat/ghi", held))).resolves.toMatchObject({ authStatus: "unauthenticated" });
             expect(getSessionAuthState).toHaveBeenCalledTimes(3);

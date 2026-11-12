@@ -6,7 +6,7 @@ import { OFFLINE_SHELL_PATH, offlineShellRootContext } from "@/lib/offline-shell
 import { readRequestContext } from "@/lib/request-context";
 
 interface RootBeforeLoadOptions {
-    context: { lunoraClient: { getAuthToken: () => string | null; setAuthToken: (token: string) => void } };
+    context: { lunoraClient: { getAuthToken: () => string | null; setAuthToken: (token: string | null) => void } };
     location: { pathname: string };
 }
 
@@ -99,8 +99,15 @@ const rootBeforeLoad = async (options: RootBeforeLoadOptions) => {
         readRequestContext(options),
     ]);
 
-    if (token) {
+    // In the browser only the newest read sets the client's bearer: an older signed-in answer landing after a newer
+    // switch or sign-out must not put the previous account's token back. A newer "no session" clears it; a failed read
+    // (`unknown`) keeps it. A server render has one read per request.
+    const isNewest = import.meta.env.SSR || readNumber === confirmed.started;
+
+    if (isNewest && token) {
         options.context.lunoraClient.setAuthToken(token);
+    } else if (isNewest && authStatus === "unauthenticated") {
+        options.context.lunoraClient.setAuthToken(null);
     }
 
     // Only a signed-in answer is reused; `unknown` and `unauthenticated` are asked again next time.

@@ -61,14 +61,15 @@ export const getSharedSessionRead = (): SharedSessionRead | undefined => {
 
         // better-auth broadcasts no sign-in, guest upgrade or account switch, and a cookie change fires no event:
         // whatever another tab or window did, the user went there to do it. A tab return shows as `visibilitychange`,
-        // a return from a window that stood beside this one only as `focus`. Counted only, the cached read stays.
+        // a return from a window that stood beside this one only as `focus`. The cached read goes too (`invalidate` also
+        // counts the change): kept, it would answer the identity probe with the old session for the rest of its window.
         globalThis.document.addEventListener("visibilitychange", () => {
             if (globalThis.document.visibilityState === "visible") {
-                singleton.changes += 1;
+                instance.invalidate();
             }
         });
         globalThis.addEventListener("focus", () => {
-            singleton.changes += 1;
+            instance.invalidate();
         });
 
         singleton.shared = instance;
