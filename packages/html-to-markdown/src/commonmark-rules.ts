@@ -649,9 +649,22 @@ function hasPrintingBlockDescendant(node: Node, options: Options): boolean {
 }
 
 /**
+ * A void element prints markup for a break (which ends a run) and for an image with a
+ * source. Any other void element, such as a word-break hint or an input, prints nothing,
+ * so the run looks past it to the text beyond.
+ */
+function voidEdge(element: Element): string | null {
+    if (element.nodeName === "BR") {
+        return "";
+    }
+
+    return element.nodeName === "IMG" && element.getAttribute("src") ? "" : null;
+}
+
+/**
  * The character a node's output shows on the side facing the emphasis: "" when
- * the output ends in markup, a void element or a block boundary, and null when
- * the node outputs nothing.
+ * the output ends in markup, a void element that prints markup or a block boundary,
+ * and null when the node outputs nothing.
  */
 function edgeCharacter(node: Node, side: Side, options: Options): string | null {
     if (node.nodeType === 3) {
@@ -665,8 +678,12 @@ function edgeCharacter(node: Node, side: Side, options: Options): string | null 
     const element = node as Element;
     const annotated = annotationOf(element, options);
 
-    if (annotated.isBlock || isVoid(element)) {
+    if (annotated.isBlock) {
         return "";
+    }
+
+    if (isVoid(element)) {
+        return voidEdge(element);
     }
 
     if (DELIMITED_NAMES.has(element.nodeName.toLowerCase())) {

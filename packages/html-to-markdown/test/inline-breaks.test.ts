@@ -205,3 +205,17 @@ describe("edge breaks are restored only when trimming removed them (Qodo)", () =
         expect(convert("<p>x<span> y<br> </span>z</p>", { br: "<br>" })).toBe("x y<br>\nz");
     });
 });
+
+describe("emphasis looks past void elements that print nothing (Qodo)", () => {
+    it("reads the word on the far side of a word-break hint", () => {
+        expect(convert("Brus<wbr><em>sel</em><wbr>s")).toBe("Brus*sel*s");
+    });
+
+    it("reads past an image with no source, which prints nothing", () => {
+        expect(convert('Brus<img alt=""><em>sel</em><img alt="">s')).toBe("Brus*sel*s");
+    });
+
+    it("keeps the plain delimiter beside an image with a source, which prints markup", () => {
+        expect(convert('<em>a</em><img src="x.png">b')).toBe("_a_![](x.png)b");
+    });
+});
