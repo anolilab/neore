@@ -30,7 +30,12 @@ export interface Options {
 
     /**
      * When true, a link whose destination has a scheme other than http, https, mailto or tel renders as its text only.
-     * Relative destinations are kept. Off by default, as upstream.
+     * Relative destinations are kept, unless a `&` comes before their first `/`, `?` or `#`. The destination is checked
+     * after CommonMark's escapes are undone, and `\` and `&` are escaped in the output so the rendered href is the checked
+     * text. Off by default, as upstream.
+     *
+     * Images are out of scope: an `<img src>` is rendered unchanged, even a `javascript:` one, because an image does not
+     * run script.
      */
     safeLinks: boolean;
     strongDelimiter: string;
