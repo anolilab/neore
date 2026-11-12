@@ -53,7 +53,7 @@ export default class TurndownService {
      */
     turndown(input: TurndownInput): string {
         if (!canConvert(input)) {
-            throw new TypeError(`${String(input)} is not a string, or an element/document/fragment node.`);
+            throw new TypeError(`${describeInput(input)} is not a string, or an element/document/fragment node.`);
         }
 
         if (input === "") {
@@ -180,6 +180,14 @@ function join(output: string[], replacement: string): void {
     }
 }
 
+/**
+ * Names an invalid input for the error message. String() throws on an object
+ * with no prototype, so objects get their tag instead.
+ */
+function describeInput(input: unknown): string {
+    return typeof input === "object" && input !== null ? Object.prototype.toString.call(input) : String(input);
+}
+
 function canConvert(input: unknown): input is TurndownInput {
     if (input == null) {
         return false;
@@ -189,7 +197,8 @@ function canConvert(input: unknown): input is TurndownInput {
         return true;
     }
 
-    const { nodeType } = input as Node;
+    // An object with a nodeType alone is not a node: rootNode calls cloneNode.
+    const node = input as Partial<Node>;
 
-    return [1, 9, 11].includes(nodeType);
+    return [1, 9, 11].includes(node.nodeType as number) && typeof node.cloneNode === "function";
 }

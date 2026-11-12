@@ -6,6 +6,7 @@ import TurndownService from "../src/index";
 
 const NULL_INPUT_ERROR = /null is not a string/;
 const UNDEFINED_INPUT_ERROR = /undefined is not a string/;
+const INVALID_INPUT_MESSAGE = /is not a string, or an element\/document\/fragment node/;
 
 const CDATA_SECTION_NODE = 4;
 
@@ -176,6 +177,20 @@ describe("turndown service API", () => {
         service.keep(["del", "ins"]);
         service.remove(["del", "ins"]);
         expect(service.turndown("<p>Hello <del>world</del><ins>World</ins></p>")).toBe("Hello <del>world</del><ins>World</ins>");
+    });
+});
+
+describe("invalid input", () => {
+    it("rejects an object that only imitates an element", () => {
+        expect(() => new TurndownService().turndown({ nodeType: 1 } as unknown as string)).toThrow(INVALID_INPUT_MESSAGE);
+    });
+
+    it("rejects an object with a nodeType and no cloneNode", () => {
+        expect(() => new TurndownService().turndown({ nodeType: 9 } as unknown as string)).toThrow(INVALID_INPUT_MESSAGE);
+    });
+
+    it("rejects an object without a prototype with the package error", () => {
+        expect(() => new TurndownService().turndown(Object.create(null) as string)).toThrow(INVALID_INPUT_MESSAGE);
     });
 });
 
