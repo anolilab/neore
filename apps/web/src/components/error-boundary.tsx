@@ -90,8 +90,17 @@ const withComponentStack = (error: unknown, componentStack: string): unknown => 
 
 /** Reports a caught render error; a failure here must never keep the boundary from rendering its fallback. */
 const captureRenderError = (error: unknown, componentStack: string): void => {
+    // The component stack is best-effort: an error whose cause chain cannot be read or changed is reported as it is.
+    let reported: unknown = error;
+
     try {
-        captureException(withComponentStack(error, componentStack));
+        reported = withComponentStack(error, componentStack);
+    } catch {
+        // A throwing `cause` accessor, say: the original error still goes.
+    }
+
+    try {
+        captureException(reported);
     } catch (reportError) {
         // Best-effort, but a lost report should leave a trace.
         // eslint-disable-next-line no-console -- the only trace of a report that never left

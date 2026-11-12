@@ -341,7 +341,8 @@ export const flushPendingCaptures = (posthog: PostHog): void => {
     const sendable = isOptedOut ? [] : events.filter(({ userId }) => typeof userId !== "string" || userId === appliedUserId);
 
     if (landing && posthog.is_capturing()) {
-        const later = sendable.findIndex(({ timestamp }) => Date.parse(timestamp) > Date.parse(landing.timestamp));
+        // Before what this page queued in the same millisecond: the page view opens the page it was recorded on.
+        const later = sendable.findIndex(({ timestamp }) => Date.parse(timestamp) >= Date.parse(landing.timestamp));
 
         sendable.splice(later === -1 ? sendable.length : later, 0, landing);
     }

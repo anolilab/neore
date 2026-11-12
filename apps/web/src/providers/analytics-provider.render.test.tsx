@@ -246,6 +246,33 @@ describe("AnalyticsProvider", () => {
         expect(screen.getByText("flags pending")).toBeTruthy();
     });
 
+    it("keeps its retry after it unmounts (the global boundary's fallback), so a queued crash is still sent", async () => {
+        vi.useFakeTimers();
+        vi.spyOn(console, "warn").mockImplementation(() => {});
+        loadPostHog.mockRejectedValueOnce(new Error("chunk failed")).mockResolvedValue(posthogMock);
+
+        const view = render(
+            <AnalyticsProvider>
+                <ClientState />
+            </AnalyticsProvider>,
+        );
+
+        await act(async () => {
+            await vi.advanceTimersByTimeAsync(0);
+        });
+
+        expect(loadPostHog).toHaveBeenCalledOnce();
+
+        view.unmount();
+
+        await act(async () => {
+            await vi.advanceTimersByTimeAsync(START_RETRY_DELAY_MS);
+        });
+
+        expect(loadPostHog).toHaveBeenCalledTimes(2);
+        expect(posthogMock.init).toHaveBeenCalledOnce();
+    });
+
     it("loads PostHog again once the window is back online after its chunk failed to load", async () => {
         vi.spyOn(console, "warn").mockImplementation(() => {});
         vi.spyOn(globalThis.navigator, "onLine", "get").mockReturnValue(false);

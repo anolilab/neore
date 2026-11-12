@@ -99,6 +99,16 @@ const AnalyticsProvider: FC<PropsWithChildren> = ({ children }) => {
     // Provided once initialised; until then (and while its chunk cannot load) the app runs without analytics.
     const [client, setClient] = useState<PostHog | undefined>(undefined);
 
+    // The landing page view is recorded while this provider first renders, so it comes before anything a descendant's
+    // mount effect queues (children's effects run before this provider's). Once per page; the server has no location.
+    useState(() => {
+        if (globalThis.document) {
+            recordLandingPageview();
+        }
+
+        return undefined;
+    });
+
     useEffect(() => {
         if (import.meta.env.DEV || !globalThis || !import.meta.env.VITE_POSTHOG_API_KEY || !import.meta.env.VITE_POSTHOG_HOST) {
             discardPendingCaptures();
@@ -132,8 +142,6 @@ const AnalyticsProvider: FC<PropsWithChildren> = ({ children }) => {
 
         let isCancelled = false;
 
-        // Before the chunk loads, while `location` is still the page this load landed on.
-        recordLandingPageview();
         setIdentityExpected(true);
 
         // Initialize PostHog with cookieless mode for GDPR compliance
@@ -189,10 +197,8 @@ const AnalyticsProvider: FC<PropsWithChildren> = ({ children }) => {
                 // eslint-disable-next-line no-console -- the only trace of why analytics did not start
                 console.warn("[PostHog] Analytics did not start:", error);
 
-                if (isCancelled) {
-                    return;
-                }
-
+                // An unmounted provider still retries: the global boundary unmounts it when it shows its fallback, and
+                // the crash it caught waits in the queue for this start. Retries end once PostHog starts.
                 if (globalThis.navigator.onLine && backoffRetriesLeft > 0) {
                     backoffRetriesLeft -= 1;
                     retryTimer = setTimeout(attempt, START_RETRY_DELAY_MS);
@@ -213,8 +219,12 @@ const AnalyticsProvider: FC<PropsWithChildren> = ({ children }) => {
             isCancelled = true;
             // The session that would publish the identity unmounts with this tree.
             setIdentityExpected(false);
-            clearTimeout(retryTimer);
-            globalThis.removeEventListener("online", attempt);
+
+            // Started, or never going to (no retry left): nothing queued waits on this provider's retries any more.
+            if (getStartedPostHog()) {
+                clearTimeout(retryTimer);
+                globalThis.removeEventListener("online", attempt);
+            }
         };
     }, []);
 

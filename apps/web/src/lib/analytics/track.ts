@@ -7,7 +7,7 @@
 import { useCallback } from "react";
 
 import type { AnalyticsEvent, AnalyticsEventMap } from "./events";
-import { captureException, forgetPostHogIdentity, getStartedPostHog, queueEvent, resetStartedPostHog } from "./posthog-client";
+import { captureException, forgetPostHogIdentity, getPostHog, getStartedPostHog, queueEvent, resetStartedPostHog } from "./posthog-client";
 
 /**
  * Forget the identified user before a sign-out reload, so later events from this
@@ -26,6 +26,14 @@ export const resetAnalyticsIdentity = (): void => {
 
     if (import.meta.env.VITE_POSTHOG_API_KEY) {
         forgetPostHogIdentity(import.meta.env.VITE_POSTHOG_API_KEY);
+    }
+
+    // Initialised but not started yet (startup waits for the session): the live client still holds the departed
+    // identity in memory, and its next persistence write (a page leave) would put the cookie back. It forgets it now.
+    const loaded = getPostHog();
+
+    if (loaded?.__loaded) {
+        loaded.reset();
     }
 };
 

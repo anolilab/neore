@@ -299,6 +299,16 @@ describe("the landing page view", () => {
         sessionStorage.clear();
     });
 
+    it("goes before an event its page queued in the same millisecond", async () => {
+        const client = await loadClientModule();
+
+        client.recordLandingPageview();
+        client.queueEvent("onboarding_started", {});
+        client.flushPendingCaptures(await client.loadPostHog());
+
+        expect(posthog.capture.mock.calls.map(([event]) => event)).toStrictEqual(["$pageview", "onboarding_started"]);
+    });
+
     it("names the page recorded at mount and goes in order with the queued events, once", async () => {
         const client = await loadClientModule();
 

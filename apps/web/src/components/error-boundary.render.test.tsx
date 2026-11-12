@@ -34,6 +34,32 @@ describe(ErrorBoundary, () => {
         expect(captureException).toHaveBeenCalledWith(frozenError);
     });
 
+    it("reports an error whose cause cannot be read, without the component stack", () => {
+        vi.spyOn(console, "error").mockImplementation(() => {});
+        captureException.mockClear();
+
+        const hostile = new Error("hostile");
+
+        Object.defineProperty(hostile, "cause", {
+            get: () => {
+                throw new Error("no cause for you");
+            },
+        });
+
+        const HostileThrower = (): never => {
+            throw hostile;
+        };
+
+        render(
+            <ErrorBoundary fallback={(error: Error) => <p>{`Recovered: ${error.message}`}</p>}>
+                <HostileThrower />
+            </ErrorBoundary>,
+        );
+
+        expect(screen.getByText("Recovered: hostile")).toBeTruthy();
+        expect(captureException).toHaveBeenCalledWith(hostile);
+    });
+
     it("still renders its fallback, and warns, when reporting the error throws", () => {
         vi.spyOn(console, "error").mockImplementation(() => {});
         const warn = vi.spyOn(console, "warn").mockImplementation(() => {});

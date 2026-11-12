@@ -72,3 +72,23 @@ describe(reportCaughtError, () => {
         expect(posthog.captureException).toHaveBeenCalledExactlyOnceWith(error, { feature: "composer-paste" });
     });
 });
+
+describe("resetAnalyticsIdentity on a client initialised but not started", () => {
+    beforeEach(() => {
+        vi.stubEnv("VITE_POSTHOG_API_KEY", "phc_a+b/c=");
+        posthog.reset.mockClear();
+    });
+
+    afterEach(() => {
+        vi.unstubAllEnvs();
+    });
+
+    it("resets the live client, so its next write cannot put the departed identity back", async () => {
+        // The chunk loaded and `init` ran; startup still waits for the session.
+        await loadPostHog();
+
+        resetAnalyticsIdentity();
+
+        expect(posthog.reset).toHaveBeenCalledOnce();
+    });
+});
