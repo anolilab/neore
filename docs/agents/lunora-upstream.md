@@ -23,6 +23,12 @@ The ORM-facade reads and
 index field of `messages` (read policy: `OR` of `{ userId }` and `{ threadId: { in } }`); the owner-policy `threadGuestLinks`
 honours it. `findSentNote` reads through `admittedThreadDb`; `agent/messages.ts#pinFollowingRowParent` is exposed.
 
+**Not filed yet (owner to decide): seed the identity store from SSR.** `@lunora/react`'s `useAuth` / `useAuthState`
+read `"loading"` on the server and while hydrating (`getServerSnapshot`), and on the client until `getCurrentUser()`
+answers, even when SSR already minted the token. `apps/web/src/features/auth/components/optimistic-auth-gate.tsx`
+works around it with the dehydrated `authStatus` and a stored signed-in hint. An upstream option to seed the store
+(status and user) from SSR would let `<Authenticated>` render on the first paint and retire that gate.
+
 **Not filed yet (owner to decide): `.global()` writes and live queries.** In `@lunora/shard-engine@alpha.193`, only an
 insert into a `.global()` table re-runs the subscriptions that read it, and only on the writer's own Durable Object;
 `patch`, `replace`, `patchIf` and `delete` re-run none. No `.global()` write reaches another shard's subscriptions

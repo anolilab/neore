@@ -4,6 +4,7 @@ import { authClient as sessionSource } from "@/lib/auth/client";
 
 import type { AuthUIProviderProps } from "../auth-ui-provider";
 import { AuthUIProvider } from "../auth-ui-provider";
+import { clearLastAccountHint } from "../last-account-hint";
 import useTanstackOptions from "./use-tanstack-options";
 
 const AuthUIProviderTanstack = ({
@@ -42,6 +43,10 @@ const AuthUIProviderTanstack = ({
                 onSessionSwitch?.("before", departing);
 
                 const result = await setActiveSession(...parameters);
+
+                // Only once the switch went through: the account left is no longer "the last one signed in", and the
+                // new one writes it when confirmed. A failed switch keeps it, since that account is still signed in.
+                clearLastAccountHint();
 
                 onSessionSwitch?.("after", departing);
 

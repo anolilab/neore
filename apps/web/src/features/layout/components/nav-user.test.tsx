@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { hasLastAccountHint, writeLastAccountHint } from "@/features/auth/lib/last-account-hint";
 import { draftGeneration } from "@/features/chat/split/composer-drafts";
 import { releaseThreadListWrites, writeThreadListCache } from "@/features/chat/thread-list/lib/thread-list-cache";
 
@@ -158,6 +159,40 @@ describe("NavUser sign-out", () => {
             threads: { page: [{ _id: "t1", title: "Still signed in" }] },
         });
         expect(localStorage).toHaveLength(1);
+    });
+
+    it("keeps the queued prompts and the signed-in hint when the sign-out fails, and drops them once it succeeds", async () => {
+        const queueKey = "neore:prompt-queue:t1";
+
+        writeLastAccountHint();
+        sessionStorage.setItem(queueKey, "[]");
+        auth.signOut.mockImplementationOnce(async ({ fetchOptions }: { fetchOptions: { onError: () => void } }) => {
+            fetchOptions.onError();
+        });
+        render(<NavUser />);
+
+        fireEvent.click(screen.getByText("Log out"));
+
+        await vi.waitFor(() => {
+            expect(auth.signOut).toHaveBeenCalledTimes(1);
+        });
+        expect(sessionStorage.getItem(queueKey)).toBe("[]");
+        expect(hasLastAccountHint()).toBe(true);
+
+        const reload = vi.fn();
+
+        vi.stubGlobal("location", { reload });
+        auth.signOut.mockImplementationOnce(async ({ fetchOptions }: { fetchOptions: { onSuccess: () => Promise<void> } }) => {
+            await fetchOptions.onSuccess();
+        });
+        fireEvent.click(screen.getByText("Log out"));
+
+        await vi.waitFor(() => {
+            expect(reload).toHaveBeenCalled();
+        });
+        expect(sessionStorage.getItem(queueKey)).toBeNull();
+        expect(hasLastAccountHint()).toBe(false);
+        vi.unstubAllGlobals();
     });
 
     it("keeps the unsent drafts, and their saving, when the sign-out fails", async () => {

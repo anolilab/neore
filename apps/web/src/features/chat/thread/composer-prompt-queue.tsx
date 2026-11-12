@@ -44,10 +44,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useChatActions, useChatError, useChatIsStreaming, useChatThread } from "@/features/chat/core/context/chat-context";
 import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
 import type { QueuedChatPrompt } from "@/features/chat/core/stores/prompt-queue-store";
-import { selectThreadQueue, usePromptQueueStore } from "@/features/chat/core/stores/prompt-queue-store";
+import { allowPromptQueueRestore, selectThreadQueue, usePromptQueueStore } from "@/features/chat/core/stores/prompt-queue-store";
 import type { QueuedSteer, SteerWithdrawal } from "@/features/chat/core/utils/prompt-queue";
 import { decideAutoSend, deliveredSteerItems, takeNextToSend } from "@/features/chat/core/utils/prompt-queue";
-import { useCRPC } from "@/lib/lunora/crpc";
+import { useCRPC, useLunoraAuth } from "@/lib/lunora/crpc";
 import { showError } from "@/lib/toast";
 
 import { permissionModeSaveKey, usePermissionModeSaving } from "./composer-permission-mode";
@@ -375,12 +375,19 @@ const ComposerPromptQueue: FC = () => {
         crpc.chat.streaming.getActiveStreamForThread.queryOptions(threadId && threadId !== "default" ? { threadId: threadId as Id<"threads"> } : skipToken),
     );
 
+    // Not before Lunora confirms the session: the chat layout paints before that (`OptimisticAuthGate`), and a queue
+    // left by a session that has since ended is not this visitor's to read.
+    const { isAuthenticated } = useLunoraAuth();
+
     // Restores a queue left in sessionStorage by a reload; it arrives paused.
     useEffect(() => {
-        if (threadId) {
-            usePromptQueueStore.getState().hydrate(threadId);
+        if (!threadId || !isAuthenticated) {
+            return;
         }
-    }, [threadId]);
+
+        allowPromptQueueRestore();
+        usePromptQueueStore.getState().hydrate(threadId);
+    }, [isAuthenticated, threadId]);
 
     // A steered prompt the running reply has taken is in the thread now: retire its chip.
     useEffect(() => {
