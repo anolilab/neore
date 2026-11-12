@@ -13,6 +13,11 @@ const LANGUAGE_CLASS = /language-(\S+)/;
 const LINE_BREAK_RUN = /\n\s*/g;
 const DOUBLE_QUOTE = /"/g;
 
+// The <code> each selected <pre> was matched with. The replacement reads it from here
+// rather than searching again: a rule that claims a wrapper after the match would make
+// the search find nothing, and the block would lose its code.
+const pinnedCode = new WeakMap<Node, Element>();
+
 /**
  * Reference-style links collect their definitions here and append them after
  * the document (see `append`). The state lives on this rule object, as in
@@ -132,11 +137,11 @@ const rules: Record<string, Rule> = {
 
     fencedCodeBlock: {
         filter(node, options, lookup) {
-            return options.codeBlockStyle === "fenced" && node.nodeName === "PRE" && preCodeElement(node, lookup) !== null;
+            return options.codeBlockStyle === "fenced" && node.nodeName === "PRE" && pinnedCodeElement(node, lookup) !== null;
         },
 
         replacement(_content, node, options, lookup) {
-            const codeElement = preCodeElement(node, lookup);
+            const codeElement = pinnedCode.get(node) ?? preCodeElement(node, lookup);
             const className = codeElement?.getAttribute("class") ?? "";
             const language = (LANGUAGE_CLASS.exec(className) ?? [null, ""])[1];
             const code = codeElement?.textContent ?? "";
@@ -200,11 +205,11 @@ const rules: Record<string, Rule> = {
 
     indentedCodeBlock: {
         filter(node, options, lookup) {
-            return options.codeBlockStyle === "indented" && node.nodeName === "PRE" && preCodeElement(node, lookup) !== null;
+            return options.codeBlockStyle === "indented" && node.nodeName === "PRE" && pinnedCodeElement(node, lookup) !== null;
         },
 
         replacement(_content, node, _options, lookup) {
-            const code = preCodeElement(node, lookup)?.textContent ?? "";
+            const code = (pinnedCode.get(node) ?? preCodeElement(node, lookup))?.textContent ?? "";
 
             return `\n\n    ${code.replaceAll(NEWLINE, "\n    ")}\n\n`;
         },
@@ -422,6 +427,16 @@ function preCodeElement(pre: Node, lookup: RuleLookup): Element | null {
     }
 
     return soleCodeElement(pre, lookup);
+}
+
+function pinnedCodeElement(pre: Node, lookup: RuleLookup): Element | null {
+    const code = preCodeElement(pre, lookup);
+
+    if (code) {
+        pinnedCode.set(pre, code);
+    }
+
+    return code;
 }
 
 // Elements with no rule of their own here. Any other element changes the output

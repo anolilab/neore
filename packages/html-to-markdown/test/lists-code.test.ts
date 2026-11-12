@@ -32,7 +32,7 @@ describe("ordered list start (#547)", () => {
     // A start beyond the safe integer range is written as its exact digits. Number() would print 1e+21 or Infinity.
     it.each([
         ["a start that formats in exponential notation", "1000000000000000000000", "1000000000000000000000.  a\n1000000000000000000001.  b"],
-        ["a start that overflows to Infinity", "9".repeat(400), `${"9".repeat(400)}.  a\n1${"0".repeat(400)}.  b`],
+        ["a 40-digit start is kept exactly", "9".repeat(40), `${"9".repeat(40)}.  a\n1${"0".repeat(40)}.  b`],
         ["a start above 2^53 keeps its last digits", "9007199254740993", "9007199254740993.  a\n9007199254740994.  b"],
     ])("%s", (_name, start, expected) => {
         const markdown = convert(`<ol start="${start}"><li>a</li><li>b</li></ol>`);
@@ -40,6 +40,18 @@ describe("ordered list start (#547)", () => {
         expect(markdown).toBe(expected);
         expect(markdown).not.toContain("e+");
         expect(markdown).not.toContain("Infinity");
+    });
+
+    // Each marker and indent copies the start, so a longer one would size the output by digits times items.
+    it("numbers a start over 40 digits from 1, rather than copying it into every item", () => {
+        expect(convert(`<ol start="${"9".repeat(400)}"><li>a</li><li>b</li></ol>`)).toBe("1.  a\n2.  b");
+    });
+
+    it("bounds the output of a long start over many items", () => {
+        const markdown = convert(`<ol start="${"7".repeat(5000)}">${"<li>a</li>".repeat(2000)}</ol>`);
+
+        expect(markdown.length).toBeLessThan(100_000);
+        expect(markdown.startsWith("1.  a\n2.  a\n")).toBe(true);
     });
 });
 
@@ -148,6 +160,27 @@ describe("code block with whitespace or a wrapper before <code> (#486, #498, #53
 
             expect(service.turndown("<pre><span><code>x</code></span></pre>")).toBe(expected);
         }
+    });
+
+    // A rule that claims the wrapper only after the <pre> was matched must not drop the code.
+    it.each(["indented", "fenced"] as const)("keeps the code in %s style when a rule claims the wrapper later", (codeBlockStyle) => {
+        let divChecks = 0;
+        const service = new TurndownService({ codeBlockStyle });
+
+        service.addRule("claims-wrapper-late", {
+            filter(node: Node) {
+                if (node.nodeName !== "DIV") {
+                    return false;
+                }
+
+                divChecks += 1;
+
+                return divChecks > 1;
+            },
+            replacement: (content: string) => content,
+        });
+
+        expect(service.turndown("<pre><div><code>x</code></div></pre>")).toBe(codeBlockStyle === "fenced" ? "```\nx\n```" : "    x");
     });
 
     it("does not make a code block when text comes before <code>", () => {

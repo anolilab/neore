@@ -198,17 +198,30 @@ function scanDescendants(parent: Node): DescendantScan {
 
 // The HTML "rules for parsing integers": ASCII whitespace, an optional sign, then digits.
 const LEADING_INTEGER = /^[\t\n\f\r ]*([+-]?\d+)/;
+const SIGN = /^[+-]/;
+
+const MAX_LIST_START_DIGITS = 40;
 
 /**
  * Reads an `<ol start>` value as HTML does. The leading integer counts and anything
  * after it is ignored, so "3x" and "3.7" give 3. Null when there is no integer.
  * A BigInt, not a number: a long start would print as `1e+21`, or as `Infinity`
- * past about 309 digits, and one above 2^53 would lose its last digits.
+ * past about 309 digits, and one above 2^53 would lose its last digits. A run of
+ * more than MAX_LIST_START_DIGITS digits gives null, so the list is numbered from 1.
  */
 export function parseListStart(value: string | null): bigint | null {
     const match = value ? LEADING_INTEGER.exec(value) : null;
 
-    return match ? BigInt(match[1] ?? "0") : null;
+    if (!match) {
+        return null;
+    }
+
+    // Each marker and indent copies the start, so output size is digits times items.
+    if ((match[1] ?? "").replace(SIGN, "").length > MAX_LIST_START_DIGITS) {
+        return null;
+    }
+
+    return BigInt(match[1] ?? "0");
 }
 
 const INLINE_SYNTAX = /[\\*`[\]_]/g;
