@@ -55,7 +55,6 @@ const BOLD_STYLE = /font-weight\s*:\s*(?:bold|[6-9]00)/i;
 const NORMAL_WEIGHT = /font-weight\s*:\s*(?:normal|[1-4]00)/i;
 const ITALIC_STYLE = /font-style\s*:\s*italic/i;
 const STRIKE_STYLE = /text-decoration[\w-]{0,20}\s*:[^;]{0,200}line-through/i;
-const HIDDEN_STYLE = /display\s*:\s*none|visibility\s*:\s*hidden|mso-list\s*:\s*ignore/i;
 const HIDDEN_CLASS = /(?:^|\s)(?:sr-only|visually-?hidden)(?:\s|$)/i;
 const EMOJI_NAME = /^:[\w+-]{1,40}:$/;
 const PICTOGRAPHIC = /\p{Extended_Pictographic}/u;
@@ -64,7 +63,7 @@ const EMOJI_ONLY = /^[\p{Extended_Pictographic}\p{Emoji_Component}\s]+$/u;
 const MATH_CLASS = /math/i;
 const WORD_LIST_LEVEL = /mso-list\s*:[^;]{0,200}level(\d)/i;
 const WORD_ORDERED_MARKER = /^\s*\w{1,4}[.)]/;
-const WORD_LIST_BULLET = /mso-list\s*:\s*ignore/i;
+const IMPORTANT = /!\s{0,20}important\s{0,20}$/i;
 const HEADING = /^H[1-6]$/;
 const BLANK_LINES = /\n{3,}/g;
 const PLACEHOLDER = /\0(\d+)\0/g;
@@ -74,6 +73,8 @@ const MAX_TABLE_CELLS = 100_000;
 const MAX_INDENT_WORK = 20_000_000;
 /** Elements deep the walk goes before the paste falls back to its plain text, well before the stack runs out. */
 const MAX_DEPTH = 500;
+/** Elements the walk reads as code or a formula: a paragraph in one is never a Word list item. */
+const NOT_WALKED = new Set(["CODE", "KBD", "MATH", "PRE", "SAMP", "TT"]);
 
 interface Context {
     /** Fenced code blocks, put back at the end so whitespace clean-up never touches them. */
@@ -119,10 +120,31 @@ const oneLine = (text: string): string =>
 
 const styleOf = (element: Element): string => element.getAttribute("style") ?? "";
 
+/** Whether a declaration in `style` sets `property` to `value`: not the same words inside another value, such as a URL. */
+const declares = (style: string, property: string, value: string): boolean =>
+    style.split(";").some((declaration: string) => {
+        const colon = declaration.indexOf(":");
+
+        return (
+            colon !== -1 &&
+            declaration.slice(0, colon).trim().toLowerCase() === property &&
+            declaration
+                .slice(colon + 1)
+                .replace(IMPORTANT, "")
+                .trim()
+                .toLowerCase() === value
+        );
+    });
+
+/** Word's list bullet, written as text the page does not show. */
+const isWordBullet = (element: Element): boolean => element.tagName === "SPAN" && declares(styleOf(element), "mso-list", "ignore");
+
 /** Whether the page leaves `element` out of what it shows (or it is not text at all). */
 const isHidden = (element: Element): boolean =>
     SKIPPED.has(element.tagName.toUpperCase()) ||
-    HIDDEN_STYLE.test(styleOf(element)) ||
+    declares(styleOf(element), "display", "none") ||
+    declares(styleOf(element), "visibility", "hidden") ||
+    declares(styleOf(element), "mso-list", "ignore") ||
     HIDDEN_CLASS.test(element.getAttribute("class") ?? "") ||
     element.hasAttribute("hidden") ||
     element.getAttribute("aria-hidden") === "true";
@@ -328,12 +350,20 @@ const cellText = (cell: Element, context: Context): string => {
 
 const ROW_GROUPS = new Set(["TBODY", "TFOOT", "THEAD"]);
 
+interface Row {
+    element: Element;
+    /** The index after the last row of its row group: no cell spans down past it. */
+    groupEnd: number;
+}
+
 /**
  * The shown rows of `table` itself, read from its children and row groups: a selector would list the rows of every table
  * nested in it too, once per table around them, which grows with the square of the nesting.
  */
-const ownRows = (table: Element): Element[] => {
-    const rows: Element[] = [];
+const ownRows = (table: Element): Row[] => {
+    const groups: Element[][] = [];
+    // Rows straight in the table, one group while no row group comes between them.
+    let loose: Element[] | undefined;
 
     for (const child of table.children) {
         if (isHidden(child)) {
@@ -341,13 +371,25 @@ const ownRows = (table: Element): Element[] => {
         }
 
         if (child.tagName === "TR") {
-            rows.push(child);
-        } else if (ROW_GROUPS.has(child.tagName)) {
-            for (const row of child.children) {
-                if (row.tagName === "TR" && !isHidden(row)) {
-                    rows.push(row);
-                }
+            if (!loose) {
+                loose = [];
+                groups.push(loose);
             }
+
+            loose.push(child);
+        } else if (ROW_GROUPS.has(child.tagName)) {
+            loose = undefined;
+            groups.push([...child.children].filter((row: Element) => row.tagName === "TR" && !isHidden(row)));
+        }
+    }
+
+    const rows: Row[] = [];
+
+    for (const group of groups) {
+        const groupEnd = rows.length + group.length;
+
+        for (const element of group) {
+            rows.push({ element, groupEnd });
         }
     }
 
@@ -363,7 +405,7 @@ const table = (element: Element, context: Context): string => {
     let overflow = false;
     // Rows each column is still covered for by a cell above that spans down: a spanning cell keeps the cells after it under their own headers.
     const covered: number[] = [];
-    const cells = rows.map((row: Element) => {
+    const cells = rows.map(({ element: row, groupEnd }: Row, rowIndex: number) => {
         const line: string[] = [];
         const rowTexts: string[] = [];
         let column = 0;
@@ -396,10 +438,12 @@ const table = (element: Element, context: Context): string => {
 
             line[column] = rowTexts.at(-1) ?? "";
 
-            // The DOM clamps both spans; `rowspan="0"` runs to the end.
+            // The DOM clamps both spans; a cell spans down to the end of its row group at most, and `rowspan="0"` to its end.
+            const below = groupEnd - rowIndex - 1;
+
             for (let offset = 0; offset < cell.colSpan; offset += 1) {
                 line[column + offset] ??= "";
-                covered[column + offset] = (cell.rowSpan || rows.length) - 1;
+                covered[column + offset] = cell.rowSpan === 0 ? below : Math.min(cell.rowSpan - 1, below);
             }
 
             column += cell.colSpan;
@@ -436,7 +480,7 @@ const table = (element: Element, context: Context): string => {
 const nestedTable = (element: Element, context: Context): string => {
     const texts: string[] = [];
 
-    for (const row of ownRows(element)) {
+    for (const { element: row } of ownRows(element)) {
         for (const cell of row.children) {
             if (!(cell instanceof HTMLTableCellElement) || isHidden(cell)) {
                 continue;
@@ -550,7 +594,17 @@ const wordListItem = (element: Element, inner: string, context: Context): string
         return undefined;
     }
 
-    const bullet = ([...element.querySelectorAll("span")].find((span: Element) => WORD_LIST_BULLET.test(styleOf(span)))?.textContent ?? "").trim();
+    // The first bullet the paragraph shows: one inside hidden text is not its marker.
+    const walker = element.ownerDocument.createTreeWalker(element, NodeFilter.SHOW_ELEMENT, {
+        acceptNode: (node: Node) => {
+            if (isWordBullet(node as Element)) {
+                return NodeFilter.FILTER_ACCEPT;
+            }
+
+            return isHidden(node as Element) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_SKIP;
+        },
+    });
+    const bullet = (walker.nextNode()?.textContent ?? "").trim();
     const number = bullet.endsWith(")") ? `${bullet.slice(0, -1)}.` : bullet;
     const marker = WORD_ORDERED_MARKER.test(bullet) ? `${number} ` : "- ";
 
@@ -749,10 +803,23 @@ export const htmlToMarkdown = (html: string): string => {
     const parsed = new DOMParser().parseFromString(html, "text/html");
     const context: Context = { code: [], depth: 0, indentWork: MAX_INDENT_WORK, inTable: false, tableCells: MAX_TABLE_CELLS, wordTopLevel: 9 };
 
-    for (const paragraph of parsed.querySelectorAll("p[style*='mso-list']")) {
-        const level = WORD_LIST_LEVEL.exec(styleOf(paragraph));
+    // Only the paragraphs the walk shows: one in hidden text or in code never sets where the list starts.
+    const paragraphs = parsed.createTreeWalker(parsed.body, NodeFilter.SHOW_ELEMENT, {
+        acceptNode: (node: Node) => {
+            const tag = (node as Element).tagName.toUpperCase();
 
-        if (level && !isHidden(paragraph)) {
+            if (isHidden(node as Element) || NOT_WALKED.has(tag)) {
+                return NodeFilter.FILTER_REJECT;
+            }
+
+            return tag === "P" ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP;
+        },
+    });
+
+    for (let paragraph = paragraphs.nextNode(); paragraph; paragraph = paragraphs.nextNode()) {
+        const level = WORD_LIST_LEVEL.exec(styleOf(paragraph as Element));
+
+        if (level) {
             context.wordTopLevel = Math.min(context.wordTopLevel, Number(level[1]));
         }
     }

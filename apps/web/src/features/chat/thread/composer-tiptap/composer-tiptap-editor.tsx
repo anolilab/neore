@@ -52,7 +52,7 @@ import type { VaultFileRef } from "./file-mention-popup";
 import FileMentionPopup from "./file-mention-popup";
 import type { GhostController, GhostEligibility, GhostRequest } from "./ghost-completion-controller";
 import { createGhostController, shouldAnnounceGhost } from "./ghost-completion-controller";
-import { pastePlainText } from "./paste-plain-text";
+import { composerCoreExtensionOptions, pastePlainText } from "./paste-plain-text";
 import { plainTextToHtml } from "./plain-text";
 import SlashCommandPopup from "./slash-command-popup";
 import VariableAutocompletePopup from "./variable-autocomplete-popup";
@@ -273,6 +273,7 @@ const ComposerTiptapEditor = ({
     // Create editor
     const editor = useEditor({
         autofocus: autoFocus ? "end" : false,
+        coreExtensionOptions: composerCoreExtensionOptions,
         editable: !disabled,
         editorProps: {
             attributes: composerEditorAttributes({ describedBy, invalid, label: t`Message` }),

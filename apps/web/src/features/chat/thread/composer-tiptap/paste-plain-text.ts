@@ -1,8 +1,15 @@
 import type { Editor } from "@tiptap/core";
+import { closeHistory } from "@tiptap/pm/history";
 import { Fragment, Slice } from "@tiptap/pm/model";
 import type { EditorState } from "@tiptap/pm/state";
 
 const LINE_BREAK = /\r\n?|\n/;
+
+/**
+ * A copy from the composer puts one line break between its lines in `text/plain`, as the draft has them. With the
+ * editor's default blank line, a cut and paste inside the draft (pasted line by line) would add an empty line each time.
+ */
+export const composerCoreExtensionOptions = { clipboardTextSerializer: { blockSeparator: "\n" } };
 
 /**
  * The paste the editor would make of `text/plain`, but with every line kept: its own parser merges blank lines. With
@@ -29,7 +36,8 @@ export const pastePlainText = (editor: Editor, text: string, at?: EditorState): 
     const paragraphs = text.split(LINE_BREAK).map((line: string) => paragraph.create(null, line === "" ? null : schema.text(line)));
     const slice = new Slice(Fragment.from(paragraphs), 1, 1);
 
-    editor.view.dispatch(tr.replaceSelection(slice).scrollIntoView().setMeta("paste", true).setMeta("uiEvent", "paste"));
+    // Its own undo step: a paste that finishes right after typing next to it would otherwise undo with that typing.
+    editor.view.dispatch(closeHistory(tr).replaceSelection(slice).scrollIntoView().setMeta("paste", true).setMeta("uiEvent", "paste"));
 
     return true;
 };

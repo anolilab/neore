@@ -48,6 +48,8 @@ const RAW_TEXT = /<(script|style|noscript|template)[\s/>]/iy;
 // Tags whose text stands apart from its neighbours': on a line of its own, or a cell away.
 const LINE_TAG = /<\/?(?:p|div|br|li|tr|h[1-6])[\s/>]/iy;
 const CELL_TAG = /<t[dh][\s/>]/iy;
+// What starts markup after a `<`; any other `<` is text, as in `2 < 3`.
+const MARKUP_START = /[a-z/!?]/i;
 const LINE_RUNS = /\n{2,}/g;
 const LANGUAGE_UNSAFE = /[^\w#+.-]/g;
 const VSCODE_LANGUAGES: Record<string, string> = { javascriptreact: "jsx", plaintext: "", shellscript: "bash", typescriptreact: "tsx" };
@@ -303,6 +305,13 @@ const stripTags = (html: string): string => {
         }
 
         parts.push(html.slice(index, open));
+
+        if (!MARKUP_START.test(html[open + 1] ?? "")) {
+            parts.push("<");
+            index = open + 1;
+            continue;
+        }
+
         LINE_TAG.lastIndex = open;
         CELL_TAG.lastIndex = open;
 

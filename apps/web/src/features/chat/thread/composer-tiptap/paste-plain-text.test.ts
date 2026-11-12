@@ -5,12 +5,12 @@ import { TextSelection } from "@tiptap/pm/state";
 import StarterKitExtension from "@tiptap/starter-kit";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { pastePlainText } from "./paste-plain-text";
+import { composerCoreExtensionOptions, pastePlainText } from "./paste-plain-text";
 
 const editors: Editor[] = [];
 
 const editorWith = (content: string): Editor => {
-    const editor = new Editor({ content, extensions: [StarterKitExtension] });
+    const editor = new Editor({ content, coreExtensionOptions: composerCoreExtensionOptions, extensions: [StarterKitExtension] });
 
     editors.push(editor);
 
@@ -66,5 +66,29 @@ describe(pastePlainText, () => {
 
         expect(pastePlainText(editor, "a\n\nb")).toBe(true);
         expect(text(editor)).toBe("hello a\n\nb");
+    });
+
+    it("is an undo step of its own, apart from the typing just before it", () => {
+        const editor = editorWith("<p>hello</p>");
+
+        select(editor, 6, 6);
+        editor.view.dispatch(editor.state.tr.insertText(" there"));
+
+        expect(pastePlainText(editor, "X")).toBe(true);
+
+        editor.commands.undo();
+
+        expect(text(editor)).toBe("hello there");
+    });
+
+    it("gets back the same lines from a copy of the composer's own text", () => {
+        const editor = editorWith("<p>one</p><p></p><p>two</p>");
+
+        editor.commands.selectAll();
+
+        const copied = editor.view.someProp("clipboardTextSerializer", (serialize) => serialize(editor.state.selection.content(), editor.view)) ?? "";
+
+        expect(pastePlainText(editor, copied)).toBe(true);
+        expect(text(editor)).toBe("one\n\ntwo");
     });
 });

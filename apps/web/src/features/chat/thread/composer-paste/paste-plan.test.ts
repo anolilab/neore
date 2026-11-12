@@ -54,6 +54,14 @@ describe("composer paste", () => {
             `<p class=MsoListParagraph style='mso-list:l0 level${level} lfo1'><span style='mso-list:Ignore'>o</span>${text}</p>`;
 
         expect(htmlToMarkdown(item(2, "a") + item(3, "b") + item(2, "c"))).toBe(["- a", "    - b", "- c"].join("\n"));
+        // A level-one item in hidden text is not where the shown list starts.
+        expect(htmlToMarkdown(`<p>Steps</p><div style="display:none">${item(1, "secret")}</div>${item(3, "a")}`)).toBe("Steps\n\n- a");
+    });
+
+    it("takes a Word item's number only from a marker it shows", () => {
+        const hiddenMarker = '<span style="display:none"><span style="mso-list:Ignore">9.</span></span>';
+
+        expect(htmlToMarkdown(`<p style="mso-list:l0 level1 lfo1">${hiddenMarker}visible</p>`)).toBe("- visible");
     });
 
     it("keeps the spaces at both ends of inline code", () => {
@@ -161,6 +169,10 @@ describe("composer paste", () => {
                 },
             ),
         ).toStrictEqual({ kind: "default" });
+    });
+
+    it("keeps a less-than sign that starts no tag in the text of HTML too big to convert", async () => {
+        await expect(paste({ "text/html": `<p>2 < 3 <= 4 <3</p><!--${"x".repeat(1_000_000)}-->` })).resolves.toBe("2 < 3 <= 4 <3");
     });
 
     it("keeps quoted attribute values out of the text of HTML too big to convert", async () => {
@@ -275,6 +287,19 @@ describe("composer paste", () => {
             "a cell spanning columns or rows keeps the cells after it under their headers",
             '<table><tr><th>A</th><th>B</th><th>C</th></tr><tr><td colspan="2">ab</td><td>c</td></tr><tr><td rowspan="2">a</td><td>b</td><td>c</td></tr><tr><td>b2</td><td>c2</td></tr></table>',
             "| A | B | C |\n| --- | --- | --- |\n| ab |  | c |\n| a | b | c |\n|  | b2 | c2 |",
+        ],
+        [
+            "a cell spans down to the end of its row group at most, so the footer keeps its columns",
+            [
+                '<table><thead><tr><th>A</th><th>B</th></tr></thead><tbody><tr><td rowspan="0">a</td><td>b</td></tr><tr><td>c</td></tr></tbody>',
+                '<tfoot><tr><td>f1</td><td>f2</td></tr></tfoot></table><table><tbody><tr><td rowspan="5">x</td><td>y</td></tr></tbody><tbody><tr><td>z1</td><td>z2</td></tr></tbody></table>',
+            ].join(""),
+            "| A | B |\n| --- | --- |\n| a | b |\n|  | c |\n| f1 | f2 |\n\n| x | y |\n| --- | --- |\n| z1 | z2 |",
+        ],
+        [
+            "only a style that hides text hides it, not the same words inside another value",
+            '<p><span style="background-image:url(https://example.com/display:none)">shown</span> <span style="display: none !important">gone</span></p>',
+            "shown",
         ],
         [
             "hidden list items are left out",
