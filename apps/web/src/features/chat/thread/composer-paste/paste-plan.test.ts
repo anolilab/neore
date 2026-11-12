@@ -598,6 +598,15 @@ describe("a paste inside a code block the person typed", () => {
         expect(inOpenFence("``` a`b\ntext")).toBe(false);
     });
 
+    it("sees a fence opened inside a quote or a list item", () => {
+        expect(inOpenFence("> ```md\n> some\n")).toBe(true);
+        expect(inOpenFence("- ```js\n  code\n")).toBe(true);
+        expect(inOpenFence("1. a\n   - ```js\n     code\n")).toBe(true);
+        expect(inOpenFence("> ```\n> x\n> ```\nafter ")).toBe(false);
+        expect(inOpenFence("- ```js\n  x\n  ```\n- after ")).toBe(false);
+        expect(inOpenFence("-```\n* * *\n")).toBe(false);
+    });
+
     it("inserts code as copied, without a fence of its own or Markdown", async () => {
         const code = "const a = 1;\nconst b = 2;";
         const vscode = { "text/html": "<div>x</div>", "text/plain": code, "vscode-editor-data": '{"mode":"typescript"}' };
@@ -792,7 +801,22 @@ describe("text set back to normal weight inside bold", () => {
         ["bold again inside it", '<b>a <span style="font-weight:normal">b <b>c</b> d</span> e</b>', "**a** b **c** d **e**"],
         ["across lines", '<b>a<br><span style="font-weight:normal">b</span><br>c</b>', "**a**\nb\n**c**"],
         ["with no bold around it", '<p>a <span style="font-weight:normal">b</span> <i>c</i></p>', "a b *c*"],
+        ["italic on the same span", '<b><span style="font-weight:400;font-style:italic">x</span></b>', "*x*"],
+        ["struck on the same span", '<b><span style="font-weight:400;text-decoration:line-through">x</span></b>', "~~x~~"],
+        ["inside italics in the bold", '<b><i><span style="font-weight:normal">x</span> y</i></b>', "*x* ***y***"],
     ])("stays out of the bold: %s", (_: string, html: string, markdown: string) => {
+        expect(htmlToMarkdown(html)).toBe(markdown);
+    });
+});
+
+describe("superscripts and subscripts", () => {
+    it.each([
+        ["an exponent", "<strong>E=mc<sup>2</sup></strong>", "**E=mc²**"],
+        ["a chemical formula", "<p><b>H<sub>2</sub>O</b> and CO<sub>2</sub></p>", "**H₂O** and CO₂"],
+        ["a signed exponent", "<p><i>x<sup>-(n+1)</sup></i></p>", "*x⁻⁽ⁿ⁺¹⁾*"],
+        ["an ordinal, kept as text", "<p>12<sup>th</sup> <b>May</b></p>", "12th **May**"],
+        ["a footnote mark, kept as text", "<p>Fact<sup>[1]</sup> <b>here</b></p>", "Fact[1] **here**"],
+    ])("keeps the raised or lowered meaning where Unicode can: %s", (_: string, html: string, markdown: string) => {
         expect(htmlToMarkdown(html)).toBe(markdown);
     });
 });

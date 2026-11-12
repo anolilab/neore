@@ -86,6 +86,10 @@ const EMOJI_EDGE = /^[\p{Extended_Pictographic}\p{Emoji_Modifier}\u{FE0F}]$/u;
 // After blank-line runs are collapsed, an edge holds at most two line breaks.
 const LEADING_NEWLINE = /^\n{1,2}/;
 const TRAILING_NEWLINE = /\n{1,2}$/;
+// Characters Unicode has raised or lowered forms of, so `E=mc<sup>2</sup>` stays `E=mc²` in plain Markdown.
+const SCRIPT_FROM = "0123456789+-\u{2212}=()";
+const SUPERSCRIPT = new Map([...`${SCRIPT_FROM}ni`].map((char: string, index: number) => [char, [..."⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻⁻⁼⁽⁾ⁿⁱ"][index] ?? char]));
+const SUBSCRIPT = new Map([...SCRIPT_FROM].map((char: string, index: number) => [char, [..."₀₁₂₃₄₅₆₇₈₉₊₋₋₌₍₎"][index] ?? char]));
 /** Grid cells all tables of a paste may fill: spans multiply a cell, and past this a table is pasted as its text. */
 const MAX_TABLE_CELLS = 100_000;
 /** Characters quotes and list items may re-indent in all: each re-indents all it holds, so deep nesting is quadratic. */
@@ -361,20 +365,24 @@ const wrapLines = (inner: string, marker: string): string =>
         .map((line: string) => wrapLine(line, marker))
         .join("\n");
 
-/** `**` around each run of `inner` outside text marked normal weight (`unbold`), which stays as it is. */
-const wrapBold = (inner: string): string => {
+/**
+ * `marker` around each run of `inner` apart. Bold leaves text marked normal weight (`unbold`) as it is and drops the
+ * mark; italics and strikethrough go inside the mark as well, so the bold around them later never splits a marker.
+ */
+const wrapRuns = (inner: string, marker: string): string => {
     const parts: string[] = [];
     let from = 0;
 
     for (let start = inner.indexOf(NORMAL_START); start !== -1; start = inner.indexOf(NORMAL_START, from)) {
         const end = inner.indexOf(NORMAL_END, start);
         const normalEnd = end === -1 ? inner.length : end;
+        const normal = inner.slice(start + 1, normalEnd);
 
-        parts.push(wrapLines(inner.slice(from, start), "**"), inner.slice(start + 1, normalEnd));
+        parts.push(wrapLines(inner.slice(from, start), marker), marker === "**" ? normal : NORMAL_START + wrapLines(normal, marker) + NORMAL_END);
         from = normalEnd + 1;
     }
 
-    parts.push(wrapLines(inner.slice(from), "**"));
+    parts.push(wrapLines(inner.slice(from), marker));
 
     return parts.join("");
 };
@@ -382,7 +390,7 @@ const wrapBold = (inner: string): string => {
 /**
  * `**`, `*` or `~~` around inline content, with its outer spaces kept outside. Content broken by `<br>` is marked line by
  * line, as Markdown emphasis cannot span lines; content holding blocks (a blank line) is left as it is, and so is
- * content whose edge is inside an emoji sequence (`splitsEmoji`). Bold leaves out text set back to normal weight.
+ * content whose edge is inside an emoji sequence (`splitsEmoji`). Text set back to normal weight is marked apart (`wrapRuns`).
  */
 const wrap = (inner: string, marker: string, context: Context, node: Element): string => {
     const isBold = marker === "**";
@@ -398,7 +406,7 @@ const wrap = (inner: string, marker: string, context: Context, node: Element): s
         throw new RangeError("Nested too deep to convert");
     }
 
-    return isBold && inner.includes(NORMAL_START) ? wrapBold(inner) : wrapLines(inner, marker);
+    return inner.includes(NORMAL_START) ? wrapRuns(inner, marker) : wrapLines(inner, marker);
 };
 
 /**
@@ -1073,6 +1081,15 @@ const element = (node: Element, context: Context): string => {
             context.code.push(fenceCode(code, languageOf(node)));
 
             return `\n\n\0${context.code.length - 1}\0\n\n`;
+        }
+        case "SUB":
+        case "SUP": {
+            // Only when every character has a form: an ordinal (`12<sup>th</sup>`) or footnote mark stays as copied.
+            const inner = styledChildren(node, context);
+            const forms = tag === "SUP" ? SUPERSCRIPT : SUBSCRIPT;
+            const chars = [...inner];
+
+            return chars.every((char: string) => forms.has(char)) ? chars.map((char: string) => forms.get(char)).join("") : inner;
         }
         case "TABLE": {
             return context.inTable ? nestedTable(node, context) : table(node, context);

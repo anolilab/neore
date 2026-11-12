@@ -520,16 +520,20 @@ const markdownLink = (label: string, url: string): string =>
     // A backslash is encoded too: left as it is, one at the end would escape the link's closing parenthesis.
     `[${label.replaceAll(/[[\]\\]/g, String.raw`\$&`)}](${url.replaceAll("\\", "%5C").replaceAll("(", "%28").replaceAll(")", "%29")})`;
 
-const FENCE_LINE = /^ {0,3}(`{3,}|~{3,})/;
+// Quote and list markers before a line's content, so a fence in a quote or list item counts.
+const CONTAINER_PREFIX = /^(?:[ \t]*(?:>|[-+*][ \t]|\d{1,9}[.)][ \t]))*/;
+const FENCE_LINE = /^[ \t]*(`{3,}|~{3,})/;
 
 /**
  * Whether `textBefore` (the draft before the caret) leaves a code fence open. As in CommonMark, a fence closes only on a
  * run of its own character at least as long, with nothing after it; a backtick fence's info string has no backticks.
+ * Quote and list prefixes are skipped, not matched up: a draft is short, and a wrong guess only pastes text as copied.
  */
 export const inOpenFence = (textBefore: string): boolean => {
     let open = "";
 
-    for (const line of textBefore.split("\n")) {
+    for (const fullLine of textBefore.split("\n")) {
+        const line = fullLine.slice(CONTAINER_PREFIX.exec(fullLine)?.[0].length ?? 0);
         const [fence = "", run = ""] = FENCE_LINE.exec(line) ?? [];
 
         if (run === "") {
