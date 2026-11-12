@@ -4,7 +4,7 @@ import { api } from "@neore/backend/api";
 import type { Id } from "@neore/backend/dataModel";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import type { ComponentRef } from "react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { AccessibilityInfo, Keyboard, KeyboardAvoidingView, Pressable, Share, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -14,11 +14,13 @@ import { secureGrantStore } from "@/auth/secure-store";
 import { ChatError, startChat } from "@/chat/chat-api";
 import { forgetLastThread, rememberLastThread } from "@/chat/last-thread-store";
 import { displayTextOf, shareTextOf } from "@/chat/message-parts";
+import { entriesFor } from "@/chat/possibly-sent";
+import { possiblySent } from "@/chat/possibly-sent-store";
 import { isScrolledToEnd, scrollToLatestLabel, scrollToLatestText, shouldShowScrollToLatest } from "@/chat/scroll-to-latest";
 import { shareableMessageText, shareLabel } from "@/chat/share-message";
 import { relayReply } from "@/chat/stream";
 import type { SendStage } from "@/chat/unsent-send";
-import { draftAfterUnsent, failedSendMessage, failedSendOutcome, withoutUnsentRows } from "@/chat/unsent-send";
+import { draftAfterUnsent, failedSendMessage, failedSendOutcome, POSSIBLY_SENT_NOTICE, UNSENT_GIVEN_BACK_MESSAGE, withoutUnsentRows } from "@/chat/unsent-send";
 import { useReplyConfirmation } from "@/chat/use-reply-confirmation";
 import { loadConfig } from "@/lib/config";
 import { DEFAULT_CHAT_MODEL } from "@/lib/defaults";
@@ -61,6 +63,15 @@ const withoutShareFailure = (current: string | null): string | null => {
 /** A confirmation that ends clears the wait message; any other message on screen is not the confirmation's to clear. */
 const withoutAwaitReply = (current: string | null): string | null => {
     if (current === AWAIT_REPLY_MESSAGE) {
+        return null;
+    }
+
+    return current;
+};
+
+/** A possibly-sent prompt that was found or given back ends its notice; any other message on screen is not its to clear. */
+const withoutPossiblySent = (current: string | null): string | null => {
+    if (current?.endsWith(POSSIBLY_SENT_NOTICE)) {
         return null;
     }
 
@@ -145,7 +156,14 @@ const Chat = () => {
     // Whether this chat is the one on screen: a read that lands after another chat was pushed over it must not save it.
     const isFocusedRef = useRef(false);
     const [threadId, setThreadId] = useState<string | undefined>(routeThreadId === NEW_THREAD ? undefined : routeThreadId);
+    // The chat on screen for listeners that outlive a render: a found prompt opens only on the screen of its chat.
+    const threadIdRef = useRef(threadId);
+
+    threadIdRef.current = threadId;
     const [rows, setRows] = useState<Row[]>([]);
+    // Prompts that went out with no answer: shown after the rows while the server is checked for them (`possibly-sent.ts`).
+    const allHeld = useSyncExternalStore(possiblySent.subscribe, possiblySent.snapshot);
+    const held = useMemo(() => entriesFor(allHeld, accountId, threadId), [accountId, allHeld, threadId]);
     // The rows as the last write left them. Every write goes through `writeRows`, so a read can decide against the rows on
     // screen when it lands, not against the rows of the render it was started in.
     const rowsRef = useRef<Row[]>([]);
@@ -407,26 +425,67 @@ const Chat = () => {
         }
     }, [confirmTick, hasToken, loadMessages, refreshTick, sending, status, threadId]);
 
+    // A prompt the checks did not find goes back into the composer, with a notice that it may not have been sent: at once
+    // when this chat's screen is open, or when it opens next.
+    useEffect(
+        () =>
+            possiblySent.watchUnsent(accountId, threadId, (prompts) => {
+                for (const prompt of prompts) {
+                    setDraft((current) => draftAfterUnsent(current, prompt));
+                }
+
+                setError(UNSENT_GIVEN_BACK_MESSAGE);
+            }),
+        [accountId, threadId],
+    );
+
+    // A prompt the checks found: a new chat opens the chat that started, an existing one reads its messages again.
+    useEffect(
+        () =>
+            possiblySent.onFound((entry, foundThreadId) => {
+                if (entry.accountId !== accountId || entry.threadId !== threadIdRef.current) {
+                    return;
+                }
+
+                setError(withoutPossiblySent);
+
+                if (entry.threadId === undefined) {
+                    setThreadId(foundThreadId);
+                    router.setParams({ threadId: foundThreadId });
+                } else {
+                    loadMessages(foundThreadId);
+                }
+            }),
+        [accountId, loadMessages, router],
+    );
+
     // A send the server never accepted gives its prompt back and drops its local rows: no read will confirm them. One that
-    // may have reached it keeps its prompt row for the next read to confirm or remove, and drops only the empty reply row.
+    // may have reached it is held in `possiblySent`, which shows it here and checks the server for it until it is found or
+    // given back; its local rows go, so no read of the chat can drop it.
     const settleFailedSend = ({
         error: failure,
         ids,
         prompt,
+        sentAt,
         stage,
     }: {
         error: unknown;
         ids: { assistant: string; user: string };
         prompt: string;
+        sentAt: number;
         stage: SendStage;
     }) => {
         const outcome = failedSendOutcome(stage, failure);
 
-        if (outcome === "give-back") {
+        // Without an account to hold it for (not expected while sending), the prompt goes back rather than nowhere.
+        if (outcome === "give-back" || (outcome === "possibly-sent" && !accountId)) {
             setDraft((current) => draftAfterUnsent(current, prompt));
             writeRows((current) => withoutUnsentRows(current, [ids.user, ids.assistant]));
-        } else if (outcome === "possibly-sent") {
-            writeRows((current) => current.filter((row) => row.id !== ids.assistant || row.text !== ""));
+        } else if (outcome === "possibly-sent" && accountId) {
+            const knownMessageIds = new Set(rowsRef.current.filter((row) => row.status !== "local").map((row) => row.id));
+
+            writeRows((current) => withoutUnsentRows(current, [ids.user, ids.assistant]));
+            settleQuietly(possiblySent.track({ accountId, failedAt: Date.now(), id: ids.user, knownMessageIds, prompt, sentAt, threadId }));
         }
 
         return outcome;
@@ -561,7 +620,7 @@ const Chat = () => {
 
             AccessibilityInfo.announceForAccessibility("Reply finished");
         } catch (error_) {
-            const outcome = settleFailedSend({ error: error_, ids: { assistant: assistantId, user: userId }, prompt, stage });
+            const outcome = settleFailedSend({ error: error_, ids: { assistant: assistantId, user: userId }, prompt, sentAt: stamp, stage });
 
             // The abort error of a send stopped on purpose is not shown: its notice is.
             if (!controller.signal.aborted) {
@@ -615,6 +674,10 @@ const Chat = () => {
 
     // The home indicator's inset, which the open keyboard already covers.
     const safeBottom = keyboardShown ? 0 : insets.bottom;
+    const shownRows = [
+        ...rows,
+        ...held.filter((entry) => entry.state === "pending").map((entry) => localRow(entry.id, "user", threadId ?? NEW_THREAD, entry.prompt)),
+    ];
     const syncedTimes = rows.filter((row) => row.status !== "local" && row.finished !== true).map((row) => row.syncedAt);
     const syncedAt = syncedTimes.length === 0 ? undefined : Math.max(...syncedTimes);
 
@@ -634,7 +697,7 @@ const Chat = () => {
                     style={{ flex: 1 }}
                 >
                     <LegendList
-                        data={rows}
+                        data={shownRows}
                         estimatedItemSize={72}
                         keyExtractor={(row) => row.id}
                         ListHeaderComponent={olderHeader}

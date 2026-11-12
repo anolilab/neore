@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 
 import { clearLastThread } from "../chat/last-thread-store";
+import { possiblySent } from "../chat/possibly-sent-store";
 import { loadConfig } from "../lib/config";
 import { getClient } from "../lib/lunora";
 import { backendPushServer, devicePushPlatform, pushRegistrations } from "../notifications/phone-push";
@@ -92,6 +93,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
             if (jwt === null) {
                 dispatch({ type: "signed-out" });
+                possiblySent.clear();
                 // Retries a cache wipe that failed at sign-out; the credential side never waits on it.
                 await emptyCacheWhileSignedOut({ clearCache: () => getOfflineCache().clear(), forgetLastChat: clearLastThread, warn: console.warn });
 
@@ -139,6 +141,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const signOut = useCallback(async () => {
         // From here on, no prompt and no registration for the account that is leaving.
         endPhonePushForAccount();
+        // Its possibly-sent prompts are dropped with it: they never go back into another account's composer.
+        possiblySent.clear();
 
         try {
             // The cache holds this person's chats: it is emptied FIRST and locally, so a sign-out request that fails or

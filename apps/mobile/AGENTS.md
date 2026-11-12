@@ -16,7 +16,7 @@
   statuses and cleared from the screen (`message-read.ts`). Every start signs the stored user in before the first
   token mint answers (`session-state.ts`, `isConfirming`: not offline yet, but every write control waits for the token like a
   connection being checked; the splash holds until the chat list has read its saved rows, at most 2 s,
-  `splash-gate.ts`). A send the server provably never took (failed before the request, or an answered refusal) gives its prompt back; one that timed out or lost its answer keeps the prompt row for the next read, since giving it back invites a duplicate (`unsent-send.ts`). A mint with no answer keeps them signed in without a JWT, which counts as offline; an answered "no session"
+  `splash-gate.ts`). A send the server provably never took (failed before the request, or an answered refusal) gives its prompt back; one that timed out or lost its answer is held in memory per account (`possibly-sent.ts`, cleared at sign-out) and checked against the server (the chat's newest messages, or for a first message the newest chats created since): found, its chat opens or re-reads; not found by a check that answered after 60 s, it goes back to the composer with a notice. Giving it back at once invites a duplicate. A mint with no answer keeps them signed in without a JWT, which counts as offline; an answered "no session"
   signs out and empties the cache. Live queries wait for a JWT.
   **Stamps and races:** a read stamps its rows with the moment it STARTED (`syncedAt`), and only the newest read of a
   screen may paint or save (`createMessageReadGate`), because messages carry no server version. A thread missing from

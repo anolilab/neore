@@ -22,7 +22,7 @@ export type SendStage = "accepted" | "before-request" | "requested";
  * What a failed send does with its prompt. `give-back`: the server provably never took it (the failure came before the
  * request, or the gateway answered with a refusal), so it returns to the composer and its rows go. `possibly-sent`: the
  * request went out and no answer says whether the chat started (a timeout, a dropped connection, a body that would not
- * parse), so giving it back would invite a second copy; the prompt row stays and the next read confirms or removes it.
+ * parse), so giving it back at once would invite a second copy; it is held and checked for (`possibly-sent.ts`).
  * `accepted`: the chat started; only the reply failed.
  */
 export const failedSendOutcome = (stage: SendStage, error: unknown): "accepted" | "give-back" | "possibly-sent" => {
@@ -33,9 +33,15 @@ export const failedSendOutcome = (stage: SendStage, error: unknown): "accepted" 
     return stage === "accepted" ? "accepted" : "give-back";
 };
 
-/** The error shown for a failed send. One that may have reached the server warns that sending again could make a second copy. */
+/** The end of the error for a send that may have reached the server; a found or given-back prompt clears it. */
+export const POSSIBLY_SENT_NOTICE = "The message may have been sent. It is being checked; if it did not arrive, it goes back to the message box.";
+
+/** Shown when a possibly-sent prompt was not found on the server and is back in the composer. */
+export const UNSENT_GIVEN_BACK_MESSAGE = "The message may not have been sent. It is back in the message box; send it again if it does not show up.";
+
+/** The error shown for a failed send. One that may have reached the server says it is being checked. */
 export const failedSendMessage = (error: unknown, outcome: ReturnType<typeof failedSendOutcome>): string => {
     const message = error instanceof Error ? error.message : "Could not send.";
 
-    return outcome === "possibly-sent" ? `${message} The message may have been sent. Wait for it to show here before you send it again.` : message;
+    return outcome === "possibly-sent" ? `${message} ${POSSIBLY_SENT_NOTICE}` : message;
 };
