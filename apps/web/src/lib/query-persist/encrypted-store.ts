@@ -37,9 +37,10 @@ export interface RecordStore {
     /**
      * In one transaction over both stores (another tab may save in between otherwise): removes the entry and the key of
      * each account in `userIds` (every account with an entry when omitted) whose entry, as stored then, passes
-     * `shouldRemove`. With neither, empties both stores.
+     * `shouldRemove`. With neither, empties both stores. Without `userIds` but with `shouldRemove`, a key whose account has
+     * no entry (a tab closed between making the key and sealing) is offered too, as `shouldRemove(undefined, key)`.
      */
-    remove: (userIds?: ReadonlyArray<string>, shouldRemove?: (entry: unknown) => boolean) => Promise<void>;
+    remove: (userIds?: ReadonlyArray<string>, shouldRemove?: (entry: unknown, key?: unknown) => boolean) => Promise<void>;
 }
 
 const failure = (error: DOMException | null): Error => error ?? new Error("IndexedDB request failed");
@@ -152,13 +153,32 @@ export const indexedDatabaseStore = (): RecordStore | undefined => {
                 });
             }
         } else if (shouldRemove) {
+            const withEntry = new Set<string>();
             const cursor = entries.openCursor();
 
             cursor.addEventListener("success", () => {
                 if (!cursor.result) {
+                    // Then the keys no entry belongs to.
+                    const keyCursor = keys.openCursor();
+
+                    keyCursor.addEventListener("success", () => {
+                        if (!keyCursor.result) {
+                            return;
+                        }
+
+                        const userId = String(keyCursor.result.key);
+
+                        if (!withEntry.has(userId) && shouldRemove(undefined, keyCursor.result.value)) {
+                            keys.delete(userId);
+                        }
+
+                        keyCursor.result.continue();
+                    });
+
                     return;
                 }
 
+                withEntry.add(String(cursor.result.key));
                 removeIf(String(cursor.result.key), cursor.result.value);
                 cursor.result.continue();
             });
@@ -245,6 +265,8 @@ const sealOf = (entry: unknown): string | undefined => {
 };
 
 interface AccountKey {
+    /** When it was made: a key whose record was never sealed (the tab closed in between) is pruned once it is this old. */
+    createdAt: number;
     /** Tells this key from one made after it was removed: a stored clone is never the same object. */
     id: string;
     key: CryptoKey;
@@ -270,7 +292,7 @@ const accountKey = async (store: RecordStore, userId: string, create: boolean): 
 
     const key = await crypto.subtle.generateKey({ length: 256, name: "AES-GCM" }, false, ["encrypt", "decrypt"]);
     // Another tab of the same account may have made one meanwhile: both must seal under the same key.
-    const kept = await store.putIfAbsent(KEYS, userId, { id: crypto.randomUUID(), key } satisfies AccountKey);
+    const kept = await store.putIfAbsent(KEYS, userId, { createdAt: Date.now(), id: crypto.randomUUID(), key } satisfies AccountKey);
 
     return isAccountKey(kept) ? kept : undefined;
 };
@@ -346,7 +368,14 @@ export const removeRecord = async (store: RecordStore, userId: string, seal?: st
 
 /** Removes the record and key of every account whose record was written before `writtenBefore`, unread. */
 export const pruneRecords = async (store: RecordStore, writtenBefore: number): Promise<void> => {
-    await store.remove(undefined, (entry) => !isSealedRecord(entry) || entry.writtenAt < writtenBefore);
+    await store.remove(undefined, (entry, key) => {
+        // A key alone: made before the cut-off and never sealed with, or not a key this version made.
+        if (entry === undefined) {
+            return !isAccountKey(key) || typeof key.createdAt !== "number" || key.createdAt < writtenBefore;
+        }
+
+        return !isSealedRecord(entry) || entry.writtenAt < writtenBefore;
+    });
 };
 
 /** Removes every account's record and key. */

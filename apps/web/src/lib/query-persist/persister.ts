@@ -151,6 +151,8 @@ export const startQueryPersistence = (options: PersistenceOptions): PersistenceC
     const isRestored = (query: Query): boolean => restoredCount.get(query) === query.state.dataUpdateCount;
     const state = { isDirty: false, isHeldByGate: false, isRestoreDone: false, isRestoring: true, isSaving: false, stopped: false, writes: false };
     let timer: ReturnType<typeof setTimeout> | undefined;
+    /** The generation the queued save was scheduled under. */
+    let timerGeneration = -1;
     let unsubscribe: (() => void) | undefined;
 
     const mayWrite = (generation: number): boolean => !state.stopped && state.writes && generation === gate.generation() && gate.canWrite(userId);
@@ -295,6 +297,11 @@ export const startQueryPersistence = (options: PersistenceOptions): PersistenceC
 
     const schedule = (): void => {
         if (timer !== undefined) {
+            // A clear since that save was queued drops it: this change needs a save of its own after it.
+            if (timerGeneration !== gate.generation()) {
+                state.isDirty = true;
+            }
+
             return;
         }
 
@@ -330,13 +337,18 @@ export const startQueryPersistence = (options: PersistenceOptions): PersistenceC
 
         const generation = gate.generation();
 
+        timerGeneration = generation;
         timer = setTimeout(() => {
             timer = undefined;
             state.isSaving = true;
 
             void serialized(userId, async () => {
-                // The save takes the cache as it is now: only a change after this needs another.
-                state.isDirty = false;
+                // The save takes the cache as it is now: only a change after this needs another. One a clear dropped
+                // takes nothing, so a change waiting for it stays waiting.
+                if (generation === gate.generation()) {
+                    state.isDirty = false;
+                }
+
                 await write(generation);
             })
                 .catch(() => {

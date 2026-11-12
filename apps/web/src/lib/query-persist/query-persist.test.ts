@@ -6,7 +6,7 @@ import { IDBFactory } from "fake-indexeddb";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { RecordStore } from "./encrypted-store";
-import { indexedDatabaseStore, openRecord, removeRecord, sealRecord } from "./encrypted-store";
+import { indexedDatabaseStore, openRecord, pruneRecords, removeRecord, sealRecord } from "./encrypted-store";
 import type { PersistPolicy, WriteGate } from "./persister";
 import { MAX_AGE_MS, startQueryPersistence, WRITE_THROTTLE_MS } from "./persister";
 
@@ -61,6 +61,18 @@ const memoryStore = () => {
                 stores.entries.delete(userId);
                 stores.keys.delete(userId);
                 changed();
+            }
+
+            // As the IndexedDB store: a prune also offers the keys no entry belongs to.
+            if (userIds === undefined && shouldRemove !== undefined) {
+                for (const [userId, key] of stores.keys) {
+                    if (stores.entries.has(userId) || !shouldRemove(undefined, key)) {
+                        continue;
+                    }
+
+                    stores.keys.delete(userId);
+                    changed();
+                }
             }
         },
     };
@@ -495,6 +507,51 @@ describe("saving", () => {
         expect(textOf(next, OTHER_KEY)).toBe("kept");
     });
 
+    it("saves a change made after a clear even though a save from before it was still queued", async () => {
+        const memory = memoryStore();
+        const { gate, writeGate } = openGate();
+        const queryClient = new QueryClient();
+        const controller = start(memory.store, ALICE, queryClient, { gate: writeGate });
+
+        await controller.restored;
+        controller.enableWrites();
+        queryClient.setQueryData(OTHER_KEY, { text: "before" });
+        // A clear while that save waits on its throttle, then a new read.
+        gate.generation += 1;
+        queryClient.setQueryData(KEY, { text: "after" });
+
+        const written = { done: false };
+
+        void (async () => {
+            await memory.settled();
+            written.done = true;
+        })();
+
+        while (!written.done) {
+            await vi.advanceTimersByTimeAsync(WRITE_THROTTLE_MS);
+        }
+
+        controller.stop();
+
+        const next = new QueryClient();
+
+        await start(memory.store, ALICE, next).restored;
+        expect(textOf(next, KEY)).toBe("after");
+    });
+
+    it("prunes a key left without a record once it is past the age limit, and keeps a new one", async () => {
+        const memory = memoryStore();
+
+        const key = await crypto.subtle.generateKey({ length: 256, name: "AES-GCM" }, false, ["encrypt", "decrypt"]);
+
+        memory.stores.keys.set("orphan", { createdAt: Date.now() - MAX_AGE_MS - 1, id: "a", key });
+        memory.stores.keys.set("fresh", { createdAt: Date.now(), id: "b", key });
+
+        await pruneRecords(memory.store, Date.now() - MAX_AGE_MS);
+
+        expect([...memory.stores.keys.keys()]).toStrictEqual(["fresh"]);
+    });
+
     it("saves a change the closed gate held back once the gate says it opened", async () => {
         const memory = memoryStore();
         const listeners = new Set<() => void>();
@@ -852,6 +909,26 @@ describe("IndexedDB store", () => {
         const kept = await openRecord(store, ALICE);
 
         expect(kept?.text).toBe(otherTab);
+    });
+
+    it("prunes, in IndexedDB, a key no record belongs to once it is past the age limit, and keeps a sealed account", async () => {
+        const store = indexedDatabaseStore();
+
+        expect(store).toBeDefined();
+
+        if (!store) {
+            return;
+        }
+
+        await sealRecord(store, ALICE, "kept");
+
+        const key = await crypto.subtle.generateKey({ length: 256, name: "AES-GCM" }, false, ["encrypt", "decrypt"]);
+
+        await store.putIfAbsent("keys", "orphan", { createdAt: Date.now() - MAX_AGE_MS - 1, id: "orphan", key });
+        await pruneRecords(store, Date.now() - MAX_AGE_MS);
+
+        await expect(store.get("keys", "orphan")).resolves.toBeUndefined();
+        await expect(openRecord(store, ALICE)).resolves.toMatchObject({ text: "kept" });
     });
 
     it("a slow tab's older state never replaces a record another tab took later", async () => {
