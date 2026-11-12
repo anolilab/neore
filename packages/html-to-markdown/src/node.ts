@@ -44,18 +44,38 @@ function hasBlankText(node: Node): boolean {
         return BLANK.test(node.textContent ?? "");
     }
 
-    return hasOnlyBlankText(node);
+    // A CDATA section counts toward textContent in some hosts and not in others
+    // (domino skips it). Those trees take the host's own textContent answer.
+    return hasOnlyBlankText(node) ?? BLANK.test(node.textContent ?? "");
 }
 
-function hasOnlyBlankText(parent: Node): boolean {
+/**
+ * Returns false at the first text piece with content, true when every piece is
+ * blank, and undefined when a CDATA section is reached before any content.
+ */
+function hasOnlyBlankText(parent: Node): boolean | undefined {
     for (let child = parent.firstChild; child; child = child.nextSibling) {
-        if (child.nodeType === 3 || child.nodeType === 4) {
-            if (!BLANK.test(child.nodeValue ?? "")) {
-                return false;
-            }
-        } else if (child.nodeType === 1 && !hasOnlyBlankText(child)) {
-            return false;
+        const verdict = blankPieceVerdict(child);
+
+        if (verdict !== true) {
+            return verdict;
         }
+    }
+
+    return true;
+}
+
+function blankPieceVerdict(node: Node): boolean | undefined {
+    if (node.nodeType === 3) {
+        return BLANK.test(node.nodeValue ?? "");
+    }
+
+    if (node.nodeType === 4) {
+        return undefined;
+    }
+
+    if (node.nodeType === 1) {
+        return hasOnlyBlankText(node);
     }
 
     return true;
