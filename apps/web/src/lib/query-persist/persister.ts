@@ -153,7 +153,8 @@ export const startQueryPersistence = (options: PersistenceOptions): PersistenceC
         const keep = policy.select(queryClient.getQueryCache().getAll(), userId);
         const dehydrated = dehydrate(queryClient, {
             shouldDehydrateMutation: () => false,
-            shouldDehydrateQuery: (query) => keep(query) && (isReadSinceStart(query) || isRestored(query)),
+            // A read older than the cache's age limit is not carried into a fresh record: it would outlive the limit.
+            shouldDehydrateQuery: (query) => keep(query) && (isReadSinceStart(query) || isRestored(query)) && now() - query.state.dataUpdatedAt <= MAX_AGE_MS,
         });
         const record: StoredClient = { buster, clientState: asSettled(policy.sanitize(dehydrated, userId)), timestamp: now(), userId };
 

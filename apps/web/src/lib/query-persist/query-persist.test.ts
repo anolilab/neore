@@ -495,6 +495,36 @@ describe("saving", () => {
         expect(textOf(next, OTHER_KEY)).toBe("kept");
     });
 
+    it("does not carry a read older than the age limit into a new record", async () => {
+        const memory = memoryStore();
+        const queryClient = new QueryClient();
+        const controller = start(memory.store, ALICE, queryClient);
+
+        await controller.restored;
+        controller.enableWrites();
+
+        const written = { done: false };
+
+        void (async () => {
+            await memory.settled();
+            written.done = true;
+        })();
+        queryClient.setQueryData(OTHER_KEY, { text: "old" }, { updatedAt: Date.now() - MAX_AGE_MS - 1 });
+        queryClient.setQueryData(KEY, { text: "fresh" });
+
+        while (!written.done) {
+            await vi.advanceTimersByTimeAsync(WRITE_THROTTLE_MS);
+        }
+
+        controller.stop();
+
+        // Not only hidden on restore: the stored record itself holds no expired read.
+        const opened = await openRecord(memory.store, ALICE);
+        const stored = JSON.parse(opened?.text ?? "{}") as { clientState?: DehydratedState };
+
+        expect(stored.clientState?.queries.map((query) => query.queryKey)).toStrictEqual([KEY]);
+    });
+
     it("a record the store failed to read is never replaced by a save, and is restored on the next try", async () => {
         const memory = memoryStore();
 
