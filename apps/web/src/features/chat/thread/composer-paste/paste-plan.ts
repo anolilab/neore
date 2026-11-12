@@ -3,15 +3,26 @@
  * points to is loaded only when a paste needs it.
  */
 
-/** Leave the paste to the editor, insert `text` as typed, or convert `html` to Markdown (`plain` if that fails). */
-export type PastePlan = { html: string; kind: "html"; plain: string } | { kind: "default" } | { kind: "text"; text: string };
+/**
+ * Leave the paste to the editor, insert `text` as typed (`markdown` when the plan wrote Markdown into it), or convert
+ * `html` to Markdown (`plain` if that fails); with `textOnly`, to its visible text only.
+ */
+export type PastePlan =
+    | { html: string; kind: "html"; plain: string; textOnly?: boolean }
+    | { kind: "default" }
+    | { kind: "text"; markdown?: boolean; text: string };
+
+/** Whether the paste is Markdown the plan wrote, whose blocks are kept off the text beside the caret; not text as copied. */
+export const isMarkdownPlan = (plan: PastePlan): boolean => (plan.kind === "html" ? plan.textOnly !== true : plan.kind === "text" && plan.markdown === true);
 
 const URL_ONLY = /^https?:\/\/\S+$/i;
 // Repetitions are bounded and tags are found with indexOf: the clipboard HTML is untrusted, and a regex that rescans to
 // the end from every `<` or `class=` would take quadratic time on a crafted copy.
 const LINK_START = /<a\s/gi;
 const DIV_START = /<div\s/gi;
-const DIV_TAG = /<(\/?)div[\s/>]/gi;
+// A tag start: `<` and a name, or `</` and one.
+const TAG_START = /<\/?[a-z]/iy;
+const DIV_TAG_NAME = /^<(\/?)div[\s/>]/i;
 const QUOTE_CHIP_ATTRIBUTE = "data-quote-chip";
 const HREF = /href/i;
 // HTML allows space around the `=`: `class = "language-js"` names a language too.
@@ -245,21 +256,41 @@ const hasAttribute = (html: string, open: number, end: number, name: string): bo
     return false;
 };
 
-/** Where the `<div>` whose start tag ends at `end` closes: after its own `</div>`, nested divs counted, or the end of `html`. */
+/**
+ * Where the `<div>` whose start tag ends at `end` closes: after its own `</div>`, nested divs counted, or the end of
+ * `html`. Tag by tag, each read once to its own `>`: a `</div>` inside a quoted attribute value is not one.
+ */
 const divEnd = (html: string, end: number): number => {
-    const tags = new RegExp(DIV_TAG);
+    const tagStart = new RegExp(TAG_START);
     let depth = 1;
+    let index = html.indexOf("<", end);
 
-    tags.lastIndex = end;
+    while (index !== -1) {
+        tagStart.lastIndex = index;
 
-    for (let tag = tags.exec(html); tag; tag = tags.exec(html)) {
-        depth += tag[1] === "/" ? -1 : 1;
-
-        if (depth === 0) {
-            const close = html.indexOf(">", tag.index);
-
-            return close === -1 ? html.length : close + 1;
+        // A `<` not opening a tag (`1 < 2`) is text.
+        if (!tagStart.test(html)) {
+            index = html.indexOf("<", index + 1);
+            continue;
         }
+
+        const close = tagEnd(html, index);
+
+        if (close === -1) {
+            return html.length;
+        }
+
+        const tag = DIV_TAG_NAME.exec(html.slice(index, Math.min(close + 1, index + 6)));
+
+        if (tag) {
+            depth += tag[1] === "/" ? -1 : 1;
+
+            if (depth === 0) {
+                return close + 1;
+            }
+        }
+
+        index = html.indexOf("<", close + 1);
     }
 
     return html.length;
@@ -344,10 +375,10 @@ const vscodeLanguage = (data: string): string | undefined => {
 export const isLongPaste = (text: string): boolean => text.length > 500 || text.split("\n").length > 10;
 
 // Markdown lines that only parse at a line's start: a table row, a fence, a heading, a list item, a quote.
-const BLOCK_LINE = /^(?:\||`{3}|~{3}|#{1,6}\s|[-*+]\s|\d+[.)]\s|>)/;
-// A table or fence also takes a blank line before it, or the text before is read as part of it. So does a numbered list
-// that does not start at 1: it cannot interrupt a paragraph.
-const BLANK_LINE_BEFORE = /^(?:\||`{3}|~{3})/;
+const BLOCK_LINE = /^(?:\||`{3}|~{3}|#{1,6}\s|[-*+]\s|\d+[.)]\s|>|---$)/;
+// A table or fence also takes a blank line before it, or the text before is read as part of it; a rule too, or the text
+// before becomes a heading. So does a numbered list that does not start at 1: it cannot interrupt a paragraph.
+const BLANK_LINE_BEFORE = /^(?:\||`{3}|~{3}|---$)/;
 const ORDERED_START = /^(\d{1,9})[.)]\s/;
 // Only a heading ends at its line: text after a table row, a list item or a quote continues it.
 const HEADING = /^#{1,6}\s/;
@@ -510,15 +541,19 @@ export const planPaste = (data: Pick<DataTransfer, "getData">, { inFence = false
         }
 
         // text/plain exactly as copied; an HTML-only copy (in a code fence, or with the plain-paste shortcut) goes in as its
-        // visible text, no Markdown added.
-        return { kind: "text", text: plain === "" ? stripTags(html) : plain };
+        // visible text, no Markdown added: read by the converter, which knows what the page hides, unless it is too big to parse.
+        if (plain !== "") {
+            return { kind: "text", text: plain };
+        }
+
+        return html.length > MAX_CONVERTED_HTML ? { kind: "text", text: stripTags(html) } : { html, kind: "html", plain: "", textOnly: true };
     }
 
     const url = plain.trim();
 
     // A URL pasted over a URL replaces it.
     if (selectedText.trim() !== "" && !selectedText.includes("\n") && URL_ONLY.test(url) && !URL_ONLY.test(selectedText.trim())) {
-        return { kind: "text", text: markdownLink(selectedText, url) };
+        return { kind: "text", markdown: true, text: markdownLink(selectedText, url) };
     }
 
     const vscode = data.getData("vscode-editor-data");
@@ -529,7 +564,7 @@ export const planPaste = (data: Pick<DataTransfer, "getData">, { inFence = false
         const fenced = language === undefined ? "" : fenceCode(plain, language);
 
         if (fenced !== "" && !isLongPaste(fenced)) {
-            return { kind: "text", text: fenced };
+            return { kind: "text", markdown: true, text: fenced };
         }
     }
 
@@ -563,7 +598,11 @@ export const planText = async (plan: Exclude<PastePlan, { kind: "default" }>): P
     }
 
     try {
-        const { htmlToMarkdown } = await import("./html-to-markdown");
+        const { htmlToMarkdown, visibleText } = await import("./html-to-markdown");
+
+        if (plan.textOnly) {
+            return visibleText(plan.html);
+        }
 
         return htmlToMarkdown(plan.html) || plan.plain;
     } catch {

@@ -9,7 +9,7 @@ import terminalHtml from "./__fixtures__/terminal.html?raw";
 import vscodeHtml from "./__fixtures__/vscode.html?raw";
 import wordHtml from "./__fixtures__/word-paragraph.html?raw";
 import { htmlToMarkdown } from "./html-to-markdown";
-import { breaksBefore, inOpenFence, isLongPaste, isPlainHtml, longestBacktickRun, onOwnLines, planPaste, planText } from "./paste-plan";
+import { breaksBefore, inOpenFence, isLongPaste, isMarkdownPlan, isPlainHtml, longestBacktickRun, onOwnLines, planPaste, planText } from "./paste-plan";
 
 const clipboard = (data: Record<string, string>): Pick<DataTransfer, "getData"> => {
     return { getData: (type: string) => data[type] ?? "" };
@@ -83,13 +83,12 @@ describe("composer paste", () => {
     });
 
     it("converts a code block of many line elements in linear time", () => {
-        // 30,000 lines: about 0.8 s here, against about 4 s when each line re-read the text built so far.
+        // 30,000 lines: about 0.8 s here, against about 4 s when each line re-read the text built so far. No wall-clock
+        // gate (docs/agents/testing.md): the test timeout stops a run that grows far worse than that.
         const html = `<pre>${"<div>let a = 1;</div>".repeat(30_000)}</pre>`;
-        const started = performance.now();
         const markdown = htmlToMarkdown(html);
 
         expect(markdown.split("\n").filter((line) => line === "let a = 1;")).toHaveLength(30_000);
-        expect(performance.now() - started).toBeLessThan(3000);
     });
 
     it("takes a Word item's number only from a marker it shows", () => {
@@ -168,8 +167,10 @@ describe("composer paste", () => {
         // An HTML-only clipboard is not handed to the editor's rich paste: its visible text goes in, no Markdown added.
         const plan = planPaste(clipboard({ "text/html": googleDocs }), { plainOnly: true, selectedText: "" });
 
-        expect(plan.kind).toBe("text");
-        expect(plan.kind === "text" && plan.text !== "" && !plan.text.includes("**")).toBe(true);
+        const text = plan.kind === "default" ? "" : await planText(plan);
+
+        expect(plan.kind).not.toBe("default");
+        expect(text !== "" && !text.includes("**")).toBe(true);
     });
 
     it("takes the text of HTML too big to convert when it is the only text, and leaves a composer quote chip to the editor", async () => {
@@ -227,6 +228,8 @@ describe("composer paste", () => {
         // A div nested in the chip is part of it, and what follows the chip is still looked at.
         expect(plan(`<div data-quote-chip=""><div><blockquote><p>q</p></blockquote></div></div><p>plain</p>`)).toBe("default");
         expect(plan(`<div data-quote-chip=""><div><blockquote><p>q</p></blockquote></div></div><p><strong>bold</strong></p>`)).toBe("html");
+        // A `</div>` in an attribute value or a `<` in text does not end the chip.
+        expect(plan(`<div data-quote-chip=""><span title="</div>">1 < 2</span><blockquote><p>q</p></blockquote></div><p>plain</p>`)).toBe("default");
         expect(plan(`${chip}<p>see <a href="https://example.com">this</a></p>`)).toBe("html");
         await expect(paste({ "text/html": `${chip}<p><strong>bold</strong> reply</p>`, "text/plain": "> quoted\n\nbold reply" })).resolves.toBe(
             "> quoted\n\n**bold** reply",
@@ -246,22 +249,19 @@ describe("composer paste", () => {
     it("plans crafted multi-megabyte HTML in linear time", () => {
         const plain = { plainOnly: false, selectedText: "" };
 
+        // No wall-clock gate (docs/agents/testing.md): a pattern that rescans from every match takes minutes here, past the
+        // test timeout.
         for (const html of ["class=".repeat(500_000), "<b ".repeat(1_000_000), "<a ".repeat(1_000_000), "text-decoration".repeat(200_000)]) {
-            const started = performance.now();
-
-            planPaste(clipboard({ "text/html": html, "text/plain": "plain" }), plain);
+            expect(planPaste(clipboard({ "text/html": html, "text/plain": "plain" }), plain).kind).not.toBe("default");
             // Under the cap the formatting checks run on all of it.
-            isPlainHtml(html.slice(0, 1_000_000));
-            expect(performance.now() - started).toBeLessThan(500);
+            expect(typeof isPlainHtml(html.slice(0, 1_000_000))).toBe("boolean");
         }
     });
 
     it("converts a crafted style attribute under the cap in linear time", () => {
+        // A crafted style of 800 KB took 69 s before the patterns were bounded: past the test timeout, with no wall-clock gate.
         for (const style of ["text-decoration:".repeat(50_000), "mso-list:".repeat(80_000)]) {
-            const started = performance.now();
-
-            htmlToMarkdown(`<p><span style="${style}">x</span></p>`);
-            expect(performance.now() - started).toBeLessThan(1000);
+            expect(htmlToMarkdown(`<p><span style="${style}">x</span></p>`)).toBe("x");
         }
     });
 
@@ -422,6 +422,21 @@ describe("composer paste", () => {
             "Ship 🎉 👍🏽 👨‍👩‍👧 :tada: $E=mc^2$",
         ],
         [
+            "an emoji or formula drawn as an image in a picture keeps its text",
+            '<p>Ship <picture><source srcset="https://x.y/a.webp"><img alt="🎉" src="https://x.y/a.png"></picture> <picture><img class="math" alt="x^2"></picture></p>',
+            "Ship 🎉 $x^2$",
+        ],
+        [
+            "a closed details shows its summary alone, an open one all of it",
+            "<details><summary>Logs</summary><p>hidden line</p>loose text</details><details><p>no summary</p></details><details open><summary>Shown</summary><p>body</p></details>",
+            "Logs\n\nShown\n\nbody",
+        ],
+        [
+            "a link in a table cell keeps its label escaped once, a backslash before code in it and a pipe too",
+            String.raw`<table><tr><th>A</th></tr><tr><td><a href="https://x.y/">a\<code>b|c</code>]</a> <a href="https://x.y/">d|]e</a> <a href="https://x.y/a|b">https://x.y/a|b</a></td></tr></table>`,
+            ["| A |", "| --- |", String.raw`| [a\\${"`"}b\|c${"`"}\]](https://x.y/) [d\|\]e](https://x.y/) https://x.y/a\|b |`].join("\n"),
+        ],
+        [
             "a MathML formula without TeX keeps its visible text, not its other annotations",
             '<p>Area <math><semantics><mrow><mi>a</mi><mo>+</mo><mi>b</mi></mrow><annotation encoding="StarMath">a + b</annotation></semantics></math> here</p>',
             "Area a+b here",
@@ -503,6 +518,8 @@ describe("pasted blocks beside text", () => {
         ["a quote pasted mid-line", "<blockquote><p>q</p></blockquote>", "foo \n> q\n\nbar"],
         ["a numbered list starting at 3", '<ol start="3"><li>c</li></ol>', "foo \n\n3. c\n\nbar"],
         ["a heading", "<h2>Title</h2>", "foo \n## Title\nbar"],
+        // A blank line before, or the text before it becomes a heading.
+        ["a rule", "<hr>", "foo \n\n---\n\nbar"],
     ])("keeps the text after %s out of it", async (_label: string, html: string, draft: string) => {
         await expect(pasteInto("foo bar", 4, { "text/html": html, "text/plain": "x" })).resolves.toBe(draft);
     });
@@ -619,10 +636,9 @@ describe("lists nested in the page's list items", () => {
 describe("a code block of deeply nested spans", () => {
     it("is read once, however many elements wrap its text", () => {
         const html = `<pre>${"<span>".repeat(400)}${"x".repeat(200_000)}${"</span>".repeat(400)}</pre>`;
-        const started = performance.now();
 
+        // No wall-clock gate (docs/agents/testing.md): the test timeout stops a run far slower than one read of the text.
         expect(htmlToMarkdown(html).length).toBeGreaterThan(200_000);
-        expect(performance.now() - started).toBeLessThan(2000);
     });
 });
 
@@ -643,23 +659,52 @@ describe("named references in HTML past the conversion cap", () => {
 });
 
 describe("an HTML-only copy pasted inside a code fence", () => {
-    it("goes in as its visible text, with no Markdown added", () => {
+    it("goes in as its visible text, with no Markdown added and its indentation kept", async () => {
         const plan = planPaste(
-            { getData: (type: string) => (type === "text/html" ? "<p><b>const</b> a = 1;</p><p>b()</p>" : "") },
+            {
+                getData: (type: string) =>
+                    type === "text/html" ? "<p><b>const</b> a = 1;</p><p>b()<span hidden>secret</span></p><pre>  if (x) {\n    y();\n  }</pre>" : "",
+            },
             { inFence: true, plainOnly: false, selectedText: "" },
         );
 
-        expect(plan).toStrictEqual({ kind: "text", text: "const a = 1;\nb()" });
+        expect(plan.kind === "default" ? undefined : await planText(plan)).toBe("const a = 1;\nb()\n  if (x) {\n    y();\n  }");
+        expect(isMarkdownPlan(plan)).toBe(false);
     });
 });
 
 describe("the plain-paste shortcut on an HTML-only copy", () => {
-    it("pastes its visible text instead of nothing", () => {
-        const plan = planPaste(
-            { getData: (type: string) => (type === "text/html" ? "<p><b>bold</b> text</p>" : "") },
-            { inFence: false, plainOnly: true, selectedText: "" },
-        );
+    it("pastes its visible text instead of nothing, hidden parts left out", async () => {
+        const html = [
+            '<p><b>bold</b>   text<span style="display:none">secret</span><span aria-hidden="true">secret</span></p>',
+            "<table><tr><td>a</td><td>b</td></tr><tr><td>c</td><td>d</td></tr></table><ul><li>one</li><li>two</li></ul>",
+        ].join("");
+        const plan = planPaste({ getData: (type: string) => (type === "text/html" ? html : "") }, { inFence: false, plainOnly: true, selectedText: "" });
 
-        expect(plan).toStrictEqual({ kind: "text", text: "bold text" });
+        expect(plan.kind === "default" ? undefined : await planText(plan)).toBe("bold text\na b\nc d\none\ntwo");
+        // Text as copied: no breaks are added to keep a block off the text beside the caret, even when it starts like one.
+        expect(isMarkdownPlan(plan)).toBe(false);
+    });
+
+    it("takes the text of HTML too big to parse in one pass", () => {
+        const html = `<p>words</p>${"<b></b>".repeat(200_000)}`;
+        const plan = planPaste({ getData: (type: string) => (type === "text/html" ? html : "") }, { inFence: false, plainOnly: true, selectedText: "" });
+
+        expect(plan).toStrictEqual({ kind: "text", text: "words" });
+    });
+});
+
+describe("which plans are Markdown the plan wrote", () => {
+    it("counts converted HTML, a fenced editor copy and a link over a selection, not text as copied", () => {
+        const plan = (data: Record<string, string>, selectedText = ""): boolean =>
+            isMarkdownPlan(planPaste(clipboard(data), { plainOnly: false, selectedText }));
+
+        expect(plan({ "text/html": "<b>bold</b>", "text/plain": "bold" })).toBe(true);
+        expect(plan({ "text/plain": "a\nb", "vscode-editor-data": JSON.stringify({ mode: "typescript" }) })).toBe(true);
+        expect(plan({ "text/plain": "https://x.y/" }, "docs")).toBe(true);
+        expect(plan({ "text/html": "<p>| a |</p>", "text/plain": "| a |" })).toBe(false);
+        const plainShortcut = planPaste(clipboard({ "text/plain": "| a |" }), { plainOnly: true, selectedText: "" });
+
+        expect(isMarkdownPlan(plainShortcut)).toBe(false);
     });
 });

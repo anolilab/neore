@@ -74,7 +74,7 @@ import { appendPastedText, attachLongPaste, draftFitsAsFile, insertPastedText, m
 import type { ComposerInputAreaRef } from "./composer-input-area";
 import ComposerInputArea from "./composer-input-area";
 import ComposerLongTextPrompt from "./composer-long-text-prompt";
-import { breaksBefore, inOpenFence, isLongPaste, onOwnLines, planPaste, planText } from "./composer-paste/paste-plan";
+import { breaksBefore, inOpenFence, isLongPaste, isMarkdownPlan, onOwnLines, planPaste, planText } from "./composer-paste/paste-plan";
 import { takesPaste } from "./composer-paste/paste-target";
 import ComposerPromptQueue from "./composer-prompt-queue";
 import { composerSubmitIntent } from "./composer-submit-intent";
@@ -999,7 +999,7 @@ const ComposerInput = ({
             }
 
             // Converted Markdown that opens or ends with a table, fence, heading, list or quote keeps it off the text beside the caret.
-            const converted = plan.kind === "html" || (plan.kind === "text" && plan.text !== plainText);
+            const converted = isMarkdownPlan(plan);
 
             if (!isLongPaste(pastedText)) {
                 const draft = useChatUIStore.getState().composerText;

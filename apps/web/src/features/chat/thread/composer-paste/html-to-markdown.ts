@@ -23,7 +23,6 @@ const SKIPPED = new Set([
     "META",
     "NOSCRIPT",
     "OBJECT",
-    "PICTURE",
     "SCRIPT",
     "SELECT",
     "STYLE",
@@ -77,6 +76,9 @@ const HTML_SPACE = /[\t\n\f\r ]+/g;
 // After collapsing, an edge holds at most one plain space.
 const EDGE_SPACE = /^ | $/g;
 const PLACEHOLDER = /\0(\d+)\0/g;
+// After blank-line runs are collapsed, an edge holds at most two line breaks.
+const LEADING_NEWLINE = /^\n{1,2}/;
+const TRAILING_NEWLINE = /\n{1,2}$/;
 /** Grid cells all tables of a paste may fill: spans multiply a cell, and past this a table is pasted as its text. */
 const MAX_TABLE_CELLS = 100_000;
 /** Characters quotes and list items may re-indent in all: each re-indents all it holds, so deep nesting is quadratic. */
@@ -90,7 +92,7 @@ const MAX_DEPTH = 500;
 const NOT_WALKED = new Set(["CODE", "KBD", "MATH", "PRE", "SAMP", "TT"]);
 
 interface Context {
-    /** Fenced code blocks, put back at the end so whitespace clean-up never touches them. */
+    /** Fenced code blocks and links in table cells, put back at the end so clean-up and cell escaping never touch them. */
     code: string[];
     depth: number;
     /** Characters quotes and list items may still re-indent. */
@@ -166,8 +168,16 @@ const isHidden = (element: Element): boolean =>
     element.hasAttribute("hidden") ||
     element.getAttribute("aria-hidden") === "true";
 
-/** The text of code as shown, whitespace kept: no hidden parts, and a line per `<br>` and per line block. */
-const codeText = (node: Node): string => {
+/** Elements a page shows on lines of their own besides the blocks: read only as page text, as code rarely holds them. */
+const PAGE_LINES = new Set(["BLOCKQUOTE", "H1", "H2", "H3", "H4", "H5", "H6", "LI", "OL", "PRE", "TABLE", "TR", "UL"]);
+const CELLS = new Set(["TD", "TH"]);
+
+/**
+ * The text of code as shown, whitespace kept: no hidden parts, and a line per `<br>` and per line block. With `page`, the
+ * text of a page instead: HTML whitespace collapsed outside `<pre>`, a line per row, list item and heading, a space
+ * between cells.
+ */
+const codeText = (node: Node, page = false): string => {
     // One list of parts for the whole block, nested elements included, with the last character tracked: joining per element
     // rebuilt a text run once per element around it, and `endsWith` on a string built by `+=` flattens all of it.
     const parts: string[] = [];
@@ -187,17 +197,30 @@ const codeText = (node: Node): string => {
         parts.push(part);
         endsWithNewline = part.endsWith("\n");
     };
-    const walk = (parent: Node, depth: number): void => {
+    const walk = (parent: Node, depth: number, inPre: boolean): void => {
         if (depth >= MAX_DEPTH) {
             throw new RangeError("Nested too deep to convert");
         }
 
         for (const child of parent.childNodes) {
             if (child.nodeType === Node.TEXT_NODE) {
-                push((child.nodeValue ?? "").replaceAll("\0", ""));
+                const text = (child.nodeValue ?? "").replaceAll("\0", "");
+
+                if (!page || inPre) {
+                    push(text);
+                } else {
+                    const collapsed = text.replaceAll(HTML_SPACE, " ");
+
+                    // Collapsed space at the start of a line is not shown.
+                    push(parts.length === 0 || endsWithNewline || lineEnded ? trimSpacesStart(collapsed) : collapsed);
+                }
             } else if (child.nodeType === Node.ELEMENT_NODE && !isHidden(child as Element)) {
                 const { tagName } = child as Element;
-                const isLine = BLOCKS.has(tagName) || LINE_BLOCKS.has(tagName);
+                const isLine = BLOCKS.has(tagName) || LINE_BLOCKS.has(tagName) || (page && PAGE_LINES.has(tagName));
+
+                if (page && CELLS.has(tagName) && parts.length > 0 && !endsWithNewline && !lineEnded) {
+                    push(" ");
+                }
 
                 if (isLine && parts.length > 0 && !endsWithNewline) {
                     // The one break between the two lines: the one the line before asked for is this one.
@@ -208,7 +231,7 @@ const codeText = (node: Node): string => {
                 if (tagName === "BR") {
                     push("\n");
                 } else {
-                    walk(child, depth + 1);
+                    walk(child, depth + 1, inPre || tagName === "PRE");
                 }
 
                 lineEnded ||= isLine;
@@ -216,7 +239,7 @@ const codeText = (node: Node): string => {
         }
     };
 
-    walk(node, 0);
+    walk(node, 0, false);
 
     return parts.join("");
 };
@@ -411,6 +434,10 @@ const escapeOutsideCode = (label: string, escapeText: (text: string) => string, 
 };
 
 const escapeLinkLabel = (label: string): string => escapeOutsideCode(label, escapeLabelText);
+
+/** `[`, `]`, `|` and backslashes in `text` escaped for a link label in a table cell: the row's pipes and the label's brackets at once. */
+const escapeCellLabelText = (text: string): string =>
+    text.replaceAll(/[\\[\]|]+/g, (run: string, offset: number, whole: string) => escapeRun(run, offset + run.length === whole.length));
 
 /** Backslashes and pipes in a cell's text escaped; a backslash tail too when a code span follows, so it never escapes its backtick. */
 const escapeCellText = (text: string): string =>
@@ -729,8 +756,19 @@ const element = (node: Element, context: Context): string => {
             }
 
             const core = text.trim();
-            const label = escapeLinkLabel(core);
             const start = text.indexOf(core);
+
+            if (context.inTable) {
+                // Escaped for the row here and set aside, so the cell's own escaping never escapes the label's backslashes again.
+                const label = escapeOutsideCode(oneLine(core), escapeCellLabelText, (span) => span.replaceAll("|", String.raw`\|`));
+                const cellHref = href.replaceAll("|", String.raw`\|`);
+
+                context.code.push(label === cellHref ? cellHref : `[${label}](${cellHref})`);
+
+                return `${text.slice(0, start)}\0${context.code.length - 1}\0${text.slice(start + core.length)}`;
+            }
+
+            const label = escapeLinkLabel(core);
             const link = label === href ? href : `[${label}](${href})`;
 
             // The spaces around the label stay outside the link: they part it from the words beside it.
@@ -761,6 +799,16 @@ const element = (node: Element, context: Context): string => {
         case "S":
         case "STRIKE": {
             return wrap(children(node, context), "~~", context);
+        }
+        case "DETAILS": {
+            // A closed one shows its summary alone.
+            if (!node.hasAttribute("open")) {
+                const summary = [...node.children].find((child: Element) => child.tagName === "SUMMARY");
+
+                return summary ? element(summary, context) : "";
+            }
+
+            break;
         }
         case "EM":
         case "I": {
@@ -906,6 +954,16 @@ function children(node: Node, context: Context): string {
 
     return parts.join("");
 }
+
+/** The text a clipboard `text/html` payload shows, no Markdown added: hidden parts left out, code indentation kept. */
+export const visibleText = (html: string): string =>
+    codeText(new DOMParser().parseFromString(html, "text/html").body, true)
+        .split("\n")
+        .map((line: string) => trimSpacesEnd(line))
+        .join("\n")
+        .replaceAll(BLANK_LINES, "\n\n")
+        .replace(LEADING_NEWLINE, "")
+        .replace(TRAILING_NEWLINE, "");
 
 /** The Markdown for a clipboard `text/html` payload; empty when it holds no text. */
 export const htmlToMarkdown = (html: string): string => {
