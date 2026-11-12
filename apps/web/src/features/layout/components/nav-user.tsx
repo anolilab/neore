@@ -24,8 +24,10 @@ import { useListDeviceSessions } from "@/features/auth/hooks/device-session-mana
 import { useSession } from "@/features/auth/hooks/session-user-management";
 import useIsAnonymous from "@/features/auth/hooks/use-is-anonymous";
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
+import { clearLastAccountHint } from "@/features/auth/lib/last-account-hint";
 import { getLocalizedError } from "@/features/auth/lib/utilities";
 import useCheckout from "@/features/billing/hooks/use-checkout";
+import { clearPromptQueues } from "@/features/chat/core/stores/prompt-queue-session";
 import { dropStoredDrafts } from "@/features/chat/split/composer-drafts";
 import { clearThreadListCache, releaseThreadListWrites } from "@/features/chat/thread-list/lib/thread-list-cache";
 import { useUserPreferences } from "@/features/layout/hooks/use-ui-state";
@@ -300,6 +302,8 @@ const NavUser: FC<NavUserProperties> = ({ trigger }) => {
                             onSuccess: async () => {
                                 // Only once the session ended (a failed sign-out keeps them and their saving), and before the reload,
                                 // which comes before the handler that drops them would run.
+                                clearLastAccountHint();
+                                clearPromptQueues();
                                 dropStoredDrafts(departing);
                                 resetAnalyticsIdentity();
                                 // Only after the session ends: a failed sign-out keeps the badge.

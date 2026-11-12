@@ -4,6 +4,7 @@ import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { usePromptQueueStore } from "@/features/chat/core/stores/prompt-queue-store";
+import { EMPTY_PROMPT_QUEUE, serializePromptQueue } from "@/features/chat/core/utils/prompt-queue";
 
 import ComposerPromptQueue from "./composer-prompt-queue";
 
@@ -30,6 +31,7 @@ vi.mock("@dnd-kit/core", async (importOriginal) => {
 
 const chat = vi.hoisted(() => {
     return {
+        authenticated: true,
         error: undefined as Error | undefined,
         isStreaming: false,
         // A mode save as the query cache sees it now; `saving` is the flag the last render read.
@@ -80,6 +82,9 @@ vi.mock("@/lib/lunora/crpc", () => {
     };
 
     return {
+        useLunoraAuth: () => {
+            return { isAuthenticated: chat.authenticated };
+        },
         useCRPC: () => {
             return { chat: { steering: { withdrawSteer: options() }, streaming: { getActiveStreamForThread: options() } } };
         },
@@ -131,6 +136,9 @@ describe("composer prompt queue", () => {
                 return { disconnect: vi.fn(), observe: vi.fn(), unobserve: vi.fn() };
             }),
         );
+        chat.authenticated = true;
+        chat.threadId = "thread-1";
+        sessionStorage.clear();
         chat.error = new Error("the reply failed");
         chat.isStreaming = false;
         chat.liveSaving = false;
@@ -142,6 +150,24 @@ describe("composer prompt queue", () => {
         usePromptQueueStore.setState({ offlineHolds: {}, queues: {} });
         // Marks the thread as hydrated, so the (empty) stored queue is not read over ours.
         usePromptQueueStore.getState().hydrate(chat.threadId);
+    });
+
+    it("restores a stored queue only once Lunora confirms the session, never in the optimistic layout before it", () => {
+        chat.authenticated = false;
+        chat.threadId = "thread-stored";
+        sessionStorage.setItem(
+            "neore:prompt-queue:thread-stored",
+            serializePromptQueue({ ...EMPTY_PROMPT_QUEUE, items: [{ attachments: [], id: "q1", text: "an ended session's prompt" }] }) ?? "",
+        );
+
+        const { rerender } = render(<ComposerPromptQueue />);
+
+        expect(screen.queryByText("an ended session's prompt")).toBeNull();
+
+        chat.authenticated = true;
+        rerender(<ComposerPromptQueue />);
+
+        expect(screen.getByText("an ended session's prompt")).toBeTruthy();
     });
 
     it("holds a queued prompt while the thread's mode is saving, and sends it once the save has ended", async () => {

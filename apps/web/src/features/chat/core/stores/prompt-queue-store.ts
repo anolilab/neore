@@ -38,6 +38,14 @@ import {
 } from "@/features/chat/core/utils/prompt-queue";
 
 import type { PendingAttachment } from "./chat-ui-store";
+import {
+    claimPromptQueueRestore,
+    isPromptQueueRestoreAllowed,
+    PROMPT_QUEUE_STORAGE_KEY_PREFIX as STORAGE_KEY_PREFIX,
+    registerPromptQueueReset,
+} from "./prompt-queue-session";
+
+export { allowPromptQueueRestore, clearPromptQueues } from "./prompt-queue-session";
 
 export type QueuedChatPrompt = QueuedPrompt<PendingAttachment>;
 type ThreadQueue = PromptQueueState<PendingAttachment>;
@@ -74,8 +82,6 @@ interface PromptQueueStore {
     /** Removes and returns the thread's offline-held send, if any. */
     takeOfflineHold: (threadId: string) => { explicit: boolean } | undefined;
 }
-
-const STORAGE_KEY_PREFIX = "neore:prompt-queue:";
 
 const generatePromptId = () => `queued-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 
@@ -133,10 +139,12 @@ const writeStoredQueue = (threadId: string, queue: ThreadQueue): void => {
     }
 };
 
-/** Threads already checked against storage this page load, so a drained queue is not resurrected. */
-const hydratedThreadIds = new Set<string>();
-
 export const usePromptQueueStore = create<PromptQueueStore>()((set, get) => {
+    // `clearPromptQueues` lives apart from the store (`prompt-queue-session`) and drops what is in memory through this.
+    registerPromptQueueReset(() => {
+        set({ queues: {} });
+    });
+
     const update = (threadId: string, next: (queue: ThreadQueue) => ThreadQueue) => {
         // A write that beats the composer's hydrate effect must not clobber the stored queue.
         get().hydrate(threadId);
@@ -151,7 +159,12 @@ export const usePromptQueueStore = create<PromptQueueStore>()((set, get) => {
         set((state) => {
             return { queues: { ...state.queues, [threadId]: updated } };
         });
-        writeStoredQueue(threadId, updated);
+
+        // Before the session is confirmed, in memory only: storing it would replace the queue kept from before a reload,
+        // which `hydrate` merges in once it may be read.
+        if (isPromptQueueRestoreAllowed()) {
+            writeStoredQueue(threadId, updated);
+        }
     };
 
     return {
@@ -162,23 +175,35 @@ export const usePromptQueueStore = create<PromptQueueStore>()((set, get) => {
                 return { ...prependPrompt(queue, { ...prompt, id: prompt.id ?? generatePromptId() }), paused: false };
             }),
         hydrate: (threadId) => {
-            if (hydratedThreadIds.has(threadId)) {
+            // Not yet: not marked either, so the first read once the session is confirmed still restores it.
+            if (!claimPromptQueueRestore(threadId)) {
                 return;
             }
 
-            hydratedThreadIds.add(threadId);
-
-            if (get().queues[threadId]?.items.length) {
-                return;
-            }
-
+            const current = get().queues[threadId];
             const restored = restorePromptQueue(readStoredQueue(threadId), fromStoredAttachment);
 
-            if (restored) {
-                set((state) => {
-                    return { queues: { ...state.queues, [threadId]: restored } };
-                });
+            if (!current?.items.length) {
+                if (restored) {
+                    set((state) => {
+                        return { queues: { ...state.queues, [threadId]: restored } };
+                    });
+                }
+
+                return;
             }
+
+            // Queued before the session was confirmed, so kept in memory only (`update`): the stored queue comes first, in
+            // its paused state, then what was queued since; then both are stored.
+            const restoredIds = new Set(restored?.items.map((item) => item.id));
+            const merged: ThreadQueue = restored
+                ? { ...restored, items: [...restored.items, ...current.items.filter((item) => !restoredIds.has(item.id))] }
+                : current;
+
+            set((state) => {
+                return { queues: { ...state.queues, [threadId]: merged } };
+            });
+            writeStoredQueue(threadId, merged);
         },
         holdOffline: (threadId, explicit) =>
             set((state) => {

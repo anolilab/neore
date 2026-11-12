@@ -7,10 +7,14 @@ const uploaded = (fileId: string, name: string): PendingAttachment => {
 };
 
 /** A fresh module is what a reload gives: nothing in memory, only what sessionStorage kept. */
-const reload = async () => {
+const reload = async ({ confirmed = true }: { confirmed?: boolean } = {}) => {
     vi.resetModules();
 
-    const { usePromptQueueStore } = await import("./prompt-queue-store");
+    const { allowPromptQueueRestore, usePromptQueueStore } = await import("./prompt-queue-store");
+
+    if (confirmed) {
+        allowPromptQueueRestore();
+    }
 
     return usePromptQueueStore;
 };
@@ -67,5 +71,103 @@ describe("prompt queue across a reload", () => {
         full.mockRestore();
 
         expect(sessionStorage.getItem("neore:prompt-queue:thread-2")).toBeNull();
+    });
+});
+
+describe("prompt queues after the session ends", () => {
+    it("drops every thread's queue, in memory and in sessionStorage, so the next account cannot restore one", async () => {
+        const before = await reload();
+
+        before.getState().enqueue("thread-1", { attachments: [], id: "q1", text: "the old account's prompt" });
+        before.getState().enqueue("thread-2", { attachments: [], id: "q2", text: "another" });
+        sessionStorage.setItem("unrelated", "kept");
+
+        const { clearPromptQueues } = await import("./prompt-queue-store");
+
+        clearPromptQueues();
+
+        expect(before.getState().queues).toEqual({});
+        expect(sessionStorage.getItem("neore:prompt-queue:thread-1")).toBeNull();
+        expect(sessionStorage.getItem("neore:prompt-queue:thread-2")).toBeNull();
+        expect(sessionStorage.getItem("unrelated")).toBe("kept");
+
+        before.getState().hydrate("thread-1");
+
+        expect(before.getState().queues["thread-1"]).toBeUndefined();
+    });
+});
+
+describe("prompt queues before the session is confirmed", () => {
+    it("restores no stored queue, not through a write either, until the session is confirmed", async () => {
+        const before = await reload();
+
+        before.getState().enqueue("thread-3", { attachments: [], id: "old", text: "the ended session's prompt" });
+
+        const visitor = await reload({ confirmed: false });
+
+        visitor.getState().hydrate("thread-3");
+        expect(visitor.getState().queues["thread-3"]).toBeUndefined();
+
+        visitor.getState().enqueue("thread-3", { attachments: [], id: "new", text: "typed now" });
+        expect(visitor.getState().queues["thread-3"]?.items.map((item) => item.id)).toStrictEqual(["new"]);
+    });
+
+    it("restores the stored queue once the session is confirmed", async () => {
+        const before = await reload();
+
+        before.getState().enqueue("thread-4", { attachments: [], id: "mine", text: "still mine" });
+
+        const after = await reload({ confirmed: false });
+
+        after.getState().hydrate("thread-4");
+        expect(after.getState().queues["thread-4"]).toBeUndefined();
+
+        const { allowPromptQueueRestore } = await import("./prompt-queue-store");
+
+        allowPromptQueueRestore();
+        after.getState().hydrate("thread-4");
+        expect(after.getState().queues["thread-4"]?.items.map((item) => item.id)).toStrictEqual(["mine"]);
+    });
+});
+
+describe("prompt queues across an account switch", () => {
+    it("restores what the next account queues, without the session being confirmed again", async () => {
+        const store = await reload();
+        const { clearPromptQueues } = await import("./prompt-queue-store");
+
+        store.getState().enqueue("thread-5", { attachments: [], id: "old", text: "the departing account's prompt" });
+        clearPromptQueues();
+
+        store.getState().enqueue("thread-5", { attachments: [], id: "new", text: "the next account's prompt" });
+        expect(sessionStorage.getItem("neore:prompt-queue:thread-5")).toContain("the next account's prompt");
+
+        const after = await reload();
+
+        after.getState().hydrate("thread-5");
+        expect(after.getState().queues["thread-5"]?.items.map((item) => item.id)).toStrictEqual(["new"]);
+    });
+});
+
+describe("prompt queues written before the session is confirmed", () => {
+    it("keeps the queue stored before the reload and what was queued since, the stored one first", async () => {
+        const before = await reload();
+
+        before.getState().enqueue("thread-6", { attachments: [], id: "stored", text: "queued before the reload" });
+
+        const after = await reload({ confirmed: false });
+
+        after.getState().enqueue("thread-6", { attachments: [], id: "early", text: "queued before the session was confirmed" });
+        expect(sessionStorage.getItem("neore:prompt-queue:thread-6")).not.toContain("queued before the session was confirmed");
+
+        const { allowPromptQueueRestore } = await import("./prompt-queue-store");
+
+        allowPromptQueueRestore();
+        after.getState().hydrate("thread-6");
+
+        const queue = after.getState().queues["thread-6"];
+
+        expect(queue?.items.map((item) => item.id)).toStrictEqual(["stored", "early"]);
+        expect(queue?.paused).toBe(true);
+        expect(sessionStorage.getItem("neore:prompt-queue:thread-6")).toContain("queued before the session was confirmed");
     });
 });

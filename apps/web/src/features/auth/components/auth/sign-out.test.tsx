@@ -39,6 +39,7 @@ const list = {
 describe("SignOut", () => {
     beforeEach(() => {
         localStorage.clear();
+        sessionStorage.clear();
         auth.session.data = null;
         releaseThreadListWrites();
         localStorage.setItem("neore-collapsed-groups", '["archived"]');
@@ -98,5 +99,33 @@ describe("SignOut", () => {
             expect(auth.signOut).toHaveBeenCalled();
         });
         expect(Object.keys(localStorage).filter((key) => key.startsWith("neore-draft:"))).toStrictEqual([]);
+    });
+
+    it("keeps the queued prompts and the signed-in hint when sign-out fails, as the session may still be active", async () => {
+        auth.outcome = "error";
+        localStorage.setItem("neore-signed-in-hint", "1");
+        sessionStorage.setItem("neore:prompt-queue:thread-a", '{"items":[]}');
+
+        render(<SignOut />);
+
+        await vi.waitFor(() => {
+            expect(globalThis.location.replace).toHaveBeenCalled();
+        });
+        expect(localStorage.getItem("neore-signed-in-hint")).toBe("1");
+        expect(sessionStorage.getItem("neore:prompt-queue:thread-a")).toBe('{"items":[]}');
+    });
+
+    it("drops the queued prompts and the signed-in hint once sign-out succeeds", async () => {
+        auth.outcome = "success";
+        localStorage.setItem("neore-signed-in-hint", "1");
+        sessionStorage.setItem("neore:prompt-queue:thread-a", '{"items":[]}');
+
+        render(<SignOut />);
+
+        await vi.waitFor(() => {
+            expect(globalThis.location.replace).toHaveBeenCalled();
+        });
+        expect(localStorage.getItem("neore-signed-in-hint")).toBeNull();
+        expect(sessionStorage.getItem("neore:prompt-queue:thread-a")).toBeNull();
     });
 });
