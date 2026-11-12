@@ -40,6 +40,25 @@ describe("captureException before PostHog initialises", () => {
         vi.restoreAllMocks();
     });
 
+    it("never sends an error caught longer ago than the age limit, when PostHog starts late", async () => {
+        vi.useFakeTimers({ now: new Date("2026-11-12T10:00:00Z"), toFake: ["Date"] });
+
+        try {
+            const client = await loadClientModule();
+            const stale = new Error("long ago");
+            const fresh = new Error("just now");
+
+            client.captureException(stale);
+            vi.setSystemTime(Date.now() + client.PENDING_EVENT_MAX_AGE_MS + 1);
+            client.captureException(fresh);
+            client.flushPendingCaptures(await client.loadPostHog());
+
+            expect(posthog.captureException).toHaveBeenCalledExactlyOnceWith(fresh, undefined);
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
     it("queues what is caught while the chunk loads and sends it, in order, once PostHog has started", async () => {
         const client = await loadClientModule();
         const early = new Error("hydration failed");

@@ -116,6 +116,11 @@ class PostHogCapturingBoundary extends React.Component<
     { children: ReactNode; fallback: (captured: CapturedError) => ReactNode },
     { captured: CapturedError | null }
 > {
+    /** The fallback in the same pass that caught the error; `componentDidCatch` adds the component stack after. */
+    public static getDerivedStateFromError(error: unknown): { captured: CapturedError } {
+        return { captured: { componentStack: "", error } };
+    }
+
     public override state: { captured: CapturedError | null } = { captured: null };
 
     public override componentDidCatch(error: unknown, errorInfo: ErrorInfo): void {

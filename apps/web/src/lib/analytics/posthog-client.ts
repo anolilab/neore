@@ -77,7 +77,15 @@ interface PendingEvent {
 }
 
 /** A caught error waiting for PostHog, with who was signed in then, as a queued event carries it (`PendingEvent.userId`). */
-const pendingExceptions: { error: unknown; properties: ExceptionProperties; userId?: string | null }[] = [];
+const pendingExceptions: { caughtAt: number; error: unknown; properties: ExceptionProperties; userId?: string | null }[] = [];
+
+/** Drops the queued errors past the age limit the queued events keep (`PENDING_EVENT_MAX_AGE_MS`): never sent late. */
+const dropExpiredExceptions = (): void => {
+    const oldest = Date.now() - PENDING_EVENT_MAX_AGE_MS;
+    const fresh = pendingExceptions.filter(({ caughtAt }) => caughtAt >= oldest);
+
+    pendingExceptions.splice(0, pendingExceptions.length, ...fresh);
+};
 const queueState: { closed: boolean; events?: PendingEvent[] } = { closed: false };
 
 /**
@@ -248,7 +256,8 @@ export const captureException = (error: unknown, properties?: ExceptionPropertie
         return;
     }
 
-    pendingExceptions.push({ error, properties, userId: caughtUnder() });
+    dropExpiredExceptions();
+    pendingExceptions.push({ caughtAt: Date.now(), error, properties, userId: caughtUnder() });
 
     if (pendingExceptions.length > MAX_PENDING_EXCEPTIONS) {
         pendingExceptions.shift();
@@ -339,6 +348,9 @@ const capturePending = (posthog: PostHog, { event, properties, timestamp }: Pend
  */
 export const flushPendingCaptures = (posthog: PostHog): void => {
     const events = [...pendingEvents()];
+
+    dropExpiredExceptions();
+
     const exceptions = [...pendingExceptions];
     const landing = landingState.pageview;
 
@@ -484,6 +496,12 @@ export const forgetPostHogIdentity = (token: string): void => {
 
     try {
         clearStorageKeys(globalThis.localStorage, prefix);
+    } catch {
+        // Storage blocked: nothing was persisted there either.
+    }
+
+    // Apart: one storage blocked must not keep the other's identity (the session's window id) past the sign-out.
+    try {
         clearStorageKeys(globalThis.sessionStorage, prefix);
     } catch {
         // Storage blocked: nothing was persisted there either.

@@ -29,6 +29,22 @@ describe(resetAnalyticsIdentity, () => {
         sessionStorage.clear();
     });
 
+    it("clears the session's PostHog keys even when localStorage is blocked", () => {
+        sessionStorage.setItem("ph_phc_aPLbSLcEQ_window_id", "window");
+
+        const blocked = vi.spyOn(globalThis, "localStorage", "get").mockImplementation(() => {
+            throw new DOMException("blocked", "SecurityError");
+        });
+
+        try {
+            resetAnalyticsIdentity();
+        } finally {
+            blocked.mockRestore();
+        }
+
+        expect(sessionStorage.getItem("ph_phc_aPLbSLcEQ_window_id")).toBeNull();
+    });
+
     it("removes the identity PostHog stored when a sign-out comes before its chunk has loaded", () => {
         const name = "ph_phc_aPLbSLcEQ_posthog";
 
