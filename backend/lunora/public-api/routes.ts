@@ -116,6 +116,8 @@ export interface RouteDefinition {
     successStatus?: number;
     summary: string;
     tag: string;
+    /** The body takes a `clientMessageId`: a retry answers 409 `chat_start_in_progress` or 422 `client_message_id_reused` (documented in the OpenAPI output). */
+    takesClientMessageId?: boolean;
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -165,6 +167,15 @@ const chatStartError = (status: number, body: { error?: string; message?: string
             limit: body.error,
             ...(typeof body.retryAfter === "number" && { retryAfterSeconds: body.retryAfter / 1000 }),
         });
+    }
+
+    // A retry of a send with a `clientMessageId` (`chat/start-claim.ts`).
+    if (status === 409 && body.error === "CHAT_START_IN_PROGRESS") {
+        return new PublicApiError("chat_start_in_progress", body.message ?? "This message is still being sent.");
+    }
+
+    if (status === 422 && body.error === "CLIENT_MESSAGE_ID_REUSED") {
+        return new PublicApiError("client_message_id_reused", body.message ?? "This message id was already used for a different message.");
     }
 
     if (status === 409 && body.error === "HOST_RUN_THREAD") {
@@ -222,7 +233,10 @@ const collectBlockingReply = async (input: RouteInput, threadId: string | undefi
     }
 };
 
-const startChat = async (input: RouteInput, request: { model?: string; prompt: string; stream?: boolean; threadId?: string }): Promise<RouteResult> => {
+const startChat = async (
+    input: RouteInput,
+    request: { clientMessageId?: string; model?: string; prompt: string; stream?: boolean; threadId?: string },
+): Promise<RouteResult> => {
     const signingSecret = process.env.LLM_GATEWAY_SIGNING_SECRET;
 
     if (!signingSecret) {
@@ -233,6 +247,8 @@ const startChat = async (input: RouteInput, request: { model?: string; prompt: s
     const response = await runChatStart(
         input.ctx,
         {
+            // A retry with the same id answers with the first send's ids and saves nothing (`chat/start-claim.ts`).
+            ...(request.clientMessageId !== undefined && { clientMessageId: request.clientMessageId }),
             mode: "text",
             model: resolveChatModel(request.model),
             prompt: request.prompt,
@@ -242,6 +258,7 @@ const startChat = async (input: RouteInput, request: { model?: string; prompt: s
         "outside_agent",
     );
     const body = (await response.json()) as {
+        duplicate?: boolean;
         error?: string;
         message?: string;
         messageId?: string;
@@ -254,6 +271,8 @@ const startChat = async (input: RouteInput, request: { model?: string; prompt: s
     if (!response.ok || !body.threadId || !body.messageId || !body.streamId || !body.streamToken) {
         throw chatStartError(response.ok ? 500 : response.status, body);
     }
+
+    const duplicate = body.duplicate === true;
 
     if (request.stream === false) {
         // The stream lives where `runChatStart` put it: the thread OWNER's shard,
@@ -269,6 +288,7 @@ const startChat = async (input: RouteInput, request: { model?: string; prompt: s
 
         return {
             data: {
+                ...(duplicate && { duplicate: true }),
                 messageId: body.messageId,
                 ...(collected.pendingRequest && { pendingRequest: collected.pendingRequest }),
                 reasoning: collected.reasoning,
@@ -279,7 +299,17 @@ const startChat = async (input: RouteInput, request: { model?: string; prompt: s
         };
     }
 
-    return { data: { messageId: body.messageId, streamId: body.streamId, streamToken: body.streamToken, threadId: body.threadId }, status: 202 };
+    // A retry answers 200: the send it names was already started.
+    return {
+        data: {
+            ...(duplicate && { duplicate: true }),
+            messageId: body.messageId,
+            streamId: body.streamId,
+            streamToken: body.streamToken,
+            threadId: body.threadId,
+        },
+        status: duplicate ? 200 : 202,
+    };
 };
 
 /**
@@ -556,6 +586,7 @@ export const ROUTES: ReadonlyArray<RouteDefinition> = [
         successStatus: 202,
         summary: "Send a message",
         tag: "Chat",
+        takesClientMessageId: true,
     },
     {
         body: zStreamRequestSchema,

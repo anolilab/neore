@@ -105,6 +105,13 @@ describe("OpenAPI document", () => {
         expect(key?.description).toContain("webhook");
     });
 
+    it("documents the clientMessageId retry answers on POST /chat", () => {
+        const responses = paths["/chat"]!["post"]!["responses"] as Record<string, { description: string }>;
+
+        expect(responses["409"]!.description).toContain("chat_start_in_progress");
+        expect(responses["422"]!.description).toContain("client_message_id_reused");
+    });
+
     it("documents 409 on the trigger update only among PATCH routes", () => {
         expect(Object.keys(paths["/triggers/{triggerId}"]!["patch"]!["responses"] as object)).toContain("409");
     });

@@ -470,9 +470,9 @@ describe("MCP write tools", () => {
 
         expect(Object.keys(byName)).toEqual(["create_thread", "send_message"]);
         expect(byName["create_thread"].required).toEqual(["prompt"]);
-        expect(Object.keys(byName["create_thread"].properties)).toEqual(["model", "prompt", "idempotencyKey"]);
+        expect(Object.keys(byName["create_thread"].properties)).toEqual(["clientMessageId", "model", "prompt", "idempotencyKey"]);
         expect(byName["send_message"].required).toEqual(["prompt", "threadId"]);
-        expect(Object.keys(byName["send_message"].properties)).toEqual(["model", "prompt", "threadId", "idempotencyKey"]);
+        expect(Object.keys(byName["send_message"].properties)).toEqual(["clientMessageId", "model", "prompt", "threadId", "idempotencyKey"]);
         expect(byName["send_message"].additionalProperties).toBe(false);
     });
 

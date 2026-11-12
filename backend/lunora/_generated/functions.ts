@@ -560,6 +560,7 @@ export const LUNORA_FUNCTION_MANIFEST: Readonly<Record<string, FunctionManifestE
     "chat_functions:updateThreadOrder": {"argumentDescriptors":[{"kind":"array","name":"threadOrders","optional":false,"element":"object"}],"exportName":"updateThreadOrder","kind":"mutation","moduleId":"lunora_chat_functions_73","visibility":"public"},
     "chat_functions:updateThreadVisibility": {"argumentDescriptors":[{"kind":"boolean","name":"isPublic","optional":true},{"kind":"id","name":"threadId","optional":false,"table":"threads"}],"exportName":"updateThreadVisibility","kind":"mutation","moduleId":"lunora_chat_functions_73","visibility":"public"},
     "chat_functions:validateThreadExists": {"argumentDescriptors":[{"kind":"id","name":"threadId","optional":false,"table":"threads"}],"exportName":"validateThreadExists","kind":"query","moduleId":"lunora_chat_functions_73","visibility":"public"},
+    "chat_functions:writeThreadCategory": {"argumentDescriptors":[{"kind":"string","name":"category","optional":false},{"kind":"number","name":"claimedAt","optional":false},{"kind":"string","name":"key","optional":false},{"kind":"id","name":"threadId","optional":false,"table":"threads"}],"exportName":"writeThreadCategory","kind":"mutation","moduleId":"lunora_chat_functions_73","visibility":"internal"},
     "chat_goals_execute:reviewGoalRound": {"argumentDescriptors":[{"kind":"id","name":"goalId","optional":false,"table":"threadGoals"},{"kind":"number","name":"round","optional":false}],"exportName":"reviewGoalRound","kind":"action","moduleId":"lunora_chat_goals_execute_74","visibility":"internal"},
     "chat_goals_functions:getThreadGoal": {"argumentDescriptors":[{"kind":"id","name":"threadId","optional":false,"table":"threads"},{"kind":"string","name":"unlockProof","optional":true}],"exportName":"getThreadGoal","kind":"query","moduleId":"lunora_chat_goals_functions_75","visibility":"public"},
     "chat_goals_internal:chargeGoalRound": {"argumentDescriptors":[{"kind":"string","name":"userId","optional":false}],"exportName":"chargeGoalRound","kind":"mutation","moduleId":"lunora_chat_goals_internal_76","visibility":"internal"},
@@ -2369,6 +2370,7 @@ export const LUNORA_FUNCTIONS: Record<string, RegisteredLunoraFunction> = {
     "chat_functions:updateThreadOrder": { args: {}, handler: unloadedFunctionHandler, "argumentDescriptors":[{"kind":"array","name":"threadOrders","optional":false,"element":"object"}],"kind":"mutation","visibility":"public" } satisfies RegisteredLunoraFunction & Pick<FunctionManifestEntry, "argumentDescriptors" | "channel" | "expose">,
     "chat_functions:updateThreadVisibility": { args: {}, handler: unloadedFunctionHandler, "argumentDescriptors":[{"kind":"boolean","name":"isPublic","optional":true},{"kind":"id","name":"threadId","optional":false,"table":"threads"}],"kind":"mutation","visibility":"public" } satisfies RegisteredLunoraFunction & Pick<FunctionManifestEntry, "argumentDescriptors" | "channel" | "expose">,
     "chat_functions:validateThreadExists": { args: {}, handler: unloadedFunctionHandler, "argumentDescriptors":[{"kind":"id","name":"threadId","optional":false,"table":"threads"}],"kind":"query","visibility":"public" } satisfies RegisteredLunoraFunction & Pick<FunctionManifestEntry, "argumentDescriptors" | "channel" | "expose">,
+    "chat_functions:writeThreadCategory": { args: {}, handler: unloadedFunctionHandler, "argumentDescriptors":[{"kind":"string","name":"category","optional":false},{"kind":"number","name":"claimedAt","optional":false},{"kind":"string","name":"key","optional":false},{"kind":"id","name":"threadId","optional":false,"table":"threads"}],"kind":"mutation","visibility":"internal" } satisfies RegisteredLunoraFunction & Pick<FunctionManifestEntry, "argumentDescriptors" | "channel" | "expose">,
     "chat_goals_execute:reviewGoalRound": { args: {}, handler: unloadedFunctionHandler, "argumentDescriptors":[{"kind":"id","name":"goalId","optional":false,"table":"threadGoals"},{"kind":"number","name":"round","optional":false}],"kind":"action","visibility":"internal" } satisfies RegisteredLunoraFunction & Pick<FunctionManifestEntry, "argumentDescriptors" | "channel" | "expose">,
     "chat_goals_functions:getThreadGoal": { args: {}, handler: unloadedFunctionHandler, "argumentDescriptors":[{"kind":"id","name":"threadId","optional":false,"table":"threads"},{"kind":"string","name":"unlockProof","optional":true}],"kind":"query","visibility":"public" } satisfies RegisteredLunoraFunction & Pick<FunctionManifestEntry, "argumentDescriptors" | "channel" | "expose">,
     "chat_goals_internal:chargeGoalRound": { args: {}, handler: unloadedFunctionHandler, "argumentDescriptors":[{"kind":"string","name":"userId","optional":false}],"kind":"mutation","visibility":"internal" } satisfies RegisteredLunoraFunction & Pick<FunctionManifestEntry, "argumentDescriptors" | "channel" | "expose">,
@@ -3935,7 +3937,7 @@ export interface Caller {
         functions: {
             abortStreamByMessageId: (args: { messageId: string; threadId: Id<"threads">; unlockProof?: string }) => Promise<{ aborted: boolean }>;
             abortThreadStream: (args: { threadId: Id<"threads">; unlockProof?: string }) => Promise<{ aborted: boolean }>;
-            admitCategoryRun: (args: { key: string; userId: string }) => Promise<{ claimedAt: number; outcome: "admitted" } | { category: string; outcome: "answered" } | { outcome: "in-flight" }>;
+            admitCategoryRun: (args: { key: string; userId: string }) => Promise<{ claimedAt: number; outcome: "admitted" } | { category: string; claimedAt: number; outcome: "answered" } | { outcome: "in-flight" }>;
             branchThread: (args: { branchName?: string; branchPoint?: number; messageId?: string; threadId: Id<"threads">; unlockProof?: string }) => Promise<string>;
             continueThread: (args: { model: string; prompt: string; threadId: Id<"threads">; unlockProof?: string }) => Promise<unknown>;
             convertTemporaryToPermanent: (args: { threadId: Id<"threads"> }) => Promise<string>;
@@ -4023,6 +4025,7 @@ export interface Caller {
             updateThreadOrder: (args: { threadOrders: Array<{ order: number; threadId: string }> }) => Promise<{ success: boolean }>;
             updateThreadVisibility: (args: { isPublic?: boolean; threadId: Id<"threads"> }) => Promise<{ success: boolean }>;
             validateThreadExists: (args: { threadId: Id<"threads"> }) => Promise<boolean>;
+            writeThreadCategory: (args: { category: string; claimedAt: number; key: string; threadId: Id<"threads"> }) => Promise<"written" | "refused" | "moved">;
         };
         goals: {
             execute: {
@@ -6094,6 +6097,7 @@ export const createCaller = (context: CallerCtx): Caller => ({
             updateThreadOrder: (args) => callRegistered(context, "chat_functions:updateThreadOrder", args),
             updateThreadVisibility: (args) => callRegistered(context, "chat_functions:updateThreadVisibility", args),
             validateThreadExists: (args) => callRegistered(context, "chat_functions:validateThreadExists", args),
+            writeThreadCategory: (args) => callRegistered(context, "chat_functions:writeThreadCategory", args),
         },
         goals: {
             execute: {

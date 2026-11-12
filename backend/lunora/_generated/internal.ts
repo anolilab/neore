@@ -383,7 +383,7 @@ export interface InternalApiTypes {
             runStreamingAgent: FunctionReference<"action", { isAnonymous?: boolean; messageId: string; organizationId?: string; origin?: "lead" | "outside_agent"; resume?: string; skill?: { rawArgs: string; slug: string }; streamId: string; streamingConfig: { contentType: string; customSystemPrompt?: string; enabledFeatures?: Array<string>; imageSize?: string; mcpServerNames?: Array<string>; model: string; reasoningEffort?: number; researchDepth?: string; searchMode?: string; shouldAutoContinue?: boolean; statelessMode?: boolean }; threadId: string; userId: string; userPrompt?: string }, void>;
         };
         functions: {
-            admitCategoryRun: FunctionReference<"mutation", { key: string; userId: string }, { claimedAt: number; outcome: "admitted" } | { category: string; outcome: "answered" } | { outcome: "in-flight" }>;
+            admitCategoryRun: FunctionReference<"mutation", { key: string; userId: string }, { claimedAt: number; outcome: "admitted" } | { category: string; claimedAt: number; outcome: "answered" } | { outcome: "in-flight" }>;
             createCategoryChat: FunctionReference<"action", { prompt: string; promptId?: string; threadId: string }, void>;
             createSummarizeChat: FunctionReference<"action", { threadId: string; userId: string }, void>;
             createThreadRelationship: FunctionReference<"mutation", { branchPoint?: number; branchType?: "branch" | "continuation" | "comparison"; parentThreadId: string; threadId: string }, void>;
@@ -421,6 +421,7 @@ export interface InternalApiTypes {
             retryTitleWrite: FunctionReference<"action", { chargeKey: string; expectedTitleDigest: string; regenerateClaimedAt?: number; requestedBy?: string; threadId: string }, void>;
             streamAsync: FunctionReference<"action", { customSystemPrompt?: string; enabledFeatures?: Array<string>; jobId?: string; messageId: string; model: string; parentId?: string; prompt?: string; reasoningEffort?: number; statelessMode?: boolean; threadId: string }, null>;
             updateThreadModel: FunctionReference<"mutation", { autoModel?: boolean; customSystemPrompt?: string; dictationLanguage?: string; enabledFeatures?: Array<string>; model: string; order?: number; reasoningEffort?: number; statelessMode?: boolean; threadId: string; userId: string }, null>;
+            writeThreadCategory: FunctionReference<"mutation", { category: string; claimedAt: number; key: string; threadId: Id<"threads"> }, "written" | "refused" | "moved">;
         };
         goals: {
             execute: {
@@ -1749,6 +1750,7 @@ export const internal: InternalApiTypes = {
             retryTitleWrite: { __lunoraRef: "chat_functions:retryTitleWrite" },
             streamAsync: { __lunoraRef: "chat_functions:streamAsync" },
             updateThreadModel: { __lunoraRef: "chat_functions:updateThreadModel" },
+            writeThreadCategory: { __lunoraRef: "chat_functions:writeThreadCategory" },
         },
         goals: {
             execute: {

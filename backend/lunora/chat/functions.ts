@@ -60,7 +60,7 @@ import {
     type ThreadPermission,
 } from "../agent/thread-read-access";
 import { insertTemporaryThread, publicThread, threadForViewer } from "../agent/threads";
-import { insertThread } from "../agent/table-writes";
+import { insertThread, patchThread } from "../agent/table-writes";
 import { withoutUndefined } from "../lib/patch";
 import { isThreadLocked, throwThreadLocked } from "../lib/thread-lock";
 import { readChildThreads } from "./lib/child-threads";
@@ -2346,7 +2346,7 @@ export const admitCategoryRun = internalMutation
     .output(
         v.union(
             v.object({ claimedAt: v.number(), outcome: v.literal("admitted") }),
-            v.object({ category: v.string(), outcome: v.literal("answered") }),
+            v.object({ category: v.string(), claimedAt: v.number(), outcome: v.literal("answered") }),
             v.object({ outcome: v.literal("in-flight") }),
         ),
     )
@@ -2355,7 +2355,11 @@ export const admitCategoryRun = internalMutation
 
         if (existing) {
             if (existing.result !== undefined) {
-                return { category: (JSON.parse(existing.result) as { category: string }).category, outcome: "answered" as const };
+                return {
+                    category: (JSON.parse(existing.result) as { category: string }).category,
+                    claimedAt: existing.claimedAt,
+                    outcome: "answered" as const,
+                };
             }
 
             if (ctx.now - existing.claimedAt < CATEGORY_LEASE_MS) {
@@ -2384,6 +2388,32 @@ const categoryRefused = (thread: (Parameters<typeof isThreadLocked>[0] & { delet
     !thread || isThreadLocked(thread) || thread.deletedAt !== undefined;
 
 /**
+ * Writes a category in one transaction with everything that may forbid it: the thread exists, is not locked or deleted and
+ * has no category yet, and the delivery's claim still holds the key (`claimedAt`). A lock or a delete during the model call,
+ * or a takeover of a delivery that outlasted its lease, writes nothing. Not `updateThread`, whose other callers keep their rules.
+ */
+export const writeThreadCategory = internalMutation
+    .input({ category: v.string().max(MAX_LENGTH.short), claimedAt: v.number(), key: v.string().max(MAX_LENGTH.short), threadId: v.id("threads") })
+    .output(v.union(v.literal("written"), v.literal("refused"), v.literal("moved")))
+    .mutation(async ({ args: { category, claimedAt, key, threadId }, ctx }) => {
+        const thread = await ctx.db.get("threads", threadId);
+
+        if (categoryRefused(thread) || thread?.category) {
+            return "refused" as const;
+        }
+
+        const claim = await claimRow(ctx, CATEGORY_CLAIM_SCOPE, key);
+
+        if (claim?.claimedAt !== claimedAt) {
+            return "moved" as const;
+        }
+
+        await patchThread(ctx.db, threadId, { category });
+
+        return "written" as const;
+    });
+
+/**
  * Sets a new chat's category from its first prompt. One paid call per prompt, under the prompt's `thread-category`
  * claim: a recorded answer is written before any model is resolved, so it lands whatever the model filters say by then;
  * a delivery that finds another's unanswered claim within its lease fails, and the scheduler's retry comes back to it
@@ -2399,9 +2429,10 @@ export const createCategoryChat = internalAction
     .action(async ({ args: arguments_, ctx: context }) => {
         const threadId = arguments_.threadId as Id<"threads">;
         const readThread = async () => await context.runQuery(internal.agent.threads.getThreadInternal, { threadId });
-        const writeCategory = async (category: string): Promise<void> => {
-            await context.runMutation(internal.agent.threads.updateThread, { patch: { category }, threadId });
-        };
+        // Fenced, and checked against a lock or delete in the same transaction (`writeThreadCategory`).
+        const writeCategory = async (category: string, claimedAt: number): Promise<"moved" | "refused" | "written"> =>
+            await context.runMutation(internal.chat.functions.writeThreadCategory, { category, claimedAt, key: claimKey, threadId });
+        const claimKey = `${arguments_.threadId}:${arguments_.promptId ?? "thread"}`;
         // As in `createTitleChat`: a thread that is gone is skipped, not retried.
         const threadData = await readThread();
 
@@ -2416,13 +2447,13 @@ export const createCategoryChat = internalAction
             return;
         }
 
-        const claimKey = `${arguments_.threadId}:${arguments_.promptId ?? "thread"}`;
         const admission = await context.runMutation(internal.chat.functions.admitCategoryRun, { key: claimKey, userId: threadData.userId });
 
         if (admission.outcome === "answered") {
             // An earlier delivery's answer: written with no model, whatever the filters allow by now.
-            await writeCategory(admission.category);
-            context.log.event("chat.thread_category", { category: admission.category, resumed: true });
+            const written = await writeCategory(admission.category, admission.claimedAt);
+
+            context.log.event("chat.thread_category", { category: admission.category, resumed: true, written });
 
             return;
         }
@@ -2491,28 +2522,32 @@ export const createCategoryChat = internalAction
             throw error;
         }
 
-        // Kept before the write, so a failed write is retried from it with no second call. A record that fails, or finds the
-        // claim moved, keeps the claim unanswered: the write below still lands, and if it fails too, the lease lets a later
-        // delivery redo it.
+        // Kept before the write, so a failed write is retried from it with no second call. A record that threw (transient)
+        // leaves the claim unanswered: the write below still lands, and if it fails too, the lease lets a later delivery redo it.
         const recorded = await context
             .runMutation(internal.chat.functions.recordCategoryAnswer, { category: answer.category, claimedAt, key: claimKey })
             .catch((error: unknown) => {
                 console.error("[createCategoryChat] Could not keep the category answer:", error);
 
-                return false;
+                return undefined;
             });
 
-        if (!recorded) {
-            context.log.event("chat.thread_category", { unrecorded: true });
+        // The claim moved: this delivery outlasted its lease and another took over. Its answer, not this one, is the chat's.
+        if (recorded === false) {
+            context.log.event("chat.thread_category", { skipped: "claim-moved" });
+
+            return;
         }
 
-        await writeCategory(answer.category);
+        const written = await writeCategory(answer.category, claimedAt);
 
         context.log.event("chat.thread_category", {
             category: answer.category,
+            ...(recorded === undefined && { unrecorded: true }),
             inputTokens: answer.inputTokens,
             model: answer.model,
             outputTokens: answer.outputTokens,
+            written,
         });
     });
 

@@ -42,6 +42,33 @@ const REACHED = "getAgent reached";
 
 let functionsModule: Record<string, unknown>;
 
+/** `chat/functions`, with its category write failing on demand (`categoryWrites`) before the real, fenced write runs. */
+const registerFunctions = (): void => {
+    registerModule(registry, "chat_functions", functionsModule);
+
+    const realWrite = functionsModule["writeThreadCategory"] as { handler?: (ctx: unknown, args: unknown) => Promise<unknown> } | undefined;
+
+    if (realWrite?.handler) {
+        const { handler } = realWrite;
+
+        registry.set(
+            "chat_functions:writeThreadCategory",
+            internalMutation
+                .input({ category: v.string(), claimedAt: v.number(), key: v.string(), threadId: v.string() })
+                .output(v.string())
+                .mutation(async ({ args, ctx }) => {
+                    if (categoryWrites.failures > 0) {
+                        categoryWrites.failures -= 1;
+
+                        throw new Error("the category write failed");
+                    }
+
+                    return (await handler(ctx, args)) as string;
+                }),
+        );
+    }
+};
+
 const writeCategoryRow = async (ctx: any, rowThreadId: string, patch: Record<string, unknown>): Promise<void> => {
     if (categoryWrites.failures > 0) {
         categoryWrites.failures -= 1;
@@ -56,7 +83,7 @@ beforeAll(async () => {
     registerModule(registry, "agent_threads", await import("../agent/threads"));
     registerModule(registry, "auth_functions", await import("../auth/functions"));
     functionsModule = await import("./functions");
-    registerModule(registry, "chat_functions", functionsModule);
+    registerFunctions();
     registerModule(registry, "lib_claim_once", await import("../lib/claim-once"));
     // The thread write a category delivery makes, failing on demand.
     registry.set(
@@ -287,7 +314,7 @@ describe("createCategoryChat with an unanswered claim", () => {
     afterEach(() => {
         vi.useRealTimers();
         registry.delete("chat_functions:recordCategoryAnswer");
-        registerModule(registry, "chat_functions", functionsModule);
+        registerFunctions();
     });
 
     it("leaves a claim abandoned before its answer to the scheduler's retry, which takes it over after the lease", async () => {
@@ -342,7 +369,7 @@ describe("createCategoryChat with an unanswered claim", () => {
 
         await expect(deliver()).rejects.toThrow("the category write failed");
         registry.delete("chat_functions:recordCategoryAnswer");
-        registerModule(registry, "chat_functions", functionsModule);
+        registerFunctions();
 
         // No answer was kept: in flight until the lease ends, then taken over with one more call.
         await expect(deliver()).rejects.toThrow();
@@ -353,5 +380,66 @@ describe("createCategoryChat with an unanswered claim", () => {
         await expect(deliver()).resolves.toBeUndefined();
         expect(calls).toBe(2);
         expect(await categoryOf()).toBe("coding");
+    });
+});
+
+describe("createCategoryChat whose thread changes during the model call", () => {
+    afterEach(() => {
+        vi.useRealTimers();
+    });
+
+    it("writes nothing into a chat locked while the model was answering", async () => {
+        getAgent.mockResolvedValue(
+            categoryAgent(async () => {
+                await harness.run(async (ctx: any) => await ctx.db.patch("threads", threadId, { lockedAt: Date.now() }));
+
+                return ANSWER;
+            }),
+        );
+
+        await expect(deliver()).resolves.toBeUndefined();
+        expect(await categoryOf()).toBeUndefined();
+    });
+
+    it("leaves the answer of the delivery that took over a slow one's lease, which never overwrites it", async () => {
+        vi.useFakeTimers({ toFake: ["Date"] });
+
+        let calls = 0;
+        let slowMayAnswer = false;
+
+        getAgent.mockResolvedValue(
+            categoryAgent(async () => {
+                calls += 1;
+
+                if (calls === 1) {
+                    // The first delivery's call outlasts its lease.
+                    await vi.waitFor(
+                        () => {
+                            expect(slowMayAnswer).toBe(true);
+                        },
+                        { timeout: 5000 },
+                    );
+
+                    return ANSWER;
+                }
+
+                return { ...ANSWER, text: "math" };
+            }),
+        );
+
+        const slow = deliver();
+
+        await vi.waitFor(() => {
+            expect(calls).toBe(1);
+        });
+        vi.setSystemTime(Date.now() + CATEGORY_LEASE_MS);
+
+        // Another delivery takes the claim over and writes its answer.
+        await expect(deliver()).resolves.toBeUndefined();
+        expect(await categoryOf()).toBe("math");
+
+        slowMayAnswer = true;
+        await expect(slow).resolves.toBeUndefined();
+        expect(await categoryOf()).toBe("math");
     });
 });
