@@ -444,13 +444,15 @@ export function parseListStart(value: string | null): bigint | null {
     return match ? BigInt(match[1] ?? "0") : null;
 }
 
-const INLINE_SYNTAX = /[\\*`[\]_]/g;
-const INLINE_SYNTAX_PRESENT = /[\\*`[\]_]/;
+// A `<` opens raw HTML or an autolink only when a letter, `/`, `!` or `?` follows it.
+// Any other follower (a space, a digit, `=`, `<`) cannot, so such a `<` stays as it is.
+const INLINE_SYNTAX = /[\\*`[\]_]|<(?=[a-z/!?])/gi;
+const INLINE_SYNTAX_PRESENT = /[\\*`[\]_]|<[a-z/!?]/i;
 
 // The line-start markers, anchored and non-global. Their first characters differ, so
-// at most one can match. An ordered-list number is handled apart: its dot is escaped.
+// at most one can match. An ordered-list number is handled apart: its `.` or `)` is escaped.
 const LINE_START = /^(?:-|\+ |=+|#{1,6} |~~~|>)/;
-const ORDERED_START = /^(\d+)\. /;
+const ORDERED_START = /^(\d+)([.)]) /;
 
 /**
  * Escapes text so that it cannot start a Markdown block or open an inline
@@ -467,7 +469,7 @@ export function escapeMarkdown(string: string): string {
     // After the inline pass, a string that starts with a backslash matches no
     // line-start rule, so matching on the escaped string is exact.
     if (ORDERED_START.test(inline)) {
-        return inline.replace(ORDERED_START, String.raw`$1\. `);
+        return inline.replace(ORDERED_START, String.raw`$1\$2 `);
     }
 
     return inline.replace(LINE_START, String.raw`\$&`);
