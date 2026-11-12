@@ -559,6 +559,92 @@ describe("saving", () => {
         expect([...memory.stores.keys.keys()]).toStrictEqual(["fresh"]);
     });
 
+    it("restores the record on the next opening when the gate closed again while it was read", async () => {
+        const memory = memoryStore();
+
+        await saveTexts(memory, ALICE, [
+            [KEY, "kept"],
+            [OTHER_KEY, "kept"],
+        ]);
+
+        const listeners = new Set<() => void>();
+        const notify = (): void => {
+            for (const listener of listeners) {
+                listener();
+            }
+        };
+        const { gate, writeGate } = openGate();
+        const reads = { done: 0 };
+        const counted: RecordStore = {
+            ...memory.store,
+            get: async (name, key) => {
+                const value = await memory.store.get(name, key);
+
+                if (name === "entries") {
+                    reads.done += 1;
+                }
+
+                return value;
+            },
+        };
+        const settleReads = async (count: number): Promise<void> => {
+            // WebCrypto runs outside the fake clock: let real ticks pass until the record was read and decrypted.
+            for (let tick = 0; tick < 200 && reads.done < count; tick += 1) {
+                await new Promise((resolve) => {
+                    setImmediate(resolve);
+                });
+            }
+
+            for (let tick = 0; tick < 20; tick += 1) {
+                await new Promise((resolve) => {
+                    setImmediate(resolve);
+                });
+            }
+        };
+        const queryClient = new QueryClient();
+
+        gate.allowed = false;
+
+        const controller = start(counted, ALICE, queryClient, {
+            gate: {
+                ...writeGate,
+                subscribe: (listener) => {
+                    listeners.add(listener);
+
+                    return () => listeners.delete(listener);
+                },
+            },
+        });
+
+        await controller.restored;
+        controller.enableWrites();
+        queryClient.setQueryData(KEY, { text: "live" });
+        await vi.advanceTimersByTimeAsync(WRITE_THROTTLE_MS * 2);
+
+        // Opens: the restore starts; the gate closes again before its read lands, and the read finishes while it is closed.
+        const readsBefore = reads.done;
+
+        gate.allowed = true;
+        notify();
+        gate.allowed = false;
+        await settleReads(readsBefore + 1);
+        expect(queryClient.getQueryData(OTHER_KEY)).toBeUndefined();
+
+        // Opens a second time: the record is restored now.
+        const written = { done: false };
+
+        void (async () => {
+            await memory.settled();
+            written.done = true;
+        })();
+        gate.allowed = true;
+        notify();
+        await untilDone(written);
+
+        expect(textOf(queryClient, OTHER_KEY)).toBe("kept");
+        controller.stop();
+    });
+
     it("saves a change the closed gate held back once the gate says it opened", async () => {
         const memory = memoryStore();
         const listeners = new Set<() => void>();

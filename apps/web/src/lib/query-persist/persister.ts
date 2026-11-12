@@ -300,6 +300,11 @@ export const startQueryPersistence = (options: PersistenceOptions): PersistenceC
 
         state.isRestoring = false;
         state.isRestoreDone = isDone;
+
+        // Held back because the gate closed while the record was read: offered again when it next opens.
+        if (!isDone && !state.stopped && !gate.canWrite(userId)) {
+            state.isHeldByGate = true;
+        }
     };
 
     const schedule = (): void => {
