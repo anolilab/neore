@@ -532,7 +532,7 @@ describe("generate-sw.mjs", () => {
     });
 
     /** Runs the generator on a minimal client build whose entry chunk is `entryFile`, and returns sw.js. */
-    const generate = (entryFile: string, { withPostHog = true }: { withPostHog?: boolean } = {}): string => {
+    const generate = (entryFile: string, { hasPostHogKey = true, withPostHog = true }: { hasPostHogKey?: boolean; withPostHog?: boolean } = {}): string => {
         const dir = mkdtempSync(join(tmpdir(), "neore-generate-sw-"));
 
         dirs.push(dir);
@@ -556,7 +556,12 @@ describe("generate-sw.mjs", () => {
         writeFileSync(join(dir, "assets", "messages-Ab12Cd34.js"), "export const messages = {};");
         writeFileSync(join(dir, entryFile), "export {};");
         writeFileSync(join(dir, "offline.html"), "<html>offline</html>");
-        execFileSync(process.execPath, [resolve(import.meta.dirname, "generate-sw.mjs"), dir], { stdio: "pipe" });
+        // The environment wins over the `.env` files, as in `vite build`: a key in a local `.env` does not leak in.
+        const postHogEnv = hasPostHogKey
+            ? { VITE_POSTHOG_API_KEY: "phc_test", VITE_POSTHOG_HOST: "https://posthog.invalid" }
+            : { VITE_POSTHOG_API_KEY: "", VITE_POSTHOG_HOST: "" };
+
+        execFileSync(process.execPath, [resolve(import.meta.dirname, "generate-sw.mjs"), dir], { env: { ...process.env, ...postHogEnv }, stdio: "pipe" });
 
         return readFileSync(join(dir, "sw.js"), "utf8");
     };
@@ -579,10 +584,14 @@ describe("generate-sw.mjs", () => {
     });
 
     it("builds without the PostHog chunk when the build has none (no PostHog key)", () => {
-        const sw = generate(ENTRY, { withPostHog: false });
+        const sw = generate(ENTRY, { hasPostHogKey: false, withPostHog: false });
 
         expect(sw).toContain("assets/offline-screen-Ij90Kl12.js");
         expect(sw).not.toContain("assets/posthog-js-Mn34Op56.js");
+    });
+
+    it("fails a build with a PostHog key whose PostHog chunk is gone from the manifest (a renamed module)", () => {
+        expect(() => generate(ENTRY, { hasPostHogKey: true, withPostHog: false })).toThrow(/src\/lib\/analytics\/posthog-js\.ts is not a chunk/u);
     });
 
     it("shifts sw.js.map down one line for the config line put in front of sw.js", () => {

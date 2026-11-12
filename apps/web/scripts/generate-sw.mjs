@@ -11,6 +11,7 @@ import { createHash } from "node:crypto";
 import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 
+import { loadEnv } from "vite";
 import { generateSW } from "workbox-build";
 
 const clientDir = resolve(process.argv[2] ?? resolve(import.meta.dirname, "../dist/client"));
@@ -55,8 +56,13 @@ const DEFAULT_CATALOG = "src/locales/en/messages.po";
  */
 const OFFLINE_SHELL_CHUNKS = ["src/features/connection/components/offline-screen.tsx"];
 
-/** As `OFFLINE_SHELL_CHUNKS`, but absent from some builds: one without a PostHog key drops the code that loads PostHog. */
-const OPTIONAL_OFFLINE_SHELL_CHUNKS = ["src/lib/analytics/posthog-js.ts"];
+/**
+ * As `OFFLINE_SHELL_CHUNKS`, but only in a build with a PostHog key and host: one without them drops the code that
+ * loads PostHog (`src/providers/analytics-provider.tsx`). Read as `vite build` reads them: the `.env` files, and the
+ * environment over them.
+ */
+const buildEnv = loadEnv("production", resolve(import.meta.dirname, ".."), "VITE_");
+const POSTHOG_OFFLINE_SHELL_CHUNKS = buildEnv.VITE_POSTHOG_API_KEY && buildEnv.VITE_POSTHOG_HOST ? ["src/lib/analytics/posthog-js.ts"] : [];
 
 const readAppShell = () => {
     const manifestDir = resolve(clientDir, ".vite");
@@ -97,18 +103,12 @@ const readAppShell = () => {
         }
     }
 
-    for (const key of OFFLINE_SHELL_CHUNKS) {
+    for (const key of [...OFFLINE_SHELL_CHUNKS, ...POSTHOG_OFFLINE_SHELL_CHUNKS]) {
         if (!manifest[key]) {
-            throw new Error(`${key} is not a chunk in .vite/manifest.json; update OFFLINE_SHELL_CHUNKS.`);
+            throw new Error(`${key} is not a chunk in .vite/manifest.json; update OFFLINE_SHELL_CHUNKS or POSTHOG_OFFLINE_SHELL_CHUNKS.`);
         }
 
         walk(key);
-    }
-
-    for (const key of OPTIONAL_OFFLINE_SHELL_CHUNKS) {
-        if (manifest[key]) {
-            walk(key);
-        }
     }
 
     if (entries.length !== 1) {

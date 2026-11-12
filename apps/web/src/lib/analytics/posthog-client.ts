@@ -320,16 +320,30 @@ export const flushPendingCaptures = (posthog: PostHog): void => {
  */
 const availability = { isUnavailable: false, listeners: new Set<() => void>() };
 
-/** Records that PostHog will not start on this page (the chunk failed for good), so nothing waits for its flags. */
-export const markPostHogUnavailable = (): void => {
-    if (availability.isUnavailable) {
+const setUnavailable = (isUnavailable: boolean): void => {
+    if (availability.isUnavailable === isUnavailable) {
         return;
     }
 
-    availability.isUnavailable = true;
+    availability.isUnavailable = isUnavailable;
 
     for (const listener of availability.listeners) {
         listener();
+    }
+};
+
+/** Records that PostHog will not start on this page (the chunk failed for good), so nothing waits for its flags. */
+export const markPostHogUnavailable = (): void => {
+    setUnavailable(true);
+};
+
+/**
+ * A start is tried again (the window came back online): its flags may arrive after all, so what reads them waits
+ * again until they do or the start fails. Not in a session analytics never loads in (`discardPendingCaptures`).
+ */
+export const markPostHogRetrying = (): void => {
+    if (!queueState.closed) {
+        setUnavailable(false);
     }
 };
 

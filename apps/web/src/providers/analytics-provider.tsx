@@ -10,6 +10,7 @@ import {
     getPostHog,
     getStartedPostHog,
     loadPostHog,
+    markPostHogRetrying,
     markPostHogUnavailable,
     PostHogClientContext,
     recordLandingPageview,
@@ -172,8 +173,15 @@ const AnalyticsProvider: FC<PropsWithChildren> = ({ children }) => {
         // `START_RETRY_DELAY_MS` when the window is online, and again whenever it comes back online.
         let backoffRetriesLeft = 1;
         let retryTimer: ReturnType<typeof setTimeout> | undefined;
+        let isWaitingForOnline = false;
 
         const attempt = (): void => {
+            // Back online after the start failed for good: the flags may come after all, so what reads them waits again.
+            if (isWaitingForOnline) {
+                isWaitingForOnline = false;
+                markPostHogRetrying();
+            }
+
             start().catch((error: unknown) => {
                 // eslint-disable-next-line no-console -- the only trace of why analytics did not start
                 console.warn("[PostHog] Analytics did not start:", error);
@@ -191,6 +199,7 @@ const AnalyticsProvider: FC<PropsWithChildren> = ({ children }) => {
 
                 // Nothing waits for flags that may never come; a start once back online still provides them.
                 markPostHogUnavailable();
+                isWaitingForOnline = true;
                 globalThis.addEventListener("online", attempt, { once: true });
             });
         };

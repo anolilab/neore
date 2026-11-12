@@ -242,6 +242,8 @@ describe("AnalyticsProvider", () => {
 
         expect(posthogMock.init).toHaveBeenCalledOnce();
         expect(screen.getByText("analytics on")).toBeTruthy();
+        // The client that started once back online has not had its flags yet: what reads them waits again.
+        expect(screen.getByText("flags pending")).toBeTruthy();
     });
 
     it("loads PostHog again once the window is back online after its chunk failed to load", async () => {
