@@ -754,6 +754,26 @@ describe("useFeatureFlagReader", () => {
         expect(renders.count).toBe(before);
     });
 
+    it("registers one PostHog listener per client, however many flag hooks read it", async () => {
+        const client = await loadClientModule();
+        const listeners: (() => void)[] = [];
+        const fake = {
+            isFeatureEnabled: () => true,
+            onFeatureFlags: (callback: () => void) => {
+                listeners.push(callback);
+
+                return () => {};
+            },
+        } as unknown as PostHog;
+        const wrapper = ({ children }: { children: ReactNode }) => createElement(client.PostHogClientContext, { value: fake }, children);
+
+        renderHook(() => [client.useFeatureFlagEnabled("a"), client.useFeatureFlagEnabled("b"), client.useFeatureFlagsKnown(), client.useFeatureFlagReader()], {
+            wrapper,
+        });
+
+        expect(listeners).toHaveLength(1);
+    });
+
     it("keeps answering from the server-rendered flags while a retry runs after coming back online", async () => {
         const client = await loadClientModule();
         const wrapper = ({ children }: { children: ReactNode }) => createElement(client.PostHogClientContext, { value: undefined }, children);

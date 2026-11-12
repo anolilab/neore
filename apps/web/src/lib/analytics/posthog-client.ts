@@ -5,7 +5,7 @@
  * no flags, nothing captured.
  */
 import type { PostHog, Properties } from "posthog-js";
-import { createContext, useCallback, useContext, useSyncExternalStore } from "react";
+import { createContext, useCallback, useContext, useMemo, useSyncExternalStore } from "react";
 
 import { redactPromptFromProperties } from "@/lib/analytics/redact-prompt";
 import { retryChunk } from "@/lib/native/shell-chunk";
@@ -637,23 +637,32 @@ const readUnavailable = (): boolean => availability.isUnavailable;
 const readFallsBack = (): boolean => availability.hasFailed;
 const notKnown = (): false => false;
 
-/**
- * Each client's flag loads, from one `onFeatureFlags` listener per client: a reader that subscribes adds a listener to
- * the set, and changes no count (PostHog answers a new `onFeatureFlags` at once when it holds flags already).
- */
-const flagStores = new WeakMap<PostHog, { listeners: Set<() => void>; loads: number }>();
+interface FlagStore {
+    /** The flags arrived (fetched, persisted, bootstrapped, or failed to load): what the client answers is final. */
+    hasFlags: boolean;
+    listeners: Set<() => void>;
+    loads: number;
+}
 
-const flagStoreOf = (posthog: PostHog): { listeners: Set<() => void>; loads: number } => {
+/**
+ * Each client's flags, from the one `onFeatureFlags` listener per client that every flag hook goes through: a hook that
+ * subscribes adds a listener to the set, and changes no count (PostHog answers a new `onFeatureFlags` at once when it
+ * holds flags already).
+ */
+const flagStores = new WeakMap<PostHog, FlagStore>();
+
+const flagStoreOf = (posthog: PostHog): FlagStore => {
     const known = flagStores.get(posthog);
 
     if (known) {
         return known;
     }
 
-    const store = { listeners: new Set<() => void>(), loads: 0 };
+    const store: FlagStore = { hasFlags: false, listeners: new Set<() => void>(), loads: 0 };
 
     flagStores.set(posthog, store);
     posthog.onFeatureFlags(() => {
+        store.hasFlags = true;
         store.loads += 1;
 
         for (const listener of store.listeners) {
@@ -666,9 +675,25 @@ const flagStoreOf = (posthog: PostHog): { listeners: Set<() => void>; loads: num
 
 const noLoads = (): number => 0;
 
-// Clients whose flags have arrived (fetched, persisted, bootstrapped, or failed to load): `onFeatureFlags` answers at
-// once for flags it already has.
-const clientsWithFlags = new WeakSet<PostHog>();
+/** `useSyncExternalStore`'s subscribe for a client's flags, through its one listener; registers it on first use. */
+const subscribeFlags =
+    (posthog: PostHog | undefined) =>
+    (onChange: () => void): (() => void) => {
+        if (!posthog) {
+            return noSubscription();
+        }
+
+        const { listeners } = flagStoreOf(posthog);
+
+        listeners.add(onChange);
+
+        return () => {
+            listeners.delete(onChange);
+        };
+    };
+
+/** Whether a client's flags arrived. Read only: the listener is registered by a subscribe, never by a render. */
+const hasFlagsOf = (posthog: PostHog | undefined): boolean => posthog !== undefined && flagStores.get(posthog)?.hasFlags === true;
 
 /**
  * Whether `useFeatureFlagEnabled` and `usePostHog()?.isFeatureEnabled` give their final answer: the client has its
@@ -677,17 +702,8 @@ const clientsWithFlags = new WeakSet<PostHog>();
 export const useFeatureFlagsKnown = (): boolean => {
     const posthog = usePostHog();
     const isUnavailable = useSyncExternalStore(subscribeAvailability, readUnavailable, notKnown);
-    const subscribe = useCallback(
-        (onChange: () => void) =>
-            posthog
-                ? posthog.onFeatureFlags(() => {
-                      clientsWithFlags.add(posthog);
-                      onChange();
-                  })
-                : noSubscription(),
-        [posthog],
-    );
-    const read = useCallback(() => posthog !== undefined && clientsWithFlags.has(posthog), [posthog]);
+    const subscribe = useMemo(() => subscribeFlags(posthog), [posthog]);
+    const read = useCallback(() => hasFlagsOf(posthog), [posthog]);
     const hasFlags = useSyncExternalStore(subscribe, read, notKnown);
 
     return hasFlags || isUnavailable;
@@ -717,22 +733,7 @@ export const useFeatureFlagReader = (): ((flag: string) => boolean | undefined) 
     const posthog = usePostHog();
     const fallsBack = useSyncExternalStore(subscribeAvailability, readFallsBack, notKnown);
     // Counts the client's flag loads and reloads, so the reader changes with them and a memo over it recomputes.
-    const subscribe = useCallback(
-        (onChange: () => void) => {
-            if (!posthog) {
-                return noSubscription();
-            }
-
-            const { listeners } = flagStoreOf(posthog);
-
-            listeners.add(onChange);
-
-            return () => {
-                listeners.delete(onChange);
-            };
-        },
-        [posthog],
-    );
+    const subscribe = useMemo(() => subscribeFlags(posthog), [posthog]);
     // Read only: the listener is registered by `subscribe`, never by a render React may throw away.
     const readLoads = useCallback(() => (posthog ? (flagStores.get(posthog)?.loads ?? 0) : 0), [posthog]);
     const loads = useSyncExternalStore(subscribe, readLoads, noLoads);
@@ -759,18 +760,9 @@ export const useFeatureFlagReader = (): ((flag: string) => boolean | undefined) 
 export const useFeatureFlagEnabled = (flag: string): boolean | undefined => {
     const posthog = usePostHog();
     const fallsBack = useSyncExternalStore(subscribeAvailability, readFallsBack, notKnown);
-    const subscribe = useCallback(
-        (onChange: () => void) =>
-            posthog
-                ? posthog.onFeatureFlags(() => {
-                      clientsWithFlags.add(posthog);
-                      onChange();
-                  })
-                : noSubscription(),
-        [posthog],
-    );
+    const subscribe = useMemo(() => subscribeFlags(posthog), [posthog]);
     // A client whose flags have not arrived reads every flag as off: that is not an answer yet, so it stays pending.
-    const read = useCallback(() => (posthog && clientsWithFlags.has(posthog) ? posthog.isFeatureEnabled(flag) : undefined), [posthog, flag]);
+    const read = useCallback(() => (posthog && hasFlagsOf(posthog) ? posthog.isFeatureEnabled(flag) : undefined), [posthog, flag]);
     const enabled = useSyncExternalStore(subscribe, read, notLoaded);
 
     return posthog === undefined && fallsBack ? readBootstrapFlag(flag) : enabled;
