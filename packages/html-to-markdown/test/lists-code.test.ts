@@ -1,0 +1,109 @@
+import TurndownUpstream from "turndown";
+import { describe, expect, it } from "vitest";
+
+import TurndownService from "../src/index";
+
+/*
+ * Lists and code blocks. Each block names the upstream issue it covers. Where the
+ * expected output differs from upstream 7.2.5, the test says so.
+ */
+
+function convert(html: string, options = {}): string {
+    return new TurndownService(options).turndown(html);
+}
+
+describe("ordered list start (#547)", () => {
+    it.each([
+        ["a non-numeric start is ignored", "abc", "1.  a\n2.  b"],
+        ["a leading integer is read, the rest ignored", "3x", "3.  a\n4.  b"],
+        ["a fraction is cut at the integer part", "3.7", "3.  a\n4.  b"],
+        ["leading whitespace is skipped", " 4", "4.  a\n5.  b"],
+        ["a whitespace-only start is ignored", " ", "1.  a\n2.  b"],
+        ["an empty start is ignored", "", "1.  a\n2.  b"],
+        ["a zero start is kept", "0", "0.  a\n1.  b"],
+        ["a plain start is kept", "3", "3.  a\n4.  b"],
+    ])("%s", (_name, start, expected) => {
+        const markdown = convert(`<ol start="${start}"><li>a</li><li>b</li></ol>`);
+
+        expect(markdown).toBe(expected);
+        expect(markdown).not.toContain("NaN");
+    });
+});
+
+describe("text after a nested list (#554)", () => {
+    it("keeps the text inside the parent item, in its own paragraph", () => {
+        const html = "<ul><li>Fruits<ul><li>Apple</li><li>Pear</li></ul>are healthy.</li><li>Next</li></ul>";
+
+        expect(convert(html)).toBe("*   Fruits\n    *   Apple\n    *   Pear\n    \n    are healthy.\n*   Next");
+    });
+
+    it("does the same for an ordered parent and child", () => {
+        const html = "<ol><li>Fruits<ol><li>Apple</li></ol>are healthy.</li><li>Next</li></ol>";
+
+        expect(convert(html)).toBe("1.  Fruits\n    1.  Apple\n    \n    are healthy.\n2.  Next");
+    });
+
+    it("does not change a nested list that ends its item", () => {
+        const html = "<ul><li>Fruits<ul><li>Apple</li><li>Pear</li></ul></li><li>Next</li></ul>";
+
+        expect(convert(html)).toBe("*   Fruits\n    *   Apple\n    *   Pear\n*   Next");
+    });
+
+    it("does not change whitespace after a nested list", () => {
+        const html = "<ul><li>Fruits<ul><li>Apple</li></ul> </li><li>Next</li></ul>";
+
+        expect(convert(html)).toBe(new TurndownUpstream().turndown(html));
+    });
+});
+
+describe("code block with whitespace or a wrapper before <code> (#486, #498, #530)", () => {
+    it.each([
+        ["whitespace before <code>", "<pre>   <code>x = 1</code></pre>"],
+        ["a wrapper element around <code>", "<pre><div><code>x = 1</code></div></pre>"],
+        ["whitespace inside a wrapper", "<pre><div>\n  <code>x = 1</code>\n</div></pre>"],
+    ])("%s is a code block in indented style", (_name, html) => {
+        expect(convert(html, { codeBlockStyle: "indented" })).toBe("    x = 1");
+    });
+
+    it.each([
+        ["whitespace before <code>", "<pre>   <code>x = 1</code></pre>"],
+        ["a wrapper element around <code>", "<pre><div><code>x = 1</code></div></pre>"],
+    ])("%s is a fenced code block in fenced style", (_name, html) => {
+        expect(convert(html, { codeBlockStyle: "fenced" })).toBe("```\nx = 1\n```");
+    });
+
+    it("keeps the code text of a multi-line block", () => {
+        const html = "<pre>\n  <code class=language-js>a = 1\nb = 2</code>\n</pre>";
+
+        expect(convert(html, { codeBlockStyle: "fenced" })).toBe("```js\na = 1\nb = 2\n```");
+    });
+
+    it("does not make a code block when text comes before <code>", () => {
+        const html = "<pre>note <code>x = 1</code></pre>";
+        const upstream = new TurndownUpstream({ codeBlockStyle: "indented" }).turndown(html);
+
+        expect(convert(html, { codeBlockStyle: "indented" })).toBe(upstream);
+    });
+});
+
+describe("ordinary pre and code output is unchanged", () => {
+    it.each([
+        ["plain", "<pre><code>x = 1</code></pre>"],
+        ["with a language", "<pre><code class=language-js>x = 1\ny = 2</code></pre>"],
+        ["with a trailing newline", "<pre><code>x = 1\n</code></pre>"],
+    ])("%s", (_name, html) => {
+        for (const codeBlockStyle of ["indented", "fenced"]) {
+            const upstream = new TurndownUpstream({ codeBlockStyle }).turndown(html);
+
+            expect(convert(html, { codeBlockStyle })).toBe(upstream);
+        }
+    });
+
+    it("keeps the indented form", () => {
+        expect(convert("<pre><code>x = 1</code></pre>", { codeBlockStyle: "indented" })).toBe("    x = 1");
+    });
+
+    it("keeps the fenced form", () => {
+        expect(convert("<pre><code>x = 1</code></pre>", { codeBlockStyle: "fenced" })).toBe("```\nx = 1\n```");
+    });
+});

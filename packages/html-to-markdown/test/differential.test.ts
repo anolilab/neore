@@ -3,6 +3,7 @@
  * URLs and HTML below are inputs to convert, never requests.
  */
 /* eslint-disable no-bitwise, operator-assignment, unicorn/operator-assignment, unicorn/prefer-math-trunc, no-script-url -- see the comment above */
+import { createDocument } from "@mixmark-io/domino";
 import TurndownUpstream from "turndown";
 import { describe, expect, it } from "vitest";
 
@@ -18,6 +19,7 @@ import TurndownService from "../src/index";
 
 const SEED = 20_261_112;
 const CASES = 1500;
+const NON_BLANK = /\S/;
 
 // Mulberry32: a small seeded PRNG, so a failure reproduces exactly.
 function createRandom(seed: number): () => number {
@@ -135,7 +137,7 @@ function randomHtml(random: () => number, depth: number): string {
             break;
         }
         case "ol": {
-            attributes = ` start="${pick(["", "3", "x"], random)}"`;
+            attributes = ` start="${pick(["", "3", "7"], random)}"`;
 
             break;
         }
@@ -166,12 +168,48 @@ const OPTION_SETS: Partial<Options>[] = [
     { br: "\\", bulletListMarker: "-", emDelimiter: "*", hr: "---", strongDelimiter: "__" },
 ];
 
+/*
+ * #554: text after a nested list that ends an item. The output differs from upstream
+ * on purpose (a blank line keeps the text out of the sub-item), so such documents are
+ * skipped here and covered by lists-code.test.ts. Non-numeric `start` values (#547)
+ * are no longer generated for the same reason; lists-code.test.ts covers them.
+ */
+function hasTextAfterNestedList(html: string): boolean {
+    const parsed = createDocument(html);
+
+    return Array.from(parsed.querySelectorAll("li"), (item) => hasTrailingListThenText(item)).includes(true);
+}
+
+function hasTrailingListThenText(item: Element): boolean {
+    let lastElement: Element | null = null;
+    let hasTextAfterLast = false;
+
+    for (let child = item.firstChild; child; child = child.nextSibling) {
+        if (child.nodeType === 1) {
+            lastElement = child as Element;
+            hasTextAfterLast = false;
+        } else if (child.nodeType === 3 && NON_BLANK.test(child.nodeValue ?? "")) {
+            hasTextAfterLast = true;
+        }
+    }
+
+    return hasTextAfterLast && (lastElement?.nodeName === "UL" || lastElement?.nodeName === "OL");
+}
+
 describe("differential against upstream turndown 7.2.5", () => {
     it(`matches upstream on ${CASES} seeded random documents`, () => {
         const random = createRandom(SEED);
+        let skipped = 0;
 
         for (let index = 0; index < CASES; index += 1) {
             const html = randomHtml(random, 0) + randomHtml(random, 0);
+
+            if (hasTextAfterNestedList(html)) {
+                skipped += 1;
+
+                continue;
+            }
+
             const options = pick(OPTION_SETS, random);
 
             const expected = new TurndownUpstream(options).turndown(html);
@@ -183,5 +221,7 @@ describe("differential against upstream turndown 7.2.5", () => {
                 );
             }
         }
+
+        expect(skipped).toBeLessThan(CASES / 100);
     });
 });
