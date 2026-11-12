@@ -69,6 +69,35 @@ describe("keep and remove on built-in tags (upstream #455)", () => {
         service.remove(["div"]);
         expect(service.turndown(`<div><a href="x">l</a></div><p>after</p>`)).toBe("after");
     });
+
+    it("a custom keepReplacement on a built-in tag receives the converted children", () => {
+        const service = new TurndownService({ keepReplacement: (content) => `{${content}}` });
+
+        service.keep(["b"]);
+        expect(service.turndown("<p>a <b><i>x</i></b></p>")).toBe("a {_x_}");
+    });
+
+    it("a kept tag inside a removed one is dropped with it", () => {
+        const service = new TurndownService();
+
+        service.keep(["b"]);
+        service.remove(["div"]);
+        expect(service.turndown("<div><b>x</b></div>y")).toBe("y");
+    });
+
+    it("remove drops a referenced link nested in another link, unlike upstream, which leaks its definitions", () => {
+        const service = new TurndownService({ linkStyle: "referenced" });
+
+        service.remove(["div"]);
+        expect(service.turndown(`<a href="y">m<div><a href="x">n</a></div></a>`)).toBe("[m][1]\n\n[1]: y");
+    });
+
+    it("a custom keepReplacement still converts the children, so a referenced link keeps its definition", () => {
+        const service = new TurndownService({ keepReplacement: (content) => `{${content}}`, linkStyle: "referenced" });
+
+        service.keep(["span"]);
+        expect(service.turndown(`<span><a href="x">l</a></span>`)).toBe("{[l][1]}\n\n[1]: x");
+    });
 });
 
 describe("behaviour that already holds (regression tests, no code change)", () => {
