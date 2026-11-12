@@ -592,6 +592,8 @@ export const setAnalyticsIdentity = (identity: AnalyticsIdentity): void => {
 
     if (!startup.isStarted && previousUserId !== undefined && previousUserId !== identity.user?.id) {
         resetState.pending = true;
+        // Caught under the account that left: queued errors carry no user, so the next one would be sent them.
+        pendingExceptions.length = 0;
     }
 
     identityState.departedUserId = undefined;

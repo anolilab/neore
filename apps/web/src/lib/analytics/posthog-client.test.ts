@@ -519,6 +519,18 @@ describe("startPostHog", () => {
         expect(posthog.capture.mock.calls.map(([event]) => event)).toStrictEqual(["signed_out"]);
     });
 
+    it("drops an error caught under the account that left when another signs in before PostHog starts", async () => {
+        const client = await loadClientModule();
+
+        client.setAnalyticsIdentity({ isOrganizationPending: true, user: { id: "user-a" } });
+        client.captureException(new Error("caught for A"));
+        // Account B before PostHog has started.
+        client.setAnalyticsIdentity({ user: { id: "user-b" } });
+        client.startPostHog(await client.loadPostHog(), () => {});
+
+        expect(posthog.captureException).not.toHaveBeenCalled();
+    });
+
     it("resets the stored identity before the flush when the session ended while startup waited for it", async () => {
         const client = await loadClientModule();
 

@@ -2,7 +2,7 @@
 
 import { Trans } from "@lingui/react/macro";
 import type { ErrorInfo, ReactNode } from "react";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 
 import { captureException } from "@/lib/analytics/posthog-client";
 import { ErrorUtilities } from "@/lib/errors";
@@ -14,6 +14,17 @@ import { ErrorBoundary } from "../error-boundary";
 interface GlobalErrorBoundaryProviderProperties {
     children: ReactNode;
 }
+
+/** The keys a storage holds, for an error report: never their values, which can be what the person wrote. */
+export const storageKeys = (getStorage: () => Storage): string[] => {
+    try {
+        const storage = getStorage();
+
+        return Array.from({ length: storage.length }, (_unused, index) => storage.key(index)).filter((key): key is string => key !== null);
+    } catch {
+        return [];
+    }
+};
 
 const GlobalErrorBoundaryProvider = ({ children }: GlobalErrorBoundaryProviderProperties) => {
     const [isOnline, setIsOnline] = useState(true);
@@ -127,42 +138,6 @@ const GlobalErrorBoundaryProvider = ({ children }: GlobalErrorBoundaryProviderPr
         };
     }, [isOnline]);
 
-    const getLocalStorageSnapshot = useCallback(() => {
-        try {
-            const snapshot: Record<string, string | null> = {};
-
-            for (let index = 0; index < localStorage.length; index += 1) {
-                const key = localStorage.key(index);
-
-                if (key && !key.includes("password") && !key.includes("token")) {
-                    snapshot[key] = localStorage.getItem(key);
-                }
-            }
-
-            return snapshot;
-        } catch {
-            return {};
-        }
-    }, []);
-
-    const getSessionStorageSnapshot = useCallback(() => {
-        try {
-            const snapshot: Record<string, string | null> = {};
-
-            for (let index = 0; index < sessionStorage.length; index += 1) {
-                const key = sessionStorage.key(index);
-
-                if (key && !key.includes("password") && !key.includes("token")) {
-                    snapshot[key] = sessionStorage.getItem(key);
-                }
-            }
-
-            return snapshot;
-        } catch {
-            return {};
-        }
-    }, []);
-
     const handleGlobalError = (error: Error, errorInfo: ErrorInfo) => {
         setErrorId(`global_${Date.now().toString(36)}`);
 
@@ -177,8 +152,9 @@ const GlobalErrorBoundaryProvider = ({ children }: GlobalErrorBoundaryProviderPr
             componentStack: errorInfo.componentStack,
             context: {
                 isOnline,
-                localStorage: getLocalStorageSnapshot(),
-                sessionStorage: getSessionStorageSnapshot(),
+                // Key names only: values hold unsent drafts, queued prompts and other text the person wrote.
+                localStorageKeys: storageKeys(() => globalThis.localStorage),
+                sessionStorageKeys: storageKeys(() => globalThis.sessionStorage),
                 timestamp: new Date().toISOString(),
                 url: globalThis.location.href,
                 userAgent: navigator.userAgent,
