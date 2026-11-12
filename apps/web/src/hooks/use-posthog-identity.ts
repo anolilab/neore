@@ -7,10 +7,10 @@
  * - Calls `posthog.group("organization", orgId)` when the org changes
  * - Calls `posthog.reset()` when the user signs out
  */
-import { usePostHog } from "posthog-js/react";
 import { useEffect, useRef } from "react";
 
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
+import { usePostHog } from "@/lib/analytics/posthog-client";
 
 const usePostHogIdentity = (): void => {
     const posthog = usePostHog();

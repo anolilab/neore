@@ -17,8 +17,8 @@ const posthogMock = vi.hoisted(() => {
 vi.mock("@c15t/react", () => {
     return { useEffectivePermissions: () => permissions };
 });
-vi.mock("posthog-js", () => {
-    return { posthog: posthogMock };
+vi.mock("@/lib/analytics/posthog-client", () => {
+    return { getPostHog: () => posthogMock };
 });
 vi.mock("@/lib/analytics/first-native-launch", () => {
     return { reportFirstNativeLaunch: vi.fn() };

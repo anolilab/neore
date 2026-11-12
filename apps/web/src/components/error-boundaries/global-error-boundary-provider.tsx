@@ -1,10 +1,10 @@
 "use client";
 
 import { Trans } from "@lingui/react/macro";
-import { usePostHog } from "posthog-js/react";
 import type { ErrorInfo, ReactNode } from "react";
 import { useCallback, useEffect, useState } from "react";
 
+import { getPostHog } from "@/lib/analytics/posthog-client";
 import { ErrorUtilities } from "@/lib/errors";
 import { UserErrorMessage } from "@/lib/localized-message";
 import { showError } from "@/lib/toast";
@@ -21,7 +21,6 @@ const GlobalErrorBoundaryProvider = ({ children }: GlobalErrorBoundaryProviderPr
     // catches, not while rendering the fallback — `Date.now()` in render would
     // hand out a different id on every re-paint of the same crash.
     const [errorId, setErrorId] = useState<string | null>(null);
-    const posthog = usePostHog();
 
     // Network status for the fallback's note. The banner (`OfflineBanner`) tells a working app it is offline.
     useEffect(() => {
@@ -68,6 +67,8 @@ const GlobalErrorBoundaryProvider = ({ children }: GlobalErrorBoundaryProviderPr
             showError(error);
 
             // Send error to PostHog
+            const posthog = getPostHog();
+
             if (posthog && typeof posthog.captureException === "function") {
                 posthog.captureException(error, {
                     errorType: "unhandled-promise-rejection",
@@ -87,7 +88,7 @@ const GlobalErrorBoundaryProvider = ({ children }: GlobalErrorBoundaryProviderPr
         return () => {
             globalThis.removeEventListener("unhandledrejection", handleUnhandledRejection);
         };
-    }, [posthog, isOnline]);
+    }, [isOnline]);
 
     // Global error handler for JavaScript errors
     useEffect(() => {
@@ -111,6 +112,8 @@ const GlobalErrorBoundaryProvider = ({ children }: GlobalErrorBoundaryProviderPr
             showError(error);
 
             // Send error to PostHog
+            const posthog = getPostHog();
+
             if (posthog && typeof posthog.captureException === "function") {
                 posthog.captureException(error, {
                     colno: event.colno,
@@ -130,7 +133,7 @@ const GlobalErrorBoundaryProvider = ({ children }: GlobalErrorBoundaryProviderPr
         return () => {
             globalThis.removeEventListener("error", handleError);
         };
-    }, [posthog, isOnline]);
+    }, [isOnline]);
 
     const getLocalStorageSnapshot = useCallback(() => {
         try {
@@ -178,6 +181,8 @@ const GlobalErrorBoundaryProvider = ({ children }: GlobalErrorBoundaryProviderPr
         console.groupEnd();
 
         // Send comprehensive error report to PostHog
+        const posthog = getPostHog();
+
         if (posthog && typeof posthog.captureException === "function") {
             posthog.captureException(error, {
                 componentStack: errorInfo.componentStack,

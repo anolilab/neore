@@ -4,10 +4,10 @@
  * Provides a typed `trackEvent` function and a `useTrack` hook that
  * automatically respects the user's consent preferences.
  */
-import { posthog } from "posthog-js";
 import { useCallback } from "react";
 
 import type { AnalyticsEvent, AnalyticsEventMap } from "./events";
+import { getPostHog } from "./posthog-client";
 
 /**
  * Forget the identified user before a sign-out reload, so later events from this
@@ -15,7 +15,9 @@ import type { AnalyticsEvent, AnalyticsEventMap } from "./events";
  * was never initialised.
  */
 export const resetAnalyticsIdentity = (): void => {
-    if (posthog.__loaded) {
+    const posthog = getPostHog();
+
+    if (posthog?.__loaded) {
         posthog.reset();
     }
 };
@@ -26,9 +28,11 @@ export const resetAnalyticsIdentity = (): void => {
  */
 
 export const trackEvent = <E extends AnalyticsEvent>(event: E, properties: AnalyticsEventMap[E]): boolean => {
-    // posthog-js is a singleton – if it was never initialised (e.g. in dev
-    // mode or when the env-var is missing) the `__loaded` flag will be falsy.
-    if (!posthog.__loaded) {
+    // posthog-js is a singleton – if it was never loaded or initialised (e.g. in dev
+    // mode or when the env-var is missing) there is no client or its `__loaded` flag is falsy.
+    const posthog = getPostHog();
+
+    if (!posthog?.__loaded) {
         return false;
     }
 
@@ -48,7 +52,9 @@ export const trackEvent = <E extends AnalyticsEvent>(event: E, properties: Analy
  * initialisation and consent checks as `trackEvent`. `properties` say where it was caught; never user content.
  */
 export const reportCaughtError = (error: unknown, properties: Record<string, string>): boolean => {
-    if (!posthog.__loaded || posthog.has_opted_out_capturing()) {
+    const posthog = getPostHog();
+
+    if (!posthog?.__loaded || posthog.has_opted_out_capturing()) {
         return false;
     }
 

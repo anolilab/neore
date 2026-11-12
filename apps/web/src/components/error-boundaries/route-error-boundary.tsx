@@ -4,10 +4,10 @@ import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@neore/ui/components/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@neore/ui/components/card";
 import { AlertTriangle, ArrowLeft, Home, RefreshCw } from "lucide-react";
-import { usePostHog } from "posthog-js/react";
 import type { ErrorInfo, FC, ReactNode } from "react";
 import { useEffect } from "react";
 
+import { getPostHog } from "@/lib/analytics/posthog-client";
 import { AuthenticationError, ErrorUtilities, NetworkError } from "@/lib/errors";
 
 import { ErrorBoundary } from "../error-boundary";
@@ -151,8 +151,6 @@ const UnauthorizedThreadRedirect: FC = () => {
  * Provides navigation recovery and route-specific error handling.
  */
 const RouteErrorBoundary = ({ children, fallbackRoute = "/", routeName = "page" }: RouteErrorBoundaryProperties) => {
-    const posthog = usePostHog();
-
     const handleError = (error: Error, errorInfo: ErrorInfo) => {
         if (import.meta.env.DEV) {
             // eslint-disable-next-line no-console
@@ -170,6 +168,8 @@ const RouteErrorBoundary = ({ children, fallbackRoute = "/", routeName = "page" 
         }
 
         // Send error report with route context to PostHog
+        const posthog = getPostHog();
+
         if (posthog && typeof posthog.captureException === "function") {
             posthog.captureException(error, {
                 componentStack: errorInfo.componentStack,

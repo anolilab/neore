@@ -24,7 +24,6 @@ import {
     Workflow,
     Zap,
 } from "lucide-react";
-import { usePostHog } from "posthog-js/react";
 import type { ComponentType, FC } from "react";
 import { useMemo } from "react";
 
@@ -42,6 +41,7 @@ import NavUser from "@/features/layout/components/nav-user";
 import { useModalState, useUserPreferences } from "@/features/layout/hooks/use-ui-state";
 import NotificationBell from "@/features/notifications/components/notification-bell";
 import useAfterFirstPaint from "@/hooks/use-after-first-paint";
+import { usePostHog } from "@/lib/analytics/posthog-client";
 
 // ---------------------------------------------------------------------------
 // Static nav configuration — add / remove / reorder entries here only.

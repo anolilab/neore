@@ -1,10 +1,10 @@
 "use client";
 
 import { Trans } from "@lingui/react/macro";
-import { PostHogErrorBoundary } from "@posthog/react";
 import type { ErrorInfo, ReactNode } from "react";
 import React from "react";
 
+import { getPostHog } from "@/lib/analytics/posthog-client";
 import { UserErrorMessage } from "@/lib/localized-message";
 import { showError } from "@/lib/toast";
 
@@ -15,12 +15,88 @@ interface ErrorBoundaryProperties {
     showToast?: boolean;
 }
 
+interface CapturedError {
+    componentStack: string;
+    error: unknown;
+}
+
 /**
- * Simple Error Boundary wrapper around PostHogErrorBoundary
- * Automatically logs errors to PostHog.
+ * Hands React's component stack to PostHog as the error's innermost `cause`, named `React ErrorBoundary <name>`, as
+ * `@posthog/react`'s boundary does, so the exception groups as it did before this boundary replaced that one.
+ */
+const withComponentStack = (error: unknown, componentStack: string): unknown => {
+    if (!componentStack) {
+        return error;
+    }
+
+    const stackError = new Error(error instanceof Error ? error.message : `Primitive value captured as exception: ${String(error)}`);
+
+    // Defined, not assigned: the same shape `@posthog/react` builds, without writing to a built-in error's fields.
+    Object.defineProperties(stackError, {
+        name: {
+            configurable: true,
+            value: `React ErrorBoundary ${error instanceof Error ? error.name : "Error"}`,
+            writable: true,
+        },
+        stack: { configurable: true, value: componentStack, writable: true },
+    });
+
+    if (!(error instanceof Error)) {
+        return stackError;
+    }
+
+    const seen = new Set<Error>();
+    let current: Error = error;
+
+    while (!seen.has(current)) {
+        seen.add(current);
+
+        if (!(current.cause instanceof Error)) {
+            if (current.cause !== undefined) {
+                Object.defineProperty(stackError, "cause", { configurable: true, value: current.cause, writable: true });
+            }
+
+            Object.defineProperty(current, "cause", { configurable: true, value: stackError, writable: true });
+
+            return error;
+        }
+
+        current = current.cause;
+    }
+
+    return error;
+};
+
+/**
+ * Catches a render error, reports it to PostHog (once PostHog has loaded; `lib/analytics/posthog-client.ts`) and
+ * renders `fallback` in its place. Kept free of `@posthog/react`, which would put `posthog-js` on the first load.
+ */
+class PostHogCapturingBoundary extends React.Component<
+    { children: ReactNode; fallback: (captured: CapturedError) => ReactNode },
+    { captured: CapturedError | null }
+> {
+    public override state: { captured: CapturedError | null } = { captured: null };
+
+    public override componentDidCatch(error: unknown, errorInfo: ErrorInfo): void {
+        const componentStack = errorInfo.componentStack ?? "";
+
+        getPostHog()?.captureException(withComponentStack(error, componentStack));
+        this.setState({ captured: { componentStack, error } });
+    }
+
+    public override render(): ReactNode {
+        const { children, fallback } = this.props;
+        const { captured } = this.state;
+
+        return captured ? fallback(captured) : children;
+    }
+}
+
+/**
+ * Error boundary that reports what it catches to PostHog.
  */
 export const ErrorBoundary = ({ children, fallback, onError, showToast }: ErrorBoundaryProperties) => {
-    const defaultFallback = ({ componentStack, error }: { componentStack?: string; error: unknown; exceptionEvent?: any }) => {
+    const defaultFallback = ({ componentStack, error }: CapturedError) => {
         // Convert unknown error to Error
         const errorObject = error instanceof Error ? error : new Error(String(error));
 
@@ -69,7 +145,7 @@ export const ErrorBoundary = ({ children, fallback, onError, showToast }: ErrorB
         );
     };
 
-    return <PostHogErrorBoundary fallback={defaultFallback}>{children}</PostHogErrorBoundary>;
+    return <PostHogCapturingBoundary fallback={defaultFallback}>{children}</PostHogCapturingBoundary>;
 };
 
 /**

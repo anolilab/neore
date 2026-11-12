@@ -2,8 +2,8 @@
 
 import type { GatewayModel } from "@neore/ai/models";
 import { useQuery } from "@tanstack/react-query";
-import { usePostHog } from "posthog-js/react";
 
+import { usePostHog } from "@/lib/analytics/posthog-client";
 import { useCRPC } from "@/lib/lunora/crpc";
 
 import { useGatewayModels, useGatewayModelsSettled } from "./use-gateway-models";

@@ -1,18 +1,17 @@
 import { useEffectivePermissions } from "@c15t/react";
-import type { PostHogConfig, PostHogInterface } from "posthog-js";
-import { posthog } from "posthog-js";
-import { PostHogProvider } from "posthog-js/react";
+import type { PostHog, PostHogConfig, PostHogInterface } from "posthog-js";
 import type { FC, PropsWithChildren } from "react";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 import { reportFirstNativeLaunch } from "@/lib/analytics/first-native-launch";
+import { getPostHog, loadPostHog, PostHogClientContext } from "@/lib/analytics/posthog-client";
 import { redactPromptFromEvent } from "@/lib/analytics/redact-prompt";
 
 // The consent state PostHog should follow. `PostHogConsentSync` is a child of `AnalyticsProvider`, so its first
 // effect runs before `posthog.init`; the `loaded` callback applies whatever arrived before then.
 const consentState: { measurement?: boolean } = {};
 
-const applyMeasurementConsent = (granted: boolean): void => {
+const applyMeasurementConsent = (posthog: PostHogInterface, granted: boolean): void => {
     if (granted) {
         posthog.opt_in_capturing();
         // A launch that happened before consent is reported now; its stored flag keeps it from repeating.
@@ -35,8 +34,10 @@ export const PostHogConsentSync: FC = () => {
     useEffect(() => {
         consentState.measurement = measurement;
 
-        if (posthog.__loaded) {
-            applyMeasurementConsent(measurement);
+        const posthog = getPostHog();
+
+        if (posthog?.__loaded) {
+            applyMeasurementConsent(posthog, measurement);
         }
     }, [measurement]);
 
@@ -65,7 +66,7 @@ export const onPostHogLoaded = (ph: PostHogInterface): void => {
     }
 
     if (consentState.measurement !== undefined) {
-        applyMeasurementConsent(consentState.measurement);
+        applyMeasurementConsent(ph, consentState.measurement);
     }
 
     // Here, not in an effect: AnalyticsProvider wraps the app, so child effects run before PostHog loads.
@@ -73,9 +74,12 @@ export const onPostHogLoaded = (ph: PostHogInterface): void => {
 };
 
 const AnalyticsProvider: FC<PropsWithChildren> = ({ children }) => {
+    // Provided once initialised; until then (and for good when its chunk never loads) the app runs without analytics.
+    const [client, setClient] = useState<PostHog | undefined>(undefined);
+
     useEffect(() => {
         if (import.meta.env.DEV || !globalThis || !import.meta.env.VITE_POSTHOG_API_KEY || !import.meta.env.VITE_POSTHOG_HOST) {
-            return;
+            return undefined;
         }
 
         // Get bootstrapped data from meta tag (injected by server)
@@ -100,25 +104,44 @@ const AnalyticsProvider: FC<PropsWithChildren> = ({ children }) => {
             }
         }
 
+        let isCancelled = false;
+
         // Initialize PostHog with cookieless mode for GDPR compliance
         // PostHog will operate in cookieless mode until consent is granted
-        posthog.init(import.meta.env.VITE_POSTHOG_API_KEY, {
-            api_host: import.meta.env.VITE_POSTHOG_HOST,
-            // Bootstrap feature flags from server-side rendering
-            bootstrap:
-                distinctId && flagData
-                    ? {
-                          distinctID: distinctId,
-                          featureFlags: flagData,
-                          isIdentifiedID: false,
-                      }
-                    : undefined,
-            ...POSTHOG_OPTIONS,
-            loaded: onPostHogLoaded,
+        const start = async (): Promise<void> => {
+            const posthog = await loadPostHog();
+
+            if (isCancelled) {
+                return;
+            }
+
+            posthog.init(import.meta.env.VITE_POSTHOG_API_KEY, {
+                api_host: import.meta.env.VITE_POSTHOG_HOST,
+                // Bootstrap feature flags from server-side rendering
+                bootstrap:
+                    distinctId && flagData
+                        ? {
+                              distinctID: distinctId,
+                              featureFlags: flagData,
+                              isIdentifiedID: false,
+                          }
+                        : undefined,
+                ...POSTHOG_OPTIONS,
+                loaded: onPostHogLoaded,
+            });
+            setClient(posthog);
+        };
+
+        start().catch(() => {
+            // The chunk never loaded: the app runs without analytics this session.
         });
+
+        return () => {
+            isCancelled = true;
+        };
     }, []);
 
-    return <PostHogProvider client={posthog}>{children}</PostHogProvider>;
+    return <PostHogClientContext value={client}>{children}</PostHogClientContext>;
 };
 
 export default AnalyticsProvider;

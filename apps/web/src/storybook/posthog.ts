@@ -1,7 +1,7 @@
 import type { PostHog } from "posthog-js";
 
 /**
- * A stand-in PostHog client for `PostHogProvider`: `isFeatureEnabled` and `getFeatureFlag`
+ * A stand-in PostHog client for `PostHogClientContext`: `isFeatureEnabled` and `getFeatureFlag`
  * answer from `flags` (a story's `parameters.featureFlags`), and every other method is a
  * no-op, so `capture`, `identify` and friends do nothing and send nothing.
  */
