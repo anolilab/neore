@@ -30,7 +30,7 @@ const OfflineBanner = () => {
         <div
             aria-live="polite"
             className={cn(
-                "pointer-events-none fixed top-2 left-1/2 z-50 -translate-x-1/2 rounded-full px-3 py-1 text-xs font-medium shadow-sm transition-[opacity,translate] duration-200 ease-out motion-reduce:transition-none",
+                "pointer-events-none fixed top-[calc(env(safe-area-inset-top)+0.5rem)] left-1/2 z-50 -translate-x-1/2 rounded-full px-3 py-1 text-xs font-medium shadow-sm transition-[opacity,translate] duration-200 ease-out motion-reduce:transition-none",
                 message === "" && "-translate-y-full opacity-0",
                 view === "online" ? "bg-emerald-700 text-white" : "bg-amber-500 text-black",
             )}

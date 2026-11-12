@@ -37,6 +37,7 @@ const chat = vi.hoisted(() => {
         saving: false,
         sendMessage: vi.fn(),
         threadId: "thread-1",
+        view: "online" as "offline" | "online" | "reconnecting",
     };
 });
 const withdrawSteer = vi.hoisted(() => vi.fn());
@@ -84,6 +85,9 @@ vi.mock("@/lib/lunora/crpc", () => {
         },
     };
 });
+vi.mock("@/features/connection/hooks/use-connection", () => {
+    return { useConnectionView: () => chat.view };
+});
 vi.mock("@/lib/toast", () => {
     return { showError: vi.fn() };
 });
@@ -130,6 +134,7 @@ describe("composer prompt queue", () => {
         chat.liveSaving = false;
         chat.saving = false;
         chat.sendMessage.mockReset();
+        chat.view = "online";
         withdrawSteer.mockReset();
         usePromptQueueStore.setState({ queues: {} });
         // Marks the thread as hydrated, so the (empty) stored queue is not read over ours.
@@ -153,6 +158,28 @@ describe("composer prompt queue", () => {
         view.rerender(<ComposerPromptQueue />);
 
         await waitFor(() => expect(chat.sendMessage).toHaveBeenCalledTimes(1));
+    });
+
+    it("holds a queued prompt while the browser is offline, and sends it once the network is back", async () => {
+        chat.error = undefined;
+        chat.isStreaming = true;
+        chat.view = "offline";
+        usePromptQueueStore.getState().enqueue(chat.threadId, { attachments: [], text: "queued" });
+
+        const view = render(<ComposerPromptQueue />);
+
+        chat.isStreaming = false;
+        view.rerender(<ComposerPromptQueue />);
+        await act(async () => {
+            await Promise.resolve();
+        });
+        expect(chat.sendMessage).not.toHaveBeenCalled();
+
+        // Only the live socket is down: messages go over HTTP, so the held prompt goes.
+        chat.view = "reconnecting";
+        view.rerender(<ComposerPromptQueue />);
+
+        await waitFor(() => expect(chat.sendMessage).toHaveBeenCalledWith("queued", []));
     });
 
     it("holds a prompt when a mode save begins after the last render, while a steer withdrawal settles", async () => {

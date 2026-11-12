@@ -47,6 +47,7 @@ import type { QueuedChatPrompt } from "@/features/chat/core/stores/prompt-queue-
 import { selectThreadQueue, usePromptQueueStore } from "@/features/chat/core/stores/prompt-queue-store";
 import type { QueuedSteer, SteerWithdrawal } from "@/features/chat/core/utils/prompt-queue";
 import { decideAutoSend, deliveredSteerItems, takeNextToSend } from "@/features/chat/core/utils/prompt-queue";
+import { useConnectionView } from "@/features/connection/hooks/use-connection";
 import { useCRPC } from "@/lib/lunora/crpc";
 import { showError } from "@/lib/toast";
 
@@ -93,9 +94,12 @@ const useQueueActions = () => {
     const { error } = useChatError();
     const queryClient = useQueryClient();
     const { mutateAsync: withdrawSteer } = useMutation(crpc.chat.steering.withdrawSteer.mutationOptions());
+    const offline = useConnectionView() === "offline";
     const busyRef = useRef(false);
     // What an `await` in here must re-read afterwards, not close over.
-    const latestRef = useRef({ hasError: Boolean(error), isStreaming, threadId: currentThreadId });
+    const latestRef = useRef({ hasError: Boolean(error), isStreaming, offline, threadId: currentThreadId });
+    // A send asked for while the browser was offline: it waits for the network instead of failing.
+    const heldOfflineRef = useRef<{ explicit: boolean; threadId: string } | undefined>(undefined);
     // A thread whose send was asked for while a removal held `busyRef`; `explicit` is the Send next button, which outranks a reply's error.
     const sendRequestedRef = useRef<{ explicit: boolean; threadId: string } | undefined>(undefined);
     // Chips whose removal was asked for while another call held `busyRef`.
@@ -104,8 +108,8 @@ const useQueueActions = () => {
     const sendNextPromptRef = useRef<(threadId: string, options?: { explicit?: boolean }) => Promise<void>>(async () => {});
 
     useEffect(() => {
-        latestRef.current = { hasError: Boolean(error), isStreaming, threadId: currentThreadId };
-    }, [currentThreadId, error, isStreaming]);
+        latestRef.current = { hasError: Boolean(error), isStreaming, offline, threadId: currentThreadId };
+    }, [currentThreadId, error, isStreaming, offline]);
 
     /** Once `busyRef` is free: runs the removals asked for meanwhile, one after the other (each re-queues the rest while it holds the flag). */
     const removeRequestedMeanwhile = useCallback(() => {
@@ -138,6 +142,12 @@ const useQueueActions = () => {
      */
     const sendNextPrompt = useCallback(
         async (threadId: string, { explicit = false }: { explicit?: boolean } = {}): Promise<void> => {
+            if (latestRef.current.offline) {
+                heldOfflineRef.current = { explicit: explicit || heldOfflineRef.current?.explicit === true, threadId };
+
+                return;
+            }
+
             if (busyRef.current) {
                 // Not dropped: the call that holds the flag runs it once it lets go.
                 sendRequestedRef.current = { explicit: explicit || sendRequestedRef.current?.explicit === true, threadId };
@@ -213,6 +223,17 @@ const useQueueActions = () => {
             void sendNextPromptRef.current(threadId, { explicit });
         }
     }, []);
+
+    // Back online: the send that waited for the network goes, if the thread still allows one.
+    useEffect(() => {
+        if (offline || !heldOfflineRef.current) {
+            return;
+        }
+
+        sendRequestedRef.current = heldOfflineRef.current;
+        heldOfflineRef.current = undefined;
+        sendRequestedMeanwhile();
+    }, [offline, sendRequestedMeanwhile]);
 
     /** Removes a chip. A steered one leaves only once its run no longer holds the message. */
     const removePrompt = useCallback(

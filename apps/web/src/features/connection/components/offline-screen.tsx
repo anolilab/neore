@@ -3,11 +3,10 @@
 import { useLingui } from "@lingui/react/macro";
 import { AlertDialog, AlertDialogContent, AlertDialogTitle } from "@neore/ui/components/alert-dialog";
 import { Button } from "@neore/ui/components/button";
-import { useQueryClient } from "@tanstack/react-query";
 import { WifiOff } from "lucide-react";
 
 import { useConnection } from "../hooks/use-connection";
-import hasCachedAppData from "../lib/has-cached-app-data";
+import useHasCachedAppData from "../lib/use-has-cached-app-data";
 
 const PROBE_TIMEOUT_MS = 5000;
 
@@ -43,9 +42,9 @@ const reloadWhenReachable = async (): Promise<void> => {
  */
 const OfflineScreen = () => {
     const { t } = useLingui();
-    const queryClient = useQueryClient();
     const { screen } = useConnection();
-    const lapsedView = screen !== null && !hasCachedAppData(queryClient) ? screen : null;
+    const hasCachedAppData = useHasCachedAppData();
+    const lapsedView = screen !== null && !hasCachedAppData ? screen : null;
 
     let message = "";
 

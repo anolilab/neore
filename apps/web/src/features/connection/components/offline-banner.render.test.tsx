@@ -37,6 +37,18 @@ vi.mock("@/lib/lunora/crpc", () => {
     return { useLunora: () => client };
 });
 
+const auth = vi.hoisted(() => {
+    return { persisted: undefined as unknown, state: { isAuthenticated: true, isLoading: false } };
+});
+
+vi.mock("@lunora/react", () => {
+    return { useAuthState: () => auth.state };
+});
+
+vi.mock("@/features/chat/thread-list/hooks/use-thread-list-cache", () => {
+    return { useThreadListPlaceholder: () => auth.persisted };
+});
+
 vi.mock("@lingui/react/macro", () => {
     return {
         useLingui: () => {
@@ -68,6 +80,8 @@ describe("offline presentation", () => {
     beforeEach(() => {
         vi.useFakeTimers();
         client.initial = "connected";
+        auth.persisted = undefined;
+        auth.state = { isAuthenticated: true, isLoading: false };
     });
 
     afterEach(() => {
@@ -106,6 +120,49 @@ describe("offline presentation", () => {
         act(() => {
             vi.advanceTimersByTime(CONNECTION_THRESHOLDS_MS.offlineScreen);
         });
+
+        expect(screen.getByRole("alertdialog")).toBeTruthy();
+    });
+
+    it("lifts the full-screen view when the thread list lands after it opened", () => {
+        client.initial = "connecting";
+        const queryClient = new QueryClient();
+
+        renderApp(queryClient);
+        setBrowserOnline(false);
+
+        expect(screen.getByRole("alertdialog")).toBeTruthy();
+
+        act(() => {
+            queryClient.setQueryData(THREAD_LIST_KEY, { threads: { page: [] } });
+        });
+
+        expect(screen.queryByRole("alertdialog")).toBeNull();
+    });
+
+    it("keeps the app on screen with the signed-in user's stored thread list", () => {
+        client.initial = "connecting";
+        auth.persisted = { threads: { page: [] } };
+        renderApp(new QueryClient());
+
+        setBrowserOnline(false);
+
+        expect(screen.queryByRole("alertdialog")).toBeNull();
+    });
+
+    it.each([
+        ["has no token", { isAuthenticated: false, isLoading: false }],
+        ["is still resolving its token", { isAuthenticated: true, isLoading: true }],
+    ])("covers the window when the auth gate %s, whatever is cached", (_label, state) => {
+        client.initial = "connecting";
+        auth.state = state;
+        auth.persisted = { threads: { page: [] } };
+        const queryClient = new QueryClient();
+
+        queryClient.setQueryData(THREAD_LIST_KEY, { threads: { page: [] } });
+        renderApp(queryClient);
+
+        setBrowserOnline(false);
 
         expect(screen.getByRole("alertdialog")).toBeTruthy();
     });

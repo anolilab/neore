@@ -15,6 +15,7 @@ import { createContext, use, useEffect, useMemo } from "react";
 import { AuthQueryProvider } from "@/features/auth/lib/auth-query-provider";
 import AuthUIProviderTanstack from "@/features/auth/lib/tanstack/auth-ui-provider-tanstack";
 import ConnectionProvider from "@/features/connection/components/connection-provider";
+import OfflineBanner from "@/features/connection/components/offline-banner";
 import { authClient } from "@/lib/auth/client";
 import { getSharedSessionRead } from "@/lib/auth/shared-session";
 import env from "@/lib/env";
@@ -197,7 +198,11 @@ export const AppProviders = ({ children, connection, direction, featureFlags, pe
                                 <AuthUIProviderTanstack authClient={authClient} navigate={noop} persistClient={false} replace={noop}>
                                     <ThemeProvider attribute="class" forcedTheme={theme}>
                                         <TooltipProvider>
-                                            <ConnectionProvider>{children}</ConnectionProvider>
+                                            <ConnectionProvider>
+                                                {/* Mounted at the app root, above every layout (`routes/__root.tsx`). */}
+                                                <OfflineBanner />
+                                                {children}
+                                            </ConnectionProvider>
                                             <Toaster />
                                         </TooltipProvider>
                                     </ThemeProvider>

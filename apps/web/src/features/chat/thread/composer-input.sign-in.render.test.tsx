@@ -10,13 +10,21 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useLoginPromptStore } from "@/features/auth/stores/login-prompt-store";
 import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
+import { usePromptQueueStore } from "@/features/chat/core/stores/prompt-queue-store";
 
 const harness = vi.hoisted(() => {
     return {
+        isStreaming: false,
         mustSignIn: true,
         sendComparisonMessage: vi.fn(async () => undefined),
         sendMessage: vi.fn(async () => undefined),
+        threadId: undefined as string | undefined,
+        view: "online" as "offline" | "online" | "reconnecting",
     };
+});
+
+vi.mock("@/features/connection/hooks/use-connection", () => {
+    return { useConnectionView: () => harness.view };
 });
 
 vi.mock("@lingui/react/macro", () => {
@@ -51,13 +59,16 @@ vi.mock("@/features/chat/core/context/chat-context", () => {
             return { cancelStream: vi.fn(), jwtToken: "", sendMessage: harness.sendMessage };
         },
         useChatIsStreaming: () => {
-            return { isStreaming: false, sseStreamState: null };
+            return { isStreaming: harness.isStreaming, sseStreamState: null };
         },
         useChatLunora: () => {
             return {};
         },
+        useChatMessages: () => {
+            return { isStreaming: harness.isStreaming, messages: [], messagesStatus: "loaded" };
+        },
         useChatThread: () => {
-            return { isNewThread: true, threadId: undefined };
+            return { isNewThread: harness.threadId === undefined, threadId: harness.threadId };
         },
     };
 });
@@ -186,5 +197,50 @@ describe("ComposerInput under invite-only", () => {
 
         expect(onSubmitOverride).toHaveBeenCalledWith("compare these", []);
         expect(useLoginPromptStore.getState().isOpen).toBe(false);
+    });
+});
+
+describe("ComposerInput while the connection is down", () => {
+    beforeEach(() => {
+        harness.mustSignIn = false;
+        useChatUIStore.getState().setComposerText("a follow-up");
+    });
+
+    afterEach(() => {
+        harness.isStreaming = false;
+        harness.threadId = undefined;
+        harness.view = "online";
+        usePromptQueueStore.setState({ queues: {} });
+        useChatUIStore.getState().clearComposer();
+        useChatUIStore.getState().setIsSubmitting(false);
+        vi.clearAllMocks();
+    });
+
+    it("keeps the draft when the browser is offline", () => {
+        harness.view = "offline";
+        renderComposer();
+        fireEvent.click(screen.getByRole("button", { name: "Send message" }));
+
+        expect(harness.sendMessage).not.toHaveBeenCalled();
+        expect(useChatUIStore.getState().composerText).toBe("a follow-up");
+    });
+
+    it("sends while only the live socket reconnects: messages go over HTTP", () => {
+        harness.view = "reconnecting";
+        renderComposer();
+        fireEvent.click(screen.getByRole("button", { name: "Send message" }));
+
+        expect(harness.sendMessage).toHaveBeenCalledWith("a follow-up", []);
+    });
+
+    it("queues a follow-up offline while a reply streams", () => {
+        harness.view = "offline";
+        harness.isStreaming = true;
+        harness.threadId = "thread-1";
+        renderComposer();
+        fireEvent.click(screen.getByRole("button", { name: "Send message" }));
+
+        expect(harness.sendMessage).not.toHaveBeenCalled();
+        expect(usePromptQueueStore.getState().queues["thread-1"]?.items.map((item) => item.text)).toStrictEqual(["a follow-up"]);
     });
 });

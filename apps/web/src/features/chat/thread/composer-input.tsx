@@ -551,8 +551,9 @@ const ComposerInput = ({
     // The comparison parent fans out through `onSubmitOverride`, and the compact
     // landing bar has no thread to recall from or queue against.
     const isThreadComposer = !onSubmitOverride && !compact && Boolean(threadId);
-    // Sending needs the server; offline the draft stays where it is, and the send says why instead of hanging.
-    const connectionView = useConnectionView();
+    // Sending needs the network; offline the draft stays where it is, and the send says why instead of hanging. A dropped
+    // live socket alone ("reconnecting") does not block: messages go over HTTP.
+    const isOffline = useConnectionView() === "offline";
 
     const getComposerText = useCallback(() => useChatUIStore.getState().composerText, []);
     const promptHistory = usePromptHistory(getComposerText);
@@ -995,7 +996,7 @@ const ComposerInput = ({
             return;
         }
 
-        if (connectionView !== "online") {
+        if (isOffline) {
             showInfo(t`You are offline. Your message stays here; send it once you are back online.`, { id: "composer-offline-send" });
 
             return;
@@ -1028,7 +1029,7 @@ const ComposerInput = ({
             .then(() => settleSteer(threadId, steerId, "accepted"))
             .catch((error: unknown) => settleSteer(threadId, steerId, wasRefused(error) ? "refused" : "accepted"))
             .finally(() => clearTimeout(unanswered));
-    }, [canSteer, cancelStream, clear, connectionView, disabled, followUp, promptHistory, sseStreamState, steerRun, t, text, threadId]);
+    }, [canSteer, cancelStream, clear, isOffline, disabled, followUp, promptHistory, sseStreamState, steerRun, t, text, threadId]);
 
     // Handle submit — fully synchronous, fire-and-forget network call.
     // Optimistic state (user message + Thinking...) is shown immediately inside
@@ -1060,7 +1061,10 @@ const ComposerInput = ({
             return;
         }
 
-        if (connectionView !== "online") {
+        // A follow-up while a reply streams only joins the local queue, which waits for the network before it sends.
+        const queuesLocally = isStreaming && isThreadComposer && !isComparisonValid && Boolean(threadId) && !(draftAttachments.length === 0 && (isCompactCommand(draftText) || isClearCommand(draftText)));
+
+        if (isOffline && !queuesLocally) {
             showInfo(t`You are offline. Your message stays here; send it once you are back online.`, { id: "composer-offline-send" });
 
             return;
@@ -1153,7 +1157,7 @@ const ComposerInput = ({
 
         onSubmitProp?.();
     }, [
-        connectionView,
+        isOffline,
         t,
         disabled,
         mustSignIn,
