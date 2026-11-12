@@ -36,6 +36,62 @@ export const loadPostHog = async (): Promise<PostHog> => {
     return await chunk.loading;
 };
 
+const resetState: { pending: boolean } = { pending: false };
+
+const clearStorageKeys = (storage: Storage, prefix: string): void => {
+    for (const key of Object.keys(storage)) {
+        if (key.startsWith(prefix)) {
+            storage.removeItem(key);
+        }
+    }
+};
+
+/**
+ * Forget the PostHog identity stored for `token` without loading `posthog-js`: a sign-out while its chunk is still
+ * downloading reloads before PostHog could `reset()`, and the next page would otherwise boot (and be bootstrapped by
+ * the server, which reads the cookie) as the account that left. Removes what posthog-js persists under
+ * `ph_<token>_…` (`parseName` in its `posthog-persistence`): the `ph_<token>_posthog` cookie on this host and every
+ * parent domain it may have been set on, and the localStorage and sessionStorage entries. The client is also reset
+ * once it initialises, for a page that did not reload.
+ */
+export const forgetPostHogIdentity = (token: string): void => {
+    resetState.pending = true;
+
+    const prefix = `ph_${token.replaceAll("+", "PL").replaceAll("/", "SL").replaceAll("=", "EQ")}_`;
+
+    try {
+        clearStorageKeys(globalThis.localStorage, prefix);
+        clearStorageKeys(globalThis.sessionStorage, prefix);
+    } catch {
+        // Storage blocked: nothing was persisted there either.
+    }
+
+    if (!globalThis.document) {
+        return;
+    }
+
+    const cookie = `${prefix}posthog=; path=/; max-age=0`;
+    const labels = globalThis.location.hostname.split(".");
+
+    // Synchronous on purpose: the sign-out reload follows at once, and the async Cookie Store API could lose that race.
+    // eslint-disable-next-line unicorn/no-document-cookie -- see above; posthog-js writes this cookie the same way
+    document.cookie = cookie;
+
+    for (let index = 0; index < labels.length - 1; index += 1) {
+        // eslint-disable-next-line unicorn/no-document-cookie -- see above
+        document.cookie = `${cookie}; domain=.${labels.slice(index).join(".")}`;
+    }
+};
+
+/** Whether a sign-out asked for a reset before PostHog had initialised; answers `true` once. */
+export const takePendingPostHogReset = (): boolean => {
+    const { pending } = resetState;
+
+    resetState.pending = false;
+
+    return pending;
+};
+
 /** The initialised client, provided by `AnalyticsProvider` (and a fake one in Storybook). */
 export const PostHogClientContext = createContext<PostHog | undefined>(undefined);
 

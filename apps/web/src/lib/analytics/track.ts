@@ -7,18 +7,24 @@
 import { useCallback } from "react";
 
 import type { AnalyticsEvent, AnalyticsEventMap } from "./events";
-import { getPostHog } from "./posthog-client";
+import { forgetPostHogIdentity, getPostHog } from "./posthog-client";
 
 /**
  * Forget the identified user before a sign-out reload, so later events from this
- * browser are not attributed to the account that just left. A no-op when PostHog
- * was never initialised.
+ * browser are not attributed to the account that just left. Before PostHog has
+ * initialised (its chunk loads after mount) the identity it stored is removed instead.
  */
 export const resetAnalyticsIdentity = (): void => {
     const posthog = getPostHog();
 
     if (posthog?.__loaded) {
         posthog.reset();
+
+        return;
+    }
+
+    if (import.meta.env.VITE_POSTHOG_API_KEY) {
+        forgetPostHogIdentity(import.meta.env.VITE_POSTHOG_API_KEY);
     }
 };
 

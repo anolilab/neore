@@ -35,4 +35,26 @@ describe(ErrorBoundary, () => {
         expect(screen.getByText("Recovered: frozen")).toBeTruthy();
         expect(captureException).toHaveBeenCalledWith(frozenError);
     });
+
+    it("replaces the component stack it attached before when the same error is caught again", () => {
+        vi.spyOn(console, "error").mockImplementation(() => {});
+        const original = new Error("again", { cause: "root cause" });
+        const Again = (): never => {
+            throw original;
+        };
+
+        for (let index = 0; index < 2; index += 1) {
+            render(
+                <ErrorBoundary fallback={(error: Error) => <p>{error.message}</p>}>
+                    <Again />
+                </ErrorBoundary>,
+            ).unmount();
+        }
+
+        const link = original.cause as Error;
+
+        expect(link.name).toBe("React ErrorBoundary Error");
+        expect(link.stack).toContain("Again");
+        expect(link.cause).toBe("root cause");
+    });
 });

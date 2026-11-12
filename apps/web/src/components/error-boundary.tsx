@@ -28,9 +28,13 @@ const attachCause = (target: Error, cause: Error): void => {
     }
 };
 
+/** The component-stack errors `withComponentStack` attached, so an error caught again gets its link replaced, not a second one. */
+const stackErrors = new WeakSet<Error>();
+
 /**
  * Hands React's component stack to PostHog as the error's innermost `cause`, named `React ErrorBoundary <name>`, as
- * `@posthog/react`'s boundary does, so the exception groups as it did before this boundary replaced that one.
+ * `@posthog/react`'s boundary does, so the exception groups as it did before this boundary replaced that one. An error
+ * caught again (re-thrown, or rendered by a second boundary) has the link it got last time replaced by this render's.
  */
 const withComponentStack = (error: unknown, componentStack: string): unknown => {
     if (!componentStack) {
@@ -48,6 +52,7 @@ const withComponentStack = (error: unknown, componentStack: string): unknown => 
         },
         stack: { configurable: true, value: componentStack, writable: true },
     });
+    stackErrors.add(stackError);
 
     if (!(error instanceof Error)) {
         return stackError;
@@ -59,18 +64,25 @@ const withComponentStack = (error: unknown, componentStack: string): unknown => 
     while (!seen.has(current)) {
         seen.add(current);
 
-        if (!(current.cause instanceof Error)) {
-            if (current.cause !== undefined) {
-                Object.defineProperty(stackError, "cause", { configurable: true, value: current.cause, writable: true });
-            }
+        const { cause } = current;
 
-            // A frozen error, or one whose `cause` cannot be redefined, is reported without the component stack.
-            attachCause(current, stackError);
+        if (cause instanceof Error && !stackErrors.has(cause)) {
+            current = cause;
 
-            return error;
+            continue;
         }
 
-        current = current.cause;
+        // An earlier link is replaced; whatever it carried on (a non-Error cause) moves to the new one.
+        const tail: unknown = cause instanceof Error ? cause.cause : cause;
+
+        if (tail !== undefined) {
+            Object.defineProperty(stackError, "cause", { configurable: true, value: tail, writable: true });
+        }
+
+        // A frozen error, or one whose `cause` cannot be redefined, is reported without the component stack.
+        attachCause(current, stackError);
+
+        return error;
     }
 
     return error;

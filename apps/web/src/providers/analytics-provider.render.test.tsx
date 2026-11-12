@@ -12,6 +12,7 @@ const posthogMock = vi.hoisted(() => {
         init: vi.fn(),
         opt_in_capturing: vi.fn(),
         opt_out_capturing: vi.fn(),
+        reset: vi.fn(),
     };
 });
 
@@ -28,7 +29,7 @@ vi.mock("@/lib/analytics/first-native-launch", () => {
 });
 
 const { default: AnalyticsProvider, onPostHogLoaded, PostHogConsentSync } = await import("./analytics-provider");
-const { usePostHog } = await import("@/lib/analytics/posthog-client");
+const { forgetPostHogIdentity, usePostHog } = await import("@/lib/analytics/posthog-client");
 
 describe("PostHog consent sync", () => {
     beforeEach(() => {
@@ -76,6 +77,7 @@ describe("AnalyticsProvider", () => {
         vi.stubEnv("VITE_POSTHOG_HOST", "https://posthog.test");
         loadPostHog.mockReset();
         posthogMock.init.mockClear();
+        posthogMock.reset.mockClear();
     });
 
     afterEach(() => {
@@ -106,5 +108,27 @@ describe("AnalyticsProvider", () => {
         expect(loadPostHog).toHaveBeenCalledTimes(2);
         expect(posthogMock.init).toHaveBeenCalledOnce();
         expect(screen.getByText("analytics on")).toBeTruthy();
+    });
+
+    it("resets the identity it was bootstrapped with when a sign-out came before its chunk loaded", async () => {
+        loadPostHog.mockResolvedValue(posthogMock);
+        forgetPostHogIdentity("key");
+
+        render(
+            <AnalyticsProvider>
+                <ClientState />
+            </AnalyticsProvider>,
+        );
+
+        await act(async () => {
+            await Promise.resolve();
+        });
+
+        expect(posthogMock.init).toHaveBeenCalledOnce();
+        expect(posthogMock.reset).toHaveBeenCalledOnce();
+        const [initOrder = 0] = posthogMock.init.mock.invocationCallOrder;
+        const [resetOrder = 0] = posthogMock.reset.mock.invocationCallOrder;
+
+        expect(resetOrder).toBeGreaterThan(initOrder);
     });
 });

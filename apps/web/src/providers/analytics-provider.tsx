@@ -4,7 +4,7 @@ import type { FC, PropsWithChildren } from "react";
 import { useEffect, useState } from "react";
 
 import { reportFirstNativeLaunch } from "@/lib/analytics/first-native-launch";
-import { getPostHog, loadPostHog, PostHogClientContext } from "@/lib/analytics/posthog-client";
+import { getPostHog, loadPostHog, PostHogClientContext, takePendingPostHogReset } from "@/lib/analytics/posthog-client";
 import { redactPromptFromEvent } from "@/lib/analytics/redact-prompt";
 
 // The consent state PostHog should follow. `PostHogConsentSync` is a child of `AnalyticsProvider`, so its first
@@ -129,6 +129,12 @@ const AnalyticsProvider: FC<PropsWithChildren> = ({ children }) => {
                 ...POSTHOG_OPTIONS,
                 loaded: onPostHogLoaded,
             });
+
+            // Signed out while the chunk loaded, on a page that has not reloaded: drop the bootstrapped identity too.
+            if (takePendingPostHogReset()) {
+                posthog.reset();
+            }
+
             setClient(posthog);
         };
 
