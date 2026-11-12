@@ -8,7 +8,7 @@ import UpstreamTurndown from "turndown";
 import TurndownService from "../src/index";
 
 /*
- * `pnpm bench`: this port against upstream turndown 7.2.5 (the devDependency),
+ * `pnpm test:bench`: this port against upstream turndown 7.2.5 (the devDependency),
  * on real paste fixtures, a large synthetic page, and adversarial inputs.
  * Prints a table of median milliseconds; paste the numbers into pull request descriptions.
  * Not part of `pnpm test`: timings are not asserted.

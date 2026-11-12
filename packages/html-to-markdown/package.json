@@ -11,13 +11,13 @@
         "./package.json": "./package.json"
     },
     "scripts": {
-        "bench": "tsx bench/run.ts",
         "build": "tsc --noEmit",
         "lint:eslint": "eslint . --cache --cache-location .eslint.cache.json",
         "lint:eslint:fix": "eslint . --fix --cache --cache-location .eslint.cache.json",
         "lint:types": "tsc --noEmit",
         "lint:types:fast": "tsrs --noEmit",
-        "test": "vitest run"
+        "test": "vitest run",
+        "test:bench": "tsx bench/run.ts"
     },
     "dependencies": {
         "@mixmark-io/domino": "2.2.0"

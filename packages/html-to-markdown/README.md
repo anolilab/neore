@@ -49,4 +49,4 @@ differential test covers each of them.
 ## Scripts
 
 - `pnpm test`: unit, golden and differential tests.
-- `pnpm bench`: this port against upstream 7.2.5 on the paste fixtures, a 5 MB document and adversarial inputs.
+- `pnpm test:bench`: this port against upstream 7.2.5 on the paste fixtures, a 5 MB document and adversarial inputs.
