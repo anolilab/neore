@@ -69,9 +69,14 @@ const rootBeforeLoad = async (options: RootBeforeLoadOptions) => {
     const reused = reusableToken(options.context.lunoraClient);
 
     if (reused) {
+        const changesBefore = sessionChangeCount();
         const { nonce, posthog } = await readRequestContext(options);
 
-        return { authStatus: "authenticated" as const, isAuthenticated: true, nonce, token: reused, posthog };
+        // A sign-in, sign-out or switch while the context was read: the reused token may be the old session's, so the
+        // session is read as on any other navigation below.
+        if (sessionChangeCount() === changesBefore && reusableToken(options.context.lunoraClient) === reused) {
+            return { authStatus: "authenticated" as const, isAuthenticated: true, nonce, token: reused, posthog };
+        }
     }
 
     // Taken before the read: a change while it is out leaves the answer unconfirmed.

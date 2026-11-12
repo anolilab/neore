@@ -167,6 +167,25 @@ describe("rootBeforeLoad", () => {
             expect(getSessionAuthState).toHaveBeenCalledTimes(2);
         });
 
+        it("reads the session when it changes while a reused token's navigation is under way", async () => {
+            const rootBeforeLoad = await loadRootBeforeLoad();
+            const held = signedIn(jwt(600));
+
+            await rootBeforeLoad(options("/chat/abc", held));
+            expect(getSessionAuthState).toHaveBeenCalledTimes(1);
+
+            // The change lands during the reuse's await: everything read after it sees the new count.
+            let changed = false;
+
+            vi.mocked(sessionChangeCount).mockImplementation(() => (changed ? 1 : 0));
+
+            const navigation = rootBeforeLoad(options("/chat/def", held));
+
+            changed = true;
+            await navigation;
+            expect(getSessionAuthState).toHaveBeenCalledTimes(2);
+        });
+
         it("does not confirm a read that a session change overtook", async () => {
             const rootBeforeLoad = await loadRootBeforeLoad();
             const held = signedIn(jwt(600));
