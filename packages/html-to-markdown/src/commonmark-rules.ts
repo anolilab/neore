@@ -344,11 +344,13 @@ const SAFE_SCHEMES = new Set(["http", "https", "mailto", "tel"]);
  * True when a link destination has a scheme outside `SAFE_SCHEMES` (`javascript:`, `data:`, `vbscript:`, `file:`...).
  * A destination with no scheme is relative and kept.
  *
- * The destination is read the way CommonMark decodes it (backslash escapes and numeric character references), then the
- * way a browser reads an `href` (leading and trailing C0 controls and spaces dropped, tabs and line breaks removed).
- * A named reference such as `&colon;` is not decoded, so a `&` before the first `/`, `?` or `#` makes the destination
- * unsafe: it could spell a scheme. A plain scheme regular expression is used instead of `new URL`, which throws on a
- * relative URL and on some schemes with a bad host; those must not pass as relative.
+ * The check runs on a decoded copy of the destination. Backslash escapes of ASCII punctuation and numeric character
+ * references (decimal or hex, `;` optional) are decoded first. Then leading and trailing C0 controls and spaces are
+ * dropped and tabs and line breaks removed, the way a browser reads an `href`. A named reference such as `&colon;` is
+ * not decoded, so a `&` that remains before the first `/`, `?` or `#` makes the destination unsafe: it could spell a
+ * scheme. Numeric references are decoded before that test, so `&#0;javascript:alert(1)` becomes U+FFFD followed by
+ * `javascript:alert(1)`, which has no scheme, and is kept. A plain scheme regular expression is used instead of
+ * `new URL`, which throws on a relative URL and on some schemes with a bad host; those must not pass as relative.
  */
 function isUnsafeDestination(href: string): boolean {
     const decoded = stripUrlNoise(decodeDestination(href));
@@ -393,8 +395,9 @@ function cleanAttribute(attribute: string | null): string {
 }
 
 /**
- * With `safeLinks`, `\` and `&` are escaped too, so the rendered destination is exactly the text that was checked and no
- * escape or character reference is decoded after the check.
+ * With `safeLinks`, `\` and `&` are escaped too. CommonMark undoes those added escapes, so the rendered destination is
+ * the raw attribute, not the decoded copy. The check already covers the raw attribute: `isUnsafeDestination` runs on a
+ * decoded copy of that same text.
  */
 function escapeLinkDestination(destination: string, isSafeLinks = false): string {
     const escaped = (isSafeLinks ? destination.replaceAll("\\", "\\\\").replaceAll("&", "&amp;") : destination)
