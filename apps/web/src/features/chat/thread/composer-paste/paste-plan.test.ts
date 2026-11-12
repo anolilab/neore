@@ -99,10 +99,10 @@ describe("composer paste", () => {
         expect(htmlToMarkdown(item(1, "a)", "one") + item(1, "b)", "two"))).toBe("- a) one\n- b) two");
     });
 
-    it("counts a reversed list down, from its start or its number of items", () => {
-        expect(htmlToMarkdown("<ol reversed><li>b</li><li>a</li></ol>")).toBe("2. b\n1. a");
-        expect(htmlToMarkdown('<ol reversed start="10"><li>j</li><li value="4">d</li><li>c</li></ol>')).toBe("10. j\n4. d\n3. c");
-        expect(htmlToMarkdown('<ol reversed start="1"><li>a</li><li>z</li></ol>')).toBe("1. a\n0. z");
+    it("counts a reversed list down, from its start or its number of items, with its numbers kept as text", () => {
+        expect(htmlToMarkdown("<ol reversed><li>b</li><li>a</li></ol>")).toBe("- 2. b\n- 1. a");
+        expect(htmlToMarkdown('<ol reversed start="10"><li>j</li><li value="4">d</li><li>c</li></ol>')).toBe("- 10. j\n- 4. d\n- 3. c");
+        expect(htmlToMarkdown('<ol reversed start="1"><li>a</li><li>z</li></ol>')).toBe("- 1. a\n- 0. z");
     });
 
     it("marks formatted text broken by a line break on each of its lines", () => {

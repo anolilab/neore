@@ -931,7 +931,10 @@ const list = (listElement: Element, context: Context): string => {
         numbers.length = level;
         // A reversed list counts on below 0: such numbers are kept as text (`listMarker`).
         numbers[level - 1] = reversed && level === 1 ? number - 1 : number + 1;
-        items.push(listItem(body.replaceAll(BLANK_LINES, "\n\n").trim(), level, listMarker(ordered, listType, number), context));
+        // Markdown reads only the first item's number and counts up from it: a reversed list keeps its numbers as text.
+        const marker = reversed && level === 1 ? `- ${listLabel(number, listType)}. ` : listMarker(ordered, listType, number);
+
+        items.push(listItem(body.replaceAll(BLANK_LINES, "\n\n").trim(), level, marker, context));
     }
 
     // In an item, one break: a blank line between the item's text and its sub-list would make the whole outer list loose.
