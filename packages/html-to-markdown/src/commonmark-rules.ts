@@ -26,7 +26,13 @@ class ReferenceLinkRule implements Rule {
     filter = isReferencedLink;
 
     replacement(content: string, node: AnnotatedNode, options: Options): string {
-        const href = escapeLinkDestination(node.getAttribute("href") ?? "");
+        const rawHref = node.getAttribute("href") ?? "";
+
+        if (options.safeLinks && isUnsafeDestination(rawHref)) {
+            return content;
+        }
+
+        const href = escapeLinkDestination(rawHref);
         let title = cleanAttribute(node.getAttribute("title"));
 
         if (title) {
@@ -207,8 +213,14 @@ const rules: Record<string, Rule> = {
             return options.linkStyle === "inlined" && node.nodeName === "A" && Boolean(node.getAttribute("href"));
         },
 
-        replacement(content, node) {
-            const href = escapeLinkDestination(node.getAttribute("href") ?? "");
+        replacement(content, node, options) {
+            const rawHref = node.getAttribute("href") ?? "";
+
+            if (options.safeLinks && isUnsafeDestination(rawHref)) {
+                return content;
+            }
+
+            const href = escapeLinkDestination(rawHref);
             const title = escapeLinkTitle(cleanAttribute(node.getAttribute("title")));
             const titlePart = title ? ` "${title}"` : "";
 
@@ -319,6 +331,39 @@ function isSpacePadded(text: string): boolean {
     // With no terminator, any non-space will do. With exactly one, that
     // character itself is the non-space that the pattern needs.
     return terminators === 0 ? hasNonSpace : terminators === 1;
+}
+
+const SCHEME = /^([a-z][\d+.a-z-]*):/i;
+const TAB_OR_NEWLINE = /[\t\n\r]/g;
+const SAFE_SCHEMES = new Set(["http", "https", "mailto", "tel"]);
+
+/**
+ * True when a link destination has a scheme outside `SAFE_SCHEMES` (`javascript:`, `data:`, `vbscript:`, `file:`...).
+ * A destination with no scheme is relative and kept.
+ *
+ * The scheme is read the way a browser reads an `href`: leading and trailing C0 controls and spaces are dropped, and
+ * tabs and line breaks are removed everywhere, before the scheme is matched. A plain scheme regular expression is used
+ * instead of `new URL`, which throws on a relative URL and on some schemes with a bad host; those must not pass as relative.
+ */
+function isUnsafeDestination(href: string): boolean {
+    const scheme = SCHEME.exec(stripUrlNoise(href))?.[1];
+
+    return scheme !== undefined && !SAFE_SCHEMES.has(scheme.toLowerCase());
+}
+
+function stripUrlNoise(href: string): string {
+    let start = 0;
+    let end = href.length;
+
+    while (start < end && (href.codePointAt(start) ?? 0) <= 0x20) {
+        start += 1;
+    }
+
+    while (end > start && (href.codePointAt(end - 1) ?? 0) <= 0x20) {
+        end -= 1;
+    }
+
+    return href.slice(start, end).replaceAll(TAB_OR_NEWLINE, "");
 }
 
 function cleanAttribute(attribute: string | null): string {

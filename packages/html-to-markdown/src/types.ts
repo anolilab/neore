@@ -27,6 +27,12 @@ export interface Options {
     linkStyle: string;
     preformattedCode: boolean;
     rules?: Record<string, Rule>;
+
+    /**
+     * When true, a link whose destination has a scheme other than http, https, mailto or tel renders as its text only.
+     * Relative destinations are kept. Off by default, as upstream.
+     */
+    safeLinks: boolean;
     strongDelimiter: string;
 }
 
