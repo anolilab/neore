@@ -46,7 +46,7 @@ const NON_CONTENT_NAMES = new Set(["noscript", "script", "style", "template", "t
 function removeNonContent(root: Node): void {
     if (isNonContent(root)) {
         while (root.firstChild) {
-            root.removeChild(root.firstChild);
+            root.firstChild.remove();
         }
 
         return;
@@ -66,7 +66,7 @@ function removeNonContentBelow(parent: Node): void {
         const next = child.nextSibling;
 
         if (isNonContent(child)) {
-            parent.removeChild(child);
+            child.remove();
         } else {
             removeNonContentBelow(child);
         }
