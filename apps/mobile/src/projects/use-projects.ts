@@ -8,10 +8,13 @@ import { EMPTY_LIVE, followLive, liveFor } from "./live-follow";
 import type { ProjectRow, ProjectThreadRow } from "./projects-api";
 import { watchProject, watchProjects, watchProjectThreads } from "./projects-api";
 
-/** Follows one live query while the user is signed in; the subscription ends with the screen. */
+/**
+ * Follows one live query while the user is signed in with a token; the subscription ends with the screen. A start that
+ * is still confirming the stored user holds none yet, and a subscription opened without one would be refused.
+ */
 const useLive = <T>(watch: (onRows: (rows: T[]) => void, onError: (message: string) => void) => () => void, key: string): Live<T> => {
-    const { status, user } = useAuth();
-    const scope = status === "signed-in" && user ? `${user.id}:${key}` : undefined;
+    const { hasToken, status, user } = useAuth();
+    const scope = status === "signed-in" && hasToken && user ? `${user.id}:${key}` : undefined;
     const [live, setLive] = useState<Scoped<T>>({ ...EMPTY_LIVE, scope: "" });
 
     useEffect(() => {

@@ -1,6 +1,6 @@
 import { tokenRefreshDelayMs } from "@neore/client-runtime";
 import type { ReactNode } from "react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 
 import { clearLastThread } from "../chat/last-thread-store";
 import { loadConfig } from "../lib/config";
@@ -9,11 +9,10 @@ import { backendPushServer, devicePushPlatform, pushRegistrations } from "../not
 import { releaseOnSignOut } from "../notifications/push-registration";
 import { endPhonePushForAccount } from "../notifications/use-phone-push";
 import { getOfflineCache } from "../offline/database";
-import type { AuthStatus } from "./auth-state";
 import { AuthContext } from "./auth-state";
-import type { GrantUser } from "./grant";
 import { fetchAccessToken, readStoredUser, signOutGrant } from "./grant";
 import { secureGrantStore } from "./secure-store";
+import { INITIAL_SESSION, reduceSession } from "./session-state";
 import { signInWithBrowser } from "./sign-in";
 import { emptyCacheWhileSignedOut, signOutOnDevice } from "./sign-out";
 
@@ -28,17 +27,38 @@ const nextTick = (tick: number): number => tick + 1;
 /**
  * Keeps the Lunora client's bearer in step with the stored grant. The JWT lives in
  * memory only; it is re-minted when client-runtime says the current one is due.
+ * A returning person is signed in from the stored user before the first mint answers
+ * (`reduceSession`), so the app opens on their saved chats instead of waiting on the network.
  */
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-    const [status, setStatus] = useState<AuthStatus>("loading");
-    const [user, setUser] = useState<GrantUser | null>(null);
+    const [session, dispatch] = useReducer(reduceSession, INITIAL_SESSION);
+    const { hasToken, isConfirming, status, user } = session;
     const [refreshTick, setRefreshTick] = useState(0);
-    const [hasToken, setHasToken] = useState(false);
     const signOutCount = useRef(0);
     // Callers of `retryToken` waiting for the attempt they asked for to end.
     const renewalWaiters = useRef<(() => void)[]>([]);
     const [config] = useState(loadConfig);
     const [client] = useState(getClient);
+
+    // The stored user is on the device: reading it needs no network, so it paints the signed-in app at once. A sign-out
+    // or a mint that lands first wins (the reducer ignores a late read).
+    useEffect(() => {
+        let isCancelled = false;
+
+        const paint = async () => {
+            const storedUser = await readStoredUser(secureGrantStore);
+
+            if (!isCancelled) {
+                dispatch({ type: "stored-user", user: storedUser });
+            }
+        };
+
+        paint();
+
+        return () => {
+            isCancelled = true;
+        };
+    }, []);
 
     useEffect(() => {
         let isCancelled = false;
@@ -57,11 +77,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 const storedUser = await readStoredUser(secureGrantStore);
 
                 if (!isStale()) {
-                    if (storedUser !== null) {
-                        setUser(storedUser);
-                        setStatus("signed-in");
-                    }
-
+                    dispatch({ type: "unreachable", user: storedUser });
                     timer = setTimeout(setRefreshTick, TOKEN_RETRY_MS, nextTick);
                 }
 
@@ -73,11 +89,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             }
 
             client.setAuthToken(jwt);
-            setHasToken(jwt !== null);
 
             if (jwt === null) {
-                setUser(null);
-                setStatus("signed-out");
+                dispatch({ type: "signed-out" });
                 // Retries a cache wipe that failed at sign-out; the credential side never waits on it.
                 await emptyCacheWhileSignedOut({ clearCache: () => getOfflineCache().clear(), forgetLastChat: clearLastThread, warn: console.warn });
 
@@ -90,8 +104,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 return;
             }
 
-            setUser(storedUser);
-            setStatus("signed-in");
+            dispatch({ type: "token", user: storedUser });
             timer = setTimeout(setRefreshTick, tokenRefreshDelayMs(jwt) ?? FALLBACK_REFRESH_MS, nextTick);
         };
 
@@ -141,9 +154,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         } finally {
             signOutCount.current += 1;
             client.setAuthToken(null);
-            setHasToken(false);
-            setUser(null);
-            setStatus("signed-out");
+            dispatch({ type: "signed-out" });
         }
     }, [client, config.lunoraUrl]);
 
@@ -157,8 +168,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     );
 
     const value = useMemo(() => {
-        return { hasToken, retryToken, signIn, signOut, status, user };
-    }, [hasToken, retryToken, signIn, signOut, status, user]);
+        return { hasToken, isConfirming, retryToken, signIn, signOut, status, user };
+    }, [hasToken, isConfirming, retryToken, signIn, signOut, status, user]);
 
     return <AuthContext value={value}>{children}</AuthContext>;
 };

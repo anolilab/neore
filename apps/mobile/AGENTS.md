@@ -13,8 +13,10 @@
   sign-out; a save from a screen of a signed-out account is refused. Sign-out empties the cache BEFORE it asks the
   server (`auth/sign-out.ts`), so a failing or hanging request leaves nothing behind. Locked threads are never cached,
   and a chat the server refuses (`FORBIDDEN`/`NOT_FOUND`/`THREAD_LOCKED`, not a lapsed sign-in) is forgotten with its
-  statuses and cleared from the screen (`message-read.ts`). A cold start with no network signs the stored user in
-  without a JWT (`auth-context.tsx`) so the saved chats can open; that state counts as offline.
+  statuses and cleared from the screen (`message-read.ts`). Every start signs the stored user in before the first
+  token mint answers (`session-state.ts`, `isConfirming`: not offline yet; the splash holds until the session is known, at
+  most 2 s). A mint with no answer keeps them signed in without a JWT, which counts as offline; an answered "no session"
+  signs out and empties the cache. Live queries wait for a JWT.
   **Stamps and races:** a read stamps its rows with the moment it STARTED (`syncedAt`), and only the newest read of a
   screen may paint or save (`createMessageReadGate`), because messages carry no server version. A thread missing from
   a COMPLETE first-page list read is pruned (`pruneThreads`, rows synced by a later read stay); a partial page never
