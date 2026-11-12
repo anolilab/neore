@@ -261,7 +261,7 @@ const sealOf = (entry: unknown): string | undefined => {
         return undefined;
     }
 
-    return isSealedRecord(entry) ? Array.from(entry.iv, (byte) => byte.toString(16).padStart(2, "0")).join("") : "unreadable";
+    return isSealedRecord(entry) ? Array.from(entry.iv, (byte: number) => byte.toString(16).padStart(2, "0")).join("") : "unreadable";
 };
 
 interface AccountKey {
@@ -319,7 +319,7 @@ export const sealRecord = async (store: RecordStore, userId: string, text: strin
     const isWritten = await store.putEntry(
         userId,
         entry,
-        (storedKey, storedEntry) =>
+        (storedKey: unknown, storedEntry: unknown) =>
             isAccountKey(storedKey) && storedKey.id === sealingKey.id && !(isSealedRecord(storedEntry) && storedEntry.writtenAt > writtenAt),
     );
 
@@ -363,12 +363,12 @@ export const openRecord = async (store: RecordStore, userId: string): Promise<Op
 
 /** Removes the account's record and its key; with `seal`, only while the stored record is still the one read. */
 export const removeRecord = async (store: RecordStore, userId: string, seal?: string): Promise<void> => {
-    await store.remove([userId], seal === undefined ? undefined : (entry) => sealOf(entry) === seal);
+    await store.remove([userId], seal === undefined ? undefined : (entry: unknown) => sealOf(entry) === seal);
 };
 
 /** Removes the record and key of every account whose record was written before `writtenBefore`, unread. */
 export const pruneRecords = async (store: RecordStore, writtenBefore: number): Promise<void> => {
-    await store.remove(undefined, (entry, key) => {
+    await store.remove(undefined, (entry: unknown, key?: unknown) => {
         // A key alone: made before the cut-off and never sealed with, or not a key this version made.
         if (entry === undefined) {
             return !isAccountKey(key) || typeof key.createdAt !== "number" || key.createdAt < writtenBefore;

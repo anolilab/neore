@@ -9,11 +9,14 @@
  * What is kept, and how it is cleaned, is the caller's `policy`; whether a save may reach disk at all (a sign-out
  * holds every write until the identity changes) is its `gate`. The record is encrypted (`encrypted-store.ts`).
  */
-import type { DehydratedState, Query, QueryClient } from "@tanstack/query-core";
+import type { DehydratedState, Query, QueryCacheNotifyEvent, QueryClient } from "@tanstack/query-core";
 import { dehydrate, hydrate, QueryObserver } from "@tanstack/query-core";
 
 import type { RecordStore } from "./encrypted-store";
 import { openRecord, pruneRecords, removeRecord, sealRecord } from "./encrypted-store";
+
+/** One saved read, as `dehydrate` writes it. */
+type DehydratedQuery = DehydratedState["queries"][number];
 
 /**
  * A record not written for this long is dropped (any account's, on any account's start), and so is a kept read not
@@ -120,7 +123,7 @@ const serialized = async (userId: string, task: () => Promise<void>): Promise<vo
 const asSettled = (state: DehydratedState): DehydratedState => {
     return {
         mutations: [],
-        queries: state.queries.map((query) => {
+        queries: state.queries.map((query: DehydratedQuery) => {
             return { ...query, promise: undefined, state: { ...query.state, fetchStatus: "idle" as const } };
         }),
     };
@@ -169,7 +172,8 @@ export const startQueryPersistence = (options: PersistenceOptions): PersistenceC
         const dehydrated = dehydrate(queryClient, {
             shouldDehydrateMutation: () => false,
             // A read older than the cache's age limit is not carried into a fresh record: it would outlive the limit.
-            shouldDehydrateQuery: (query) => keep(query) && (isReadSinceStart(query) || isRestored(query)) && now() - query.state.dataUpdatedAt <= MAX_AGE_MS,
+            shouldDehydrateQuery: (query: Query) =>
+                keep(query) && (isReadSinceStart(query) || isRestored(query)) && now() - query.state.dataUpdatedAt <= MAX_AGE_MS,
         });
         const record: StoredClient = { buster, clientState: asSettled(policy.sanitize(dehydrated, userId)), timestamp: now(), userId };
 
@@ -232,18 +236,21 @@ export const startQueryPersistence = (options: PersistenceOptions): PersistenceC
 
         const cutoff = now() - MAX_AGE_MS;
         const clientState = asSettled(
-            policy.sanitize({ ...parsed.clientState, queries: parsed.clientState.queries.filter((query) => query.state.dataUpdatedAt >= cutoff) }, userId),
+            policy.sanitize(
+                { ...parsed.clientState, queries: parsed.clientState.queries.filter((query: DehydratedQuery) => query.state.dataUpdatedAt >= cutoff) },
+                userId,
+            ),
         );
 
         const queryCache = queryClient.getQueryCache();
         // A read that arrived since this start is live, whatever its stamp (a clock that stepped back, a server time):
         // the saved value never replaces it. `hydrate` alone keeps only one stamped later than the saved value.
-        const restorable = clientState.queries.filter((query) => {
+        const restorable = clientState.queries.filter((query: DehydratedQuery) => {
             const existing = queryCache.get(query.queryHash);
 
             return existing === undefined || !isReadSinceStart(existing);
         });
-        const before = new Map(restorable.map((query) => [query.queryHash, queryCache.get(query.queryHash)?.state]));
+        const before = new Map(restorable.map((query: DehydratedQuery) => [query.queryHash, queryCache.get(query.queryHash)?.state]));
 
         // A restored entry nobody watches yet must outlive the default five minutes, or the next save forgets it.
         hydrate(queryClient, { ...clientState, queries: restorable }, { defaultOptions: { queries: { gcTime: MAX_AGE_MS } } });
@@ -369,7 +376,7 @@ export const startQueryPersistence = (options: PersistenceOptions): PersistenceC
         await attemptRestore();
 
         if (!state.stopped) {
-            unsubscribe = queryClient.getQueryCache().subscribe((event) => {
+            unsubscribe = queryClient.getQueryCache().subscribe((event: QueryCacheNotifyEvent) => {
                 if (CACHE_EVENTS.has(event.type)) {
                     schedule();
                 }
