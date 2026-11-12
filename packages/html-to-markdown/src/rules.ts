@@ -1,18 +1,86 @@
+import { isUnsafeDestination } from "./commonmark-rules";
 import annotateNode from "./node";
 import type { AnnotatedNode, Options, ReplacementFunction, Rule, RuleLookup } from "./types";
+
+/** The attributes that carry a link destination: `href`, and `xlink:href` on an SVG `<a>`. */
+const LINK_ATTRIBUTES = ["href", "xlink:href"];
 
 /**
  * The default `keepReplacement`. It ignores its content and outputs the
  * element's HTML, so the converter skips the children of a kept element when
  * this is the replacement in use. A custom `keepReplacement` still gets the
  * converted children.
+ *
+ * With `safeLinks`, an `<a>` inside the element whose destination is unsafe is
+ * written without its link: its content stays and its destination goes. Kept
+ * markup with only safe links is output unchanged.
  */
-export function defaultKeepReplacement(_content: string, node: AnnotatedNode): string {
+export function defaultKeepReplacement(_content: string, node: AnnotatedNode, options: Options): string {
+    const html = options.safeLinks ? htmlWithoutUnsafeLinks(node) : node.outerHTML;
+
     if (node.isBlock) {
-        return `\n\n${node.outerHTML}\n\n`;
+        return `\n\n${html}\n\n`;
     }
 
-    return node.outerHTML;
+    return html;
+}
+
+/**
+ * The element's HTML with every unsafe anchor unwrapped, so its text and its
+ * inner markup stay. The element is returned as is when it has no unsafe anchor.
+ */
+function htmlWithoutUnsafeLinks(node: AnnotatedNode): string {
+    const hasUnsafeLink = isUnsafeAnchor(node) || anchorsWithin(node).some((anchor) => isUnsafeAnchor(anchor));
+
+    if (!hasUnsafeLink) {
+        return node.outerHTML;
+    }
+
+    const copy = node.cloneNode(true) as Element;
+    const isRootUnsafe = isUnsafeAnchor(copy);
+
+    for (const anchor of anchorsWithin(copy)) {
+        if (isUnsafeAnchor(anchor)) {
+            unwrap(anchor);
+        }
+    }
+
+    // A root anchor has no parent to unwrap into, so only its inner markup is output.
+    // eslint-disable-next-line unicorn/prefer-dom-node-html-methods -- domino, the Node and Workers parser, has no getHTML, so innerHTML is the serialiser here.
+    return isRootUnsafe ? copy.innerHTML : copy.outerHTML;
+}
+
+/** The `<a>` elements inside the element, in document order. Copied by index, since domino's NodeList is not iterable. */
+function anchorsWithin(element: Element): Element[] {
+    const found = element.querySelectorAll("a");
+
+    return Array.from({ length: found.length }, (_unused, index) => found[index]).filter((anchor) => anchor !== undefined);
+}
+
+function isUnsafeAnchor(element: Element): boolean {
+    if (element.localName !== "a") {
+        return false;
+    }
+
+    return LINK_ATTRIBUTES.some((name) => {
+        const href = element.getAttribute(name);
+
+        return href !== null && isUnsafeDestination(href);
+    });
+}
+
+function unwrap(element: Element): void {
+    const parent = element.parentNode;
+
+    if (!parent) {
+        return;
+    }
+
+    while (element.firstChild) {
+        parent.insertBefore(element.firstChild, element);
+    }
+
+    element.remove();
 }
 
 /**

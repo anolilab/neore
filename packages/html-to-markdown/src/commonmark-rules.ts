@@ -521,7 +521,7 @@ const SAFE_SCHEMES = new Set(["http", "https", "mailto", "tel"]);
  * `javascript:alert(1)`, which has no scheme, and is kept. A plain scheme regular expression is used instead of
  * `new URL`, which throws on a relative URL and on some schemes with a bad host; those must not pass as relative.
  */
-function isUnsafeDestination(href: string): boolean {
+export function isUnsafeDestination(href: string): boolean {
     const decoded = stripUrlNoise(decodeDestination(href));
     const head = decoded.split(HEAD_END, 1)[0] ?? "";
 
