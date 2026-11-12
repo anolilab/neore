@@ -81,6 +81,9 @@ const PLACEHOLDER = /\0(\d+)\0/g;
 const MAX_TABLE_CELLS = 100_000;
 /** Characters quotes and list items may re-indent in all: each re-indents all it holds, so deep nesting is quadratic. */
 const MAX_INDENT_WORK = 20_000_000;
+// Characters bold, italic and strike may rebuild line by line: a real paste wraps its text a few times, a crafted one
+// nests hundreds of elements around the same lines.
+const MAX_WRAP_WORK = 2_000_000;
 /** Elements deep the walk goes before the paste falls back to its plain text, well before the stack runs out. */
 const MAX_DEPTH = 500;
 /** Elements the walk reads as code or a formula: a paragraph in one is never a Word list item. */
@@ -99,6 +102,8 @@ interface Context {
     tableCells: number;
     /** The shallowest Word list level in the paste: a copy that starts at a nested item starts at the left edge. */
     wordTopLevel: number;
+    /** Characters formatting may still rebuild (`wrap`). */
+    wrapWork: number;
 }
 
 const isSpace = (char: string | undefined): boolean => char === " " || char === "\t";
@@ -239,9 +244,9 @@ const wrap = (inner: string, marker: string, context: Context): string => {
     }
 
     // Each formatting element around the same lines rebuilds them: deep nesting around many lines counts against the budget.
-    context.indentWork -= inner.length;
+    context.wrapWork -= inner.length;
 
-    if (context.indentWork < 0) {
+    if (context.wrapWork < 0) {
         throw new RangeError("Nested too deep to convert");
     }
 
@@ -905,7 +910,15 @@ function children(node: Node, context: Context): string {
 /** The Markdown for a clipboard `text/html` payload; empty when it holds no text. */
 export const htmlToMarkdown = (html: string): string => {
     const parsed = new DOMParser().parseFromString(html, "text/html");
-    const context: Context = { code: [], depth: 0, indentWork: MAX_INDENT_WORK, inTable: false, tableCells: MAX_TABLE_CELLS, wordTopLevel: 9 };
+    const context: Context = {
+        code: [],
+        depth: 0,
+        indentWork: MAX_INDENT_WORK,
+        inTable: false,
+        tableCells: MAX_TABLE_CELLS,
+        wordTopLevel: 9,
+        wrapWork: MAX_WRAP_WORK,
+    };
 
     // Only the paragraphs the walk shows: one in hidden text or in code never sets where the list starts.
     const paragraphs = parsed.createTreeWalker(parsed.body, NodeFilter.SHOW_ELEMENT, {

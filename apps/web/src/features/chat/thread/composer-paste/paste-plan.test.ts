@@ -287,7 +287,7 @@ describe("composer paste", () => {
     });
 
     it("pastes deeply nested formatting around many lines as plain text instead of rebuilding them per element", async () => {
-        const html = `${"<b>".repeat(400)}${"line<br>".repeat(20_000)}${"</b>".repeat(400)}`;
+        const html = `${"<b>".repeat(400)}${"line<br>".repeat(5000)}${"</b>".repeat(400)}`;
 
         expect(() => htmlToMarkdown(html)).toThrow(RangeError);
         await expect(paste({ "text/html": html, "text/plain": "plain" })).resolves.toBe("plain");
