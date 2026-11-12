@@ -63,19 +63,41 @@ export interface ChatStartRequest {
     threadId?: string;
 }
 
-/** A digest of {@link ChatStartRequest}, in a fixed field order. */
+/**
+ * `value` with every nested object's keys sorted, so two requests that differ only in the order a client wrote their
+ * keys (`cinemaSettings`, `pageContext`, a goal) digest alike. Arrays keep their order: it can mean something.
+ */
+const canonical = (value: unknown): unknown => {
+    if (Array.isArray(value)) {
+        return value.map((item: unknown) => canonical(item));
+    }
+
+    if (value !== null && typeof value === "object") {
+        return Object.fromEntries(
+            Object.entries(value as Record<string, unknown>)
+                .toSorted(([left], [right]) => left.localeCompare(right, "en"))
+                .map(([key, item]) => [key, canonical(item)]),
+        );
+    }
+
+    return value;
+};
+
+/** A digest of {@link ChatStartRequest}, in a fixed field order and with nested keys sorted (`canonical`). */
 export const chatStartFingerprint = async (request: ChatStartRequest): Promise<string> =>
     await sha256Hex(
-        JSON.stringify([
-            request.threadId ?? null,
-            request.contentType,
-            request.prompt ?? null,
-            request.fileIds ?? [],
-            request.guestMessageId ?? null,
-            request.parentId ?? null,
-            request.goal ?? null,
-            request.settings ?? null,
-        ]),
+        JSON.stringify(
+            canonical([
+                request.threadId ?? null,
+                request.contentType,
+                request.prompt ?? null,
+                request.fileIds ?? [],
+                request.guestMessageId ?? null,
+                request.parentId ?? null,
+                request.goal ?? null,
+                request.settings ?? null,
+            ]),
+        ),
     );
 
 /** The fence the save checks: the claim it took, by its key and `claimedAt`. */

@@ -381,3 +381,15 @@ describe("/chat/start with clientMessageId", () => {
         expect(await countRows("messages")).toBe(2);
     });
 });
+
+describe("chatStartFingerprint", () => {
+    it("digests the same settings alike whatever order their keys were written in, and different values apart", async () => {
+        const request = { contentType: "video" as const, prompt: "a shot", threadId: "thread-1" };
+        const written = await chatStartFingerprint({ ...request, settings: { cinemaSettings: { camera: "dolly", lens: "35mm" }, model: "m" } });
+        const reordered = await chatStartFingerprint({ ...request, settings: { cinemaSettings: { camera: "dolly", lens: "35mm" }, model: "m" } });
+        const changed = await chatStartFingerprint({ ...request, settings: { cinemaSettings: { camera: "dolly", lens: "50mm" }, model: "m" } });
+
+        expect(reordered).toBe(written);
+        expect(changed).not.toBe(written);
+    });
+});
