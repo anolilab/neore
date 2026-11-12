@@ -5,7 +5,7 @@ import { QueryClient, QueryObserver } from "@tanstack/query-core";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { RecordStore } from "./encrypted-store";
-import { entryName, openRecord, sealRecord } from "./encrypted-store";
+import { openRecord, sealRecord } from "./encrypted-store";
 import type { PersistPolicy, WriteGate } from "./persister";
 import { MAX_AGE_MS, startQueryPersistence, WRITE_THROTTLE_MS } from "./persister";
 
@@ -31,16 +31,6 @@ const memoryStore = () => {
         events.dispatchEvent(new Event("change"));
     };
     const store: RecordStore = {
-        clear: async (name) => {
-            stores[name].clear();
-        },
-        delete: async (name, key) => {
-            stores[name].delete(key);
-
-            if (name === "entries") {
-                changed();
-            }
-        },
         get: async (name, key) => structuredClone(stores[name].get(key)),
         put: async (name, key, value) => {
             stores[name].set(key, structuredClone(value));
@@ -55,6 +45,19 @@ const memoryStore = () => {
             }
 
             return structuredClone(stores[name].get(key));
+        },
+        remove: async (userIds, shouldRemove) => {
+            const candidates = userIds ?? [...stores.entries.keys()];
+
+            for (const userId of candidates) {
+                if (shouldRemove !== undefined && !shouldRemove(structuredClone(stores.entries.get(userId)))) {
+                    continue;
+                }
+
+                stores.entries.delete(userId);
+                stores.keys.delete(userId);
+                changed();
+            }
         },
     };
 
@@ -83,11 +86,17 @@ const start = (store: RecordStore, userId: string, queryClient: QueryClient, ext
         userId,
     });
 
-/** Runs a session with writes on, waits for its throttled save to land, and stops it. */
-const saveSession = async (memory: ReturnType<typeof memoryStore>, userId: string, queryClient: QueryClient): Promise<void> => {
+/** Runs a session that reads `fill` once started, with writes on; waits for its throttled save to land, and stops it. */
+const saveSession = async (
+    memory: ReturnType<typeof memoryStore>,
+    userId: string,
+    queryClient: QueryClient,
+    fill: (queryClient: QueryClient) => void,
+): Promise<void> => {
     const controller = start(memory.store, userId, queryClient);
 
     await controller.restored;
+    fill(queryClient);
 
     const written = memory.settled();
 
@@ -98,6 +107,40 @@ const saveSession = async (memory: ReturnType<typeof memoryStore>, userId: strin
 };
 
 const textOf = (queryClient: QueryClient, key: unknown[]): string | undefined => (queryClient.getQueryData(key) as { text: string } | undefined)?.text;
+
+/** Saves `{ text }` under each key as `userId`'s record. */
+const saveTexts = async (memory: ReturnType<typeof memoryStore>, userId: string, texts: ReadonlyArray<[unknown[], string]>): Promise<void> => {
+    await saveSession(memory, userId, new QueryClient(), (queryClient) => {
+        for (const [key, text] of texts) {
+            queryClient.setQueryData(key, { text });
+        }
+    });
+};
+
+/** A store whose reads of `name` wait until `release()`; `reached` resolves when the first one is waiting. */
+const heldReads = (store: RecordStore, name: "entries" | "keys") => {
+    const gate = new EventTarget();
+    const released = nextEvent(gate, "open");
+    const reached = nextEvent(gate, "reached");
+
+    return {
+        reached,
+        release: () => {
+            gate.dispatchEvent(new Event("open"));
+        },
+        store: {
+            ...store,
+            get: async (storeName, key) => {
+                if (storeName === name) {
+                    gate.dispatchEvent(new Event("reached"));
+                    await released;
+                }
+
+                return await store.get(storeName, key);
+            },
+        } satisfies RecordStore,
+    };
+};
 
 beforeEach(() => {
     vi.useFakeTimers({ now: new Date("2026-11-12T10:00:00Z"), toFake: ["setTimeout", "clearTimeout", "Date"] });
@@ -113,9 +156,11 @@ describe("encryption", () => {
 
         await sealRecord(store, ALICE, `{"text":"${SECRET_TEXT}"}`);
 
-        expect(await openRecord(store, ALICE)).toBe(`{"text":"${SECRET_TEXT}"}`);
+        const opened = await openRecord(store, ALICE);
 
-        const sealed = stores.entries.get(entryName(ALICE)) as { data: ArrayBuffer };
+        expect(opened?.text).toBe(`{"text":"${SECRET_TEXT}"}`);
+
+        const sealed = stores.entries.get(ALICE) as { data: ArrayBuffer };
 
         expect(new TextDecoder().decode(sealed.data)).not.toContain(SECRET_TEXT);
         expect(stores.keys.get(ALICE)).toMatchObject({ extractable: false });
@@ -123,10 +168,8 @@ describe("encryption", () => {
 
     it("keeps accounts apart: a record never opens as another account's", async () => {
         const memory = memoryStore();
-        const alice = new QueryClient();
 
-        alice.setQueryData(KEY, { text: SECRET_TEXT });
-        await saveSession(memory, ALICE, alice);
+        await saveTexts(memory, ALICE, [[KEY, SECRET_TEXT]]);
 
         const bob = new QueryClient();
 
@@ -135,18 +178,21 @@ describe("encryption", () => {
 
         // Moved under Bob's name, even with Alice's key standing in for Bob's, the record's name (its additional data) refuses it.
         memory.stores.keys.set(BOB, memory.stores.keys.get(ALICE));
-        memory.stores.entries.set(entryName(BOB), memory.stores.entries.get(entryName(ALICE)));
-        await expect(openRecord(memory.store, BOB)).rejects.toThrow();
+        memory.stores.entries.set(BOB, memory.stores.entries.get(ALICE));
+        const moved = await openRecord(memory.store, BOB);
+
+        expect(moved?.text).toBeUndefined();
     });
 });
 
 describe("restore", () => {
     it("shows the kept data on the first read, marks it old, and a live value replaces it", async () => {
         const memory = memoryStore();
-        const before = new QueryClient();
 
-        before.setQueryData(KEY, { text: "kept" });
-        await saveSession(memory, ALICE, before);
+        await saveTexts(memory, ALICE, [
+            [KEY, "kept"],
+            [OTHER_KEY, "kept"],
+        ]);
 
         // The browser's default gcTime (Node's is infinite, as on a server).
         const queryClient = new QueryClient({ defaultOptions: { queries: { gcTime: 5 * 60 * 1000 } } });
@@ -165,9 +211,10 @@ describe("restore", () => {
         expect(textOf(queryClient, KEY)).toBe("live");
         unsubscribe();
 
-        // Nobody watches it now: it still outlives the default five-minute collection.
+        // Nobody watches either now: both outlive the default five-minute collection, the restored one untouched.
         await vi.advanceTimersByTimeAsync(10 * 60 * 1000);
         expect(textOf(queryClient, KEY)).toBe("live");
+        expect(textOf(queryClient, OTHER_KEY)).toBe("kept");
     });
 
     it.each([
@@ -175,10 +222,8 @@ describe("restore", () => {
         ["not written for longer than the maximum age", {}, MAX_AGE_MS + 1],
     ])("drops a record %s", async (_name, extra, age) => {
         const memory = memoryStore();
-        const before = new QueryClient();
 
-        before.setQueryData(KEY, { text: "kept" });
-        await saveSession(memory, ALICE, before);
+        await saveTexts(memory, ALICE, [[KEY, "kept"]]);
         vi.setSystemTime(Date.now() + age);
 
         const queryClient = new QueryClient();
@@ -191,11 +236,11 @@ describe("restore", () => {
 
     it("applies the policy on the way back in, so a tightened rule drops what an older save kept", async () => {
         const memory = memoryStore();
-        const before = new QueryClient();
 
-        before.setQueryData(KEY, { text: "kept" });
-        before.setQueryData(OTHER_KEY, { text: "dropped" });
-        await saveSession(memory, ALICE, before);
+        await saveTexts(memory, ALICE, [
+            [KEY, "kept"],
+            [OTHER_KEY, "dropped"],
+        ]);
 
         const onlyKey = (state: DehydratedState): DehydratedState => {
             return { ...state, queries: state.queries.filter((query) => query.queryKey[1] === KEY[1]) };
@@ -213,24 +258,13 @@ describe("restore", () => {
         ["cleared (a sign-out)", "clear"],
     ])("a restore still reading the record when the session is %s shows nothing", async (_name, how) => {
         const memory = memoryStore();
-        const before = new QueryClient();
 
-        before.setQueryData(KEY, { text: SECRET_TEXT });
-        await saveSession(memory, ALICE, before);
+        await saveTexts(memory, ALICE, [[KEY, SECRET_TEXT]]);
 
-        const storeGate = new EventTarget();
-        const opened = nextEvent(storeGate, "open");
-        const slowStore: RecordStore = {
-            ...memory.store,
-            get: async (name, key) => {
-                await opened;
-
-                return await memory.store.get(name, key);
-            },
-        };
+        const held = heldReads(memory.store, "entries");
         const { gate, writeGate } = openGate();
         const queryClient = new QueryClient();
-        const controller = start(slowStore, ALICE, queryClient, { gate: writeGate });
+        const controller = start(held.store, ALICE, queryClient, { gate: writeGate });
 
         if (how === "stop") {
             controller.stop();
@@ -238,24 +272,68 @@ describe("restore", () => {
             gate.generation += 1;
         }
 
-        storeGate.dispatchEvent(new Event("open"));
+        held.release();
         await controller.restored;
         expect(queryClient.getQueryCache().getAll()).toHaveLength(0);
     });
 
+    it.each([
+        ["another tab", false],
+        ["a newer session of this tab", true],
+    ])("dropping an old record never takes one %s wrote after it was read", async (_name, isStopped) => {
+        const memory = memoryStore();
+
+        await saveTexts(memory, ALICE, [[KEY, "old"]]);
+        vi.setSystemTime(Date.now() + MAX_AGE_MS + 1);
+
+        // The old record is read; its key read waits while a fresh record lands under the same key.
+        const held = heldReads(memory.store, "keys");
+        const controller = start(held.store, ALICE, new QueryClient());
+
+        await held.reached;
+
+        if (isStopped) {
+            controller.stop();
+        }
+
+        await sealRecord(memory.store, ALICE, "fresh");
+        held.release();
+        await controller.restored;
+
+        const kept = await openRecord(memory.store, ALICE);
+
+        expect(kept?.text).toBe("fresh");
+    });
+
+    it("drops an account's record not written for longer than the maximum age when another account starts", async () => {
+        const memory = memoryStore();
+
+        await saveTexts(memory, BOB, [[KEY, "bob's"]]);
+        vi.setSystemTime(Date.now() + MAX_AGE_MS / 2);
+        await saveTexts(memory, ALICE, [[KEY, "alice's"]]);
+        vi.setSystemTime(Date.now() + MAX_AGE_MS / 2 + 1);
+
+        await start(memory.store, ALICE, new QueryClient()).restored;
+
+        expect(memory.stores.entries.has(BOB)).toBe(false);
+        expect(memory.stores.keys.has(BOB)).toBe(false);
+        expect(memory.stores.entries.has(ALICE)).toBe(true);
+    });
+
     it("a session that turns out impersonated or a guest drops what was restored, not what it read since", async () => {
         const memory = memoryStore();
-        const before = new QueryClient();
 
-        before.setQueryData(KEY, { text: "kept" });
-        before.setQueryData(OTHER_KEY, { text: "kept" });
-        await saveSession(memory, ALICE, before);
+        await saveTexts(memory, ALICE, [
+            [KEY, "kept"],
+            [OTHER_KEY, "kept"],
+        ]);
 
         const queryClient = new QueryClient();
         const controller = start(memory.store, ALICE, queryClient);
 
         await controller.restored;
-        queryClient.setQueryData(OTHER_KEY, { text: "live" });
+        // Stamped the same millisecond as the restored value: still a read of this session's.
+        queryClient.setQueryData(OTHER_KEY, { text: "live" }, { updatedAt: queryClient.getQueryState(OTHER_KEY)?.dataUpdatedAt });
         controller.revoke();
         await controller.restored;
 
@@ -269,14 +347,15 @@ describe("saving", () => {
         const memory = memoryStore();
         const queryClient = new QueryClient();
 
+        // Read under Alice's token in the very millisecond Bob's session starts.
         queryClient.setQueryData(OTHER_KEY, { text: "alice's" });
-        vi.setSystemTime(Date.now() + 1);
-        await saveSession(memory, BOB, queryClient);
+        queryClient.setQueryData(KEY, { text: "alice's" });
+        await saveSession(memory, BOB, queryClient, (client) => {
+            client.setQueryData(KEY, { text: "bob's" });
+        });
 
         const restored = new QueryClient();
 
-        queryClient.setQueryData(KEY, { text: "bob's" });
-        await saveSession(memory, BOB, queryClient);
         await start(memory.store, BOB, restored).restored;
 
         expect(textOf(restored, KEY)).toBe("bob's");
@@ -315,12 +394,10 @@ describe("saving", () => {
         };
         const { gate, writeGate } = openGate();
         const queryClient = new QueryClient();
-
-        queryClient.setQueryData(KEY, { text: SECRET_TEXT });
-
         const controller = start(slowStore, ALICE, queryClient, { gate: writeGate });
 
         await controller.restored;
+        queryClient.setQueryData(KEY, { text: SECRET_TEXT });
         controller.enableWrites();
         await vi.advanceTimersByTimeAsync(WRITE_THROTTLE_MS);
 
@@ -334,7 +411,7 @@ describe("saving", () => {
         await sealed;
         // The sealed record did land after the clear; the save takes it back out.
         await memory.settled();
-        expect(memory.stores.entries.has(entryName(ALICE))).toBe(false);
+        expect(memory.stores.entries.has(ALICE)).toBe(false);
         controller.stop();
     });
 
@@ -342,7 +419,7 @@ describe("saving", () => {
         const blocked = async (): Promise<never> => {
             throw new DOMException("blocked", "InvalidStateError");
         };
-        const failing: RecordStore = { clear: blocked, delete: blocked, get: blocked, put: blocked, putIfAbsent: blocked };
+        const failing: RecordStore = { get: blocked, put: blocked, putIfAbsent: blocked, remove: blocked };
         const queryClient = new QueryClient();
 
         queryClient.setQueryData(KEY, { text: "kept" });
