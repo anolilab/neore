@@ -28,11 +28,13 @@ export const useConnectionStatus = (): ConnectionPresentation => {
     const client = useLunora();
     const [state, dispatch] = useReducer(reduceConnection, true, initialConnectionState);
     const [lapsed, setLapsed] = useState<Lapsed | null>(null);
-    const view = connectionViewOf(state);
-    const { hasConnected } = state;
+    const { hasConnected, live } = state;
     const [backOnline, setBackOnline] = useState(false);
-    // The banner has shown this outage; it stays up until the view is `online` again, then says "Back online".
+    // The banner has shown this outage; it stays up until the live socket is connected again, then says "Back online".
     const [announced, setAnnounced] = useState(false);
+    // An outage the banner showed is not over while the socket is still connecting, even before the first connect of the page.
+    const stateView = connectionViewOf(state);
+    const view = stateView === "online" && announced && live === "connecting" ? "reconnecting" : stateView;
 
     useEffect(() => {
         dispatch({ online: navigator.onLine, type: "browser" });
@@ -100,11 +102,13 @@ export const useConnectionStatus = (): ConnectionPresentation => {
         hasConnected,
     });
 
-    // Only an outage the banner had shown is announced as over; a socket bounce it never showed is not.
+    // Only an outage the banner had shown is announced as over, and only once the socket is connected: the browser's `online`
+    // event alone proves nothing reaches the backend. A socket that is not needed (`idle`) clears the banner without the claim.
+    // A socket bounce the banner never showed is not announced.
     if (view === "online") {
         if (announced) {
             setAnnounced(false);
-            setBackOnline(true);
+            setBackOnline(live === "connected");
         }
     } else if (backOnline) {
         setBackOnline(false);

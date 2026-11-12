@@ -3,7 +3,7 @@
  * under invite-only the signed-out page, and nothing either way until the
  * backend has said which.
  */
-import { render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ConnectionContext } from "@/features/connection/hooks/use-connection";
@@ -13,6 +13,14 @@ import UnauthenticatedGate from "./unauthenticated-gate";
 const harness = vi.hoisted(() => {
     return {
         adopt: vi.fn(async () => undefined),
+        /** Settles the pending re-read; set by the `rereadFailedSession` mock. */
+        finishReread: undefined as (() => void) | undefined,
+        reread: vi.fn(
+            async () =>
+                await new Promise<void>((resolve) => {
+                    harness.finishReread = resolve;
+                }),
+        ),
         inviteOnly: undefined as boolean | undefined,
         session: { data: null as { user: { id: string } } | null, error: null as unknown, isPending: false },
     };
@@ -42,6 +50,10 @@ vi.mock("@/features/auth/lib/guest-session", () => {
     return { adoptSessionTokenWhileShut: harness.adopt };
 });
 
+vi.mock("@/lib/auth/client", () => {
+    return { rereadFailedSession: harness.reread };
+});
+
 vi.mock("@/lib/auth/server-functions", () => {
     return { default: vi.fn() };
 });
@@ -53,12 +65,16 @@ vi.mock("@/lib/lunora/crpc", () => {
 const gate = () => <UnauthenticatedGate loading={<p>loading</p>} signedOut={<p>signed out</p>} />;
 
 const OFFLINE = { backOnline: false, banner: "offline", screen: "offline", view: "offline" } as const;
+const RECONNECTING = { backOnline: false, banner: "reconnecting", screen: null, view: "reconnecting" } as const;
+const ONLINE = { backOnline: false, banner: "online", screen: null, view: "online" } as const;
 
 describe("UnauthenticatedGate", () => {
     beforeEach(() => {
         harness.inviteOnly = undefined;
         harness.session = { data: null, error: null, isPending: false };
         harness.adopt.mockClear();
+        harness.reread.mockClear();
+        harness.finishReread = undefined;
     });
 
     it("waits, and makes no guest, until the backend says whether registration is invite-only", () => {
@@ -138,6 +154,46 @@ describe("UnauthenticatedGate", () => {
         harness.inviteOnly = true;
 
         render(<ConnectionContext value={OFFLINE}>{gate()}</ConnectionContext>);
+
+        expect(screen.getByText("signed out")).toBeTruthy();
+    });
+
+    it("after a server outage, stays loading until the failed session read has been re-read, then shows the session", async () => {
+        harness.inviteOnly = true;
+        harness.session = { data: null, error: { status: 503 }, isPending: false };
+
+        const { rerender } = render(<ConnectionContext value={RECONNECTING}>{gate()}</ConnectionContext>);
+
+        expect(harness.reread).not.toHaveBeenCalled();
+
+        rerender(<ConnectionContext value={ONLINE}>{gate()}</ConnectionContext>);
+
+        expect(screen.getByText("loading")).toBeTruthy();
+        expect(screen.queryByText("signed out")).toBeNull();
+        expect(harness.reread).toHaveBeenCalledOnce();
+
+        harness.session = { data: { user: { id: "user-1" } }, error: null, isPending: false };
+        await act(async () => {
+            harness.finishReread?.();
+        });
+
+        expect(screen.queryByText("signed out")).toBeNull();
+        expect(harness.adopt).toHaveBeenCalledOnce();
+    });
+
+    it("shows the signed-out page once the re-read after the outage still fails", async () => {
+        harness.inviteOnly = true;
+        harness.session = { data: null, error: { status: 503 }, isPending: false };
+
+        const { rerender } = render(<ConnectionContext value={OFFLINE}>{gate()}</ConnectionContext>);
+
+        rerender(<ConnectionContext value={ONLINE}>{gate()}</ConnectionContext>);
+
+        expect(screen.getByText("loading")).toBeTruthy();
+
+        await act(async () => {
+            harness.finishReread?.();
+        });
 
         expect(screen.getByText("signed out")).toBeTruthy();
     });

@@ -497,6 +497,54 @@ const errorStatus = (error: unknown): number | undefined => {
     return typeof status === "number" ? status : undefined;
 };
 
+/** Whether the atom has no read in flight. */
+const isSettled = ({ error, isPending, isRefetching }: ReturnType<SessionAtomLike["get"]>): boolean => !isRefetching && !(isPending && !error);
+
+/**
+ * Re-read the session now if better-auth's atom holds a FAILED read (a 401 is an
+ * answer and is left alone), for a connection that has just come back. A read
+ * still in flight, which may have started while offline, is waited for first,
+ * and re-read once it settles if it failed: re-reading at once would join the
+ * same shared read and fail with it. Resolves once the re-read (if any) has
+ * settled, or at once when `signal` aborts.
+ */
+export const rereadFailedSessionRead = async (atom: SessionAtomLike, signal?: AbortSignal): Promise<void> => {
+    const settled = new Promise<void>((resolve) => {
+        if (isSettled(atom.get())) {
+            resolve();
+
+            return;
+        }
+
+        const stop = () => {
+            unlisten();
+            signal?.removeEventListener("abort", stop);
+            resolve();
+        };
+        const unlisten = atom.listen(() => {
+            if (isSettled(atom.get())) {
+                stop();
+            }
+        });
+
+        signal?.addEventListener("abort", stop, { once: true });
+    });
+
+    await settled;
+
+    const { error, refetch } = atom.get();
+
+    if (signal?.aborted || !error || errorStatus(error) === 401 || !refetch) {
+        return;
+    }
+
+    try {
+        await refetch();
+    } catch {
+        // The atom holds the failure; `keepRetryingFailedSessionReads` takes it from there.
+    }
+};
+
 /**
  * Keep re-reading the session while better-auth's atom holds a FAILED read.
  *

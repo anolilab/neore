@@ -46,7 +46,7 @@ vi.mock("@lunora/react", () => {
 });
 
 vi.mock("@/features/chat/thread-list/hooks/use-thread-list-cache", () => {
-    return { useThreadListPlaceholder: () => auth.persisted };
+    return { useCacheUserId: () => "user-1", useThreadListPlaceholder: () => auth.persisted };
 });
 
 vi.mock("@lingui/react/macro", () => {
@@ -198,6 +198,33 @@ describe("offline presentation", () => {
         });
 
         expect(screen.getAllByRole("status").some((status) => status.textContent === "Back online")).toBe(true);
+    });
+
+    it("on an offline start, keeps saying reconnecting after the network is back until the socket connects", () => {
+        client.initial = "connecting";
+        renderApp(new QueryClient());
+        setBrowserOnline(false);
+
+        setBrowserOnline(true);
+
+        expect(screen.getAllByRole("status").some((status) => status.textContent === "Reconnecting to the server…")).toBe(true);
+        expect(screen.getAllByRole("status").some((status) => status.textContent === "Back online")).toBe(false);
+
+        act(() => {
+            client.emit("connected");
+        });
+
+        expect(screen.getAllByRole("status").some((status) => status.textContent === "Back online")).toBe(true);
+    });
+
+    it("clears the banner without claiming back online when the network returns and no socket is open", () => {
+        client.initial = "idle";
+        renderApp(new QueryClient());
+        setBrowserOnline(false);
+
+        setBrowserOnline(true);
+
+        expect(screen.getAllByRole("status").every((status) => status.textContent === "")).toBe(true);
     });
 
     it("does not announce a socket bounce the banner never showed", () => {
