@@ -27,6 +27,7 @@ import { useLunoraActionOptions } from "@/lib/lunora/crpc";
 
 import type { ComposerSlashState, SlashCommandMatch } from "./extensions/slash-command";
 import { clearedCommandRange, isBareCommand, isPrefixOfCommand } from "./extensions/slash-command";
+import { POPUP_ENTER_MOTION, POPUP_ROW_MOTION } from "./popup-motion";
 
 ("use client");
 
@@ -50,6 +51,8 @@ interface SlashCommandPopupProps {
     onReplace: (from: number, to: number, replacement: string) => void;
     /** The editor's whole text now; a `/clear` that finished reads it, so an edit the menu has not seen yet is not cut. */
     readDraft: () => string;
+    /** The person has typed in the composer (`use-mention-prefetch.ts`): load the prompts and skills now, so "/prompt" and "/skill" open with them. */
+    warm?: boolean;
 }
 
 // `/model` stays first: the list is not filtered for a partial command, so Enter on a bare `/` picks the first entry,
@@ -134,7 +137,17 @@ const filterSkills = (skills: Doc<"skills">[], query: string): Doc<"skills">[] =
 // Main Component
 // ============================================================================
 
-const SlashCommandPopup: FC<SlashCommandPopupProps> = ({ currentThreadId, editorRect, favoriteModelIds, match, models, onDismiss, onReplace, readDraft }) => {
+const SlashCommandPopup: FC<SlashCommandPopupProps> = ({
+    currentThreadId,
+    editorRect,
+    favoriteModelIds,
+    match,
+    models,
+    onDismiss,
+    onReplace,
+    readDraft,
+    warm = false,
+}) => {
     const { i18n } = useLingui();
     const selectedModel = useModelStore((state) => state.selectedModel);
     const setSelectedModelStore = useModelStore((state) => state.setSelectedModel);
@@ -147,46 +160,85 @@ const SlashCommandPopup: FC<SlashCommandPopupProps> = ({ currentThreadId, editor
     const user = sessionData?.user;
     const isProUser = (user as { plan?: string; role?: string } | undefined)?.plan === "premium" || user?.role === "admin";
 
-    // Fetch prompts and skills
-    const { mutateAsync: getPrompts } = useMutation(useLunoraActionOptions(api.prompts.functions.getPrompts));
-    const { mutateAsync: getSkills } = useMutation(useLunoraActionOptions(api.skills.functions.getSkills));
+    // Fetch prompts and skills. Offline they fail at once, as Lunora's own `useAction` does, instead of waiting paused for the
+    // network (TanStack's default for a mutation): a failed load is tried again when the menu next opens.
+    const { mutateAsync: getPrompts } = useMutation({ ...useLunoraActionOptions(api.prompts.functions.getPrompts), networkMode: "always" });
+    const { mutateAsync: getSkills } = useMutation({ ...useLunoraActionOptions(api.skills.functions.getSkills), networkMode: "always" });
     const [prompts, setPrompts] = useState<Doc<"prompts">[]>([]);
     const [skills, setSkills] = useState<Doc<"skills">[]>([]);
+    // Both follow the session's active organization, so a switch drops what was loaded for the previous one.
+    const organizationId = sessionData?.session.activeOrganizationId ?? null;
+    const loadedRef = useRef({ organizationId, prompts: false, skills: false });
+    const [loadOrganizationId, setLoadOrganizationId] = useState(organizationId);
 
-    // Loaded once, on the first "/" — not on mount: the editor mounts this popup
-    // permanently, and two actions on every first paint of /chat queued on the
-    // one `__root__` shard (see `e2e/first-paint.e2e.test.ts`).
-    const hasMatch = match !== null;
-    const [shouldLoad, setShouldLoad] = useState(false);
+    // Loaded when the composer is warm (`use-mention-prefetch.ts`) or on the first "/" — not on mount: the editor mounts
+    // this popup permanently, and two actions on every first paint of /chat queued on the one `__root__` shard (see
+    // `e2e/first-paint.e2e.test.ts`). What failed is tried again once, when "/" opens or its submenu changes, never in a loop.
+    const menuKey = match === null ? null : (match.command ?? "");
+    const [load, setLoad] = useState<"done" | "failed" | "idle" | "pending">("idle");
+    const [loadMenuKey, setLoadMenuKey] = useState(menuKey);
 
-    if (hasMatch && !shouldLoad) {
-        setShouldLoad(true);
+    if (loadMenuKey !== menuKey) {
+        setLoadMenuKey(menuKey);
+    }
+
+    if (loadOrganizationId !== organizationId) {
+        setLoadOrganizationId(organizationId);
+        setPrompts([]);
+        setSkills([]);
+        setLoad("idle");
+    }
+
+    if ((load === "idle" && (menuKey !== null || warm)) || (load === "failed" && menuKey !== null && menuKey !== loadMenuKey)) {
+        setLoad("pending");
     }
 
     useEffect(() => {
-        if (!shouldLoad) {
+        if (load !== "pending") {
             return undefined;
         }
 
         let isCancelled = false;
 
-        Promise.all([getPrompts({}), getSkills({ sortBy: "recent" })])
-            .then(([p, s]) => {
-                if (isCancelled) {
-                    return undefined;
-                }
+        if (loadedRef.current.organizationId !== organizationId) {
+            loadedRef.current = { organizationId, prompts: false, skills: false };
+        }
 
-                setPrompts(p as Doc<"prompts">[]);
-                setSkills(s as Doc<"skills">[]);
+        const loaded = loadedRef.current;
+        // Each list is shown as soon as its own request answers: a slow one never holds back the other's menu.
+        const promptsLoad = loaded.prompts
+            ? undefined
+            : getPrompts({}).then((result) => {
+                  if (!isCancelled) {
+                      loaded.prompts = true;
+                      setPrompts(result as Doc<"prompts">[]);
+                  }
 
-                return undefined;
-            })
-            .catch(() => {});
+                  return undefined;
+              });
+        const skillsLoad = loaded.skills
+            ? undefined
+            : getSkills({ sortBy: "recent" }).then((result) => {
+                  if (!isCancelled) {
+                      loaded.skills = true;
+                      setSkills(result as Doc<"skills">[]);
+                  }
+
+                  return undefined;
+              });
+
+        void Promise.allSettled([promptsLoad, skillsLoad]).then(() => {
+            if (!isCancelled) {
+                setLoad(loaded.prompts && loaded.skills ? "done" : "failed");
+            }
+
+            return undefined;
+        });
 
         return () => {
             isCancelled = true;
         };
-    }, [getPrompts, getSkills, shouldLoad]);
+    }, [getPrompts, getSkills, load, organizationId]);
 
     const [selectedIndex, setSelectedIndex] = useState(0);
     const commandListRef = useRef<HTMLDivElement | null>(null);
@@ -473,7 +525,7 @@ const SlashCommandPopup: FC<SlashCommandPopupProps> = ({ currentThreadId, editor
                     "border-border dark:border-white/10",
                     "shadow-md dark:shadow-xl dark:shadow-black/50",
                     "ring-foreground/10 ring-1 dark:ring-white/10",
-                    "animate-in fade-in-0 zoom-in-95 slide-in-from-bottom-2",
+                    POPUP_ENTER_MOTION,
                 )}
                 style={{ width: MENU_WIDTH }}
             >
@@ -487,7 +539,7 @@ const SlashCommandPopup: FC<SlashCommandPopupProps> = ({ currentThreadId, editor
                                     </CommandGroupLabel>
                                     {(items as ReadonlyArray<(typeof COMMANDS)[number]>).map((command, index) => (
                                         <CommandItem
-                                            className={clsx("transition-colors", index === selectedIndex && "bg-accent text-accent-foreground")}
+                                            className={clsx(POPUP_ROW_MOTION, index === selectedIndex && "bg-accent text-accent-foreground")}
                                             key={command.id}
                                             onClick={(e) => {
                                                 e.preventDefault();
@@ -513,7 +565,7 @@ const SlashCommandPopup: FC<SlashCommandPopupProps> = ({ currentThreadId, editor
                                         return (
                                             <CommandItem
                                                 className={clsx(
-                                                    "transition-colors",
+                                                    POPUP_ROW_MOTION,
                                                     index === selectedIndex && "bg-accent text-accent-foreground",
                                                     !isSelectable && "cursor-not-allowed opacity-50",
                                                 )}
@@ -551,7 +603,7 @@ const SlashCommandPopup: FC<SlashCommandPopupProps> = ({ currentThreadId, editor
                                     </CommandGroupLabel>
                                     {(items as Doc<"prompts">[]).map((prompt, index) => (
                                         <CommandItem
-                                            className={clsx("transition-colors", index === selectedIndex && "bg-accent text-accent-foreground")}
+                                            className={clsx(POPUP_ROW_MOTION, index === selectedIndex && "bg-accent text-accent-foreground")}
                                             key={prompt._id}
                                             onClick={(e) => {
                                                 e.preventDefault();
@@ -584,7 +636,7 @@ const SlashCommandPopup: FC<SlashCommandPopupProps> = ({ currentThreadId, editor
                                     </CommandGroupLabel>
                                     {(items as Doc<"skills">[]).map((skill, index) => (
                                         <CommandItem
-                                            className={clsx("transition-colors", index === selectedIndex && "bg-accent text-accent-foreground")}
+                                            className={clsx(POPUP_ROW_MOTION, index === selectedIndex && "bg-accent text-accent-foreground")}
                                             key={skill._id}
                                             onClick={(e) => {
                                                 e.preventDefault();

@@ -88,6 +88,11 @@ vi.mock("./file-mention-popup", () => {
     };
 });
 
+// Its reads are covered in `file-mention-popup.prefetch.render.test.tsx`; here it would need a query client and auth.
+vi.mock("./use-mention-prefetch", () => {
+    return { default: () => false };
+});
+
 vi.mock("./variable-autocomplete-popup", () => {
     return {
         default: ({ match }: { match: unknown }) => {

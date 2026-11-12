@@ -10,6 +10,8 @@
  * Also offers your recent chats (never a locked one): picking one attaches
  * its text, so you can ask about it here.
  *
+ * Files and chats from the current chat's project come first, under "In this project".
+ *
  * In a group-chat thread the participants come first: picking one inserts
  * `@<slug> `, which makes that participant answer (`chat/group/` backend).
  */
@@ -21,7 +23,7 @@ import { keepPreviousData, skipToken, useQuery } from "@tanstack/react-query";
 import clsx from "clsx";
 import { FileIcon, FileImage, FileText, MessageSquareIcon, UploadIcon } from "lucide-react";
 import type { FC } from "react";
-import { useCallback, useEffect, useEffectEvent, useMemo, useState } from "react";
+import { createElement, Fragment, useCallback, useEffect, useEffectEvent, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 
 import useAllThreadsData from "@/features/chat/core/hooks/use-all-threads-data";
@@ -32,6 +34,8 @@ import { useCRPC } from "@/lib/lunora/crpc";
 import type { ChatReference } from "../chat-reference";
 import { mentionableChats } from "../chat-reference";
 import type { FileMentionMatch } from "./extensions/file-mention";
+import { POPUP_ENTER_MOTION, POPUP_ROW_MOTION } from "./popup-motion";
+import { partitionByProject, projectThreadIds } from "./project-mentions";
 
 // ============================================================================
 // Types
@@ -39,6 +43,8 @@ import type { FileMentionMatch } from "./extensions/file-mention";
 
 export interface VaultFileRef {
     _id: string;
+    /** The chat it was uploaded in; places it in that chat's project */
+    chatId?: string;
     fileName: string;
     fileSize: number;
     fileType: string;
@@ -63,6 +69,14 @@ interface FileMentionPopupProps {
     onSelectVaultFile?: (file: VaultFileRef) => void;
 }
 
+type MentionRow = { chat: ChatReference; kind: "chat" } | { file: VaultFileRef; kind: "file" };
+
+interface MentionSection {
+    key: string;
+    label: string;
+    rows: MentionRow[];
+}
+
 const MENU_WIDTH = 340;
 
 /** Chats shown in the menu; typing narrows them. */
@@ -85,6 +99,27 @@ const getFileTypeIcon = (fileType: string) => {
 
     return FileIcon;
 };
+
+const FileRow: FC<{ file: VaultFileRef }> = ({ file }) => {
+    const icon = createElement(getFileTypeIcon(file.fileType), { "aria-hidden": true, className: "text-muted-foreground size-4 shrink-0" });
+
+    return (
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+            {icon}
+            <div className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-medium">{file.fileName}</span>
+                <span className="text-muted-foreground block truncate text-xs">{formatFileSize(file.fileSize)}</span>
+            </div>
+        </div>
+    );
+};
+
+const ChatRow: FC<{ chat: ChatReference }> = ({ chat }) => (
+    <div className="flex min-w-0 flex-1 items-center gap-2">
+        <MessageSquareIcon aria-hidden="true" className="text-muted-foreground size-4 shrink-0" />
+        <span className="block truncate text-sm font-medium">{chat.title}</span>
+    </div>
+);
 
 // ============================================================================
 // Main Component
@@ -153,26 +188,53 @@ const FileMentionPopup: FC<FileMentionPopupProps> = ({
         ),
         placeholderData: keepPreviousData,
     });
-    const filteredChats = useMemo(() => {
+    const chatCandidates = useMemo(() => {
         const query = chatSearch.toLowerCase();
         const pending = threads.filter((thread) => thread.title?.toLowerCase().includes(query));
         // Only the answer to the query now typed: the previous one (kept while this one loads) and a failed search do not count.
         const answered = searchedThreads && !isPlaceholderData && !searchFailed ? searchedThreads.page : undefined;
         const chats = mentionableChats(chatSearch ? (answered ?? pending) : threads, currentThreadId);
 
-        return chats.slice(0, MAX_CHAT_SUGGESTIONS);
+        return { answered, chats };
     }, [threads, searchedThreads, isPlaceholderData, searchFailed, chatSearch, currentThreadId]);
 
-    // Total items: participants + 1 for "Upload new file" + filtered files + chats
-    const totalItems = participantCount + filteredFiles.length + filteredChats.length + 1;
+    // The current chat's project, read from the chats already loaded: a searched chat outside the first page counts too.
+    const inProject = useMemo(
+        () => projectThreadIds(chatCandidates.answered ? [...threads, ...chatCandidates.answered] : threads, currentThreadId),
+        [threads, chatCandidates, currentThreadId],
+    );
 
-    // Reset the highlighted row whenever the list length changes, and clear the search once the
-    // popup closes. Adjusting during render (rather than in an effect) avoids painting a frame
-    // with the stale selection. See https://react.dev/learn/you-might-not-need-an-effect
-    const [renderedItemCount, setRenderedItemCount] = useState(totalItems);
+    // Project rows first (files, then chats), then the other files and chats. The keyboard index runs through them in this order.
+    const sections = useMemo((): MentionSection[] => {
+        const files = partitionByProject(filteredFiles, (file) => file.chatId !== undefined && inProject.has(file.chatId));
+        const chats = partitionByProject(chatCandidates.chats, (chat) => inProject.has(chat.id));
+        const shownChats = chats.inProject.slice(0, MAX_CHAT_SUGGESTIONS);
+        const fileRow = (file: VaultFileRef): MentionRow => {
+            return { file, kind: "file" };
+        };
+        const chatRow = (chat: ChatReference): MentionRow => {
+            return { chat, kind: "chat" };
+        };
 
-    if (renderedItemCount !== totalItems) {
-        setRenderedItemCount(totalItems);
+        return [
+            { key: "project", label: t`In this project`, rows: [...files.inProject.map((file) => fileRow(file)), ...shownChats.map((chat) => chatRow(chat))] },
+            { key: "files", label: t`Vault files`, rows: files.rest.map((file) => fileRow(file)) },
+            { key: "chats", label: t`Chats`, rows: chats.rest.slice(0, Math.max(0, MAX_CHAT_SUGGESTIONS - shownChats.length)).map((chat) => chatRow(chat)) },
+        ].filter((section) => section.rows.length > 0);
+    }, [filteredFiles, chatCandidates, inProject, t]);
+    const rows = useMemo(() => sections.flatMap((section) => section.rows), [sections]);
+
+    // Total items: participants + 1 for "Upload new file" + files and chats
+    const totalItems = participantCount + rows.length + 1;
+
+    // Reset the highlighted row whenever the rows change — in number or in order (a search answer can move a file into the
+    // project) — and clear the search once the popup closes. Adjusting during render (rather than in an effect) avoids
+    // painting a frame with the stale selection. See https://react.dev/learn/you-might-not-need-an-effect
+    const rowsKey = `${String(participantCount)}:${rows.map((row) => (row.kind === "file" ? row.file._id : row.chat.id)).join(",")}`;
+    const [renderedRowsKey, setRenderedRowsKey] = useState(rowsKey);
+
+    if (renderedRowsKey !== rowsKey) {
+        setRenderedRowsKey(rowsKey);
         setSelectedIndex(0);
     }
 
@@ -260,17 +322,13 @@ const FileMentionPopup: FC<FileMentionPopupProps> = ({
             } else if (selectedIndex === participantCount) {
                 // "Upload new file" follows the participants
                 handleUploadNew();
-            } else if (selectedIndex <= participantCount + filteredFiles.length) {
-                const file = filteredFiles[selectedIndex - participantCount - 1];
-
-                if (file) {
-                    handleSelectFile(file);
-                }
             } else {
-                const chat = filteredChats[selectedIndex - participantCount - filteredFiles.length - 1];
+                const row = rows[selectedIndex - participantCount - 1];
 
-                if (chat) {
-                    handleSelectChat(chat);
+                if (row?.kind === "file") {
+                    handleSelectFile(row.file);
+                } else if (row) {
+                    handleSelectChat(row.chat);
                 }
             }
         } else if (event.key === "Escape") {
@@ -319,7 +377,7 @@ const FileMentionPopup: FC<FileMentionPopupProps> = ({
                     "border-border dark:border-white/10",
                     "shadow-md dark:shadow-xl dark:shadow-black/50",
                     "ring-foreground/10 ring-1 dark:ring-white/10",
-                    "animate-in fade-in-0 zoom-in-95 slide-in-from-bottom-2",
+                    POPUP_ENTER_MOTION,
                 )}
                 style={{ width: MENU_WIDTH }}
             >
@@ -343,7 +401,7 @@ const FileMentionPopup: FC<FileMentionPopupProps> = ({
                                     {filteredParticipants.map((participant, index) => (
                                         <CommandItem
                                             aria-selected={index === selectedIndex}
-                                            className={clsx("transition-colors", index === selectedIndex && "bg-accent text-accent-foreground")}
+                                            className={clsx(POPUP_ROW_MOTION, index === selectedIndex && "bg-accent text-accent-foreground")}
                                             key={participant.skillId}
                                             onClick={(e) => {
                                                 e.preventDefault();
@@ -370,7 +428,7 @@ const FileMentionPopup: FC<FileMentionPopupProps> = ({
                             <CommandGroupLabel>{t`Actions`}</CommandGroupLabel>
                             <CommandItem
                                 aria-selected={selectedIndex === participantCount}
-                                className={clsx("transition-colors", selectedIndex === participantCount && "bg-accent text-accent-foreground")}
+                                className={clsx(POPUP_ROW_MOTION, selectedIndex === participantCount && "bg-accent text-accent-foreground")}
                                 onClick={(e) => {
                                     e.preventDefault();
                                     handleUploadNew();
@@ -384,73 +442,44 @@ const FileMentionPopup: FC<FileMentionPopupProps> = ({
                             </CommandItem>
                         </CommandGroup>
 
-                        {filteredFiles.length > 0 && <CommandSeparator />}
+                        {sections.map((section, sectionIndex) => {
+                            const offset = participantCount + 1 + sections.slice(0, sectionIndex).reduce((count, previous) => count + previous.rows.length, 0);
 
-                        {/* Vault files */}
-                        {filteredFiles.length > 0 && (
-                            <CommandGroup>
-                                <CommandGroupLabel>{t`Vault files`}</CommandGroupLabel>
-                                {filteredFiles.map((file, index) => {
-                                    const Icon = getFileTypeIcon(file.fileType);
+                            return (
+                                <Fragment key={section.key}>
+                                    <CommandSeparator />
+                                    <CommandGroup>
+                                        <CommandGroupLabel>{section.label}</CommandGroupLabel>
+                                        {section.rows.map((row, index) => {
+                                            const selected = offset + index === selectedIndex;
 
-                                    return (
-                                        <CommandItem
-                                            aria-selected={participantCount + index + 1 === selectedIndex}
-                                            className={clsx(
-                                                "transition-colors",
-                                                participantCount + index + 1 === selectedIndex && "bg-accent text-accent-foreground",
-                                            )}
-                                            key={file._id}
-                                            onClick={(e) => {
-                                                e.preventDefault();
-                                                handleSelectFile(file);
-                                            }}
-                                            value={file._id}
-                                        >
-                                            <div className="flex min-w-0 flex-1 items-center gap-2">
-                                                <Icon className="text-muted-foreground size-4 shrink-0" />
-                                                <div className="min-w-0 flex-1">
-                                                    <span className="block truncate text-sm font-medium">{file.fileName}</span>
-                                                    <span className="text-muted-foreground block truncate text-xs">{formatFileSize(file.fileSize)}</span>
-                                                </div>
-                                            </div>
-                                        </CommandItem>
-                                    );
-                                })}
-                            </CommandGroup>
-                        )}
+                                            return (
+                                                <CommandItem
+                                                    aria-selected={selected}
+                                                    className={clsx(POPUP_ROW_MOTION, selected && "bg-accent text-accent-foreground")}
+                                                    key={row.kind === "file" ? row.file._id : row.chat.id}
+                                                    onClick={(e) => {
+                                                        e.preventDefault();
 
-                        {filteredChats.length > 0 && (
-                            <>
-                                {filteredFiles.length > 0 && <CommandSeparator />}
-                                <CommandGroup>
-                                    <CommandGroupLabel>{t`Chats`}</CommandGroupLabel>
-                                    {filteredChats.map((chat, index) => (
-                                        <CommandItem
-                                            aria-selected={participantCount + filteredFiles.length + index + 1 === selectedIndex}
-                                            className={clsx(
-                                                "transition-colors",
-                                                participantCount + filteredFiles.length + index + 1 === selectedIndex && "bg-accent text-accent-foreground",
-                                            )}
-                                            key={chat.id}
-                                            onClick={(e) => {
-                                                e.preventDefault();
-                                                handleSelectChat(chat);
-                                            }}
-                                            // The title is in the value so the popup's own search matches it; the id keeps it unique.
-                                            value={`${chat.title} chat:${chat.id}`}
-                                        >
-                                            <div className="flex min-w-0 flex-1 items-center gap-2">
-                                                <MessageSquareIcon aria-hidden="true" className="text-muted-foreground size-4 shrink-0" />
-                                                <span className="block truncate text-sm font-medium">{chat.title}</span>
-                                            </div>
-                                        </CommandItem>
-                                    ))}
-                                </CommandGroup>
-                            </>
-                        )}
+                                                        if (row.kind === "file") {
+                                                            handleSelectFile(row.file);
+                                                        } else {
+                                                            handleSelectChat(row.chat);
+                                                        }
+                                                    }}
+                                                    // A chat's title is in the value so the popup's own search matches it; the id keeps it unique.
+                                                    value={row.kind === "file" ? row.file._id : `${row.chat.title} chat:${row.chat.id}`}
+                                                >
+                                                    {row.kind === "file" ? <FileRow file={row.file} /> : <ChatRow chat={row.chat} />}
+                                                </CommandItem>
+                                            );
+                                        })}
+                                    </CommandGroup>
+                                </Fragment>
+                            );
+                        })}
 
-                        {filteredFiles.length === 0 && filteredChats.length === 0 && activeQuery && (
+                        {rows.length === 0 && activeQuery && (
                             <CommandEmpty>
                                 <div className="flex flex-col items-center gap-2 py-6">
                                     <FileIcon className="text-muted-foreground size-8" />

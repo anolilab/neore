@@ -35866,6 +35866,10 @@ msgstr "Variablen:"
 msgid "Vault"
 msgstr "Tresor"
 
+#: src/features/chat/thread/composer-tiptap/file-mention-popup.tsx
+msgid "In this project"
+msgstr "In diesem Projekt"
+
 #: src/features/chat/thread/composer-tiptap/file-mention-popup.tsx:392
 msgid "Vault files"
 msgstr "Vault-Dateien"
