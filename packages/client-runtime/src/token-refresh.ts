@@ -59,11 +59,21 @@ export const tokenRefreshDelayMs = (token: string, nowMs: number = Date.now()): 
 export const TOKEN_REUSE_MARGIN_MS = 60_000;
 
 /**
- * Whether `token` still has at least `TOKEN_REUSE_MARGIN_MS` before it expires. A token whose
- * claims can't say counts as not valid, so the caller asks the server.
+ * Whether `token`, which a session read started at `readAtMs` returned, still has more than
+ * `TOKEN_REUSE_MARGIN_MS` before it expires. Measured twice, and the smaller wins: against the
+ * device clock, and as the token's own lifetime (`exp - iat`) less the time since the read, which
+ * a device clock that is behind the server's cannot stretch. That second measure holds for a token
+ * minted for the read or cached up to a minute before it; the margin covers the minute. A token
+ * whose claims can't say counts as not valid, so the caller asks the server.
  */
-export const tokenStillValid = (token: string, nowMs: number = Date.now()): boolean => {
+export const tokenStillValid = (token: string, readAtMs: number, nowMs: number = Date.now()): boolean => {
     const claims = lifetimeClaims(token);
 
-    return claims !== undefined && claims.exp * 1000 - nowMs > TOKEN_REUSE_MARGIN_MS;
+    if (!claims) {
+        return false;
+    }
+
+    const leftMs = Math.min(claims.exp * 1000 - nowMs, (claims.exp - claims.iat) * 1000 - (nowMs - readAtMs));
+
+    return leftMs > TOKEN_REUSE_MARGIN_MS;
 };

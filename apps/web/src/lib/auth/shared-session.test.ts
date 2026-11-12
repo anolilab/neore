@@ -38,4 +38,13 @@ describe("sessionChangeCount", () => {
 
         expect(sessionChangeCount()).toBe(1);
     });
+
+    it("counts a return to this window from another one beside it, which leaves it visible", async () => {
+        const { getSharedSessionRead, sessionChangeCount } = await loadSharedSession();
+
+        getSharedSessionRead();
+        globalThis.dispatchEvent(new FocusEvent("focus"));
+
+        expect(sessionChangeCount()).toBe(1);
+    });
 });

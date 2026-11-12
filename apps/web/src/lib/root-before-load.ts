@@ -16,19 +16,27 @@ interface RootBeforeLoadOptions {
  */
 export const CONFIRMED_READ_MAX_AGE_MS = 5 * 60 * 1000;
 
-/**
- * Browser only: when, and at which `sessionChangeCount()`, the session was last read and found
- * signed in. The page starts at 0 with the token the server rendered it with
- * (`seedHydratedAuthToken`), which is that read.
- */
-const confirmed: { at: number; changes: number | undefined } = { at: Date.now(), changes: 0 };
+/** A browser session read that answered signed in: when it started, at which `sessionChangeCount()`, and its token. */
+interface ConfirmedRead {
+    at: number;
+    changes: number;
+    token: string;
+}
 
 /**
- * The token a client navigation may keep without asking the server: the one the client holds,
- * while it has more than a minute left, the session was read as signed in less than
- * `CONFIRMED_READ_MAX_AGE_MS` ago, and nothing has possibly changed it since (`sessionChangeCount`).
- * Anything else (no token, near expiry, a sign-in or sign-out, a return to the tab) reads the
- * session as the first load does.
+ * Browser only. `started` numbers the session reads, so only the latest one started may set
+ * `read`: an older answer that lands after a newer one must not restore a session that ended.
+ * Nothing is confirmed at page load, so the first client navigation reads the session.
+ */
+const confirmed: { read: ConfirmedRead | undefined; started: number } = { read: undefined, started: 0 };
+
+/**
+ * The token a client navigation may keep without asking the server: the token the latest session
+ * read returned, while the client still holds it, it has more than a minute left (`tokenStillValid`,
+ * which a device clock that is off cannot stretch), the read is less than `CONFIRMED_READ_MAX_AGE_MS`
+ * old, and nothing has possibly changed the session since (`sessionChangeCount`). Anything else (no
+ * token, a renewed token, near expiry, a sign-in or sign-out, a return to the tab or window) reads
+ * the session as the first load does.
  *
  * What this skips is one server-function round trip per navigation, nothing the backend
  * checks: every RPC still carries the token, which the backend verifies. `AuthRecovery`
@@ -36,13 +44,13 @@ const confirmed: { at: number; changes: number | undefined } = { at: Date.now(),
  * reads the session again.
  */
 const reusableToken = (client: RootBeforeLoadOptions["context"]["lunoraClient"]): string | undefined => {
-    if (import.meta.env.SSR || confirmed.changes !== sessionChangeCount() || Date.now() - confirmed.at > CONFIRMED_READ_MAX_AGE_MS) {
+    const { read } = confirmed;
+
+    if (!read || import.meta.env.SSR || read.changes !== sessionChangeCount() || Date.now() - read.at > CONFIRMED_READ_MAX_AGE_MS) {
         return undefined;
     }
 
-    const token = client.getAuthToken();
-
-    return token && tokenStillValid(token) ? token : undefined;
+    return client.getAuthToken() === read.token && tokenStillValid(read.token, read.at) ? read.token : undefined;
 };
 
 /**
@@ -70,6 +78,9 @@ const rootBeforeLoad = async (options: RootBeforeLoadOptions) => {
     const changesAtRead = sessionChangeCount();
     const readAt = Date.now();
 
+    confirmed.started += 1;
+    const readNumber = confirmed.started;
+
     // CSP nonce (security-middleware) and PostHog flags (posthog-middleware)
     // arrive as `serverContext`, not on the router context — see
     // `readRequestContext`. Read in parallel with the token: during SSR both
@@ -88,9 +99,8 @@ const rootBeforeLoad = async (options: RootBeforeLoadOptions) => {
     }
 
     // Only a signed-in answer is reused; `unknown` and `unauthenticated` are asked again next time.
-    if (!import.meta.env.SSR) {
-        confirmed.at = readAt;
-        confirmed.changes = authStatus === "authenticated" && token ? changesAtRead : undefined;
+    if (!import.meta.env.SSR && readNumber === confirmed.started) {
+        confirmed.read = authStatus === "authenticated" && token ? { at: readAt, changes: changesAtRead, token } : undefined;
     }
 
     return {

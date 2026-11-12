@@ -35,13 +35,21 @@ describe("tokenRefreshDelayMs", () => {
 
 describe(tokenStillValid, () => {
     it("holds while more than a minute is left", () => {
-        expect(tokenStillValid(jwt({ exp: NOW_S + 61, iat: NOW_S - 600 }), at(NOW_S))).toBe(true);
+        expect(tokenStillValid(jwt({ exp: NOW_S + 61, iat: NOW_S - 600 }), at(NOW_S), at(NOW_S))).toBe(true);
     });
 
     it("fails for an expired or nearly expired token, and for one whose claims can't say", () => {
-        expect(tokenStillValid(jwt({ exp: NOW_S + 60, iat: NOW_S - 600 }), at(NOW_S))).toBe(false);
-        expect(tokenStillValid(jwt({ exp: NOW_S - 1, iat: NOW_S - 900 }), at(NOW_S))).toBe(false);
-        expect(tokenStillValid("not-a-jwt", at(NOW_S))).toBe(false);
-        expect(tokenStillValid(jwt({ sub: "user" }), at(NOW_S))).toBe(false);
+        expect(tokenStillValid(jwt({ exp: NOW_S + 60, iat: NOW_S - 600 }), at(NOW_S), at(NOW_S))).toBe(false);
+        expect(tokenStillValid(jwt({ exp: NOW_S - 1, iat: NOW_S - 900 }), at(NOW_S), at(NOW_S))).toBe(false);
+        expect(tokenStillValid("not-a-jwt", at(NOW_S), at(NOW_S))).toBe(false);
+        expect(tokenStillValid(jwt({ sub: "user" }), at(NOW_S), at(NOW_S))).toBe(false);
+    });
+
+    it("counts the time since the read against the token's lifetime, so a device clock behind the server's keeps no expired token", () => {
+        // A 15-minute token minted for a read 14.5 minutes ago, on a device whose clock is 10 minutes behind:
+        // by that clock it has 10.5 minutes left, by its lifetime 30 seconds.
+        const minted = NOW_S - 870 + 600;
+
+        expect(tokenStillValid(jwt({ exp: minted + 900, iat: minted }), at(NOW_S - 870), at(NOW_S))).toBe(false);
     });
 });
