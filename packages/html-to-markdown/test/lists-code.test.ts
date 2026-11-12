@@ -49,6 +49,12 @@ describe("text after a nested list (#554)", () => {
         expect(convert(html)).toBe("*   Fruits\n    *   Apple\n    *   Pear\n*   Next");
     });
 
+    it("adds one blank line, not two, when a loose item has text after a nested list", () => {
+        const html = "<ul><li><p>Fruits</p><ul><li><p>Pear</p></li></ul>are healthy.</li></ul>";
+
+        expect(convert(html)).toBe("*   Fruits\n    \n    *   Pear\n        \n    are healthy.");
+    });
+
     it("does not change whitespace after a nested list", () => {
         const html = "<ul><li>Fruits<ul><li>Apple</li></ul> </li><li>Next</li></ul>";
 
@@ -76,6 +82,12 @@ describe("code block with whitespace or a wrapper before <code> (#486, #498, #53
         const html = "<pre>\n  <code class=language-js>a = 1\nb = 2</code>\n</pre>";
 
         expect(convert(html, { codeBlockStyle: "fenced" })).toBe("```js\na = 1\nb = 2\n```");
+    });
+
+    it.each(["indented", "fenced"])("a link around <code> keeps the link in %s style", (codeBlockStyle) => {
+        const html = "<pre><a href=u><code>x</code></a></pre>";
+
+        expect(convert(html, { codeBlockStyle })).toBe("[`x`](u)");
     });
 
     it("does not make a code block when text comes before <code>", () => {

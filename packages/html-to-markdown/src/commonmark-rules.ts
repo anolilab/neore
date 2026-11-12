@@ -4,6 +4,7 @@ import { escapeMarkdown, parseListStart, repeat, trimNewlines } from "./utilitie
 const LINE_START = /^/gm;
 const NEWLINE = /\n/g;
 const NON_BLANK = /\S/;
+const TRAILING_INDENTED_BREAK = /\n *$/;
 const TRAILING_NEWLINE = /\n$/;
 const LINE_BREAKS = /\r?\n|\r/g;
 const BACKTICKS = /`+/g;
@@ -135,10 +136,10 @@ const rules: Record<string, Rule> = {
         },
 
         replacement(_content, node, options) {
-            const codeElement = preCodeElement(node) as Element;
-            const className = codeElement.getAttribute("class") ?? "";
+            const codeElement = preCodeElement(node);
+            const className = codeElement?.getAttribute("class") ?? "";
             const language = (LANGUAGE_CLASS.exec(className) ?? [null, ""])[1];
-            const code = codeElement.textContent ?? "";
+            const code = codeElement?.textContent ?? "";
 
             const fenceChar = options.fence.charAt(0);
             let fenceSize = 3;
@@ -203,7 +204,7 @@ const rules: Record<string, Rule> = {
         },
 
         replacement(_content, node) {
-            const code = (preCodeElement(node) as Element).textContent ?? "";
+            const code = preCodeElement(node)?.textContent ?? "";
 
             return `\n\n    ${code.replaceAll(NEWLINE, "\n    ")}\n\n`;
         },
@@ -244,9 +245,14 @@ const rules: Record<string, Rule> = {
             const parent = node.parentNode as Element | null;
 
             if (parent?.nodeName === "LI" && parent.lastElementChild === node) {
+                if (!hasTextAfter(node)) {
+                    return `\n${content}`;
+                }
+
                 // Text after the list needs a blank line. Without one, CommonMark reads the
-                // text as a lazy continuation of the last sub-item's paragraph.
-                return hasTextAfter(node) ? `\n${content}\n\n` : `\n${content}`;
+                // text as a lazy continuation of the last sub-item's paragraph. A paragraph
+                // item already ends in a line break and its indent, so it needs one more.
+                return `\n${content}${TRAILING_INDENTED_BREAK.test(content) ? "\n" : "\n\n"}`;
             }
 
             return `\n\n${content}\n\n`;
@@ -403,9 +409,10 @@ function hasTextAfter(node: Node): boolean {
 
 /**
  * The `<code>` that a `<pre>` holds as its block, or null when the `<pre>` is not
- * a code block. A `<pre>` whose first child is `<code>` is one, as before. Otherwise
- * the `<pre>` must hold a single `<code>`, apart from whitespace, possibly wrapped
- * in elements that hold nothing else. Any other content keeps the `<pre>` as text.
+ * a code block. A `<pre>` whose first child is `<code>` is one. Otherwise the
+ * `<pre>` must hold a single `<code>`, apart from whitespace, possibly wrapped in
+ * `<div>` or `<span>` elements that hold nothing else. Any other content, such as
+ * a link around the code, keeps the `<pre>` as text.
  */
 function preCodeElement(pre: Node): Element | null {
     if (pre.firstChild?.nodeName === "CODE") {
@@ -414,6 +421,10 @@ function preCodeElement(pre: Node): Element | null {
 
     return soleCodeElement(pre);
 }
+
+// Elements with no rule of their own here. Any other element changes the output
+// (a link, bold text), so it is not a wrapper.
+const WRAPPER_ELEMENTS = new Set(["DIV", "SPAN"]);
 
 function soleCodeElement(parent: Node): Element | null {
     let only: Node | null = null;
@@ -434,7 +445,11 @@ function soleCodeElement(parent: Node): Element | null {
         return null;
     }
 
-    return only.nodeName === "CODE" ? (only as Element) : soleCodeElement(only);
+    if (only.nodeName === "CODE") {
+        return only as Element;
+    }
+
+    return WRAPPER_ELEMENTS.has(only.nodeName) ? soleCodeElement(only) : null;
 }
 
 function cleanAttribute(attribute: string | null): string {
