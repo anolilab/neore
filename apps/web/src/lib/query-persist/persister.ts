@@ -27,6 +27,19 @@ export const MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 /** Live pushes come in bursts; the record only needs the latest state, at most once a second. */
 export const WRITE_THROTTLE_MS = 1000;
 
+/** Whether the cache holds exactly what `entry` saved: the same stamp and the same data. */
+const isSavedValue = (query: Query, entry: DehydratedQuery | undefined): boolean => {
+    if (entry === undefined || query.state.status !== "success" || query.state.dataUpdatedAt !== entry.state.dataUpdatedAt) {
+        return false;
+    }
+
+    try {
+        return JSON.stringify(query.state.data) === JSON.stringify(entry.state.data);
+    } catch {
+        return false;
+    }
+};
+
 /** Whether data stamped `stamp` is within the age limit at `at`: not older than it, and not stamped ahead of `at`. */
 const isWithinAge = (stamp: number, at: number): boolean => stamp <= at && at - stamp <= MAX_AGE_MS;
 
@@ -150,6 +163,8 @@ export const startQueryPersistence = (options: PersistenceOptions): PersistenceC
      * that back below what it was at this start.
      */
     const live = new WeakSet<Query>();
+    /** What the restore handed over and no read has replaced since (even one stamped the same millisecond). */
+    const restoredEntries = new WeakSet<Query>();
     /** Set while `hydrate` runs: what it builds or replaces is restored, not read. */
     let isHydrating = false;
     const unsubscribeLive = queryClient.getQueryCache().subscribe((event: QueryCacheNotifyEvent) => {
@@ -159,13 +174,13 @@ export const startQueryPersistence = (options: PersistenceOptions): PersistenceC
 
         if ((event.type === "added" && event.query.state.data !== undefined) || (event.type === "updated" && event.action.type === "success")) {
             live.add(event.query);
+            // Restored no more, for good: a reset that winds the data count back cannot make this read look restored.
+            restoredEntries.delete(event.query);
         }
     });
 
     const isReadSinceStart = (query: Query): boolean => live.has(query);
-    /** What the restore handed over, with its data count then: any later data, even stamped the same millisecond, counts it up. */
-    const restoredCount = new WeakMap<Query, number>();
-    const isRestored = (query: Query): boolean => restoredCount.get(query) === query.state.dataUpdateCount;
+    const isRestored = (query: Query): boolean => restoredEntries.has(query);
     const state = { isDirty: false, isHeldByGate: false, isRestoreDone: false, isRestoring: true, isSaving: false, stopped: false, writes: false };
     let timer: ReturnType<typeof setTimeout> | undefined;
     /** The generation the queued save was scheduled under. */
@@ -312,16 +327,24 @@ export const startQueryPersistence = (options: PersistenceOptions): PersistenceC
             isHydrating = false;
         }
 
-        // `hydrate` skips an entry the cache holds newer data for: only one whose state it replaced is restored.
+        const saved = new Map(restorable.map((query: DehydratedQuery) => [query.queryHash, query]));
+
+        // `hydrate` skips an entry the cache holds newer data for: only one whose state it replaced is restored. Or one
+        // it skipped because the cache already holds exactly the saved value (an earlier session of this account restored
+        // it into this client): that is the record's own entry, and a save that left it out would erase it. Not any
+        // entry from before this start: only the very value saved, stamp and data alike.
         for (const [queryHash, previous] of before) {
             const query = queryCache.get(queryHash);
 
             if (query && query.state !== previous) {
-                restoredCount.set(query, query.state.dataUpdateCount);
+                restoredEntries.add(query);
 
                 if (previous !== undefined) {
                     keepRestored(query);
                 }
+            } else if (query && isSavedValue(query, saved.get(queryHash))) {
+                restoredEntries.add(query);
+                keepRestored(query);
             }
         }
 

@@ -928,6 +928,65 @@ describe("saving", () => {
         unsubscribe();
     });
 
+    it("a second session of the account on the same client keeps what the first restored in the record it saves", async () => {
+        const memory = memoryStore();
+
+        await saveTexts(memory, ALICE, [[KEY, "kept"]]);
+
+        const queryClient = new QueryClient();
+        const first = start(memory.store, ALICE, queryClient);
+
+        await first.restored;
+        first.stop();
+
+        // The same account starts again on the same client (a remount): the cache already holds the saved value.
+        const second = start(memory.store, ALICE, queryClient);
+
+        await second.restored;
+
+        const written = { done: false };
+
+        void (async () => {
+            await memory.settled();
+            written.done = true;
+        })();
+        second.enableWrites();
+        queryClient.setQueryData(OTHER_KEY, { text: "live" });
+        await untilDone(written);
+        second.stop();
+
+        const next = new QueryClient();
+
+        await start(memory.store, ALICE, next).restored;
+        expect(textOf(next, KEY)).toBe("kept");
+        expect(textOf(next, OTHER_KEY)).toBe("live");
+    });
+
+    it("a read after a reset is never taken for the restored value, even when its data count matches", async () => {
+        const memory = memoryStore();
+
+        await saveTexts(memory, ALICE, [[KEY, "kept"]]);
+
+        const queryClient = new QueryClient();
+
+        // A screen built the entry before this session, with no data yet: the restore fills it in place.
+        queryClient.getQueryCache().build(queryClient, { queryKey: KEY });
+
+        const controller = start(memory.store, ALICE, queryClient);
+
+        await controller.restored;
+        expect(textOf(queryClient, KEY)).toBe("kept");
+
+        // The reset winds the data count back to the built entry's; one fresh read brings it to the restored count again.
+        void queryClient.resetQueries({ queryKey: KEY });
+        queryClient.setQueryData(KEY, { text: "fresh" });
+
+        controller.revoke();
+        await vi.advanceTimersByTimeAsync(0);
+
+        expect(textOf(queryClient, KEY)).toBe("fresh");
+    });
+
     it("a record the store failed to read is never replaced by a save, and is restored on the next try", async () => {
         const memory = memoryStore();
 
