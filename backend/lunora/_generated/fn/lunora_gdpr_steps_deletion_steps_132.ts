@@ -53,6 +53,12 @@ if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(
 if (typeof source["userId"] !== "string") return DEFER;
 return { "userId": source["userId"] };
 });
+installCompiledValidatorMap(lunora_gdpr_steps_deletion_steps_132.deleteUserPlugins.args, (source) => {
+if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
+if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
+if (typeof source["userId"] !== "string") return DEFER;
+return { "userId": source["userId"] };
+});
 installCompiledValidatorMap(lunora_gdpr_steps_deletion_steps_132.deleteUserPresentations.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;

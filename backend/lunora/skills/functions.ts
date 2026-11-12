@@ -15,7 +15,7 @@ import { getEnabledSkillsForSystemPrompt } from "./executor";
 import { getToolRegistry } from "./jit-tool-loader";
 import { deleteSkillRatings } from "./rating-cascade";
 import { ensureSlugUnique, validateSlug, vSkillConfigInput } from "./validators";
-import { systemDb } from "../lib/rls/scope";
+import { insertSkill, skillCreateFields } from "./create-skill";
 import { scheduleObjectDeletion } from "../lib/storage-cleanup";
 import { assertJsonWithinLimit, MAX_LENGTH, vJsonValue } from "../lib/validators";
 
@@ -307,139 +307,19 @@ export const getEnabledSkillsMetadata = authQuery
  */
 export const createSkill = authMutation
     .use(rateLimit("skills/create"))
-    .input({
-        category: v.optional(v.string().max(MAX_LENGTH.short)),
-        config: v.optional(vSkillConfigInput),
-        description: v.string().max(MAX_LENGTH.long),
-        /** Defaults to on. `false` creates the skill switched off, so it reaches no system prompt until the user turns it on. */
-        enabled: v.optional(v.boolean()),
-        icon: v.optional(v.string().max(MAX_LENGTH.url)),
-        instructions: v.string().max(MAX_LENGTH.document),
-        name: v.string().max(MAX_LENGTH.short),
-        organizationId: v.optional(v.string().max(MAX_LENGTH.id)),
-        slug: v.string().max(MAX_LENGTH.short),
-        source: v.union(
-            v.object({ type: v.literal("editor") }),
-            v.object({
-                commitSha: v.optional(v.string().max(MAX_LENGTH.short)),
-                path: v.optional(v.string().max(MAX_LENGTH.key)),
-                repoUrl: v.string().max(MAX_LENGTH.url),
-                type: v.literal("github"),
-            }),
-            v.object({ originalSkillId: v.string().max(MAX_LENGTH.short), type: v.literal("official") }),
-            v.object({ filename: v.string().max(MAX_LENGTH.short), type: v.literal("upload"), uploadedAt: v.number() }),
-        ),
-        tags: v.optional(v.array(v.string().max(MAX_LENGTH.short))),
-        variables: v.optional(
-            v.array(
-                v.object({
-                    defaultValue: v.optional(v.string().max(MAX_LENGTH.document)),
-                    description: v.optional(v.string().max(MAX_LENGTH.long)),
-                    name: v.string().check((s) => s.length > 0, { message: "Variable name is required", schema: { minLength: 1 } }),
-                    required: v.optional(v.boolean()),
-                }),
-            ),
-        ),
-        version: v.optional(v.string().max(MAX_LENGTH.short)),
-        visibility: v.optional(v.union(v.literal("private"), v.literal("organization"), v.literal("public"))),
-    })
+    .input({ ...skillCreateFields })
     .output(v.id("skills"))
     .mutation(
-        async ({
-            args: { category, config, description, enabled, icon, instructions, name, organizationId, slug, source, tags, variables, version, visibility },
-            ctx,
-        }) => {
-            const { userId } = ctx.user;
-            const activeOrganizationId = ctx.user.activeOrganization?.id;
-
-            // A caller-supplied organization must be the one they are acting in;
-            // otherwise anyone could plant an "organization" skill in a foreign org.
-            if (organizationId && organizationId !== activeOrganizationId) {
-                throw new LunoraError("FORBIDDEN", "Not a member of that organization");
-            }
-
-            const organizationIdToUse = organizationId || activeOrganizationId;
-            const { now } = ctx;
-
-            // Validate slug format
-            const slugValidation = validateSlug(slug);
-
-            if (!slugValidation.valid) {
-                throw new LunoraError("BAD_REQUEST", slugValidation.errors.join(", "));
-            }
-
-            // Check slug uniqueness
-            await ensureSlugUnique(ctx, userId, slug);
-
-            // Check skill limit for free users using aggregate
-            const isPremium = ctx.user.plan === "premium" || ctx.user.isAdmin;
-
-            if (!isPremium) {
-                // The caller's own rows — what the owner policy admits; `count()` cannot run behind it.
-                const totalCount = await systemDb(ctx).skills.count({ userId });
-
-                if (totalCount >= FREE_SKILL_LIMIT) {
-                    throw new LunoraError("UNPROCESSABLE", "Free accounts are limited to 5 skills. Upgrade to Pro for unlimited skills.");
-                }
-            }
-
-            // Create skill
-            const insertedSkillId = await ctx.db.insert("skills", {
-                category,
-                config,
-                currentVersion: 1,
-                description,
-                icon,
-                instructions,
-                name,
-                organizationId: organizationIdToUse,
-                slug,
-                source,
-                tags,
-                updatedAt: now,
-                userId,
-                variables,
-                version,
-                visibility: visibility ?? "private",
-            });
-
-            const skillId = insertedSkillId as Id<"skills">;
-
-            // Create skillStats entry
-            await ctx.db.insert("skillStats", {
-                skillId,
-                usageCount: 0,
-            });
-
-            // Create userSkills entry (enabled unless the caller asked for it off)
-            await ctx.db.insert("userSkills", {
-                addedAt: now,
-                autoRun: false,
-                enabled: enabled ?? true,
-                skillId,
-                userId,
-            });
-
-            // Create initial history entry
-            await ctx.db.insert("skillHistory", {
-                changeType: "created",
-                config,
-                createdAt: now,
-                instructions,
-                note: "Initial version",
-                skillId,
-                userId,
-                variables,
-                version: 1,
-            });
-
-            // Invalidate skills list cache
-            await invalidateSkillsCache(ctx, userId);
-
-            ctx.log.event("skills.create", { skillId });
-
-            return skillId;
-        },
+        async ({ args, ctx }) =>
+            await insertSkill(
+                ctx,
+                {
+                    activeOrganizationId: ctx.user.activeOrganization?.id,
+                    isPremium: ctx.user.plan === "premium" || ctx.user.isAdmin === true,
+                    userId: ctx.user.userId,
+                },
+                args,
+            ),
     );
 
 /**

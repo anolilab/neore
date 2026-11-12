@@ -2,10 +2,10 @@
 // Run `lunora codegen` to regenerate.
 
 import { DEFER_VALIDATION as DEFER, installCompiledValidatorMap } from "lunorash/values";
-import * as lunora_source_control_freshness_poll_203 from "../../source-control/freshness-poll.js";
+import * as lunora_source_control_freshness_poll_204 from "../../source-control/freshness-poll.js";
 
 /** Install the precompiled argument parsers before the module is dispatched. */
-installCompiledValidatorMap(lunora_source_control_freshness_poll_203.pollWatchedRepo.args, (source) => {
+installCompiledValidatorMap(lunora_source_control_freshness_poll_204.pollWatchedRepo.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["lease"] !== "number" || !Number.isFinite(source["lease"])) return DEFER;

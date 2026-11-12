@@ -241,6 +241,8 @@ const OWNER_TABLES = [
     "userConnectors",
     "userSettings",
     "userSkills",
+    "pluginInstalls",
+    "pluginItems",
     "watchedRepositories",
     "workflowExecutions",
     "workflowPresence",

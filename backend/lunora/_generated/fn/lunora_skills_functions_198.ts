@@ -2,35 +2,35 @@
 // Run `lunora codegen` to regenerate.
 
 import { DEFER_VALIDATION as DEFER, installCompiledValidatorMap } from "lunorash/values";
-import * as lunora_skills_functions_197 from "../../skills/functions.js";
+import * as lunora_skills_functions_198 from "../../skills/functions.js";
 
 /** Install the precompiled argument parsers before the module is dispatched. */
-installCompiledValidatorMap(lunora_skills_functions_197.calculateSkillCount.args, (source) => {
+installCompiledValidatorMap(lunora_skills_functions_198.calculateSkillCount.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["isPremium"] !== "boolean") return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "isPremium": source["isPremium"], "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_skills_functions_197.deleteSkill.args, (source) => {
+installCompiledValidatorMap(lunora_skills_functions_198.deleteSkill.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["skillId"] !== "string") return DEFER;
 return { "skillId": source["skillId"] };
 });
-installCompiledValidatorMap(lunora_skills_functions_197.getSkill.args, (source) => {
+installCompiledValidatorMap(lunora_skills_functions_198.getSkill.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["skillId"] !== "string") return DEFER;
 return { "skillId": source["skillId"] };
 });
-installCompiledValidatorMap(lunora_skills_functions_197.getSkillCountInternal.args, (source) => {
+installCompiledValidatorMap(lunora_skills_functions_198.getSkillCountInternal.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_skills_functions_197.getSkillsByIdsInternal.args, (source) => {
+installCompiledValidatorMap(lunora_skills_functions_198.getSkillsByIdsInternal.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (!Array.isArray(source["skillIds"])) return DEFER;
@@ -42,34 +42,34 @@ __arr1[__i1] = __e1;
 }
 return { "skillIds": __arr1 };
 });
-installCompiledValidatorMap(lunora_skills_functions_197.getSkillsByOrganizationInternal.args, (source) => {
+installCompiledValidatorMap(lunora_skills_functions_198.getSkillsByOrganizationInternal.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["maxSkills"] !== "number" || !Number.isFinite(source["maxSkills"])) return DEFER;
 if (typeof source["organizationId"] !== "string") return DEFER;
 return { "maxSkills": source["maxSkills"], "organizationId": source["organizationId"] };
 });
-installCompiledValidatorMap(lunora_skills_functions_197.getSkillsByUserInternal.args, (source) => {
+installCompiledValidatorMap(lunora_skills_functions_198.getSkillsByUserInternal.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["maxSkills"] !== "number" || !Number.isFinite(source["maxSkills"])) return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "maxSkills": source["maxSkills"], "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_skills_functions_197.getUserSkillsStateInternal.args, (source) => {
+installCompiledValidatorMap(lunora_skills_functions_198.getUserSkillsStateInternal.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_skills_functions_197.setSkillAutoRun.args, (source) => {
+installCompiledValidatorMap(lunora_skills_functions_198.setSkillAutoRun.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["autoRun"] !== "boolean") return DEFER;
 if (typeof source["skillId"] !== "string") return DEFER;
 return { "autoRun": source["autoRun"], "skillId": source["skillId"] };
 });
-installCompiledValidatorMap(lunora_skills_functions_197.setSkillEnabled.args, (source) => {
+installCompiledValidatorMap(lunora_skills_functions_198.setSkillEnabled.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["enabled"] !== "boolean") return DEFER;

@@ -20442,6 +20442,249 @@
       "relations": {},
       "shardMode": "root"
     },
+    "pluginInstalls": {
+      "commitOrdered": false,
+      "fields": {
+        "contentHash": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "generation": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "installedAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "leaseUntil": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "pluginSlug": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "status": {
+          "kind": "union",
+          "nullable": false,
+          "optional": false,
+          "unique": false,
+          "members": [
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"installed\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"installing\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"needs-repair\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"uninstalling\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"updating\""
+            }
+          ]
+        },
+        "targetVersion": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "updatedAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "userId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "version": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        }
+      },
+      "indexes": {
+        "by_user_and_slug": {
+          "fields": [
+            "userId",
+            "pluginSlug"
+          ],
+          "unique": false
+        }
+      },
+      "memory": false,
+      "relations": {},
+      "shardMode": "global:d1"
+    },
+    "pluginItems": {
+      "commitOrdered": false,
+      "fields": {
+        "contentHash": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "createdAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "entryKey": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "installId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "itemId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "kind": {
+          "kind": "union",
+          "nullable": false,
+          "optional": false,
+          "unique": false,
+          "members": [
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"group\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"skill\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"trigger\""
+            }
+          ]
+        },
+        "pendingHash": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "state": {
+          "kind": "union",
+          "nullable": false,
+          "optional": false,
+          "unique": false,
+          "members": [
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"created\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"detached\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"intent\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"updating\""
+            }
+          ]
+        },
+        "userId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        }
+      },
+      "indexes": {
+        "by_install": {
+          "fields": [
+            "installId"
+          ],
+          "unique": false
+        },
+        "by_user": {
+          "fields": [
+            "userId"
+          ],
+          "unique": false
+        }
+      },
+      "memory": false,
+      "relations": {},
+      "shardMode": "global:d1"
+    },
     "presentationSlides": {
       "commitOrdered": false,
       "fields": {
@@ -23599,6 +23842,18 @@
           "optional": true,
           "unique": false
         },
+        "pluginInstallId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "pluginMarker": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "slug": {
           "kind": "string",
           "nullable": false,
@@ -23665,6 +23920,33 @@
                 },
                 "uploadedAt": {
                   "kind": "number",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false
+                }
+              }
+            },
+            {
+              "kind": "object",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "fields": {
+                "installId": {
+                  "kind": "string",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false
+                },
+                "type": {
+                  "kind": "literal",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
+                  "literal": "\"plugin\""
+                },
+                "version": {
+                  "kind": "string",
                   "nullable": false,
                   "optional": false,
                   "unique": false
@@ -23794,6 +24076,18 @@
         "by_organization": {
           "fields": [
             "organizationId"
+          ],
+          "unique": false
+        },
+        "by_plugin_install": {
+          "fields": [
+            "pluginInstallId"
+          ],
+          "unique": false
+        },
+        "by_plugin_marker": {
+          "fields": [
+            "pluginMarker"
           ],
           "unique": false
         },
@@ -27268,6 +27562,12 @@
           "optional": true,
           "unique": false
         },
+        "isGroupChat": {
+          "kind": "boolean",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "isPublic": {
           "kind": "boolean",
           "nullable": false,
@@ -27396,6 +27696,18 @@
         },
         "pinnedAt": {
           "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "pluginInstallId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "pluginMarker": {
+          "kind": "string",
           "nullable": false,
           "optional": true,
           "unique": false
@@ -27594,6 +27906,18 @@
         }
       },
       "indexes": {
+        "by_plugin_install": {
+          "fields": [
+            "pluginInstallId"
+          ],
+          "unique": false
+        },
+        "by_plugin_marker": {
+          "fields": [
+            "pluginMarker"
+          ],
+          "unique": false
+        },
         "by_projectId": {
           "fields": [
             "projectId"
@@ -28833,6 +29157,18 @@
           "optional": true,
           "unique": false
         },
+        "pluginInstallId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "pluginMarker": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "quietWhenEmpty": {
           "kind": "boolean",
           "nullable": false,
@@ -28957,6 +29293,18 @@
           "fields": [
             "enabled",
             "nextTriggerAt"
+          ],
+          "unique": false
+        },
+        "by_plugin_install": {
+          "fields": [
+            "pluginInstallId"
+          ],
+          "unique": false
+        },
+        "by_plugin_marker": {
+          "fields": [
+            "pluginMarker"
           ],
           "unique": false
         },

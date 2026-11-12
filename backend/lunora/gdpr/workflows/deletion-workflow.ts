@@ -481,6 +481,18 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
                 ),
         );
 
+        await context.step.do(
+            "delete-user-plugins",
+            async () =>
+                await context.run(
+                    internal.gdpr.steps.deletion_steps.deleteUserPlugins,
+                    {
+                        userId: args.userId,
+                    },
+                    { dedupId: stepDedupId(scope, "delete-user-plugins") },
+                ),
+        );
+
         await context.run(internal.gdpr.functions.updateRequestProgress, {
             currentStep: "deleting_connectors",
             progress: 50,
