@@ -323,3 +323,25 @@ describe("review: backslashes before a hyphen in a destination", () => {
         expect(convert(String.raw`<a href="a\c-d">x</a>`)).toBe(String.raw`[x](a\c-d)`);
     });
 });
+
+describe("review: a backslash hard break in link text", () => {
+    function blockStartingSpan(): TurndownService {
+        const service = new TurndownService({ br: "\\" });
+
+        service.addRule("blockStartingSpan", { filter: "span", replacement: () => "- x" });
+
+        return service;
+    }
+
+    it("drops a backslash break that is not kept, so no stray backslash shows in the link text", () => {
+        expect(blockStartingSpan().turndown(`<a href="/x">one<br><span>x</span></a>`)).toBe("[one - x](/x)");
+    });
+
+    it("guard, passes before and after: a space break that is not kept still leaves the spaces it always left", () => {
+        const service = new TurndownService();
+
+        service.addRule("blockStartingSpan", { filter: "span", replacement: () => "- x" });
+
+        expect(service.turndown(`<a href="/x">one<br><span>x</span></a>`)).toBe("[one  - x](/x)");
+    });
+});

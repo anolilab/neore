@@ -50,6 +50,12 @@ const BACKSLASH_BEFORE_PUNCTUATION = /\\(?=[!"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~]
 // two or more spaces, or in an unescaped backslash, as a hard break. The marker may hold other
 // text before that ending, as in ` \`. An even run of backslashes is escaped pairs, not a break.
 const HARD_BREAK = / {2}$|(?:^|[^\\])(?:\\\\)*\\$/;
+const SPACES_ONLY = /^ *$/;
+const REGEXP_SPECIAL = /[.*+?^${}()|[\]\\]/g;
+
+function escapeRegExp(text: string): string {
+    return text.replaceAll(REGEXP_SPECIAL, String.raw`\$&`);
+}
 // The tag names of CommonMark's HTML block type 6. A tag with one of these names may interrupt a
 // paragraph. Any other tag (an inline one such as `<em>`) cannot, so it does not start a block.
 const HTML_BLOCK_TAGS =
@@ -904,14 +910,24 @@ function cleanAttribute(attribute: string | null): string {
 function linkText(content: string, hardBreak: string): string {
     const hasHardBreaks = HARD_BREAK.test(hardBreak);
     const closed = `${content}]`;
+    // A line break, with the marker that the rule writes in front of it when the marker is there.
+    const lineBreak = new RegExp(`(${escapeRegExp(hardBreak)})?\\n\\s*`, "g");
 
     return closed
-        .replaceAll(LINE_BREAK_RUN, (run: string, offset: number, whole: string) => {
-            if (hasHardBreaks && isKeptHardBreak(run, offset, whole, hardBreak)) {
-                return run;
+        .replaceAll(lineBreak, (match: string, marker: string | undefined, offset: number, whole: string) => {
+            const written = marker ?? "";
+
+            if (hasHardBreaks && written && isKeptHardBreak(match.slice(written.length), offset + written.length, whole, hardBreak)) {
+                return match;
             }
 
-            return offset > 0 && whole[offset - 1] === " " ? "" : " ";
+            // Spaces are harmless in text, so a space marker stays and the break becomes a space or nothing. Any other
+            // marker, such as a backslash, would show in the link text, so it goes with the break.
+            if (SPACES_ONLY.test(written)) {
+                return written + (whole.charAt(offset + written.length - 1) === " " ? "" : " ");
+            }
+
+            return whole.charAt(offset - 1) === " " ? "" : " ";
         })
         .slice(0, -1);
 }
