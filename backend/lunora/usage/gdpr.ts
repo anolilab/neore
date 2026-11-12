@@ -34,6 +34,9 @@ export const EXPORT_PIECE_TTL_MS = 24 * 60 * 60 * 1000;
 /** Runs the sweep reads, metadata only, while it looks for dead runs; so live runs cannot fill a whole batch. */
 const SWEEP_SCAN_LIMIT = 500;
 
+/** Pages of a user's run rows one erasure call reads: the unkeyed runs among them are removed in the same call. */
+const RUN_PAGES_PER_ERASURE = 50;
+
 /**
  * Schedules the purge of a run's usage object (`purgeUsageFile`). The purge runs on the user's shard and is retried by the scheduler,
  * unlike the shared storage cleanup, which swallows a failed delete. The run's record stays until the object is gone, so a purge that
@@ -52,7 +55,7 @@ const schedulePurge = async (ctx: MutationCtx, run: { _id: Id<"usageExportRuns">
  * record is kept for the sweep to retry from.
  */
 export const purgeUsageFile = internalAction
-    .input({ key: v.string().max(MAX_LENGTH.id), runId: v.id("usageExportRuns") })
+    .input({ key: v.string().max(MAX_LENGTH.key), runId: v.id("usageExportRuns") })
     .output(v.null())
     .action(async ({ args: { key, runId }, ctx }) => {
         if (await ctx.storage.getMetadata(key)) {
@@ -103,7 +106,7 @@ export const releaseUsageKey = internalMutation
  * early. A run row with an object is kept: its purge removes the object and then the row.
  */
 export const eraseUsageForUser = async (ctx: MutationCtx, userId: string): Promise<BatchResult> => {
-    const [days, keys, backfills, pieces, projects, runs] = await Promise.all([
+    const [days, keys, backfills, pieces, projects] = await Promise.all([
         ctx.db
             .query("usageDaily")
             .withIndex("by_user_date", (q) => q.eq("userId", userId))
@@ -118,7 +121,6 @@ export const eraseUsageForUser = async (ctx: MutationCtx, userId: string): Promi
             .take(BATCH),
         ctx.db.usageExportPieces.findMany({ consistency: "primary", limit: EXPORT_PIECE_BATCH, where: { userId } }),
         ctx.db.usageExportProjects.findMany({ consistency: "primary", limit: EXPORT_PIECE_BATCH, where: { userId } }),
-        ctx.db.usageExportRuns.findMany({ consistency: "primary", limit: EXPORT_PIECE_BATCH, where: { userId } }),
     ]);
 
     await Promise.all([
@@ -130,20 +132,30 @@ export const eraseUsageForUser = async (ctx: MutationCtx, userId: string): Promi
     ]);
 
     // A run with an object keeps its row: the erasure's purge step deletes the object, then releases the row, so the erasure is not
-    // done while an object remains. A run without one has nothing left to keep.
+    // done while an object remains. A run without one has nothing left to keep, wherever its page sits among the keyed ones.
+    const runsAt = (cursor: string | null) => ctx.db.usageExportRuns.findMany({ consistency: "primary", cursor, limit: EXPORT_PIECE_BATCH, where: { userId } });
     let unkeyed = 0;
+    let cursor: string | null = null;
+    let isDone = false;
 
-    for (const run of runs.page) {
-        if (run.usageKey !== undefined) {
-            continue;
+    for (let pages = 0; !isDone && pages < RUN_PAGES_PER_ERASURE; pages += 1) {
+        const runs = await runsAt(cursor);
+
+        for (const run of runs.page) {
+            if (run.usageKey !== undefined) {
+                continue;
+            }
+
+            unkeyed += 1;
+            await ctx.db.delete("usageExportRuns", run._id);
         }
 
-        unkeyed += 1;
-        await ctx.db.delete("usageExportRuns", run._id);
+        isDone = runs.isDone;
+        cursor = runs.continueCursor;
     }
 
     return {
-        hasMore: full(days) || full(keys) || full(backfills) || fullPieces(pieces.page) || fullPieces(projects.page) || (fullPieces(runs.page) && unkeyed > 0),
+        hasMore: full(days) || full(keys) || full(backfills) || fullPieces(pieces.page) || fullPieces(projects.page) || (!isDone && unkeyed > 0),
     };
 };
 
@@ -179,24 +191,14 @@ export const keyedUsageRuns = internalQuery
     });
 
 /**
- * Whether the account's deletion has begun, read from the primary: a replica that has not seen the deletion would let a write through
- * after the erasure has passed over the rollup. Only the blocking statuses count: a failed or cancelled deletion holds nothing back.
- */
-export const deletionUnderwayOnPrimary = async (ctx: MutationCtx | QueryCtx, userId: string): Promise<boolean> => {
-    const request = await ctx.db.gdprRequests.findFirst({
-        consistency: "primary",
-        where: { requestType: "deletion", status: { in: ["completed", "pending", "processing"] }, userId },
-    });
-
-    return Boolean(request);
-};
-
-/**
  * Whether an export run is still live: its request is pending or processing. A run's request is the part of its key before the
  * workflow instance. A request that is gone is not live.
  */
 const isRunLive = async (ctx: MutationCtx | QueryCtx, runKey: string, userId: string): Promise<boolean> => {
-    const request = await ctx.db.gdprRequests.findFirst({ where: { _id: runKey.split(":", 1)[0] as Id<"gdprRequests">, userId } });
+    const request = await ctx.db.gdprRequests.findFirst({
+        consistency: "primary",
+        where: { _id: runKey.split(":", 1)[0] as Id<"gdprRequests">, userId },
+    });
 
     return request?.status === "pending" || request?.status === "processing";
 };
@@ -258,6 +260,12 @@ export const sweepUsageExportPieces = internalMutation
                 await Promise.all(projects.page.map(async (row) => await ctx.db.delete("usageExportProjects", row._id)));
                 await schedulePurge(ctx, run);
 
+                // A keyed run waits for its purge: it moves to the newest end of the scan, so a purge that keeps failing cannot block the
+                // expired runs behind it. Its next purge is scheduled when the scan reaches it again.
+                if (run.usageKey !== undefined) {
+                    await ctx.db.patch("usageExportRuns", run._id, { createdAt: ctx.now });
+                }
+
                 if (!fullPieces(pieces.page) && !fullPieces(projects.page) && run.usageKey === undefined) {
                     await ctx.db.delete("usageExportRuns", run._id);
                 }
@@ -280,7 +288,7 @@ export const sweepUsageExportPieces = internalMutation
  * usage object is deleted. `hasMore` while a batch came back full.
  */
 export const clearUsageExportPieces = internalMutation
-    .input({ requestId: v.string().max(MAX_LENGTH.id), userId: v.string().max(MAX_LENGTH.id) })
+    .input({ requestId: v.string().max(MAX_LENGTH.key), userId: v.string().max(MAX_LENGTH.id) })
     .output(v.object({ hasMore: v.boolean() }))
     .mutation(async ({ args: { requestId, userId }, ctx }) => {
         const { page } = await ctx.db.usageExportPieces.findMany({

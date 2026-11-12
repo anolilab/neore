@@ -6,15 +6,7 @@ import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import schema from "../schema";
-import {
-    clearUsageExportPieces,
-    deletionUnderwayOnPrimary,
-    EXPORT_PIECE_TTL_MS,
-    eraseUsageForUser,
-    keyedUsageRuns,
-    releaseUsageKey,
-    sweepUsageExportPieces,
-} from "./gdpr";
+import { clearUsageExportPieces, EXPORT_PIECE_TTL_MS, eraseUsageForUser, keyedUsageRuns, releaseUsageKey, sweepUsageExportPieces } from "./gdpr";
 
 /** Object keys the purges were scheduled for, captured in place of the scheduler. */
 const scheduled = vi.hoisted(() => {
@@ -84,6 +76,34 @@ afterEach(() => {
 });
 
 describe("eraseUsageForUser", () => {
+    it("removes an unkeyed run that sits behind a page of keyed runs", async () => {
+        await harness.run(async (ctx: any) => {
+            for (let index = 0; index < 10; index += 1) {
+                await ctx.db.insert("usageExportRuns", {
+                    createdAt: 1,
+                    requestId: `keyed:${String(index)}`,
+                    usageKey: `gdpr-exports/keyed-${String(index)}.json`,
+                    userId: A,
+                });
+            }
+
+            await ctx.db.insert("usageExportRuns", { createdAt: 2, requestId: "plain:1", userId: A });
+        });
+
+        let more = true;
+
+        while (more) {
+            more = await harness.run(async (ctx: any) => {
+                const erased = await eraseUsageForUser(ctx, A);
+
+                return erased.hasMore;
+            });
+        }
+
+        expect(await countOf("usageExportRuns", A)).toBe(10);
+        expect(await keyedRunsOf(A)).toHaveLength(10);
+    });
+
     it("erases the user's rollup and export rows across batches, and leaves another user's", async () => {
         await harness.run(async (ctx: any) => {
             for (let index = 0; index < 25; index += 1) {
@@ -220,24 +240,42 @@ describe("the purge's record", () => {
     });
 });
 
-describe("the deletion check", () => {
-    it("counts a pending, processing or completed deletion as underway, and a failed or cancelled one as not", async () => {
-        const underway = async (status: string) =>
-            await harness.run(async (ctx: any) => {
-                await ctx.db.insert("gdprRequests", { requestedAt: 1, requestType: "deletion", status, userEmail: "a@example.com", userId: status });
-
-                return await deletionUnderwayOnPrimary(ctx, status);
-            });
-
-        expect(await underway("pending")).toBe(true);
-        expect(await underway("processing")).toBe(true);
-        expect(await underway("completed")).toBe(true);
-        expect(await underway("failed")).toBe(false);
-        expect(await underway("cancelled")).toBe(false);
-    });
-});
-
 describe("the sweep and the clear", () => {
+    it("does not let a keyed run whose purge keeps failing block the expired runs behind it", async () => {
+        const old = Date.now() - EXPORT_PIECE_TTL_MS - 60_000;
+
+        await harness.run(async (ctx: any) => {
+            for (let index = 0; index < 10; index += 1) {
+                await ctx.db.insert("usageExportRuns", {
+                    createdAt: old,
+                    requestId: `stuck:${String(index)}`,
+                    usageKey: `gdpr-exports/stuck-${String(index)}.json`,
+                    userId: A,
+                });
+            }
+
+            await ctx.db.insert("usageExportRuns", { createdAt: old + 1, requestId: "expired:1", userId: A });
+            await ctx.db.insert("usageExportPieces", { ...piece("expired:1", A), createdAt: old });
+        });
+
+        // The first sweep handles the ten keyed runs, and moves them out of the window.
+        await harness.run(async (ctx: any) => await ctx.runMutation(sweepUsageExportPieces, {}));
+        expect(scheduled.keys).toHaveLength(10);
+        expect(await countOf("usageExportPieces", A)).toBe(1);
+
+        // The second sweep reaches the expired run behind them.
+        await harness.run(async (ctx: any) => await ctx.runMutation(sweepUsageExportPieces, {}));
+        expect(await countOf("usageExportPieces", A)).toBe(0);
+        expect(scheduled.keys).toHaveLength(10);
+    });
+
+    it("accepts a composite run id longer than a single id, as an export run's id is", async () => {
+        const longRequestId = `${"r".repeat(120)}:${"i".repeat(60)}`;
+
+        const result = await harness.run(async (ctx: any) => await ctx.runMutation(clearUsageExportPieces, { requestId: longRequestId, userId: A }));
+
+        expect(result).toEqual({ hasMore: false });
+    });
     it("removes a dead run's pieces and index rows, schedules its purge, and leaves a live run alone", async () => {
         const old = Date.now() - EXPORT_PIECE_TTL_MS - 60_000;
         const { dead, live } = await harness.run(async (ctx: any) => {

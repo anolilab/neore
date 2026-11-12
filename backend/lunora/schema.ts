@@ -3512,9 +3512,8 @@ export const schema = defineSchema({
         // The retention sweep (`gdpr/retention.ts`), which serves a whole shard.
         .index("by_date", ["date"]),
 
-    // The replies already in `usageDaily`, keyed by the reply's first row id:
-    // what makes `recordReplyUsage` and the backfill count a reply once.
-    // Pruned by `usage/backfill.ts#sweepUsageRollup` once the backfill is done.
+    // The export's pieces: one per rows page, projects page and title or verification step of a run. The export's clear step
+    // removes them after the usage object, and the sweep and erasure remove the rest.
     usageExportPieces: defineTable({
         // The user's backfill row when the rows were read: a change to it during the export means history was written meanwhile.
         backfill: v.optional(v.string()),
@@ -3574,6 +3573,9 @@ export const schema = defineSchema({
         .index("by_createdAt", ["createdAt"])
         .index("by_requestId", ["requestId"]),
 
+    // The replies already in `usageDaily`, keyed by the reply's first row id:
+    // what makes `recordReplyUsage` and the backfill count a reply once.
+    // Pruned by `usage/backfill.ts#sweepUsageRollup` once the backfill is done.
     // The replies already in `usageDaily`, keyed by the reply's first row id:
     // what makes `recordReplyUsage` and the backfill count a reply once.
     // Pruned by `usage/backfill.ts#sweepUsageRollup` once the backfill is done.
