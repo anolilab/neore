@@ -216,6 +216,20 @@ describe("composer paste", () => {
         expect(plan('<meta charset="utf-8"><div data-x=\'a>b\' data-quote-chip=""><blockquote><p>bold</p></blockquote></div>')).toBe("default");
     });
 
+    it("leaves a quote chip beside plain text to the editor, and converts one beside formatting", async () => {
+        const chip = '<div data-quote-chip="" data-message-id="m1"><blockquote><p>quoted</p></blockquote></div>';
+        const plan = (html: string) => planPaste(clipboard({ "text/html": html, "text/plain": "x" }), { plainOnly: false, selectedText: "" }).kind;
+
+        expect(plan(`${chip}<p>my comment</p>`)).toBe("default");
+        // A div nested in the chip is part of it, and what follows the chip is still looked at.
+        expect(plan(`<div data-quote-chip=""><div><blockquote><p>q</p></blockquote></div></div><p>plain</p>`)).toBe("default");
+        expect(plan(`<div data-quote-chip=""><div><blockquote><p>q</p></blockquote></div></div><p><strong>bold</strong></p>`)).toBe("html");
+        expect(plan(`${chip}<p>see <a href="https://example.com">this</a></p>`)).toBe("html");
+        await expect(paste({ "text/html": `${chip}<p><strong>bold</strong> reply</p>`, "text/plain": "> quoted\n\nbold reply" })).resolves.toBe(
+            "> quoted\n\n**bold** reply",
+        );
+    });
+
     it("keeps a less-than sign that starts no tag in the text of HTML too big to convert", async () => {
         await expect(paste({ "text/html": `<p>2 < 3 <= 4 <3</p><!--${"x".repeat(1_000_000)}-->` })).resolves.toBe("2 < 3 <= 4 <3");
     });
@@ -547,7 +561,7 @@ describe("plain-looking HTML that still carries Markdown", () => {
         await expect(paste({ "text/html": '<div><input type="checkbox" checked>Finish report</div>', "text/plain": "Finish report" })).resolves.toBe(
             "[x] Finish report",
         );
-        await expect(paste({ "text/html": "<div>a</div><hr><div>b</div>", "text/plain": "a\nb" })).resolves.toContain("---");
+        await expect(paste({ "text/html": "<div>a</div><hr><div>b</div>", "text/plain": "a\nb" })).resolves.toBe("a\n\n---\n\nb");
     });
 });
 

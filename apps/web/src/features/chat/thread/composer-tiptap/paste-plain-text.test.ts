@@ -123,12 +123,20 @@ describe(appendPlainText, () => {
         expect(editor.state.doc.childCount).toBe(3);
     });
 
-    it("leaves a first line with no text block to end to the caller", () => {
+    it("puts a first line with no text block to end in a paragraph after the block, which it leaves as it is", () => {
         const editor = editorWith("<p>draft</p><hr>");
 
-        expect(appendPlainText(editor, "pasted")).toBe(false);
-        expect(appendPlainText(editor, "\npasted")).toBe(true);
+        expect(appendPlainText(editor, "pasted")).toBe(true);
+        expect(editor.state.doc.child(1).type.name).toBe("horizontalRule");
+        expect(editor.state.doc.childCount).toBe(3);
         expect(editor.state.doc.lastChild?.textContent).toBe("pasted");
+
+        // A first line that is only a break is the block's own end.
+        const other = editorWith("<p>draft</p><hr>");
+
+        expect(appendPlainText(other, "\npasted")).toBe(true);
+        expect(other.state.doc.childCount).toBe(3);
+        expect(other.state.doc.lastChild?.textContent).toBe("pasted");
     });
 
     it("takes nothing into an editor that is not editable, nor does a paste", () => {

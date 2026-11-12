@@ -986,8 +986,11 @@ const ComposerInput = ({
                 return;
             }
 
-            // The composer was disabled while the paste was converted: nothing is written, through the editor or the store.
+            // The composer was disabled while the paste was converted: nothing is written, through the editor or the store,
+            // and the user is told so.
             if (!takesPaste(disabledRef.current, inputAreaRef.current?.getEditor()?.getEditor())) {
+                showInfo(t`The composer was locked before the paste was ready, so it was not inserted.`);
+
                 return;
             }
 
@@ -1001,36 +1004,25 @@ const ComposerInput = ({
             if (!isLongPaste(pastedText)) {
                 const draft = useChatUIStore.getState().composerText;
                 const inserted = converted ? onOwnLines(pastedText, selection.textBefore, selection.textAfter, selection) : pastedText;
-
-                // Into the editor only while the store still holds the draft the paste was made in: an update the editor has not
-                // caught up with yet would otherwise be written over by the stale document's next change.
-                if (draft === draftAtPaste && inputAreaRef.current?.getEditor()?.pasteText(inserted, stateAtPaste)) {
-                    return;
-                }
-
-                if (draft === draftAtPaste) {
-                    setText(insertPastedText(draft, inserted, selection.start, selection.end));
-
-                    return;
-                }
-
-                // An edit meanwhile moved the text the caret was in: the paste goes at the end, on a line of its own, with the
-                // breaks its first line needs there rather than those worked out for the old caret. Through the editor while it
-                // shows that draft, so its quote chips stay chips; a rebuild from the text would flatten them.
                 const appended = appendPastedText(draft, pastedText, converted ? breaksBefore(pastedText) : 1);
                 const now = inputAreaRef.current?.getEditor();
                 const shown = now?.getEditor();
 
-                if (
-                    shown &&
-                    !shown.isDestroyed &&
-                    shown.state.doc.textBetween(0, shown.state.doc.content.size, "\n") === draft &&
-                    now?.appendText(appended.slice(draft.length))
-                ) {
+                // While the editor shows the store's draft, the paste goes in only through an editor transaction, so its quote
+                // chips stay chips; a rebuild from the text would flatten them. Over the paste-time selection while the document
+                // is the one the paste was made in, otherwise at the end, on a line of its own: an edit meanwhile moved the text
+                // the caret was in, and the first line gets the breaks it needs there rather than those worked out for the caret.
+                if (now && shown && !shown.isDestroyed && shown.state.doc.textBetween(0, shown.state.doc.content.size, "\n") === draft) {
+                    if (!(stateAtPaste && now.pasteText(inserted, stateAtPaste)) && !now.appendText(appended.slice(draft.length))) {
+                        showInfo(t`The composer was locked before the paste was ready, so it was not inserted.`);
+                    }
+
                     return;
                 }
 
-                setText(appended);
+                // No editor, or one the store's draft has not reached yet (it is rebuilt from that text next): the store takes
+                // it. A draft changed since the paste would otherwise be written over by the stale document's next change.
+                setText(draft === draftAtPaste ? insertPastedText(draft, inserted, selection.start, selection.end) : appended);
 
                 return;
             }

@@ -51,20 +51,26 @@ export const pastePlainText = (editor: Editor, text: string, at?: EditorState): 
 /**
  * `text` at the document's end as if typed there: its first line ends the last block, each line after it is a paragraph
  * of its own, and the blocks before are untouched, so a quote chip stays a chip where rebuilding the draft from its text
- * would turn it into plain text. False when the first line has no text block to end. Its own undo step.
+ * would turn it into plain text. After a block that is not text (a quote chip, whose text ends its line) the block's end
+ * is the first line's break, and a first line with text is a paragraph of its own. False when the editor cannot take it.
+ * Its own undo step.
  */
 export const appendPlainText = (editor: Editor, text: string): boolean => {
     const { schema, tr } = editor.state;
     const { paragraph } = schema.nodes;
-    const [first = "", ...rest] = text.split(LINE_BREAK);
-    const last = tr.doc.lastChild;
 
-    if (!paragraph || !editor.isEditable || (first !== "" && !last?.isTextblock)) {
+    if (!paragraph || !editor.isEditable) {
         return false;
     }
 
-    if (first !== "") {
-        tr.insertText(first, tr.doc.content.size - 1);
+    const [first = "", ...rest] = text.split(LINE_BREAK);
+
+    if (tr.doc.lastChild?.isTextblock) {
+        if (first !== "") {
+            tr.insertText(first, tr.doc.content.size - 1);
+        }
+    } else if (first !== "") {
+        rest.unshift(first);
     }
 
     const paragraphs = rest.map((line: string) => paragraph.create(null, line === "" ? null : schema.text(line)));

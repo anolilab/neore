@@ -11,6 +11,7 @@ const URL_ONLY = /^https?:\/\/\S+$/i;
 // the end from every `<` or `class=` would take quadratic time on a crafted copy.
 const LINK_START = /<a\s/gi;
 const DIV_START = /<div\s/gi;
+const DIV_TAG = /<(\/?)div[\s/>]/gi;
 const QUOTE_CHIP_ATTRIBUTE = "data-quote-chip";
 const HREF = /href/i;
 // HTML allows space around the `=`: `class = "language-js"` names a language too.
@@ -244,31 +245,58 @@ const hasAttribute = (html: string, open: number, end: number, name: string): bo
     return false;
 };
 
-/** Whether `html` has a quote chip copied from a composer: a `<div>` shown (not in a comment) with `data-quote-chip`. */
-const hasQuoteChip = (markup: string): boolean => {
+/** Where the `<div>` whose start tag ends at `end` closes: after its own `</div>`, nested divs counted, or the end of `html`. */
+const divEnd = (html: string, end: number): number => {
+    const tags = new RegExp(DIV_TAG);
+    let depth = 1;
+
+    tags.lastIndex = end;
+
+    for (let tag = tags.exec(html); tag; tag = tags.exec(html)) {
+        depth += tag[1] === "/" ? -1 : 1;
+
+        if (depth === 0) {
+            const close = html.indexOf(">", tag.index);
+
+            return close === -1 ? html.length : close + 1;
+        }
+    }
+
+    return html.length;
+};
+
+/**
+ * `html` without the quote chips copied from a composer (a `<div>` shown, not in a comment, with `data-quote-chip`), and
+ * whether it had one. One pass: each div start is read once, and a chip's end is looked for from where it starts.
+ */
+const splitQuoteChips = (markup: string): { chips: boolean; rest: string } => {
     // Attribute names are not case-sensitive: `DATA-QUOTE-CHIP` names one too.
     if (!markup.toLowerCase().includes(QUOTE_CHIP_ATTRIBUTE)) {
-        return false;
+        return { chips: false, rest: markup };
     }
 
     const html = withoutComments(markup);
     const starts = new RegExp(DIV_START);
+    const rest: string[] = [];
+    let kept = 0;
 
     for (let start = starts.exec(html); start; start = starts.exec(html)) {
         const end = tagEnd(html, start.index);
 
         if (end === -1) {
-            return false;
+            break;
         }
 
         if (hasAttribute(html, start.index, end, QUOTE_CHIP_ATTRIBUTE)) {
-            return true;
+            rest.push(html.slice(kept, start.index));
+            kept = divEnd(html, end);
+            starts.lastIndex = kept;
+        } else {
+            starts.lastIndex = end;
         }
-
-        starts.lastIndex = end;
     }
 
-    return false;
+    return kept === 0 ? { chips: false, rest: markup } : { chips: true, rest: rest.join("") + html.slice(kept) };
 };
 
 /** The first content element's tag name and attributes, as `<name …>` up to the first `>` after it. */
@@ -437,9 +465,16 @@ export const planPaste = (data: Pick<DataTransfer, "getData">, { inFence = false
 
     const html = data.getData("text/html");
 
-    // A quote chip copied from a composer: the editor rebuilds it from its HTML.
-    if (html.trim() === "" || hasQuoteChip(html)) {
+    if (html.trim() === "") {
         return { kind: "default" };
+    }
+
+    const { chips, rest } = splitQuoteChips(html);
+
+    // A quote chip copied from a composer: the editor rebuilds it from its HTML, while the text beside it is plain. Beside
+    // formatting the whole paste is converted, the chip to the quoted lines it stands for in the draft.
+    if (chips) {
+        return isPlainHtml(rest) ? { kind: "default" } : { html, kind: "html", plain };
     }
 
     // HTML past the cap is never converted (planText), so it need not be checked.
