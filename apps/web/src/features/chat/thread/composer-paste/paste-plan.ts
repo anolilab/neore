@@ -509,9 +509,9 @@ export const planPaste = (data: Pick<DataTransfer, "getData">, { inFence = false
             return { kind: "default" };
         }
 
-        // In a code fence an HTML-only copy goes in as its visible text, no Markdown added; the plain-paste shortcut takes
-        // text/plain exactly as copied (without it, nothing: the editor would paste the HTML with its formatting).
-        return { kind: "text", text: plain === "" && inFence && !plainOnly ? stripTags(html) : plain };
+        // text/plain exactly as copied; an HTML-only copy (in a code fence, or with the plain-paste shortcut) goes in as its
+        // visible text, no Markdown added.
+        return { kind: "text", text: plain === "" ? stripTags(html) : plain };
     }
 
     const url = plain.trim();

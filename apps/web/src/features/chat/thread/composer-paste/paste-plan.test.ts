@@ -165,8 +165,11 @@ describe("composer paste", () => {
 
     it("pastes text/plain exactly on Ctrl/Cmd+Shift+V", async () => {
         await expect(paste({ "text/html": googleDocs, "text/plain": "Ship the beta" }, { plainOnly: true, selectedText: "x" })).resolves.toBe("Ship the beta");
-        // An HTML-only clipboard is not handed to the editor's rich paste.
-        expect(planPaste(clipboard({ "text/html": googleDocs }), { plainOnly: true, selectedText: "" })).toStrictEqual({ kind: "text", text: "" });
+        // An HTML-only clipboard is not handed to the editor's rich paste: its visible text goes in, no Markdown added.
+        const plan = planPaste(clipboard({ "text/html": googleDocs }), { plainOnly: true, selectedText: "" });
+
+        expect(plan.kind).toBe("text");
+        expect(plan.kind === "text" && plan.text !== "" && !plan.text.includes("**")).toBe(true);
     });
 
     it("takes the text of HTML too big to convert when it is the only text, and leaves a composer quote chip to the editor", async () => {
@@ -647,5 +650,16 @@ describe("an HTML-only copy pasted inside a code fence", () => {
         );
 
         expect(plan).toStrictEqual({ kind: "text", text: "const a = 1;\nb()" });
+    });
+});
+
+describe("the plain-paste shortcut on an HTML-only copy", () => {
+    it("pastes its visible text instead of nothing", () => {
+        const plan = planPaste(
+            { getData: (type: string) => (type === "text/html" ? "<p><b>bold</b> text</p>" : "") },
+            { inFence: false, plainOnly: true, selectedText: "" },
+        );
+
+        expect(plan).toStrictEqual({ kind: "text", text: "bold text" });
     });
 });
