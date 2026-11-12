@@ -722,7 +722,7 @@ const element = (node: Element, context: Context): string => {
             return EMOJI_NAME.test(alt) || (alt.length <= 16 && PICTOGRAPHIC.test(alt) && EMOJI_ONLY.test(alt)) ? alt : "";
         }
         case "INPUT": {
-            if (node.getAttribute("type") !== "checkbox") {
+            if (node.getAttribute("type")?.toLowerCase() !== "checkbox") {
                 return "";
             }
 

@@ -253,19 +253,22 @@ describe("composer paste", () => {
         const depth = 200;
         const html = `${"<table><tr><td>".repeat(depth)}<table>${"<tr><td>r</td></tr>".repeat(500)}</table>${"</td></tr></table>".repeat(depth)}`;
         const elements = new DOMParser().parseFromString(html, "text/html").body.querySelectorAll("*").length;
-        // Spies call through: they count the rows a selector lists and the climbs to an enclosing table.
-        const select = vi.spyOn(Element.prototype, "querySelectorAll");
-        const climb = vi.spyOn(Element.prototype, "closest");
+        // Calls through: counts the children every walk lists, so a nested table read again per table around it shows up.
+        const listed = vi.spyOn(Element.prototype, "children", "get");
 
         try {
             expect(htmlToMarkdown(html)).toBe(`| ${"r ".repeat(500).trim()} |\n| --- |`);
-            const visited = climb.mock.calls.length + select.mock.results.reduce((sum: number, result) => sum + (result.value as NodeList).length, 0);
+            const visited = listed.mock.results.reduce((sum: number, result) => sum + (result.value as HTMLCollection).length, 0);
 
-            expect(visited).toBeLessThan(elements);
+            // Read once each: a few listings per element. Read per enclosing table: about depth × 500 rows (100,000).
+            expect(visited).toBeLessThan(elements * 4);
         } finally {
-            select.mockRestore();
-            climb.mockRestore();
+            listed.mockRestore();
         }
+    });
+
+    it("keeps task boxes whatever the case of their type", () => {
+        expect(htmlToMarkdown('<ul><li><input type="CHECKBOX" checked>done</li><li><input type="Checkbox">open</li></ul>')).toBe("- [x] done\n- [ ] open");
     });
 
     it("pastes a table whose spans would fill too many cells as its text", () => {
