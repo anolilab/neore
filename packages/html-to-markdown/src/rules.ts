@@ -101,8 +101,14 @@ function isFilterMatch(rule: Rule, node: AnnotatedNode, nodeName: string, option
 }
 
 function findRule(rules: Rule[], node: AnnotatedNode, nodeName: string, options: Options): Rule | undefined {
-    for (const rule of rules) {
-        if (isFilterMatch(rule, node, nodeName, options)) {
+    // A filter may add rules to this same list. Bounding the search by the length
+    // at the start keeps it to the rules that existed, as Array.find did.
+    const { length } = rules;
+
+    for (let index = 0; index < length; index += 1) {
+        const rule = rules[index];
+
+        if (rule && isFilterMatch(rule, node, nodeName, options)) {
             return rule;
         }
     }
