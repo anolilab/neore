@@ -478,10 +478,11 @@ const ComposerPromptQueue: FC = () => {
         const { queues, setPaused, takeOfflineHold } = usePromptQueueStore.getState();
 
         // A Send next asked for offline waited for this reply: it goes now, as asked (an explicit one even after an error).
+        // Not into a queue paused since, and an automatic one not after an error: the usual decision below pauses it then.
         if (previous.isStreaming && !isStreaming) {
             const held = takeOfflineHold(threadId);
 
-            if (held) {
+            if (held && !(queues[threadId]?.paused ?? false) && (held.explicit || !error)) {
                 void sendNextPrompt(threadId, { explicit: held.explicit });
 
                 return;

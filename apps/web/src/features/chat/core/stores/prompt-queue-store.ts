@@ -142,7 +142,8 @@ const writeStoredQueue = (threadId: string, queue: ThreadQueue): void => {
 export const usePromptQueueStore = create<PromptQueueStore>()((set, get) => {
     // `clearPromptQueues` lives apart from the store (`prompt-queue-session`) and drops what is in memory through this.
     registerPromptQueueReset(() => {
-        set({ queues: {} });
+        // The ended session's held sends go too: a later queue under the same thread id must not inherit its request.
+        set({ offlineHolds: {}, queues: {} });
     });
 
     const update = (threadId: string, next: (queue: ThreadQueue) => ThreadQueue) => {

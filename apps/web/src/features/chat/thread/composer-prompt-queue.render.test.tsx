@@ -323,6 +323,32 @@ describe("composer prompt queue", () => {
         await waitFor(() => expect(chat.sendMessage).toHaveBeenCalledWith("queued", []));
     });
 
+    it("does not send a held Send next into a queue paused since, when the reply ends", async () => {
+        chat.error = undefined;
+        chat.view = "offline";
+        usePromptQueueStore.getState().enqueue(chat.threadId, { attachments: [], text: "queued" });
+
+        const view = render(<ComposerPromptQueue />);
+
+        fireEvent.click(screen.getByRole("button", { name: "Send next" }));
+        chat.isStreaming = true;
+        view.rerender(<ComposerPromptQueue />);
+        chat.view = "online";
+        view.rerender(<ComposerPromptQueue />);
+
+        await act(async () => {
+            usePromptQueueStore.getState().setPaused(chat.threadId, true);
+        });
+
+        chat.isStreaming = false;
+        view.rerender(<ComposerPromptQueue />);
+        await act(async () => {
+            await Promise.resolve();
+        });
+
+        expect(chat.sendMessage).not.toHaveBeenCalled();
+    });
+
     it("sends a prompt held offline when its thread's composer mounts again online", async () => {
         chat.error = undefined;
         chat.view = "offline";
