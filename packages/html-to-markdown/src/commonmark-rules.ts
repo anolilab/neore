@@ -686,7 +686,9 @@ function edgeCharacter(node: Node, side: Side, options: Options): string | null 
         return voidEdge(element);
     }
 
-    if (DELIMITED_NAMES.has(element.nodeName.toLowerCase())) {
+    const name = element.nodeName.toLowerCase();
+
+    if (DELIMITED_NAMES.has(name) && (name !== "a" || isRenderedLink(element, options))) {
         // A blank element that outputs a space ends a run like a space does; an empty one outputs nothing.
         if (annotated.isBlank) {
             return element.textContent ? " " : null;
@@ -696,6 +698,21 @@ function edgeCharacter(node: Node, side: Side, options: Options): string | null 
     }
 
     return childEdge(element, side, options);
+}
+
+/**
+ * True when an anchor renders as a Markdown link, with brackets. An anchor with no href,
+ * a link style that writes no link, or an unsafe destination under safe links renders
+ * only its text.
+ */
+function isRenderedLink(element: Element, options: Options): boolean {
+    const href = element.getAttribute("href");
+
+    if (!href || (options.linkStyle !== "inlined" && options.linkStyle !== "referenced")) {
+        return false;
+    }
+
+    return !(options.safeLinks && isUnsafeDestination(href));
 }
 
 function textEdge(text: string, side: Side): string | null {
