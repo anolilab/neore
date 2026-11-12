@@ -320,6 +320,6 @@ describe("review: backslashes before a hyphen in a destination", () => {
     });
 
     it("guard, passes before and after: a backslash before a letter is still left alone", () => {
-        expect(convert(String.raw`<a href="a\-b\c">x</a>`)).toBe(String.raw`[x](a\\-b\c)`);
+        expect(convert(String.raw`<a href="a\c-d">x</a>`)).toBe(String.raw`[x](a\c-d)`);
     });
 });
