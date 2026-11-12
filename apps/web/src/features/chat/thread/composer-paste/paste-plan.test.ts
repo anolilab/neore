@@ -977,3 +977,9 @@ describe("block content in a pasted table cell", () => {
         ).toBe("| A |\n| --- |\n| a; b |\n| **Title** |\n| q |");
     });
 });
+
+describe("an HTML-only copy with an emoji picture, pasted plain", () => {
+    it("keeps the emoji from its alt text", async () => {
+        await expect(paste({ "text/html": '<p>Done <img alt="🎉" src="x.png"></p>' }, { plainOnly: true, selectedText: "" })).resolves.toBe("Done 🎉");
+    });
+});

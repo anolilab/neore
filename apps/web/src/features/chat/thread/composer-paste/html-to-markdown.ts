@@ -220,6 +220,17 @@ const CELLS = new Set(["TD", "TH"]);
  * text of a page instead: HTML whitespace collapsed outside `<pre>`, a line per row, list item and heading, a space
  * between cells.
  */
+/** The text an image stands for: an emoji's or a formula's alt text; other images arrive as files, if at all. */
+const imageText = (image: Element): string => {
+    const alt = image.getAttribute("alt")?.trim() ?? "";
+
+    if (MATH_CLASS.test(image.getAttribute("class") ?? "") && alt !== "") {
+        return alt;
+    }
+
+    return EMOJI_NAME.test(alt) || (alt.length <= 16 && PICTOGRAPHIC.test(alt) && EMOJI_ONLY.test(alt)) ? alt : "";
+};
+
 const codeText = (node: Node, page = false): string => {
     // One list of parts for the whole block, nested elements included, with the last character tracked: joining per element
     // rebuilt a text run once per element around it, and `endsWith` on a string built by `+=` flattens all of it.
@@ -273,6 +284,8 @@ const codeText = (node: Node, page = false): string => {
 
                 if (tagName === "BR") {
                     push("\n");
+                } else if (page && tagName === "IMG") {
+                    push(imageText(child as Element));
                 } else if (tagName === "DETAILS" && !(child as Element).hasAttribute("open")) {
                     // A closed one shows its summary alone.
                     const summary = [...(child as Element).children].find((nested: Element) => nested.tagName === "SUMMARY");
@@ -1100,14 +1113,9 @@ const element = (node: Element, context: Context): string => {
             return "\n\n---\n\n";
         }
         case "IMG": {
-            // Emoji and formulas drawn as pictures are text; other images arrive as files, if at all.
-            const alt = node.getAttribute("alt")?.trim() ?? "";
+            const alt = imageText(node);
 
-            if (MATH_CLASS.test(node.getAttribute("class") ?? "") && alt !== "") {
-                return inlineMath(alt);
-            }
-
-            return EMOJI_NAME.test(alt) || (alt.length <= 16 && PICTOGRAPHIC.test(alt) && EMOJI_ONLY.test(alt)) ? alt : "";
+            return alt !== "" && MATH_CLASS.test(node.getAttribute("class") ?? "") ? inlineMath(alt) : alt;
         }
         case "INPUT": {
             if (node.getAttribute("type")?.toLowerCase() !== "checkbox") {

@@ -146,6 +146,8 @@ export const undoLongPaste = ({
 
 interface AttachLongPasteOptions {
     attach: (text: string) => Promise<TextFileResult>;
+    /** Whether the composer still takes text (not disabled or locked meanwhile); true when not given. */
+    canInsert?: () => boolean;
     /** Whether `pastedText` is converted Markdown: put back, its tables, fences and lists then go on lines of their own. */
     converted?: boolean;
     discard: (attachmentId: string) => void;
@@ -176,6 +178,7 @@ interface AttachLongPasteOptions {
  */
 export const attachLongPaste = async ({
     attach,
+    canInsert = () => true,
     converted = false,
     discard,
     draftAtPaste: givenDraft,
@@ -204,7 +207,8 @@ export const attachLongPaste = async ({
 
     discard(attachmentId);
 
-    if (getChatKey() !== chatKey) {
+    // Another chat open, or the composer locked meanwhile: the text is not written into it.
+    if (getChatKey() !== chatKey || !canInsert()) {
         onNotInserted(error);
 
         return false;

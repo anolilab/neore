@@ -1029,6 +1029,7 @@ const ComposerInput = ({
 
             await attachLongPaste({
                 attach: attachTextAsFile,
+                canInsert: () => takesPaste(disabledRef.current, inputAreaRef.current?.getEditor()?.getEditor()),
                 converted,
                 discard: removeAttachment,
                 draftAtPaste,

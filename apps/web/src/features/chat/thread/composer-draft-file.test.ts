@@ -111,6 +111,15 @@ describe("attachLongPaste", () => {
         expect(appended.state.text).toBe(`beforeTYPED after\n\n${table}`);
     });
 
+    it("writes nothing into a composer that locked during the upload, and says the text was not inserted", async () => {
+        const { options } = setup({ attachmentId: "a1", error: "Too big" });
+
+        expect(await attachLongPaste({ ...options, canInsert: () => false })).toBe(false);
+        expect(options.setDraft).not.toHaveBeenCalled();
+        expect(options.discard).toHaveBeenCalledWith("a1");
+        expect(options.onNotInserted).toHaveBeenCalledWith("Too big");
+    });
+
     it("leaves another chat's draft alone and says the text was not inserted when the chat changed during the upload", async () => {
         const { options, state } = setup({ attachmentId: "a1", error: "Too big" });
 
