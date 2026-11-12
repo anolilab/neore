@@ -12,7 +12,7 @@ import type { SlashCommandMatch } from "./extensions/slash-command";
 import SlashCommandPopup from "./slash-command-popup";
 
 const harness = vi.hoisted(() => {
-    return { calls: { prompts: 0, skills: 0 }, organizationId: null as null | string, skillsFail: false };
+    return { calls: { prompts: 0, skills: 0 }, organizationId: null as null | string, skillsFail: false, skillsGate: undefined as Promise<void> | undefined };
 });
 
 vi.mock("@lingui/core/macro", () => {
@@ -82,6 +82,7 @@ vi.mock("@/lib/lunora/crpc", async () => {
     const skills = {
         mutationFn: async () => {
             harness.calls.skills += 1;
+            await harness.skillsGate;
 
             if (harness.skillsFail) {
                 throw new Error("unavailable");
@@ -100,6 +101,7 @@ vi.mock("@/lib/lunora/crpc", async () => {
 
 const RECT = new DOMRect(0, 400, 600, 0);
 
+const promptMatch: SlashCommandMatch = { command: "prompt", from: 1, query: "", startOffset: 0, text: "/prompt ", to: 9, wholeDraft: true };
 const skillMatch: SlashCommandMatch = { command: "skill", from: 1, query: "", startOffset: 0, text: "/skill ", to: 8, wholeDraft: true };
 
 const popup = (client: QueryClient, match: SlashCommandMatch | null, warm: boolean) => (
@@ -122,6 +124,7 @@ beforeEach(() => {
     harness.calls = { prompts: 0, skills: 0 };
     harness.organizationId = null;
     harness.skillsFail = false;
+    harness.skillsGate = undefined;
     Object.defineProperty(Element.prototype, "getAnimations", { configurable: true, value: () => [] });
     vi.stubGlobal(
         "ResizeObserver",
@@ -158,6 +161,28 @@ describe("SlashCommandPopup prompts and skills", () => {
 
         expect(await screen.findByText("Code review")).toBeTruthy();
         expect(harness.calls).toStrictEqual({ prompts: 1, skills: 2 });
+    });
+
+    it("shows the prompts as soon as they load, while the skills are still loading", async () => {
+        expect.hasAssertions();
+
+        let releaseSkills = (): void => {};
+
+        // eslint-disable-next-line unicorn/prefer-promise-with-resolvers -- the web lib target has no Promise.withResolvers
+        harness.skillsGate = new Promise((resolve) => {
+            releaseSkills = resolve;
+        });
+
+        const client = new QueryClient();
+
+        render(popup(client, promptMatch, true));
+
+        expect(await screen.findByText("Saved prompt")).toBeTruthy();
+        expect(harness.calls).toStrictEqual({ prompts: 1, skills: 1 });
+
+        await act(async () => {
+            releaseSkills();
+        });
     });
 
     it("does not load again once both have loaded", async () => {

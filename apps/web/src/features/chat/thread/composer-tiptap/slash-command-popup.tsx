@@ -205,25 +205,32 @@ const SlashCommandPopup: FC<SlashCommandPopupProps> = ({
         }
 
         const loaded = loadedRef.current;
-        const promptsLoad = loaded.prompts ? undefined : getPrompts({});
-        const skillsLoad = loaded.skills ? undefined : getSkills({ sortBy: "recent" });
+        // Each list is shown as soon as its own request answers: a slow one never holds back the other's menu.
+        const promptsLoad = loaded.prompts
+            ? undefined
+            : getPrompts({}).then((result) => {
+                  if (!isCancelled) {
+                      loaded.prompts = true;
+                      setPrompts(result as Doc<"prompts">[]);
+                  }
 
-        void Promise.allSettled([promptsLoad, skillsLoad]).then(([p, s]) => {
-            if (isCancelled) {
-                return undefined;
+                  return undefined;
+              });
+        const skillsLoad = loaded.skills
+            ? undefined
+            : getSkills({ sortBy: "recent" }).then((result) => {
+                  if (!isCancelled) {
+                      loaded.skills = true;
+                      setSkills(result as Doc<"skills">[]);
+                  }
+
+                  return undefined;
+              });
+
+        void Promise.allSettled([promptsLoad, skillsLoad]).then(() => {
+            if (!isCancelled) {
+                setLoad(loaded.prompts && loaded.skills ? "done" : "failed");
             }
-
-            if (promptsLoad && p.status === "fulfilled") {
-                loaded.prompts = true;
-                setPrompts(p.value as Doc<"prompts">[]);
-            }
-
-            if (skillsLoad && s.status === "fulfilled") {
-                loaded.skills = true;
-                setSkills(s.value as Doc<"skills">[]);
-            }
-
-            setLoad(loaded.prompts && loaded.skills ? "done" : "failed");
 
             return undefined;
         });
