@@ -11124,6 +11124,12 @@
     "notifications": {
       "commitOrdered": false,
       "fields": {
+        "approvalId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "body": {
           "kind": "string",
           "nullable": false,
