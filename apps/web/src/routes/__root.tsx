@@ -30,7 +30,7 @@ import LoginPromptHost from "@/features/auth/components/auth/login-prompt-host";
 import { AuthQueryProvider } from "@/features/auth/lib/auth-query-provider";
 import AuthUIProviderTanstack from "@/features/auth/lib/tanstack/auth-ui-provider-tanstack";
 import { closeSidePanelForSessionSwitch } from "@/features/chat/core/stores/chat-ui-store";
-import { clearComposerDrafts } from "@/features/chat/split/composer-drafts";
+import { clearComposerDrafts, clearDraftsForSessionSwitch } from "@/features/chat/split/composer-drafts";
 import ConnectionProvider from "@/features/connection/components/connection-provider";
 import { useUIStateStore } from "@/features/layout/stores/ui-state-store";
 import type { SettingsTab } from "@/features/settings/lib/settings-navigation";
@@ -158,6 +158,9 @@ const CONSENT_CATEGORIES: ("experience" | "functionality" | "marketing" | "measu
 // Built once: c15t 3 reads `mode` only when the provider mounts. Local mode (the default) resolves the policy in
 // the browser with no geolocation, so every visitor is treated as an unknown location and asked to opt in.
 const CONSENT_MODE = env.VITE_C15T_MODE === "c15t" && env.VITE_C15T_BACKEND_URL ? hosted({ backendURL: env.VITE_C15T_BACKEND_URL }) : local();
+
+// The last signed-in user (set in an effect, so browser only).
+const signedInUser: { id?: string } = {};
 
 /**
  * Handles data refetching after authentication changes.
@@ -296,8 +299,8 @@ const AuthRecovery = ({ children }: { children: ReactNode }) => {
             queryClient.clear();
             // The side panel's document or PDF was the ended session's: whoever signs in next, without a reload, must not find it.
             closeSidePanelForSessionSwitch("after");
-            // Parked drafts and model choices (split view) are the ended session's too.
-            clearComposerDrafts();
+            // Parked drafts and model choices (split view) are the ended session's too; every account's when it is not known whose.
+            clearComposerDrafts(signedInUser.id);
             // An expired session skips both sign-out handlers, so the dock badge is cleared here.
             void setNativeBadge(0);
         }
@@ -318,6 +321,11 @@ const AuthRecovery = ({ children }: { children: ReactNode }) => {
      */
     useEffect(() => {
         const userId = sessionData?.user?.id;
+
+        // Kept once the session ends: an expired session's drafts are its user's.
+        if (userId) {
+            signedInUser.id = userId;
+        }
 
         // Depend on the id, never on `sessionData.user` — that object is a fresh
         // identity on every render, so an effect keyed on it re-runs forever.
@@ -426,12 +434,10 @@ const RootComponent = () => {
 
     // The side panel may show the previous account's document or PDF. A PDF (a signed link, nothing unsaved) closes as a switch
     // starts; a document, whose editor may hold unsaved edits, only once the switch has gone through, so a failed one keeps them.
-    const closeSidePanel = useCallback((phase: "after" | "before") => {
+    // The departing account's drafts go too (`clearDraftsForSessionSwitch`).
+    const closeSidePanel = useCallback((phase: "after" | "before", departingUserId: string | undefined) => {
         closeSidePanelForSessionSwitch(phase);
-
-        if (phase === "after") {
-            clearComposerDrafts();
-        }
+        clearDraftsForSessionSwitch(phase, departingUserId);
     }, []);
 
     const handleSessionChange = useCallback(async () => {
