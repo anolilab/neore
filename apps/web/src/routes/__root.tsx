@@ -291,6 +291,8 @@ const AuthRecovery = ({ children, serverAuthStatus }: { children: ReactNode; ser
             if (startsSignedIn(serverAuthStatus, hasLastAccountHint())) {
                 clearEndedSession();
             } else {
+                // A session that expired before the reload left its queued prompts in this tab: the next account must not get them.
+                clearPromptQueues();
                 void setNativeBadge(0);
             }
         }
