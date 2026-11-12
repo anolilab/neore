@@ -1,7 +1,7 @@
 // eslint-disable-next-line testing-library/no-manual-cleanup -- vitest runs without globals, so nothing else cleans up between tests
 import { act, cleanup, render, screen } from "@testing-library/react";
 import { Suspense } from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import ImpersonationBannerGate from "./impersonation-banner-gate";
 
@@ -35,6 +35,11 @@ const renderApp = () =>
     );
 
 describe("the impersonation banner gate", () => {
+    // Each test starts with no fetch seen, whatever order they run in.
+    beforeEach(() => {
+        state.bannerImported = false;
+    });
+
     afterEach(() => {
         cleanup();
         vi.useRealTimers();

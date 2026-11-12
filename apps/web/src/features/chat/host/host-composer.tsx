@@ -21,7 +21,7 @@ import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { useUserSettings } from "@/features/auth/hooks/use-user-settings";
-import { selectThreadQueue, usePromptQueueStore } from "@/features/chat/core/stores/prompt-queue-store";
+import { allowPromptQueueRestore, selectThreadQueue, usePromptQueueStore } from "@/features/chat/core/stores/prompt-queue-store";
 import { cleanPromptText } from "@/features/chat/core/utils/prompt-queue";
 import { useCRPC, useLunoraAuth } from "@/lib/lunora/crpc";
 
@@ -257,9 +257,12 @@ const HostComposerForThread: FC<{ className?: string; threadId: string }> = ({ c
     const { isAuthenticated } = useLunoraAuth();
 
     useEffect(() => {
-        if (isAuthenticated) {
-            usePromptQueueStore.getState().hydrate(threadId);
+        if (!isAuthenticated) {
+            return;
         }
+
+        allowPromptQueueRestore();
+        usePromptQueueStore.getState().hydrate(threadId);
     }, [isAuthenticated, threadId]);
 
     // The queue's state machine (`host-queue.ts`). The ref is the truth, written synchronously on every event, so a decision

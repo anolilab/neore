@@ -125,6 +125,18 @@ const writeStoredQueue = (threadId: string, queue: ThreadQueue): void => {
 /** Threads already checked against storage this page load, so a drained queue is not resurrected. */
 const hydratedThreadIds = new Set<string>();
 
+/**
+ * Whether a stored queue may be read back: only once Lunora confirmed the session (`allowPromptQueueRestore`). The chat layout
+ * paints before that (`OptimisticAuthGate`), and a queue an ended session left is not the visitor's. Every path in reads it
+ * through `hydrate`, so a write before then (`update`) restores nothing either.
+ */
+const restore = { allowed: false };
+
+/** The session is confirmed: stored queues may be restored from now on, until the queues are cleared. */
+export const allowPromptQueueRestore = (): void => {
+    restore.allowed = true;
+};
+
 export const usePromptQueueStore = create<PromptQueueStore>()((set, get) => {
     const update = (threadId: string, next: (queue: ThreadQueue) => ThreadQueue) => {
         // A write that beats the composer's hydrate effect must not clobber the stored queue.
@@ -151,7 +163,8 @@ export const usePromptQueueStore = create<PromptQueueStore>()((set, get) => {
                 return { ...prependPrompt(queue, { ...prompt, id: prompt.id ?? generatePromptId() }), paused: false };
             }),
         hydrate: (threadId) => {
-            if (hydratedThreadIds.has(threadId)) {
+            // Not yet: not marked either, so the first read once the session is confirmed still restores it.
+            if (!restore.allowed || hydratedThreadIds.has(threadId)) {
                 return;
             }
 
@@ -199,6 +212,7 @@ export const usePromptQueueStore = create<PromptQueueStore>()((set, get) => {
 
 /** Drops every queue, in memory and in this tab's sessionStorage: the session that queued them has ended. */
 export const clearPromptQueues = (): void => {
+    restore.allowed = false;
     hydratedThreadIds.clear();
     usePromptQueueStore.setState({ queues: {} });
 

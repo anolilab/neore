@@ -7,10 +7,14 @@ const uploaded = (fileId: string, name: string): PendingAttachment => {
 };
 
 /** A fresh module is what a reload gives: nothing in memory, only what sessionStorage kept. */
-const reload = async () => {
+const reload = async ({ confirmed = true }: { confirmed?: boolean } = {}) => {
     vi.resetModules();
 
-    const { usePromptQueueStore } = await import("./prompt-queue-store");
+    const { allowPromptQueueRestore, usePromptQueueStore } = await import("./prompt-queue-store");
+
+    if (confirmed) {
+        allowPromptQueueRestore();
+    }
 
     return usePromptQueueStore;
 };
@@ -90,5 +94,38 @@ describe("prompt queues after the session ends", () => {
         before.getState().hydrate("thread-1");
 
         expect(before.getState().queues["thread-1"]).toBeUndefined();
+    });
+});
+
+describe("prompt queues before the session is confirmed", () => {
+    it("restores no stored queue, not through a write either, until the session is confirmed", async () => {
+        const before = await reload();
+
+        before.getState().enqueue("thread-3", { attachments: [], id: "old", text: "the ended session's prompt" });
+
+        const visitor = await reload({ confirmed: false });
+
+        visitor.getState().hydrate("thread-3");
+        expect(visitor.getState().queues["thread-3"]).toBeUndefined();
+
+        visitor.getState().enqueue("thread-3", { attachments: [], id: "new", text: "typed now" });
+        expect(visitor.getState().queues["thread-3"]?.items.map((item) => item.id)).toStrictEqual(["new"]);
+    });
+
+    it("restores the stored queue once the session is confirmed", async () => {
+        const before = await reload();
+
+        before.getState().enqueue("thread-4", { attachments: [], id: "mine", text: "still mine" });
+
+        const after = await reload({ confirmed: false });
+
+        after.getState().hydrate("thread-4");
+        expect(after.getState().queues["thread-4"]).toBeUndefined();
+
+        const { allowPromptQueueRestore } = await import("./prompt-queue-store");
+
+        allowPromptQueueRestore();
+        after.getState().hydrate("thread-4");
+        expect(after.getState().queues["thread-4"]?.items.map((item) => item.id)).toStrictEqual(["mine"]);
     });
 });
