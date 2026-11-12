@@ -197,7 +197,7 @@ const rules: Record<string, Rule> = {
         replacement(content, node, options) {
             const hLevel = Number(node.nodeName.charAt(1));
             // A heading is one line, so a hard break in it becomes a space.
-            const text = node.querySelector("br") ? flattenBreaks(content, lineBreakMarker(options.br)) : content;
+            const text = node.querySelector("br") ? flattenBreaks(content, lineBreakMarker(options.br), hasBlockDescendant(node)) : content;
 
             if (options.headingStyle === "setext" && hLevel < 3) {
                 const underline = repeat(hLevel === 1 ? "=" : "-", text.length);
