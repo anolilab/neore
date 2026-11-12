@@ -10,7 +10,7 @@ import { describe, expect, it } from "vitest";
 import type { Options } from "../src/index";
 import TurndownService from "../src/index";
 import rootNode from "../src/root-node";
-import { isBlock, isVoid } from "../src/utilities";
+import { hasVoidOrMeaningfulDescendant, isBlock, isMeaningfulWhenBlank, isVoid } from "../src/utilities";
 
 /*
  * Differential check against upstream turndown 7.2.5 on seeded random HTML.
@@ -42,8 +42,8 @@ const EDGE_WHITESPACE = /^\s|\s$/;
  * the changes pinned in test/inline-breaks.test.ts: a break inside code or a heading; a
  * break at the edge of emphasis (or of an element whose text is trimmed); emphasis next to
  * other emphasis, which merges into a run; emphasis that touches a word character, which
- * uses `*`; and emphasis nested directly in the same kind, which writes no delimiters.
- * Every other document must match upstream.
+ * uses `*`; and emphasis nested directly in the same kind inside a parent with no printing
+ * block, which writes no delimiters. Every other document must match upstream.
  */
 function isChangedOnPurpose(html: string, options: Partial<Options>): boolean {
     // The converter's own DOM, with whitespace collapsed, so the checks see the same text it does.
@@ -60,8 +60,13 @@ function isChangedOnPurpose(html: string, options: Partial<Options>): boolean {
             return true;
         }
 
-        // An empty emphasis element writes nothing, so it has no delimiters to place.
-        if (EMPHASIS_NAMES.has(element.nodeName) && element.textContent !== "" && (isNestedInSameKind(element) || hasChangedNeighbour(element))) {
+        // An emphasis element with no text writes no delimiters of its own, unless a block inside it writes a separator.
+        if (EMPHASIS_NAMES.has(element.nodeName) && hasOutput(element) && isNestedInSameKind(element)) {
+            return true;
+        }
+
+        // A run that touches another emphasis element or a word changes output; an empty one has no run to change.
+        if (EMPHASIS_NAMES.has(element.nodeName) && element.textContent !== "" && hasChangedNeighbour(element)) {
             return true;
         }
     }
@@ -83,9 +88,17 @@ function nearest(node: Node, side: (typeof SIDES)[number]): Node | null {
     return sibling;
 }
 
+/**
+ * An inline element with no text and no break. The converter looks past it at an edge
+ * (`edgeBreaks` in src/utilities.ts counts through it), so the edge test must too.
+ */
+function isEmptyInline(node: ChildNode): boolean {
+    return node.nodeType === 1 && !isBlock(node) && !isVoid(node) && BLANK_TEXT.test(node.textContent ?? "") && !(node as Element).querySelector("br");
+}
+
 /** True when a break is the first or last thing in the element, looking through nested elements. */
 function hasEdgeBreak(element: Element): boolean {
-    const children = [...element.childNodes].filter((child) => !(child.nodeType === 3 && BLANK_TEXT.test(child.nodeValue ?? "")));
+    const children = [...element.childNodes].filter((child) => !(child.nodeType === 3 && BLANK_TEXT.test(child.nodeValue ?? "")) && !isEmptyInline(child));
     const first = children[0];
     const last = children.at(-1);
 
@@ -95,18 +108,33 @@ function hasEdgeBreak(element: Element): boolean {
 }
 
 /**
- * True when the element's direct parent is emphasis of the same kind and has no block inside,
- * so the nested one writes no delimiters. A parent with a block keeps its delimiters, so the
- * nested element matches upstream there.
+ * True when the element's direct parent is emphasis of the same kind and has no printing block
+ * inside, so the nested one writes no delimiters. A parent with a printing block keeps its
+ * delimiters, so the nested element matches upstream there.
  */
 function isNestedInSameKind(element: Element): boolean {
     const parent = element.parentElement;
 
-    return parent !== null && EMPHASIS_KIND.get(parent.nodeName) === EMPHASIS_KIND.get(element.nodeName) && !hasBlock(parent);
+    return parent !== null && EMPHASIS_KIND.get(parent.nodeName) === EMPHASIS_KIND.get(element.nodeName) && !hasPrintingBlockDescendant(parent);
 }
 
-function hasBlock(element: Element): boolean {
-    return [...element.querySelectorAll("*")].some((descendant) => isBlock(descendant));
+/** True when the element has text, or a block inside it (which writes a separator even when blank). */
+function hasOutput(element: Element): boolean {
+    return element.textContent !== "" || [...element.querySelectorAll("*")].some((descendant) => isBlock(descendant));
+}
+
+/** True when a block that prints something sits inside the element, at any depth (`hasPrintingBlockDescendant` in src/commonmark-rules.ts). */
+function hasPrintingBlockDescendant(element: Element): boolean {
+    return [...element.querySelectorAll("*")].some((descendant) => isBlock(descendant) && !isBlankElement(descendant));
+}
+
+/** The converter's blank test (`isBlank` in src/node.ts): only whitespace text, and no void or meaningful element. */
+function isBlankElement(element: Element): boolean {
+    if (isVoid(element) || isMeaningfulWhenBlank(element)) {
+        return false;
+    }
+
+    return BLANK_TEXT.test(element.textContent ?? "") && !hasVoidOrMeaningfulDescendant(element);
 }
 
 function hasEdgeSpace(element: Element): boolean {
@@ -140,9 +168,11 @@ function isWordNeighbour(sibling: Node | null, side: (typeof SIDES)[number]): bo
     return facing !== undefined && WORD_CHARACTER.test(facing);
 }
 
-// Measured: 1403 of the 1500 documents are compared. The floor is that count, so an
-// exclusion that grows (a regression hidden as an intended change) fails the test.
-const MIN_COMPARED = 1403;
+// Measured: 1397 of the 1500 documents are compared (was 1403 before the blank-block rule:
+// six more documents now write no delimiters where upstream does, so they are excluded).
+// The floor is that count, so an exclusion that grows (a regression hidden as an intended
+// change) fails the test.
+const MIN_COMPARED = 1397;
 
 // Mulberry32: a small seeded PRNG, so a failure reproduces exactly.
 function createRandom(seed: number): () => number {
