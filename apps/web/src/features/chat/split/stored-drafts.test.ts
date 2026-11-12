@@ -509,6 +509,19 @@ describe("a prefilled message", () => {
         expect(useChatUIStore.getState().composerText).toBe("saved draft");
     });
 
+    it("keeps the draft of the chat whose text it replaced when it came along to another chat", () => {
+        put("thread-a", "draft of a");
+        bindStoredDrafts("thread-a", "user-1", false);
+        // Single view keeps the text when you move on: it is still thread-a's.
+        bindStoredDrafts("thread-b", "user-1", false);
+        prefill("from the link");
+        vi.advanceTimersByTime(DRAFT_WRITE_DELAY_MS);
+
+        expect(useChatUIStore.getState().composerText).toBe("from the link");
+        expect(text("thread-a")).toBe("draft of a");
+        expect(text("thread-b")).toBeUndefined();
+    });
+
     it("is stored once edited", () => {
         put("thread-a", "saved draft");
         bindStoredDrafts("thread-a", "user-1", false);

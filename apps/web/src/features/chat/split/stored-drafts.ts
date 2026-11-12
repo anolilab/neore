@@ -402,6 +402,11 @@ const restore = (owner: string, userId: string): void => {
 
 /** A route's message is in the composer: the chat it lands on keeps its stored draft, which is not this page's to remove. */
 const holdPrefill = (owner: string | undefined): void => {
+    // Text carried from another chat that the prefill replaced is still that chat's stored draft: no longer this page's to remove.
+    if (state.carried && state.carriedFrom !== undefined) {
+        state.mine.delete(state.carriedFrom);
+    }
+
     state.prefill = true;
     state.carried = false;
 
