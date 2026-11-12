@@ -796,3 +796,10 @@ describe("formatting on part of an emoji sequence", () => {
         expect(htmlToMarkdown("<p><b>👩\u{200D}👩</b> and <b>🎉</b> <i>yay</i></p>")).toBe("**👩\u{200D}👩** and **🎉** *yay*");
     });
 });
+
+describe("an anchor without its own href", () => {
+    it("does not count as a link, so a code editor's copy keeps its plain text", () => {
+        expect(isPlainHtml('<pre style="font-family:monospace"><a data-href="x" title="see href=y">fn</a>()</pre>')).toBe(true);
+        expect(isPlainHtml('<p><a class="x" href="https://example.com/">docs</a></p>')).toBe(false);
+    });
+});

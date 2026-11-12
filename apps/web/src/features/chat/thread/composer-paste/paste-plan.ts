@@ -28,7 +28,6 @@ const DIV_START = /<div\s/gi;
 const TAG_START = /<\/?[a-z]/iy;
 const DIV_TAG_NAME = /^<(\/?)div[\s/>]/i;
 const QUOTE_CHIP_ATTRIBUTE = "data-quote-chip";
-const HREF = /href/i;
 // HTML allows space around the `=`: `class = "language-js"` names a language too.
 const LANGUAGE = /class\s{0,20}=\s{0,20}["']?[^"'>]{0,200}(?:language|lang|highlight)-/i;
 // Formatting the Markdown can carry. A `<pre>` alone is not in it: terminals and code editors wrap their text in one.
@@ -177,6 +176,45 @@ const tagEnd = (html: string, open: number): number => {
     return -1;
 };
 
+/**
+ * Whether the tag between `open` and `end` has an `href` attribute: a name of its own, not `data-href` and not text inside
+ * a quoted value. One pass over the tag, values skipped as `tagEnd` does.
+ */
+const hasHrefAttribute = (html: string, open: number, end: number): boolean => {
+    let afterEquals = false;
+    let index = open + 1;
+
+    while (index < end) {
+        const char = html[index] ?? "";
+
+        if ((char === '"' || char === "'") && afterEquals) {
+            const closeQuote = html.indexOf(char, index + 1);
+
+            if (closeQuote === -1 || closeQuote > end) {
+                return false;
+            }
+
+            index = closeQuote;
+            afterEquals = false;
+        } else if (char === "=") {
+            afterEquals = true;
+        } else if (HTML_SPACE_CHAR.has(char)) {
+            const name = html.slice(index + 1, index + 5).toLowerCase();
+            const after = html[index + 5] ?? "";
+
+            if (name === "href" && (after === "=" || after === ">" || after === "/" || HTML_SPACE_CHAR.has(after))) {
+                return true;
+            }
+        } else {
+            afterEquals = false;
+        }
+
+        index += 1;
+    }
+
+    return false;
+};
+
 /** Whether an `<a>` tag in `html` has an `href`. One pass: each tag's attributes are read once, up to its `>`. */
 const hasLink = (html: string): boolean => {
     const starts = new RegExp(LINK_START);
@@ -190,7 +228,7 @@ const hasLink = (html: string): boolean => {
             return false;
         }
 
-        if (HREF.test(html.slice(start.index, end))) {
+        if (hasHrefAttribute(html, start.index, end)) {
             return true;
         }
 
