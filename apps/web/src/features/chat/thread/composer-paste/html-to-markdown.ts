@@ -69,6 +69,9 @@ const WORD_LETTERED_MARKER = /^[a-z]{1,9}[.)]$/i;
 const IMPORTANT = /!\s{0,20}important\s{0,20}$/i;
 const HEADING = /^H[1-6]$/;
 const BLANK_LINES = /\n{3,}/g;
+// The whitespace HTML collapses: ASCII only. `\s` would also take the non-breaking spaces Word and Google Docs indent with.
+const HTML_SPACE = /[\t\n\f\r ]+/g;
+const EDGE_HTML_SPACE = /^[\t\n\f\r ]+|[\t\n\f\r ]+$/g;
 const PLACEHOLDER = /\0(\d+)\0/g;
 /** Grid cells all tables of a paste may fill: spans multiply a cell, and past this a table is pasted as its text. */
 const MAX_TABLE_CELLS = 100_000;
@@ -560,7 +563,7 @@ const list = (listElement: Element, context: Context): string => {
 
     for (const child of listElement.childNodes) {
         if (child.nodeType === Node.TEXT_NODE) {
-            const text = (child.nodeValue ?? "").replaceAll("\0", "").replaceAll(/\s+/g, " ").trim();
+            const text = (child.nodeValue ?? "").replaceAll("\0", "").replaceAll(HTML_SPACE, " ").replaceAll(EDGE_HTML_SPACE, "");
 
             if (text !== "") {
                 entries.push({ body: text });
@@ -808,7 +811,7 @@ function children(node: Node, context: Context): string {
         const isBreak = child.nodeType === Node.ELEMENT_NODE && (child as Element).tagName === "BR";
 
         if (child.nodeType === Node.TEXT_NODE) {
-            next = (child.nodeValue ?? "").replaceAll("\0", "").replaceAll(/\s+/g, " ");
+            next = (child.nodeValue ?? "").replaceAll("\0", "").replaceAll(HTML_SPACE, " ");
         } else if (child.nodeType === Node.ELEMENT_NODE) {
             next = element(child as Element, context);
         }

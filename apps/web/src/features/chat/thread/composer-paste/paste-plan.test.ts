@@ -267,6 +267,10 @@ describe("composer paste", () => {
         }
     });
 
+    it("keeps runs of non-breaking spaces, which HTML does not collapse", () => {
+        expect(htmlToMarkdown("<p>a\u00A0\u00A0\u00A0b <b>c</b></p>")).toBe("a\u00A0\u00A0\u00A0b **c**");
+    });
+
     it("keeps the spaces inside a link's tag around the link", () => {
         expect(htmlToMarkdown('<p>Read<a href="https://example.com/"> docs </a>today</p>')).toBe("Read [docs](https://example.com/) today");
     });
