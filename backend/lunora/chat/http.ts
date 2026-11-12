@@ -33,7 +33,7 @@ import { mediaThreadTitle, startTitleJobs } from "./lib/start-title-jobs";
 import { documentTextPart, guestNoteIdOfMessage, guestTextPart } from "./lib/attached-text";
 import { unsendableGuestText } from "./lib/guest-link-store";
 import { formatPageContextPart, parsePageContext } from "./lib/page-context";
-import type { ChatStartRequest } from "./start-claim";
+import type { ChatStartRequest, StartClaim } from "./start-claim";
 import { chatStartFingerprint, isValidClientMessageId } from "./start-claim";
 import { createStreamToken } from "./streaming/persistent/stream-token";
 
@@ -1012,6 +1012,14 @@ const runChatStartOnShard = async (
         return titled.every((outcome) => outcome.status === "fulfilled");
     };
 
+    // A claimed send's title jobs, once all are scheduled: no resend schedules them again (`claimChatStart`). Never throws: a
+    // resend that schedules them again costs no second title, which is keyed by the prompt.
+    const recordTitlesScheduled = async (claim: StartClaim, promptId: string): Promise<void> => {
+        await context.runMutation(internal.chat.start_claim.recordStartTitlesScheduled, { claim, messageId: promptId }).catch((error: unknown) => {
+            chatLogger.warn("Could not record a send's title jobs as scheduled:", error);
+        });
+    };
+
     if (startOutcome?.outcome === "duplicate") {
         // The stream token attaches to the first send's run as a reconnect does; a run that ended reads from the thread.
         const { messageId, streamId: duplicateStreamId, threadId } = startOutcome;
@@ -1023,8 +1031,8 @@ const runChatStartOnShard = async (
                 await enqueueRun({ messageId, streamId: duplicateStreamId, threadId });
             }
         } finally {
-            // The first send's title jobs follow its run, so a failed submission skipped them. Recorded once all are scheduled: a
-            // resend that fails to schedule one, or dies first, leaves them to the next (`claimChatStart`).
+            // Title jobs no try recorded scheduled: they follow the run, so a failed submission skipped them, or one was refused.
+            // Recorded once all are scheduled; a resend that fails to schedule one, or dies first, leaves them to the next.
             // A guest note's text never reaches the title model.
             const { titlesClaim } = startOutcome;
 
@@ -1032,11 +1040,7 @@ const runChatStartOnShard = async (
                 scheduleTitleJobs(threadId, messageId, startOutcome.newThread === true);
 
                 if (await runTitleJobs()) {
-                    await context
-                        .runMutation(internal.chat.start_claim.recordStartTitlesScheduled, { claim: titlesClaim, messageId })
-                        .catch((error: unknown) => {
-                            chatLogger.warn("Could not record a resend's title jobs as scheduled:", error);
-                        });
+                    await recordTitlesScheduled(titlesClaim, messageId);
                 }
             }
         }
@@ -1355,7 +1359,11 @@ const runChatStartOnShard = async (
         // `createStreamWithMessage`.
     }
 
-    await runTitleJobs();
+    // A claimed send records its title jobs scheduled, so a resend does not schedule them again; one that could not
+    // schedule them all leaves them to a resend.
+    if ((await runTitleJobs()) && startClaim !== undefined && titleJobs.length > 0) {
+        await recordTitlesScheduled(startClaim, messageId);
+    }
 
     return Response.json(
         {

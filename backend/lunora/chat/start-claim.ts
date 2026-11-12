@@ -117,8 +117,8 @@ interface StartRecord {
     newThread?: boolean;
     streamId?: string;
     threadId?: string;
-    /** A resend that queued the run again scheduled the title jobs (`recordStartTitlesScheduled`): no later resend schedules them. */
-    titlesRecovered?: boolean;
+    /** The send's title jobs were all scheduled, by its first try or a resend (`recordStartTitlesScheduled`): no resend schedules them again. */
+    titlesScheduled?: boolean;
 }
 
 type SavedRecord = StartRecord & { messageId: string; threadId: string };
@@ -138,9 +138,10 @@ const vClaimOutcome = v.union(
         streamUnclaimed: v.optional(v.boolean()),
         threadId: v.string(),
         /**
-         * The caller schedules the title jobs, which follow the run and so were skipped with a failed queue submission,
-         * then records them scheduled under this fence (`recordStartTitlesScheduled`). Until then every resend that finds
-         * the run unqueued gets it; a title job keyed by the prompt (`autoTitleChargeKey`) is charged once anyway.
+         * The caller schedules the title jobs, which no try has recorded scheduled (they follow the run, so a failed queue
+         * submission skipped them, or a scheduler submission failed), then records them under this fence
+         * (`recordStartTitlesScheduled`). Until then every resend gets it, whether or not a worker took the run; a title job
+         * keyed by the prompt (`autoTitleChargeKey`) is charged once anyway.
          */
         titlesClaim: v.optional(vStartClaim),
     }),
@@ -190,8 +191,9 @@ export const claimChatStart = internalMutation
         if (isSaved(record) && (!streams || record.streamId !== undefined)) {
             const { messageId, model, newThread, streamId, threadId } = record;
             const unclaimed = streamId !== undefined && (await streamUnclaimed(ctx, streamId));
-            // Recorded only once the jobs are scheduled: a resend that died or failed to schedule them leaves them to the next.
-            const recoverTitles = existing !== null && unclaimed && record.titlesRecovered !== true;
+            // A text turn's title jobs, until a try records them all scheduled: whatever became of the run, a try that died or
+            // failed to schedule one leaves them to the next resend.
+            const recoverTitles = existing !== null && streams && record.titlesScheduled !== true;
 
             return {
                 messageId,
@@ -239,7 +241,7 @@ export const claimChatStart = internalMutation
         return { claim: { claimedAt, key }, outcome: "claimed" as const };
     });
 
-/** After a resend scheduled the title jobs it was handed: no later resend schedules them again. Throws when the claim moved. */
+/** After a try scheduled all of a send's title jobs (its first, a resume or a resend): no resend schedules them again. Throws when the claim moved. */
 export const recordStartTitlesScheduled = internalMutation
     .input({ claim: vStartClaim, messageId: v.string().max(MAX_LENGTH.id) })
     .output(v.null())
@@ -250,7 +252,7 @@ export const recordStartTitlesScheduled = internalMutation
             throw new LunoraError("CONFLICT", "This message was already sent.");
         }
 
-        await patchRow(ctx.db, "idempotencyClaims", existing, { result: JSON.stringify({ ...record, titlesRecovered: true } satisfies StartRecord) });
+        await patchRow(ctx.db, "idempotencyClaims", existing, { result: JSON.stringify({ ...record, titlesScheduled: true } satisfies StartRecord) });
 
         return null;
     });

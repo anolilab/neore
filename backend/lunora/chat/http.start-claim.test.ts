@@ -563,16 +563,52 @@ describe("/chat/start with clientMessageId", () => {
         expect(state.scheduled).toHaveLength(3);
     });
 
-    it("gives a claimed send's title job one billing key, so a recovering resend never pays for a second title", async () => {
+    it("schedules no title jobs on a resend of a send whose first try scheduled them, though its run still waits", async () => {
         const first = await send({ clientMessageId: "titled" });
 
-        // The run was queued but no worker took it yet: a resend queues it again and may schedule the title again.
-        await send({ clientMessageId: "titled" });
+        expect(state.scheduled.toSorted((left, right) => left.localeCompare(right, "en"))).toStrictEqual([
+            "chat_functions:createCategoryChat",
+            "chat_functions:createTitleChat",
+        ]);
+        expect(state.scheduledArgs.find((_args, index) => state.scheduled[index] === "chat_functions:createTitleChat")).toMatchObject({
+            jobId: first.json.messageId,
+        });
 
-        const titleJobs = state.scheduledArgs.filter((_args, index) => state.scheduled[index] === "chat_functions:createTitleChat");
+        // No worker took the run yet: the resend queues it again, and schedules no second title or category.
+        expect((await send({ clientMessageId: "titled" })).json).toMatchObject({ duplicate: true });
+        expect(enqueueJob).toHaveBeenCalledTimes(2);
+        expect(state.scheduled).toHaveLength(2);
+    });
 
-        expect(titleJobs.length).toBeGreaterThan(0);
-        expect(new Set(titleJobs.map((job) => job.jobId))).toStrictEqual(new Set([first.json.messageId]));
+    it("hands a resend the title jobs a recovery could not schedule, though a worker took the run since", async () => {
+        state.enqueueFails = true;
+
+        await expect(send({ clientMessageId: "claimed-run" })).rejects.toThrow("the queue refused the run");
+
+        // The recovering resend queues the run, but the scheduler refuses the category job.
+        state.scheduleFails = "chat_functions:createCategoryChat";
+
+        const recovered = await send({ clientMessageId: "claimed-run" });
+
+        expect(state.scheduled).toStrictEqual(["chat_functions:createTitleChat"]);
+
+        // A worker claims the stream before the next resend.
+        await run(async (ctx) => await ctx.db.patch("persistentStreams", recovered.json.streamId, { runClaimedAt: Date.now(), status: "streaming" }));
+
+        expect((await send({ clientMessageId: "claimed-run" })).json).toMatchObject({ duplicate: true });
+        // The run is not queued a third time; the title jobs are scheduled again, the title under the prompt's billing key.
+        expect(enqueueJob).toHaveBeenCalledTimes(2);
+        expect(state.scheduled.toSorted((left, right) => left.localeCompare(right, "en"))).toStrictEqual([
+            "chat_functions:createCategoryChat",
+            "chat_functions:createTitleChat",
+            "chat_functions:createTitleChat",
+        ]);
+        expect(
+            new Set(state.scheduledArgs.filter((_args, index) => state.scheduled[index] === "chat_functions:createTitleChat").map((job) => job.jobId)),
+        ).toStrictEqual(new Set([recovered.json.messageId]));
+
+        await send({ clientMessageId: "claimed-run" });
+        expect(state.scheduled).toHaveLength(3);
     });
 
     it("schedules a new chat's title when it resumes the send that died before its stream", async () => {
