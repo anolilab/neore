@@ -370,15 +370,21 @@ export const removeRecord = async (store: RecordStore, userId: string, seal?: st
     await store.remove([userId], seal === undefined ? undefined : (entry: unknown) => sealOf(entry) === seal);
 };
 
-/** Removes the record and key of every account whose record was written before `writtenBefore`, unread. */
-export const pruneRecords = async (store: RecordStore, writtenBefore: number): Promise<void> => {
+/**
+ * Removes the record and key of every account whose record was written before `writtenBefore`, unread. One stamped
+ * after `now` goes too: a clock that ran ahead and was set back made it, and it would outlive the age limit until the
+ * clock caught up.
+ */
+export const pruneRecords = async (store: RecordStore, writtenBefore: number, now: number = Date.now()): Promise<void> => {
+    const isOutside = (stamp: number): boolean => stamp < writtenBefore || stamp > now;
+
     await store.remove(undefined, (entry: unknown, key?: unknown) => {
-        // A key alone: made before the cut-off and never sealed with, or not a key this version made.
+        // A key alone: made before the cut-off (or ahead of the clock) and never sealed with, or not a key this version made.
         if (entry === undefined) {
-            return !isAccountKey(key) || typeof key.createdAt !== "number" || key.createdAt < writtenBefore;
+            return !isAccountKey(key) || typeof key.createdAt !== "number" || isOutside(key.createdAt);
         }
 
-        return !isSealedRecord(entry) || entry.writtenAt < writtenBefore;
+        return !isSealedRecord(entry) || isOutside(entry.writtenAt);
     });
 };
 

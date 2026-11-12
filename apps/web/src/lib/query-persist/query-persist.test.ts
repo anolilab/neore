@@ -599,6 +599,36 @@ describe("saving", () => {
         expect([...memory.stores.keys.keys()]).toStrictEqual(["fresh"]);
     });
 
+    it("prunes a record and a key stamped ahead of a clock that was set back, so they cannot outlive the age limit", async () => {
+        const memory = memoryStore();
+        const key = await crypto.subtle.generateKey({ length: 256, name: "AES-GCM" }, false, ["encrypt", "decrypt"]);
+
+        // Saved, and a key made, while the clock ran a year ahead.
+        await sealRecord(memory.store, BOB, "from the future", Date.now() + 365 * 24 * 60 * 60 * 1000);
+        memory.stores.keys.set("orphan", { createdAt: Date.now() + 365 * 24 * 60 * 60 * 1000, id: "a", key });
+        memory.stores.keys.set("fresh", { createdAt: Date.now(), id: "b", key });
+
+        await pruneRecords(memory.store, Date.now() - MAX_AGE_MS);
+
+        expect(memory.stores.entries.has(BOB)).toBe(false);
+        expect([...memory.stores.keys.keys()]).toStrictEqual(["fresh"]);
+    });
+
+    it("drops, not restores, its own record saved while the clock ran ahead", async () => {
+        const memory = memoryStore();
+        const realNow = Date.now();
+
+        vi.setSystemTime(realNow + 365 * 24 * 60 * 60 * 1000);
+        await saveTexts(memory, ALICE, [[KEY, "from the future"]]);
+        vi.setSystemTime(realNow);
+
+        const next = new QueryClient();
+
+        await start(memory.store, ALICE, next).restored;
+        expect(next.getQueryData(KEY)).toBeUndefined();
+        expect(memory.stores.entries.has(ALICE)).toBe(false);
+    });
+
     it("restores the record on the next opening when the gate closed again while it was read", async () => {
         const memory = memoryStore();
 

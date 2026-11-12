@@ -238,7 +238,7 @@ export const startQueryPersistence = (options: PersistenceOptions): PersistenceC
         const isStale = (): boolean => state.stopped || generation !== gate.generation();
         const parsed = parse(opened.text);
 
-        if (!isStoredClient(parsed, userId) || parsed.buster !== buster || parsed.timestamp < now() - MAX_AGE_MS) {
+        if (!isStoredClient(parsed, userId) || parsed.buster !== buster || parsed.timestamp < now() - MAX_AGE_MS || parsed.timestamp > now()) {
             // Unreadable (a lost key, another shape) or old: drop it, and the network fills the cache. Not a record written
             // since it was read (another tab, a newer session), and not between this tab's seal of the key and of the record.
             if (!isStale()) {
@@ -315,7 +315,7 @@ export const startQueryPersistence = (options: PersistenceOptions): PersistenceC
         }
 
         try {
-            await pruneRecords(store, now() - MAX_AGE_MS);
+            await pruneRecords(store, now() - MAX_AGE_MS, now());
         } catch {
             // Expired records go on a later start.
         }
