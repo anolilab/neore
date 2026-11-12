@@ -92,3 +92,5 @@ docs/**/*.md
 docs/**/*.mdx
 /*.md
 /.github/*.md
+# Pasted-HTML fixtures: whitespace inside them is the input under test, so they are never reformatted.
+packages/html-to-markdown/bench/fixtures/
