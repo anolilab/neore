@@ -105,7 +105,14 @@ describe(appendPlainText, () => {
     it("adds the lines after the last block and leaves the blocks before it as they are", () => {
         const editor = editorWith("<blockquote><p>quoted</p></blockquote><p>draft</p>");
 
+        // The caret was left in the quote, as when the draft changed while the paste converted.
+        select(editor, 2, 2);
+
         expect(appendPlainText(editor, "\n\npasted")).toBe(true);
+        // Typing goes on after the paste, not where the caret was.
+        editor.view.dispatch(editor.state.tr.insertText("!"));
+        expect(editor.state.doc.lastChild?.textContent).toBe("pasted!");
+        editor.view.dispatch(editor.state.tr.delete(editor.state.selection.from - 1, editor.state.selection.from));
         expect(editor.state.doc.firstChild?.type.name).toBe("blockquote");
         expect(editor.state.doc.childCount).toBe(4);
         expect(editor.state.doc.child(1).textContent).toBe("draft");

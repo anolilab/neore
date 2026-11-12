@@ -287,6 +287,26 @@ const lastText = (node: Node | null): string => {
     return current?.nodeType === Node.TEXT_NODE ? (current.nodeValue ?? "") : "";
 };
 
+/**
+ * `tex` as inline math. Like a code span, math ends at the first `$` run as long as the one it opened with, so the
+ * delimiter is one `$` longer than any run inside, with a space against a `$` at either edge: a `$` in the formula
+ * cannot close it early and turn the rest of its source into Markdown.
+ */
+const inlineMath = (tex: string): string => {
+    let longest = 0;
+    let run = 0;
+
+    for (const character of tex) {
+        run = character === "$" ? run + 1 : 0;
+        longest = Math.max(longest, run);
+    }
+
+    const fence = "$".repeat(longest + 1);
+    const pad = tex.startsWith("$") || tex.endsWith("$") ? " " : "";
+
+    return `${fence}${pad}${tex}${pad}${fence}`;
+};
+
 const firstCodePoint = (text: string): string => String.fromCodePoint(text.codePointAt(0) ?? 0);
 
 const lastCodePoint = (text: string): string => {
@@ -988,7 +1008,7 @@ const element = (node: Element, context: Context): string => {
             const alt = node.getAttribute("alt")?.trim() ?? "";
 
             if (MATH_CLASS.test(node.getAttribute("class") ?? "") && alt !== "") {
-                return `$${alt}$`;
+                return inlineMath(alt);
             }
 
             return EMOJI_NAME.test(alt) || (alt.length <= 16 && PICTOGRAPHIC.test(alt) && EMOJI_ONLY.test(alt)) ? alt : "";
@@ -1004,7 +1024,7 @@ const element = (node: Element, context: Context): string => {
             const tex = node.querySelector('annotation[encoding="application/x-tex"]')?.textContent?.trim();
 
             if (tex) {
-                return `$${tex}$`;
+                return inlineMath(tex);
             }
 
             // No TeX source: the formula's visible text, as the page shows it.

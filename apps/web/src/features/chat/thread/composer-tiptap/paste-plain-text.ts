@@ -2,6 +2,7 @@ import type { Editor } from "@tiptap/core";
 import { closeHistory } from "@tiptap/pm/history";
 import { Fragment, Slice } from "@tiptap/pm/model";
 import type { EditorState } from "@tiptap/pm/state";
+import { TextSelection } from "@tiptap/pm/state";
 
 const LINE_BREAK = /\r\n?|\n/;
 
@@ -53,7 +54,7 @@ export const pastePlainText = (editor: Editor, text: string, at?: EditorState): 
  * of its own, and the blocks before are untouched, so a quote chip stays a chip where rebuilding the draft from its text
  * would turn it into plain text. After a block that is not text (a quote chip, whose text ends its line) the block's end
  * is the first line's break, and a first line with text is a paragraph of its own. False when the editor cannot take it.
- * Its own undo step.
+ * Its own undo step, with the caret after the pasted text.
  */
 export const appendPlainText = (editor: Editor, text: string): boolean => {
     const { schema, tr } = editor.state;
@@ -75,7 +76,10 @@ export const appendPlainText = (editor: Editor, text: string): boolean => {
 
     const paragraphs = rest.map((line: string) => paragraph.create(null, line === "" ? null : schema.text(line)));
 
-    editor.view.dispatch(closeHistory(tr).insert(tr.doc.content.size, paragraphs).scrollIntoView().setMeta("paste", true).setMeta("uiEvent", "paste"));
+    tr.insert(tr.doc.content.size, paragraphs);
+
+    // The caret follows the paste, as after one at the caret: the next keystroke goes after the pasted text.
+    editor.view.dispatch(closeHistory(tr).setSelection(TextSelection.atEnd(tr.doc)).scrollIntoView().setMeta("paste", true).setMeta("uiEvent", "paste"));
 
     return true;
 };

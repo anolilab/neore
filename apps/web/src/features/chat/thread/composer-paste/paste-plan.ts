@@ -103,11 +103,15 @@ const RAW_TEXT_END: Record<string, RegExp> = {
     template: /<\/template(?=[\s/>]|$)/gi,
 };
 // Tags whose text stands apart from its neighbours': on a line of its own, or a cell away.
-const LINE_TAG = /<\/?(?:p|div|br|li|tr|h[1-6])[\s/>]/iy;
+const LINE_TAG = /<\/?(?:p|div|li|tr|h[1-6])[\s/>]/iy;
+const BREAK_TAG = /<\/?br[\s/>]/iy;
 const CELL_TAG = /<t[dh][\s/>]/iy;
 // What starts markup after a `<`; any other `<` is text, as in `2 < 3`.
 const MARKUP_START = /[a-z/!?]/i;
 const LINE_RUNS = /\n{2,}/g;
+const SOURCE_BREAK = /\r\n?/g;
+// A `<br>` (marked `\r` while the text is built) that ends a line: the block's own end.
+const LINE_END_BREAK = /\r(?=\n)/g;
 const LANGUAGE_UNSAFE = /[^\w#+.-]/g;
 const VSCODE_LANGUAGES: Record<string, string> = { javascriptreact: "jsx", plaintext: "", shellscript: "bash", typescriptreact: "tsx" };
 
@@ -502,7 +506,9 @@ export const inOpenFence = (textBefore: string): boolean => {
 
 /**
  * The text of HTML too big to parse, in one pass: every `<…>` and script, style, noscript and template dropped, a line
- * break for a paragraph, div, line, list item, row or heading tag and a space for a cell, the common entities decoded.
+ * break for a paragraph, div, list item, row or heading tag and a space for a cell, the common entities decoded. Block
+ * breaks in a row are one, but each `<br>` is a line of its own, so `A<br><br>B` keeps its blank line; a `<br>` that
+ * ends a block is that block's end.
  */
 const stripTags = (html: string): string => {
     const parts: string[] = [];
@@ -512,11 +518,11 @@ const stripTags = (html: string): string => {
         const open = html.indexOf("<", index);
 
         if (open === -1) {
-            parts.push(html.slice(index));
+            parts.push(html.slice(index).replaceAll(SOURCE_BREAK, "\n"));
             break;
         }
 
-        parts.push(html.slice(index, open));
+        parts.push(html.slice(index, open).replaceAll(SOURCE_BREAK, "\n"));
 
         if (!MARKUP_START.test(html[open + 1] ?? "")) {
             parts.push("<");
@@ -525,10 +531,13 @@ const stripTags = (html: string): string => {
         }
 
         LINE_TAG.lastIndex = open;
+        BREAK_TAG.lastIndex = open;
         CELL_TAG.lastIndex = open;
 
         if (LINE_TAG.test(html)) {
             parts.push("\n");
+        } else if (BREAK_TAG.test(html)) {
+            parts.push("\r");
         } else if (CELL_TAG.test(html)) {
             parts.push(" ");
         }
@@ -560,6 +569,8 @@ const stripTags = (html: string): string => {
         .join("")
         .replaceAll(ENTITY, (entity: string) => decodeEntity(entity))
         .replaceAll(LINE_RUNS, "\n")
+        .replaceAll(LINE_END_BREAK, "")
+        .replaceAll("\r", "\n")
         .trim();
 };
 

@@ -222,6 +222,10 @@ describe("composer paste", () => {
         await expect(
             paste({ "text/html": `<p>one</p><p>two<br>three</p><table><tr><td>a</td><td>b</td></tr></table><!--${"x".repeat(1_000_000)}-->` }),
         ).resolves.toBe("one\ntwo\nthree\n a b");
+        // Each <br> is a line, so two keep their blank line; one that ends a block is its end, and Windows line ends are one.
+        await expect(paste({ "text/html": `<p>A<br><br>B</p>\r\n<div>C<br></div><div><br></div><div>D</div><!--${"x".repeat(1_000_000)}-->` })).resolves.toBe(
+            "A\n\nB\nC\n\nD",
+        );
         expect(isLongPaste(text ?? "")).toBe(true);
         expect(
             planPaste(
@@ -453,6 +457,11 @@ describe("composer paste", () => {
             "an emoji or formula drawn as an image in a picture keeps its text",
             '<p>Ship <picture><source srcset="https://x.y/a.webp"><img alt="🎉" src="https://x.y/a.png"></picture> <picture><img class="math" alt="x^2"></picture></p>',
             "Ship 🎉 $x^2$",
+        ],
+        [
+            "a dollar sign in a formula's source cannot end it early, so the rest stays in the formula",
+            '<p><math><semantics><mi>x</mi><annotation encoding="application/x-tex">x$ [click](https://x.y/) $y</annotation></semantics></math> <img class="math" alt="$$a"></p>',
+            "$$x$ [click](https://x.y/) $y$$ $$$ $$a $$$",
         ],
         [
             "a closed details shows its summary alone, an open one all of it",
