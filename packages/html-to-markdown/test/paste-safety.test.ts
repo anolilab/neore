@@ -88,6 +88,18 @@ describe("non-content elements emit nothing", () => {
         expect(new TurndownService().turndown(div as unknown as Node)).toBe("a");
     });
 
+    // Domino's cloneNode lowercases the local name of an HTML element, so a plain domino root is emptied either way. A
+    // browser keeps the name it was created with. The stub keeps this root's name through the clone, as a browser does.
+    it("drops the text of an HTML SCRIPT root whose local name is upper case", () => {
+        const document = createDocument("<div></div>");
+        const script = document.createElementNS("http://www.w3.org/1999/xhtml", "SCRIPT");
+
+        script.appendChild(document.createTextNode("alert(1)"));
+        Object.defineProperty(script, "cloneNode", { value: () => script });
+
+        expect(new TurndownService().turndown(script as unknown as Node)).toBe("");
+    });
+
     // The Word wrapper leaves whitespace before the paragraph. Upstream keeps that too, so these tests trim only the
     // whitespace; the style text must still be absent.
     it("drops the Word style sheet from the Word paragraph fixture", () => {

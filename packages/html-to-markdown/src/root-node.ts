@@ -47,7 +47,7 @@ const NON_CONTENT_SELECTOR = [...NON_CONTENT_NAMES].join(", ");
 
 /** Removes the non-content elements under `root`. A root that is itself one of them is emptied. */
 function removeNonContent(root: Node): void {
-    if (root.nodeType === 1 && NON_CONTENT_NAMES.has((root as Element).localName)) {
+    if (root.nodeType === 1 && NON_CONTENT_NAMES.has((root as Element).localName.toLowerCase())) {
         while (root.firstChild) {
             root.firstChild.remove();
         }
