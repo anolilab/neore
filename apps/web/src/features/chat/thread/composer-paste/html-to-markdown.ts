@@ -206,9 +206,16 @@ const wrapLine = (line: string, marker: string): string => {
  * `**`, `*` or `~~` around inline content, with its outer spaces kept outside. Content broken by `<br>` is marked line by
  * line, as Markdown emphasis cannot span lines; content holding blocks (a blank line) is left as it is.
  */
-const wrap = (inner: string, marker: string): string => {
+const wrap = (inner: string, marker: string, context: Context): string => {
     if (inner.includes("\n\n")) {
         return inner;
+    }
+
+    // Each formatting element around the same lines rebuilds them: deep nesting around many lines counts against the budget.
+    context.indentWork -= inner.length;
+
+    if (context.indentWork < 0) {
+        throw new RangeError("Nested too deep to convert");
     }
 
     return inner
@@ -674,7 +681,8 @@ const element = (node: Element, context: Context): string => {
             const text = children(node, context);
             const href = safeHref(node);
 
-            if (!href || text.trim() === "" || text.includes("\n")) {
+            // A label broken by `<br>` stays one link (a label may span lines); one holding blocks cannot.
+            if (!href || text.trim() === "" || text.includes("\n\n")) {
                 return text;
             }
 
@@ -691,7 +699,7 @@ const element = (node: Element, context: Context): string => {
             const inner = children(node, context);
 
             // Google Docs wraps the whole copy in `<b style="font-weight:normal">`.
-            return NORMAL_WEIGHT.test(style) ? inner : wrap(inner, "**");
+            return NORMAL_WEIGHT.test(style) ? inner : wrap(inner, "**", context);
         }
         case "BLOCKQUOTE": {
             const inner = children(node, context).replaceAll(BLANK_LINES, "\n\n").trim();
@@ -710,11 +718,11 @@ const element = (node: Element, context: Context): string => {
         case "DEL":
         case "S":
         case "STRIKE": {
-            return wrap(children(node, context), "~~");
+            return wrap(children(node, context), "~~", context);
         }
         case "EM":
         case "I": {
-            return wrap(children(node, context), "*");
+            return wrap(children(node, context), "*", context);
         }
         case "HR": {
             return "\n\n---\n\n";
@@ -773,10 +781,10 @@ const element = (node: Element, context: Context): string => {
     }
 
     if (tag === "SPAN" || tag === "FONT") {
-        inner = BOLD_STYLE.test(style) ? wrap(inner, "**") : inner;
-        inner = ITALIC_STYLE.test(style) ? wrap(inner, "*") : inner;
+        inner = BOLD_STYLE.test(style) ? wrap(inner, "**", context) : inner;
+        inner = ITALIC_STYLE.test(style) ? wrap(inner, "*", context) : inner;
 
-        return STRIKE_STYLE.test(style) ? wrap(inner, "~~") : inner;
+        return STRIKE_STYLE.test(style) ? wrap(inner, "~~", context) : inner;
     }
 
     if (tag === "P") {

@@ -271,6 +271,17 @@ describe("composer paste", () => {
         expect(htmlToMarkdown("<p>a\u{A0}\u{A0}\u{A0}b <b>c</b></p>")).toBe("a\u{A0}\u{A0}\u{A0}b **c**");
     });
 
+    it("keeps a link whose label is broken by a line break", () => {
+        expect(htmlToMarkdown('<p><a href="https://example.com/">first<br>second</a></p>')).toBe("[first\nsecond](https://example.com/)");
+    });
+
+    it("pastes deeply nested formatting around many lines as plain text instead of rebuilding them per element", async () => {
+        const html = `${"<b>".repeat(400)}${"line<br>".repeat(20_000)}${"</b>".repeat(400)}`;
+
+        expect(() => htmlToMarkdown(html)).toThrow(RangeError);
+        await expect(paste({ "text/html": html, "text/plain": "plain" })).resolves.toBe("plain");
+    });
+
     it("keeps the spaces inside a link's tag around the link", () => {
         expect(htmlToMarkdown('<p>Read<a href="https://example.com/"> docs </a>today</p>')).toBe("Read [docs](https://example.com/) today");
     });
