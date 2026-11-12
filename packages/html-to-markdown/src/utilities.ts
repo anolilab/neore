@@ -196,6 +196,19 @@ function scanDescendants(parent: Node): DescendantScan {
     return "none";
 }
 
+// The HTML "rules for parsing integers": ASCII whitespace, an optional sign, then digits.
+const LEADING_INTEGER = /^[\t\n\f\r ]*([+-]?\d+)/;
+
+/**
+ * Reads an `<ol start>` value as HTML does. The leading integer counts and anything
+ * after it is ignored, so "3x" and "3.7" give 3. Null when there is no integer.
+ */
+export function parseListStart(value: string | null): number | null {
+    const match = value ? LEADING_INTEGER.exec(value) : null;
+
+    return match ? Number(match[1]) : null;
+}
+
 const INLINE_SYNTAX = /[\\*`[\]_]/g;
 const INLINE_SYNTAX_PRESENT = /[\\*`[\]_]/;
 

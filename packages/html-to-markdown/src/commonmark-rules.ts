@@ -1,8 +1,9 @@
 import type { AnnotatedNode, Options, Rule } from "./types";
-import { escapeMarkdown, repeat, trimNewlines } from "./utilities";
+import { escapeMarkdown, parseListStart, repeat, trimNewlines } from "./utilities";
 
 const LINE_START = /^/gm;
 const NEWLINE = /\n/g;
+const NON_BLANK = /\S/;
 const TRAILING_NEWLINE = /\n$/;
 const LINE_BREAKS = /\r?\n|\r/g;
 const BACKTICKS = /`+/g;
@@ -130,11 +131,11 @@ const rules: Record<string, Rule> = {
 
     fencedCodeBlock: {
         filter(node, options) {
-            return options.codeBlockStyle === "fenced" && node.nodeName === "PRE" && node.firstChild?.nodeName === "CODE";
+            return options.codeBlockStyle === "fenced" && node.nodeName === "PRE" && preCodeElement(node) !== null;
         },
 
         replacement(_content, node, options) {
-            const codeElement = node.firstChild as Element;
+            const codeElement = preCodeElement(node) as Element;
             const className = codeElement.getAttribute("class") ?? "";
             const language = (LANGUAGE_CLASS.exec(className) ?? [null, ""])[1];
             const code = codeElement.textContent ?? "";
@@ -198,11 +199,11 @@ const rules: Record<string, Rule> = {
 
     indentedCodeBlock: {
         filter(node, options) {
-            return options.codeBlockStyle === "indented" && node.nodeName === "PRE" && node.firstChild?.nodeName === "CODE";
+            return options.codeBlockStyle === "indented" && node.nodeName === "PRE" && preCodeElement(node) !== null;
         },
 
         replacement(_content, node) {
-            const code = (node.firstChild as Element).textContent ?? "";
+            const code = (preCodeElement(node) as Element).textContent ?? "";
 
             return `\n\n    ${code.replaceAll(NEWLINE, "\n    ")}\n\n`;
         },
@@ -243,7 +244,9 @@ const rules: Record<string, Rule> = {
             const parent = node.parentNode as Element | null;
 
             if (parent?.nodeName === "LI" && parent.lastElementChild === node) {
-                return `\n${content}`;
+                // Text after the list needs a blank line. Without one, CommonMark reads the
+                // text as a lazy continuation of the last sub-item's paragraph.
+                return hasTextAfter(node) ? `\n${content}\n\n` : `\n${content}`;
             }
 
             return `\n\n${content}\n\n`;
@@ -258,10 +261,10 @@ const rules: Record<string, Rule> = {
             const parent = node.parentNode as Element | null;
 
             if (parent?.nodeName === "OL") {
-                const start = parent.getAttribute("start");
+                const start = parseListStart(parent.getAttribute("start")) ?? 1;
                 const index = Array.prototype.indexOf.call(parent.children, node);
 
-                prefix = `${start ? Number(start) + index : index + 1}.  `;
+                prefix = `${start + index}.  `;
             }
 
             const isParagraph = TRAILING_NEWLINE.test(content);
@@ -386,6 +389,52 @@ function stripUrlNoise(href: string): string {
     }
 
     return href.slice(start, end).replaceAll(TAB_OR_NEWLINE, "");
+}
+
+function hasTextAfter(node: Node): boolean {
+    for (let sibling = node.nextSibling; sibling; sibling = sibling.nextSibling) {
+        if (sibling.nodeType === 3 && NON_BLANK.test(sibling.nodeValue ?? "")) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+/**
+ * The `<code>` that a `<pre>` holds as its block, or null when the `<pre>` is not
+ * a code block. A `<pre>` whose first child is `<code>` is one, as before. Otherwise
+ * the `<pre>` must hold a single `<code>`, apart from whitespace, possibly wrapped
+ * in elements that hold nothing else. Any other content keeps the `<pre>` as text.
+ */
+function preCodeElement(pre: Node): Element | null {
+    if (pre.firstChild?.nodeName === "CODE") {
+        return pre.firstChild as Element;
+    }
+
+    return soleCodeElement(pre);
+}
+
+function soleCodeElement(parent: Node): Element | null {
+    let only: Node | null = null;
+
+    for (let child = parent.firstChild; child; child = child.nextSibling) {
+        if (child.nodeType === 3 && !NON_BLANK.test(child.nodeValue ?? "")) {
+            continue;
+        }
+
+        if (only) {
+            return null;
+        }
+
+        only = child;
+    }
+
+    if (only?.nodeType !== 1) {
+        return null;
+    }
+
+    return only.nodeName === "CODE" ? (only as Element) : soleCodeElement(only);
 }
 
 function cleanAttribute(attribute: string | null): string {
