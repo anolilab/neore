@@ -179,6 +179,16 @@ describe("turndown service API", () => {
     });
 });
 
+describe("input that contains the wrapper's closing tag", () => {
+    it("does not end the conversion early at a literal </x-turndown>", () => {
+        expect(new TurndownService().turndown("a</x-turndown>b")).toBe("ab");
+    });
+
+    it("still converts markup after the wrapper's name", () => {
+        expect(new TurndownService().turndown("<p>x</p>")).toBe("x");
+    });
+});
+
 describe("CDATA sections in DOM input", () => {
     it("converts the text of a CDATA section in a paragraph", () => {
         const htmlDocument = createDocument("<p>before </p>");
