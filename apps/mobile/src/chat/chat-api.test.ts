@@ -36,4 +36,13 @@ describe("startChat", () => {
             message: "Slow down",
         });
     });
+
+    it("keeps a refusal whose body is JSON null a refusal", async () => {
+        const fetch: Fetch = async () => Response.json(null, { status: 403 });
+
+        await expect(startChat({ body: { model: "m", prompt: "p" }, fetch, gatewayUrl: "https://gw", jwt: "j" })).rejects.toMatchObject({
+            isRefusal: true,
+            message: "Could not send (403).",
+        });
+    });
 });

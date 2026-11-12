@@ -13,7 +13,7 @@ import { getOfflineCache } from "../offline/database";
 import { AuthContext } from "./auth-state";
 import { fetchAccessToken, readStoredUser, signOutGrant } from "./grant";
 import { secureGrantStore } from "./secure-store";
-import { INITIAL_SESSION, reduceSession } from "./session-state";
+import { createAuthEpoch, INITIAL_SESSION, reduceSession } from "./session-state";
 import { signInWithBrowser } from "./sign-in";
 import { emptyCacheWhileSignedOut, signOutOnDevice } from "./sign-out";
 
@@ -35,7 +35,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const [session, dispatch] = useReducer(reduceSession, INITIAL_SESSION);
     const { hasToken, isConfirming, status, user } = session;
     const [refreshTick, setRefreshTick] = useState(0);
-    const signOutCount = useRef(0);
+    // Bumped by every sign-in and sign-out: a mint still out from before applies nothing.
+    const [epoch] = useState(createAuthEpoch);
     // Callers of `retryToken` waiting for the attempt they asked for to end.
     const renewalWaiters = useRef<(() => void)[]>([]);
     const [config] = useState(loadConfig);
@@ -64,8 +65,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     useEffect(() => {
         let isCancelled = false;
         let timer: ReturnType<typeof setTimeout> | undefined;
-        const signOutsAtStart = signOutCount.current;
-        const isStale = () => isCancelled || signOutsAtStart !== signOutCount.current;
+        const hasEpochEnded = epoch.start();
+        const isStale = () => isCancelled || hasEpochEnded();
 
         const mint = async () => {
             let jwt: string | null;
@@ -130,13 +131,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             isCancelled = true;
             clearTimeout(timer);
         };
-    }, [client, config.lunoraUrl, refreshTick]);
+    }, [client, config.lunoraUrl, epoch, refreshTick]);
 
     const signIn = useCallback(async () => {
+        epoch.end();
         dispatch({ type: "sign-in-started" });
-        await signInWithBrowser({ appUrl: config.appUrl, lunoraUrl: config.lunoraUrl });
-        setRefreshTick(nextTick);
-    }, [config.appUrl, config.lunoraUrl]);
+
+        try {
+            await signInWithBrowser({ appUrl: config.appUrl, lunoraUrl: config.lunoraUrl });
+        } finally {
+            // Also after a cancelled browser flow: the mint it ended must be replaced, or the status stays `loading`.
+            setRefreshTick(nextTick);
+        }
+    }, [config.appUrl, config.lunoraUrl, epoch]);
 
     const signOut = useCallback(async () => {
         // From here on, no prompt and no registration for the account that is leaving.
@@ -157,11 +164,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 warn: console.warn,
             });
         } finally {
-            signOutCount.current += 1;
+            epoch.end();
             client.setAuthToken(null);
             dispatch({ type: "signed-out" });
         }
-    }, [client, config.lunoraUrl]);
+    }, [client, config.lunoraUrl, epoch]);
 
     const retryToken = useCallback(
         () =>

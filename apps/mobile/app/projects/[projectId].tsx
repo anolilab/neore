@@ -70,6 +70,7 @@ const ProjectScreen = () => {
                             <Text style={{ fontWeight: "600" }}>{starting ? "Starting..." : "New chat in this project"}</Text>
                         </Pressable>
                         {isOffline ? <Text accessibilityRole="alert" style={{ paddingHorizontal: 16 }}>You are offline. Starting a chat needs a connection.</Text> : null}
+                        {!isOffline && startControl.reason ? <Text accessibilityRole="alert" style={{ paddingHorizontal: 16 }}>{startControl.reason}</Text> : null}
                         {shownError ? <Text accessibilityRole="alert" style={{ color: "#b00020", padding: 16 }}>{shownError}</Text> : null}
                     </>
                 )}

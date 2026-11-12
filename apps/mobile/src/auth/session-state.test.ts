@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { SessionEvent, SessionState } from "./session-state";
-import { INITIAL_SESSION, reduceSession } from "./session-state";
+import { createAuthEpoch, INITIAL_SESSION, reduceSession } from "./session-state";
 
 const USER = { email: "a@b.c", id: "u1", image: null, name: "A" };
 const OTHER = { email: "x@y.z", id: "u2", image: null, name: "X" };
@@ -75,5 +75,18 @@ describe(reduceSession, () => {
 
         expect(state.hasToken).toBe(true);
         expect(state.status).toBe("signed-in");
+    });
+});
+
+describe(createAuthEpoch, () => {
+    it("makes a mint begun before a sign-in or sign-out stale, and not one begun after", () => {
+        const epoch = createAuthEpoch();
+        const before = epoch.start();
+
+        epoch.end();
+        const after = epoch.start();
+
+        expect(before()).toBe(true);
+        expect(after()).toBe(false);
     });
 });

@@ -159,7 +159,10 @@ const Chat = () => {
     // The chat on screen for listeners that outlive a render: a found prompt opens only on the screen of its chat.
     const threadIdRef = useRef(threadId);
 
-    threadIdRef.current = threadId;
+    // After commit: a render React drops must not name the chat a listener compares against.
+    useEffect(() => {
+        threadIdRef.current = threadId;
+    }, [threadId]);
     const [rows, setRows] = useState<Row[]>([]);
     // Prompts that went out with no answer: shown after the rows while the server is checked for them (`possibly-sent.ts`).
     const allHeld = useSyncExternalStore(possiblySent.subscribe, possiblySent.snapshot);

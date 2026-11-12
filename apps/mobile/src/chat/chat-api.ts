@@ -61,7 +61,12 @@ export const startChat = async (input: { body: StartChatBody; fetch: Fetch; gate
             let body: { error?: unknown } = {};
 
             try {
-                body = (await response.json()) as { error?: unknown };
+                const parsed: unknown = await response.json();
+
+                // JSON `null` or a bare value parses too: only an object can carry `error`.
+                if (typeof parsed === "object" && parsed !== null) {
+                    body = parsed as { error?: unknown };
+                }
             } catch {
                 // A body that is not JSON keeps the status-based message.
             }

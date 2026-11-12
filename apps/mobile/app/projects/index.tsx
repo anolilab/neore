@@ -79,6 +79,7 @@ const ProjectsScreen = () => {
                     {isOffline
                         ? <Text accessibilityRole="alert">You are offline. Creating a project needs a connection.</Text>
                         : null}
+                    {!isOffline && createControl.reason ? <Text accessibilityRole="alert">{createControl.reason}</Text> : null}
                     {shownError
                         ? <Text accessibilityRole="alert" style={{ color: "#b00020" }}>{shownError}</Text>
                         : null}
