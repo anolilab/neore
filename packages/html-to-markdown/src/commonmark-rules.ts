@@ -268,10 +268,10 @@ const rules: Record<string, Rule> = {
             const parent = node.parentNode as Element | null;
 
             if (parent?.nodeName === "OL") {
-                const start = parseListStart(parent.getAttribute("start")) ?? 1;
+                const start = parseListStart(parent.getAttribute("start")) ?? BigInt(1);
                 const index = Array.prototype.indexOf.call(parent.children, node);
 
-                prefix = `${start + index}.  `;
+                prefix = `${start + BigInt(index)}.  `;
             }
 
             const isParagraph = TRAILING_NEWLINE.test(content);

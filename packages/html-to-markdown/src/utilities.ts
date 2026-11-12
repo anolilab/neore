@@ -202,11 +202,13 @@ const LEADING_INTEGER = /^[\t\n\f\r ]*([+-]?\d+)/;
 /**
  * Reads an `<ol start>` value as HTML does. The leading integer counts and anything
  * after it is ignored, so "3x" and "3.7" give 3. Null when there is no integer.
+ * A BigInt, not a number: a long start would print as `1e+21`, or as `Infinity`
+ * past about 309 digits, and one above 2^53 would lose its last digits.
  */
-export function parseListStart(value: string | null): number | null {
+export function parseListStart(value: string | null): bigint | null {
     const match = value ? LEADING_INTEGER.exec(value) : null;
 
-    return match ? Number(match[1]) : null;
+    return match ? BigInt(match[1] ?? "0") : null;
 }
 
 const INLINE_SYNTAX = /[\\*`[\]_]/g;

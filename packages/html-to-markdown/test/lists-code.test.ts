@@ -28,6 +28,18 @@ describe("ordered list start (#547)", () => {
         expect(markdown).toBe(expected);
         expect(markdown).not.toContain("NaN");
     });
+
+    // A start beyond the safe integer range is written as its exact digits. Number() would print 1e+21 or Infinity.
+    it.each([
+        ["a start that formats in exponential notation", "1000000000000000000000", "1000000000000000000000.  a\n1000000000000000000001.  b"],
+        ["a start that overflows to Infinity", "9".repeat(400), `${"9".repeat(400)}.  a\n1${"0".repeat(400)}.  b`],
+        ["a start above 2^53 keeps its last digits", "9007199254740993", "9007199254740993.  a\n9007199254740994.  b"],
+    ])("%s", (_name, start, expected) => {
+        const markdown = convert(`<ol start="${start}"><li>a</li><li>b</li></ol>`);
+
+        expect(markdown).toBe(expected);
+        expect(markdown).not.toMatch(/e\+|Infinity|NaN/);
+    });
 });
 
 describe("text after a nested list (#554)", () => {
