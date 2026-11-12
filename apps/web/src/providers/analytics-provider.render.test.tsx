@@ -11,7 +11,10 @@ const posthogMock = vi.hoisted(() => {
         captureException: vi.fn(),
         debug: vi.fn(),
         has_opted_out_capturing: vi.fn(() => false),
-        init: vi.fn(),
+        init: vi.fn(() => {
+            // Like posthog-js: `init` marks the singleton loaded.
+            posthogMock.__loaded = true;
+        }),
         opt_in_capturing: vi.fn(),
         opt_out_capturing: vi.fn(),
         reset: vi.fn(),
@@ -31,7 +34,7 @@ vi.mock("@/lib/analytics/first-native-launch", () => {
 });
 
 const { default: AnalyticsProvider, onPostHogLoaded, PostHogConsentSync } = await import("./analytics-provider");
-const { captureException, forgetPostHogIdentity, usePostHog } = await import("@/lib/analytics/posthog-client");
+const { captureException, forgetPostHogIdentity, setMeasurementConsent, usePostHog } = await import("@/lib/analytics/posthog-client");
 
 describe("PostHog consent sync", () => {
     beforeEach(() => {
@@ -78,6 +81,8 @@ describe("AnalyticsProvider", () => {
         vi.stubEnv("VITE_POSTHOG_API_KEY", "key");
         vi.stubEnv("VITE_POSTHOG_HOST", "https://posthog.test");
         loadPostHog.mockReset();
+        posthogMock.__loaded = false;
+        setMeasurementConsent(true);
         posthogMock.init.mockClear();
         posthogMock.reset.mockClear();
     });
@@ -87,23 +92,34 @@ describe("AnalyticsProvider", () => {
     });
 
     // First: the queue is flushed once per page, by whichever case initialises PostHog first.
-    it("reports an error caught before its chunk loaded once PostHog has initialised", async () => {
-        loadPostHog.mockResolvedValue(posthogMock);
-        const early = new Error("crashed on first render");
+    it("reports an error caught before its chunk loaded, even when the global boundary unmounted the provider meanwhile", async () => {
+        let resolveChunk: (posthog: typeof posthogMock) => void = () => {};
 
-        captureException(early, { errorBoundary: "global" });
+        loadPostHog.mockReturnValue(
+            // eslint-disable-next-line unicorn/prefer-promise-with-resolvers -- the web lib target has no Promise.withResolvers
+            new Promise((resolve) => {
+                resolveChunk = resolve;
+            }),
+        );
 
-        render(
+        const { unmount } = render(
             <AnalyticsProvider>
                 <ClientState />
             </AnalyticsProvider>,
         );
+        const crash = new Error("crashed on first render");
+
+        // The global boundary reports the crash, then its fallback replaces the tree this provider is in.
+        captureException(crash, { errorBoundary: "global" });
+        unmount();
 
         await act(async () => {
+            resolveChunk(posthogMock);
             await Promise.resolve();
         });
 
-        expect(posthogMock.captureException).toHaveBeenCalledExactlyOnceWith(early, { errorBoundary: "global" });
+        expect(posthogMock.init).toHaveBeenCalledOnce();
+        expect(posthogMock.captureException).toHaveBeenCalledExactlyOnceWith(crash, { errorBoundary: "global" });
         const [initOrder = 0] = posthogMock.init.mock.invocationCallOrder;
         const [captureOrder = 0] = posthogMock.captureException.mock.invocationCallOrder;
 

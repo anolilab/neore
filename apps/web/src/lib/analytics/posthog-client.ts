@@ -44,10 +44,26 @@ export const MAX_PENDING_EXCEPTIONS = 20;
 const pendingExceptions: { error: unknown; properties: ExceptionProperties }[] = [];
 const queueState: { closed: boolean } = { closed: false };
 
+// The measurement consent `PostHogConsentSync` read from c15t; `undefined` until its first effect has run.
+const consentState: { measurement?: boolean } = {};
+
+/** The measurement consent last applied, or `undefined` before the consent state has been read. */
+export const getMeasurementConsent = (): boolean | undefined => consentState.measurement;
+
+/** Records the measurement consent; a refusal also drops what was queued, so a later grant cannot send it. */
+export const setMeasurementConsent = (granted: boolean): void => {
+    consentState.measurement = granted;
+
+    if (!granted) {
+        pendingExceptions.length = 0;
+    }
+};
+
 /**
  * Reports a caught exception. Before PostHog has initialised (its chunk loads after mount, which can take seconds) the
  * exception is queued, up to `MAX_PENDING_EXCEPTIONS`, and `AnalyticsProvider` sends the queue once `init` and
- * consent have been applied (`flushPendingExceptions`). An opted-out user's are never sent.
+ * consent have been applied (`flushPendingExceptions`). Nothing is queued while measurement consent is refused, and an
+ * opted-out user's are never sent.
  */
 export const captureException = (error: unknown, properties?: ExceptionProperties): void => {
     const posthog = chunk.loaded;
@@ -60,7 +76,7 @@ export const captureException = (error: unknown, properties?: ExceptionPropertie
         return;
     }
 
-    if (queueState.closed) {
+    if (queueState.closed || consentState.measurement === false) {
         return;
     }
 
@@ -71,7 +87,10 @@ export const captureException = (error: unknown, properties?: ExceptionPropertie
     }
 };
 
-/** Sends what `captureException` queued before `posthog` initialised, unless the user opted out; then queues nothing more. */
+/**
+ * Sends what `captureException` queued before `posthog` initialised, unless the user opted out; then queues nothing
+ * more. A report that throws is logged and skipped, so the rest are still sent.
+ */
 export const flushPendingExceptions = (posthog: PostHog): void => {
     const pending = [...pendingExceptions];
 
@@ -83,7 +102,12 @@ export const flushPendingExceptions = (posthog: PostHog): void => {
     }
 
     for (const { error, properties } of pending) {
-        posthog.captureException(error, properties);
+        try {
+            posthog.captureException(error, properties);
+        } catch (reportError) {
+            // eslint-disable-next-line no-console -- the only trace of a report that never left
+            console.warn("[PostHog] Could not report a queued error:", reportError);
+        }
     }
 };
 

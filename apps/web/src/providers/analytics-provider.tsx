@@ -7,16 +7,14 @@ import { reportFirstNativeLaunch } from "@/lib/analytics/first-native-launch";
 import {
     discardPendingExceptions,
     flushPendingExceptions,
+    getMeasurementConsent,
     getPostHog,
     loadPostHog,
     PostHogClientContext,
+    setMeasurementConsent,
     takePendingPostHogReset,
 } from "@/lib/analytics/posthog-client";
 import { redactPromptFromEvent } from "@/lib/analytics/redact-prompt";
-
-// The consent state PostHog should follow. `PostHogConsentSync` is a child of `AnalyticsProvider`, so its first
-// effect runs before `posthog.init`; the `loaded` callback applies whatever arrived before then.
-const consentState: { measurement?: boolean } = {};
 
 const applyMeasurementConsent = (posthog: PostHogInterface, granted: boolean): void => {
     if (granted) {
@@ -39,7 +37,9 @@ export const PostHogConsentSync: FC = () => {
     const { measurement } = useEffectivePermissions();
 
     useEffect(() => {
-        consentState.measurement = measurement;
+        // `PostHogConsentSync` is a child of `AnalyticsProvider`, so this runs before `posthog.init`; the `loaded`
+        // callback applies what arrived before then.
+        setMeasurementConsent(measurement);
 
         const posthog = getPostHog();
 
@@ -72,8 +72,10 @@ export const onPostHogLoaded = (ph: PostHogInterface): void => {
         ph.debug();
     }
 
-    if (consentState.measurement !== undefined) {
-        applyMeasurementConsent(ph, consentState.measurement);
+    const measurement = getMeasurementConsent();
+
+    if (measurement !== undefined) {
+        applyMeasurementConsent(ph, measurement);
     }
 
     // Here, not in an effect: AnalyticsProvider wraps the app, so child effects run before PostHog loads.
@@ -119,34 +121,41 @@ const AnalyticsProvider: FC<PropsWithChildren> = ({ children }) => {
         // PostHog will operate in cookieless mode until consent is granted
         const start = async (): Promise<void> => {
             const posthog = await loadPostHog();
+            // A remount (or React's second effect run) finds the singleton already initialised.
+            const isFirstInit = !posthog.__loaded;
 
-            if (isCancelled) {
-                return;
+            if (isFirstInit) {
+                posthog.init(import.meta.env.VITE_POSTHOG_API_KEY, {
+                    api_host: import.meta.env.VITE_POSTHOG_HOST,
+                    // Bootstrap feature flags from server-side rendering
+                    bootstrap:
+                        distinctId && flagData
+                            ? {
+                                  distinctID: distinctId,
+                                  featureFlags: flagData,
+                                  isIdentifiedID: false,
+                              }
+                            : undefined,
+                    ...POSTHOG_OPTIONS,
+                    loaded: onPostHogLoaded,
+                });
+
+                // Signed out while the chunk loaded, on a page that has not reloaded: drop the bootstrapped identity too.
+                if (takePendingPostHogReset()) {
+                    posthog.reset();
+                }
             }
 
-            posthog.init(import.meta.env.VITE_POSTHOG_API_KEY, {
-                api_host: import.meta.env.VITE_POSTHOG_HOST,
-                // Bootstrap feature flags from server-side rendering
-                bootstrap:
-                    distinctId && flagData
-                        ? {
-                              distinctID: distinctId,
-                              featureFlags: flagData,
-                              isIdentifiedID: false,
-                          }
-                        : undefined,
-                ...POSTHOG_OPTIONS,
-                loaded: onPostHogLoaded,
-            });
-
-            // Signed out while the chunk loaded, on a page that has not reloaded: drop the bootstrapped identity too.
-            if (takePendingPostHogReset()) {
-                posthog.reset();
+            // An unmount cancels only the provided client, not `init` and the flush: the global error boundary
+            // unmounts this provider when it shows its fallback, and the crash it caught is queued for PostHog.
+            if (!isCancelled) {
+                setClient(posthog);
             }
 
-            // Errors caught while the chunk loaded; after `init`, whose `loaded` callback applied the consent state.
-            flushPendingExceptions(posthog);
-            setClient(posthog);
+            if (isFirstInit) {
+                // Errors caught while the chunk loaded; after `init`, whose `loaded` callback applied the consent state.
+                flushPendingExceptions(posthog);
+            }
         };
 
         // A chunk that never loaded (retries exhausted, e.g. offline) is tried again once the window is back online.

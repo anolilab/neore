@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const posthog = vi.hoisted(() => {
     return {
@@ -24,6 +24,10 @@ describe("captureException before PostHog initialises", () => {
         posthog.__loaded = false;
         posthog.captureException.mockClear();
         posthog.has_opted_out_capturing.mockReturnValue(false);
+    });
+
+    afterEach(() => {
+        vi.restoreAllMocks();
     });
 
     it("queues what is caught while the chunk loads and sends it, in order, once the client is flushed", async () => {
@@ -87,5 +91,33 @@ describe("captureException before PostHog initialises", () => {
         client.flushPendingExceptions(await client.loadPostHog());
 
         expect(posthog.captureException).not.toHaveBeenCalled();
+    });
+
+    it("sends the rest of the queue when one report throws", async () => {
+        const client = await loadClientModule();
+        const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+        client.captureException("first");
+        client.captureException("second");
+        posthog.captureException.mockImplementationOnce(() => {
+            throw new Error("report failed");
+        });
+
+        expect(() => client.flushPendingExceptions(posthog as never)).not.toThrow();
+        expect(posthog.captureException.mock.calls.map(([error]) => error)).toStrictEqual(["first", "second"]);
+        expect(warn).toHaveBeenCalledOnce();
+    });
+
+    it("queues nothing while measurement consent is refused, and a refusal drops what was queued", async () => {
+        const client = await loadClientModule();
+
+        client.captureException("before the refusal");
+        client.setMeasurementConsent(false);
+        client.captureException("while refused");
+        client.setMeasurementConsent(true);
+        client.captureException("after the grant");
+        client.flushPendingExceptions(await client.loadPostHog());
+
+        expect(posthog.captureException.mock.calls.map(([error]) => error)).toStrictEqual(["after the grant"]);
     });
 });
