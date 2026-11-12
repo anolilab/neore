@@ -42,9 +42,29 @@ interface RunStyle {
     plain: string;
 }
 
-// A line break, then whitespace that holds another line break. Linear: the scan starts
-// only at a line break, and the whitespace after it is consumed once.
-const BLANK_LINE = /\n\s*\n/g;
+// A backslash escapes the ASCII punctuation character after it, and at the end of
+// the destination it would escape the closing parenthesis. Such a backslash is
+// doubled. Any other backslash is literal, so it is left alone.
+const BACKSLASH_BEFORE_PUNCTUATION = /\\(?=[!"#$%&'()*+,./:;<=>?@[\\\]^_`{|}~]|$)/g;
+// The hard break is `options.br` followed by a line break. CommonMark reads two or more
+// spaces, or a backslash, before a line break as a hard break.
+const HARD_BREAK = /^(?: {2,}|\\)$/;
+// The line starts that CommonMark lets interrupt a paragraph: a quote, an ATX heading, a
+// fence, a bullet followed by a space, a setext underline, a thematic break, an ordered
+// item that starts at 1, and an HTML tag. Only `1` can start an ordered item that
+// interrupts a paragraph. The check is conservative: a tag opener is matched without
+// the tag name. Sticky, so each one tests at a single index and copies nothing.
+const BLOCK_OPENERS: ReadonlyArray<RegExp> = [
+    />/y,
+    /#{1,6}(?=[ \t\n]|$)/y,
+    /`{3}|~{3}/y,
+    /[*+-](?=[ \t\n]|$)/y,
+    /-+(?=[ \t]*(?:\n|$))/y,
+    /=+(?=[ \t]*(?:\n|$))/y,
+    /([*_-])(?:[ \t]*\1){2}/y,
+    /1[.)](?=[ \t\n]|$)/y,
+    /<[a-z/!?]/iy,
+];
 
 /**
  * Reference-style links collect their definitions here and append them after
@@ -67,7 +87,7 @@ class ReferenceLinkRule implements Rule {
             return content;
         }
 
-        const text = linkText(content);
+        const text = linkText(content, options.br);
         const href = escapeLinkDestination(rawHref, options.safeLinks);
         let title = cleanAttribute(node.getAttribute("title"));
 
@@ -259,7 +279,7 @@ const rules: Record<string, Rule> = {
             const title = escapeLinkTitle(cleanAttribute(node.getAttribute("title")));
             const titlePart = title ? ` "${title}"` : "";
 
-            return `[${linkText(content)}](${href}${titlePart})`;
+            return `[${linkText(content, options.br)}](${href}${titlePart})`;
         },
     },
 
@@ -822,21 +842,50 @@ function cleanAttribute(attribute: string | null): string {
 }
 
 /**
- * Link text cannot hold a blank line, which ends the paragraph and leaves the
- * brackets as plain text. A block element inside a link puts one there, so each
- * blank line becomes a space. A single line break stays: CommonMark keeps link
- * text across it.
+ * Link text sits on one line. A line that starts with a block marker (a list item, a
+ * quote, a heading underline, an ordered number) ends the paragraph, and the brackets
+ * stop being a link. A block element inside a link puts such lines there, so every
+ * line break becomes a space, except a hard break whose next line cannot open a block.
+ * CommonMark keeps a hard break inside link text.
+ *
+ * A space that already precedes the break is not doubled, so a marker that the block
+ * rule added (`> `) follows one space, not two.
  */
-function linkText(content: string): string {
-    return content.replaceAll(BLANK_LINE, " ");
+function linkText(content: string, hardBreak: string): string {
+    const hasHardBreaks = HARD_BREAK.test(hardBreak);
+
+    return content.replaceAll(LINE_BREAK_RUN, (run: string, offset: number, whole: string) => {
+        if (hasHardBreaks && isKeptHardBreak(run, offset, whole, hardBreak)) {
+            return run;
+        }
+
+        return offset > 0 && whole[offset - 1] === " " ? "" : " ";
+    });
 }
 
 /**
- * A backslash escapes the ASCII punctuation character after it, and at the end of
- * the destination it would escape the closing parenthesis. Such a backslash is
- * doubled. Any other backslash is literal, so it is left alone.
+ * True for a single line break that directly follows the hard break marker, when the
+ * line after it cannot open a block. A break inside a blank line is not a hard break.
  */
-const BACKSLASH_BEFORE_PUNCTUATION = /\\(?=[!"#$%&'()*+,./:;<=>?@[\\\]^_`{|}~]|$)/g;
+function isKeptHardBreak(run: string, offset: number, whole: string, hardBreak: string): boolean {
+    const markerStart = offset - hardBreak.length;
+    const isAfterMarker = markerStart >= 0 && whole.startsWith(hardBreak, markerStart);
+    const isSingle = !run.includes("\n", 1);
+
+    return isAfterMarker && isSingle && !isBlockStartAt(whole, offset + run.length);
+}
+
+function isBlockStartAt(text: string, index: number): boolean {
+    for (const opener of BLOCK_OPENERS) {
+        opener.lastIndex = index;
+
+        if (opener.test(text)) {
+            return true;
+        }
+    }
+
+    return false;
+}
 
 /**
  * With `safeLinks`, `\` and `&` are escaped too. CommonMark undoes those added escapes, so the rendered destination is
