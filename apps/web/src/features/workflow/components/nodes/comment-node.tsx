@@ -106,6 +106,7 @@ const CommentNodeComponent = ({ data, id, selected }: NodeProps<Node<CommentNode
                         placeholder={t`Add a note...`}
                         ref={textareaRef}
                         rows={3}
+                        spellCheck
                         value={data.content ?? ""}
                     />
                 ) : (

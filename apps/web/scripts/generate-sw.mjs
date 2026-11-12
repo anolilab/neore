@@ -38,7 +38,7 @@ const DEFAULT_CATALOG = "src/locales/en/messages.po";
 
 /**
  * The app shell: the client entry and everything it imports STATICALLY, JS and
- * CSS only. That is what every page needs before it can render, so it is what
+ * CSS only, plus `OFFLINE_SHELL_CHUNKS`. That is what every page needs before it can render, so it is what
  * an offline start needs; everything else (route chunks, lazy editors, fonts)
  * is runtime-cached by `bundle-assets` / `static-assets` the first time a page
  * actually uses it.
@@ -47,6 +47,12 @@ const DEFAULT_CATALOG = "src/locales/en/messages.po";
  * visit download ~940 files / ~36 MB in the background, in competition with the
  * page's own lazy chunks, for code most sessions never reach.
  */
+/**
+ * Lazy chunks an offline start still needs: the desktop shell's offline screen is kept off the web's first load
+ * (`__root.tsx`), but it is shown exactly when the network is gone, so it is precached with the shell.
+ */
+const OFFLINE_SHELL_CHUNKS = ["src/features/connection/components/offline-screen.tsx"];
+
 const readAppShell = () => {
     const manifestDir = resolve(clientDir, ".vite");
     const manifestSource = readFileSync(resolve(manifestDir, "manifest.json"), "utf8");
@@ -84,6 +90,14 @@ const readAppShell = () => {
             entries.push(chunk.file);
             walk(key);
         }
+    }
+
+    for (const key of OFFLINE_SHELL_CHUNKS) {
+        if (!manifest[key]) {
+            throw new Error(`${key} is not a chunk in .vite/manifest.json; update OFFLINE_SHELL_CHUNKS.`);
+        }
+
+        walk(key);
     }
 
     if (entries.length !== 1) {

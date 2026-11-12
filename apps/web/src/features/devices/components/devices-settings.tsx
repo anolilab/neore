@@ -27,7 +27,7 @@ import {
     pairNativeDevice,
     pairNativeHost,
     probeNativeHost,
-} from "@/lib/native/bridge";
+} from "@/lib/native/device-bridge";
 
 import { buildDeviceDiagnostics, routeOf } from "../lib/device-diagnostics";
 import { DEVICE_PAIRED_EVENT } from "../lib/device-events";

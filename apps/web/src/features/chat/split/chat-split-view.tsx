@@ -210,6 +210,7 @@ const Pane: FC<PaneProps> = ({
                     "flex h-9 shrink-0 items-center gap-1 px-3 pointer-coarse:h-11",
                     isFocused ? "text-foreground dark:bg-muted" : "bg-muted/60 text-muted-foreground dark:bg-transparent",
                 )}
+                data-chrome=""
             >
                 {hasDraft && <span aria-hidden="true" className="border-muted-foreground size-2 shrink-0 rounded-full border-[1.5px] border-dashed" />}
                 <h2 className="min-w-0 flex-1 truncate text-sm font-medium" id={headingId}>

@@ -148,6 +148,7 @@ const EditComposer: FC<EditComposerProps> = ({ message }) => {
                         placeholder={message.role === "assistant" ? t`Edit the reply...` : t`Edit your message...`}
                         ref={textareaRef}
                         rows={1}
+                        spellCheck
                         value={editText}
                     />
                 </div>
