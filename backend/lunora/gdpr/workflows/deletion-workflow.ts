@@ -32,6 +32,9 @@ export interface DeletionParams {
     userId: string;
 }
 
+/** Rounds the erasure waits, one minute apart, for a live usage export to end before it forces the purge. */
+const MAX_USAGE_PURGE_ROUNDS = 120;
+
 /** Upper bound on batches per drained step — a guard against a row that never stops matching. */
 const MAX_DRAIN_ROUNDS = 10_000;
 
@@ -585,6 +588,29 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
             async (round) =>
                 await context.run(steps.deleteUserUsageDaily, { userId: args.userId }, { dedupId: stepDedupId(scope, "delete-user-usage-daily", round) }),
         );
+
+        // The runs' stored usage JSON is deleted before the erasure is done. A run whose export is still live keeps its record until that
+        // export ends, so the step runs again after a pause, up to a bound.
+        for (let round = 0; ; round += 1) {
+            // After the bound the purge is forced: an export still live by then has its object and record removed, so erasure finishes.
+            const force = round >= MAX_USAGE_PURGE_ROUNDS;
+
+            const { waiting } = (await context.step.do(
+                `purge-user-usage-files-${String(round)}`,
+                async () =>
+                    await context.run(
+                        steps.purgeUserUsageFiles,
+                        { force, userId: args.userId },
+                        { dedupId: stepDedupId(scope, "purge-user-usage-files", round) },
+                    ),
+            )) as { waiting: boolean };
+
+            if (!waiting || force) {
+                break;
+            }
+
+            await context.step.sleep(`usage-exports-live-${String(round)}`, "1 minute");
+        }
 
         await context.step.do(
             "delete-user-settings",

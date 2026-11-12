@@ -219,6 +219,45 @@ export const deleteUserUsageDaily = internalMutation
     .mutation(async ({ args: { userId }, ctx: context }): Promise<BatchResult> => await eraseUsageForUser(context, userId));
 
 /**
+ * Deletes the stored usage JSON of the user's export runs, and releases the record of each run whose export has ended. A run whose
+ * export is still live keeps its record, so its write cannot land after the record is gone: `waiting` tells the workflow to purge
+ * again once that export has ended. A failed delete throws, so the workflow retries the step.
+ */
+export const purgeUserUsageFiles = internalAction
+    .input({ force: v.optional(v.boolean()), userId: v.string() })
+    .output(v.object({ waiting: v.boolean() }))
+    .action(async ({ args: { force, userId }, ctx: context }) => {
+        let waiting = false;
+        let cursor: string | null = null;
+
+        do {
+            const page: { cursor: string | null; keyed: { key: string; live: boolean; runId: Id<"usageExportRuns"> }[] } = await context.runQuery(
+                internal.usage.gdpr.keyedUsageRuns,
+                { cursor, userId },
+            );
+
+            for (const run of page.keyed) {
+                // A live export's object and record are its own until the export ends: they are left alone, and the workflow
+                // purges again. Only a forced purge, after the workflow's bound, removes them while the export is live.
+                if (run.live && force !== true) {
+                    waiting = true;
+                    continue;
+                }
+
+                if (await context.storage.getMetadata(run.key)) {
+                    await context.storage.delete(run.key);
+                }
+
+                await context.runMutation(internal.usage.gdpr.releaseUsageKey, { runId: run.runId });
+            }
+
+            cursor = page.cursor;
+        } while (cursor !== null);
+
+        return { waiting };
+    });
+
+/**
  * Sub-agent runs (`sub-agents/gdpr.ts`). A run still in flight finds its row
  * gone and posts nothing.
  */

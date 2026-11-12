@@ -51,6 +51,9 @@ const workflowContext = () => {
 
                 return await callback();
             },
+            sleep: async (name: string) => {
+                trace.push({ kind: "step", name });
+            },
         },
     };
 };
@@ -506,5 +509,37 @@ describe("account deletion workflow: replay", () => {
 
         expect(sweeps()).toBe(2);
         expect(request.status).toBe("completed");
+    });
+});
+
+describe("account deletion workflow: usage exports", () => {
+    const isPurge = (ref: string): boolean => ref.endsWith("purgeUserUsageFiles");
+
+    it("waits while a usage export is live, purges again once it has ended, and then completes", async () => {
+        const base = answer;
+
+        answer = (ref, round, args) => (isPurge(ref) ? { waiting: round < 3 } : base(ref, round, args));
+
+        await execute();
+
+        const purges = runs().filter((entry) => isPurge(entry.ref));
+
+        expect(purges.map((entry) => entry.args["force"])).toStrictEqual([false, false, false]);
+        expect(completionIndex()).toBeGreaterThan(-1);
+    });
+
+    it("forces the purge once the wait is over, so erasure finishes while a long export is still live", async () => {
+        const base = answer;
+
+        // The export never ends on its own: only the forced purge, after the bound, removes its object and record.
+        answer = (ref, round, args) => (isPurge(ref) ? { waiting: args["force"] !== true } : base(ref, round, args));
+
+        await execute();
+
+        const purges = runs().filter((entry) => isPurge(entry.ref));
+
+        expect(purges).toHaveLength(121);
+        expect(purges.at(-1)?.args["force"]).toBe(true);
+        expect(completionIndex()).toBeGreaterThan(-1);
     });
 });

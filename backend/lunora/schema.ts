@@ -3515,6 +3515,68 @@ export const schema = defineSchema({
     // The replies already in `usageDaily`, keyed by the reply's first row id:
     // what makes `recordReplyUsage` and the backfill count a reply once.
     // Pruned by `usage/backfill.ts#sweepUsageRollup` once the backfill is done.
+    usageExportPieces: defineTable({
+        // The user's backfill row when the rows were read: a change to it during the export means history was written meanwhile.
+        backfill: v.optional(v.string()),
+        bytes: v.number(),
+        // The same rows' totals: a backfill can patch a closed day's row without adding one, and the totals catch that.
+        closed: v.optional(v.object({ cost: v.number(), replies: v.number(), rows: v.number(), tokens: v.number() })),
+        // Rows of the page dated before the cutoff, which the recount of the pass must match.
+        closedRows: v.optional(v.number()),
+        // When the piece was written: the sweep removes a run's pieces once they are older than its time to live.
+        createdAt: v.optional(v.number()),
+        // The day the export's recount is taken before (YYYY-MM-DD): rows dated before it are counted, later ones are not.
+        cutoff: v.optional(v.string()),
+        // `file` is the kind earlier builds stored; nothing writes it now, and it stays so stored rows still validate.
+        kind: v.union(v.literal("file"), v.literal("projects"), v.literal("rows"), v.literal("titles"), v.literal("verified")),
+        // The rows page's cursor for the next page (unset on the last page).
+        nextCursor: v.optional(v.string()),
+        pass: v.number(),
+        // The exported JSON of the piece: rows, or a map of project id to a title and its grant.
+        payload: v.string(),
+        // The rows page's distinct project ids, which the title steps read.
+        projectIds: v.array(v.string()),
+        // The export run that wrote the piece, `<request id>:<workflow instance id>`: a run reads and clears only its own.
+        requestId: v.string(),
+        // Rows the piece holds, or titles it names.
+        rowCount: v.number(),
+        // The page's (or the group's) order within its pass and kind.
+        seq: v.number(),
+        userId: v.string(),
+    })
+        .shardBy("userId")
+        .index("by_userId", ["userId"])
+        .index("by_createdAt", ["createdAt"])
+        // A run's pieces of one pass and kind, in their order: what the usage action reads them by.
+        .index("by_request", ["requestId", "pass", "kind", "seq"]),
+
+    // One row per project a pass names, written once per pass: a project on several rows pages is read once. Cleared with the pass.
+    usageExportProjects: defineTable({
+        pass: v.number(),
+        projectId: v.string(),
+        requestId: v.string(),
+        userId: v.string(),
+    })
+        .shardBy("userId")
+        .index("by_userId", ["userId"])
+        .index("by_request_project", ["requestId", "pass", "projectId"]),
+    // One small row per export run: its key, its owner, when it began, and the key of the usage JSON object it stored, if any. The
+    // row is that object's record: kept until the object is confirmed deleted, so the sweep can retry the purge from it. The sweep
+    // scans these rows, which hold no payloads, to find dead runs.
+    usageExportRuns: defineTable({
+        createdAt: v.number(),
+        requestId: v.string(),
+        usageKey: v.optional(v.string()),
+        userId: v.string(),
+    })
+        .shardBy("userId")
+        .index("by_userId", ["userId"])
+        .index("by_createdAt", ["createdAt"])
+        .index("by_requestId", ["requestId"]),
+
+    // The replies already in `usageDaily`, keyed by the reply's first row id:
+    // what makes `recordReplyUsage` and the backfill count a reply once.
+    // Pruned by `usage/backfill.ts#sweepUsageRollup` once the backfill is done.
     usageReplies: defineTable({
         // Set by a retry's record that arrived more than a day after the reply with no key to find: the reply's total is
         // still to come, from its first record, which counts it with `deferredProjectKey` (`usage/activity.ts`).

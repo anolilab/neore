@@ -1874,6 +1874,55 @@ export const usageDaily = sqliteTable("usageDaily", {
     by_date: index("by_date").on(t.date),
 }));
 
+export const usageExportPieces = sqliteTable("usageExportPieces", {
+    _id: text("_id").primaryKey(),
+    _creationTime: integer("_creationTime").notNull(),
+    backfill: text("backfill"),
+    bytes: real("bytes").notNull(),
+    closed: text("closed", { mode: "json" }).$type<{ cost: number; replies: number; rows: number; tokens: number }>(),
+    closedRows: real("closedRows"),
+    createdAt: real("createdAt"),
+    cutoff: text("cutoff"),
+    kind: text("kind", { mode: "json" }).$type<"file" | "projects" | "rows" | "titles" | "verified">().notNull(),
+    nextCursor: text("nextCursor"),
+    pass: real("pass").notNull(),
+    payload: text("payload").notNull(),
+    projectIds: text("projectIds", { mode: "json" }).$type<Array<string>>().notNull(),
+    requestId: text("requestId").notNull(),
+    rowCount: real("rowCount").notNull(),
+    seq: real("seq").notNull(),
+    userId: text("userId").notNull(),
+}, (t) => ({
+    by_userId: index("by_userId").on(t.userId),
+    by_createdAt: index("by_createdAt").on(t.createdAt),
+    by_request: index("by_request").on(t.requestId, t.pass, t.kind, t.seq),
+}));
+
+export const usageExportProjects = sqliteTable("usageExportProjects", {
+    _id: text("_id").primaryKey(),
+    _creationTime: integer("_creationTime").notNull(),
+    pass: real("pass").notNull(),
+    projectId: text("projectId").notNull(),
+    requestId: text("requestId").notNull(),
+    userId: text("userId").notNull(),
+}, (t) => ({
+    by_userId: index("by_userId").on(t.userId),
+    by_request_project: index("by_request_project").on(t.requestId, t.pass, t.projectId),
+}));
+
+export const usageExportRuns = sqliteTable("usageExportRuns", {
+    _id: text("_id").primaryKey(),
+    _creationTime: integer("_creationTime").notNull(),
+    createdAt: real("createdAt").notNull(),
+    requestId: text("requestId").notNull(),
+    usageKey: text("usageKey"),
+    userId: text("userId").notNull(),
+}, (t) => ({
+    by_userId: index("by_userId").on(t.userId),
+    by_createdAt: index("by_createdAt").on(t.createdAt),
+    by_requestId: index("by_requestId").on(t.requestId),
+}));
+
 export const usageReplies = sqliteTable("usageReplies", {
     _id: text("_id").primaryKey(),
     _creationTime: integer("_creationTime").notNull(),

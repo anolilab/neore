@@ -78,6 +78,8 @@ const shardSweeps = (): ReadonlyArray<Sweep> => [
     { name: "sweepDeviceCalls", ref: internal.devices.internal.sweepDeviceCalls },
     { name: "sweepKnowledgeFiles", ref: internal.knowledge.housekeeping.sweepKnowledgeFiles },
     { name: "pruneRetainedActivity", ref: internal.gdpr.retention.pruneRetainedActivity },
+    // An export whose workflow died leaves its pieces and usage object on the shard; past their time to live, the sweep removes them.
+    { name: "sweepUsageExportPieces", ref: internal.usage.gdpr.sweepUsageExportPieces },
     { name: "sweepUsageRollup", ref: internal.usage.backfill.sweepUsageRollup },
     { name: "sweepStagedChatUploads", ref: internal.file.sweepStagedChatUploads },
     { name: "pruneExpiredToolPermissionGrants", ref: internal.chat.tool_permissions.pruneExpiredToolPermissionGrants },

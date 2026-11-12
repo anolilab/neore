@@ -29244,6 +29244,296 @@
       "relations": {},
       "shardMode": "shardBy:userId"
     },
+    "usageExportPieces": {
+      "commitOrdered": false,
+      "fields": {
+        "backfill": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "bytes": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "closed": {
+          "kind": "object",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "fields": {
+            "cost": {
+              "kind": "number",
+              "nullable": false,
+              "optional": false,
+              "unique": false
+            },
+            "replies": {
+              "kind": "number",
+              "nullable": false,
+              "optional": false,
+              "unique": false
+            },
+            "rows": {
+              "kind": "number",
+              "nullable": false,
+              "optional": false,
+              "unique": false
+            },
+            "tokens": {
+              "kind": "number",
+              "nullable": false,
+              "optional": false,
+              "unique": false
+            }
+          }
+        },
+        "closedRows": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "createdAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "cutoff": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "kind": {
+          "kind": "union",
+          "nullable": false,
+          "optional": false,
+          "unique": false,
+          "members": [
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"file\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"projects\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"rows\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"titles\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"verified\""
+            }
+          ]
+        },
+        "nextCursor": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "pass": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "payload": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "projectIds": {
+          "kind": "array",
+          "nullable": false,
+          "optional": false,
+          "unique": false,
+          "of": {
+            "kind": "string",
+            "nullable": false,
+            "optional": false,
+            "unique": false
+          }
+        },
+        "requestId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "rowCount": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "seq": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "userId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        }
+      },
+      "indexes": {
+        "by_createdAt": {
+          "fields": [
+            "createdAt"
+          ],
+          "unique": false
+        },
+        "by_request": {
+          "fields": [
+            "requestId",
+            "pass",
+            "kind",
+            "seq"
+          ],
+          "unique": false
+        },
+        "by_userId": {
+          "fields": [
+            "userId"
+          ],
+          "unique": false
+        }
+      },
+      "memory": false,
+      "relations": {},
+      "shardMode": "shardBy:userId"
+    },
+    "usageExportProjects": {
+      "commitOrdered": false,
+      "fields": {
+        "pass": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "projectId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "requestId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "userId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        }
+      },
+      "indexes": {
+        "by_request_project": {
+          "fields": [
+            "requestId",
+            "pass",
+            "projectId"
+          ],
+          "unique": false
+        },
+        "by_userId": {
+          "fields": [
+            "userId"
+          ],
+          "unique": false
+        }
+      },
+      "memory": false,
+      "relations": {},
+      "shardMode": "shardBy:userId"
+    },
+    "usageExportRuns": {
+      "commitOrdered": false,
+      "fields": {
+        "createdAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "requestId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "usageKey": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "userId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        }
+      },
+      "indexes": {
+        "by_createdAt": {
+          "fields": [
+            "createdAt"
+          ],
+          "unique": false
+        },
+        "by_requestId": {
+          "fields": [
+            "requestId"
+          ],
+          "unique": false
+        },
+        "by_userId": {
+          "fields": [
+            "userId"
+          ],
+          "unique": false
+        }
+      },
+      "memory": false,
+      "relations": {},
+      "shardMode": "shardBy:userId"
+    },
     "usageReplies": {
       "commitOrdered": false,
       "fields": {
