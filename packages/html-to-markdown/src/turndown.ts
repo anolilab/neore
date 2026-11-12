@@ -1,4 +1,4 @@
-import COMMONMARK_RULES from "./commonmark-rules";
+import COMMONMARK_RULES, { isLinkElement } from "./commonmark-rules";
 import annotateNode from "./node";
 import rootNode from "./root-node";
 import Rules from "./rules";
@@ -147,7 +147,7 @@ const HTML_OPENER = /^[a-z/!?]/i;
 function escapeText(service: TurndownService, node: Node, text: string): string {
     const escaped = service.escape(text);
 
-    if (text.endsWith("<") && escaped.endsWith("<") && isFollowedByHtmlOpener(node)) {
+    if (text.endsWith("<") && escaped.endsWith("<") && isFollowedByHtmlOpener(node, service.options)) {
         return `${escaped.slice(0, -1)}${String.raw`\<`}`;
     }
 
@@ -156,12 +156,13 @@ function escapeText(service: TurndownService, node: Node, text: string): string 
 
 /**
  * True when the output after the node may begin with a character that opens raw HTML.
- * It looks at the next sibling, then past the end of an inline parent. A link or a
- * block ends the search: a link closes with `]`, and a block starts on a new line.
- * A sibling whose text is blank may print nothing, so it is looked past too. The
- * check is conservative: a `<` that cannot open HTML may still be escaped.
+ * It looks at the next sibling, then past the end of an inline parent. A link that the
+ * rules print ends the search: it closes with `]`. A block ends it too, since a block
+ * starts on a new line. An `<a>` that prints no link is looked past, like any inline
+ * parent. A sibling whose text is blank may print nothing, so it is looked past too.
+ * The check is conservative: a `<` that cannot open HTML may still be escaped.
  */
-function isFollowedByHtmlOpener(node: Node): boolean {
+function isFollowedByHtmlOpener(node: Node, options: Options): boolean {
     let current: Node | null = node;
 
     while (current) {
@@ -175,7 +176,7 @@ function isFollowedByHtmlOpener(node: Node): boolean {
 
         const parent: Node | null = current.parentNode;
 
-        if (!parent || parent.nodeName === "A" || isBlock(parent)) {
+        if (!parent || isLinkElement(parent, options) || isBlock(parent)) {
             return false;
         }
 
