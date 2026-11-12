@@ -34,6 +34,123 @@ export function trimLeadingBreaks(string: string): string {
     return string.replace(TRAILING_NEWLINE_BLOCK_START, "");
 }
 
+/** The string the line-break rule emits for a hard break. */
+export function lineBreakMarker(br: string): string {
+    return `${br}\n`;
+}
+
+const BLANK_TEXT = /^\s*$/;
+
+/**
+ * Trims the whitespace at both ends of an element's content, as `trim` does, and
+ * then writes back the hard line breaks that the element starts and ends with.
+ * Those breaks are whitespace in the content, so `trim` would remove them. They
+ * are counted from the DOM, not found in the string, because text can hold the
+ * same characters as a break.
+ */
+export function trimKeepingBreaks(content: string, node: Node, br: string): string {
+    const marker = lineBreakMarker(br);
+    const core = content.trim();
+    const lead = edgeBreaks(node, "left");
+    const trail = edgeBreaks(node, "right");
+
+    // An element that holds only breaks has the same breaks at both ends, so they are written once.
+    if (core === "") {
+        return marker.repeat(Math.max(lead, trail));
+    }
+
+    return marker.repeat(lead) + core + marker.repeat(trail);
+}
+
+/**
+ * How many hard line breaks sit at one edge of an element, counting through
+ * inline children. Whitespace-only text and comments are skipped. An inline child
+ * is counted only while it holds nothing but breaks, so the run stops at text.
+ */
+export function edgeBreaks(node: Node, side: "left" | "right"): number {
+    let count = 0;
+    let child = side === "left" ? node.firstChild : node.lastChild;
+
+    while (child) {
+        if (child.nodeName === "BR") {
+            count += 1;
+        } else if (child.nodeType === 1 && !isBlock(child) && !isVoid(child)) {
+            count += edgeBreaks(child, side);
+
+            if (!hasOnlyBreaks(child)) {
+                break;
+            }
+        } else if (!isIgnorableEdge(child)) {
+            break;
+        }
+
+        child = side === "left" ? child.nextSibling : child.previousSibling;
+    }
+
+    return count;
+}
+
+function isIgnorableEdge(node: Node): boolean {
+    if (node.nodeType === 8) {
+        return true;
+    }
+
+    return (node.nodeType === 3 || node.nodeType === 4) && BLANK_TEXT.test(node.nodeValue ?? "");
+}
+
+/** True when the node's content is only whitespace and line breaks, so it outputs no text. */
+export function hasOnlyBreaks(node: Node): boolean {
+    for (const child of node.childNodes) {
+        if (child.nodeName === "BR") {
+            continue;
+        }
+
+        if (child.nodeType === 1) {
+            if (isVoid(child) || !hasOnlyBreaks(child)) {
+                return false;
+            }
+        } else if (!isIgnorableEdge(child) && child.nodeType !== 8) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+/** Replaces each break marker with a space, for text that must stay on one line. */
+export function flattenBreaks(content: string, marker: string): string {
+    if (!marker || !content.includes(marker)) {
+        return content;
+    }
+
+    return content
+        .split(marker)
+        .map((part) => part.trim())
+        .filter((part) => part !== "")
+        .join(" ");
+}
+
+/**
+ * The text of a code element. Each line break element becomes a newline, which
+ * is how a line break is written inside a code block; otherwise it is the same
+ * text that textContent gives.
+ */
+export function codeText(node: Node): string {
+    let text = "";
+
+    for (const child of node.childNodes) {
+        if (child.nodeName === "BR") {
+            text += "\n";
+        } else if (child.nodeType === 1) {
+            text += codeText(child);
+        } else if (child.nodeType === 3 || child.nodeType === 4) {
+            text += child.nodeValue ?? "";
+        }
+    }
+
+    return text;
+}
+
 const blockElements = new Set([
     "ADDRESS",
     "ARTICLE",

@@ -21,6 +21,15 @@ const SEED = 20_261_112;
 const CASES = 1500;
 const NON_BLANK = /\S/;
 
+/*
+ * Documents with a line break or emphasis are not compared with upstream: those
+ * constructs change on purpose (adjacent and intraword emphasis and strong, breaks
+ * at the edges of an element), and test/inline-breaks.test.ts pins their output.
+ */
+const CHANGED_ON_PURPOSE = /<(?:br|em|i|strong|b)[\s/>]/;
+// About 55% of the seeded documents have no such construct; the floor guards against the exclusion swallowing the test.
+const MIN_COMPARED = 800;
+
 // Mulberry32: a small seeded PRNG, so a failure reproduces exactly.
 function createRandom(seed: number): () => number {
     let state = seed;
@@ -200,6 +209,7 @@ describe("differential against upstream turndown 7.2.5", () => {
     it(`matches upstream on ${CASES} seeded random documents`, () => {
         const random = createRandom(SEED);
         let skipped = 0;
+        let compared = 0;
 
         for (let index = 0; index < CASES; index += 1) {
             const html = randomHtml(random, 0) + randomHtml(random, 0);
@@ -212,16 +222,21 @@ describe("differential against upstream turndown 7.2.5", () => {
 
             const options = pick(OPTION_SETS, random);
 
-            const expected = new TurndownUpstream(options).turndown(html);
-            const actual = new TurndownService(options).turndown(html);
+            if (!CHANGED_ON_PURPOSE.test(html)) {
+                compared += 1;
 
-            if (actual !== expected) {
-                expect.fail(
-                    `case ${index} differs for ${JSON.stringify(options)}\ninput: ${JSON.stringify(html)}\nupstream: ${JSON.stringify(expected)}\nours:     ${JSON.stringify(actual)}`,
-                );
+                const expected = new TurndownUpstream(options).turndown(html);
+                const actual = new TurndownService(options).turndown(html);
+
+                if (actual !== expected) {
+                    expect.fail(
+                        `case ${index} differs for ${JSON.stringify(options)}\ninput: ${JSON.stringify(html)}\nupstream: ${JSON.stringify(expected)}\nours:     ${JSON.stringify(actual)}`,
+                    );
+                }
             }
         }
 
         expect(skipped).toBeLessThan(CASES / 100);
+        expect(compared).toBeGreaterThanOrEqual(MIN_COMPARED);
     });
 });
