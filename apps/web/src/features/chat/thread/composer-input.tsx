@@ -56,6 +56,7 @@ import type { ComposerRestoreFile } from "@/features/chat/core/utils/composer-re
 import { loadRestoreFile, onComposerRestore, textAfterRestore } from "@/features/chat/core/utils/composer-restore";
 import { onComposerAttachRequest, onComposerSubmitRequest } from "@/features/chat/core/utils/composer-submit";
 import ComposerPromptImprovementButton from "@/features/chat/prompt-improvement/components/composer-prompt-improvement-button";
+import { draftOwnership } from "@/features/chat/split/composer-drafts";
 import AutoReadReplies from "@/features/chat/voice-mode/auto-read-replies";
 import VoiceModeButton from "@/features/chat/voice-mode/voice-mode-button";
 import { useConnectionView } from "@/features/connection/hooks/use-connection";
@@ -1198,6 +1199,9 @@ const ComposerInput = ({
         }
 
         return onComposerSubmitRequest(({ text: requested }) => {
+            // Sent from outside the chat (the Quick Composer): like a route's prefill, it is not stored over the chat's saved
+            // draft, which comes back once the send ends (`stored-drafts.ts`).
+            draftOwnership.prefill = requested;
             autoSubmitTextRef.current = requested;
             setText(requested);
             setAutoSubmitRequest((count) => count + 1);
@@ -1207,6 +1211,7 @@ const ComposerInput = ({
     // The message a visitor sent before signing in (invite-only), sent once a real account's token is on the client.
     // The new-chat composer and a thread's composer both take it: sign-in returns to the URL it started from.
     usePendingSend(!onSubmitOverride && !compact, (pending) => {
+        draftOwnership.prefill = pending;
         autoSubmitTextRef.current = pending;
         setText(pending);
         setAutoSubmitRequest((count) => count + 1);
