@@ -559,10 +559,18 @@ const syncIdentity = (posthog: PostHog): void => {
     identityState.applied = { organizationId, userId };
 };
 
+/**
+ * How long startup waits for a signed-in user's organization. A read that stalls past it does not hold every capture:
+ * PostHog starts with the user alone, and the group is applied once the organization answers.
+ */
+export const ORGANIZATION_WAIT_MS = 5000;
+
+const organizationWait: { isOver: boolean; timer?: ReturnType<typeof setTimeout> } = { isOver: false };
+
 const finishStartup = (): void => {
     const { client } = startup;
 
-    const isIdentityKnown = identityState.current !== undefined && !identityState.current.isOrganizationPending;
+    const isIdentityKnown = identityState.current !== undefined && (!identityState.current.isOrganizationPending || organizationWait.isOver);
 
     if (!client || startup.isStarted || (!isIdentityKnown && !identityState.isAbandoned)) {
         return;
@@ -602,6 +610,27 @@ export const startPostHog = (posthog: PostHog, onStarted: () => void): void => {
     finishStartup();
 };
 
+/** Starts the bound on a pending organization, once per wait; an answer (or no user to wait for) ends it. */
+const waitForOrganization = (identity: AnalyticsIdentity): void => {
+    if (!identity.isOrganizationPending || startup.isStarted) {
+        clearTimeout(organizationWait.timer);
+        organizationWait.timer = undefined;
+        organizationWait.isOver = false;
+
+        return;
+    }
+
+    if (organizationWait.timer !== undefined || organizationWait.isOver) {
+        return;
+    }
+
+    organizationWait.timer = setTimeout(() => {
+        organizationWait.timer = undefined;
+        organizationWait.isOver = true;
+        finishStartup();
+    }, ORGANIZATION_WAIT_MS);
+};
+
 /** Publishes the session's identity; applied at once to a started client, else when PostHog starts. */
 export const setAnalyticsIdentity = (identity: AnalyticsIdentity): void => {
     if (identity.user && identity.user.id === identityState.departedUserId) {
@@ -618,6 +647,7 @@ export const setAnalyticsIdentity = (identity: AnalyticsIdentity): void => {
 
     identityState.departedUserId = undefined;
     identityState.current = identity;
+    waitForOrganization(identity);
 
     // The landing page view belongs to the first account the session names: one that switches before PostHog starts
     // does not send it (`flushPendingCaptures` applies the events' rule to it).

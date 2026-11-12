@@ -458,6 +458,33 @@ describe("startPostHog", () => {
         expect(onStarted).toHaveBeenCalledOnce();
     });
 
+    it("starts with the user alone once the organization stalls past the wait, and adds the group when it answers", async () => {
+        vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+
+        try {
+            const client = await loadClientModule();
+
+            client.queueEvent("onboarding_started", {});
+            client.startPostHog(await client.loadPostHog(), () => {});
+            client.setAnalyticsIdentity({ isOrganizationPending: true, user: { id: "user-1" } });
+
+            expect(client.getStartedPostHog()).toBeUndefined();
+
+            vi.advanceTimersByTime(client.ORGANIZATION_WAIT_MS);
+
+            expect(client.getStartedPostHog()).toBe(posthog);
+            expect(posthog.identify).toHaveBeenCalledWith("user-1", expect.anything());
+            expect(posthog.capture.mock.calls.map(([event]) => event)).toContain("onboarding_started");
+            expect(posthog.group).not.toHaveBeenCalled();
+
+            client.setAnalyticsIdentity({ organization: { id: "org-1", name: "Acme" }, user: { id: "user-1" } });
+
+            expect(posthog.group).toHaveBeenCalledExactlyOnceWith("organization", "org-1", { name: "Acme" });
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
     it("waits for a signed-in user's pending organization before it starts, then applies both", async () => {
         const client = await loadClientModule();
 
