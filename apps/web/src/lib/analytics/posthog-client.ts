@@ -349,14 +349,7 @@ export const flushPendingCaptures = (posthog: PostHog): void => {
 
     const isOptedOut = posthog.has_opted_out_capturing();
     const appliedUserId = identityState.applied?.userId;
-    const sendable = isOptedOut
-        ? []
-        : events.filter(
-              ({ event, userId }) =>
-                  (typeof userId !== "string" || userId === appliedUserId) &&
-                  // The sign-out kept through its drop is the account that left: sent signed out, never as whoever signed in next.
-                  (event !== SIGN_OUT_EVENT || appliedUserId === undefined),
-          );
+    const sendable = isOptedOut ? [] : events.filter(({ userId }) => typeof userId !== "string" || userId === appliedUserId);
 
     const isLandingTheirs = typeof landing?.userId !== "string" || landing.userId === appliedUserId;
 
@@ -575,6 +568,33 @@ export const ORGANIZATION_WAIT_MS = 5000;
 /** The bounded wait for one user's organization: another user starts a wait of their own. */
 const organizationWait: { isOver: boolean; timer?: ReturnType<typeof setTimeout>; userId?: string } = { isOver: false };
 
+/**
+ * The sign-outs a sign-out's drop kept (`dropForSignOut`), sent before the session's identity is applied: the client is
+ * still the signed-out one then (the sign-out cleared what it stored), so the count is kept and never lands on an account
+ * that signed in on this page.
+ */
+const sendKeptSignOuts = (posthog: PostHog): void => {
+    const events = pendingEvents();
+    const kept = events.filter(({ event, userId }) => event === SIGN_OUT_EVENT && userId === null);
+
+    if (kept.length === 0) {
+        return;
+    }
+
+    const rest = events.filter((event: PendingEvent) => !kept.includes(event));
+
+    queueState.events = rest;
+    storeEvents(rest);
+
+    if (posthog.has_opted_out_capturing()) {
+        return;
+    }
+
+    for (const event of kept) {
+        capturePending(posthog, event);
+    }
+};
+
 const finishStartup = (): void => {
     const { client } = startup;
 
@@ -589,6 +609,7 @@ const finishStartup = (): void => {
         client.reset();
     }
 
+    sendKeptSignOuts(client);
     syncIdentity(client);
     startup.isStarted = true;
     flushPendingCaptures(client);
