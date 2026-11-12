@@ -446,6 +446,55 @@ describe("saving", () => {
         controller.stop();
     });
 
+    it("a record held back while the gate was closed is restored before the first save once it opens, never replaced by less", async () => {
+        const memory = memoryStore();
+
+        await saveTexts(memory, ALICE, [
+            [KEY, "kept"],
+            [OTHER_KEY, "kept"],
+        ]);
+
+        const { gate, writeGate } = openGate();
+        const queryClient = new QueryClient();
+
+        gate.allowed = false;
+
+        const controller = start(memory.store, ALICE, queryClient, { gate: writeGate });
+
+        await controller.restored;
+        expect(queryClient.getQueryData(OTHER_KEY)).toBeUndefined();
+
+        controller.enableWrites();
+        queryClient.setQueryData(KEY, { text: "live" });
+        await vi.advanceTimersByTimeAsync(WRITE_THROTTLE_MS * 2);
+
+        expect(memory.stores.entries.get(ALICE)).toBeDefined();
+
+        const written = { done: false };
+
+        void (async () => {
+            await memory.settled();
+            written.done = true;
+        })();
+        gate.allowed = true;
+        queryClient.setQueryData(KEY, { text: "live again" });
+
+        // The restore runs first (WebCrypto, not a timer), then the throttled save: step the clock until it lands.
+        while (!written.done) {
+            await vi.advanceTimersByTimeAsync(WRITE_THROTTLE_MS);
+        }
+
+        expect(textOf(queryClient, OTHER_KEY)).toBe("kept");
+        expect(textOf(queryClient, KEY)).toBe("live again");
+        controller.stop();
+
+        const next = new QueryClient();
+
+        await start(memory.store, ALICE, next).restored;
+        expect(textOf(next, KEY)).toBe("live again");
+        expect(textOf(next, OTHER_KEY)).toBe("kept");
+    });
+
     /** A session whose save waits on the store until `release()`; `release` resolves once a removal has run after it. */
     const heldSave = async (onRemove: () => Promise<void> = async () => undefined) => {
         const memory = memoryStore();

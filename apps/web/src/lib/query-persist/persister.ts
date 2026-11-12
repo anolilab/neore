@@ -52,7 +52,11 @@ export interface PersistenceOptions {
 export interface PersistenceController {
     /** Starts saving: the session is confirmed to be this account's own (not a guest, not impersonated). */
     enableWrites: () => void;
-    /** Resolves once the restore has finished or failed; never rejects. */
+
+    /**
+     * Resolves once the first restore attempt has finished or failed; never rejects. A record it could not hand over (the
+     * gate closed, a clear meanwhile) is restored once the gate lets a save through, before that save.
+     */
     readonly restored: Promise<void>;
     /** The session turned out not to be one to keep: stop, and drop what was restored and not yet refreshed. */
     revoke: () => void;
@@ -135,7 +139,7 @@ export const startQueryPersistence = (options: PersistenceOptions): PersistenceC
     /** What the restore handed over, with its data count then: any later data, even stamped the same millisecond, counts it up. */
     const restoredCount = new WeakMap<Query, number>();
     const isRestored = (query: Query): boolean => restoredCount.get(query) === query.state.dataUpdateCount;
-    const state = { isDirty: false, isRestoreDone: false, isSaving: false, stopped: false, writes: false };
+    const state = { isDirty: false, isRestoreDone: false, isRestoring: true, isSaving: false, stopped: false, writes: false };
     let timer: ReturnType<typeof setTimeout> | undefined;
     let unsubscribe: (() => void) | undefined;
 
@@ -162,43 +166,6 @@ export const startQueryPersistence = (options: PersistenceOptions): PersistenceC
         }
     };
 
-    const schedule = (): void => {
-        if (timer !== undefined || !state.isRestoreDone || !mayWrite(gate.generation())) {
-            return;
-        }
-
-        // One save queued or sealing at a time: a change meanwhile is saved once after it, not once per interval it waited.
-        if (state.isSaving) {
-            state.isDirty = true;
-
-            return;
-        }
-
-        const generation = gate.generation();
-
-        timer = setTimeout(() => {
-            timer = undefined;
-            state.isSaving = true;
-
-            void serialized(userId, async () => {
-                // The save takes the cache as it is now: only a change after this needs another.
-                state.isDirty = false;
-                await write(generation);
-            })
-                .catch(() => {
-                    // Quota, a blocked store, a lost key: the cache just is not kept this time.
-                })
-                .finally(() => {
-                    state.isSaving = false;
-
-                    if (state.isDirty) {
-                        state.isDirty = false;
-                        schedule();
-                    }
-                });
-        }, WRITE_THROTTLE_MS);
-    };
-
     const parse = (text: string | undefined): unknown => {
         try {
             return text === undefined ? undefined : JSON.parse(text);
@@ -220,12 +187,13 @@ export const startQueryPersistence = (options: PersistenceOptions): PersistenceC
         }
     };
 
-    const restore = async (): Promise<void> => {
+    /** Whether the record is settled for this session: handed over, absent, or dropped. Not when it is held back unread. */
+    const restore = async (): Promise<boolean> => {
         const generation = gate.generation();
         const opened = await openRecord(store, userId);
 
         if (opened === undefined) {
-            return;
+            return true;
         }
 
         // Stopped (an account switch) or cleared (a sign-out) while the record was read: it is no longer this session's to show or remove.
@@ -239,11 +207,11 @@ export const startQueryPersistence = (options: PersistenceOptions): PersistenceC
                 await serialized(userId, async () => await removeRecord(store, userId, opened.seal));
             }
 
-            return;
+            return true;
         }
 
         if (isStale() || !gate.canWrite(userId)) {
-            return;
+            return false;
         }
 
         const cutoff = now() - MAX_AGE_MS;
@@ -283,17 +251,81 @@ export const startQueryPersistence = (options: PersistenceOptions): PersistenceC
         // it), and one already showing it fetches now. Not awaited: the restore is done once the data shows, not once the
         // network answers. A fetch already in flight is kept, not restarted.
         void queryClient.invalidateQueries({ predicate: isRestored, refetchType: "active" }, { cancelRefetch: false });
+
+        return true;
     };
 
-    const restored = (async () => {
+    /** Restores the record, unless it is held back (the gate closed, a clear meanwhile): then the next save retries first. */
+    const attemptRestore = async (): Promise<void> => {
+        state.isRestoring = true;
+
+        let isDone = true;
+
         try {
-            await restore();
+            isDone = await restore();
             await pruneRecords(store, now() - MAX_AGE_MS);
         } catch {
             // A blocked or failing store: nothing is shown, and the network fills the cache.
         }
 
-        state.isRestoreDone = true;
+        state.isRestoring = false;
+        state.isRestoreDone = isDone;
+    };
+
+    const schedule = (): void => {
+        if (timer !== undefined || !mayWrite(gate.generation())) {
+            return;
+        }
+
+        // A save replaces the whole record: one this session has not restored yet is restored first, or it is lost.
+        if (!state.isRestoreDone) {
+            if (!state.isRestoring) {
+                void (async () => {
+                    await attemptRestore();
+
+                    if (!state.stopped) {
+                        schedule();
+                    }
+                })();
+            }
+
+            return;
+        }
+
+        // One save queued or sealing at a time: a change meanwhile is saved once after it, not once per interval it waited.
+        if (state.isSaving) {
+            state.isDirty = true;
+
+            return;
+        }
+
+        const generation = gate.generation();
+
+        timer = setTimeout(() => {
+            timer = undefined;
+            state.isSaving = true;
+
+            void serialized(userId, async () => {
+                // The save takes the cache as it is now: only a change after this needs another.
+                state.isDirty = false;
+                await write(generation);
+            })
+                .catch(() => {
+                    // Quota, a blocked store, a lost key: the cache just is not kept this time.
+                })
+                .finally(() => {
+                    state.isSaving = false;
+
+                    if (state.isDirty) {
+                        state.isDirty = false;
+                        schedule();
+                    }
+                });
+        }, WRITE_THROTTLE_MS);
+    };
+
+    const restored = (async () => {
+        await attemptRestore();
 
         if (!state.stopped) {
             unsubscribe = queryClient.getQueryCache().subscribe((event) => {
