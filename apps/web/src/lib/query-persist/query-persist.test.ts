@@ -734,6 +734,39 @@ describe("saving", () => {
         await expect(openRecord(memory.store, ALICE)).resolves.toMatchObject({ text: "now" });
     });
 
+    it("joins a request already in flight for a restored query instead of starting a second", async () => {
+        const memory = memoryStore();
+
+        await saveTexts(memory, ALICE, [[KEY, "kept"]]);
+
+        const queryClient = new QueryClient();
+        let calls = 0;
+        const pending: { answer?: (value: { text: string }) => void } = {};
+        const observer = new QueryObserver(queryClient, {
+            queryFn: async () => {
+                calls += 1;
+
+                return await new Promise<{ text: string }>((resolve) => {
+                    pending.answer = resolve;
+                });
+            },
+            queryKey: KEY,
+            staleTime: Infinity,
+        });
+        const unsubscribe = observer.subscribe(() => undefined);
+
+        expect(calls).toBe(1);
+
+        await start(memory.store, ALICE, queryClient).restored;
+        await vi.advanceTimersByTimeAsync(0);
+
+        expect(calls).toBe(1);
+        pending.answer?.({ text: "live" });
+        await vi.advanceTimersByTimeAsync(0);
+        expect(textOf(queryClient, KEY)).toBe("live");
+        unsubscribe();
+    });
+
     it("does not carry a read older than the age limit into a new record", async () => {
         const memory = memoryStore();
         const queryClient = new QueryClient();
