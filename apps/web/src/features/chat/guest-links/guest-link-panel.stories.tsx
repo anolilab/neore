@@ -6,28 +6,30 @@ import { expect, fn, screen, userEvent, waitFor, within } from "storybook/test";
 
 import { GUEST_NOTES, guestLinksFixtures } from "@/storybook/fixtures/guest-links";
 import { userFixtures } from "@/storybook/fixtures/user";
-import { lunoraAnswered, lunoraError, lunoraHandlers } from "@/storybook/lunora";
+import { lunora, lunoraAnswered, lunoraError, lunoraHandlers, lunoraIdle } from "@/storybook/lunora";
 
 import GuestLinkPanel from "./guest-link-panel";
 import useGuestLinkRevoke from "./use-guest-link-revoke";
 
 /** The panel with the real revoke and its confirm beside it, as the share button holds them. */
-const WithRevoke = ({ revokeLink: _unused, ...props }: ComponentProps<typeof GuestLinkPanel>) => {
-    const { confirmDialog, revokeLink } = useGuestLinkRevoke(props.threadId);
+const WithRevoke = ({ threadId, ...props }: Omit<ComponentProps<typeof GuestLinkPanel>, "revokeLink">) => {
+    const { confirmDialog, revokeLink } = useGuestLinkRevoke(threadId);
 
     return (
         <>
-            <GuestLinkPanel {...props} revokeLink={revokeLink} />
+            <GuestLinkPanel {...props} revokeLink={revokeLink} threadId={threadId} />
             {confirmDialog}
         </>
     );
 };
 
 const HELD = GUEST_NOTES[0]?.text ?? "";
+/** `RevokeDeclined`'s revoke: a Cancel must never reach it. */
+const revokeCalled = fn(() => null);
 
 const meta = {
-    args: { revokeLink: fn(async () => true), threadId: "thread-1" },
-    component: GuestLinkPanel,
+    args: { threadId: "thread-1" },
+    component: WithRevoke,
     decorators: [
         (Story) => (
             <div className="w-[26rem]">
@@ -36,9 +38,8 @@ const meta = {
         ),
     ],
     parameters: { msw: { handlers: { lunora: lunoraHandlers(...userFixtures(), ...guestLinksFixtures()) } } },
-    render: (args) => <WithRevoke {...args} />,
     title: "Chat/Guest link",
-} satisfies Meta<typeof GuestLinkPanel>;
+} satisfies Meta<typeof WithRevoke>;
 
 export default meta;
 
@@ -115,12 +116,18 @@ export const RevokeWithWaitingNotes: Story = {
 
 /** Cancelling the confirm revokes nothing. */
 export const RevokeDeclined: Story = {
+    parameters: {
+        msw: { handlers: { lunora: lunoraHandlers(...userFixtures(), ...guestLinksFixtures(), lunora(api.chat.guest_links.revokeGuestLink, revokeCalled)) } },
+    },
     play: async ({ canvas }) => {
+        revokeCalled.mockClear();
         await userEvent.click(await canvas.findByRole("button", { name: "Revoke link" }));
         await userEvent.click(await screen.findByRole("button", { name: "Cancel" }));
         await waitFor(async () => {
             await expect(screen.queryByRole("alertdialog")).toBeNull();
         });
+        await lunoraIdle();
+        await expect(revokeCalled).not.toHaveBeenCalled();
         await expect(canvas.getByRole("button", { name: "Revoke link" })).toBeEnabled();
     },
 };
@@ -147,7 +154,7 @@ export const RefusalInAppWords: Story = {
 };
 
 /** Stands in for the owner moving to another chat while a new link is being made. */
-const ChatChangesDuringCreate = ({ threadId: firstThreadId, ...props }: ComponentProps<typeof GuestLinkPanel>) => {
+const ChatChangesDuringCreate = ({ threadId: firstThreadId, ...props }: ComponentProps<typeof WithRevoke>) => {
     const [threadId, setThreadId] = useState(firstThreadId);
 
     return (
@@ -155,7 +162,7 @@ const ChatChangesDuringCreate = ({ threadId: firstThreadId, ...props }: Componen
             <button onClick={() => setThreadId("thread-2")} type="button">
                 Open another chat
             </button>
-            <GuestLinkPanel {...props} threadId={threadId} />
+            <WithRevoke {...props} threadId={threadId} />
         </>
     );
 };

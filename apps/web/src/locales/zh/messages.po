@@ -1523,7 +1523,7 @@ msgstr "$20/月，替代 ChatGPT + Midjourney + Runway 等。免费开始——�
 msgid "1 {from} in other currencies"
 msgstr "1 {from} 兑换其他货币"
 
-#: src/features/chat/sharing/thread-share-button.tsx:329
+#: src/features/chat/sharing/thread-share-button.tsx:328
 msgid "1 Day"
 msgstr "1 天"
 
@@ -1688,7 +1688,7 @@ msgstr "52 周区间"
 msgid "7 days"
 msgstr "7 天"
 
-#: src/features/chat/sharing/thread-share-button.tsx:330
+#: src/features/chat/sharing/thread-share-button.tsx:329
 msgid "7 Days"
 msgstr "7 天"
 
@@ -1802,7 +1802,8 @@ msgstr "已保存密钥。留空则保持不变。"
 msgid "A key is saved. Leave blank to keep it. Changing the endpoint, region or access key id requires entering it again."
 msgstr "已保存密钥。留空即可保留。更改端点、区域或访问密钥 ID 时需要重新输入。"
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:160
+#: src/features/chat/guest-links/guest-link-panel.tsx:67
+#: src/features/chat/guest-links/guest-link-panel.tsx:131
 msgid "A locked chat cannot have a guest link."
 msgstr "已锁定的聊天不能有访客链接。"
 
@@ -2046,7 +2047,7 @@ msgstr "接受邀请"
 msgid "Accept or reject invitations to join organizations"
 msgstr "接受或拒绝加入组织的邀请"
 
-#: src/features/chat/sharing/thread-share-button.tsx:259
+#: src/features/chat/sharing/thread-share-button.tsx:258
 #: src/features/pages/components/page-share-dialog.tsx:96
 msgid "Access"
 msgstr "访问权限"
@@ -2607,8 +2608,8 @@ msgstr "调整"
 #: src/features/auth/components/team/team-member-cell.tsx:148
 #: src/features/auth/components/team/team-member-cell.tsx:163
 #: src/features/auth/components/team/team-switcher.tsx:143
-#: src/features/chat/sharing/thread-share-button.tsx:213
-#: src/features/chat/sharing/thread-share-button.tsx:318
+#: src/features/chat/sharing/thread-share-button.tsx:212
+#: src/features/chat/sharing/thread-share-button.tsx:317
 #: src/features/layout/components/sidebar-shortcut.tsx:268
 #: src/features/layout/lib/dashboard-page-names.ts:12
 #: src/routes/admin/route.tsx:51
@@ -3635,7 +3636,7 @@ msgstr "我的任意聊天"
 msgid "Any string you choose; enter the same value as the webhook Verify token in the Meta app"
 msgstr "任意你选择的字符串；在 Meta 应用中填入相同的值作为 webhook 验证令牌"
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:158
+#: src/features/chat/guest-links/guest-link-panel.tsx:129
 msgid "Anyone with a guest link can leave you a message here. Nothing they write runs on its own."
 msgstr "任何拥有访客链接的人都可以在这里给你留言。他们写的内容不会自行运行。"
 
@@ -3643,7 +3644,7 @@ msgstr "任何拥有访客链接的人都可以在这里给你留言。他们写
 msgid "Anyone with the link can read this page. Comments are never shown. Turning it off revokes the link."
 msgstr "任何拥有链接的人都可以阅读此页面。评论永远不会显示。关闭后链接将失效。"
 
-#: src/features/chat/sharing/thread-share-button.tsx:379
+#: src/features/chat/sharing/thread-share-button.tsx:378
 msgid "Anyone with the link can view this thread"
 msgstr "任何拥有链接的人都可以查看此对话"
 
@@ -3961,7 +3962,7 @@ msgstr "确定要离开此组织吗？"
 msgid "Are you sure you want to make {userName} an admin? They will have full access to admin features."
 msgstr "确定要将 {userName} 设为管理员吗？对方将拥有管理功能的完全访问权限。"
 
-#: src/features/chat/sharing/thread-share-button.tsx:413
+#: src/features/chat/sharing/thread-share-button.tsx:412
 msgid "Are you sure you want to remove {userToRemoveName} from this thread?"
 msgstr "确定要将 {userToRemoveName} 从此对话中移除吗？"
 
@@ -7981,8 +7982,8 @@ msgstr "已复制！"
 #: ../../packages/ui/src/components/data-grid/data-grid-context-menu.tsx:225
 #: src/features/auth/components/settings/api-key/mcp-config-snippet.tsx:30
 #: src/features/auth/components/settings/two-factor/backup-codes-dialog.tsx:100
-#: src/features/chat/guest-links/guest-link-panel.tsx:165
-#: src/features/chat/sharing/thread-share-button.tsx:394
+#: src/features/chat/guest-links/guest-link-panel.tsx:136
+#: src/features/chat/sharing/thread-share-button.tsx:393
 #: src/features/chat/thread/message-item.tsx:356
 #: src/features/chat/thread/text-selection-menu.tsx:525
 #: src/features/settings/components/chat/trigger-settings.tsx:782
@@ -8291,11 +8292,11 @@ msgstr "无法确认自动合并的更改。请先在 {hostLabel} 上确认，�
 msgid "Could not connect to the server."
 msgstr "无法连接到服务器。"
 
-#: src/features/chat/sharing/thread-share-button.tsx:125
+#: src/features/chat/sharing/thread-share-button.tsx:124
 msgid "Could not copy automatically. Invite link: {inviteLink}"
 msgstr "无法自动复制。邀请链接：{inviteLink}"
 
-#: src/features/chat/sharing/thread-share-button.tsx:191
+#: src/features/chat/sharing/thread-share-button.tsx:190
 msgid "Could not copy automatically. Public link: {publicLink}"
 msgstr "无法自动复制。公开链接：{publicLink}"
 
@@ -8832,7 +8833,7 @@ msgstr "创建目标"
 msgid "Create group chat"
 msgstr "创建群聊"
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:195
+#: src/features/chat/guest-links/guest-link-panel.tsx:166
 msgid "Create guest link"
 msgstr "创建访客链接"
 
@@ -8844,7 +8845,7 @@ msgstr "创建图像和视频"
 msgid "Create images with FLUX, Imagen, and Stable Diffusion. Generate videos with Runway, Luma, and Kling. Compare outputs across providers — pick the best result, not the only result."
 msgstr "使用 FLUX、Imagen 和 Stable Diffusion 生成图像，使用 Runway、Luma 和 Kling 生成视频。跨提供商对比输出——选择最佳结果，而不是唯一结果。"
 
-#: src/features/chat/sharing/thread-share-button.tsx:342
+#: src/features/chat/sharing/thread-share-button.tsx:341
 msgid "Create Invite"
 msgstr "创建邀请"
 
@@ -9157,7 +9158,7 @@ msgid "Currently restricted"
 msgstr "当前受限"
 
 #: src/features/canvas/components/design-preset-selector.tsx:87
-#: src/features/chat/sharing/thread-share-button.tsx:331
+#: src/features/chat/sharing/thread-share-button.tsx:330
 #: src/features/marketing/components/gateway-landing-page.tsx:792
 #: src/features/marketing/components/landing-page.tsx:1014
 #: src/features/prompts/components/prompt-form-dialog.tsx:444
@@ -11542,7 +11543,7 @@ msgid "Email"
 msgstr "邮箱"
 
 #: src/features/auth/components/settings/security/change-email-card.tsx:139
-#: src/features/chat/sharing/thread-share-button.tsx:306
+#: src/features/chat/sharing/thread-share-button.tsx:305
 msgid "Email Address"
 msgstr "邮箱地址"
 
@@ -11889,7 +11890,7 @@ msgid "Enter default value..."
 msgstr "输入默认值..."
 
 #: src/features/auth/components/organization/invite-member-dialog.tsx:118
-#: src/features/chat/sharing/thread-share-button.tsx:307
+#: src/features/chat/sharing/thread-share-button.tsx:306
 msgid "Enter email address"
 msgstr "输入邮箱地址"
 
@@ -12579,7 +12580,7 @@ msgstr "实验性"
 msgid "Experimental reasoning with DeepSeek's latest thinking capabilities"
 msgstr "使用 DeepSeek 最新思考能力的实验性推理"
 
-#: src/features/chat/sharing/thread-share-button.tsx:323
+#: src/features/chat/sharing/thread-share-button.tsx:322
 msgid "Expiration"
 msgstr "有效期"
 
@@ -12631,7 +12632,7 @@ msgstr "{remainingTime} 后过期"
 msgid "Expires on {0}"
 msgstr "于 {0} 过期"
 
-#: src/features/chat/sharing/thread-share-button.tsx:355
+#: src/features/chat/sharing/thread-share-button.tsx:354
 msgid "Expires:"
 msgstr "过期时间："
 
@@ -12970,7 +12971,7 @@ msgstr "创建分支失败"
 msgid "Failed to create budget alert"
 msgstr "创建预算提醒失败"
 
-#: src/features/chat/sharing/thread-share-button.tsx:130
+#: src/features/chat/sharing/thread-share-button.tsx:129
 msgid "Failed to create invite"
 msgstr "创建邀请失败"
 
@@ -13274,7 +13275,7 @@ msgstr "无法移除提供商"
 msgid "Failed to remove skill"
 msgstr "移除技能失败"
 
-#: src/features/chat/sharing/thread-share-button.tsx:156
+#: src/features/chat/sharing/thread-share-button.tsx:155
 msgid "Failed to remove user access"
 msgstr "移除用户访问权限失败"
 
@@ -13306,7 +13307,7 @@ msgstr "恢复此版本失败。"
 msgid "Failed to restore version"
 msgstr "恢复版本失败"
 
-#: src/features/chat/sharing/thread-share-button.tsx:140
+#: src/features/chat/sharing/thread-share-button.tsx:139
 msgid "Failed to revoke invite"
 msgstr "撤销邀请失败"
 
@@ -13568,7 +13569,7 @@ msgstr "更新快速检查失败"
 msgid "Failed to update the trusted servers"
 msgstr "更新受信任服务器失败"
 
-#: src/features/chat/sharing/thread-share-button.tsx:173
+#: src/features/chat/sharing/thread-share-button.tsx:172
 msgid "Failed to update thread visibility"
 msgstr "更新对话可见性失败"
 
@@ -15794,23 +15795,23 @@ msgstr "访客账号只能使用免费模型。"
 msgid "Guest accounts use free models only. Sign up to unlock all models."
 msgstr "访客账号仅可使用免费模型。注册即可解锁所有模型。"
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:163
+#: src/features/chat/guest-links/guest-link-panel.tsx:134
 msgid "Guest link"
 msgstr "访客链接"
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:149
+#: src/features/chat/guest-links/guest-link-panel.tsx:120
 msgid "Guest link copied"
 msgstr "已复制访客链接"
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:199
+#: src/features/chat/guest-links/guest-link-panel.tsx:170
 msgid "Guest messages"
 msgstr "访客消息"
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:87
+#: src/features/chat/guest-links/guest-link-panel.tsx:61
 msgid "Guest messages from an earlier link are still waiting."
 msgstr "仍有来自之前链接的访客消息在等待。"
 
-#: src/features/chat/sharing/thread-share-button.tsx:262
+#: src/features/chat/sharing/thread-share-button.tsx:261
 msgid "Guests"
 msgstr "访客"
 
@@ -16288,7 +16289,7 @@ msgstr "热键"
 msgid "Hour"
 msgstr "小时"
 
-#: src/features/chat/sharing/thread-share-button.tsx:337
+#: src/features/chat/sharing/thread-share-button.tsx:336
 msgid "Hours"
 msgstr "小时"
 
@@ -17359,7 +17360,7 @@ msgstr "邀请出错"
 msgid "Invite link"
 msgstr "邀请链接"
 
-#: src/features/chat/sharing/thread-share-button.tsx:123
+#: src/features/chat/sharing/thread-share-button.tsx:122
 msgid "Invite link copied to clipboard!"
 msgstr "邀请链接已复制到剪贴板！"
 
@@ -17376,7 +17377,7 @@ msgstr "邀请新成员并更新现有成员的角色"
 msgid "Invite new members. They join once they accept the invitation."
 msgstr "邀请新成员。他们接受邀请后即可加入。"
 
-#: src/features/chat/sharing/thread-share-button.tsx:138
+#: src/features/chat/sharing/thread-share-button.tsx:137
 msgid "Invite revoked"
 msgstr "邀请已撤销"
 
@@ -17389,7 +17390,7 @@ msgstr "由 {0} 邀请"
 msgid "Invited to join"
 msgstr "受邀加入"
 
-#: src/features/chat/sharing/thread-share-button.tsx:260
+#: src/features/chat/sharing/thread-share-button.tsx:259
 msgid "Invites"
 msgstr "邀请"
 
@@ -18217,7 +18218,7 @@ msgstr "了解更多关于 MCP 的信息"
 msgid "Learning"
 msgstr "学习"
 
-#: src/features/chat/guest-links/guest-page.tsx:240
+#: src/features/chat/guest-links/guest-page.tsx:235
 #: src/routes/(public)/guest.tsx:12
 msgid "Leave a message"
 msgstr "留言"
@@ -18457,7 +18458,7 @@ msgstr "不是有效 JSON 的行"
 msgid "Link"
 msgstr "关联"
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:171
+#: src/features/chat/guest-links/guest-link-panel.tsx:142
 msgid "Link active until {expiresAt}"
 msgstr "链接有效期至 {expiresAt}"
 
@@ -18860,7 +18861,7 @@ msgstr "正在加载工作流..."
 msgid "Loading your items…"
 msgstr "正在加载你的项目…"
 
-#: src/features/chat/guest-links/guest-page.tsx:291
+#: src/features/chat/guest-links/guest-page.tsx:286
 msgid "Loading your messages…"
 msgstr "正在加载你的消息…"
 
@@ -21468,7 +21469,7 @@ msgstr "无权访问此仓库。"
 msgid "No active session found. Please sign in again."
 msgstr "未找到活跃会话。请重新登录。"
 
-#: src/features/chat/sharing/thread-share-button.tsx:266
+#: src/features/chat/sharing/thread-share-button.tsx:265
 msgid "No additional users have access to this thread."
 msgstr "没有其他用户可以访问此对话。"
 
@@ -24265,7 +24266,7 @@ msgstr "待处理"
 msgid "Pending Invitations"
 msgstr "待处理的邀请"
 
-#: src/features/chat/sharing/thread-share-button.tsx:347
+#: src/features/chat/sharing/thread-share-button.tsx:346
 msgid "Pending Invites"
 msgstr "待处理的邀请"
 
@@ -24321,7 +24322,7 @@ msgstr "永久删除此组织及其所有数据"
 msgid "Permanently delete your account and all associated data"
 msgstr "永久删除你的账号及所有相关数据"
 
-#: src/features/chat/sharing/thread-share-button.tsx:310
+#: src/features/chat/sharing/thread-share-button.tsx:309
 msgid "Permission Level"
 msgstr "权限级别"
 
@@ -24623,7 +24624,7 @@ msgstr "请确认你的密码"
 msgid "Please enter a backup code to access your account"
 msgstr "请输入备用码以访问你的账号"
 
-#: src/features/chat/sharing/thread-share-button.tsx:102
+#: src/features/chat/sharing/thread-share-button.tsx:101
 msgid "Please enter an email address"
 msgstr "请输入电子邮件地址"
 
@@ -25655,14 +25656,14 @@ msgstr "提供商"
 msgid "Pseudo numerical diffusion"
 msgstr "伪数值扩散"
 
-#: src/features/chat/sharing/thread-share-button.tsx:261
+#: src/features/chat/sharing/thread-share-button.tsx:260
 #: src/features/skills/components/skill-form-dialog.tsx:481
 #: src/features/skills/components/skill-item.tsx:124
 msgid "Public"
 msgstr "公开"
 
-#: src/features/chat/sharing/thread-share-button.tsx:378
-#: src/features/chat/sharing/thread-share-button.tsx:382
+#: src/features/chat/sharing/thread-share-button.tsx:377
+#: src/features/chat/sharing/thread-share-button.tsx:381
 msgid "Public Access"
 msgstr "公开访问"
 
@@ -25675,11 +25676,11 @@ msgstr "来自 Discord Developer Portal 的公钥，用于签名验证"
 msgid "Public link"
 msgstr "公开链接"
 
-#: src/features/chat/sharing/thread-share-button.tsx:390
+#: src/features/chat/sharing/thread-share-button.tsx:389
 msgid "Public Link"
 msgstr "公开链接"
 
-#: src/features/chat/sharing/thread-share-button.tsx:189
+#: src/features/chat/sharing/thread-share-button.tsx:188
 msgid "Public link copied to clipboard!"
 msgstr "公开链接已复制到剪贴板！"
 
@@ -26038,8 +26039,8 @@ msgstr "重新运行 {0}？"
 msgid "Read"
 msgstr "读取"
 
-#: src/features/chat/sharing/thread-share-button.tsx:219
-#: src/features/chat/sharing/thread-share-button.tsx:317
+#: src/features/chat/sharing/thread-share-button.tsx:218
+#: src/features/chat/sharing/thread-share-button.tsx:316
 msgid "Read & Write"
 msgstr "读写"
 
@@ -26059,8 +26060,8 @@ msgstr "每条助手回复完成后，使用浏览器的声音朗读出来。"
 msgid "Read only"
 msgstr "只读"
 
-#: src/features/chat/sharing/thread-share-button.tsx:216
-#: src/features/chat/sharing/thread-share-button.tsx:316
+#: src/features/chat/sharing/thread-share-button.tsx:215
+#: src/features/chat/sharing/thread-share-button.tsx:315
 msgid "Read Only"
 msgstr "只读"
 
@@ -26712,8 +26713,8 @@ msgstr "记住我"
 #: ../../packages/ui/src/components/ai-elements/attachments.tsx:195
 #: ../../packages/ui/src/components/combobox.tsx:304
 #: src/features/chat/host/host-composer.tsx:917
-#: src/features/chat/sharing/thread-share-button.tsx:295
-#: src/features/chat/sharing/thread-share-button.tsx:367
+#: src/features/chat/sharing/thread-share-button.tsx:294
+#: src/features/chat/sharing/thread-share-button.tsx:366
 #: src/features/chat/thread/composer-input.tsx:341
 #: src/features/chat/thread/composer-input.tsx:353
 #: src/features/chat/thread/composer-input.tsx:407
@@ -26942,7 +26943,7 @@ msgstr "移除 webhook"
 msgid "Remove These Files"
 msgstr "移除这些文件"
 
-#: src/features/chat/sharing/thread-share-button.tsx:429
+#: src/features/chat/sharing/thread-share-button.tsx:428
 msgid "Remove User"
 msgstr "移除用户"
 
@@ -27611,7 +27612,7 @@ msgstr "撤销"
 msgid "Revoke All Sessions"
 msgstr "撤销所有会话"
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:179
+#: src/features/chat/guest-links/guest-link-panel.tsx:150
 msgid "Revoke link"
 msgstr "撤销链接"
 
@@ -27627,11 +27628,11 @@ msgstr "撤销对 {tool} 的允许"
 msgid "Revoke the allow for {tool} on {server}"
 msgstr "撤销对 {server} 上 {tool} 的允许"
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:62
+#: src/features/chat/guest-links/guest-link-panel.tsx:51
 msgid "Revoke the earlier guest link first, then make a new one."
 msgstr "请先撤销之前的访客链接，再创建新的链接。"
 
-#: src/features/chat/guest-links/use-guest-link-revoke.tsx:58
+#: src/features/chat/guest-links/use-guest-link-revoke.tsx:61
 msgid "Revoke the guest link?"
 msgstr "撤销访客链接？"
 
@@ -27641,7 +27642,7 @@ msgid "Revoked {0} sessions"
 msgstr "已撤销 {0} 个会话"
 
 #: src/features/chat/guest-links/use-guest-link-revoke.tsx:48
-msgid "Revoking the link deletes {waitingCount, plural, one {the # guest message} other {the # guest messages}} still waiting. They cannot be sent afterwards."
+msgid "Revoking the link deletes {waitingCount, plural, one {the # guest message still waiting. It cannot be sent afterwards.} other {the # guest messages still waiting. They cannot be sent afterwards.}}"
 msgstr "撤销链接会删除仍在等待的 {waitingCount, plural, other {# 条访客消息}}。删除后将无法发送。"
 
 #: src/features/auth/components/settings/security/session-cell.tsx:103
@@ -29035,7 +29036,7 @@ msgstr "用你的账号将此内容发送给机器人："
 msgid "Send to agent"
 msgstr "发送给智能体"
 
-#: src/features/chat/guest-links/guest-page.tsx:280
+#: src/features/chat/guest-links/guest-page.tsx:275
 msgid "Send to the owner"
 msgstr "发送给所有者"
 
@@ -29051,12 +29052,12 @@ msgstr "发送验证码"
 msgid "Sending your message and waiting for the reply"
 msgstr "正在发送你的消息并等待回复"
 
-#: src/features/chat/guest-links/guest-page.tsx:280
+#: src/features/chat/guest-links/guest-page.tsx:275
 #: src/features/chat/thread/streaming-placeholder.tsx:617
 msgid "Sending…"
 msgstr "正在发送…"
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:204
+#: src/features/chat/guest-links/guest-link-panel.tsx:175
 #: src/features/devices/components/devices-settings.tsx:387
 msgid "Sent"
 msgstr "已发送"
@@ -29077,7 +29078,7 @@ msgstr "由无人值守的运行发送"
 msgid "Sent by the lead agent"
 msgstr "由主导智能体发送"
 
-#: src/features/chat/guest-links/guest-page.tsx:297
+#: src/features/chat/guest-links/guest-page.tsx:292
 msgid "Sent by the owner"
 msgstr "所有者已发送"
 
@@ -29288,8 +29289,8 @@ msgstr "支出占比"
 msgid "Share page"
 msgstr "分享页面"
 
-#: src/features/chat/sharing/thread-share-button.tsx:203
-#: src/features/chat/sharing/thread-share-button.tsx:252
+#: src/features/chat/sharing/thread-share-button.tsx:202
+#: src/features/chat/sharing/thread-share-button.tsx:251
 msgid "Share Thread"
 msgstr "分享对话"
 
@@ -32375,7 +32376,7 @@ msgstr "那台电脑不在线。"
 msgid "That did not go through. Try again."
 msgstr ""
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:102
+#: src/features/chat/guest-links/guest-link-panel.tsx:77
 msgid "That did not work. Please try again."
 msgstr "操作未成功。请重试。"
 
@@ -32386,10 +32387,6 @@ msgstr "未成功。请重试。"
 #: src/features/develop/components/guide-tab.tsx:92
 msgid "That folder is not offered for this repository on that computer."
 msgstr "那台电脑上未提供该文件夹用于此仓库。"
-
-#: src/features/chat/guest-links/guest-link-panel.tsx:67
-msgid "That guest link has ended."
-msgstr "该访客链接已失效。"
 
 #: src/features/develop/components/watched-repositories.tsx:163
 msgid "That is not a repository address."
@@ -32406,14 +32403,6 @@ msgstr "无法读取该链接。"
 #: src/features/chat/thread/message-list.tsx:312
 msgid "That message could not be found in this conversation."
 msgstr "在此对话中找不到该消息。"
-
-#: src/features/chat/guest-links/guest-link-panel.tsx:77
-msgid "That message is being sent."
-msgstr "该消息正在发送。"
-
-#: src/features/chat/guest-links/guest-link-panel.tsx:82
-msgid "That message is no longer waiting."
-msgstr "该消息已不在等待中。"
 
 #: src/features/chat/host/host-send-errors.ts:21
 msgid "That message is too long to send from here."
@@ -32736,7 +32725,7 @@ msgstr "发送给模型的完整系统提示词..."
 msgid "The goal is removed; its tasks stay, without a goal."
 msgstr "目标将被删除；其任务会保留，但不再属于任何目标。"
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:159
+#: src/features/chat/guest-links/guest-link-panel.tsx:130
 msgid "The guest link could not be loaded."
 msgstr "无法加载访客链接。"
 
@@ -32845,7 +32834,7 @@ msgstr "登录"
 msgid "The last turn stopped before it finished."
 msgstr "上一轮在完成前就停止了。"
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:150
+#: src/features/chat/guest-links/guest-link-panel.tsx:121
 msgid "The link could not be copied. Select it and copy it yourself."
 msgstr "无法复制链接。请选中后自行复制。"
 
@@ -32901,7 +32890,7 @@ msgstr "无法访问 MCP 注册表，因此可能缺少服务器建议。"
 msgid "The MCP Registry is unavailable right now. Showing popular servers instead."
 msgstr "MCP 注册表当前不可用，改为显示热门服务器。"
 
-#: src/features/chat/guest-links/guest-page.tsx:104
+#: src/features/chat/guest-links/guest-page.tsx:99
 msgid "The message could not be sent. Check your connection and try again."
 msgstr "消息无法发送。请检查网络连接后重试。"
 
@@ -33376,7 +33365,7 @@ msgstr "此聊天属于某个工作进程。请在它自己的消息框中向它
 msgid "This chat cannot be compacted."
 msgstr "此聊天无法压缩。"
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:72
+#: src/features/chat/guest-links/guest-link-panel.tsx:56
 msgid "This chat cannot have a guest link."
 msgstr "此聊天不能有访客链接。"
 
@@ -33395,10 +33384,6 @@ msgstr "此聊天已闲置，模型缓存已过期。精简较早的消息可使
 #: src/features/chat/lock/locked-chat-gate.tsx:123
 msgid "This chat is locked"
 msgstr "此聊天已锁定"
-
-#: src/features/chat/guest-links/guest-link-panel.tsx:92
-msgid "This chat is locked. Unlock it and try again."
-msgstr "此聊天已锁定。请解锁后重试。"
 
 #: src/features/chat/sidebar/thread-sidebar.tsx:286
 msgid "This chat is locked. Unlock it to see its details."
@@ -33626,11 +33611,11 @@ msgstr "太短了：至少 {minLength} 个字符。"
 msgid "This is your organization's URL namespace"
 msgstr "这是你的组织的 URL 命名空间"
 
-#: src/features/chat/guest-links/guest-page.tsx:259
+#: src/features/chat/guest-links/guest-page.tsx:254
 msgid "This link has ended."
 msgstr "此链接已失效。"
 
-#: src/features/chat/guest-links/guest-page.tsx:95
+#: src/features/chat/guest-links/guest-page.tsx:90
 msgid "This link is already in use in another browser."
 msgstr "此链接已在另一个浏览器中使用。"
 
@@ -33638,11 +33623,11 @@ msgstr "此链接已在另一个浏览器中使用。"
 msgid "This link is incomplete."
 msgstr "此链接不完整。"
 
-#: src/features/chat/guest-links/guest-page.tsx:284
+#: src/features/chat/guest-links/guest-page.tsx:279
 msgid "This link is not complete. Ask for the full link."
 msgstr "此链接不完整。请索取完整链接。"
 
-#: src/features/chat/guest-links/guest-page.tsx:98
+#: src/features/chat/guest-links/guest-page.tsx:93
 msgid "This link is not taking messages right now. Try again later."
 msgstr "此链接目前不接收消息。请稍后再试。"
 
@@ -33656,7 +33641,7 @@ msgstr "此记忆已被删除。"
 msgid "This merges the commit {0} into the base branch with “{1}” on {hostLabel}. If the branch has changed since you opened this page, {hostLabel} refuses."
 msgstr "这会在 {hostLabel} 上以“{1}”方式将提交 {0} 合并到基础分支。如果自你打开此页面后分支已更改，{hostLabel} 将拒绝。"
 
-#: src/features/chat/guest-links/guest-page.tsx:92
+#: src/features/chat/guest-links/guest-page.tsx:87
 msgid "This message cannot be left. Keep it short, don't start it with / or mention anyone, or try again later."
 msgstr "无法留下此消息。请保持简短，不要以 / 开头或提及任何人，或稍后再试。"
 
@@ -33989,11 +33974,11 @@ msgstr "对话已设为永久"
 msgid "Thread list"
 msgstr "对话列表"
 
-#: src/features/chat/sharing/thread-share-button.tsx:171
+#: src/features/chat/sharing/thread-share-button.tsx:170
 msgid "Thread made private"
 msgstr "对话已设为私密"
 
-#: src/features/chat/sharing/thread-share-button.tsx:171
+#: src/features/chat/sharing/thread-share-button.tsx:170
 msgid "Thread made public"
 msgstr "对话已设为公开"
 
@@ -34317,7 +34302,7 @@ msgstr ""
 msgid "too many files"
 msgstr "文件过多"
 
-#: src/features/chat/guest-links/guest-page.tsx:101
+#: src/features/chat/guest-links/guest-page.tsx:96
 msgid "Too many messages. Please try again later."
 msgstr "消息太多。请稍后再试。"
 
@@ -34330,7 +34315,7 @@ msgstr "短时间内开始的新上下文过多，请一分钟后重试。"
 msgid "Too many requests right now. Try again in a moment."
 msgstr "当前请求过多。请稍后重试。"
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:97
+#: src/features/chat/guest-links/guest-link-panel.tsx:72
 msgid "Too many requests. Please try again in a moment."
 msgstr "请求过多。请稍后再试。"
 
@@ -34705,7 +34690,7 @@ msgstr "尝试调整搜索词。"
 #: src/components/error-component.tsx:40
 #: src/features/auth/components/device-approval.tsx:95
 #: src/features/auth/components/device-approval.tsx:338
-#: src/features/chat/guest-links/guest-page.tsx:275
+#: src/features/chat/guest-links/guest-page.tsx:270
 #: src/features/connection/components/offline-screen.tsx:64
 #: src/features/develop/components/files-tab.tsx:275
 #: src/features/develop/components/thread-pull-requests.tsx:169
@@ -35792,7 +35777,7 @@ msgstr "使用了 {0}"
 msgid "Used for buttons, highlights and focus rings. Every option keeps text readable in light and dark mode."
 msgstr "用于按钮、高亮和焦点环。每个选项在浅色和深色模式下都能保持文字清晰可读。"
 
-#: src/features/chat/sharing/thread-share-button.tsx:288
+#: src/features/chat/sharing/thread-share-button.tsx:287
 msgid "user"
 msgstr "用户"
 
@@ -35810,7 +35795,7 @@ msgstr "用户"
 msgid "User"
 msgstr "用户"
 
-#: src/features/chat/sharing/thread-share-button.tsx:154
+#: src/features/chat/sharing/thread-share-button.tsx:153
 msgid "User access removed"
 msgstr "已移除用户访问权限"
 
@@ -36668,7 +36653,7 @@ msgstr "请等待智能体准备就绪后再试。"
 msgid "Wait for the reply to finish, then try again."
 msgstr "请等待回复完成后再重试。"
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:204
+#: src/features/chat/guest-links/guest-link-panel.tsx:175
 msgid "Waiting"
 msgstr "等待中"
 
@@ -36697,7 +36682,7 @@ msgstr "正在等待输出…"
 msgid "Waiting for the agent…"
 msgstr "正在等待智能体…"
 
-#: src/features/chat/guest-links/guest-page.tsx:297
+#: src/features/chat/guest-links/guest-page.tsx:292
 #: src/features/chat/thread/request-secret-prompt.tsx:343
 msgid "Waiting for the owner"
 msgstr "正在等待所有者"
@@ -37876,7 +37861,7 @@ msgstr "你的本地服务器有响应，但拒绝了此网站（CORS）。请�
 msgid "Your location (e.g., \"New York, USA\", \"Berlin, Germany\")."
 msgstr "你的位置（例如“New York, USA”“Berlin, Germany”）。"
 
-#: src/features/chat/guest-links/guest-page.tsx:246
+#: src/features/chat/guest-links/guest-page.tsx:241
 msgid "Your message"
 msgstr "你的消息"
 
@@ -37884,7 +37869,7 @@ msgstr "你的消息"
 msgid "Your message contains inappropriate content that cannot be sent."
 msgstr "你的消息包含不当内容，无法发送。"
 
-#: src/features/chat/guest-links/guest-page.tsx:241
+#: src/features/chat/guest-links/guest-page.tsx:236
 msgid "Your message waits for the owner of this conversation. Nothing happens until they send it."
 msgstr "你的消息正在等待此对话的所有者。在对方发送之前不会有任何操作。"
 
@@ -37892,7 +37877,7 @@ msgstr "你的消息正在等待此对话的所有者。在对方发送之前不
 msgid "Your message:"
 msgstr "你的消息："
 
-#: src/features/chat/guest-links/guest-page.tsx:290
+#: src/features/chat/guest-links/guest-page.tsx:285
 msgid "Your messages"
 msgstr "你的消息"
 
@@ -37908,7 +37893,7 @@ msgstr "你的下一条消息是一个目标。智能体会持续工作，直到
 msgid "Your next message will start a self-destructing chat."
 msgstr "你的下一条消息将开始一个阅后即焚的聊天。"
 
-#: src/features/chat/guest-links/guest-page.tsx:267
+#: src/features/chat/guest-links/guest-page.tsx:262
 msgid "Your notes could not be loaded. They are still there; try again in a moment."
 msgstr "无法加载你的消息。它们仍然存在；请稍后再试。"
 

@@ -7,20 +7,15 @@ import { Input } from "@neore/ui/components/input";
 import { formatDateTime } from "@neore/ui/utils/locale-format";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import type { FC } from "react";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { useCRPC } from "@/lib/lunora/crpc";
 
+import { errorCode } from "./error-code";
+
 /** Where a guest opens the link: the token rides in the fragment, which never reaches a server log. */
 export const guestLinkUrl = (linkToken: string): string => `${globalThis.location.origin}/guest#${linkToken}`;
-
-/** The backend's code for a refusal (`chat/guest-links.ts`): its own `data.code`, else the standard one. */
-const errorCode = (error: unknown): unknown => {
-    const { code, data } = (typeof error === "object" && error !== null ? error : {}) as { code?: unknown; data?: { code?: unknown } };
-
-    return data?.code ?? code;
-};
 
 interface GuestLinkPanelProps {
     /** A locked chat holds no guest link (`createGuestLink` refuses one): its notes stay readable, no new link is made. */
@@ -49,12 +44,6 @@ const GuestLinkPanel: FC<GuestLinkPanelProps> = ({ locked = false, revokeLink, t
     // After a revoke, focus goes to "Create guest link" once it shows, not to the page: the Revoke button is gone.
     const focusCreateRef = useRef(false);
     const [revoking, setRevoking] = useState(false);
-    // Read again once a round trip is back: the owner can have moved to another chat meanwhile.
-    const threadIdRef = useRef(threadId);
-
-    useEffect(() => {
-        threadIdRef.current = threadId;
-    }, [threadId]);
 
     const reportError = (error: unknown) => {
         switch (errorCode(error)) {
@@ -63,23 +52,8 @@ const GuestLinkPanel: FC<GuestLinkPanelProps> = ({ locked = false, revokeLink, t
 
                 return;
             }
-            case "GUEST_LINK_ENDED": {
-                toast.error(t`That guest link has ended.`);
-
-                return;
-            }
             case "GUEST_LINK_NOT_ALLOWED": {
                 toast.error(t`This chat cannot have a guest link.`);
-
-                return;
-            }
-            case "GUEST_NOTE_BEING_SENT": {
-                toast.info(t`That message is being sent.`);
-
-                return;
-            }
-            case "GUEST_NOTE_GONE": {
-                toast.error(t`That message is no longer waiting.`);
 
                 return;
             }
@@ -89,7 +63,8 @@ const GuestLinkPanel: FC<GuestLinkPanelProps> = ({ locked = false, revokeLink, t
                 return;
             }
             case "THREAD_LOCKED": {
-                toast.error(t`This chat is locked. Unlock it and try again.`);
+                // `createGuestLink` refuses a locked chat even once it is unlocked.
+                toast.error(t`A locked chat cannot have a guest link.`);
 
                 return;
             }
@@ -111,12 +86,8 @@ const GuestLinkPanel: FC<GuestLinkPanelProps> = ({ locked = false, revokeLink, t
             { threadId: forThread as Id<"threads"> },
             {
                 onError: reportError,
-                onSuccess: ({ linkToken }) => {
-                    // A link made for a chat the panel no longer shows is not shown in another.
-                    if (threadIdRef.current === forThread) {
-                        setMadeLink({ threadId: forThread, url: guestLinkUrl(linkToken) });
-                    }
-                },
+                // Kept with its chat: a link made for a chat the panel no longer shows is not shown in another.
+                onSuccess: ({ linkToken }) => setMadeLink({ threadId: forThread, url: guestLinkUrl(linkToken) }),
             },
         );
     };

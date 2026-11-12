@@ -45,7 +45,10 @@ const useGuestLinkRevoke = (threadId: string | undefined): { confirmDialog: Reac
     const confirmDialog = (
         <DeleteConfirmationDialog
             confirmLabel={t`Revoke`}
-            description={t`Revoking the link deletes ${plural(waitingCount, { one: "the # guest message", other: "the # guest messages" })} still waiting. They cannot be sent afterwards.`}
+            description={t`Revoking the link deletes ${plural(waitingCount, {
+                one: "the # guest message still waiting. It cannot be sent afterwards.",
+                other: "the # guest messages still waiting. They cannot be sent afterwards.",
+            })}`}
             onConfirm={() => answer(true)}
             onOpenChange={(open) => {
                 if (open) {

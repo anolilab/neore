@@ -67,12 +67,12 @@ const ThreadShareButton: React.FC<ThreadShareButtonProperties> = ({ classes, thr
     const { mutateAsync: toggleVisibilityMutation } = useMutation(crpc.chat.sharing.toggleThreadVisibility.mutationOptions());
 
     const { thread } = useChatThread();
-    const { isLoading: workerLoading, worker } = useWorker(actualThreadId);
-    // As the backend refuses one (`chat/guest-links.ts#createGuestLink`): no link for a temporary, archived, worker or host-run
-    // chat, and none shown until the thread is known not to be a worker's.
+    const { knownNotWorker } = useWorker(actualThreadId);
+    // As the backend refuses one (`chat/guest-links.ts#createGuestLink`): no tab for a temporary, archived or host-run chat, nor
+    // for a worker's once the thread has said so, and none while that read is out. A locked chat's read says nothing of its
+    // relationship (`null`), so a locked worker's thread shows the tab; there Create is off and the backend refuses a link.
     const canHaveGuestLink =
-        !workerLoading &&
-        !worker &&
+        knownNotWorker &&
         thread?.runner !== "host" &&
         thread?.status !== "archived" &&
         (thread as { isTemporary?: boolean } | null | undefined)?.isTemporary !== true;

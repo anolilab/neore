@@ -1543,7 +1543,7 @@ msgstr "$20/mo replaces ChatGPT + Midjourney + Runway + more. Free to start — 
 msgid "1 {from} in other currencies"
 msgstr "1 {from} in other currencies"
 
-#: src/features/chat/sharing/thread-share-button.tsx:329
+#: src/features/chat/sharing/thread-share-button.tsx:328
 msgid "1 Day"
 msgstr "1 Day"
 
@@ -1712,7 +1712,7 @@ msgstr "52-week range"
 msgid "7 days"
 msgstr "7 days"
 
-#: src/features/chat/sharing/thread-share-button.tsx:330
+#: src/features/chat/sharing/thread-share-button.tsx:329
 msgid "7 Days"
 msgstr "7 Days"
 
@@ -1826,7 +1826,8 @@ msgstr "A key is saved. Leave blank to keep it."
 msgid "A key is saved. Leave blank to keep it. Changing the endpoint, region or access key id requires entering it again."
 msgstr "A key is saved. Leave blank to keep it. Changing the endpoint, region or access key id requires entering it again."
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:160
+#: src/features/chat/guest-links/guest-link-panel.tsx:67
+#: src/features/chat/guest-links/guest-link-panel.tsx:131
 msgid "A locked chat cannot have a guest link."
 msgstr "A locked chat cannot have a guest link."
 
@@ -2070,7 +2071,7 @@ msgstr "Accept Invite"
 msgid "Accept or reject invitations to join organizations"
 msgstr "Accept or reject invitations to join organizations"
 
-#: src/features/chat/sharing/thread-share-button.tsx:259
+#: src/features/chat/sharing/thread-share-button.tsx:258
 #: src/features/pages/components/page-share-dialog.tsx:96
 msgid "Access"
 msgstr "Access"
@@ -2635,8 +2636,8 @@ msgstr "Adjust"
 #: src/features/auth/components/team/team-member-cell.tsx:148
 #: src/features/auth/components/team/team-member-cell.tsx:163
 #: src/features/auth/components/team/team-switcher.tsx:143
-#: src/features/chat/sharing/thread-share-button.tsx:213
-#: src/features/chat/sharing/thread-share-button.tsx:318
+#: src/features/chat/sharing/thread-share-button.tsx:212
+#: src/features/chat/sharing/thread-share-button.tsx:317
 #: src/features/layout/components/sidebar-shortcut.tsx:268
 #: src/features/layout/lib/dashboard-page-names.ts:12
 #: src/routes/admin/route.tsx:51
@@ -3663,7 +3664,7 @@ msgstr "Any of my chats"
 msgid "Any string you choose; enter the same value as the webhook Verify token in the Meta app"
 msgstr "Any string you choose; enter the same value as the webhook Verify token in the Meta app"
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:158
+#: src/features/chat/guest-links/guest-link-panel.tsx:129
 msgid "Anyone with a guest link can leave you a message here. Nothing they write runs on its own."
 msgstr "Anyone with a guest link can leave you a message here. Nothing they write runs on its own."
 
@@ -3671,7 +3672,7 @@ msgstr "Anyone with a guest link can leave you a message here. Nothing they writ
 msgid "Anyone with the link can read this page. Comments are never shown. Turning it off revokes the link."
 msgstr "Anyone with the link can read this page. Comments are never shown. Turning it off revokes the link."
 
-#: src/features/chat/sharing/thread-share-button.tsx:379
+#: src/features/chat/sharing/thread-share-button.tsx:378
 msgid "Anyone with the link can view this thread"
 msgstr "Anyone with the link can view this thread"
 
@@ -3989,7 +3990,7 @@ msgstr "Are you sure you want to leave this organization?"
 msgid "Are you sure you want to make {userName} an admin? They will have full access to admin features."
 msgstr "Are you sure you want to make {userName} an admin? They will have full access to admin features."
 
-#: src/features/chat/sharing/thread-share-button.tsx:413
+#: src/features/chat/sharing/thread-share-button.tsx:412
 msgid "Are you sure you want to remove {userToRemoveName} from this thread?"
 msgstr "Are you sure you want to remove {userToRemoveName} from this thread?"
 
@@ -8013,8 +8014,8 @@ msgstr "Copied!"
 #: ../../packages/ui/src/components/data-grid/data-grid-context-menu.tsx:225
 #: src/features/auth/components/settings/api-key/mcp-config-snippet.tsx:30
 #: src/features/auth/components/settings/two-factor/backup-codes-dialog.tsx:100
-#: src/features/chat/guest-links/guest-link-panel.tsx:165
-#: src/features/chat/sharing/thread-share-button.tsx:394
+#: src/features/chat/guest-links/guest-link-panel.tsx:136
+#: src/features/chat/sharing/thread-share-button.tsx:393
 #: src/features/chat/thread/message-item.tsx:356
 #: src/features/chat/thread/text-selection-menu.tsx:525
 #: src/features/settings/components/chat/trigger-settings.tsx:782
@@ -8323,11 +8324,11 @@ msgstr "Could not confirm the change to auto-merge. Check on {hostLabel} before 
 msgid "Could not connect to the server."
 msgstr "Could not connect to the server."
 
-#: src/features/chat/sharing/thread-share-button.tsx:125
+#: src/features/chat/sharing/thread-share-button.tsx:124
 msgid "Could not copy automatically. Invite link: {inviteLink}"
 msgstr "Could not copy automatically. Invite link: {inviteLink}"
 
-#: src/features/chat/sharing/thread-share-button.tsx:191
+#: src/features/chat/sharing/thread-share-button.tsx:190
 msgid "Could not copy automatically. Public link: {publicLink}"
 msgstr "Could not copy automatically. Public link: {publicLink}"
 
@@ -8868,7 +8869,7 @@ msgstr "Create goal"
 msgid "Create group chat"
 msgstr "Create group chat"
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:195
+#: src/features/chat/guest-links/guest-link-panel.tsx:166
 msgid "Create guest link"
 msgstr "Create guest link"
 
@@ -8880,7 +8881,7 @@ msgstr "Create Images and Videos"
 msgid "Create images with FLUX, Imagen, and Stable Diffusion. Generate videos with Runway, Luma, and Kling. Compare outputs across providers — pick the best result, not the only result."
 msgstr "Create images with FLUX, Imagen, and Stable Diffusion. Generate videos with Runway, Luma, and Kling. Compare outputs across providers — pick the best result, not the only result."
 
-#: src/features/chat/sharing/thread-share-button.tsx:342
+#: src/features/chat/sharing/thread-share-button.tsx:341
 msgid "Create Invite"
 msgstr "Create Invite"
 
@@ -9193,7 +9194,7 @@ msgid "Currently restricted"
 msgstr "Currently restricted"
 
 #: src/features/canvas/components/design-preset-selector.tsx:87
-#: src/features/chat/sharing/thread-share-button.tsx:331
+#: src/features/chat/sharing/thread-share-button.tsx:330
 #: src/features/marketing/components/gateway-landing-page.tsx:792
 #: src/features/marketing/components/landing-page.tsx:1014
 #: src/features/prompts/components/prompt-form-dialog.tsx:444
@@ -11578,7 +11579,7 @@ msgid "Email"
 msgstr "Email"
 
 #: src/features/auth/components/settings/security/change-email-card.tsx:139
-#: src/features/chat/sharing/thread-share-button.tsx:306
+#: src/features/chat/sharing/thread-share-button.tsx:305
 msgid "Email Address"
 msgstr "Email Address"
 
@@ -11925,7 +11926,7 @@ msgid "Enter default value..."
 msgstr "Enter default value..."
 
 #: src/features/auth/components/organization/invite-member-dialog.tsx:118
-#: src/features/chat/sharing/thread-share-button.tsx:307
+#: src/features/chat/sharing/thread-share-button.tsx:306
 msgid "Enter email address"
 msgstr "Enter email address"
 
@@ -12611,7 +12612,7 @@ msgstr "experimental"
 msgid "Experimental reasoning with DeepSeek's latest thinking capabilities"
 msgstr "Experimental reasoning with DeepSeek's latest thinking capabilities"
 
-#: src/features/chat/sharing/thread-share-button.tsx:323
+#: src/features/chat/sharing/thread-share-button.tsx:322
 msgid "Expiration"
 msgstr "Expiration"
 
@@ -12663,7 +12664,7 @@ msgstr "Expires in {remainingTime}"
 msgid "Expires on {0}"
 msgstr "Expires on {0}"
 
-#: src/features/chat/sharing/thread-share-button.tsx:355
+#: src/features/chat/sharing/thread-share-button.tsx:354
 msgid "Expires:"
 msgstr "Expires:"
 
@@ -13002,7 +13003,7 @@ msgstr "Failed to create branch"
 msgid "Failed to create budget alert"
 msgstr "Failed to create budget alert"
 
-#: src/features/chat/sharing/thread-share-button.tsx:130
+#: src/features/chat/sharing/thread-share-button.tsx:129
 msgid "Failed to create invite"
 msgstr "Failed to create invite"
 
@@ -13306,7 +13307,7 @@ msgstr "Failed to remove provider"
 msgid "Failed to remove skill"
 msgstr "Failed to remove skill"
 
-#: src/features/chat/sharing/thread-share-button.tsx:156
+#: src/features/chat/sharing/thread-share-button.tsx:155
 msgid "Failed to remove user access"
 msgstr "Failed to remove user access"
 
@@ -13338,7 +13339,7 @@ msgstr "Failed to restore this version."
 msgid "Failed to restore version"
 msgstr "Failed to restore version"
 
-#: src/features/chat/sharing/thread-share-button.tsx:140
+#: src/features/chat/sharing/thread-share-button.tsx:139
 msgid "Failed to revoke invite"
 msgstr "Failed to revoke invite"
 
@@ -13600,7 +13601,7 @@ msgstr "Failed to update the quick check"
 msgid "Failed to update the trusted servers"
 msgstr "Failed to update the trusted servers"
 
-#: src/features/chat/sharing/thread-share-button.tsx:173
+#: src/features/chat/sharing/thread-share-button.tsx:172
 msgid "Failed to update thread visibility"
 msgstr "Failed to update thread visibility"
 
@@ -15830,23 +15831,23 @@ msgstr "Guest accounts use free models only."
 msgid "Guest accounts use free models only. Sign up to unlock all models."
 msgstr "Guest accounts use free models only. Sign up to unlock all models."
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:163
+#: src/features/chat/guest-links/guest-link-panel.tsx:134
 msgid "Guest link"
 msgstr "Guest link"
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:149
+#: src/features/chat/guest-links/guest-link-panel.tsx:120
 msgid "Guest link copied"
 msgstr "Guest link copied"
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:199
+#: src/features/chat/guest-links/guest-link-panel.tsx:170
 msgid "Guest messages"
 msgstr "Guest messages"
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:87
+#: src/features/chat/guest-links/guest-link-panel.tsx:61
 msgid "Guest messages from an earlier link are still waiting."
 msgstr "Guest messages from an earlier link are still waiting."
 
-#: src/features/chat/sharing/thread-share-button.tsx:262
+#: src/features/chat/sharing/thread-share-button.tsx:261
 msgid "Guests"
 msgstr "Guests"
 
@@ -16324,7 +16325,7 @@ msgstr "hotkey"
 msgid "Hour"
 msgstr "Hour"
 
-#: src/features/chat/sharing/thread-share-button.tsx:337
+#: src/features/chat/sharing/thread-share-button.tsx:336
 msgid "Hours"
 msgstr "Hours"
 
@@ -17400,7 +17401,7 @@ msgstr "Invite Error"
 msgid "Invite link"
 msgstr "Invite link"
 
-#: src/features/chat/sharing/thread-share-button.tsx:123
+#: src/features/chat/sharing/thread-share-button.tsx:122
 msgid "Invite link copied to clipboard!"
 msgstr "Invite link copied to clipboard!"
 
@@ -17417,7 +17418,7 @@ msgstr "Invite new members and update existing member roles"
 msgid "Invite new members. They join once they accept the invitation."
 msgstr "Invite new members. They join once they accept the invitation."
 
-#: src/features/chat/sharing/thread-share-button.tsx:138
+#: src/features/chat/sharing/thread-share-button.tsx:137
 msgid "Invite revoked"
 msgstr "Invite revoked"
 
@@ -17430,7 +17431,7 @@ msgstr "Invited by {0}"
 msgid "Invited to join"
 msgstr "Invited to join"
 
-#: src/features/chat/sharing/thread-share-button.tsx:260
+#: src/features/chat/sharing/thread-share-button.tsx:259
 msgid "Invites"
 msgstr "Invites"
 
@@ -18258,7 +18259,7 @@ msgstr "Learn more about MCP"
 msgid "Learning"
 msgstr "Learning"
 
-#: src/features/chat/guest-links/guest-page.tsx:240
+#: src/features/chat/guest-links/guest-page.tsx:235
 #: src/routes/(public)/guest.tsx:12
 msgid "Leave a message"
 msgstr "Leave a message"
@@ -18498,7 +18499,7 @@ msgstr "Lines that are not valid JSON"
 msgid "Link"
 msgstr "Link"
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:171
+#: src/features/chat/guest-links/guest-link-panel.tsx:142
 msgid "Link active until {expiresAt}"
 msgstr "Link active until {expiresAt}"
 
@@ -18907,7 +18908,7 @@ msgstr "Loading workflow..."
 msgid "Loading your items…"
 msgstr "Loading your items…"
 
-#: src/features/chat/guest-links/guest-page.tsx:291
+#: src/features/chat/guest-links/guest-page.tsx:286
 msgid "Loading your messages…"
 msgstr "Loading your messages…"
 
@@ -21515,7 +21516,7 @@ msgstr "No access to this repository."
 msgid "No active session found. Please sign in again."
 msgstr "No active session found. Please sign in again."
 
-#: src/features/chat/sharing/thread-share-button.tsx:266
+#: src/features/chat/sharing/thread-share-button.tsx:265
 msgid "No additional users have access to this thread."
 msgstr "No additional users have access to this thread."
 
@@ -24321,7 +24322,7 @@ msgstr "Pending"
 msgid "Pending Invitations"
 msgstr "Pending Invitations"
 
-#: src/features/chat/sharing/thread-share-button.tsx:347
+#: src/features/chat/sharing/thread-share-button.tsx:346
 msgid "Pending Invites"
 msgstr "Pending Invites"
 
@@ -24377,7 +24378,7 @@ msgstr "Permanently delete this organization and all its data"
 msgid "Permanently delete your account and all associated data"
 msgstr "Permanently delete your account and all associated data"
 
-#: src/features/chat/sharing/thread-share-button.tsx:310
+#: src/features/chat/sharing/thread-share-button.tsx:309
 msgid "Permission Level"
 msgstr "Permission Level"
 
@@ -24679,7 +24680,7 @@ msgstr "Please confirm your password"
 msgid "Please enter a backup code to access your account"
 msgstr "Please enter a backup code to access your account"
 
-#: src/features/chat/sharing/thread-share-button.tsx:102
+#: src/features/chat/sharing/thread-share-button.tsx:101
 msgid "Please enter an email address"
 msgstr "Please enter an email address"
 
@@ -25711,14 +25712,14 @@ msgstr "Providers"
 msgid "Pseudo numerical diffusion"
 msgstr "Pseudo numerical diffusion"
 
-#: src/features/chat/sharing/thread-share-button.tsx:261
+#: src/features/chat/sharing/thread-share-button.tsx:260
 #: src/features/skills/components/skill-form-dialog.tsx:481
 #: src/features/skills/components/skill-item.tsx:124
 msgid "Public"
 msgstr "Public"
 
-#: src/features/chat/sharing/thread-share-button.tsx:378
-#: src/features/chat/sharing/thread-share-button.tsx:382
+#: src/features/chat/sharing/thread-share-button.tsx:377
+#: src/features/chat/sharing/thread-share-button.tsx:381
 msgid "Public Access"
 msgstr "Public Access"
 
@@ -25731,11 +25732,11 @@ msgstr "Public key from the Discord Developer Portal for signature verification"
 msgid "Public link"
 msgstr "Public link"
 
-#: src/features/chat/sharing/thread-share-button.tsx:390
+#: src/features/chat/sharing/thread-share-button.tsx:389
 msgid "Public Link"
 msgstr "Public Link"
 
-#: src/features/chat/sharing/thread-share-button.tsx:189
+#: src/features/chat/sharing/thread-share-button.tsx:188
 msgid "Public link copied to clipboard!"
 msgstr "Public link copied to clipboard!"
 
@@ -26094,8 +26095,8 @@ msgstr "Re-run {0}?"
 msgid "Read"
 msgstr "Read"
 
-#: src/features/chat/sharing/thread-share-button.tsx:219
-#: src/features/chat/sharing/thread-share-button.tsx:317
+#: src/features/chat/sharing/thread-share-button.tsx:218
+#: src/features/chat/sharing/thread-share-button.tsx:316
 msgid "Read & Write"
 msgstr "Read & Write"
 
@@ -26115,8 +26116,8 @@ msgstr "Read every assistant reply aloud when it finishes, using your browser's 
 msgid "Read only"
 msgstr "Read only"
 
-#: src/features/chat/sharing/thread-share-button.tsx:216
-#: src/features/chat/sharing/thread-share-button.tsx:316
+#: src/features/chat/sharing/thread-share-button.tsx:215
+#: src/features/chat/sharing/thread-share-button.tsx:315
 msgid "Read Only"
 msgstr "Read Only"
 
@@ -26772,8 +26773,8 @@ msgstr "Remember me"
 #: ../../packages/ui/src/components/ai-elements/attachments.tsx:195
 #: ../../packages/ui/src/components/combobox.tsx:304
 #: src/features/chat/host/host-composer.tsx:917
-#: src/features/chat/sharing/thread-share-button.tsx:295
-#: src/features/chat/sharing/thread-share-button.tsx:367
+#: src/features/chat/sharing/thread-share-button.tsx:294
+#: src/features/chat/sharing/thread-share-button.tsx:366
 #: src/features/chat/thread/composer-input.tsx:341
 #: src/features/chat/thread/composer-input.tsx:353
 #: src/features/chat/thread/composer-input.tsx:407
@@ -27002,7 +27003,7 @@ msgstr "Remove the webhook"
 msgid "Remove These Files"
 msgstr "Remove These Files"
 
-#: src/features/chat/sharing/thread-share-button.tsx:429
+#: src/features/chat/sharing/thread-share-button.tsx:428
 msgid "Remove User"
 msgstr "Remove User"
 
@@ -27671,7 +27672,7 @@ msgstr "Revoke"
 msgid "Revoke All Sessions"
 msgstr "Revoke All Sessions"
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:179
+#: src/features/chat/guest-links/guest-link-panel.tsx:150
 msgid "Revoke link"
 msgstr "Revoke link"
 
@@ -27687,11 +27688,11 @@ msgstr "Revoke the allow for {tool}"
 msgid "Revoke the allow for {tool} on {server}"
 msgstr "Revoke the allow for {tool} on {server}"
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:62
+#: src/features/chat/guest-links/guest-link-panel.tsx:51
 msgid "Revoke the earlier guest link first, then make a new one."
 msgstr "Revoke the earlier guest link first, then make a new one."
 
-#: src/features/chat/guest-links/use-guest-link-revoke.tsx:58
+#: src/features/chat/guest-links/use-guest-link-revoke.tsx:61
 msgid "Revoke the guest link?"
 msgstr "Revoke the guest link?"
 
@@ -27701,8 +27702,8 @@ msgid "Revoked {0} sessions"
 msgstr "Revoked {0} sessions"
 
 #: src/features/chat/guest-links/use-guest-link-revoke.tsx:48
-msgid "Revoking the link deletes {waitingCount, plural, one {the # guest message} other {the # guest messages}} still waiting. They cannot be sent afterwards."
-msgstr "Revoking the link deletes {waitingCount, plural, one {the # guest message} other {the # guest messages}} still waiting. They cannot be sent afterwards."
+msgid "Revoking the link deletes {waitingCount, plural, one {the # guest message still waiting. It cannot be sent afterwards.} other {the # guest messages still waiting. They cannot be sent afterwards.}}"
+msgstr "Revoking the link deletes {waitingCount, plural, one {the # guest message still waiting. It cannot be sent afterwards.} other {the # guest messages still waiting. They cannot be sent afterwards.}}"
 
 #: src/features/auth/components/settings/security/session-cell.tsx:103
 msgid "Revoking..."
@@ -29104,7 +29105,7 @@ msgstr "Send this to the bot from your account:"
 msgid "Send to agent"
 msgstr "Send to agent"
 
-#: src/features/chat/guest-links/guest-page.tsx:280
+#: src/features/chat/guest-links/guest-page.tsx:275
 msgid "Send to the owner"
 msgstr "Send to the owner"
 
@@ -29120,12 +29121,12 @@ msgstr "Send Verification Code"
 msgid "Sending your message and waiting for the reply"
 msgstr "Sending your message and waiting for the reply"
 
-#: src/features/chat/guest-links/guest-page.tsx:280
+#: src/features/chat/guest-links/guest-page.tsx:275
 #: src/features/chat/thread/streaming-placeholder.tsx:617
 msgid "Sending…"
 msgstr "Sending…"
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:204
+#: src/features/chat/guest-links/guest-link-panel.tsx:175
 #: src/features/devices/components/devices-settings.tsx:387
 msgid "Sent"
 msgstr "Sent"
@@ -29146,7 +29147,7 @@ msgstr "Sent by an unattended run"
 msgid "Sent by the lead agent"
 msgstr "Sent by the lead agent"
 
-#: src/features/chat/guest-links/guest-page.tsx:297
+#: src/features/chat/guest-links/guest-page.tsx:292
 msgid "Sent by the owner"
 msgstr "Sent by the owner"
 
@@ -29357,8 +29358,8 @@ msgstr "Share of spend"
 msgid "Share page"
 msgstr "Share page"
 
-#: src/features/chat/sharing/thread-share-button.tsx:203
-#: src/features/chat/sharing/thread-share-button.tsx:252
+#: src/features/chat/sharing/thread-share-button.tsx:202
+#: src/features/chat/sharing/thread-share-button.tsx:251
 msgid "Share Thread"
 msgstr "Share Thread"
 
@@ -32449,7 +32450,7 @@ msgstr "That computer is not online."
 msgid "That did not go through. Try again."
 msgstr "That did not go through. Try again."
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:102
+#: src/features/chat/guest-links/guest-link-panel.tsx:77
 msgid "That did not work. Please try again."
 msgstr "That did not work. Please try again."
 
@@ -32460,10 +32461,6 @@ msgstr "That did not work. Try again."
 #: src/features/develop/components/guide-tab.tsx:92
 msgid "That folder is not offered for this repository on that computer."
 msgstr "That folder is not offered for this repository on that computer."
-
-#: src/features/chat/guest-links/guest-link-panel.tsx:67
-msgid "That guest link has ended."
-msgstr "That guest link has ended."
 
 #: src/features/develop/components/watched-repositories.tsx:163
 msgid "That is not a repository address."
@@ -32480,14 +32477,6 @@ msgstr "That link could not be read."
 #: src/features/chat/thread/message-list.tsx:312
 msgid "That message could not be found in this conversation."
 msgstr "That message could not be found in this conversation."
-
-#: src/features/chat/guest-links/guest-link-panel.tsx:77
-msgid "That message is being sent."
-msgstr "That message is being sent."
-
-#: src/features/chat/guest-links/guest-link-panel.tsx:82
-msgid "That message is no longer waiting."
-msgstr "That message is no longer waiting."
 
 #: src/features/chat/host/host-send-errors.ts:21
 msgid "That message is too long to send from here."
@@ -32810,7 +32799,7 @@ msgstr "The full system prompt to send to the model..."
 msgid "The goal is removed; its tasks stay, without a goal."
 msgstr "The goal is removed; its tasks stay, without a goal."
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:159
+#: src/features/chat/guest-links/guest-link-panel.tsx:130
 msgid "The guest link could not be loaded."
 msgstr "The guest link could not be loaded."
 
@@ -32927,7 +32916,7 @@ msgstr "the last time"
 msgid "The last turn stopped before it finished."
 msgstr "The last turn stopped before it finished."
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:150
+#: src/features/chat/guest-links/guest-link-panel.tsx:121
 msgid "The link could not be copied. Select it and copy it yourself."
 msgstr "The link could not be copied. Select it and copy it yourself."
 
@@ -32983,7 +32972,7 @@ msgstr "The MCP registry could not be reached, so server suggestions may be miss
 msgid "The MCP Registry is unavailable right now. Showing popular servers instead."
 msgstr "The MCP Registry is unavailable right now. Showing popular servers instead."
 
-#: src/features/chat/guest-links/guest-page.tsx:104
+#: src/features/chat/guest-links/guest-page.tsx:99
 msgid "The message could not be sent. Check your connection and try again."
 msgstr "The message could not be sent. Check your connection and try again."
 
@@ -33462,7 +33451,7 @@ msgstr "This chat belongs to a worker. Send it messages from its own message box
 msgid "This chat cannot be compacted."
 msgstr "This chat cannot be compacted."
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:72
+#: src/features/chat/guest-links/guest-link-panel.tsx:56
 msgid "This chat cannot have a guest link."
 msgstr "This chat cannot have a guest link."
 
@@ -33481,10 +33470,6 @@ msgstr "This chat has been idle, so the model's cache has expired. Condense the 
 #: src/features/chat/lock/locked-chat-gate.tsx:123
 msgid "This chat is locked"
 msgstr "This chat is locked"
-
-#: src/features/chat/guest-links/guest-link-panel.tsx:92
-msgid "This chat is locked. Unlock it and try again."
-msgstr "This chat is locked. Unlock it and try again."
 
 #: src/features/chat/sidebar/thread-sidebar.tsx:286
 msgid "This chat is locked. Unlock it to see its details."
@@ -33726,11 +33711,11 @@ msgstr "This is too short: at least {minLength} characters."
 msgid "This is your organization's URL namespace"
 msgstr "This is your organization's URL namespace"
 
-#: src/features/chat/guest-links/guest-page.tsx:259
+#: src/features/chat/guest-links/guest-page.tsx:254
 msgid "This link has ended."
 msgstr "This link has ended."
 
-#: src/features/chat/guest-links/guest-page.tsx:95
+#: src/features/chat/guest-links/guest-page.tsx:90
 msgid "This link is already in use in another browser."
 msgstr "This link is already in use in another browser."
 
@@ -33738,11 +33723,11 @@ msgstr "This link is already in use in another browser."
 msgid "This link is incomplete."
 msgstr "This link is incomplete."
 
-#: src/features/chat/guest-links/guest-page.tsx:284
+#: src/features/chat/guest-links/guest-page.tsx:279
 msgid "This link is not complete. Ask for the full link."
 msgstr "This link is not complete. Ask for the full link."
 
-#: src/features/chat/guest-links/guest-page.tsx:98
+#: src/features/chat/guest-links/guest-page.tsx:93
 msgid "This link is not taking messages right now. Try again later."
 msgstr "This link is not taking messages right now. Try again later."
 
@@ -33756,7 +33741,7 @@ msgstr "This memory has since been deleted."
 msgid "This merges the commit {0} into the base branch with “{1}” on {hostLabel}. If the branch has changed since you opened this page, {hostLabel} refuses."
 msgstr "This merges the commit {0} into the base branch with “{1}” on {hostLabel}. If the branch has changed since you opened this page, {hostLabel} refuses."
 
-#: src/features/chat/guest-links/guest-page.tsx:92
+#: src/features/chat/guest-links/guest-page.tsx:87
 msgid "This message cannot be left. Keep it short, don't start it with / or mention anyone, or try again later."
 msgstr "This message cannot be left. Keep it short, don't start it with / or mention anyone, or try again later."
 
@@ -34113,11 +34098,11 @@ msgstr "Thread is now permanent"
 msgid "Thread list"
 msgstr "Thread list"
 
-#: src/features/chat/sharing/thread-share-button.tsx:171
+#: src/features/chat/sharing/thread-share-button.tsx:170
 msgid "Thread made private"
 msgstr "Thread made private"
 
-#: src/features/chat/sharing/thread-share-button.tsx:171
+#: src/features/chat/sharing/thread-share-button.tsx:170
 msgid "Thread made public"
 msgstr "Thread made public"
 
@@ -34441,7 +34426,7 @@ msgstr "Too many attempts. Wait a few seconds, then try again."
 msgid "too many files"
 msgstr "too many files"
 
-#: src/features/chat/guest-links/guest-page.tsx:101
+#: src/features/chat/guest-links/guest-page.tsx:96
 msgid "Too many messages. Please try again later."
 msgstr "Too many messages. Please try again later."
 
@@ -34454,7 +34439,7 @@ msgstr "Too many new contexts in a short while. Try again in a minute."
 msgid "Too many requests right now. Try again in a moment."
 msgstr "Too many requests right now. Try again in a moment."
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:97
+#: src/features/chat/guest-links/guest-link-panel.tsx:72
 msgid "Too many requests. Please try again in a moment."
 msgstr "Too many requests. Please try again in a moment."
 
@@ -34829,7 +34814,7 @@ msgstr "Try adjusting your search terms."
 #: src/components/error-component.tsx:40
 #: src/features/auth/components/device-approval.tsx:95
 #: src/features/auth/components/device-approval.tsx:338
-#: src/features/chat/guest-links/guest-page.tsx:275
+#: src/features/chat/guest-links/guest-page.tsx:270
 #: src/features/connection/components/offline-screen.tsx:64
 #: src/features/develop/components/files-tab.tsx:275
 #: src/features/develop/components/thread-pull-requests.tsx:169
@@ -35916,7 +35901,7 @@ msgstr "Used {0}"
 msgid "Used for buttons, highlights and focus rings. Every option keeps text readable in light and dark mode."
 msgstr "Used for buttons, highlights and focus rings. Every option keeps text readable in light and dark mode."
 
-#: src/features/chat/sharing/thread-share-button.tsx:288
+#: src/features/chat/sharing/thread-share-button.tsx:287
 msgid "user"
 msgstr "user"
 
@@ -35934,7 +35919,7 @@ msgstr "user"
 msgid "User"
 msgstr "User"
 
-#: src/features/chat/sharing/thread-share-button.tsx:154
+#: src/features/chat/sharing/thread-share-button.tsx:153
 msgid "User access removed"
 msgstr "User access removed"
 
@@ -36792,7 +36777,7 @@ msgstr "Wait for the agent to be ready, then try again."
 msgid "Wait for the reply to finish, then try again."
 msgstr "Wait for the reply to finish, then try again."
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:204
+#: src/features/chat/guest-links/guest-link-panel.tsx:175
 msgid "Waiting"
 msgstr "Waiting"
 
@@ -36821,7 +36806,7 @@ msgstr "Waiting for output…"
 msgid "Waiting for the agent…"
 msgstr "Waiting for the agent…"
 
-#: src/features/chat/guest-links/guest-page.tsx:297
+#: src/features/chat/guest-links/guest-page.tsx:292
 #: src/features/chat/thread/request-secret-prompt.tsx:343
 msgid "Waiting for the owner"
 msgstr "Waiting for the owner"
@@ -38000,7 +37985,7 @@ msgstr "Your local server answered, but refused this site (CORS). Allow this sit
 msgid "Your location (e.g., \"New York, USA\", \"Berlin, Germany\")."
 msgstr "Your location (e.g., \"New York, USA\", \"Berlin, Germany\")."
 
-#: src/features/chat/guest-links/guest-page.tsx:246
+#: src/features/chat/guest-links/guest-page.tsx:241
 msgid "Your message"
 msgstr "Your message"
 
@@ -38008,7 +37993,7 @@ msgstr "Your message"
 msgid "Your message contains inappropriate content that cannot be sent."
 msgstr "Your message contains inappropriate content that cannot be sent."
 
-#: src/features/chat/guest-links/guest-page.tsx:241
+#: src/features/chat/guest-links/guest-page.tsx:236
 msgid "Your message waits for the owner of this conversation. Nothing happens until they send it."
 msgstr "Your message waits for the owner of this conversation. Nothing happens until they send it."
 
@@ -38016,7 +38001,7 @@ msgstr "Your message waits for the owner of this conversation. Nothing happens u
 msgid "Your message:"
 msgstr "Your message:"
 
-#: src/features/chat/guest-links/guest-page.tsx:290
+#: src/features/chat/guest-links/guest-page.tsx:285
 msgid "Your messages"
 msgstr "Your messages"
 
@@ -38032,7 +38017,7 @@ msgstr "Your next message is a goal. The agent keeps working until a review conf
 msgid "Your next message will start a self-destructing chat."
 msgstr "Your next message will start a self-destructing chat."
 
-#: src/features/chat/guest-links/guest-page.tsx:267
+#: src/features/chat/guest-links/guest-page.tsx:262
 msgid "Your notes could not be loaded. They are still there; try again in a moment."
 msgstr "Your notes could not be loaded. They are still there; try again in a moment."
 
