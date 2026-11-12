@@ -69,3 +69,26 @@ describe("prompt queue across a reload", () => {
         expect(sessionStorage.getItem("neore:prompt-queue:thread-2")).toBeNull();
     });
 });
+
+describe("prompt queues after the session ends", () => {
+    it("drops every thread's queue, in memory and in sessionStorage, so the next account cannot restore one", async () => {
+        const before = await reload();
+
+        before.getState().enqueue("thread-1", { attachments: [], id: "q1", text: "the old account's prompt" });
+        before.getState().enqueue("thread-2", { attachments: [], id: "q2", text: "another" });
+        sessionStorage.setItem("unrelated", "kept");
+
+        const { clearPromptQueues } = await import("./prompt-queue-store");
+
+        clearPromptQueues();
+
+        expect(before.getState().queues).toEqual({});
+        expect(sessionStorage.getItem("neore:prompt-queue:thread-1")).toBeNull();
+        expect(sessionStorage.getItem("neore:prompt-queue:thread-2")).toBeNull();
+        expect(sessionStorage.getItem("unrelated")).toBe("kept");
+
+        before.getState().hydrate("thread-1");
+
+        expect(before.getState().queues["thread-1"]).toBeUndefined();
+    });
+});

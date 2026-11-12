@@ -27,6 +27,7 @@ import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 import { clearLastAccountHint } from "@/features/auth/lib/last-account-hint";
 import { getLocalizedError } from "@/features/auth/lib/utilities";
 import useCheckout from "@/features/billing/hooks/use-checkout";
+import { clearPromptQueues } from "@/features/chat/core/stores/prompt-queue-store";
 import { clearThreadListCache, releaseThreadListWrites } from "@/features/chat/thread-list/lib/thread-list-cache";
 import { useUserPreferences } from "@/features/layout/hooks/use-ui-state";
 import { useReleasePushOnSignOut } from "@/features/notifications/hooks/use-release-push-on-sign-out";
@@ -278,6 +279,7 @@ const NavUser: FC<NavUserProperties> = ({ trigger }) => {
                     // Before the request, and it holds writes until the page reloads or the next sign-in: the sidebar stays mounted meanwhile.
                     clearThreadListCache();
                     clearLastAccountHint();
+                    clearPromptQueues();
                     // Push first, while the session still authenticates the server call.
                     await releasePush();
                     await authClient.signOut({

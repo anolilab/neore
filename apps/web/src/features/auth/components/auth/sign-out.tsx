@@ -5,6 +5,7 @@ import { useEffect, useRef } from "react";
 
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 import { clearLastAccountHint } from "@/features/auth/lib/last-account-hint";
+import { clearPromptQueues } from "@/features/chat/core/stores/prompt-queue-store";
 import { clearThreadListCache } from "@/features/chat/thread-list/lib/thread-list-cache";
 import { useReleasePushOnSignOut } from "@/features/notifications/hooks/use-release-push-on-sign-out";
 import { resetAnalyticsIdentity, trackEvent } from "@/lib/analytics";
@@ -29,6 +30,7 @@ const SignOut = () => {
         clearThreadListCache();
         // The sign-in page that follows must not paint the chat layout optimistically for this account.
         clearLastAccountHint();
+        clearPromptQueues();
 
         // A full load of sign-in, not a reload: reloading `/auth/sign-out` would
         // mount this view again and sign out in a loop. A full load (rather than

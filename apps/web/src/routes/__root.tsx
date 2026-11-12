@@ -23,6 +23,7 @@ import { ThemeProvider } from "next-themes";
 import type { ReactNode } from "react";
 import { lazy, Suspense, useCallback, useEffect, useEffectEvent, useRef, useState } from "react";
 
+import ImpersonationBannerGate from "@/features/admin/components/impersonation-banner-gate";
 import AppearanceSync from "@/features/appearance/components/appearance-sync";
 import { ACCENT_BOOT_SCRIPT } from "@/features/appearance/lib/accent-boot-script";
 import { CHAT_TEXT_SIZE_BOOT_SCRIPT } from "@/features/appearance/lib/chat-text-size";
@@ -31,6 +32,7 @@ import { AuthQueryProvider } from "@/features/auth/lib/auth-query-provider";
 import { clearLastAccountHint, hasLastAccountHint, startsSignedIn, writeLastAccountHint } from "@/features/auth/lib/last-account-hint";
 import AuthUIProviderTanstack from "@/features/auth/lib/tanstack/auth-ui-provider-tanstack";
 import { closeSidePanelForSessionSwitch } from "@/features/chat/core/stores/chat-ui-store";
+import { clearPromptQueues } from "@/features/chat/core/stores/prompt-queue-store";
 import { clearComposerDrafts } from "@/features/chat/split/composer-drafts";
 import ConnectionProvider from "@/features/connection/components/connection-provider";
 import { useUIStateStore } from "@/features/layout/stores/ui-state-store";
@@ -84,8 +86,6 @@ const SettingsModal = lazy(() =>
         return { default: m.SettingsModal };
     }),
 );
-// Off the first load: it renders nothing unless an admin is impersonating someone.
-const ImpersonationBanner = lazy(() => import("@/features/admin/components/impersonation-banner"));
 const SwUpdatePrompt = lazy(() => import("@/components/sw-update-prompt"));
 
 /**
@@ -278,6 +278,8 @@ const AuthRecovery = ({ children, serverAuthStatus }: { children: ReactNode; ser
             closeSidePanelForSessionSwitch("after");
             // Parked drafts and model choices (split view) are the ended session's too.
             clearComposerDrafts();
+            // Queued prompts in this tab's sessionStorage too: the optimistic layout must not restore them for the next visitor.
+            clearPromptQueues();
             // An expired session skips both sign-out handlers, so the dock badge is cleared here.
             void setNativeBadge(0);
         };
@@ -324,13 +326,14 @@ const AuthRecovery = ({ children, serverAuthStatus }: { children: ReactNode; ser
         previousIsAnonymousRef.current = userIsAnonymous;
     }, [isLoading, isAuthenticated, userIsAnonymous, queryClient, serverAuthStatus]);
 
-    // The last confirmed account, so the next start paints the chat layout before the identity probe answers
-    // (`OptimisticAuthGate`). Another account confirmed here replaces it.
+    // A confirmed session, so the next start paints the chat layout before the identity probe answers
+    // (`OptimisticAuthGate`). A marker only: which account is not kept. The id is a dependency so an account switch,
+    // which clears the marker while the status stays "authenticated", writes it again for the account switched to.
     const identityUserId = identityUser?.id;
 
     useEffect(() => {
         if (identityStatus === "authenticated" && identityUserId) {
-            writeLastAccountHint(identityUserId);
+            writeLastAccountHint();
         }
     }, [identityStatus, identityUserId]);
 
@@ -459,8 +462,7 @@ const RootComponent = () => {
 
         if (phase === "after") {
             clearComposerDrafts();
-            // The switched-to account rewrites it once Lunora confirms it (`AuthRecovery`).
-            clearLastAccountHint();
+            clearPromptQueues();
         }
     }, []);
 
@@ -512,7 +514,7 @@ const RootComponent = () => {
                                                 <ConsentProvider options={{ consentCategories: CONSENT_CATEGORIES, mode: CONSENT_MODE, nonce: context.nonce }}>
                                                     <PostHogConsentSync />
                                                     <Suspense fallback={null}>
-                                                        <ImpersonationBanner />
+                                                        <ImpersonationBannerGate />
                                                     </Suspense>
                                                     <ConnectionProvider>
                                                         {isNative && (

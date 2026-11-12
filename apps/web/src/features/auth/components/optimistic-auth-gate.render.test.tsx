@@ -170,7 +170,7 @@ describe("the chat layout's auth gate", () => {
     });
 
     it("renders the signed-in layout on the client while Lunora loads, when the last account is remembered", () => {
-        writeLastAccountHint("user-1");
+        writeLastAccountHint();
 
         render(<ChatLayout />);
 
@@ -180,7 +180,7 @@ describe("the chat layout's auth gate", () => {
 
     it("hands over to the signed-out path when Lunora answers that there is no session", () => {
         harness.authStatus = "authenticated";
-        writeLastAccountHint("user-1");
+        writeLastAccountHint();
 
         render(<ChatLayout />);
 
@@ -217,7 +217,7 @@ describe("the chat layout's auth gate", () => {
 
     it("ignores a remembered account once the server has answered that there is no session", () => {
         harness.authStatus = "unauthenticated";
-        writeLastAccountHint("user-1");
+        writeLastAccountHint();
 
         render(<ChatLayout />);
 

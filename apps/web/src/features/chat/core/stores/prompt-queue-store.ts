@@ -197,6 +197,28 @@ export const usePromptQueueStore = create<PromptQueueStore>()((set, get) => {
     };
 });
 
+/** Drops every queue, in memory and in this tab's sessionStorage: the session that queued them has ended. */
+export const clearPromptQueues = (): void => {
+    hydratedThreadIds.clear();
+    usePromptQueueStore.setState({ queues: {} });
+
+    try {
+        const storage = globalThis.sessionStorage;
+
+        if (!storage) {
+            return;
+        }
+
+        const keys = Array.from({ length: storage.length }, (_, index) => storage.key(index)).filter((key) => key?.startsWith(STORAGE_KEY_PREFIX));
+
+        for (const key of keys) {
+            storage.removeItem(key as string);
+        }
+    } catch {
+        // Blocked storage: nothing was stored to come back.
+    }
+};
+
 /** Selector for one thread's queue; returns a stable empty queue when there is none. */
 export const selectThreadQueue =
     (threadId: string | undefined) =>

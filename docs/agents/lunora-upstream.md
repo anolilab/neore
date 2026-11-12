@@ -26,7 +26,7 @@ honours it. `findSentNote` reads through `admittedThreadDb`; `agent/messages.ts#
 **Not filed yet (owner to decide): seed the identity store from SSR.** `@lunora/react`'s `useAuth` / `useAuthState`
 read `"loading"` on the server and while hydrating (`getServerSnapshot`), and on the client until `getCurrentUser()`
 answers, even when SSR already minted the token. `apps/web/src/features/auth/components/optimistic-auth-gate.tsx`
-works around it with the dehydrated `authStatus` and a stored last-account hint. An upstream option to seed the store
+works around it with the dehydrated `authStatus` and a stored signed-in hint. An upstream option to seed the store
 (status and user) from SSR would let `<Authenticated>` render on the first paint and retire that gate.
 
 **Not filed yet (owner to decide): `.global()` writes and live queries.** In `@lunora/shard-engine@alpha.193`, only an

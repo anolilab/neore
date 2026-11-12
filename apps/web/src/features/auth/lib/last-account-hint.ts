@@ -1,16 +1,18 @@
 /**
- * "Someone was signed in here last time": the user id of the last session Lunora confirmed, in `localStorage`.
+ * "Someone was signed in here last time": a fixed marker in `localStorage`, no account id.
  *
  * Only a hint for which layout to paint while Lunora's identity probe is in flight
- * (`features/auth/components/optimistic-auth-gate.tsx`). It grants nothing and reads no data: queries still go out with the
- * RPC token, and per-user caches key on the token's subject, never on this id. Written when a session is
- * confirmed, replaced when another account is confirmed, removed on an account switch, when Lunora answers "no session" (sign-out,
- * expiry, revocation) and when sign-out starts. Every storage access is guarded: a blocked store reads as "no hint".
+ * (`features/auth/components/optimistic-auth-gate.tsx`). It grants nothing, reads no data and names nobody: queries
+ * still go out with the RPC token, and per-user caches key on the token's subject. Written when a session is
+ * confirmed, removed on an account switch, when Lunora answers "no session" (sign-out, expiry, revocation) and when
+ * sign-out starts. Every storage access is guarded: a blocked store reads as "no hint".
  */
 
 import type { SessionAuthStatus } from "@neore/client-runtime";
 
-const STORAGE_KEY = "neore-last-account";
+const STORAGE_KEY = "neore-signed-in-hint";
+/** Presence is all the gate reads; the value is fixed so the browser keeps no identifier. */
+const MARKER = "1";
 
 const listeners = new Set<() => void>();
 
@@ -36,12 +38,12 @@ export const hasLastAccountHint = (): boolean => {
     }
 };
 
-export const writeLastAccountHint = (userId: string): void => {
+export const writeLastAccountHint = (): void => {
     try {
         const store = storage();
 
-        if (store && store.getItem(STORAGE_KEY) !== userId) {
-            store.setItem(STORAGE_KEY, userId);
+        if (store && store.getItem(STORAGE_KEY) !== MARKER) {
+            store.setItem(STORAGE_KEY, MARKER);
             notify();
         }
     } catch {
