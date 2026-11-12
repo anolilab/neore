@@ -3,7 +3,7 @@
     "version": "0.0.0",
     "private": true,
     "description": "HTML to Markdown converter, forked from turndown (MIT). See README.md.",
-    "license": "SEE LICENSE IN NOTICE",
+    "license": "MIT",
     "sideEffects": false,
     "type": "module",
     "exports": {

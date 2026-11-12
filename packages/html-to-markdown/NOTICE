@@ -15,5 +15,5 @@ test/fixtures/upstream-cases.json is generated from turndown's test/index.html
 Runtime dependency: @mixmark-io/domino (MIT), used on Node and in tests only.
 Development dependency: turndown 7.2.5 (MIT), used by the differential test and benchmarks.
 
-Code in this package that is not derived from turndown is part of the Neore repository and is covered by its
-license (LICENSE.md at the repository root).
+Code in this package that is not derived from turndown is also MIT-licensed (see LICENSE). The package is
+MIT-licensed as a whole, unlike the rest of the repository, whose licence is LICENSE.md at the repository root.

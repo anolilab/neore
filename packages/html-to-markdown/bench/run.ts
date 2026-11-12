@@ -30,7 +30,7 @@ const fixtures = Object.fromEntries(
 const pasteSample = fixtures["google-docs-list.html"] ?? "";
 const tableSample = fixtures["github-readme-table.html"] ?? "";
 
-// About 2 MB: the Google Docs and GitHub table fixtures repeated, as one long document.
+// About 5 MB: the Google Docs and GitHub table fixtures repeated, as one long document.
 const largeDocument = (pasteSample + tableSample).repeat(700);
 
 // Inputs in the shape of the ReDoS reports (#505, #506) and the linear-time
@@ -46,7 +46,7 @@ const adversarial: Record<string, string> = {
 
 const cases: [string, string][] = [
     ...Object.entries(fixtures).map(([name, html]): [string, string] => [`fixture ${name}`, html]),
-    ["large document (~2 MB)", largeDocument],
+    ["large document (~5 MB)", largeDocument],
     ...Object.entries(adversarial).map(([name, html]): [string, string] => [`adversarial: ${name}`, html]),
 ];
 
