@@ -7,7 +7,7 @@
 import { useCallback } from "react";
 
 import type { AnalyticsEvent, AnalyticsEventMap } from "./events";
-import { captureException, forgetPostHogIdentity, getStartedPostHog, queueEvent } from "./posthog-client";
+import { captureException, forgetPostHogIdentity, getStartedPostHog, queueEvent, resetStartedPostHog } from "./posthog-client";
 
 /**
  * Forget the identified user before a sign-out reload, so later events from this
@@ -19,7 +19,7 @@ export const resetAnalyticsIdentity = (): void => {
     const posthog = getStartedPostHog();
 
     if (posthog) {
-        posthog.reset();
+        resetStartedPostHog(posthog);
 
         return;
     }

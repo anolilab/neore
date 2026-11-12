@@ -10,6 +10,7 @@ import {
     getPostHog,
     getStartedPostHog,
     loadPostHog,
+    markPostHogUnavailable,
     PostHogClientContext,
     setIdentityExpected,
     setMeasurementConsent,
@@ -181,6 +182,8 @@ const AnalyticsProvider: FC<PropsWithChildren> = ({ children }) => {
                     return;
                 }
 
+                // Nothing waits for flags that may never come; a start once back online still provides them.
+                markPostHogUnavailable();
                 globalThis.addEventListener("online", attempt, { once: true });
             });
         };

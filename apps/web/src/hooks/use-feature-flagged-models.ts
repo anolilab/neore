@@ -3,7 +3,7 @@
 import type { GatewayModel } from "@neore/ai/models";
 import { useQuery } from "@tanstack/react-query";
 
-import { usePostHog } from "@/lib/analytics/posthog-client";
+import { useFeatureFlagsKnown, usePostHog } from "@/lib/analytics/posthog-client";
 import { useCRPC } from "@/lib/lunora/crpc";
 
 import { useGatewayModels, useGatewayModelsSettled } from "./use-gateway-models";
@@ -47,14 +47,18 @@ const useFeatureFlaggedModels = (options?: { applyUserOverrides?: boolean }): Ga
 
 /**
  * Whether the list above has its inputs: the catalog and this person's preferences (their switched-off models and filter rules)
- * have loaded or failed to. Until then the list can still lose a model it shows, or gain one it leaves out.
+ * have loaded or failed to, and, when the catalog has a flag-gated model, PostHog's flags are known (`useFeatureFlagsKnown`:
+ * PostHog loads after mount, so a cold load reads every flag as off until then). Until then the list can still lose a model it
+ * shows, or gain one it leaves out.
  */
 export const useFeatureFlaggedModelsSettled = (): boolean => {
     const crpc = useCRPC();
+    const gatewayModels = useGatewayModels();
     const gatewaySettled = useGatewayModelsSettled();
+    const flagsKnown = useFeatureFlagsKnown();
     const { isPending: preferencesPending } = useQuery(crpc.auth.functions.getAIUserPreferences.queryOptions({}));
 
-    return gatewaySettled && !preferencesPending;
+    return gatewaySettled && !preferencesPending && (flagsKnown || gatewayModels.every((model) => !model.featureFlag));
 };
 
 /**

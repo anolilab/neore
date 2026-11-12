@@ -1,3 +1,7 @@
+import { act, renderHook } from "@testing-library/react";
+import type { PostHog } from "posthog-js";
+import type { ReactNode } from "react";
+import { createElement } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const posthog = vi.hoisted(() => {
@@ -158,8 +162,12 @@ describe("events tracked before PostHog initialises", () => {
         client.flushPendingCaptures(await client.loadPostHog());
 
         expect(posthog.capture.mock.calls).toStrictEqual([
-            ["anonymous_session_started", { provider: "anonymous" }, { timestamp: new Date("2026-11-12T10:00:00.000Z") }],
-            ["onboarding_started", {}, { timestamp: new Date("2026-11-12T10:00:02.000Z") }],
+            [
+                "anonymous_session_started",
+                expect.objectContaining({ $pathname: "/", provider: "anonymous" }),
+                { timestamp: new Date("2026-11-12T10:00:00.000Z") },
+            ],
+            ["onboarding_started", expect.any(Object), { timestamp: new Date("2026-11-12T10:00:02.000Z") }],
         ]);
         expect(posthog.captureException).toHaveBeenCalledExactlyOnceWith("early", undefined);
         expect(posthog.capture.mock.invocationCallOrder.at(-1)).toBeLessThan(posthog.captureException.mock.invocationCallOrder[0] ?? 0);
@@ -205,6 +213,44 @@ describe("events tracked before PostHog initialises", () => {
 
         expect(posthog.capture).toHaveBeenCalledOnce();
         expect(sessionStorage.getItem(next.PENDING_EVENTS_KEY)).toBeNull();
+    });
+
+    it("skips stored entries without the shape it wrote and still sends the rest", async () => {
+        sessionStorage.setItem(
+            "neore:posthog-pending-events",
+            JSON.stringify([
+                null,
+                { event: 1, timestamp: "2026-11-12T10:00:00.000Z" },
+                { event: "no time" },
+                { event: "valid", timestamp: "2026-11-12T09:59:00.000Z" },
+            ]),
+        );
+
+        const client = await loadClientModule();
+        const onStarted = vi.fn();
+
+        client.setAnalyticsIdentity({});
+        expect(() => client.startPostHog(posthog as never, onStarted)).not.toThrow();
+
+        expect(posthog.capture).toHaveBeenCalledExactlyOnceWith("valid", undefined, { timestamp: new Date("2026-11-12T09:59:00.000Z") });
+        expect(onStarted).toHaveBeenCalledOnce();
+    });
+
+    it("names the page it was tracked on, not the one the flush runs on", async () => {
+        const client = await loadClientModule();
+
+        globalThis.history.replaceState(null, "", "/auth/sign-in?redirectTo=%2Fchat#token");
+        client.queueEvent("desktop_signed_in", { method: "email" });
+        globalThis.history.replaceState(null, "", "/chat");
+        client.flushPendingCaptures(await client.loadPostHog());
+
+        expect(posthog.capture.mock.calls[0]?.[1]).toStrictEqual({
+            $current_url: `${globalThis.location.origin}/auth/sign-in?redirectTo=%2Fchat`,
+            $host: globalThis.location.host,
+            $pathname: "/auth/sign-in",
+            $referrer: "$direct",
+            method: "email",
+        });
     });
 });
 
@@ -278,6 +324,66 @@ describe("startPostHog", () => {
         expect(order(posthog.identify)).toBeLessThan(order(onStarted));
     });
 
+    it("does not identify the account that left again when the session still publishes it before the page leaves", async () => {
+        const client = await loadClientModule();
+
+        client.setAnalyticsIdentity({ user: { id: "user-1" } });
+        client.forgetPostHogIdentity("key");
+        // The session's last answer, published again before the sign-out navigation.
+        client.setAnalyticsIdentity({ user: { id: "user-1" } });
+        client.startPostHog(await client.loadPostHog(), () => {});
+
+        // It waits for the session's next answer instead.
+        expect(posthog.identify).not.toHaveBeenCalled();
+        expect(client.getStartedPostHog()).toBeUndefined();
+
+        client.setAnalyticsIdentity({});
+
+        expect(client.getStartedPostHog()).toBe(posthog);
+        expect(posthog.reset).toHaveBeenCalledOnce();
+        expect(posthog.identify).not.toHaveBeenCalled();
+
+        // Once started, a sign-out through `resetStartedPostHog` holds the same way; a new account is identified.
+        client.setAnalyticsIdentity({ user: { id: "user-2" } });
+        client.resetStartedPostHog(posthog as never);
+        client.setAnalyticsIdentity({ user: { id: "user-2" } });
+
+        expect(posthog.identify.mock.calls.map(([id]) => id)).toStrictEqual(["user-2"]);
+
+        client.setAnalyticsIdentity({ user: { id: "user-3" } });
+
+        expect(posthog.identify.mock.calls.map(([id]) => id)).toStrictEqual(["user-2", "user-3"]);
+    });
+
+    it("applies the organization group again after a switch to another user of the same organization", async () => {
+        const client = await loadClientModule();
+        const organization = { id: "org-1", name: "Acme" };
+
+        client.setAnalyticsIdentity({ organization, user: { id: "user-1" } });
+        client.startPostHog(await client.loadPostHog(), () => {});
+        client.setAnalyticsIdentity({ organization, user: { id: "user-2" } });
+
+        expect(posthog.group).toHaveBeenCalledTimes(2);
+        expect(order(posthog.reset)).toBeLessThan(posthog.group.mock.invocationCallOrder[1] ?? 0);
+    });
+
+    it("sends an event queued under one account only to that account, and a signed-out one to whoever signs in", async () => {
+        const before = await loadClientModule();
+
+        before.setAnalyticsIdentity({ user: { id: "user-1" } });
+        before.queueEvent("tracked as user-1", {});
+        before.setAnalyticsIdentity({});
+        before.queueEvent("tracked signed out", {});
+
+        // A failed sign-out navigated with the queue kept; the next page is another account's.
+        const after = await loadClientModule();
+
+        after.setAnalyticsIdentity({ user: { id: "user-2" } });
+        after.startPostHog(await after.loadPostHog(), () => {});
+
+        expect(posthog.capture.mock.calls.map(([event]) => event)).toStrictEqual(["tracked signed out"]);
+    });
+
     it("follows later sign-ins and sign-outs once started", async () => {
         const client = await loadClientModule();
 
@@ -288,5 +394,55 @@ describe("startPostHog", () => {
         expect(posthog.identify).toHaveBeenCalledOnce();
         expect(posthog.reset).toHaveBeenCalledOnce();
         expect(posthog.register).toHaveBeenLastCalledWith({ is_anonymous: true });
+    });
+});
+
+describe("useFeatureFlagsKnown", () => {
+    afterEach(() => {
+        vi.unstubAllEnvs();
+    });
+
+    it("waits for the client's flags, or for PostHog to be known not to start", async () => {
+        const client = await loadClientModule();
+        const flagListeners: (() => void)[] = [];
+        const fake = {
+            onFeatureFlags: (callback: () => void) => {
+                flagListeners.push(callback);
+
+                return () => {};
+            },
+        } as unknown as PostHog;
+        const state: { client?: PostHog } = {};
+        const wrapper = ({ children }: { children: ReactNode }) => createElement(client.PostHogClientContext, { value: state.client }, children);
+        const { rerender, result } = renderHook(() => client.useFeatureFlagsKnown(), { wrapper });
+
+        // The chunk is still loading.
+        expect(result.current).toBe(false);
+
+        state.client = fake;
+        rerender();
+
+        expect(result.current).toBe(false);
+
+        act(() => {
+            for (const listener of flagListeners) {
+                listener();
+            }
+        });
+
+        expect(result.current).toBe(true);
+
+        // Another page whose chunk failed for good: nothing waits for flags.
+        const failed = await loadClientModule();
+        const failedWrapper = ({ children }: { children: ReactNode }) => createElement(failed.PostHogClientContext, { value: undefined }, children);
+        const { result: failedResult } = renderHook(() => failed.useFeatureFlagsKnown(), { wrapper: failedWrapper });
+
+        expect(failedResult.current).toBe(false);
+
+        act(() => {
+            failed.markPostHogUnavailable();
+        });
+
+        expect(failedResult.current).toBe(true);
     });
 });

@@ -14,6 +14,8 @@ const posthogMock = vi.hoisted(() => {
         group: vi.fn(),
         has_opted_out_capturing: vi.fn(() => false),
         identify: vi.fn(),
+        // Flags that never arrive: only a start that failed for good settles them here.
+        onFeatureFlags: vi.fn(() => () => {}),
         init: vi.fn((_key: string, config: { loaded?: (posthog: unknown) => void }) => {
             // Like posthog-js: `init` marks the singleton loaded and calls `loaded`.
             posthogMock.__loaded = true;
@@ -106,11 +108,16 @@ describe("AnalyticsProvider", () => {
     beforeEach(async () => {
         modules = await loadModules();
         modules.setMeasurementConsent(true);
-        const { usePostHog } = modules;
+        const { useFeatureFlagsKnown, usePostHog } = modules;
 
         AnalyticsProvider = modules.default;
 
-        ClientState = () => <p>{usePostHog() ? "analytics on" : "analytics off"}</p>;
+        ClientState = () => (
+            <>
+                <p>{usePostHog() ? "analytics on" : "analytics off"}</p>
+                <p>{useFeatureFlagsKnown() ? "flags known" : "flags pending"}</p>
+            </>
+        );
     });
 
     afterEach(() => {
@@ -172,13 +179,16 @@ describe("AnalyticsProvider", () => {
 
         expect(warn).toHaveBeenCalledExactlyOnceWith("[PostHog] Analytics did not start:", failure);
         expect(loadPostHog).toHaveBeenCalledOnce();
+        // The retry may still bring the flags.
+        expect(screen.getByText("flags pending")).toBeTruthy();
 
         await act(async () => {
             await vi.advanceTimersByTimeAsync(START_RETRY_DELAY_MS);
         });
 
-        // The one retry failed too: no more timers, only the `online` event tries again.
+        // The one retry failed too: no more timers, only the `online` event tries again, and nothing waits for flags.
         expect(loadPostHog).toHaveBeenCalledTimes(2);
+        expect(screen.getByText("flags known")).toBeTruthy();
 
         await act(async () => {
             await vi.advanceTimersByTimeAsync(START_RETRY_DELAY_MS * 10);

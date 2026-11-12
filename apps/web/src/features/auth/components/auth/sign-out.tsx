@@ -10,6 +10,7 @@ import { dropStoredDrafts } from "@/features/chat/split/composer-drafts";
 import { clearThreadListCache } from "@/features/chat/thread-list/lib/thread-list-cache";
 import { useReleasePushOnSignOut } from "@/features/notifications/hooks/use-release-push-on-sign-out";
 import { resetAnalyticsIdentity, trackEvent } from "@/lib/analytics";
+import { dropPendingCaptures } from "@/lib/analytics/posthog-client";
 import { setNativeBadge } from "@/lib/native/bridge";
 
 const SignOut = () => {
@@ -51,6 +52,8 @@ const SignOut = () => {
                     onError: () => {
                         // The session may still be active: keep the analytics identity, the queued prompts and the hint. One
                         // that had already ended is cleared by the signed-out start (`AuthRecovery` in `__root.tsx`).
+                        // Events queued for PostHog go: the sign-in page may be someone else's, and they would be sent as them.
+                        dropPendingCaptures();
                         globalThis.location.replace(signInPath);
                     },
                     onSuccess: async () => {

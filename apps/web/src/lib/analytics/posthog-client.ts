@@ -57,19 +57,42 @@ export const PENDING_EVENTS_KEY = "neore:posthog-pending-events";
 
 interface PendingEvent {
     event: string;
-    properties: Properties;
+    /** With the page it was tracked on (`pageProperties`). */
+    properties?: Properties;
     /** When it was tracked (ISO 8601), sent as the event's time. */
     timestamp: string;
+    /** Who tracked it: a user's id, `null` signed out or a guest, absent while the session had not answered yet. */
+    userId?: string | null;
 }
 
 const pendingExceptions: { error: unknown; properties: ExceptionProperties }[] = [];
 const queueState: { closed: boolean; events?: PendingEvent[] } = { closed: false };
 
+const isPlainRecord = (value: unknown): value is Partial<Record<keyof PendingEvent, unknown>> =>
+    typeof value === "object" && value !== null && !Array.isArray(value);
+
+/** Whether a stored entry has the shape `queueEvent` wrote: any script of the origin can write to sessionStorage. */
+const isPendingEvent = (value: unknown): value is PendingEvent => {
+    if (!isPlainRecord(value)) {
+        return false;
+    }
+
+    const { event, properties, timestamp, userId } = value;
+
+    return (
+        typeof event === "string" &&
+        (properties === undefined || isPlainRecord(properties)) &&
+        typeof timestamp === "string" &&
+        !Number.isNaN(Date.parse(timestamp)) &&
+        (userId === undefined || userId === null || typeof userId === "string")
+    );
+};
+
 const readStoredEvents = (): PendingEvent[] => {
     try {
         const parsed: unknown = JSON.parse(globalThis.sessionStorage.getItem(PENDING_EVENTS_KEY) ?? "[]");
 
-        return Array.isArray(parsed) ? (parsed as PendingEvent[]) : [];
+        return Array.isArray(parsed) ? parsed.filter((entry: unknown) => isPendingEvent(entry)) : [];
     } catch {
         return [];
     }
@@ -143,6 +166,44 @@ export const captureException = (error: unknown, properties?: ExceptionPropertie
     }
 };
 
+/** Who the session says is signed in, as `usePostHogIdentity` publishes it. */
+export interface AnalyticsIdentity {
+    organization?: { id: string; name?: string };
+    /** `undefined` when signed out or a guest. */
+    user?: { email?: string; id: string; name?: string };
+}
+
+const identityState: {
+    /** What was last applied to the started client. */
+    applied?: { organizationId?: string; userId?: string };
+    current?: AnalyticsIdentity;
+
+    /**
+     * The user a sign-out ended. The session can still publish them until the page leaves; that is not applied, so
+     * PostHog does not identify them again after the reset.
+     */
+    departedUserId?: string;
+    /** The session cannot answer any more (its provider unmounted): start without it rather than never. */
+    isAbandoned: boolean;
+} = { isAbandoned: false };
+
+/** The page an event is tracked on, as posthog-js would name it then, so a later flush does not name the page it runs on. */
+const pageProperties = (): Properties => {
+    const { document, location } = globalThis;
+
+    if (!location) {
+        return {};
+    }
+
+    return {
+        // Without the fragment, as `disable_capture_url_hashes` has PostHog do; `before_send` redacts a prompt parameter.
+        $current_url: `${location.origin}${location.pathname}${location.search}`,
+        $host: location.host,
+        $pathname: location.pathname,
+        $referrer: document?.referrer || "$direct",
+    };
+};
+
 /**
  * Keeps an event tracked before PostHog started, up to `MAX_PENDING_EVENTS`, under the same rules as
  * `captureException`'s queue; `flushPendingCaptures` sends it with the time it was tracked. It outlives a page load in
@@ -155,7 +216,14 @@ export const queueEvent = (event: string, properties: Properties): void => {
 
     const events = pendingEvents();
 
-    events.push({ event, properties, timestamp: new Date().toISOString() });
+    const { current } = identityState;
+
+    events.push({
+        event,
+        properties: { ...pageProperties(), ...properties },
+        timestamp: new Date().toISOString(),
+        userId: current ? (current.user?.id ?? null) : undefined,
+    });
 
     if (events.length > MAX_PENDING_EVENTS) {
         events.shift();
@@ -166,7 +234,10 @@ export const queueEvent = (event: string, properties: Properties): void => {
 
 /**
  * Sends what was queued before `posthog` initialised, events first and then exceptions, unless the user opted out;
- * then queues nothing more. A capture that throws is logged and skipped, so the rest are still sent.
+ * then queues nothing more. A capture that throws is logged and skipped, so the rest are still sent. An event a
+ * signed-in user tracked is sent only under that user: one another account (or a sign-out) has replaced since is
+ * dropped. One tracked signed out or before the session answered goes to whoever is identified, as PostHog's own
+ * anonymous events do.
  */
 export const flushPendingCaptures = (posthog: PostHog): void => {
     const events = [...pendingEvents()];
@@ -180,7 +251,13 @@ export const flushPendingCaptures = (posthog: PostHog): void => {
         return;
     }
 
-    for (const { event, properties, timestamp } of events) {
+    const appliedUserId = identityState.applied?.userId;
+
+    for (const { event, properties, timestamp, userId } of events) {
+        if (typeof userId === "string" && userId !== appliedUserId) {
+            continue;
+        }
+
         try {
             posthog.capture(event, properties, { timestamp: new Date(timestamp) });
         } catch (captureError) {
@@ -199,11 +276,47 @@ export const flushPendingCaptures = (posthog: PostHog): void => {
     }
 };
 
+/**
+ * Analytics will not start on this page: development or no PostHog key (`discardPendingCaptures`), or its chunk could
+ * not load after the retries. Flags then never arrive, so nothing waits for them (`useFeatureFlagsKnown`).
+ */
+const availability = { isUnavailable: false, listeners: new Set<() => void>() };
+
+/** Records that PostHog will not start on this page (the chunk failed for good), so nothing waits for its flags. */
+export const markPostHogUnavailable = (): void => {
+    if (availability.isUnavailable) {
+        return;
+    }
+
+    availability.isUnavailable = true;
+
+    for (const listener of availability.listeners) {
+        listener();
+    }
+};
+
 /** Analytics will not load in this session (development, or no PostHog key): drop the queues and stop queueing. */
 export const discardPendingCaptures = (): void => {
     pendingExceptions.length = 0;
     dropPendingEvents();
     queueState.closed = true;
+    markPostHogUnavailable();
+};
+
+/**
+ * A sign-out ended a session that may still navigate as it was: drop what it queued, without closing the queue. The
+ * sign-out error path, which leaves for the sign-in page while the session may still be active, uses this; its events
+ * must not reach whoever signs in there.
+ */
+export const dropPendingCaptures = (): void => {
+    pendingExceptions.length = 0;
+    dropPendingEvents();
+};
+
+/** The session's user left: the identity applied or waiting is forgotten, and that user is not applied again. */
+const departIdentity = (): void => {
+    identityState.departedUserId = identityState.current?.user?.id ?? identityState.applied?.userId;
+    identityState.current = undefined;
 };
 
 const resetState: { pending: boolean } = { pending: false };
@@ -222,10 +335,13 @@ const clearStorageKeys = (storage: Storage, prefix: string): void => {
  * the server, which reads the cookie) as the account that left. Removes what posthog-js persists under
  * `ph_<token>_…` (`parseName` in its `posthog-persistence`): the `ph_<token>_posthog` cookie on this host and every
  * parent domain it may have been set on, and the localStorage and sessionStorage entries. The client is also reset
- * when it starts, for a page that did not reload. Events and errors still queued for PostHog are dropped with it.
+ * when it starts, for a page that did not reload, and then waits for a new identity rather than applying the one that
+ * left. Events and errors still queued for PostHog are dropped with it.
  */
 export const forgetPostHogIdentity = (token: string): void => {
     resetState.pending = true;
+    // Startup waits for the next identity the session publishes; the one that left is not applied after the reset.
+    departIdentity();
     // Tracked and caught as the account that left: sent after the reset they would count for whoever this browser is
     // next. Later ones still queue, for the signed-out session.
     dropPendingEvents();
@@ -257,6 +373,16 @@ export const forgetPostHogIdentity = (token: string): void => {
     }
 };
 
+/**
+ * Signs the started client out: `reset()`, and the user who left is not identified again if the session publishes
+ * them before the page leaves.
+ */
+export const resetStartedPostHog = (posthog: PostHog): void => {
+    posthog.reset();
+    departIdentity();
+    identityState.applied = {};
+};
+
 /** Whether a sign-out asked for a reset before PostHog had started; answers `true` once. */
 const takePendingPostHogReset = (): boolean => {
     const { pending } = resetState;
@@ -266,28 +392,15 @@ const takePendingPostHogReset = (): boolean => {
     return pending;
 };
 
-/** Who the session says is signed in, as `usePostHogIdentity` publishes it. */
-export interface AnalyticsIdentity {
-    organization?: { id: string; name?: string };
-    /** `undefined` when signed out or a guest. */
-    user?: { email?: string; id: string; name?: string };
-}
-
-const identityState: {
-    /** What was last applied to the started client. */
-    applied?: { organizationId?: string; userId?: string };
-    current?: AnalyticsIdentity;
-    /** The session cannot answer any more (its provider unmounted): start without it rather than never. */
-    isAbandoned: boolean;
-} = { isAbandoned: false };
-
 /** Brings the started client to the published identity: identify, reset on sign-out, the organization group. */
 const syncIdentity = (posthog: PostHog): void => {
     const { applied = {}, current = {} } = identityState;
     const userId = current.user?.id;
     const organizationId = current.organization?.id;
 
-    if (applied.userId && applied.userId !== userId) {
+    const isReset = Boolean(applied.userId && applied.userId !== userId);
+
+    if (isReset) {
         posthog.reset();
     }
 
@@ -298,7 +411,8 @@ const syncIdentity = (posthog: PostHog): void => {
         posthog.identify(current.user.id, { email: current.user.email, name: current.user.name });
     }
 
-    if (current.organization && organizationId !== applied.organizationId) {
+    // A reset dropped the group too, even when the next user is in the same organization.
+    if (current.organization && (isReset || organizationId !== applied.organizationId)) {
         posthog.group("organization", current.organization.id, { name: current.organization.name });
     }
 
@@ -344,6 +458,11 @@ export const startPostHog = (posthog: PostHog, onStarted: () => void): void => {
 
 /** Publishes the session's identity; applied at once to a started client, else when PostHog starts. */
 export const setAnalyticsIdentity = (identity: AnalyticsIdentity): void => {
+    if (identity.user && identity.user.id === identityState.departedUserId) {
+        return;
+    }
+
+    identityState.departedUserId = undefined;
     identityState.current = identity;
 
     if (startup.isStarted && startup.client) {
@@ -370,6 +489,44 @@ export const usePostHog = (): PostHog | undefined => useContext(PostHogClientCon
 
 const noSubscription = (): (() => void) => () => {};
 const notLoaded = (): undefined => undefined;
+
+const subscribeAvailability = (onChange: () => void): (() => void) => {
+    availability.listeners.add(onChange);
+
+    return () => {
+        availability.listeners.delete(onChange);
+    };
+};
+
+const readUnavailable = (): boolean => availability.isUnavailable;
+const notKnown = (): false => false;
+
+// Clients whose flags have arrived (fetched, persisted, bootstrapped, or failed to load): `onFeatureFlags` answers at
+// once for flags it already has.
+const clientsWithFlags = new WeakSet<PostHog>();
+
+/**
+ * Whether `useFeatureFlagEnabled` and `usePostHog()?.isFeatureEnabled` give their final answer: the client has its
+ * flags, or PostHog will not start on this page. Until then a flag reads as off only because it has not arrived.
+ */
+export const useFeatureFlagsKnown = (): boolean => {
+    const posthog = usePostHog();
+    const isUnavailable = useSyncExternalStore(subscribeAvailability, readUnavailable, notKnown);
+    const subscribe = useCallback(
+        (onChange: () => void) =>
+            posthog
+                ? posthog.onFeatureFlags(() => {
+                      clientsWithFlags.add(posthog);
+                      onChange();
+                  })
+                : noSubscription(),
+        [posthog],
+    );
+    const read = useCallback(() => posthog !== undefined && clientsWithFlags.has(posthog), [posthog]);
+    const hasFlags = useSyncExternalStore(subscribe, read, notKnown);
+
+    return hasFlags || isUnavailable;
+};
 
 /** Whether `flag` is on; `undefined` while PostHog or its flags have not loaded. Follows later flag reloads. */
 export const useFeatureFlagEnabled = (flag: string): boolean | undefined => {
