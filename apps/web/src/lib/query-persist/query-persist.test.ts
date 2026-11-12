@@ -158,6 +158,17 @@ const heldReads = (store: RecordStore, name: "entries" | "keys") => {
     };
 };
 
+/** Steps the fake clock until `flag.done`; fails after a bounded number of throttle intervals instead of looping until the runner times out. */
+const untilDone = async (flag: { done: boolean }, maxSteps = 100): Promise<void> => {
+    for (let step = 0; step < maxSteps && !flag.done; step += 1) {
+        await vi.advanceTimersByTimeAsync(WRITE_THROTTLE_MS);
+    }
+
+    if (!flag.done) {
+        throw new Error(`No write landed within ${String(maxSteps)} throttle intervals`);
+    }
+};
+
 beforeEach(() => {
     vi.useFakeTimers({ now: new Date("2026-11-12T10:00:00Z"), toFake: ["setTimeout", "clearTimeout", "Date"] });
 });
@@ -492,9 +503,7 @@ describe("saving", () => {
         queryClient.setQueryData(KEY, { text: "live again" });
 
         // The restore runs first (WebCrypto, not a timer), then the throttled save: step the clock until it lands.
-        while (!written.done) {
-            await vi.advanceTimersByTimeAsync(WRITE_THROTTLE_MS);
-        }
+        await untilDone(written);
 
         expect(textOf(queryClient, OTHER_KEY)).toBe("kept");
         expect(textOf(queryClient, KEY)).toBe("live again");
@@ -527,9 +536,7 @@ describe("saving", () => {
             written.done = true;
         })();
 
-        while (!written.done) {
-            await vi.advanceTimersByTimeAsync(WRITE_THROTTLE_MS);
-        }
+        await untilDone(written);
 
         controller.stop();
 
@@ -587,9 +594,7 @@ describe("saving", () => {
             listener();
         }
 
-        while (!written.done) {
-            await vi.advanceTimersByTimeAsync(WRITE_THROTTLE_MS);
-        }
+        await untilDone(written);
 
         controller.stop();
 
@@ -623,9 +628,7 @@ describe("saving", () => {
         })();
         queryClient.setQueryData(KEY, { text: "fresh" });
 
-        while (!written.done) {
-            await vi.advanceTimersByTimeAsync(WRITE_THROTTLE_MS);
-        }
+        await untilDone(written);
 
         controller.stop();
 
@@ -662,9 +665,7 @@ describe("saving", () => {
         queryClient.setQueryData(OTHER_KEY, { text: "old" }, { updatedAt: Date.now() - MAX_AGE_MS - 1 });
         queryClient.setQueryData(KEY, { text: "fresh" });
 
-        while (!written.done) {
-            await vi.advanceTimersByTimeAsync(WRITE_THROTTLE_MS);
-        }
+        await untilDone(written);
 
         controller.stop();
 
@@ -719,9 +720,7 @@ describe("saving", () => {
         })();
         queryClient.setQueryData(KEY, { text: "live again" });
 
-        while (!written.done) {
-            await vi.advanceTimersByTimeAsync(WRITE_THROTTLE_MS);
-        }
+        await untilDone(written);
 
         expect(textOf(queryClient, OTHER_KEY)).toBe("kept");
         controller.stop();
