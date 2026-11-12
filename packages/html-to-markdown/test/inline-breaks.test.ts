@@ -40,6 +40,48 @@ describe("adjacent emphasis (#512, #442)", () => {
     it("unchanged: emphasis separated by a space stays separate", () => {
         expect(convert("<em>a</em> <em>b</em>")).toBe("_a_ _b_");
     });
+
+    it("merges a long run without changing the output", () => {
+        expect(convert("<em>x</em>".repeat(300))).toBe(`_${"x".repeat(300)}_`);
+    });
+});
+
+describe("runs stop at block edges (review)", () => {
+    // The block-containing element keeps the delimiters upstream writes around it, so these
+    // outputs match upstream. The run itself never reaches past the block.
+    it("does not merge strong across a block", () => {
+        expect(convert("<strong>a<div>b</div></strong><strong>c</strong>")).toBe("**a\n\nb\n\n****c**");
+    });
+
+    it("does not merge emphasis across a block", () => {
+        expect(convert("<em>a</em><em><div>b</div>c</em>")).toBe("_a__\n\nb\n\nc_");
+    });
+});
+
+describe("nested emphasis of the same kind (review)", () => {
+    it("writes an inner element of a merged run without delimiters", () => {
+        expect(convert("<em>a</em><em><em>b</em></em>")).toBe("_ab_");
+    });
+
+    it("writes an inner element without delimiters inside its parent", () => {
+        expect(convert("<em>a<em>b</em>c</em>")).toBe("_abc_");
+    });
+});
+
+describe("whitespace-only emphasis (review)", () => {
+    it("ends a run, as upstream does", () => {
+        expect(convert("<b>a</b><strong> </strong><b>c</b>")).toBe("**a** **c**");
+    });
+
+    it("passes over an empty emphasis element", () => {
+        expect(convert("<em>a</em><em></em><em>b</em>")).toBe("_ab_");
+    });
+});
+
+describe("inline code keeps upstream's trim (review)", () => {
+    it("drops an edge break in a code span, as upstream does", () => {
+        expect(convert("x<code> y<br></code>z")).toBe("x `y`z");
+    });
 });
 
 describe("intraword emphasis (#441)", () => {
@@ -89,6 +131,18 @@ describe("line breaks in headings (#555)", () => {
 
     it("replaces a break in a setext heading with a space, and sizes the underline to it", () => {
         expect(convert("<h1>Chapter 1<br>The Beginning</h1>")).toBe(`Chapter 1 The Beginning\n${"=".repeat(23)}`);
+    });
+
+    it("keeps the block separators when a break comes before a block (review)", () => {
+        expect(convert("<h2>a<br><p>b</p></h2>")).toBe("a\n\nb\n\n\n------");
+    });
+
+    it("keeps a horizontal rule on its own line when a break comes before it (review)", () => {
+        expect(convert("<h2>x<br><hr>y</h2>")).toContain("x\n\n* * *\n\ny");
+    });
+
+    it("drops the spaces that touch a trailing break (review)", () => {
+        expect(convert("<h3>a<br></h3>")).toBe("### a");
     });
 });
 

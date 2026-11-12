@@ -151,8 +151,9 @@ function replacementForNode(service: TurndownService, node: AnnotatedNode): stri
     const whitespace = node.flankingWhitespace;
 
     if (whitespace.leading || whitespace.trailing) {
-        // A plain trim would also remove a hard line break at either end of the content.
-        content = trimKeepingBreaks(content, node, service.options.br);
+        // Inline code keeps upstream's plain trim. Elsewhere a plain trim would also remove a hard
+        // line break at either end of the content.
+        content = node.nodeName === "CODE" ? content.trim() : trimKeepingBreaks(content, node, service.options.br);
     }
 
     return whitespace.leading + rule.replacement(content, node, service.options, service.rules) + whitespace.trailing;

@@ -117,17 +117,42 @@ export function hasOnlyBreaks(node: Node): boolean {
     return true;
 }
 
-/** Replaces each break marker with a space, for text that must stay on one line. */
+/** Removes the spaces at both ends of a string. Other whitespace, such as a newline, stays. */
+function trimSpaces(text: string): string {
+    let start = 0;
+    let end = text.length;
+
+    while (start < end && text[start] === " ") {
+        start += 1;
+    }
+
+    while (end > start && text[end - 1] === " ") {
+        end -= 1;
+    }
+
+    return text.slice(start, end);
+}
+
+/**
+ * Replaces each break marker with a space, for text that must stay on one line.
+ * A marker followed by a newline sits next to a block, so it becomes a newline
+ * and the block separator keeps its newlines. Spaces next to a marker are trimmed.
+ */
 export function flattenBreaks(content: string, marker: string): string {
     if (!marker || !content.includes(marker)) {
         return content;
     }
 
-    return content
-        .split(marker)
-        .map((part) => part.trim())
-        .filter((part) => part !== "")
-        .join(" ");
+    const [first = "", ...parts] = content.split(marker);
+    let text = first;
+
+    for (const part of parts) {
+        const separator = part.startsWith("\n") ? "\n" : " ";
+
+        text = trimSpaces(text) + separator + trimSpaces(part);
+    }
+
+    return trimSpaces(text);
 }
 
 /**
