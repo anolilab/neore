@@ -42,7 +42,7 @@ import type { WsTicketMinter } from "./ws-ticket";
 export { FIRST_VALUE_TIMEOUT_MS } from "./live-query-entry";
 
 /** The slice of `LunoraClient` this needs — the real signatures, narrowed so tests can fake it. */
-export type LiveQueryClient = Pick<LunoraClient, "getAuthToken" | "onAuthTokenChange" | "query" | "setWsToken" | "subscribe">;
+export type LiveQueryClient = Pick<LunoraClient, "getAuthToken" | "onAuthTokenChange" | "onIdentityChange" | "query" | "setWsToken" | "subscribe">;
 
 type WsTokenProvider = Extract<Parameters<LunoraClient["setWsToken"]>[0], (...args: never[]) => unknown>;
 
@@ -154,6 +154,8 @@ export class LiveQueryManager {
 
     private disconnectCache: (() => void) | undefined;
 
+    private disconnectIdentity: (() => void) | undefined;
+
     private disconnectToken: (() => void) | undefined;
 
     private disconnectUnlock: (() => void) | undefined;
@@ -190,6 +192,8 @@ export class LiveQueryManager {
                 return;
             }
 
+            const previous = subject;
+
             subject = next;
             // Another user's grants are not this one's: shared objects re-resolve.
             resetShardRegistry();
@@ -198,12 +202,23 @@ export class LiveQueryManager {
             // Nor another user's prompt outline. Remove it rather than invalidate: an invalidated query keeps its old data
             // while the new account's read runs or fails, and that would show the previous account's prompts.
             this.queryClient.removeQueries({ predicate: (query) => isLunoraKey(query.queryKey) && query.queryKey[1] === PROMPT_OUTLINE_REF });
-            // Nor the threads they opened, which the long thread gcTime (`thread-queries.ts`) would keep for half an hour.
-            // Unobserved ones only: what is on screen refetches for the new account.
-            this.queryClient.removeQueries({ predicate: (query) => isLunoraKey(query.queryKey) && THREAD_QUERY_PATHS.has(query.queryKey[1]), type: "inactive" });
+            // Nor the threads they read. From no subject there is no one's to drop: a hydrating page's first token
+            // (`seedHydratedAuthToken`) belongs to the account the server rendered its threads for.
+            if (previous !== null) {
+                this.forgetThreadReads();
+            }
+
             // A NEW function identity is what makes `setWsToken` close the open
             // sockets; the client resends every subscription on reconnect.
             this.client.setWsToken(this.wsTokenProvider());
+        });
+
+        // A cookie session's account change moves no token, so the subject above cannot see it; Lunora reports it here.
+        // With a token the subject decides: without a user id, Lunora reads a token refresh as an identity change too.
+        this.disconnectIdentity = this.client.onIdentityChange(() => {
+            if (subject === null && this.client.getAuthToken() === null) {
+                this.forgetThreadReads();
+            }
         });
 
         return () => {
@@ -213,9 +228,11 @@ export class LiveQueryManager {
 
     public disconnect(): void {
         this.disconnectCache?.();
+        this.disconnectIdentity?.();
         this.disconnectToken?.();
         this.disconnectUnlock?.();
         this.disconnectCache = undefined;
+        this.disconnectIdentity = undefined;
         this.disconnectToken = undefined;
         this.disconnectUnlock = undefined;
 
@@ -297,6 +314,28 @@ export class LiveQueryManager {
                 return args.threadId === threadId || args.chatId === threadId || args.unlockProof === proof;
             },
         });
+    }
+
+    /**
+     * Drops an account's thread reads (`THREAD_QUERY_PATHS`), which the long thread gcTime would keep after it
+     * signed out. An unobserved read goes. An observed one loses its value and its subscription and subscribes
+     * again: kept, the old account's thread would stay on screen until the new read lands, and for good if it fails.
+     */
+    private forgetThreadReads(): void {
+        const cache = this.queryClient.getQueryCache();
+        const reads = cache.findAll({ predicate: (query) => isLunoraKey(query.queryKey) && THREAD_QUERY_PATHS.has(query.queryKey[1]) });
+
+        for (const query of reads) {
+            if (query.getObserversCount() === 0) {
+                // `removed` releases its subscription (`onCacheEvent`).
+                cache.remove(query);
+            } else {
+                this.release(query.queryHash);
+                this.reconcile(query);
+                // Errors land in the query's state; `resetQueries` does not throw them.
+                void this.queryClient.resetQueries({ exact: true, queryKey: query.queryKey });
+            }
+        }
     }
 
     private onCacheEvent(event: QueryCacheNotifyEvent): void {

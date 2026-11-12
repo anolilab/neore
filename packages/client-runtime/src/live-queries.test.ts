@@ -29,11 +29,23 @@ interface FakeSubscription {
 const createClient = () => {
     let token: string | null = null;
     const tokenListeners = new Set<(token: string | null) => void>();
+    const identityListeners = new Set<() => void>();
     const subscriptions: FakeSubscription[] = [];
 
     return {
+        /** Lunora's `onIdentityChange`: a sign-out or user switch it retired, a cookie session's included. */
+        changeIdentity: () => {
+            for (const listener of identityListeners) {
+                listener();
+            }
+        },
         client: {
             getAuthToken: () => token,
+            onIdentityChange: (listener: () => void) => {
+                identityListeners.add(listener);
+
+                return () => identityListeners.delete(listener);
+            },
             onAuthTokenChange: (listener: (token: string | null) => void) => {
                 tokenListeners.add(listener);
 
@@ -438,6 +450,60 @@ describe(LiveQueryManager, () => {
         expect(queryClient.getQueryCache().find({ queryKey: key("chat_composite:getThreadListData") })).toBeDefined();
 
         unobserve();
+    });
+
+    it("keeps the thread reads a page was rendered with when its first token arrives, and drops them on sign-out", () => {
+        const threadKey = key("chat_functions:getThread", { threadId: "t1" });
+
+        // Hydrated from the server render, before any component observes it.
+        queryClient.setQueryData(threadKey, { title: "server-rendered" });
+        fake.setToken(jwt("alice"));
+
+        expect(queryClient.getQueryData(threadKey)).toStrictEqual({ title: "server-rendered" });
+
+        fake.setToken(null);
+
+        expect(queryClient.getQueryData(threadKey)).toBeUndefined();
+    });
+
+    it("blanks an observed thread read on an account switch and subscribes it again, so a failed read shows nothing of the old account", async () => {
+        const threadKey = key("chat_functions:getThread", { threadId: "t1" });
+
+        fake.setToken(jwt("alice"));
+        const unobserve = observe(threadKey);
+
+        fake.subscriptions[0]!.onData({ title: "alice's" });
+        await vi.runAllTimersAsync();
+        fake.client.query.mockRejectedValueOnce(new Error("FORBIDDEN"));
+
+        fake.setToken(jwt("bob"));
+
+        expect(queryClient.getQueryData(threadKey)).toBeUndefined();
+        expect(fake.subscriptions[0]!.unsubscribe).toHaveBeenCalledOnce();
+        expect(fake.subscriptions).toHaveLength(2);
+
+        fake.subscriptions[1]!.onError!({ code: "FORBIDDEN", message: "not bob's" });
+        await vi.runAllTimersAsync();
+
+        expect(queryClient.getQueryState(threadKey)).toMatchObject({ data: undefined, status: "error" });
+
+        unobserve();
+    });
+
+    it("drops the thread reads when a cookie session's account changes, which moves no token, and not on a bearer's", () => {
+        const threadKey = key("chat_functions:getThread", { threadId: "t1" });
+
+        queryClient.setQueryData(threadKey, { title: "cookie user's" });
+        fake.changeIdentity();
+
+        expect(queryClient.getQueryData(threadKey)).toBeUndefined();
+
+        // With a token the subject decides: Lunora reports a refresh without a user id as an identity change too.
+        fake.setToken(jwt("alice"));
+        queryClient.setQueryData(threadKey, { title: "alice's" });
+        fake.changeIdentity();
+
+        expect(queryClient.getQueryData(threadKey)).toStrictEqual({ title: "alice's" });
     });
 
     it("gives a slot back when a seed never answers, and skips queued entries that were released", () => {
