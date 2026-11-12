@@ -15,7 +15,10 @@ const chunk: { loaded?: PostHog; loading?: Promise<PostHog> } = {};
 /** The PostHog singleton once its chunk has loaded, else `undefined`. For code outside React or outside the provider. */
 export const getPostHog = (): PostHog | undefined => chunk.loaded;
 
-const startup: { client?: PostHog; isStarted: boolean; onStarted?: () => void } = { isStarted: false };
+const startup: { client?: PostHog; isStarted: boolean; listeners: Set<() => void>; onStarted?: () => void } = {
+    isStarted: false,
+    listeners: new Set<() => void>(),
+};
 
 /** The client once `startPostHog` has finished, else `undefined`: until then, captures queue. */
 export const getStartedPostHog = (): PostHog | undefined => (startup.isStarted ? startup.client : undefined);
@@ -348,7 +351,9 @@ export const flushPendingCaptures = (posthog: PostHog): void => {
     const appliedUserId = identityState.applied?.userId;
     const sendable = isOptedOut ? [] : events.filter(({ userId }) => typeof userId !== "string" || userId === appliedUserId);
 
-    if (landing && posthog.is_capturing()) {
+    const isLandingTheirs = typeof landing?.userId !== "string" || landing.userId === appliedUserId;
+
+    if (landing && isLandingTheirs && posthog.is_capturing()) {
         // Before what this page queued in the same millisecond: the page view opens the page it was recorded on.
         const later = sendable.findIndex(({ timestamp }) => Date.parse(timestamp) >= Date.parse(landing.timestamp));
 
@@ -572,6 +577,10 @@ const finishStartup = (): void => {
     startup.isStarted = true;
     flushPendingCaptures(client);
     startup.onStarted?.();
+
+    for (const listener of startup.listeners) {
+        listener();
+    }
 };
 
 /**
@@ -610,6 +619,12 @@ export const setAnalyticsIdentity = (identity: AnalyticsIdentity): void => {
     identityState.departedUserId = undefined;
     identityState.current = identity;
 
+    // The landing page view belongs to the first account the session names: one that switches before PostHog starts
+    // does not send it (`flushPendingCaptures` applies the events' rule to it).
+    if (landingState.pageview && landingState.pageview.userId === undefined) {
+        landingState.pageview.userId = identity.user?.id ?? null;
+    }
+
     if (startup.isStarted && startup.client) {
         syncIdentity(startup.client);
     } else {
@@ -628,6 +643,21 @@ export const setIdentityExpected = (isExpected: boolean): void => {
 
 /** The initialised client, provided by `AnalyticsProvider` (and a fake one in Storybook). */
 export const PostHogClientContext = createContext<PostHog | undefined>(undefined);
+
+const subscribeStarted = (onChange: () => void): (() => void) => {
+    startup.listeners.add(onChange);
+
+    return () => {
+        startup.listeners.delete(onChange);
+    };
+};
+
+/**
+ * The client once PostHog has started: the reset after a sign-out, the session's identity and the queued captures are
+ * applied. What captures on its own (the onboarding plugin) takes this one, not `usePostHog()`'s, which is provided as
+ * soon as `init` ran and still holds the identity it was bootstrapped with.
+ */
+export const useStartedPostHog = (): PostHog | undefined => useSyncExternalStore(subscribeStarted, getStartedPostHog, () => undefined);
 
 /** The PostHog client, or `undefined` until it has loaded and been initialised. */
 export const usePostHog = (): PostHog | undefined => useContext(PostHogClientContext);

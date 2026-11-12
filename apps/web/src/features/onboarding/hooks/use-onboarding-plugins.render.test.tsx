@@ -1,9 +1,14 @@
 import { renderHook } from "@testing-library/react";
 import type { PostHog } from "posthog-js";
-import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 
-import { PostHogClientContext } from "@/lib/analytics/posthog-client";
+const started = vi.hoisted(() => {
+    return { client: undefined as unknown };
+});
+
+vi.mock("@/lib/analytics/posthog-client", () => {
+    return { useStartedPostHog: () => started.client };
+});
 
 const createPostHogPlugin = vi.hoisted(() =>
     vi.fn((config: { posthogInstance: unknown }) => {
@@ -17,20 +22,18 @@ vi.mock("@onboardjs/posthog-plugin", () => {
 
 const { default: useOnboardingPlugins } = await import("./use-onboarding-plugins");
 
-const withClient =
-    (client: PostHog | undefined) =>
-    ({ children }: { children: ReactNode }) => <PostHogClientContext value={client}>{children}</PostHogClientContext>;
-
 describe(useOnboardingPlugins, () => {
-    it("installs the plugin when PostHog loads after the dialog mounted, and keeps it across rerenders", () => {
-        let client: PostHog | undefined;
-        const { rerender, result } = renderHook(() => useOnboardingPlugins(), {
-            wrapper: ({ children }: { children: ReactNode }) => withClient(client)({ children }),
-        });
+    it("installs the plugin once PostHog has started after the dialog mounted, and keeps it across rerenders", () => {
+        started.client = undefined;
 
+        const { rerender, result } = renderHook(() => useOnboardingPlugins());
+
+        // Initialised maybe, not started: the identity is not applied yet, so nothing captures.
         expect(result.current).toStrictEqual([]);
 
-        client = { __loaded: true } as unknown as PostHog;
+        const client = { __loaded: true } as unknown as PostHog;
+
+        started.client = client;
         rerender();
 
         expect(result.current).toHaveLength(1);

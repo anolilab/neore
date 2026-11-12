@@ -299,6 +299,42 @@ describe("the landing page view", () => {
         sessionStorage.clear();
     });
 
+    it("is not sent when the account the session first named switched before PostHog started", async () => {
+        const client = await loadClientModule();
+
+        client.recordLandingPageview();
+        client.setAnalyticsIdentity({ isOrganizationPending: true, user: { id: "user-a" } });
+        client.setAnalyticsIdentity({ user: { id: "user-b" } });
+        client.startPostHog(await client.loadPostHog(), () => {});
+
+        expect(posthog.capture.mock.calls.map(([event]) => event)).not.toContain("$pageview");
+    });
+
+    it("is sent as the account the session first named", async () => {
+        const client = await loadClientModule();
+
+        client.recordLandingPageview();
+        client.setAnalyticsIdentity({ user: { id: "user-a" } });
+        client.startPostHog(await client.loadPostHog(), () => {});
+
+        expect(posthog.capture.mock.calls.map(([event]) => event)).toContain("$pageview");
+    });
+
+    it("tells a started-client hook once PostHog has started, not when it initialised", async () => {
+        const client = await loadClientModule();
+        const { result } = renderHook(() => client.useStartedPostHog());
+
+        client.startPostHog(await client.loadPostHog(), () => {});
+
+        expect(result.current).toBeUndefined();
+
+        act(() => {
+            client.setAnalyticsIdentity({});
+        });
+
+        expect(result.current).toBe(posthog);
+    });
+
     it("goes before an event its page queued in the same millisecond", async () => {
         const client = await loadClientModule();
 

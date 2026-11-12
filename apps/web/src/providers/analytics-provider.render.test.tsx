@@ -1,6 +1,7 @@
 import { act, render, screen } from "@testing-library/react";
 import type { PostHogInterface } from "posthog-js";
 import type { FC } from "react";
+import { useEffect } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const permissions = vi.hoisted(() => {
@@ -244,6 +245,31 @@ describe("AnalyticsProvider", () => {
         expect(screen.getByText("analytics on")).toBeTruthy();
         // The client that started once back online has not had its flags yet: what reads them waits again.
         expect(screen.getByText("flags pending")).toBeTruthy();
+    });
+
+    it("records the landing page view before what a descendant queues on mount", async () => {
+        // The chunk never arrives here: the queue is flushed by hand below.
+        loadPostHog.mockReturnValue(new Promise(() => {}));
+
+        const { queueEvent } = modules;
+        const Onboarding = () => {
+            useEffect(() => {
+                queueEvent("onboarding_started", {});
+            }, []);
+
+            return null;
+        };
+
+        render(
+            <AnalyticsProvider>
+                <Onboarding />
+            </AnalyticsProvider>,
+        );
+
+        posthogMock.capture.mockClear();
+        modules.flushPendingCaptures(posthogMock as unknown as Parameters<typeof modules.flushPendingCaptures>[0]);
+
+        expect(posthogMock.capture.mock.calls.map(([event]) => event)).toStrictEqual(["$pageview", "onboarding_started"]);
     });
 
     it("keeps its retry after it unmounts (the global boundary's fallback), so a queued crash is still sent", async () => {

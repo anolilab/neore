@@ -1,7 +1,7 @@
 import { useEffectivePermissions } from "@c15t/react";
 import type { PostHog, PostHogConfig, PostHogInterface } from "posthog-js";
 import type { FC, PropsWithChildren } from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useState } from "react";
 
 import { reportFirstNativeLaunch } from "@/lib/analytics/first-native-launch";
 import {
@@ -99,15 +99,11 @@ const AnalyticsProvider: FC<PropsWithChildren> = ({ children }) => {
     // Provided once initialised; until then (and while its chunk cannot load) the app runs without analytics.
     const [client, setClient] = useState<PostHog | undefined>(undefined);
 
-    // The landing page view is recorded while this provider first renders, so it comes before anything a descendant's
-    // mount effect queues (children's effects run before this provider's). Once per page; the server has no location.
-    useState(() => {
-        if (globalThis.document) {
-            recordLandingPageview();
-        }
-
-        return undefined;
-    });
+    // The landing page view is recorded after commit (a render React abandons claims nothing), in a layout effect: every
+    // layout effect runs before any passive one, so it still comes before what a descendant's mount effect queues.
+    useLayoutEffect(() => {
+        recordLandingPageview();
+    }, []);
 
     useEffect(() => {
         if (import.meta.env.DEV || !globalThis || !import.meta.env.VITE_POSTHOG_API_KEY || !import.meta.env.VITE_POSTHOG_HOST) {
