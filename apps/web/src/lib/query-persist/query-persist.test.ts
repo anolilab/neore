@@ -996,6 +996,59 @@ describe("saving", () => {
         expect(textOf(next, KEY)).toBe(SECRET_TEXT);
     });
 
+    it("a clear that lands while the first save makes the account's key leaves no record behind", async () => {
+        const memory = memoryStore();
+        const storeGate = new EventTarget();
+        const opened = nextEvent(storeGate, "open");
+        const reached = nextEvent(storeGate, "reached");
+        const steps = { put: false, removed: false };
+        const slowStore: RecordStore = {
+            ...memory.store,
+            putEntry: async (userId, entry, mayReplace) => {
+                const isWritten = await memory.store.putEntry(userId, entry, mayReplace);
+
+                steps.put = true;
+
+                return isWritten;
+            },
+            putIfAbsent: async (name, key, value) => {
+                storeGate.dispatchEvent(new Event("reached"));
+                await opened;
+
+                return await memory.store.putIfAbsent(name, key, value);
+            },
+            remove: async (userIds, shouldRemove) => {
+                await memory.store.remove(userIds, shouldRemove);
+                steps.removed = steps.put;
+            },
+        };
+        const { gate, writeGate } = openGate();
+        const queryClient = new QueryClient();
+        const controller = start(slowStore, ALICE, queryClient, { gate: writeGate });
+
+        await controller.restored;
+        queryClient.setQueryData(KEY, { text: SECRET_TEXT });
+        controller.enableWrites();
+        await vi.advanceTimersByTimeAsync(WRITE_THROTTLE_MS);
+        await reached;
+
+        // The save read the key as absent; the sign-out clears the account before the save makes one.
+        gate.generation += 1;
+        gate.allowed = false;
+        await memory.store.remove([ALICE]);
+        storeGate.dispatchEvent(new Event("open"));
+
+        // The save makes a key and writes its record after the clear; the persister then takes that record back out.
+        await untilDone({
+            get done() {
+                return steps.removed;
+            },
+        });
+
+        expect(memory.stores.entries.has(ALICE)).toBe(false);
+        controller.stop();
+    });
+
     it("changes while a save is sealing are saved once after it, with the latest state", async () => {
         const { controller, memory, open, puts, queryClient } = await heldSave();
 
