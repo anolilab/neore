@@ -35,6 +35,8 @@ export const NoIcon: Story = {
             throw new Error("The badge has no initials");
         }
 
+        // Shown, not only generated: hidden styling on the badge or a parent fails here.
+        await expect(initials).toBeVisible();
         await expect(getComputedStyle(initials, "::before").content).toBe('"AN"');
         await expect(canvas.queryByText("AN")).toBeNull();
     },
