@@ -597,11 +597,32 @@ export const useFeatureFlagsKnown = (): boolean => {
     return hasFlags || isUnavailable;
 };
 
-/** Whether `flag` is on; `undefined` while PostHog or its flags have not loaded. Follows later flag reloads. */
+/** The flags the server rendered into the page (`posthog-data`), for when PostHog itself never loads. */
+const bootstrapState: { flags?: Readonly<Record<string, boolean | string>> } = {};
+
+/** Keeps the server-rendered flags, so a page whose PostHog chunk is blocked or fails still answers them. */
+export const setBootstrapFlags = (flags: Readonly<Record<string, boolean | string>> | undefined): void => {
+    bootstrapState.flags = flags;
+};
+
+/** As PostHog's `isFeatureEnabled` reads a bootstrapped flag: a variant counts as on, an absent flag as off. */
+const readBootstrapFlag = (flag: string): boolean => {
+    const value = bootstrapState.flags?.[flag];
+
+    return value !== undefined && value !== false;
+};
+
+/**
+ * Whether `flag` is on; `undefined` while PostHog or its flags have not loaded. Follows later flag reloads. When PostHog
+ * will not start on this page (its chunk failed for good, blocked, no key), the server-rendered flag answers, or `false`:
+ * what is gated shows its "not available" state instead of waiting for ever.
+ */
 export const useFeatureFlagEnabled = (flag: string): boolean | undefined => {
     const posthog = usePostHog();
+    const isUnavailable = useSyncExternalStore(subscribeAvailability, readUnavailable, notKnown);
     const subscribe = useCallback((onChange: () => void) => (posthog ? posthog.onFeatureFlags(onChange) : noSubscription()), [posthog]);
     const read = useCallback(() => posthog?.isFeatureEnabled(flag), [posthog, flag]);
+    const enabled = useSyncExternalStore(subscribe, read, notLoaded);
 
-    return useSyncExternalStore(subscribe, read, notLoaded);
+    return posthog === undefined && isUnavailable ? readBootstrapFlag(flag) : enabled;
 };

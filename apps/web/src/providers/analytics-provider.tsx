@@ -14,6 +14,7 @@ import {
     markPostHogUnavailable,
     PostHogClientContext,
     recordLandingPageview,
+    setBootstrapFlags,
     setIdentityExpected,
     setMeasurementConsent,
     startPostHog,
@@ -126,6 +127,8 @@ const AnalyticsProvider: FC<PropsWithChildren> = ({ children }) => {
                 }
             }
         }
+
+        setBootstrapFlags(flagData);
 
         let isCancelled = false;
 

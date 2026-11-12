@@ -581,3 +581,43 @@ describe("useFeatureFlagsKnown", () => {
         expect(failedResult.current).toBe(true);
     });
 });
+
+describe("useFeatureFlagEnabled", () => {
+    it("is pending while PostHog loads, and answers from the server-rendered flags once it will not start", async () => {
+        const client = await loadClientModule();
+        const wrapper = ({ children }: { children: ReactNode }) => createElement(client.PostHogClientContext, { value: undefined }, children);
+
+        client.setBootstrapFlags({ "code-mode": true, experiment: "variant-a", "off-flag": false });
+
+        const { result } = renderHook(
+            () => [
+                client.useFeatureFlagEnabled("code-mode"),
+                client.useFeatureFlagEnabled("experiment"),
+                client.useFeatureFlagEnabled("off-flag"),
+                client.useFeatureFlagEnabled("absent"),
+            ],
+            { wrapper },
+        );
+
+        // The chunk may still come: nothing is decided yet.
+        expect(result.current).toStrictEqual([undefined, undefined, undefined, undefined]);
+
+        act(() => {
+            client.markPostHogUnavailable();
+        });
+
+        expect(result.current).toStrictEqual([true, true, false, false]);
+    });
+
+    it("reads as off, not pending, on a page whose PostHog never loads and that had no server-rendered flags", async () => {
+        const client = await loadClientModule();
+        const wrapper = ({ children }: { children: ReactNode }) => createElement(client.PostHogClientContext, { value: undefined }, children);
+        const { result } = renderHook(() => client.useFeatureFlagEnabled("code-mode"), { wrapper });
+
+        act(() => {
+            client.markPostHogUnavailable();
+        });
+
+        expect(result.current).toBe(false);
+    });
+});
