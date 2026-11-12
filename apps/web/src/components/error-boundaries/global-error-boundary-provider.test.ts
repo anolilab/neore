@@ -1,5 +1,6 @@
 /**
- * A global crash report names what the browser stored, never the values: drafts and queued prompts are unsent text.
+ * A global crash report says how much the browser stored, never what: values are unsent text, and keys name accounts
+ * and chats.
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -7,27 +8,32 @@ vi.mock("@/lib/analytics/posthog-client", () => {
     return { captureException: vi.fn() };
 });
 
-const { storageKeys } = await import("./global-error-boundary-provider");
+const { storageSize } = await import("./global-error-boundary-provider");
 
-describe(storageKeys, () => {
+describe(storageSize, () => {
     afterEach(() => {
         localStorage.clear();
     });
 
-    it("lists the keys a storage holds, and none of its values", () => {
-        localStorage.setItem("neore-draft:thread-1", "my unsent message");
+    it("counts a storage's entries, and reports neither a key nor a value", () => {
+        localStorage.setItem("neore-draft:user-123:chat-456", "my unsent message");
 
-        const keys = storageKeys(() => localStorage);
+        const size = storageSize(() => localStorage);
 
-        expect(keys).toStrictEqual(["neore-draft:thread-1"]);
-        expect(JSON.stringify(keys)).not.toContain("my unsent message");
+        expect(size).toBe(1);
+
+        const report = JSON.stringify({ localStorageSize: size });
+
+        expect(report).not.toContain("user-123");
+        expect(report).not.toContain("chat-456");
+        expect(report).not.toContain("my unsent message");
     });
 
-    it("answers no keys for a storage that cannot be read", () => {
+    it("answers undefined for a storage that cannot be read", () => {
         expect(
-            storageKeys(() => {
+            storageSize(() => {
                 throw new DOMException("blocked", "SecurityError");
             }),
-        ).toStrictEqual([]);
+        ).toBeUndefined();
     });
 });

@@ -15,14 +15,15 @@ interface GlobalErrorBoundaryProviderProperties {
     children: ReactNode;
 }
 
-/** The keys a storage holds, for an error report: never their values, which can be what the person wrote. */
-export const storageKeys = (getStorage: () => Storage): string[] => {
+/**
+ * How many entries a storage holds, for an error report: never their values (what the person wrote) nor their keys,
+ * which name accounts and chats (`neore-draft:<user>:<chat>`). `undefined` when the storage cannot be read.
+ */
+export const storageSize = (getStorage: () => Storage): number | undefined => {
     try {
-        const storage = getStorage();
-
-        return Array.from({ length: storage.length }, (_unused, index) => storage.key(index)).filter((key): key is string => key !== null);
+        return getStorage().length;
     } catch {
-        return [];
+        return undefined;
     }
 };
 
@@ -152,9 +153,9 @@ const GlobalErrorBoundaryProvider = ({ children }: GlobalErrorBoundaryProviderPr
             componentStack: errorInfo.componentStack,
             context: {
                 isOnline,
-                // Key names only: values hold unsent drafts, queued prompts and other text the person wrote.
-                localStorageKeys: storageKeys(() => globalThis.localStorage),
-                sessionStorageKeys: storageKeys(() => globalThis.sessionStorage),
+                // Counts only: values hold unsent drafts and prompts, and keys name accounts and chats.
+                localStorageSize: storageSize(() => globalThis.localStorage),
+                sessionStorageSize: storageSize(() => globalThis.sessionStorage),
                 timestamp: new Date().toISOString(),
                 url: globalThis.location.href,
                 userAgent: navigator.userAgent,

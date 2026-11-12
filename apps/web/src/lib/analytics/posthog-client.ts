@@ -73,7 +73,8 @@ interface PendingEvent {
     userId?: string | null;
 }
 
-const pendingExceptions: { error: unknown; properties: ExceptionProperties }[] = [];
+/** A caught error waiting for PostHog, with who was signed in then, as a queued event carries it (`PendingEvent.userId`). */
+const pendingExceptions: { error: unknown; properties: ExceptionProperties; userId?: string | null }[] = [];
 const queueState: { closed: boolean; events?: PendingEvent[] } = { closed: false };
 
 /**
@@ -190,34 +191,6 @@ export const setMeasurementConsent = (granted: boolean): void => {
     }
 };
 
-/**
- * Reports a caught exception. Before PostHog has started (its chunk loads after mount, which can take seconds; see
- * `startPostHog`) the exception is queued, up to `MAX_PENDING_EXCEPTIONS`, and sent once `init`, consent and the
- * session's identity have been applied (`flushPendingCaptures`). Nothing is queued while measurement consent is refused, and an
- * opted-out user's are never sent.
- */
-export const captureException = (error: unknown, properties?: ExceptionProperties): void => {
-    const posthog = getStartedPostHog();
-
-    if (posthog) {
-        if (!posthog.has_opted_out_capturing()) {
-            posthog.captureException(error, properties);
-        }
-
-        return;
-    }
-
-    if (queueState.closed || consentState.measurement === false) {
-        return;
-    }
-
-    pendingExceptions.push({ error, properties });
-
-    if (pendingExceptions.length > MAX_PENDING_EXCEPTIONS) {
-        pendingExceptions.shift();
-    }
-};
-
 /** Who the session says is signed in, as `usePostHogIdentity` publishes it. */
 export interface AnalyticsIdentity {
     /**
@@ -243,6 +216,41 @@ const identityState: {
     /** The session cannot answer any more (its provider unmounted): start without it rather than never. */
     isAbandoned: boolean;
 } = { isAbandoned: false };
+
+/** Who a capture made now is tracked as: a user's id, `null` signed out or a guest, `undefined` before the session answered. */
+const caughtUnder = (): string | null | undefined => {
+    const { current } = identityState;
+
+    return current ? (current.user?.id ?? null) : undefined;
+};
+
+/**
+ * Reports a caught exception. Before PostHog has started (its chunk loads after mount, which can take seconds; see
+ * `startPostHog`) the exception is queued, up to `MAX_PENDING_EXCEPTIONS`, and sent once `init`, consent and the
+ * session's identity have been applied (`flushPendingCaptures`). Nothing is queued while measurement consent is refused, and an
+ * opted-out user's are never sent.
+ */
+export const captureException = (error: unknown, properties?: ExceptionProperties): void => {
+    const posthog = getStartedPostHog();
+
+    if (posthog) {
+        if (!posthog.has_opted_out_capturing()) {
+            posthog.captureException(error, properties);
+        }
+
+        return;
+    }
+
+    if (queueState.closed || consentState.measurement === false) {
+        return;
+    }
+
+    pendingExceptions.push({ error, properties, userId: caughtUnder() });
+
+    if (pendingExceptions.length > MAX_PENDING_EXCEPTIONS) {
+        pendingExceptions.shift();
+    }
+};
 
 /** The page an event is tracked on, as posthog-js would name it then, so a later flush does not name the page it runs on. */
 const pageProperties = (): Properties => {
@@ -355,7 +363,12 @@ export const flushPendingCaptures = (posthog: PostHog): void => {
         return;
     }
 
-    for (const { error, properties } of exceptions) {
+    // As the events: one caught while another account was signed in is not sent as this one.
+    for (const { error, properties, userId } of exceptions) {
+        if (typeof userId === "string" && userId !== appliedUserId) {
+            continue;
+        }
+
         try {
             posthog.captureException(error, properties);
         } catch (reportError) {
@@ -592,8 +605,6 @@ export const setAnalyticsIdentity = (identity: AnalyticsIdentity): void => {
 
     if (!startup.isStarted && previousUserId !== undefined && previousUserId !== identity.user?.id) {
         resetState.pending = true;
-        // Caught under the account that left: queued errors carry no user, so the next one would be sent them.
-        pendingExceptions.length = 0;
     }
 
     identityState.departedUserId = undefined;

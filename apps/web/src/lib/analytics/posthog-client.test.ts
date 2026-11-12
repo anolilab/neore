@@ -519,6 +519,19 @@ describe("startPostHog", () => {
         expect(posthog.capture.mock.calls.map(([event]) => event)).toStrictEqual(["signed_out"]);
     });
 
+    it("keeps an error caught before any account was known through a switch, and sends it", async () => {
+        const client = await loadClientModule();
+        const early = new Error("caught while the session loaded");
+
+        client.captureException(early);
+        client.setAnalyticsIdentity({ isOrganizationPending: true, user: { id: "user-a" } });
+        client.captureException(new Error("caught for A"));
+        client.setAnalyticsIdentity({ user: { id: "user-b" } });
+        client.startPostHog(await client.loadPostHog(), () => {});
+
+        expect(posthog.captureException).toHaveBeenCalledExactlyOnceWith(early, undefined);
+    });
+
     it("drops an error caught under the account that left when another signs in before PostHog starts", async () => {
         const client = await loadClientModule();
 
