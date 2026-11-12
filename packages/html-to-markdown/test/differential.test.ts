@@ -76,8 +76,8 @@ function isChangedOnPurpose(html: string, options: Partial<Options>): boolean {
             return true;
         }
 
-        // A run that touches another emphasis element or a word changes output; an empty one has no run to change.
-        if (EMPHASIS_NAMES.has(element.nodeName) && element.textContent !== "" && hasChangedNeighbour(element)) {
+        // A run that touches another emphasis element or a word changes output; an element with no output has no run to change.
+        if (EMPHASIS_NAMES.has(element.nodeName) && hasOutput(element) && hasChangedNeighbour(element)) {
             return true;
         }
     }
@@ -158,6 +158,15 @@ function hasEdgeSpace(element: Element): boolean {
     return EDGE_WHITESPACE.test(element.textContent ?? "");
 }
 
+/**
+ * True when the element has text, or an image with a source. The image rule writes nothing without a `src`, and an
+ * image with one writes output that the delimiter choice sees (`x<i><img src="i.png"></i>`). A `<br>` or a list item
+ * alone does not change output there, so they are not counted.
+ */
+function hasOutput(element: Element): boolean {
+    return element.textContent !== "" || [...element.querySelectorAll("img[src]")].some((image) => image.getAttribute("src") !== "");
+}
+
 function hasChangedNeighbour(element: Element): boolean {
     return SIDES.some((side) => {
         const next = nearest(element, side);
@@ -185,11 +194,11 @@ function isWordNeighbour(sibling: Node | null, side: (typeof SIDES)[number]): bo
     return facing !== undefined && WORD_CHARACTER.test(facing);
 }
 
-// Measured: 1403 of the 1500 documents are compared. A blank block counts as a printing block
+// Measured: 1383 of the 1500 documents are compared. A blank block counts as a printing block
 // in the predicate too, so a parent with one keeps its delimiters and is compared like upstream.
 // The floor is that count, so an exclusion that grows (a regression hidden as an intended
 // change) fails the test.
-const MIN_COMPARED = 1403;
+const MIN_COMPARED = 1383;
 
 // Mulberry32: a small seeded PRNG, so a failure reproduces exactly.
 function createRandom(seed: number): () => number {
