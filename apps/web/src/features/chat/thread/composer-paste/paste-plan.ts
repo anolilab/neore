@@ -153,8 +153,31 @@ const hasLink = (html: string): boolean => {
     return false;
 };
 
+/** `html` without its comments, in one pass with indexOf: a `<pre>` in a comment is not the first element shown. */
+const withoutComments = (html: string): string => {
+    const parts: string[] = [];
+    let index = 0;
+
+    for (let open = html.indexOf("<!--"); open !== -1; open = html.indexOf("<!--", index)) {
+        parts.push(html.slice(index, open));
+
+        const close = html.indexOf("-->", open + 4);
+
+        if (close === -1) {
+            return parts.join("");
+        }
+
+        index = close + 3;
+    }
+
+    parts.push(html.slice(index));
+
+    return parts.join("");
+};
+
 /** The first content element's tag name and attributes, as `<name …>` up to the first `>` after it. */
-const firstElement = (html: string): [tag: string, attributes: string] => {
+const firstElement = (markup: string): [tag: string, attributes: string] => {
+    const html = withoutComments(markup);
     const match = FIRST_ELEMENT.exec(html);
     const end = match ? html.indexOf(">", match.index) : -1;
 

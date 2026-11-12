@@ -19,6 +19,12 @@ export const composerCoreExtensionOptions = { clipboardTextSerializer: { blockSe
  */
 export const pastePlainText = (editor: Editor, text: string, at?: EditorState): boolean => {
     const { schema, tr } = editor.state;
+
+    // A disabled composer takes no paste, as the editor's own paste path refuses a view that is not editable.
+    if (!editor.isEditable) {
+        return false;
+    }
+
     const { paragraph } = schema.nodes;
 
     if (!paragraph) {
@@ -38,6 +44,25 @@ export const pastePlainText = (editor: Editor, text: string, at?: EditorState): 
 
     // Its own undo step: a paste that finishes right after typing next to it would otherwise undo with that typing.
     editor.view.dispatch(closeHistory(tr).replaceSelection(slice).scrollIntoView().setMeta("paste", true).setMeta("uiEvent", "paste"));
+
+    return true;
+};
+
+/**
+ * `lines` as paragraphs after the last block, the rest of the document untouched: a quote chip stays a chip, where
+ * rebuilding the draft from its text would turn it into plain text. Its own undo step.
+ */
+export const appendPlainLines = (editor: Editor, lines: string[]): boolean => {
+    const { schema, tr } = editor.state;
+    const { paragraph } = schema.nodes;
+
+    if (!paragraph || !editor.isEditable) {
+        return false;
+    }
+
+    const paragraphs = lines.map((line: string) => paragraph.create(null, line === "" ? null : schema.text(line)));
+
+    editor.view.dispatch(closeHistory(tr).insert(tr.doc.content.size, paragraphs).scrollIntoView().setMeta("paste", true).setMeta("uiEvent", "paste"));
 
     return true;
 };

@@ -5,7 +5,7 @@ import { TextSelection } from "@tiptap/pm/state";
 import StarterKitExtension from "@tiptap/starter-kit";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { composerCoreExtensionOptions, pastePlainText } from "./paste-plain-text";
+import { appendPlainLines, composerCoreExtensionOptions, pastePlainText } from "./paste-plain-text";
 
 const editors: Editor[] = [];
 
@@ -90,5 +90,36 @@ describe(pastePlainText, () => {
 
         expect(pastePlainText(editor, copied)).toBe(true);
         expect(text(editor)).toBe("one\n\ntwo");
+    });
+});
+
+describe(appendPlainLines, () => {
+    afterEach(() => {
+        for (const editor of editors) {
+            editor.destroy();
+        }
+
+        editors.length = 0;
+    });
+
+    it("adds the lines after the last block and leaves the blocks before it as they are", () => {
+        const editor = editorWith("<blockquote><p>quoted</p></blockquote><p>draft</p>");
+
+        expect(appendPlainLines(editor, ["", "pasted"])).toBe(true);
+        expect(editor.state.doc.firstChild?.type.name).toBe("blockquote");
+        expect(editor.state.doc.childCount).toBe(4);
+        expect(editor.state.doc.child(1).textContent).toBe("draft");
+        expect(editor.state.doc.child(2).textContent).toBe("");
+        expect(editor.state.doc.lastChild?.textContent).toBe("pasted");
+    });
+
+    it("takes nothing into an editor that is not editable, nor does a paste", () => {
+        const editor = editorWith("<p>draft</p>");
+
+        editor.setEditable(false);
+
+        expect(appendPlainLines(editor, ["pasted"])).toBe(false);
+        expect(pastePlainText(editor, "pasted")).toBe(false);
+        expect(text(editor)).toBe("draft");
     });
 });

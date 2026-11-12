@@ -581,3 +581,9 @@ describe("a code block of deeply nested spans", () => {
         expect(performance.now() - started).toBeLessThan(2000);
     });
 });
+
+describe("a comment before the first element", () => {
+    it("is not read as a monospace block, so the bold text after it converts", async () => {
+        await expect(paste({ "text/html": "<!-- <pre> --><strong>Important</strong>", "text/plain": "Important" })).resolves.toBe("**Important**");
+    });
+});

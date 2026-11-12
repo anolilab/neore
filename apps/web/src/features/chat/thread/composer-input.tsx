@@ -933,6 +933,12 @@ const ComposerInput = ({
 
             const editorHandle = inputAreaRef.current?.getEditor();
             const editor = editorHandle?.getEditor();
+
+            // A disabled composer takes no paste: left to the editor, which refuses it.
+            if (disabled || (editor && !editor.isDestroyed && !editor.isEditable)) {
+                return;
+            }
+
             const live = editor && !editor.isDestroyed ? editor.state : undefined;
             const plan = planPaste(e.clipboardData, {
                 inFence: inOpenFence(live ? live.doc.textBetween(0, live.selection.from, "\n") : useChatUIStore.getState().composerText),
@@ -991,8 +997,23 @@ const ComposerInput = ({
                 }
 
                 // An edit meanwhile moved the text the caret was in: the paste goes at the end, on a line of its own, with the
-                // breaks its first line needs there rather than those worked out for the old caret.
-                setText(appendPastedText(draft, pastedText, converted ? breaksBefore(pastedText) : 1));
+                // breaks its first line needs there rather than those worked out for the old caret. Through the editor while it
+                // shows that draft, so its quote chips stay chips; a rebuild from the text would flatten them.
+                const appended = appendPastedText(draft, pastedText, converted ? breaksBefore(pastedText) : 1);
+                const now = inputAreaRef.current?.getEditor();
+                const shown = now?.getEditor();
+
+                if (
+                    appended.startsWith(`${draft}\n`) &&
+                    shown &&
+                    !shown.isDestroyed &&
+                    shown.state.doc.textBetween(0, shown.state.doc.content.size, "\n") === draft &&
+                    now?.appendLines(appended.slice(draft.length + 1).split("\n"))
+                ) {
+                    return;
+                }
+
+                setText(appended);
 
                 return;
             }
@@ -1022,7 +1043,7 @@ const ComposerInput = ({
                 setDraft: setText,
             });
         },
-        [handleFileSelect, announcePasteAttached, attachTextAsFile, getChatKey, pasteSelection, removeAttachment, setText, t],
+        [handleFileSelect, announcePasteAttached, attachTextAsFile, disabled, getChatKey, pasteSelection, removeAttachment, setText, t],
     );
 
     // Handle text change — clear banned content error when user edits.
