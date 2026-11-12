@@ -169,9 +169,10 @@ const useQueueActions = () => {
      * the flag it stays held, and that call runs it when it lets go — its own `finally` must not swallow it.
      */
     const replayOfflineHold = useCallback(() => {
-        const { offline: isOffline, threadId } = latestRef.current;
+        const { isStreaming: streaming, offline: isOffline, threadId } = latestRef.current;
 
-        if (isOffline || busyRef.current || !threadId) {
+        // While a reply streams the hold stays where it is: the runner takes it once that reply ends.
+        if (isOffline || busyRef.current || streaming || !threadId) {
             return;
         }
 
@@ -467,7 +468,19 @@ const ComposerPromptQueue: FC = () => {
             return;
         }
 
-        const { queues, setPaused } = usePromptQueueStore.getState();
+        const { queues, setPaused, takeOfflineHold } = usePromptQueueStore.getState();
+
+        // A Send next asked for offline waited for this reply: it goes now, as asked (an explicit one even after an error).
+        if (previous.isStreaming && !isStreaming) {
+            const held = takeOfflineHold(threadId);
+
+            if (held) {
+                void sendNextPrompt(threadId, { explicit: held.explicit });
+
+                return;
+            }
+        }
+
         const current = queues[threadId];
         const decision = decideAutoSend({
             hasError: Boolean(error),

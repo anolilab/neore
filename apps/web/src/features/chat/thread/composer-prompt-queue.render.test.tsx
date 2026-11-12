@@ -271,6 +271,32 @@ describe("composer prompt queue", () => {
         await waitFor(() => expect(chat.sendMessage).toHaveBeenCalledWith("steered", []));
     });
 
+    it("keeps a Send next asked for offline while a reply streams on reconnect, and sends it when that reply ends, even in an error", async () => {
+        chat.error = undefined;
+        chat.view = "offline";
+        usePromptQueueStore.getState().enqueue(chat.threadId, { attachments: [], text: "queued" });
+
+        const view = render(<ComposerPromptQueue />);
+
+        fireEvent.click(screen.getByRole("button", { name: "Send next" }));
+
+        // A reply is streaming when the network comes back: the request is kept for its end, not dropped.
+        chat.isStreaming = true;
+        view.rerender(<ComposerPromptQueue />);
+        chat.view = "online";
+        view.rerender(<ComposerPromptQueue />);
+        await act(async () => {
+            await Promise.resolve();
+        });
+        expect(chat.sendMessage).not.toHaveBeenCalled();
+
+        chat.error = new Error("the reply failed");
+        chat.isStreaming = false;
+        view.rerender(<ComposerPromptQueue />);
+
+        await waitFor(() => expect(chat.sendMessage).toHaveBeenCalledWith("queued", []));
+    });
+
     it("sends a prompt held offline when its thread's composer mounts again online", async () => {
         chat.error = undefined;
         chat.view = "offline";
