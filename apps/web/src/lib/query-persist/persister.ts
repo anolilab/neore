@@ -138,17 +138,25 @@ export const startQueryPersistence = (options: PersistenceOptions): PersistenceC
     const { buster, gate, now = Date.now, policy, queryClient, store, userId } = options;
 
     /**
-     * Each query's data count at this start. Data held then came in before this account's token: across an account
-     * switch that is the previous account's, even when stamped in the same millisecond. A query is kept only once data
-     * arrives for it after this start, or when it is restored.
+     * Queries data arrived for after this start: a fetch or a write that succeeded, or a query built with its data (a
+     * loader's `initialData`). Data held before came in under the previous account's token, even when stamped in the
+     * same millisecond. A query is kept only once it is here, or when it is restored. Not a data count: a reset winds
+     * that back below what it was at this start.
      */
-    const atStart = new WeakMap<Query, number>();
+    const live = new WeakSet<Query>();
+    /** Set while `hydrate` runs: what it builds or replaces is restored, not read. */
+    let isHydrating = false;
+    const unsubscribeLive = queryClient.getQueryCache().subscribe((event: QueryCacheNotifyEvent) => {
+        if (isHydrating) {
+            return;
+        }
 
-    for (const query of queryClient.getQueryCache().getAll()) {
-        atStart.set(query, query.state.dataUpdateCount);
-    }
+        if ((event.type === "added" && event.query.state.data !== undefined) || (event.type === "updated" && event.action.type === "success")) {
+            live.add(event.query);
+        }
+    });
 
-    const isReadSinceStart = (query: Query): boolean => query.state.dataUpdateCount > (atStart.get(query) ?? 0);
+    const isReadSinceStart = (query: Query): boolean => live.has(query);
     /** What the restore handed over, with its data count then: any later data, even stamped the same millisecond, counts it up. */
     const restoredCount = new WeakMap<Query, number>();
     const isRestored = (query: Query): boolean => restoredCount.get(query) === query.state.dataUpdateCount;
@@ -183,6 +191,16 @@ export const startQueryPersistence = (options: PersistenceOptions): PersistenceC
         // a record another tab wrote after it.
         if (seal !== undefined && (state.stopped || generation !== gate.generation() || !gate.canWrite(userId))) {
             await removeRecord(store, userId, seal);
+
+            // Only the gate closed meanwhile: the record it withdrew is written again when the gate opens (or now, had it
+            // opened during the removal: its listener found nothing held).
+            if (!state.stopped && generation === gate.generation()) {
+                if (gate.canWrite(userId)) {
+                    state.isDirty = true;
+                } else {
+                    state.isHeldByGate = true;
+                }
+            }
         }
     };
 
@@ -253,15 +271,19 @@ export const startQueryPersistence = (options: PersistenceOptions): PersistenceC
         const before = new Map(restorable.map((query: DehydratedQuery) => [query.queryHash, queryCache.get(query.queryHash)?.state]));
 
         // A restored entry nobody watches yet must outlive the default five minutes, or the next save forgets it.
-        hydrate(queryClient, { ...clientState, queries: restorable }, { defaultOptions: { queries: { gcTime: MAX_AGE_MS } } });
+        isHydrating = true;
+
+        try {
+            hydrate(queryClient, { ...clientState, queries: restorable }, { defaultOptions: { queries: { gcTime: MAX_AGE_MS } } });
+        } finally {
+            isHydrating = false;
+        }
 
         // `hydrate` skips an entry the cache holds newer data for: only one whose state it replaced is restored.
         for (const [queryHash, previous] of before) {
             const query = queryCache.get(queryHash);
 
             if (query && query.state !== previous) {
-                // Counted from here: data arriving later makes it a read of this session's, whatever the replaced count was.
-                atStart.set(query, query.state.dataUpdateCount);
                 restoredCount.set(query, query.state.dataUpdateCount);
 
                 if (previous !== undefined) {
@@ -404,6 +426,7 @@ export const startQueryPersistence = (options: PersistenceOptions): PersistenceC
         clearTimeout(timer);
         timer = undefined;
         unsubscribe?.();
+        unsubscribeLive();
         unsubscribeGate?.();
     };
 

@@ -158,14 +158,22 @@ const heldReads = (store: RecordStore, name: "entries" | "keys") => {
     };
 };
 
-/** Steps the fake clock until `flag.done`; fails after a bounded number of throttle intervals instead of looping until the runner times out. */
-const untilDone = async (flag: { done: boolean }, maxSteps = 100): Promise<void> => {
-    for (let step = 0; step < maxSteps && !flag.done; step += 1) {
+/**
+ * Steps the fake clock until `flag.done`. WebCrypto settles on the real thread pool, not on the fake clock, so each step
+ * also yields to the real event loop, and the bound is real time: a busy machine slows the crypto, not the outcome.
+ */
+const untilDone = async (flag: { done: boolean }, realMs = 5000): Promise<void> => {
+    const deadline = performance.now() + realMs;
+
+    while (!flag.done && performance.now() < deadline) {
         await vi.advanceTimersByTimeAsync(WRITE_THROTTLE_MS);
+        await new Promise<void>((resolve) => {
+            setImmediate(resolve);
+        });
     }
 
     if (!flag.done) {
-        throw new Error(`No write landed within ${String(maxSteps)} throttle intervals`);
+        throw new Error(`No write landed within ${String(realMs)} ms`);
     }
 };
 
@@ -448,6 +456,38 @@ describe("saving", () => {
 
         expect(textOf(restored, KEY)).toBe("bob's");
         expect(restored.getQueryData(OTHER_KEY)).toBeUndefined();
+    });
+
+    it("saves a query built after the start with its data (a loader's initial data)", async () => {
+        const memory = memoryStore();
+
+        await saveSession(memory, ALICE, new QueryClient(), (client) => {
+            client.getQueryCache().build(client, { initialData: { text: "seeded" }, queryKey: KEY });
+        });
+
+        const restored = new QueryClient();
+
+        await start(memory.store, ALICE, restored).restored;
+        expect(textOf(restored, KEY)).toBe("seeded");
+    });
+
+    it("saves a read that arrives after a reset wound the query's data count back below its count at the start", async () => {
+        const memory = memoryStore();
+        const queryClient = new QueryClient();
+
+        for (const text of ["alice's 1", "alice's 2", "alice's 3"]) {
+            queryClient.setQueryData(KEY, { text });
+        }
+
+        await saveSession(memory, BOB, queryClient, (client) => {
+            void client.resetQueries({ queryKey: KEY });
+            client.setQueryData(KEY, { text: "bob's" });
+        });
+
+        const restored = new QueryClient();
+
+        await start(memory.store, BOB, restored).restored;
+        expect(textOf(restored, KEY)).toBe("bob's");
     });
 
     it("saves nothing while the gate is closed or before writes are enabled", async () => {
@@ -867,8 +907,18 @@ describe("saving", () => {
             },
         };
         const { gate, writeGate } = openGate();
+        const listeners = new Set<() => void>();
         const queryClient = new QueryClient();
-        const controller = start(slowStore, ALICE, queryClient, { gate: writeGate });
+        const controller = start(slowStore, ALICE, queryClient, {
+            gate: {
+                ...writeGate,
+                subscribe: (listener) => {
+                    listeners.add(listener);
+
+                    return () => listeners.delete(listener);
+                },
+            },
+        });
 
         await controller.restored;
         queryClient.setQueryData(KEY, { text: SECRET_TEXT });
@@ -884,6 +934,13 @@ describe("saving", () => {
             },
             puts,
             queryClient,
+            reopen: () => {
+                gate.allowed = true;
+
+                for (const listener of listeners) {
+                    listener();
+                }
+            },
             // Not the restore's prune: only a removal after the save is let through counts.
             release: async () => {
                 const removed = nextEvent(removals, "removed");
@@ -912,6 +969,31 @@ describe("saving", () => {
         await release();
         expect(memory.stores.entries.has(ALICE)).toBe(false);
         controller.stop();
+    });
+
+    it("a save the gate closed on while it was sealed is written again once the gate opens", async () => {
+        const { controller, gate, memory, release, reopen } = await heldSave();
+
+        // Closed for a moment (a lock), not cleared: the save waiting on the store takes its record back out.
+        gate.allowed = false;
+        await release();
+        expect(memory.stores.entries.has(ALICE)).toBe(false);
+
+        const written = { done: false };
+
+        void (async () => {
+            await memory.settled();
+            written.done = true;
+        })();
+        reopen();
+        await vi.advanceTimersByTimeAsync(WRITE_THROTTLE_MS);
+        await untilDone(written);
+        controller.stop();
+
+        const next = new QueryClient();
+
+        await start(memory.store, ALICE, next).restored;
+        expect(textOf(next, KEY)).toBe(SECRET_TEXT);
     });
 
     it("changes while a save is sealing are saved once after it, with the latest state", async () => {
