@@ -8,8 +8,10 @@ vi.mock("@/lib/analytics/posthog-client", () => {
         captureException,
     };
 });
+const showError = vi.hoisted(() => vi.fn());
+
 vi.mock("@/lib/toast", () => {
-    return { showError: vi.fn() };
+    return { showError };
 });
 
 const { ErrorBoundary } = await import("./error-boundary");
@@ -58,6 +60,26 @@ describe(ErrorBoundary, () => {
 
         expect(screen.getByText("Recovered: hostile")).toBeTruthy();
         expect(captureException).toHaveBeenCalledWith(hostile);
+    });
+
+    it("calls onError once, with the component stack, and toasts once per caught error", () => {
+        vi.spyOn(console, "error").mockImplementation(() => {});
+        captureException.mockClear();
+        showError.mockClear();
+
+        const onError = vi.fn();
+
+        render(
+            <ErrorBoundary fallback={(error: Error) => <p>{`Recovered: ${error.message}`}</p>} onError={onError}>
+                <Thrower />
+            </ErrorBoundary>,
+        );
+
+        expect(screen.getByText("Recovered: frozen")).toBeTruthy();
+        expect(onError).toHaveBeenCalledOnce();
+        expect(onError.mock.calls[0]?.[1]).toMatchObject({ componentStack: expect.stringContaining("Thrower") });
+        expect(showError).toHaveBeenCalledOnce();
+        expect(captureException).toHaveBeenCalledOnce();
     });
 
     it("still renders its fallback, and warns, when reporting the error throws", () => {

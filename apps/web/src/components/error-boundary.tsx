@@ -113,21 +113,24 @@ const captureRenderError = (error: unknown, componentStack: string): void => {
  * renders `fallback` in its place. Kept free of `@posthog/react`, which would put `posthog-js` on the first load.
  */
 class PostHogCapturingBoundary extends React.Component<
-    { children: ReactNode; fallback: (captured: CapturedError) => ReactNode },
+    { children: ReactNode; fallback: (captured: CapturedError) => ReactNode; onCaught?: (captured: CapturedError) => void },
     { captured: CapturedError | null }
 > {
-    /** The fallback in the same pass that caught the error; `componentDidCatch` adds the component stack after. */
+    /** The fallback in the same pass that caught the error. Rendering it has no side effects: those run once, below. */
     public static getDerivedStateFromError(error: unknown): { captured: CapturedError } {
         return { captured: { componentStack: "", error } };
     }
 
     public override state: { captured: CapturedError | null } = { captured: null };
 
+    /** Once per caught error, with its component stack: the report, then the caller's handler and toast. */
     public override componentDidCatch(error: unknown, errorInfo: ErrorInfo): void {
         const componentStack = errorInfo.componentStack ?? "";
 
+        const { onCaught } = this.props;
+
         captureRenderError(error, componentStack);
-        this.setState({ captured: { componentStack, error } });
+        onCaught?.({ componentStack, error });
     }
 
     public override render(): ReactNode {
@@ -142,23 +145,21 @@ class PostHogCapturingBoundary extends React.Component<
  * Error boundary that reports what it catches to PostHog.
  */
 export const ErrorBoundary = ({ children, fallback, onError, showToast }: ErrorBoundaryProperties) => {
-    const defaultFallback = ({ componentStack, error }: CapturedError) => {
-        // Convert unknown error to Error
-        const errorObject = error instanceof Error ? error : new Error(String(error));
+    const toError = (error: unknown): Error => (error instanceof Error ? error : new Error(String(error)));
 
-        // Call custom error handler if provided
-        if (onError) {
-            const errorInfo: ErrorInfo = {
-                componentStack: componentStack || "",
-            };
+    // Once per caught error (`componentDidCatch`), never on a render of the fallback.
+    const handleCaught = ({ componentStack, error }: CapturedError) => {
+        const errorObject = toError(error);
 
-            onError(errorObject, errorInfo);
-        }
+        onError?.(errorObject, { componentStack });
 
-        // Show toast notification if enabled
         if (showToast !== false) {
             showError(errorObject);
         }
+    };
+
+    const defaultFallback = ({ error }: CapturedError) => {
+        const errorObject = toError(error);
 
         // Use custom fallback if provided
         if (fallback) {
@@ -191,7 +192,11 @@ export const ErrorBoundary = ({ children, fallback, onError, showToast }: ErrorB
         );
     };
 
-    return <PostHogCapturingBoundary fallback={defaultFallback}>{children}</PostHogCapturingBoundary>;
+    return (
+        <PostHogCapturingBoundary fallback={defaultFallback} onCaught={handleCaught}>
+            {children}
+        </PostHogCapturingBoundary>
+    );
 };
 
 /**
