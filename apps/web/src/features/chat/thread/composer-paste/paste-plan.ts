@@ -34,15 +34,43 @@ const MONOSPACE_FONT = /font-family\s*:[^;">]{0,200}(?:mono|consolas|menlo|couri
 const MAX_CONVERTED_HTML = 1_000_000;
 const BACKTICK_RUNS = /`+/g;
 // Bounded digit runs: the longest valid reference is `&#1114111;` or `&#x10FFFF;`.
-const ENTITY = /&(?:amp|gt|lt|nbsp|quot|#\d{1,7}|#[Xx][\dA-Fa-f]{1,6});/g;
+// Named references are bounded: the longest HTML name has 31 characters (`&CounterClockwiseContourIntegral;`).
+const ENTITY = /&(?:[a-z][a-z\d]{1,31}|#\d{1,7}|#x[\da-f]{1,6});/gi;
 const ENTITIES: Record<string, string> = { "&amp;": "&", "&gt;": ">", "&lt;": "<", "&nbsp;": " ", "&quot;": '"' };
 
 /** A named entity from ENTITIES or a decimal or hex character reference; one that names no character stays as written. */
+// Named references decoded once each: the page has a few kinds, used many times.
+const decodedNames = new Map<string, string>();
+
+/** A named reference as the browser reads it: set as a textarea's content, which holds text only and runs nothing. */
+const decodeName = (entity: string): string => {
+    const known = decodedNames.get(entity);
+
+    if (known !== undefined) {
+        return known;
+    }
+
+    if (typeof document === "undefined" || decodedNames.size >= 2000) {
+        return entity;
+    }
+
+    const textarea = document.createElement("textarea");
+
+    textarea.innerHTML = entity;
+    decodedNames.set(entity, textarea.value);
+
+    return textarea.value;
+};
+
 const decodeEntity = (entity: string): string => {
     const named = ENTITIES[entity];
 
     if (named !== undefined) {
         return named;
+    }
+
+    if (entity[1] !== "#") {
+        return decodeName(entity);
     }
 
     const hex = entity[2] === "x" || entity[2] === "X";

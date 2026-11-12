@@ -614,3 +614,13 @@ describe("a comment before the first element", () => {
         await expect(paste({ "text/html": "<!-- <pre> --><strong>Important</strong>", "text/plain": "Important" })).resolves.toBe("**Important**");
     });
 });
+
+describe("named references in HTML past the conversion cap", () => {
+    it("decodes them as the page shows them, the legacy prefix match included", async () => {
+        const html = `<p>caf&eacute;&hellip; &notaname; &zz;</p>${"<p>x</p>".repeat(140_000)}`;
+        const text = await paste({ "text/html": html });
+
+        // `&notaname;` reads as "¬aname;" in a browser too; a name that matches nothing stays as written.
+        expect(text?.split("\n", 1)[0]).toBe("café… ¬aname; &zz;");
+    });
+});
