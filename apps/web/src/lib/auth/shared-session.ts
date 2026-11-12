@@ -23,8 +23,9 @@ const singleton: { changes: number; shared?: SharedSessionRead } = { changes: 0 
 
 /**
  * How many times this page has seen the session possibly change: a sign-in, sign-out or other
- * session-changing auth request (counted when it starts and when it ends), or another tab's
- * better-auth broadcast. A reader that remembers this number can tell whether what it last read
+ * session-changing auth request (counted when it starts and when it ends), another tab's
+ * better-auth broadcast (sign-out and user updates only), or the user coming back to this tab,
+ * which is how a sign-in or account switch made in another tab reaches it. A reader that remembers this number can tell whether what it last read
  * may be out of date (`root-before-load.ts`). Always 0 on the server.
  */
 export const sessionChangeCount = (): number => singleton.changes;
@@ -55,6 +56,14 @@ export const getSharedSessionRead = (): SharedSessionRead | undefined => {
         globalThis.addEventListener("storage", (event) => {
             if (event.key === BETTER_AUTH_BROADCAST_KEY) {
                 instance.invalidate();
+            }
+        });
+
+        // better-auth broadcasts no sign-in, guest upgrade or account switch, and a cookie change fires no event:
+        // whatever another tab did, the user went there to do it. Counted only, the cached read stays.
+        globalThis.document.addEventListener("visibilitychange", () => {
+            if (globalThis.document.visibilityState === "visible") {
+                singleton.changes += 1;
             }
         });
 

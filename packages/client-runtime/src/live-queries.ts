@@ -198,6 +198,9 @@ export class LiveQueryManager {
             // Nor another user's prompt outline. Remove it rather than invalidate: an invalidated query keeps its old data
             // while the new account's read runs or fails, and that would show the previous account's prompts.
             this.queryClient.removeQueries({ predicate: (query) => isLunoraKey(query.queryKey) && query.queryKey[1] === PROMPT_OUTLINE_REF });
+            // Nor the threads they opened, which the long thread gcTime (`thread-queries.ts`) would keep for half an hour.
+            // Unobserved ones only: what is on screen refetches for the new account.
+            this.queryClient.removeQueries({ predicate: (query) => isLunoraKey(query.queryKey) && THREAD_QUERY_PATHS.has(query.queryKey[1]), type: "inactive" });
             // A NEW function identity is what makes `setWsToken` close the open
             // sockets; the client resends every subscription on reconnect.
             this.client.setWsToken(this.wsTokenProvider());

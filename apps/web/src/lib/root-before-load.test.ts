@@ -3,6 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { getSessionAuthState } from "@/lib/auth/server-functions";
 import { sessionChangeCount } from "@/lib/auth/shared-session";
 
+import { CONFIRMED_READ_MAX_AGE_MS } from "./root-before-load";
+
 vi.mock("@/lib/auth/server-functions", () => {
     return { default: vi.fn(), getSessionAuthState: vi.fn() };
 });
@@ -45,6 +47,7 @@ describe("rootBeforeLoad", () => {
 
     afterEach(() => {
         vi.unstubAllEnvs();
+        vi.useRealTimers();
     });
 
     describe("on the server", () => {
@@ -98,6 +101,21 @@ describe("rootBeforeLoad", () => {
             await expect(rootBeforeLoad(options("/chat/def", held))).resolves.toMatchObject({ token: held });
             expect(getSessionAuthState).not.toHaveBeenCalled();
             expect(page.context.lunoraClient.setAuthToken).not.toHaveBeenCalled();
+        });
+
+        it("reads the session again once the last signed-in read is older than the max age", async () => {
+            vi.useFakeTimers();
+            const rootBeforeLoad = await loadRootBeforeLoad();
+
+            vi.advanceTimersByTime(CONFIRMED_READ_MAX_AGE_MS + 1);
+            // Minted now, so the token itself is still valid.
+            const held = jwt(600);
+
+            await rootBeforeLoad(options("/chat/abc", held));
+            expect(getSessionAuthState).toHaveBeenCalledOnce();
+
+            await rootBeforeLoad(options("/chat/def", held));
+            expect(getSessionAuthState).toHaveBeenCalledOnce();
         });
 
         it("reads the session when the client holds no token", async () => {

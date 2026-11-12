@@ -11,17 +11,24 @@ interface RootBeforeLoadOptions {
 }
 
 /**
- * Browser only: the `sessionChangeCount()` at which the session was last read and found
+ * How long a signed-in read is trusted. Past it the next navigation asks again, so a session ended
+ * from another device still reaches the route guards within this time, not only at token renewal.
+ */
+export const CONFIRMED_READ_MAX_AGE_MS = 5 * 60 * 1000;
+
+/**
+ * Browser only: when, and at which `sessionChangeCount()`, the session was last read and found
  * signed in. The page starts at 0 with the token the server rendered it with
  * (`seedHydratedAuthToken`), which is that read.
  */
-const confirmed: { changes: number | undefined } = { changes: 0 };
+const confirmed: { at: number; changes: number | undefined } = { at: Date.now(), changes: 0 };
 
 /**
  * The token a client navigation may keep without asking the server: the one the client holds,
- * while it has more than a minute left and no session-changing request or other tab's
- * broadcast has happened since the session was last read as signed in. Anything else (no
- * token, near expiry, a sign-in or sign-out since) reads the session as the first load does.
+ * while it has more than a minute left, the session was read as signed in less than
+ * `CONFIRMED_READ_MAX_AGE_MS` ago, and nothing has possibly changed it since (`sessionChangeCount`).
+ * Anything else (no token, near expiry, a sign-in or sign-out, a return to the tab) reads the
+ * session as the first load does.
  *
  * What this skips is one server-function round trip per navigation, nothing the backend
  * checks: every RPC still carries the token, which the backend verifies. `AuthRecovery`
@@ -29,7 +36,7 @@ const confirmed: { changes: number | undefined } = { changes: 0 };
  * reads the session again.
  */
 const reusableToken = (client: RootBeforeLoadOptions["context"]["lunoraClient"]): string | undefined => {
-    if (import.meta.env.SSR || confirmed.changes !== sessionChangeCount()) {
+    if (import.meta.env.SSR || confirmed.changes !== sessionChangeCount() || Date.now() - confirmed.at > CONFIRMED_READ_MAX_AGE_MS) {
         return undefined;
     }
 
@@ -61,6 +68,7 @@ const rootBeforeLoad = async (options: RootBeforeLoadOptions) => {
 
     // Taken before the read: a change while it is out leaves the answer unconfirmed.
     const changesAtRead = sessionChangeCount();
+    const readAt = Date.now();
 
     // CSP nonce (security-middleware) and PostHog flags (posthog-middleware)
     // arrive as `serverContext`, not on the router context — see
@@ -81,6 +89,7 @@ const rootBeforeLoad = async (options: RootBeforeLoadOptions) => {
 
     // Only a signed-in answer is reused; `unknown` and `unauthenticated` are asked again next time.
     if (!import.meta.env.SSR) {
+        confirmed.at = readAt;
         confirmed.changes = authStatus === "authenticated" && token ? changesAtRead : undefined;
     }
 

@@ -12,7 +12,7 @@ import {
     SEED_SLOT_TIMEOUT_MS,
     tokenSubject,
 } from "./live-queries";
-import { THREAD_QUERY_GC_TIME_MS } from "./thread-queries";
+import { createQueryClient } from "./query-client";
 import { currentUnlockProof, rememberUnlockProof } from "./unlock-proofs";
 
 type OnData = (value: unknown) => void;
@@ -398,20 +398,46 @@ describe(LiveQueryManager, () => {
         }
     });
 
-    it("closes a thread read's subscription after the linger while its cached value stays for the thread gcTime", () => {
+    it("closes a thread read's subscription after the linger while the app's client keeps its value for the thread gcTime", () => {
+        const appClient = createQueryClient();
+        const appManager = new LiveQueryManager(fake.client as unknown as LiveQueryClient, appClient, mintWsTicket);
         const threadKey = key("chat_functions:getThread", { threadId: "t1" });
-        const unobserve = observe(threadKey, { gcTime: THREAD_QUERY_GC_TIME_MS });
+
+        appManager.connect();
+
+        const unobserve = new QueryObserver(appClient, {
+            queryFn: async ({ queryKey: k }) => await appManager.fetch(k, hashKey(k), { __lunoraRef: threadKey[1] }, threadKey[2]),
+            queryKey: threadKey,
+        }).subscribe(() => {});
 
         fake.subscriptions[0]!.onData({ title: "t1" });
         unobserve();
         vi.advanceTimersByTime(LINGER_MS);
 
-        expect(manager.size).toBe(0);
+        expect(appManager.size).toBe(0);
         expect(fake.subscriptions[0]!.unsubscribe).toHaveBeenCalledOnce();
 
         vi.advanceTimersByTime(10 * 60 * 1000);
 
-        expect(queryClient.getQueryData(threadKey)).toStrictEqual({ title: "t1" });
+        expect(appClient.getQueryData(threadKey)).toStrictEqual({ title: "t1" });
+
+        appManager.disconnect();
+        appClient.clear();
+    });
+
+    it("drops the previous user's unobserved thread reads when the token's subject changes", () => {
+        fake.setToken(jwt("alice"));
+        queryClient.setQueryData(key("chat_functions:getThread", { threadId: "old" }), { title: "alice's" });
+        queryClient.setQueryData(key("tasks_functions:getTaskBoard"), ["kept"]);
+        const unobserve = observe(key("chat_composite:getThreadListData"));
+
+        fake.setToken(jwt("bob"));
+
+        expect(queryClient.getQueryData(key("chat_functions:getThread", { threadId: "old" }))).toBeUndefined();
+        expect(queryClient.getQueryData(key("tasks_functions:getTaskBoard"))).toStrictEqual(["kept"]);
+        expect(queryClient.getQueryCache().find({ queryKey: key("chat_composite:getThreadListData") })).toBeDefined();
+
+        unobserve();
     });
 
     it("gives a slot back when a seed never answers, and skips queued entries that were released", () => {
