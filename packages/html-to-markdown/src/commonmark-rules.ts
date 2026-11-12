@@ -1,5 +1,17 @@
+import annotateNode from "./node";
 import type { AnnotatedNode, Options, Rule, RuleLookup } from "./types";
-import { escapeMarkdown, parseListStart, repeat, trimNewlines } from "./utilities";
+import {
+    codeText,
+    edgeBreaks,
+    escapeMarkdown,
+    flattenBreaks,
+    hasOnlyBreaks,
+    isVoid,
+    lineBreakMarker,
+    parseListStart,
+    repeat,
+    trimNewlines,
+} from "./utilities";
 
 const LINE_START = /^/gm;
 const NEWLINE = /\n/g;
@@ -12,6 +24,22 @@ const BACKTICK_EDGE = /^`|`$/;
 const LANGUAGE_CLASS = /language-(\S+)/;
 const LINE_BREAK_RUN = /\n\s*/g;
 const DOUBLE_QUOTE = /"/g;
+// A character that can sit next to emphasis without `_` failing to open or close: anything but
+// whitespace, punctuation and symbols (CommonMark's flanking rules).
+const WORD_CHARACTER = /^[^\s\p{P}\p{S}]$/u;
+const EMPHASIS_NAMES = new Set(["em", "i"]);
+const STRONG_NAMES = new Set(["b", "strong"]);
+// Elements whose output starts or ends with a delimiter, so their edge is never a word character.
+const DELIMITED_NAMES = new Set(["a", "b", "code", "em", "i", "strong"]);
+
+interface RunStyle {
+    /** The delimiter for a run that touches a word character. */
+    intraword: string;
+    /** The element names that share a run with this one. */
+    names: ReadonlySet<string>;
+    /** The delimiter for a run that stands alone in a word-free context. */
+    plain: string;
+}
 
 // The <code> each selected <pre> was matched with. The replacement reads it from here
 // rather than searching again: a rule that claims a wrapper after the match would make
@@ -126,12 +154,8 @@ const rules: Record<string, Rule> = {
     emphasis: {
         filter: ["em", "i"],
 
-        replacement(content, _node, options) {
-            if (!content.trim()) {
-                return "";
-            }
-
-            return options.emDelimiter + content + options.emDelimiter;
+        replacement(content, node, options) {
+            return wrapRun(content, node, options, { intraword: "*", names: EMPHASIS_NAMES, plain: options.emDelimiter });
         },
     },
 
@@ -144,7 +168,7 @@ const rules: Record<string, Rule> = {
             const codeElement = pinnedCode.get(node) ?? preCodeElement(node, lookup);
             const className = codeElement?.getAttribute("class") ?? "";
             const language = (LANGUAGE_CLASS.exec(className) ?? [null, ""])[1];
-            const code = codeElement?.textContent ?? "";
+            const code = codeElement ? codeText(codeElement) : "";
 
             const fenceChar = options.fence.charAt(0);
             let fenceSize = 3;
@@ -171,14 +195,16 @@ const rules: Record<string, Rule> = {
 
         replacement(content, node, options) {
             const hLevel = Number(node.nodeName.charAt(1));
+            // A heading is one line, so a hard break in it becomes a space.
+            const text = node.querySelector("br") ? flattenBreaks(content, lineBreakMarker(options.br)) : content;
 
             if (options.headingStyle === "setext" && hLevel < 3) {
-                const underline = repeat(hLevel === 1 ? "=" : "-", content.length);
+                const underline = repeat(hLevel === 1 ? "=" : "-", text.length);
 
-                return `\n\n${content}\n${underline}\n\n`;
+                return `\n\n${text}\n${underline}\n\n`;
             }
 
-            return `\n\n${repeat("#", hLevel)} ${content}\n\n`;
+            return `\n\n${repeat("#", hLevel)} ${text}\n\n`;
         },
     },
 
@@ -209,7 +235,8 @@ const rules: Record<string, Rule> = {
         },
 
         replacement(_content, node, _options, lookup) {
-            const code = (pinnedCode.get(node) ?? preCodeElement(node, lookup))?.textContent ?? "";
+            const codeElement = pinnedCode.get(node) ?? preCodeElement(node, lookup);
+            const code = codeElement ? codeText(codeElement) : "";
 
             return `\n\n    ${code.replaceAll(NEWLINE, "\n    ")}\n\n`;
         },
@@ -239,7 +266,7 @@ const rules: Record<string, Rule> = {
         filter: "br",
 
         replacement(_content, _node, options) {
-            return `${options.br}\n`;
+            return lineBreakMarker(options.br);
         },
     },
 
@@ -302,12 +329,8 @@ const rules: Record<string, Rule> = {
     strong: {
         filter: ["strong", "b"],
 
-        replacement(content, _node, options) {
-            if (!content.trim()) {
-                return "";
-            }
-
-            return options.strongDelimiter + content + options.strongDelimiter;
+        replacement(content, node, options) {
+            return wrapRun(content, node, options, { intraword: "**", names: STRONG_NAMES, plain: options.strongDelimiter });
         },
     },
 };
@@ -468,6 +491,181 @@ function soleCodeElement(parent: Node, lookup: RuleLookup): Element | null {
     }
 
     return WRAPPER_ELEMENTS.has(only.nodeName) && !lookup.hasRuleFor(only) ? soleCodeElement(only, lookup) : null;
+}
+
+type Side = "left" | "right";
+
+interface EmphasisRun {
+    /** Emphasis elements next to this one, with no text, space or break between them. */
+    count: number;
+    /** True when the output past them touches a word character. */
+    wordEdge: boolean;
+}
+
+/**
+ * Wraps an emphasis or strong element. Adjacent elements of the same kind form one
+ * run: only the first opens it and only the last closes it, so `<i>1</i><em>2</em>`
+ * gives `_12_`. A run that touches a word character uses `*` (or `**`), because `_`
+ * cannot open or close inside a word.
+ */
+function wrapRun(content: string, node: AnnotatedNode, options: Options, style: RunStyle): string {
+    const before = emphasisRun(node, "left", style.names, options);
+    const after = emphasisRun(node, "right", style.names, options);
+    const delimiter = before.wordEdge || after.wordEdge ? style.intraword : style.plain;
+
+    return wrapInline(content, options, before.count === 0 ? delimiter : "", after.count === 0 ? delimiter : "");
+}
+
+/**
+ * Wraps content in an opening and a closing delimiter (either may be empty). The
+ * line breaks at its ends go outside the delimiters, where a break is valid.
+ */
+function wrapInline(content: string, options: Options, open: string, close: string): string {
+    const { core, lead, trail } = splitBreaks(content, lineBreakMarker(options.br));
+
+    if (!core.trim()) {
+        return lead + trail;
+    }
+
+    return lead + open + core + close + trail;
+}
+
+/** Splits the line break markers off both ends of content. */
+function splitBreaks(content: string, marker: string): { core: string; lead: string; trail: string } {
+    let start = 0;
+
+    while (content.startsWith(marker, start)) {
+        start += marker.length;
+    }
+
+    let end = content.length;
+
+    while (end - marker.length >= start && content.startsWith(marker, end - marker.length)) {
+        end -= marker.length;
+    }
+
+    return { core: content.slice(start, end), lead: content.slice(0, start), trail: content.slice(end) };
+}
+
+/**
+ * Walks from an emphasis element to one side, over the emphasis elements that
+ * are output directly beside it. The walk stops at whitespace, at a line break,
+ * and at the first node that outputs something else.
+ */
+function emphasisRun(node: AnnotatedNode, side: Side, names: ReadonlySet<string>, options: Options): EmphasisRun {
+    let count = 0;
+    let gap = separation(node, side);
+    let sibling = neighbour(node, side);
+
+    while (sibling && gap !== Infinity) {
+        if (isRunMember(sibling, names, options)) {
+            const member = annotateNode(sibling, options);
+
+            // Two emphasis elements join across at most one break; two breaks would be a blank line.
+            if (gap + separation(member, opposite(side)) > 1) {
+                break;
+            }
+
+            count += 1;
+            gap = separation(member, side);
+        } else {
+            // A break keeps the next output apart from the run, so it cannot touch a word.
+            if (gap > 0) {
+                break;
+            }
+
+            const edge = edgeCharacter(sibling, side, options);
+
+            if (edge !== null) {
+                return { count, wordEdge: WORD_CHARACTER.test(edge) };
+            }
+        }
+
+        sibling = neighbour(sibling, side);
+    }
+
+    return { count, wordEdge: false };
+}
+
+/**
+ * The line breaks between a node and its neighbour on one side, or infinity when
+ * whitespace lies there, which keeps the two apart whatever comes next.
+ */
+function separation(node: AnnotatedNode, side: Side): number {
+    return flankOf(node, side) === "" ? edgeBreaks(node, side) : Infinity;
+}
+
+/** True for an element of the same kind that outputs delimiters, so it can share a run with this one. */
+function isRunMember(node: Node, names: ReadonlySet<string>, options: Options): boolean {
+    if (node.nodeType !== 1 || !names.has(node.nodeName.toLowerCase())) {
+        return false;
+    }
+
+    return !annotateNode(node, options).isBlank && !hasOnlyBreaks(node);
+}
+
+/**
+ * The character a node's output shows on the side facing the emphasis: "" when
+ * the output ends in markup, a void element or a block boundary, and null when
+ * the node outputs nothing.
+ */
+function edgeCharacter(node: Node, side: Side, options: Options): string | null {
+    if (node.nodeType === 3) {
+        return textEdge(node.nodeValue ?? "", side);
+    }
+
+    if (node.nodeType !== 1) {
+        return null;
+    }
+
+    const element = node as Element;
+    const annotated = annotateNode(element, options);
+
+    if (annotated.isBlock || isVoid(element)) {
+        return "";
+    }
+
+    if (DELIMITED_NAMES.has(element.nodeName.toLowerCase())) {
+        return annotated.isBlank ? null : "";
+    }
+
+    return childEdge(element, side, options);
+}
+
+function textEdge(text: string, side: Side): string | null {
+    const chars = [...text];
+
+    return chars[side === "left" ? chars.length - 1 : 0] ?? null;
+}
+
+/** The edge of the first child, from the facing end, that outputs something. */
+function childEdge(element: Element, side: Side, options: Options): string | null {
+    let child = side === "left" ? element.lastChild : element.firstChild;
+
+    while (child) {
+        const edge = edgeCharacter(child, side, options);
+
+        if (edge !== null) {
+            return edge;
+        }
+
+        child = side === "left" ? child.previousSibling : child.nextSibling;
+    }
+
+    return null;
+}
+
+function neighbour(node: Node, side: Side): Node | null {
+    return side === "left" ? node.previousSibling : node.nextSibling;
+}
+
+function opposite(side: Side): Side {
+    return side === "left" ? "right" : "left";
+}
+
+/** The whitespace that the flanking rules move outside a node, on one side. */
+function flankOf(node: AnnotatedNode, side: Side): string {
+    return side === "left" ? node.flankingWhitespace.leading : node.flankingWhitespace.trailing;
 }
 
 function cleanAttribute(attribute: string | null): string {
