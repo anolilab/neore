@@ -46,7 +46,7 @@ const CLIENT_MESSAGE_ID_RE = new RegExp(String.raw`^[\w-]{1,${String(MAX_LENGTH.
 
 export const isValidClientMessageId = (value: unknown): value is string => typeof value === "string" && CLIENT_MESSAGE_ID_RE.test(value);
 
-/** What makes two requests the same send: where it goes, what it saves, and whether it streams or starts a goal. */
+/** What makes two requests the same send: where it goes, what it saves, whether it streams or starts a goal, and how it runs. */
 export interface ChatStartRequest {
     contentType: "image" | "text" | "video";
     fileIds?: string[];
@@ -54,6 +54,11 @@ export interface ChatStartRequest {
     guestMessageId?: string;
     parentId?: string;
     prompt?: string;
+    /**
+     * Every other input the request sets (page context, model and generation settings, a goal's round cap, a new chat's
+     * own settings), in a fixed key order: a resend that changes one is another send, never answered with the first's ids.
+     */
+    settings?: unknown;
     /** The existing thread, or none for a new chat. */
     threadId?: string;
 }
@@ -69,6 +74,7 @@ export const chatStartFingerprint = async (request: ChatStartRequest): Promise<s
             request.guestMessageId ?? null,
             request.parentId ?? null,
             request.goal ?? null,
+            request.settings ?? null,
         ]),
     );
 

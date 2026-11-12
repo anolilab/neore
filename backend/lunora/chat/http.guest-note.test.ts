@@ -429,4 +429,34 @@ describe("/chat/start with a held guest note and a clientMessageId", () => {
         expect(await savedNotes()).toHaveLength(1);
         expect(saved.charges).toBe(1);
     });
+
+    it("resumes a send that saved the note before its link ended, and still refuses the ended link under a new id", async () => {
+        saved.fail = "record";
+        claimedSend.streamFails = true;
+
+        await expect(sendNoteOnce()).rejects.toThrow("the stream could not be made");
+        await run(async (ctx) => {
+            const row = await ctx.db.get("threadGuestMessages", noteId);
+
+            await ctx.db.patch("threadGuestLinks", row.linkId, { expiresAt: 1 });
+        });
+        vi.setSystemTime(Date.now() + CHAT_START_LEASE_MS);
+
+        const other = await runChatStart(
+            fakeContext(CLAIMED_HANDLERS),
+            { clientMessageId: "another-send", guestMessageId: noteId, model: MODEL, prompt: "x", threadId } as never,
+            "secret",
+        );
+
+        expect(other.status).toBe(400);
+        expect(await other.json()).toMatchObject({ error: "GUEST_LINK_ENDED" });
+
+        const resumed = await sendNoteOnce();
+
+        expect(resumed.status).toBe(200);
+        expect(resumed.json.streamId).toEqual(expect.any(String));
+        expect(await noteStatus()).toBe("sent");
+        expect(await savedNotes()).toHaveLength(1);
+        expect(saved.charges).toBe(1);
+    });
 });

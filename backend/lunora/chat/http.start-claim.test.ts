@@ -261,7 +261,7 @@ describe("/chat/start with clientMessageId", () => {
     });
 
     it("takes over a send that died before its save, and refuses the dead send's late save", async () => {
-        const fingerprint = await chatStartFingerprint({ contentType: "text", prompt: "hello", threadId });
+        const fingerprint = await chatStartFingerprint({ contentType: "text", prompt: "hello", settings: { model: MODEL }, threadId });
         const dead = await run(async (ctx) => await ctx.runMutation(claimChatStart, { clientMessageId: "dead", fingerprint, streams: true, userId: OWNER }));
 
         expect((await send({ clientMessageId: "dead", threadId })).status).toBe(409);
@@ -319,8 +319,14 @@ describe("/chat/start with clientMessageId", () => {
     it("refuses the same id on a different send, and never answers it with the first send's thread", async () => {
         const first = await send({ clientMessageId: "reused", threadId });
 
-        // Another prompt, or the same one with no thread (which would mint a token for a thread this request never gated).
-        for (const body of [{ prompt: "something else", threadId }, {}]) {
+        // Another prompt, the same one with no thread (which would mint a token for a thread this request never gated), or
+        // the same prompt with another page attached or another setting, which the first send's run would not have used.
+        for (const body of [
+            { prompt: "something else", threadId },
+            {},
+            { pageContext: { text: "Another page", title: "Page", url: "https://example.com/" }, threadId },
+            { searchMode: "research", threadId },
+        ]) {
             const reused = await send({ clientMessageId: "reused", ...body });
 
             expect(reused.status).toBe(422);
@@ -329,6 +335,10 @@ describe("/chat/start with clientMessageId", () => {
 
         expect((await send({ clientMessageId: "reused", threadId })).json).toMatchObject({ duplicate: true, messageId: first.json.messageId });
         expect(await countRows("messages")).toBe(1);
+
+        // A goal's round cap, with the same goal text.
+        expect((await send({ clientMessageId: "goal-cap", goal: { maxRounds: 5, text: "Ship it" }, threadId })).status).toBe(200);
+        expect((await send({ clientMessageId: "goal-cap", goal: { maxRounds: 3, text: "Ship it" }, threadId })).status).toBe(422);
     });
 
     it("queues the run again on a resend when the first send recorded its stream but its queue submission failed", async () => {

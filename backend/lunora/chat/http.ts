@@ -33,6 +33,7 @@ import { mediaThreadTitle, startTitleJobs } from "./lib/start-title-jobs";
 import { documentTextPart, guestNoteIdOfMessage, guestTextPart } from "./lib/attached-text";
 import { unsendableGuestText } from "./lib/guest-link-store";
 import { formatPageContextPart, parsePageContext } from "./lib/page-context";
+import type { ChatStartRequest } from "./start-claim";
 import { chatStartFingerprint, isValidClientMessageId } from "./start-claim";
 import { createStreamToken } from "./streaming/persistent/stream-token";
 
@@ -357,7 +358,7 @@ export interface ChatStartBody {
     /**
      * The client's own id for this send (`chat/start-claim.ts`), so a resend after an ambiguous failure saves nothing
      * twice: it is answered with the first send's ids and `duplicate: true`. 1–128 of `[A-Za-z0-9_-]`; not with `regenerate`.
-     * The same id on a different send (thread, prompt, attachments, guest note, goal) is a 422 `CLIENT_MESSAGE_ID_REUSED`.
+     * The same id on a different send (thread, prompt, attachments, guest note, goal, or any setting) is a 422 `CLIENT_MESSAGE_ID_REUSED`.
      */
     clientMessageId?: string;
     customSystemPrompt?: string;
@@ -536,6 +537,40 @@ const GUEST_NOTE_REFUSALS: Record<"being-sent" | "ended" | "missing" | "sent", {
     sent: { error: "GUEST_NOTE_ALREADY_SENT", message: "That guest note was already sent.", status: 409 },
 };
 
+/**
+ * The rest of a send's inputs for its `clientMessageId` fingerprint (`chat/start-claim.ts`), listed in a fixed order so
+ * the client's key order never matters. Not the id itself, nor `unlockProof`, which a resend may refresh.
+ */
+const startSettingsOf = (body: ChatStartBody, pageContext: ReturnType<typeof parsePageContext>): ChatStartRequest["settings"] => {
+    return {
+        autoModel: body.autoModel,
+        cinemaSettings: body.cinemaSettings,
+        customSystemPrompt: body.customSystemPrompt,
+        duration: body.duration,
+        enabledFeatures: body.enabledFeatures,
+        goalMaxRounds: body.goal?.maxRounds,
+        imageSize: body.imageSize,
+        language: body.language,
+        mcpServerNames: body.mcpServerNames,
+        mode: body.mode,
+        model: body.model,
+        negativePrompt: body.negativePrompt,
+        numImages: body.numImages,
+        pageContext,
+        quality: body.quality,
+        reasoningEffort: body.reasoningEffort,
+        referenceImages: body.referenceImages,
+        researchDepth: body.researchDepth,
+        retentionHours: body.retentionHours,
+        searchMode: body.searchMode,
+        seed: body.seed,
+        shouldAutoContinue: body.shouldAutoContinue,
+        statelessMode: body.statelessMode,
+        style: body.style,
+        temporary: body.temporary,
+    };
+};
+
 /** A `clientMessageId` already used for a different send (another thread, prompt or attachment): the client needs a new id. */
 const startMismatchResponse = (): Response =>
     Response.json({ error: "CLIENT_MESSAGE_ID_REUSED", message: "This message id was already used for a different message." }, { status: 422 });
@@ -625,9 +660,9 @@ const runChatStartOnShard = async (
           })
         : undefined;
     const guestRefusal = guestLookup && "refused" in guestLookup ? guestLookup.refused : undefined;
-    // A resend of a send that took the note marked it sent (or holds it): its claim answers it below, and refuses it only
-    // when this id never sent the note.
-    const deferredGuestRefusal = body.clientMessageId !== undefined && (guestRefusal === "sent" || guestRefusal === "being-sent") ? guestRefusal : undefined;
+    // A resend of a send that took the note marked it sent (or holds it), or saved it before its link ended: its claim
+    // answers it below, and refuses it only when this id never saved the note. A note gone or not the caller's is refused here.
+    const deferredGuestRefusal = body.clientMessageId !== undefined && guestRefusal !== "missing" ? guestRefusal : undefined;
 
     if (guestRefusal && !deferredGuestRefusal) {
         return guestNoteRefused(guestRefusal);
@@ -879,6 +914,7 @@ const runChatStartOnShard = async (
                       ...(body.guestMessageId !== undefined && { guestMessageId: body.guestMessageId }),
                       ...(body.parentId !== undefined && { parentId: body.parentId }),
                       ...(body.prompt !== undefined && { prompt: body.prompt }),
+                      settings: startSettingsOf(body, pageContext),
                       ...(validThreadId !== undefined && { threadId: validThreadId }),
                   }),
                   streams: contentType === "text",
@@ -960,8 +996,8 @@ const runChatStartOnShard = async (
         }
     };
 
-    // The note was sent, or is being sent, by another send than this id's: refused as without an id. Nothing was saved, so
-    // the `messageContent` built without the note's text is never used.
+    // The note was sent, or is being sent, by another send than this id's, or its link ended before this id saved it:
+    // refused as without an id. Nothing was saved, so the `messageContent` built without the note's text is never used.
     if (deferredGuestRefusal && !resumed) {
         await releaseStartClaim();
 
