@@ -296,6 +296,8 @@ const startChat = async (
                 text: collected.text,
                 threadId: body.threadId,
             },
+            // As the streaming reply: a retry answers 200, the route's 202 is for a first send.
+            ...(duplicate && { status: 200 }),
         };
     }
 

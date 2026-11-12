@@ -110,6 +110,9 @@ describe("OpenAPI document", () => {
 
         expect(responses["409"]!.description).toContain("chat_start_in_progress");
         expect(responses["422"]!.description).toContain("client_message_id_reused");
+        // A first send is 202; its retry is 200 with `duplicate: true`.
+        expect(Object.keys(responses)).toEqual(expect.arrayContaining(["200", "202"]));
+        expect(responses["200"]!.description).toContain("clientMessageId");
     });
 
     it("documents 409 on the trigger update only among PATCH routes", () => {

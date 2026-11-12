@@ -96,6 +96,11 @@ const operation = (route: RouteDefinition) => {
             403: errorResponse("`insufficient_scope` or `forbidden`"),
             404: errorResponse("`not_found`"),
             [status]: { content: successContent, description: "Success" },
+            // A retry with the same `clientMessageId` answers the first send's ids with 200 and `duplicate: true`.
+            ...(route.takesClientMessageId &&
+                status !== "200" && {
+                    200: { content: successContent, description: "A retry of a send with the same `clientMessageId`: its first ids, with `duplicate: true`." },
+                }),
             ...(route.method === "post" &&
                 route.noIdempotency !== true && {
                     409: errorResponse(

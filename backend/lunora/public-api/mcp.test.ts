@@ -683,6 +683,20 @@ describe("MCP write tools", () => {
         expect(chatStart).toHaveBeenCalledOnce();
     });
 
+    it("answers a blocking retry of a send (same clientMessageId) with 200 and duplicate, as the streaming one does", async () => {
+        chatStart.mockImplementation(async () => Response.json({ ...started, duplicate: true }));
+
+        const harness = setup({ scopes: WRITE_SCOPES });
+        const response = await harness.request("/chat", {
+            body: JSON.stringify({ clientMessageId: "send-1", prompt: "hello", stream: false, threadId: "t1" }),
+            headers: { "Content-Type": "application/json" },
+            method: "POST",
+        });
+
+        expect(response.status).toBe(200);
+        expect(await response.json()).toMatchObject({ duplicate: true });
+    });
+
     it("rejects an idempotencyKey the header would reject", async () => {
         const { result } = await send({}, { idempotencyKey: "has space", prompt: "hello", threadId: "t1" });
 
