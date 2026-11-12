@@ -37,7 +37,7 @@ const FORMATTING = [
     /<(?:h[1-6]|ul|ol|table|blockquote|hr)[\s/>]/i,
     // A task box outside a list: `<input>` has no closing tag, so its type is looked for within the tag only.
     /<input[^>]{0,200}checkbox/i,
-    /<(?:[bis]|strong|em|del|strike|code|kbd|math|img)[\s>]/i,
+    /<(?:[bis]|strong|em|del|strike|code|kbd|samp|tt|sup|sub|math|img)[\s>]/i,
     /font-weight\s*:\s*(?:bold|[6-9]00)|font-style\s*:\s*italic/i,
     /text-decoration[\w-]{0,20}\s*:[^;"]{0,100}line-through/i,
     // Word's list paragraphs: plain text keeps only their bullet characters and tabs.

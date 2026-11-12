@@ -204,8 +204,8 @@ const isWordBullet = (element: Element): boolean => element.tagName === "SPAN" &
 /** Whether the page leaves `element` out of what it shows (or it is not text at all). */
 const isHidden = (element: Element): boolean =>
     SKIPPED.has(element.tagName.toUpperCase()) ||
-    declares(styleOf(element), "display", "none") ||
-    declares(styleOf(element), "visibility", "hidden") ||
+    declared(styleOf(element), "display") === "none" ||
+    declared(styleOf(element), "visibility") === "hidden" ||
     declares(styleOf(element), "mso-list", "ignore") ||
     HIDDEN_CLASS.test(element.getAttribute("class") ?? "") ||
     element.hasAttribute("hidden") ||
@@ -1135,9 +1135,25 @@ const element = (node: Element, context: Context): string => {
     }
 
     if (HEADING.test(tag)) {
-        const text = oneLine(children(node, context)).trim();
+        // Outside a table a placeholder is a fenced block (`<pre>`): it goes below the heading, which holds one line.
+        const blocks: string[] = [];
+        const inner = children(node, context);
+        const text = (
+            context.inTable
+                ? inner
+                : inner.replaceAll(PLACEHOLDER, (placeholder: string) => {
+                      blocks.push(placeholder);
 
-        return text === "" ? "" : `\n\n${"#".repeat(Number(tag[1]))} ${text}\n\n`;
+                      return "";
+                  })
+        )
+            .split("\n")
+            .map((line: string) => line.trim())
+            .filter(Boolean)
+            .join(" ");
+        const heading = text === "" ? "" : `\n\n${"#".repeat(Number(tag[1]))} ${text}\n\n`;
+
+        return heading + blocks.map((block: string) => `\n\n${block}\n\n`).join("");
     }
 
     const inner = styledChildren(node, context);

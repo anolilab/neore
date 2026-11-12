@@ -930,3 +930,32 @@ describe("negative list numbers", () => {
         expect(htmlToMarkdown('<ol start="-2"><li>alpha</li><li>beta</li><li>gamma</li></ol>')).toBe("- -2. alpha\n- -1. beta\n0. gamma");
     });
 });
+
+describe("a raised, lowered or monospace run with no other formatting", () => {
+    it("goes through the converter, so its meaning survives", () => {
+        expect(isPlainHtml("<p>E=mc<sup>2</sup></p>")).toBe(false);
+        expect(isPlainHtml("<p>H<sub>2</sub>O</p>")).toBe(false);
+        expect(isPlainHtml("<p>run <samp>ok</samp> and <tt>ls</tt></p>")).toBe(false);
+        expect(isPlainHtml("<p>simple text</p>")).toBe(true);
+        expect(htmlToMarkdown("<p>E=mc<sup>2</sup></p>")).toBe("E=mc²");
+        expect(htmlToMarkdown("<p>12<sup>th</sup> May</p>")).toBe("12th May");
+    });
+});
+
+describe("display or visibility declared twice", () => {
+    it("hides only what the last declaration hides", () => {
+        expect(htmlToMarkdown('<p style="display:none; display:block">Visible</p><p><b>bold</b></p>')).toBe("Visible\n\n**bold**");
+        expect(htmlToMarkdown('<p style="visibility:hidden; visibility:visible">Visible</p>')).toBe("Visible");
+        expect(htmlToMarkdown('<p style="display:block; display:none">secret</p><p>shown</p>')).toBe("shown");
+        expect(htmlToMarkdown('<p style="display:none !important; display:block">secret</p><p>shown</p>')).toBe("shown");
+    });
+});
+
+describe("a code block inside a heading", () => {
+    it("keeps the heading's text and puts the block below it", () => {
+        expect(htmlToMarkdown("<h2>Setup<pre>npm i</pre></h2>")).toBe("## Setup\n\n```\nnpm i\n```");
+        expect(htmlToMarkdown("<h2>A<pre>x</pre>B</h2>")).toBe("## A B\n\n```\nx\n```");
+        expect(htmlToMarkdown("<h3><pre>only code</pre></h3>")).toBe("```\nonly code\n```");
+        expect(htmlToMarkdown("<h2>Use <code>npm</code></h2>")).toBe("## Use `npm`");
+    });
+});
