@@ -49,7 +49,7 @@ import { showInfo } from "@/lib/toast";
 
 import LoadMoreTrigger from "./load-more-trigger";
 import MessageItem from "./message-item";
-import type { MessagePosition, PinnedRange, WindowPlan } from "./message-windowing";
+import type { MessagePosition, WindowPlan } from "./message-windowing";
 import {
     getWindowPlan,
     isBrowserFindKey,
@@ -59,10 +59,11 @@ import {
     resolveJumpTarget,
     shouldAnimateEntrance,
     shouldLoadOlderForJump,
-    withPinnedRange,
+    withPinnedRows,
 } from "./message-windowing";
 import { RateLimitPauseNotice } from "./rate-limit-pause-notice";
 import { useEndReadAloudWithMessages } from "./read-aloud-speech";
+import { usePinnedRowIds } from "./row-pins";
 import { selectStreamIdToShow, selectStreamTokenFor } from "./stream-to-show";
 import { StreamingPlaceholder, ThinkingPlaceholder } from "./streaming-placeholder";
 
@@ -218,20 +219,33 @@ const useSelectedRows = (listRef: RefObject<HTMLElement | null>): SelectedRows |
     return selected;
 };
 
-/** The selected rows as indexes into `messages`; null when there is no selection or a row is gone. */
-const pinnedRange = (messages: ReadonlyArray<UIMessage>, selected: SelectedRows | null): PinnedRange | null => {
-    if (!selected) {
-        return null;
+/**
+ * Rows held mounted, as ascending indexes into `messages`: every row a text selection spans, and the
+ * rows something inside them pinned (`row-pins.ts`).
+ */
+const pinnedIndexes = (messages: ReadonlyArray<UIMessage>, selected: SelectedRows | null, pinnedIds: ReadonlySet<string>): number[] => {
+    const indexes: number[] = [];
+
+    if (pinnedIds.size > 0) {
+        for (const [index, message] of messages.entries()) {
+            if (pinnedIds.has(message.id)) {
+                indexes.push(index);
+            }
+        }
     }
 
-    const first = messages.findIndex((message) => message.id === selected.firstId);
-    const last = messages.findIndex((message) => message.id === selected.lastId);
+    if (selected) {
+        const first = messages.findIndex((message) => message.id === selected.firstId);
+        const last = messages.findIndex((message) => message.id === selected.lastId);
 
-    if (first === -1 || last === -1) {
-        return null;
+        if (first !== -1 && last !== -1) {
+            for (let index = Math.min(first, last); index <= Math.max(first, last); index += 1) {
+                indexes.push(index);
+            }
+        }
     }
 
-    return { first: Math.min(first, last), last: Math.max(first, last) };
+    return indexes;
 };
 
 type RenderRow = (message: UIMessage, index: number) => ReactNode;
@@ -241,8 +255,8 @@ interface VirtualizedHeadProps {
     layoutKey: string;
     messages: UIMessage[];
     onVirtualizer: (virtualizer: Virtualizer<HTMLElement, Element> | null) => void;
-    /** Rows a text selection spans: mounted wherever the scroll is, so the selection holds. */
-    pinned: PinnedRange | null;
+    /** Rows held mounted wherever the scroll is: a text selection's, an open diff comment's (`pinnedIndexes`). */
+    pinned: ReadonlyArray<number>;
     renderRow: RenderRow;
 }
 
@@ -279,7 +293,7 @@ const VirtualizedHead: FC<VirtualizedHeadProps> = ({ layoutKey, messages, onVirt
     const getItemKey = useCallback((index: number) => messages[index]?.id ?? index, [messages]);
 
     const rangeExtractor = useCallback(
-        (range: Parameters<typeof defaultRangeExtractor>[0]) => withPinnedRange(defaultRangeExtractor(range), pinned, messages.length),
+        (range: Parameters<typeof defaultRangeExtractor>[0]) => withPinnedRows(defaultRangeExtractor(range), pinned, messages.length),
         [messages.length, pinned],
     );
 
@@ -361,6 +375,7 @@ const MessageList: FC<MessageListProps> = memo(({ className, editComposerCompone
     const { isAllShown, showAll } = useShowAllMessages();
     const listRef = useRef<HTMLDivElement>(null);
     const selectedRows = useSelectedRows(listRef);
+    const pinnedRowIds = usePinnedRowIds();
     const plan: WindowPlan = getWindowPlan(messages.length, { enabled: isVirtualizeFlagOn && !isAllShown });
 
     // After "Show all earlier messages", focus goes to the oldest loaded message, where the shown history starts.
@@ -648,7 +663,7 @@ const MessageList: FC<MessageListProps> = memo(({ className, editComposerCompone
     };
 
     const tailStart = plan.virtualized ? plan.headCount : 0;
-    const pinned = pinnedRange(messages, selectedRows);
+    const pinned = pinnedIndexes(messages, selectedRows, pinnedRowIds);
     const earlierCount = plan.headCount;
 
     return (

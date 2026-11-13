@@ -14,7 +14,7 @@ import {
     shouldLoadOlderForJump,
     VIRTUALIZE_FLAG_KEY,
     VIRTUALIZE_THRESHOLD,
-    withPinnedRange,
+    withPinnedRows,
 } from "./message-windowing";
 
 describe(getWindowPlan, () => {
@@ -184,8 +184,8 @@ describe(shouldLoadOlderForJump, () => {
 });
 
 describe(isBrowserFindKey, () => {
-    const key = (init: Partial<Pick<KeyboardEvent, "ctrlKey" | "key" | "metaKey">>) => {
-        return { ctrlKey: false, key: "", metaKey: false, ...init };
+    const key = (init: Partial<Pick<KeyboardEvent, "ctrlKey" | "key" | "metaKey" | "shiftKey">>) => {
+        return { ctrlKey: false, key: "", metaKey: false, shiftKey: false, ...init };
     };
 
     it("takes the keys that open or step through the browser's find", () => {
@@ -193,6 +193,7 @@ describe(isBrowserFindKey, () => {
         expect(isBrowserFindKey(key({ key: "F", metaKey: true }))).toBe(true);
         expect(isBrowserFindKey(key({ key: "F3" }))).toBe(true);
         expect(isBrowserFindKey(key({ ctrlKey: true, key: "g" }))).toBe(true);
+        expect(isBrowserFindKey(key({ key: "F3", shiftKey: true }))).toBe(true);
         expect(isBrowserFindKey(key({ key: "G", metaKey: true }))).toBe(true);
     });
 
@@ -201,11 +202,14 @@ describe(isBrowserFindKey, () => {
         expect(isBrowserFindKey(key({ key: "g" }))).toBe(false);
         expect(isBrowserFindKey(key({ ctrlKey: true, key: "h" }))).toBe(false);
         expect(isBrowserFindKey(key({ key: "F4" }))).toBe(false);
+        // The app's Focus Search shortcut, not the browser's find.
+        expect(isBrowserFindKey(key({ ctrlKey: true, key: "F", shiftKey: true }))).toBe(false);
+        expect(isBrowserFindKey(key({ key: "F", metaKey: true, shiftKey: true }))).toBe(false);
     });
 
     it("takes a keydown with no key (autofill) without throwing", () => {
-        const autofill = { ctrlKey: false, key: undefined, metaKey: false } as unknown as KeyboardEvent;
-        const withModifier = { ctrlKey: true, key: undefined, metaKey: false } as unknown as KeyboardEvent;
+        const autofill = { ctrlKey: false, key: undefined, metaKey: false, shiftKey: false } as unknown as KeyboardEvent;
+        const withModifier = { ctrlKey: true, key: undefined, metaKey: false, shiftKey: false } as unknown as KeyboardEvent;
 
         expect(() => isBrowserFindKey(autofill)).not.toThrow();
         expect(isBrowserFindKey(autofill)).toBe(false);
@@ -213,13 +217,13 @@ describe(isBrowserFindKey, () => {
     });
 });
 
-describe(withPinnedRange, () => {
+describe(withPinnedRows, () => {
     it("adds the pinned rows to the visible ones, in order", () => {
-        expect(withPinnedRange([10, 11, 12], { first: 3, last: 5 }, 40)).toStrictEqual([3, 4, 5, 10, 11, 12]);
+        expect(withPinnedRows([10, 11, 12], [5, 3, 4, 11], 40)).toStrictEqual([3, 4, 5, 10, 11, 12]);
     });
 
-    it("keeps the visible rows as they are without a pin, and clamps a pin to the rows that exist", () => {
-        expect(withPinnedRange([1, 2], null, 40)).toStrictEqual([1, 2]);
-        expect(withPinnedRange([1, 2], { first: 38, last: 45 }, 40)).toStrictEqual([1, 2, 38, 39]);
+    it("keeps the visible rows as they are without pins, and drops pins past the rows that exist", () => {
+        expect(withPinnedRows([1, 2], [], 40)).toStrictEqual([1, 2]);
+        expect(withPinnedRows([1, 2], [38, 39, 40, 45, -1], 40)).toStrictEqual([1, 2, 38, 39]);
     });
 });

@@ -13,6 +13,7 @@ import { useDiffCommentStore, useDiffDraftFull } from "@/features/chat/host/diff
 import type { UIMessage } from "@/lib/agent";
 
 import HostDiffViewer from "./host-diff-viewer";
+import { useKeepRowMounted } from "./row-pins";
 
 type HostChangesData = NonNullable<UIMessage["hostChanges"]>;
 
@@ -40,6 +41,9 @@ const HostChanges: FC<HostChangesProps> = ({ changes, messageId, threadId }) => 
     const full = useDiffDraftFull(threadId ?? "");
     // The button that opened each file's comment box: closing the box hands keyboard focus back to it.
     const openers = useRef(new Map<string, HTMLButtonElement>());
+
+    // An open comment box or diff keeps its text only in this row: the list must not virtualize the row away meanwhile.
+    useKeepRowMounted(messageId, open || commenting !== undefined);
 
     const closeComment = (path: string): void => {
         setCommenting(undefined);

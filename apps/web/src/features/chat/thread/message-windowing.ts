@@ -156,11 +156,12 @@ export const parseMessageHash = (hash: string): string | undefined => {
 };
 
 /**
- * Keys that open, or step through, the BROWSER's find: Cmd/Ctrl+F, F3 and Cmd/Ctrl+G, with or without Shift.
+ * Keys that open, or step through, the BROWSER's find: Cmd/Ctrl+F, and F3 and Cmd/Ctrl+G with or without Shift.
+ * Cmd/Ctrl+Shift+F is not one: it is the app's own Focus Search shortcut.
  * Find opened from a menu (Edit › Find, Firefox's quick find, mobile Safari) sends no key at all; the list's
  * "Show all earlier messages" control is the way to reach unmounted messages from there.
  */
-export const isBrowserFindKey = (event: Pick<KeyboardEvent, "ctrlKey" | "key" | "metaKey">): boolean => {
+export const isBrowserFindKey = (event: Pick<KeyboardEvent, "ctrlKey" | "key" | "metaKey" | "shiftKey">): boolean => {
     // Autofill and some IMEs send a keydown with no `key`.
     const key = typeof event.key === "string" ? event.key : "";
 
@@ -174,25 +175,21 @@ export const isBrowserFindKey = (event: Pick<KeyboardEvent, "ctrlKey" | "key" | 
 
     const lower = key.toLowerCase();
 
-    return lower === "f" || lower === "g";
+    return lower === "g" || (lower === "f" && !event.shiftKey);
 };
 
-/** Message indexes `[first, last]` a text selection spans; those rows stay mounted while it lasts. */
-export interface PinnedRange {
-    first: number;
-    last: number;
-}
-
-/** The virtualizer's indexes plus the pinned ones below `count`, ascending and without repeats. */
-export const withPinnedRange = (indexes: ReadonlyArray<number>, pinned: PinnedRange | null, count: number): number[] => {
-    if (!pinned) {
+/** The virtualizer's indexes plus the pinned ones below `count` (rows held mounted), ascending and without repeats. */
+export const withPinnedRows = (indexes: ReadonlyArray<number>, pinned: ReadonlyArray<number>, count: number): number[] => {
+    if (pinned.length === 0) {
         return [...indexes];
     }
 
     const all = new Set(indexes);
 
-    for (let index = Math.max(0, pinned.first); index <= Math.min(pinned.last, count - 1); index += 1) {
-        all.add(index);
+    for (const index of pinned) {
+        if (index >= 0 && index < count) {
+            all.add(index);
+        }
     }
 
     return [...all].toSorted((a, b) => a - b);

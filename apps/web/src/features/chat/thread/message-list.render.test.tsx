@@ -28,6 +28,8 @@ const harness = vi.hoisted(() => {
         contentRenders: new Map<string, number>(),
         /** Renders the list inside the real shortcut manager and the thread's find bar. */
         withFind: false,
+        /** Renders a host turn's real changes (commentable) on rows that carry them. */
+        withHostChanges: false,
         /** Renders the real read-aloud action on assistant rows. */
         withReadAloud: false,
         activeStreamId: null as string | null,
@@ -45,6 +47,7 @@ const harness = vi.hoisted(() => {
 
 vi.mock("@lingui/react/macro", () => {
     return {
+        Plural: ({ other, value }: { other: string; value: number }) => other.replace("#", () => String(value)),
         Trans: ({ children }: { children: unknown }) => children,
         useLingui: () => {
             return { i18n: { locale: "en" }, t: (strings: TemplateStringsArray, ...values: unknown[]) => String.raw({ raw: strings }, ...values) };
@@ -80,8 +83,24 @@ vi.mock("@/features/chat/core/context/chat-context", async () => {
 });
 
 // A host turn's changes (and the comment draft under them) are not under test here and reach for the backend.
-vi.mock("./host-changes-of-thread", () => {
+// The comments panel sends to the host and the diff viewer is a dialog's content; neither is under test here.
+vi.mock("@/features/chat/host/diff-comments-draft", () => {
     return { default: () => null };
+});
+
+vi.mock("./host-diff-viewer", () => {
+    return { default: () => null };
+});
+
+vi.mock("./host-changes-of-thread", async () => {
+    const { createElement: create } = await import("react");
+    const { default: HostChanges } = await vi.importActual<typeof import("./host-changes")>("./host-changes");
+
+    // The real changes, as the thread's owner sees them (commentable), only where a test asks for them.
+    return {
+        default: ({ changes, messageId }: { changes: NonNullable<UIMessage["hostChanges"]>; messageId: string }) =>
+            harness.withHostChanges ? create(HostChanges, { changes, messageId, threadId: harness.threadId }) : null,
+    };
 });
 
 vi.mock("./message-content", () => {
@@ -598,6 +617,7 @@ describe("a long thread", { timeout: RENDER_TEST_TIMEOUT_MS }, () => {
         harness.loadMore = () => {};
         harness.withFind = false;
         harness.withReadAloud = false;
+        harness.withHostChanges = false;
         harness.threadId = "thread-1";
         scrollReportDelayFrames = 0;
         vi.unstubAllGlobals();
@@ -771,6 +791,49 @@ describe("a long thread", { timeout: RENDER_TEST_TIMEOUT_MS }, () => {
 
         await vi.waitFor(() => expect(mountedIds()).not.toContain("m100"), { timeout: 5000 });
         expect(mountedIds()).not.toContain("m101");
+    });
+
+    it("keeps the rows of messages whose diff comment is open mounted, with the unsent text, until it is added or cancelled", async () => {
+        const user = userEvent.setup();
+
+        harness.withHostChanges = true;
+        harness.messages = (harness.messages as UIMessage[]).map((message) =>
+            message.id === "m101" ? ({ ...message, hostChanges: { files: [{ added: 3, path: "src/a.ts", removed: 1 }] } } as UIMessage) : message,
+        );
+        mountInto();
+
+        act(() => scrollToMessage("m101"));
+        await vi.waitFor(() => expect(mountedIds()).toContain("m101"), { timeout: 5000 });
+
+        const rowOf = (id: string): HTMLElement | null => document.querySelector<HTMLElement>(`[data-list-message-id="${CSS.escape(id)}"]`);
+
+        await user.click(within(rowOf("m101")!).getByRole("button", { name: "Comment on src/a.ts" }));
+        await user.type(within(rowOf("m101")!).getByRole("textbox", { name: "Comment on the whole file src/a.ts" }), "Rename this");
+
+        // Back to the newest messages: without the open comment the reply would leave the window.
+        act(() => viewport().scrollTo({ top: THREAD_LENGTH * 100 }));
+        await vi.waitFor(() => expect(mountedIds()).not.toContain("m100"), { timeout: 5000 });
+
+        expect((within(rowOf("m101")!).getByRole("textbox", { name: "Comment on the whole file src/a.ts" }) as HTMLTextAreaElement).value).toBe("Rename this");
+
+        // Cancelling closes the box, and the row is windowed again.
+        await user.click(within(rowOf("m101")!).getByRole("button", { name: "Cancel" }));
+        await vi.waitFor(() => expect(mountedIds()).not.toContain("m101"), { timeout: 5000 });
+    });
+
+    it("leaves windowing on for Cmd/Ctrl+Shift+F typed in the composer, the app's search shortcut", () => {
+        const composer = document.createElement("textarea");
+
+        composer.setAttribute("aria-label", "Message");
+        document.body.insertAdjacentElement("beforeend", composer);
+        mountInto();
+        composer.focus();
+
+        pressKey({ code: "KeyF", ctrlKey: true, key: "F", shiftKey: true });
+        pressKey({ code: "KeyF", key: "F", metaKey: true, shiftKey: true });
+
+        expect(mountedIds().length).toBeLessThan(THREAD_LENGTH / 2);
+        composer.remove();
     });
 
     it("has no show-all control while every message is mounted", () => {
