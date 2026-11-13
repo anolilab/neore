@@ -1,6 +1,21 @@
 import annotateNode from "./node";
 import type { AnnotatedNode, Options, ReplacementFunction, Rule, RuleLookup } from "./types";
 
+/** The answers given to nodes during one conversion. */
+interface Answers {
+    /**
+     * A rule's answer for a node. Kept for as long as this service lives, so a node never gets a second answer.
+     * Each parse makes new nodes, so one document never sees another document's answers.
+     */
+    readonly decided: WeakMap<Node, Rule>;
+    /** No-match answers. Dropped when a rule, keep or remove is added, because the new one may match them. */
+    undecided: WeakSet<Node>;
+}
+
+function newAnswers(): Answers {
+    return { decided: new WeakMap(), undecided: new WeakSet() };
+}
+
 /**
  * Manages the rules used to convert HTML to Markdown: the built-in rules, then
  * the ones added with `addRule`, then keep/remove filters.
@@ -12,11 +27,10 @@ export default class Rules implements RuleLookup {
 
     private readonly removeList: Rule[] = [];
 
-    // The rule each node was given, or undefined when none matched. Keyed by node, so it lives with the parsed document.
-    private readonly decided = new WeakMap<Node, Rule | undefined>();
-
     // The lists a node is searched in, in order: added and built-in rules, then keep, then remove.
     private readonly searchOrder: ReadonlyArray<ReadonlyArray<Rule>> = [this.array, this.keepList, this.removeList];
+
+    private readonly answers = newAnswers();
 
     private readonly options: Options;
 
@@ -41,6 +55,7 @@ export default class Rules implements RuleLookup {
 
     add(_key: string, rule: Rule): void {
         this.array.unshift(rule);
+        this.answers.undecided = new WeakSet();
     }
 
     keep(filter: Rule["filter"]): void {
@@ -48,6 +63,7 @@ export default class Rules implements RuleLookup {
             filter,
             replacement: this.keepReplacement,
         });
+        this.answers.undecided = new WeakSet();
     }
 
     remove(filter: Rule["filter"]): void {
@@ -55,6 +71,7 @@ export default class Rules implements RuleLookup {
             filter,
             replacement: () => "",
         });
+        this.answers.undecided = new WeakSet();
     }
 
     forNode(node: AnnotatedNode): Rule {
@@ -62,7 +79,7 @@ export default class Rules implements RuleLookup {
             return this.blankRule;
         }
 
-        return decideRule(this.decided, this.searchOrder, node, this.options, this) ?? this.defaultRule;
+        return decideRule(this.answers, this.searchOrder, node, this.options, this) ?? this.defaultRule;
     }
 
     /**
@@ -75,7 +92,7 @@ export default class Rules implements RuleLookup {
             return false;
         }
 
-        return decideRule(this.decided, this.searchOrder, annotateNode(node, this.options), this.options, this) !== undefined;
+        return decideRule(this.answers, this.searchOrder, annotateNode(node, this.options), this.options, this) !== undefined;
     }
 
     forEach(visit: (rule: Rule, index: number) => void): void {
@@ -91,30 +108,41 @@ export default class Rules implements RuleLookup {
  * answer that differs from the first would split the two. The first answer is kept.
  */
 function decideRule(
-    decided: WeakMap<Node, Rule | undefined>,
+    answers: Answers,
     searchOrder: ReadonlyArray<ReadonlyArray<Rule>>,
     node: AnnotatedNode,
     options: Options,
     lookup: RuleLookup,
 ): Rule | undefined {
-    if (decided.has(node)) {
-        return decided.get(node);
+    const known = answers.decided.get(node);
+
+    if (known) {
+        return known;
+    }
+
+    if (answers.undecided.has(node)) {
+        return undefined;
     }
 
     // Lowercased once for the node, not once per rule.
     const nodeName = node.nodeName.toLowerCase();
+    // A filter may add a rule during this search, which replaces the no-match set. A no-match answer then
+    // belongs to the old rules, so it is not recorded in the new set.
+    const undecidedBefore = answers.undecided;
 
     for (const list of searchOrder) {
         const rule = findRule(list, node, nodeName, options, lookup);
 
         if (rule) {
-            decided.set(node, rule);
+            answers.decided.set(node, rule);
 
             return rule;
         }
     }
 
-    decided.set(node, undefined);
+    if (answers.undecided === undecidedBefore) {
+        answers.undecided.add(node);
+    }
 
     return undefined;
 }
