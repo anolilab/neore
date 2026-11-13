@@ -9,10 +9,10 @@ import { isSendStarting } from "@/features/chat/core/utils/send-in-flight";
 import { useCRPC } from "@/lib/lunora/crpc";
 
 /**
- * How a note's Send ended: its send started; found already sent; held for a reply that has begun; the owner asked to sign in
- * first; or failed, with the message to show (`/chat/start`'s refusal in the app's words; none for no reason in particular).
+ * How a note's Send ended: its send started; found already sent; held for a reply that has begun; held because the owner
+ * moved to another chat meanwhile (`moved`); the owner asked to sign in first; or failed, with the message to show (`/chat/start`'s refusal in the app's words; none for no reason in particular).
  */
-export type GuestNoteSendOutcome = { kind: "already-sent" | "busy" | "sent" | "sign-in" } | { kind: "failed"; message?: string };
+export type GuestNoteSendOutcome = { kind: "already-sent" | "busy" | "moved" | "sent" | "sign-in" } | { kind: "failed"; message?: string };
 
 /**
  * A held note's Send, held by a component that outlives the share menu (`ThreadShareButton`): the review and the send that
@@ -57,12 +57,17 @@ const useGuestNoteSend = (
                 return { kind: "already-sent" };
             }
 
-            // A reply started meanwhile in the note's thread, or another send there has begun: sending now would start a second
-            // run beside it. Its state is known only while it is the chat shown; after a move to another chat the note stays
-            // waiting too, to be sent from its own chat.
+            // The note's thread's state is known only while it is the chat shown: after a move to another chat (or out of the
+            // chat view) the note stays waiting, to be sent from its own chat.
             const shown = shownRef.current;
 
-            if (shown.threadId !== noteThreadId || shown.turnRunning || isSendStarting(noteThreadId)) {
+            if (shown.threadId !== noteThreadId) {
+                return { kind: "moved" };
+            }
+
+            // A reply started meanwhile in the note's thread, or another send there has begun: sending now would start a second
+            // run beside it.
+            if (shown.turnRunning || isSendStarting(noteThreadId)) {
                 return { kind: "busy" };
             }
 

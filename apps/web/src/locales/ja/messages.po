@@ -1238,11 +1238,11 @@ msgstr "{name} を再開しました"
 msgid "{name} wants to run \"{tool}\""
 msgstr "{name} が「{tool}」の実行を求めています"
 
-#: ../../packages/ui/src/components/file-renderers/pdf-thumbnail.tsx:69
+#: ../../packages/ui/src/components/file-renderers/pdf-thumbnail.tsx:102
 msgid "{name}, {pages, plural, one {# page} other {# pages}}"
 msgstr "{name}、{pages, plural, other {# ページ}}"
 
-#: ../../packages/ui/src/components/file-renderers/pdf-thumbnail.tsx:70
+#: ../../packages/ui/src/components/file-renderers/pdf-thumbnail.tsx:103
 msgid "{name}, preview unavailable"
 msgstr "{name}、プレビューは利用できません"
 
@@ -1266,7 +1266,7 @@ msgstr "未解決のコメント {openCount} 件"
 msgid "{overflowCount, plural, one {# more user} other {# more users}}"
 msgstr "{overflowCount, plural, other {ほか # 人のユーザー}}"
 
-#: ../../packages/ui/src/components/file-renderers/pdf-thumbnail.tsx:116
+#: ../../packages/ui/src/components/file-renderers/pdf-thumbnail.tsx:151
 msgid "{pages, plural, one {# page} other {# pages}}"
 msgstr "{pages, plural, other {# ページ}}"
 
@@ -1811,7 +1811,7 @@ msgid "A key is saved. Leave blank to keep it. Changing the endpoint, region or 
 msgstr "キーは保存済みです。そのままにするには空欄のままにしてください。エンドポイント、リージョン、アクセスキー ID を変更する場合は再入力が必要です。"
 
 #: src/features/chat/guest-links/guest-link-panel.tsx:159
-#: src/features/chat/guest-links/guest-link-panel.tsx:354
+#: src/features/chat/guest-links/guest-link-panel.tsx:360
 msgid "A locked chat cannot have a guest link."
 msgstr "ロックされたチャットにはゲストリンクを作成できません。"
 
@@ -1897,7 +1897,7 @@ msgid "A reply is posted straight away, not with the rest of your review."
 msgstr "返信は、残りのレビューとは別に、すぐに投稿されます。"
 
 #: src/features/chat/guest-links/guest-link-panel.tsx:244
-#: src/features/chat/guest-links/guest-link-panel.tsx:350
+#: src/features/chat/guest-links/guest-link-panel.tsx:356
 msgid "A reply is running. Send a message once it has finished."
 msgstr "返信を生成中です。完了してからメッセージを送信してください。"
 
@@ -3649,7 +3649,7 @@ msgstr "自分のすべてのチャット"
 msgid "Any string you choose; enter the same value as the webhook Verify token in the Meta app"
 msgstr "任意の文字列を指定し、Meta アプリの Webhook Verify token にも同じ値を入力してください"
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:342
+#: src/features/chat/guest-links/guest-link-panel.tsx:348
 msgid "Anyone with a guest link can leave you a message here. Nothing they write runs until you send it."
 msgstr "ゲストリンクを持っている人は、ここにメッセージを残せます。あなたが送信するまで、書かれた内容は実行されません。"
 
@@ -4067,7 +4067,7 @@ msgid "ask"
 msgstr "質問"
 
 #: src/features/chat/aside/aside-panel.tsx:306
-#: src/features/chat/sidebar/thread-sidebar.tsx:339
+#: src/features/chat/sidebar/thread-sidebar.tsx:354
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:61
 msgid "Ask"
 msgstr "確認"
@@ -6783,7 +6783,7 @@ msgid "Collaborate with shared AI workflows."
 msgstr "共有された AI ワークフローで共同作業。"
 
 #: ../../packages/ui/src/components/ai-elements/reasoning.tsx:201
-#: ../../packages/ui/src/components/sidebar.tsx:411
+#: ../../packages/ui/src/components/sidebar.tsx:432
 #: src/features/workflow/components/canvas/workflow-toolbar.tsx:197
 #: src/features/workflow/components/nodes/group-node.tsx:216
 msgid "Collapse"
@@ -7995,7 +7995,7 @@ msgstr "コピーしました！"
 #: ../../packages/ui/src/components/data-grid/data-grid-context-menu.tsx:225
 #: src/features/auth/components/settings/api-key/mcp-config-snippet.tsx:30
 #: src/features/auth/components/settings/two-factor/backup-codes-dialog.tsx:100
-#: src/features/chat/guest-links/guest-link-panel.tsx:359
+#: src/features/chat/guest-links/guest-link-panel.tsx:365
 #: src/features/chat/sharing/thread-share-button.tsx:398
 #: src/features/chat/thread/message-item.tsx:356
 #: src/features/chat/thread/text-selection-menu.tsx:525
@@ -8846,7 +8846,7 @@ msgstr "目標を作成"
 msgid "Create group chat"
 msgstr "グループチャットを作成"
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:390
+#: src/features/chat/guest-links/guest-link-panel.tsx:396
 msgid "Create guest link"
 msgstr "ゲストリンクを作成"
 
@@ -10555,11 +10555,11 @@ msgstr "エラーを閉じる"
 msgid "Dismiss errors"
 msgstr "エラーを閉じる"
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:433
+#: src/features/chat/guest-links/guest-link-panel.tsx:439
 msgid "Dismiss note"
 msgstr "メッセージを破棄"
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:427
+#: src/features/chat/guest-links/guest-link-panel.tsx:433
 msgid "Dismiss note: {snippet}"
 msgstr "メッセージを破棄: {snippet}"
 
@@ -10595,7 +10595,7 @@ msgstr "結果を表示"
 msgid "Display timestamps on messages."
 msgstr "メッセージにタイムスタンプを表示します。"
 
-#: ../../packages/ui/src/components/sidebar.tsx:278
+#: ../../packages/ui/src/components/sidebar.tsx:286
 msgid "Displays the mobile sidebar."
 msgstr "モバイル用サイドバーを表示します。"
 
@@ -12501,7 +12501,7 @@ msgstr "終了コード {0}"
 msgid "Exit fullscreen"
 msgstr "全画面表示を終了"
 
-#: ../../packages/ui/src/components/sidebar.tsx:411
+#: ../../packages/ui/src/components/sidebar.tsx:432
 #: src/features/workflow/components/nodes/group-node.tsx:216
 msgid "Expand"
 msgstr "展開"
@@ -15816,15 +15816,15 @@ msgstr "ゲストアカウントでは無料モデルのみ利用できます。
 msgid "Guest accounts use free models only. Sign up to unlock all models."
 msgstr "ゲストアカウントでは無料モデルのみ使用できます。サインアップするとすべてのモデルが利用できます。"
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:357
+#: src/features/chat/guest-links/guest-link-panel.tsx:363
 msgid "Guest link"
 msgstr "ゲストリンク"
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:333
+#: src/features/chat/guest-links/guest-link-panel.tsx:339
 msgid "Guest link copied"
 msgstr "ゲストリンクをコピーしました"
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:395
+#: src/features/chat/guest-links/guest-link-panel.tsx:401
 msgid "Guest messages"
 msgstr "ゲストのメッセージ"
 
@@ -18479,7 +18479,7 @@ msgstr "有効な JSON ではない行"
 msgid "Link"
 msgstr "リンク"
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:365
+#: src/features/chat/guest-links/guest-link-panel.tsx:371
 msgid "Link active until {expiresAt}"
 msgstr "{expiresAt} までリンクが有効です"
 
@@ -18793,7 +18793,7 @@ msgstr "プリセットを読み込み中…"
 msgid "Loading preview..."
 msgstr "プレビューを読み込んでいます..."
 
-#: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:170
+#: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:104
 #: src/features/canvas/pdf-preview-panel.tsx:127
 #: src/features/chat/thread/sandbox-files.tsx:104
 msgid "Loading preview…"
@@ -18840,7 +18840,7 @@ msgstr "統計を読み込み中…"
 msgid "Loading tasks…"
 msgstr "タスクを読み込んでいます…"
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:275
+#: src/features/chat/guest-links/guest-link-panel.tsx:281
 msgid "Loading the guest link…"
 msgstr "ゲストリンクを読み込んでいます…"
 
@@ -19008,8 +19008,8 @@ msgstr "サインアウト"
 
 #: src/features/auth/components/auth/login-modal.tsx:46
 #: src/features/chat/signed-out/signed-out-chat.tsx:284
-#: src/features/layout/components/app-sidebar.tsx:54
-#: src/features/layout/components/app-sidebar.tsx:67
+#: src/features/layout/components/app-sidebar.tsx:61
+#: src/features/layout/components/app-sidebar.tsx:74
 #: src/features/marketing/components/gateway-navbar.tsx:90
 #: src/features/marketing/components/gateway-navbar.tsx:184
 #: src/features/marketing/components/navbar-menu.tsx:99
@@ -21392,7 +21392,7 @@ msgstr "次のオプション"
 msgid "Next output mode"
 msgstr "次の出力モード"
 
-#: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:119
+#: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:144
 #: src/features/prompts/components/prompts-sidebar-tab.tsx:883
 msgid "Next page"
 msgstr "次のページ"
@@ -22889,7 +22889,7 @@ msgctxt "stock opening price"
 msgid "Open"
 msgstr "始値"
 
-#: ../../packages/ui/src/components/file-renderers/pdf-thumbnail.tsx:68
+#: ../../packages/ui/src/components/file-renderers/pdf-thumbnail.tsx:101
 msgid "Open {filename}"
 msgstr "{filename} を開く"
 
@@ -23018,7 +23018,7 @@ msgstr "{0} で開く"
 msgid "Open Pages"
 msgstr "ページを開く"
 
-#: ../../packages/ui/src/components/file-renderers/pdf-thumbnail.tsx:68
+#: ../../packages/ui/src/components/file-renderers/pdf-thumbnail.tsx:101
 msgid "Open PDF"
 msgstr "PDF を開く"
 
@@ -24571,7 +24571,7 @@ msgstr "ピン留め済み"
 msgid "Pinned project"
 msgstr "ピン留めしたプロジェクト"
 
-#: src/features/chat/sidebar/thread-sidebar.tsx:348
+#: src/features/chat/sidebar/thread-sidebar.tsx:363
 msgid "Pins"
 msgstr "ピン"
 
@@ -25146,7 +25146,7 @@ msgstr "前のオプション"
 msgid "Previous output mode"
 msgstr "前の出力モード"
 
-#: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:105
+#: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:130
 #: src/features/prompts/components/prompts-sidebar-tab.tsx:874
 msgid "Previous page"
 msgstr "前のページ"
@@ -25590,7 +25590,7 @@ msgstr "最適化した内容でプロンプトを更新しました"
 msgid "Prompt Variables"
 msgstr "プロンプト変数"
 
-#: src/features/chat/sidebar/thread-sidebar.tsx:324
+#: src/features/chat/sidebar/thread-sidebar.tsx:339
 #: src/features/layout/components/sidebar-shortcut.tsx:87
 #: src/features/prompts/components/prompt-header.tsx:10
 #: src/features/prompts/components/prompts-sidebar-tab.tsx:479
@@ -27638,7 +27638,7 @@ msgstr "取り消す"
 msgid "Revoke All Sessions"
 msgstr "すべてのセッションを取り消す"
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:374
+#: src/features/chat/guest-links/guest-link-panel.tsx:380
 msgid "Revoke link"
 msgstr "リンクを取り消す"
 
@@ -28959,7 +28959,7 @@ msgstr "プロンプトへの忠実度が高いセミリアルなモデル"
 msgid "Semi-realistic visual style"
 msgstr "セミリアルなビジュアルスタイル"
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:424
+#: src/features/chat/guest-links/guest-link-panel.tsx:430
 #: src/features/chat/host/host-composer.tsx:687
 #: src/features/sub-agents/components/worker-composer.tsx:118
 msgid "Send"
@@ -29079,7 +29079,7 @@ msgstr "確認コードを送信"
 msgid "Send Verification Code"
 msgstr "確認コードを送信"
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:410
+#: src/features/chat/guest-links/guest-link-panel.tsx:416
 msgid "Send: {snippet}"
 msgstr "送信: {snippet}"
 
@@ -29092,8 +29092,8 @@ msgstr "メッセージを送信して返信を待っています"
 msgid "Sending…"
 msgstr "送信中…"
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:277
-#: src/features/chat/guest-links/guest-link-panel.tsx:405
+#: src/features/chat/guest-links/guest-link-panel.tsx:283
+#: src/features/chat/guest-links/guest-link-panel.tsx:411
 #: src/features/devices/components/devices-settings.tsx:387
 msgid "Sent"
 msgstr "送信済み"
@@ -29609,7 +29609,7 @@ msgstr "サイドクエスチョン"
 msgid "Side questions are not available for this chat, or the question is too long."
 msgstr "このチャットではサイドクエスチョンを利用できないか、質問が長すぎます。"
 
-#: ../../packages/ui/src/components/sidebar.tsx:277
+#: ../../packages/ui/src/components/sidebar.tsx:285
 msgid "Sidebar"
 msgstr "サイドバー"
 
@@ -30650,7 +30650,7 @@ msgstr "最新の AI モデルで、自分の会話を始めましょう。"
 msgid "Start a conversation to ask a side question."
 msgstr "サイドクエスチョンをするには、会話を始めてください。"
 
-#: src/features/chat/sidebar/thread-sidebar.tsx:371
+#: src/features/chat/sidebar/thread-sidebar.tsx:386
 msgid "Start a conversation to configure variables."
 msgstr "変数を設定するには会話を始めてください。"
 
@@ -32464,7 +32464,7 @@ msgstr "そのメッセージは長すぎて、ここから送信できません
 
 #: src/features/chat/core/context/chat-context.tsx:719
 #: src/features/chat/guest-links/guest-link-panel.tsx:240
-#: src/features/chat/guest-links/guest-link-panel.tsx:310
+#: src/features/chat/guest-links/guest-link-panel.tsx:316
 msgid "That message was already sent."
 msgstr "そのメッセージはすでに送信されています。"
 
@@ -32785,7 +32785,7 @@ msgstr "モデルに送信する完全なシステムプロンプト..."
 msgid "The goal is removed; its tasks stay, without a goal."
 msgstr "目標は削除されます。タスクは目標なしの状態で残ります。"
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:353
+#: src/features/chat/guest-links/guest-link-panel.tsx:359
 msgid "The guest link could not be loaded."
 msgstr "ゲストリンクを読み込めませんでした。"
 
@@ -32902,7 +32902,7 @@ msgstr "でサインインしました"
 msgid "The last turn stopped before it finished."
 msgstr "前回のターンは完了する前に停止しました。"
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:322
+#: src/features/chat/guest-links/guest-link-panel.tsx:328
 msgid "The link could not be copied. Select it and copy it yourself."
 msgstr "リンクをコピーできませんでした。選択して手動でコピーしてください。"
 
@@ -33453,7 +33453,7 @@ msgstr "このチャットはしばらく操作されていないため、モデ
 msgid "This chat is locked"
 msgstr "このチャットはロックされています"
 
-#: src/features/chat/sidebar/thread-sidebar.tsx:286
+#: src/features/chat/sidebar/thread-sidebar.tsx:294
 msgid "This chat is locked. Unlock it to see its details."
 msgstr ""
 
@@ -33745,6 +33745,10 @@ msgstr "このメッセージは{value, plural, other {# 秒}}後に閉じます
 msgid "This model has no reasoning effort"
 msgstr "このモデルには推論の強度がありません"
 
+#: src/features/chat/guest-links/guest-link-panel.tsx:255
+msgid "This note waits in its own chat. Open that chat to send it."
+msgstr "このメッセージは元のチャットで待機しています。送信するにはそのチャットを開いてください。"
+
 #: src/features/pages/components/page-conflict-banner.tsx:27
 msgid "This page changed while you were editing."
 msgstr "編集中にこのページが変更されました。"
@@ -33792,9 +33796,9 @@ msgstr "このプレゼンテーションにはまだスライドがありませ
 msgid "This preset will be permanently removed."
 msgstr "このプリセットは完全に削除されます。"
 
-#: ../../packages/ui/src/components/file-renderers/pdf-thumbnail.tsx:85
-#: ../../packages/ui/src/components/file-renderers/pdf-thumbnail.tsx:90
-#: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:162
+#: ../../packages/ui/src/components/file-renderers/pdf-thumbnail.tsx:118
+#: ../../packages/ui/src/components/file-renderers/pdf-thumbnail.tsx:124
+#: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:187
 #: src/features/canvas/pdf-preview-panel.tsx:121
 #: src/features/chat/thread/sandbox-files.tsx:159
 #: src/features/chat/thread/sandbox-files.tsx:199
@@ -34010,7 +34014,7 @@ msgstr "数秒間思考しました"
 msgid "thread"
 msgstr "スレッド"
 
-#: src/features/chat/sidebar/thread-sidebar.tsx:317
+#: src/features/chat/sidebar/thread-sidebar.tsx:332
 #: src/features/settings/components/chat/event-trigger-fields.tsx:270
 #: src/features/settings/components/chat/trigger-settings.tsx:1010
 msgid "Thread"
@@ -34294,9 +34298,9 @@ msgstr "右サイドバーを切り替え"
 msgid "Toggle right sidebar ({0})"
 msgstr "右サイドバーの切り替え（{0}）"
 
-#: ../../packages/ui/src/components/sidebar.tsx:363
-#: ../../packages/ui/src/components/sidebar.tsx:385
-#: ../../packages/ui/src/components/sidebar.tsx:399
+#: ../../packages/ui/src/components/sidebar.tsx:383
+#: ../../packages/ui/src/components/sidebar.tsx:405
+#: ../../packages/ui/src/components/sidebar.tsx:420
 msgid "Toggle Sidebar"
 msgstr "サイドバーを切り替え"
 
@@ -36030,7 +36034,7 @@ msgstr "可変焦点距離"
 msgid "Variable name..."
 msgstr "変数名..."
 
-#: src/features/chat/sidebar/thread-sidebar.tsx:331
+#: src/features/chat/sidebar/thread-sidebar.tsx:346
 #: src/features/prompts/components/prompt-list-view.tsx:180
 #: src/features/prompts/components/variable-definitions.tsx:69
 #: src/features/skills/components/marketplace-skill-detail-dialog.tsx:141
@@ -36726,7 +36730,7 @@ msgstr "エージェントの準備ができるまで待ってから、もう一
 msgid "Wait for the reply to finish, then try again."
 msgstr "返信が終わるまで待ってから、もう一度お試しください。"
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:405
+#: src/features/chat/guest-links/guest-link-panel.tsx:411
 msgid "Waiting"
 msgstr "保留中"
 
@@ -38156,7 +38160,7 @@ msgstr "Zhipu AI の最も強力な推論 LLM"
 msgid "ZIP archive"
 msgstr "ZIP アーカイブ"
 
-#: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:141
+#: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:166
 #: ../../packages/ui/src/components/zoomable-image.tsx:397
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:284
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:290
@@ -38173,7 +38177,7 @@ msgstr "拡大"
 msgid "Zoom Lens"
 msgstr "ズームレンズ"
 
-#: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:131
+#: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:156
 #: ../../packages/ui/src/components/zoomable-image.tsx:391
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:250
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:256

@@ -263,8 +263,20 @@ describe("GuestLinkPanel's Send and Dismiss", () => {
             answer({ status: "ready", text: "please call me back", threadId: "thread-1" });
         });
 
-        expect(outcome).toStrictEqual({ kind: "busy" });
+        expect(outcome).toStrictEqual({ kind: "moved" });
         expect(onSendNote).not.toHaveBeenCalled();
+    });
+
+    it("says a note held after a move to another chat waits in its own chat, not that a reply is running", async () => {
+        showPanel(WAITING, {
+            sendNote: async () => {
+                return { kind: "moved" as const };
+            },
+        });
+        fireEvent.click(screen.getByRole("button", { name: SEND }));
+
+        await waitFor(() => expect(toastInfo).toHaveBeenCalledWith("This note waits in its own chat. Open that chat to send it."));
+        expect(screen.getByRole("button", { name: SEND })).toBeTruthy();
     });
 
     it("does not count a refused send as delivered: it says why, and the note stays waiting", async () => {
