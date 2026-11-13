@@ -1041,7 +1041,8 @@ export const claimQueuedRun = async (ctx: MutationCtx, runId: Id<"subAgentRuns">
     if (run.mode === "worker") {
         // Archived, deleted or locked after this run was queued: it ends cancelled and uncharged, the
         // thread stays as it is, and the rest of the queue drains the same way.
-        if (!worker || worker.deleted || worker.status === "archived" || isThreadLocked(worker)) {
+        // A worker being hard-deleted (`deletingAt`) starts nothing more, past what its delete has cancelled so far.
+        if (!worker || worker.deleted || worker.deletingAt !== undefined || worker.status === "archived" || isThreadLocked(worker)) {
             await finishRun(ctx, run._id, { kind: "cancelled" });
 
             return null;
@@ -1333,6 +1334,27 @@ const waitsOnOpenRequest = async (ctx: Pick<QueryCtx, "db">, thread: Doc<"thread
 const HELD_RESULTS_RELEASED = 20;
 
 /**
+ * Schedules `run`'s next post check and records it (`postCheckId`). With `replace`, the one still pending is cancelled
+ * first: a release then moves the check up instead of starting a second backoff loop beside it. The loop's own reschedule
+ * (inside the check that is running) only records the next one.
+ */
+const schedulePostCheck = async (
+    ctx: MutationCtx,
+    run: Pick<RunDoc, "_id" | "postCheckId">,
+    delayMs: number,
+    args: { attempt: number; failures?: number; waits?: number },
+    replace = false,
+): Promise<void> => {
+    if (replace && run.postCheckId !== undefined) {
+        await ctx.scheduler.cancel(run.postCheckId as never).catch(() => undefined);
+    }
+
+    const id = await ctx.scheduler.runAfter(delayMs, internal.sub_agents.functions.postResult, { ...args, runId: run._id });
+
+    await patchById(ctx.db, "subAgentRuns", run._id, { postCheckId: String(id) });
+};
+
+/**
  * The results `childThreadId` held back are posted now ({@link postRunResult} checks again): its one-shot run ended, or a
  * request it waited on was answered (`resumeClaimedRun`).
  */
@@ -1346,7 +1368,7 @@ export const releaseHeldResults = async (ctx: MutationCtx, childThreadId: string
 
         for (const row of nested) {
             if (row.resultPostedAt === undefined && row.postFailed === undefined && postsBack(row)) {
-                await ctx.scheduler.runAfter(0, internal.sub_agents.functions.postResult, { attempt: 0, runId: row._id });
+                await schedulePostCheck(ctx, row, 0, { attempt: 0 }, true);
             }
         }
     }
@@ -1386,13 +1408,13 @@ export const postRunResult = async (ctx: MutationCtx, runId: Id<"subAgentRuns">,
     // end posts it (`finishRun`). Nor does any parent that waits on a request its owner can still answer: the answer posts
     // it (`resumeClaimedRun`). This check, backing off, covers an end or an expiry that did not.
     if ((await oneShotRunGoesOn(ctx, run.parentThreadId)) || (parent !== null && (await waitsOnOpenRequest(ctx, parent, ctx.now)))) {
-        await ctx.scheduler.runAfter(heldPostDelayMs(waits), internal.sub_agents.functions.postResult, { attempt, failures, runId, waits: waits + 1 });
+        await schedulePostCheck(ctx, run, heldPostDelayMs(waits), { attempt, failures, waits: waits + 1 });
 
         return false;
     }
 
     if (attempt < SUB_AGENT_POST_MAX_ATTEMPTS && (await isThreadStreaming(ctx, run.parentThreadId))) {
-        await ctx.scheduler.runAfter(postRetryDelayMs(attempt), internal.sub_agents.functions.postResult, { attempt: attempt + 1, failures, runId });
+        await schedulePostCheck(ctx, run, postRetryDelayMs(attempt), { attempt: attempt + 1, failures });
 
         return false;
     }
@@ -1422,7 +1444,7 @@ export const postRunResult = async (ctx: MutationCtx, runId: Id<"subAgentRuns">,
     if (!refusal.retry || failures + 1 >= SUB_AGENT_POST_FAILURE_MAX_ATTEMPTS) {
         await patchById(ctx.db, "subAgentRuns", run._id, { postFailed: refusal.reason });
     } else {
-        await ctx.scheduler.runAfter(postRetryDelayMs(failures), internal.sub_agents.functions.postResult, { attempt, failures: failures + 1, runId });
+        await schedulePostCheck(ctx, run, postRetryDelayMs(failures), { attempt, failures: failures + 1 });
     }
 
     return false;

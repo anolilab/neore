@@ -21,6 +21,7 @@ import {
     completeResumedRun,
     markDeletedThreadResults,
     cancelDeletedThreadQueue,
+    claimQueuedRun,
     afterOwnerMessage,
     finishRun,
     listSubAgentApprovals,
@@ -1017,16 +1018,10 @@ describe("a result for a parent that waits on its own request", () => {
     });
 
     it("is released when the owner sends a new message past the request, though the thread does not show it waits yet", async () => {
-        const before = heldPosts().length;
-
         await run(async (context) => await clearAwaitingInput(context.db, parentId as Id<"threads">));
         await internalCall(afterOwnerMessage, { threadId: parentId });
 
-        expect(
-            heldPosts()
-                .slice(before)
-                .map((job) => job.args),
-        ).toStrictEqual([{ attempt: 0, runId }]);
+        expect(heldPosts().map((job) => job.args)).toStrictEqual([{ attempt: 0, runId }]);
     });
 
     it("is released by a reply that closed a secret request, though no request is pending any more", async () => {
@@ -1040,27 +1035,23 @@ describe("a result for a parent that waits on its own request", () => {
             await context.db.patch("toolApprovalRuns", row._id, { resolvedAt: Date.now(), resolvedBy: "abandoned", secretRequest: true, status: "denied" });
         });
 
-        const before = heldPosts().length;
-
         await internalCall(afterOwnerMessage, { threadId: parentId });
 
-        expect(
-            heldPosts()
-                .slice(before)
-                .map((job) => job.args),
-        ).toStrictEqual([{ attempt: 0, runId }]);
+        expect(heldPosts().map((job) => job.args)).toStrictEqual([{ attempt: 0, runId }]);
+    });
+
+    it("keeps one check, however many sends release it while it is still held", async () => {
+        for (let send = 0; send < 3; send += 1) {
+            await internalCall(afterOwnerMessage, { threadId: parentId });
+        }
+
+        expect(heldPosts()).toHaveLength(1);
     });
 
     it("is released when the owner answers the request, to post after the reply the answer starts", async () => {
-        const before = heldPosts().length;
-
         await as(OWNER).mutation(respondToToolApproval as never, { approvalId: PARENT_REQUEST, decision: "approve", threadId: parentId } as never);
 
-        expect(
-            heldPosts()
-                .slice(before)
-                .map((job) => job.args),
-        ).toStrictEqual([{ attempt: 0, runId }]);
+        expect(heldPosts().map((job) => job.args)).toStrictEqual([{ attempt: 0, runId }]);
     });
 });
 
@@ -1211,6 +1202,33 @@ describe("deleting a thread", () => {
                 .slice(before)
                 .filter((job) => JSON.stringify(job.args).includes(lone)),
         ).toStrictEqual([]);
+    });
+
+    it("starts no queued message of a worker that is being deleted, past what its delete has cancelled", async () => {
+        const queued = await run(async (context) => {
+            const now = Date.now();
+            const worker = await context.db.insert("threads", { deletingAt: now, status: "active", title: "Worker", userId: OWNER });
+
+            return await context.db.insert("subAgentRuns", {
+                childThreadId: worker,
+                createdAt: now,
+                depth: 1,
+                mode: "worker",
+                parentThreadId: parentId,
+                runner: { deviceId: "device-1", kind: "host" },
+                status: "queued",
+                task: "Next message",
+                toolCallId: "call-next",
+                updatedAt: now,
+                userId: OWNER,
+            });
+        });
+
+        expect(await run(async (context) => await claimQueuedRun(context, queued))).toBeNull();
+
+        const row = await run(async (context) => await context.db.get("subAgentRuns", queued));
+
+        expect(row.status).toBe("cancelled");
     });
 
     it("cancels a deleted worker's queue past one call's 200, in a continuation", async () => {

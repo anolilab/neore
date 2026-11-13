@@ -69,5 +69,6 @@
   no post, `isGoneParent`), marks every result bound for it `postFailed` and cancels its queue (both paged with a
   continuation), then ends the runs it is the child of and those it delegated, typed worker messages too
   (`endSubAgentRunsOfDeletedThread`; a Stop leaves those). A result for any parent with a request its owner can still answer
-  (pending, unexpired, open on its latest turn) is held; an answer or a send releases it (`releaseHeldResults`), the
-  backed-off recheck covers an expiry. Every end goes through `finishRun`.
+  (pending, unexpired, open on its latest turn) is held; an answer or a send releases it (`releaseHeldResults`, which
+  replaces the run's one pending check, `postCheckId`), the backed-off recheck covers an expiry. A going worker
+  (`deletingAt`) starts no queued run (`claimQueuedRun`). Every end goes through `finishRun`.
