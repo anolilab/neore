@@ -4,7 +4,8 @@
  * browser extension mounts.
  */
 import type { GatewayModel } from "@neore/ai/models";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import type { ComponentProps, ReactNode } from "react";
 import { createElement } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -116,10 +117,31 @@ const MODELS = [
 // The model rows only: the web picker's sort control has options of its own.
 const listedRows = () => screen.getAllByRole("option").filter((option: HTMLElement) => option.dataset.modelId !== undefined);
 
-const search = (query: string) => {
-    rowRenders.clear();
-    groupRenders.count = 0;
-    fireEvent.change(screen.getByPlaceholderText("Search models..."), { target: { value: query } });
+const listedIds = () => listedRows().map((row: HTMLElement) => row.dataset.modelId ?? "");
+
+/**
+ * Types `text` one key at a time. After each key, a row that was listed before it and still is was not rendered
+ * again, and while the listed rows stay the same no group was rendered again either.
+ */
+const typeChecked = async (user: ReturnType<typeof userEvent.setup>, text: string) => {
+    for (const key of text) {
+        const before = listedIds();
+
+        rowRenders.clear();
+        groupRenders.count = 0;
+        await user.type(screen.getByPlaceholderText("Search models..."), key);
+
+        const after = listedIds();
+        const kept = after.filter((id: string) => before.includes(id));
+
+        for (const id of kept) {
+            expect({ id, renders: rowRenders.get(id) ?? 0 }).toStrictEqual({ id, renders: 0 });
+        }
+
+        if (after.join(",") === before.join(",")) {
+            expect(groupRenders.count).toBe(0);
+        }
+    }
 };
 
 // Base UI's scroll area constructs a ResizeObserver.
@@ -140,34 +162,18 @@ describe.each([
     ["web", WebModelPicker],
     ["shared (browser extension)", SharedModelPicker],
 ])("%s ModelPicker search", (_name: string, ModelPicker: typeof WebModelPicker | typeof SharedModelPicker) => {
-    it("re-renders only the rows whose match changed", () => {
+    it("re-renders only the rows whose match changed, key by key", async () => {
+        const user = userEvent.setup();
+
         render(<ModelPicker defaultModeFilter="text" defaultTab="all" footer={null} models={MODELS} />);
 
-        // Both GPT rows were listed before and still are; the other creators' rows leave.
-        search("gpt");
+        await typeChecked(user, "gpt");
 
-        expect(listedRows()).toHaveLength(2);
-        expect(rowRenders.get("openai/gpt-5") ?? 0).toBe(0);
-        expect(rowRenders.get("openai/gpt-4o") ?? 0).toBe(0);
+        expect(listedIds()).toStrictEqual(["openai/gpt-5", "openai/gpt-4o"]);
 
         // GPT-5 leaves; GPT-4o stays as it was, though its group changed.
-        search("gpt-4");
+        await typeChecked(user, "-4");
 
-        expect(listedRows()).toHaveLength(1);
-        expect(rowRenders.get("openai/gpt-4o") ?? 0).toBe(0);
-    });
-
-    it("does not re-render a group whose matching rows are unchanged", () => {
-        render(<ModelPicker defaultModeFilter="text" defaultTab="all" footer={null} models={MODELS} />);
-
-        search("gp");
-
-        expect(listedRows()).toHaveLength(2);
-
-        // The same two GPT rows match (not o3), so the filtered OpenAI group is the same group.
-        search("gpt");
-
-        expect(listedRows()).toHaveLength(2);
-        expect(groupRenders.count).toBe(0);
+        expect(listedIds()).toStrictEqual(["openai/gpt-4o"]);
     });
 });
