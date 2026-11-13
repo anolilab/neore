@@ -112,14 +112,18 @@ const shellProbe: {
     device: boolean;
     dictation?: DictationProbe;
     openTerminal: (folder: string) => Promise<void>;
+    /** Whether the Quick Composer window exists: it is created on its first use. */
     quickComposer: boolean;
     terminalPids: () => number[];
+    /** What the shortcut and the tray item do; the e2e suite cannot press a global shortcut. */
+    toggleQuickComposer: () => void;
     tray: boolean;
 } = {
     device: false,
     openTerminal: async (_folder: string): Promise<void> => {},
     quickComposer: false,
     terminalPids: (): number[] => [],
+    toggleQuickComposer: (): void => {},
     tray: false,
 };
 
@@ -990,10 +994,25 @@ const createQuickComposer = (): BrowserWindow => {
     return win;
 };
 
+const revealQuickComposer = (composer: BrowserWindow): void => {
+    composer.center();
+    composer.show();
+    composer.focus();
+};
+
+/**
+ * The composer is created on its first use, not at start-up, so a launch spends no renderer on it while the site
+ * loads. That first open waits for `ready-to-show`: its page focuses the prompt on the window's `focus`, which a
+ * window shown before its script ran would miss.
+ */
 const toggleQuickComposer = (): void => {
     const { composer } = state;
 
     if (composer === undefined) {
+        const created = createQuickComposer();
+
+        created.once("ready-to-show", () => revealQuickComposer(created));
+
         return;
     }
 
@@ -1003,9 +1022,7 @@ const toggleQuickComposer = (): void => {
         return;
     }
 
-    composer.center();
-    composer.show();
-    composer.focus();
+    revealQuickComposer(composer);
 };
 
 /** A global shortcut can be taken by another app, and Wayland has none at all, so a failure is logged, never fatal. */
@@ -1376,8 +1393,8 @@ const start = (): void => {
     }
 
     createMainWindow();
-    createQuickComposer();
     createTray();
+    shellProbe.toggleQuickComposer = toggleQuickComposer;
     registerQuickComposerShortcut();
     dictation.register();
     checkForUpdates();

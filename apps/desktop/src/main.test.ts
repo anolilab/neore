@@ -343,7 +343,9 @@ const topFrameOf = (window: FakeWindow, url: string) => {
 /** The main window is the only window the hand-offs are sent to, so only its frame may take them. */
 const siteSender = () => topFrameOf(mainWindow(), `${SITE}/chat`);
 const mainWindow = (): FakeWindow => fake().windows[0];
-const composer = (): FakeWindow => fake().windows[1];
+/** The Quick Composer: the window on its own local page, which exists only after its first use. */
+const composerWindows = (): FakeWindow[] => fake().windows.filter((window) => SITE_HTML_PATTERN.test(window.loaded[0] ?? ""));
+const composer = (): FakeWindow => composerWindows()[0] as FakeWindow;
 
 /** The composer's own sender: its window's webContents, on its own file URL. */
 const composerSender = () => topFrameOf(composer(), composer().loaded[0]);
@@ -389,8 +391,8 @@ describe("main window", () => {
 
         expect(result).toStrictEqual({ action: "deny" });
         await vi.waitFor(() => expect(fake().opened).toStrictEqual(["https://example.org/x"]));
-        // The main window and the (hidden) Quick Composer; nothing else.
-        expect(fake().windows).toHaveLength(2);
+        // The main window only: no composer before its first use, and nothing else.
+        expect(fake().windows).toHaveLength(1);
     });
 
     it("opens a same-origin popup in its own window and leaves the main window on its page", () => {
@@ -450,21 +452,35 @@ describe("main window", () => {
 });
 
 describe("tray and Quick Composer", () => {
-    it("creates the tray, and a hidden composer on its own local page", () => {
+    it("creates the tray and registers the shortcut, but no composer window, at start-up", () => {
         expect(fake().trays).toBe(1);
-        expect(composer().loaded).toHaveLength(1);
-        expect(composer().loaded[0]).toMatch(SITE_HTML_PATTERN);
-        expect(composer().shown).toBe(false);
         expect(fake().shortcuts.has(COMPOSER_SHORTCUT)).toBe(true);
+        expect(composerWindows()).toHaveLength(0);
     });
 
-    it("toggles the composer with the global shortcut", () => {
+    it("creates the composer on its own local page at the first shortcut press, and shows it once it is ready", () => {
         const toggle = fake().shortcuts.get(COMPOSER_SHORTCUT);
 
         toggle?.();
+        expect(composerWindows()).toHaveLength(1);
+        expect(composer().loaded).toStrictEqual([expect.stringMatching(SITE_HTML_PATTERN)]);
+        // Shown at its first paint, when its script is there to focus the prompt.
+        expect(composer().shown).toBe(false);
+
+        composer().handlers.get("ready-to-show")?.({ preventDefault: () => {} }, "");
         expect(composer().shown).toBe(true);
+    });
+
+    it("reuses the same composer window on later presses, toggling it", () => {
+        const toggle = fake().shortcuts.get(COMPOSER_SHORTCUT);
+
         toggle?.();
         expect(composer().shown).toBe(false);
+        toggle?.();
+        expect(composer().shown).toBe(true);
+        toggle?.();
+        expect(composerWindows()).toHaveLength(1);
+        expect(composer().loaded).toHaveLength(1);
     });
 
     it("hands a composed text to the main window once, and hides the composer", () => {
@@ -1393,7 +1409,7 @@ describe("main window reveal and saved state", () => {
             const { file, win } = await restart("win32", { maximized: true });
 
             // Another window of ours, as a dictation window would be: a lost focus ends a dictation.
-            fake().focusedWindow = fake().windows.at(-1) as FakeWindow;
+            fake().focusedWindow = mainWindow();
             readyToShow(win);
             expect(win.calls).toStrictEqual(["showInactive"]);
 

@@ -106,13 +106,21 @@ const findPage = async (app: ElectronApplication, isMatch: (url: string) => bool
 };
 
 /**
- * The site's window. `firstWindow()` is not it: the local Quick Composer page can
- * load first, so the site is picked by its URL, once the site has loaded.
+ * The site's window. `firstWindow()` is not it: a local page of ours (the Quick Composer,
+ * once opened) can come first, so the site is picked by its URL, once the site has loaded.
  */
 const siteWindow = (app: ElectronApplication): Promise<Page> => findPage(app, (url) => url.startsWith(SITE));
 
-/** The Quick Composer's own page, which is loaded (and hidden) at start-up. */
-const composerPage = (app: ElectronApplication): Promise<Page> => findPage(app, (url) => COMPOSER_FILE.test(url));
+/** Whether the main process has created the Quick Composer window. */
+const composerCreated = (app: ElectronApplication): Promise<boolean | undefined> =>
+    app.evaluate(() => (globalThis as { neoreShell?: { quickComposer: boolean } }).neoreShell?.quickComposer);
+
+/** Opens the Quick Composer as its shortcut would (it is created on first use), and returns its own page. */
+const composerPage = async (app: ElectronApplication): Promise<Page> => {
+    await app.evaluate(() => (globalThis as { neoreShell?: { toggleQuickComposer: () => void } }).neoreShell?.toggleQuickComposer());
+
+    return findPage(app, (url) => COMPOSER_FILE.test(url));
+};
 
 /** Replaces `shell.openExternal` in the main process, recording every URL it is asked to open. */
 const recordExternalOpens = (app: ElectronApplication): Promise<void> =>
@@ -198,7 +206,7 @@ test("a foreign page in the window gets no bridge", async () => {
     }
 });
 
-test("creates the tray, and a Quick Composer window on its own local page", async () => {
+test("creates the tray, and the Quick Composer window on its own local page at its first use", async () => {
     const app = await launch();
 
     try {
@@ -206,6 +214,7 @@ test("creates the tray, and a Quick Composer window on its own local page", asyn
 
         expect(await app.evaluate(() => (globalThis as { neoreShell?: { tray: boolean } }).neoreShell?.tray)).toBe(true);
         expect(await siteWindowCount(app)).toBe(1);
+        expect(await composerCreated(app)).toBe(false);
 
         const composer = await composerPage(app);
 
