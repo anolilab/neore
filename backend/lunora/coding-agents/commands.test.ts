@@ -128,6 +128,12 @@ describe("buildAgentCommand", () => {
         }
     });
 
+    it("names neore as Claude Code's entrypoint, and only for Claude Code", () => {
+        expect(agentEnv("claude_code", fakeKey("anthropic"))["CLAUDE_CODE_ENTRYPOINT"]).toBe("neore");
+        expect(agentEnv("codex", fakeKey("openai"))).not.toHaveProperty("CLAUDE_CODE_ENTRYPOINT");
+        expect(buildAgentCommand("claude_code")).not.toContain("CLAUDE_CODE_ENTRYPOINT");
+    });
+
     it("keeps the prompt from starting with a dash", () => {
         expect(buildAgentPrompt("-rf /").startsWith("-")).toBe(false);
     });
