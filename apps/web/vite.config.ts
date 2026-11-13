@@ -20,6 +20,8 @@ import { ViteImageOptimizer } from "vite-plugin-image-optimizer";
 import svgr from "vite-plugin-svgr";
 import wasm from "vite-plugin-wasm";
 
+import reactCompilerOptions from "./react-compiler-options";
+
 // Manual groups hold ONLY what every page loads anyway, for cache stability.
 // A group is emitted as one chunk and swallows the dependencies of what it
 // matches, so anything lazy that shares a group with anything eager becomes
@@ -290,10 +292,9 @@ export default defineConfig(async ({ mode }) => {
             tailwindcss(),
             svgr(),
             tanstackStart(),
-            // The React Compiler's native port, in place of the Babel plugin: ~15x less compile time. The exhaustive
-            // memo-dependency check is off, as in the Babel version this replaced, which does not run it: with it on,
-            // hand-memoized hooks such as `useThreadGroups` and `DataGridRow` would be skipped.
-            react({ compiler: { environment: { validateExhaustiveMemoizationDependencies: false }, target: "19" } }),
+            // The React Compiler's native port, in place of the Babel plugin: ~15x less compile time. Its options (and why
+            // one check is off) are in `react-compiler-options.ts`, which the compiler coverage test reads too.
+            react({ compiler: reactCompilerOptions }),
         ],
         resolve: {
             alias: {

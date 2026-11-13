@@ -5,11 +5,14 @@ import { resolve } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
+import reactCompilerOptions from "../react-compiler-options";
+
 /**
  * The busiest chat components must stay compiled by the React Compiler. It skips a component without a word in the
  * build (a dynamically taken hook, a `try`/`finally`, …), and the component then re-renders its whole subtree on every
- * parent render. This runs the same passes as `vite.config.ts` (the Lingui macro, then the compiler for React 19) and
- * fails when one of these components is skipped again.
+ * parent render. The build lowers the Lingui macro with Babel, then runs the compiler's native port with
+ * `react-compiler-options.ts`; this runs that, and the Babel compiler Storybook still uses, and fails when either skips
+ * one of these components.
  */
 const MUST_COMPILE: Record<string, string[]> = {
     "src/features/chat/core/context/chat-context.tsx": ["ChatProvider"],
@@ -32,6 +35,41 @@ const requireFromWeb = createRequire(resolve(webRoot, "package.json"));
 const babel = createRequire(requireFromWeb.resolve("@rolldown/plugin-babel"))("@babel/core") as BabelCore;
 const compilerPlugin = requireFromWeb.resolve("babel-plugin-react-compiler");
 const linguiMacroPlugin = requireFromWeb.resolve("@lingui/babel-plugin-lingui-macro");
+
+type NativeCompiler = {
+    transformSync: (filename: string, code: string, options: Record<string, unknown>) => { code: string; errors: { message: string }[]; fatal?: boolean };
+};
+
+// The compiler's native port, as `react({ compiler })` loads it in the build.
+const nativeCompiler = requireFromWeb("oxc-transform-react") as NativeCompiler;
+
+/** The build's passes: Babel lowers the Lingui macro, then the native port compiles with the build's options. */
+const compileNative = (file: string): { code: string; diagnostics: string[] } => {
+    const filename = resolve(webRoot, file);
+    const lowered = babel.transformSync(readFileSync(filename, "utf8"), {
+        babelrc: false,
+        configFile: false,
+        cwd: webRoot,
+        filename,
+        parserOpts: { plugins: file.endsWith(".tsx") ? ["typescript", "jsx"] : ["typescript"] },
+        plugins: [linguiMacroPlugin],
+        sourceType: "module",
+    }) as { code: string };
+    const result = nativeCompiler.transformSync(filename, lowered.code, {
+        jsx: { runtime: "automatic" },
+        reactCompiler: { ...reactCompilerOptions, reportDiagnostics: true },
+    });
+
+    return { code: result.code, diagnostics: result.errors.map((error: { message: string }) => error.message) };
+};
+
+/** Whether `name` is compiled in the port's output: a compiled function opens with its memo cache, `const $ = _c(n)`. */
+const isCompiledIn = (output: string, name: string): boolean => {
+    const lines = output.split("\n");
+    const start = lines.findIndex((line: string) => new RegExp(String.raw`^(?:export )?(?:const|function)\s+${name}\b`).test(line));
+
+    return start !== -1 && lines.slice(start, start + 3).some((line: string) => line.includes("_c("));
+};
 
 const compile = (file: string): { code: string; events: CompilerEvent[] } => {
     const filename = resolve(webRoot, file);
@@ -102,6 +140,20 @@ describe("react Compiler coverage of the chat components", () => {
                     ownEvents.some((event: CompilerEvent) => event.kind === "CompileSuccess"),
                     `${name} was not compiled`,
                 ).toBe(true);
+            }
+        },
+        60_000,
+    );
+});
+
+describe("react Compiler coverage of the chat components, as the build compiles them", () => {
+    it.each(Object.entries(MUST_COMPILE))(
+        "compiles every listed component in %s with the native port",
+        (file: string, names: string[]) => {
+            const { code, diagnostics } = compileNative(file);
+
+            for (const name of names) {
+                expect({ compiled: isCompiledIn(code, name), diagnostics, name }).toStrictEqual({ compiled: true, diagnostics, name });
             }
         },
         60_000,
