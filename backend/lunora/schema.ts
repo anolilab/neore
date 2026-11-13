@@ -3567,7 +3567,7 @@ export const schema = defineSchema({
     usageExportRuns: defineTable({
         createdAt: v.number(),
         deleteAt: v.number(),
-        // Set by the erasure when it re-arms a live run it could not finish. Only such runs are checked a minute ahead while live.
+        // Set by the erasure when it re-arms a live run it could not finish. Such a run is checked a minute ahead while live, for its first hour.
         erasing: v.optional(v.boolean()),
         requestId: v.string(),
         usageKey: v.optional(v.string()),

@@ -249,6 +249,12 @@ const armRun = async (ctx: MutationCtx, runId: Id<"usageExportRuns">, userId: st
 export const LIVE_RECHECK_MS = 60 * 1000;
 
 /**
+ * How long a re-armed run is checked a minute apart, counted from its export's start. An export that runs longer is checked at the time
+ * to live again, so a stuck export does not wake its shard every minute for weeks; its object then goes at the first check after it ends.
+ */
+export const LIVE_FAST_WINDOW_MS = 60 * 60 * 1000;
+
+/**
  * Hands a live run the erasure could not finish to the sweep: the run is marked `erasing` and checked a minute on. The run's record is
  * kept while its export is live, so anything the export stores later is found, and the sweep purges it once the export has ended.
  */
@@ -303,7 +309,9 @@ export const sweepUsageExportPieces = internalMutation
                 }
 
                 if (await isRunLive(ctx, run.requestId, run.userId)) {
-                    await armRun(ctx, run._id, run.userId, ctx.now + (run.erasing === true ? LIVE_RECHECK_MS : EXPORT_PIECE_TTL_MS));
+                    const fast = run.erasing === true && ctx.now - run.createdAt < LIVE_FAST_WINDOW_MS;
+
+                    await armRun(ctx, run._id, run.userId, ctx.now + (fast ? LIVE_RECHECK_MS : EXPORT_PIECE_TTL_MS));
                     continue;
                 }
 

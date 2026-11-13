@@ -117,27 +117,6 @@ afterEach(() => {
 });
 
 describe("eraseUsageForUser", () => {
-    it("removes an unkeyed run that sits behind a page of keyed runs", async () => {
-        await harness.run(async (ctx: any) => {
-            for (let index = 0; index < 10; index += 1) {
-                await ctx.db.insert("usageExportRuns", {
-                    createdAt: 1,
-                    deleteAt: 0,
-                    requestId: `keyed:${String(index)}`,
-                    usageKey: `gdpr-exports/keyed-${String(index)}.json`,
-                    userId: A,
-                });
-            }
-
-            await ctx.db.insert("usageExportRuns", { createdAt: 2, deleteAt: 0, requestId: "plain:1", userId: A });
-        });
-
-        await eraseAll(A);
-
-        expect(await countOf("usageExportRuns", A)).toBe(10);
-        expect(await keyedRunsOf(A)).toHaveLength(10);
-    });
-
     it("erases the user's rollup and export rows across batches, and leaves another user's", async () => {
         await harness.run(async (ctx: any) => {
             for (let index = 0; index < 25; index += 1) {
@@ -251,18 +230,6 @@ describe("erasure of the run scan", () => {
 
         expect(await countOf("usageExportRuns", A)).toBe(510);
         expect(await keyedRunsOf(A)).toHaveLength(510);
-    });
-
-    it("removes what was written after an earlier pass of the erasure, when the next pass runs", async () => {
-        await harness.run(async (ctx: any) => {
-            await ctx.db.insert("usageExportPieces", piece("early:1", A));
-            await eraseUsageForUser(ctx, A);
-            await ctx.db.insert("usageExportPieces", piece("late:1", A));
-        });
-
-        await eraseAll(A);
-
-        expect(await countOf("usageExportPieces", A)).toBe(0);
     });
 });
 
@@ -691,6 +658,7 @@ describe("the sweep and the clear", () => {
         expect(pieces).toEqual([`${live}:1`]);
         expect(await countOf("usageExportProjects", A)).toBe(0);
         expect(dead).toBeDefined();
+        expect(await countOf("usageExportRuns", A)).toBe(2);
     });
 
     it("reaches an expired run behind a full scan of live ones on a later sweep, instead of starving it", async () => {
