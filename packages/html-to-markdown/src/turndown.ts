@@ -3,20 +3,24 @@ import annotateNode from "./node";
 import rootNode from "./root-node";
 import Rules from "./rules";
 import type { AnnotatedNode, Options, Rule } from "./types";
-import { escapeMarkdown, trimLeadingBreaks, trimLeadingNewlines, trimTrailingNewlines } from "./utilities";
+import {
+    defaultBlankReplacement,
+    defaultElementReplacement,
+    escapeMarkdown,
+    trimKeepingBreaks,
+    trimLeadingBreaks,
+    trimLeadingNewlines,
+    trimTrailingNewlines,
+} from "./utilities";
 
 export type TurndownInput = string | Node;
 
 export const DEFAULT_OPTIONS: Options = {
-    blankReplacement(_content, node) {
-        return node.isBlock ? "\n\n" : "";
-    },
+    blankReplacement: defaultBlankReplacement,
     br: "  ",
     bulletListMarker: "*",
     codeBlockStyle: "indented",
-    defaultReplacement(content, node) {
-        return node.isBlock ? `\n\n${content}\n\n` : content;
-    },
+    defaultReplacement: defaultElementReplacement,
     emDelimiter: "_",
     fence: "```",
     headingStyle: "setext",
@@ -151,7 +155,9 @@ function replacementForNode(service: TurndownService, node: AnnotatedNode): stri
     const whitespace = node.flankingWhitespace;
 
     if (whitespace.leading || whitespace.trailing) {
-        content = content.trim();
+        // Inline code keeps upstream's plain trim. Elsewhere a plain trim would also remove a hard
+        // line break at either end of the content.
+        content = node.nodeName === "CODE" ? content.trim() : trimKeepingBreaks(content, node, service.options.br);
     }
 
     return whitespace.leading + rule.replacement(content, node, service.options, service.rules) + whitespace.trailing;
