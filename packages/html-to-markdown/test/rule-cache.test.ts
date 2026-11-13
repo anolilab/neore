@@ -25,4 +25,26 @@ describe("the rule lookup cache", () => {
 
         expect(service.turndown("<div><span>x</span></div>")).toBe("[S]");
     });
+
+    // A node already answered by an earlier rule keeps that answer when a newer rule is added in the same conversion.
+    it("keeps the first answer for a node that a later rule would also match", () => {
+        const service = new TurndownService();
+
+        service.addRule("first", { filter: "span", replacement: () => "[1]" });
+        service.addRule("ask-then-add", {
+            filter(node: Node, _options, lookup) {
+                if (node.nodeName !== "P") {
+                    return false;
+                }
+
+                lookup.hasRuleFor(node.firstChild as Node);
+                service.addRule("second", { filter: "span", replacement: () => "[2]" });
+
+                return true;
+            },
+            replacement: (content: string) => content,
+        });
+
+        expect(service.turndown("<p><span>x</span></p>")).toBe("[1]");
+    });
 });

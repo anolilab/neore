@@ -14,7 +14,10 @@ export default class Rules implements RuleLookup {
 
     // The rule each node was given, or undefined when none matched. Replaced whenever a rule is added, so a
     // negative answer given before the rule existed is not reused.
-    private decided = new WeakMap<Node, Rule | undefined>();
+    private decided = new WeakMap<Node, Rule>();
+
+    // Nodes that no rule matched. Dropped when a rule is added, because the new rule may match them.
+    private undecided = new WeakSet<Node>();
 
     // The lists a node is searched in, in order: added and built-in rules, then keep, then remove.
     private readonly searchOrder: ReadonlyArray<ReadonlyArray<Rule>> = [this.array, this.keepList, this.removeList];
@@ -42,7 +45,7 @@ export default class Rules implements RuleLookup {
 
     add(_key: string, rule: Rule): void {
         this.array.unshift(rule);
-        this.decided = new WeakMap();
+        this.undecided = new WeakSet();
     }
 
     keep(filter: Rule["filter"]): void {
@@ -50,7 +53,7 @@ export default class Rules implements RuleLookup {
             filter,
             replacement: this.keepReplacement,
         });
-        this.decided = new WeakMap();
+        this.undecided = new WeakSet();
     }
 
     remove(filter: Rule["filter"]): void {
@@ -58,7 +61,7 @@ export default class Rules implements RuleLookup {
             filter,
             replacement: () => "",
         });
-        this.decided = new WeakMap();
+        this.undecided = new WeakSet();
     }
 
     forNode(node: AnnotatedNode): Rule {
@@ -66,7 +69,7 @@ export default class Rules implements RuleLookup {
             return this.blankRule;
         }
 
-        return decideRule(this.decided, this.searchOrder, node, this.options, this) ?? this.defaultRule;
+        return decideRule(this.decided, this.undecided, this.searchOrder, node, this.options, this) ?? this.defaultRule;
     }
 
     /**
@@ -79,7 +82,7 @@ export default class Rules implements RuleLookup {
             return false;
         }
 
-        return decideRule(this.decided, this.searchOrder, annotateNode(node, this.options), this.options, this) !== undefined;
+        return decideRule(this.decided, this.undecided, this.searchOrder, annotateNode(node, this.options), this.options, this) !== undefined;
     }
 
     forEach(visit: (rule: Rule, index: number) => void): void {
@@ -95,14 +98,21 @@ export default class Rules implements RuleLookup {
  * answer that differs from the first would split the two. The first answer is kept.
  */
 function decideRule(
-    decided: WeakMap<Node, Rule | undefined>,
+    decided: WeakMap<Node, Rule>,
+    undecided: WeakSet<Node>,
     searchOrder: ReadonlyArray<ReadonlyArray<Rule>>,
     node: AnnotatedNode,
     options: Options,
     lookup: RuleLookup,
 ): Rule | undefined {
-    if (decided.has(node)) {
-        return decided.get(node);
+    const known = decided.get(node);
+
+    if (known) {
+        return known;
+    }
+
+    if (undecided.has(node)) {
+        return undefined;
     }
 
     // Lowercased once for the node, not once per rule.
@@ -118,7 +128,7 @@ function decideRule(
         }
     }
 
-    decided.set(node, undefined);
+    undecided.add(node);
 
     return undefined;
 }
