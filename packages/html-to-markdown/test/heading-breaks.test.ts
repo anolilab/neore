@@ -157,3 +157,22 @@ describe("a heading crafted to contain every candidate break mark", () => {
         expect(markdown).toBe(`# ${crafted} b`);
     });
 });
+
+describe("a break beside a block or a link in a heading", () => {
+    it("adds no space after a block's paragraph break", () => {
+        expect(new TurndownService({ headingStyle: "atx" }).turndown("<h1><p>c</p><br>b</h1>")).toBe("# c\n\nb");
+    });
+
+    it.each([
+        ["a leading break", "<h1>x<a href=/u><br>a</a></h1>", "# x [a](/u)"],
+        ["a trailing break", "<h1><a href=/u>a<br></a>b</h1>", "# [a](/u) b"],
+    ])("moves %s of an inlined link outside its brackets", (_name, html, expected) => {
+        expect(new TurndownService({ headingStyle: "atx" }).turndown(html)).toBe(expected);
+    });
+
+    it("moves the edge break of a referenced link outside its brackets and label", () => {
+        const service = new TurndownService({ headingStyle: "atx", linkReferenceStyle: "collapsed", linkStyle: "referenced" });
+
+        expect(service.turndown("<h1>x<a href=/u><br>a</a></h1>")).toBe("# x [a][]\n\n[a]: /u");
+    });
+});

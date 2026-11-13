@@ -27,9 +27,9 @@ const BACKTICK_EDGE = /^`|`$/;
 const LANGUAGE_CLASS = /language-(\S+)/;
 const LINE_BREAK_RUN = /\n\s*/g;
 const DOUBLE_QUOTE = /"/g;
-// A character that can sit next to emphasis without `_` failing to open or close: anything but
-// whitespace, punctuation and symbols (CommonMark's flanking rules).
 const WHITESPACE_EDGE = /^\s$/u;
+// A word character: anything but whitespace, punctuation and symbols. Emphasis that touches one is intraword, where
+// `_` cannot open or close (CommonMark's flanking rules), so a run that touches one uses `*`.
 const WORD_CHARACTER = /^[^\s\p{P}\p{S}]$/u;
 const EMPHASIS_NAMES = new Set(["em", "i"]);
 const STRONG_NAMES = new Set(["b", "strong"]);
@@ -79,7 +79,8 @@ class ReferenceLinkRule implements Rule {
         // The reference definition is written after the document, out of the heading's reach, so a heading's break
         // marks are turned into spaces here; otherwise the label in the heading and the definition would differ.
         const mark = breakMarkFor(node, lookup);
-        const content = mark === undefined ? rawContent : joinAtMarks(rawContent, mark);
+        const { lead, text, trail } = headingLinkParts(rawContent, mark);
+        const content = mark === undefined ? text : joinAtMarks(text, mark);
 
         const href = escapeLinkDestination(rawHref, options.safeLinks);
         let title = cleanAttribute(node.getAttribute("title"));
@@ -112,7 +113,7 @@ class ReferenceLinkRule implements Rule {
 
         this.references.push(reference);
 
-        return replacement;
+        return lead + replacement + trail;
     }
 
     append(): string {
@@ -260,7 +261,7 @@ const rules: Record<string, Rule> = {
             return options.linkStyle === "inlined" && node.nodeName === "A" && Boolean(node.getAttribute("href"));
         },
 
-        replacement(content, node, options) {
+        replacement(content, node, options, lookup) {
             const rawHref = node.getAttribute("href") ?? "";
 
             if (options.safeLinks && isUnsafeDestination(rawHref)) {
@@ -270,8 +271,9 @@ const rules: Record<string, Rule> = {
             const href = escapeLinkDestination(rawHref, options.safeLinks);
             const title = escapeLinkTitle(cleanAttribute(node.getAttribute("title")));
             const titlePart = title ? ` "${title}"` : "";
+            const { lead, text, trail } = headingLinkParts(content, breakMarkFor(node, lookup));
 
-            return `[${content}](${href}${titlePart})`;
+            return `${lead}[${text}](${href}${titlePart})${trail}`;
         },
     },
 
@@ -901,13 +903,39 @@ function joinAtMarks(content: string, mark: string): string {
             continue;
         }
 
-        pieces.push(carried.replace(TRAILING_SPACE, ""), piece.startsWith("\n") ? "" : " ");
+        const before = carried.replace(TRAILING_SPACE, "");
+
+        // A block's paragraph break on either side of the mark already separates the text, so no space is added.
+        pieces.push(before, piece.startsWith("\n") || before.endsWith("\n") ? "" : " ");
         carried = piece.replace(LEADING_SPACE, "");
     }
 
     pieces.push(carried);
 
     return pieces.join("");
+}
+
+/**
+ * A link's text in a heading, split into the break marks at its edges and the text between. The edge marks go
+ * outside the link's brackets, where the heading turns them into spaces between words, not spaces in the link.
+ */
+function headingLinkParts(content: string, mark: string | undefined): { lead: string; text: string; trail: string } {
+    if (mark === undefined) {
+        return { lead: "", text: content, trail: "" };
+    }
+
+    let start = 0;
+    let end = content.length;
+
+    while (content.startsWith(mark, start)) {
+        start += mark.length;
+    }
+
+    while (end - mark.length >= start && content.startsWith(mark, end - mark.length)) {
+        end -= mark.length;
+    }
+
+    return { lead: content.slice(0, start), text: content.slice(start, end), trail: content.slice(end) };
 }
 
 /** True when a block element sits inside the node, at any depth. */
