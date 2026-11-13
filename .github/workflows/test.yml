@@ -134,10 +134,13 @@ jobs:
                   cat "${RUNNER_TEMP}/disk.log"
                   exit "$(cat "${RUNNER_TEMP}/disk-status")"
 
-            # The web and backend app builds are not inputs to the tests in this job. Web tests import the
-            # workspace packages' dist, which `build:packages` produces (the same step Storybook and E2E use).
-            # Backend tests read committed sources and the committed `_generated/` output, so neither needs
-            # a build. Web's `tsc` runs in the Types job, and bundle.yml runs its `vite build` on every PR.
+            # The web, backend, browser-extension and mobile builds are not inputs to the tests in this job.
+            # Web tests import the workspace packages' dist, which `build:packages` produces (the same step
+            # Storybook and E2E use). Backend tests read committed sources and the committed `_generated/`
+            # output. browser-extension and mobile depend on the backend, and vis expands `^build` past a
+            # query, so excluding them also keeps the backend Worker build out. Web's `tsc` runs in the Types
+            # job, and bundle.yml runs its `vite build` on every PR.
+            # `--if-present`: a change that selects only packages without a `build` target leaves nothing here.
             - name: "Build affected packages"
               shell: "bash"
               env:
@@ -145,7 +148,7 @@ jobs:
                   NODE_OPTIONS: "--max-old-space-size=4096"
               run: |
                   pnpm run build:packages
-                  pnpm exec vis affected build --query "project!=@neore/web && project!=@neore/backend" --base "$VIS_BASE" --head "$VIS_HEAD" --fail-fast
+                  pnpm exec vis affected build --if-present --query "project!=@neore/web && project!=@neore/backend && project!=@neore/browser-extension && project!=@neore/mobile" --base "$VIS_BASE" --head "$VIS_HEAD" --fail-fast
 
             # `--parallel 2`: the standard runner is 2-core/7GB and every project's vitest spawns its own
             # worker pool, so running all of them at once starved the suites (trivial tests timing out at

@@ -10,10 +10,11 @@ import { defineConfig } from "@visulima/vis/config";
 // tracking without any error — keep them strictly separate.
 
 export default defineConfig({
-    // A workflow file lives outside every project, so without this a CI-only edit marks `root` affected
-    // and every package downstream of it (about 11 packages and the Rust device-core build). The
-    // workflows are checked by actionlint and zizmor, and nothing in the code they run depends on them.
-    affectedIgnore: [".github/**"],
+    // A file outside every project marks `root` affected, and that rebuilds and retests every package
+    // downstream of it. The workflows below are ignored for that: they are checked by actionlint and
+    // zizmor, and the test code they run does not change with them. `test.yml` and the local actions it
+    // uses stay visible, because editing them changes what the Test and Rust jobs execute.
+    affectedIgnore: [".github/workflows/!(test).{yml,yaml}", ".github/ISSUE_TEMPLATE/**", ".github/assets/**", ".github/*.{md,json5,td}", ".github/CODEOWNERS"],
     // Releases: every workspace package moves together under one version and one
     // `v<version>` tag, which is what `deploy.yml` matches. Versions come from
     // conventional commits (`vis release ci release --generate`). Merging the
