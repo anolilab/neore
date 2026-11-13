@@ -17,7 +17,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import DeleteConfirmationDialog from "@/components/delete-confirmation-dialog";
-import { useAuth } from "@/features/auth/lib/auth-ui-provider";
+import { useAuthActiveOrganization, useAuthSession } from "@/features/auth/hooks/use-auth-session";
 import useCheckout from "@/features/billing/hooks/use-checkout";
 import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
 import { useModelStore } from "@/features/chat/core/stores/model-store";
@@ -53,9 +53,8 @@ const PromptsSidebarTab = ({ threadId }: PromptsSidebarTabProps) => {
     const setComposerText = useChatUIStore((state) => state.setComposerText);
 
     // Get current user context for auto-populated variables
-    const { hooks } = useAuth();
-    const { data: sessionData } = hooks.useSession();
-    const { data: activeOrganization } = hooks.useActiveOrganization();
+    const { data: sessionData } = useAuthSession();
+    const { data: activeOrganization } = useAuthActiveOrganization();
 
     // Model store for applying settings
     const setSelectedModel = useModelStore((state) => state.setSelectedModel);

@@ -58,11 +58,13 @@ vi.mock("@tanstack/react-router", () => {
     return {
         // The thread title is a router link (#548); it renders as a plain anchor here.
         Link: ({ children, to }: { children: unknown; to: string }) => <a href={to}>{children as never}</a>,
-        useLocation: () => {
-            return { pathname: "/chat" };
+        useLocation: (options?: { select?: (location: { pathname: string }) => unknown }) => {
+            const location = { pathname: "/chat" };
+
+            return options?.select ? options.select(location) : location;
         },
         useRouter: () => {
-            return { navigate, preloadRoute: async () => {} };
+            return { navigate, preloadRoute: async () => {}, state: { location: { pathname: "/chat" } } };
         },
     };
 });
@@ -169,7 +171,7 @@ vi.mock("./stores/thread-list-ui-store", () => {
 });
 
 const { default: ThreadNode } = await import("./thread-node");
-const { default: SortableThreadItem } = await import("./sortable-thread-item");
+const { KeyboardSelectionProvider } = await import("./contexts/keyboard-selection-context");
 
 const SNOOZE_BUTTON = /^Snooze thread/u;
 const TOUCH_CLASSES = /pointer-coarse|hover:none/u;
@@ -177,7 +179,6 @@ const TOUCH_CLASSES = /pointer-coarse|hover:none/u;
 const child = { branchPoint: 0, branchType: "branch", children: [], createdAt: 0, depth: 1, status: "idle", threadId: "c1", title: "Child" };
 
 const baseProps = {
-    currentThreadId: undefined,
     expandedThreads: new Set<string>(),
     handleCreateBranch: () => {},
     handleDeleteThread: () => {},
@@ -253,19 +254,24 @@ describe("ThreadNode", () => {
         expect(screen.queryByRole("button", { name: SNOOZE_BUTTON })).toBeNull();
     });
 
-    it("marks the keyboard-selected child inside an expanded group, and no other row", () => {
-        // The child rows are stubbed here: the test checks the selection each one is given.
-        vi.mocked(SortableThreadItem).mockImplementation((props) => (
-            <div data-selected={String(props.isKeyboardSelected)} data-testid={`row-${props.node.threadId}`} />
-        ));
+    it("marks itself when the list's arrow keys select it, and not when they select another row", () => {
+        const { container, rerender } = render(
+            <KeyboardSelectionProvider threadId="t1">
+                <ThreadNode {...baseProps} />
+            </KeyboardSelectionProvider>,
+        );
 
-        try {
-            render(<ThreadNode {...baseProps} expandedThreads={new Set(["t1"])} keyboardThreadId="c1" />);
+        // eslint-disable-next-line testing-library/no-container, testing-library/no-node-access -- the highlight is only a class
+        expect(container.querySelector(`[data-thread-id="t1"]`)?.className).toContain("ring-white/50");
 
-            expect(screen.getByTestId("row-c1").dataset.selected).toBe("true");
-        } finally {
-            vi.mocked(SortableThreadItem).mockImplementation(() => null);
-        }
+        rerender(
+            <KeyboardSelectionProvider threadId="c1">
+                <ThreadNode {...baseProps} />
+            </KeyboardSelectionProvider>,
+        );
+
+        // eslint-disable-next-line testing-library/no-container, testing-library/no-node-access -- the highlight is only a class
+        expect(container.querySelector(`[data-thread-id="t1"]`)?.className).not.toContain("ring-white/50");
     });
 
     describe("when its chat is a split view pane", () => {
