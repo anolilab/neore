@@ -5,6 +5,7 @@ import {
     createFillRunner,
     createLoadingOwner,
     fillHistory,
+    hasOlder,
     MAX_FILL_PAGES,
     newestRun,
     nextOlderCursor,
@@ -662,4 +663,24 @@ describe("any split of a chat into pages", () => {
         }
         // 400 seeds take a few seconds alone, and several times that beside the other test files.
     }, 60_000);
+});
+
+describe("an empty newest page that is not the chat's end", () => {
+    it("keeps the rows on screen, their hole and their cursor", () => {
+        const shown = withNewestPage({ olderCursor: null, rows: run(1, 20) }, { olderCursor: "61", rows: run(61, 80) });
+        const next = withNewestPage(shown, { olderCursor: "next", rows: [] });
+
+        expect(next).toStrictEqual(shown);
+        expect(hasOlder(next)).toBe(true);
+    });
+
+    it("lets an empty screen read on from the page's cursor", () => {
+        const next = withNewestPage({ olderCursor: undefined, rows: [] }, { olderCursor: "next", rows: [] });
+
+        expect(nextOlderCursor(next)).toBe("next");
+    });
+
+    it("still ends the chat when the empty page is its end", () => {
+        expect(withNewestPage({ olderCursor: "41", rows: run(41, 60) }, { olderCursor: null, rows: [] })).toStrictEqual({ olderCursor: null, rows: [] });
+    });
 });

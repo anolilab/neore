@@ -256,6 +256,10 @@ const Chat = () => {
     // Locked, gone or no longer shared: the saved copy is dropped, and nothing of it stays on screen.
     const showRefused = useCallback(
         (refusedThreadId: string) => {
+            // Every refusal path (a newest-page read, a fill's older page, a reply check) stops what could still write
+            // into the chat: the send streaming into it and any read in flight.
+            sendAbort.current?.abort();
+            readGate.current.invalidate();
             isRefused.current = true;
             hasLiveRows.current = false;
             fillEpoch.current += 1;
@@ -500,10 +504,7 @@ const Chat = () => {
     // The reply checks run in a hook; the screen decides what a refusal or a settled check means for the chat.
     const onConfirmationRefused = useCallback(
         (refusedThreadId: string) => {
-            // A chat the reader can no longer open is cleared now, not by a read that may not run. A send still streaming
-            // into it is stopped, so no row is written into the chat after the refusal.
-            sendAbort.current?.abort();
-            readGate.current.invalidate();
+            // A chat the reader can no longer open is cleared now, not by a read that may not run.
             showRefused(refusedThreadId);
             settleQuietly(cache?.forgetThreads([refusedThreadId]));
         },

@@ -25,6 +25,8 @@ const harness = vi.hoisted(() => {
         holdStart: false,
         /** One entry per render of the message list: it renders exactly when the screen does. */
         listRenders: [] as number[],
+        /** Holds a read of the newest page until it resolves, when a test sets it. */
+        newestPageGate: undefined as (() => Promise<void>) | undefined,
         /** Answers a read of an older page; each test that has older history sets it. */
         olderPage: async (_cursor: string): Promise<unknown> => { throw new Error("This test has no older page."); },
         /** The delta handler the screen gave the stream. */
@@ -45,6 +47,8 @@ const stable = vi.hoisted(() => {
                 if (args.paginationOpts.cursor !== null) {
                     return await harness.olderPage(args.paginationOpts.cursor);
                 }
+
+                await harness.newestPageGate?.();
 
                 return {
                     continueCursor: "older",
@@ -488,6 +492,65 @@ describe("the chat screen filling its history after the newest page", () => {
         expect(mounted.container?.textContent).toContain("An older question");
 
         stable.offline = before;
+    });
+
+    it("drops a newest-page read in flight when a fill's older page finds the chat refused", async () => {
+        let refuseOlder: (() => void) | undefined;
+        let answerNewest: (() => void) | undefined;
+
+        harness.olderPage = async () => {
+            // eslint-disable-next-line unicorn/prefer-promise-with-resolvers -- `Promise.withResolvers` needs Node 22.11; the package allows 22.0
+            await new Promise<void>((resolve) => {
+                refuseOlder = resolve;
+            });
+
+            throw Object.assign(new Error("Forbidden"), { code: "FORBIDDEN" });
+        };
+
+        act(() => {
+            mounted.root?.render(createElement(ChatScreen));
+        });
+
+        await vi.waitFor(() => {
+            expect(refuseOlder).toBeDefined();
+        });
+
+        // A reconnect re-reads the newest page, which waits while the fill's older page is refused.
+        harness.newestPageGate = async () => {
+            // eslint-disable-next-line unicorn/prefer-promise-with-resolvers -- `Promise.withResolvers` needs Node 22.11; the package allows 22.0
+            await new Promise<void>((resolve) => {
+                answerNewest = resolve;
+            });
+        };
+
+        const before = stable.offline;
+
+        stable.offline = { ...before, refreshTick: before.refreshTick + 1 };
+
+        try {
+            await act(async () => {
+                mounted.root?.render(createElement(ChatScreen));
+            });
+            await vi.waitFor(() => {
+                expect(answerNewest).toBeDefined();
+            });
+
+            await act(async () => {
+                refuseOlder?.();
+            });
+            await vi.waitFor(() => {
+                expect(mounted.container?.textContent).toContain("This chat is locked or no longer available.");
+            });
+
+            await act(async () => {
+                answerNewest?.();
+            });
+
+            expect(mounted.container?.textContent).not.toContain("An earlier answer");
+        } finally {
+            harness.newestPageGate = undefined;
+            stable.offline = before;
+        }
     });
 
     it("saves an older page's rows with the time its read started, not when it answered", async () => {

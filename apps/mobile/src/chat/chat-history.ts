@@ -186,15 +186,22 @@ const merged = <R extends HistoryRow>({ kept, keptCursor, keptGap, run }: Split<
  * - when the run on screen holds the page's oldest row, the page replaces the run from there up; a hole below the run
  * and the cursor stay as they were;
  * - otherwise the run is no longer known to join the newest row, and the page is {@link merged} with the rows on screen;
- * - when the page is the whole chat, nothing older exists, and older rows on screen go.
+ * - when the page is the whole chat, nothing older exists, and older rows on screen go;
+ * - an empty page that is not the chat's end leaves the rows on screen as they are.
  * Rows made on this screen are not kept: the page holds their server copies.
  */
 const newestPageOf = <R extends HistoryRow>(history: ChatHistory<R>, page: HistoryPage<R>): ChatHistory<R> => {
     const [oldest] = page.rows;
 
-    if (oldest === undefined || page.olderCursor === null) {
+    if (page.olderCursor === null) {
         // eslint-disable-next-line unicorn/no-null -- the newest page is the whole chat: nothing older
         return { olderCursor: null, rows: page.rows };
+    }
+
+    if (oldest === undefined) {
+        // A page with nothing to show (its messages had no content) that is not the chat's end tells nothing about the
+        // rows on screen: they stay, and an empty screen can still read on from the page's cursor.
+        return history.rows.length === 0 ? { olderCursor: page.olderCursor, rows: [] } : history;
     }
 
     const split = splitOf(history);
