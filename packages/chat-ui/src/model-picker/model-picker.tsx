@@ -90,6 +90,7 @@ const stableModelItem = (model: GatewayModel): ModelItem => {
 /**
  * The last group built with each first row, per picker: a group is reused while its label and rows are the same. Two
  * pickers showing different groups that start with the same row would replace each other's entries if they shared one.
+ * Renders only read the cache; a layout effect records what was committed.
  */
 type GroupCache = WeakMap<ModelItem, ModelGroup>;
 
@@ -107,13 +108,18 @@ const stableModelGroup = (groupsByFirstItem: GroupCache, value: string, items: M
         return previous;
     }
 
-    const group: ModelGroup = isFavorite ? { isFavorite: true, items, value } : { items, value };
+    return isFavorite ? { isFavorite: true, items, value } : { items, value };
+};
 
-    if (first) {
-        groupsByFirstItem.set(first, group);
+/** Records the groups a committed render showed; a render React abandons leaves the cache as it was. */
+const rememberGroups = (groupsByFirstItem: GroupCache, groups: ModelGroup[]): void => {
+    for (const group of groups) {
+        const [first] = group.items;
+
+        if (first) {
+            groupsByFirstItem.set(first, group);
+        }
     }
-
-    return group;
 };
 
 // ─── Provider sidebar button ───────────────────────────────────────────────────
@@ -564,6 +570,10 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
 
         return groups;
     }, [favoriteModels, regularModels, activeTab, groupCache]);
+
+    useLayoutEffect(() => {
+        rememberGroups(groupCache, groupedItems);
+    }, [groupCache, groupedItems]);
 
     const isParallelMaxReached = parallelSelectedIds.size >= MAX_PARALLEL;
     const isShowProviderSidebar = activeTab === "all" && !searchQuery.trim();

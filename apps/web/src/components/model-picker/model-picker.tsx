@@ -154,6 +154,7 @@ const stableModelItem = (model: GatewayModel, label: string): ModelItem => {
  * The last group built with each first row, per picker: a group is reused while its label, kind and rows are the
  * same. Complete and search-filtered groups keep separate caches, as do separate pickers: a search rebuilds the
  * complete groups too, and a shared entry would let one group evict an unchanged one that starts with the same row.
+ * Renders only read the caches; a layout effect records what was committed.
  */
 type GroupCache = WeakMap<ModelItem, ModelGroup>;
 
@@ -171,13 +172,18 @@ const stableModelGroup = (groupsByFirstItem: GroupCache, value: string, items: M
         return previous;
     }
 
-    const group: ModelGroup = isFavorite ? { isFavorite: true, items, value } : { items, value };
+    return isFavorite ? { isFavorite: true, items, value } : { items, value };
+};
 
-    if (first) {
-        groupsByFirstItem.set(first, group);
+/** Records the groups a committed render showed; a render React abandons leaves the cache as it was. */
+const rememberGroups = (groupsByFirstItem: GroupCache, groups: ModelGroup[]): void => {
+    for (const group of groups) {
+        const [first] = group.items;
+
+        if (first) {
+            groupsByFirstItem.set(first, group);
+        }
     }
-
-    return group;
 };
 
 // ─── Detail Panel ─────────────────────────────────────────────────────────────
@@ -977,6 +983,11 @@ const ModelPicker: FC<ModelPickerProps> = ({
 
         return filtered;
     }, [groupedItems, searchQuery, searchTexts, groupCaches]);
+
+    useLayoutEffect(() => {
+        rememberGroups(groupCaches.complete, groupedItems);
+        rememberGroups(groupCaches.filtered, filteredGroupedItems);
+    }, [groupCaches, groupedItems, filteredGroupedItems]);
 
     const infoModel = useMemo(() => {
         if (!infoModelId) {
