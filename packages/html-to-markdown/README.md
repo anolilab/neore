@@ -64,6 +64,29 @@ new TurndownService().use(gfm).turndown("<table><tr><th>a</th></tr><tr><td><s>1<
   `td`, `th` or `caption` takes those elements from it, and the table does not write what that rule returns: its output
   reaches the row mixed with the other cells', with no place in the grid.
 
+## Paste preset
+
+`paste` is a preset for HTML pasted into a chat composer, with the options it is written for:
+
+```ts
+import TurndownService, { paste, PASTE_OPTIONS } from "@neore/html-to-markdown";
+
+new TurndownService(PASTE_OPTIONS).use(paste).turndown(html);
+```
+
+- It uses the `gfm` plugin, and `PASTE_OPTIONS` turns `safeLinks` on.
+- What the page does not show is left out: an element with `hidden`, `aria-hidden="true"`, an `sr-only` or
+  `visually-hidden` class, or a style whose last `display` is `none` or `visibility` is `hidden` (an earlier
+  `!important` declaration wins). So are scripts, styles, media, form controls, embedded documents and `<svg>`.
+- An image is written as text only when it draws an emoji (its alt text) or a formula (an image with a `math` class,
+  as inline math). Any other image is dropped: a pasted picture arrives as a file, if at all.
+- A formula with a TeX annotation is written as inline math; without one, its visible text stays.
+- The forms are the ones people type: `- ` and `1. ` with one space, a plain newline for a line break, fenced code,
+  `#` headings, `*` emphasis and `---` rules.
+
+The rest of the composer's paste behaviour (Word and Google Docs lists, formatting set by style, code languages)
+follows in the next parts.
+
 ## Status
 
 This is the first step of the fork: a behaviour-preserving TypeScript port, except for `keep` and `remove` on built-in
@@ -94,7 +117,7 @@ differential test covers each of them.
 2. An internal tree built from the DOM, DOMParser on the main thread, parse5 only for Node and offline use, domino removed.
 3. Upstream fixes and the known issues above (per-line escaping, `<br>` handling, list `start`/`value`, hidden content,
    safe hrefs).
-4. GFM: tables, strikethrough and task lists (the `gfm` plugin), then a paste preset with the rules the composer needs.
+4. GFM: tables, strikethrough and task lists (the `gfm` plugin), then a paste preset (`paste`) with the rules the composer needs.
 5. Use in the composer's paste path, loaded lazily.
 
 ## Scripts
