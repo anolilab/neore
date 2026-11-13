@@ -113,14 +113,14 @@ export const backendPushServer = (client: LunoraClient): PushServer => {
     };
 };
 
+/** The backend's address, for the notification extension: it reads it from the shared keychain group to fetch a push's text. */
+const EXTENSION_LUNORA_URL_KEY = "neore.mobile.lunora-url";
+
 /**
  * Once per launch, once it worked: a notification that arrives while the app is open still shows as a banner, and
  * Android gets the channel its pushes show on (Android 8+ shows nothing on a channel that does not exist). A failed
  * step is tried again the next time this is called (the app coming back to the front).
  */
-/** The backend's address, for the notification extension: it reads it from the shared keychain group to fetch a push's text. */
-const EXTENSION_LUNORA_URL_KEY = "neore.mobile.lunora-url";
-
 export const configurePhoneNotifications = onceItWorks(async () => {
     setNotificationHandler({
         handleNotification: async () => {

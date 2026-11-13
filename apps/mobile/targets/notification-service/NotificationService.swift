@@ -189,7 +189,6 @@ enum PushContent {
         return .text(Text(title: title, body: body))
     }
 
-    /// The response's status (`nil` when there was no answer) and its JSON body, read only for a 2xx.
     /// The backend is https. A local backend may be plain http, in debug builds only.
     private static func isAllowedEndpoint(_ endpoint: URL) -> Bool {
         #if DEBUG
@@ -199,6 +198,7 @@ enum PushContent {
         #endif
     }
 
+    /// The response's status (`nil` when there was no answer) and its JSON body, read only for a 2xx.
     private static func post(_ url: String, body: [String: String], bearer: String?, deadline: Date) async -> (status: Int?, json: [String: Any]?) {
         let remaining = deadline.timeIntervalSinceNow
 
