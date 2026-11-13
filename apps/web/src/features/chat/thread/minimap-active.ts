@@ -2,8 +2,8 @@ import { useEffect, useState } from "react";
 
 /**
  * Which prompt the reader is at, for the minimap's highlight: the LAST prompt, in rail order,
- * whose row has reached the reading line. A prompt that is not in the DOM (virtualized out, or not
- * loaded yet) is not in `reached`, so it is simply not picked.
+ * whose row has reached the reading line. A prompt that is not in the DOM (not loaded yet) is not in
+ * `reached`, so it is simply not picked.
  */
 export const lastReachedId = (order: ReadonlyArray<string>, reached: ReadonlySet<string>): string | undefined => {
     for (let index = order.length - 1; index >= 0; index -= 1) {

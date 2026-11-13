@@ -10,12 +10,12 @@ export interface ScrollToMessageDetail {
     threadId?: string;
 }
 
-/** Consumed by the message list, which owns the virtualizer; here so a caller outside the list need not import it. */
+/** Consumed by the message list, which owns the jump; here so a caller outside the list need not import it. */
 export const scrollToMessageChannel = createRequestChannel<ScrollToMessageDetail>();
 
 /**
- * Scrolls the open thread to a message and focuses it, mounting it first if it
- * is virtualized and loading older pages if it is not loaded yet; the list says
+ * Scrolls the open thread to a message and focuses it, loading older pages if it
+ * is not loaded yet; the list says
  * so when the message is not in the conversation. Pass `threadId` when the
  * request races a navigation to that thread: the jump then waits until that
  * thread's messages are showing.

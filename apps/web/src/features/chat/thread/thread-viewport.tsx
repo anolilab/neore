@@ -73,6 +73,9 @@ const ThreadViewport = ({ children, className, ref }: ThreadViewportProps & { re
     const isAtBottomRef = useRef(true);
     const userScrolledRef = useRef(false);
     const hasInitialScrolledRef = useRef(false);
+    // Where the last scroll event left the view, and whether a smooth scroll to the bottom is on its way there.
+    const lastScrollTopRef = useRef(0);
+    const smoothToBottomRef = useRef(false);
 
     // Scroll anchor: scrollHeight captured synchronously in the scroll handler at the
     // exact moment loadMore() is called — before any React state changes. This is the
@@ -105,6 +108,13 @@ const ThreadViewport = ({ children, className, ref }: ThreadViewportProps & { re
         return distanceFromBottom <= SCROLL_THRESHOLD;
     }, []);
 
+    // Puts the view at the bottom at once and records where it left it, so the next scroll event can tell the reader
+    // scrolling up from the content growing (a programmatic scroll's own event may come after another change).
+    const pinToBottom = useCallback((viewport: HTMLElement) => {
+        viewport.scrollTo({ behavior: "instant", top: viewport.scrollHeight });
+        lastScrollTopRef.current = viewport.scrollTop;
+    }, []);
+
     // Scroll to bottom function
     const scrollToBottom = useCallback(
         (behavior: ScrollBehavior = "smooth") => {
@@ -114,17 +124,20 @@ const ThreadViewport = ({ children, className, ref }: ThreadViewportProps & { re
                 return;
             }
 
-            viewport.scrollTo({
-                behavior,
-                top: viewport.scrollHeight,
-            });
+            smoothToBottomRef.current = behavior === "smooth";
+
+            if (behavior === "smooth") {
+                viewport.scrollTo({ behavior, top: viewport.scrollHeight });
+            } else {
+                pinToBottom(viewport);
+            }
 
             // Reset user scroll flag and update state
             userScrolledRef.current = false;
             isAtBottomRef.current = true;
             setIsAtBottom(true);
         },
-        [setIsAtBottom],
+        [pinToBottom, setIsAtBottom],
     );
 
     // Handle scroll events — also drives the load-more preload trigger
@@ -137,10 +150,28 @@ const ThreadViewport = ({ children, className, ref }: ThreadViewportProps & { re
 
         const { scrollTop } = viewport;
         const atBottom = checkIsAtBottom();
+        const scrolledUp = scrollTop < lastScrollTopRef.current;
 
-        // If user manually scrolled away from bottom, track it
-        if (!atBottom && isAtBottomRef.current) {
-            userScrolledRef.current = true;
+        lastScrollTopRef.current = scrollTop;
+
+        if (atBottom) {
+            smoothToBottomRef.current = false;
+        }
+
+        // Off the bottom while the reader was there. Only scrolling UP is the reader leaving. A view that moved
+        // down or stayed put means the content grew: rows above took their real height in place of their estimate
+        // (`content-visibility`) and the browser kept the visible text still. The reader stays at the bottom then.
+        if (isAtBottomRef.current && !userScrolledRef.current) {
+            if (scrolledUp) {
+                if (!atBottom) {
+                    userScrolledRef.current = true;
+                }
+            } else if (!smoothToBottomRef.current && viewport.scrollHeight - scrollTop - viewport.clientHeight > 1) {
+                // Close even a gap inside the threshold: the reader is at the very bottom, not near it.
+                pinToBottom(viewport);
+
+                return;
+            }
         }
 
         // If user scrolled back to bottom, reset the flag
@@ -164,7 +195,7 @@ const ThreadViewport = ({ children, className, ref }: ThreadViewportProps & { re
         if (scrollTop > LOAD_MORE_THRESHOLD && loadMoreTriggeredRef.current && messagesStatusRef.current !== "LoadingMore") {
             loadMoreTriggeredRef.current = false;
         }
-    }, [checkIsAtBottom, setIsAtBottom]);
+    }, [checkIsAtBottom, pinToBottom, setIsAtBottom]);
 
     // Attach scroll listener
     useEffect(() => {
@@ -257,6 +288,39 @@ const ThreadViewport = ({ children, className, ref }: ThreadViewportProps & { re
 
         return () => observer.disconnect();
     }, [activeStreamId]);
+
+    // Stick to the bottom while the reader is there and the content changes height, streaming or not: the first page
+    // settling, a row near the bottom taking its real height in place of its estimate (message rows skip layout off
+    // screen, `content-visibility` in styles.css), an image loading. A resize is not a DOM mutation, so the streaming
+    // observer above does not see it.
+    useEffect(() => {
+        const viewport = viewportRef.current;
+
+        if (!viewport || typeof ResizeObserver === "undefined") {
+            return undefined;
+        }
+
+        const resizes = new ResizeObserver(() => {
+            if (hasInitialScrolledRef.current && !userScrolledRef.current && isAtBottomRef.current) {
+                pinToBottom(viewport);
+            }
+        });
+        const observeChildren = () => {
+            for (const child of viewport.children) {
+                resizes.observe(child);
+            }
+        };
+        // The viewport has no single content element: its children come and go (the breadcrumb, the empty state).
+        const children = new MutationObserver(observeChildren);
+
+        observeChildren();
+        children.observe(viewport, { childList: true });
+
+        return () => {
+            children.disconnect();
+            resizes.disconnect();
+        };
+    }, [pinToBottom]);
 
     // Expose ref methods
     useImperativeHandle(ref, () => {

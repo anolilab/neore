@@ -40,8 +40,7 @@ const collectPass = (host: Element, query: string, current: FindMatch | undefine
 
 /**
  * Paints the find matches with the CSS Custom Highlight API: the rendered DOM is never touched.
- * The mounted rows are re-scanned when the list changes (windowed rows mount as they scroll in,
- * a streaming reply grows). Without the API nothing is painted; the bar still scrolls and counts.
+ * The rows are re-scanned when the list changes (older pages load, a streaming reply grows). Without the API nothing is painted; the bar still scrolls and counts.
  */
 const useFindHighlights = (active: boolean, query: string, current: FindMatch | undefined, revealKey: number): void => {
     const currentMessageId = current?.messageId;

@@ -18,6 +18,7 @@ const harness = vi.hoisted(() => {
     return {
         actions: {} as Record<string, unknown>,
         ActionsContext: undefined as Context<Record<string, unknown>> | undefined,
+        activeStreamId: null as string | null,
         contentRenders: new Map<string, number>(),
         goal: null as unknown,
         messages: [] as unknown[],
@@ -46,7 +47,7 @@ vi.mock("@/features/chat/core/context/chat-context", async () => {
     return {
         useChatActions: () => use(harness.ActionsContext!),
         useChatIsStreaming: () => {
-            return { activeStreamId: null, gatewayUrl: null, isStreaming: false, streamToken: null };
+            return { activeStreamId: harness.activeStreamId, gatewayUrl: null, isStreaming: harness.activeStreamId !== null, streamToken: null };
         },
         useChatMessages: () => {
             return { isStreaming: false, loadMore: () => {}, messages: use(harness.MessagesContext!), messagesReady: true, messagesStatus: "Exhausted" };
@@ -76,7 +77,10 @@ vi.mock("./message-content", () => {
 });
 
 vi.mock("./streaming-placeholder", () => {
-    return { StreamingPlaceholder: () => null, ThinkingPlaceholder: () => null };
+    return {
+        StreamingPlaceholder: ({ streamId }: { streamId: string }) => createElement("div", { "data-testid": "streaming-placeholder" }, streamId),
+        ThinkingPlaceholder: () => null,
+    };
 });
 
 vi.mock("@/features/chat/core/hooks/use-thread-manager", () => {
@@ -151,6 +155,15 @@ vi.mock("@/features/chat/translation/translate-action", () => {
 vi.mock("./fork-branch-dialog", () => {
     return { default: () => null };
 });
+
+/** Waits for `count` animation frames. */
+const nextFrames = async (count: number): Promise<void> => {
+    for (let frame = 0; frame < count; frame += 1) {
+        await new Promise<void>((resolve) => {
+            requestAnimationFrame(() => resolve());
+        });
+    }
+};
 
 // Imported after the mocks.
 const { default: MessageList, scrollToMessage } = await import("./message-list");
@@ -410,5 +423,104 @@ describe("message list goal", () => {
         expect(harness.contentRenders.has("m2")).toBe(false);
         expect(harness.contentRenders.has("m1")).toBe(true);
         expect(harness.contentRenders.has("m3")).toBe(true);
+    });
+});
+
+describe("a long thread", () => {
+    afterEach(() => {
+        harness.activeStreamId = null;
+        vi.restoreAllMocks();
+    });
+
+    beforeEach(() => {
+        harness.messages = Array.from({ length: THREAD_LENGTH }, (_, index) => makeMessage(index));
+        harness.actions = { copyMessage: () => {}, reloadMessage: () => {} };
+    });
+
+    /* eslint-disable testing-library/no-node-access -- the assertions are about which elements the stylesheet reaches */
+    it("keeps every message mounted, each a row directly in the list, where off-screen rows skip layout and paint", () => {
+        mountInto();
+
+        const rows = [...document.querySelectorAll<HTMLElement>("[data-list-message-id]")];
+
+        expect(rows).toHaveLength(THREAD_LENGTH);
+        // `.message-list > [data-list-message-id]` in styles.css: content-visibility applies to exactly these.
+        expect(rows.every((row) => row.parentElement?.classList.contains("message-list"))).toBe(true);
+    });
+
+    it("renders the streaming reply as the list's last item, outside the rows the stylesheet can skip", () => {
+        harness.activeStreamId = "stream-1";
+
+        mountInto();
+
+        const placeholder = screen.getByTestId("streaming-placeholder");
+
+        expect(placeholder.closest("[data-list-message-id]")).toBeNull();
+        expect(screen.getAllByRole("listitem").at(-1)?.contains(placeholder)).toBe(true);
+    });
+    /* eslint-enable testing-library/no-node-access */
+
+    describe("a jump", () => {
+        /** Calls of `scrollIntoView` per row, and the tops a row reports, frame after frame. */
+        const scrolls = new Map<string, number>();
+        const tops = new Map<string, number[]>();
+        /** Runs after a row's `scrollIntoView`. */
+        let onScroll: (id: string) => void = () => {};
+
+        beforeEach(() => {
+            scrolls.clear();
+            tops.clear();
+            onScroll = () => {};
+            Element.prototype.scrollIntoView = vi.fn(function scrollIntoView(this: Element) {
+                const id = (this as HTMLElement).dataset.listMessageId ?? "";
+
+                scrolls.set(id, (scrolls.get(id) ?? 0) + 1);
+                onScroll(id);
+            });
+            vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(function getBoundingClientRect(this: Element) {
+                const id = (this as HTMLElement).dataset.listMessageId ?? "";
+                const queue = tops.get(id) ?? [];
+                const top = queue.length > 1 ? queue.shift()! : (queue[0] ?? 0);
+
+                return { bottom: top + 100, height: 100, left: 0, right: 0, top, width: 0, x: 0, y: top, toJSON: () => ({}) } as DOMRect;
+            });
+        });
+
+        it("re-centres its row until rows above it stop pushing it", async () => {
+            // Rows above render at their real height as they come into view: the row moves twice, then stays.
+            tops.set("m100", [500, 300, 300]);
+            mountInto();
+
+            act(() => scrollToMessage("m100"));
+
+            await vi.waitFor(() => expect(scrolls.get("m100")).toBe(3));
+            await act(async () => {
+                await nextFrames(3);
+            });
+
+            expect(scrolls.get("m100")).toBe(3);
+        });
+
+        it("stops re-centring an older jump once a newer one is asked for", async () => {
+            // A row that never settles would be re-centred for every frame of the budget.
+            tops.set("m100", [100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 1100]);
+            mountInto();
+
+            // The newer jump is asked for right after the older one first scrolls its row.
+            onScroll = (id) => {
+                if (id === "m100" && scrolls.get("m100") === 1) {
+                    scrollToMessage("m150");
+                }
+            };
+            act(() => scrollToMessage("m100"));
+            await vi.waitFor(() => expect(scrolls.get("m150")).toBeGreaterThanOrEqual(1));
+
+            await act(async () => {
+                await nextFrames(12);
+            });
+
+            // Its first scroll only: none of the re-centring frames ran.
+            expect(scrolls.get("m100")).toBe(1);
+        });
     });
 });
