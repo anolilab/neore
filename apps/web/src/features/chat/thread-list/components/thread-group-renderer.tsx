@@ -1,7 +1,7 @@
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { useLingui } from "@lingui/react/macro";
 import type { FC } from "react";
-import { memo } from "react";
+import { memo, useMemo } from "react";
 
 import GroupHeader from "../group-header";
 import SortableThreadItem from "../sortable-thread-item";
@@ -9,7 +9,6 @@ import type { BranchNode, LoadingStates, ThreadGroup } from "../types";
 import { getGroupType } from "../utilities";
 
 interface ThreadGroupRendererProps {
-    currentThreadId: string | undefined;
     /** dnd-kit listeners for the project drag handle. Absent for non-project groups. */
     dragListeners?: unknown;
     expandedThreads: Set<string>;
@@ -27,14 +26,11 @@ interface ThreadGroupRendererProps {
     handlePinThread: (threadId: string) => void;
     handleThreadToggle: (threadId: string, index: number, isShiftClick: boolean) => void;
     handleUnpinThread: (threadId: string) => void;
-    isKeyboardNavigating: boolean;
     isReordering?: boolean;
     isSelectionMode: boolean;
     loadingStates: LoadingStates;
     projectPinnedAt?: number | null;
-    searchQuery: string;
     selectedThreadIds: Set<string>;
-    selectedThreadIndex: number;
     toggleExpanded: (threadId: string) => void;
     toggleGroupCollapsed: (groupType: import("../types").GroupType, projectId?: string) => void;
     updateThread: (threadId: string, model: string, status: "archived" | "active") => void;
@@ -49,7 +45,6 @@ interface ThreadGroupRendererProps {
  */
 const ThreadGroupRenderer: FC<ThreadGroupRendererProps> = memo(
     ({
-        currentThreadId,
         dragListeners,
         expandedThreads,
         flattenedThreads,
@@ -66,22 +61,18 @@ const ThreadGroupRenderer: FC<ThreadGroupRendererProps> = memo(
         handlePinThread,
         handleThreadToggle,
         handleUnpinThread,
-        isKeyboardNavigating,
         isReordering,
         isSelectionMode,
         loadingStates,
         projectPinnedAt,
-        searchQuery,
         selectedThreadIds,
-        selectedThreadIndex,
         toggleExpanded,
         toggleGroupCollapsed,
         updateThread,
     }) => {
-        // The keyboard-selected thread, by id: the index means nothing inside a group, and rows below the top level need the id too.
-        const keyboardThreadId = isKeyboardNavigating ? flattenedThreads[selectedThreadIndex]?.threadId : undefined;
-
         const { t } = useLingui();
+        // The sortable rows re-render whenever this list's identity changes: a new array per render would re-render every row.
+        const sortableIds = useMemo(() => group.threads.map((candidate) => candidate.threadId), [group.threads]);
 
         return (
             <>
@@ -117,15 +108,12 @@ const ThreadGroupRenderer: FC<ThreadGroupRendererProps> = memo(
                                 {group.projectId ? t`Drop threads here to add them to this project` : t`No threads in this group`}
                             </div>
                         ) : (
-                            <SortableContext items={group.threads.map((candidate) => candidate.threadId)} strategy={verticalListSortingStrategy}>
+                            <SortableContext items={sortableIds} strategy={verticalListSortingStrategy}>
                                 {group.threads.map((thread) => {
                                     const threadIndexInFlattened = flattenedThreads.findIndex((candidate) => candidate.threadId === thread.threadId);
-                                    // Matched by id, as the virtualized list does: a child inside this group is selected by its id too.
-                                    const isKeyboardSelected = isKeyboardNavigating && thread.threadId === keyboardThreadId;
 
                                     return (
                                         <SortableThreadItem
-                                            currentThreadId={currentThreadId}
                                             expandedThreads={expandedThreads}
                                             handleCreateBranch={handleCreateBranch}
                                             handleDeleteThread={handleDeleteThread}
@@ -135,17 +123,12 @@ const ThreadGroupRenderer: FC<ThreadGroupRendererProps> = memo(
                                             handleThreadToggle={handleThreadToggle}
                                             handleUnpinThread={handleUnpinThread}
                                             index={threadIndexInFlattened}
-                                            isKeyboardNavigating={isKeyboardNavigating}
-                                            isKeyboardSelected={isKeyboardSelected}
                                             isSelected={selectedThreadIds.has(thread.threadId)}
                                             isSelectionMode={isSelectionMode}
                                             key={thread.threadId}
-                                            keyboardThreadId={keyboardThreadId}
                                             loadingStates={loadingStates}
                                             node={thread}
-                                            searchQuery={searchQuery}
                                             selectedThreadIds={selectedThreadIds}
-                                            selectedThreadIndex={selectedThreadIndex}
                                             toggleExpanded={toggleExpanded}
                                             updateThread={updateThread}
                                         />

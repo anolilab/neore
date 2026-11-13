@@ -3,6 +3,8 @@
  * (cancelable). A listener that opens it calls `preventDefault`; with no listener (a shared view, say) the thumbnail
  * falls back to the inline viewer.
  */
+import { clearPdfThumbnailCache } from "./pdf-thumbnail-cache";
+
 export const OPEN_PDF_PREVIEW_EVENT = "neore:open-pdf-preview";
 
 export interface OpenPdfPreviewDetail {
@@ -51,7 +53,11 @@ export const rememberPdfUrl = (url: string): void => {
 /** The newest URL seen for the same file as `url`, or `url` itself: a signed URL expires, and its message re-signs it. */
 export const latestPdfUrl = (url: string): string => latestUrls.get(pdfFileKey(url)) ?? url;
 
-/** Forgets every remembered URL: they were signed for the session that ended, and the next one on this tab must not reuse them. */
+/**
+ * Forgets every remembered URL and drawn thumbnail: they belong to the session that ended, and the next one on this
+ * tab must not reuse or show them.
+ */
 export const forgetPdfUrls = (): void => {
     latestUrls.clear();
+    clearPdfThumbnailCache();
 };

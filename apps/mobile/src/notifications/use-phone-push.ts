@@ -16,6 +16,7 @@ import {
     noteSignedInAccount,
     pushRegistrations,
     syncApprovalActions,
+    syncExtensionAddress,
 } from "./phone-push";
 import { createAccountChecks, createForegroundGate, createPromptOffer, createTokenChangeFilter, registerPhoneForPush } from "./push-registration";
 
@@ -86,6 +87,7 @@ const syncActionsNow = async (): Promise<boolean> => {
 const attemptSetUp = async (): Promise<boolean> => {
     try {
         await configurePhoneNotifications();
+        await syncExtensionAddress();
 
         return true;
     } catch (error: unknown) {

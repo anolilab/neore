@@ -784,7 +784,7 @@ export interface InternalApiTypes {
                 deleteUserStreamingMessages: FunctionReference<"mutation", { userId: string }, { hasMore: boolean }>;
                 deleteUserSubAgentRuns: FunctionReference<"mutation", { userId: string }, { hasMore: boolean }>;
                 deleteUserThreadSummaries: FunctionReference<"mutation", { userId: string }, { hasMore: boolean }>;
-                deleteUserUsageDaily: FunctionReference<"mutation", { userId: string }, { hasMore: boolean }>;
+                deleteUserUsageDaily: FunctionReference<"mutation", { runCursor?: string | null; userId: string }, { hasMore: boolean; runCursor: string | null }>;
                 deleteUserWorkflowData: FunctionReference<"mutation", { userId: string }, { hasMore: boolean }>;
                 deregisterMessengerWebhooks: FunctionReference<"action", { userId: string }, null>;
                 killUserSandboxes: FunctionReference<"action", { userId: string }, null>;
@@ -792,6 +792,7 @@ export interface InternalApiTypes {
                 listSandboxIdsForDeletion: FunctionReference<"query", { userId: string }, Array<string>>;
                 minimiseGdprRecords: FunctionReference<"mutation", { retainEmailOf?: Id<"gdprRequests">; userId: string }, null>;
                 purgeUserDocumentHistory: FunctionReference<"mutation", { userId: string }, { hasMore: boolean }>;
+                purgeUserUsageFiles: FunctionReference<"action", { cursor?: string | null; force?: boolean; userId: string }, { cursor: string | null; waiting: boolean }>;
                 revokeUserConnectorGrants: FunctionReference<"action", { userId: string }, null>;
             };
         };
@@ -1298,6 +1299,14 @@ export interface InternalApiTypes {
         backfill: {
             runUsageBackfillStep: FunctionReference<"mutation", { runId: string; userId: string }, null>;
             sweepUsageRollup: FunctionReference<"mutation", {}, { pruned: number; status: "idle" | "running" | "done" }>;
+        };
+        gdpr: {
+            clearUsageExportPieces: FunctionReference<"mutation", { requestId: string; userId: string }, { hasMore: boolean }>;
+            keyedUsageRuns: FunctionReference<"query", { cursor: string | null; userId: string }, { cursor: string | null; keyed: Array<{ key?: string; live: boolean; runId: Id<"usageExportRuns"> }> }>;
+            purgeUsageFile: FunctionReference<"action", { key: string; runId: Id<"usageExportRuns"> }, null>;
+            rearmLiveUsageRun: FunctionReference<"mutation", { runId: Id<"usageExportRuns">; userId: string }, null>;
+            releaseUsageKey: FunctionReference<"mutation", { runId: Id<"usageExportRuns"> }, null>;
+            sweepUsageExportPieces: FunctionReference<"mutation", {}, null>;
         };
     };
     vault: {
@@ -2122,6 +2131,7 @@ export const internal: InternalApiTypes = {
                 listSandboxIdsForDeletion: { __lunoraRef: "gdpr_steps_residual_deletion_steps:listSandboxIdsForDeletion" },
                 minimiseGdprRecords: { __lunoraRef: "gdpr_steps_residual_deletion_steps:minimiseGdprRecords" },
                 purgeUserDocumentHistory: { __lunoraRef: "gdpr_steps_residual_deletion_steps:purgeUserDocumentHistory" },
+                purgeUserUsageFiles: { __lunoraRef: "gdpr_steps_residual_deletion_steps:purgeUserUsageFiles" },
                 revokeUserConnectorGrants: { __lunoraRef: "gdpr_steps_residual_deletion_steps:revokeUserConnectorGrants" },
             },
         },
@@ -2628,6 +2638,14 @@ export const internal: InternalApiTypes = {
         backfill: {
             runUsageBackfillStep: { __lunoraRef: "usage_backfill:runUsageBackfillStep" },
             sweepUsageRollup: { __lunoraRef: "usage_backfill:sweepUsageRollup" },
+        },
+        gdpr: {
+            clearUsageExportPieces: { __lunoraRef: "usage_gdpr:clearUsageExportPieces" },
+            keyedUsageRuns: { __lunoraRef: "usage_gdpr:keyedUsageRuns" },
+            purgeUsageFile: { __lunoraRef: "usage_gdpr:purgeUsageFile" },
+            rearmLiveUsageRun: { __lunoraRef: "usage_gdpr:rearmLiveUsageRun" },
+            releaseUsageKey: { __lunoraRef: "usage_gdpr:releaseUsageKey" },
+            sweepUsageExportPieces: { __lunoraRef: "usage_gdpr:sweepUsageExportPieces" },
         },
     },
     vault: {

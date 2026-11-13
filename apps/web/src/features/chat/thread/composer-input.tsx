@@ -55,6 +55,7 @@ import { captureScreenFrame, isScreenCaptureSupported } from "@/features/chat/co
 import type { ComposerRestoreFile } from "@/features/chat/core/utils/composer-restore";
 import { loadRestoreFile, onComposerRestore, textAfterRestore } from "@/features/chat/core/utils/composer-restore";
 import { onComposerAttachRequest, onComposerSubmitRequest } from "@/features/chat/core/utils/composer-submit";
+import { isSendStarting } from "@/features/chat/core/utils/send-in-flight";
 import ComposerPromptImprovementButton from "@/features/chat/prompt-improvement/components/composer-prompt-improvement-button";
 import { draftOwnership } from "@/features/chat/split/composer-drafts";
 import AutoReadReplies from "@/features/chat/voice-mode/auto-read-replies";
@@ -1165,7 +1166,8 @@ const ComposerInput = ({
         const intent = composerSubmitIntent({
             hasAttachments: draftAttachments.length > 0,
             isComparisonValid,
-            isStreaming,
+            // Another send in this thread has begun (a guest note's) and its reply does not stream yet: this one waits too.
+            isStreaming: isStreaming || isSendStarting(threadId),
             isThreadComposer,
             text: draftText,
             threadId,

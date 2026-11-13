@@ -1,22 +1,20 @@
+import LucideIconByName from "@neore/ui/components/lucide-icon-by-name";
 import { Folder } from "lucide-react";
-import type { IconName } from "lucide-react/dynamic";
-import { DynamicIcon, iconNames } from "lucide-react/dynamic";
 
 import IconPlaceholder from "./icon-placeholder";
 
-const KNOWN_ICON_NAMES = new Set<string>(iconNames);
-
 /**
- * A project's icon, which is a lucide name chosen at runtime. It is loaded on
- * demand, and this module is itself lazy: `lucide-react/dynamic` carries an
- * import map of every icon (~190KB), which does not belong on the chat route.
+ * A project's icon, a lucide name chosen at runtime. The first one loads the map of
+ * every icon as one lazy chunk; a name lucide does not have shows the folder icon.
  */
-const ProjectIcon = ({ color, name }: { color: string; name: string }) => {
-    if (!KNOWN_ICON_NAMES.has(name)) {
-        return <Folder className="size-3" style={{ color }} />;
-    }
-
-    return <DynamicIcon className="size-3" fallback={IconPlaceholder} name={name as IconName} style={{ color }} />;
-};
+const ProjectIcon = ({ color, name }: { color: string; name: string }) => (
+    <LucideIconByName
+        className="size-3"
+        fallback={<IconPlaceholder />}
+        name={name}
+        notFound={<Folder className="size-3" style={{ color }} />}
+        style={{ color }}
+    />
+);
 
 export default ProjectIcon;

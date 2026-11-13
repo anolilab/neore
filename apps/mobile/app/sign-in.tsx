@@ -3,6 +3,7 @@ import { useState } from "react";
 import { AccessibilityInfo, Pressable, Text, View } from "react-native";
 
 import { useAuth } from "@/auth/auth-state";
+import { withFinally } from "@/lib/guarded";
 
 const SignInScreen = () => {
     const { signIn } = useAuth();
@@ -15,13 +16,18 @@ const SignInScreen = () => {
         // The button's busy state is read only when it has focus; the announcement reaches VoiceOver and TalkBack either way.
         AccessibilityInfo.announceForAccessibility("Opening sign-in");
 
-        try {
-            await signIn();
-        } catch (error_) {
-            setError(error_ instanceof Error ? error_.message : "Sign-in failed.");
-        } finally {
+        const attempt = async () => {
+            try {
+                await signIn();
+            } catch (error_) {
+                setError(error_ instanceof Error ? error_.message : "Sign-in failed.");
+            }
+        };
+
+        // `withFinally`, not `try … finally`: the React Compiler skips a component that holds a `finally`.
+        await withFinally(attempt, () => {
             setBusy(false);
-        }
+        });
     };
 
     return (

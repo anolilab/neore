@@ -3,10 +3,10 @@ import { LegendList } from "@legendapp/list/react-native";
 import { api } from "@neore/backend/api";
 import type { Id } from "@neore/backend/dataModel";
 import { randomUUID } from "expo-crypto";
-import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
+import { useFocusEffect, useIsFocused, useLocalSearchParams, useRouter } from "expo-router";
 import type { ComponentRef } from "react";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { AccessibilityInfo, Keyboard, KeyboardAvoidingView, Pressable, Share, Text, TextInput, View } from "react-native";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { AccessibilityInfo, Keyboard, KeyboardAvoidingView, Pressable, Share, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useAuth } from "@/auth/auth-state";
@@ -14,20 +14,27 @@ import { fetchAccessToken } from "@/auth/grant";
 import { secureGrantStore } from "@/auth/secure-store";
 import type { StartedChat } from "@/chat/chat-api";
 import { ChatError, startChat } from "@/chat/chat-api";
+import { ChatComposer } from "@/chat/chat-composer";
+import type { ShownRow } from "@/chat/chunk-batcher";
+import { appendTexts, createChunkBatcher } from "@/chat/chunk-batcher";
+import { createDraftStore } from "@/chat/draft-store";
 import { forgetLastThread, rememberLastThread } from "@/chat/last-thread-store";
 import { displayTextOf, shareTextOf } from "@/chat/message-parts";
+import { MessageRowView } from "@/chat/message-row";
 import { isScrolledToEnd, scrollToLatestLabel, scrollToLatestText, shouldShowScrollToLatest } from "@/chat/scroll-to-latest";
 import type { SendSession } from "@/chat/send-sessions";
 import { sendSessions } from "@/chat/send-sessions";
-import { shareableMessageText, shareLabel } from "@/chat/share-message";
 import type { HeldSend } from "@/chat/start-send";
 import { abortableSleep, afterStart, clientMessageIdFor, replyStreamOf, startWithRetries } from "@/chat/start-send";
+import type { StreamDelta } from "@/chat/stream";
 import { relayReply } from "@/chat/stream";
 import type { SendStage } from "@/chat/unsent-send";
 import { failedSendMessage, failedSendOutcome, giveBackDraft, shouldKeepClientMessageId, withoutUnsentRows } from "@/chat/unsent-send";
+import { useIsAppActive } from "@/chat/use-app-active";
 import { useReplyConfirmation } from "@/chat/use-reply-confirmation";
 import { loadConfig } from "@/lib/config";
 import { DEFAULT_CHAT_MODEL } from "@/lib/defaults";
+import { withCatch, withFinally } from "@/lib/guarded";
 import { getClient } from "@/lib/lunora";
 import { streamingFetch } from "@/lib/streaming-fetch";
 import { offerPhonePush } from "@/notifications/use-phone-push";
@@ -37,14 +44,12 @@ import { createMessageReadGate, readOlderMessages, readThreadMessages } from "@/
 import { OfflineBanner } from "@/offline/offline-banner";
 import { useOffline, useWriteControl } from "@/offline/offline-context";
 import { settleQuietly } from "@/offline/quietly";
-import type { MessageRow } from "@/offline/types";
 import { requireOnline } from "@/offline/write-gate";
-import { useDictation } from "@/voice/use-dictation";
-import { VoiceButton, VoiceStatus } from "@/voice/voice-button";
-import { appendTranscript } from "@/voice/voice-input";
 
 /** A row on this screen; `finished` marks a local row whose send completed, which no server read has confirmed yet. */
-type Row = MessageRow & { finished?: boolean };
+type Row = ShownRow;
+
+const rowKey = (row: Row): string => row.id;
 
 const NEW_THREAD = "new";
 
@@ -120,15 +125,24 @@ const finishRow = (rows: Row[], id: string): Row[] =>
         return { ...row, finished: true };
     });
 
-/** Adds `text` to the end of the row with `id`, leaving every other row as it is. */
-const appendToRow = (rows: Row[], id: string, text: string): Row[] =>
-    rows.map((row) => {
-        if (row.id !== id) {
-            return row;
-        }
+/** When the newest server-confirmed row on screen was read; local rows, and finished ones not yet re-read, do not count. */
+const newestSyncedAt = (rows: Row[]): number | undefined => {
+    let newest: number | undefined;
 
-        return { ...row, shareText: row.shareText + text, text: row.text + text };
-    });
+    for (const row of rows) {
+        if (row.status !== "local" && row.finished !== true && (newest === undefined || row.syncedAt > newest)) {
+            newest = row.syncedAt;
+        }
+    }
+
+    return newest;
+};
+
+/** A steer starts a new row. The row before it stays unless it has no text yet: then it is not part of the reply. */
+const withSteeredRow = (rows: Row[], previousId: string, steered: Row): Row[] => [
+    ...rows.filter((row) => row.id !== previousId || row.text !== ""),
+    steered,
+];
 
 const fetchMessagePage = (threadId: string, cursor: string | null) =>
     getClient().query(api.chat.functions.getThreadUIMessages, {
@@ -170,20 +184,12 @@ const Chat = () => {
     // Where the next older page starts; null once the whole history is loaded.
     const [olderCursor, setOlderCursor] = useState<string | null>(null);
     const [isLoadingOlder, setIsLoadingOlder] = useState(false);
-    const [draft, setDraftState] = useState("");
-    // The composer as the last write left it, like `rowsRef`: a failed send decides whether its prompt lands alone or ahead
-    // of text typed meanwhile against the composer as it is, not as it was when the send started.
-    const draftRef = useRef("");
-    const setDraft = useCallback((update: string | ((current: string) => string)) => {
-        const next = typeof update === "function" ? update(draftRef.current) : update;
-
-        draftRef.current = next;
-        setDraftState(next);
-    }, []);
+    // The composer's text. Only `ChatComposer` subscribes, so typing never re-renders this screen or its message list.
+    // Like `rowsRef`, it is the composer as the last write left it: a failed send decides whether its prompt lands alone or
+    // ahead of text typed meanwhile against the composer as it is, not as it was when the send started.
+    const [draft] = useState(createDraftStore);
     const [sending, setSending] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    // The words land in the draft, after anything typed meanwhile; they are never sent on their own.
-    const voice = useDictation({ onText: (text) => setDraft((current) => appendTranscript(current, text)) });
     const listRef = useRef<LegendListRef>(null);
     // Whether the list shows its last message: the jump button shows whenever it does not, and while a reply streams.
     const [isAtEnd, setIsAtEnd] = useState(true);
@@ -306,22 +312,7 @@ const Chat = () => {
 
         setIsLoadingOlder(true);
 
-        try {
-            const result = await readOlderMessages({
-                cache,
-                fetchPage: async () => {
-                    const page = await fetchMessagePage(threadId, olderCursor);
-                    const syncedAt = Date.now();
-
-                    return {
-                        olderCursor: page.isDone ? null : page.continueCursor,
-                        rows: page.page.map((message) => toRow(message, threadId, syncedAt)),
-                    };
-                },
-                gate: readGate.current,
-                threadId,
-            });
-
+        const showOlder = (result: Awaited<ReturnType<typeof readOlderMessages>>) => {
             switch (result.kind) {
                 case "failed": {
                     setError(result.message);
@@ -350,9 +341,27 @@ const Chat = () => {
                     break;
                 }
             }
-        } finally {
-            setIsLoadingOlder(false);
-        }
+        };
+
+        const fetchPage = async () => {
+            const page = await fetchMessagePage(threadId, olderCursor);
+            const syncedAt = Date.now();
+
+            return {
+                olderCursor: page.isDone ? null : page.continueCursor,
+                rows: page.page.map((message) => toRow(message, threadId, syncedAt)),
+            };
+        };
+
+        // `withFinally`, not `try … finally`: the React Compiler skips a component that holds a `finally`.
+        await withFinally(
+            async () => {
+                showOlder(await readOlderMessages({ cache, fetchPage, gate: readGate.current, threadId }));
+            },
+            () => {
+                setIsLoadingOlder(false);
+            },
+        );
     };
 
     // The saved messages paint first; live rows replace them, and a cached row never replaces a newer live one.
@@ -364,14 +373,11 @@ const Chat = () => {
         let isCancelled = false;
 
         const showCached = async () => {
-            try {
-                const cached = await cache.loadMessages(threadId);
+            // An unreadable cache is an empty one.
+            const cached = await withCatch(async () => await cache.loadMessages(threadId), (): Row[] => []);
 
-                if (!isCancelled && !hasLiveRows.current && !isRefused.current && cached.length > 0) {
-                    writeRows((current) => byCreation(mergeRows(current, cached)));
-                }
-            } catch {
-                // An unreadable cache is an empty one.
+            if (!isCancelled && !hasLiveRows.current && !isRefused.current && cached.length > 0) {
+                writeRows((current) => byCreation(mergeRows(current, cached)));
             }
         };
 
@@ -414,8 +420,12 @@ const Chat = () => {
     const onConfirmationEnded = useCallback(() => {
         setError(withoutAwaitReply);
     }, []);
+    const isFocused = useIsFocused();
+    const isAppActive = useIsAppActive();
     const { addConfirmation, confirmTick, isAwaitingReply } = useReplyConfirmation({
         fetchPage: fetchMessagePage,
+        // Nobody sees a check's result behind another screen or with the app in the background.
+        isPaused: !isFocused || !isAppActive,
         onEnded: onConfirmationEnded,
         onRefused: onConfirmationRefused,
         threadId,
@@ -450,9 +460,9 @@ const Chat = () => {
 
         // Back to this screen's composer, ahead of anything typed meanwhile, with its held id: the same prompt sent again
         // alone and unchanged is the same send (`clientMessageIdFor`). A screen left meanwhile is gone, and so is the prompt.
-        const { draft: given, isMerged } = giveBackDraft(draftRef.current, prompt);
+        const { draft: given, isMerged } = giveBackDraft(draft.get(), prompt);
 
-        setDraft(given);
+        draft.set(given);
         writeRows((current) => withoutUnsentRows(current, [ids.user, ids.assistant]));
         heldSend.current = shouldKeepClientMessageId(failure) ? { clientMessageId, prompt } : null;
 
@@ -500,9 +510,9 @@ const Chat = () => {
     };
 
     const send = async () => {
-        // The composer as the last write left it (`draftRef`), not as this render saw it: an edit made just before the press
+        // The composer as the last write left it (`draft`), not as this render saw it: an edit made just before the press
         // is what is sent.
-        const prompt = draftRef.current.trim();
+        const prompt = draft.get().trim();
 
         if (!prompt || sending || sendControl.disabled) {
             return;
@@ -530,7 +540,7 @@ const Chat = () => {
         setError(null);
         // Announced when a reply starts and when it finishes. The deltas stay silent: an announcement on each would flood the reader.
         AccessibilityInfo.announceForAccessibility("Assistant is replying");
-        setDraft("");
+        draft.set("");
         const stamp = Date.now();
         const userId = `user-${stamp}`;
         const assistantId = `pending-${stamp}`;
@@ -543,9 +553,11 @@ const Chat = () => {
         ]);
 
         // How far the send got decides whether a failure gives the prompt back (`settleFailedSend`).
-        let stage: SendStage = "before-request";
+        const progress: { stage: SendStage } = { stage: "before-request" };
 
-        try {
+        // The send as a closure run by `withCatch` and `withFinally` below, not a `try` around it: the React Compiler skips
+        // a component that holds a `finally`, or a `throw` inside a `try`.
+        const deliver = async () => {
             const config = loadConfig();
             const jwt = await fetchAccessToken({ fetch, lunoraUrl: config.lunoraUrl, store: secureGrantStore });
 
@@ -559,7 +571,7 @@ const Chat = () => {
             // is tried again while its first try is still being saved, or when a try gets no answer (`startWithRetries`). A
             // resend the server already took answers with that send's ids (`duplicate`), and opens that chat like any start.
             const started = await requireOnline({ isOffline: sendControl.disabled }, () => {
-                stage = "requested";
+                progress.stage = "requested";
 
                 return startWithRetries({
                     attempt: async () =>
@@ -581,7 +593,7 @@ const Chat = () => {
                 return;
             }
 
-            stage = "accepted";
+            progress.stage = "accepted";
             acceptStart({ controller, sender, started, userId });
 
             const replyStream = replyStreamOf(started);
@@ -601,41 +613,62 @@ const Chat = () => {
             // saves that text as a message of its own.
             let activeId = assistantId;
             let steerCount = 0;
-            const outcome = await relayReply({
-                fetch: streamingFetch,
-                gatewayUrl: config.gatewayUrl,
-                onDelta: ({ restart, text }) => {
-                    // A send that was stopped, by a refusal of its chat or by leaving the screen, writes nothing more.
-                    if (controller.signal.aborted) {
-                        return;
-                    }
-
-                    if (restart) {
-                        isSteered = true;
-                        const previousId = activeId;
-
-                        steerCount += 1;
-                        activeId = `${assistantId}-${steerCount}`;
-                        writeRows((current) => {
-                            // A row that has no text yet is not part of the reply; the steered text takes its place.
-                            const kept = current.filter((row) => row.id !== previousId || row.text !== "");
-
-                            return [...kept, localRow(activeId, "assistant", threadId ?? NEW_THREAD, text)];
-                        });
-
-                        return;
-                    }
-
-                    writeRows((current) => appendToRow(current, activeId, text));
+            // Deltas land at most once a frame, each batch in one update that replaces only the streaming row.
+            const chunks = createChunkBatcher({
+                apply: (texts) => {
+                    writeRows((current) => appendTexts(current, texts));
                 },
+                cancelFrame: cancelAnimationFrame,
+                requestFrame: requestAnimationFrame,
                 signal: controller.signal,
-                streamToken: replyStream.streamToken,
             });
+            const onDelta = ({ restart, text }: StreamDelta) => {
+                // A send that was stopped, by a refusal of its chat or by leaving the screen, writes nothing more.
+                if (controller.signal.aborted) {
+                    chunks.discard();
+
+                    return;
+                }
+
+                if (restart) {
+                    // The text before the steer lands in its own row first.
+                    chunks.flush();
+                    isSteered = true;
+                    const previousId = activeId;
+
+                    steerCount += 1;
+                    activeId = `${assistantId}-${steerCount}`;
+                    const steered = localRow(activeId, "assistant", threadId ?? NEW_THREAD, text);
+
+                    writeRows((current) => withSteeredRow(current, previousId, steered));
+
+                    return;
+                }
+
+                chunks.add(activeId, text);
+            };
+            // The batcher stops listening to the send once the stream has settled, however it ended.
+            const outcome = await withFinally(
+                async () =>
+                    await relayReply({
+                        fetch: streamingFetch,
+                        gatewayUrl: config.gatewayUrl,
+                        onDelta,
+                        signal: controller.signal,
+                        streamToken: replyStream.streamToken,
+                    }),
+                chunks.detach,
+            );
 
             // A send stopped on purpose has its notice on screen already, and gets no confirmation.
             if (controller.signal.aborted) {
+                chunks.discard();
+
                 return;
             }
+
+            // The last deltas are on screen before the reply is marked finished or confirmed.
+            chunks.flush();
 
             if (outcome === "failed") {
                 throw new ChatError("The reply did not finish. Try again.");
@@ -650,7 +683,8 @@ const Chat = () => {
             addConfirmation({ holdsSend: outcome === "unconfirmed", messageId: started.messageId, steers: steerCount, threadId: started.threadId });
 
             AccessibilityInfo.announceForAccessibility("Reply finished");
-        } catch (error_) {
+        };
+        const recover = (error_: unknown) => {
             // A send sign-out stopped belongs to the account that left: its prompt and held id are dropped, never kept for
             // the next one to sign in.
             if (sendSession.isSignedOut()) {
@@ -660,16 +694,23 @@ const Chat = () => {
                 return;
             }
 
-            const { isMerged } = settleFailedSend({ clientMessageId, error: error_, ids: { assistant: assistantId, user: userId }, prompt, stage });
+            const { isMerged } = settleFailedSend({ clientMessageId, error: error_, ids: { assistant: assistantId, user: userId }, prompt, stage: progress.stage });
 
             // The abort error of a send stopped on purpose is not shown: its notice is.
             if (!controller.signal.aborted) {
-                setError(failedSendMessage(error_, stage, { isMerged }));
+                setError(failedSendMessage(error_, progress.stage, { isMerged }));
             }
-        } finally {
-            sendSession.end();
-            setSending(false);
-        }
+        };
+
+        await withFinally(
+            async () => {
+                await withCatch(deliver, recover);
+            },
+            () => {
+                sendSession.end();
+                setSending(false);
+            },
+        );
     };
 
     // The last known geometry of the list. The end is recomputed whenever any of it changes, not only on a scroll.
@@ -701,7 +742,8 @@ const Chat = () => {
             );
 
     /** Opens the system share sheet. Cancelling resolves normally, so a rejection is a failure to open it. */
-    const shareRow = async (text: string): Promise<void> => {
+    // Stable, so a memoised row is not re-rendered for a new handler.
+    const shareRow = useCallback(async (text: string): Promise<void> => {
         try {
             await Share.share({ message: text });
             setError(withoutShareFailure);
@@ -711,12 +753,13 @@ const Chat = () => {
             // The message on screen can be out of view when the sheet fails: a screen reader needs the announcement.
             AccessibilityInfo.announceForAccessibility(SHARE_FAILED_MESSAGE);
         }
-    };
+    }, []);
+    const renderRow = useCallback((info: { item: Row }) => <MessageRowView onShare={shareRow} row={info.item} />, [shareRow]);
 
     // The home indicator's inset, which the open keyboard already covers.
     const safeBottom = keyboardShown ? 0 : insets.bottom;
-    const syncedTimes = rows.filter((row) => row.status !== "local" && row.finished !== true).map((row) => row.syncedAt);
-    const syncedAt = syncedTimes.length === 0 ? undefined : Math.max(...syncedTimes);
+    // Over every row: worked out again only when the rows change, not on each keystroke, scroll or layout.
+    const syncedAt = useMemo(() => newestSyncedAt(rows), [rows]);
 
     // The control and its hint say why sending waits, so it is not announced as available while a reply is held.
     const sendReason = sendControl.reason ?? (isAwaitingReply ? AWAIT_REPLY_MESSAGE : undefined);
@@ -736,7 +779,7 @@ const Chat = () => {
                     <LegendList
                         data={rows}
                         estimatedItemSize={72}
-                        keyExtractor={(row) => row.id}
+                        keyExtractor={rowKey}
                         ListHeaderComponent={olderHeader}
                         onContentSizeChange={(_width, height) => {
                             metrics.current = { ...metrics.current, contentHeight: height };
@@ -744,34 +787,7 @@ const Chat = () => {
                         }}
                         onScroll={onListScroll}
                         ref={listRef}
-                        renderItem={({ item }) => {
-                            // Only a finished message can be shared: one still streaming, or one that failed, is not the whole text.
-                            const isFinished = item.status === "success" || item.finished === true;
-                            const shareText = isFinished ? shareableMessageText({ text: item.shareText }) : undefined;
-
-                            return (
-                                <View style={{ alignSelf: item.role === "user" ? "flex-end" : "flex-start", maxWidth: "85%", padding: 12 }}>
-                                    <Text selectable>{item.text || (item.role === "assistant" ? "..." : "")}</Text>
-                                    {shareText !== undefined && (
-                                        <Pressable
-                                            accessibilityLabel={shareLabel({ role: item.role, text: shareText })}
-                                            accessibilityRole="button"
-                                            onPress={() => shareRow(shareText)}
-                                            style={{
-                                                alignItems: "center",
-                                                alignSelf: "flex-start",
-                                                justifyContent: "center",
-                                                minHeight: 44,
-                                                minWidth: 44,
-                                                paddingHorizontal: 12,
-                                            }}
-                                        >
-                                            <Text style={{ fontSize: 12 }}>Share</Text>
-                                        </Pressable>
-                                    )}
-                                </View>
-                            );
-                        }}
+                        renderItem={renderRow}
                     />
                     {shouldShowScrollToLatest({ isScrolledToEnd: isAtEnd, isStreaming: sending })
                         ? (
@@ -806,32 +822,7 @@ const Chat = () => {
                     </Text>
                     )
                     : null}
-                <View style={{ flexDirection: "row", gap: 8, padding: 12, paddingBottom: sendReason ? 12 : 12 + safeBottom }}>
-                    <TextInput
-                        accessibilityHint={composer.reason}
-                        accessibilityLabel="Message"
-                        accessibilityState={{ disabled: composer.disabled }}
-                        editable={!composer.disabled}
-                        multiline
-                        onChangeText={setDraft}
-                        placeholder="Message"
-                        style={{ borderColor: "#ccc", borderRadius: 10, borderWidth: 1, flex: 1, padding: 10 }}
-                        value={draft}
-                    />
-                    <VoiceButton disabledReason={composer.reason} isDisabled={composer.disabled} voice={voice} />
-                    <Pressable
-                        accessibilityHint={sendReason}
-                        accessibilityRole="button"
-                        accessibilityState={{ disabled: isSendBlocked }}
-                        disabled={isSendBlocked}
-                        onPress={send}
-                        style={{ justifyContent: "center", opacity: isSendBlocked ? 0.5 : 1, padding: 12 }}
-                    >
-                        <Text style={{ fontWeight: "600" }}>Send</Text>
-                    </Pressable>
-                </View>
-                <VoiceStatus error={voice.error} phase={voice.phase} />
-                {sendReason ? <Text style={{ fontSize: 12, paddingBottom: 8 + safeBottom, paddingHorizontal: 12 }}>{sendReason}</Text> : null}
+                <ChatComposer control={composer} draft={draft} isSendBlocked={isSendBlocked} onSend={send} safeBottom={safeBottom} sendReason={sendReason} />
             </KeyboardAvoidingView>
         </View>
     );

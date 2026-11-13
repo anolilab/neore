@@ -598,3 +598,73 @@ describe("the version-one cache", () => {
         expect(saved?.shareText).toBe("Saved reply");
     });
 });
+
+describe("message writes", () => {
+    /** Counts the message upserts that reach the database: each is one call across to the native side in the app. */
+    const countingCache = () => {
+        const made = makeCache();
+        const upserts: number[] = [];
+        const { runAsync } = made.database;
+
+        made.database.runAsync = async (source, params = []) => {
+            if (source.trimStart().startsWith("INSERT INTO cached_messages")) {
+                upserts.push(params.length);
+            }
+
+            await runAsync(source, params);
+        };
+
+        return { ...made, upserts };
+    };
+
+    it("saves a read's messages in one statement, not one per row", async () => {
+        const { cache, upserts } = countingCache();
+        const scoped = await owned(cache);
+        const messages = Array.from({ length: MAX_MESSAGES_PER_THREAD }, (_, index) => message(`m${index}`, "t", index + 1));
+
+        await scoped.saveMessages("t", messages);
+
+        expect(upserts).toStrictEqual([MAX_MESSAGES_PER_THREAD * 9]);
+        expect(await scoped.loadMessages("t")).toHaveLength(MAX_MESSAGES_PER_THREAD);
+    });
+
+    it("splits a very large save into statements of at most 100 rows", async () => {
+        const { cache, upserts } = countingCache();
+        const scoped = await owned(cache);
+
+        await scoped.saveMessages(
+            "t",
+            Array.from({ length: 250 }, (_, index) => message(`m${index}`, "t", index + 1)),
+        );
+
+        expect(upserts).toStrictEqual([900, 900, 450]);
+    });
+
+    it("guards each row of one statement against its stored copy, as row-by-row saves did", async () => {
+        const { cache, clock } = countingCache();
+        const scoped = await owned(cache);
+
+        clock.now = 5000;
+        await scoped.saveMessages("t", [message("kept", "t", 1, { text: "newer", updatedAt: 9 }), message("old", "t", 2, { updatedAt: 1 })]);
+        clock.now = 6000;
+        await scoped.saveMessages("t", [message("kept", "t", 1, { text: "stale", updatedAt: 3 }), message("old", "t", 2, { text: "fresh", updatedAt: 4 })]);
+
+        const rows = await scoped.loadMessages("t");
+
+        expect(rows.map((row) => [row.id, row.text, row.syncedAt])).toStrictEqual([
+            ["kept", "newer", 5000],
+            ["old", "fresh", 6000],
+        ]);
+    });
+
+    it("keeps the later copy when one save holds the same message twice", async () => {
+        const { cache } = countingCache();
+        const scoped = await owned(cache);
+
+        await scoped.saveMessages("t", [message("m", "t", 1, { text: "first", updatedAt: 1 }), message("m", "t", 1, { text: "second", updatedAt: 2 })]);
+
+        const rows = await scoped.loadMessages("t");
+
+        expect(rows.map((row) => row.text)).toStrictEqual(["second"]);
+    });
+});

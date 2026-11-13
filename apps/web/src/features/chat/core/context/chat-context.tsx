@@ -22,11 +22,10 @@ import type { ReactNode } from "react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 
+import { useAuthSession } from "@/features/auth/hooks/use-auth-session";
 import useInviteOnly from "@/features/auth/hooks/use-invite-only";
 import { useUserSettings } from "@/features/auth/hooks/use-user-settings";
-import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 import { openLoginPrompt } from "@/features/auth/stores/login-prompt-store";
-import { holdForSignIn } from "@/features/chat/core/hooks/use-pending-send";
 import useLocalModelTurn from "@/features/local-models/hooks/use-local-model-turn";
 import type { UIMessage } from "@/lib/agent";
 import { trackEvent } from "@/lib/analytics";
@@ -45,7 +44,7 @@ import { createReadinessGate } from "../utils/readiness-gate";
 import { runEditMessage, runReloadMessage } from "./branch-actions";
 import type { ChangedSettings, StreamingMessage } from "./chat-action-shared";
 import { stopTarget, toAppError } from "./chat-action-shared";
-import { ChatActionsContext, ChatMessagesContext, ChatStreamingContext, ChatThreadContext } from "./chat-context-hooks";
+import ChatContextProviders from "./chat-context-providers";
 import type {
     ChatActionsContextValue,
     ChatMessagesContextValue,
@@ -58,16 +57,19 @@ import type {
 import type { GatewayInfo } from "./chat-gateway";
 import { NO_GATEWAY_INFO, pendingGatewayInfo } from "./chat-gateway";
 import { kickOffMediaGeneration } from "./media-kickoff";
-import { runSendMessage } from "./send-message";
+import type { SendMessageOptions, SendOutcome } from "./send-message";
+import { holdSendForSignIn, runSendMessage } from "./send-message";
 import { registerThreadErrorSink, takeUndeliveredThreadError } from "./thread-error-sinks";
 
 // The context objects, hooks and value types live in sibling files; importers keep this path.
 export {
     ChatActionsContext,
     ChatContext,
+    ChatIsEmptyContext,
     ChatMessagesContext,
     ChatStreamingContext,
     ChatThreadContext,
+    ChatThreadIdentityContext,
     useChat,
     useChatActions,
     useChatError,
@@ -77,6 +79,7 @@ export {
     useChatLunora,
     useChatMessages,
     useChatThread,
+    useChatThreadIdentity,
 } from "./chat-context-hooks";
 export type {
     ChatActionsContextValue,
@@ -84,6 +87,7 @@ export type {
     ChatMessagesContextValue,
     ChatStreamingContextValue,
     ChatThreadContextValue,
+    ChatThreadIdentity,
 } from "./chat-context-types";
 
 interface ChatProviderProps {
@@ -165,8 +169,7 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
         return registerThreadErrorSink(threadId, handleError);
     }, [threadId, handleError]);
 
-    const { hooks } = useAuth();
-    const { data: sessionData, refetch: refetchSession } = hooks.useSession();
+    const { data: sessionData, refetch: refetchSession } = useAuthSession();
     const isAuthenticated = !!sessionData?.user;
 
     // A send that lands before the session query resolves WAITS on this rather
@@ -677,16 +680,14 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
     const { mustSignIn } = useInviteOnly();
 
     const sendMessage = useCallback(
-        async (text: string, attachments?: PendingAttachment[]) => {
+        async (text: string, attachments?: PendingAttachment[], options?: SendMessageOptions): Promise<SendOutcome> => {
             if (mustSignIn) {
-                useChatUIStore.getState().setComposerText(text);
-                useChatUIStore.getState().setIsSubmitting(false);
-                holdForSignIn(text);
+                holdSendForSignIn(text, options);
 
-                return;
+                return { refused: false, signIn: true, started: false };
             }
 
-            await runSendMessage(
+            return await runSendMessage(
                 {
                     authGate,
                     authHeader,
@@ -714,6 +715,15 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
                     streamingMessageRef,
                     texts: {
                         bannedContent: () => t`Your message contains inappropriate content that cannot be sent.`,
+                        guestLinkEnded: () => t`That guest link has ended.`,
+                        guestNoteAlreadySent: () => t`That message was already sent.`,
+                        guestNoteAsGoal: () => t`A guest's message cannot be sent as a goal.`,
+                        guestNoteBeingSent: () => t`That message is being sent.`,
+                        guestNoteNeedsTextModel: () => t`Switch to a text model to send this message.`,
+                        guestNoteNotLocal: () => t`A guest's message is sent through a hosted model only. Pick one and send it again.`,
+                        guestNoteNotSendable: () => t`This message cannot be sent in this chat.`,
+                        guestNoteSessionNotReady: () =>
+                            t`We could not confirm your session in time. The guest's message was not sent; send it again from the Guests tab.`,
                         localTextOnly: () => t`Local models are text only. Remove the attachments to send.`,
                         sessionNotReady: () =>
                             t`We could not confirm your session in time. Your message is still in the composer. Please try sending it again.`,
@@ -724,6 +734,7 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
                 },
                 text,
                 attachments,
+                options,
             );
         },
         [
@@ -973,12 +984,8 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
     }, [sendMessage, cancelStream, reloadMessage, editMessage, copyMessage, clearError, regenerate, error, lunora, jwtToken]);
 
     return (
-        <ChatThreadContext value={threadContextValue}>
-            <ChatMessagesContext value={messagesContextValue}>
-                <ChatStreamingContext value={streamingContextValue}>
-                    <ChatActionsContext value={actionsContextValue}>{children}</ChatActionsContext>
-                </ChatStreamingContext>
-            </ChatMessagesContext>
-        </ChatThreadContext>
+        <ChatContextProviders actions={actionsContextValue} messages={messagesContextValue} streaming={streamingContextValue} thread={threadContextValue}>
+            {children}
+        </ChatContextProviders>
     );
 };

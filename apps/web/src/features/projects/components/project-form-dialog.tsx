@@ -5,15 +5,15 @@ import type { Id } from "@neore/backend/dataModel";
 import { Button } from "@neore/ui/components/button";
 import { ColorPicker } from "@neore/ui/components/color-picker";
 import { useAppForm } from "@neore/ui/components/form";
+import type { IconName } from "@neore/ui/components/icon-picker";
 import { IconPicker } from "@neore/ui/components/icon-picker";
 import { Input } from "@neore/ui/components/input";
 import { Label } from "@neore/ui/components/label";
+import LucideIconByName from "@neore/ui/components/lucide-icon-by-name";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogPanel, DialogTitle } from "@neore/ui/components/responsive-dialog";
 import { Textarea } from "@neore/ui/components/textarea";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@neore/ui/components/tooltip";
 import { useMutation } from "@tanstack/react-query";
-import type { IconName } from "lucide-react/dynamic";
-import { DynamicIcon } from "lucide-react/dynamic";
 import { useEffect, useEffectEvent } from "react";
 import { toast } from "sonner";
 import * as z from "zod";
@@ -290,7 +290,7 @@ const ProjectFormDialog = ({ editingProject, onClose, open }: ProjectFormDialogP
                                                                                 variant="outline"
                                                                             >
                                                                                 {iconField.state.value ? (
-                                                                                    <DynamicIcon className="size-4" name={iconField.state.value as IconName} />
+                                                                                    <LucideIconByName className="size-4" name={iconField.state.value} />
                                                                                 ) : (
                                                                                     <span className="text-muted-foreground text-xs">×</span>
                                                                                 )}

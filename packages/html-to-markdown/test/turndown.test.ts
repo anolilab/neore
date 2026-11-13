@@ -123,11 +123,11 @@ describe("turndown service API", () => {
         expect(service.keep(["del", "ins"])).toBe(service);
     });
 
-    it("keep rules are overridden by the standard rules", () => {
+    it("keep rules override the standard rules (upstream #455)", () => {
         const service = new TurndownService();
 
         service.keep("p");
-        expect(service.turndown("<p>Hello world</p>")).toBe("Hello world");
+        expect(service.turndown("<p>Hello world</p>")).toBe("<p>Hello world</p>");
     });
 
     it("keeping elements that have a blank textContent but contain significant elements", () => {
@@ -166,11 +166,11 @@ describe("turndown service API", () => {
         expect(service.remove(["del", "ins"])).toBe(service);
     });
 
-    it("remove elements are overridden by rules", () => {
+    it("remove elements override the standard rules (upstream #455)", () => {
         const service = new TurndownService();
 
         service.remove("p");
-        expect(service.turndown("<p>Hello world</p>")).toBe("Hello world");
+        expect(service.turndown("<p>Hello world</p>")).toBe("");
     });
 
     it("remove elements are overridden by keep", () => {
@@ -217,6 +217,21 @@ describe("unclosed raw-text elements in string input", () => {
 });
 
 describe("CDATA sections in DOM input", () => {
+    // A CDATA section prints its text, so an emphasis run must not join across it as if it printed nothing.
+    it("keeps a CDATA section between emphasis outside the emphasis", () => {
+        const htmlDocument = createDocument("<p><em>a</em></p>");
+        const paragraph = htmlDocument.querySelector("p") as Element;
+        const second = htmlDocument.createElement("em");
+
+        second.textContent = "b";
+        appendCdataSection(paragraph, "x");
+        // Domino has no ParentNode.append().
+        // eslint-disable-next-line unicorn/prefer-dom-node-append
+        paragraph.appendChild(second);
+
+        expect(new TurndownService().turndown(paragraph)).toBe("*a*x*b*");
+    });
+
     it("converts the text of a CDATA section in a paragraph", () => {
         const htmlDocument = createDocument("<p>before </p>");
         const paragraph = htmlDocument.querySelector("p") as Element;
