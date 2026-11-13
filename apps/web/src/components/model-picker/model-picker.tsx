@@ -150,10 +150,20 @@ const stableModelItem = (model: GatewayModel, label: string): ModelItem => {
     return item;
 };
 
-/** The last group built with each first row; a group is reused while its label, kind and rows are the same. */
-const groupsByFirstItem = new WeakMap<ModelItem, ModelGroup>();
+/**
+ * The last group built with each first row; a group is reused while its label, kind and rows are the same. Complete
+ * and search-filtered groups keep separate entries: a search rebuilds the complete groups too, and a shared entry
+ * would let a complete group evict the unchanged filtered group that starts with the same row.
+ */
+const completeGroupsByFirstItem = new WeakMap<ModelItem, ModelGroup>();
+const filteredGroupsByFirstItem = new WeakMap<ModelItem, ModelGroup>();
 
-const stableModelGroup = (value: string, items: ModelItem[], isFavorite: boolean): ModelGroup => {
+const stableModelGroup = (
+    value: string,
+    items: ModelItem[],
+    isFavorite: boolean,
+    groupsByFirstItem: WeakMap<ModelItem, ModelGroup> = completeGroupsByFirstItem,
+): ModelGroup => {
     const [first] = items;
     const previous = first ? groupsByFirstItem.get(first) : undefined;
 
@@ -964,7 +974,7 @@ const ModelPicker: FC<ModelPickerProps> = ({
             const filteredItems = filterModelsByQuery(group.items, searchQuery, searchTexts);
 
             if (filteredItems.length > 0) {
-                filtered.push(stableModelGroup(group.value, filteredItems, Boolean(group.isFavorite)));
+                filtered.push(stableModelGroup(group.value, filteredItems, Boolean(group.isFavorite), filteredGroupsByFirstItem));
             }
         }
 

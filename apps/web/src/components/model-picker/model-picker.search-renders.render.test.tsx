@@ -10,6 +10,9 @@ import { createElement } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const rowRenders = vi.hoisted(() => new Map<string, number>());
+const groupRenders = vi.hoisted(() => {
+    return { count: 0 };
+});
 
 vi.mock("@lingui/core/macro", () => {
     return {
@@ -42,7 +45,13 @@ vi.mock("@neore/ui/components/command", async (importOriginal) => {
         return createElement(original.CommandItem, props);
     };
 
-    return { ...original, CommandItem: CountedCommandItem };
+    const CountedCommandGroup = (props: ComponentProps<typeof original.CommandGroup>) => {
+        groupRenders.count += 1;
+
+        return createElement(original.CommandGroup, props);
+    };
+
+    return { ...original, CommandGroup: CountedCommandGroup, CommandItem: CountedCommandItem };
 });
 
 vi.mock("@/hooks/use-feature-flagged-models", () => {
@@ -99,6 +108,7 @@ const model = (id: string, name: string, displayProvider: string) => ({ displayP
 const MODELS = [
     model("openai/gpt-5", "GPT-5", "OpenAI"),
     model("openai/gpt-4o", "GPT-4o", "OpenAI"),
+    model("openai/o3", "o3", "OpenAI"),
     model("anthropic/claude-sonnet", "Claude Sonnet", "Anthropic"),
     model("mistral/large", "Large", "Mistral"),
 ];
@@ -108,6 +118,7 @@ const listedRows = () => screen.getAllByRole("option").filter((option: HTMLEleme
 
 const search = (query: string) => {
     rowRenders.clear();
+    groupRenders.count = 0;
     fireEvent.change(screen.getByPlaceholderText("Search models..."), { target: { value: query } });
 };
 
@@ -144,5 +155,19 @@ describe.each([
 
         expect(listedRows()).toHaveLength(1);
         expect(rowRenders.get("openai/gpt-4o") ?? 0).toBe(0);
+    });
+
+    it("does not re-render a group whose matching rows are unchanged", () => {
+        render(<ModelPicker defaultModeFilter="text" defaultTab="all" footer={null} models={MODELS} />);
+
+        search("gp");
+
+        expect(listedRows()).toHaveLength(2);
+
+        // The same two GPT rows match (not o3), so the filtered OpenAI group is the same group.
+        search("gpt");
+
+        expect(listedRows()).toHaveLength(2);
+        expect(groupRenders.count).toBe(0);
     });
 });
