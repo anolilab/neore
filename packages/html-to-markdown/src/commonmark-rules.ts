@@ -168,10 +168,11 @@ const WHITESPACE_RUN = /\s+/g;
 
 /**
  * A reference label as CommonMark matches it: leading and trailing whitespace dropped, each run of
- * whitespace read as one space, and case ignored.
+ * whitespace read as one space, and case folded. Lowercasing and then uppercasing folds case as the
+ * reference parsers do, so `ß` and `SS` are one label.
  */
 function normalizeLabel(text: string): string {
-    return text.replaceAll(WHITESPACE_RUN, " ").trim().toLowerCase();
+    return text.replaceAll(WHITESPACE_RUN, " ").trim().toLowerCase().toUpperCase();
 }
 
 function hasHref(node: Node): boolean {

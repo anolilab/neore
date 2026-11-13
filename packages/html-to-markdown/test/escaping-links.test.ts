@@ -227,7 +227,7 @@ describe("review: inline tags after a hard break in link text", () => {
     });
 
     it("guard, passes before and after: a hard break before a block tag is still replaced, as a block starts a line", () => {
-        expect(convert(`<a href="/x">one<br><div>two</div></a>`)).not.toContain("one  \n");
+        expect(convert(`<a href="/x">one<br><div>two</div></a>`)).toBe("[one  two ](/x)");
     });
 });
 
@@ -273,7 +273,7 @@ describe("review: formatted text after a hard break in link text", () => {
     });
 
     it("guard, passes before and after: a hard break before a real thematic break is still replaced", () => {
-        expect(convert(`<a href="/x">one<br><hr>two</a>`)).not.toContain("one  \n");
+        expect(convert(`<a href="/x">one<br><hr>two</a>`)).toBe("[one  * * * two](/x)");
     });
 });
 
@@ -288,6 +288,14 @@ describe("review: reference labels that two links share", () => {
         expect(convert(`<a href="/a">one</a> <a href="/b">One</a>`, { linkReferenceStyle: "shortcut", linkStyle: "referenced" })).toBe(
             "[one] [One][2]\n\n[one]: /a\n[2]: /b",
         );
+    });
+
+    // CommonMark matches labels after Unicode case folding, so `ß` and `SS` are one label.
+    it.each(["collapsed", "shortcut"] as const)("treats labels that are equal after case folding as one label in %s style", (linkReferenceStyle) => {
+        const markdown = convert(`<a href="/a">ß</a> <a href="/b">SS</a>`, { linkReferenceStyle, linkStyle: "referenced" });
+
+        expect(markdown).toContain("[SS][2]");
+        expect(markdown).toContain("[2]: /b");
     });
 
     it("guard, passes before and after: two links to one destination under one label share one label", () => {
@@ -308,6 +316,22 @@ describe("review: email addresses in angle brackets", () => {
 
     it("guard, passes before and after: a < between spaces is not escaped", () => {
         expect(convert("1 &lt; 2")).toBe("1 < 2");
+    });
+
+    it.each([
+        ["a digit", "&lt;1<span>a@b.co&gt;</span>", String.raw`\<1a@b.co>`],
+        ["a digit and a dot", "&lt;1.x<span>a@b.co&gt;</span>", String.raw`\<1.xa@b.co>`],
+    ])("escapes a < when the local part after it starts with %s and its @ is in the next node", (_name, html, expected) => {
+        expect(convert(html)).toBe(expected);
+    });
+
+    it("escapes a < before a letter once when the local part's @ is in the next node", () => {
+        expect(convert("&lt;a<span>b@c.co&gt;</span>")).toBe(String.raw`\<ab@c.co>`);
+    });
+
+    it("guard: a < before a split local part with no @ after it is not escaped", () => {
+        expect(convert("x &lt;1<span>2</span>")).toBe("x <12");
+        expect(convert("&lt;1<span>a b@c&gt;</span>")).toBe("<1a b@c>");
     });
 
     it("guard, passes before and after: a < before a digit with no @ after it is not escaped", () => {

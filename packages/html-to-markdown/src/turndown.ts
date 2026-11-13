@@ -137,6 +137,8 @@ function process(service: TurndownService, parentNode: Node): string[] {
 // autolink opens with a local part and then an `@`.
 const HTML_START = /[a-z/!?]/i;
 const LOCAL_PART = /[a-z0-9.!#$%&'+/=?^{|}~-]/i;
+// A `<` at the end of a text node, with the start of a local part after it that has no `@` yet.
+const TRAILING_OPENER = /<[a-z0-9.!#$%&'+/=?^{|}~-]*$/i;
 const WHITESPACE_CHAR = /\s/;
 
 /**
@@ -156,11 +158,23 @@ export const htmlOpenerSteps = { count: 0 };
 function escapeText(service: TurndownService, node: Node, text: string): string {
     const escaped = service.escape(text);
 
-    if (service.escape === escapeMarkdown && text.endsWith("<") && escaped.endsWith("<") && isFollowedByHtmlOpener(node, service.options)) {
-        return `${escaped.slice(0, -1)}${String.raw`\<`}`;
+    if (service.escape !== escapeMarkdown) {
+        return escaped;
     }
 
-    return escaped;
+    // The text may end in a `<` and the start of an email local part, such as `<1`, whose `@` is in the next node.
+    const opener = TRAILING_OPENER.exec(text)?.[0];
+
+    // A `<` before a letter, `/`, `!` or `?` is escaped by escapeMarkdown already.
+    if (opener === undefined || HTML_START.test(opener.charAt(1)) || !escaped.endsWith(opener)) {
+        return escaped;
+    }
+
+    if (!isFollowedByHtmlOpener(node, service.options, opener.length > 1)) {
+        return escaped;
+    }
+
+    return `${escaped.slice(0, -opener.length)}\\${opener}`;
 }
 
 /**
@@ -169,8 +183,8 @@ function escapeText(service: TurndownService, node: Node, text: string): string 
  * character that decides: a letter, `/`, `!` or `?` decides at once, and a local part decides at
  * its `@`. The check is conservative: a `<` that cannot open HTML may still be escaped.
  */
-function isFollowedByHtmlOpener(node: Node, options: Options): boolean {
-    let isInLocalPart = false;
+function isFollowedByHtmlOpener(node: Node, options: Options, isAfterLocalPart: boolean): boolean {
+    let isInLocalPart = isAfterLocalPart;
 
     for (const piece of followingText(node, options)) {
         for (const char of piece) {
