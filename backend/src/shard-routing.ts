@@ -20,6 +20,17 @@ const WS_PATH = "/_lunora/ws";
 
 const namesShard = (value: unknown): boolean => typeof value === "string" && value.length > 0;
 
+/**
+ * Procedures that read or write the `@lunora/payment` store, which lives on `__root__` with the webhook, the
+ * seat sync and the deletion step. On the caller's shard they would write a customer row the webhook never sees
+ * and the deletion step never erases.
+ */
+const ROOT_FUNCTIONS: ReadonlySet<string> = new Set(["billing_checkout:createCheckout"]);
+
+/** Where a call that names no shard goes: `__root__` for {@link ROOT_FUNCTIONS}, the caller's shard otherwise. */
+const defaultShardFor = (call: { functionPath?: unknown }, callerShard: string): string =>
+    typeof call.functionPath === "string" && ROOT_FUNCTIONS.has(call.functionPath) ? ROOT_SHARD_KEY : callerShard;
+
 /** Whether `request` is one {@link withCallerShard} may route. */
 export const isShardRoutedRequest = (request: Request): boolean => {
     const { pathname } = new URL(request.url);
@@ -66,7 +77,7 @@ export const withCallerShard = async (request: Request, shardKey: string | undef
         return request;
     }
 
-    const record = envelope as { calls?: unknown; fanOut?: unknown; shardKey?: unknown };
+    const record = envelope as { calls?: unknown; fanOut?: unknown; functionPath?: unknown; shardKey?: unknown };
     let routed: Record<string, unknown>;
 
     if (url.pathname === RPC_BATCH_PATH) {
@@ -77,7 +88,9 @@ export const withCallerShard = async (request: Request, shardKey: string | undef
         routed = {
             ...record,
             calls: record.calls.map((call: unknown) =>
-                call !== null && typeof call === "object" && !namesShard((call as { shardKey?: unknown }).shardKey) ? { ...call, shardKey } : call,
+                call !== null && typeof call === "object" && !namesShard((call as { shardKey?: unknown }).shardKey)
+                    ? { ...call, shardKey: defaultShardFor(call, shardKey) }
+                    : call,
             ),
         };
     } else {
@@ -86,7 +99,7 @@ export const withCallerShard = async (request: Request, shardKey: string | undef
             return request;
         }
 
-        routed = { ...record, shardKey };
+        routed = { ...record, shardKey: defaultShardFor(record, shardKey) };
     }
 
     const headers = new Headers(request.headers);

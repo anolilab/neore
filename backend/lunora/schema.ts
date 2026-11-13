@@ -3861,7 +3861,8 @@ export const schema = defineSchema({
         .index("by_userId", ["userId"]),
 })
     // The `@lunora/payment` store's tables (`payment_customers`, `payment_events`,
-    // `payment_sessions`, `payment_subscriptions`, `payment_usageEvents`), owned by
+    // `payment_referenceRevisions`, `payment_sessions`, `payment_subscriptions`,
+    // `payment_usageEvents`), owned by
     // the billing module. Merged, never copied: the store reads and writes them by
     // these names, which the package may change on any upgrade.
     .extend(paymentExtension)

@@ -111,6 +111,7 @@ for a schema table that is neither policed nor listed:
 | `documentHistory` | audit trail written by triggers; no client read |
 | `emails` | outbound mail log; system only |
 | `payment_events` | `@lunora/payment` webhook claim log; system only |
+| `payment_referenceRevisions` | `@lunora/payment` per-reference grant counter (unused: `singleSubscriptionPerReference` is off); system only, erased with the subject |
 | `idempotencyClaims` | internal claims; no client access |
 | `invitation` | better-auth organization invitations; org-scoped, checked by org role |
 | `jwks` | better-auth signing keys |
@@ -253,7 +254,7 @@ for a schema table that is neither policed nor listed:
 | `auth_team.updateTeam` | mutation | authMutation + RL | team | caller-scoped (ctx.user) | ok |
 | `auth_team.updateTeamMemberRole` | mutation | authMutation + RL | team, teamMember | org membership/role | ok |
 | `auth_team.updateTeamSettings` | mutation | authMutation + RL | team, teamSettings | org membership/role | ok |
-| `billing_checkout.createCheckout` | action | authAction + RL | — (Creem adapter) | `pro`: reference = caller's own user id, guests refused; `team`: active org, owner only (`billingOrganizationOf`; admins have `billing: read`), the paid webhook records the payer as `creemPurchaserId` (checkout metadata); `interval` only selects between two server-configured product ids, never a client-supplied one | ok — new; Pro is per user so one seat cannot cover an org |
+| `billing_checkout.createCheckout` | action | authAction + RL | payment_customers (`ctx.payments` facade) | `pro`: reference = caller's own user id, guests refused; `team`: active org, owner only (`billingOrganizationOf`; admins have `billing: read`), and the facade's `authorize` (`billing/authorize.ts`) re-checks the reference against the caller's own id or an owner `member` row; the paid webhook records the payer as `creemPurchaserId` (checkout metadata); `interval` only selects between two server-configured product ids, never a client-supplied one | ok — new; Pro is per user so one seat cannot cover an org |
 | `billing_checkout.getBillingOptions` | query | authQuery | — | any signed-in user; returns only whether each plan's yearly product is configured (two booleans, no ids) | ok |
 | `billing_checkout.getMyPlan` | query | authQuery | user | caller-scoped (ctx.user) — own row only | ok — new |
 | `billing_checkout.getTeamPlansIPay` | query | authQuery | organization, member (count) | caller-scoped: organizations whose `creemPurchaserId` is the caller (indexed); returns name + member count only, for the delete-account warning | ok — new |

@@ -2,7 +2,6 @@
 // builder is declared against these, and the concrete Workers types are not
 // assignable to them. Each lives in the add-on package that owns it.
 import type { PaymentsFromContextOptions } from "@lunora/payment";
-import { createCreemAdapter } from "@lunora/payment/creem";
 import type { JSONWebKeySet } from "jose";
 import type { D1DatabaseLike } from "@lunora/d1";
 import type { MessageBatchLike, QueueBindingLike } from "@lunora/queue";
@@ -16,6 +15,8 @@ import { createJwksCache, type JwksCache } from "./jwks-cache.js";
 import { inTimingFrame, installFetchTiming, isTimingEnabled, logTiming, timedD1 } from "./development-timing.js";
 import { env as workerEnv } from "cloudflare:workers";
 
+import { authorizeBilling } from "../lunora/billing/authorize.js";
+import { buildCreemAdapter } from "../lunora/billing/creem-adapter.js";
 import { allowLocalJurisdiction } from "../lunora/lib/local-jurisdiction.js";
 import { routedShardNamespace } from "../lunora/lib/shard-namespace.js";
 import { posthogErrorSink } from "./posthog-sink.js";
@@ -151,36 +152,16 @@ const requirePublicOrigin = (env: Env): string => {
     return origin;
 };
 
-/** Every outbound Creem call holds the shard it runs on while it waits, so it gets a deadline. */
-const CREEM_TIMEOUT_MS = 10_000;
-
 let payments: PaymentsFromContextOptions | undefined;
 
 /**
  * Backs `ctx.payments`, built once per isolate. It must not throw when Creem is
  * not configured: billing procedures report that themselves.
- *
- * `authorize` is Lunora's default — the reference must be the caller's own user
- * id — so the facade can never act on someone else's billing. Every call that
- * needs more goes to `ctx.payments.adapter` behind its own check:
- * `billing/checkout.ts` (Team: `billingOrganizationOf`, portal:
- * `portalCustomerFor`) and the GDPR deletion step (`billing/gdpr.ts`).
  */
 const creemPayments = (env: Env): PaymentsFromContextOptions => {
     payments ??= {
-        adapter: createCreemAdapter({
-            // The adapter calls this once, on first use, so the SDK is not loaded at worker startup.
-            client: async () => {
-                const { Creem } = await import("creem");
-
-                return new Creem({
-                    apiKey: env.CREEM_API_KEY ?? "",
-                    server: env.CREEM_TEST_MODE === "true" ? "test" : "prod",
-                    timeoutMs: CREEM_TIMEOUT_MS,
-                });
-            },
-            webhookSecret: env.CREEM_WEBHOOK_SECRET ?? "",
-        }),
+        adapter: buildCreemAdapter({ apiKey: env.CREEM_API_KEY, testMode: env.CREEM_TEST_MODE, webhookSecret: env.CREEM_WEBHOOK_SECRET }),
+        authorize: authorizeBilling,
     };
 
     return payments;
