@@ -118,12 +118,13 @@ describe("thread viewport while message rows settle", () => {
         layout.scrollTop = 0;
         resized.length = 0;
         vi.stubGlobal("ResizeObserver", RecordingResizeObserver);
-        // The scroll area's scrollbar waits for animations, which jsdom does not have.
-        Element.prototype.getAnimations = () => [];
+        // The scroll area's scrollbar waits for animations, which jsdom does not have; removed again after each test.
+        Object.defineProperty(Element.prototype, "getAnimations", { configurable: true, value: () => [] });
     });
 
     afterEach(() => {
         vi.unstubAllGlobals();
+        Reflect.deleteProperty(Element.prototype, "getAnimations");
     });
 
     it("keeps the reader at the bottom when rows above them take their real height", async () => {
@@ -187,4 +188,8 @@ describe("thread viewport while message rows settle", () => {
 
         expect(layout.scrollTop).toBe(readingAt);
     });
+});
+
+it("leaves no stand-in animation API behind for the tests that follow", () => {
+    expect("getAnimations" in Element.prototype).toBe(false);
 });
