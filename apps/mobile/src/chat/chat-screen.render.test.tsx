@@ -489,4 +489,63 @@ describe("the chat screen filling its history after the newest page", () => {
 
         stable.offline = before;
     });
+
+    it("saves an older page's rows with the time its read started, not when it answered", async () => {
+        const saved: { id: string; syncedAt?: number }[] = [];
+        const clock = { now: 1000 };
+        const nowSpy = vi.spyOn(Date, "now").mockImplementation(() => clock.now);
+        let answerOlder: (() => void) | undefined;
+        const before = stable.offline;
+
+        stable.offline = {
+            ...before,
+            cache: {
+                forgetThreads: async () => {},
+                loadMessages: async () => [],
+                saveMessages: async (_threadId: string, messages: ReadonlyArray<{ id: string; syncedAt?: number }>) => {
+                    saved.push(...messages);
+                },
+            } as never,
+        };
+        harness.olderPage = async (cursor) => {
+            if (cursor === "older") {
+                // eslint-disable-next-line unicorn/prefer-promise-with-resolvers -- `Promise.withResolvers` needs Node 22.11; the package allows 22.0
+                await new Promise<void>((resolve) => {
+                    answerOlder = resolve;
+                });
+
+                return {
+                    continueCursor: "",
+                    isDone: true,
+                    page: [{ _creationTime: 0, id: "q0", parts: [{ text: "An older question", type: "text" }], role: "user", status: "success" }],
+                };
+            }
+
+            return { continueCursor: "", isDone: true, page: [] };
+        };
+
+        try {
+            act(() => {
+                mounted.root?.render(createElement(ChatScreen));
+            });
+
+            await vi.waitFor(() => {
+                expect(answerOlder).toBeDefined();
+            });
+
+            // The older page answers well after it was asked for, as a newer read could land in between.
+            clock.now = 9000;
+
+            await act(async () => {
+                answerOlder?.();
+            });
+
+            await vi.waitFor(() => {
+                expect(saved.find((row) => row.id === "q0")?.syncedAt).toBe(1000);
+            });
+        } finally {
+            nowSpy.mockRestore();
+            stable.offline = before;
+        }
+    });
 });

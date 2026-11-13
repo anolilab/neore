@@ -281,10 +281,11 @@ const Chat = () => {
             const result = await readOlderMessages({
                 cache,
                 fetchPage: async () => {
+                    // Stamped with when the read STARTED: a newer read that lands first must keep its copy in the cache.
+                    const startedAt = Date.now();
                     const page = await fetchMessagePage(id, cursor);
-                    const syncedAt = Date.now();
 
-                    return { olderCursor: page.isDone ? null : page.continueCursor, rows: page.page.map((message) => toRow(message, id, syncedAt)) };
+                    return { olderCursor: page.isDone ? null : page.continueCursor, rows: page.page.map((message) => toRow(message, id, startedAt)) };
                 },
                 gate: readGate.current,
                 isCurrent,
