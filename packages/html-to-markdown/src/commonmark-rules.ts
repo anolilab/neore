@@ -1,18 +1,6 @@
 import annotateNode from "./node";
 import type { AnnotatedNode, Options, Rule, RuleLookup } from "./types";
-import {
-    codeText,
-    edgeBreaks,
-    escapeMarkdown,
-    flattenBreaks,
-    hasOnlyBreaks,
-    isBlock,
-    isVoid,
-    lineBreakMarker,
-    parseListStart,
-    repeat,
-    trimNewlines,
-} from "./utilities";
+import { codeText, edgeBreaks, escapeMarkdown, hasOnlyBreaks, isBlock, isVoid, lineBreakMarker, parseListStart, repeat, trimNewlines } from "./utilities";
 
 const LINE_START = /^/gm;
 const NEWLINE = /\n/g;
@@ -199,9 +187,9 @@ const rules: Record<string, Rule> = {
     heading: {
         filter: ["h1", "h2", "h3", "h4", "h5", "h6"],
 
-        replacement(content, node, options) {
+        replacement(content, node, options, lookup) {
             const hLevel = Number(node.nodeName.charAt(1));
-            const text = headingText(content, node, options);
+            const text = headingText(content, node, lookup);
 
             if (options.headingStyle === "setext" && hLevel < 3) {
                 const underline = repeat(hLevel === 1 ? "=" : "-", text.length);
@@ -270,8 +258,8 @@ const rules: Record<string, Rule> = {
     lineBreak: {
         filter: "br",
 
-        replacement(_content, node, options) {
-            return breakMarkFor(node, options) ?? lineBreakMarker(options.br);
+        replacement(_content, node, options, lookup) {
+            return breakMarkFor(node, lookup) ?? lineBreakMarker(options.br);
         },
     },
 
@@ -518,13 +506,13 @@ function wrapRun(content: string, node: AnnotatedNode, options: Options, style: 
     // when the built-in rule renders the parent: a custom rule writes its own output and no delimiters.
     // A parent with a block (even a blank one, which prints a break) never shares its delimiters, so the nested element keeps its own.
     if (hasSharingParent(node.parentNode, style, options, lookup)) {
-        return wrapInline(content, options, "", "", breakMarkFor(node, options));
+        return wrapInline(content, options, "", "", breakMarkFor(node, lookup));
     }
 
     const before = emphasisRun(node, "left", style.names, options, lookup);
     const after = emphasisRun(node, "right", style.names, options, lookup);
     const delimiter = before.wordEdge || after.wordEdge ? style.intraword : style.plain;
-    const breakMark = breakMarkFor(node, options);
+    const breakMark = breakMarkFor(node, lookup);
 
     return wrapInline(content, options, before.count === 0 ? delimiter : "", after.count === 0 ? delimiter : "", breakMark);
 }
@@ -758,28 +746,30 @@ function annotationOf(node: Node, options: Options): AnnotatedNode {
 }
 
 /**
- * The text of a heading. A heading is one line, so a hard break in it becomes a space. A heading that holds a
- * block marks its breaks (see headingBreakMark), so the block separators are the only newlines left.
+ * The text of a heading. A heading is one line, so a hard break in it becomes a space. Its breaks are written as
+ * a mark (see headingBreakMark) rather than the break marker, so neither block separators nor text that looks
+ * like a marker (a code line ending in two spaces) is taken for a break.
  */
-function headingText(content: string, node: AnnotatedNode, options: Options): string {
-    const mark = headingMarkOf(node, options);
+function headingText(content: string, node: AnnotatedNode, lookup: RuleLookup): string {
+    const mark = headingMarkOf(node, lookup);
 
-    if (mark !== undefined) {
-        // The block's own separators at either end are not heading text, so the underline is not sized to them.
-        return trimNewlines(joinAtMarks(content, mark));
-    }
-
-    return node.querySelector("br") ? flattenBreaks(content, lineBreakMarker(options.br), hasBlockDescendant(node)) : content;
+    // The block's own separators at either end are not heading text, so the underline is not sized to them.
+    return mark === undefined ? content : trimNewlines(joinAtMarks(content, mark).trim());
 }
 
-/** The break mark of a heading that holds a block when a break marker is a newline, otherwise undefined. */
-function headingMarkOf(heading: Node, options: Options): string | undefined {
+/**
+ * The break mark of a heading that the built-in heading rule renders and that holds a break, otherwise
+ * undefined. A custom heading rule never sees a mark: only the built-in rule turns it back into a space.
+ */
+function headingMarkOf(heading: Node, lookup: RuleLookup): string | undefined {
     // Each break asks for its heading's mark. The mark serialises and scans the whole heading, so it is computed once.
     if (headingMarks.has(heading)) {
         return headingMarks.get(heading);
     }
 
-    const mark = options.br.includes("\n") && hasBlockDescendant(heading) ? headingBreakMark(heading) : undefined;
+    // Truthiness, not `!== null`: domino returns undefined when nothing matches.
+    const isMarked = lookup.ruleFor(heading) === rules.heading && Boolean((heading as Element).querySelector("br"));
+    const mark = isMarked ? headingBreakMark(heading) : undefined;
 
     headingMarks.set(heading, mark);
 
@@ -787,13 +777,13 @@ function headingMarkOf(heading: Node, options: Options): string | undefined {
 }
 
 /**
- * The break mark for a break in the node's heading, or undefined when the break is not in a heading that
- * holds a block. Uses the heading's cached mark, so each break does not serialise the whole heading again.
+ * The break mark for a break in the node's heading, or undefined when the break is not in a marked heading.
+ * Uses the heading's cached mark, so each break does not serialise the whole heading again.
  */
-function breakMarkFor(node: Node, options: Options): string | undefined {
+function breakMarkFor(node: Node, lookup: RuleLookup): string | undefined {
     for (let ancestor = node.parentNode; ancestor; ancestor = ancestor.parentNode) {
         if (HEADING_NAMES.has(ancestor.nodeName)) {
-            return headingMarkOf(ancestor, options);
+            return headingMarkOf(ancestor, lookup);
         }
     }
 
@@ -805,8 +795,9 @@ const PRIVATE_USE_START = "".codePointAt(0) ?? 0;
 const PRIVATE_USE_END = "".codePointAt(0) ?? 0;
 
 /**
- * A private-use character that the heading's markup does not contain. A break in the heading is written as this
- * character, so a literal character of the same code point in the text is never taken for a break.
+ * A mark that the heading's markup does not contain. A break in the heading is written as this mark, so text of
+ * the heading is never taken for a break. The mark is a private-use character the markup lacks; when the markup
+ * holds every one, it is a run of the first, one longer than the longest such run in the markup.
  */
 function headingBreakMark(heading: Node): string {
     const markup = (heading as Element).outerHTML ?? "";
@@ -819,7 +810,16 @@ function headingBreakMark(heading: Node): string {
         }
     }
 
-    return String.fromCodePoint(PRIVATE_USE_START);
+    const first = String.fromCodePoint(PRIVATE_USE_START);
+    let longest = 0;
+    let current = 0;
+
+    for (const character of markup) {
+        current = character === first ? current + 1 : 0;
+        longest = Math.max(longest, current);
+    }
+
+    return first.repeat(longest + 1);
 }
 
 /** Writes each mark as a space, dropping the spaces beside it. A piece that starts a new line takes no space. */
@@ -831,6 +831,11 @@ function joinAtMarks(content: string, mark: string): string {
     // Only the piece just before a mark can end in a space, so only that piece is trimmed. Trimming the whole text
     // each time would rescan everything written so far.
     for (const piece of rest) {
+        // Marks with only spaces between them (two breaks in a row) write one space, not one each.
+        if (piece.trim() === "" && !piece.includes("\n")) {
+            continue;
+        }
+
         pieces.push(carried.replace(TRAILING_SPACE, ""), piece.startsWith("\n") ? "" : " ");
         carried = piece.replace(LEADING_SPACE, "");
     }

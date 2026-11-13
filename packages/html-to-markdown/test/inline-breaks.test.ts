@@ -172,7 +172,8 @@ describe("line breaks in headings (#555)", () => {
     });
 
     it("keeps the block separators when a break comes before a block (review)", () => {
-        expect(convert("<h2>a<br><p>b</p></h2>")).toBe("a\n\nb\n\n\n------");
+        // The underline is sized to the heading text, not to the block's trailing separators.
+        expect(convert("<h2>a<br><p>b</p></h2>")).toBe("a\n\nb\n----");
     });
 
     it("keeps a horizontal rule on its own line when a break comes before it (review)", () => {

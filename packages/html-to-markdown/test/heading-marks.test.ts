@@ -16,7 +16,8 @@ describe("breaks in a heading that holds a block (Qodo)", () => {
         expect(convert("<h1><strong>a<br></strong><div>c</div></h1>", { br: "\n" })).toBe("**a**\n\nc\n========");
     });
 
+    // With no break the heading text is written as is, as upstream does, so the underline spans the separators too.
     it("keeps a literal private-use character in the heading text", () => {
-        expect(convert("<h1>leftright<div>c</div></h1>", { br: "\n" })).toBe(`leftright\n\nc\n${"=".repeat(13)}`);
+        expect(convert("<h1>leftright<div>c</div></h1>", { br: "\n" })).toBe(`leftright\n\nc\n\n\n${"=".repeat(15)}`);
     });
 });
