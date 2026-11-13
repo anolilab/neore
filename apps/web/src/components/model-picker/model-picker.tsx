@@ -24,8 +24,8 @@ import type { FC, ReactNode } from "react";
 import React, { memo, useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
+import { useAuthSession } from "@/features/auth/hooks/use-auth-session";
 import useInviteOnly from "@/features/auth/hooks/use-invite-only";
-import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 import useModelNicknames from "@/features/chat/core/hooks/use-model-nicknames";
 import useFeatureFlaggedModels from "@/hooks/use-feature-flagged-models";
 import { useBlockedCreators, withCreatorHidden, withoutCreator } from "@/hooks/use-model-filter-rules";
@@ -605,8 +605,7 @@ const ModelPicker: FC<ModelPickerProps> = ({
     const featureFlaggedModels = useFeatureFlaggedModels({ applyUserOverrides: true });
     const { blockedCreators, isLoaded: isRulesLoaded, setBlockedCreators } = useBlockedCreators();
     const { nicknames } = useModelNicknames();
-    const { hooks } = useAuth();
-    const { data: sessionData } = hooks.useSession();
+    const { data: sessionData } = useAuthSession();
     // Hiding writes the account's filter rules, so it is offered to signed-in users only.
     const isSignedIn = Boolean(sessionData?.user?.id);
     const sourceModels = useMemo(

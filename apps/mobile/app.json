@@ -18,6 +18,7 @@
             "expo-secure-store",
             "expo-web-browser",
             "expo-notifications",
+            "@bacons/apple-targets",
             [
                 "expo-audio",
                 {

@@ -6,11 +6,12 @@ import { usePaginatedQuery } from "@lunora/react";
 import { sorted } from "@neore/backend/agent/shared";
 import type { SyncStreamsReturnValue } from "@neore/backend/agent/types";
 import type { UIMessage, UIStatus } from "@neore/backend/agent/ui-messages";
-import { combineUIMessages } from "@neore/backend/agent/ui-messages";
 import type { StreamArgs } from "@neore/backend/agent/validators";
 import { shardOptionsFor, withUnlockProof } from "@neore/client-runtime";
 import { useLayoutEffect, useMemo, useRef } from "react";
 
+import type { CombineCache } from "./combine-unchanged-turns";
+import { combineUnchangedTurns } from "./combine-unchanged-turns";
 import { shareUnchangedMessages } from "./share-unchanged-messages";
 import type { BetterOmit, ErrorMessage, Expand } from "./type-utilities";
 import type { StreamQuery, StreamQueryArgs } from "./types";
@@ -207,11 +208,14 @@ export const useUIMessages = <Query extends UIMessagesQuery<any, any>>(
     // The last result, so unchanged messages keep their identity across pushes
     // and memoized rows skip them (`shareUnchangedMessages`).
     const previousResultsRef = useRef<UIMessage[]>([]);
+    // The committed result's combined turns, reused while their steps are the same objects (`combineUnchangedTurns`).
+    // Read during render, replaced only in the layout effect: a discarded render cannot evict it.
+    const combineCacheRef = useRef<CombineCache>(new Map());
 
     // Manual memo on purpose: the React Compiler bails out of this hook (it reads a ref during render), so this is its only memoization.
-    const merged = useMemo(() => {
-        // Messages may have been split by pagination. Re-combine them here.
-        const combined = combineUIMessages(sorted(paginated.results));
+    const { cache: combineCache, merged } = useMemo(() => {
+        // Messages may have been split by pagination. Re-combine them here, only the turns a push changed.
+        const { cache, messages: combined } = combineUnchangedTurns(sorted(paginated.results), combineCacheRef.current);
         const deduped = shareUnchangedMessages(previousResultsRef.current, dedupeMessages(combined, streamMessages ?? []));
 
         // Debug: Log streaming message merge
@@ -237,14 +241,18 @@ export const useUIMessages = <Query extends UIMessagesQuery<any, any>>(
         }
 
         return {
-            ...paginated,
-            results: deduped,
+            cache,
+            merged: {
+                ...paginated,
+                results: deduped,
+            },
         };
     }, [paginated, streamMessages]);
 
     useLayoutEffect(() => {
         previousResultsRef.current = merged.results;
-    }, [merged]);
+        combineCacheRef.current = combineCache;
+    }, [combineCache, merged]);
 
     return merged as UIMessagesQueryResult<Query>;
 };

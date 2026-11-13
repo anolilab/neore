@@ -1,3 +1,5 @@
+import type { AnnotatedNode } from "./types";
+
 const TRAILING_NEWLINE_BLOCK_START = /^[\t\r\n]+/;
 
 export function repeat(character: string, count: number): string {
@@ -32,6 +34,196 @@ export function trimNewlines(string: string): string {
 /** Strips leading tabs and line breaks (not spaces), as upstream's postProcess does. */
 export function trimLeadingBreaks(string: string): string {
     return string.replace(TRAILING_NEWLINE_BLOCK_START, "");
+}
+
+/**
+ * The default replacement of a blank element: a paragraph break for a block, nothing for an inline element. Shared,
+ * so the emphasis code can tell it from a caller's own `blankReplacement`, whose output is not known from the DOM.
+ */
+export function defaultBlankReplacement(_content: string, node: AnnotatedNode): string {
+    return node.isBlock ? "\n\n" : "";
+}
+
+/**
+ * The default replacement for an element no rule claims: its content, between paragraph breaks for a block.
+ * Shared, so the emphasis code can tell an inline element that prints its content as is from one a caller's own
+ * `defaultReplacement` writes.
+ */
+export function defaultElementReplacement(content: string, node: AnnotatedNode): string {
+    return node.isBlock ? `\n\n${content}\n\n` : content;
+}
+
+/**
+ * The replacement of a rule added with `remove`. One shared function, so the emphasis code can tell a removed
+ * element (which writes nothing) from one a custom rule renders.
+ */
+export function removeReplacement(): string {
+    return "";
+}
+
+/** The string the line-break rule emits for a hard break. */
+export function lineBreakMarker(br: string): string {
+    return `${br}\n`;
+}
+
+const BLANK_TEXT = /^\s*$/;
+const WHITESPACE = /\s/;
+
+/**
+ * Trims the whitespace at both ends of an element's content, as `trim` does, and
+ * then writes back the hard line breaks that the element starts and ends with.
+ * Those breaks are whitespace in the content, so `trim` would remove them. The DOM
+ * says how many breaks each edge holds, but a break is written back only where the
+ * trim removed its marker from the content: a break that a child already writes
+ * inside a link stays there, and a marker that trim keeps is not written twice.
+ * The DOM count also keeps text that holds the same characters as a break from
+ * being taken for one.
+ */
+export function trimKeepingBreaks(content: string, node: Node, br: string): string {
+    const marker = lineBreakMarker(br);
+    const lead = edgeBreaks(node, "left");
+    const trail = edgeBreaks(node, "right");
+    const edges = splitEdgeMarkers(content, marker, lead, trail);
+
+    // An element that holds only breaks has the same breaks at both ends, so they are written once.
+    if (edges.core === "") {
+        const all = splitEdgeMarkers(content, marker, Infinity, 0);
+
+        return marker.repeat(Math.min(Math.max(lead, trail), all.lead));
+    }
+
+    return marker.repeat(edges.lead) + edges.core + marker.repeat(edges.trail);
+}
+
+/**
+ * Trims the whitespace at both ends of content and splits off up to `leadBudget` and
+ * `trailBudget` break markers, the number of breaks the DOM says each edge holds. A
+ * marker is split off only while the budget lasts, so text that holds the same
+ * characters as a marker is left in the core unless the DOM counted a break there.
+ * A marker is matched before whitespace is skipped, because a marker can start or end
+ * with whitespace.
+ */
+function splitEdgeMarkers(content: string, marker: string, leadBudget: number, trailBudget: number): { core: string; lead: number; trail: number } {
+    let start = 0;
+    let end = content.length;
+    let lead = 0;
+    let trail = 0;
+
+    while (start < end) {
+        if (lead < leadBudget && content.startsWith(marker, start)) {
+            lead += 1;
+            start += marker.length;
+        } else if (WHITESPACE.test(content.charAt(start))) {
+            start += 1;
+        } else {
+            break;
+        }
+    }
+
+    while (end > start) {
+        if (trail < trailBudget && end - marker.length >= start && content.startsWith(marker, end - marker.length)) {
+            trail += 1;
+            end -= marker.length;
+        } else if (WHITESPACE.test(content.charAt(end - 1))) {
+            end -= 1;
+        } else {
+            break;
+        }
+    }
+
+    return { core: content.slice(start, end), lead, trail };
+}
+
+/**
+ * How many hard line breaks sit at one edge of an element, counting through
+ * inline children. Whitespace-only text and comments are skipped. An inline child
+ * is counted only while it holds nothing but breaks, so the run stops at text.
+ */
+export function edgeBreaks(node: Node, side: "left" | "right"): number {
+    let count = 0;
+    let child = side === "left" ? node.firstChild : node.lastChild;
+
+    while (child) {
+        if (child.nodeName === "BR") {
+            count += 1;
+        } else if (child.nodeType === 1 && !isBlock(child) && !isVoid(child)) {
+            count += edgeBreaks(child, side);
+
+            if (!hasOnlyBreaks(child)) {
+                break;
+            }
+        } else if (!isIgnorableEdge(child)) {
+            break;
+        }
+
+        child = side === "left" ? child.nextSibling : child.previousSibling;
+    }
+
+    return count;
+}
+
+function isIgnorableEdge(node: Node): boolean {
+    if (node.nodeType === 8 || isSilentVoid(node)) {
+        return true;
+    }
+
+    return (node.nodeType === 3 || node.nodeType === 4) && BLANK_TEXT.test(node.nodeValue ?? "");
+}
+
+/**
+ * True for a void element that writes no Markdown: a word-break hint, a form input and the like. A break and an
+ * image with a source write output, and a block void such as a rule is a boundary, so those are not silent.
+ */
+export function isSilentVoid(node: Node): boolean {
+    if (node.nodeType !== 1 || !isVoid(node) || isBlock(node) || node.nodeName === "BR") {
+        return false;
+    }
+
+    return !(node.nodeName === "IMG" && (node as Element).getAttribute("src"));
+}
+
+/** True when the node's content is only whitespace and line breaks, so it outputs no text. */
+export function hasOnlyBreaks(node: Node): boolean {
+    for (const child of node.childNodes) {
+        if (child.nodeName === "BR") {
+            continue;
+        }
+
+        if (isSilentVoid(child)) {
+            continue;
+        }
+
+        if (child.nodeType === 1) {
+            if (isVoid(child) || !hasOnlyBreaks(child)) {
+                return false;
+            }
+        } else if (!isIgnorableEdge(child) && child.nodeType !== 8) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+/**
+ * The text of a code element. Each line break element becomes a newline, which
+ * is how a line break is written inside a code block; otherwise it is the same
+ * text that textContent gives.
+ */
+export function codeText(node: Node): string {
+    let text = "";
+
+    for (const child of node.childNodes) {
+        if (child.nodeName === "BR") {
+            text += "\n";
+        } else if (child.nodeType === 1) {
+            text += codeText(child);
+        } else if (child.nodeType === 3 || child.nodeType === 4) {
+            text += child.nodeValue ?? "";
+        }
+    }
+
+    return text;
 }
 
 const blockElements = new Set([
