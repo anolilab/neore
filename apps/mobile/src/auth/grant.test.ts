@@ -10,9 +10,10 @@ import {
     fetchAccessToken,
     parseAuthorizeResponse,
     readStoredUser,
+    revokeSessionToken,
     serializeGrantStore,
     SignInError,
-    signOutGrant,
+    takeStoredGrant,
     toBase64Url,
 } from "./grant";
 
@@ -255,6 +256,47 @@ describe("grant storage", () => {
         expect(await fetchAccessToken({ fetch, lunoraUrl: LUNORA, store })).toBe("jwt-1");
         expect(sent).toEqual({ token: "session-1" });
     });
+});
+
+describe("takeStoredGrant", () => {
+    it("clears the stored session and resolves its token, so the caller can revoke it", async () => {
+        const store = memoryStore({ token: "session-1", user: USER });
+
+        expect(await takeStoredGrant(store)).toBe("session-1");
+        expect(store.value).toBeNull();
+    });
+
+    it("resolves nothing when no session was stored", async () => {
+        expect(await takeStoredGrant(memoryStore())).toBeUndefined();
+    });
+
+    it("carries the token it read when the stored session cannot be cleared, so the session can still be revoked", async () => {
+        const store: GrantStore = {
+            clear: async () => {
+                throw new Error("keychain locked");
+            },
+            get: async () => {
+                return { token: "session-1", user: USER };
+            },
+            set: async () => {},
+        };
+
+        await expect(takeStoredGrant(store)).rejects.toMatchObject({ name: "StoredGrantNotClearedError", token: "session-1" });
+    });
+
+    it("still clears the stored session when it cannot be read, so an unreadable sign-in is removed", async () => {
+        const clear = vi.fn(async () => undefined);
+        const store: GrantStore = {
+            clear,
+            get: async () => {
+                throw new Error("keychain locked");
+            },
+            set: async () => {},
+        };
+
+        await expect(takeStoredGrant(store)).resolves.toBeUndefined();
+        expect(clear).toHaveBeenCalledOnce();
+    });
 
     it("sign-out forgets the grant even when the revoke fails", async () => {
         const store = memoryStore({ token: "session-1", user: USER });
@@ -262,22 +304,38 @@ describe("grant storage", () => {
             throw new Error("offline");
         };
 
-        await signOutGrant({ fetch, lunoraUrl: LUNORA, store });
+        await expect(takeStoredGrant(store)).resolves.toBe("session-1");
+        await expect(revokeSessionToken({ fetch, lunoraUrl: LUNORA, token: "session-1" })).rejects.toThrow("offline");
         expect(store.value).toBeNull();
     });
 });
 
-describe("signOutGrant", () => {
-    it("lets a store that cannot be cleared reject, so the provider can still sign out in memory", async () => {
-        const store: GrantStore = {
-            clear: async () => {
-                throw new Error("keychain locked");
-            },
-            get: async () => null,
-            set: async () => {},
+describe("revokeSessionToken", () => {
+    it("revokes the token it is given", async () => {
+        const sent: unknown[] = [];
+        const fetch: Fetch = async (_url, init) => {
+            sent.push(JSON.parse(String(init?.body)));
+
+            return json({});
         };
 
-        await expect(signOutGrant({ fetch: async () => json({}), lunoraUrl: LUNORA, store })).rejects.toThrow("keychain locked");
+        await revokeSessionToken({ fetch, lunoraUrl: LUNORA, token: "session-1" });
+
+        expect(sent).toEqual([{ token: "session-1" }]);
+    });
+
+    it("rejects when the server cannot be reached, so the caller can tell the revoke did not happen", async () => {
+        const fetch: Fetch = async () => {
+            throw new Error("offline");
+        };
+
+        await expect(revokeSessionToken({ fetch, lunoraUrl: LUNORA, token: "session-1" })).rejects.toThrow("offline");
+    });
+
+    it("rejects when the server refuses the revoke, so a refused revoke is not reported as done", async () => {
+        const fetch: Fetch = async () => json({ message: "nope" }, 500);
+
+        await expect(revokeSessionToken({ fetch, lunoraUrl: LUNORA, token: "session-1" })).rejects.toThrow("Could not revoke the session (500).");
     });
 });
 

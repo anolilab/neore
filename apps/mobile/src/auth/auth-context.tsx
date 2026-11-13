@@ -11,7 +11,7 @@ import { releaseOnSignOut } from "../notifications/push-registration";
 import { endPhonePushForAccount } from "../notifications/use-phone-push";
 import { getOfflineCache } from "../offline/database";
 import { AuthContext } from "./auth-state";
-import { fetchAccessToken, readStoredUser, signOutGrant } from "./grant";
+import { fetchAccessToken, readStoredUser, revokeSessionToken, takeStoredGrant } from "./grant";
 import { secureGrantStore } from "./secure-store";
 import { createAuthEpoch, INITIAL_SESSION, reduceSession } from "./session-state";
 import { signInWithBrowser } from "./sign-in";
@@ -172,14 +172,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 dispatch({ type: "signed-out" });
             },
             // The cache holds this person's chats: it is emptied FIRST and locally, so a sign-out request that fails or
-            // hangs offline cannot leave them behind. Then the server is told and the stored grant cleared.
+            // hangs offline cannot leave them behind. Then the stored grant is cleared, so nothing on the phone can sign in
+            // with it, and only then is the server told.
             teardown: async () =>
                 await signOutOnDevice({
                     clearCache: () => getOfflineCache().clear(),
                     forgetLastChat: clearLastThread,
                     releasePush: async () =>
                         await releaseOnSignOut({ platform: devicePushPlatform, registrations: pushRegistrations, server: backendPushServer(client) }),
-                    revokeGrant: () => signOutGrant({ fetch, lunoraUrl: config.lunoraUrl, store: secureGrantStore }),
+                    revokeSession: async (token) => await revokeSessionToken({ fetch, lunoraUrl: config.lunoraUrl, token }),
+                    takeCredential: async () => await takeStoredGrant(secureGrantStore),
                     // eslint-disable-next-line no-console -- no logger in the app; a failed clear must not be silent
                     warn: console.warn,
                 }),
