@@ -37,6 +37,7 @@ import type { ThreadData, ThreadRow } from "./chat-context-types";
 import type { GatewayErrorBody, GatewayInfo } from "./chat-gateway";
 import { CHAT_STREAM_URL, gatewayError, pendingGatewayInfo, validateGatewayUrl } from "./chat-gateway";
 import type { KickOffMedia } from "./media-kickoff";
+import { streamErrorType } from "./stream-error-type";
 
 /** How long a send waits for the session before handing the text back. */
 const AUTH_READY_TIMEOUT_MS = 10_000;
@@ -514,7 +515,7 @@ export const runSendMessage = async (env: SendMessageEnv, rawText: string, attac
         setOptimisticMessages(withoutMessage(optimisticId));
 
         trackEvent("stream_error", {
-            error_type: error_ instanceof Error ? error_.message : "unknown",
+            error_type: streamErrorType(error_),
             model,
         });
 

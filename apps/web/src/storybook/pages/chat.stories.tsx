@@ -314,7 +314,14 @@ export const JumpToLastMessage: Story = {
             return centre >= box.top && centre <= box.bottom;
         };
 
-        // Scrolled up past the question, the way a long run of replies leaves it. The control shows only away from the bottom.
+        // The thread first scrolls itself to the bottom, a frame after its messages are ready (`thread-viewport.tsx`). Scrolling up
+        // before that lands would be undone by it, and the control, shown only away from the bottom, would never appear. The
+        // viewport starts at the top and nothing else moves it first.
+        await waitFor(() => {
+            expect(scroller.scrollTop).toBeGreaterThan(0);
+        }, STATE_WAIT);
+
+        // Scrolled up past the question, the way a long run of replies leaves it.
         scroller.scrollTop = 0;
         await waitFor(() => {
             expect(isCentred()).toBe(false);

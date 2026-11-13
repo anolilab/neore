@@ -181,6 +181,16 @@ export const zTriggerExecutionSchema = z.object({
 // ─── Requests ───────────────────────────────────────────────────────────────
 
 export const zChatRequestSchema = z.object({
+    clientMessageId: z
+        .string()
+        .min(1)
+        .max(128)
+        .regex(/^[\w-]+$/u)
+        .optional()
+        .meta({
+            description:
+                "Your id for this send (1-128 letters, digits, `_` or `-`), kept for 24 hours. A retry with the same id and the same request saves nothing again: it answers 200 with `duplicate: true` and the first send's ids, 409 `chat_start_in_progress` while the first send is still saving, or 422 `client_message_id_reused` when the id was used for a different request. Independent of the `Idempotency-Key` header.",
+        }),
     model: z
         .string()
         .min(1)
@@ -202,7 +212,14 @@ export const zSkillRunRequestSchema = z.object({
     threadId: zChatRequestSchema.shape.threadId,
 });
 
+/** On a retry of a send with a `clientMessageId`: the ids are the first send's, and nothing was saved again. */
+const zDuplicateFlagSchema = z
+    .literal(true)
+    .optional()
+    .meta({ description: "A retry of a send with the same `clientMessageId`: these are the first send's ids, and nothing was saved again." });
+
 export const zChatStartedSchema = z.object({
+    duplicate: zDuplicateFlagSchema,
     messageId: z.string(),
     streamId: z.string(),
     streamToken: z.string().meta({ description: "Pass to POST /chat/stream. Valid for 30 minutes." }),
@@ -216,6 +233,7 @@ export const zPendingRequestSchema = z.object({
 });
 
 export const zChatCompletedSchema = z.object({
+    duplicate: zDuplicateFlagSchema,
     messageId: z.string(),
     pendingRequest: zPendingRequestSchema.optional().meta({
         description:

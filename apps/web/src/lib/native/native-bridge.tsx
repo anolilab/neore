@@ -123,7 +123,8 @@ const NativeBridge = (): JSX.Element | null => {
             onNativeSignIn((signIn) => {
                 void (async () => {
                     if (await completeNativeSignIn(signIn)) {
-                        // Sent before the reload; analytics may not flush on unload, so this one can be lost.
+                        // Survives the full load: a loaded PostHog sends its batch on `pagehide`; before it has loaded the
+                        // event waits in sessionStorage and the next page sends it (`queueEvent`).
                         trackEvent("desktop_signed_in", {});
                         // A full load: SSR, the RPC token and every cached query
                         // must all start from the new session.

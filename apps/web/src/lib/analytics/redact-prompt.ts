@@ -1,4 +1,4 @@
-import type { CaptureResult } from "posthog-js";
+import type { CaptureResult, Properties } from "posthog-js";
 
 /**
  * A prompt link (`/chat?prompt=…`) carries a person's text in its address, and the page view PostHog captures names that address
@@ -10,17 +10,25 @@ import type { CaptureResult } from "posthog-js";
 const REDACTED = "redacted";
 
 /**
- * The parameter name `prompt`, any of whose letters may be percent-encoded (the router decodes a key before it reads it), as
+ * The parameters whose value is redacted: `prompt` (a person's text) and `invite` (sign-up's bearer invitation token,
+ * `/auth/sign-up?invite=…`).
+ */
+const REDACTED_PARAMETERS = ["prompt", "invite"] as const;
+
+/**
+ * Any of `REDACTED_PARAMETERS`, any of whose letters may be percent-encoded (the router decodes a key before it reads it), as
  * `%70` in an address or `%2570` inside an encoded one. `escapes` are the prefixes an encoded letter may carry.
  */
 const keyPattern = (escapes: ReadonlyArray<string>): string =>
-    [..."prompt"]
-        .map((letter) => {
-            const hex = letter.codePointAt(0)!.toString(16);
+    `(?:${REDACTED_PARAMETERS.map((name) =>
+        [...name]
+            .map((letter) => {
+                const hex = letter.codePointAt(0)!.toString(16);
 
-            return `(?:${letter}|${escapes.map((escape) => `${escape}${hex}`).join("|")})`;
-        })
-        .join("");
+                return `(?:${letter}|${escapes.map((escape) => `${escape}${hex}`).join("|")})`;
+            })
+            .join(""),
+    ).join("|")})`;
 
 /**
  * A `prompt` parameter in an address: its value runs to the next `&` or `#` (an `&` inside the text is encoded as `%26`), or to
@@ -103,3 +111,6 @@ const redactValue = <T>(value: T): T => {
 };
 
 export const redactPromptFromEvent = (event: CaptureResult | null): CaptureResult | null => (event === null ? null : redactValue(event));
+
+/** An event's properties as `redactPromptFromEvent` would send them, for an event kept in the browser before it is sent. */
+export const redactPromptFromProperties = (properties: Properties): Properties => redactValue(properties);

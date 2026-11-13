@@ -1,7 +1,7 @@
 /**
  * `send_message` through the real path: the router, the tool, `runChatStart` and the database, with only the agent
  * run (the jobs queue) replaced. One send takes one unit of the daily message limit, and a replay of its
- * idempotency key takes none.
+ * idempotency key takes none. A resend with the same `clientMessageId` saves one prompt and answers with the first ids.
  */
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
@@ -60,7 +60,9 @@ registerModule(registry, "agent_messages", await import("../agent/messages"));
 registerModule(registry, "agent_sharing", await import("../agent/sharing"));
 registerModule(registry, "agent_threads", await import("../agent/threads"));
 registerModule(registry, "auth_functions", await import("../auth/functions"));
+registerModule(registry, "chat_daily_charge", await import("../chat/daily-charge"));
 registerModule(registry, "chat_functions", await import("../chat/functions"));
+registerModule(registry, "chat_start_claim", await import("../chat/start-claim"));
 registerModule(registry, "chat_streaming", await import("../chat/streaming"));
 registerModule(registry, "chat_streaming_persistent_library", await import("../chat/streaming/persistent/library"));
 registerModule(registry, "lib_action_cache", await import("../lib/action-cache"));
@@ -83,7 +85,7 @@ const dailyRemaining = async (): Promise<number> => {
     return remaining;
 };
 
-const connect = async () => {
+const buildApp = () => {
     const ctx = {
         auth: {
             getIdentity: async () => {
@@ -105,6 +107,11 @@ const connect = async () => {
     });
     app.route("/api/v1", createPublicApiRouter());
 
+    return app;
+};
+
+const connect = async () => {
+    const app = buildApp();
     const client = new Client({ name: "test-client", version: "1.0.0" });
 
     await client.connect(
@@ -155,6 +162,76 @@ describe("send_message through the real path", () => {
 
             expect(sent.isError).toBe(false);
             expect(await dailyRemaining()).toBe(before - 2);
+        } finally {
+            await client.close();
+        }
+    });
+});
+
+describe("POST /chat with a clientMessageId", () => {
+    const countMessages = async (): Promise<number> =>
+        await harness.run(async (ctx: any) => {
+            const messages = await ctx.db.query("messages").collect();
+
+            return messages.length;
+        });
+    const postChat = async (body: Record<string, unknown>) => {
+        const response = await buildApp().request("https://api.example/api/v1/chat", {
+            body: JSON.stringify(body),
+            headers: { Authorization: "Bearer nk_test", "Content-Type": "application/json" },
+            method: "POST",
+        });
+
+        return { json: (await response.json()) as any, status: response.status };
+    };
+
+    // What a retry saves and charges is `chat/http.start-claim.test.ts`'s; this checks the public answer to it.
+    it("answers a retried send 200 with duplicate: true and the first send's ids, and the id on another prompt with client_message_id_reused", async () => {
+        const first = await postChat({ clientMessageId: "public-send-1", prompt: "hello" });
+
+        expect(first.status).toBe(202);
+        expect(first.json).not.toHaveProperty("duplicate");
+
+        const retry = await postChat({ clientMessageId: "public-send-1", prompt: "hello" });
+
+        expect(retry.status).toBe(200);
+        expect(retry.json).toMatchObject({
+            duplicate: true,
+            messageId: first.json.messageId,
+            streamId: first.json.streamId,
+            streamToken: expect.any(String),
+            threadId: first.json.threadId,
+        });
+
+        const reused = await postChat({ clientMessageId: "public-send-1", prompt: "something else" });
+
+        expect(reused.status).toBe(422);
+        expect(reused.json.error).toMatchObject({ code: "client_message_id_reused" });
+    });
+
+    it("refuses a malformed clientMessageId before anything is saved", async () => {
+        for (const clientMessageId of ["has:colon", "", "x".repeat(129)]) {
+            const refused = await postChat({ clientMessageId, prompt: "hello" });
+
+            expect(refused.status).toBe(400);
+            expect(refused.json.error).toMatchObject({ code: "invalid_request" });
+        }
+
+        expect(await countMessages()).toBe(0);
+    });
+
+    it("answers an MCP create_thread retried with the same clientMessageId from the first send", async () => {
+        const client = await connect();
+
+        try {
+            const sendArgs = { clientMessageId: "mcp-send-1", prompt: "hello" };
+            const created = await client.callTool({ arguments: sendArgs, name: "create_thread" });
+            const retried = await client.callTool({ arguments: sendArgs, name: "create_thread" });
+
+            expect(created).toMatchObject({ isError: false, structuredContent: { status: "done", text: "Mock reply" } });
+            expect(retried).toMatchObject({ isError: false, structuredContent: { duplicate: true, text: "Mock reply" } });
+            expect((retried.structuredContent as { threadId: string }).threadId).toBe((created.structuredContent as { threadId: string }).threadId);
+            expect(await countMessages()).toBe(1);
         } finally {
             await client.close();
         }

@@ -101,10 +101,11 @@ describe("SignOut", () => {
         expect(Object.keys(localStorage).filter((key) => key.startsWith("neore-draft:"))).toStrictEqual([]);
     });
 
-    it("keeps the queued prompts and the signed-in hint when sign-out fails, as the session may still be active", async () => {
+    it("keeps the queued prompts and the signed-in hint when sign-out fails, as the session may still be active, but not the queued analytics events", async () => {
         auth.outcome = "error";
         localStorage.setItem("neore-signed-in-hint", "1");
         sessionStorage.setItem("neore:prompt-queue:thread-a", '{"items":[]}');
+        sessionStorage.setItem("neore:posthog-pending-events", '[{"event":"tracked","timestamp":"2026-11-12T10:00:00.000Z"}]');
 
         render(<SignOut />);
 
@@ -113,6 +114,8 @@ describe("SignOut", () => {
         });
         expect(localStorage.getItem("neore-signed-in-hint")).toBe("1");
         expect(sessionStorage.getItem("neore:prompt-queue:thread-a")).toBe('{"items":[]}');
+        // Events queued for PostHog do not wait on a sign-in page that may be someone else's.
+        expect(sessionStorage.getItem("neore:posthog-pending-events")).toBeNull();
     });
 
     it("drops the queued prompts and the signed-in hint once sign-out succeeds", async () => {

@@ -430,6 +430,7 @@ catalogs:
     "@vitest/coverage-v8": 5.1.0
     "@vitest/ui": 5.1.0
     axe-core: 4.14.0
+    fake-indexeddb: 6.2.8
     jsdom: 31.0.0
     msw: 3.0.4
     playwright: 1.65.0
@@ -649,7 +650,7 @@ overrides:
   "@eslint/plugin-kit@<0.3.3": ">=0.5.0"
   "@grpc/grpc-js@<1.14.5": ">=1.14.5"
   "@hono/node-server@<1.19.10": ">=1.19.10"
-  "@hono/node-server@<2.0.10": ">=2.0.10"
+  "@hono/node-server@<2.1.6": ">=2.1.6"
   "@humanfs/node@<0.16.8": ">=0.16.8"
   "@langchain/core@<0.3.80": ">=0.3.80"
   # @lunora/auth@alpha.63 peer-depends on better-auth 1.7.0-rc.2; the catalog now
