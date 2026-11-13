@@ -67,12 +67,17 @@ class ReferenceLinkRule implements Rule {
 
     filter = isReferencedLink;
 
-    replacement(content: string, node: AnnotatedNode, options: Options): string {
+    replacement(rawContent: string, node: AnnotatedNode, options: Options, lookup: RuleLookup): string {
         const rawHref = node.getAttribute("href") ?? "";
 
         if (options.safeLinks && isUnsafeDestination(rawHref)) {
-            return content;
+            return rawContent;
         }
+
+        // The reference definition is written after the document, out of the heading's reach, so a heading's break
+        // marks are turned into spaces here; otherwise the label in the heading and the definition would differ.
+        const mark = breakMarkFor(node, lookup);
+        const content = mark === undefined ? rawContent : joinAtMarks(rawContent, mark);
 
         const href = escapeLinkDestination(rawHref, options.safeLinks);
         let title = cleanAttribute(node.getAttribute("title"));
