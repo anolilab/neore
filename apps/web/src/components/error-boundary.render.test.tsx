@@ -126,6 +126,27 @@ describe(ErrorBoundary, () => {
         expect((thrown.cause as Error).stack).toContain("RouteThrower");
     });
 
+    it("still renders its fallback and toasts, and warns, when a reporting onError throws", () => {
+        vi.spyOn(console, "error").mockImplementation(() => {});
+        const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+        showError.mockClear();
+
+        const onError = vi.fn(() => {
+            throw new Error("report failed");
+        });
+
+        render(
+            <ErrorBoundary fallback={(error: Error) => <p>{`Recovered: ${error.message}`}</p>} isReportedByOnError onError={onError} showToast>
+                <Thrower />
+            </ErrorBoundary>,
+        );
+
+        expect(screen.getByText("Recovered: frozen")).toBeTruthy();
+        expect(showError).toHaveBeenCalledOnce();
+        expect(warn).toHaveBeenCalledWith("[ErrorBoundary] The error handler failed:", expect.objectContaining({ message: "report failed" }));
+    });
+
     it("still renders its fallback, and warns, when reporting the error throws", () => {
         vi.spyOn(console, "error").mockImplementation(() => {});
         const warn = vi.spyOn(console, "warn").mockImplementation(() => {});

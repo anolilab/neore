@@ -145,7 +145,14 @@ class PostHogCapturingBoundary extends React.Component<
             captureRenderError(reported);
         }
 
-        onCaught?.({ componentStack, error, reported });
+        // Best-effort, as the boundary's own report is: a handler that throws (its report failing) must not keep the
+        // fallback from showing.
+        try {
+            onCaught?.({ componentStack, error, reported });
+        } catch (handlerError) {
+            // eslint-disable-next-line no-console -- the only trace of a handler that failed while a crash was handled
+            console.warn("[ErrorBoundary] The error handler failed:", handlerError);
+        }
     }
 
     public override render(): ReactNode {
@@ -167,10 +174,13 @@ export const ErrorBoundary = ({ children, fallback, isReportedByOnError, onError
         const errorObject = toError(error);
 
         // A handler that reports gets the error with its component stack attached; the toast shows the error as thrown.
-        onError?.(isReportedByOnError ? toError(reported) : errorObject, { componentStack });
-
-        if (showToast !== false) {
-            showError(errorObject);
+        try {
+            onError?.(isReportedByOnError ? toError(reported) : errorObject, { componentStack });
+        } finally {
+            // The toast still shows when the handler (its report) throws; the boundary logs that failure.
+            if (showToast !== false) {
+                showError(errorObject);
+            }
         }
     };
 
