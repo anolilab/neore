@@ -210,3 +210,22 @@ describe("paste styles: review cases, third round", () => {
         ).toBe("a *b* *c* d");
     });
 });
+
+describe("paste styles: review cases, fourth round", () => {
+    it("lets an invalid declaration override no earlier one, as a browser drops it", () => {
+        expect(
+            convert(
+                `<p><span style="font-weight:bold; font-weight:bogus">x</span> <span style="font-style:italic; font-style:bogus">y</span> <span style="text-decoration-line:line-through; text-decoration-line:bogus">z</span></p>`,
+            ),
+        ).toBe("**x** *y* ~~z~~");
+    });
+
+    it("finds a joiner beside the inline element around formatting on part of an emoji sequence", () => {
+        expect(convert("<p><span><b>👩</b></span>\u{200D}👩</p>")).toBe("👩\u{200D}👩");
+        expect(convert("<p>👩\u{200D}<span><i>👧</i></span></p>")).toBe("👩\u{200D}👧");
+    });
+
+    it("keeps a normal-weight link inside bold out of the bold, its marks outside the link syntax", () => {
+        expect(convert(`<b>a <a href="https://x.y" style="font-weight:normal">x</a> b</b>`)).toBe("**a** [x](https://x.y) **b**");
+    });
+});

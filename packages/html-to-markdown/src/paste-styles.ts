@@ -11,6 +11,7 @@ import { declaredStyle } from "./inline-style";
 import type TurndownService from "./turndown";
 import type { TurndownInput } from "./turndown";
 import type { Rule, RuleLookup } from "./types";
+import { isBlock } from "./utilities";
 
 const NORMAL_START = "\u{1}";
 const NORMAL_END = "\u{2}";
@@ -21,6 +22,10 @@ const BOLD_WEIGHTS = new Set(["600", "700", "800", "900", "bold", "bolder"]);
 export const NORMAL_WEIGHTS = new Set(["100", "200", "300", "400", "500", "normal"]);
 // The whitespace between the keywords of a CSS value.
 const CSS_SPACE = /[\t\n\f\r ]+/;
+const GLOBAL_VALUES = new Set(["inherit", "initial", "revert", "revert-layer", "unset"]);
+const NUMBER = /^\d+(?:\.\d+)?$/;
+const MAX_WEIGHT = 1000;
+const LINE_KEYWORDS = new Set(["blink", "line-through", "none", "overline", "underline"]);
 // An angle, as `oblique` may take: `10deg`, `-0.5turn`.
 const ANGLE = /^[+-]?(?:\d+(?:\.\d+)?|\.\d+)(?:deg|grad|rad|turn)$/;
 
@@ -59,7 +64,7 @@ function emphasisOf(element: Element): Emphasis {
     const name = element.nodeName;
     const style = element.getAttribute("style") ?? "";
     const isStyled = STYLED.has(name);
-    const weight = style === "" ? "" : declaredStyle(style, "font-weight");
+    const weight = style === "" ? "" : declaredStyle(style, "font-weight", isWeightValue);
     const isNormal = (isStyled || isNamed(element)) && NORMAL_WEIGHTS.has(weight);
     const emphasis: Emphasis = {
         isBold: !isNormal && (BOLD_NAMES.has(name) || (isStyled && BOLD_WEIGHTS.has(weight))),
@@ -73,17 +78,43 @@ function emphasisOf(element: Element): Emphasis {
     return emphasis;
 }
 
-function isItalicStyle(style: string): boolean {
-    const value = declaredStyle(style, "font-style");
+/** True for a `font-weight` a browser reads: a keyword, a global value, or a number from 1 to 1000. */
+function isWeightValue(value: string): boolean {
+    if (value === "lighter" || NORMAL_WEIGHTS.has(value) || BOLD_WEIGHTS.has(value) || GLOBAL_VALUES.has(value)) {
+        return true;
+    }
 
-    const [keyword, angle, ...rest] = value.split(CSS_SPACE);
-
-    // `oblique` alone or with an angle: a value a browser cannot read sets nothing.
-    return value === "italic" || (keyword === "oblique" && rest.length === 0 && (angle === undefined || ANGLE.test(angle)));
+    return NUMBER.test(value) && Number(value) >= 1 && Number(value) <= MAX_WEIGHT;
 }
 
+/** True for a `font-style` a browser reads: `oblique` alone or with an angle among them. */
+function isFontStyleValue(value: string): boolean {
+    const [keyword, angle, ...rest] = value.split(CSS_SPACE);
+
+    if (keyword === "oblique") {
+        return rest.length === 0 && (angle === undefined || ANGLE.test(angle));
+    }
+
+    return value === "italic" || value === "normal" || GLOBAL_VALUES.has(value);
+}
+
+/** True for a `text-decoration-line` a browser reads: line keywords, or a global value. */
+function isDecorationLineValue(value: string): boolean {
+    return GLOBAL_VALUES.has(value) || value.split(CSS_SPACE).every((keyword) => LINE_KEYWORDS.has(keyword));
+}
+
+// A value a browser cannot read is dropped, so it overrides no earlier declaration.
+function isItalicStyle(style: string): boolean {
+    const value = declaredStyle(style, "font-style", isFontStyleValue);
+
+    return value === "italic" || value.startsWith("oblique");
+}
+
+// The `text-decoration` shorthand also takes a color, which can be almost any word, so only its longhand is checked.
 function isStruckStyle(style: string): boolean {
-    return ["text-decoration", "text-decoration-line"].some((property) => declaredStyle(style, property).split(CSS_SPACE).includes("line-through"));
+    const isShorthandStruck = declaredStyle(style, "text-decoration").split(CSS_SPACE).includes("line-through");
+
+    return isShorthandStruck || declaredStyle(style, "text-decoration-line", isDecorationLineValue).split(CSS_SPACE).includes("line-through");
 }
 
 function isNamed(element: Element): boolean {
@@ -320,12 +351,52 @@ function isInEmojiSequence(element: Element, lookup: RuleLookup): boolean {
         return true;
     }
 
-    const after = edgeText(shownFrom(element.nextSibling, "first", lookup), "first", lookup);
-    const before = edgeText(shownFrom(element.previousSibling, "last", lookup), "last", lookup);
-    const isJoinedAfter = EMOJI_EDGE.test(lastCodePoint(last)) && after.startsWith(JOINER);
-    const isJoinedBefore = EMOJI_EDGE.test(String.fromCodePoint(first.codePointAt(0) ?? 0)) && before.endsWith(JOINER);
+    const isJoinedAfter = EMOJI_EDGE.test(lastCodePoint(last)) && neighbourText(element, "first", lookup).startsWith(JOINER);
 
-    return isJoinedAfter || isJoinedBefore;
+    return isJoinedAfter || (EMOJI_EDGE.test(String.fromCodePoint(first.codePointAt(0) ?? 0)) && neighbourText(element, "last", lookup).endsWith(JOINER));
+}
+
+const textsAfter = new WeakMap<Node, string>();
+const textsBefore = new WeakMap<Node, string>();
+
+/**
+ * The text beside the node: at the start of what the page shows after it ("first") or at the end of what it shows
+ * before it ("last"). With no such sibling, the text beside its inline parent, up to the nearest block. Remembered for
+ * each node on the way up, so nested formatting reads it once.
+ */
+function neighbourText(node: Node, side: "first" | "last", lookup: RuleLookup): string {
+    const known = side === "first" ? textsAfter : textsBefore;
+    const chain: Node[] = [];
+    let current: Node | null = node;
+    let text = "";
+
+    while (current) {
+        const cached = known.get(current);
+
+        if (cached !== undefined) {
+            text = cached;
+            break;
+        }
+
+        chain.push(current);
+
+        const sibling = shownFrom(side === "first" ? current.nextSibling : current.previousSibling, side, lookup);
+
+        if (sibling) {
+            text = edgeText(sibling, side, lookup);
+            break;
+        }
+
+        const parent: Node | null = current.parentNode;
+
+        current = parent?.nodeType === 1 && !isBlock(parent) ? parent : null;
+    }
+
+    for (const member of chain) {
+        known.set(member, text);
+    }
+
+    return text;
 }
 
 export function withoutMarks(text: string): string {
@@ -506,7 +577,7 @@ const styledText: Rule = {
             if (!isFormattedAbove(node, "isBold", lookup)) {
                 text = isWrapped ? wrapRuns(text, options.strongDelimiter, true) : withoutMarks(text);
             }
-        } else if (isUnbold(node) && text.trim() !== "") {
+        } else if (isUnbold(node) && isNamed(node) && text.trim() !== "") {
             // All of it is normal weight, so marks inside it are not needed.
             text = `${NORMAL_START}${withoutMarks(text)}${NORMAL_END}`;
         }
@@ -524,10 +595,25 @@ const styledText: Rule = {
         }
 
         const next = lookup.ruleAfter(styledText, node);
+        const written = next.replacement.call(next, isUnbold(node) ? withoutMarks(text) : text, node, options, lookup);
 
-        return next.replacement.call(next, text, node, options, lookup);
+        // Marked around what the element's rule writes, not inside it: a link's label is not where its bold ends.
+        return isUnbold(node) ? markNormal(written) : written;
     },
 };
+
+/** The marks around a normal-weight element's Markdown, inside the line breaks at its ends. */
+function markNormal(markdown: string): string {
+    const core = markdown.trim();
+
+    if (core === "") {
+        return markdown;
+    }
+
+    const start = markdown.indexOf(core);
+
+    return `${markdown.slice(0, start)}${NORMAL_START}${core}${NORMAL_END}${markdown.slice(start + core.length)}`;
+}
 
 export const styleRules: Record<string, Rule> = { styledText };
 
