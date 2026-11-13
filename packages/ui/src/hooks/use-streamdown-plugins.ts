@@ -1,6 +1,8 @@
 import { cjk } from "@streamdown/cjk";
 import { useEffect, useState } from "react";
 import type { PluginConfig } from "streamdown";
+import { defaultRehypePlugins } from "streamdown";
+import type { PluggableList } from "unified";
 
 import { code } from "../utils/code-highlighter";
 
@@ -55,6 +57,25 @@ export const loadHeavyStreamdownPlugins = (): Promise<PluginConfig> => {
 
     return heavy.loading;
 };
+
+/** Streamdown's default rehype set: raw HTML parsed into the tree, then sanitized and hardened. */
+const REHYPE_WITH_RAW_HTML: PluggableList = [defaultRehypePlugins.raw, defaultRehypePlugins.sanitize, defaultRehypePlugins.harden] as PluggableList;
+
+/** The same without the raw-HTML step. Streamdown then shows any HTML node as text; sanitize and harden still run. */
+const REHYPE_WITHOUT_RAW_HTML: PluggableList = [defaultRehypePlugins.sanitize, defaultRehypePlugins.harden] as PluggableList;
+
+/**
+ * Anything markdown could read as an HTML tag, comment, declaration or processing instruction. Without it the text
+ * has no HTML node to parse; an autolink (`<https://…>`) or a `<` in code also matches, which only costs the skip.
+ */
+const HTML_TAG_RE = /<[a-z!/?]/iu;
+
+/**
+ * The rehype plugins for `text`. The raw-HTML step runs the whole block through an HTML parser, so it only runs when
+ * the text has something that looks like a tag. Both lists are module constants: Streamdown re-parses every block
+ * when the list's identity changes.
+ */
+export const streamdownRehypePlugins = (text: string): PluggableList => (HTML_TAG_RE.test(text) ? REHYPE_WITH_RAW_HTML : REHYPE_WITHOUT_RAW_HTML);
 
 /**
  * The plugins to render `text` with: the basic set until the text needs math

@@ -7,12 +7,10 @@
  */
 import { useEffect } from "react";
 
-import { useAuth } from "@/features/auth/lib/auth-ui-provider";
+import { useAuthActiveOrganization, useAuthSession } from "@/features/auth/hooks/use-auth-session";
 import { setAnalyticsIdentity, setIdentityExpected } from "@/lib/analytics/posthog-client";
 
 const usePostHogIdentity = (): void => {
-    const { hooks } = useAuth();
-
     // The identity is expected while this publisher is mounted. A crash that unmounts it (the router's error component in
     // place of the root) lets PostHog start without one, instead of holding every capture for the rest of the page.
     useEffect(() => {
@@ -23,13 +21,13 @@ const usePostHogIdentity = (): void => {
         };
     }, []);
 
-    const { data: sessionData, isPending: isSessionPending } = hooks.useSession();
+    const { data: sessionData, isPending: isSessionPending } = useAuthSession();
     const user = sessionData?.user;
     const isSignedIn = Boolean(user && !user.isAnonymous);
 
     // Without a session this read is skipped and stays pending; only a signed-in user's organization is read at all, so
     // a cached one never follows a sign-out onto the anonymous client.
-    const { data: orgData, isPending: isOrgPending } = hooks.useActiveOrganization();
+    const { data: orgData, isPending: isOrgPending } = useAuthActiveOrganization();
 
     const userId = isSignedIn ? user?.id : undefined;
     const email = user?.email;

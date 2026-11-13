@@ -1,5 +1,5 @@
 import { act, renderHook } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import useLocalModelTurn from "./use-local-model-turn";
 
@@ -239,5 +239,164 @@ describe("useLocalModelTurn close warning", () => {
         });
 
         expect(isGuarded()).toBe(false);
+    });
+});
+
+/** Animation frames that run only when the test says so. */
+const stubFrames = () => {
+    const frames = new Map<number, FrameRequestCallback>();
+    let lastId = 0;
+
+    vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
+        lastId += 1;
+        frames.set(lastId, callback);
+
+        return lastId;
+    });
+    vi.stubGlobal("cancelAnimationFrame", (id: number) => {
+        frames.delete(id);
+    });
+
+    return () => {
+        act(() => {
+            const due = [...frames.values()];
+
+            frames.clear();
+
+            for (const frame of due) {
+                frame(0);
+            }
+        });
+    };
+};
+
+type StreamedOptions = { onUpdate: (text: string, reasoning: string) => void; prompt: string; save: (input: unknown) => Promise<{ threadId: string }> };
+
+/** A turn that streams through `onUpdate` and saves `reply` once `finish` is called. */
+const streamingTurn = (reply: string) => {
+    const turn = { finish: undefined as unknown as () => void, onUpdate: undefined as unknown as StreamedOptions["onUpdate"] };
+
+    const gate = new Promise<void>((resolve) => {
+        turn.finish = resolve;
+    });
+
+    runLocalTurn.mockImplementationOnce(async (options: StreamedOptions) => {
+        turn.onUpdate = options.onUpdate;
+        await gate;
+
+        const saved = await options.save({ outcome: "complete", prompt: options.prompt, reply });
+
+        return { outcome: "complete", saved: true, threadId: saved.threadId };
+    });
+
+    return turn;
+};
+
+/** The hook, recording the live reply of every render. */
+const renderTurn = () => {
+    const rendered: ({ status: string | undefined; text: string } | null)[] = [];
+    const view = renderHook(() => {
+        const turn = useLocalModelTurn(MODEL, new Set());
+
+        rendered.push(turn.streamingMessage ? { status: turn.streamingMessage.status, text: turn.streamingMessage.text } : null);
+
+        return turn;
+    });
+
+    return { rendered, result: view.result };
+};
+
+describe("useLocalModelTurn streaming updates", () => {
+    afterEach(() => {
+        vi.unstubAllGlobals();
+    });
+
+    it("shows the tokens that arrive within one frame in one update", async () => {
+        const runFrames = stubFrames();
+        const turn = streamingTurn("Hello");
+        const { rendered, result } = renderTurn();
+        let sent!: Promise<void>;
+
+        act(() => {
+            sent = result.current.send(sendOptions({}));
+        });
+
+        const rendersBefore = rendered.length;
+
+        // Five network reads, each its own task, before the next frame.
+        for (const text of ["H", "He", "Hel", "Hell", "Hello"]) {
+            act(() => {
+                turn.onUpdate(text, "");
+            });
+        }
+
+        expect(rendered).toHaveLength(rendersBefore);
+
+        runFrames();
+
+        expect(rendered.slice(rendersBefore).map((reply) => reply?.text)).toStrictEqual(["Hello"]);
+
+        await act(async () => {
+            turn.finish();
+            await sent;
+        });
+    });
+
+    it("never shows an older turn's queued text in a newer turn's reply", async () => {
+        const runFrames = stubFrames();
+        const older = streamingTurn("old reply");
+        const newer = streamingTurn("new reply");
+        const { rendered, result } = renderTurn();
+        let olderSent!: Promise<void>;
+        let newerSent!: Promise<void>;
+
+        act(() => {
+            olderSent = result.current.send(sendOptions({}));
+        });
+        act(() => {
+            older.onUpdate("old reply", "old thoughts");
+        });
+
+        // A regenerate starts before the older turn's frame ran.
+        act(() => {
+            newerSent = result.current.send(sendOptions({ branch: { kind: "regenerate", messageId: "u1" } }));
+        });
+
+        const newerStart = rendered.length - 1;
+
+        runFrames();
+
+        expect(rendered.slice(newerStart).map((reply) => reply?.text)).not.toContain("old reply");
+        expect(result.current.streamingMessage?.parts).toStrictEqual([{ text: "", type: "text" }]);
+
+        await act(async () => {
+            older.finish();
+            newer.finish();
+            await Promise.all([olderSent, newerSent]);
+        });
+    });
+
+    it("shows the last tokens, still waiting for a frame, when the reply is saved", async () => {
+        stubFrames();
+        const turn = streamingTurn("Hello");
+        const { rendered, result } = renderTurn();
+        let sent!: Promise<void>;
+
+        act(() => {
+            sent = result.current.send(sendOptions({}));
+        });
+        act(() => {
+            turn.onUpdate("Hel", "");
+        });
+        act(() => {
+            turn.onUpdate("Hello", "");
+        });
+
+        await act(async () => {
+            turn.finish();
+            await sent;
+        });
+
+        expect(rendered.at(-1)).toStrictEqual({ status: "success", text: "Hello" });
     });
 });

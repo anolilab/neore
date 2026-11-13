@@ -38,7 +38,7 @@ import {
 import type { FC, ReactNode } from "react";
 import { memo, useCallback, useState } from "react";
 
-import { useChatActions, useChatThread } from "@/features/chat/core/context/chat-context";
+import { useChatActions, useChatThreadIdentity } from "@/features/chat/core/context/chat-context";
 import { useThreadManager } from "@/features/chat/core/hooks/use-thread-manager";
 import { isValidThreadId } from "@/features/chat/core/hooks/use-validated-thread";
 import { useChatUIStore, useMessageInteractionState } from "@/features/chat/core/stores/chat-ui-store";
@@ -267,7 +267,7 @@ const MessageTimestamp: FC<{ message: UIMessage }> = ({ message }) => {
  * Uses MessageActions and MessageAction from AI elements
  */
 const DefaultActionBar: FC<ActionBarProps> = memo(({ isCopied, isHovered, isStreaming, message, messageIndex, onCopy, onCopyPlain, onEdit, onReload }) => {
-    const { model: currentModel, threadId } = useChatThread();
+    const { model: currentModel, threadId } = useChatThreadIdentity();
     const models = useFeatureFlaggedModels();
     const crpc = useCRPC();
     const { createBranch } = useThreadManager(true);
