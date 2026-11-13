@@ -8,18 +8,22 @@ import TurndownService from "../src/index";
  * text that looks like a break marker.
  */
 
+// The private-use area, U+E000 to U+F8FF, read from escaped characters.
+const FIRST_PRIVATE_USE = "\u{E000}".codePointAt(0) ?? 0;
+const LAST_PRIVATE_USE = "\u{F8FF}".codePointAt(0) ?? 0;
+
 function hasPrivateUse(text: string): boolean {
     return [...text].some((character) => {
         const code = character.codePointAt(0) ?? 0;
 
-        return code >= 0xe0_00 && code <= 0xf8_ff;
+        return code >= FIRST_PRIVATE_USE && code <= LAST_PRIVATE_USE;
     });
 }
 
 function allPrivateUse(): string {
     let text = "";
 
-    for (let code = 0xe0_00; code <= 0xf8_ff; code += 1) {
+    for (let code = FIRST_PRIVATE_USE; code <= LAST_PRIVATE_USE; code += 1) {
         text += String.fromCodePoint(code);
     }
 
