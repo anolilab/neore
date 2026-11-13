@@ -69,7 +69,7 @@ export function declaredStyle(style: string, property: string): string {
     let value = "";
     let isImportant = false;
 
-    const parts = declarations(withoutComments(style));
+    const parts = declarations(style);
 
     for (const declaration of parts) {
         const colon = declaration.indexOf(":");
@@ -90,34 +90,13 @@ export function declaredStyle(style: string, property: string): string {
     return value;
 }
 
-// The style without its comments: CSS reads `display:` then an empty comment then `none` as `display:none`. An
-// unclosed comment runs to the end.
-function withoutComments(style: string): string {
-    let result = "";
-    let index = 0;
-
-    for (let open = style.indexOf("/*"); open !== -1; open = style.indexOf("/*", index)) {
-        result += style.slice(index, open);
-
-        const close = style.indexOf("*/", open + 2);
-
-        if (close === -1) {
-            return result;
-        }
-
-        index = close + 2;
-    }
-
-    return result + style.slice(index);
-}
-
 /**
- * The declarations of an inline style: split at each `;` that is not inside a quoted string or parentheses, so a value
- * such as `url('a;b')` or `"x; y"` stays whole.
+ * The declarations of an inline style, without its comments: split at each `;` that is not inside a quoted string or
+ * parentheses, so a value such as `url('a;b')` or `"x; y"` stays whole.
  */
 function declarations(style: string): string[] {
     const parts: string[] = [];
-    let start = 0;
+    let current = "";
     let depth = 0;
     let index = 0;
 
@@ -125,21 +104,35 @@ function declarations(style: string): string[] {
         const char = style.charAt(index);
 
         if (QUOTES.has(char)) {
-            index = afterQuoted(style, index);
+            const end = afterQuoted(style, index);
+
+            current += style.slice(index, end);
+            index = end;
+            continue;
+        }
+
+        // A comment is no text to CSS (a value broken by one reads as if it were not there); an unclosed one runs to the
+        // end. Markers inside a quoted string are its text, so they were copied above.
+        if (style.startsWith("/*", index)) {
+            const close = style.indexOf("*/", index + 2);
+
+            index = close === -1 ? style.length : close + 2;
             continue;
         }
 
         depth = Math.max(0, depth + (DEPTH_CHANGE[char] ?? 0));
 
         if (char === ";" && depth === 0) {
-            parts.push(style.slice(start, index));
-            start = index + 1;
+            parts.push(current);
+            current = "";
+        } else {
+            current += char;
         }
 
         index += 1;
     }
 
-    parts.push(style.slice(start));
+    parts.push(current);
 
     return parts;
 }

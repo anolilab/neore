@@ -166,3 +166,9 @@ describe("paste: review cases, second round", () => {
         expect(convert(`<p><math><semantics><mi>x</mi><annotation encoding="${encoding}">x^2</annotation></semantics></math></p>`)).toBe("$x^2$");
     });
 });
+
+describe("paste: review cases, third round", () => {
+    it.each([`--x:"/*";display:none;--y:"*/"`, `content:"/*"; visibility:hidden`])("reads comment markers inside a quoted value as text: %s", (style) => {
+        expect(convert(`<p>shown<span style='${style}'> secret</span></p>`)).toBe("shown");
+    });
+});
