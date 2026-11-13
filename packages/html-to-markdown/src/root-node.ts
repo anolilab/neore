@@ -25,6 +25,8 @@ export default function rootNode(input: string | Node, options: Options): Node {
         root = input.cloneNode(true);
     }
 
+    removeNonContent(root);
+
     collapseWhitespace({
         element: root,
         isBlock,
@@ -33,6 +35,50 @@ export default function rootNode(input: string | Node, options: Options): Node {
     });
 
     return root;
+}
+
+/**
+ * Elements whose text is never content: a script or style sheet, a noscript fallback, a template, a title. Removed with
+ * their text, before whitespace is collapsed, so the text around them keeps its spacing. Matched by local name, in any
+ * namespace, so an SVG `<script>` or `<style>` is removed too.
+ */
+const NON_CONTENT_NAMES = new Set(["noscript", "script", "style", "template", "title"]);
+
+/** Removes the non-content elements under `root`. A root that is itself one of them is emptied. */
+function removeNonContent(root: Node): void {
+    if (isNonContent(root)) {
+        while (root.firstChild) {
+            root.firstChild.remove();
+        }
+
+        return;
+    }
+
+    removeNonContentBelow(root);
+}
+
+/**
+ * Walks the children through the Node API, so a fragment without selector methods works too. The next sibling is read
+ * before a match is removed, so the walk goes on past it.
+ */
+function removeNonContentBelow(parent: Node): void {
+    let child = parent.firstChild;
+
+    while (child) {
+        const next = child.nextSibling;
+
+        if (isNonContent(child)) {
+            child.remove();
+        } else {
+            removeNonContentBelow(child);
+        }
+
+        child = next;
+    }
+}
+
+function isNonContent(node: Node): boolean {
+    return node.nodeType === 1 && NON_CONTENT_NAMES.has((node as Element).localName.toLowerCase());
 }
 
 function isPreOrCode(node: Node): boolean {

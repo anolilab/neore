@@ -28,6 +28,7 @@ export const DEFAULT_OPTIONS: Options = {
     linkStyle: "inlined",
     preformattedCode: false,
     rules: COMMONMARK_RULES,
+    safeLinks: false,
     strongDelimiter: "**",
 };
 

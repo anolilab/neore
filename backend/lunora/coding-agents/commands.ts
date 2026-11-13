@@ -230,11 +230,15 @@ export const gitAuthEnv = (githubToken: string | undefined, origin = GITHUB_CRED
     return env;
 };
 
-/** The agent CLI's environment: the user's provider key and nothing of ours. */
+/**
+ * The agent CLI's environment: the user's provider key and nothing of ours. Claude Code also names neore as its
+ * entrypoint, which it sends in its `User-Agent`.
+ */
 export const agentEnv = (agent: CodingAgentId, providerKey: string): Record<string, string> => {
     return {
         CI: "1",
         [CODING_AGENTS[agent].envVar]: providerKey,
+        ...(agent === "claude_code" && { CLAUDE_CODE_ENTRYPOINT: "neore" }),
         DISABLE_AUTOUPDATER: "1",
         DISABLE_TELEMETRY: "1",
         NO_COLOR: "1",
