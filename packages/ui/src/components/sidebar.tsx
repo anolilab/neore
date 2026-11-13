@@ -240,6 +240,7 @@ const Sidebar = <T extends string>({
     /** Marks the sidebar as a screen area for F6 focus traversal; set on the element the user sees (the sheet on mobile). */
     "data-focus-area"?: string;
     name: T;
+
     /**
      * The `SidebarRail` that reopens the sidebar. It is fixed to the viewport, so it is rendered outside the sliding box: a
      * translated box would carry it off screen with the panel.
