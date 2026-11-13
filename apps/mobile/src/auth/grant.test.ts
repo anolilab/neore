@@ -225,6 +225,20 @@ describe("takeStoredGrant", () => {
 
         await expect(takeStoredGrant(store)).rejects.toMatchObject({ name: "StoredGrantNotClearedError", token: "session-1" });
     });
+
+    it("still clears the stored session when it cannot be read, so an unreadable sign-in is removed", async () => {
+        const clear = vi.fn(async () => undefined);
+        const store: GrantStore = {
+            clear,
+            get: async () => {
+                throw new Error("keychain locked");
+            },
+            set: async () => {},
+        };
+
+        await expect(takeStoredGrant(store)).resolves.toBeUndefined();
+        expect(clear).toHaveBeenCalledOnce();
+    });
 });
 
 describe("revokeSessionToken", () => {

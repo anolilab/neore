@@ -1,12 +1,5 @@
 import { StoredGrantNotClearedError } from "./stored-grant-error";
 
-/** The session token a failed credential clear carries (`StoredGrantNotClearedError`), if any. */
-const tokenOf = (error: unknown): string | undefined => {
-    const { token } = (error ?? {}) as { token?: unknown };
-
-    return typeof token === "string" ? token : undefined;
-};
-
 /** How long sign-out waits for the server to drop this phone's push token before it carries on without it. */
 export const RELEASE_PUSH_TIMEOUT_MS = 5000;
 
@@ -53,7 +46,7 @@ export const signOutOnDevice = async ({ clearCache, forgetLastChat, releasePush,
         // The stored session could not be cleared. The user is still signed out in memory by the caller, and the session
         // is still revoked below with the token the failed clear carries, so a grant left behind stops working. The
         // warning gets only the keychain failure: the error itself carries the session token.
-        token = tokenOf(error);
+        token = error instanceof StoredGrantNotClearedError ? error.token : undefined;
         warn("Could not clear the stored sign-in.", error instanceof StoredGrantNotClearedError ? error.cause : error);
     }
 
