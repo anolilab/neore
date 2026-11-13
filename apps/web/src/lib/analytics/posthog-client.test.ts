@@ -15,6 +15,8 @@ const posthog = vi.hoisted(() => {
         has_opted_out_capturing: vi.fn(() => false),
         identify: vi.fn(),
         is_capturing: vi.fn(() => true),
+        opt_in_capturing: vi.fn(),
+        opt_out_capturing: vi.fn(),
         // As posthog-js holding bootstrapped flags: a new listener is answered at once.
         onFeatureFlags: vi.fn((callback: () => void) => {
             callback();
@@ -857,6 +859,56 @@ describe("startPostHog", () => {
         }
     });
 
+    it("finishes its startup on a retry after a startup step threw, sending what was queued and the reset it owed", async () => {
+        const client = await loadClientModule();
+
+        client.forgetPostHogIdentity("key");
+        client.queueEvent("onboarding_started", {});
+        client.setAnalyticsIdentity({ user: { id: "user-1" } });
+        posthog.identify.mockImplementationOnce(() => {
+            throw new Error("identify failed");
+        });
+
+        const loaded = await client.loadPostHog();
+
+        expect(() => client.startPostHog(loaded, () => {})).toThrow("identify failed");
+        expect(client.getStartedPostHog()).toBeUndefined();
+
+        const onStarted = vi.fn();
+
+        client.startPostHog(loaded, onStarted);
+
+        expect(client.getStartedPostHog()).toBe(posthog);
+        expect(posthog.capture.mock.calls.map(([event]) => event)).toContain("onboarding_started");
+        expect(posthog.identify).toHaveBeenLastCalledWith("user-1", expect.anything());
+        expect(posthog.reset).toHaveBeenCalled();
+        expect(onStarted).toHaveBeenCalledOnce();
+    });
+
+    it.each([
+        [true, "opt_in_capturing"],
+        [false, "opt_out_capturing"],
+    ] as const)("applies measurement consent %s again after the reset of an account switch, which clears it", async (granted, method) => {
+        posthog.opt_in_capturing.mockClear();
+        posthog.opt_out_capturing.mockClear();
+
+        const client = await loadClientModule();
+
+        client.setMeasurementConsent(granted);
+        client.setAnalyticsIdentity({ user: { id: "user-1" } });
+        client.startPostHog(await client.loadPostHog(), () => {});
+        client.setAnalyticsIdentity({ user: { id: "user-2" } });
+
+        expect(posthog.reset).toHaveBeenCalledOnce();
+        expect(posthog[method]).toHaveBeenCalledOnce();
+        expect(order(posthog.reset)).toBeLessThan(order(posthog[method]));
+        expect(order(posthog[method])).toBeLessThan(posthog.identify.mock.invocationCallOrder.at(-1) ?? 0);
+
+        if (granted) {
+            expect(posthog.opt_in_capturing).toHaveBeenCalledWith({ captureEventName: false });
+        }
+    });
+
     it("follows later sign-ins and sign-outs once started", async () => {
         const client = await loadClientModule();
 
@@ -1059,6 +1111,23 @@ describe("useFeatureFlagReader", () => {
         expect(result.current("code-mode")).toBe(false);
         expect(result.current("other")).toBe(true);
     });
+
+    it("drops the server-rendered flags when the account changes, so the next one's come only from PostHog", async () => {
+        const client = await loadClientModule();
+
+        client.setBootstrapFlags({ "code-mode": true });
+        client.setAnalyticsIdentity({ user: { id: "user-1" } });
+        client.markPostHogUnavailable();
+
+        const { rerender, result } = renderHook(() => client.useFeatureFlagReader());
+
+        expect(result.current("code-mode")).toBe(true);
+
+        client.setAnalyticsIdentity({ user: { id: "user-2" } });
+        rerender();
+
+        expect(result.current("code-mode")).toBe(false);
+    });
 });
 
 describe("flag reads on the client this module loads", () => {
@@ -1080,6 +1149,73 @@ describe("flag reads on the client this module loads", () => {
         });
 
         expect(result.current).toStrictEqual([true, true]);
+    });
+});
+
+describe("useFeatureFlagReader fallbacks", () => {
+    it("reads a flag the loaded response has no value for as the server-rendered flag, as useFeatureFlagEnabled does", async () => {
+        const client = await loadClientModule();
+
+        client.setBootstrapFlags({ "code-mode": true });
+
+        const loaded = await client.loadPostHog();
+
+        Object.assign(loaded, { isFeatureEnabled: vi.fn((flag: string): boolean | undefined => (flag === "other" ? false : undefined)) });
+
+        const wrapper = ({ children }: { children: ReactNode }) => createElement(client.PostHogClientContext, { value: loaded }, children);
+        const { result } = renderHook(
+            () => {
+                const read = client.useFeatureFlagReader();
+
+                return [read("code-mode"), read("other"), read("absent"), client.useFeatureFlagEnabled("code-mode")];
+            },
+            { wrapper },
+        );
+
+        act(() => {
+            client.setAnalyticsIdentity({ user: { id: "user-1" } });
+            client.startPostHog(loaded, () => {});
+        });
+
+        expect(result.current).toStrictEqual([true, false, false, true]);
+    });
+
+    it("reads the server-rendered flag once the started client's flags miss the wait", async () => {
+        vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+        posthog.onFeatureFlags.mockImplementation(() => () => {});
+
+        try {
+            const client = await loadClientModule();
+
+            client.setBootstrapFlags({ "code-mode": true });
+
+            const loaded = await client.loadPostHog();
+
+            Object.assign(loaded, { isFeatureEnabled: vi.fn((): boolean | undefined => undefined) });
+
+            const wrapper = ({ children }: { children: ReactNode }) => createElement(client.PostHogClientContext, { value: loaded }, children);
+            const { result } = renderHook(() => client.useFeatureFlagReader()("code-mode"), { wrapper });
+
+            act(() => {
+                client.setAnalyticsIdentity({ user: { id: "user-1" } });
+                client.startPostHog(loaded, () => {});
+            });
+
+            expect(result.current).toBeUndefined();
+
+            act(() => {
+                vi.advanceTimersByTime(client.FLAGS_WAIT_MS);
+            });
+
+            expect(result.current).toBe(true);
+        } finally {
+            posthog.onFeatureFlags.mockImplementation((callback: () => void) => {
+                callback();
+
+                return () => {};
+            });
+            vi.useRealTimers();
+        }
     });
 });
 

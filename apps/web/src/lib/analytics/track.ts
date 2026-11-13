@@ -7,7 +7,7 @@
 import { useCallback } from "react";
 
 import type { AnalyticsEvent, AnalyticsEventMap } from "./events";
-import { captureException, forgetPostHogIdentity, getPostHog, getStartedPostHog, queueEvent, resetStartedPostHog } from "./posthog-client";
+import { captureException, forgetPostHogIdentity, getPostHog, getStartedPostHog, queueEvent, resetKeepingConsent, resetStartedPostHog } from "./posthog-client";
 
 /**
  * Forget the identified user before a sign-out reload, so later events from this
@@ -33,7 +33,7 @@ export const resetAnalyticsIdentity = (): void => {
     const loaded = getPostHog();
 
     if (loaded?.__loaded) {
-        loaded.reset();
+        resetKeepingConsent(loaded);
     }
 };
 

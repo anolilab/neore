@@ -185,6 +185,21 @@ const dropForSignOut = (): void => {
 /** The measurement consent last applied, or `undefined` before the consent state has been read. */
 export const getMeasurementConsent = (): boolean | undefined => consentState.measurement;
 
+/**
+ * `posthog.reset()`, keeping the visitor's measurement consent: posthog-js's reset clears its stored consent too, and
+ * with `cookieless_mode: "on_reject"` a client back at "pending" captures nothing for the rest of the page. The
+ * consent is applied again without a second `$opt_in` event.
+ */
+export const resetKeepingConsent = (posthog: Pick<PostHog, "opt_in_capturing" | "opt_out_capturing" | "reset">): void => {
+    posthog.reset();
+
+    if (consentState.measurement === true) {
+        posthog.opt_in_capturing({ captureEventName: false });
+    } else if (consentState.measurement === false) {
+        posthog.opt_out_capturing();
+    }
+};
+
 /** Records the measurement consent; a refusal also drops what was queued, so a later grant cannot send it. */
 export const setMeasurementConsent = (granted: boolean): void => {
     consentState.measurement = granted;
@@ -529,18 +544,9 @@ export const forgetPostHogIdentity = (token: string): void => {
  * them before the page leaves.
  */
 export const resetStartedPostHog = (posthog: PostHog): void => {
-    posthog.reset();
+    resetKeepingConsent(posthog);
     departIdentity();
     identityState.applied = {};
-};
-
-/** Whether a sign-out asked for a reset before PostHog had started; answers `true` once. */
-const takePendingPostHogReset = (): boolean => {
-    const { pending } = resetState;
-
-    resetState.pending = false;
-
-    return pending;
 };
 
 /**
@@ -560,7 +566,7 @@ const syncIdentity = (posthog: PostHog): void => {
     const isReset = applied.userId === undefined ? isStoredAnotherUser(posthog, userId) : applied.userId !== userId;
 
     if (isReset) {
-        posthog.reset();
+        resetKeepingConsent(posthog);
     }
 
     // After a reset, which clears super properties.
@@ -590,6 +596,9 @@ const syncIdentity = (posthog: PostHog): void => {
  * PostHog starts with the user alone, and the group is applied once the organization answers.
  */
 export const ORGANIZATION_WAIT_MS = 5000;
+
+/** The flags the server rendered into the page (`posthog-data`), for when PostHog itself never loads. */
+const bootstrapState: { flags?: Readonly<Record<string, boolean | string>> } = {};
 
 /** The bounded wait for one user's organization: another user starts a wait of their own. */
 const organizationWait: { isOver: boolean; timer?: ReturnType<typeof setTimeout>; userId?: string } = { isOver: false };
@@ -649,9 +658,11 @@ const finishStartup = (): void => {
 
     clearTimeout(sessionWait.timer);
 
-    // Read again here: a sign-out may have come while this waited for the session.
-    if (takePendingPostHogReset()) {
-        client.reset();
+    // Read again here: a sign-out may have come while this waited for the session. Cleared only once the reset ran,
+    // so a startup that throws and is retried still resets.
+    if (resetState.pending) {
+        resetKeepingConsent(client);
+        resetState.pending = false;
     }
 
     sendKeptSignOuts(client);
@@ -684,6 +695,13 @@ const finishStartup = (): void => {
  */
 export const startPostHog = (posthog: PostHog, onStarted: () => void): void => {
     if (startup.client) {
+        // A retry after a startup step threw (a reset, identify or group call): the same client finishes its startup,
+        // so what is queued is still sent. Initialisation and the session wait are not repeated.
+        if (startup.client === posthog && !startup.isStarted) {
+            startup.onStarted = onStarted;
+            finishStartup();
+        }
+
         return;
     }
 
@@ -746,8 +764,13 @@ export const setAnalyticsIdentity = (identity: AnalyticsIdentity): void => {
     // from an earlier page, so the startup resets it before anything queued is sent.
     const previousUserId = identityState.current?.user?.id;
 
-    if (!startup.isStarted && previousUserId !== undefined && previousUserId !== identity.user?.id) {
-        resetState.pending = true;
+    if (previousUserId !== undefined && previousUserId !== identity.user?.id) {
+        if (!startup.isStarted) {
+            resetState.pending = true;
+        }
+
+        // The server rendered the page's flags for the account that left: the next one's come only from PostHog.
+        bootstrapState.flags = undefined;
     }
 
     identityState.departedUserId = undefined;
@@ -894,9 +917,6 @@ export const useFeatureFlagsKnown = (): boolean => {
     return (hasFlags && (!isOwnClient || started === posthog)) || isUnavailable || (isOwnClient && started === posthog && isFlagsWaitOver);
 };
 
-/** The flags the server rendered into the page (`posthog-data`), for when PostHog itself never loads. */
-const bootstrapState: { flags?: Readonly<Record<string, boolean | string>> } = {};
-
 /** Keeps the server-rendered flags, so a page whose PostHog chunk is blocked or fails still answers them. */
 export const setBootstrapFlags = (flags: Readonly<Record<string, boolean | string>> | undefined): void => {
     bootstrapState.flags = flags;
@@ -924,7 +944,9 @@ export const useFeatureFlagReader = (): ((flag: string) => boolean | undefined) 
     const loads = useSyncExternalStore(subscribe, readLoads, noLoads);
     // The client this module loads holds the stored identity's flags (perhaps another account's) until it has started.
     const started = useStartedPostHog();
-    const isAwaitingStart = posthog !== undefined && posthog === getPostHog() && started !== posthog;
+    const isOwnClient = posthog !== undefined && posthog === getPostHog();
+    const isAwaitingStart = isOwnClient && started !== posthog;
+    const isFlagsWaitOver = useSyncExternalStore(subscribeStarted, readFlagsWaitOver, notKnown);
 
     return useCallback(
         (flag: string) => {
@@ -933,14 +955,22 @@ export const useFeatureFlagReader = (): ((flag: string) => boolean | undefined) 
             }
 
             if (posthog) {
-                return posthog.isFeatureEnabled(flag);
+                const value = posthog.isFeatureEnabled(flag);
+
+                if (value !== undefined) {
+                    return value;
+                }
+
+                // As `useFeatureFlagEnabled`: a flag the loaded response has no value for, or one whose flags missed
+                // `FLAGS_WAIT_MS`, is the server-rendered flag (else off); before either, it is not answered yet.
+                return hasFlagsOf(posthog) || (isOwnClient && isFlagsWaitOver) ? readBootstrapFlag(flag) : undefined;
             }
 
             return fallsBack ? readBootstrapFlag(flag) : undefined;
         },
         // `loads` is the reader's version: the flags it reads changed.
 
-        [posthog, fallsBack, loads, isAwaitingStart],
+        [posthog, fallsBack, loads, isAwaitingStart, isOwnClient, isFlagsWaitOver],
     );
 };
 

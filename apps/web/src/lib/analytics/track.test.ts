@@ -10,6 +10,8 @@ const posthog = vi.hoisted(() => {
         captureException: vi.fn(),
         get_distinct_id: vi.fn(() => "anonymous-1"),
         get_property: vi.fn((_key: string): unknown => undefined),
+        opt_in_capturing: vi.fn(),
+        opt_out_capturing: vi.fn(),
         has_opted_out_capturing: vi.fn(() => false),
         register: vi.fn(),
         reset: vi.fn(),
