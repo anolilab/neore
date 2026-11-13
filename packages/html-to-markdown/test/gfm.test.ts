@@ -15,7 +15,7 @@ describe("gfm tables", () => {
     it("keeps the cells after a cell that spans columns or rows under their own headers", () => {
         expect(
             convert(
-                '<table><tr><th>A</th><th>B</th><th>C</th></tr><tr><td colspan="2">ab</td><td>c</td></tr><tr><td rowspan="2">a</td><td>b</td><td>c</td></tr><tr><td>b2</td><td>c2</td></tr></table>',
+                `<table><tr><th>A</th><th>B</th><th>C</th></tr><tr><td colspan="2">ab</td><td>c</td></tr><tr><td rowspan="2">a</td><td>b</td><td>c</td></tr><tr><td>b2</td><td>c2</td></tr></table>`,
             ),
         ).toBe("| A | B | C |\n| --- | --- | --- |\n| ab |  | c |\n| a | b | c |\n|  | b2 | c2 |");
     });
@@ -24,8 +24,8 @@ describe("gfm tables", () => {
         expect(
             convert(
                 [
-                    '<table><thead><tr><th>A</th><th>B</th></tr></thead><tbody><tr><td rowspan="0">a</td><td>b</td></tr><tr><td>c</td></tr></tbody>',
-                    '<tfoot><tr><td>f1</td><td>f2</td></tr></tfoot></table><table><tbody><tr><td rowspan="5">x</td><td>y</td></tr></tbody><tbody><tr><td>z1</td><td>z2</td></tr></tbody></table>',
+                    `<table><thead><tr><th>A</th><th>B</th></tr></thead><tbody><tr><td rowspan="0">a</td><td>b</td></tr><tr><td>c</td></tr></tbody>`,
+                    `<tfoot><tr><td>f1</td><td>f2</td></tr></tfoot></table><table><tbody><tr><td rowspan="5">x</td><td>y</td></tr></tbody><tbody><tr><td>z1</td><td>z2</td></tr></tbody></table>`,
                 ].join(""),
             ),
         ).toBe("| A | B |\n| --- | --- |\n| a | b |\n|  | c |\n| f1 | f2 |\n\n| x | y |\n| --- | --- |\n| z1 | z2 |");
@@ -42,7 +42,7 @@ describe("gfm tables", () => {
 
         expect(
             service.turndown(
-                '<table><tr><th>A</th><th>B</th></tr><tr><td>x<table><tr><td>in 1</td><td class="no">no</td></tr><tr><td>in <b>2</b></td></tr></table>y</td><td>z</td></tr></table>',
+                `<table><tr><th>A</th><th>B</th></tr><tr><td>x<table><tr><td>in 1</td><td class="no">no</td></tr><tr><td>in <b>2</b></td></tr></table>y</td><td>z</td></tr></table>`,
             ),
         ).toBe("| A | B |\n| --- | --- |\n| x in 1 in **2** y | z |");
     });
@@ -104,15 +104,15 @@ describe("gfm strikethrough", () => {
 
 describe("gfm task list items", () => {
     it("writes a checkbox as a task box, matching its type without case", () => {
-        expect(convert('<ul><li><input type="CHECKBOX" checked>done</li><li><input type="Checkbox">open</li></ul>')).toBe("*   [x] done\n*   [ ] open");
+        expect(convert(`<ul><li><input type="CHECKBOX" checked>done</li><li><input type="Checkbox">open</li></ul>`)).toBe("*   [x] done\n*   [ ] open");
     });
 
     it("writes a checkbox outside a list as a task box too", () => {
-        expect(convert('<div><input type="checkbox" checked>Finish report</div>')).toBe("[x] Finish report");
+        expect(convert(`<div><input type="checkbox" checked>Finish report</div>`)).toBe("[x] Finish report");
     });
 
     it("leaves other inputs alone", () => {
-        expect(convert('<p>a<input type="text" value="x">b</p>')).toBe("ab");
+        expect(convert(`<p>a<input type="text" value="x">b</p>`)).toBe("ab");
     });
 });
 
@@ -122,12 +122,12 @@ describe("gfm rules and remove filters", () => {
 
         service.remove((node) => node.getAttribute("class") === "gone");
 
-        expect(service.turndown('<p>a <s class="gone">old</s><input class="gone" type="checkbox"> b</p>')).toBe("a  b");
+        expect(service.turndown(`<p>a <s class="gone">old</s><input class="gone" type="checkbox"> b</p>`)).toBe("a  b");
     });
 });
 
 describe("gfm span attributes", () => {
     it("reads a span's leading digits, as HTML does", () => {
-        expect(convert('<table><tr><th colspan="2abc">a</th></tr><tr><td>1</td><td>2</td></tr></table>')).toBe("| a |  |\n| --- | --- |\n| 1 | 2 |");
+        expect(convert(`<table><tr><th colspan="2abc">a</th></tr><tr><td>1</td><td>2</td></tr></table>`)).toBe("| a |  |\n| --- | --- |\n| 1 | 2 |");
     });
 });

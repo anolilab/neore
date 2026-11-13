@@ -209,6 +209,10 @@ function grid(rows: ReadonlyArray<Row>, lookup: RuleLookup): { lines: string[][]
     return { lines, width };
 }
 
+function captionText(caption: Element): string {
+    return cellTexts.get(caption) ?? "";
+}
+
 function tableReplacement(_content: string, node: AnnotatedNode, _options: Options, lookup: RuleLookup): string {
     const rows = ownRows(node, lookup);
 
@@ -220,7 +224,7 @@ function tableReplacement(_content: string, node: AnnotatedNode, _options: Optio
     }
 
     const caption = childElements(node).find((child) => child.nodeName === "CAPTION" && !isRemoved(child, lookup));
-    const title = caption ? (cellTexts.get(caption) ?? "") : "";
+    const title = caption === undefined ? "" : captionText(caption);
     const before = title === "" ? "\n\n" : `\n\n${title}\n\n`;
     const laidOut = grid(rows, lookup);
 
