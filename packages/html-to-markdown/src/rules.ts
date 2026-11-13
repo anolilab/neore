@@ -43,7 +43,9 @@ export function defaultKeepReplacement(_content: string, node: AnnotatedNode, op
 
 /**
  * The element's HTML with every unsafe anchor unwrapped, so its text and its
- * inner markup stay. The element is returned as is when it has no unsafe anchor.
+ * inner markup stay. An image map's `<area>` has no content, so an unsafe one
+ * loses its destination instead. The element is returned as is when it has no
+ * unsafe link.
  */
 function htmlWithoutUnsafeLinks(node: AnnotatedNode): string {
     const hasUnsafeLink = isUnsafeAnchor(node) || anchorsWithin(node).some((anchor) => isUnsafeAnchor(anchor));
@@ -53,10 +55,12 @@ function htmlWithoutUnsafeLinks(node: AnnotatedNode): string {
     }
 
     const copy = node.cloneNode(true) as Element;
-    const isRootUnsafe = isUnsafeAnchor(copy);
+    const isRootUnsafe = copy.localName === "a" && isUnsafeAnchor(copy);
 
-    for (const anchor of anchorsWithin(copy)) {
-        if (isUnsafeAnchor(anchor)) {
+    for (const anchor of [copy, ...anchorsWithin(copy)]) {
+        if (anchor.localName === "area" && isUnsafeAnchor(anchor)) {
+            dropDestination(anchor);
+        } else if (anchor !== copy && isUnsafeAnchor(anchor)) {
             unwrap(anchor);
         }
     }
@@ -66,15 +70,15 @@ function htmlWithoutUnsafeLinks(node: AnnotatedNode): string {
     return isRootUnsafe ? copy.innerHTML : copy.outerHTML;
 }
 
-/** The `<a>` elements inside the element, in document order. Copied by index, since domino's NodeList is not iterable. */
+/** The `<a>` and `<area>` elements inside the element, in document order. Copied by index, since domino's NodeList is not iterable. */
 function anchorsWithin(element: Element): Element[] {
-    const found = element.querySelectorAll("a");
+    const found = element.querySelectorAll("a, area");
 
     return Array.from({ length: found.length }, (_unused, index) => found[index]).filter((anchor) => anchor !== undefined);
 }
 
 function isUnsafeAnchor(element: Element): boolean {
-    if (element.localName !== "a") {
+    if (element.localName !== "a" && element.localName !== "area") {
         return false;
     }
 
@@ -83,6 +87,13 @@ function isUnsafeAnchor(element: Element): boolean {
 
         return href !== null && isUnsafeDestination(href);
     });
+}
+
+/** Removes the element's link destinations, so it links nowhere. */
+function dropDestination(element: Element): void {
+    for (const name of LINK_ATTRIBUTES) {
+        element.removeAttribute(name);
+    }
 }
 
 function unwrap(element: Element): void {

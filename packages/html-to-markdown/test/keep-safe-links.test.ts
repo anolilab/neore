@@ -62,3 +62,26 @@ describe("keep with safeLinks does not emit an unsafe link destination (PR #723 
         expect(service.turndown(`<p><a href="javascript:alert(1)">x</a></p>`)).toBe(`<p><a href="javascript:alert(1)">x</a></p>`);
     });
 });
+
+/*
+ * An image map's `<area>` carries a link destination too. It has no content to keep, so under safeLinks an unsafe
+ * one loses its destination and stays as an area that links nowhere; a safe one is kept as it is.
+ */
+
+describe("keep with safeLinks and an image map", () => {
+    it("drops the unsafe destination of an area and keeps a safe one", () => {
+        const service = new TurndownService({ safeLinks: true });
+
+        service.keep(["p"]);
+        expect(
+            service.turndown(`<p><img src="m.png" usemap="#m"><map name="m"><area href="javascript:alert(1)" alt="x"><area href="/ok" alt="y"></map></p>`),
+        ).toBe(`<p><img src="m.png" usemap="#m"><map name="m"><area alt="x"><area href="/ok" alt="y"></map></p>`);
+    });
+
+    it("drops the unsafe destination of an area directly inside a kept map", () => {
+        const service = new TurndownService({ safeLinks: true });
+
+        service.keep(["map"]);
+        expect(service.turndown(`<map name="m"><area href="javascript:alert(1)" alt="x"></map>`)).toBe(`<map name="m"><area alt="x"></map>`);
+    });
+});
