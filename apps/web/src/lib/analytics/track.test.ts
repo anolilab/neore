@@ -8,6 +8,8 @@ const posthog = vi.hoisted(() => {
         __loaded: true,
         capture: vi.fn(),
         captureException: vi.fn(),
+        get_distinct_id: vi.fn(() => "anonymous-1"),
+        get_property: vi.fn((_key: string): unknown => undefined),
         has_opted_out_capturing: vi.fn(() => false),
         register: vi.fn(),
         reset: vi.fn(),
@@ -100,10 +102,18 @@ describe("resetAnalyticsIdentity on a client initialised but not started", () =>
     });
 
     it("resets the live client, so its next write cannot put the departed identity back", async () => {
-        // The chunk loaded and `init` ran; startup still waits for the session.
-        await loadPostHog();
+        // Fresh modules: an earlier test in this file started PostHog, which would take the started-client path.
+        vi.resetModules();
 
-        resetAnalyticsIdentity();
+        const client = await import("./posthog-client");
+        const track = await import("./track");
+
+        // The chunk loaded and `init` ran; startup still waits for the session.
+        await client.loadPostHog();
+
+        expect(client.getStartedPostHog()).toBeUndefined();
+
+        track.resetAnalyticsIdentity();
 
         expect(posthog.reset).toHaveBeenCalledOnce();
     });

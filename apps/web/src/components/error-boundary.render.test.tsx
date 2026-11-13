@@ -82,6 +82,24 @@ describe(ErrorBoundary, () => {
         expect(captureException).toHaveBeenCalledOnce();
     });
 
+    it("reports once, through onError, when onError sends its own report", () => {
+        vi.spyOn(console, "error").mockImplementation(() => {});
+        captureException.mockClear();
+
+        const onError = vi.fn((error: Error) => {
+            captureException(error, { errorBoundary: "route" });
+        });
+
+        render(
+            <ErrorBoundary fallback={(error: Error) => <p>{`Recovered: ${error.message}`}</p>} isReportedByOnError onError={onError} showToast={false}>
+                <Thrower />
+            </ErrorBoundary>,
+        );
+
+        expect(screen.getByText("Recovered: frozen")).toBeTruthy();
+        expect(captureException).toHaveBeenCalledExactlyOnceWith(frozenError, { errorBoundary: "route" });
+    });
+
     it("still renders its fallback, and warns, when reporting the error throws", () => {
         vi.spyOn(console, "error").mockImplementation(() => {});
         const warn = vi.spyOn(console, "warn").mockImplementation(() => {});

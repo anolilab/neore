@@ -543,13 +543,21 @@ const takePendingPostHogReset = (): boolean => {
     return pending;
 };
 
+/**
+ * Whether the client's persisted identity is an identified user other than `userId`: one this page never applied (a
+ * session that ended on the server, then another account on a later load). An anonymous visitor's id is not one, so
+ * a sign-in still merges it.
+ */
+const isStoredAnotherUser = (posthog: PostHog, userId: string | undefined): boolean =>
+    posthog.get_property("$user_state") === "identified" && posthog.get_distinct_id() !== userId;
+
 /** Brings the started client to the published identity: identify, reset on sign-out, the organization group. */
 const syncIdentity = (posthog: PostHog): void => {
     const { applied = {}, current = {} } = identityState;
     const userId = current.user?.id;
     const organizationId = current.organization?.id;
 
-    const isReset = Boolean(applied.userId && applied.userId !== userId);
+    const isReset = applied.userId === undefined ? isStoredAnotherUser(posthog, userId) : applied.userId !== userId;
 
     if (isReset) {
         posthog.reset();
@@ -587,6 +595,23 @@ export const ORGANIZATION_WAIT_MS = 5000;
 const organizationWait: { isOver: boolean; timer?: ReturnType<typeof setTimeout>; userId?: string } = { isOver: false };
 
 /**
+ * How long startup waits for the session's first answer once PostHog has loaded. A session read that never settles
+ * does not hold every capture: PostHog starts without a user (after a reset, as whose it was is unknown), and the
+ * session's identity is applied when it does answer.
+ */
+export const SESSION_WAIT_MS = 10_000;
+
+const sessionWait: { isOver: boolean; timer?: ReturnType<typeof setTimeout> } = { isOver: false };
+
+/**
+ * How long, once started, the flag-gated model list and the code shell wait for PostHog's flags. Flags that never
+ * arrive (a failed `/flags` with nothing persisted, flags disabled) stop holding them: what reads them then decides.
+ */
+export const FLAGS_WAIT_MS = 10_000;
+
+const flagsWait: { isOver: boolean } = { isOver: false };
+
+/**
  * The sign-outs a sign-out's drop kept (`dropForSignOut`), sent before the session's identity is applied: the client is
  * still the signed-out one then (the sign-out cleared what it stored), so the count is kept and never lands on an account
  * that signed in on this page.
@@ -618,9 +643,11 @@ const finishStartup = (): void => {
 
     const isIdentityKnown = identityState.current !== undefined && (!identityState.current.isOrganizationPending || organizationWait.isOver);
 
-    if (!client || startup.isStarted || (!isIdentityKnown && !identityState.isAbandoned)) {
+    if (!client || startup.isStarted || (!isIdentityKnown && !identityState.isAbandoned && !sessionWait.isOver)) {
         return;
     }
+
+    clearTimeout(sessionWait.timer);
 
     // Read again here: a sign-out may have come while this waited for the session.
     if (takePendingPostHogReset()) {
@@ -630,6 +657,14 @@ const finishStartup = (): void => {
     sendKeptSignOuts(client);
     syncIdentity(client);
     startup.isStarted = true;
+    // Flags that never arrive stop holding what waits for them, after a bound.
+    setTimeout(() => {
+        flagsWait.isOver = true;
+
+        for (const listener of startup.listeners) {
+            listener();
+        }
+    }, FLAGS_WAIT_MS);
     flushPendingCaptures(client);
     startup.onStarted?.();
 
@@ -654,6 +689,23 @@ export const startPostHog = (posthog: PostHog, onStarted: () => void): void => {
 
     startup.client = posthog;
     startup.onStarted = onStarted;
+
+    // The session may never answer: bounded, PostHog then starts without a user.
+    if (identityState.current === undefined && !identityState.isAbandoned) {
+        sessionWait.timer = setTimeout(() => {
+            sessionWait.timer = undefined;
+
+            if (identityState.current !== undefined) {
+                return;
+            }
+
+            sessionWait.isOver = true;
+            // Whose identity the client stored is unknown: it is not carried into a start without one.
+            resetState.pending = true;
+            finishStartup();
+        }, SESSION_WAIT_MS);
+    }
+
     finishStartup();
 };
 
@@ -740,6 +792,8 @@ const subscribeStarted = (onChange: () => void): (() => void) => {
  * applied. What captures on its own (the onboarding plugin) takes this one, not `usePostHog()`'s, which is provided as
  * soon as `init` ran and still holds the identity it was bootstrapped with.
  */
+const readFlagsWaitOver = (): boolean => flagsWait.isOver;
+
 export const useStartedPostHog = (): PostHog | undefined => useSyncExternalStore(subscribeStarted, getStartedPostHog, () => undefined);
 
 /** The PostHog client, or `undefined` until it has loaded and been initialised. */
@@ -834,8 +888,10 @@ export const useFeatureFlagsKnown = (): boolean => {
     // session's identity applied): before, its flags are the bootstrapped ones. A client provided otherwise (Storybook's)
     // is never started here, and its flags are final as they come.
     const isOwnClient = posthog !== undefined && posthog === getPostHog();
+    // Started, and its flags still have not come within `FLAGS_WAIT_MS`: nothing waits for them any longer.
+    const isFlagsWaitOver = useSyncExternalStore(subscribeStarted, readFlagsWaitOver, notKnown);
 
-    return (hasFlags && (!isOwnClient || started === posthog)) || isUnavailable;
+    return (hasFlags && (!isOwnClient || started === posthog)) || isUnavailable || (isOwnClient && started === posthog && isFlagsWaitOver);
 };
 
 /** The flags the server rendered into the page (`posthog-data`), for when PostHog itself never loads. */

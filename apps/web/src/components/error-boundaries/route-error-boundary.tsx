@@ -224,7 +224,7 @@ const RouteErrorBoundary = ({ children, fallbackRoute = "/", routeName = "page" 
     };
 
     return (
-        <ErrorBoundary fallback={renderFallback} onError={handleError} showToast>
+        <ErrorBoundary fallback={renderFallback} isReportedByOnError onError={handleError} showToast>
             {children}
         </ErrorBoundary>
     );

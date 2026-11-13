@@ -247,6 +247,7 @@ const GlobalErrorBoundaryProvider = ({ children }: GlobalErrorBoundaryProviderPr
     return (
         <ErrorBoundary
             fallback={renderGlobalFallback}
+            isReportedByOnError
             onError={handleGlobalError}
             showToast={false} // We handle our own notifications
         >

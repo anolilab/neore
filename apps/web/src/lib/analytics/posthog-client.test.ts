@@ -9,6 +9,8 @@ const posthog = vi.hoisted(() => {
         __loaded: false,
         capture: vi.fn(),
         captureException: vi.fn(),
+        get_distinct_id: vi.fn((): string => "anonymous-1"),
+        get_property: vi.fn((_key: string): unknown => undefined),
         group: vi.fn(),
         has_opted_out_capturing: vi.fn(() => false),
         identify: vi.fn(),
@@ -510,6 +512,34 @@ describe("startPostHog", () => {
         }
     });
 
+    it("starts without a user, after a reset, once the session has not answered within the wait", async () => {
+        vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+
+        try {
+            const client = await loadClientModule();
+
+            client.queueEvent("landing", {});
+            client.startPostHog(await client.loadPostHog(), () => {});
+            vi.advanceTimersByTime(client.SESSION_WAIT_MS - 1);
+
+            expect(client.getStartedPostHog()).toBeUndefined();
+
+            vi.advanceTimersByTime(1);
+
+            expect(client.getStartedPostHog()).toBe(posthog);
+            expect(posthog.reset).toHaveBeenCalledOnce();
+            expect(posthog.identify).not.toHaveBeenCalled();
+            expect(posthog.capture.mock.calls.map(([event]) => event)).toContain("landing");
+
+            // A session answering late is still applied.
+            client.setAnalyticsIdentity({ user: { id: "user-1" } });
+
+            expect(posthog.identify).toHaveBeenCalledWith("user-1", expect.anything());
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
     it("gives a user who switched in while the first one's organization was pending a full wait of their own", async () => {
         vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
 
@@ -770,6 +800,49 @@ describe("startPostHog", () => {
         expect(posthog.capture.mock.calls.map(([event]) => event)).toStrictEqual(["tracked signed out"]);
     });
 
+    it.each([
+        ["another account a previous page identified", "identified", "user-a", true],
+        ["the same account", "identified", "user-b", false],
+        ["an anonymous visitor, whose id a sign-in merges", "anonymous", "anonymous-1", false],
+    ])("on a fresh page, resets before identifying when the client stored %s", async (_name, userState, storedId, isReset) => {
+        posthog.get_property.mockImplementation((key: unknown) => (key === "$user_state" ? userState : undefined));
+        posthog.get_distinct_id.mockReturnValue(storedId);
+
+        try {
+            const client = await loadClientModule();
+
+            client.setAnalyticsIdentity({ user: { id: "user-b" } });
+            client.startPostHog(await client.loadPostHog(), () => {});
+
+            expect(posthog.identify).toHaveBeenCalledWith("user-b", expect.anything());
+            expect(posthog.reset).toHaveBeenCalledTimes(isReset ? 1 : 0);
+
+            if (isReset) {
+                expect(order(posthog.reset)).toBeLessThan(order(posthog.identify));
+            }
+        } finally {
+            posthog.get_property.mockImplementation(() => undefined);
+            posthog.get_distinct_id.mockReturnValue("anonymous-1");
+        }
+    });
+
+    it("resets a previous page's identified account on a signed-out page, so its events are not sent as that account", async () => {
+        posthog.get_property.mockImplementation((key: unknown) => (key === "$user_state" ? "identified" : undefined));
+        posthog.get_distinct_id.mockReturnValue("user-a");
+
+        try {
+            const client = await loadClientModule();
+
+            client.setAnalyticsIdentity({});
+            client.startPostHog(await client.loadPostHog(), () => {});
+
+            expect(posthog.reset).toHaveBeenCalledOnce();
+        } finally {
+            posthog.get_property.mockImplementation(() => undefined);
+            posthog.get_distinct_id.mockReturnValue("anonymous-1");
+        }
+    });
+
     it("follows later sign-ins and sign-outs once started", async () => {
         const client = await loadClientModule();
 
@@ -990,6 +1063,41 @@ describe("useFeatureFlagsKnown on the client this module loads", () => {
         });
 
         expect(result.current).toBe(true);
+    });
+
+    it("settles once started when the flags never arrive within the wait", async () => {
+        vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+
+        try {
+            const client = await loadClientModule();
+            const loaded = await client.loadPostHog();
+
+            // The flags request hangs: no listener is ever answered.
+            posthog.onFeatureFlags.mockImplementation(() => () => {});
+
+            const wrapper = ({ children }: { children: ReactNode }) => createElement(client.PostHogClientContext, { value: loaded }, children);
+            const { result } = renderHook(() => client.useFeatureFlagsKnown(), { wrapper });
+
+            act(() => {
+                client.setAnalyticsIdentity({ user: { id: "user-1" } });
+                client.startPostHog(loaded, () => {});
+            });
+
+            expect(result.current).toBe(false);
+
+            act(() => {
+                vi.advanceTimersByTime(client.FLAGS_WAIT_MS);
+            });
+
+            expect(result.current).toBe(true);
+        } finally {
+            posthog.onFeatureFlags.mockImplementation((callback: () => void) => {
+                callback();
+
+                return () => {};
+            });
+            vi.useRealTimers();
+        }
     });
 });
 
