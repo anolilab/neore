@@ -17,7 +17,7 @@ import { useEffect, useRef, useState } from "react";
 import { Document, Page } from "react-pdf";
 
 import { PDF_LOAD_TIMEOUT_MS } from "./pdf-limits";
-import { sharedPdfOptions } from "./pdf-worker";
+import { useSharedPdfOptions } from "./pdf-worker";
 
 const THUMBNAIL_WIDTH = 200;
 
@@ -38,12 +38,20 @@ export interface PdfThumbnailProps {
     url: string;
 }
 
+/**
+ * A PDF inlined in its URL (`data:`, or a page-local `blob:`): no stable file to key a cache entry by, and a `data:`
+ * key would keep the whole file in memory as long as the entry lives.
+ */
+const INLINE_URL_RE = /^(?:data|blob):/iu;
+
 const PdfThumbnail: FC<PdfThumbnailProps> = ({ className, filename, onOpen, url }) => {
     const { t } = useLingui();
     const fileKey = pdfFileKey(url);
+    // Only a fetched file is cached: an inline one is drawn each time it mounts.
+    const cacheable = !INLINE_URL_RE.test(url);
     // A thumbnail drawn before (this file, any signature) starts out drawn: no document, no worker, no placeholder.
     // Read-only here (a render can be discarded); the effect below marks the entry used once this thumbnail mounts.
-    const [cached] = useState(() => peekCachedPdfThumbnail(fileKey));
+    const [cached] = useState(() => (cacheable ? peekCachedPdfThumbnail(fileKey) : undefined));
     // The cache's generation when this thumbnail's draw starts: a sign-out (cache clear) before it finishes discards it.
     const [cacheGeneration] = useState(pdfThumbnailCacheGeneration);
     const [pages, setPages] = useState(cached?.pages ?? 0);
@@ -57,6 +65,8 @@ const PdfThumbnail: FC<PdfThumbnailProps> = ({ className, filename, onOpen, url 
     // fetch is refused before any request, the way the text previews refuse it.
     const [progress, setProgress] = useState(0);
     const origins = useFetchableOrigins();
+    // The shared pdf.js worker, taken after commit: the document renders once it is there.
+    const pdfOptions = useSharedPdfOptions();
     const refused = !isFetchableUrl(url, origins);
     const unavailable = failed || refused;
     // Loading ends when the first page has rendered, not when the page count arrives: a page that never renders is failed too.
@@ -81,11 +91,12 @@ const PdfThumbnail: FC<PdfThumbnailProps> = ({ className, filename, onOpen, url 
     // Kept once both the drawn page and the page count are in, whichever arrives last. A thumbnail shown from the cache
     // writes nothing: its entry is already there, and marking it used is the effect above's job.
     useEffect(() => {
-        if (snapshot && pages > 0 && (snapshot !== cached?.snapshot || pages !== cached.pages)) {
+        if (cacheable && snapshot && pages > 0 && (snapshot !== cached?.snapshot || pages !== cached.pages)) {
             cachePdfThumbnail(fileKey, { pages, snapshot }, cacheGeneration);
         }
-    }, [cacheGeneration, cached, fileKey, pages, snapshot]);
+    }, [cacheGeneration, cacheable, cached, fileKey, pages, snapshot]);
 
+    const placeholder = <span aria-hidden="true" className="bg-muted block h-[260px] w-[200px] animate-pulse rounded motion-reduce:animate-none" />;
     const name = filename ? t`Open ${filename}` : t`Open PDF`;
     const pagesLabel = pages > 0 ? t`${name}, ${plural(pages, { one: "# page", other: "# pages" })}` : name;
     const label = unavailable ? t`${name}, preview unavailable` : pagesLabel;
@@ -106,15 +117,16 @@ const PdfThumbnail: FC<PdfThumbnailProps> = ({ className, filename, onOpen, url 
                     {t`This preview could not be loaded.`}
                 </span>
             )}
-            {!unavailable && !snapshot && (
+            {!unavailable && !snapshot && !pdfOptions && placeholder}
+            {!unavailable && !snapshot && pdfOptions && (
                 <Document
                     error={<span className="text-muted-foreground w-[200px] p-6 text-sm">{t`This preview could not be loaded.`}</span>}
                     file={url}
-                    loading={<span aria-hidden="true" className="bg-muted block h-[260px] w-[200px] animate-pulse rounded motion-reduce:animate-none" />}
+                    loading={placeholder}
                     onLoadError={() => setFailed(true)}
                     onLoadProgress={() => setProgress((count) => count + 1)}
                     onLoadSuccess={({ numPages }: { numPages: number }) => setPages(numPages)}
-                    options={sharedPdfOptions()}
+                    options={pdfOptions}
                     // Like the viewer: its own loading and error UI, not the nearest Suspense boundary.
                     suspense={false}
                 >

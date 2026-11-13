@@ -2,7 +2,7 @@
 
 import { FetchableOriginsProvider } from "@ui/components/file-renderers/fetchable-origins-provider";
 import { originsOf } from "@ui/hooks/use-fetchable-origins";
-import { forgetPdfUrls } from "@ui/utils/pdf-preview-event";
+import { forgetPdfUrls, pdfFileKey } from "@ui/utils/pdf-preview-event";
 import { cachePdfThumbnail, MAX_CACHED_PDF_THUMBNAILS, pdfThumbnailCacheGeneration, peekCachedPdfThumbnail } from "@ui/utils/pdf-thumbnail-cache";
 import type { ReactNode } from "react";
 import { act, Suspense, use } from "react";
@@ -179,6 +179,10 @@ describe("the thumbnail's load deadline", () => {
     });
 });
 
+// A render that suspends forever is never committed.
+const neverResolves = new Promise<never>(() => {});
+const SuspendsForever = () => use(neverResolves);
+
 describe("the thumbnail's worker and cache", () => {
     let container: HTMLDivElement;
     let root: Root;
@@ -288,6 +292,60 @@ describe("the thumbnail's worker and cache", () => {
 
         expect(container.querySelector("img")).toBeNull();
         expect(container.querySelector("button")?.getAttribute("aria-busy")).toBe("true");
+    });
+
+    it("starts the shared worker after commit, not in a render that is thrown away", async () => {
+        // A worker from earlier tests is marked gone, so the next document needs a new one.
+        await render(<PdfThumbnail onOpen={() => {}} url={`${ORIGIN}/worker.pdf?sig=1`} />);
+
+        const [options] = firstPage.documentOptions.slice(-1) as { worker: { destroyed: boolean } }[];
+
+        options!.worker.destroyed = true;
+        act(() => {
+            root.unmount();
+        });
+        root = createRoot(container);
+
+        const before = firstPage.workers;
+
+        await render(
+            <Suspense fallback={<p>waiting</p>}>
+                <PdfThumbnail onOpen={() => {}} url={`${ORIGIN}/thrown-away.pdf?sig=1`} />
+                <SuspendsForever />
+            </Suspense>,
+        );
+
+        expect(container.textContent).toBe("waiting");
+        expect(firstPage.workers).toBe(before);
+
+        act(() => {
+            root.unmount();
+        });
+        root = createRoot(container);
+        await render(<PdfThumbnail onOpen={() => {}} url={`${ORIGIN}/mounted.pdf?sig=1`} />);
+
+        expect(firstPage.workers).toBe(before + 1);
+    });
+
+    it("does not cache an inline PDF, whose key would hold the whole file", async () => {
+        const inline = `data:application/pdf;base64,${"JVBERi0xLjQK".repeat(500)}`;
+
+        firstPage.renders = true;
+        await render(<PdfThumbnail onOpen={() => {}} url={inline} />);
+
+        expect(container.querySelector("img")?.getAttribute("src")).toBe("data:image/png;base64,cGFnZQ==");
+        expect(peekCachedPdfThumbnail(pdfFileKey(inline))).toBeUndefined();
+
+        // Mounted again, it loads again instead of showing a cached image.
+        act(() => {
+            root.unmount();
+        });
+        root = createRoot(container);
+        firstPage.renders = false;
+        firstPage.documentPending = true;
+        await render(<PdfThumbnail onOpen={() => {}} url={inline} />);
+
+        expect(container.querySelector("img")).toBeNull();
     });
 });
 
