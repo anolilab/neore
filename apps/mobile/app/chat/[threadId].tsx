@@ -2,6 +2,7 @@ import type { LegendListRef } from "@legendapp/list/react-native";
 import { LegendList } from "@legendapp/list/react-native";
 import { api } from "@neore/backend/api";
 import type { Id } from "@neore/backend/dataModel";
+import { randomUUID } from "expo-crypto";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import type { ComponentRef } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -11,12 +12,19 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "@/auth/auth-state";
 import { fetchAccessToken } from "@/auth/grant";
 import { secureGrantStore } from "@/auth/secure-store";
+import type { StartedChat } from "@/chat/chat-api";
 import { ChatError, startChat } from "@/chat/chat-api";
 import { forgetLastThread, rememberLastThread } from "@/chat/last-thread-store";
 import { displayTextOf, shareTextOf } from "@/chat/message-parts";
 import { isScrolledToEnd, scrollToLatestLabel, scrollToLatestText, shouldShowScrollToLatest } from "@/chat/scroll-to-latest";
+import type { SendSession } from "@/chat/send-sessions";
+import { sendSessions } from "@/chat/send-sessions";
 import { shareableMessageText, shareLabel } from "@/chat/share-message";
+import type { HeldSend } from "@/chat/start-send";
+import { abortableSleep, afterStart, clientMessageIdFor, replyStreamOf, startWithRetries } from "@/chat/start-send";
 import { relayReply } from "@/chat/stream";
+import type { SendStage } from "@/chat/unsent-send";
+import { failedSendMessage, failedSendOutcome, giveBackDraft, shouldKeepClientMessageId, withoutUnsentRows } from "@/chat/unsent-send";
 import { useReplyConfirmation } from "@/chat/use-reply-confirmation";
 import { loadConfig } from "@/lib/config";
 import { DEFAULT_CHAT_MODEL } from "@/lib/defaults";
@@ -39,6 +47,9 @@ import { appendTranscript } from "@/voice/voice-input";
 type Row = MessageRow & { finished?: boolean };
 
 const NEW_THREAD = "new";
+
+/** A new chat's screen moves to the chat its start opened, unless the send was stopped meanwhile (sign-out, leaving, a refusal). */
+const shouldMoveRoute = (routeThreadId: string, signal: AbortSignal): boolean => routeThreadId === NEW_THREAD && !signal.aborted;
 const MAX_HISTORY_PAGES = 10;
 const REFUSED_MESSAGE = "This chat is locked or no longer available.";
 const SHARE_FAILED_MESSAGE = "The message could not be shared. Try again.";
@@ -144,6 +155,9 @@ const Chat = () => {
     const isFocusedRef = useRef(false);
     const [threadId, setThreadId] = useState<string | undefined>(routeThreadId === NEW_THREAD ? undefined : routeThreadId);
     const [rows, setRows] = useState<Row[]>([]);
+    // The prompt that went back to the composer with its `clientMessageId`: sending that prompt again reuses the id, so a
+    // send the server took on a try whose answer was lost is saved once (`start-send.ts`).
+    const heldSend = useRef<HeldSend | null>(null);
     // The rows as the last write left them. Every write goes through `writeRows`, so a read can decide against the rows on
     // screen when it lands, not against the rows of the render it was started in.
     const rowsRef = useRef<Row[]>([]);
@@ -156,7 +170,16 @@ const Chat = () => {
     // Where the next older page starts; null once the whole history is loaded.
     const [olderCursor, setOlderCursor] = useState<string | null>(null);
     const [isLoadingOlder, setIsLoadingOlder] = useState(false);
-    const [draft, setDraft] = useState("");
+    const [draft, setDraftState] = useState("");
+    // The composer as the last write left it, like `rowsRef`: a failed send decides whether its prompt lands alone or ahead
+    // of text typed meanwhile against the composer as it is, not as it was when the send started.
+    const draftRef = useRef("");
+    const setDraft = useCallback((update: string | ((current: string) => string)) => {
+        const next = typeof update === "function" ? update(draftRef.current) : update;
+
+        draftRef.current = next;
+        setDraftState(next);
+    }, []);
     const [sending, setSending] = useState(false);
     const [error, setError] = useState<string | null>(null);
     // The words land in the draft, after anything typed meanwhile; they are never sent on their own.
@@ -405,8 +428,81 @@ const Chat = () => {
         }
     }, [confirmTick, hasToken, loadMessages, refreshTick, sending, status, threadId]);
 
+    // A send the server did not accept, or whose answer was lost, gives its prompt back and drops its local rows: no read
+    // will confirm them. The prompt keeps its `clientMessageId`, so sending it again cannot save it twice; the server answers
+    // a resend of a saved one with its ids. Only an id the server says belongs to another request is dropped.
+    const settleFailedSend = ({
+        clientMessageId,
+        error: failure,
+        ids,
+        prompt,
+        stage,
+    }: {
+        clientMessageId: string;
+        error: unknown;
+        ids: { assistant: string; user: string };
+        prompt: string;
+        stage: SendStage;
+    }) => {
+        if (failedSendOutcome(stage) === "accepted") {
+            return { isMerged: false };
+        }
+
+        // Back to this screen's composer, ahead of anything typed meanwhile, with its held id: the same prompt sent again
+        // alone and unchanged is the same send (`clientMessageIdFor`). A screen left meanwhile is gone, and so is the prompt.
+        const { draft: given, isMerged } = giveBackDraft(draftRef.current, prompt);
+
+        setDraft(given);
+        writeRows((current) => withoutUnsentRows(current, [ids.user, ids.assistant]));
+        heldSend.current = shouldKeepClientMessageId(failure) ? { clientMessageId, prompt } : null;
+
+        return { isMerged };
+    };
+
+    // After a start answered: `true` when the send was stopped while it was out (sign-out, leaving, a refusal) and changes
+    // nothing more here, since the server has the message. One sign-out stopped also drops its local rows and its hold, as
+    // its failure would (`afterStart`).
+    const isStoppedAfterStart = ({
+        controller,
+        ids,
+        sendSession,
+    }: {
+        controller: AbortController;
+        ids: { assistant: string; user: string };
+        sendSession: SendSession;
+    }): boolean => {
+        const next = afterStart({ isAborted: controller.signal.aborted, isSignedOut: sendSession.isSignedOut() });
+
+        if (next === "signed-out") {
+            writeRows((current) => withoutUnsentRows(current, [ids.user, ids.assistant]));
+            heldSend.current = null;
+        }
+
+        return next !== "continue";
+    };
+
+    // A start accepted: its chat is this screen's, the prompt is complete, and a new chat's screen moves to it.
+    const acceptStart = ({ controller, sender, started, userId }: { controller: AbortController; sender: string | undefined; started: StartedChat; userId: string }) => {
+        setThreadId(started.threadId);
+
+        // A reply, a question or an approval may now arrive while the app is in the background.
+        if (sender) {
+            offerPhonePush(sender);
+        }
+
+        // The prompt is complete once the server has accepted it, whether or not the screen's next read succeeds.
+        writeRows((current) => finishRow(current, userId));
+
+        // A send stopped meanwhile (sign-out, leaving, a refusal) keeps its result but moves no route.
+        if (shouldMoveRoute(routeThreadId, controller.signal)) {
+            router.setParams({ threadId: started.threadId });
+        }
+    };
+
     const send = async () => {
-        const prompt = draft.trim();
+        // The composer as the last write left it (`draftRef`), not as this render saw it: an edit made just before the press
+        // is what is sent.
+        const prompt = draftRef.current.trim();
 
         if (!prompt || sending || sendControl.disabled) {
             return;
@@ -421,8 +517,15 @@ const Chat = () => {
         const controller = new AbortController();
         // The account that sends: the offer below is its, even if another account is signed in by the time it lands.
         const sender = accountId;
+        // One id per composed message: the held one when this is exactly the prompt that went back, so the resend is the same send.
+        const clientMessageId = clientMessageIdFor(heldSend.current, prompt, randomUUID);
+
+        heldSend.current = null;
 
         sendAbort.current = controller;
+        // Sign-out stops this send, retries included (`sendSessions`), and marks it the departed account's.
+        const sendSession = sendSessions.begin(controller);
+
         setSending(true);
         setError(null);
         // Announced when a reply starts and when it finishes. The deltas stay silent: an announcement on each would flood the reader.
@@ -439,6 +542,9 @@ const Chat = () => {
             localRow(assistantId, "assistant", threadId ?? NEW_THREAD, ""),
         ]);
 
+        // How far the send got decides whether a failure gives the prompt back (`settleFailedSend`).
+        let stage: SendStage = "before-request";
+
         try {
             const config = loadConfig();
             const jwt = await fetchAccessToken({ fetch, lunoraUrl: config.lunoraUrl, store: secureGrantStore });
@@ -449,27 +555,45 @@ const Chat = () => {
 
             getClient().setAuthToken(jwt);
 
-            // Nothing is held back for later: a send that finds the app offline is refused, not queued.
-            const started = await requireOnline({ isOffline: sendControl.disabled }, () =>
-                startChat({
-                    body: { model: DEFAULT_CHAT_MODEL, prompt, threadId },
-                    fetch,
-                    gatewayUrl: config.gatewayUrl,
-                    jwt,
-                }));
+            // Nothing is held back for later: a send that finds the app offline is refused, not queued. Online, the same send
+            // is tried again while its first try is still being saved, or when a try gets no answer (`startWithRetries`). A
+            // resend the server already took answers with that send's ids (`duplicate`), and opens that chat like any start.
+            const started = await requireOnline({ isOffline: sendControl.disabled }, () => {
+                stage = "requested";
 
-            setThreadId(started.threadId);
+                return startWithRetries({
+                    attempt: async () =>
+                        await startChat({
+                            body: { clientMessageId, model: DEFAULT_CHAT_MODEL, prompt, threadId },
+                            fetch,
+                            gatewayUrl: config.gatewayUrl,
+                            jwt,
+                        }),
+                    signal: controller.signal,
+                    // Cut short when the send is stopped, so a stopped send settles at once, not after its retry delay.
+                    sleep: async (ms) => {
+                        await abortableSleep(ms, controller.signal);
+                    },
+                });
+            });
 
-            // A reply, a question or an approval may now arrive while the app is in the background.
-            if (sender) {
-                offerPhonePush(sender);
+            if (isStoppedAfterStart({ controller, ids: { assistant: assistantId, user: userId }, sendSession })) {
+                return;
             }
 
-            // The prompt is complete once the server has accepted it, whether or not the screen's next read succeeds.
-            writeRows((current) => finishRow(current, userId));
+            stage = "accepted";
+            acceptStart({ controller, sender, started, userId });
 
-            if (routeThreadId === NEW_THREAD) {
-                router.setParams({ threadId: started.threadId });
+            const replyStream = replyStreamOf(started);
+
+            // No reply stream to follow (`streaming: false`): the message went through, and its saved reply is read from the
+            // chat instead (the confirmation's read once `sending` ends). Its empty placeholder row goes.
+            if (replyStream === undefined) {
+                writeRows((current) => withoutUnsentRows(current, [assistantId]));
+                addConfirmation({ holdsSend: false, messageId: started.messageId, steers: 0, threadId: started.threadId });
+                AccessibilityInfo.announceForAccessibility("Reply finished");
+
+                return;
             }
 
             let isSteered = false;
@@ -505,7 +629,7 @@ const Chat = () => {
                     writeRows((current) => appendToRow(current, activeId, text));
                 },
                 signal: controller.signal,
-                streamToken: started.streamToken,
+                streamToken: replyStream.streamToken,
             });
 
             // A send stopped on purpose has its notice on screen already, and gets no confirmation.
@@ -527,11 +651,23 @@ const Chat = () => {
 
             AccessibilityInfo.announceForAccessibility("Reply finished");
         } catch (error_) {
+            // A send sign-out stopped belongs to the account that left: its prompt and held id are dropped, never kept for
+            // the next one to sign in.
+            if (sendSession.isSignedOut()) {
+                writeRows((current) => withoutUnsentRows(current, [userId, assistantId]));
+                heldSend.current = null;
+
+                return;
+            }
+
+            const { isMerged } = settleFailedSend({ clientMessageId, error: error_, ids: { assistant: assistantId, user: userId }, prompt, stage });
+
             // The abort error of a send stopped on purpose is not shown: its notice is.
             if (!controller.signal.aborted) {
-                setError(error_ instanceof Error ? error_.message : "Could not send.");
+                setError(failedSendMessage(error_, stage, { isMerged }));
             }
         } finally {
+            sendSession.end();
             setSending(false);
         }
     };

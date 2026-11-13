@@ -23,7 +23,7 @@ const nextTick = (tick: number): number => tick + 1;
  * coming back online moves `refreshTick` and nothing else.
  */
 export const OfflineProvider = ({ children }: { children: ReactNode }) => {
-    const { hasToken, retryToken, status, user } = useAuth();
+    const { hasToken, isConfirming, retryToken, status, user } = useAuth();
     const [connectivity, dispatch] = useReducer(reduceConnectivity, INITIAL_CONNECTIVITY);
     const [refreshTick, setRefreshTick] = useState(0);
     const [bound, setBound] = useState<{ cache: ScopedCache; userId: string } | undefined>();
@@ -72,11 +72,14 @@ export const OfflineProvider = ({ children }: { children: ReactNode }) => {
     }, []);
 
     // Signed in with no token: the server could not be reached to mint one, which is offline whatever the device says.
-    const isTokenMissing = status === "signed-in" && !hasToken;
+    // A start still confirming the stored user has not failed yet, so it shows no offline banner.
+    // It has no token to write with either, so its write controls wait as they do while a connection is checked.
+    const isTokenMissing = status === "signed-in" && !hasToken && !isConfirming;
+    const isTokenPending = status === "signed-in" && !hasToken && isConfirming;
 
     useEffect(() => {
-        dispatch({ missing: isTokenMissing, type: "token" });
-    }, [isTokenMissing]);
+        dispatch({ missing: isTokenMissing, pending: isTokenPending, type: "token" });
+    }, [isTokenMissing, isTokenPending]);
 
     useEffect(() => {
         refresher.current.update(isOffline);

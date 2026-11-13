@@ -1,8 +1,10 @@
 import "@/lib/crash-boot";
+import "@/lib/splash-boot";
 
 import { Link, Stack, useRouter, useSegments } from "expo-router";
+import { hideAsync } from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
-import { useEffect } from "react";
+import { useEffect, useSyncExternalStore } from "react";
 import { Pressable, Text, View } from "react-native";
 
 import { AuthProvider } from "@/auth/auth-context";
@@ -14,8 +16,39 @@ import { crashReportStore } from "@/lib/crash-report-store";
 import { applyStoredCrashReportChoice, startCrashReporting } from "@/lib/crash-reporting";
 import { installMarker } from "@/lib/install-marker";
 import { createPostHogClient } from "@/lib/posthog-client";
+import { canHideSplash, listReady } from "@/lib/splash-gate";
 import { usePhonePush } from "@/notifications/use-phone-push";
 import { OfflineProvider } from "@/offline/offline-provider";
+import { settleQuietly } from "@/offline/quietly";
+
+/** The splash stays up at most this long: a session that is still not known by then shows the app anyway. */
+const SPLASH_MAX_MS = 2000;
+
+/** Hiding twice, or after a failed prevent, is harmless. */
+const hideSplash = (): void => settleQuietly(hideAsync());
+
+/** Hides the splash once the first screen can paint (`canHideSplash`), or after {@link SPLASH_MAX_MS} whatever it is. */
+const SplashGate = () => {
+    const { status } = useAuth();
+    const segments = useSegments();
+    const first: string | undefined = segments[0];
+    const isOnList = first === undefined || first === "index";
+    const isListReady = useSyncExternalStore(listReady.subscribe, listReady.isReady);
+
+    useEffect(() => {
+        const timer = setTimeout(hideSplash, SPLASH_MAX_MS);
+
+        return () => clearTimeout(timer);
+    }, []);
+
+    useEffect(() => {
+        if (canHideSplash({ isListReady, isOnList, status })) {
+            hideSplash();
+        }
+    }, [isListReady, isOnList, status]);
+
+    return null;
+};
 
 /** Starts crash reporting when the build has a PostHog key, and applies the stored choice. */
 const CrashReportingStartup = () => {
@@ -100,6 +133,8 @@ const RootLayout = () => {
     }
 
     if (configError) {
+        hideSplash();
+
         return (
             <View style={{ alignItems: "center", flex: 1, justifyContent: "center", padding: 24 }}>
                 <Text accessibilityRole="alert">{configError}</Text>
@@ -112,6 +147,7 @@ const RootLayout = () => {
             {/* eslint-disable-next-line react/style-prop-object -- expo-status-bar takes "auto" as a string, not a style object */}
             <StatusBar style="auto" />
             <CrashReportingStartup />
+            <SplashGate />
             <OfflineProvider>
                 <SignInGate />
             </OfflineProvider>

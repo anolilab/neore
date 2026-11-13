@@ -7,7 +7,7 @@ import { writeControlState } from "./write-gate";
 export interface OfflineValue {
     /** The signed-in account's cache, or undefined while nobody is signed in. */
     cache: ScopedCache | undefined;
-    /** The network just came back and no request has answered yet: reads run, writes wait. */
+    /** The network just came back and no request has answered yet, or the first token mint is still out: reads run, writes wait. */
     isChecking: boolean;
     isOffline: boolean;
     /** Moves when a read should run again: the app came back online, or a retry is due while offline. Reads only. */

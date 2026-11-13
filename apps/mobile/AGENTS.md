@@ -13,8 +13,13 @@
   sign-out; a save from a screen of a signed-out account is refused. Sign-out empties the cache BEFORE it asks the
   server (`auth/sign-out.ts`), so a failing or hanging request leaves nothing behind. Locked threads are never cached,
   and a chat the server refuses (`FORBIDDEN`/`NOT_FOUND`/`THREAD_LOCKED`, not a lapsed sign-in) is forgotten with its
-  statuses and cleared from the screen (`message-read.ts`). A cold start with no network signs the stored user in
-  without a JWT (`auth-context.tsx`) so the saved chats can open; that state counts as offline.
+  statuses and cleared from the screen (`message-read.ts`). Every start signs the stored user in before the first
+  token mint answers (`session-state.ts`, `isConfirming`: not offline yet, but every write control waits for the token like a
+  connection being checked; the splash holds until the chat list has read its saved rows, at most 2 s,
+  `splash-gate.ts`). A mint still out when a sign-in or sign-out starts applies nothing (`createAuthEpoch`); a sign-out closes the epoch until the next sign-in, so a mint begun during its teardown applies nothing either. A mint with no answer keeps them signed in without a JWT, which counts as offline; an answered "no session"
+  signs out and empties the cache. Live queries wait for a JWT. A 401/403 mint clears the stored
+  grant only while it still holds the grant that mint sent (a new sign-in's grant survives an old mint's refusal); every
+  grant read, write and clear goes through one queue (`serializeGrantStore`), so that check-and-clear is atomic.
   **Stamps and races:** a read stamps its rows with the moment it STARTED (`syncedAt`), and only the newest read of a
   screen may paint or save (`createMessageReadGate`), because messages carry no server version. A thread missing from
   a COMPLETE first-page list read is pruned (`pruneThreads`, rows synced by a later read stay); a partial page never
@@ -26,6 +31,22 @@
   Android Auto Backup never copies the cache directory, so no backup rule is needed (the secure-store plugin owns the
   app's backup rules). `PRAGMA user_version` (`SCHEMA_VERSION` in `cache.ts`) drops and recreates the tables on a
   mismatch: bump it with any `SCHEMA` change. The screens are keyed by the signed-in account.
+- **Sending a message** (`src/chat/start-send.ts`, `chat-api.ts`, `unsent-send.ts`):
+  - One `clientMessageId` per composed message, sent on `/v1/chat` and reused on every retry: the server saves it once.
+  - 409 `CHAT_START_IN_PROGRESS`: the first try is still saving. Wait and resend (past the server's 2-minute lease); not a failure.
+  - A try with no answer (timeout, dropped connection, 5xx) is resent a bounded number of times under the same id.
+  - 200 with `duplicate: true`: the first send's ids. Open that chat like any start.
+  - 422 `CLIENT_MESSAGE_ID_REUSED`: show it, never retry, drop the id.
+  - A send that still fails gives its prompt back to the same mounted screen's composer with its id held; exactly the
+    same text sent again is the same send (`clientMessageIdFor`). Merged ahead of text typed meanwhile, it is another
+    message, and the notice says to send it alone and unchanged. A screen left meanwhile drops the prompt.
+  - A send stopped before its first try sends nothing; sign-out ends the mint epoch before its first await (`runSignOut`).
+  - Sign-out stops every send still retrying (`sendSessions`) and drops its prompt and held id; sends stay closed until
+    the next sign-in (a send begun mid-teardown is stopped at once). A stopped send moves no route, leaves its retry
+    delay at once (`abortableSleep`), and changes nothing on the screen if its start answers anyway (`afterStart`).
+  - A start with `streaming: false` (no `streamToken`) follows no stream: the chat's saved reply is read instead.
+  - Match codes lower-cased: the gateway passes `/chat/start`'s SCREAMING_CASE, the public API uses snake_case.
+  - Nothing is held and polled for: the resend is idempotent.
 - **Voice input paths** (`src/voice/`) — the cloud by default; "Transcribe on this device" (secure store, read on every
   press by `createDictationRouter`) switches to the phone's recognizer. There is NO fallback between them: an on-device
   press that cannot be served shows a message and records nothing, and a setting that cannot be read records nothing.

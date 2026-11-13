@@ -41,10 +41,18 @@ describe("isOffline", () => {
 
 describe("a signed-in launch without a token", () => {
     it("is offline: the server could not be reached to mint one", () => {
-        const state = reduceConnectivity(INITIAL_CONNECTIVITY, { missing: true, type: "token" });
+        const state = reduceConnectivity(INITIAL_CONNECTIVITY, { missing: true, pending: false, type: "token" });
 
         expect(isOffline(state)).toBe(true);
-        expect(isOffline(reduceConnectivity(state, { missing: false, type: "token" }))).toBe(false);
+        expect(isOffline(reduceConnectivity(state, { missing: false, pending: false, type: "token" }))).toBe(false);
+    });
+
+    it("is not offline while the first mint is out, but cannot write until it lands", () => {
+        const state = reduceConnectivity(INITIAL_CONNECTIVITY, { missing: false, pending: true, type: "token" });
+
+        expect(isOffline(state)).toBe(false);
+        expect(canWrite(state)).toBe(false);
+        expect(canWrite(reduceConnectivity(state, { missing: false, pending: false, type: "token" }))).toBe(true);
     });
 });
 

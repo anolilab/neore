@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { emptyCacheWhileSignedOut, RELEASE_PUSH_TIMEOUT_MS, signOutOnDevice } from "./sign-out";
+import { createAuthEpoch } from "./session-state";
+import { emptyCacheWhileSignedOut, RELEASE_PUSH_TIMEOUT_MS, runSignOut, signOutOnDevice } from "./sign-out";
 
 describe("signOutOnDevice", () => {
     it("empties the cache before it asks the server, so a request that fails or hangs cannot leave chats behind", async () => {
@@ -174,5 +175,72 @@ describe("emptyCacheWhileSignedOut", () => {
             }),
         ).resolves.toBeUndefined();
         expect(warn).toHaveBeenCalledTimes(1);
+    });
+});
+
+describe(runSignOut, () => {
+    it("stales a mint still out before the teardown's first await, so it applies nothing while the cache is emptied", async () => {
+        const epoch = createAuthEpoch();
+        const isStale = epoch.start();
+        let staleDuringTeardown: boolean | undefined;
+        const finish = vi.fn();
+
+        await runSignOut({
+            endMints: () => epoch.close(),
+            finish,
+            teardown: async () => {
+                // The mint answers while the teardown still waits on the cache and the server.
+                staleDuringTeardown = isStale();
+                await Promise.resolve();
+            },
+        });
+
+        expect(staleDuringTeardown).toBe(true);
+        expect(finish).toHaveBeenCalledOnce();
+    });
+
+    it("also stales a mint started during the teardown, and finishes when the teardown fails", async () => {
+        const epoch = createAuthEpoch();
+        let isStale: (() => boolean) | undefined;
+        const finish = vi.fn();
+
+        await expect(
+            runSignOut({
+                endMints: () => epoch.close(),
+                finish,
+                teardown: async () => {
+                    isStale = epoch.start();
+
+                    throw new Error("the revoke failed");
+                },
+            }),
+        ).rejects.toThrow("the revoke failed");
+
+        expect(isStale?.()).toBe(true);
+        expect(finish).toHaveBeenCalledOnce();
+    });
+
+    it("applies nothing from a mint a refresh timer begins while the teardown still runs, until the next sign-in", async () => {
+        const epoch = createAuthEpoch();
+        let staleDuringTeardown: boolean | undefined;
+        let begunDuringTeardown: (() => boolean) | undefined;
+
+        await runSignOut({
+            endMints: () => epoch.close(),
+            finish: () => {},
+            teardown: async () => {
+                // The refresh timer fires after the epoch ended, and its mint answers before the teardown is done.
+                begunDuringTeardown = epoch.start();
+                staleDuringTeardown = begunDuringTeardown();
+                await Promise.resolve();
+            },
+        });
+
+        expect(staleDuringTeardown).toBe(true);
+
+        // The next sign-in reopens the epoch; a mint from the sign-out still applies nothing, a new one applies.
+        epoch.open();
+        expect(begunDuringTeardown?.()).toBe(true);
+        expect(epoch.start()()).toBe(false);
     });
 });
