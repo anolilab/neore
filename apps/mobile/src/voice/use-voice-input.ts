@@ -1,11 +1,14 @@
 import type { RecordingOptions } from "expo-audio";
-import { AudioQuality, getRecordingPermissionsAsync, IOSOutputFormat, requestRecordingPermissionsAsync, setAudioModeAsync, useAudioRecorder } from "expo-audio";
+import { AudioModule, AudioQuality, getRecordingPermissionsAsync, IOSOutputFormat, requestRecordingPermissionsAsync, setAudioModeAsync } from "expo-audio";
+// The platform mapping `useAudioRecorder` applies to the options; the recorder here is made outside that hook.
+import { createRecordingOptions } from "expo-audio/build/utils/options";
 import { File } from "expo-file-system";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { getClient } from "@/lib/lunora";
 import { settleQuietly } from "@/offline/quietly";
 
+import { createLazyResource } from "./lazy-resource";
 import type { VoicePhase } from "./voice-input";
 import {
     MAX_CLIP_MS,
@@ -123,7 +126,17 @@ const isDiscarded = (uri: string | undefined): boolean => {
  * press never clears a send failure.
  */
 export const useVoiceInput = ({ onText }: { onText: (text: string) => void }) => {
-    const recorder = useAudioRecorder(RECORDING_OPTIONS);
+    // Made on the first press, not each time a chat opens: most visits never record. Released when the screen goes.
+    const [recorders] = useState(() =>
+        createLazyResource(
+            () => new AudioModule.AudioRecorder(createRecordingOptions(RECORDING_OPTIONS)),
+            (made) => {
+                made.release();
+            },
+        ),
+    );
+
+    useEffect(() => () => recorders.release(), [recorders]);
     const [phase, setPhase] = useState<VoicePhase>("idle");
     const [error, setError] = useState<string | undefined>(undefined);
     // Whether the finger is still on the button: a release during the permission prompt or the recorder's start records nothing.
@@ -151,8 +164,9 @@ export const useVoiceInput = ({ onText }: { onText: (text: string) => void }) =>
     const stopRecording = useCallback(async (): Promise<string | undefined> => {
         isRecording.current = false;
 
+        const recorder = recorders.peek();
         const stopping = (async () => {
-            await recorder.stop();
+            await recorder?.stop();
         })();
         const leaving = leaveRecordingMode(pressToken.current, stopping);
 
@@ -163,8 +177,8 @@ export const useVoiceInput = ({ onText }: { onText: (text: string) => void }) =>
             await leaving;
         }
 
-        return clipUri.current ?? recorder.uri ?? undefined;
-    }, [recorder]);
+        return clipUri.current ?? recorder?.uri ?? undefined;
+    }, [recorders]);
 
     const finish = useCallback(async () => {
         isHeld.current = false;
@@ -183,7 +197,7 @@ export const useVoiceInput = ({ onText }: { onText: (text: string) => void }) =>
             let durationMillis = 0;
 
             try {
-                ({ durationMillis } = recorder.getStatus());
+                durationMillis = recorders.peek()?.getStatus().durationMillis ?? 0;
             } catch (statusError) {
                 console.warn("Could not read the voice recording's length.", statusError);
             }
@@ -234,7 +248,7 @@ export const useVoiceInput = ({ onText }: { onText: (text: string) => void }) =>
                 setPhase("idle");
             }
         }
-    }, [recorder, report, stopRecording]);
+    }, [recorders, report, stopRecording]);
 
     const start = useCallback(async () => {
         if (isBusy.current) {
@@ -275,6 +289,9 @@ export const useVoiceInput = ({ onText }: { onText: (text: string) => void }) =>
 
             session.owner = token;
             await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
+
+            const recorder = recorders.get();
+
             await recorder.prepareToRecordAsync();
             clipUri.current = recorder.uri ?? undefined;
 
@@ -306,7 +323,7 @@ export const useVoiceInput = ({ onText }: { onText: (text: string) => void }) =>
             clipUri.current = undefined;
             isBusy.current = false;
         }
-    }, [finish, recorder, report]);
+    }, [finish, recorders, report]);
 
     // Leaving the screen mid-recording: stop, and delete what was recorded even when the released recorder cannot stop.
     useEffect(() => {
