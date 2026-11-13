@@ -120,7 +120,7 @@ export interface ChatActionsContextValue {
     lunora: ReturnType<typeof useLunora>;
     regenerate: () => Promise<void>;
     reloadMessage: (messageId: string) => Promise<void>;
-    sendMessage: (text: string, attachments?: PendingAttachment[]) => Promise<void>;
+    sendMessage: (text: string, attachments?: PendingAttachment[], options?: { guestMessageId?: string }) => Promise<void>;
 }
 
 /**

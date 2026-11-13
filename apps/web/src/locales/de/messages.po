@@ -25,11 +25,11 @@ msgstr " · Modell: {modelFilter}"
 msgid "- {0, plural, one {# row} other {# rows}}, {1, plural, one {# column} other {# columns}}"
 msgstr "- {0, plural, one {# Zeile} other {# Zeilen}}, {1, plural, one {# Spalte} other {# Spalten}}"
 
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:634
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:639
 msgid "-- INSERT --"
 msgstr "-- EINFÜGEN --"
 
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:634
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:639
 msgid "-- NORMAL --"
 msgstr "-- NORMAL --"
 
@@ -61,23 +61,23 @@ msgstr "\"{0}\" startet, sobald seine Abhängigkeiten erledigt sind"
 msgid "\"{badLogin}\" is not a valid login. A login starts with a letter or digit, has at most {0} characters, and uses only letters, digits, and single hyphens or underscores."
 msgstr "„{badLogin}“ ist kein gültiger Login. Ein Login beginnt mit einem Buchstaben oder einer Ziffer, hat höchstens {0} Zeichen und enthält nur Buchstaben, Ziffern und einzelne Bindestriche oder Unterstriche."
 
-#: src/features/chat/thread/composer-input.tsx:627
+#: src/features/chat/thread/composer-input.tsx:628
 msgid "\"{fileName}\" cannot be attached: this file type is not supported."
 msgstr "„{fileName}“ kann nicht angehängt werden: Dieser Dateityp wird nicht unterstützt."
 
-#: src/features/chat/thread/composer-input.tsx:620
+#: src/features/chat/thread/composer-input.tsx:621
 msgid "\"{fileName}\" could not be attached: its contents do not match its file type."
 msgstr "„{fileName}“ konnte nicht angehängt werden: Der Inhalt passt nicht zum Dateityp."
 
-#: src/features/chat/thread/composer-input.tsx:622
+#: src/features/chat/thread/composer-input.tsx:623
 msgid "\"{fileName}\" could not be uploaded. Check your connection and try again."
 msgstr "„{fileName}“ konnte nicht hochgeladen werden. Prüfe deine Verbindung und versuche es erneut."
 
-#: src/features/chat/thread/composer-input.tsx:625
+#: src/features/chat/thread/composer-input.tsx:626
 msgid "\"{fileName}\" is too large. Documents can be at most {maxMegabytes} MB."
 msgstr "„{fileName}“ ist zu groß. Dokumente dürfen höchstens {maxMegabytes} MB groß sein."
 
-#: src/features/chat/thread/composer-input.tsx:626
+#: src/features/chat/thread/composer-input.tsx:627
 msgid "\"{fileName}\" is too large. Files of this type can be at most {maxMegabytes} MB."
 msgstr "„{fileName}“ ist zu groß. Dateien dieses Typs dürfen höchstens {maxMegabytes} MB groß sein."
 
@@ -102,7 +102,7 @@ msgstr "({0} von {MAX_PARTICIPANTS}, mindestens {MIN_PARTICIPANTS})"
 msgid "({jobFailed} failed)"
 msgstr "({jobFailed} fehlgeschlagen)"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:345
+#: src/features/chat/thread/composer-prompt-queue.tsx:348
 msgid "(attachments only)"
 msgstr "(nur Anhänge)"
 
@@ -235,7 +235,7 @@ msgid "{0, plural, one {# line} other {# lines}}"
 msgstr "{0, plural, one {# Zeile} other {# Zeilen}}"
 
 #. placeholder {0}: node.relevantMessages.length
-#: src/features/chat/thread-list/thread-node.tsx:1160
+#: src/features/chat/thread-list/thread-node.tsx:1167
 msgid "{0, plural, one {# match} other {# matches}}"
 msgstr "{0, plural, one {# Treffer} other {# Treffer}}"
 
@@ -721,7 +721,7 @@ msgstr "{0} % der Ausgaben"
 msgid "{0}+ text models, {1}+ image models, and {2}+ video models — from Claude and GPT-5 to Flux and Veo — all included in one plan. Switch between any of them mid-conversation."
 msgstr "{0}+ Textmodelle, {1}+ Bildmodelle und {2}+ Videomodelle – von Claude und GPT-5 bis Flux und Veo – alle in einem Tarif enthalten. Wechsle mitten im Gespräch zwischen ihnen."
 
-#: src/features/chat/thread-list/thread-node.tsx:270
+#: src/features/chat/thread-list/thread-node.tsx:277
 msgid "{action}: {displayTitle}"
 msgstr "{action}: {displayTitle}"
 
@@ -811,7 +811,7 @@ msgstr "{count, plural, one {# Nachricht ausgewählt} other {# Nachrichten ausge
 msgid "{count, plural, one {# of {maxReferenceImages} reference attached} other {# of {maxReferenceImages} references attached}}"
 msgstr "{count, plural, one {# von {maxReferenceImages} Referenz angehängt} other {# von {maxReferenceImages} Referenzen angehängt}}"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:686
+#: src/features/chat/thread/composer-prompt-queue.tsx:689
 msgid "{count, plural, one {# steering — the reply reads it at its next step} other {# steering — the reply reads them at its next step}}"
 msgstr "{count, plural, one {# Steuerhinweis – die Antwort liest ihn bei ihrem nächsten Schritt} other {# Steuerhinweise – die Antwort liest sie bei ihrem nächsten Schritt}}"
 
@@ -831,15 +831,15 @@ msgstr "{count, plural, one {# Quelle verwendet} other {# Quellen verwendet}}"
 msgid "{count} characters now."
 msgstr "Jetzt {count} Zeichen."
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:683
+#: src/features/chat/thread/composer-prompt-queue.tsx:686
 msgid "{count} queued"
 msgstr "{count} in der Warteschlange"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:683
+#: src/features/chat/thread/composer-prompt-queue.tsx:686
 msgid "{count} queued — sends when the current reply finishes"
 msgstr "{count} in der Warteschlange – wird gesendet, wenn die aktuelle Antwort fertig ist"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:691
+#: src/features/chat/thread/composer-prompt-queue.tsx:694
 msgid "{count} queued — waiting for the permission mode to save"
 msgstr ""
 
@@ -861,7 +861,7 @@ msgstr "{days} Tage"
 msgid "{days}d ago"
 msgstr "vor {days} T."
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:386
+#: src/features/chat/thread/composer-prompt-queue.tsx:389
 msgid "{droppedCount, plural, one {# attachment removed on reload} other {# attachments removed on reload}}"
 msgstr "{droppedCount, plural, one {# Anhang beim Neuladen entfernt} other {# Anhänge beim Neuladen entfernt}}"
 
@@ -1011,7 +1011,7 @@ msgstr "{hostLabel} mergt diesen {requestNoun} mit „{0}“, sobald die Regeln 
 msgid "{hours} hours"
 msgstr "{hours} Stunden"
 
-#: src/features/chat/thread-list/thread-node.tsx:364
+#: src/features/chat/thread-list/thread-node.tsx:371
 msgid "{hours}h {minutes}m"
 msgstr "{hours} Std. {minutes} Min."
 
@@ -1128,7 +1128,7 @@ msgstr "{mins}m"
 msgid "{mins}m {secs}s"
 msgstr "{mins}m {secs}s"
 
-#: src/features/chat/thread-list/thread-node.tsx:367
+#: src/features/chat/thread-list/thread-node.tsx:374
 msgid "{minutes}m"
 msgstr "{minutes} Min."
 
@@ -1523,7 +1523,7 @@ msgstr "$20/Monat ersetzt ChatGPT + Midjourney + Runway + mehr. Kostenlos starte
 msgid "1 {from} in other currencies"
 msgstr "1 {from} in anderen Währungen"
 
-#: src/features/chat/sharing/thread-share-button.tsx:329
+#: src/features/chat/sharing/thread-share-button.tsx:333
 msgid "1 Day"
 msgstr "1 Tag"
 
@@ -1688,7 +1688,7 @@ msgstr "52-Wochen-Spanne"
 msgid "7 days"
 msgstr "7 Tage"
 
-#: src/features/chat/sharing/thread-share-button.tsx:330
+#: src/features/chat/sharing/thread-share-button.tsx:334
 msgid "7 Days"
 msgstr "7 Tage"
 
@@ -1786,6 +1786,14 @@ msgstr "Ein Ziel gruppiert Aufgaben. Sein Fortschritt ergibt sich daraus, wie vi
 msgid "A group chat. A question from the owner is answered by three agents in turn: a security reviewer, a performance reviewer, and a lead who sums up."
 msgstr ""
 
+#: src/features/chat/core/context/chat-context.tsx:721
+msgid "A guest's message cannot be sent as a goal."
+msgstr "Die Nachricht eines Gasts kann nicht als Ziel gesendet werden."
+
+#: src/features/chat/core/context/chat-context.tsx:724
+msgid "A guest's message is sent through a hosted model only. Pick one and send it again."
+msgstr "Die Nachricht eines Gasts wird nur über ein gehostetes Modell gesendet. Wähle eines aus und sende sie erneut."
+
 #: src/features/develop/components/guide-tab.tsx:101
 msgid "A guide for this {requestNoun} is already being written."
 msgstr "Ein Leitfaden für diesen {requestNoun} wird bereits erstellt."
@@ -1802,8 +1810,8 @@ msgstr "Ein Schlüssel ist gespeichert. Leer lassen, um ihn zu behalten."
 msgid "A key is saved. Leave blank to keep it. Changing the endpoint, region or access key id requires entering it again."
 msgstr "Ein Schlüssel ist gespeichert. Leer lassen, um ihn zu behalten. Wenn du Endpunkt, Region oder Zugriffsschlüssel-ID änderst, musst du ihn erneut eingeben."
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:90
-#: src/features/chat/guest-links/guest-link-panel.tsx:156
+#: src/features/chat/guest-links/guest-link-panel.tsx:153
+#: src/features/chat/guest-links/guest-link-panel.tsx:293
 msgid "A locked chat cannot have a guest link."
 msgstr "Ein gesperrter Chat kann keinen Gastlink haben."
 
@@ -1887,6 +1895,11 @@ msgstr "Ein regulärer Ausdruck, dem die Antwort entsprechen muss"
 #: src/features/develop/components/review-thread.tsx:76
 msgid "A reply is posted straight away, not with the rest of your review."
 msgstr "Eine Antwort wird sofort gepostet, nicht zusammen mit dem Rest deines Reviews."
+
+#: src/features/chat/guest-links/guest-link-panel.tsx:221
+#: src/features/chat/guest-links/guest-link-panel.tsx:289
+msgid "A reply is running. Send a message once it has finished."
+msgstr "Eine Antwort läuft gerade. Sende eine Nachricht, sobald sie fertig ist."
 
 #: src/features/marketing/use-cases/use-case-data.ts:112
 msgid "A reply that used memories shows a \"Memories used\" list, so you can see exactly what it was given."
@@ -2047,7 +2060,7 @@ msgstr "Einladung annehmen"
 msgid "Accept or reject invitations to join organizations"
 msgstr "Einladungen zum Beitritt zu Organisationen annehmen oder ablehnen"
 
-#: src/features/chat/sharing/thread-share-button.tsx:259
+#: src/features/chat/sharing/thread-share-button.tsx:263
 #: src/features/pages/components/page-share-dialog.tsx:96
 msgid "Access"
 msgstr "Zugriff"
@@ -2608,8 +2621,8 @@ msgstr "Anpassen"
 #: src/features/auth/components/team/team-member-cell.tsx:148
 #: src/features/auth/components/team/team-member-cell.tsx:163
 #: src/features/auth/components/team/team-switcher.tsx:143
-#: src/features/chat/sharing/thread-share-button.tsx:213
-#: src/features/chat/sharing/thread-share-button.tsx:318
+#: src/features/chat/sharing/thread-share-button.tsx:217
+#: src/features/chat/sharing/thread-share-button.tsx:322
 #: src/features/layout/components/sidebar-shortcut.tsx:268
 #: src/features/layout/lib/dashboard-page-names.ts:12
 #: src/routes/admin/route.tsx:51
@@ -2975,7 +2988,7 @@ msgstr "KI-Videogenerierung"
 msgid "AI-assisted bug triage with full recording context"
 msgstr "KI-gestützte Bug-Triage mit vollständigem Aufzeichnungskontext"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:377
+#: ../../packages/chat-ui/src/chat/message-content.tsx:384
 msgid "AI-generated"
 msgstr "KI-generiert"
 
@@ -3427,7 +3440,7 @@ msgstr "Ein Fehler ist aufgetreten"
 msgid "An error occurred during One Tap sign in"
 msgstr "Bei der One-Tap-Anmeldung ist ein Fehler aufgetreten"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1155
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1162
 msgid "An error occurred while generating the response."
 msgstr "Beim Generieren der Antwort ist ein Fehler aufgetreten."
 
@@ -3636,15 +3649,15 @@ msgstr "Alle meine Chats"
 msgid "Any string you choose; enter the same value as the webhook Verify token in the Meta app"
 msgstr "Eine beliebige Zeichenfolge deiner Wahl; gib denselben Wert als Webhook-Verify-Token in der Meta-App ein"
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:150
-msgid "Anyone with a guest link can leave you a message here. Nothing they write runs on its own."
-msgstr "Wer einen Gastlink hat, kann dir hier eine Nachricht hinterlassen. Nichts davon wird von selbst ausgeführt."
+#: src/features/chat/guest-links/guest-link-panel.tsx:282
+msgid "Anyone with a guest link can leave you a message here. Nothing they write runs until you send it."
+msgstr "Wer einen Gastlink hat, kann dir hier eine Nachricht hinterlassen. Nichts davon wird ausgeführt, bis du es sendest."
 
 #: src/features/pages/components/page-share-dialog.tsx:63
 msgid "Anyone with the link can read this page. Comments are never shown. Turning it off revokes the link."
 msgstr "Jeder mit dem Link kann diese Seite lesen. Kommentare werden nie angezeigt. Beim Ausschalten wird der Link widerrufen."
 
-#: src/features/chat/sharing/thread-share-button.tsx:379
+#: src/features/chat/sharing/thread-share-button.tsx:383
 msgid "Anyone with the link can view this thread"
 msgstr "Jeder mit dem Link kann diesen Thread ansehen"
 
@@ -3781,7 +3794,7 @@ msgstr "Wird angewendet..."
 msgid "approval"
 msgstr "Genehmigung"
 
-#: src/features/chat/thread-list/thread-node.tsx:614
+#: src/features/chat/thread-list/thread-node.tsx:621
 msgid "Approval"
 msgstr "Genehmigung"
 
@@ -3904,7 +3917,7 @@ msgstr "Den geöffneten Thread archivieren, oder aus dem Archiv holen, wenn er a
 #: ../../packages/chat-ui/src/threads/thread-item.tsx:98
 #: src/components/command-palette.tsx:476
 #: src/components/command-palette.tsx:637
-#: src/features/chat/thread-list/thread-node.tsx:119
+#: src/features/chat/thread-list/thread-node.tsx:120
 msgid "Archive thread"
 msgstr "Thread archivieren"
 
@@ -3944,7 +3957,7 @@ msgstr "Möchtest du diesen API-Schlüssel wirklich löschen? Alles, was ihn ver
 msgid "Are you sure you want to delete this item? This action cannot be undone."
 msgstr "Bist du sicher, dass du dieses Element löschen möchtest? Diese Aktion kann nicht rückgängig gemacht werden."
 
-#: src/features/chat/thread-list/thread-node.tsx:1110
+#: src/features/chat/thread-list/thread-node.tsx:1117
 #: src/features/chat/thread/thread-shortcuts-listener.tsx:69
 msgid "Are you sure you want to delete this thread? This action cannot be undone and will permanently remove all messages in this conversation."
 msgstr "Bist du sicher, dass du diesen Thread löschen möchtest? Diese Aktion kann nicht rückgängig gemacht werden und entfernt alle Nachrichten in dieser Unterhaltung dauerhaft."
@@ -3962,7 +3975,7 @@ msgstr "Bist du sicher, dass du diese Organisation verlassen möchtest?"
 msgid "Are you sure you want to make {userName} an admin? They will have full access to admin features."
 msgstr "Bist du sicher, dass du {userName} zum Administrator machen möchtest? Diese Person erhält vollständigen Zugriff auf Admin-Funktionen."
 
-#: src/features/chat/sharing/thread-share-button.tsx:413
+#: src/features/chat/sharing/thread-share-button.tsx:420
 msgid "Are you sure you want to remove {userToRemoveName} from this thread?"
 msgstr "Möchtest du {userToRemoveName} wirklich aus diesem Thread entfernen?"
 
@@ -4187,7 +4200,7 @@ msgstr "Anhang (ausgeblendet)"
 msgid "Attachment only"
 msgstr "Nur Anhang"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:380
+#: src/features/chat/thread/composer-prompt-queue.tsx:383
 msgid "Attachments:"
 msgstr "Anhänge:"
 
@@ -5134,11 +5147,11 @@ msgstr "Frühere Versionen deines Workflows durchsuchen und wiederherstellen."
 msgid "Browse, fork, and remix workflows shared by the community"
 msgstr "Von der Community geteilte Workflows durchsuchen, forken und remixen"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:738
+#: ../../packages/chat-ui/src/chat/message-content.tsx:745
 msgid "Browser"
 msgstr "Browser"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:761
+#: ../../packages/chat-ui/src/chat/message-content.tsx:768
 msgid "Browser action failed"
 msgstr "Browser-Aktion fehlgeschlagen"
 
@@ -5146,7 +5159,7 @@ msgstr "Browser-Aktion fehlgeschlagen"
 msgid "Browser Automation"
 msgstr "Browser-Automatisierung"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:759
+#: ../../packages/chat-ui/src/chat/message-content.tsx:766
 msgid "Browser error"
 msgstr "Browser-Fehler"
 
@@ -5155,7 +5168,7 @@ msgid "Browser notes"
 msgstr "Browser-Hinweise"
 
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:262
-#: ../../packages/chat-ui/src/chat/message-content.tsx:721
+#: ../../packages/chat-ui/src/chat/message-content.tsx:728
 msgid "Browser screenshot"
 msgstr "Browser-Screenshot"
 
@@ -5163,7 +5176,7 @@ msgstr "Browser-Screenshot"
 msgid "Browser Session"
 msgstr "Browser-Sitzung"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:671
+#: ../../packages/chat-ui/src/chat/message-content.tsx:678
 msgid "Browser working..."
 msgstr "Browser arbeitet..."
 
@@ -5774,7 +5787,7 @@ msgid "Change colors"
 msgstr "Farben ändern"
 
 #: src/features/chat/lock/thread-lock-dialog.tsx:150
-#: src/features/chat/thread-list/thread-node.tsx:901
+#: src/features/chat/thread-list/thread-node.tsx:908
 msgid "Change passcode"
 msgstr "Passcode ändern"
 
@@ -5912,12 +5925,12 @@ msgstr "Chat-Import fehlgeschlagen"
 msgid "Chat import finished"
 msgstr "Chat-Import abgeschlossen"
 
-#: src/features/chat/thread-list/thread-node.tsx:868
-#: src/features/chat/thread-list/thread-node.tsx:882
+#: src/features/chat/thread-list/thread-node.tsx:875
+#: src/features/chat/thread-list/thread-node.tsx:889
 msgid "Chat lock"
 msgstr "Chat-Sperre"
 
-#: src/features/chat/thread-list/thread-node.tsx:868
+#: src/features/chat/thread-list/thread-node.tsx:875
 msgid "Chat lock: locked"
 msgstr "Chat-Sperre: gesperrt"
 
@@ -6043,7 +6056,7 @@ msgstr "Geprüft: {0}"
 msgid "Checking"
 msgstr ""
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:394
+#: ../../packages/chat-ui/src/chat/message-content.tsx:401
 msgid "Checking image safety..."
 msgstr "Bildsicherheit wird geprüft..."
 
@@ -6450,7 +6463,7 @@ msgstr "Klicke auf das Pin-Symbol bei einer Nachricht, um sie hier zu speichern.
 msgid "Click the star on any model in All models to add it here."
 msgstr "Klicke bei einem beliebigen Modell unter Alle Modelle auf den Stern, um es hier hinzuzufügen."
 
-#: src/features/chat/thread/composer-input.tsx:315
+#: src/features/chat/thread/composer-input.tsx:316
 msgid "Click to edit"
 msgstr "Zum Bearbeiten klicken"
 
@@ -6458,7 +6471,7 @@ msgstr "Zum Bearbeiten klicken"
 msgid "Click to edit..."
 msgstr "Zum Bearbeiten klicken..."
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:663
+#: ../../packages/chat-ui/src/chat/message-content.tsx:670
 msgid "Clicking element..."
 msgstr "Element wird angeklickt..."
 
@@ -6614,7 +6627,7 @@ msgstr "Cloudflare-Workers-AI-Modelle laufen dort, wo Cloudflare gerade Kapazit�
 msgid "Code"
 msgstr "Code"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:129
+#: ../../packages/chat-ui/src/chat/message-content.tsx:131
 #: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:333
 msgid "Code block"
 msgstr "Codeblock"
@@ -6627,7 +6640,7 @@ msgstr "Codeausführung"
 msgid "Code execution and sandbox files"
 msgstr "Codeausführung und Sandbox-Dateien"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:639
+#: ../../packages/chat-ui/src/chat/message-content.tsx:646
 msgid "Code execution failed"
 msgstr "Codeausführung fehlgeschlagen"
 
@@ -6651,7 +6664,7 @@ msgstr "Der Code-Modus ist für dein Konto noch nicht verfügbar."
 msgid "Code navigation"
 msgstr "Code-Navigation"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:595
+#: ../../packages/chat-ui/src/chat/message-content.tsx:602
 msgid "Code output"
 msgstr "Code-Ausgabe"
 
@@ -6784,7 +6797,7 @@ msgstr "{groupLabel}-Vorgänge einklappen"
 msgid "Collapse {title}"
 msgstr "{title} einklappen"
 
-#: src/features/chat/thread-list/thread-node.tsx:560
+#: src/features/chat/thread-list/thread-node.tsx:567
 msgid "Collapse branches"
 msgstr "Branches einklappen"
 
@@ -7900,8 +7913,8 @@ msgstr "Unterhaltungen und ausstehende Kommentare zu Dateien, die diese Liste ni
 msgid "Conversations on lines this diff no longer shows"
 msgstr "Unterhaltungen zu Zeilen, die dieser Diff nicht mehr zeigt"
 
-#: src/features/chat/thread/composer-input.tsx:811
-#: src/features/chat/thread/composer-input.tsx:1551
+#: src/features/chat/thread/composer-input.tsx:812
+#: src/features/chat/thread/composer-input.tsx:1553
 msgid "Conversion failed"
 msgstr "Konvertierung fehlgeschlagen"
 
@@ -7930,8 +7943,8 @@ msgstr "Für bessere Lesbarkeit in einen Anhang konvertieren?"
 msgid "Convert to Full Account"
 msgstr "In vollständiges Konto konvertieren"
 
-#: src/features/chat/thread-list/thread-node.tsx:1050
-#: src/features/chat/thread-list/thread-node.tsx:1081
+#: src/features/chat/thread-list/thread-node.tsx:1057
+#: src/features/chat/thread-list/thread-node.tsx:1088
 msgid "Convert to permanent"
 msgstr "In dauerhaft umwandeln"
 
@@ -7943,8 +7956,8 @@ msgstr "Konvertieren, um deine Daten zu speichern"
 msgid "Convert to TypeScript"
 msgstr "In TypeScript konvertieren"
 
-#: src/features/chat/thread-list/thread-node.tsx:1050
-#: src/features/chat/thread-list/thread-node.tsx:1081
+#: src/features/chat/thread-list/thread-node.tsx:1057
+#: src/features/chat/thread-list/thread-node.tsx:1088
 msgid "Converting..."
 msgstr "Wird umgewandelt..."
 
@@ -7982,8 +7995,8 @@ msgstr "Kopiert!"
 #: ../../packages/ui/src/components/data-grid/data-grid-context-menu.tsx:225
 #: src/features/auth/components/settings/api-key/mcp-config-snippet.tsx:30
 #: src/features/auth/components/settings/two-factor/backup-codes-dialog.tsx:100
-#: src/features/chat/guest-links/guest-link-panel.tsx:161
-#: src/features/chat/sharing/thread-share-button.tsx:394
+#: src/features/chat/guest-links/guest-link-panel.tsx:298
+#: src/features/chat/sharing/thread-share-button.tsx:398
 #: src/features/chat/thread/message-item.tsx:356
 #: src/features/chat/thread/text-selection-menu.tsx:525
 #: src/features/settings/components/chat/trigger-settings.tsx:782
@@ -8222,7 +8235,7 @@ msgstr "{0} konnte nicht angehängt werden. Die übrigen Dateien wurden angehän
 msgid "Could not attach {0}. Try those again."
 msgstr "{0} konnte nicht angehängt werden. Bitte versuche es erneut."
 
-#: src/features/chat/thread/composer-input.tsx:1573
+#: src/features/chat/thread/composer-input.tsx:1575
 msgid "Could not attach the chat"
 msgstr "Der Chat konnte nicht angehängt werden"
 
@@ -8230,7 +8243,7 @@ msgstr "Der Chat konnte nicht angehängt werden"
 msgid "could not be saved"
 msgstr "konnte nicht gespeichert werden"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:310
+#: src/features/chat/thread/composer-prompt-queue.tsx:313
 msgid "Could not cancel the message. It is still queued."
 msgstr "Die Nachricht konnte nicht abgebrochen werden. Sie ist weiterhin in der Warteschlange."
 
@@ -8292,11 +8305,11 @@ msgstr "Die Änderung am Auto-Merge ließ sich nicht bestätigen. Prüfe {hostLa
 msgid "Could not connect to the server."
 msgstr "Verbindung zum Server nicht möglich."
 
-#: src/features/chat/sharing/thread-share-button.tsx:125
+#: src/features/chat/sharing/thread-share-button.tsx:129
 msgid "Could not copy automatically. Invite link: {inviteLink}"
 msgstr "Kopieren war nicht automatisch möglich. Einladungslink: {inviteLink}"
 
-#: src/features/chat/sharing/thread-share-button.tsx:191
+#: src/features/chat/sharing/thread-share-button.tsx:195
 msgid "Could not copy automatically. Public link: {publicLink}"
 msgstr "Kopieren war nicht automatisch möglich. Öffentlicher Link: {publicLink}"
 
@@ -8498,7 +8511,7 @@ msgstr "Vorschau nicht möglich · Zum Herunterladen klicken"
 msgid "Could not pull {0}: {1}"
 msgstr "{0} konnte nicht heruntergeladen werden: {1}"
 
-#: src/features/chat/core/context/chat-context.tsx:668
+#: src/features/chat/core/context/chat-context.tsx:672
 msgid "Could not reach the server to start generating. Check your connection and try again."
 msgstr "Der Server ist nicht erreichbar, um die Generierung zu starten. Prüfe deine Verbindung und versuche es erneut."
 
@@ -8506,11 +8519,11 @@ msgstr "Der Server ist nicht erreichbar, um die Generierung zu starten. Prüfe d
 msgid "Could not reach the server. Try again."
 msgstr "Der Server ist nicht erreichbar. Versuche es erneut."
 
-#: src/features/chat/thread/composer-input.tsx:1576
+#: src/features/chat/thread/composer-input.tsx:1578
 msgid "Could not read that chat"
 msgstr "Dieser Chat konnte nicht gelesen werden"
 
-#: src/features/chat/thread/composer-input.tsx:1577
+#: src/features/chat/thread/composer-input.tsx:1579
 msgid "Could not read that chat. If it is locked, unlock it first."
 msgstr "Dieser Chat konnte nicht gelesen werden. Ist er gesperrt, entsperre ihn zuerst."
 
@@ -8632,7 +8645,7 @@ msgstr "Der Probelauf konnte nicht gestartet werden."
 msgid "Could not stop the conversation"
 msgstr "Die Unterhaltung konnte nicht gestoppt werden"
 
-#: src/features/chat/thread-list/thread-node.tsx:661
+#: src/features/chat/thread-list/thread-node.tsx:668
 #: src/features/chat/thread/rate-limit-pause-notice.tsx:150
 msgid "Could not stop the reply. Please try again."
 msgstr "Die Antwort konnte nicht gestoppt werden. Bitte versuche es erneut."
@@ -8808,8 +8821,8 @@ msgid "Create bot"
 msgstr "Bot erstellen"
 
 #: src/components/command-palette.tsx:464
-#: src/features/chat/thread-list/thread-node.tsx:760
-#: src/features/chat/thread-list/thread-node.tsx:783
+#: src/features/chat/thread-list/thread-node.tsx:767
+#: src/features/chat/thread-list/thread-node.tsx:790
 msgid "Create branch"
 msgstr "Branch erstellen"
 
@@ -8833,7 +8846,7 @@ msgstr "Ziel erstellen"
 msgid "Create group chat"
 msgstr "Gruppenchat erstellen"
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:191
+#: src/features/chat/guest-links/guest-link-panel.tsx:329
 msgid "Create guest link"
 msgstr "Gastlink erstellen"
 
@@ -8845,7 +8858,7 @@ msgstr "Bilder und Videos erstellen"
 msgid "Create images with FLUX, Imagen, and Stable Diffusion. Generate videos with Runway, Luma, and Kling. Compare outputs across providers — pick the best result, not the only result."
 msgstr "Erstelle Bilder mit FLUX, Imagen und Stable Diffusion. Generiere Videos mit Runway, Luma und Kling. Vergleiche Ergebnisse über Anbieter hinweg – wähle das beste Ergebnis, nicht das einzige."
 
-#: src/features/chat/sharing/thread-share-button.tsx:342
+#: src/features/chat/sharing/thread-share-button.tsx:346
 msgid "Create Invite"
 msgstr "Einladung erstellen"
 
@@ -8965,12 +8978,12 @@ msgstr "Erstellt: {createdAt}"
 msgid "Creates a single-use link, valid for 7 days. Whoever opens it signed in gets access."
 msgstr "Erstellt einen Einmal-Link, der 7 Tage gültig ist. Wer ihn angemeldet öffnet, erhält Zugriff."
 
-#: src/features/chat/thread-list/thread-node.tsx:760
-#: src/features/chat/thread-list/thread-node.tsx:783
+#: src/features/chat/thread-list/thread-node.tsx:767
+#: src/features/chat/thread-list/thread-node.tsx:790
 msgid "Creating branch..."
 msgstr "Branch wird erstellt..."
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:318
+#: ../../packages/chat-ui/src/chat/message-content.tsx:325
 msgid "Creating slides..."
 msgstr "Folien werden erstellt..."
 
@@ -9158,7 +9171,7 @@ msgid "Currently restricted"
 msgstr "Derzeit eingeschränkt"
 
 #: src/features/canvas/components/design-preset-selector.tsx:87
-#: src/features/chat/sharing/thread-share-button.tsx:331
+#: src/features/chat/sharing/thread-share-button.tsx:335
 #: src/features/marketing/components/gateway-landing-page.tsx:792
 #: src/features/marketing/components/landing-page.tsx:1014
 #: src/features/prompts/components/prompt-form-dialog.tsx:444
@@ -9975,13 +9988,13 @@ msgstr "Diesen Testfall löschen?"
 #: ../../packages/chat-ui/src/threads/thread-item.tsx:118
 #: src/components/command-palette.tsx:482
 #: src/components/command-palette.tsx:661
-#: src/features/chat/thread-list/thread-node.tsx:1089
-#: src/features/chat/thread-list/thread-node.tsx:1107
+#: src/features/chat/thread-list/thread-node.tsx:1096
+#: src/features/chat/thread-list/thread-node.tsx:1114
 #: src/features/pages/components/page-comments-panel.tsx:188
 msgid "Delete thread"
 msgstr "Thread löschen"
 
-#: src/features/chat/thread-list/thread-node.tsx:1122
+#: src/features/chat/thread-list/thread-node.tsx:1129
 msgid "Delete Thread"
 msgstr "Thread löschen"
 
@@ -10017,8 +10030,8 @@ msgstr ""
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-file.tsx:77
 #: src/components/delete-confirmation-dialog.tsx:68
 #: src/features/admin/components/admin-cleanup-dashboard.tsx:285
-#: src/features/chat/thread-list/thread-node.tsx:1089
-#: src/features/chat/thread-list/thread-node.tsx:1107
+#: src/features/chat/thread-list/thread-node.tsx:1096
+#: src/features/chat/thread-list/thread-node.tsx:1114
 msgid "Deleting..."
 msgstr "Wird gelöscht..."
 
@@ -10542,6 +10555,14 @@ msgstr "Fehler schließen"
 msgid "Dismiss errors"
 msgstr "Fehler schließen"
 
+#: src/features/chat/guest-links/guest-link-panel.tsx:366
+msgid "Dismiss note"
+msgstr "Nachricht verwerfen"
+
+#: src/features/chat/guest-links/guest-link-panel.tsx:360
+msgid "Dismiss note: {snippet}"
+msgstr "Nachricht verwerfen: {snippet}"
+
 #: src/features/skills/components/skill-builder-setup.tsx:94
 msgid "Dismiss setup suggestions"
 msgstr "Einrichtungsvorschläge ausblenden"
@@ -10623,7 +10644,7 @@ msgid "Do you want to add more rows?"
 msgstr "Möchtest du weitere Zeilen hinzufügen?"
 
 #: ../../packages/chat-ui/src/chat/document-artifact.tsx:44
-#: ../../packages/chat-ui/src/chat/message-content.tsx:293
+#: ../../packages/chat-ui/src/chat/message-content.tsx:300
 #: ../../packages/ui/src/components/file-renderers/docx-preview.tsx:114
 #: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:182
 msgid "Document"
@@ -10779,7 +10800,7 @@ msgstr "Dokument herunterladen"
 msgid "Download Export"
 msgstr "Export herunterladen"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:456
+#: ../../packages/chat-ui/src/chat/message-content.tsx:463
 #: ../../packages/ui/src/components/file-renderers/generic-file-card.tsx:87
 msgid "Download file"
 msgstr "Datei herunterladen"
@@ -10822,8 +10843,8 @@ msgstr "Text herunterladen"
 msgid "Download the Neore desktop app for macOS, Windows and Linux."
 msgstr "Lade die Neore-Desktop-App für macOS, Windows und Linux herunter."
 
-#: src/features/chat/thread-list/thread-node.tsx:977
-#: src/features/chat/thread-list/thread-node.tsx:996
+#: src/features/chat/thread-list/thread-node.tsx:984
+#: src/features/chat/thread-list/thread-node.tsx:1003
 msgid "Download thread"
 msgstr "Thread herunterladen"
 
@@ -10831,8 +10852,8 @@ msgstr "Thread herunterladen"
 msgid "Download Word document"
 msgstr "Word-Dokument herunterladen"
 
-#: src/features/chat/thread-list/thread-node.tsx:977
-#: src/features/chat/thread-list/thread-node.tsx:996
+#: src/features/chat/thread-list/thread-node.tsx:984
+#: src/features/chat/thread-list/thread-node.tsx:1003
 msgid "Downloading..."
 msgstr "Wird heruntergeladen..."
 
@@ -10841,7 +10862,7 @@ msgid "Downloads open the GitHub releases page. If no installers are listed ther
 msgstr "Downloads öffnen die GitHub-Releaseseite. Wenn dort noch keine Installationsprogramme aufgeführt sind, wurde das Desktop-Release noch nicht veröffentlicht."
 
 #: src/features/chat/link-preview/link-preview-card.tsx:117
-#: src/features/chat/thread-list/thread-node.tsx:616
+#: src/features/chat/thread-list/thread-node.tsx:623
 #: src/features/develop/components/inbox-list.tsx:118
 #: src/features/develop/components/pull-request-view.tsx:83
 #: src/features/skills/components/skill-builder-review.tsx:133
@@ -10906,7 +10927,7 @@ msgstr "Datei ablegen oder zum Hochladen klicken"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-file.tsx:686
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-file.tsx:765
-#: src/features/chat/thread/composer-input.tsx:1761
+#: src/features/chat/thread/composer-input.tsx:1763
 msgid "Drop files here"
 msgstr "Dateien hier ablegen"
 
@@ -11215,8 +11236,8 @@ msgstr "Sammlung bearbeiten"
 msgid "Edit comment"
 msgstr "Kommentar bearbeiten"
 
-#: src/features/chat/thread/composer-input.tsx:322
-#: src/features/chat/thread/composer-input.tsx:334
+#: src/features/chat/thread/composer-input.tsx:323
+#: src/features/chat/thread/composer-input.tsx:335
 msgid "Edit content"
 msgstr "Inhalt bearbeiten"
 
@@ -11543,7 +11564,7 @@ msgid "Email"
 msgstr "E-Mail"
 
 #: src/features/auth/components/settings/security/change-email-card.tsx:139
-#: src/features/chat/sharing/thread-share-button.tsx:306
+#: src/features/chat/sharing/thread-share-button.tsx:310
 msgid "Email Address"
 msgstr "E-Mail-Adresse"
 
@@ -11890,7 +11911,7 @@ msgid "Enter default value..."
 msgstr "Standardwert eingeben..."
 
 #: src/features/auth/components/organization/invite-member-dialog.tsx:118
-#: src/features/chat/sharing/thread-share-button.tsx:307
+#: src/features/chat/sharing/thread-share-button.tsx:311
 msgid "Enter email address"
 msgstr "E-Mail-Adresse eingeben"
 
@@ -12183,7 +12204,7 @@ msgstr "Fehlerquote"
 msgid "Error trace:"
 msgstr "Fehler-Trace:"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:254
+#: ../../packages/chat-ui/src/chat/message-content.tsx:261
 msgid "Error:"
 msgstr "Fehler:"
 
@@ -12451,7 +12472,7 @@ msgstr "Tools werden ausgeführt..."
 msgid "Execution"
 msgstr "Ausführung"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:629
+#: ../../packages/chat-ui/src/chat/message-content.tsx:636
 msgid "Execution failed"
 msgstr "Ausführung fehlgeschlagen"
 
@@ -12494,7 +12515,7 @@ msgstr "{groupLabel}-Operationen ausklappen"
 msgid "Expand {title}"
 msgstr "{title} ausklappen"
 
-#: src/features/chat/thread-list/thread-node.tsx:560
+#: src/features/chat/thread-list/thread-node.tsx:567
 msgid "Expand branches"
 msgstr "Branches ausklappen"
 
@@ -12580,7 +12601,7 @@ msgstr "experimentell"
 msgid "Experimental reasoning with DeepSeek's latest thinking capabilities"
 msgstr "Experimentelles Reasoning mit DeepSeeks neuesten Denkfähigkeiten"
 
-#: src/features/chat/sharing/thread-share-button.tsx:323
+#: src/features/chat/sharing/thread-share-button.tsx:327
 msgid "Expiration"
 msgstr "Ablauf"
 
@@ -12593,7 +12614,7 @@ msgstr "Ablaufzeit auf {0} aktualisiert"
 msgid "expired"
 msgstr "abgelaufen"
 
-#: src/features/chat/thread-list/thread-node.tsx:357
+#: src/features/chat/thread-list/thread-node.tsx:364
 #: src/features/devices/components/devices-settings.tsx:385
 #: src/features/settings/connectors/connector-card.tsx:76
 msgid "Expired"
@@ -12623,7 +12644,7 @@ msgstr "Läuft ab"
 msgid "Expires {date}"
 msgstr "Läuft ab am {date}"
 
-#: src/features/chat/thread-list/thread-node.tsx:1148
+#: src/features/chat/thread-list/thread-node.tsx:1155
 msgid "Expires in {remainingTime}"
 msgstr "Läuft in {remainingTime} ab"
 
@@ -12632,7 +12653,7 @@ msgstr "Läuft in {remainingTime} ab"
 msgid "Expires on {0}"
 msgstr "Läuft ab am {0}"
 
-#: src/features/chat/sharing/thread-share-button.tsx:355
+#: src/features/chat/sharing/thread-share-button.tsx:359
 msgid "Expires:"
 msgstr "Läuft ab:"
 
@@ -12794,11 +12815,11 @@ msgstr "Seite extrahieren"
 msgid "Extract subject"
 msgstr "Motiv extrahieren"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:729
+#: ../../packages/chat-ui/src/chat/message-content.tsx:736
 msgid "Extracted"
 msgstr "Extrahiert"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:664
+#: ../../packages/chat-ui/src/chat/message-content.tsx:671
 msgid "Extracting content..."
 msgstr "Inhalt wird extrahiert..."
 
@@ -12898,7 +12919,7 @@ msgid "Failed to attach collection"
 msgstr "Sammlung konnte nicht angehängt werden"
 
 #: src/features/chat/header/kb-attachment-button.tsx:128
-#: src/features/chat/thread/composer-input.tsx:1402
+#: src/features/chat/thread/composer-input.tsx:1404
 msgid "Failed to attach file"
 msgstr "Datei konnte nicht angehängt werden"
 
@@ -12971,7 +12992,7 @@ msgstr "Branch konnte nicht erstellt werden"
 msgid "Failed to create budget alert"
 msgstr "Budget-Alarm konnte nicht erstellt werden"
 
-#: src/features/chat/sharing/thread-share-button.tsx:130
+#: src/features/chat/sharing/thread-share-button.tsx:134
 msgid "Failed to create invite"
 msgstr "Einladung konnte nicht erstellt werden"
 
@@ -13275,7 +13296,7 @@ msgstr "Anbieter konnte nicht entfernt werden"
 msgid "Failed to remove skill"
 msgstr "Skill konnte nicht entfernt werden"
 
-#: src/features/chat/sharing/thread-share-button.tsx:156
+#: src/features/chat/sharing/thread-share-button.tsx:160
 msgid "Failed to remove user access"
 msgstr "Benutzerzugriff konnte nicht entfernt werden"
 
@@ -13295,7 +13316,7 @@ msgstr "Exportanfrage fehlgeschlagen"
 msgid "Failed to reset to defaults"
 msgstr "Zurücksetzen auf Standard fehlgeschlagen"
 
-#: src/features/chat/thread/composer-input.tsx:1434
+#: src/features/chat/thread/composer-input.tsx:1436
 msgid "Failed to restore attachment"
 msgstr "Anhang konnte nicht wiederhergestellt werden"
 
@@ -13307,7 +13328,7 @@ msgstr "Diese Version konnte nicht wiederhergestellt werden."
 msgid "Failed to restore version"
 msgstr "Version konnte nicht wiederhergestellt werden"
 
-#: src/features/chat/sharing/thread-share-button.tsx:140
+#: src/features/chat/sharing/thread-share-button.tsx:144
 msgid "Failed to revoke invite"
 msgstr "Einladung konnte nicht widerrufen werden"
 
@@ -13569,7 +13590,7 @@ msgstr "Die Schnellprüfung konnte nicht aktualisiert werden"
 msgid "Failed to update the trusted servers"
 msgstr "Die vertrauenswürdigen Server konnten nicht aktualisiert werden"
 
-#: src/features/chat/sharing/thread-share-button.tsx:173
+#: src/features/chat/sharing/thread-share-button.tsx:177
 msgid "Failed to update thread visibility"
 msgstr "Sichtbarkeit des Threads konnte nicht aktualisiert werden"
 
@@ -15098,7 +15119,7 @@ msgstr "Generiertes Video"
 msgid "Generated videos will appear here. Start by describing what you want to create in the composer below."
 msgstr "Generierte Videos werden hier angezeigt. Beginne damit, unten im Composer zu beschreiben, was du erstellen möchtest."
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:471
+#: ../../packages/chat-ui/src/chat/message-content.tsx:478
 msgid "Generating audio..."
 msgstr "Audio wird generiert..."
 
@@ -15106,12 +15127,12 @@ msgstr "Audio wird generiert..."
 msgid "Generating draft…"
 msgstr "Entwurf wird erstellt…"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:472
+#: ../../packages/chat-ui/src/chat/message-content.tsx:479
 #: src/features/chat/thread/media-gallery-view.tsx:395
 msgid "Generating image..."
 msgstr "Bild wird generiert..."
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:315
+#: ../../packages/chat-ui/src/chat/message-content.tsx:322
 msgid "Generating presentation..."
 msgstr "Präsentation wird generiert..."
 
@@ -15119,7 +15140,7 @@ msgstr "Präsentation wird generiert..."
 msgid "Generating response"
 msgstr "Antwort wird generiert"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:473
+#: ../../packages/chat-ui/src/chat/message-content.tsx:480
 #: src/features/chat/thread/media-gallery-view.tsx:395
 msgid "Generating video..."
 msgstr "Video wird generiert..."
@@ -15341,7 +15362,7 @@ msgstr "Zur vorherigen Seite"
 msgid "Go to Prompts"
 msgstr "Zu den Prompts"
 
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:342
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:344
 msgid "Go to reply"
 msgstr "Zur Antwort"
 
@@ -15795,23 +15816,23 @@ msgstr "Gastkonten verwenden nur kostenlose Modelle."
 msgid "Guest accounts use free models only. Sign up to unlock all models."
 msgstr "Gastkonten nutzen nur kostenlose Modelle. Registriere dich, um alle Modelle freizuschalten."
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:159
+#: src/features/chat/guest-links/guest-link-panel.tsx:296
 msgid "Guest link"
 msgstr "Gastlink"
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:141
+#: src/features/chat/guest-links/guest-link-panel.tsx:274
 msgid "Guest link copied"
 msgstr "Gastlink kopiert"
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:195
+#: src/features/chat/guest-links/guest-link-panel.tsx:334
 msgid "Guest messages"
 msgstr "Nachrichten von Gästen"
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:84
+#: src/features/chat/guest-links/guest-link-panel.tsx:147
 msgid "Guest messages from an earlier link are still waiting."
 msgstr "Nachrichten von Gästen über einen früheren Link warten noch."
 
-#: src/features/chat/sharing/thread-share-button.tsx:262
+#: src/features/chat/sharing/thread-share-button.tsx:266
 msgid "Guests"
 msgstr "Gäste"
 
@@ -16289,7 +16310,7 @@ msgstr "Hotkey"
 msgid "Hour"
 msgstr "Stunde"
 
-#: src/features/chat/sharing/thread-share-button.tsx:337
+#: src/features/chat/sharing/thread-share-button.tsx:341
 msgid "Hours"
 msgstr "Stunden"
 
@@ -16449,7 +16470,7 @@ msgid "Identity"
 msgstr "Identität"
 
 #: ../../packages/chat-ui/src/chat/auto-continue-status.tsx:53
-#: src/features/chat/thread-list/thread-node.tsx:626
+#: src/features/chat/thread-list/thread-node.tsx:633
 #: src/features/sub-agents/components/worker-list.tsx:80
 msgid "Idle"
 msgstr "Inaktiv"
@@ -16481,7 +16502,7 @@ msgid "illustration"
 msgstr "Illustration"
 
 #: ../../packages/chat-ui/src/chat/document-artifact.tsx:42
-#: ../../packages/chat-ui/src/chat/message-content.tsx:423
+#: ../../packages/chat-ui/src/chat/message-content.tsx:430
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:679
 #: ../../packages/ui/src/components/ai-elements/attachments-utilities.tsx:47
 #: ../../packages/ui/src/components/ai-elements/attachments.tsx:107
@@ -17083,7 +17104,7 @@ msgstr "Eingabevorlage"
 msgid "Input tokens"
 msgstr "Eingabe-Tokens"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:231
+#: ../../packages/chat-ui/src/chat/message-content.tsx:238
 msgid "Input:"
 msgstr "Eingabe:"
 
@@ -17360,7 +17381,7 @@ msgstr "Einladungsfehler"
 msgid "Invite link"
 msgstr "Einladungslink"
 
-#: src/features/chat/sharing/thread-share-button.tsx:123
+#: src/features/chat/sharing/thread-share-button.tsx:127
 msgid "Invite link copied to clipboard!"
 msgstr "Einladungslink in die Zwischenablage kopiert!"
 
@@ -17377,7 +17398,7 @@ msgstr "Neue Mitglieder einladen und bestehende Mitgliedsrollen aktualisieren"
 msgid "Invite new members. They join once they accept the invitation."
 msgstr "Lade neue Mitglieder ein. Sie treten bei, sobald sie die Einladung annehmen."
 
-#: src/features/chat/sharing/thread-share-button.tsx:138
+#: src/features/chat/sharing/thread-share-button.tsx:142
 msgid "Invite revoked"
 msgstr "Einladung widerrufen"
 
@@ -17390,7 +17411,7 @@ msgstr "Eingeladen von {0}"
 msgid "Invited to join"
 msgstr "Eingeladen beizutreten"
 
-#: src/features/chat/sharing/thread-share-button.tsx:260
+#: src/features/chat/sharing/thread-share-button.tsx:264
 msgid "Invites"
 msgstr "Einladungen"
 
@@ -17493,7 +17514,7 @@ msgstr "Es wurde eine andere als die eigene Sitzung geöffnet, daher wurde die U
 msgid "It was not saved. Paste it again and save."
 msgstr "Es wurde nicht gespeichert. Füge es erneut ein und speichere."
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:400
+#: ../../packages/chat-ui/src/chat/message-content.tsx:407
 msgid "It will be visible once approved by a moderator"
 msgstr "Es wird sichtbar, sobald ein Moderator es freigegeben hat"
 
@@ -18458,7 +18479,7 @@ msgstr "Zeilen, die kein gültiges JSON sind"
 msgid "Link"
 msgstr "Verknüpfen"
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:167
+#: src/features/chat/guest-links/guest-link-panel.tsx:304
 msgid "Link active until {expiresAt}"
 msgstr "Link aktiv bis {expiresAt}"
 
@@ -18492,7 +18513,7 @@ msgstr "Pull Requests verknüpfen"
 msgid "Linked by hand"
 msgstr "Manuell verknüpft"
 
-#: src/features/chat/thread-list/thread-node.tsx:619
+#: src/features/chat/thread-list/thread-node.tsx:626
 msgid "Linked pull requests: {linkedPullRequests}"
 msgstr "Verknüpfte Pull Requests: {linkedPullRequests}"
 
@@ -18697,7 +18718,7 @@ msgstr "Editor wird geladen..."
 msgid "Loading editor…"
 msgstr "Editor wird geladen…"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:337
+#: ../../packages/chat-ui/src/chat/message-content.tsx:344
 #: ../../packages/ui/src/components/file-renderers/fetched-text-preview.tsx:65
 msgid "Loading file…"
 msgstr "Datei wird geladen…"
@@ -18819,7 +18840,7 @@ msgstr "Statistiken werden geladen…"
 msgid "Loading tasks…"
 msgstr "Aufgaben werden geladen…"
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:153
+#: src/features/chat/guest-links/guest-link-panel.tsx:285
 msgid "Loading the guest link…"
 msgstr "Gastlink wird geladen …"
 
@@ -18897,7 +18918,7 @@ msgstr "Deine Projekte werden geladen…"
 msgid "Loading..."
 msgstr "Wird geladen..."
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:340
+#: ../../packages/chat-ui/src/chat/message-content.tsx:347
 #: src/features/auth/components/device-approval.tsx:349
 #: src/features/chat/thread/memory-usage-action.tsx:46
 #: src/features/chat/thread/request-secret-prompt.tsx:479
@@ -18912,7 +18933,7 @@ msgstr "Wird geladen…"
 msgid "local"
 msgstr "lokal"
 
-#: src/features/chat/core/context/chat-context.tsx:717
+#: src/features/chat/core/context/chat-context.tsx:728
 msgid "Local models are text only. Remove the attachments to send."
 msgstr "Lokale Modelle verarbeiten nur Text. Entferne die Anhänge, um zu senden."
 
@@ -18942,7 +18963,7 @@ msgstr "Standort"
 msgid "Location updated"
 msgstr "Standort aktualisiert"
 
-#: src/features/chat/thread-list/thread-node.tsx:905
+#: src/features/chat/thread-list/thread-node.tsx:912
 msgid "Lock chat"
 msgstr "Chat sperren"
 
@@ -18955,7 +18976,7 @@ msgstr "Gruppe sperren"
 msgid "Lock node"
 msgstr "Knoten sperren"
 
-#: src/features/chat/thread-list/thread-node.tsx:897
+#: src/features/chat/thread-list/thread-node.tsx:904
 msgid "Lock now"
 msgstr "Jetzt sperren"
 
@@ -18964,7 +18985,7 @@ msgid "Lock this chat"
 msgstr "Diesen Chat sperren"
 
 #: src/features/chat/header/chat-header.tsx:39
-#: src/features/chat/thread-list/thread-node.tsx:268
+#: src/features/chat/thread-list/thread-node.tsx:275
 msgid "Locked chat"
 msgstr "Gesperrter Chat"
 
@@ -19064,7 +19085,7 @@ msgstr "Langer Text erkannt"
 msgid "Long text generation in images"
 msgstr "Generierung langer Texte in Bildern"
 
-#: src/features/chat/thread/composer-input.tsx:887
+#: src/features/chat/thread/composer-input.tsx:888
 msgid "Long text was attached as a file."
 msgstr "Der lange Text wurde als Datei angehängt."
 
@@ -19818,8 +19839,8 @@ msgstr "Auf {hostLabel} gemergt."
 msgid "Merging…"
 msgstr "Wird gemergt…"
 
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:292
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:466
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:294
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:471
 msgid "Message"
 msgstr "Nachricht"
 
@@ -19870,8 +19891,8 @@ msgstr "Nachrichten"
 msgid "Messages API (/v1/messages) — Anthropic and services that mirror it."
 msgstr "Messages API (/v1/messages) – Anthropic und Dienste, die sie nachbilden."
 
-#: src/features/chat/thread-list/thread-node.tsx:690
-#: src/features/chat/thread-list/thread-node.tsx:702
+#: src/features/chat/thread-list/thread-node.tsx:697
+#: src/features/chat/thread-list/thread-node.tsx:709
 msgid "Messages from {sourceName}"
 msgstr "Nachrichten von {sourceName}"
 
@@ -20209,7 +20230,7 @@ msgstr "Modell bereits blockiert"
 msgid "Model Breakdown"
 msgstr "Aufschlüsselung nach Modell"
 
-#: src/features/chat/thread-list/thread-node.tsx:587
+#: src/features/chat/thread-list/thread-node.tsx:594
 msgid "Model comparison"
 msgstr "Modellvergleich"
 
@@ -20566,11 +20587,11 @@ msgstr "Eine Seite nach unten"
 msgid "Move out one level"
 msgstr "Eine Ebene nach oben verschieben"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:400
+#: src/features/chat/thread/composer-prompt-queue.tsx:403
 msgid "Move queued message {position} down"
 msgstr "Eingereihte Nachricht {position} nach unten"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:390
+#: src/features/chat/thread/composer-prompt-queue.tsx:393
 msgid "Move queued message {position} up"
 msgstr "Eingereihte Nachricht {position} nach oben"
 
@@ -20614,8 +20635,8 @@ msgstr "Zur nächsten Zelle"
 msgid "Move to previous cell"
 msgstr "Zur vorherigen Zelle"
 
-#: src/features/chat/thread-list/thread-node.tsx:790
-#: src/features/chat/thread-list/thread-node.tsx:803
+#: src/features/chat/thread-list/thread-node.tsx:797
+#: src/features/chat/thread-list/thread-node.tsx:810
 msgid "Move to project"
 msgstr "In Projekt verschieben"
 
@@ -20637,8 +20658,8 @@ msgid "Moved selected node {0}. New position, x: {x}, y: {y}"
 msgstr "Ausgewählten Knoten {0} verschoben. Neue Position, x: {x}, y: {y}"
 
 #. placeholder {0}: to + 1
-#: src/features/chat/thread/composer-prompt-queue.tsx:633
-#: src/features/chat/thread/composer-prompt-queue.tsx:660
+#: src/features/chat/thread/composer-prompt-queue.tsx:636
+#: src/features/chat/thread/composer-prompt-queue.tsx:663
 msgid "Moved to position {0}"
 msgstr "Auf Position {0} verschoben"
 
@@ -20932,11 +20953,11 @@ msgstr "Threads navigieren"
 msgid "navigate within each column"
 msgstr "innerhalb jeder Spalte navigieren"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:730
+#: ../../packages/chat-ui/src/chat/message-content.tsx:737
 msgid "Navigated"
 msgstr "Navigiert"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:671
+#: ../../packages/chat-ui/src/chat/message-content.tsx:678
 msgid "Navigating to {target}..."
 msgstr "Navigiere zu {target}..."
 
@@ -21473,7 +21494,7 @@ msgstr "Kein Zugriff auf dieses Repository."
 msgid "No active session found. Please sign in again."
 msgstr "Keine aktive Sitzung gefunden. Bitte melde dich erneut an."
 
-#: src/features/chat/sharing/thread-share-button.tsx:266
+#: src/features/chat/sharing/thread-share-button.tsx:270
 msgid "No additional users have access to this thread."
 msgstr "Keine weiteren Nutzer haben Zugriff auf diesen Thread."
 
@@ -22849,7 +22870,7 @@ msgstr "Hoppla! Etwas ist schiefgelaufen"
 msgid "Opacity"
 msgstr "Deckkraft"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:716
+#: ../../packages/chat-ui/src/chat/message-content.tsx:723
 #: src/components/command-palette.tsx:700
 #: src/features/chat/link-preview/link-preview-card.tsx:117
 #: src/features/develop/components/pull-request-actions-panel.tsx:112
@@ -22941,12 +22962,12 @@ msgstr "Offene Bildgenerierung"
 msgid "Open in full screen"
 msgstr "Im Vollbild öffnen"
 
-#: src/features/chat/thread-list/thread-node.tsx:811
-#: src/features/chat/thread-list/thread-node.tsx:824
+#: src/features/chat/thread-list/thread-node.tsx:818
+#: src/features/chat/thread-list/thread-node.tsx:831
 msgid "Open in new window"
 msgstr "In neuem Fenster öffnen"
 
-#: src/features/chat/thread-list/thread-node.tsx:607
+#: src/features/chat/thread-list/thread-node.tsx:614
 #: src/features/chat/thread-list/thread-options-menu.tsx:73
 msgid "Open in split view"
 msgstr "In geteilter Ansicht öffnen"
@@ -23743,7 +23764,7 @@ msgstr "Veraltet"
 msgid "Outpaint"
 msgstr "Outpainting"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:571
+#: ../../packages/chat-ui/src/chat/message-content.tsx:578
 #: ../../packages/ui/src/components/ai-elements/context.tsx:277
 #: src/components/model-picker/model-picker.tsx:206
 #: src/features/devices/components/device-tool-call.tsx:174
@@ -23799,8 +23820,8 @@ msgstr "Ausgabetyp"
 msgid "Output-format focused"
 msgstr "Fokus auf Ausgabeformat"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:239
-#: ../../packages/chat-ui/src/chat/message-content.tsx:247
+#: ../../packages/chat-ui/src/chat/message-content.tsx:246
+#: ../../packages/chat-ui/src/chat/message-content.tsx:254
 msgid "Output:"
 msgstr "Ausgabe:"
 
@@ -23844,7 +23865,7 @@ msgstr "owner/name"
 msgid "Pacific Time (US & Canada)"
 msgstr "Pacific Time (USA & Kanada)"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:670
+#: ../../packages/chat-ui/src/chat/message-content.tsx:677
 msgid "page"
 msgstr "Seite"
 
@@ -24270,7 +24291,7 @@ msgstr "Ausstehend"
 msgid "Pending Invitations"
 msgstr "Ausstehende Einladungen"
 
-#: src/features/chat/sharing/thread-share-button.tsx:347
+#: src/features/chat/sharing/thread-share-button.tsx:351
 msgid "Pending Invites"
 msgstr "Ausstehende Einladungen"
 
@@ -24326,7 +24347,7 @@ msgstr "Diese Organisation und alle ihre Daten dauerhaft löschen"
 msgid "Permanently delete your account and all associated data"
 msgstr "Dein Konto und alle damit verbundenen Daten dauerhaft löschen"
 
-#: src/features/chat/sharing/thread-share-button.tsx:310
+#: src/features/chat/sharing/thread-share-button.tsx:314
 msgid "Permission Level"
 msgstr "Berechtigungsstufe"
 
@@ -24521,7 +24542,7 @@ msgstr "Nachricht anheften"
 
 #: ../../packages/chat-ui/src/threads/thread-item.tsx:81
 #: src/components/command-palette.tsx:470
-#: src/features/chat/thread-list/thread-node.tsx:111
+#: src/features/chat/thread-list/thread-node.tsx:112
 msgid "Pin thread"
 msgstr "Thread anheften"
 
@@ -24628,7 +24649,7 @@ msgstr "Bitte bestätige dein Passwort"
 msgid "Please enter a backup code to access your account"
 msgstr "Bitte gib einen Backup-Code ein, um auf dein Konto zuzugreifen"
 
-#: src/features/chat/sharing/thread-share-button.tsx:102
+#: src/features/chat/sharing/thread-share-button.tsx:106
 msgid "Please enter an email address"
 msgstr "Bitte gib eine E-Mail-Adresse ein"
 
@@ -25272,8 +25293,8 @@ msgid "Processing voice input"
 msgstr "Spracheingabe wird verarbeitet"
 
 #: src/features/chat/header/temporary-chat-dropdown.tsx:211
-#: src/features/chat/thread-list/thread-node.tsx:108
-#: src/features/chat/thread-list/thread-node.tsx:116
+#: src/features/chat/thread-list/thread-node.tsx:109
+#: src/features/chat/thread-list/thread-node.tsx:117
 #: src/features/settings/components/privacy/data-export.tsx:101
 msgid "Processing..."
 msgstr "Wird verarbeitet..."
@@ -25660,14 +25681,14 @@ msgstr "Anbieter"
 msgid "Pseudo numerical diffusion"
 msgstr "Pseudo-numerische Diffusion"
 
-#: src/features/chat/sharing/thread-share-button.tsx:261
+#: src/features/chat/sharing/thread-share-button.tsx:265
 #: src/features/skills/components/skill-form-dialog.tsx:481
 #: src/features/skills/components/skill-item.tsx:124
 msgid "Public"
 msgstr "Öffentlich"
 
-#: src/features/chat/sharing/thread-share-button.tsx:378
 #: src/features/chat/sharing/thread-share-button.tsx:382
+#: src/features/chat/sharing/thread-share-button.tsx:386
 msgid "Public Access"
 msgstr "Öffentlicher Zugriff"
 
@@ -25680,11 +25701,11 @@ msgstr "Public Key aus dem Discord Developer Portal zur Signaturprüfung"
 msgid "Public link"
 msgstr "Öffentlicher Link"
 
-#: src/features/chat/sharing/thread-share-button.tsx:390
+#: src/features/chat/sharing/thread-share-button.tsx:394
 msgid "Public Link"
 msgstr "Öffentlicher Link"
 
-#: src/features/chat/sharing/thread-share-button.tsx:189
+#: src/features/chat/sharing/thread-share-button.tsx:193
 msgid "Public link copied to clipboard!"
 msgstr "Öffentlicher Link in die Zwischenablage kopiert!"
 
@@ -25795,7 +25816,7 @@ msgstr "Vom Routing-Modul zugewiesene Komplexitätsstufen für Anfragen"
 msgid "Query usage analytics and costs"
 msgstr "Nutzungsanalysen und Kosten abfragen"
 
-#: src/features/chat/thread-list/thread-node.tsx:614
+#: src/features/chat/thread-list/thread-node.tsx:621
 msgid "Question"
 msgstr "Frage"
 
@@ -25822,7 +25843,7 @@ msgid "Queued"
 msgstr "In Warteschlange"
 
 #: src/features/chat/host/host-composer.tsx:351
-#: src/features/chat/thread/composer-prompt-queue.tsx:705
+#: src/features/chat/thread/composer-prompt-queue.tsx:708
 msgid "Queued messages"
 msgstr "Nachrichten in der Warteschlange"
 
@@ -26043,8 +26064,8 @@ msgstr "{0} erneut ausführen?"
 msgid "Read"
 msgstr "Lesen"
 
-#: src/features/chat/sharing/thread-share-button.tsx:219
-#: src/features/chat/sharing/thread-share-button.tsx:317
+#: src/features/chat/sharing/thread-share-button.tsx:223
+#: src/features/chat/sharing/thread-share-button.tsx:321
 msgid "Read & Write"
 msgstr "Lesen & Schreiben"
 
@@ -26064,8 +26085,8 @@ msgstr "Jede Antwort des Assistenten nach Abschluss mit der Stimme deines Browse
 msgid "Read only"
 msgstr "Nur lesen"
 
-#: src/features/chat/sharing/thread-share-button.tsx:216
-#: src/features/chat/sharing/thread-share-button.tsx:316
+#: src/features/chat/sharing/thread-share-button.tsx:220
+#: src/features/chat/sharing/thread-share-button.tsx:320
 msgid "Read Only"
 msgstr "Nur lesen"
 
@@ -26093,7 +26114,7 @@ msgstr "Schreibgeschützte Vorschau – zum Bearbeiten forken"
 msgid "Read-only shared conversation"
 msgstr "Schreibgeschützte geteilte Unterhaltung"
 
-#: src/features/chat/thread/composer-input.tsx:279
+#: src/features/chat/thread/composer-input.tsx:280
 msgid "Reading \"{attachmentName}\"…"
 msgstr "„{attachmentName}“ wird gelesen …"
 
@@ -26717,12 +26738,12 @@ msgstr "Angemeldet bleiben"
 #: ../../packages/ui/src/components/ai-elements/attachments.tsx:195
 #: ../../packages/ui/src/components/combobox.tsx:304
 #: src/features/chat/host/host-composer.tsx:917
-#: src/features/chat/sharing/thread-share-button.tsx:295
-#: src/features/chat/sharing/thread-share-button.tsx:367
-#: src/features/chat/thread/composer-input.tsx:341
-#: src/features/chat/thread/composer-input.tsx:353
-#: src/features/chat/thread/composer-input.tsx:407
-#: src/features/chat/thread/composer-input.tsx:416
+#: src/features/chat/sharing/thread-share-button.tsx:299
+#: src/features/chat/sharing/thread-share-button.tsx:371
+#: src/features/chat/thread/composer-input.tsx:342
+#: src/features/chat/thread/composer-input.tsx:354
+#: src/features/chat/thread/composer-input.tsx:408
+#: src/features/chat/thread/composer-input.tsx:417
 #: src/features/devices/components/devices-settings.tsx:334
 #: src/features/devices/components/devices-settings.tsx:340
 #: src/features/projects/components/project-form-dialog.tsx:265
@@ -26895,7 +26916,7 @@ msgid "Remove or add objects in an image"
 msgstr "Objekte in einem Bild entfernen oder hinzufügen"
 
 #: src/features/chat/lock/thread-lock-dialog.tsx:151
-#: src/features/chat/thread-list/thread-node.tsx:902
+#: src/features/chat/thread-list/thread-node.tsx:909
 msgid "Remove passcode"
 msgstr "Passcode entfernen"
 
@@ -26908,7 +26929,7 @@ msgstr "Anbieter entfernen?"
 msgid "Remove queued message {0}"
 msgstr "Wartende Nachricht {0} entfernen"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:410
+#: src/features/chat/thread/composer-prompt-queue.tsx:413
 msgid "Remove queued message {position}"
 msgstr "Eingereihte Nachricht {position} entfernen"
 
@@ -26947,7 +26968,7 @@ msgstr "Den Webhook entfernen"
 msgid "Remove These Files"
 msgstr "Diese Dateien entfernen"
 
-#: src/features/chat/sharing/thread-share-button.tsx:429
+#: src/features/chat/sharing/thread-share-button.tsx:436
 msgid "Remove User"
 msgstr "Benutzer entfernen"
 
@@ -26994,7 +27015,7 @@ msgstr "Umbenennungen, Lockfiles, Snapshots und generierte Dateien. Zuletzt lese
 msgid "Reopen"
 msgstr "Wieder öffnen"
 
-#: src/features/chat/thread-list/thread-node.tsx:544
+#: src/features/chat/thread-list/thread-node.tsx:551
 msgid "Reorder"
 msgstr "Neu anordnen"
 
@@ -27098,7 +27119,7 @@ msgstr "Antworten"
 msgid "Reply complete"
 msgstr "Antwort abgeschlossen"
 
-#: src/features/chat/core/context/chat-context.tsx:632
+#: src/features/chat/core/context/chat-context.tsx:636
 msgid "Reply ready"
 msgstr "Antwort bereit"
 
@@ -27338,7 +27359,7 @@ msgstr "Ressourcen"
 msgid "Response"
 msgstr "Antwort"
 
-#: src/features/chat/thread-list/thread-node.tsx:633
+#: src/features/chat/thread-list/thread-node.tsx:640
 msgid "Response failed - try again"
 msgstr "Antwort fehlgeschlagen – versuche es erneut"
 
@@ -27490,11 +27511,11 @@ msgstr "Jetzt wiederholen"
 msgid "Retry the device check"
 msgstr ""
 
-#: src/features/chat/thread/composer-input.tsx:430
+#: src/features/chat/thread/composer-input.tsx:431
 msgid "Retry upload"
 msgstr "Upload wiederholen"
 
-#: src/features/chat/thread/composer-input.tsx:425
+#: src/features/chat/thread/composer-input.tsx:426
 msgid "Retry upload of {attachmentName}"
 msgstr "Upload von {attachmentName} wiederholen"
 
@@ -27606,7 +27627,7 @@ msgid "Reviewer note"
 msgstr "Notiz des Prüfers"
 
 #: src/features/auth/components/settings/account/account-cell.tsx:140
-#: src/features/chat/guest-links/use-guest-link-revoke.tsx:89
+#: src/features/chat/guest-links/use-guest-link-revoke.tsx:105
 #: src/features/pages/components/page-share-dialog.tsx:209
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:215
 msgid "Revoke"
@@ -27616,7 +27637,7 @@ msgstr "Widerrufen"
 msgid "Revoke All Sessions"
 msgstr "Alle Sitzungen widerrufen"
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:175
+#: src/features/chat/guest-links/guest-link-panel.tsx:313
 msgid "Revoke link"
 msgstr "Link widerrufen"
 
@@ -27632,11 +27653,11 @@ msgstr "Freigabe für {tool} widerrufen"
 msgid "Revoke the allow for {tool} on {server}"
 msgstr "Freigabe für {tool} auf {server} widerrufen"
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:74
+#: src/features/chat/guest-links/guest-link-panel.tsx:120
 msgid "Revoke the earlier guest link first, then make a new one."
 msgstr "Widerrufe zuerst den bisherigen Gastlink und erstelle dann einen neuen."
 
-#: src/features/chat/guest-links/use-guest-link-revoke.tsx:103
+#: src/features/chat/guest-links/use-guest-link-revoke.tsx:119
 msgid "Revoke the guest link?"
 msgstr "Gastlink widerrufen?"
 
@@ -27645,7 +27666,7 @@ msgstr "Gastlink widerrufen?"
 msgid "Revoked {0} sessions"
 msgstr "{0} Sitzungen widerrufen"
 
-#: src/features/chat/guest-links/use-guest-link-revoke.tsx:90
+#: src/features/chat/guest-links/use-guest-link-revoke.tsx:106
 msgid "Revoking the link deletes {waitingCount, plural, one {the # guest message still waiting. It cannot be sent afterwards.} other {the # guest messages still waiting. They cannot be sent afterwards.}}"
 msgstr "Wenn du den Link widerrufst, {waitingCount, plural, one {wird die # wartende Nachricht eines Gasts gelöscht. Sie kann danach nicht mehr gesendet werden.} other {werden die # wartenden Nachrichten von Gästen gelöscht. Sie können danach nicht mehr gesendet werden.}}"
 
@@ -27922,7 +27943,7 @@ msgstr "Führe deinen Workflow aus, um hier den Ausführungsverlauf zu sehen."
 msgid "Running"
 msgstr "Läuft"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:532
+#: ../../packages/chat-ui/src/chat/message-content.tsx:539
 msgid "Running code..."
 msgstr "Code wird ausgeführt..."
 
@@ -27930,7 +27951,7 @@ msgstr "Code wird ausgeführt..."
 msgid "Running on {device}…"
 msgstr "{device}: läuft…"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:208
+#: ../../packages/chat-ui/src/chat/message-content.tsx:215
 #: src/features/admin/components/admin-cleanup-dashboard.tsx:258
 #: src/features/workflow/components/canvas/workflow-controls.tsx:622
 #: src/features/workflow/components/nodes/base-node.tsx:263
@@ -28308,12 +28329,12 @@ msgstr "Score"
 msgid "Scores each answer 0–100% against the expected answer or rubric. Adds a small model call per case."
 msgstr "Bewertet jede Antwort mit 0–100 % anhand der erwarteten Antwort oder der Bewertungsrubrik. Fügt pro Testfall einen kleinen Modellaufruf hinzu."
 
-#: src/features/chat/thread/composer-input.tsx:1361
+#: src/features/chat/thread/composer-input.tsx:1363
 msgid "Screen capture failed. Please try again."
 msgstr "Die Bildschirmaufnahme ist fehlgeschlagen. Bitte versuche es erneut."
 
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:118
-#: ../../packages/chat-ui/src/chat/message-content.tsx:712
+#: ../../packages/chat-ui/src/chat/message-content.tsx:719
 msgid "Screenshot"
 msgstr "Screenshot"
 
@@ -28800,7 +28821,7 @@ msgid "Select model"
 msgstr "Modell auswählen"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker-button.tsx:173
-#: src/components/model-picker/model-picker-button.tsx:202
+#: src/components/model-picker/model-picker-button.tsx:203
 #: src/components/model-picker/model-picker-popup.tsx:42
 msgid "Select Model"
 msgstr "Modell auswählen"
@@ -28937,6 +28958,7 @@ msgstr "Halbrealistisches Modell mit guter Prompt-Treue"
 msgid "Semi-realistic visual style"
 msgstr "Halbrealistischer Bildstil"
 
+#: src/features/chat/guest-links/guest-link-panel.tsx:357
 #: src/features/chat/host/host-composer.tsx:687
 #: src/features/sub-agents/components/worker-composer.tsx:118
 msgid "Send"
@@ -29015,7 +29037,7 @@ msgid "Send messages to the AI bot via Telegram. Conversations appear as threads
 msgstr "Sende über Telegram Nachrichten an den KI-Bot. Unterhaltungen erscheinen als Threads in deiner Chat-Liste."
 
 #: src/features/chat/host/host-composer.tsx:874
-#: src/features/chat/thread/composer-prompt-queue.tsx:724
+#: src/features/chat/thread/composer-prompt-queue.tsx:727
 msgid "Send next"
 msgstr "Als Nächstes senden"
 
@@ -29056,6 +29078,10 @@ msgstr "Verifizierungscode senden"
 msgid "Send Verification Code"
 msgstr "Verifizierungscode senden"
 
+#: src/features/chat/guest-links/guest-link-panel.tsx:349
+msgid "Send: {snippet}"
+msgstr "Senden: {snippet}"
+
 #: src/features/chat/voice-mode/voice-mode-button.tsx:88
 msgid "Sending your message and waiting for the reply"
 msgstr "Deine Nachricht wird gesendet, warte auf die Antwort"
@@ -29065,7 +29091,8 @@ msgstr "Deine Nachricht wird gesendet, warte auf die Antwort"
 msgid "Sending…"
 msgstr "Wird gesendet…"
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:200
+#: src/features/chat/guest-links/guest-link-panel.tsx:230
+#: src/features/chat/guest-links/guest-link-panel.tsx:344
 #: src/features/devices/components/devices-settings.tsx:387
 msgid "Sent"
 msgstr "Gesendet"
@@ -29297,8 +29324,8 @@ msgstr "Anteil an den Ausgaben"
 msgid "Share page"
 msgstr "Seite teilen"
 
-#: src/features/chat/sharing/thread-share-button.tsx:203
-#: src/features/chat/sharing/thread-share-button.tsx:252
+#: src/features/chat/sharing/thread-share-button.tsx:207
+#: src/features/chat/sharing/thread-share-button.tsx:256
 msgid "Share Thread"
 msgstr "Thread teilen"
 
@@ -30001,7 +30028,7 @@ msgstr "Folie {streamingSlideNumber}"
 msgid "Slide title"
 msgstr "Folientitel"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1088
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1095
 msgid "Slide updated"
 msgstr "Folie aktualisiert"
 
@@ -30081,12 +30108,12 @@ msgstr "Weiche Übergänge"
 msgid "Snooze"
 msgstr "Zurückstellen"
 
-#: src/features/chat/thread-list/thread-node.tsx:945
+#: src/features/chat/thread-list/thread-node.tsx:952
 msgid "Snooze 1 hour"
 msgstr "1 Stunde zurückstellen"
 
-#: src/features/chat/thread-list/thread-node.tsx:924
-#: src/features/chat/thread-list/thread-node.tsx:938
+#: src/features/chat/thread-list/thread-node.tsx:931
+#: src/features/chat/thread-list/thread-node.tsx:945
 msgid "Snooze thread"
 msgstr "Thread zurückstellen"
 
@@ -30094,15 +30121,15 @@ msgstr "Thread zurückstellen"
 msgid "Snooze until"
 msgstr "Zurückstellen bis"
 
-#: src/features/chat/thread-list/thread-node.tsx:951
+#: src/features/chat/thread-list/thread-node.tsx:958
 msgid "Snooze until next week"
 msgstr "Bis nächste Woche zurückstellen"
 
-#: src/features/chat/thread-list/thread-node.tsx:947
+#: src/features/chat/thread-list/thread-node.tsx:954
 msgid "Snooze until tomorrow 09:00"
 msgstr "Bis morgen 09:00 zurückstellen"
 
-#: src/features/chat/thread-list/thread-node.tsx:952
+#: src/features/chat/thread-list/thread-node.tsx:959
 msgid "Snooze until…"
 msgstr "Zurückstellen bis…"
 
@@ -30159,7 +30186,7 @@ msgstr "Solide Allzweck-Fähigkeiten"
 msgid "Solid performance across most task types"
 msgstr "Solide Leistung bei den meisten Aufgabentypen"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:621
+#: ../../packages/chat-ui/src/chat/message-content.tsx:628
 msgid "Some images from this run could not be saved."
 msgstr "Einige Bilder aus diesem Lauf konnten nicht gespeichert werden."
 
@@ -30252,7 +30279,7 @@ msgstr "Soundeffekte aktiviert"
 msgid "Source"
 msgstr "Quelle"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1225
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1232
 #: src/features/chat/thread/message-content.tsx:146
 msgid "Source {index}"
 msgstr "Quelle {index}"
@@ -30474,7 +30501,7 @@ msgstr "Geteilte Ansicht deaktiviert"
 msgid "Split view enabled"
 msgstr "Geteilte Ansicht aktiviert"
 
-#: src/features/chat/thread-list/thread-node.tsx:299
+#: src/features/chat/thread-list/thread-node.tsx:306
 msgid "Split view is full. Close a chat first."
 msgstr "Die geteilte Ansicht ist voll. Schließe zuerst einen Chat."
 
@@ -30870,7 +30897,7 @@ msgstr "Steuern – die aktuelle Antwort liest dies bei ihrem nächsten Schritt"
 msgid "Steer the reply"
 msgstr "Die Antwort steuern"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:371
+#: src/features/chat/thread/composer-prompt-queue.tsx:374
 msgid "Steering:"
 msgstr "Steuerhinweise:"
 
@@ -30945,8 +30972,8 @@ msgstr "Stoppen und Warteschlange leeren"
 msgid "Stop browser session"
 msgstr "Browser-Sitzung stoppen"
 
-#: src/features/chat/thread-list/thread-node.tsx:650
-#: src/features/chat/thread-list/thread-node.tsx:672
+#: src/features/chat/thread-list/thread-node.tsx:657
+#: src/features/chat/thread-list/thread-node.tsx:679
 #: src/features/chat/thread/composer-input-area.tsx:394
 #: src/features/chat/thread/composer-input-area.tsx:407
 msgid "Stop generating"
@@ -31053,7 +31080,7 @@ msgstr "Streamable HTTP (empfohlen)"
 msgid "Streaming"
 msgstr "Streaming"
 
-#: src/features/chat/thread-list/thread-node.tsx:632
+#: src/features/chat/thread-list/thread-node.tsx:639
 msgid "Streaming..."
 msgstr "Wird gestreamt..."
 
@@ -31489,7 +31516,7 @@ msgstr "Vorgeschlagen"
 msgid "Suggested answers"
 msgstr "Vorgeschlagene Antworten"
 
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:508
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:513
 msgid "Suggestion available, press Right Arrow to accept"
 msgstr "Vorschlag verfügbar, zum Übernehmen Pfeil nach rechts drücken"
 
@@ -31671,6 +31698,10 @@ msgstr "Zu {label} wechseln"
 msgid "Switch to {name}?"
 msgstr "Zu {name} wechseln?"
 
+#: src/features/chat/core/context/chat-context.tsx:723
+msgid "Switch to a text model to send this message."
+msgstr "Wechsle zu einem Textmodell, um diese Nachricht zu senden."
+
 #: src/features/knowledge/components/collection-dialog.tsx:84
 msgid "Switch to an organization to share a collection with it."
 msgstr "Wechsle zu einer Organisation, um eine Sammlung mit ihr zu teilen."
@@ -31812,7 +31843,7 @@ msgstr "Tags sind deine eigenen Labels für Chats. Filtere die Chat-Liste zusät
 msgid "Tags for {threadTitle}"
 msgstr "Tags für {threadTitle}"
 
-#: src/features/chat/thread-list/thread-node.tsx:836
+#: src/features/chat/thread-list/thread-node.tsx:843
 msgid "Tags unavailable for temporary chats"
 msgstr "Tags für temporäre Chats nicht verfügbar"
 
@@ -31832,7 +31863,7 @@ msgstr "Ein Eingabebild nehmen, den Hintergrund entfernen und dann eine Stilübe
 msgid "Take turns"
 msgstr "Abwechselnd"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:665
+#: ../../packages/chat-ui/src/chat/message-content.tsx:672
 msgid "Taking screenshot..."
 msgstr "Screenshot wird erstellt..."
 
@@ -32109,7 +32140,7 @@ msgstr "Vorlagen"
 msgid "Temporary"
 msgstr "Temporär"
 
-#: src/features/chat/thread-list/thread-node.tsx:1148
+#: src/features/chat/thread-list/thread-node.tsx:1155
 msgid "Temporary chat"
 msgstr "Temporärer Chat"
 
@@ -32135,7 +32166,7 @@ msgstr "Aufbewahrung temporärer Chats (Stunden)"
 msgid "Temporary chat settings, {0}"
 msgstr "Einstellungen für temporäre Chats, {0}"
 
-#: src/features/chat/thread-list/thread-node.tsx:848
+#: src/features/chat/thread-list/thread-node.tsx:855
 msgid "Temporary chats expire, so they can't be tagged. Convert it to a permanent chat to add tags."
 msgstr "Temporäre Chats laufen ab und können daher nicht getaggt werden. Wandle ihn in einen dauerhaften Chat um, um Tags hinzuzufügen."
 
@@ -32262,7 +32293,7 @@ msgstr "Textrichtung auf LTR gesetzt"
 msgid "Text direction set to RTL"
 msgstr "Textrichtung auf RTL gesetzt"
 
-#: src/features/chat/thread/composer-input.tsx:315
+#: src/features/chat/thread/composer-input.tsx:316
 msgid "Text document"
 msgstr "Textdokument"
 
@@ -32384,7 +32415,7 @@ msgstr "Dieser Computer ist nicht online."
 msgid "That did not go through. Try again."
 msgstr ""
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:100
+#: src/features/chat/guest-links/guest-link-panel.tsx:163
 msgid "That did not work. Please try again."
 msgstr "Das hat nicht geklappt. Bitte versuche es erneut."
 
@@ -32395,6 +32426,10 @@ msgstr "Das hat nicht funktioniert. Versuche es erneut."
 #: src/features/develop/components/guide-tab.tsx:92
 msgid "That folder is not offered for this repository on that computer."
 msgstr "Dieser Ordner wird für dieses Repository auf jenem Computer nicht angeboten."
+
+#: src/features/chat/core/context/chat-context.tsx:719
+msgid "That guest link has ended."
+msgstr "Dieser Gastlink ist abgelaufen."
 
 #: src/features/develop/components/watched-repositories.tsx:163
 msgid "That is not a repository address."
@@ -32412,9 +32447,24 @@ msgstr "Dieser Link konnte nicht gelesen werden."
 msgid "That message could not be found in this conversation."
 msgstr "Diese Nachricht wurde in dieser Unterhaltung nicht gefunden."
 
+#: src/features/chat/core/context/chat-context.tsx:722
+#: src/features/chat/guest-links/guest-link-panel.tsx:137
+msgid "That message is being sent."
+msgstr "Diese Nachricht wird gerade gesendet."
+
+#: src/features/chat/guest-links/guest-link-panel.tsx:142
+msgid "That message is no longer waiting."
+msgstr "Diese Nachricht wartet nicht mehr."
+
 #: src/features/chat/host/host-send-errors.ts:21
 msgid "That message is too long to send from here."
 msgstr "Diese Nachricht ist zu lang, um sie von hier zu senden."
+
+#: src/features/chat/core/context/chat-context.tsx:720
+#: src/features/chat/guest-links/guest-link-panel.tsx:221
+#: src/features/chat/guest-links/guest-link-panel.tsx:251
+msgid "That message was already sent."
+msgstr "Diese Nachricht wurde bereits gesendet."
 
 #: src/features/chat/lock/thread-lock-dialog.tsx:60
 msgid "That passcode is not right."
@@ -32553,7 +32603,7 @@ msgstr "Die Änderung ist zu groß, um sie vollständig anzuzeigen."
 msgid "The chat agent works the task with its tools, optionally following a skill."
 msgstr "Der Chat-Agent erledigt die Aufgabe mit seinen Tools und folgt optional einem Skill."
 
-#: src/features/chat/thread/composer-input.tsx:987
+#: src/features/chat/thread/composer-input.tsx:988
 msgid "The chat changed before the paste was ready, so it was not inserted."
 msgstr "Der Chat hat gewechselt, bevor das Einfügen fertig war, daher wurde nichts eingefügt."
 
@@ -32589,8 +32639,8 @@ msgstr ""
 msgid "The comparison could not be loaded."
 msgstr "Der Vergleich konnte nicht geladen werden."
 
-#: src/features/chat/thread/composer-input.tsx:995
-#: src/features/chat/thread/composer-input.tsx:1017
+#: src/features/chat/thread/composer-input.tsx:996
+#: src/features/chat/thread/composer-input.tsx:1018
 msgid "The composer was locked before the paste was ready, so it was not inserted."
 msgstr "Der Eingabebereich war gesperrt, bevor das Einfügen fertig war, daher wurde nichts eingefügt."
 
@@ -32733,11 +32783,11 @@ msgstr "Der vollständige System-Prompt, der an das Modell gesendet wird..."
 msgid "The goal is removed; its tasks stay, without a goal."
 msgstr "Das Ziel wird entfernt; seine Aufgaben bleiben ohne Ziel erhalten."
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:155
+#: src/features/chat/guest-links/guest-link-panel.tsx:292
 msgid "The guest link could not be loaded."
 msgstr "Der Gastlink konnte nicht geladen werden."
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:68
+#: src/features/chat/guest-links/guest-link-panel.tsx:126
 msgid "The guest link was replaced or has ended."
 msgstr "Der Gastlink wurde ersetzt oder ist abgelaufen."
 
@@ -32846,7 +32896,7 @@ msgstr "das letzte Mal"
 msgid "The last turn stopped before it finished."
 msgstr "Der letzte Durchgang wurde gestoppt, bevor er fertig war."
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:142
+#: src/features/chat/guest-links/guest-link-panel.tsx:263
 msgid "The link could not be copied. Select it and copy it yourself."
 msgstr "Der Link konnte nicht kopiert werden. Markiere ihn und kopiere ihn selbst."
 
@@ -32981,7 +33031,7 @@ msgstr "Die Seite zeigt jetzt die andere Version. Kopiere alles, was du aus dein
 msgid "The page, every sub-page, its comments and its version history are deleted. This cannot be undone."
 msgstr "Die Seite, alle Unterseiten, ihre Kommentare und ihr Versionsverlauf werden gelöscht. Das kann nicht rückgängig gemacht werden."
 
-#: src/features/chat/thread/composer-input.tsx:1043
+#: src/features/chat/thread/composer-input.tsx:1044
 msgid "The pasted text could not be attached and was not inserted."
 msgstr "Der eingefügte Text konnte nicht angehängt werden und wurde nicht eingefügt."
 
@@ -33074,7 +33124,7 @@ msgstr "Das richtige Modell, jedes Mal."
 msgid "The run goes where you chose: a new chat each time, the same chat as before, or the same chat with a fresh context."
 msgstr ""
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:741
+#: ../../packages/chat-ui/src/chat/message-content.tsx:748
 msgid "The screenshot could not be saved."
 msgstr "Der Screenshot konnte nicht gespeichert werden."
 
@@ -33139,7 +33189,7 @@ msgstr "Die beiden Passcodes stimmen nicht überein."
 msgid "The unified LLM gateway for modern AI applications."
 msgstr "Das einheitliche LLM-Gateway für moderne KI-Anwendungen."
 
-#: src/features/chat/thread/composer-input.tsx:621
+#: src/features/chat/thread/composer-input.tsx:622
 msgid "The upload of \"{fileName}\" expired. Please attach it again."
 msgstr "Der Upload von „{fileName}“ ist abgelaufen. Bitte hänge die Datei erneut an."
 
@@ -33294,7 +33344,7 @@ msgid "Thinking-enabled vision-language model"
 msgstr "Vision-Language-Modell mit Denkmodus"
 
 #: ../../packages/chat-ui/src/chat/auto-continue-status.tsx:54
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1151
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1158
 #: ../../packages/ui/src/components/ai-elements/reasoning.tsx:114
 #: src/features/chat/thread/streaming-placeholder.tsx:799
 msgid "Thinking..."
@@ -33377,7 +33427,7 @@ msgstr "Dieser Chat gehört zu einem Worker. Sende ihm Nachrichten über sein ei
 msgid "This chat cannot be compacted."
 msgstr "Dieser Chat kann nicht komprimiert werden."
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:79
+#: src/features/chat/guest-links/guest-link-panel.tsx:132
 msgid "This chat cannot have a guest link."
 msgstr "Dieser Chat kann keinen Gastlink haben."
 
@@ -33580,7 +33630,7 @@ msgstr "Dieser Host bietet noch keinen Posteingang an."
 msgid "This host does not offer any view of a {requestNoun} yet."
 msgstr "Dieser Host bietet noch keine Ansicht eines {requestNoun} an."
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:399
+#: ../../packages/chat-ui/src/chat/message-content.tsx:406
 msgid "This image has been flagged for review"
 msgstr "Dieses Bild wurde zur Prüfung markiert"
 
@@ -33656,6 +33706,10 @@ msgstr "Dies mergt den Commit {0} mit „{1}“ auf {hostLabel} in den Basis-Bra
 #: src/features/chat/guest-links/guest-page.tsx:86
 msgid "This message cannot be left. Keep it short, don't start it with / or mention anyone, or try again later."
 msgstr "Diese Nachricht kann nicht hinterlassen werden. Halte sie kurz, beginne sie nicht mit / und erwähne niemanden, oder versuche es später erneut."
+
+#: src/features/chat/core/context/chat-context.tsx:725
+msgid "This message cannot be sent in this chat."
+msgstr "Diese Nachricht kann in diesem Chat nicht gesendet werden."
 
 #: src/features/chat/thread/copy-prompt-link-action.tsx:51
 msgid "This message has no text to copy as a prompt link."
@@ -33986,11 +34040,11 @@ msgstr "Thread ist jetzt dauerhaft"
 msgid "Thread list"
 msgstr "Thread-Liste"
 
-#: src/features/chat/sharing/thread-share-button.tsx:171
+#: src/features/chat/sharing/thread-share-button.tsx:175
 msgid "Thread made private"
 msgstr "Thread privat gemacht"
 
-#: src/features/chat/sharing/thread-share-button.tsx:171
+#: src/features/chat/sharing/thread-share-button.tsx:175
 msgid "Thread made public"
 msgstr "Thread öffentlich gemacht"
 
@@ -34327,7 +34381,7 @@ msgstr "Zu viele neue Kontexte in kurzer Zeit. Versuche es in einer Minute erneu
 msgid "Too many requests right now. Try again in a moment."
 msgstr "Gerade zu viele Anfragen. Versuche es gleich noch einmal."
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:95
+#: src/features/chat/guest-links/guest-link-panel.tsx:158
 msgid "Too many requests. Please try again in a moment."
 msgstr "Zu viele Anfragen. Bitte versuche es gleich noch einmal."
 
@@ -34900,8 +34954,8 @@ msgid "Type your answer…"
 msgstr "Gib deine Antwort ein…"
 
 #: src/features/chat/signed-out/signed-out-chat.tsx:249
-#: src/features/chat/thread/composer-input.tsx:1751
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:195
+#: src/features/chat/thread/composer-input.tsx:1753
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:197
 msgid "Type your message..."
 msgstr "Nachricht eingeben..."
 
@@ -34909,7 +34963,7 @@ msgstr "Nachricht eingeben..."
 msgid "Typeface for the whole interface. Code blocks always stay monospace."
 msgstr "Schriftart für die gesamte Oberfläche. Codeblöcke bleiben immer monospace."
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:666
+#: ../../packages/chat-ui/src/chat/message-content.tsx:673
 msgid "Typing text..."
 msgstr "Text wird eingegeben..."
 
@@ -35013,7 +35067,7 @@ msgstr "Archivierung aufheben"
 
 #: src/components/command-palette.tsx:476
 #: src/components/command-palette.tsx:637
-#: src/features/chat/thread-list/thread-node.tsx:119
+#: src/features/chat/thread-list/thread-node.tsx:120
 msgid "Unarchive thread"
 msgstr "Thread aus dem Archiv holen"
 
@@ -35070,7 +35124,7 @@ msgstr "Unterstrichen"
 #: src/features/chat/thread-list/hooks/use-thread-state-actions.ts:68
 #: src/features/chat/thread-list/hooks/use-thread-state-actions.ts:95
 #: src/features/chat/thread/composer-draw-dialog.tsx:349
-#: src/features/chat/thread/composer-input.tsx:889
+#: src/features/chat/thread/composer-input.tsx:890
 #: src/features/workflow/components/canvas/keyboard-shortcuts-dialog.tsx:36
 msgid "Undo"
 msgstr "Rückgängig"
@@ -35161,7 +35215,7 @@ msgid "Unlink"
 msgstr "Verknüpfung aufheben"
 
 #: src/features/chat/lock/locked-chat-gate.tsx:127
-#: src/features/chat/thread-list/thread-node.tsx:900
+#: src/features/chat/thread-list/thread-node.tsx:907
 msgid "Unlock chat"
 msgstr "Chat entsperren"
 
@@ -35216,7 +35270,7 @@ msgstr "Erinnerung nicht mehr anheften"
 
 #: ../../packages/chat-ui/src/threads/thread-item.tsx:81
 #: src/components/command-palette.tsx:470
-#: src/features/chat/thread-list/thread-node.tsx:111
+#: src/features/chat/thread-list/thread-node.tsx:112
 msgid "Unpin thread"
 msgstr "Thread nicht mehr anheften"
 
@@ -35224,7 +35278,7 @@ msgstr "Thread nicht mehr anheften"
 msgid "Unpublish"
 msgstr "Veröffentlichung zurückziehen"
 
-#: src/features/chat/thread-list/thread-node.tsx:1155
+#: src/features/chat/thread-list/thread-node.tsx:1162
 msgid "Unread"
 msgstr "Ungelesen"
 
@@ -35236,7 +35290,7 @@ msgstr "Nicht gespeicherte Änderungen"
 msgid "Unsent draft"
 msgstr ""
 
-#: src/features/chat/thread-list/thread-node.tsx:954
+#: src/features/chat/thread-list/thread-node.tsx:961
 msgid "Unsnooze"
 msgstr "Zurückstellung aufheben"
 
@@ -35313,7 +35367,7 @@ msgstr "Aktuelle Dokumentation für jede Bibliothek und jedes Framework"
 msgid "Update Duration"
 msgstr "Dauer aktualisieren"
 
-#: src/features/chat/thread/composer-input.tsx:1608
+#: src/features/chat/thread/composer-input.tsx:1610
 msgid "Update failed"
 msgstr "Aktualisierung fehlgeschlagen"
 
@@ -35406,11 +35460,11 @@ msgstr "Aktualisierte OpenAI-Spitzenleistung"
 msgid "Updated reasoning capabilities over the original R1"
 msgstr "Aktualisierte Reasoning-Fähigkeiten gegenüber dem ursprünglichen R1"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1086
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1093
 msgid "Updated slide"
 msgstr "Folie aktualisiert"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1086
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1093
 msgid "Updated slide {slideNumber}"
 msgstr "Folie {slideNumber} aktualisiert"
 
@@ -35501,14 +35555,14 @@ msgstr "CSVs hochladen, Python-Analysen ausführen und Diagramme exportieren –
 msgid "Upload documents to your knowledge base and group them into collections. The AI searches them for relevant context and cites the passages it used."
 msgstr "Lade Dokumente in deine Wissensdatenbank hoch und gruppiere sie in Sammlungen. Die KI durchsucht sie nach relevantem Kontext und zitiert die verwendeten Abschnitte."
 
-#: src/features/chat/thread/composer-input.tsx:422
-#: src/features/chat/thread/composer-input.tsx:666
-#: src/features/chat/thread/composer-input.tsx:1529
+#: src/features/chat/thread/composer-input.tsx:423
+#: src/features/chat/thread/composer-input.tsx:667
+#: src/features/chat/thread/composer-input.tsx:1531
 msgid "Upload failed"
 msgstr "Hochladen fehlgeschlagen"
 
 #. placeholder {0}: fresh.name
-#: src/features/chat/thread/composer-input.tsx:1522
+#: src/features/chat/thread/composer-input.tsx:1524
 msgid "Upload failed: {0}"
 msgstr "Upload fehlgeschlagen: {0}"
 
@@ -35558,7 +35612,7 @@ msgstr "Hochgeladen"
 msgid "Uploaded {fileName}"
 msgstr "{fileName} hochgeladen"
 
-#: src/features/chat/thread/composer-input.tsx:359
+#: src/features/chat/thread/composer-input.tsx:360
 msgid "Uploading {attachmentName}"
 msgstr "{attachmentName} wird hochgeladen"
 
@@ -35789,7 +35843,7 @@ msgstr "{0} verwendet"
 msgid "Used for buttons, highlights and focus rings. Every option keeps text readable in light and dark mode."
 msgstr "Für Buttons, Hervorhebungen und Fokusrahmen. Jede Option hält Text im hellen und dunklen Modus lesbar."
 
-#: src/features/chat/sharing/thread-share-button.tsx:288
+#: src/features/chat/sharing/thread-share-button.tsx:292
 msgid "user"
 msgstr "Nutzer"
 
@@ -35807,7 +35861,7 @@ msgstr "Nutzer"
 msgid "User"
 msgstr "Benutzer"
 
-#: src/features/chat/sharing/thread-share-button.tsx:154
+#: src/features/chat/sharing/thread-share-button.tsx:158
 msgid "User access removed"
 msgstr "Nutzerzugriff entfernt"
 
@@ -36665,7 +36719,7 @@ msgstr "Warte, bis der Agent bereit ist, und versuche es dann erneut."
 msgid "Wait for the reply to finish, then try again."
 msgstr "Warte, bis die Antwort fertig ist, und versuche es dann erneut."
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:200
+#: src/features/chat/guest-links/guest-link-panel.tsx:344
 msgid "Waiting"
 msgstr "Wartet"
 
@@ -36718,8 +36772,8 @@ msgstr "Wartet, bis die Uploads abgeschlossen sind…"
 msgid "Waiting for you"
 msgstr "Wartet auf dich"
 
-#: src/features/chat/thread-list/thread-node.tsx:635
 #: src/features/chat/thread-list/thread-node.tsx:642
+#: src/features/chat/thread-list/thread-node.tsx:649
 #: src/features/chat/thread/ask-user-prompt.tsx:185
 msgid "Waiting for your answer"
 msgstr "Wartet auf deine Antwort"
@@ -36729,8 +36783,8 @@ msgstr "Wartet auf deine Antwort"
 msgid "Waiting for your answer in {0}"
 msgstr "Wartet auf deine Antwort in {0}"
 
-#: src/features/chat/thread-list/thread-node.tsx:634
 #: src/features/chat/thread-list/thread-node.tsx:641
+#: src/features/chat/thread-list/thread-node.tsx:648
 #: src/features/chat/thread/tool-approval.tsx:78
 #: src/features/home/components/home-page.tsx:114
 #: src/features/marketing/use-cases/visuals/approvals-visual.tsx:20
@@ -36768,7 +36822,11 @@ msgstr "Beobachtete Repositories"
 msgid "We could not check that you are signed in. Try again in a moment."
 msgstr ""
 
-#: src/features/chat/core/context/chat-context.tsx:719
+#: src/features/chat/core/context/chat-context.tsx:727
+msgid "We could not confirm your session in time. The guest's message was not sent; send it again from the Guests tab."
+msgstr "Wir konnten deine Sitzung nicht rechtzeitig bestätigen. Die Nachricht des Gasts wurde nicht gesendet; sende sie erneut über den Tab „Gäste“."
+
+#: src/features/chat/core/context/chat-context.tsx:730
 msgid "We could not confirm your session in time. Your message is still in the composer. Please try sending it again."
 msgstr "Wir konnten deine Sitzung nicht rechtzeitig bestätigen. Deine Nachricht ist noch im Eingabefeld. Bitte versuche erneut, sie zu senden."
 
@@ -37518,9 +37576,9 @@ msgstr "Du beobachtest kein Repository."
 msgid "You are offline. Neore will reconnect when the network is back."
 msgstr "Du bist offline. Neore verbindet sich wieder, sobald das Netzwerk verfügbar ist."
 
-#: src/features/chat/thread/composer-input.tsx:1101
-#: src/features/chat/thread/composer-input.tsx:1176
-#: src/features/chat/thread/composer-prompt-queue.tsx:111
+#: src/features/chat/thread/composer-input.tsx:1102
+#: src/features/chat/thread/composer-input.tsx:1178
+#: src/features/chat/thread/composer-prompt-queue.tsx:112
 msgid "You are offline. Your message stays here; send it once you are back online."
 msgstr "Du bist offline. Deine Nachricht bleibt hier; sende sie, sobald du wieder online bist."
 
@@ -37740,7 +37798,7 @@ msgstr "Dein KI-Arbeitsbereich <0>beginnt hier.</0>"
 msgid "Your answer"
 msgstr "Deine Antwort"
 
-#: src/features/chat/core/context/chat-context.tsx:632
+#: src/features/chat/core/context/chat-context.tsx:636
 msgid "Your answer in Neore has finished."
 msgstr "Die Antwort in Neore ist fertig."
 
@@ -37839,12 +37897,12 @@ msgid "Your First Chat"
 msgstr "Dein erster Chat"
 
 #. placeholder {0}: formatNumber(contextStats.estimatedTokens, i18n.locale)
-#: src/features/chat/thread/composer-input.tsx:731
+#: src/features/chat/thread/composer-input.tsx:732
 msgid "Your input is large (~{0} tokens) and will consume a significant portion of the model's context window."
 msgstr "Deine Eingabe ist groß (~{0} Token) und wird einen erheblichen Teil des Kontextfensters des Modells beanspruchen."
 
 #. placeholder {0}: formatNumber(contextStats.estimatedTokens, i18n.locale)
-#: src/features/chat/thread/composer-input.tsx:724
+#: src/features/chat/thread/composer-input.tsx:725
 msgid "Your input is too large (~{0} tokens) and exceeds the model's context window. Please reduce the message length or remove attachments to submit."
 msgstr "Deine Eingabe ist zu groß (~{0} Token) und überschreitet das Kontextfenster des Modells. Bitte kürze die Nachricht oder entferne Anhänge, um sie zu senden."
 
@@ -37877,7 +37935,7 @@ msgstr "Dein Standort (z. B. „New York, USA“, „Berlin, Deutschland“)."
 msgid "Your message"
 msgstr "Deine Nachricht"
 
-#: src/features/chat/core/context/chat-context.tsx:716
+#: src/features/chat/core/context/chat-context.tsx:718
 msgid "Your message contains inappropriate content that cannot be sent."
 msgstr "Deine Nachricht enthält unangemessene Inhalte und kann nicht gesendet werden."
 

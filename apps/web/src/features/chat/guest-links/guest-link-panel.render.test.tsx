@@ -6,13 +6,20 @@
  * id, asks again about the notes waiting now when one waits they did not see, and is declined when they move to another chat.
  */
 import { notifyManager, QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, fireEvent, render, renderHook, screen } from "@testing-library/react";
-import type { ReactNode } from "react";
+import { act, fireEvent, render, renderHook, screen, waitFor } from "@testing-library/react";
+import type { ComponentProps, ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const DAY = 24 * 60 * 60 * 1000;
 const ACTIVE_UNTIL = /^Link active until/u;
 const toastError = vi.hoisted(() => vi.fn());
+const toastInfo = vi.hoisted(() => vi.fn());
+const reviewSend = vi.fn(async () => {
+    return { status: "ready" as const, text: "please call me back", threadId: "thread-1" };
+});
+const dismissNote = vi.fn(async () => {
+    return { status: "dismissed" as const };
+});
 const revoke = vi.fn(async (_args: { confirmedNotes: string[]; linkId: string }) => null);
 const readLink = vi.fn(async () => {
     return { link: null as { bound?: boolean; expiresAt?: number; id: string } | null, messages: [] as { id: string; status: string }[] };
@@ -22,7 +29,7 @@ const readLink = vi.fn(async () => {
 notifyManager.setScheduler(queueMicrotask);
 
 vi.mock("sonner", () => {
-    return { toast: { error: toastError, info: vi.fn(), success: vi.fn() } };
+    return { toast: { error: toastError, info: toastInfo, success: vi.fn() } };
 });
 vi.mock("@lingui/react/macro", () => {
     return {
@@ -57,9 +64,19 @@ vi.mock("@/lib/lunora/crpc", () => {
                 return { queryFn: readLink, queryKey: ["guest-link"], staleTime: Infinity };
             },
         },
+        dismissHeldGuestMessage: {
+            mutationOptions: () => {
+                return { mutationFn: dismissNote };
+            },
+        },
         revokeGuestLink: {
             mutationOptions: () => {
                 return { mutationFn: revoke };
+            },
+        },
+        sendHeldGuestMessage: {
+            mutationOptions: () => {
+                return { mutationFn: reviewSend };
             },
         },
     };
@@ -72,15 +89,17 @@ vi.mock("@/lib/lunora/crpc", () => {
 });
 
 const { default: GuestLinkPanel } = await import("./guest-link-panel");
+const { clearSendStarting, markSendStarting } = await import("@/features/chat/core/utils/send-in-flight");
 const { default: useGuestLinkRevoke } = await import("./use-guest-link-revoke");
+const { default: useGuestNoteSend } = await import("./use-guest-note-send");
 
-const showPanel = (read: unknown) => {
+const showPanel = (read: unknown, props: Partial<ComponentProps<typeof GuestLinkPanel>> = {}) => {
     const client = new QueryClient();
 
     client.setQueryData(["guest-link"], read);
     render(
         <QueryClientProvider client={client}>
-            <GuestLinkPanel revokeLink={async () => true} threadId="thread-1" />
+            <GuestLinkPanel revokeLink={async () => true} sendNote={async () => "sent" as const} threadId="thread-1" {...props} />
         </QueryClientProvider>,
     );
 
@@ -119,6 +138,119 @@ afterEach(() => {
     vi.useRealTimers();
     revoke.mockReset();
     readLink.mockReset();
+    dismissNote.mockClear();
+    toastError.mockClear();
+    toastInfo.mockClear();
+});
+
+/** A live link with one note waiting, as the read answers it. */
+const NOTE = { createdAt: 0, id: "note-1", status: "held", text: "please call me back" };
+const WAITING = { link: { bound: true, expiresAt: Date.now() + DAY, id: "link-1" }, messages: [NOTE] };
+const SEND = /^Send: please call me back/u;
+const SEND_SECOND = /^Send: and the invoice/u;
+const DISMISS = /^Dismiss note: please call me back/u;
+
+type SendToChat = (text: string, guestMessageId: string) => Promise<void>;
+
+/** The share button's part: it holds the note's Send, and opens the panel only while the menu is open. */
+const Host = ({ onSendNote, open }: { onSendNote: SendToChat; open: boolean }) => {
+    const { sendingId, sendNote } = useGuestNoteSend("thread-1", false, onSendNote);
+
+    return open ? <GuestLinkPanel revokeLink={async () => true} sendingId={sendingId} sendNote={sendNote} threadId="thread-1" /> : null;
+};
+
+/** Opens the menu on a read; the returned call opens or closes it. */
+const showHost = (read: unknown, onSendNote: SendToChat) => {
+    const client = new QueryClient();
+    const ui = (open: boolean) => (
+        <QueryClientProvider client={client}>
+            <Host onSendNote={onSendNote} open={open} />
+        </QueryClientProvider>
+    );
+
+    client.setQueryData(["guest-link"], read);
+
+    const { rerender } = render(ui(true));
+
+    return (open: boolean) => rerender(ui(open));
+};
+
+describe("GuestLinkPanel's Send and Dismiss", () => {
+    afterEach(() => {
+        clearSendStarting("thread-1");
+        reviewSend.mockClear();
+    });
+
+    it("sends a waiting note's own text with its id through the ordinary send", async () => {
+        const onSendNote = vi.fn(async () => {});
+
+        readLink.mockResolvedValue(WAITING);
+        showHost(WAITING, onSendNote);
+        fireEvent.click(screen.getByRole("button", { name: SEND }));
+
+        await waitFor(() => expect(onSendNote).toHaveBeenCalledWith("please call me back", "note-1"));
+    });
+
+    it("holds a note while another send in the thread has begun and its reply does not stream yet", async () => {
+        const onSendNote = vi.fn(async () => {});
+
+        markSendStarting("thread-1");
+        showHost(WAITING, onSendNote);
+        fireEvent.click(screen.getByRole("button", { name: SEND }));
+
+        await waitFor(() => expect(toastInfo).toHaveBeenCalledWith("A reply is running. Send a message once it has finished."));
+        expect(onSendNote).not.toHaveBeenCalled();
+    });
+
+    it("still sends a note when the menu closes mid-check, and keeps its Dismiss off when the menu opens again", async () => {
+        const onSendNote = vi.fn(async () => {});
+        let answer: (value: { status: "ready"; text: string; threadId: string }) => void = () => {};
+        // The tsconfig lib predates `Promise.withResolvers`.
+        // eslint-disable-next-line unicorn/prefer-promise-with-resolvers
+        const review = new Promise<{ status: "ready"; text: string; threadId: string }>((resolve) => {
+            answer = resolve;
+        });
+
+        readLink.mockResolvedValue(WAITING);
+        reviewSend.mockImplementationOnce(async () => await review);
+
+        const setOpen = showHost(WAITING, onSendNote);
+
+        fireEvent.click(screen.getByRole("button", { name: SEND }));
+        setOpen(false);
+        setOpen(true);
+
+        await waitFor(() => expect((screen.getByRole("button", { name: DISMISS }) as HTMLButtonElement).disabled).toBe(true));
+
+        await act(async () => {
+            answer({ status: "ready", text: "please call me back", threadId: "thread-1" });
+        });
+
+        await waitFor(() => expect(onSendNote).toHaveBeenCalledWith("please call me back", "note-1"));
+    });
+
+    it("says Sent once the note reads as sent, and moves focus to the next note's Send", async () => {
+        const second = { createdAt: 1, id: "note-2", status: "held", text: "and the invoice" };
+
+        readLink.mockResolvedValue({ ...WAITING, messages: [{ ...NOTE, status: "sent" }, second] });
+        showHost({ ...WAITING, messages: [...WAITING.messages, second] }, async () => {});
+        fireEvent.click(screen.getByRole("button", { name: SEND }));
+
+        await waitFor(() => expect(screen.getByRole("status").textContent).toBe("Sent"));
+        expect(screen.getByRole("button", { name: SEND_SECOND }).matches(":focus")).toBe(true);
+    });
+
+    it.each([
+        ["GUEST_NOTE_GONE", toastError, "That message is no longer waiting."],
+        ["GUEST_LINK_ENDED", toastError, "The guest link was replaced or has ended."],
+        ["GUEST_NOTE_BEING_SENT", toastInfo, "That message is being sent."],
+    ] as const)("says why a Dismiss was refused (%s), in the app's words", async (code, toast, message) => {
+        dismissNote.mockRejectedValueOnce({ code: "BAD_REQUEST", data: { code } });
+        showPanel(WAITING);
+        fireEvent.click(screen.getByRole("button", { name: DISMISS }));
+
+        await waitFor(() => expect(toast).toHaveBeenCalledWith(message));
+    });
 });
 
 describe("GuestLinkPanel", () => {

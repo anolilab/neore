@@ -29,7 +29,7 @@ const revokeCalled = fn(() => null);
 const FIXTURES = guestLinksFixtures();
 
 const meta = {
-    args: { threadId: "thread-1" },
+    args: { sendNote: fn(async () => "sent" as const), threadId: "thread-1" },
     component: WithRevoke,
     decorators: [
         (Story) => (
@@ -46,7 +46,7 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-/** A live link with a note waiting and one already sent, each with its state; nothing here acts on a note. */
+/** A live link with a note waiting and one already sent, each with its state; only the waiting one can be sent or dismissed. */
 export const NotesWaiting: Story = {
     play: async ({ canvas }) => {
         const notes = await canvas.findByRole("list", { name: "Guest messages" });
@@ -54,7 +54,11 @@ export const NotesWaiting: Story = {
         await expect(await canvas.findByText(HELD)).toBeVisible();
         await expect(canvas.getByText("Waiting")).toBeVisible();
         await expect(canvas.getByText("Sent")).toBeVisible();
-        await expect(within(notes).queryAllByRole("button")).toHaveLength(0);
+        await expect(
+            within(notes)
+                .getAllByRole("button")
+                .map((button) => button.textContent),
+        ).toStrictEqual(["Send", "Dismiss note"]);
     },
 };
 

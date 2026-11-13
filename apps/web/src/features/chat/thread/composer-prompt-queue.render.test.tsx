@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { QueuedChatPrompt } from "@/features/chat/core/stores/prompt-queue-store";
 import { usePromptQueueStore } from "@/features/chat/core/stores/prompt-queue-store";
 import { EMPTY_PROMPT_QUEUE, serializePromptQueue } from "@/features/chat/core/utils/prompt-queue";
+import { clearSendStarting, markSendStarting } from "@/features/chat/core/utils/send-in-flight";
 
 import ComposerPromptQueue from "./composer-prompt-queue";
 
@@ -169,6 +170,25 @@ describe("composer prompt queue", () => {
         rerender(<ComposerPromptQueue />);
 
         expect(screen.getByText("an ended session's prompt")).toBeTruthy();
+    });
+
+    it("holds a queued prompt while another send in the thread has begun and its reply does not stream yet", async () => {
+        chat.error = undefined;
+        markSendStarting(chat.threadId);
+
+        try {
+            render(<ComposerPromptQueue />);
+            // A prompt queued now would go at once, the thread being idle.
+            act(() => {
+                usePromptQueueStore.getState().enqueue(chat.threadId, { attachments: [], text: "queued" });
+            });
+            await nextFrame();
+            await nextFrame();
+
+            expect(chat.sendMessage).not.toHaveBeenCalled();
+        } finally {
+            clearSendStarting(chat.threadId);
+        }
     });
 
     it("holds a queued prompt while the thread's mode is saving, and sends it once the save has ended", async () => {

@@ -5,6 +5,8 @@ import type { QueryClient } from "@tanstack/react-query";
 import type { HistoryState, useNavigate } from "@tanstack/react-router";
 import type { Dispatch, RefObject, SetStateAction } from "react";
 
+import { openLoginPrompt } from "@/features/auth/stores/login-prompt-store";
+import { holdForSignIn } from "@/features/chat/core/hooks/use-pending-send";
 import { goalForMessage, useGoalComposer } from "@/features/chat/goal/goal-store";
 import { draftGeneration } from "@/features/chat/split/composer-drafts";
 import {
@@ -31,6 +33,7 @@ import type { PendingSettings } from "../stores/model-store";
 import { useModelStore } from "../stores/model-store";
 import { newChatTemporaryFields } from "../utils/new-chat-temporary";
 import type { ReadinessGate } from "../utils/readiness-gate";
+import { clearSendStarting, markSendStarting } from "../utils/send-in-flight";
 import type { ChangedSettings, ChatActionBase } from "./chat-action-shared";
 import { afterLastContextReset, localModelError, withoutMessage } from "./chat-action-shared";
 import type { ThreadData, ThreadRow } from "./chat-context-types";
@@ -42,9 +45,31 @@ import { streamErrorType } from "./stream-error-type";
 /** How long a send waits for the session before handing the text back. */
 const AUTH_READY_TIMEOUT_MS = 10_000;
 
+/** The message for `/chat/start`'s refusal of a guest note (`chat/http.ts`), by its code; `undefined` for any other refusal. */
+const guestRefusalText = (texts: SendMessageTexts, code: GatewayErrorBody["error"]): string | undefined => {
+    const byCode: Record<string, () => string> = {
+        GUEST_LINK_ENDED: texts.guestLinkEnded,
+        GUEST_NOTE_ALREADY_SENT: texts.guestNoteAlreadySent,
+        GUEST_NOTE_AS_GOAL: texts.guestNoteAsGoal,
+        GUEST_NOTE_BEING_SENT: texts.guestNoteBeingSent,
+        GUEST_NOTE_NEEDS_TEXT_MODEL: texts.guestNoteNeedsTextModel,
+        GUEST_NOTE_NOT_SENDABLE: texts.guestNoteNotSendable,
+    };
+
+    return typeof code === "string" && Object.hasOwn(byCode, code) ? byCode[code]?.() : undefined;
+};
+
 /** User-facing strings the send body needs, as thunks so the `t` templates stay in the provider where Lingui compiles them. */
 export interface SendMessageTexts {
     bannedContent: () => string;
+    guestLinkEnded: () => string;
+    guestNoteAlreadySent: () => string;
+    guestNoteAsGoal: () => string;
+    guestNoteBeingSent: () => string;
+    guestNoteNeedsTextModel: () => string;
+    guestNoteNotLocal: () => string;
+    guestNoteNotSendable: () => string;
+    guestNoteSessionNotReady: () => string;
     localTextOnly: () => string;
     sessionNotReady: () => string;
 }
@@ -73,8 +98,28 @@ export interface SendMessageEnv extends ChatActionBase {
     turnRef: RefObject<number>;
 }
 
-/** The body of the provider's `sendMessage`: one user turn, local or through the gateway. */
-export const runSendMessage = async (env: SendMessageEnv, rawText: string, attachments?: PendingAttachment[]) => {
+/** What a send carries besides its text: a held guest note's id, set only by the Guests tab's Send. */
+export interface SendMessageOptions {
+    guestMessageId?: string;
+}
+
+/**
+ * A send by someone who must sign in first (invite-only): the owner's own text goes back to the composer and is held for
+ * after sign-in. A guest's note is not the composer's draft: it is neither put there nor held to go out as the owner's words.
+ */
+export const holdSendForSignIn = (text: string, { guestMessageId }: SendMessageOptions = {}): void => {
+    useChatUIStore.getState().setIsSubmitting(false);
+
+    if (guestMessageId === undefined) {
+        useChatUIStore.getState().setComposerText(text);
+        holdForSignIn(text);
+    } else {
+        openLoginPrompt();
+    }
+};
+
+/** One user turn, local or through the gateway; `runSendMessage` marks the thread around it. */
+const runSendMessageBody = async (env: SendMessageEnv, rawText: string, attachments?: PendingAttachment[], options: SendMessageOptions = {}) => {
     // Every caller (the composer, voice, a queued prompt) ends here, and the local branch never reaches the server's
     // filter, so hidden characters leave the text before either branch sees it.
     const { removed, text } = stripHiddenText(rawText);
@@ -124,7 +169,11 @@ export const runSendMessage = async (env: SendMessageEnv, rawText: string, attac
     const generationAtStart = draftGeneration();
     const focusAtStart = paneFocusEpoch();
     const sameSession = (): boolean => draftGeneration() === generationAtStart;
-    const { attachedReferences } = useChatUIStore.getState();
+    // A held guest note the owner sends on from the Guests tab: the server saves its own text, marked as the guest's. Only
+    // that send carries the id, never one of the composer's or the queue's. It goes alone: never through the composer (the
+    // owner's draft stays, on every path out), with no goal, no reference images and none of the composer's files.
+    const { guestMessageId } = options;
+    const attachedReferences = guestMessageId === undefined ? useChatUIStore.getState().attachedReferences : [];
     const modelAtStart = useModelStore.getState();
     const currentMode = modelAtStart.getComposerMode(threadId || undefined);
     // The thread the composer showed when the settings were taken: a late failure must not hand them to another thread,
@@ -143,13 +192,13 @@ export const runSendMessage = async (env: SendMessageEnv, rawText: string, attac
         if (!(await authGate.wait(AUTH_READY_TIMEOUT_MS))) {
             providerLogger.error("[ChatProvider] Session not ready after waiting; send not delivered");
 
-            if (sameSession()) {
+            if (guestMessageId === undefined && sameSession()) {
                 restoreTextFor(owner, text);
             }
 
             useChatUIStore.getState().setIsSubmitting(false);
             handleError(
-                new AppError(texts.sessionNotReady(), {
+                new AppError(guestMessageId === undefined ? texts.sessionNotReady() : texts.guestNoteSessionNotReady(), {
                     code: "AUTH_NOT_READY",
                     statusCode: 401,
                 }),
@@ -179,6 +228,14 @@ export const runSendMessage = async (env: SendMessageEnv, rawText: string, attac
     const isCreatingNewThread = !threadId;
 
     if (localTarget) {
+        // A local turn is saved as the owner's own words, so a guest's note goes only through the hosted path.
+        if (guestMessageId !== undefined) {
+            setOptimisticMessages(withoutMessage(optimisticId));
+            handleError(localModelError(texts.guestNoteNotLocal()));
+
+            return;
+        }
+
         // A local turn never carries a goal: clear one that is armed, so it cannot ride the next gateway send.
         useGoalComposer.getState().setEnabled(false);
 
@@ -271,7 +328,7 @@ export const runSendMessage = async (env: SendMessageEnv, rawText: string, attac
 
         let fileIds: string[] | undefined;
 
-        if (attachments) {
+        if (attachments && guestMessageId === undefined) {
             fileIds = [];
 
             for (const a of attachments) {
@@ -303,10 +360,14 @@ export const runSendMessage = async (env: SendMessageEnv, rawText: string, attac
         };
 
         // "Run until done": this message is a goal (text turns only).
-        const goal = currentMode === "text" ? goalForMessage(text) : undefined;
+        const goal = currentMode === "text" && guestMessageId === undefined ? goalForMessage(text) : undefined;
 
         if (goal) {
             requestBody.goal = goal;
+        }
+
+        if (guestMessageId !== undefined) {
+            requestBody.guestMessageId = guestMessageId;
         }
 
         // Add image generation settings
@@ -358,7 +419,10 @@ export const runSendMessage = async (env: SendMessageEnv, rawText: string, attac
 
         // Clear composer and show thinking state immediately — before the network round-trip
         // so the UI feels instant and non-frozen while the server processes the request
-        clearSentDraft(owner, text, focusAtStart);
+        if (guestMessageId === undefined) {
+            clearSentDraft(owner, text, focusAtStart);
+        }
+
         useChatUIStore.getState().setIsSubmitting(false);
         setIsRegenerating(true);
 
@@ -377,7 +441,16 @@ export const runSendMessage = async (env: SendMessageEnv, rawText: string, attac
                 return {};
             })) as GatewayErrorBody;
 
-            if (errorData.error === "BANNED_CONTENT") {
+            // A guest note's own refusal, by its code (the body's `error`), never by status alone: another 409 (a host-run
+            // thread's) is not "already sent". Any other code is reported as for any send.
+            const guestRefusal = guestMessageId === undefined ? undefined : guestRefusalText(texts, errorData.error);
+
+            if (guestRefusal !== undefined) {
+                throw new Error(guestRefusal);
+            }
+
+            // A guest's note is not in the composer, so its refusal shows as an error, not as the composer's banner.
+            if (guestMessageId === undefined && errorData.error === "BANNED_CONTENT") {
                 // Restore composer text so the user can edit their message
                 setIsRegenerating(false);
                 setOptimisticMessages(withoutMessage(optimisticId));
@@ -437,7 +510,10 @@ export const runSendMessage = async (env: SendMessageEnv, rawText: string, attac
             const composerMode = useModelStore.getState().getComposerMode(threadId || undefined);
 
             // A goal is spent by the message that carried it; one armed in text mode does not wait out an image or video send.
-            useGoalComposer.getState().setEnabled(false);
+            // A guest's note carries none, so the owner's armed goal waits for their own next message.
+            if (guestMessageId === undefined) {
+                useGoalComposer.getState().setEnabled(false);
+            }
 
             trackEvent("stream_started", { model });
             trackEvent("message_sent", {
@@ -522,7 +598,7 @@ export const runSendMessage = async (env: SendMessageEnv, rawText: string, attac
         // The composer was cleared before the request; hand the draft back unless a new one is there. After a
         // deadline the backend may still have saved the prompt, so the draft returns for the user to resend on
         // purpose (never automatically) and the timeout message says to check the conversation first.
-        if (sameSession()) {
+        if (guestMessageId === undefined && sameSession()) {
             restoreComposerFor(owner, { attachedReferences, composerAttachments: attachments ?? [], composerText: text });
         }
 
@@ -533,5 +609,19 @@ export const runSendMessage = async (env: SendMessageEnv, rawText: string, attac
         if (error_ instanceof Error && (error_.message.includes("401") || error_.message.includes("403"))) {
             refetchSession();
         }
+    }
+};
+
+/**
+ * The body of the provider's `sendMessage`: one user turn, local or through the gateway. Until it returns (the reply
+ * streams, or the send failed), the thread counts a send starting (`isSendStarting`): a queued prompt or a guest note waits.
+ */
+export const runSendMessage = async (env: SendMessageEnv, rawText: string, attachments?: PendingAttachment[], options: SendMessageOptions = {}) => {
+    markSendStarting(env.threadId);
+
+    try {
+        await runSendMessageBody(env, rawText, attachments, options);
+    } finally {
+        clearSendStarting(env.threadId);
     }
 };

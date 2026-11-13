@@ -47,6 +47,7 @@ import type { QueuedChatPrompt } from "@/features/chat/core/stores/prompt-queue-
 import { allowPromptQueueRestore, selectThreadQueue, usePromptQueueStore } from "@/features/chat/core/stores/prompt-queue-store";
 import type { QueuedSteer, SteerWithdrawal } from "@/features/chat/core/utils/prompt-queue";
 import { decideAutoSend, deliveredSteerItems, takeNextToSend } from "@/features/chat/core/utils/prompt-queue";
+import { isSendStarting } from "@/features/chat/core/utils/send-in-flight";
 import { useConnectionView } from "@/features/connection/hooks/use-connection";
 import { useCRPC, useLunoraAuth } from "@/lib/lunora/crpc";
 import { showError, showInfo } from "@/lib/toast";
@@ -225,7 +226,9 @@ const useQueueActions = () => {
                             // and this check runs after the withdrawal's await, so it could send under the old mode.
                             queryClient.isMutating({ exact: true, mutationKey: permissionModeSaveKey(threadId) }) === 0 &&
                             (explicit || !latest.hasError) &&
-                            !useChatUIStore.getState().isSubmitting
+                            !useChatUIStore.getState().isSubmitting &&
+                            // Another send (a guest note's, say) has begun and its reply is not streaming yet.
+                            !isSendStarting(threadId)
                         );
                     },
                     peek: () => usePromptQueueStore.getState().queues[threadId]?.items[0],
