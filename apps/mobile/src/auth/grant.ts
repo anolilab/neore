@@ -306,11 +306,18 @@ export const takeStoredGrant = async (store: GrantStore): Promise<string | undef
     return token;
 };
 
-/** Revokes a session server-side. Offline, it throws; the session then expires on its own. */
+/**
+ * Revokes a session server-side. Offline, or on an error answer, it throws; the session then expires on its own. The error
+ * never carries the token.
+ */
 export const revokeSessionToken = async (input: { fetch: Fetch; lunoraUrl: string; token: string }): Promise<void> => {
     const response = await postJson(input.fetch, `${input.lunoraUrl}/extension/auth/revoke`, { token: input.token });
 
     await response.body?.cancel();
+
+    if (!response.ok) {
+        throw new Error(`Could not revoke the session (${response.status}).`);
+    }
 };
 
 /**

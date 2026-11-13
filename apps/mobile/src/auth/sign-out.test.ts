@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { StoredGrantNotClearedError } from "./stored-grant-error";
 import { emptyCacheWhileSignedOut, RELEASE_PUSH_TIMEOUT_MS, signOutOnDevice } from "./sign-out";
+import { StoredGrantNotClearedError } from "./stored-grant-error";
 
 describe("signOutOnDevice", () => {
     it("empties the cache before it asks the server, so a request that fails or hangs cannot leave chats behind", async () => {
@@ -57,19 +57,38 @@ describe("signOutOnDevice", () => {
     it("revokes the token the failed clear carries, so a grant left in the keychain stops working", async () => {
         const revokeSession = vi.fn(async () => undefined);
         const warn = vi.fn();
+        const keychain = new Error("keychain locked");
 
         await signOutOnDevice({
             clearCache: async () => undefined,
             forgetLastChat: async () => undefined,
             revokeSession,
             takeCredential: async () => {
-                throw new StoredGrantNotClearedError("session-1", new Error("keychain locked"));
+                throw new StoredGrantNotClearedError("session-1", keychain);
             },
             warn,
         });
 
         expect(revokeSession).toHaveBeenCalledWith("session-1");
-        expect(warn).toHaveBeenCalledWith("Could not clear the stored sign-in.", expect.any(Error));
+        // The warning gets the keychain failure itself, never the error that carries the session token.
+        expect(warn).toHaveBeenCalledWith("Could not clear the stored sign-in.", keychain);
+    });
+
+    it("warns that the revoke was refused, without the token, and still finishes sign-out", async () => {
+        const warn = vi.fn();
+        const refused = new Error("Could not revoke the session (500).");
+
+        await signOutOnDevice({
+            clearCache: async () => undefined,
+            forgetLastChat: async () => undefined,
+            revokeSession: async () => {
+                throw refused;
+            },
+            takeCredential: async () => "session-1",
+            warn,
+        });
+
+        expect(warn).toHaveBeenCalledWith("Could not revoke the session on the server.", refused);
     });
 
     it("sends no revoke when no session was stored", async () => {

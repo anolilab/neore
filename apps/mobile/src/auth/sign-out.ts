@@ -1,3 +1,5 @@
+import { StoredGrantNotClearedError } from "./stored-grant-error";
+
 /** The session token a failed credential clear carries (`StoredGrantNotClearedError`), if any. */
 const tokenOf = (error: unknown): string | undefined => {
     const { token } = (error ?? {}) as { token?: unknown };
@@ -49,9 +51,10 @@ export const signOutOnDevice = async ({ clearCache, forgetLastChat, releasePush,
         token = await takeCredential();
     } catch (error) {
         // The stored session could not be cleared. The user is still signed out in memory by the caller, and the session
-        // is still revoked below with the token the failed clear carries, so a grant left behind stops working.
-        warn("Could not clear the stored sign-in.", error);
+        // is still revoked below with the token the failed clear carries, so a grant left behind stops working. The
+        // warning gets only the keychain failure: the error itself carries the session token.
         token = tokenOf(error);
+        warn("Could not clear the stored sign-in.", error instanceof StoredGrantNotClearedError ? error.cause : error);
     }
 
     if (releasePush) {
@@ -74,8 +77,9 @@ export const signOutOnDevice = async ({ clearCache, forgetLastChat, releasePush,
     if (token !== undefined) {
         try {
             await revokeSession(token);
-        } catch {
-            // Offline: the session expires on its own, and nothing on the phone holds it any more.
+        } catch (error) {
+            // Offline or refused: the session expires on its own, and nothing on the phone holds it any more.
+            warn("Could not revoke the session on the server.", error);
         }
     }
 };

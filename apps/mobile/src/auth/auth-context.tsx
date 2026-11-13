@@ -123,6 +123,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }, [config.appUrl, config.lunoraUrl]);
 
     const signOut = useCallback(async () => {
+        // Bumped now and again in `finally`: a refresh that was running, or that starts while the stored session is being
+        // cleared and revoked, is stale, so it cannot report signed-out early or let a new sign-in outlive this sign-out.
+        signOutCount.current += 1;
         // From here on, no prompt and no registration for the account that is leaving.
         endPhonePushForAccount();
 

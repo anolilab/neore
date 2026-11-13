@@ -217,7 +217,9 @@ describe("takeStoredGrant", () => {
             clear: async () => {
                 throw new Error("keychain locked");
             },
-            get: async () => ({ token: "session-1", user: USER }),
+            get: async () => {
+                return { token: "session-1", user: USER };
+            },
             set: async () => {},
         };
 
@@ -245,6 +247,12 @@ describe("revokeSessionToken", () => {
         };
 
         await expect(revokeSessionToken({ fetch, lunoraUrl: LUNORA, token: "session-1" })).rejects.toThrow("offline");
+    });
+
+    it("rejects when the server refuses the revoke, so a refused revoke is not reported as done", async () => {
+        const fetch: Fetch = async () => json({ message: "nope" }, 500);
+
+        await expect(revokeSessionToken({ fetch, lunoraUrl: LUNORA, token: "session-1" })).rejects.toThrow("Could not revoke the session (500).");
     });
 });
 
