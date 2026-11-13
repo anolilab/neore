@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import type { ReactNode } from "react";
-import { act, useState } from "react";
+import { act, Profiler, useEffect, useState } from "react";
 import type { Root } from "react-dom/client";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -28,9 +28,18 @@ const row = (id: string, text: string): ShownRow => {
 };
 
 const onShare = () => {};
+/** Commits of the chat: rows have no state of their own, so the list commits exactly when the screen renders. */
 const screenRenders = { count: 0 };
 const frame: { run?: () => void } = {};
 const wiring: { batcher?: ChunkBatcher } = {};
+
+const countScreenRender = () => {
+    screenRenders.count += 1;
+};
+
+const keepBatcher = (batcher: ChunkBatcher) => {
+    wiring.batcher = batcher;
+};
 
 /** The chat screen's wiring: rows in state, a batcher that writes them once a frame, one memoised view per row. */
 const Chat = ({ initial }: { initial: ShownRow[] }) => {
@@ -51,15 +60,18 @@ const Chat = ({ initial }: { initial: ShownRow[] }) => {
         }),
     );
 
-    screenRenders.count += 1;
-    wiring.batcher = batcher;
+    useEffect(() => {
+        keepBatcher(batcher);
+    }, [batcher]);
 
     return (
-        <ul>
-            {rows.map((shown) => (
-                <MessageRowView key={shown.id} onShare={onShare} row={shown} />
-            ))}
-        </ul>
+        <Profiler id="chat" onRender={countScreenRender}>
+            <ul>
+                {rows.map((shown) => (
+                    <MessageRowView key={shown.id} onShare={onShare} row={shown} />
+                ))}
+            </ul>
+        </Profiler>
     );
 };
 
