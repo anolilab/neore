@@ -244,3 +244,30 @@ describe("paste styles: review cases, fifth round", () => {
         ).toBe("~~x~~ ~~y~~ ~~z~~");
     });
 });
+
+describe("paste styles: review cases, sixth round", () => {
+    it("strikes text only when the last decoration line, from the shorthand or its longhand, is struck", () => {
+        expect(
+            convert(
+                `<p><span style="text-decoration:line-through; text-decoration-line:none">a</span> <span style="text-decoration-line:line-through; text-decoration:none">b</span> <span style="text-decoration:none; text-decoration-line:line-through">c</span> <span style="text-decoration:line-through bogus">d</span></p>`,
+            ),
+        ).toBe("a b ~~c~~ d");
+    });
+
+    it("takes the marks out of CDATA in a node passed in", () => {
+        const document = createDocument(`<p><span style="font-weight:bold">a <span>b</span> d</span></p>`);
+
+        appendCdataSection(document.querySelector("span span") as Element, "\u{1}c");
+
+        expect(convert(document.body)).toBe("**a bc d**");
+    });
+
+    it("passes a styled paragraph on to a rule the caller added before the preset", () => {
+        const service = new TurndownService(PASTE_OPTIONS);
+
+        service.addRule("paragraph", { filter: "p", replacement: (content: string) => `\n\n[P ${content}]\n\n` });
+        service.use(paste);
+
+        expect(service.turndown(`<p>plain</p><p style="font-weight:bold">styled</p>`)).toBe("[P plain]\n\n[P **styled**]");
+    });
+});

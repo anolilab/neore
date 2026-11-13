@@ -12,8 +12,9 @@ export function appendCdataSection(parent: Element, data: string): void {
     const retype = (node: Text): void => {
         Object.defineProperties(node, {
             clone: {
+                // The current text, as a DOM clones it: a copy whose text was changed clones with the change.
                 value: () => {
-                    const copy = htmlDocument.createTextNode(data);
+                    const copy = htmlDocument.createTextNode(node.nodeValue ?? "");
 
                     retype(copy);
 

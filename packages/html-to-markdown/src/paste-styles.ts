@@ -13,6 +13,8 @@ import type { TurndownInput } from "./turndown";
 import type { Options, Rule, RuleLookup } from "./types";
 import { isBlock } from "./utilities";
 
+// Text, CDATA and comments: the nodes whose text the marks are taken out of.
+const TEXT_TYPES = new Set([3, 4, 8]);
 const NORMAL_START = "\u{1}";
 const NORMAL_END = "\u{2}";
 const BOLD_WEIGHTS = new Set(["600", "700", "800", "900", "bold", "bolder"]);
@@ -284,10 +286,16 @@ function isDecorationValue(value: string): boolean {
         );
 }
 
-function isStruckStyle(style: string): boolean {
-    const isShorthandStruck = declaredStyle(style, "text-decoration", isDecorationValue).split(CSS_SPACE).includes("line-through");
+/** True for a value the shorthand or the longhand that sets the decoration line takes. */
+function isLineValue(value: string, property: string): boolean {
+    return property === "text-decoration" ? isDecorationValue(value) : isDecorationLineValue(value);
+}
 
-    return isShorthandStruck || declaredStyle(style, "text-decoration-line", isDecorationLineValue).split(CSS_SPACE).includes("line-through");
+/** True when the decoration line a style ends up with is struck: the shorthand and its longhand set it, the last one wins. */
+function isStruckStyle(style: string): boolean {
+    const line = declaredStyle(style, ["text-decoration", "text-decoration-line"], isLineValue);
+
+    return line.split(CSS_SPACE).includes("line-through");
 }
 
 function isNamed(element: Element): boolean {
@@ -824,7 +832,7 @@ function hasMarks(root: Node): boolean {
     while (pending.length > 0) {
         const node = pending.pop() as Node;
 
-        if ((node.nodeType === 3 || node.nodeType === 8) && withoutMarks(node.nodeValue ?? "") !== node.nodeValue) {
+        if (TEXT_TYPES.has(node.nodeType) && withoutMarks(node.nodeValue ?? "") !== node.nodeValue) {
             return true;
         }
 
@@ -848,7 +856,8 @@ function copyWithoutMarks(input: Node): Node {
     while (pending.length > 0) {
         const node = pending.pop() as Node;
 
-        if (node.nodeType === 3 || node.nodeType === 8) {
+        // Text, CDATA and comments.
+        if (TEXT_TYPES.has(node.nodeType)) {
             node.nodeValue = withoutMarks(node.nodeValue ?? "");
         } else if (node.nodeType === 1) {
             for (const attribute of attributesOf(node as Element)) {
