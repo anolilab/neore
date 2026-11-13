@@ -1238,11 +1238,11 @@ msgstr "{name} réactivé"
 msgid "{name} wants to run \"{tool}\""
 msgstr "{name} veut exécuter « {tool} »"
 
-#: ../../packages/ui/src/components/file-renderers/pdf-thumbnail.tsx:69
+#: ../../packages/ui/src/components/file-renderers/pdf-thumbnail.tsx:102
 msgid "{name}, {pages, plural, one {# page} other {# pages}}"
 msgstr "{name}, {pages, plural, one {# page} other {# pages}}"
 
-#: ../../packages/ui/src/components/file-renderers/pdf-thumbnail.tsx:70
+#: ../../packages/ui/src/components/file-renderers/pdf-thumbnail.tsx:103
 msgid "{name}, preview unavailable"
 msgstr "{name}, aperçu indisponible"
 
@@ -1266,7 +1266,7 @@ msgstr "{openCount} commentaires ouverts"
 msgid "{overflowCount, plural, one {# more user} other {# more users}}"
 msgstr "{overflowCount, plural, one {# utilisateur de plus} other {# utilisateurs de plus}}"
 
-#: ../../packages/ui/src/components/file-renderers/pdf-thumbnail.tsx:116
+#: ../../packages/ui/src/components/file-renderers/pdf-thumbnail.tsx:151
 msgid "{pages, plural, one {# page} other {# pages}}"
 msgstr "{pages, plural, one {# page} other {# pages}}"
 
@@ -1811,7 +1811,7 @@ msgid "A key is saved. Leave blank to keep it. Changing the endpoint, region or 
 msgstr "Une clé est enregistrée. Laissez vide pour la conserver. Si vous modifiez le point de terminaison, la région ou l'ID de clé d'accès, vous devrez la saisir à nouveau."
 
 #: src/features/chat/guest-links/guest-link-panel.tsx:159
-#: src/features/chat/guest-links/guest-link-panel.tsx:354
+#: src/features/chat/guest-links/guest-link-panel.tsx:360
 msgid "A locked chat cannot have a guest link."
 msgstr "Une discussion verrouillée ne peut pas avoir de lien invité."
 
@@ -1897,7 +1897,7 @@ msgid "A reply is posted straight away, not with the rest of your review."
 msgstr "Une réponse est publiée immédiatement, pas avec le reste de votre revue."
 
 #: src/features/chat/guest-links/guest-link-panel.tsx:244
-#: src/features/chat/guest-links/guest-link-panel.tsx:350
+#: src/features/chat/guest-links/guest-link-panel.tsx:356
 msgid "A reply is running. Send a message once it has finished."
 msgstr "Une réponse est en cours. Envoyez un message une fois qu’elle est terminée."
 
@@ -3649,7 +3649,7 @@ msgstr "N’importe lequel de mes chats"
 msgid "Any string you choose; enter the same value as the webhook Verify token in the Meta app"
 msgstr "Une chaîne de votre choix ; saisissez la même valeur que le « Verify token » du webhook dans l’application Meta"
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:342
+#: src/features/chat/guest-links/guest-link-panel.tsx:348
 msgid "Anyone with a guest link can leave you a message here. Nothing they write runs until you send it."
 msgstr "Toute personne disposant d’un lien invité peut vous laisser un message ici. Rien de ce qu’elle écrit n’est exécuté tant que vous ne l’envoyez pas."
 
@@ -4067,7 +4067,7 @@ msgid "ask"
 msgstr "demander"
 
 #: src/features/chat/aside/aside-panel.tsx:306
-#: src/features/chat/sidebar/thread-sidebar.tsx:339
+#: src/features/chat/sidebar/thread-sidebar.tsx:354
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:61
 msgid "Ask"
 msgstr "Demander"
@@ -6783,7 +6783,7 @@ msgid "Collaborate with shared AI workflows."
 msgstr "Collaborez avec des workflows d’IA partagés."
 
 #: ../../packages/ui/src/components/ai-elements/reasoning.tsx:201
-#: ../../packages/ui/src/components/sidebar.tsx:411
+#: ../../packages/ui/src/components/sidebar.tsx:432
 #: src/features/workflow/components/canvas/workflow-toolbar.tsx:197
 #: src/features/workflow/components/nodes/group-node.tsx:216
 msgid "Collapse"
@@ -7995,7 +7995,7 @@ msgstr "Copié !"
 #: ../../packages/ui/src/components/data-grid/data-grid-context-menu.tsx:225
 #: src/features/auth/components/settings/api-key/mcp-config-snippet.tsx:30
 #: src/features/auth/components/settings/two-factor/backup-codes-dialog.tsx:100
-#: src/features/chat/guest-links/guest-link-panel.tsx:359
+#: src/features/chat/guest-links/guest-link-panel.tsx:365
 #: src/features/chat/sharing/thread-share-button.tsx:398
 #: src/features/chat/thread/message-item.tsx:356
 #: src/features/chat/thread/text-selection-menu.tsx:525
@@ -8846,7 +8846,7 @@ msgstr "Créer un objectif"
 msgid "Create group chat"
 msgstr "Créer un chat de groupe"
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:390
+#: src/features/chat/guest-links/guest-link-panel.tsx:396
 msgid "Create guest link"
 msgstr "Créer un lien invité"
 
@@ -10555,11 +10555,11 @@ msgstr "Ignorer l’erreur"
 msgid "Dismiss errors"
 msgstr "Ignorer les erreurs"
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:433
+#: src/features/chat/guest-links/guest-link-panel.tsx:439
 msgid "Dismiss note"
 msgstr "Ignorer le message"
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:427
+#: src/features/chat/guest-links/guest-link-panel.tsx:433
 msgid "Dismiss note: {snippet}"
 msgstr "Ignorer le message : {snippet}"
 
@@ -10595,7 +10595,7 @@ msgstr "Afficher les résultats"
 msgid "Display timestamps on messages."
 msgstr "Afficher l’horodatage des messages."
 
-#: ../../packages/ui/src/components/sidebar.tsx:278
+#: ../../packages/ui/src/components/sidebar.tsx:286
 msgid "Displays the mobile sidebar."
 msgstr "Affiche la barre latérale mobile."
 
@@ -12501,7 +12501,7 @@ msgstr "Quitter {0}"
 msgid "Exit fullscreen"
 msgstr "Quitter le plein écran"
 
-#: ../../packages/ui/src/components/sidebar.tsx:411
+#: ../../packages/ui/src/components/sidebar.tsx:432
 #: src/features/workflow/components/nodes/group-node.tsx:216
 msgid "Expand"
 msgstr "Développer"
@@ -15816,15 +15816,15 @@ msgstr "Les comptes invités n’utilisent que des modèles gratuits."
 msgid "Guest accounts use free models only. Sign up to unlock all models."
 msgstr "Les comptes invités n’utilisent que des modèles gratuits. Inscrivez-vous pour débloquer tous les modèles."
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:357
+#: src/features/chat/guest-links/guest-link-panel.tsx:363
 msgid "Guest link"
 msgstr "Lien invité"
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:333
+#: src/features/chat/guest-links/guest-link-panel.tsx:339
 msgid "Guest link copied"
 msgstr "Lien invité copié"
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:395
+#: src/features/chat/guest-links/guest-link-panel.tsx:401
 msgid "Guest messages"
 msgstr "Messages des invités"
 
@@ -18479,7 +18479,7 @@ msgstr "Lignes dont le JSON n’est pas valide"
 msgid "Link"
 msgstr "Associer"
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:365
+#: src/features/chat/guest-links/guest-link-panel.tsx:371
 msgid "Link active until {expiresAt}"
 msgstr "Lien actif jusqu’au {expiresAt}"
 
@@ -18793,7 +18793,7 @@ msgstr "Chargement des préréglages…"
 msgid "Loading preview..."
 msgstr "Chargement de l’aperçu..."
 
-#: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:170
+#: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:104
 #: src/features/canvas/pdf-preview-panel.tsx:127
 #: src/features/chat/thread/sandbox-files.tsx:104
 msgid "Loading preview…"
@@ -18840,7 +18840,7 @@ msgstr "Chargement des statistiques…"
 msgid "Loading tasks…"
 msgstr "Chargement des tâches…"
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:275
+#: src/features/chat/guest-links/guest-link-panel.tsx:281
 msgid "Loading the guest link…"
 msgstr "Chargement du lien invité…"
 
@@ -19008,8 +19008,8 @@ msgstr "Se déconnecter"
 
 #: src/features/auth/components/auth/login-modal.tsx:46
 #: src/features/chat/signed-out/signed-out-chat.tsx:284
-#: src/features/layout/components/app-sidebar.tsx:54
-#: src/features/layout/components/app-sidebar.tsx:67
+#: src/features/layout/components/app-sidebar.tsx:61
+#: src/features/layout/components/app-sidebar.tsx:74
 #: src/features/marketing/components/gateway-navbar.tsx:90
 #: src/features/marketing/components/gateway-navbar.tsx:184
 #: src/features/marketing/components/navbar-menu.tsx:99
@@ -21392,7 +21392,7 @@ msgstr "Option suivante"
 msgid "Next output mode"
 msgstr "Mode de sortie suivant"
 
-#: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:119
+#: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:144
 #: src/features/prompts/components/prompts-sidebar-tab.tsx:883
 msgid "Next page"
 msgstr "Page suivante"
@@ -22889,7 +22889,7 @@ msgctxt "stock opening price"
 msgid "Open"
 msgstr "Ouverture"
 
-#: ../../packages/ui/src/components/file-renderers/pdf-thumbnail.tsx:68
+#: ../../packages/ui/src/components/file-renderers/pdf-thumbnail.tsx:101
 msgid "Open {filename}"
 msgstr "Ouvrir {filename}"
 
@@ -23018,7 +23018,7 @@ msgstr "Ouvrir sur {0}"
 msgid "Open Pages"
 msgstr "Ouvrir les pages"
 
-#: ../../packages/ui/src/components/file-renderers/pdf-thumbnail.tsx:68
+#: ../../packages/ui/src/components/file-renderers/pdf-thumbnail.tsx:101
 msgid "Open PDF"
 msgstr "Ouvrir le PDF"
 
@@ -24571,7 +24571,7 @@ msgstr "Épinglées"
 msgid "Pinned project"
 msgstr "Projet épinglé"
 
-#: src/features/chat/sidebar/thread-sidebar.tsx:348
+#: src/features/chat/sidebar/thread-sidebar.tsx:363
 msgid "Pins"
 msgstr "Épingles"
 
@@ -25146,7 +25146,7 @@ msgstr "Option précédente"
 msgid "Previous output mode"
 msgstr "Mode de sortie précédent"
 
-#: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:105
+#: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:130
 #: src/features/prompts/components/prompts-sidebar-tab.tsx:874
 msgid "Previous page"
 msgstr "Page précédente"
@@ -25590,7 +25590,7 @@ msgstr "Prompt mis à jour avec le contenu optimisé"
 msgid "Prompt Variables"
 msgstr "Variables du prompt"
 
-#: src/features/chat/sidebar/thread-sidebar.tsx:324
+#: src/features/chat/sidebar/thread-sidebar.tsx:339
 #: src/features/layout/components/sidebar-shortcut.tsx:87
 #: src/features/prompts/components/prompt-header.tsx:10
 #: src/features/prompts/components/prompts-sidebar-tab.tsx:479
@@ -27638,7 +27638,7 @@ msgstr "Révoquer"
 msgid "Revoke All Sessions"
 msgstr "Révoquer toutes les sessions"
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:374
+#: src/features/chat/guest-links/guest-link-panel.tsx:380
 msgid "Revoke link"
 msgstr "Révoquer le lien"
 
@@ -28959,7 +28959,7 @@ msgstr "Modèle semi-réaliste avec une bonne fidélité au prompt"
 msgid "Semi-realistic visual style"
 msgstr "Style visuel semi-réaliste"
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:424
+#: src/features/chat/guest-links/guest-link-panel.tsx:430
 #: src/features/chat/host/host-composer.tsx:687
 #: src/features/sub-agents/components/worker-composer.tsx:118
 msgid "Send"
@@ -29079,7 +29079,7 @@ msgstr "Envoyer le code de vérification"
 msgid "Send Verification Code"
 msgstr "Envoyer le code de vérification"
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:410
+#: src/features/chat/guest-links/guest-link-panel.tsx:416
 msgid "Send: {snippet}"
 msgstr "Envoyer : {snippet}"
 
@@ -29092,8 +29092,8 @@ msgstr "Envoi de votre message et attente de la réponse"
 msgid "Sending…"
 msgstr "Envoi…"
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:277
-#: src/features/chat/guest-links/guest-link-panel.tsx:405
+#: src/features/chat/guest-links/guest-link-panel.tsx:283
+#: src/features/chat/guest-links/guest-link-panel.tsx:411
 #: src/features/devices/components/devices-settings.tsx:387
 msgid "Sent"
 msgstr "Envoyé"
@@ -29609,7 +29609,7 @@ msgstr "Question annexe"
 msgid "Side questions are not available for this chat, or the question is too long."
 msgstr "Les questions annexes ne sont pas disponibles pour ce chat, ou la question est trop longue."
 
-#: ../../packages/ui/src/components/sidebar.tsx:277
+#: ../../packages/ui/src/components/sidebar.tsx:285
 msgid "Sidebar"
 msgstr "Barre latérale"
 
@@ -30650,7 +30650,7 @@ msgstr "Démarrez votre propre conversation avec les derniers modèles d’IA."
 msgid "Start a conversation to ask a side question."
 msgstr "Démarrez une conversation pour poser une question annexe."
 
-#: src/features/chat/sidebar/thread-sidebar.tsx:371
+#: src/features/chat/sidebar/thread-sidebar.tsx:386
 msgid "Start a conversation to configure variables."
 msgstr "Démarrez une conversation pour configurer les variables."
 
@@ -32464,7 +32464,7 @@ msgstr "Ce message est trop long pour être envoyé d’ici."
 
 #: src/features/chat/core/context/chat-context.tsx:719
 #: src/features/chat/guest-links/guest-link-panel.tsx:240
-#: src/features/chat/guest-links/guest-link-panel.tsx:310
+#: src/features/chat/guest-links/guest-link-panel.tsx:316
 msgid "That message was already sent."
 msgstr "Ce message a déjà été envoyé."
 
@@ -32785,7 +32785,7 @@ msgstr "Le prompt système complet à envoyer au modèle..."
 msgid "The goal is removed; its tasks stay, without a goal."
 msgstr "L’objectif est supprimé ; ses tâches sont conservées, sans objectif."
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:353
+#: src/features/chat/guest-links/guest-link-panel.tsx:359
 msgid "The guest link could not be loaded."
 msgstr "Le lien invité n’a pas pu être chargé."
 
@@ -32902,7 +32902,7 @@ msgstr "la dernière fois"
 msgid "The last turn stopped before it finished."
 msgstr "Le dernier tour s’est arrêté avant d’être terminé."
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:322
+#: src/features/chat/guest-links/guest-link-panel.tsx:328
 msgid "The link could not be copied. Select it and copy it yourself."
 msgstr "Le lien n’a pas pu être copié. Sélectionnez-le et copiez-le vous-même."
 
@@ -33453,7 +33453,7 @@ msgstr "Ce chat est resté inactif, le cache du modèle a donc expiré. Condense
 msgid "This chat is locked"
 msgstr "Ce chat est verrouillé"
 
-#: src/features/chat/sidebar/thread-sidebar.tsx:286
+#: src/features/chat/sidebar/thread-sidebar.tsx:294
 msgid "This chat is locked. Unlock it to see its details."
 msgstr ""
 
@@ -33745,6 +33745,10 @@ msgstr "Ce message se fermera dans {value, plural, one {# seconde} other {# seco
 msgid "This model has no reasoning effort"
 msgstr "Ce modèle n’a pas d’effort de raisonnement"
 
+#: src/features/chat/guest-links/guest-link-panel.tsx:255
+msgid "This note waits in its own chat. Open that chat to send it."
+msgstr "Ce message attend dans sa propre discussion. Ouvrez cette discussion pour l’envoyer."
+
 #: src/features/pages/components/page-conflict-banner.tsx:27
 msgid "This page changed while you were editing."
 msgstr "Cette page a été modifiée pendant que vous l’éditiez."
@@ -33792,9 +33796,9 @@ msgstr "Cette présentation ne contient encore aucune diapositive."
 msgid "This preset will be permanently removed."
 msgstr "Ce préréglage sera définitivement supprimé."
 
-#: ../../packages/ui/src/components/file-renderers/pdf-thumbnail.tsx:85
-#: ../../packages/ui/src/components/file-renderers/pdf-thumbnail.tsx:90
-#: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:162
+#: ../../packages/ui/src/components/file-renderers/pdf-thumbnail.tsx:118
+#: ../../packages/ui/src/components/file-renderers/pdf-thumbnail.tsx:124
+#: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:187
 #: src/features/canvas/pdf-preview-panel.tsx:121
 #: src/features/chat/thread/sandbox-files.tsx:159
 #: src/features/chat/thread/sandbox-files.tsx:199
@@ -34010,7 +34014,7 @@ msgstr "A réfléchi quelques secondes"
 msgid "thread"
 msgstr "fil"
 
-#: src/features/chat/sidebar/thread-sidebar.tsx:317
+#: src/features/chat/sidebar/thread-sidebar.tsx:332
 #: src/features/settings/components/chat/event-trigger-fields.tsx:270
 #: src/features/settings/components/chat/trigger-settings.tsx:1010
 msgid "Thread"
@@ -34294,9 +34298,9 @@ msgstr "Afficher ou masquer la barre latérale droite"
 msgid "Toggle right sidebar ({0})"
 msgstr "Afficher/masquer la barre latérale droite ({0})"
 
-#: ../../packages/ui/src/components/sidebar.tsx:363
-#: ../../packages/ui/src/components/sidebar.tsx:385
-#: ../../packages/ui/src/components/sidebar.tsx:399
+#: ../../packages/ui/src/components/sidebar.tsx:383
+#: ../../packages/ui/src/components/sidebar.tsx:405
+#: ../../packages/ui/src/components/sidebar.tsx:420
 msgid "Toggle Sidebar"
 msgstr "Afficher/masquer la barre latérale"
 
@@ -36030,7 +36034,7 @@ msgstr "Focale variable"
 msgid "Variable name..."
 msgstr "Nom de la variable..."
 
-#: src/features/chat/sidebar/thread-sidebar.tsx:331
+#: src/features/chat/sidebar/thread-sidebar.tsx:346
 #: src/features/prompts/components/prompt-list-view.tsx:180
 #: src/features/prompts/components/variable-definitions.tsx:69
 #: src/features/skills/components/marketplace-skill-detail-dialog.tsx:141
@@ -36726,7 +36730,7 @@ msgstr "Attendez que l'agent soit prêt, puis réessayez."
 msgid "Wait for the reply to finish, then try again."
 msgstr "Attendez la fin de la réponse, puis réessayez."
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:405
+#: src/features/chat/guest-links/guest-link-panel.tsx:411
 msgid "Waiting"
 msgstr "En attente"
 
@@ -38156,7 +38160,7 @@ msgstr "Le LLM de raisonnement le plus puissant de Zhipu AI"
 msgid "ZIP archive"
 msgstr "Archive ZIP"
 
-#: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:141
+#: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:166
 #: ../../packages/ui/src/components/zoomable-image.tsx:397
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:284
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:290
@@ -38173,7 +38177,7 @@ msgstr "Zoom avant"
 msgid "Zoom Lens"
 msgstr "Zoom"
 
-#: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:131
+#: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:156
 #: ../../packages/ui/src/components/zoomable-image.tsx:391
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:250
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:256

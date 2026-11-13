@@ -250,6 +250,12 @@ const GuestLinkPanel: FC<GuestLinkPanelProps> = ({ locked = false, revokeLink, s
                 toast.error(outcome.message || t`That did not work. Please try again.`);
                 break;
             }
+            // The note stays waiting in its own chat.
+            case "moved": {
+                toast.info(t`This note waits in its own chat. Open that chat to send it.`);
+
+                return;
+            }
             case "sent": {
                 setLeaving({ after, id: messageId, sent: true });
                 break;
