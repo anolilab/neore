@@ -28,6 +28,8 @@ const harness = vi.hoisted(() => {
         contentRenders: new Map<string, number>(),
         /** Renders the list inside the real shortcut manager and the thread's find bar. */
         withFind: false,
+        /** Every `rangeExtractor` the virtualized head handed the virtualizer, in render order. */
+        rangeExtractors: [] as unknown[],
         /** Renders a host turn's real changes (commentable) on rows that carry them. */
         withHostChanges: false,
         /** Renders the real read-aloud action on assistant rows. */
@@ -83,6 +85,19 @@ vi.mock("@/features/chat/core/context/chat-context", async () => {
 });
 
 // A host turn's changes (and the comment draft under them) are not under test here and reach for the backend.
+vi.mock("@tanstack/react-virtual", async (importOriginal) => {
+    const actual = await importOriginal<typeof import("@tanstack/react-virtual")>();
+
+    return {
+        ...actual,
+        useVirtualizer: (options: Parameters<typeof actual.useVirtualizer>[0]) => {
+            harness.rangeExtractors.push(options.rangeExtractor);
+
+            return actual.useVirtualizer(options);
+        },
+    };
+});
+
 // The comments panel sends to the host and the diff viewer is a dialog's content; neither is under test here.
 vi.mock("@/features/chat/host/diff-comments-draft", () => {
     return { default: () => null };
@@ -791,6 +806,46 @@ describe("a long thread", { timeout: RENDER_TEST_TIMEOUT_MS }, () => {
 
         await vi.waitFor(() => expect(mountedIds()).not.toContain("m100"), { timeout: 5000 });
         expect(mountedIds()).not.toContain("m101");
+    });
+
+    it("keeps a diff comment open in the oldest tail row, the same box with its text, when new messages push that row out of the tail", async () => {
+        const user = userEvent.setup();
+        const tailStart = THREAD_LENGTH - ALWAYS_MOUNTED_TAIL;
+        const replyId = `m${tailStart + 1}`;
+        const label = "Comment on the whole file src/a.ts";
+
+        harness.withHostChanges = true;
+        harness.messages = (harness.messages as UIMessage[]).map((message) =>
+            message.id === replyId ? ({ ...message, hostChanges: { files: [{ added: 3, path: "src/a.ts", removed: 1 }] } } as UIMessage) : message,
+        );
+        mountInto();
+
+        const rowOf = (id: string): HTMLElement => document.querySelector<HTMLElement>(`[data-list-message-id="${CSS.escape(id)}"]`)!;
+
+        await user.click(within(rowOf(replyId)).getByRole("button", { name: "Comment on src/a.ts" }));
+
+        const box = within(rowOf(replyId)).getByRole("textbox", { name: label });
+
+        await user.type(box, "Rename this");
+
+        // Two new messages: the reply would now be in the virtualized head.
+        harness.messages = [...(harness.messages as UIMessage[]), makeMessage(THREAD_LENGTH), makeMessage(THREAD_LENGTH + 1)];
+        act(() => harness.publish?.());
+
+        expect(within(rowOf(replyId)).getByRole("textbox", { name: label })).toBe(box);
+        expect((box as HTMLTextAreaElement).value).toBe("Rename this");
+    });
+
+    it("hands the virtualizer the same range extractor while a reply streams and nothing is pinned", () => {
+        mountInto();
+        harness.rangeExtractors.length = 0;
+
+        for (let push = 0; push < 3; push += 1) {
+            pushLastMessageEdit(true, false);
+        }
+
+        expect(harness.rangeExtractors.length).toBeGreaterThan(0);
+        expect(new Set(harness.rangeExtractors).size).toBe(1);
     });
 
     it("keeps the rows of messages whose diff comment is open mounted, with the unsent text, until it is added or cancelled", async () => {

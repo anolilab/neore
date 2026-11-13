@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
     ALWAYS_MOUNTED_TAIL,
     getWindowPlan,
+    holdPinnedTail,
     isBrowserFindKey,
     JUMP_MAX_PAGES,
     JUMP_MAX_PAGES_WITH_POSITION,
@@ -225,5 +226,24 @@ describe(withPinnedRows, () => {
     it("keeps the visible rows as they are without pins, and drops pins past the rows that exist", () => {
         expect(withPinnedRows([1, 2], [], 40)).toStrictEqual([1, 2]);
         expect(withPinnedRows([1, 2], [38, 39, 40, 45, -1], 40)).toStrictEqual([1, 2, 38, 39]);
+    });
+});
+
+describe(holdPinnedTail, () => {
+    const plan = { headCount: 172, virtualized: true };
+
+    it("keeps a held row that was in the tail there after new messages arrive", () => {
+        // The tail began at 170; two new messages would start it at 172; row 171 is held.
+        expect(holdPinnedTail(plan, 170, [171])).toStrictEqual({ headCount: 171, virtualized: true });
+    });
+
+    it("leaves the split alone for held rows deep in the head, none held, or no earlier tail", () => {
+        expect(holdPinnedTail(plan, 170, [12, 40])).toBe(plan);
+        expect(holdPinnedTail(plan, 170, [])).toBe(plan);
+        expect(holdPinnedTail(plan, -1, [171])).toBe(plan);
+    });
+
+    it("keeps everything in the tail when a held row was in it as the thread starts virtualizing", () => {
+        expect(holdPinnedTail({ headCount: 31, virtualized: true }, 0, [0])).toStrictEqual({ headCount: 0, virtualized: false });
     });
 });

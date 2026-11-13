@@ -52,6 +52,7 @@ import MessageItem from "./message-item";
 import type { MessagePosition, WindowPlan } from "./message-windowing";
 import {
     getWindowPlan,
+    holdPinnedTail,
     isBrowserFindKey,
     parseMessageHash,
     readVirtualizeFlag,
@@ -245,7 +246,50 @@ const pinnedIndexes = (messages: ReadonlyArray<UIMessage>, selected: SelectedRow
         }
     }
 
-    return indexes;
+    return [...new Set(indexes)].toSorted((a, b) => a - b);
+};
+
+const NO_PINS: ReadonlyArray<number> = [];
+
+const sameIndexes = (a: ReadonlyArray<number>, b: ReadonlyArray<number>): boolean => a.length === b.length && a.every((index, at) => index === b[at]);
+
+/**
+ * `next`, or the array the last render used when it holds the same indexes: the virtualizer's range
+ * extractor depends on it, and streaming re-renders the list on every chunk.
+ */
+const useStableIndexes = (next: ReadonlyArray<number>): ReadonlyArray<number> => {
+    const [kept, setKept] = useState(NO_PINS);
+    let value = next;
+
+    if (next.length === 0) {
+        value = NO_PINS;
+    } else if (sameIndexes(kept, next)) {
+        value = kept;
+    }
+
+    // Adjusted during render, like `useInitialMessageIds`, so this render already uses it.
+    if (value !== kept) {
+        setKept(value);
+    }
+
+    return value;
+};
+
+/**
+ * The window plan with held rows kept in the tail (`holdPinnedTail`). Where the last render's tail began
+ * is kept by message id, so older pages landing in front do not move it.
+ */
+const useHeldTailPlan = (plan: WindowPlan, messages: ReadonlyArray<UIMessage>, pinned: ReadonlyArray<number>): WindowPlan => {
+    const [tailStartId, setTailStartId] = useState<string | undefined>(undefined);
+    const previousTailStart = tailStartId === undefined ? -1 : messages.findIndex((message) => message.id === tailStartId);
+    const held = holdPinnedTail(plan, previousTailStart, pinned);
+    const nextTailStartId = messages[held.virtualized ? held.headCount : 0]?.id;
+
+    if (nextTailStartId !== tailStartId) {
+        setTailStartId(nextTailStartId);
+    }
+
+    return held;
 };
 
 type RenderRow = (message: UIMessage, index: number) => ReactNode;
@@ -376,7 +420,8 @@ const MessageList: FC<MessageListProps> = memo(({ className, editComposerCompone
     const listRef = useRef<HTMLDivElement>(null);
     const selectedRows = useSelectedRows(listRef);
     const pinnedRowIds = usePinnedRowIds();
-    const plan: WindowPlan = getWindowPlan(messages.length, { enabled: isVirtualizeFlagOn && !isAllShown });
+    const pinned = useStableIndexes(pinnedIndexes(messages, selectedRows, pinnedRowIds));
+    const plan: WindowPlan = useHeldTailPlan(getWindowPlan(messages.length, { enabled: isVirtualizeFlagOn && !isAllShown }), messages, pinned);
 
     // After "Show all earlier messages", focus goes to the oldest loaded message, where the shown history starts.
     const focusOldestRef = useRef(false);
@@ -663,7 +708,6 @@ const MessageList: FC<MessageListProps> = memo(({ className, editComposerCompone
     };
 
     const tailStart = plan.virtualized ? plan.headCount : 0;
-    const pinned = pinnedIndexes(messages, selectedRows, pinnedRowIds);
     const earlierCount = plan.headCount;
 
     return (
