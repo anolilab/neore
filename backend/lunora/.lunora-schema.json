@@ -29498,6 +29498,12 @@
           "optional": false,
           "unique": false
         },
+        "erasingSince": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "requestId": {
           "kind": "string",
           "nullable": false,
