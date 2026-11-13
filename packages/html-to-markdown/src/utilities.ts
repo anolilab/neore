@@ -137,17 +137,33 @@ export function edgeBreaks(node: Node, side: "left" | "right"): number {
 }
 
 function isIgnorableEdge(node: Node): boolean {
-    if (node.nodeType === 8) {
+    if (node.nodeType === 8 || isSilentVoid(node)) {
         return true;
     }
 
     return (node.nodeType === 3 || node.nodeType === 4) && BLANK_TEXT.test(node.nodeValue ?? "");
 }
 
+/**
+ * True for a void element that writes no Markdown: a word-break hint, a form input and the like. A break and an
+ * image with a source write output, and a block void such as a rule is a boundary, so those are not silent.
+ */
+export function isSilentVoid(node: Node): boolean {
+    if (node.nodeType !== 1 || !isVoid(node) || isBlock(node) || node.nodeName === "BR") {
+        return false;
+    }
+
+    return !(node.nodeName === "IMG" && (node as Element).getAttribute("src"));
+}
+
 /** True when the node's content is only whitespace and line breaks, so it outputs no text. */
 export function hasOnlyBreaks(node: Node): boolean {
     for (const child of node.childNodes) {
         if (child.nodeName === "BR") {
+            continue;
+        }
+
+        if (isSilentVoid(child)) {
             continue;
         }
 
