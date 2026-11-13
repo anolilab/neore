@@ -586,12 +586,6 @@ function tokenEndingAt(content: string, tokens: ReadonlyArray<string>, end: numb
     return tokens.find((token) => end - token.length >= start && content.startsWith(token, end - token.length))?.length ?? 0;
 }
 
-/**
- * Steps taken by the emphasis walks: each sibling visited and each child checked for a block.
- * The scale tests read it to show that a long run costs work in proportion to its length.
- */
-export const emphasisSteps = { count: 0 };
-
 /** Each member's walk to one side, per side, so a run is walked once rather than once from every member. */
 const leftRuns = new WeakMap<Node, EmphasisRun>();
 const rightRuns = new WeakMap<Node, EmphasisRun>();
@@ -648,8 +642,6 @@ function scanRun(
     const canMerge = isRunMember(node, names, options, lookup);
 
     while (sibling && gap !== Infinity) {
-        emphasisSteps.count += 1;
-
         if (canMerge && isRunMember(sibling, names, options, lookup)) {
             const member = annotationOf(sibling, options);
 
@@ -918,8 +910,6 @@ function hasPrintingBlockDescendant(node: Node, options: Options): boolean {
         if (child.nodeType !== 1) {
             continue;
         }
-
-        emphasisSteps.count += 1;
 
         if (isBlock(child) || (!annotationOf(child, options).isBlank && hasPrintingBlockDescendant(child, options))) {
             hasPrinting = true;

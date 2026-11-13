@@ -1,37 +1,89 @@
-import { describe, expect, it } from "vitest";
+import { createDocument } from "@mixmark-io/domino";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { emphasisSteps } from "../src/commonmark-rules";
+import { setHTMLParser } from "../src/html-parser";
 import TurndownService from "../src/index";
 
 /*
- * Long runs of emphasis must cost work in proportion to their length. The test counts the
- * steps the emphasis walks take (siblings visited and children checked), not the time. A walk
- * that rescans the run from every member makes that count quadratic in the run length.
+ * Long runs of emphasis must cost work in proportion to their length. Reading an element's text walks its whole
+ * subtree, which is the costly step, so the test adds up the characters every element text read returns rather
+ * than measuring time. Reading a long parent's text once per child makes that total quadratic in the run length.
+ * The reads are counted through the HTML parser hook: each parsed element gets its own counting getter.
  */
 
-// Each member takes a few steps to find its run's ends, so the count stays within this many per member.
-const STEPS_PER_MEMBER = 20;
+// A linear conversion reads each character a small, fixed number of times.
+const READS_PER_CHARACTER = 40;
 
-function convertCountingSteps(html: string): { output: string; steps: number } {
-    emphasisSteps.count = 0;
+const reads = { characters: 0 };
+
+/** A prototype on an element's chain; only its own textContent accessor is read. */
+type TextPrototype = Partial<Pick<Node, "textContent">>;
+
+function textContentGetter(element: Element): (this: Node) => string | null {
+    let owner: TextPrototype | null = Object.getPrototypeOf(element) as TextPrototype;
+
+    while (owner) {
+        const getter = Object.getOwnPropertyDescriptor(owner, "textContent")?.get;
+
+        if (getter) {
+            return getter as (this: Node) => string | null;
+        }
+
+        owner = Object.getPrototypeOf(owner) as TextPrototype | null;
+    }
+
+    throw new Error("the parser's elements have no textContent getter");
+}
+
+function countingParser(html: string): Document {
+    const document = createDocument(html);
+    const elements = [...document.querySelectorAll("*")];
+    const read = textContentGetter(elements[0] as Element);
+
+    for (const element of elements) {
+        Object.defineProperty(element, "textContent", {
+            configurable: true,
+            get: () => {
+                const text = read.call(element);
+
+                reads.characters += text?.length ?? 0;
+
+                return text;
+            },
+        });
+    }
+
+    return document;
+}
+
+beforeEach(() => {
+    setHTMLParser(countingParser);
+});
+
+afterEach(() => {
+    setHTMLParser(createDocument);
+});
+
+function convertCountingReads(html: string): { output: string; reads: number } {
+    reads.characters = 0;
 
     const output = new TurndownService().turndown(html);
 
-    return { output, steps: emphasisSteps.count };
+    return { output, reads: reads.characters };
 }
 
 describe("long emphasis runs stay linear", () => {
-    it.each([1000, 4000])("walks a run of %i adjacent elements in a bounded number of steps", (count) => {
-        const result = convertCountingSteps("<em>x</em>".repeat(count));
+    it.each([1000, 4000])("reads the text of a run of %i adjacent elements in work linear in its length", (count) => {
+        const result = convertCountingReads("<em>x</em>".repeat(count));
 
         expect(result.output).toBe(`_${"x".repeat(count)}_`);
-        expect(result.steps).toBeLessThan(STEPS_PER_MEMBER * count);
+        expect(result.reads).toBeLessThan(READS_PER_CHARACTER * count);
     });
 
-    it.each([1000, 4000])("checks a same-kind parent with %i children in a bounded number of steps", (count) => {
-        const result = convertCountingSteps(`<em>${"<em>x</em>".repeat(count)}</em>`);
+    it.each([1000, 4000])("reads the text of a same-kind parent with %i children in work linear in its length", (count) => {
+        const result = convertCountingReads(`<em>${"<em>x</em>".repeat(count)}</em>`);
 
         expect(result.output).toBe(`_${"x".repeat(count)}_`);
-        expect(result.steps).toBeLessThan(STEPS_PER_MEMBER * count);
+        expect(result.reads).toBeLessThan(READS_PER_CHARACTER * count);
     });
 });
