@@ -8,10 +8,9 @@
  */
 import { escapeTildes } from "./gfm";
 import { declaredStyle } from "./inline-style";
-import { unlessRemoved } from "./paste-lists";
 import type TurndownService from "./turndown";
 import type { TurndownInput } from "./turndown";
-import type { Rule } from "./types";
+import type { Rule, RuleLookup } from "./types";
 
 const NORMAL_START = "\u{1}";
 const NORMAL_END = "\u{2}";
@@ -203,7 +202,7 @@ interface StructureStep {
 const structures = new WeakMap<Element, boolean>();
 
 /** True when the element holds a block emphasis cannot span, such as a list or a table. Each element is read once. */
-function hasStructure(root: Element): boolean {
+function hasStructure(root: Element, lookup: RuleLookup): boolean {
     const known = structures.get(root);
 
     if (known !== undefined) {
@@ -220,7 +219,8 @@ function hasStructure(root: Element): boolean {
             let isFound = false;
 
             for (let child = element.firstElementChild; child && !isFound; child = child.nextElementSibling) {
-                isFound = STRUCTURE.has(child.nodeName) || structures.get(child) === true;
+                // A hidden list is not written, so it parts nothing.
+                isFound = !lookup.isRemoved(child) && (STRUCTURE.has(child.nodeName) || structures.get(child) === true);
             }
 
             structures.set(element, isFound);
@@ -230,7 +230,7 @@ function hasStructure(root: Element): boolean {
         pending.push({ element, isDone: true });
 
         for (let child = element.firstElementChild; child; child = child.nextElementSibling) {
-            if (!structures.has(child)) {
+            if (!structures.has(child) && !lookup.isRemoved(child)) {
                 pending.push({ element: child, isDone: false });
             }
         }
@@ -325,15 +325,33 @@ function wrapEdges(text: string, marker: string): string {
 }
 
 /**
- * `marker` around each run of the content between normal-weight marks. Bold leaves a marked run as it is and drops its
- * marks; italics and strikethrough go inside the marks as well, so the bold around them never splits a delimiter.
- * Content holding a blank line holds blocks, which emphasis cannot span: it is left as it is.
+ * `marker` around each run of the content between normal-weight marks, paragraph by paragraph: emphasis cannot span a
+ * blank line. A normal-weight run that goes on past one is closed before it and opened again after it.
  */
 function wrapRuns(content: string, marker: string, isBold: boolean): string {
-    if (content.trim().includes("\n\n")) {
-        return isBold ? withoutMarks(content) : content;
+    if (!content.includes("\n\n")) {
+        return wrapParagraph(content, marker, isBold);
     }
 
+    let isOpen = false;
+
+    return content
+        .split("\n\n")
+        .map((piece) => {
+            const opened = isOpen ? `${NORMAL_START}${piece}` : piece;
+
+            isOpen = opened.lastIndexOf(NORMAL_START) > opened.lastIndexOf(NORMAL_END);
+
+            return wrapParagraph(isOpen ? `${opened}${NORMAL_END}` : opened, marker, isBold);
+        })
+        .join("\n\n");
+}
+
+/**
+ * `marker` around each run of one paragraph between normal-weight marks. Bold leaves a marked run as it is and drops its
+ * marks; italics and strikethrough go inside the marks as well, so the bold around them never splits a delimiter.
+ */
+function wrapParagraph(content: string, marker: string, isBold: boolean): string {
     const parts: string[] = [];
     let from = 0;
 
@@ -351,35 +369,132 @@ function wrapRuns(content: string, marker: string, isBold: boolean): string {
     return parts.join("");
 }
 
+type Kind = "isBold" | "isItalic" | "isStrike";
+
+const KINDS: ReadonlyArray<Kind> = ["isBold", "isItalic", "isStrike"];
+
+const formattedBy: Record<Kind, WeakMap<Node, Element | null>> = { isBold: new WeakMap(), isItalic: new WeakMap(), isStrike: new WeakMap() };
+
+function hasKind(emphasis: Emphasis, kind: Kind): boolean {
+    switch (kind) {
+        case "isBold": {
+            return emphasis.isBold;
+        }
+        case "isItalic": {
+            return emphasis.isItalic;
+        }
+        default: {
+            return emphasis.isStrike;
+        }
+    }
+}
+
+/**
+ * The nearest element from `start` up that gives its text this formatting, or null. For bold, the nearest element that
+ * sets the weight decides, so text set back to normal weight inside bold is not under it. Each element is asked once.
+ */
+function formattingFrom(start: Node | null, kind: Kind): Element | null {
+    if (kind === "isBold") {
+        const weight = nearestWeight(start);
+
+        return weight !== null && emphasisOf(weight).isBold ? weight : null;
+    }
+
+    const known = formattedBy[kind];
+    const chain: Node[] = [];
+    let current = start;
+    let found: Element | null = null;
+
+    while (current?.nodeType === 1) {
+        const cached = known.get(current);
+
+        if (cached !== undefined) {
+            found = cached;
+            break;
+        }
+
+        chain.push(current);
+
+        if (hasKind(emphasisOf(current as Element), kind)) {
+            found = current as Element;
+            break;
+        }
+
+        current = current.parentNode;
+    }
+
+    for (const member of chain) {
+        known.set(member, found);
+    }
+
+    return found;
+}
+
+/** True when the preset may write the element's own formatting: no block it cannot span, no split emoji sequence. */
+function canWrap(element: Element, lookup: RuleLookup): boolean {
+    return !hasStructure(element, lookup) && !isInEmojiSequence(element);
+}
+
+/**
+ * True when an element around this one writes this formatting already: `<b>`, `<i>` or `<s>`, or a styled element
+ * that can write it. A styled block holding a list writes none, so the formatting inside it writes its own.
+ */
+function isFormattedAbove(element: Element, kind: Kind, lookup: RuleLookup): boolean {
+    const above = formattingFrom(element.parentNode, kind);
+
+    return above !== null && (isNamed(above) || canWrap(above, lookup));
+}
+
+/**
+ * True for `<b>`, `<i>` or `<s>` inside a styled element with the same formatting: the styled element writes the one
+ * pair of delimiters, so the preset writes this one, without any.
+ */
+function isNestedInStyled(element: Element, lookup: RuleLookup): boolean {
+    const emphasis = emphasisOf(element);
+
+    return KINDS.some((kind) => {
+        const above = hasKind(emphasis, kind) ? formattingFrom(element.parentNode, kind) : null;
+
+        return above !== null && !isNamed(above) && canWrap(above, lookup);
+    });
+}
+
 // Bold, italics and strikethrough set by a style, and text set back to normal weight inside bold. A styled block passes
 // its formatted text on to the rule that writes the block: a paragraph, a list item, a table cell.
 const styledText: Rule = {
-    filter: unlessRemoved((node) => {
+    filter: (node, _options, lookup) => {
+        if (lookup.isRemoved(node)) {
+            return false;
+        }
+
         if (isNamed(node)) {
-            return isUnbold(node) || carriersOf(node).has(node) || isInEmojiSequence(node);
+            return isUnbold(node) || carriersOf(node).has(node) || isInEmojiSequence(node) || isNestedInStyled(node, lookup);
         }
 
         const emphasis = emphasisOf(node);
 
         return STYLED.has(node.nodeName) && (emphasis.isBold || emphasis.isItalic || emphasis.isStrike || isUnbold(node));
-    }),
+    },
     replacement(content, node, options, lookup) {
         const emphasis = emphasisOf(node);
-        const canWrap = !hasStructure(node) && !isInEmojiSequence(node);
+        const isWrapped = canWrap(node, lookup);
         let text = content;
 
         if (emphasis.isBold) {
-            text = canWrap ? wrapRuns(text, options.strongDelimiter, true) : withoutMarks(text);
+            // Bold inside bold writes no second pair; the marks wait for the bold around it.
+            if (!isFormattedAbove(node, "isBold", lookup)) {
+                text = isWrapped ? wrapRuns(text, options.strongDelimiter, true) : withoutMarks(text);
+            }
         } else if (isUnbold(node) && text.trim() !== "") {
             // All of it is normal weight, so marks inside it are not needed.
             text = `${NORMAL_START}${withoutMarks(text)}${NORMAL_END}`;
         }
 
-        if (canWrap && emphasis.isItalic) {
+        if (isWrapped && emphasis.isItalic && !isFormattedAbove(node, "isItalic", lookup)) {
             text = wrapRuns(text, options.emDelimiter, false);
         }
 
-        if (canWrap && emphasis.isStrike) {
+        if (isWrapped && emphasis.isStrike && !isFormattedAbove(node, "isStrike", lookup)) {
             text = wrapRuns(escapeTildes(text), "~~", false);
         }
 

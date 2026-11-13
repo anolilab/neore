@@ -61,4 +61,21 @@ describe("the rule lookup", () => {
 
         expect(service.turndown("<p>a <em>b</em> <kbd>c</kbd></p>")).toBe("[lower A _B!_ <C>]");
     });
+
+    it("passes over a rule added twice, so the rule never gets itself back", () => {
+        const service = new TurndownService();
+        const rule: Rule = {
+            filter: "em",
+            replacement(content, node, options, lookup) {
+                const next = lookup.ruleAfter(rule, node);
+
+                return `[${next.replacement.call(next, content, node, options, lookup)}]`;
+            },
+        };
+
+        service.addRule("first", rule);
+        service.addRule("again", rule);
+
+        expect(service.turndown("<p><em>a</em></p>")).toBe("[_a_]");
+    });
 });

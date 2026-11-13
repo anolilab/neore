@@ -105,7 +105,8 @@ function codeText(pre: Element, lookup: RuleLookup): string {
 
         const { node } = step;
 
-        if (node.nodeType === 3) {
+        // Text, and CDATA, which a DOM passed in may hold.
+        if (node.nodeType === 3 || node.nodeType === 4) {
             push(node.nodeValue ?? "");
             continue;
         }

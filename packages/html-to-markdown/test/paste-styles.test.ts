@@ -4,6 +4,7 @@ import { createDocument } from "@mixmark-io/domino";
 import { describe, expect, it } from "vitest";
 
 import TurndownService, { paste, PASTE_OPTIONS } from "../src/index";
+import { appendCdataSection } from "./cdata";
 
 /* eslint-disable no-secrets/no-secrets -- the cases are HTML with inline styles, whose entropy reads as a secret's */
 
@@ -130,5 +131,38 @@ describe("paste styles: code blocks", () => {
 describe("paste styles: output", () => {
     it("leaves out the blank text before the first content, such as the spaces in a pasted head", () => {
         expect(convert(fixture("word-paragraph.html"))).toBe("The quarterly numbers are in, and the trend holds.");
+    });
+});
+
+describe("paste styles: review cases", () => {
+    it("keeps a styled block's formatting when the list in it is hidden", () => {
+        expect(convert(`<div style="font-weight:bold">a<ul style="display:none"><li>x</li></ul></div>`)).toBe("**a**");
+    });
+
+    it("formats each paragraph of styled text that holds blocks, as emphasis cannot span a blank line", () => {
+        expect(convert(`<span style="font-weight:bold"><p>a</p><p>b</p></span>`)).toBe("**a**\n\n**b**");
+        expect(convert(`<b>a <span style="font-weight:normal">b<p>c</p>d</span> e</b>`)).toBe("**a** b\n\nc\n\nd **e**");
+    });
+
+    it("writes one pair of delimiters for formatting inside the same formatting", () => {
+        expect(convert(`<p style="font-weight:bold"><a href="https://x.y/docs" style="font-weight:bold">Docs</a></p>`)).toBe("**[Docs](https://x.y/docs)**");
+        expect(convert(`<span style="font-weight:bold"><b>x</b> y</span> <span style="font-style:italic"><i>x</i> y</span>`)).toBe("**x y** *x y*");
+    });
+
+    it("keeps the formatting inside a styled block that writes none, as it holds a table", () => {
+        expect(convert(`<div style="font-weight:bold"><table><tr><td>t</td></tr></table><span><b>x</b></span></div>`)).toBe("| t |\n| --- |\n\n**x**");
+    });
+
+    it("reads the CDATA in a code block passed as a node", () => {
+        // Text before it: domino's textContent skips CDATA, so a block of CDATA alone would read as blank there.
+        const document = createDocument("<pre><code>let </code></pre>");
+
+        appendCdataSection(document.querySelector("code") as Element, "x = 1;");
+
+        expect(convert(document.body)).toBe("```\nlet x = 1;\n```");
+    });
+
+    it("keeps a blank line an editor writes in code as a line with only a <br>", () => {
+        expect(convert("<pre><div>one</div><div><br></div><div>three</div></pre>")).toBe("```\none\n\nthree\n```");
     });
 });

@@ -273,8 +273,9 @@ export default class Rules implements RuleLookup {
         for (const list of this.searchOrder) {
             let found: Rule | undefined;
 
+            // A rule added twice is passed over at each place, so it never gets itself back.
             if (isPast) {
-                found = search(list, node, nodeName);
+                found = list === this.removeList ? search(list, node, nodeName) : findRule(list, node, nodeName, this.options, this, 0, rule);
             } else {
                 const index = list.indexOf(rule);
 
@@ -283,7 +284,7 @@ export default class Rules implements RuleLookup {
                 }
 
                 isPast = true;
-                found = findRule(list, node, nodeName, this.options, this, index + 1);
+                found = findRule(list, node, nodeName, this.options, this, index + 1, rule);
             }
 
             if (found) {
@@ -408,7 +409,16 @@ function isFilterMatch(rule: Rule, node: AnnotatedNode, nodeName: string, option
     throw new TypeError("`filter` needs to be a string, array, or function");
 }
 
-function findRule(rules: ReadonlyArray<Rule>, node: AnnotatedNode, nodeName: string, options: Options, lookup: RuleLookup, from = 0): Rule | undefined {
+/** The first rule from index `from` that matches the node, passing over `skip`. */
+function findRule(
+    rules: ReadonlyArray<Rule>,
+    node: AnnotatedNode,
+    nodeName: string,
+    options: Options,
+    lookup: RuleLookup,
+    from = 0,
+    skip?: Rule,
+): Rule | undefined {
     // A filter may add rules to this same list. Bounding the search by the length
     // at the start keeps it to the rules that existed, as Array.find did.
     const { length } = rules;
@@ -416,7 +426,7 @@ function findRule(rules: ReadonlyArray<Rule>, node: AnnotatedNode, nodeName: str
     for (let index = from; index < length; index += 1) {
         const rule = rules[index];
 
-        if (rule && isFilterMatch(rule, node, nodeName, options, lookup)) {
+        if (rule && rule !== skip && isFilterMatch(rule, node, nodeName, options, lookup)) {
             return rule;
         }
     }
