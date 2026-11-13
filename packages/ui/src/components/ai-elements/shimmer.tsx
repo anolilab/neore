@@ -2,7 +2,7 @@
 
 import cn from "@ui/utils/cn";
 import type { CSSProperties } from "react";
-import { createElement, memo } from "react";
+import { createElement, memo, useEffect, useState } from "react";
 
 export interface TextShimmerProps {
     as?: "div" | "h1" | "h2" | "h3" | "p" | "span";
@@ -17,10 +17,32 @@ export interface TextShimmerProps {
  * Text with a highlight sweeping across it. A CSS keyframe (`animate-text-shimmer` in `global.css`) moves the
  * background in 30 steps per sweep, so no script runs per frame and the text repaints 30 times a cycle, not on every
  * frame. An endless loop is motion the user cannot pause (WCAG 2.2.2): with reduced motion it does not run, and the
- * text stays at the sweep's end position.
+ * text stays at the sweep's end position. Off-screen it pauses (`data-paused`), where IntersectionObserver exists.
  */
-const ShimmerComponent = ({ as = "p", children, className, duration = 2, spread = 2 }: TextShimmerProps) =>
-    createElement(
+const ShimmerComponent = ({ as = "p", children, className, duration = 2, spread = 2 }: TextShimmerProps) => {
+    // A callback ref into state: the effect runs again for a new element (another `as`).
+    const [target, setTarget] = useState<HTMLElement | null>(null);
+    const [offScreen, setOffScreen] = useState(false);
+
+    useEffect(() => {
+        if (!target || typeof IntersectionObserver === "undefined") {
+            return undefined;
+        }
+
+        const observer = new IntersectionObserver((entries: IntersectionObserverEntry[]) => {
+            const last = entries.at(-1);
+
+            if (last) {
+                setOffScreen(!last.isIntersecting);
+            }
+        });
+
+        observer.observe(target);
+
+        return () => observer.disconnect();
+    }, [target]);
+
+    return createElement(
         as,
         {
             "aria-live": "polite",
@@ -29,6 +51,8 @@ const ShimmerComponent = ({ as = "p", children, className, duration = 2, spread 
                 "[background-repeat:no-repeat,padding-box] [--bg:linear-gradient(90deg,#0000_calc(50%-var(--spread)),var(--color-background),#0000_calc(50%+var(--spread)))]",
                 className,
             ),
+            "data-paused": offScreen ? "" : undefined,
+            ref: setTarget,
             role: as.startsWith("h") ? undefined : "status",
             style: {
                 "--shimmer-duration": `${duration}s`,
@@ -38,6 +62,7 @@ const ShimmerComponent = ({ as = "p", children, className, duration = 2, spread 
         },
         children,
     );
+};
 
 const Shimmer = memo(ShimmerComponent);
 
