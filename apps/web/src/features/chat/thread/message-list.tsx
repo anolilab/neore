@@ -173,22 +173,24 @@ const MessageList: FC<MessageListProps> = memo(({ className, editComposerCompone
             element.focus({ preventScroll: true });
         }
 
-        // Re-centre whenever the row moved, for every frame of the budget: rows above it render at their real height as
+        // Re-centre whenever the row's centre moved, for every frame of the budget: rows above it render at their real height as
         // they come into view, and one can still change after a still frame (a late image, a skip that ends later).
         let framesLeft = JUMP_SETTLE_FRAMES;
-        let previousTop = NaN;
+        let previousCentre = NaN;
         const settle = () => {
             if (jumpGenerationRef.current !== generation || !element.isConnected) {
                 return;
             }
 
-            const { top } = element.getBoundingClientRect();
+            // The centre, not the top: the row itself can grow in place (an image in it loading without a size).
+            const { height, top } = element.getBoundingClientRect();
+            const centre = top + height / 2;
 
-            if (Number.isNaN(previousTop) || Math.abs(top - previousTop) >= 1) {
+            if (Number.isNaN(previousCentre) || Math.abs(centre - previousCentre) >= 1) {
                 element.scrollIntoView({ block: "center" });
             }
 
-            previousTop = top;
+            previousCentre = centre;
             framesLeft -= 1;
 
             if (framesLeft > 0) {

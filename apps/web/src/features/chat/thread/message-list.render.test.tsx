@@ -492,12 +492,15 @@ describe("a long thread", () => {
         /** Calls of `scrollIntoView` per row, and the tops a row reports, frame after frame. */
         const scrolls = new Map<string, number>();
         const tops = new Map<string, number[]>();
+        /** The heights a row reports, frame after frame (100 when unset). */
+        const heights = new Map<string, number[]>();
         /** Runs after a row's `scrollIntoView`. */
         let onScroll: (id: string) => void = () => {};
 
         beforeEach(() => {
             scrolls.clear();
             tops.clear();
+            heights.clear();
             onScroll = () => {};
             harness.infos.length = 0;
             stubAnimationFrames();
@@ -520,8 +523,10 @@ describe("a long thread", () => {
                         value: () => {
                             const queue = tops.get(id) ?? [];
                             const top = queue.length > 1 ? queue.shift()! : (queue[0] ?? 0);
+                            const heightQueue = heights.get(id) ?? [];
+                            const height = heightQueue.length > 1 ? heightQueue.shift()! : (heightQueue[0] ?? 100);
 
-                            return { bottom: top + 100, height: 100, left: 0, right: 0, top, width: 0, x: 0, y: top } as DOMRect;
+                            return { bottom: top + height, height, left: 0, right: 0, top, width: 0, x: 0, y: top } as DOMRect;
                         },
                     },
                     scrollIntoView: {
@@ -567,6 +572,20 @@ describe("a long thread", () => {
             // The jump's own scroll, the two moves while rows settled, and the late one.
             expect(scrolls.get("m100")).toBe(4);
             expect(document.activeElement).toBe(rowOf("m100"));
+        });
+
+        it("re-centres its row when it grows in place, its top unmoved", () => {
+            // An image in the row loads without a reserved size: the row grows by 400px, its top stays.
+            tops.set("m100", [300]);
+            heights.set("m100", [100, 100, 500, 500]);
+            mountInto();
+            stubRows();
+
+            act(() => scrollToMessage("m100"));
+            runFrames(6);
+
+            // The jump's own scroll, the first settling frame, and the growth.
+            expect(scrolls.get("m100")).toBe(3);
         });
 
         it("stops re-centring an older jump once a newer one is asked for", () => {

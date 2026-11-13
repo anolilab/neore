@@ -32,6 +32,9 @@ export interface ThreadViewportRef {
 }
 
 // Threshold in pixels to consider "at bottom"
+/** How long a smooth scroll to the bottom may run before growth is followed again, where `scrollend` does not fire. */
+const SMOOTH_SCROLL_TIMEOUT_MS = 1000;
+
 const SCROLL_THRESHOLD = 50;
 
 // Distance from the top of content at which we pre-fetch older messages.
@@ -143,6 +146,22 @@ const ThreadViewport = ({ children, className, ref }: ThreadViewportProps & { re
             smoothToBottomRef.current = behavior === "smooth";
 
             if (behavior === "smooth") {
+                // Growth is not followed while the animation runs (`followGrowth`). If it ends short of the bottom (the
+                // content grew past its target), its end closes the gap; a timer stands in where `scrollend` never fires.
+                const settled = () => {
+                    if (!smoothToBottomRef.current) {
+                        return;
+                    }
+
+                    smoothToBottomRef.current = false;
+
+                    if (isAtBottomRef.current && !userScrolledRef.current) {
+                        pinToBottom(viewport);
+                    }
+                };
+
+                viewport.addEventListener("scrollend", settled, { once: true });
+                globalThis.setTimeout(settled, SMOOTH_SCROLL_TIMEOUT_MS);
                 viewport.scrollTo({ behavior, top: viewport.scrollHeight });
             } else {
                 pinToBottom(viewport);
@@ -215,11 +234,14 @@ const ThreadViewport = ({ children, className, ref }: ThreadViewportProps & { re
     }, [checkIsAtBottom, pinToBottom, setIsAtBottom]);
 
     // Follows content that grew while the reader is at the bottom: a stream, rows settling, an image loading. Not when the
-    // view moved up since the last scroll event (a jump's `scrollIntoView`, the reader) or the reader is about to scroll up:
+    // view moved up since the last scroll event (a jump's `scrollIntoView`, the reader), the reader is about to scroll up, or
+    // a smooth scroll to the bottom is running:
     // that scroll's own event decides. Not when the growth is the row the reader pressed in: they opened something there.
     const followGrowth = useCallback(
         (viewport: HTMLElement) => {
-            if (!hasInitialScrolledRef.current || userScrolledRef.current || !isAtBottomRef.current || upwardInputRef.current) {
+            // A smooth scroll to the bottom is under way: pinning now would cut it short with a jump. Its last scroll
+            // event closes what gap the growth left (`handleScroll`).
+            if (!hasInitialScrolledRef.current || userScrolledRef.current || !isAtBottomRef.current || upwardInputRef.current || smoothToBottomRef.current) {
                 return;
             }
 

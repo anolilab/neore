@@ -7,8 +7,10 @@
  * moving the view, a resize being observed) are played by the test.
  */
 import { act, render } from "@testing-library/react";
+import { createRef } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import type { ThreadViewportRef } from "./thread-viewport";
 import ThreadViewport from "./thread-viewport";
 
 vi.mock("@/features/chat/core/context/chat-context", () => {
@@ -81,9 +83,12 @@ const playResize = (): void => {
     });
 };
 
-const mount = (): HTMLElement => {
+/** Smooth scrolls the viewport was asked for; they move the view only when the test plays them. */
+const smoothScrolls: number[] = [];
+
+const mount = (ref?: React.RefObject<ThreadViewportRef | null>): HTMLElement => {
     render(
-        <ThreadViewport>
+        <ThreadViewport ref={ref}>
             <div data-list-message-id="m1">
                 <button type="button">Show output</button>
             </div>
@@ -101,7 +106,13 @@ const mount = (): HTMLElement => {
         scrollHeight: { configurable: true, get: () => layout.scrollHeight },
         scrollTo: {
             configurable: true,
-            value: ({ top }: ScrollToOptions) => {
+            value: ({ behavior, top }: ScrollToOptions) => {
+                if (behavior === "smooth") {
+                    smoothScrolls.push(top ?? 0);
+
+                    return;
+                }
+
                 layout.scrollTop = Math.min(top ?? 0, layout.scrollHeight - CLIENT_HEIGHT);
             },
         },
@@ -135,6 +146,7 @@ describe("thread viewport while message rows settle", () => {
         layout.scrollHeight = 10_000;
         layout.scrollTop = 0;
         resized.length = 0;
+        smoothScrolls.length = 0;
         frames.clear();
         vi.stubGlobal("ResizeObserver", RecordingResizeObserver);
         vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
@@ -235,6 +247,31 @@ describe("thread viewport while message rows settle", () => {
         playResize();
 
         expect(layout.scrollTop).toBe(landedAt);
+    });
+
+    it("lets a smooth scroll to the bottom run while content grows, and closes the gap when it ends", () => {
+        const ref = createRef<ThreadViewportRef>();
+        const viewport = mount(ref);
+
+        // The reader scrolled up, then presses the scroll-to-bottom button.
+        scrolledTo(viewport, 2000);
+        act(() => ref.current?.scrollToBottom("smooth"));
+
+        expect(smoothScrolls).toHaveLength(1);
+
+        // Rows the animation passes take their real height: the view is left to the animation.
+        layout.scrollHeight += 900;
+        playResize();
+
+        expect(layout.scrollTop).toBe(2000);
+
+        // The animation ends at its old target, short of the new bottom; its end closes the gap.
+        act(() => {
+            layout.scrollTop = 10_000 - CLIENT_HEIGHT;
+            viewport.dispatchEvent(new Event("scrollend"));
+        });
+
+        expect(gap()).toBe(0);
     });
 
     it("does not scroll past a block the reader opens in the last row", () => {
