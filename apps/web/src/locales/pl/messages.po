@@ -29424,9 +29424,9 @@ msgstr "Pokaż jeszcze {remainingCount}"
 msgid "Show all"
 msgstr "Pokaż wszystko"
 
-#: src/features/chat/thread/message-list.tsx:557
-msgid "Show all {earlierCount} earlier messages"
-msgstr "Pokaż wszystkie wcześniejsze wiadomości ({earlierCount})"
+#: src/features/chat/thread/message-list.tsx:773
+msgid "{earlierCount, plural, one {Show # earlier message} other {Show all # earlier messages}}"
+msgstr "{earlierCount, plural, one {Pokaż # wcześniejszą wiadomość} few {Pokaż wszystkie # wcześniejsze wiadomości} many {Pokaż wszystkie # wcześniejszych wiadomości} other {Pokaż wszystkie # wcześniejszej wiadomości}}"
 
 #: ../../packages/ui/src/components/chat-markdown.tsx:83
 msgid "Show all {lines} lines"

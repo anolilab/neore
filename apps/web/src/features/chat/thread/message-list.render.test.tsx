@@ -7,6 +7,7 @@
  */
 
 import { formatGoalReviewNote } from "@neore/backend/chat/goals";
+import type { ToolPart } from "@neore/chat-ui/types";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, render, screen, within } from "@testing-library/react";
 import type { UserEvent } from "@testing-library/user-event";
@@ -28,6 +29,12 @@ const harness = vi.hoisted(() => {
         contentRenders: new Map<string, number>(),
         /** Renders the list inside the real shortcut manager and the thread's find bar. */
         withFind: false,
+        /** The edit composer the list renders for the message being edited. */
+        editComposer: undefined as ((props: { message: UIMessage }) => ReactNode) | undefined,
+        /** Extra content a test renders inside a message's row (a prompt card), by message id. */
+        rowExtras: new Map<string, () => ReactNode>(),
+        /** The open thread, as `useChatThread` gives it. */
+        thread: undefined as { userId: string } | undefined,
         /** Every `rangeExtractor` the virtualized head handed the virtualizer, in render order. */
         rangeExtractors: [] as unknown[],
         /** Renders a host turn's real changes (commentable) on rows that carry them. */
@@ -44,6 +51,12 @@ const harness = vi.hoisted(() => {
         messagesStatus: "Exhausted",
         publish: undefined as (() => void) | undefined,
         threadId: "thread-1",
+    };
+});
+
+vi.mock("@lingui/core/macro", () => {
+    return {
+        plural: (value: number, forms: { one: string; other: string }) => (value === 1 ? forms.one : forms.other).replace("#", () => String(value)),
     };
 });
 
@@ -79,7 +92,7 @@ vi.mock("@/features/chat/core/context/chat-context", async () => {
             };
         },
         useChatThread: () => {
-            return { isNewThread: false, model: "test-model", thread: undefined, threadId: harness.threadId };
+            return { isNewThread: false, model: "test-model", thread: harness.thread, threadId: harness.threadId };
         },
     };
 });
@@ -123,7 +136,7 @@ vi.mock("./message-content", () => {
         default: ({ message }: { message: UIMessage }) => {
             harness.contentRenders.set(message.id, (harness.contentRenders.get(message.id) ?? 0) + 1);
 
-            return createElement("div", null, message.text);
+            return createElement("div", null, message.text, harness.rowExtras.get(message.id)?.());
         },
     };
 });
@@ -160,11 +173,14 @@ vi.mock("@/lib/lunora/crpc", () => {
         mutationOptions: () => {
             return { mutationFn: async () => undefined };
         },
+        queryOptions: () => {
+            return { queryFn: async () => null, queryKey: ["crpc-mock"] };
+        },
     };
     // Any depth of namespace (`crpc.a.b.fn`) ends at `leaf`.
     const namespace: object = new Proxy({}, { get: (_target, key) => (Object.hasOwn(leaf, key) ? leaf[key as keyof typeof leaf] : namespace) });
 
-    return { useCRPC: () => namespace };
+    return { useAction: () => async () => undefined, useCRPC: () => namespace };
 });
 
 // A user message's copy-link action asks whether the thread is a group chat; these threads are not.
@@ -213,6 +229,30 @@ vi.mock("./fork-branch-dialog", () => {
     return { default: () => null };
 });
 
+// A question card's attach path reads `VITE_LUNORA_URL` at import time; CI runs without one.
+vi.mock("@/lib/auth/server-functions", () => {
+    return { default: vi.fn() };
+});
+
+vi.mock("@/lib/env", () => {
+    return { default: { VITE_LUNORA_URL: "http://localhost:8788" } };
+});
+
+// The thread's owner is signed in, so prompts in it can be answered.
+vi.mock("@/features/auth/lib/auth-ui-provider", () => {
+    return {
+        useAuth: () => {
+            return {
+                hooks: {
+                    useSession: () => {
+                        return { data: { user: { id: "owner" } } };
+                    },
+                },
+            };
+        },
+    };
+});
+
 // The shortcut chain the thread's find answers to: bindings as a user has them, a router it does not use here.
 vi.mock("@/features/layout/hooks/use-ui-state", () => {
     return {
@@ -235,6 +275,9 @@ const { default: MessageList, scrollToMessage } = await import("./message-list")
 const { KeyboardShortcutsManager } = await import("@/features/keyboard/components/keyboard-shortcuts-manager");
 const { default: useKeyboardShortcutHandler } = await import("@/features/keyboard/hooks/use-keyboard-shortcut-handler");
 const { default: ThreadFindBar } = await import("./find/thread-find-bar");
+const { default: AskUserPrompt } = await import("./ask-user-prompt");
+const { default: RequestSecretPrompt } = await import("./request-secret-prompt");
+const { useChatUIStore } = await import("@/features/chat/core/stores/chat-ui-store");
 
 /** What `_shortcut.tsx` and `thread.tsx` wrap an open thread in: the app's shortcuts, and the find bar on the thread host. */
 const FindShell = ({ children }: { children: ReactNode }): ReactNode => {
@@ -292,7 +335,7 @@ const Host = (): ReactNode => {
         >
             <MessagesContext value={value.messages}>
                 <ActionsContext value={value.actions}>
-                    <MessageList />
+                    <MessageList editComposerComponent={harness.editComposer} />
                 </ActionsContext>
             </MessagesContext>
         </div>
@@ -566,6 +609,7 @@ const nextFrames = async (count: number): Promise<void> => {
 };
 
 const SHOW_ALL_NAME = /earlier messages/;
+const SECRET_PLACEHOLDER = /Paste it here/;
 
 const viewport = (): HTMLElement => document.querySelector<HTMLElement>('[data-slot="scroll-area-viewport"]')!;
 
@@ -633,6 +677,10 @@ describe("a long thread", { timeout: RENDER_TEST_TIMEOUT_MS }, () => {
         harness.withFind = false;
         harness.withReadAloud = false;
         harness.withHostChanges = false;
+        harness.editComposer = undefined;
+        harness.rowExtras.clear();
+        harness.thread = undefined;
+        useChatUIStore.getState().stopEditing();
         harness.threadId = "thread-1";
         scrollReportDelayFrames = 0;
         vi.unstubAllGlobals();
@@ -871,8 +919,13 @@ describe("a long thread", { timeout: RENDER_TEST_TIMEOUT_MS }, () => {
 
         expect((within(rowOf("m101")!).getByRole("textbox", { name: "Comment on the whole file src/a.ts" }) as HTMLTextAreaElement).value).toBe("Rename this");
 
-        // Cancelling closes the box, and the row is windowed again.
+        // Cancelling closes the box and hands focus back to its button, which holds the row while it has focus.
         await user.click(within(rowOf("m101")!).getByRole("button", { name: "Cancel" }));
+
+        expect(mountedIds()).toContain("m101");
+
+        // Once focus is elsewhere too, the row is windowed again.
+        act(() => (document.activeElement as HTMLElement).blur());
         await vi.waitFor(() => expect(mountedIds()).not.toContain("m101"), { timeout: 5000 });
     });
 
@@ -935,6 +988,119 @@ describe("a long thread", { timeout: RENDER_TEST_TIMEOUT_MS }, () => {
         expect(mountedIds().length).toBeLessThan(THREAD_LENGTH / 2);
     });
 
+    describe("rows holding unsent input", () => {
+        const rowOf = (id: string): HTMLElement | null => document.querySelector<HTMLElement>(`[data-list-message-id="${CSS.escape(id)}"]`);
+
+        /** Scrolls to the newest messages, where the older replies would leave the window. */
+        const scrollToNewest = async (): Promise<void> => {
+            act(() => viewport().scrollTo({ top: THREAD_LENGTH * 100 }));
+            await vi.waitFor(() => expect(mountedIds()).not.toContain("m100"), { timeout: 5000 });
+        };
+
+        const waitingPart = (type: string, input: Record<string, unknown>): ToolPart =>
+            ({ approval: { id: `approval-${type}` }, input, state: "approval-requested", type }) as unknown as ToolPart;
+
+        it("keeps an unanswered question and a secret request in older replies, with what was typed, when scrolled away", async () => {
+            const user = userEvent.setup();
+
+            harness.thread = { userId: "owner" };
+            harness.rowExtras.set("m101", () => createElement(AskUserPrompt, { part: waitingPart("tool-askUser", { question: "Which file?" }) }));
+            harness.rowExtras.set("m103", () => createElement(RequestSecretPrompt, { part: waitingPart("tool-requestSecret", { label: "Files token" }) }));
+            mountInto();
+
+            act(() => scrollToMessage("m101"));
+            // The jump lands by focusing the row; typing starts after that.
+            await vi.waitFor(() => expect(focusedMessageId()).toBe("m101"), { timeout: 5000 });
+
+            const questionCard = within(rowOf("m101")!).getByRole("group", { name: "Which file?" });
+
+            await user.type(within(questionCard).getByRole("textbox"), "src/a.ts");
+
+            act(() => scrollToMessage("m103"));
+            // The jump lands by focusing the row; typing starts after that.
+            await vi.waitFor(() => expect(focusedMessageId()).toBe("m103"), { timeout: 5000 });
+
+            const secretField = within(rowOf("m103")!).getByPlaceholderText<HTMLInputElement>(SECRET_PLACEHOLDER);
+
+            await user.type(secretField, "sk-test-123");
+            // Focus moves on; the cards hold their rows because they wait for an answer.
+            act(() => (document.activeElement as HTMLElement).blur());
+            await scrollToNewest();
+
+            expect(within(rowOf("m101")!).getByRole("group", { name: "Which file?" })).toBe(questionCard);
+            expect((within(questionCard).getByRole("textbox") as HTMLTextAreaElement).value).toBe("src/a.ts");
+            expect(within(rowOf("m103")!).getByPlaceholderText(SECRET_PLACEHOLDER)).toBe(secretField);
+            expect(secretField.value).toBe("sk-test-123");
+        });
+
+        it("keeps an older message being edited, its text and focus, when scrolled away", async () => {
+            const user = userEvent.setup();
+
+            /** Keeps the text it is given in its own state, as the real edit composer does. */
+            const EditStandIn = ({ message }: { message: UIMessage }): ReactNode => {
+                const [text, setText] = useState(message.text);
+
+                return createElement("textarea", {
+                    "aria-label": "Edit message",
+                    onChange: (event: { target: { value: string } }) => setText(event.target.value),
+                    value: text,
+                });
+            };
+
+            harness.editComposer = EditStandIn;
+            mountInto();
+
+            act(() => scrollToMessage("m100"));
+            await vi.waitFor(() => expect(rowOf("m100")).not.toBeNull(), { timeout: 5000 });
+            act(() => useChatUIStore.getState().startEditing("m100", "message 100"));
+
+            const editor = within(rowOf("m100")!).getByRole("textbox", { name: "Edit message" });
+
+            await user.type(editor, " edited");
+
+            act(() => viewport().scrollTo({ top: THREAD_LENGTH * 100 }));
+            await vi.waitFor(() => expect(mountedIds()).not.toContain("m99"), { timeout: 5000 });
+
+            expect(within(rowOf("m100")!).getByRole("textbox", { name: "Edit message" })).toBe(editor);
+            expect((editor as HTMLTextAreaElement).value).toBe("message 100 edited");
+            expect(document.activeElement).toBe(editor);
+
+            // Focus elsewhere, still editing: the edit alone holds the row.
+            act(() => editor.blur());
+            act(() => viewport().scrollTo({ top: THREAD_LENGTH * 100 - 1 }));
+            await act(async () => {
+                await nextFrames(2);
+            });
+
+            expect(rowOf("m100")).not.toBeNull();
+            expect((within(rowOf("m100")!).getByRole("textbox", { name: "Edit message" }) as HTMLTextAreaElement).value).toBe("message 100 edited");
+        });
+
+        it("keeps an open diff comment in an older reply, the same box with its text, when all earlier messages are shown", async () => {
+            const user = userEvent.setup();
+            const label = "Comment on the whole file src/a.ts";
+
+            harness.withHostChanges = true;
+            harness.messages = (harness.messages as UIMessage[]).map((message) =>
+                message.id === "m101" ? ({ ...message, hostChanges: { files: [{ added: 3, path: "src/a.ts", removed: 1 }] } } as UIMessage) : message,
+            );
+            mountInto();
+
+            act(() => scrollToMessage("m101"));
+            await vi.waitFor(() => expect(rowOf("m101")).not.toBeNull(), { timeout: 5000 });
+            await user.click(within(rowOf("m101")!).getByRole("button", { name: "Comment on src/a.ts" }));
+
+            const box = within(rowOf("m101")!).getByRole("textbox", { name: label });
+
+            await user.type(box, "Rename this");
+            await user.click(screen.getByRole("button", { name: SHOW_ALL_NAME }));
+
+            expect(mountedIds()).toHaveLength(THREAD_LENGTH);
+            expect(within(rowOf("m101")!).getByRole("textbox", { name: label })).toBe(box);
+            expect((box as HTMLTextAreaElement).value).toBe("Rename this");
+        });
+    });
+
     describe("read aloud", () => {
         const speechSynthesisStub = { cancel: vi.fn(), speak: vi.fn() };
 
@@ -973,6 +1139,9 @@ describe("a long thread", { timeout: RENDER_TEST_TIMEOUT_MS }, () => {
             await readOlderReply("m101");
 
             const cancelsWhileStarting = speechSynthesisStub.cancel.mock.calls.length;
+
+            // Focus moves on (a focused row is held mounted); the reading goes on.
+            act(() => (document.activeElement as HTMLElement).blur());
 
             // Back to the newest messages: the virtualizer unmounts the reply that is reading.
             act(() => viewport().scrollTo({ top: THREAD_LENGTH * 100 }));

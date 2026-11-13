@@ -29493,9 +29493,9 @@ msgstr "Show {remainingCount} more"
 msgid "Show all"
 msgstr "Show all"
 
-#: src/features/chat/thread/message-list.tsx:557
-msgid "Show all {earlierCount} earlier messages"
-msgstr "Show all {earlierCount} earlier messages"
+#: src/features/chat/thread/message-list.tsx:773
+msgid "{earlierCount, plural, one {Show # earlier message} other {Show all # earlier messages}}"
+msgstr "{earlierCount, plural, one {Show # earlier message} other {Show all # earlier messages}}"
 
 #: ../../packages/ui/src/components/chat-markdown.tsx:83
 msgid "Show all {lines} lines"

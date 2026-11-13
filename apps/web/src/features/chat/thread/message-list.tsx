@@ -28,6 +28,7 @@
  * Pins and message-search results use the latter.
  */
 
+import { plural } from "@lingui/core/macro";
 import { useLingui } from "@lingui/react/macro";
 import { Button } from "@neore/ui/components/button";
 import cn from "@neore/ui/utils/cn";
@@ -64,7 +65,7 @@ import {
 } from "./message-windowing";
 import { RateLimitPauseNotice } from "./rate-limit-pause-notice";
 import { useEndReadAloudWithMessages } from "./read-aloud-speech";
-import { usePinnedRowIds } from "./row-pins";
+import { RowMessageIdContext, usePinnedRowIds } from "./row-pins";
 import { selectStreamIdToShow, selectStreamTokenFor } from "./stream-to-show";
 import { StreamingPlaceholder, ThinkingPlaceholder } from "./streaming-placeholder";
 
@@ -292,12 +293,65 @@ const useHeldTailPlan = (plan: WindowPlan, messages: ReadonlyArray<UIMessage>, p
     return held;
 };
 
+/**
+ * The row that holds focus, by message id: anything focused in a row (an input, a button) keeps that row
+ * mounted, so typing into or tabbing through a row never has it virtualized away underneath.
+ */
+const useFocusedRowId = (listRef: RefObject<HTMLElement | null>): string | undefined => {
+    const [focusedId, setFocusedId] = useState<string | undefined>(undefined);
+
+    useEffect(() => {
+        const list = listRef.current;
+
+        if (!list) {
+            return undefined;
+        }
+
+        const rowIdOf = (target: EventTarget | null): string | undefined =>
+            target instanceof Element && list.contains(target) ? target.closest<HTMLElement>(ROW_SELECTOR)?.dataset.listMessageId : undefined;
+        const handleFocusIn = (event: FocusEvent) => setFocusedId(rowIdOf(event.target));
+        const handleFocusOut = (event: FocusEvent) => setFocusedId(rowIdOf(event.relatedTarget));
+
+        list.addEventListener("focusin", handleFocusIn);
+        list.addEventListener("focusout", handleFocusOut);
+
+        return () => {
+            list.removeEventListener("focusin", handleFocusIn);
+            list.removeEventListener("focusout", handleFocusOut);
+        };
+    }, [listRef]);
+
+    return focusedId;
+};
+
+/** Every message whose row is held: pinned from inside (`row-pins.ts`), being edited, or holding focus. */
+const useHeldRowIds = (pinnedRowIds: ReadonlySet<string>, editingMessageId: string | null, focusedRowId: string | undefined): ReadonlySet<string> =>
+    useMemo(() => {
+        if (editingMessageId === null && focusedRowId === undefined) {
+            return pinnedRowIds;
+        }
+
+        const held = new Set(pinnedRowIds);
+
+        if (editingMessageId !== null) {
+            held.add(editingMessageId);
+        }
+
+        if (focusedRowId !== undefined) {
+            held.add(focusedRowId);
+        }
+
+        return held;
+    }, [editingMessageId, focusedRowId, pinnedRowIds]);
+
 type RenderRow = (message: UIMessage, index: number) => ReactNode;
 
 interface VirtualizedHeadProps {
     /** Changes whenever content above the list may have moved (e.g. the load-more spinner). */
     layoutKey: string;
     messages: UIMessage[];
+    /** Every row mounted ("Show all earlier messages", a browser find): the same rows under the same parent, none remounted. */
+    mountAll: boolean;
     onVirtualizer: (virtualizer: Virtualizer<HTMLElement, Element> | null) => void;
     /** Rows held mounted wherever the scroll is: a text selection's, an open diff comment's (`pinnedIndexes`). */
     pinned: ReadonlyArray<number>;
@@ -309,7 +363,7 @@ interface VirtualizedHeadProps {
  * spacer sized to the virtualizer's total, measured as they mount (heights vary
  * a lot). Scrolls with ThreadViewport's element, offset by `scrollMargin`.
  */
-const VirtualizedHead: FC<VirtualizedHeadProps> = ({ layoutKey, messages, onVirtualizer, pinned, renderRow }) => {
+const VirtualizedHead: FC<VirtualizedHeadProps> = ({ layoutKey, messages, mountAll, onVirtualizer, pinned, renderRow }) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const [scrollElement, setScrollElement] = useState<HTMLElement | null>(null);
     const [scrollMargin, setScrollMargin] = useState(0);
@@ -337,8 +391,9 @@ const VirtualizedHead: FC<VirtualizedHeadProps> = ({ layoutKey, messages, onVirt
     const getItemKey = useCallback((index: number) => messages[index]?.id ?? index, [messages]);
 
     const rangeExtractor = useCallback(
-        (range: Parameters<typeof defaultRangeExtractor>[0]) => withPinnedRows(defaultRangeExtractor(range), pinned, messages.length),
-        [messages.length, pinned],
+        (range: Parameters<typeof defaultRangeExtractor>[0]) =>
+            mountAll ? Array.from({ length: messages.length }, (_, index) => index) : withPinnedRows(defaultRangeExtractor(range), pinned, messages.length),
+        [messages.length, mountAll, pinned],
     );
 
     const virtualizer = useVirtualizer<HTMLElement, Element>({
@@ -419,15 +474,17 @@ const MessageList: FC<MessageListProps> = memo(({ className, editComposerCompone
     const { isAllShown, showAll } = useShowAllMessages();
     const listRef = useRef<HTMLDivElement>(null);
     const selectedRows = useSelectedRows(listRef);
-    const pinnedRowIds = usePinnedRowIds();
-    const pinned = useStableIndexes(pinnedIndexes(messages, selectedRows, pinnedRowIds));
-    const plan: WindowPlan = useHeldTailPlan(getWindowPlan(messages.length, { enabled: isVirtualizeFlagOn && !isAllShown }), messages, pinned);
+    const focusedRowId = useFocusedRowId(listRef);
+    const heldRowIds = useHeldRowIds(usePinnedRowIds(), editingMessageId, focusedRowId);
+    const pinned = useStableIndexes(pinnedIndexes(messages, selectedRows, heldRowIds));
+    // "Show all" keeps the same split and mounts the whole head (`mountAll`), so no row changes parent and remounts.
+    const plan: WindowPlan = useHeldTailPlan(getWindowPlan(messages.length, { enabled: isVirtualizeFlagOn }), messages, pinned);
 
     // After "Show all earlier messages", focus goes to the oldest loaded message, where the shown history starts.
     const focusOldestRef = useRef(false);
 
     useEffect(() => {
-        if (!focusOldestRef.current || plan.virtualized) {
+        if (!focusOldestRef.current || !isAllShown) {
             return;
         }
 
@@ -694,21 +751,26 @@ const MessageList: FC<MessageListProps> = memo(({ className, editComposerCompone
                 role="listitem"
                 tabIndex={-1}
             >
-                {goal && threadId && goal.startMessageId === message.id && <GoalBanner goal={goal} maxWidth={maxWidth} threadId={threadId} />}
-                {renderMessage(message, index)}
-                {reviewNotes.get(message.id)?.map((reason, noteIndex) => (
-                    <GoalReviewNote key={`${message.id}-review-${String(noteIndex)}`} maxWidth={maxWidth} reason={reason} />
-                ))}
-                {goal &&
-                    verdictAnchors
-                        ?.get(message.id)
-                        ?.map((verdict) => <GoalVerdictNote goal={goal} key={verdict.round} maxWidth={maxWidth} verdict={verdict} />)}
+                <RowMessageIdContext value={message.id}>
+                    {goal && threadId && goal.startMessageId === message.id && <GoalBanner goal={goal} maxWidth={maxWidth} threadId={threadId} />}
+                    {renderMessage(message, index)}
+                    {reviewNotes.get(message.id)?.map((reason, noteIndex) => (
+                        <GoalReviewNote key={`${message.id}-review-${String(noteIndex)}`} maxWidth={maxWidth} reason={reason} />
+                    ))}
+                    {goal &&
+                        verdictAnchors
+                            ?.get(message.id)
+                            ?.map((verdict) => <GoalVerdictNote goal={goal} key={verdict.round} maxWidth={maxWidth} verdict={verdict} />)}
+                </RowMessageIdContext>
             </div>
         );
     };
 
     const tailStart = plan.virtualized ? plan.headCount : 0;
     const earlierCount = plan.headCount;
+    // Inside `t`: a bare `plural()` compiles to the global i18n, which this app never activates.
+    // eslint-disable-next-line no-restricted-syntax -- the macro compiles this to a message, not a string conversion
+    const showAllLabel = t`${plural(earlierCount, { one: "Show # earlier message", other: "Show all # earlier messages" })}`;
 
     return (
         <>
@@ -716,9 +778,9 @@ const MessageList: FC<MessageListProps> = memo(({ className, editComposerCompone
             <LoadMoreTrigger status={messagesStatus} />
 
             {/* Rows outside the window are not in the DOM, so Tab, a screen reader and menu-opened find would skip them. Shown on focus. */}
-            {plan.virtualized && (
+            {plan.virtualized && !isAllShown && (
                 <Button className="sr-only mx-auto my-2 focus-visible:not-sr-only" onClick={handleShowAll} size="sm" type="button" variant="outline">
-                    {t`Show all ${earlierCount} earlier messages`}
+                    {showAllLabel}
                 </Button>
             )}
 
@@ -732,6 +794,7 @@ const MessageList: FC<MessageListProps> = memo(({ className, editComposerCompone
                     <VirtualizedHead
                         layoutKey={messagesStatus}
                         messages={messages.slice(0, plan.headCount)}
+                        mountAll={isAllShown}
                         onVirtualizer={handleVirtualizer}
                         pinned={pinned}
                         renderRow={renderRow}

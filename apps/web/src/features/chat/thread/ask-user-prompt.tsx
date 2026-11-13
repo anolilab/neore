@@ -41,6 +41,7 @@ import type { AskUserQuestionDraft } from "./ask-user-choices";
 import { isAskUserQuestionAnswered, normalizeAskUserChoices, normalizeAskUserQuestions } from "./ask-user-choices";
 import type { AskUserAnswerEntry } from "./ask-user-questions";
 import { AskUserAnswerList, AskUserQuestionFields } from "./ask-user-questions";
+import { useHoldRow } from "./row-pins";
 import { useAskUserAttachments } from "./use-ask-user-attachments";
 
 interface AskUserInput {
@@ -83,6 +84,9 @@ const AskUserPrompt: FC<{ part: ToolPart }> = ({ part }) => {
     // A public viewer's thread copy has no `userId`, so it never matches.
     const isOwner = !!thread?.userId && thread.userId === sessionData?.user?.id;
     const isWaiting = part.state === "approval-requested" && submitted === null;
+
+    // What is typed here lives only in this card: the list must not virtualize the row away while it waits for an answer.
+    useHoldRow(isWaiting);
     const canAnswer = isOwner && isWaiting && !!approvalId && !!threadId && !isPending;
     // The server refuses files in a locked chat, so the attach control is not offered there.
     const isLocked = thread?.lockedAt !== undefined && thread?.lockedAt !== null;

@@ -38,6 +38,7 @@ import { useChatThread } from "@/features/chat/core/context/chat-context";
 import { useCRPC } from "@/lib/lunora/crpc";
 
 import { providerLabel } from "./rate-limit-pause";
+import { useHoldRow } from "./row-pins";
 
 type SecretUse = { header: string; kind: "mcp_header"; server: string } | { kind: "provider_key"; provider: string };
 
@@ -134,6 +135,9 @@ const RequestSecretPrompt: FC<{ part: ToolPart }> = ({ part }) => {
     // A public viewer's thread copy has no `userId`, so it never matches.
     const isOwner = !!thread?.userId && thread.userId === sessionData?.user?.id;
     const isWaiting = part.state === "approval-requested" && submitted === null && !closed;
+
+    // What is typed here lives only in this card: the list must not virtualize the row away while it waits for an answer.
+    useHoldRow(isWaiting);
     const usesServer = fields.some((field) => field.use?.kind === "mcp_header");
     // Only the owner's servers are the destination, and only the owner's card needs them: for anyone else (a
     // collaborator, a public view) the query never runs. For the owner it is the one the composer and Settings read.

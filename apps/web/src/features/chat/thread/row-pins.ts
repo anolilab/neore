@@ -1,8 +1,8 @@
-import { useEffect, useSyncExternalStore } from "react";
+import { createContext, use, useEffect, useSyncExternalStore } from "react";
 
 /**
  * Messages whose rows must stay mounted however the list is scrolled, because something in them holds state
- * a remount would lose (an open diff comment box with unsent text, the diff dialog). The message list adds
+ * a remount would lose (an open diff comment box, the diff dialog, an unanswered prompt). The message list adds
  * them to the virtualizer's range. Counted per id, so two holders in one row release it only when both have.
  */
 const counts = new Map<string, number>();
@@ -55,6 +55,17 @@ export const useKeepRowMounted = (messageId: string | undefined, active: boolean
 
         return pin(messageId);
     }, [active, messageId]);
+};
+
+/** The message whose row this is; the message list provides it around each row. */
+export const RowMessageIdContext = createContext<string | undefined>(undefined);
+
+/**
+ * Keeps the row this component renders in mounted while `active`: for in-row state a remount would lose (an
+ * unanswered prompt, a typed draft). Outside a message list row it does nothing.
+ */
+export const useHoldRow = (active: boolean): void => {
+    useKeepRowMounted(use(RowMessageIdContext), active);
 };
 
 /** The ids of the messages whose rows are held mounted. */
