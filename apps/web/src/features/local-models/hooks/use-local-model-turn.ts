@@ -14,6 +14,7 @@ import type { UIMessage } from "@/lib/agent";
 import { useCRPC } from "@/lib/lunora/crpc";
 import { acquireUnloadGuard } from "@/lib/unload-guard";
 
+import type { LatestPerFrame } from "../lib/latest-per-frame";
 import { createLatestPerFrame } from "../lib/latest-per-frame";
 import { describeLocalError } from "../lib/local-errors";
 import type { HistoryMessage } from "../lib/run-local-turn";
@@ -55,6 +56,8 @@ export interface LocalModelTurn {
 interface LiveReply {
     persistedId?: string;
     reasoning: string;
+    /** The send that owns this reply; a frame queued by an older send never writes into it. */
+    sendId: number;
     startedAt: number;
     text: string;
     /** The thread the turn was sent in; unset for a turn that creates its thread. */
@@ -82,6 +85,9 @@ const useLocalModelTurn = (model: string, savedMessageIds: ReadonlySet<string>):
     const target = useMemo(() => findLocalModelTarget(providers, model), [providers, model]);
     const [live, setLive] = useState<LiveReply | null>(null);
     const abortRef = useRef<AbortController | null>(null);
+    const lastSendIdRef = useRef(0);
+    // The running send's queued frame, cancelled when a newer send takes over the live reply.
+    const pendingUpdateRef = useRef<LatestPerFrame<{ reasoning: string; text: string }> | null>(null);
 
     // Drop the live copy once the subscription delivered the saved row.
     useEffect(() => {
@@ -109,7 +115,11 @@ const useLocalModelTurn = (model: string, savedMessageIds: ReadonlySet<string>):
             const controller = new AbortController();
 
             abortRef.current = controller;
-            setLive({ reasoning: "", startedAt: Date.now(), text: "", ...(threadId && { threadId }) });
+            lastSendIdRef.current += 1;
+
+            const sendId = lastSendIdRef.current;
+
+            setLive({ reasoning: "", sendId, startedAt: Date.now(), text: "", ...(threadId && { threadId }) });
 
             let assistantMessageId: string | undefined;
 
@@ -119,8 +129,11 @@ const useLocalModelTurn = (model: string, savedMessageIds: ReadonlySet<string>):
             const releaseUnloadGuard = acquireUnloadGuard();
             // Each token rebuilds the chat's message list and re-renders its readers, so the reply is shown once a frame.
             const update = createLatestPerFrame(({ reasoning, text }: { reasoning: string; text: string }) =>
-                setLive((current) => (current ? { ...current, reasoning, text } : current)),
+                setLive((current) => (current?.sendId === sendId ? { ...current, reasoning, text } : current)),
             );
+
+            pendingUpdateRef.current?.cancel();
+            pendingUpdateRef.current = update;
 
             try {
                 const result = await runLocalTurn({
@@ -175,6 +188,10 @@ const useLocalModelTurn = (model: string, savedMessageIds: ReadonlySet<string>):
 
                 if (abortRef.current === controller) {
                     abortRef.current = null;
+                }
+
+                if (pendingUpdateRef.current === update) {
+                    pendingUpdateRef.current = null;
                 }
             }
         },
