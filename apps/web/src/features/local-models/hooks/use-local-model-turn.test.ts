@@ -241,3 +241,78 @@ describe("useLocalModelTurn close warning", () => {
         expect(isGuarded()).toBe(false);
     });
 });
+
+describe("useLocalModelTurn streaming updates", () => {
+    it("shows the tokens that arrive within one frame in one update", async () => {
+        const frames: FrameRequestCallback[] = [];
+
+        vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
+            frames.push(callback);
+
+            return frames.length;
+        });
+        vi.stubGlobal("cancelAnimationFrame", vi.fn());
+
+        let onUpdate!: (text: string, reasoning: string) => void;
+        let finish!: () => void;
+        // eslint-disable-next-line unicorn/prefer-promise-with-resolvers -- the tsconfig lib predates `Promise.withResolvers`
+        const gate = new Promise<void>((resolve) => {
+            finish = resolve;
+        });
+
+        runLocalTurn.mockImplementationOnce(
+            async (options: { onUpdate: typeof onUpdate; prompt: string; save: (input: unknown) => Promise<{ threadId: string }> }) => {
+                ({ onUpdate } = options);
+                await gate;
+
+                const saved = await options.save({ outcome: "complete", prompt: options.prompt, reply: "Hello" });
+
+                return { outcome: "complete", saved: true, threadId: saved.threadId };
+            },
+        );
+
+        const streamed: (string | undefined)[] = [];
+        const { result } = renderHook(() => {
+            const turn = useLocalModelTurn(MODEL, new Set());
+
+            streamed.push(turn.streamingMessage?.text);
+
+            return turn;
+        });
+        let sent!: Promise<void>;
+
+        act(() => {
+            sent = result.current.send(sendOptions({}));
+        });
+
+        const rendersBefore = streamed.length;
+
+        // Five network reads, each its own task, before the next frame.
+        for (const text of ["H", "He", "Hel", "Hell", "Hello"]) {
+            act(() => {
+                onUpdate(text, "");
+            });
+        }
+
+        expect(streamed).toHaveLength(rendersBefore);
+
+        act(() => {
+            const due = [...frames];
+
+            frames.length = 0;
+
+            for (const frame of due) {
+                frame(0);
+            }
+        });
+
+        expect(streamed.slice(rendersBefore)).toStrictEqual(["Hello"]);
+
+        await act(async () => {
+            finish();
+            await sent;
+        });
+
+        vi.unstubAllGlobals();
+    });
+});

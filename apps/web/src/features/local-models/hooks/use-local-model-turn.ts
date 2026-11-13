@@ -14,6 +14,7 @@ import type { UIMessage } from "@/lib/agent";
 import { useCRPC } from "@/lib/lunora/crpc";
 import { acquireUnloadGuard } from "@/lib/unload-guard";
 
+import { createLatestPerFrame } from "../lib/latest-per-frame";
 import { describeLocalError } from "../lib/local-errors";
 import type { HistoryMessage } from "../lib/run-local-turn";
 import { runLocalTurn } from "../lib/run-local-turn";
@@ -116,13 +117,19 @@ const useLocalModelTurn = (model: string, savedMessageIds: ReadonlySet<string>):
             // belongs to this send, not to the component: it outlives an unmount (the chat route can
             // unmount while the request runs) and does not depend on another send's state.
             const releaseUnloadGuard = acquireUnloadGuard();
+            // Each token rebuilds the chat's message list and re-renders its readers, so the reply is shown once a frame.
+            const update = createLatestPerFrame(({ reasoning, text }: { reasoning: string; text: string }) =>
+                setLive((current) => (current ? { ...current, reasoning, text } : current)),
+            );
 
             try {
                 const result = await runLocalTurn({
                     baseUrl: target.baseUrl,
                     history,
                     modelId: target.modelId,
-                    onUpdate: (text, reasoning) => setLive((current) => (current ? { ...current, reasoning, text } : current)),
+                    onUpdate: (text, reasoning) => {
+                        update.push({ reasoning, text });
+                    },
                     prompt,
                     save: async (input) => {
                         const saved = await saveLocalTurn({
@@ -143,12 +150,15 @@ const useLocalModelTurn = (model: string, savedMessageIds: ReadonlySet<string>):
                 });
 
                 if (!result.saved) {
+                    update.cancel();
                     setLive(null);
                     onNotSaved(result.error.kind === "aborted" ? undefined : i18n._(describeLocalError(result.error)));
 
                     return;
                 }
 
+                // The saved reply is the full text: show the last tokens before it is marked saved.
+                update.flush();
                 setLive((current) => (current && assistantMessageId ? { ...current, persistedId: assistantMessageId } : null));
                 onSaved({
                     isNewThread: !threadId,
@@ -157,6 +167,7 @@ const useLocalModelTurn = (model: string, savedMessageIds: ReadonlySet<string>):
                 });
             } catch (error) {
                 // The save itself failed (rate limit, validation, network to our backend).
+                update.cancel();
                 setLive(null);
                 onNotSaved(error instanceof Error ? error.message : undefined);
             } finally {
