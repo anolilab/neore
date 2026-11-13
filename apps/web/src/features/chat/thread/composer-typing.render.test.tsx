@@ -55,6 +55,9 @@ vi.mock("@/features/chat/core/context/chat-context", async () => {
         useChatThread: () => {
             return { isNewThread: false, model: "test-model", thread: undefined, threadId: "thread-1" };
         },
+        useChatThreadIdentity: () => {
+            return { isNewThread: false, model: "test-model", threadId: "thread-1" };
+        },
     };
 });
 
