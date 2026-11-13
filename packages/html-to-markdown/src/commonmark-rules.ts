@@ -974,7 +974,8 @@ function voidEdge(element: Element): string | null {
  * and null when the node outputs nothing.
  */
 function edgeCharacter(node: Node, side: Side, options: Options, lookup: RuleLookup): string | null {
-    if (node.nodeType === 3) {
+    // A CDATA section (type 4) prints its text, as a text node does.
+    if (node.nodeType === 3 || node.nodeType === 4) {
         return textEdge(node.nodeValue ?? "", side);
     }
 
