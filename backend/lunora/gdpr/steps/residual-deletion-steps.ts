@@ -57,6 +57,7 @@ import { eraseSubAgentRunsForUser } from "../../sub-agents/gdpr";
 import { eraseSystemPromptPresetsForUser } from "../../system-prompts/gdpr";
 import { eraseWorkflowVersionsAndPresenceForProject, eraseWorkflowVersionsAndPresenceForUser } from "../../workflow/gdpr";
 import { eraseSkillRatingRows } from "../../skills/gdpr";
+import { purgeObject } from "../../usage/gdpr";
 import { eraseKnowledgeForUser, eraseProjectKnowledgeForProject } from "../../knowledge/gdpr";
 import { eraseProjectRepositories, eraseProjectRepositoriesForUser } from "../../projects/gdpr";
 import { eraseBotsForUser } from "../../bots/gdpr";
@@ -246,11 +247,7 @@ export const purgeUserUsageFiles = internalAction
                     continue;
                 }
 
-                if (await context.storage.getMetadata(run.key)) {
-                    await context.storage.delete(run.key);
-                }
-
-                await context.runMutation(internal.usage.gdpr.releaseUsageKey, { runId: run.runId });
+                await purgeObject(context.storage, run.key, async () => await context.runMutation(internal.usage.gdpr.releaseUsageKey, { runId: run.runId }));
             }
 
             cursor = page.cursor;
