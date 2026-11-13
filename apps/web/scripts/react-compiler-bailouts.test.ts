@@ -36,15 +36,17 @@ const babel = createRequire(requireFromWeb.resolve("@rolldown/plugin-babel"))("@
 const compilerPlugin = requireFromWeb.resolve("babel-plugin-react-compiler");
 const linguiMacroPlugin = requireFromWeb.resolve("@lingui/babel-plugin-lingui-macro");
 
+type NativeDiagnostic = { labels: { end: number; start: number }[]; message: string; severity: string };
+
 type NativeCompiler = {
-    transformSync: (filename: string, code: string, options: Record<string, unknown>) => { code: string; errors: { message: string }[]; fatal?: boolean };
+    transformSync: (filename: string, code: string, options: Record<string, unknown>) => { code: string; errors: NativeDiagnostic[]; fatal: boolean };
 };
 
 // The compiler's native port, as `react({ compiler })` loads it in the build.
 const nativeCompiler = requireFromWeb("oxc-transform-react") as NativeCompiler;
 
 /** The build's passes: Babel lowers the Lingui macro, then the native port compiles with the build's options. */
-const compileNative = (file: string): { code: string; diagnostics: string[] } => {
+const compileNative = (file: string): { code: string; diagnostics: NativeDiagnostic[]; fatal: boolean; lowered: string } => {
     const filename = resolve(webRoot, file);
     const lowered = babel.transformSync(readFileSync(filename, "utf8"), {
         babelrc: false,
@@ -60,7 +62,40 @@ const compileNative = (file: string): { code: string; diagnostics: string[] } =>
         reactCompiler: { ...reactCompilerOptions, reportDiagnostics: true },
     });
 
-    return { code: result.code, diagnostics: result.errors.map((error: { message: string }) => error.message) };
+    return { code: result.code, diagnostics: result.errors, fatal: result.fatal, lowered: lowered.code };
+};
+
+const TOP_LEVEL_DECLARATION_RE = /^(?:export )?(?:default )?(?:const|let|function|class|type|interface|enum)\s/u;
+
+/** Where `name` is declared in `source`, up to the next top-level declaration, as character offsets. */
+const declarationRange = (source: string, name: string): { end: number; start: number } => {
+    const lines = source.split("\n");
+    const first = lines.findIndex((line: string) => new RegExp(String.raw`^(?:export )?(?:const|function)\s+${name}\b`).test(line));
+
+    if (first === -1) {
+        throw new Error(`${name} is not declared`);
+    }
+
+    const next = lines.findIndex((line: string, index: number) => index > first && TOP_LEVEL_DECLARATION_RE.test(line));
+    const offsetOf = (line: number): number => lines.slice(0, line).reduce((sum: number, text: string) => sum + text.length + 1, 0);
+
+    return { end: next === -1 ? source.length : offsetOf(next), start: offsetOf(first) };
+};
+
+/**
+ * The compiler errors that concern `name`: an error located inside its declaration, or one with no location at all
+ * (it cannot be ruled out). Warnings and advice are not bail-outs.
+ */
+const errorsIn = (diagnostics: NativeDiagnostic[], source: string, name: string): string[] => {
+    const { end, start } = declarationRange(source, name);
+
+    return diagnostics
+        .filter(
+            (diagnostic: NativeDiagnostic) =>
+                diagnostic.severity === "Error" &&
+                (diagnostic.labels.length === 0 || diagnostic.labels.some((label: { start: number }) => label.start >= start && label.start < end)),
+        )
+        .map((diagnostic: NativeDiagnostic) => diagnostic.message);
 };
 
 /** Whether `name` is compiled in the port's output: a compiled function opens with its memo cache, `const $ = _c(n)`. */
@@ -150,10 +185,17 @@ describe("react Compiler coverage of the chat components, as the build compiles 
     it.each(Object.entries(MUST_COMPILE))(
         "compiles every listed component in %s with the native port",
         (file: string, names: string[]) => {
-            const { code, diagnostics } = compileNative(file);
+            const { code, diagnostics, fatal, lowered } = compileNative(file);
+
+            // A fatal result emits no code: fail with its reasons rather than as "not compiled".
+            expect({ fatal, messages: fatal ? diagnostics.map((diagnostic: NativeDiagnostic) => diagnostic.message) : [] }).toStrictEqual({
+                fatal: false,
+                messages: [],
+            });
 
             for (const name of names) {
-                expect({ compiled: isCompiledIn(code, name), diagnostics, name }).toStrictEqual({ compiled: true, diagnostics, name });
+                expect({ errors: errorsIn(diagnostics, lowered, name), name }).toStrictEqual({ errors: [], name });
+                expect(isCompiledIn(code, name), `${name} was not compiled`).toBe(true);
             }
         },
         60_000,
