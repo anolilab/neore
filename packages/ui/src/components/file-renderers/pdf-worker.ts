@@ -8,3 +8,21 @@ import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import { pdfjs } from "react-pdf";
 
 pdfjs.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
+
+type PdfWorker = InstanceType<typeof pdfjs.PDFWorker>;
+
+const shared: { options?: { worker: PdfWorker } } = {};
+
+/**
+ * The `options` every `Document` gets, so all of them share one pdf.js worker. Without it pdf.js starts a Web Worker
+ * for each document (each thumbnail in a thread) and terminates it with the document. A worker passed in this way is
+ * not the document's to destroy, so it stays up for the next one. Created on first use, and the same object every
+ * time, which react-pdf needs to keep a loaded document.
+ */
+export const sharedPdfOptions = (): { worker: PdfWorker } => {
+    if (!shared.options || shared.options.worker.destroyed) {
+        shared.options = { worker: new pdfjs.PDFWorker() };
+    }
+
+    return shared.options;
+};

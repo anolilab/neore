@@ -11,7 +11,6 @@
 
 import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
-import "./pdf-worker";
 
 import { useLingui } from "@lingui/react/macro";
 import { isFetchableUrl, useFetchableOrigins } from "@ui/hooks/use-fetchable-origins";
@@ -22,6 +21,7 @@ import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { Document, Page } from "react-pdf";
 
 import { PDF_LOAD_TIMEOUT_MS } from "./pdf-limits";
+import { sharedPdfOptions } from "./pdf-worker";
 
 export interface PdfViewerProps {
     className?: string;
@@ -173,6 +173,7 @@ const PdfViewer: FC<PdfViewerProps> = memo(({ className, filename, fill, url }) 
                         onLoadError={onDocumentLoadError}
                         onLoadProgress={armLoadDeadline}
                         onLoadSuccess={onDocumentLoadSuccess}
+                        options={sharedPdfOptions()}
                         // react-pdf 11 suspends by default; keep the inline `loading` UI instead.
                         suspense={false}
                     >
