@@ -69,8 +69,11 @@ const MESSAGE_ROW_VALUES = "(?, ?, ?, ?, ?, ?, ?, ?, ?)";
 /** The placeholders of `count` (at least one) message rows in one upsert. */
 const messageRowValues = (count: number): string => MESSAGE_ROW_VALUES + `, ${MESSAGE_ROW_VALUES}`.repeat(count - 1);
 
-/** One message row's values, in the column order of the upsert. */
-const messageRowParams = (message: CachedMessage, threadId: string, syncedAt: number): SqlParametereter[] => [
+/** A message as a save takes it: with the start time of the read it came from, when it is not the save's own. */
+type SavedMessage = CachedMessage & { syncedAt?: number };
+
+/** One message row's values, in the column order of the upsert. The message's own read time wins over the save's. */
+const messageRowParams = (message: SavedMessage, threadId: string, syncedAt: number): SqlParametereter[] => [
     message.id,
     threadId,
     message.role,
@@ -79,11 +82,11 @@ const messageRowParams = (message: CachedMessage, threadId: string, syncedAt: nu
     message.status,
     message.createdAt,
     message.updatedAt ?? message.createdAt,
-    syncedAt,
+    message.syncedAt ?? syncedAt,
 ];
 
 /** The values of a chunk of message rows, row after row. */
-const messageRowsParams = (messages: ReadonlyArray<CachedMessage>, threadId: string, syncedAt: number): SqlParametereter[] =>
+const messageRowsParams = (messages: ReadonlyArray<SavedMessage>, threadId: string, syncedAt: number): SqlParametereter[] =>
     messages.flatMap((message) => messageRowParams(message, threadId, syncedAt));
 
 /** Message rows per upsert statement: 100 rows of 9 values stay under SQLite's oldest limit of 999 bound values. */
@@ -145,7 +148,13 @@ export interface ScopedCache {
      * newer than this answer and stays. Never call it for a partial page.
      */
     pruneThreads: (liveThreadIds: ReadonlyArray<string>, options: { readStartedAt: number }) => Promise<void>;
-    saveMessages: (threadId: string, messages: ReadonlyArray<CachedMessage>, options?: SaveOptions) => Promise<void>;
+
+    /**
+     * Saves messages. A message that carries its own `syncedAt` (when the read it came from started) is stamped with
+     * that, not with `options.syncedAt`: rows of different reads saved together keep their own times, so an older read's
+     * copy never looks newer than a later read's.
+     */
+    saveMessages: (threadId: string, messages: ReadonlyArray<CachedMessage & { syncedAt?: number }>, options?: SaveOptions) => Promise<void>;
     saveStatuses: (statuses: ReadonlyArray<CachedStatus>, options?: SaveOptions) => Promise<void>;
     saveThreads: (threads: ReadonlyArray<CachedThread>, options?: SaveOptions) => Promise<void>;
 }

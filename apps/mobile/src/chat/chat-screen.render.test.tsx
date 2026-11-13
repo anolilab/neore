@@ -19,10 +19,16 @@ const harness = vi.hoisted(() => {
         finishReply: undefined as ((outcome: string) => void) | undefined,
         /** Frames requested by the screen, run by the test. */
         frames: [] as (() => void)[],
+        /** Whether the chat has history below its newest page, which the screen fills after the paint. */
+        hasOlder: false,
         /** Whether the start waits for the test (`settleStart`) instead of answering with a reply stream. */
         holdStart: false,
         /** One entry per render of the message list: it renders exactly when the screen does. */
         listRenders: [] as number[],
+        /** Holds a read of the newest page until it resolves, when a test sets it. */
+        newestPageGate: undefined as (() => Promise<void>) | undefined,
+        /** Answers a read of an older page; each test that has older history sets it. */
+        olderPage: async (_cursor: string): Promise<unknown> => { throw new Error("This test has no older page."); },
         /** The delta handler the screen gave the stream. */
         onDelta: undefined as ((delta: { reasoning: string; text: string }) => void) | undefined,
         /** Settles a held start, as the gateway would. */
@@ -37,10 +43,16 @@ const stable = vi.hoisted(() => {
 
     return {
         client: {
-            query: async () => {
+            query: async (_query: unknown, args: { paginationOpts: { cursor: string | null } }) => {
+                if (args.paginationOpts.cursor !== null) {
+                    return await harness.olderPage(args.paginationOpts.cursor);
+                }
+
+                await harness.newestPageGate?.();
+
                 return {
-                    continueCursor: "",
-                    isDone: true,
+                    continueCursor: "older",
+                    isDone: !harness.hasOlder,
                     page: [
                         { _creationTime: 1, id: "q1", parts: [{ text: "Why?", type: "text" }], role: "user", status: "success" },
                         { _creationTime: 2, id: "a1", parts: [{ text: "An earlier answer", type: "text" }], role: "assistant", status: "success" },
@@ -393,5 +405,289 @@ describe("the chat screen's composer", () => {
         });
 
         expect(mounted.container?.textContent).toContain("The message was refused.");
+    });
+});
+
+describe("the chat screen filling its history after the newest page", () => {
+    const mounted: { container?: HTMLElement; root?: Root } = {};
+
+    beforeEach(() => {
+        harness.hasOlder = true;
+        // React reads this to allow `act` outside a testing library.
+        Reflect.set(globalThis, "IS_REACT_ACT_ENVIRONMENT", true);
+        mounted.container = document.createElement("div");
+        mounted.root = createRoot(mounted.container);
+    });
+
+    afterEach(() => {
+        act(() => {
+            mounted.root?.unmount();
+        });
+        harness.hasOlder = false;
+    });
+
+    it("shows why an older page of the fill could not be read, as Load older messages does", async () => {
+        harness.olderPage = async () => {
+            throw new Error("The server could not read older messages.");
+        };
+
+        act(() => {
+            mounted.root?.render(createElement(ChatScreen));
+        });
+
+        await vi.waitFor(() => {
+            expect(mounted.container?.textContent).toContain("The server could not read older messages.");
+        });
+        expect(mounted.container?.textContent).toContain("An earlier answer");
+    });
+
+    it("goes on with the fill it runs when a refresh lands mid-fill, so no older page is asked for twice", async () => {
+        const asked: string[] = [];
+        let answerOlder: (() => void) | undefined;
+
+        harness.olderPage = async (cursor) => {
+            asked.push(cursor);
+
+            if (cursor === "older") {
+                // The first older page waits until the refresh has landed.
+                // eslint-disable-next-line unicorn/prefer-promise-with-resolvers -- `Promise.withResolvers` needs Node 22.11; the package allows 22.0
+                await new Promise<void>((resolve) => {
+                    answerOlder = resolve;
+                });
+
+                return {
+                    continueCursor: "oldest",
+                    isDone: false,
+                    page: [{ _creationTime: 0, id: "q0", parts: [{ text: "An older question", type: "text" }], role: "user", status: "success" }],
+                };
+            }
+
+            return { continueCursor: "", isDone: true, page: [] };
+        };
+
+        act(() => {
+            mounted.root?.render(createElement(ChatScreen));
+        });
+
+        await vi.waitFor(() => {
+            expect(asked).toStrictEqual(["older"]);
+        });
+
+        // A reconnect re-reads the newest page while the fill waits for its first older page.
+        const before = stable.offline;
+
+        stable.offline = { ...before, refreshTick: before.refreshTick + 1 };
+
+        await act(async () => {
+            mounted.root?.render(createElement(ChatScreen));
+        });
+
+        await act(async () => {
+            answerOlder?.();
+        });
+
+        await vi.waitFor(() => {
+            expect(asked).toStrictEqual(["older", "oldest"]);
+        });
+        expect(mounted.container?.textContent).toContain("An older question");
+
+        stable.offline = before;
+    });
+
+    it("drops a newest-page read in flight when a fill's older page finds the chat refused", async () => {
+        let refuseOlder: (() => void) | undefined;
+        let answerNewest: (() => void) | undefined;
+
+        harness.olderPage = async () => {
+            // eslint-disable-next-line unicorn/prefer-promise-with-resolvers -- `Promise.withResolvers` needs Node 22.11; the package allows 22.0
+            await new Promise<void>((resolve) => {
+                refuseOlder = resolve;
+            });
+
+            throw Object.assign(new Error("Forbidden"), { code: "FORBIDDEN" });
+        };
+
+        act(() => {
+            mounted.root?.render(createElement(ChatScreen));
+        });
+
+        await vi.waitFor(() => {
+            expect(refuseOlder).toBeDefined();
+        });
+
+        // A reconnect re-reads the newest page, which waits while the fill's older page is refused.
+        harness.newestPageGate = async () => {
+            // eslint-disable-next-line unicorn/prefer-promise-with-resolvers -- `Promise.withResolvers` needs Node 22.11; the package allows 22.0
+            await new Promise<void>((resolve) => {
+                answerNewest = resolve;
+            });
+        };
+
+        const before = stable.offline;
+
+        stable.offline = { ...before, refreshTick: before.refreshTick + 1 };
+
+        try {
+            await act(async () => {
+                mounted.root?.render(createElement(ChatScreen));
+            });
+            await vi.waitFor(() => {
+                expect(answerNewest).toBeDefined();
+            });
+
+            await act(async () => {
+                refuseOlder?.();
+            });
+            await vi.waitFor(() => {
+                expect(mounted.container?.textContent).toContain("This chat is locked or no longer available.");
+            });
+
+            await act(async () => {
+                answerNewest?.();
+            });
+
+            expect(mounted.container?.textContent).not.toContain("An earlier answer");
+        } finally {
+            harness.newestPageGate = undefined;
+            stable.offline = before;
+        }
+    });
+
+    it("neither shows nor saves a fill's older page that lands while a refused chat's saved copy is being dropped", async () => {
+        const calls: string[] = [];
+        let answerOlder: (() => void) | undefined;
+        let finishForget: (() => void) | undefined;
+        const before = stable.offline;
+
+        stable.offline = {
+            ...before,
+            cache: {
+                forgetThreads: async () => {
+                    calls.push("forget");
+
+                    // eslint-disable-next-line unicorn/prefer-promise-with-resolvers -- `Promise.withResolvers` needs Node 22.11; the package allows 22.0
+                    await new Promise<void>((resolve) => {
+                        finishForget = resolve;
+                    });
+                },
+                loadMessages: async () => [],
+                saveMessages: async (_threadId: string, messages: ReadonlyArray<{ id: string }>) => {
+                    calls.push(`save:${messages.map((row) => row.id).join(",")}`);
+                },
+            } as never,
+        };
+        harness.olderPage = async () => {
+            // eslint-disable-next-line unicorn/prefer-promise-with-resolvers -- `Promise.withResolvers` needs Node 22.11; the package allows 22.0
+            await new Promise<void>((resolve) => {
+                answerOlder = resolve;
+            });
+
+            return {
+                continueCursor: "",
+                isDone: true,
+                page: [{ _creationTime: 0, id: "q0", parts: [{ text: "An older question", type: "text" }], role: "user", status: "success" }],
+            };
+        };
+
+        try {
+            act(() => {
+                mounted.root?.render(createElement(ChatScreen));
+            });
+            await vi.waitFor(() => {
+                expect(answerOlder).toBeDefined();
+            });
+
+            // A reconnect re-reads the newest page, and the server now refuses the chat.
+            harness.newestPageGate = async () => {
+                throw Object.assign(new Error("Forbidden"), { code: "FORBIDDEN" });
+            };
+            stable.offline = { ...stable.offline, refreshTick: before.refreshTick + 1 };
+
+            await act(async () => {
+                mounted.root?.render(createElement(ChatScreen));
+            });
+            await vi.waitFor(() => {
+                expect(finishForget).toBeDefined();
+            });
+
+            // The fill's page answers while the saved copy is still being dropped.
+            await act(async () => {
+                answerOlder?.();
+            });
+
+            expect(mounted.container?.textContent).not.toContain("An older question");
+
+            await act(async () => {
+                finishForget?.();
+            });
+            await vi.waitFor(() => {
+                expect(mounted.container?.textContent).toContain("This chat is locked or no longer available.");
+            });
+
+            expect(mounted.container?.textContent).not.toContain("An older question");
+            expect(calls.slice(calls.indexOf("forget"))).toStrictEqual(["forget"]);
+        } finally {
+            harness.newestPageGate = undefined;
+            stable.offline = before;
+        }
+    });
+
+    it("saves an older page's rows with the time its read started, not when it answered", async () => {
+        const saved: { id: string; syncedAt?: number }[] = [];
+        const clock = { now: 1000 };
+        const nowSpy = vi.spyOn(Date, "now").mockImplementation(() => clock.now);
+        let answerOlder: (() => void) | undefined;
+        const before = stable.offline;
+
+        stable.offline = {
+            ...before,
+            cache: {
+                forgetThreads: async () => {},
+                loadMessages: async () => [],
+                saveMessages: async (_threadId: string, messages: ReadonlyArray<{ id: string; syncedAt?: number }>) => {
+                    saved.push(...messages);
+                },
+            } as never,
+        };
+        harness.olderPage = async (cursor) => {
+            if (cursor === "older") {
+                // eslint-disable-next-line unicorn/prefer-promise-with-resolvers -- `Promise.withResolvers` needs Node 22.11; the package allows 22.0
+                await new Promise<void>((resolve) => {
+                    answerOlder = resolve;
+                });
+
+                return {
+                    continueCursor: "",
+                    isDone: true,
+                    page: [{ _creationTime: 0, id: "q0", parts: [{ text: "An older question", type: "text" }], role: "user", status: "success" }],
+                };
+            }
+
+            return { continueCursor: "", isDone: true, page: [] };
+        };
+
+        try {
+            act(() => {
+                mounted.root?.render(createElement(ChatScreen));
+            });
+
+            await vi.waitFor(() => {
+                expect(answerOlder).toBeDefined();
+            });
+
+            // The older page answers well after it was asked for, as a newer read could land in between.
+            clock.now = 9000;
+
+            await act(async () => {
+                answerOlder?.();
+            });
+
+            await vi.waitFor(() => {
+                expect(saved.find((row) => row.id === "q0")?.syncedAt).toBe(1000);
+            });
+        } finally {
+            nowSpy.mockRestore();
+            stable.offline = before;
+        }
     });
 });

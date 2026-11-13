@@ -298,7 +298,10 @@ export const redactUIMessagesForPublicViewer = (
             continue;
         }
 
-        const id = `m${String(result.length)}`;
+        // The message's place in the thread, already returned as `order`/`stepOrder`: the same on every page and read, so
+        // a client merging pages by id keeps each message once, and the real id stays private. Rows without a place fall
+        // back to their position in this page.
+        const id = message.order === undefined ? `m${String(result.length)}` : `m${String(message.order)}.${String(message.stepOrder ?? 0)}`;
         const speakerName = publicSpeakerName(message);
 
         result.push({
