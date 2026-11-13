@@ -7,8 +7,14 @@ interface CombinedTurn {
     steps: ReadonlyArray<UIMessage>;
 }
 
-/** What the last combine made, by the turn's first step. Holds only the turns of the last result. */
-export type CombineCache = Map<string, CombinedTurn>;
+/** What a combine made, by the turn's first step. Holds only the turns of that result. */
+export type CombineCache = ReadonlyMap<string, CombinedTurn>;
+
+export interface CombinedTurns {
+    /** The cache for the next combine; commit it only once this result is committed. */
+    cache: CombineCache;
+    messages: UIMessage[];
+}
 
 /** Whether `message` continues the turn `first` started; the same rule `combineUIMessages` merges by. */
 const continuesTurn = (first: UIMessage, message: UIMessage): boolean =>
@@ -23,15 +29,18 @@ const sameSteps = (a: ReadonlyArray<UIMessage>, b: ReadonlyArray<UIMessage>): bo
  * change keep their identity. Combining a multi-step turn still builds a new message every time, which
  * also makes every turn look changed to `shareUnchangedMessages`. A turn whose step objects are the
  * same ones as last time reuses last time's message instead, so a push into one turn of a long agent
- * thread combines that turn alone. `messages` must be sorted (`sorted`); the cache is replaced in place.
+ * thread combines that turn alone. `messages` must be sorted (`sorted`).
+ *
+ * `cache` is read, never changed: a render React throws away (one for another thread, interrupted) must
+ * not evict what the committed one made, so the caller commits the returned cache with its result.
  */
 export const combineUnchangedTurns = (
     messages: ReadonlyArray<UIMessage>,
     cache: CombineCache,
     combine: (steps: UIMessage[]) => UIMessage[] = combineUIMessages,
-): UIMessage[] => {
+): CombinedTurns => {
     const result: UIMessage[] = [];
-    const next: CombineCache = new Map();
+    const next = new Map<string, CombinedTurn>();
 
     let index = 0;
 
@@ -58,11 +67,5 @@ export const combineUnchangedTurns = (
         index = end;
     }
 
-    cache.clear();
-
-    for (const [id, turn] of next) {
-        cache.set(id, turn);
-    }
-
-    return result;
+    return { cache: next, messages: result };
 };

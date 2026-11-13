@@ -55,30 +55,29 @@ const merge = (page: UIMessage[], previous: UIMessage[], cache: CombineCache) =>
 
     replaceEqualDeepCalls.count = 0;
 
-    const combined = combineUnchangedTurns(sorted(page), cache, combine);
+    const { cache: nextCache, messages: combined } = combineUnchangedTurns(sorted(page), cache, combine);
     const results = shareUnchangedMessages(previous, combined);
 
     // Steps handed to `combineUIMessages`: the whole page when every turn is recombined.
     const combinedSteps = combine.mock.calls.reduce((total, [steps]) => total + steps.length, 0);
 
-    return { combinedSteps, deepCompares: replaceEqualDeepCalls.count, results };
+    return { cache: nextCache, combinedSteps, deepCompares: replaceEqualDeepCalls.count, results };
 };
 
 describe(combineUnchangedTurns, () => {
     it("combines like combineUIMessages", () => {
         const thread = makeThread();
 
-        expect(combineUnchangedTurns(thread, new Map())).toStrictEqual(combineUIMessages(thread));
+        expect(combineUnchangedTurns(thread, new Map()).messages).toStrictEqual(combineUIMessages(thread));
     });
 
     it("on a live push into one reply, recombines and compares that reply alone and keeps every other message", () => {
         const queryClient = new QueryClient();
-        const cache: CombineCache = new Map();
 
         // The first page, then a push: a freshly decoded copy of the whole page in which one step's text grew.
         queryClient.setQueryData(pageKey, makeThread());
 
-        const first = merge(queryClient.getQueryData<UIMessage[]>(pageKey)!, [], cache);
+        const first = merge(queryClient.getQueryData<UIMessage[]>(pageKey)!, [], new Map());
 
         expect(first.results).toHaveLength(TURNS * 2);
 
@@ -88,7 +87,7 @@ describe(combineUnchangedTurns, () => {
         pushed[changed] = step(42, 3, "turn 42 step 3, more text");
         queryClient.setQueryData(pageKey, pushed);
 
-        const second = merge(queryClient.getQueryData<UIMessage[]>(pageKey)!, first.results, cache);
+        const second = merge(queryClient.getQueryData<UIMessage[]>(pageKey)!, first.results, first.cache);
 
         expect(second.combinedSteps).toBe(STEPS_PER_REPLY);
         expect(second.deepCompares).toBe(1);
@@ -107,15 +106,14 @@ describe(combineUnchangedTurns, () => {
 
     it("does no work for a push that changed nothing", () => {
         const queryClient = new QueryClient();
-        const cache: CombineCache = new Map();
 
         queryClient.setQueryData(pageKey, makeThread());
 
-        const first = merge(queryClient.getQueryData<UIMessage[]>(pageKey)!, [], cache);
+        const first = merge(queryClient.getQueryData<UIMessage[]>(pageKey)!, [], new Map());
 
         queryClient.setQueryData(pageKey, structuredClone(queryClient.getQueryData<UIMessage[]>(pageKey)!));
 
-        const second = merge(queryClient.getQueryData<UIMessage[]>(pageKey)!, first.results, cache);
+        const second = merge(queryClient.getQueryData<UIMessage[]>(pageKey)!, first.results, first.cache);
 
         expect(second.combinedSteps).toBe(0);
         expect(second.deepCompares).toBe(0);
@@ -123,24 +121,39 @@ describe(combineUnchangedTurns, () => {
     });
 
     it("recombines a reply that gained a step", () => {
-        const cache: CombineCache = new Map();
         const thread = makeThread();
-        const first = combineUnchangedTurns(thread, cache);
+        const first = combineUnchangedTurns(thread, new Map());
         const extra = step(99, STEPS_PER_REPLY + 1, "a late step");
-        const second = combineUnchangedTurns([...thread, extra], cache);
+        const second = combineUnchangedTurns([...thread, extra], first.cache).messages;
 
-        expect(second.at(-1)).not.toBe(first.at(-1));
+        expect(second.at(-1)).not.toBe(first.messages.at(-1));
         expect(second.at(-1)?.text).toContain("a late step");
-        expect(second.at(-2)).toBe(first.at(-2));
+        expect(second.at(-2)).toBe(first.messages.at(-2));
     });
 
     it("forgets the turns that left the page", () => {
-        const cache: CombineCache = new Map();
         const thread = makeThread();
+        const first = combineUnchangedTurns(thread, new Map());
 
-        combineUnchangedTurns(thread, cache);
-        combineUnchangedTurns(thread.slice(-STEPS_PER_REPLY - 1), cache);
+        expect([...combineUnchangedTurns(thread.slice(-STEPS_PER_REPLY - 1), first.cache).cache.keys()]).toStrictEqual([`t${TURNS - 1}-s1`]);
+    });
 
-        expect([...cache.keys()]).toStrictEqual([`t${TURNS - 1}-s1`]);
+    it("leaves the cache it was given as it was", () => {
+        const thread = makeThread();
+        const committed = combineUnchangedTurns(thread, new Map()).cache;
+        const before = new Map(committed);
+
+        // A combine for another thread, as a render React then throws away would make.
+        const other = combineUnchangedTurns(
+            thread.map((message) => ({ ...message, id: `other-${message.id}` }) as UIMessage),
+            committed,
+        );
+
+        expect(other.cache).not.toBe(committed);
+        expect(committed).toStrictEqual(before);
+
+        for (const [id, turn] of committed) {
+            expect(turn).toBe(before.get(id));
+        }
     });
 });

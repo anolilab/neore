@@ -208,13 +208,14 @@ export const useUIMessages = <Query extends UIMessagesQuery<any, any>>(
     // The last result, so unchanged messages keep their identity across pushes
     // and memoized rows skip them (`shareUnchangedMessages`).
     const previousResultsRef = useRef<UIMessage[]>([]);
-    // Each multi-step turn's combined message, reused while its steps are the same objects (`combineUnchangedTurns`).
+    // The committed result's combined turns, reused while their steps are the same objects (`combineUnchangedTurns`).
+    // Read during render, replaced only in the layout effect: a discarded render cannot evict it.
     const combineCacheRef = useRef<CombineCache>(new Map());
 
     // Manual memo on purpose: the React Compiler bails out of this hook (it reads a ref during render), so this is its only memoization.
-    const merged = useMemo(() => {
+    const { cache: combineCache, merged } = useMemo(() => {
         // Messages may have been split by pagination. Re-combine them here, only the turns a push changed.
-        const combined = combineUnchangedTurns(sorted(paginated.results), combineCacheRef.current);
+        const { cache, messages: combined } = combineUnchangedTurns(sorted(paginated.results), combineCacheRef.current);
         const deduped = shareUnchangedMessages(previousResultsRef.current, dedupeMessages(combined, streamMessages ?? []));
 
         // Debug: Log streaming message merge
@@ -240,14 +241,18 @@ export const useUIMessages = <Query extends UIMessagesQuery<any, any>>(
         }
 
         return {
-            ...paginated,
-            results: deduped,
+            cache,
+            merged: {
+                ...paginated,
+                results: deduped,
+            },
         };
     }, [paginated, streamMessages]);
 
     useLayoutEffect(() => {
         previousResultsRef.current = merged.results;
-    }, [merged]);
+        combineCacheRef.current = combineCache;
+    }, [combineCache, merged]);
 
     return merged as UIMessagesQueryResult<Query>;
 };
