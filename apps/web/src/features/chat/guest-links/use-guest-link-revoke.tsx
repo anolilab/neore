@@ -1,40 +1,84 @@
 import { plural } from "@lingui/core/macro";
 import { useLingui } from "@lingui/react/macro";
 import type { Id } from "@neore/backend/dataModel";
-import { useMutation } from "@tanstack/react-query";
+import { useUnlockProof } from "@neore/client-runtime";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import { useState } from "react";
 
 import DeleteConfirmationDialog from "@/components/delete-confirmation-dialog";
 import { useCRPC } from "@/lib/lunora/crpc";
 
+import { errorCode } from "./error-code";
+
 /**
  * A thread's guest-link revoke, held by a component that outlives the share menu (`ThreadShareButton`): the confirm it asks
  * when notes are waiting sits beside the menu, not inside its popup, and the revoke still goes through when the menu closes
  * on the confirm's click, as Remove User's does. Render `confirmDialog` outside the menu.
  */
-const useGuestLinkRevoke = (threadId: string | undefined): { confirmDialog: ReactNode; revokeLink: (waitingCount: number) => Promise<boolean> } => {
+const useGuestLinkRevoke = (
+    threadId: string | undefined,
+): { confirmDialog: ReactNode; revokeLink: (linkId: string, waitingNotes: string[]) => Promise<boolean> } => {
     const { t } = useLingui();
     const crpc = useCRPC();
+    const queryClient = useQueryClient();
+    const unlockProof = useUnlockProof(threadId);
     const revoke = useMutation(crpc.chat.guest_links.revokeGuestLink.mutationOptions());
-    const [asking, setAsking] = useState<{ answer: (confirmed: boolean) => void; waitingCount: number } | null>(null);
+    const [asking, setAsking] = useState<{ answer: (confirmed: boolean) => void; threadId: string | undefined; waitingCount: number } | null>(null);
 
-    /** Revokes the link, asking first when `waitingCount` notes would be deleted; `false` when the owner declined. */
-    const revokeLink = async (waitingCount: number): Promise<boolean> => {
-        if (waitingCount > 0) {
-            const confirmed = await new Promise<boolean>((resolve) => {
-                setAsking({ answer: resolve, waitingCount });
+    // A question asked for one chat is never answered in another: moving to another chat declines it.
+    if (asking && asking.threadId !== threadId) {
+        asking.answer(false);
+        setAsking(null);
+    }
+
+    /** The notes waiting now, read afresh: the panel's live read may not have caught up with a note just left. */
+    const waitingNow = async (forThread: string | undefined): Promise<string[]> => {
+        const read = await queryClient.fetchQuery({
+            ...crpc.chat.guest_links.getGuestLink.queryOptions({ threadId: forThread as Id<"threads">, unlockProof }, { live: false }),
+            staleTime: 0,
+        });
+
+        return read.messages.filter((note) => note.status === "held").map((note) => note.id);
+    };
+
+    /**
+     * Revokes the link, deleting only the waiting notes the owner confirmed, by id. The server refuses when one waits that
+     * they did not see (left since, even in place of one sent meanwhile): they are asked again about the notes waiting now.
+     */
+    const revokeConfirmed = async (forThread: string | undefined, linkId: string, waitingNotes: string[]): Promise<boolean> => {
+        if (waitingNotes.length > 0) {
+            const yes = await new Promise<boolean>((resolve) => {
+                setAsking({ answer: resolve, threadId: forThread, waitingCount: waitingNotes.length });
             });
 
-            if (!confirmed) {
+            if (!yes) {
                 return false;
             }
         }
 
-        await revoke.mutateAsync({ threadId: threadId as Id<"threads"> });
+        try {
+            await revoke.mutateAsync({
+                confirmedNotes: waitingNotes as Id<"threadGuestMessages">[],
+                linkId: linkId as Id<"threadGuestLinks">,
+                threadId: forThread as Id<"threads">,
+            });
+        } catch (error) {
+            if (errorCode(error) !== "GUEST_NOTES_WAITING") {
+                throw error;
+            }
+
+            return await revokeConfirmed(forThread, linkId, await waitingNow(forThread));
+        }
 
         return true;
     };
+
+    /**
+     * Revokes the link the owner saw (`linkId`: a link replaced since is refused, `GUEST_LINK_ENDED`), asking first when the
+     * waiting notes shown (`waitingNotes`, their ids) would be deleted; `false` when declined.
+     */
+    const revokeLink = async (linkId: string, waitingNotes: string[]): Promise<boolean> => await revokeConfirmed(threadId, linkId, waitingNotes);
 
     const waitingCount = asking?.waitingCount ?? 0;
     const answer = (confirmed: boolean) => {

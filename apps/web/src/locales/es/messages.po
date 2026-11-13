@@ -1507,7 +1507,7 @@ msgstr "<0>Webhook</0>: recibe solicitudes HTTP POST de servicios externos (Stri
 msgid "~{approxTokenCount} tokens"
 msgstr "~{approxTokenCount} tokens"
 
-#: src/components/error-boundaries/global-error-boundary-provider.tsx:229
+#: src/components/error-boundaries/global-error-boundary-provider.tsx:199
 msgid "⚠️ You're currently offline. Some features may not work properly."
 msgstr "⚠️ Ahora mismo no tienes conexión. Es posible que algunas funciones no se comporten correctamente."
 
@@ -1523,7 +1523,7 @@ msgstr "Por 20 $/mes sustituye a ChatGPT + Midjourney + Runway y más. Empieza g
 msgid "1 {from} in other currencies"
 msgstr "1 {from} en otras divisas"
 
-#: src/features/chat/sharing/thread-share-button.tsx:328
+#: src/features/chat/sharing/thread-share-button.tsx:329
 msgid "1 Day"
 msgstr "1 día"
 
@@ -1640,7 +1640,7 @@ msgstr "30 días"
 msgid "30+ AI models for chat, images, video, documents, and code. One workspace, one subscription — free to start."
 msgstr "Más de 30 modelos de IA para chat, imágenes, video, documentos y código. Un espacio de trabajo, una suscripción; empieza gratis."
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:41
+#: src/features/onboarding/components/onboarding-dialog.tsx:40
 msgid "30+ Models, One Thread"
 msgstr "Más de 30 modelos, una conversación"
 
@@ -1688,7 +1688,7 @@ msgstr "Rango de 52 semanas"
 msgid "7 days"
 msgstr "7 días"
 
-#: src/features/chat/sharing/thread-share-button.tsx:329
+#: src/features/chat/sharing/thread-share-button.tsx:330
 msgid "7 Days"
 msgstr "7 días"
 
@@ -1802,8 +1802,8 @@ msgstr "Hay una clave guardada. Déjalo en blanco para conservarla."
 msgid "A key is saved. Leave blank to keep it. Changing the endpoint, region or access key id requires entering it again."
 msgstr "Hay una clave guardada. Déjalo en blanco para conservarla. Si cambias el endpoint, la región o el ID de clave de acceso, tendrás que introducirla de nuevo."
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:67
-#: src/features/chat/guest-links/guest-link-panel.tsx:131
+#: src/features/chat/guest-links/guest-link-panel.tsx:90
+#: src/features/chat/guest-links/guest-link-panel.tsx:156
 msgid "A locked chat cannot have a guest link."
 msgstr "Un chat bloqueado no puede tener un enlace de invitado."
 
@@ -2047,7 +2047,7 @@ msgstr "Aceptar invitación"
 msgid "Accept or reject invitations to join organizations"
 msgstr "Acepta o rechaza invitaciones para unirte a organizaciones"
 
-#: src/features/chat/sharing/thread-share-button.tsx:258
+#: src/features/chat/sharing/thread-share-button.tsx:259
 #: src/features/pages/components/page-share-dialog.tsx:96
 msgid "Access"
 msgstr "Acceso"
@@ -2060,7 +2060,7 @@ msgstr "Accede a más de 200 modelos (Claude, GPT-4, Gemini, Llama) con una sola
 msgid "Access for {name}"
 msgstr "Acceso para {name}"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:42
+#: src/features/onboarding/components/onboarding-dialog.tsx:41
 msgid "Access GPT-4, Claude, Gemini, and more from a single conversation. Switch models mid-thread to compare answers."
 msgstr "Accede a GPT-4, Claude, Gemini y más desde una sola conversación. Cambia de modelo a mitad de conversación para comparar respuestas."
 
@@ -2608,8 +2608,8 @@ msgstr "Ajustar"
 #: src/features/auth/components/team/team-member-cell.tsx:148
 #: src/features/auth/components/team/team-member-cell.tsx:163
 #: src/features/auth/components/team/team-switcher.tsx:143
-#: src/features/chat/sharing/thread-share-button.tsx:212
-#: src/features/chat/sharing/thread-share-button.tsx:317
+#: src/features/chat/sharing/thread-share-button.tsx:213
+#: src/features/chat/sharing/thread-share-button.tsx:318
 #: src/features/layout/components/sidebar-shortcut.tsx:268
 #: src/features/layout/lib/dashboard-page-names.ts:12
 #: src/routes/admin/route.tsx:51
@@ -3636,7 +3636,7 @@ msgstr "Cualquiera de mis chats"
 msgid "Any string you choose; enter the same value as the webhook Verify token in the Meta app"
 msgstr "Cualquier cadena que elijas; introduce el mismo valor como Verify token del webhook en la app de Meta"
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:129
+#: src/features/chat/guest-links/guest-link-panel.tsx:150
 msgid "Anyone with a guest link can leave you a message here. Nothing they write runs on its own."
 msgstr "Cualquiera con un enlace de invitado puede dejarte un mensaje aquí. Nada de lo que escriba se ejecuta por sí solo."
 
@@ -3644,7 +3644,7 @@ msgstr "Cualquiera con un enlace de invitado puede dejarte un mensaje aquí. Nad
 msgid "Anyone with the link can read this page. Comments are never shown. Turning it off revokes the link."
 msgstr "Cualquiera con el enlace puede leer esta página. Los comentarios nunca se muestran. Desactivarlo revoca el enlace."
 
-#: src/features/chat/sharing/thread-share-button.tsx:378
+#: src/features/chat/sharing/thread-share-button.tsx:379
 msgid "Anyone with the link can view this thread"
 msgstr "Cualquiera con el enlace puede ver esta conversación"
 
@@ -3729,7 +3729,7 @@ msgstr "Apariencia"
 msgid "AppID from Basic configuration of your Official Account"
 msgstr "AppID de la configuración básica de tu cuenta oficial"
 
-#: src/components/error-boundaries/global-error-boundary-provider.tsx:219
+#: src/components/error-boundaries/global-error-boundary-provider.tsx:189
 msgid "Application Error"
 msgstr "Error de la aplicación"
 
@@ -3962,7 +3962,7 @@ msgstr "¿Seguro que quieres salir de esta organización?"
 msgid "Are you sure you want to make {userName} an admin? They will have full access to admin features."
 msgstr "¿Seguro que quieres hacer admin a {userName}? Tendrá acceso completo a las funciones de administración."
 
-#: src/features/chat/sharing/thread-share-button.tsx:412
+#: src/features/chat/sharing/thread-share-button.tsx:413
 msgid "Are you sure you want to remove {userToRemoveName} from this thread?"
 msgstr "¿Seguro que quieres quitar a {userToRemoveName} de esta conversación?"
 
@@ -4493,7 +4493,7 @@ msgid "Azure portal → your OpenAI resource → Keys and Endpoint. Encrypted at
 msgstr "Portal de Azure → tu recurso de OpenAI → Claves y punto de conexión. Se guarda cifrada y no se vuelve a mostrar."
 
 #: src/features/code/components/code-shell.tsx:162
-#: src/features/onboarding/components/onboarding-dialog.tsx:395
+#: src/features/onboarding/components/onboarding-dialog.tsx:394
 #: src/features/pages/components/page-version-panel.tsx:89
 msgid "Back"
 msgstr "Atrás"
@@ -5242,7 +5242,7 @@ msgstr "Hecho para <0>flujos de trabajo reales.</0>"
 msgid "Built for expert developers and complex systems"
 msgstr "Creado para desarrolladores expertos y sistemas complejos"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:38
+#: src/features/onboarding/components/onboarding-dialog.tsx:37
 msgid "Built-in Canvas Editor"
 msgstr "Editor de lienzo integrado"
 
@@ -7074,11 +7074,11 @@ msgstr "Compara antes de decidirte"
 msgid "Compare concepts across FLUX, Runway, and Stable Diffusion. Pick the best style, not the only option."
 msgstr "Compara conceptos en FLUX, Runway y Stable Diffusion. Elige el mejor estilo, no la única opción."
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:75
+#: src/features/onboarding/components/onboarding-dialog.tsx:74
 msgid "Compare how different AI models explain quantum computing to a beginner."
 msgstr "Compara cómo explican distintos modelos de IA la computación cuántica a un principiante."
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:74
+#: src/features/onboarding/components/onboarding-dialog.tsx:73
 msgid "Compare models"
 msgstr "Comparar modelos"
 
@@ -7982,8 +7982,8 @@ msgstr "¡Copiado!"
 #: ../../packages/ui/src/components/data-grid/data-grid-context-menu.tsx:225
 #: src/features/auth/components/settings/api-key/mcp-config-snippet.tsx:30
 #: src/features/auth/components/settings/two-factor/backup-codes-dialog.tsx:100
-#: src/features/chat/guest-links/guest-link-panel.tsx:136
-#: src/features/chat/sharing/thread-share-button.tsx:393
+#: src/features/chat/guest-links/guest-link-panel.tsx:161
+#: src/features/chat/sharing/thread-share-button.tsx:394
 #: src/features/chat/thread/message-item.tsx:356
 #: src/features/chat/thread/text-selection-menu.tsx:525
 #: src/features/settings/components/chat/trigger-settings.tsx:782
@@ -8292,11 +8292,11 @@ msgstr "No se pudo confirmar el cambio en la fusión automática. Comprueba en {
 msgid "Could not connect to the server."
 msgstr "No se pudo conectar con el servidor."
 
-#: src/features/chat/sharing/thread-share-button.tsx:124
+#: src/features/chat/sharing/thread-share-button.tsx:125
 msgid "Could not copy automatically. Invite link: {inviteLink}"
 msgstr "No se pudo copiar automáticamente. Enlace de invitación: {inviteLink}"
 
-#: src/features/chat/sharing/thread-share-button.tsx:190
+#: src/features/chat/sharing/thread-share-button.tsx:191
 msgid "Could not copy automatically. Public link: {publicLink}"
 msgstr "No se pudo copiar automáticamente. Enlace público: {publicLink}"
 
@@ -8833,11 +8833,11 @@ msgstr "Crear objetivo"
 msgid "Create group chat"
 msgstr "Crear chat de grupo"
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:166
+#: src/features/chat/guest-links/guest-link-panel.tsx:191
 msgid "Create guest link"
 msgstr "Crear enlace de invitado"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:40
+#: src/features/onboarding/components/onboarding-dialog.tsx:39
 msgid "Create Images and Videos"
 msgstr "Crea imágenes y videos"
 
@@ -8845,7 +8845,7 @@ msgstr "Crea imágenes y videos"
 msgid "Create images with FLUX, Imagen, and Stable Diffusion. Generate videos with Runway, Luma, and Kling. Compare outputs across providers — pick the best result, not the only result."
 msgstr "Crea imágenes con FLUX, Imagen y Stable Diffusion. Genera videos con Runway, Luma y Kling. Compara los resultados de distintos proveedores: elige el mejor resultado, no el único."
 
-#: src/features/chat/sharing/thread-share-button.tsx:341
+#: src/features/chat/sharing/thread-share-button.tsx:342
 msgid "Create Invite"
 msgstr "Crear invitación"
 
@@ -9158,7 +9158,7 @@ msgid "Currently restricted"
 msgstr "Restringidos actualmente"
 
 #: src/features/canvas/components/design-preset-selector.tsx:87
-#: src/features/chat/sharing/thread-share-button.tsx:330
+#: src/features/chat/sharing/thread-share-button.tsx:331
 #: src/features/marketing/components/gateway-landing-page.tsx:792
 #: src/features/marketing/components/landing-page.tsx:1014
 #: src/features/prompts/components/prompt-form-dialog.tsx:444
@@ -11543,7 +11543,7 @@ msgid "Email"
 msgstr "Correo electrónico"
 
 #: src/features/auth/components/settings/security/change-email-card.tsx:139
-#: src/features/chat/sharing/thread-share-button.tsx:305
+#: src/features/chat/sharing/thread-share-button.tsx:306
 msgid "Email Address"
 msgstr "Dirección de correo electrónico"
 
@@ -11890,7 +11890,7 @@ msgid "Enter default value..."
 msgstr "Introduce el valor predeterminado..."
 
 #: src/features/auth/components/organization/invite-member-dialog.tsx:118
-#: src/features/chat/sharing/thread-share-button.tsx:306
+#: src/features/chat/sharing/thread-share-button.tsx:307
 msgid "Enter email address"
 msgstr "Introduce la dirección de correo"
 
@@ -12155,7 +12155,7 @@ msgstr "Error"
 msgid "Error details:"
 msgstr "Detalles del error:"
 
-#: src/components/error-boundaries/global-error-boundary-provider.tsx:267
+#: src/components/error-boundaries/global-error-boundary-provider.tsx:237
 msgid "Error ID: <0>{displayErrorId}</0>"
 msgstr "ID del error: <0>{displayErrorId}</0>"
 
@@ -12580,7 +12580,7 @@ msgstr "experimental"
 msgid "Experimental reasoning with DeepSeek's latest thinking capabilities"
 msgstr "Razonamiento experimental con las capacidades de pensamiento más recientes de DeepSeek"
 
-#: src/features/chat/sharing/thread-share-button.tsx:322
+#: src/features/chat/sharing/thread-share-button.tsx:323
 msgid "Expiration"
 msgstr "Caducidad"
 
@@ -12632,7 +12632,7 @@ msgstr "Caduca en {remainingTime}"
 msgid "Expires on {0}"
 msgstr "Caduca el {0}"
 
-#: src/features/chat/sharing/thread-share-button.tsx:354
+#: src/features/chat/sharing/thread-share-button.tsx:355
 msgid "Expires:"
 msgstr "Caduca:"
 
@@ -12971,7 +12971,7 @@ msgstr "No se pudo crear la rama"
 msgid "Failed to create budget alert"
 msgstr "No se pudo crear la alerta de presupuesto"
 
-#: src/features/chat/sharing/thread-share-button.tsx:129
+#: src/features/chat/sharing/thread-share-button.tsx:130
 msgid "Failed to create invite"
 msgstr "No se pudo crear la invitación"
 
@@ -13275,7 +13275,7 @@ msgstr "No se pudo eliminar el proveedor"
 msgid "Failed to remove skill"
 msgstr "No se pudo quitar la habilidad"
 
-#: src/features/chat/sharing/thread-share-button.tsx:155
+#: src/features/chat/sharing/thread-share-button.tsx:156
 msgid "Failed to remove user access"
 msgstr "No se pudo quitar el acceso del usuario"
 
@@ -13307,7 +13307,7 @@ msgstr "No se pudo restaurar esta versión."
 msgid "Failed to restore version"
 msgstr "No se pudo restaurar la versión"
 
-#: src/features/chat/sharing/thread-share-button.tsx:139
+#: src/features/chat/sharing/thread-share-button.tsx:140
 msgid "Failed to revoke invite"
 msgstr "No se pudo revocar la invitación"
 
@@ -13569,7 +13569,7 @@ msgstr "No se pudo actualizar la comprobación rápida"
 msgid "Failed to update the trusted servers"
 msgstr "No se pudieron actualizar los servidores de confianza"
 
-#: src/features/chat/sharing/thread-share-button.tsx:172
+#: src/features/chat/sharing/thread-share-button.tsx:173
 msgid "Failed to update thread visibility"
 msgstr "No se pudo actualizar la visibilidad de la conversación"
 
@@ -14994,7 +14994,7 @@ msgstr "Genera un guion gráfico para un documental corto"
 msgid "Generate a video from a text description"
 msgstr "Genera un video a partir de una descripción de texto"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:69
+#: src/features/onboarding/components/onboarding-dialog.tsx:68
 msgid "Generate an image"
 msgstr "Genera una imagen"
 
@@ -15006,7 +15006,7 @@ msgstr "Genera una imagen a partir de un prompt de texto"
 msgid "Generate an image from a text prompt and upscale it to 4x"
 msgstr "Genera una imagen a partir de un prompt de texto y amplíala a 4x"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:70
+#: src/features/onboarding/components/onboarding-dialog.tsx:69
 msgid "Generate an image of a cozy reading nook with warm lighting and plants."
 msgstr "Genera una imagen de un rincón de lectura acogedor con luz cálida y plantas."
 
@@ -15039,7 +15039,7 @@ msgstr "Generar imagen"
 msgid "Generate images with consistent character appearance"
 msgstr "Genera imágenes con una apariencia de personaje coherente"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:39
+#: src/features/onboarding/components/onboarding-dialog.tsx:38
 msgid "Generate images with FLUX and Stable Diffusion, create videos with Runway and Luma — all from the same chat."
 msgstr "Genera imágenes con FLUX y Stable Diffusion, crea videos con Runway y Luma, todo desde el mismo chat."
 
@@ -15308,7 +15308,7 @@ msgstr "Ir al texto comentado: "
 msgid "Go to first item"
 msgstr "Ir al primer elemento"
 
-#: src/components/error-boundaries/global-error-boundary-provider.tsx:258
+#: src/components/error-boundaries/global-error-boundary-provider.tsx:228
 msgid "Go to Home"
 msgstr "Ir al inicio"
 
@@ -15370,7 +15370,7 @@ msgid "Go to slide {slideNumber}"
 msgstr "Ir a la diapositiva {slideNumber}"
 
 #. placeholder {0}: index + 1
-#: src/features/onboarding/components/onboarding-dialog.tsx:363
+#: src/features/onboarding/components/onboarding-dialog.tsx:362
 msgid "Go to step {0}"
 msgstr "Ir al paso {0}"
 
@@ -15795,23 +15795,23 @@ msgstr "Las cuentas de invitado solo usan modelos gratuitos."
 msgid "Guest accounts use free models only. Sign up to unlock all models."
 msgstr "Las cuentas de invitado solo usan modelos gratuitos. Regístrate para desbloquear todos los modelos."
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:134
+#: src/features/chat/guest-links/guest-link-panel.tsx:159
 msgid "Guest link"
 msgstr "Enlace de invitado"
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:120
+#: src/features/chat/guest-links/guest-link-panel.tsx:141
 msgid "Guest link copied"
 msgstr "Enlace de invitado copiado"
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:170
+#: src/features/chat/guest-links/guest-link-panel.tsx:195
 msgid "Guest messages"
 msgstr "Mensajes de invitados"
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:61
+#: src/features/chat/guest-links/guest-link-panel.tsx:84
 msgid "Guest messages from an earlier link are still waiting."
 msgstr "Todavía hay mensajes de invitados de un enlace anterior en espera."
 
-#: src/features/chat/sharing/thread-share-button.tsx:261
+#: src/features/chat/sharing/thread-share-button.tsx:262
 msgid "Guests"
 msgstr "Invitados"
 
@@ -15946,7 +15946,7 @@ msgstr "¡Hola, {0}! ¿Qué te gustaría hacer hoy?"
 msgid "Help"
 msgstr "Ayuda"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:65
+#: src/features/onboarding/components/onboarding-dialog.tsx:64
 msgid "Help me write a professional email to introduce myself to a new team."
 msgstr "Ayúdame a escribir un correo profesional para presentarme a un equipo nuevo."
 
@@ -16289,7 +16289,7 @@ msgstr "atajo de teclado"
 msgid "Hour"
 msgstr "Hora"
 
-#: src/features/chat/sharing/thread-share-button.tsx:336
+#: src/features/chat/sharing/thread-share-button.tsx:337
 msgid "Hours"
 msgstr "Horas"
 
@@ -16458,7 +16458,7 @@ msgstr "Inactivo"
 msgid "If it kept the review as pending, submit or delete it there first."
 msgstr "Si dejó la revisión como pendiente, envíala o elimínala allí primero."
 
-#: src/components/error-boundaries/global-error-boundary-provider.tsx:264
+#: src/components/error-boundaries/global-error-boundary-provider.tsx:234
 #: src/components/error-boundaries/route-error-boundary.tsx:126
 msgid "If this problem persists, please contact support."
 msgstr "Si el problema persiste, contacta con soporte."
@@ -17360,7 +17360,7 @@ msgstr "Error de invitación"
 msgid "Invite link"
 msgstr "Enlace de invitación"
 
-#: src/features/chat/sharing/thread-share-button.tsx:122
+#: src/features/chat/sharing/thread-share-button.tsx:123
 msgid "Invite link copied to clipboard!"
 msgstr "¡Enlace de invitación copiado al portapapeles!"
 
@@ -17377,7 +17377,7 @@ msgstr "Invita a nuevos miembros y actualiza los roles de los existentes"
 msgid "Invite new members. They join once they accept the invitation."
 msgstr "Invita a nuevos miembros. Se unirán cuando acepten la invitación."
 
-#: src/features/chat/sharing/thread-share-button.tsx:137
+#: src/features/chat/sharing/thread-share-button.tsx:138
 msgid "Invite revoked"
 msgstr "Invitación revocada"
 
@@ -17390,7 +17390,7 @@ msgstr "Invitado por {0}"
 msgid "Invited to join"
 msgstr "Te han invitado a unirte"
 
-#: src/features/chat/sharing/thread-share-button.tsx:259
+#: src/features/chat/sharing/thread-share-button.tsx:260
 msgid "Invites"
 msgstr "Invitaciones"
 
@@ -17623,7 +17623,7 @@ msgstr "hace un momento"
 msgid "Just now"
 msgstr "Justo ahora"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:417
+#: src/features/onboarding/components/onboarding-dialog.tsx:416
 msgid "Just start chatting"
 msgstr "Empieza a chatear"
 
@@ -18218,7 +18218,7 @@ msgstr "Más información sobre MCP"
 msgid "Learning"
 msgstr "Aprendizaje"
 
-#: src/features/chat/guest-links/guest-page.tsx:235
+#: src/features/chat/guest-links/guest-page.tsx:234
 #: src/routes/(public)/guest.tsx:12
 msgid "Leave a message"
 msgstr "Dejar un mensaje"
@@ -18458,7 +18458,7 @@ msgstr "Líneas que no son JSON válido"
 msgid "Link"
 msgstr "Vincular"
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:142
+#: src/features/chat/guest-links/guest-link-panel.tsx:167
 msgid "Link active until {expiresAt}"
 msgstr "Enlace activo hasta {expiresAt}"
 
@@ -18739,8 +18739,8 @@ msgstr "Cargando detalles del nodo..."
 msgid "Loading older messages..."
 msgstr "Cargando mensajes anteriores..."
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:286
-#: src/features/onboarding/components/onboarding-dialog.tsx:289
+#: src/features/onboarding/components/onboarding-dialog.tsx:285
+#: src/features/onboarding/components/onboarding-dialog.tsx:288
 msgid "Loading onboarding"
 msgstr "Cargando la introducción"
 
@@ -18819,6 +18819,10 @@ msgstr "Cargando estadísticas…"
 msgid "Loading tasks…"
 msgstr "Cargando tareas…"
 
+#: src/features/chat/guest-links/guest-link-panel.tsx:153
+msgid "Loading the guest link…"
+msgstr "Cargando el enlace de invitado…"
+
 #: src/features/develop/components/guide-tab.tsx:57
 msgid "Loading the guide"
 msgstr "Cargando la guía"
@@ -18861,7 +18865,7 @@ msgstr "Cargando flujo de trabajo..."
 msgid "Loading your items…"
 msgstr "Cargando tus elementos…"
 
-#: src/features/chat/guest-links/guest-page.tsx:286
+#: src/features/chat/guest-links/guest-page.tsx:285
 msgid "Loading your messages…"
 msgstr "Cargando tus mensajes…"
 
@@ -21337,7 +21341,7 @@ msgstr "Imagen hero de newsletter"
 #: ../../packages/ui/src/components/pagination.tsx:52
 #: ../../packages/ui/src/components/spreadsheet/csv-renderer.tsx:342
 #: ../../packages/ui/src/components/spreadsheet/xlsx-renderer.tsx:656
-#: src/features/onboarding/components/onboarding-dialog.tsx:417
+#: src/features/onboarding/components/onboarding-dialog.tsx:416
 msgid "Next"
 msgstr "Siguiente"
 
@@ -21469,7 +21473,7 @@ msgstr "Sin acceso a este repositorio."
 msgid "No active session found. Please sign in again."
 msgstr "No se encontró ninguna sesión activa. Vuelve a iniciar sesión."
 
-#: src/features/chat/sharing/thread-share-button.tsx:265
+#: src/features/chat/sharing/thread-share-button.tsx:266
 msgid "No additional users have access to this thread."
 msgstr "Ningún otro usuario tiene acceso a esta conversación."
 
@@ -22588,19 +22592,19 @@ msgstr "Opción on-premise"
 msgid "Onboarding"
 msgstr "Introducción"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:254
+#: src/features/onboarding/components/onboarding-dialog.tsx:253
 msgid "Onboarding complete"
 msgstr "Introducción completada"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:273
+#: src/features/onboarding/components/onboarding-dialog.tsx:272
 msgid "Onboarding complete. Redirecting to chat."
 msgstr "Introducción completada. Redirigiendo al chat."
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:317
+#: src/features/onboarding/components/onboarding-dialog.tsx:316
 msgid "Onboarding progress"
 msgstr "Progreso de la introducción"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:359
+#: src/features/onboarding/components/onboarding-dialog.tsx:358
 msgid "Onboarding steps"
 msgstr "Pasos de la introducción"
 
@@ -22608,7 +22612,7 @@ msgstr "Pasos de la introducción"
 msgid "Onboarding will restart on your next visit to chat."
 msgstr "La introducción se reiniciará en tu próxima visita al chat."
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:313
+#: src/features/onboarding/components/onboarding-dialog.tsx:312
 msgid "Onboarding wizard"
 msgstr "Asistente de introducción"
 
@@ -22680,7 +22684,7 @@ msgstr "Una suscripción. <0>Todos los modelos.</0>"
 msgid "One workspace for 30+ AI models. Chat, generate images, create videos, write documents, and run code — one account, one price."
 msgstr "Un espacio de trabajo para más de 30 modelos de IA. Chatea, genera imágenes, crea videos, escribe documentos y ejecuta código: una cuenta, un precio."
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:43
+#: src/features/onboarding/components/onboarding-dialog.tsx:42
 msgid "One workspace for chat, images, video, documents, and code. 30+ AI models, one subscription."
 msgstr "Un espacio de trabajo para chat, imágenes, video, documentos y código. Más de 30 modelos de IA, una suscripción."
 
@@ -24266,7 +24270,7 @@ msgstr "Pendiente"
 msgid "Pending Invitations"
 msgstr "Invitaciones pendientes"
 
-#: src/features/chat/sharing/thread-share-button.tsx:346
+#: src/features/chat/sharing/thread-share-button.tsx:347
 msgid "Pending Invites"
 msgstr "Invitaciones pendientes"
 
@@ -24322,7 +24326,7 @@ msgstr "Elimina de forma permanente esta organización y todos sus datos"
 msgid "Permanently delete your account and all associated data"
 msgstr "Elimina de forma permanente tu cuenta y todos los datos asociados"
 
-#: src/features/chat/sharing/thread-share-button.tsx:309
+#: src/features/chat/sharing/thread-share-button.tsx:310
 msgid "Permission Level"
 msgstr "Nivel de permiso"
 
@@ -24437,7 +24441,7 @@ msgstr "Elige una habilidad"
 msgid "Pick a skill to evaluate."
 msgstr "Elige una habilidad para evaluar."
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:44
+#: src/features/onboarding/components/onboarding-dialog.tsx:43
 msgid "Pick a starting point or jump straight into chat."
 msgstr "Elige un punto de partida o ve directamente al chat."
 
@@ -24624,7 +24628,7 @@ msgstr "Confirma tu contraseña"
 msgid "Please enter a backup code to access your account"
 msgstr "Introduce un código de respaldo para acceder a tu cuenta"
 
-#: src/features/chat/sharing/thread-share-button.tsx:101
+#: src/features/chat/sharing/thread-share-button.tsx:102
 msgid "Please enter an email address"
 msgstr "Introduce una dirección de correo electrónico"
 
@@ -25656,14 +25660,14 @@ msgstr "Proveedores"
 msgid "Pseudo numerical diffusion"
 msgstr "Difusión pseudonumérica"
 
-#: src/features/chat/sharing/thread-share-button.tsx:260
+#: src/features/chat/sharing/thread-share-button.tsx:261
 #: src/features/skills/components/skill-form-dialog.tsx:481
 #: src/features/skills/components/skill-item.tsx:124
 msgid "Public"
 msgstr "Pública"
 
-#: src/features/chat/sharing/thread-share-button.tsx:377
-#: src/features/chat/sharing/thread-share-button.tsx:381
+#: src/features/chat/sharing/thread-share-button.tsx:378
+#: src/features/chat/sharing/thread-share-button.tsx:382
 msgid "Public Access"
 msgstr "Acceso público"
 
@@ -25676,11 +25680,11 @@ msgstr "Clave pública del Discord Developer Portal para verificar firmas"
 msgid "Public link"
 msgstr "Enlace público"
 
-#: src/features/chat/sharing/thread-share-button.tsx:389
+#: src/features/chat/sharing/thread-share-button.tsx:390
 msgid "Public Link"
 msgstr "Enlace público"
 
-#: src/features/chat/sharing/thread-share-button.tsx:188
+#: src/features/chat/sharing/thread-share-button.tsx:189
 msgid "Public link copied to clipboard!"
 msgstr "¡Enlace público copiado al portapapeles!"
 
@@ -26039,8 +26043,8 @@ msgstr "¿Volver a ejecutar {0}?"
 msgid "Read"
 msgstr "Lectura"
 
-#: src/features/chat/sharing/thread-share-button.tsx:218
-#: src/features/chat/sharing/thread-share-button.tsx:316
+#: src/features/chat/sharing/thread-share-button.tsx:219
+#: src/features/chat/sharing/thread-share-button.tsx:317
 msgid "Read & Write"
 msgstr "Lectura y escritura"
 
@@ -26060,8 +26064,8 @@ msgstr "Lee en voz alta cada respuesta del asistente al terminar, con la voz de 
 msgid "Read only"
 msgstr "Solo lectura"
 
-#: src/features/chat/sharing/thread-share-button.tsx:215
-#: src/features/chat/sharing/thread-share-button.tsx:315
+#: src/features/chat/sharing/thread-share-button.tsx:216
+#: src/features/chat/sharing/thread-share-button.tsx:316
 msgid "Read Only"
 msgstr "Solo lectura"
 
@@ -26681,7 +26685,7 @@ msgstr "Generación de vídeo fiable para escenas complejas con la probada tecno
 msgid "Reload"
 msgstr "Recargar"
 
-#: src/components/error-boundaries/global-error-boundary-provider.tsx:250
+#: src/components/error-boundaries/global-error-boundary-provider.tsx:220
 msgid "Reload Application"
 msgstr "Recargar la aplicación"
 
@@ -26690,7 +26694,7 @@ msgid "Reload now"
 msgstr "Recargar ahora"
 
 #: src/components/error-boundaries/route-error-boundary.tsx:87
-#: src/components/error-boundary.tsx:65
+#: src/components/error-boundary.tsx:214
 msgid "Reload Page"
 msgstr "Recargar página"
 
@@ -26713,8 +26717,8 @@ msgstr "Recordarme"
 #: ../../packages/ui/src/components/ai-elements/attachments.tsx:195
 #: ../../packages/ui/src/components/combobox.tsx:304
 #: src/features/chat/host/host-composer.tsx:917
-#: src/features/chat/sharing/thread-share-button.tsx:294
-#: src/features/chat/sharing/thread-share-button.tsx:366
+#: src/features/chat/sharing/thread-share-button.tsx:295
+#: src/features/chat/sharing/thread-share-button.tsx:367
 #: src/features/chat/thread/composer-input.tsx:341
 #: src/features/chat/thread/composer-input.tsx:353
 #: src/features/chat/thread/composer-input.tsx:407
@@ -26943,7 +26947,7 @@ msgstr "Quitar el webhook"
 msgid "Remove These Files"
 msgstr "Quitar estos archivos"
 
-#: src/features/chat/sharing/thread-share-button.tsx:428
+#: src/features/chat/sharing/thread-share-button.tsx:429
 msgid "Remove User"
 msgstr "Quitar usuario"
 
@@ -27209,7 +27213,7 @@ msgstr "investigación"
 msgid "Research"
 msgstr "Investigación"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:79
+#: src/features/onboarding/components/onboarding-dialog.tsx:78
 msgid "Research a topic"
 msgstr "Investiga un tema"
 
@@ -27217,7 +27221,7 @@ msgstr "Investiga un tema"
 msgid "Research a topic in depth..."
 msgstr "Investiga un tema en profundidad..."
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:80
+#: src/features/onboarding/components/onboarding-dialog.tsx:79
 msgid "Research the latest developments in renewable energy storage technology."
 msgstr "Investiga los últimos avances en tecnología de almacenamiento de energía renovable."
 
@@ -27602,7 +27606,7 @@ msgid "Reviewer note"
 msgstr "Nota del revisor"
 
 #: src/features/auth/components/settings/account/account-cell.tsx:140
-#: src/features/chat/guest-links/use-guest-link-revoke.tsx:47
+#: src/features/chat/guest-links/use-guest-link-revoke.tsx:89
 #: src/features/pages/components/page-share-dialog.tsx:209
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:215
 msgid "Revoke"
@@ -27612,7 +27616,7 @@ msgstr "Revocar"
 msgid "Revoke All Sessions"
 msgstr "Revocar todas las sesiones"
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:150
+#: src/features/chat/guest-links/guest-link-panel.tsx:175
 msgid "Revoke link"
 msgstr "Revocar enlace"
 
@@ -27628,11 +27632,11 @@ msgstr "Revocar el permiso para {tool}"
 msgid "Revoke the allow for {tool} on {server}"
 msgstr "Revocar el permiso para {tool} en {server}"
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:51
+#: src/features/chat/guest-links/guest-link-panel.tsx:74
 msgid "Revoke the earlier guest link first, then make a new one."
 msgstr "Revoca primero el enlace de invitado anterior y luego crea uno nuevo."
 
-#: src/features/chat/guest-links/use-guest-link-revoke.tsx:61
+#: src/features/chat/guest-links/use-guest-link-revoke.tsx:103
 msgid "Revoke the guest link?"
 msgstr "¿Revocar el enlace de invitado?"
 
@@ -27641,7 +27645,7 @@ msgstr "¿Revocar el enlace de invitado?"
 msgid "Revoked {0} sessions"
 msgstr "{0} sesiones revocadas"
 
-#: src/features/chat/guest-links/use-guest-link-revoke.tsx:48
+#: src/features/chat/guest-links/use-guest-link-revoke.tsx:90
 msgid "Revoking the link deletes {waitingCount, plural, one {the # guest message still waiting. It cannot be sent afterwards.} other {the # guest messages still waiting. They cannot be sent afterwards.}}"
 msgstr "Al revocar el enlace se {waitingCount, plural, one {elimina el # mensaje de invitado que aún espera. Después ya no se podrá enviar.} other {eliminan los # mensajes de invitados que aún esperan. Después ya no se podrán enviar.}}"
 
@@ -29036,7 +29040,7 @@ msgstr "Envía esto al bot desde tu cuenta:"
 msgid "Send to agent"
 msgstr "Enviar al agente"
 
-#: src/features/chat/guest-links/guest-page.tsx:275
+#: src/features/chat/guest-links/guest-page.tsx:274
 msgid "Send to the owner"
 msgstr "Enviar al propietario"
 
@@ -29052,12 +29056,12 @@ msgstr "Enviar código de verificación"
 msgid "Sending your message and waiting for the reply"
 msgstr "Enviando tu mensaje y esperando la respuesta"
 
-#: src/features/chat/guest-links/guest-page.tsx:275
+#: src/features/chat/guest-links/guest-page.tsx:274
 #: src/features/chat/thread/streaming-placeholder.tsx:617
 msgid "Sending…"
 msgstr "Enviando…"
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:175
+#: src/features/chat/guest-links/guest-link-panel.tsx:200
 #: src/features/devices/components/devices-settings.tsx:387
 msgid "Sent"
 msgstr "Enviado"
@@ -29078,7 +29082,7 @@ msgstr "Enviado por una ejecución desatendida"
 msgid "Sent by the lead agent"
 msgstr "Enviado por el agente líder"
 
-#: src/features/chat/guest-links/guest-page.tsx:292
+#: src/features/chat/guest-links/guest-page.tsx:291
 msgid "Sent by the owner"
 msgstr "Enviado por el propietario"
 
@@ -29289,8 +29293,8 @@ msgstr "Proporción del gasto"
 msgid "Share page"
 msgstr "Compartir página"
 
-#: src/features/chat/sharing/thread-share-button.tsx:202
-#: src/features/chat/sharing/thread-share-button.tsx:251
+#: src/features/chat/sharing/thread-share-button.tsx:203
+#: src/features/chat/sharing/thread-share-button.tsx:252
 msgid "Share Thread"
 msgstr "Compartir conversación"
 
@@ -29767,7 +29771,7 @@ msgstr "Mejoras de capacidad significativas respecto a Gemini 2.5 Pro"
 msgid "Significant improvements over Gemini 3 Pro"
 msgstr "Mejoras significativas respecto a Gemini 3 Pro"
 
-#: src/lib/native/native-bridge.tsx:132
+#: src/lib/native/native-bridge.tsx:133
 msgid "Signing in through your browser did not work. Try again."
 msgstr "No se pudo iniciar sesión a través del navegador. Inténtalo de nuevo."
 
@@ -29894,7 +29898,7 @@ msgstr "No se pudieron cargar las habilidades. Aún puedes reenviar sin una."
 msgid "Skills views"
 msgstr "Vistas de habilidades"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:405
+#: src/features/onboarding/components/onboarding-dialog.tsx:404
 #: src/features/onboarding/components/setup-checklist.tsx:202
 msgid "Skip"
 msgstr "Omitir"
@@ -29911,7 +29915,7 @@ msgstr "Omitir preguntas"
 msgid "Skip to content"
 msgstr "Saltar al contenido"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:400
+#: src/features/onboarding/components/onboarding-dialog.tsx:399
 msgid "Skip tour"
 msgstr "Omitir recorrido"
 
@@ -30159,7 +30163,7 @@ msgstr "Algunas imágenes de esta ejecución no se pudieron guardar."
 msgid "Some steps had no pricing data; the total is a minimum."
 msgstr "Algunos pasos no tenían datos de precio; el total es un mínimo."
 
-#: src/components/error-boundary.tsx:51
+#: src/components/error-boundary.tsx:200
 #: src/components/settings/settings-modal.tsx:127
 #: src/features/pages/components/page-share-dialog.tsx:50
 msgid "Something went wrong"
@@ -30723,7 +30727,7 @@ msgstr "Iniciar prueba"
 msgid "Start writing..."
 msgstr "Empieza a escribir..."
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:45
+#: src/features/onboarding/components/onboarding-dialog.tsx:44
 msgid "Start Your First Chat"
 msgstr "Empieza tu primer chat"
 
@@ -30867,7 +30871,7 @@ msgid "Steering:"
 msgstr "Indicaciones:"
 
 #. placeholder {0}: currentIndex + 1
-#: src/features/onboarding/components/onboarding-dialog.tsx:355
+#: src/features/onboarding/components/onboarding-dialog.tsx:354
 msgid "Step {0} of {totalSteps}: {title}"
 msgstr "Paso {0} de {totalSteps}: {title}"
 
@@ -32376,7 +32380,7 @@ msgstr "Ese ordenador no está en línea."
 msgid "That did not go through. Try again."
 msgstr ""
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:77
+#: src/features/chat/guest-links/guest-link-panel.tsx:100
 msgid "That did not work. Please try again."
 msgstr "No funcionó. Inténtalo de nuevo."
 
@@ -32725,9 +32729,13 @@ msgstr "El prompt de sistema completo que se enviará al modelo..."
 msgid "The goal is removed; its tasks stay, without a goal."
 msgstr "Se elimina el objetivo; sus tareas se conservan, sin objetivo."
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:130
+#: src/features/chat/guest-links/guest-link-panel.tsx:155
 msgid "The guest link could not be loaded."
 msgstr "No se pudo cargar el enlace de invitado."
+
+#: src/features/chat/guest-links/guest-link-panel.tsx:68
+msgid "The guest link was replaced or has ended."
+msgstr "El enlace de invitado se reemplazó o ha caducado."
 
 #: src/features/develop/components/guide-tab.tsx:118
 #: src/features/develop/components/guide-tab.tsx:121
@@ -32834,7 +32842,7 @@ msgstr "la última vez"
 msgid "The last turn stopped before it finished."
 msgstr "El último turno se detuvo antes de terminar."
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:121
+#: src/features/chat/guest-links/guest-link-panel.tsx:142
 msgid "The link could not be copied. Select it and copy it yourself."
 msgstr "No se pudo copiar el enlace. Selecciónalo y cópialo tú mismo."
 
@@ -32890,7 +32898,7 @@ msgstr "No se pudo acceder al registro MCP, así que pueden faltar sugerencias d
 msgid "The MCP Registry is unavailable right now. Showing popular servers instead."
 msgstr "El registro MCP no está disponible ahora mismo. Se muestran servidores populares en su lugar."
 
-#: src/features/chat/guest-links/guest-page.tsx:99
+#: src/features/chat/guest-links/guest-page.tsx:98
 msgid "The message could not be sent. Check your connection and try again."
 msgstr "No se pudo enviar el mensaje. Comprueba tu conexión e inténtalo de nuevo."
 
@@ -33365,7 +33373,7 @@ msgstr "Este chat pertenece a un worker. Envíale mensajes desde su propio cuadr
 msgid "This chat cannot be compacted."
 msgstr "Este chat no se puede compactar."
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:56
+#: src/features/chat/guest-links/guest-link-panel.tsx:79
 msgid "This chat cannot have a guest link."
 msgstr "Este chat no puede tener un enlace de invitado."
 
@@ -33611,11 +33619,11 @@ msgstr "Es demasiado corto: al menos {minLength} caracteres."
 msgid "This is your organization's URL namespace"
 msgstr "Este es el espacio de nombres de URL de tu organización"
 
-#: src/features/chat/guest-links/guest-page.tsx:254
+#: src/features/chat/guest-links/guest-page.tsx:253
 msgid "This link has ended."
 msgstr "Este enlace ya no está activo."
 
-#: src/features/chat/guest-links/guest-page.tsx:90
+#: src/features/chat/guest-links/guest-page.tsx:89
 msgid "This link is already in use in another browser."
 msgstr "Este enlace ya se está usando en otro navegador."
 
@@ -33623,11 +33631,11 @@ msgstr "Este enlace ya se está usando en otro navegador."
 msgid "This link is incomplete."
 msgstr "Este enlace está incompleto."
 
-#: src/features/chat/guest-links/guest-page.tsx:279
+#: src/features/chat/guest-links/guest-page.tsx:278
 msgid "This link is not complete. Ask for the full link."
 msgstr "Este enlace está incompleto. Pide el enlace completo."
 
-#: src/features/chat/guest-links/guest-page.tsx:93
+#: src/features/chat/guest-links/guest-page.tsx:92
 msgid "This link is not taking messages right now. Try again later."
 msgstr "Este enlace no acepta mensajes en este momento. Inténtalo más tarde."
 
@@ -33641,7 +33649,7 @@ msgstr "Este recuerdo se ha eliminado desde entonces."
 msgid "This merges the commit {0} into the base branch with “{1}” on {hostLabel}. If the branch has changed since you opened this page, {hostLabel} refuses."
 msgstr "Esto fusiona el commit {0} en la rama base con «{1}» en {hostLabel}. Si la rama ha cambiado desde que abriste esta página, {hostLabel} lo rechaza."
 
-#: src/features/chat/guest-links/guest-page.tsx:87
+#: src/features/chat/guest-links/guest-page.tsx:86
 msgid "This message cannot be left. Keep it short, don't start it with / or mention anyone, or try again later."
 msgstr "No se puede dejar este mensaje. Sé breve, no lo empieces con / ni menciones a nadie, o inténtalo más tarde."
 
@@ -33974,11 +33982,11 @@ msgstr "La conversación ahora es permanente"
 msgid "Thread list"
 msgstr "Lista de hilos"
 
-#: src/features/chat/sharing/thread-share-button.tsx:170
+#: src/features/chat/sharing/thread-share-button.tsx:171
 msgid "Thread made private"
 msgstr "Conversación hecha privada"
 
-#: src/features/chat/sharing/thread-share-button.tsx:170
+#: src/features/chat/sharing/thread-share-button.tsx:171
 msgid "Thread made public"
 msgstr "Conversación hecha pública"
 
@@ -34302,7 +34310,7 @@ msgstr ""
 msgid "too many files"
 msgstr "demasiados archivos"
 
-#: src/features/chat/guest-links/guest-page.tsx:96
+#: src/features/chat/guest-links/guest-page.tsx:95
 msgid "Too many messages. Please try again later."
 msgstr "Demasiados mensajes. Inténtalo más tarde."
 
@@ -34315,7 +34323,7 @@ msgstr "Demasiados contextos nuevos en poco tiempo. Inténtalo de nuevo en un mi
 msgid "Too many requests right now. Try again in a moment."
 msgstr "Demasiadas solicitudes en este momento. Inténtalo de nuevo en un momento."
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:72
+#: src/features/chat/guest-links/guest-link-panel.tsx:95
 msgid "Too many requests. Please try again in a moment."
 msgstr "Demasiadas solicitudes. Inténtalo de nuevo en un momento."
 
@@ -34690,7 +34698,7 @@ msgstr "Prueba a ajustar los términos de búsqueda."
 #: src/components/error-component.tsx:40
 #: src/features/auth/components/device-approval.tsx:95
 #: src/features/auth/components/device-approval.tsx:338
-#: src/features/chat/guest-links/guest-page.tsx:270
+#: src/features/chat/guest-links/guest-page.tsx:269
 #: src/features/connection/components/offline-screen.tsx:64
 #: src/features/develop/components/files-tab.tsx:275
 #: src/features/develop/components/thread-pull-requests.tsx:169
@@ -34702,7 +34710,7 @@ msgstr "Prueba a ajustar los términos de búsqueda."
 msgid "Try again"
 msgstr "Reintentar"
 
-#: src/components/error-boundaries/global-error-boundary-provider.tsx:241
+#: src/components/error-boundaries/global-error-boundary-provider.tsx:211
 #: src/components/error-boundaries/route-error-boundary.tsx:80
 #: src/components/settings/settings-modal.tsx:132
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:442
@@ -35777,7 +35785,7 @@ msgstr "Usó {0}"
 msgid "Used for buttons, highlights and focus rings. Every option keeps text readable in light and dark mode."
 msgstr "Se usa en botones, resaltados y anillos de foco. Todas las opciones mantienen el texto legible en modo claro y oscuro."
 
-#: src/features/chat/sharing/thread-share-button.tsx:287
+#: src/features/chat/sharing/thread-share-button.tsx:288
 msgid "user"
 msgstr "usuario"
 
@@ -35795,7 +35803,7 @@ msgstr "usuario"
 msgid "User"
 msgstr "Usuario"
 
-#: src/features/chat/sharing/thread-share-button.tsx:153
+#: src/features/chat/sharing/thread-share-button.tsx:154
 msgid "User access removed"
 msgstr "Acceso del usuario eliminado"
 
@@ -36653,7 +36661,7 @@ msgstr "Espera a que el agente esté listo e inténtalo de nuevo."
 msgid "Wait for the reply to finish, then try again."
 msgstr "Espera a que termine la respuesta y vuelve a intentarlo."
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:175
+#: src/features/chat/guest-links/guest-link-panel.tsx:200
 msgid "Waiting"
 msgstr "En espera"
 
@@ -36682,7 +36690,7 @@ msgstr "Esperando la salida…"
 msgid "Waiting for the agent…"
 msgstr "Esperando al agente…"
 
-#: src/features/chat/guest-links/guest-page.tsx:292
+#: src/features/chat/guest-links/guest-page.tsx:291
 #: src/features/chat/thread/request-secret-prompt.tsx:343
 msgid "Waiting for the owner"
 msgstr "Esperando al propietario"
@@ -36906,8 +36914,8 @@ msgstr "Grosor"
 msgid "Welcome back"
 msgstr "Bienvenido de nuevo"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:46
-#: src/features/onboarding/components/onboarding-dialog.tsx:312
+#: src/features/onboarding/components/onboarding-dialog.tsx:45
+#: src/features/onboarding/components/onboarding-dialog.tsx:311
 msgid "Welcome to Neore"
 msgstr "Te damos la bienvenida a Neore"
 
@@ -37314,7 +37322,7 @@ msgstr "Vuelve a escribirla"
 msgid "Write long-form content alongside chat"
 msgstr "Escribe contenido extenso junto al chat"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:37
+#: src/features/onboarding/components/onboarding-dialog.tsx:36
 msgid "Write long-form content in a side-by-side canvas editor. Go from chat to finished document without switching tools."
 msgstr "Escribe contenido extenso en un editor de lienzo lateral. Pasa del chat al documento terminado sin cambiar de herramienta."
 
@@ -37322,7 +37330,7 @@ msgstr "Escribe contenido extenso en un editor de lienzo lateral. Pasa del chat 
 msgid "Write some code for me..."
 msgstr "Escríbeme algo de código..."
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:64
+#: src/features/onboarding/components/onboarding-dialog.tsx:63
 msgid "Write something"
 msgstr "Escribe algo"
 
@@ -37655,7 +37663,7 @@ msgstr "Necesitarás una app de autenticación como Google Authenticator o Authy
 msgid "You're all caught up."
 msgstr "Estás al día."
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:270
+#: src/features/onboarding/components/onboarding-dialog.tsx:269
 msgid "You're all set!"
 msgstr "¡Todo listo!"
 
@@ -37861,7 +37869,7 @@ msgstr "Tu servidor local respondió, pero rechazó este sitio (CORS). Permite e
 msgid "Your location (e.g., \"New York, USA\", \"Berlin, Germany\")."
 msgstr "Tu ubicación (p. ej., \"Nueva York, EE. UU.\", \"Berlín, Alemania\")."
 
-#: src/features/chat/guest-links/guest-page.tsx:241
+#: src/features/chat/guest-links/guest-page.tsx:240
 msgid "Your message"
 msgstr "Tu mensaje"
 
@@ -37869,7 +37877,7 @@ msgstr "Tu mensaje"
 msgid "Your message contains inappropriate content that cannot be sent."
 msgstr "Tu mensaje contiene contenido inapropiado y no se puede enviar."
 
-#: src/features/chat/guest-links/guest-page.tsx:236
+#: src/features/chat/guest-links/guest-page.tsx:235
 msgid "Your message waits for the owner of this conversation. Nothing happens until they send it."
 msgstr "Tu mensaje espera al propietario de esta conversación. No pasa nada hasta que lo envíe."
 
@@ -37877,7 +37885,7 @@ msgstr "Tu mensaje espera al propietario de esta conversación. No pasa nada has
 msgid "Your message:"
 msgstr "Tu mensaje:"
 
-#: src/features/chat/guest-links/guest-page.tsx:285
+#: src/features/chat/guest-links/guest-page.tsx:284
 msgid "Your messages"
 msgstr "Tus mensajes"
 
@@ -37893,7 +37901,7 @@ msgstr "Tu próximo mensaje es un objetivo. El agente sigue trabajando hasta que
 msgid "Your next message will start a self-destructing chat."
 msgstr "Tu próximo mensaje iniciará un chat autodestructivo."
 
-#: src/features/chat/guest-links/guest-page.tsx:262
+#: src/features/chat/guest-links/guest-page.tsx:261
 msgid "Your notes could not be loaded. They are still there; try again in a moment."
 msgstr "No se pudieron cargar tus mensajes. Siguen ahí; inténtalo de nuevo en un momento."
 

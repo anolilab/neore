@@ -1507,7 +1507,7 @@ msgstr "<0>Webhook</0>——接收来自外部服务（Stripe、GitHub、Zapier�
 msgid "~{approxTokenCount} tokens"
 msgstr "约 {approxTokenCount} 个 token"
 
-#: src/components/error-boundaries/global-error-boundary-provider.tsx:229
+#: src/components/error-boundaries/global-error-boundary-provider.tsx:199
 msgid "⚠️ You're currently offline. Some features may not work properly."
 msgstr "⚠️ 你当前处于离线状态，部分功能可能无法正常使用。"
 
@@ -1523,7 +1523,7 @@ msgstr "$20/月，替代 ChatGPT + Midjourney + Runway 等。免费开始——�
 msgid "1 {from} in other currencies"
 msgstr "1 {from} 兑换其他货币"
 
-#: src/features/chat/sharing/thread-share-button.tsx:328
+#: src/features/chat/sharing/thread-share-button.tsx:329
 msgid "1 Day"
 msgstr "1 天"
 
@@ -1640,7 +1640,7 @@ msgstr "30 天"
 msgid "30+ AI models for chat, images, video, documents, and code. One workspace, one subscription — free to start."
 msgstr "30+ 个 AI 模型，支持聊天、图像、视频、文档和代码。一个工作区，一份订阅——免费开始。"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:41
+#: src/features/onboarding/components/onboarding-dialog.tsx:40
 msgid "30+ Models, One Thread"
 msgstr "30+ 个模型，一个对话"
 
@@ -1688,7 +1688,7 @@ msgstr "52 周区间"
 msgid "7 days"
 msgstr "7 天"
 
-#: src/features/chat/sharing/thread-share-button.tsx:329
+#: src/features/chat/sharing/thread-share-button.tsx:330
 msgid "7 Days"
 msgstr "7 天"
 
@@ -1802,8 +1802,8 @@ msgstr "已保存密钥。留空则保持不变。"
 msgid "A key is saved. Leave blank to keep it. Changing the endpoint, region or access key id requires entering it again."
 msgstr "已保存密钥。留空即可保留。更改端点、区域或访问密钥 ID 时需要重新输入。"
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:67
-#: src/features/chat/guest-links/guest-link-panel.tsx:131
+#: src/features/chat/guest-links/guest-link-panel.tsx:90
+#: src/features/chat/guest-links/guest-link-panel.tsx:156
 msgid "A locked chat cannot have a guest link."
 msgstr "已锁定的聊天不能有访客链接。"
 
@@ -2047,7 +2047,7 @@ msgstr "接受邀请"
 msgid "Accept or reject invitations to join organizations"
 msgstr "接受或拒绝加入组织的邀请"
 
-#: src/features/chat/sharing/thread-share-button.tsx:258
+#: src/features/chat/sharing/thread-share-button.tsx:259
 #: src/features/pages/components/page-share-dialog.tsx:96
 msgid "Access"
 msgstr "访问权限"
@@ -2060,7 +2060,7 @@ msgstr "通过单一 API 访问 200+ 个模型（Claude、GPT-4、Gemini、Llama
 msgid "Access for {name}"
 msgstr "{name} 的访问权限"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:42
+#: src/features/onboarding/components/onboarding-dialog.tsx:41
 msgid "Access GPT-4, Claude, Gemini, and more from a single conversation. Switch models mid-thread to compare answers."
 msgstr "在同一个对话中使用 GPT-4、Claude、Gemini 等模型。在对话中切换模型以比较回答。"
 
@@ -2608,8 +2608,8 @@ msgstr "调整"
 #: src/features/auth/components/team/team-member-cell.tsx:148
 #: src/features/auth/components/team/team-member-cell.tsx:163
 #: src/features/auth/components/team/team-switcher.tsx:143
-#: src/features/chat/sharing/thread-share-button.tsx:212
-#: src/features/chat/sharing/thread-share-button.tsx:317
+#: src/features/chat/sharing/thread-share-button.tsx:213
+#: src/features/chat/sharing/thread-share-button.tsx:318
 #: src/features/layout/components/sidebar-shortcut.tsx:268
 #: src/features/layout/lib/dashboard-page-names.ts:12
 #: src/routes/admin/route.tsx:51
@@ -3636,7 +3636,7 @@ msgstr "我的任意聊天"
 msgid "Any string you choose; enter the same value as the webhook Verify token in the Meta app"
 msgstr "任意你选择的字符串；在 Meta 应用中填入相同的值作为 webhook 验证令牌"
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:129
+#: src/features/chat/guest-links/guest-link-panel.tsx:150
 msgid "Anyone with a guest link can leave you a message here. Nothing they write runs on its own."
 msgstr "任何拥有访客链接的人都可以在这里给你留言。他们写的内容不会自行运行。"
 
@@ -3644,7 +3644,7 @@ msgstr "任何拥有访客链接的人都可以在这里给你留言。他们写
 msgid "Anyone with the link can read this page. Comments are never shown. Turning it off revokes the link."
 msgstr "任何拥有链接的人都可以阅读此页面。评论永远不会显示。关闭后链接将失效。"
 
-#: src/features/chat/sharing/thread-share-button.tsx:378
+#: src/features/chat/sharing/thread-share-button.tsx:379
 msgid "Anyone with the link can view this thread"
 msgstr "任何拥有链接的人都可以查看此对话"
 
@@ -3729,7 +3729,7 @@ msgstr "外观"
 msgid "AppID from Basic configuration of your Official Account"
 msgstr "公众号“基本配置”中的 AppID"
 
-#: src/components/error-boundaries/global-error-boundary-provider.tsx:219
+#: src/components/error-boundaries/global-error-boundary-provider.tsx:189
 msgid "Application Error"
 msgstr "应用错误"
 
@@ -3962,7 +3962,7 @@ msgstr "确定要离开此组织吗？"
 msgid "Are you sure you want to make {userName} an admin? They will have full access to admin features."
 msgstr "确定要将 {userName} 设为管理员吗？对方将拥有管理功能的完全访问权限。"
 
-#: src/features/chat/sharing/thread-share-button.tsx:412
+#: src/features/chat/sharing/thread-share-button.tsx:413
 msgid "Are you sure you want to remove {userToRemoveName} from this thread?"
 msgstr "确定要将 {userToRemoveName} 从此对话中移除吗？"
 
@@ -4493,7 +4493,7 @@ msgid "Azure portal → your OpenAI resource → Keys and Endpoint. Encrypted at
 msgstr "Azure 门户 → 你的 OpenAI 资源 → 密钥和终结点。加密存储，不会再次显示。"
 
 #: src/features/code/components/code-shell.tsx:162
-#: src/features/onboarding/components/onboarding-dialog.tsx:395
+#: src/features/onboarding/components/onboarding-dialog.tsx:394
 #: src/features/pages/components/page-version-panel.tsx:89
 msgid "Back"
 msgstr "返回"
@@ -5242,7 +5242,7 @@ msgstr "专为<0>真实工作流</0>打造。"
 msgid "Built for expert developers and complex systems"
 msgstr "专为资深开发者和复杂系统打造"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:38
+#: src/features/onboarding/components/onboarding-dialog.tsx:37
 msgid "Built-in Canvas Editor"
 msgstr "内置画布编辑器"
 
@@ -7074,11 +7074,11 @@ msgstr "先对比，再决定"
 msgid "Compare concepts across FLUX, Runway, and Stable Diffusion. Pick the best style, not the only option."
 msgstr "在 FLUX、Runway 和 Stable Diffusion 之间对比创意。选择最佳风格，而不是唯一选项。"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:75
+#: src/features/onboarding/components/onboarding-dialog.tsx:74
 msgid "Compare how different AI models explain quantum computing to a beginner."
 msgstr "比较不同 AI 模型如何向初学者解释量子计算。"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:74
+#: src/features/onboarding/components/onboarding-dialog.tsx:73
 msgid "Compare models"
 msgstr "比较模型"
 
@@ -7982,8 +7982,8 @@ msgstr "已复制！"
 #: ../../packages/ui/src/components/data-grid/data-grid-context-menu.tsx:225
 #: src/features/auth/components/settings/api-key/mcp-config-snippet.tsx:30
 #: src/features/auth/components/settings/two-factor/backup-codes-dialog.tsx:100
-#: src/features/chat/guest-links/guest-link-panel.tsx:136
-#: src/features/chat/sharing/thread-share-button.tsx:393
+#: src/features/chat/guest-links/guest-link-panel.tsx:161
+#: src/features/chat/sharing/thread-share-button.tsx:394
 #: src/features/chat/thread/message-item.tsx:356
 #: src/features/chat/thread/text-selection-menu.tsx:525
 #: src/features/settings/components/chat/trigger-settings.tsx:782
@@ -8292,11 +8292,11 @@ msgstr "无法确认自动合并的更改。请先在 {hostLabel} 上确认，�
 msgid "Could not connect to the server."
 msgstr "无法连接到服务器。"
 
-#: src/features/chat/sharing/thread-share-button.tsx:124
+#: src/features/chat/sharing/thread-share-button.tsx:125
 msgid "Could not copy automatically. Invite link: {inviteLink}"
 msgstr "无法自动复制。邀请链接：{inviteLink}"
 
-#: src/features/chat/sharing/thread-share-button.tsx:190
+#: src/features/chat/sharing/thread-share-button.tsx:191
 msgid "Could not copy automatically. Public link: {publicLink}"
 msgstr "无法自动复制。公开链接：{publicLink}"
 
@@ -8833,11 +8833,11 @@ msgstr "创建目标"
 msgid "Create group chat"
 msgstr "创建群聊"
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:166
+#: src/features/chat/guest-links/guest-link-panel.tsx:191
 msgid "Create guest link"
 msgstr "创建访客链接"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:40
+#: src/features/onboarding/components/onboarding-dialog.tsx:39
 msgid "Create Images and Videos"
 msgstr "创建图像和视频"
 
@@ -8845,7 +8845,7 @@ msgstr "创建图像和视频"
 msgid "Create images with FLUX, Imagen, and Stable Diffusion. Generate videos with Runway, Luma, and Kling. Compare outputs across providers — pick the best result, not the only result."
 msgstr "使用 FLUX、Imagen 和 Stable Diffusion 生成图像，使用 Runway、Luma 和 Kling 生成视频。跨提供商对比输出——选择最佳结果，而不是唯一结果。"
 
-#: src/features/chat/sharing/thread-share-button.tsx:341
+#: src/features/chat/sharing/thread-share-button.tsx:342
 msgid "Create Invite"
 msgstr "创建邀请"
 
@@ -9158,7 +9158,7 @@ msgid "Currently restricted"
 msgstr "当前受限"
 
 #: src/features/canvas/components/design-preset-selector.tsx:87
-#: src/features/chat/sharing/thread-share-button.tsx:330
+#: src/features/chat/sharing/thread-share-button.tsx:331
 #: src/features/marketing/components/gateway-landing-page.tsx:792
 #: src/features/marketing/components/landing-page.tsx:1014
 #: src/features/prompts/components/prompt-form-dialog.tsx:444
@@ -11543,7 +11543,7 @@ msgid "Email"
 msgstr "邮箱"
 
 #: src/features/auth/components/settings/security/change-email-card.tsx:139
-#: src/features/chat/sharing/thread-share-button.tsx:305
+#: src/features/chat/sharing/thread-share-button.tsx:306
 msgid "Email Address"
 msgstr "邮箱地址"
 
@@ -11890,7 +11890,7 @@ msgid "Enter default value..."
 msgstr "输入默认值..."
 
 #: src/features/auth/components/organization/invite-member-dialog.tsx:118
-#: src/features/chat/sharing/thread-share-button.tsx:306
+#: src/features/chat/sharing/thread-share-button.tsx:307
 msgid "Enter email address"
 msgstr "输入邮箱地址"
 
@@ -12155,7 +12155,7 @@ msgstr "错误"
 msgid "Error details:"
 msgstr "错误详情："
 
-#: src/components/error-boundaries/global-error-boundary-provider.tsx:267
+#: src/components/error-boundaries/global-error-boundary-provider.tsx:237
 msgid "Error ID: <0>{displayErrorId}</0>"
 msgstr "错误 ID：<0>{displayErrorId}</0>"
 
@@ -12580,7 +12580,7 @@ msgstr "实验性"
 msgid "Experimental reasoning with DeepSeek's latest thinking capabilities"
 msgstr "使用 DeepSeek 最新思考能力的实验性推理"
 
-#: src/features/chat/sharing/thread-share-button.tsx:322
+#: src/features/chat/sharing/thread-share-button.tsx:323
 msgid "Expiration"
 msgstr "有效期"
 
@@ -12632,7 +12632,7 @@ msgstr "{remainingTime} 后过期"
 msgid "Expires on {0}"
 msgstr "于 {0} 过期"
 
-#: src/features/chat/sharing/thread-share-button.tsx:354
+#: src/features/chat/sharing/thread-share-button.tsx:355
 msgid "Expires:"
 msgstr "过期时间："
 
@@ -12971,7 +12971,7 @@ msgstr "创建分支失败"
 msgid "Failed to create budget alert"
 msgstr "创建预算提醒失败"
 
-#: src/features/chat/sharing/thread-share-button.tsx:129
+#: src/features/chat/sharing/thread-share-button.tsx:130
 msgid "Failed to create invite"
 msgstr "创建邀请失败"
 
@@ -13275,7 +13275,7 @@ msgstr "无法移除提供商"
 msgid "Failed to remove skill"
 msgstr "移除技能失败"
 
-#: src/features/chat/sharing/thread-share-button.tsx:155
+#: src/features/chat/sharing/thread-share-button.tsx:156
 msgid "Failed to remove user access"
 msgstr "移除用户访问权限失败"
 
@@ -13307,7 +13307,7 @@ msgstr "恢复此版本失败。"
 msgid "Failed to restore version"
 msgstr "恢复版本失败"
 
-#: src/features/chat/sharing/thread-share-button.tsx:139
+#: src/features/chat/sharing/thread-share-button.tsx:140
 msgid "Failed to revoke invite"
 msgstr "撤销邀请失败"
 
@@ -13569,7 +13569,7 @@ msgstr "更新快速检查失败"
 msgid "Failed to update the trusted servers"
 msgstr "更新受信任服务器失败"
 
-#: src/features/chat/sharing/thread-share-button.tsx:172
+#: src/features/chat/sharing/thread-share-button.tsx:173
 msgid "Failed to update thread visibility"
 msgstr "更新对话可见性失败"
 
@@ -14994,7 +14994,7 @@ msgstr "为一部短纪录片生成分镜"
 msgid "Generate a video from a text description"
 msgstr "根据文字描述生成视频"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:69
+#: src/features/onboarding/components/onboarding-dialog.tsx:68
 msgid "Generate an image"
 msgstr "生成图像"
 
@@ -15006,7 +15006,7 @@ msgstr "根据文本提示词生成图像"
 msgid "Generate an image from a text prompt and upscale it to 4x"
 msgstr "根据文本提示词生成图像并放大 4 倍"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:70
+#: src/features/onboarding/components/onboarding-dialog.tsx:69
 msgid "Generate an image of a cozy reading nook with warm lighting and plants."
 msgstr "生成一张温馨阅读角的图像，带有暖色灯光和绿植。"
 
@@ -15039,7 +15039,7 @@ msgstr "生成图像"
 msgid "Generate images with consistent character appearance"
 msgstr "生成角色外观一致的图像"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:39
+#: src/features/onboarding/components/onboarding-dialog.tsx:38
 msgid "Generate images with FLUX and Stable Diffusion, create videos with Runway and Luma — all from the same chat."
 msgstr "用 FLUX 和 Stable Diffusion 生成图像，用 Runway 和 Luma 创作视频——全部在同一个聊天中完成。"
 
@@ -15308,7 +15308,7 @@ msgstr "跳转到被评论的文本： "
 msgid "Go to first item"
 msgstr "转到第一项"
 
-#: src/components/error-boundaries/global-error-boundary-provider.tsx:258
+#: src/components/error-boundaries/global-error-boundary-provider.tsx:228
 msgid "Go to Home"
 msgstr "返回首页"
 
@@ -15370,7 +15370,7 @@ msgid "Go to slide {slideNumber}"
 msgstr "转到第 {slideNumber} 张幻灯片"
 
 #. placeholder {0}: index + 1
-#: src/features/onboarding/components/onboarding-dialog.tsx:363
+#: src/features/onboarding/components/onboarding-dialog.tsx:362
 msgid "Go to step {0}"
 msgstr "前往第 {0} 步"
 
@@ -15795,23 +15795,23 @@ msgstr "访客账号只能使用免费模型。"
 msgid "Guest accounts use free models only. Sign up to unlock all models."
 msgstr "访客账号仅可使用免费模型。注册即可解锁所有模型。"
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:134
+#: src/features/chat/guest-links/guest-link-panel.tsx:159
 msgid "Guest link"
 msgstr "访客链接"
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:120
+#: src/features/chat/guest-links/guest-link-panel.tsx:141
 msgid "Guest link copied"
 msgstr "已复制访客链接"
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:170
+#: src/features/chat/guest-links/guest-link-panel.tsx:195
 msgid "Guest messages"
 msgstr "访客消息"
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:61
+#: src/features/chat/guest-links/guest-link-panel.tsx:84
 msgid "Guest messages from an earlier link are still waiting."
 msgstr "仍有来自之前链接的访客消息在等待。"
 
-#: src/features/chat/sharing/thread-share-button.tsx:261
+#: src/features/chat/sharing/thread-share-button.tsx:262
 msgid "Guests"
 msgstr "访客"
 
@@ -15946,7 +15946,7 @@ msgstr "你好，{0}！今天想做点什么？"
 msgid "Help"
 msgstr "帮助"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:65
+#: src/features/onboarding/components/onboarding-dialog.tsx:64
 msgid "Help me write a professional email to introduce myself to a new team."
 msgstr "帮我写一封专业的邮件，向新团队介绍自己。"
 
@@ -16289,7 +16289,7 @@ msgstr "热键"
 msgid "Hour"
 msgstr "小时"
 
-#: src/features/chat/sharing/thread-share-button.tsx:336
+#: src/features/chat/sharing/thread-share-button.tsx:337
 msgid "Hours"
 msgstr "小时"
 
@@ -16458,7 +16458,7 @@ msgstr "空闲"
 msgid "If it kept the review as pending, submit or delete it there first."
 msgstr "如果它将审查保留为待处理状态，请先在那里提交或删除。"
 
-#: src/components/error-boundaries/global-error-boundary-provider.tsx:264
+#: src/components/error-boundaries/global-error-boundary-provider.tsx:234
 #: src/components/error-boundaries/route-error-boundary.tsx:126
 msgid "If this problem persists, please contact support."
 msgstr "如果问题仍然存在，请联系支持。"
@@ -17360,7 +17360,7 @@ msgstr "邀请出错"
 msgid "Invite link"
 msgstr "邀请链接"
 
-#: src/features/chat/sharing/thread-share-button.tsx:122
+#: src/features/chat/sharing/thread-share-button.tsx:123
 msgid "Invite link copied to clipboard!"
 msgstr "邀请链接已复制到剪贴板！"
 
@@ -17377,7 +17377,7 @@ msgstr "邀请新成员并更新现有成员的角色"
 msgid "Invite new members. They join once they accept the invitation."
 msgstr "邀请新成员。他们接受邀请后即可加入。"
 
-#: src/features/chat/sharing/thread-share-button.tsx:137
+#: src/features/chat/sharing/thread-share-button.tsx:138
 msgid "Invite revoked"
 msgstr "邀请已撤销"
 
@@ -17390,7 +17390,7 @@ msgstr "由 {0} 邀请"
 msgid "Invited to join"
 msgstr "受邀加入"
 
-#: src/features/chat/sharing/thread-share-button.tsx:259
+#: src/features/chat/sharing/thread-share-button.tsx:260
 msgid "Invites"
 msgstr "邀请"
 
@@ -17623,7 +17623,7 @@ msgstr "刚刚"
 msgid "Just now"
 msgstr "刚刚"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:417
+#: src/features/onboarding/components/onboarding-dialog.tsx:416
 msgid "Just start chatting"
 msgstr "直接开始聊天"
 
@@ -18218,7 +18218,7 @@ msgstr "了解更多关于 MCP 的信息"
 msgid "Learning"
 msgstr "学习"
 
-#: src/features/chat/guest-links/guest-page.tsx:235
+#: src/features/chat/guest-links/guest-page.tsx:234
 #: src/routes/(public)/guest.tsx:12
 msgid "Leave a message"
 msgstr "留言"
@@ -18458,7 +18458,7 @@ msgstr "不是有效 JSON 的行"
 msgid "Link"
 msgstr "关联"
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:142
+#: src/features/chat/guest-links/guest-link-panel.tsx:167
 msgid "Link active until {expiresAt}"
 msgstr "链接有效期至 {expiresAt}"
 
@@ -18739,8 +18739,8 @@ msgstr "正在加载节点详情..."
 msgid "Loading older messages..."
 msgstr "正在加载更早的消息..."
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:286
-#: src/features/onboarding/components/onboarding-dialog.tsx:289
+#: src/features/onboarding/components/onboarding-dialog.tsx:285
+#: src/features/onboarding/components/onboarding-dialog.tsx:288
 msgid "Loading onboarding"
 msgstr "正在加载新手引导"
 
@@ -18819,6 +18819,10 @@ msgstr "正在加载统计数据…"
 msgid "Loading tasks…"
 msgstr "正在加载任务…"
 
+#: src/features/chat/guest-links/guest-link-panel.tsx:153
+msgid "Loading the guest link…"
+msgstr "正在加载访客链接…"
+
 #: src/features/develop/components/guide-tab.tsx:57
 msgid "Loading the guide"
 msgstr "正在加载指南"
@@ -18861,7 +18865,7 @@ msgstr "正在加载工作流..."
 msgid "Loading your items…"
 msgstr "正在加载你的项目…"
 
-#: src/features/chat/guest-links/guest-page.tsx:286
+#: src/features/chat/guest-links/guest-page.tsx:285
 msgid "Loading your messages…"
 msgstr "正在加载你的消息…"
 
@@ -21337,7 +21341,7 @@ msgstr "新闻简报头图图像"
 #: ../../packages/ui/src/components/pagination.tsx:52
 #: ../../packages/ui/src/components/spreadsheet/csv-renderer.tsx:342
 #: ../../packages/ui/src/components/spreadsheet/xlsx-renderer.tsx:656
-#: src/features/onboarding/components/onboarding-dialog.tsx:417
+#: src/features/onboarding/components/onboarding-dialog.tsx:416
 msgid "Next"
 msgstr "下一步"
 
@@ -21469,7 +21473,7 @@ msgstr "无权访问此仓库。"
 msgid "No active session found. Please sign in again."
 msgstr "未找到活跃会话。请重新登录。"
 
-#: src/features/chat/sharing/thread-share-button.tsx:265
+#: src/features/chat/sharing/thread-share-button.tsx:266
 msgid "No additional users have access to this thread."
 msgstr "没有其他用户可以访问此对话。"
 
@@ -22588,19 +22592,19 @@ msgstr "本地部署选项"
 msgid "Onboarding"
 msgstr "新手引导"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:254
+#: src/features/onboarding/components/onboarding-dialog.tsx:253
 msgid "Onboarding complete"
 msgstr "新手引导已完成"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:273
+#: src/features/onboarding/components/onboarding-dialog.tsx:272
 msgid "Onboarding complete. Redirecting to chat."
 msgstr "新手引导已完成。正在跳转到聊天。"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:317
+#: src/features/onboarding/components/onboarding-dialog.tsx:316
 msgid "Onboarding progress"
 msgstr "新手引导进度"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:359
+#: src/features/onboarding/components/onboarding-dialog.tsx:358
 msgid "Onboarding steps"
 msgstr "新手引导步骤"
 
@@ -22608,7 +22612,7 @@ msgstr "新手引导步骤"
 msgid "Onboarding will restart on your next visit to chat."
 msgstr "下次访问聊天时将重新开始新手引导。"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:313
+#: src/features/onboarding/components/onboarding-dialog.tsx:312
 msgid "Onboarding wizard"
 msgstr "新手引导向导"
 
@@ -22680,7 +22684,7 @@ msgstr "一份订阅。<0>所有模型。</0>"
 msgid "One workspace for 30+ AI models. Chat, generate images, create videos, write documents, and run code — one account, one price."
 msgstr "一个工作区，30+ 个 AI 模型。聊天、生成图像、创作视频、撰写文档、运行代码——一个账号，一个价格。"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:43
+#: src/features/onboarding/components/onboarding-dialog.tsx:42
 msgid "One workspace for chat, images, video, documents, and code. 30+ AI models, one subscription."
 msgstr "一个工作区，搞定聊天、图像、视频、文档和代码。30+ 个 AI 模型，一份订阅。"
 
@@ -24266,7 +24270,7 @@ msgstr "待处理"
 msgid "Pending Invitations"
 msgstr "待处理的邀请"
 
-#: src/features/chat/sharing/thread-share-button.tsx:346
+#: src/features/chat/sharing/thread-share-button.tsx:347
 msgid "Pending Invites"
 msgstr "待处理的邀请"
 
@@ -24322,7 +24326,7 @@ msgstr "永久删除此组织及其所有数据"
 msgid "Permanently delete your account and all associated data"
 msgstr "永久删除你的账号及所有相关数据"
 
-#: src/features/chat/sharing/thread-share-button.tsx:309
+#: src/features/chat/sharing/thread-share-button.tsx:310
 msgid "Permission Level"
 msgstr "权限级别"
 
@@ -24437,7 +24441,7 @@ msgstr "选择技能"
 msgid "Pick a skill to evaluate."
 msgstr "选择要评测的技能。"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:44
+#: src/features/onboarding/components/onboarding-dialog.tsx:43
 msgid "Pick a starting point or jump straight into chat."
 msgstr "选择一个起点，或直接开始聊天。"
 
@@ -24624,7 +24628,7 @@ msgstr "请确认你的密码"
 msgid "Please enter a backup code to access your account"
 msgstr "请输入备用码以访问你的账号"
 
-#: src/features/chat/sharing/thread-share-button.tsx:101
+#: src/features/chat/sharing/thread-share-button.tsx:102
 msgid "Please enter an email address"
 msgstr "请输入电子邮件地址"
 
@@ -25656,14 +25660,14 @@ msgstr "提供商"
 msgid "Pseudo numerical diffusion"
 msgstr "伪数值扩散"
 
-#: src/features/chat/sharing/thread-share-button.tsx:260
+#: src/features/chat/sharing/thread-share-button.tsx:261
 #: src/features/skills/components/skill-form-dialog.tsx:481
 #: src/features/skills/components/skill-item.tsx:124
 msgid "Public"
 msgstr "公开"
 
-#: src/features/chat/sharing/thread-share-button.tsx:377
-#: src/features/chat/sharing/thread-share-button.tsx:381
+#: src/features/chat/sharing/thread-share-button.tsx:378
+#: src/features/chat/sharing/thread-share-button.tsx:382
 msgid "Public Access"
 msgstr "公开访问"
 
@@ -25676,11 +25680,11 @@ msgstr "来自 Discord Developer Portal 的公钥，用于签名验证"
 msgid "Public link"
 msgstr "公开链接"
 
-#: src/features/chat/sharing/thread-share-button.tsx:389
+#: src/features/chat/sharing/thread-share-button.tsx:390
 msgid "Public Link"
 msgstr "公开链接"
 
-#: src/features/chat/sharing/thread-share-button.tsx:188
+#: src/features/chat/sharing/thread-share-button.tsx:189
 msgid "Public link copied to clipboard!"
 msgstr "公开链接已复制到剪贴板！"
 
@@ -26039,8 +26043,8 @@ msgstr "重新运行 {0}？"
 msgid "Read"
 msgstr "读取"
 
-#: src/features/chat/sharing/thread-share-button.tsx:218
-#: src/features/chat/sharing/thread-share-button.tsx:316
+#: src/features/chat/sharing/thread-share-button.tsx:219
+#: src/features/chat/sharing/thread-share-button.tsx:317
 msgid "Read & Write"
 msgstr "读写"
 
@@ -26060,8 +26064,8 @@ msgstr "每条助手回复完成后，使用浏览器的声音朗读出来。"
 msgid "Read only"
 msgstr "只读"
 
-#: src/features/chat/sharing/thread-share-button.tsx:215
-#: src/features/chat/sharing/thread-share-button.tsx:315
+#: src/features/chat/sharing/thread-share-button.tsx:216
+#: src/features/chat/sharing/thread-share-button.tsx:316
 msgid "Read Only"
 msgstr "只读"
 
@@ -26681,7 +26685,7 @@ msgstr "使用 Kling 久经验证的上一代技术，为复杂场景提供可�
 msgid "Reload"
 msgstr "重新加载"
 
-#: src/components/error-boundaries/global-error-boundary-provider.tsx:250
+#: src/components/error-boundaries/global-error-boundary-provider.tsx:220
 msgid "Reload Application"
 msgstr "重新加载应用"
 
@@ -26690,7 +26694,7 @@ msgid "Reload now"
 msgstr "立即重新加载"
 
 #: src/components/error-boundaries/route-error-boundary.tsx:87
-#: src/components/error-boundary.tsx:65
+#: src/components/error-boundary.tsx:214
 msgid "Reload Page"
 msgstr "重新加载页面"
 
@@ -26713,8 +26717,8 @@ msgstr "记住我"
 #: ../../packages/ui/src/components/ai-elements/attachments.tsx:195
 #: ../../packages/ui/src/components/combobox.tsx:304
 #: src/features/chat/host/host-composer.tsx:917
-#: src/features/chat/sharing/thread-share-button.tsx:294
-#: src/features/chat/sharing/thread-share-button.tsx:366
+#: src/features/chat/sharing/thread-share-button.tsx:295
+#: src/features/chat/sharing/thread-share-button.tsx:367
 #: src/features/chat/thread/composer-input.tsx:341
 #: src/features/chat/thread/composer-input.tsx:353
 #: src/features/chat/thread/composer-input.tsx:407
@@ -26943,7 +26947,7 @@ msgstr "移除 webhook"
 msgid "Remove These Files"
 msgstr "移除这些文件"
 
-#: src/features/chat/sharing/thread-share-button.tsx:428
+#: src/features/chat/sharing/thread-share-button.tsx:429
 msgid "Remove User"
 msgstr "移除用户"
 
@@ -27209,7 +27213,7 @@ msgstr "研究"
 msgid "Research"
 msgstr "研究"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:79
+#: src/features/onboarding/components/onboarding-dialog.tsx:78
 msgid "Research a topic"
 msgstr "研究一个主题"
 
@@ -27217,7 +27221,7 @@ msgstr "研究一个主题"
 msgid "Research a topic in depth..."
 msgstr "深入研究一个主题..."
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:80
+#: src/features/onboarding/components/onboarding-dialog.tsx:79
 msgid "Research the latest developments in renewable energy storage technology."
 msgstr "研究可再生能源储能技术的最新进展。"
 
@@ -27602,7 +27606,7 @@ msgid "Reviewer note"
 msgstr "审核备注"
 
 #: src/features/auth/components/settings/account/account-cell.tsx:140
-#: src/features/chat/guest-links/use-guest-link-revoke.tsx:47
+#: src/features/chat/guest-links/use-guest-link-revoke.tsx:89
 #: src/features/pages/components/page-share-dialog.tsx:209
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:215
 msgid "Revoke"
@@ -27612,7 +27616,7 @@ msgstr "撤销"
 msgid "Revoke All Sessions"
 msgstr "撤销所有会话"
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:150
+#: src/features/chat/guest-links/guest-link-panel.tsx:175
 msgid "Revoke link"
 msgstr "撤销链接"
 
@@ -27628,11 +27632,11 @@ msgstr "撤销对 {tool} 的允许"
 msgid "Revoke the allow for {tool} on {server}"
 msgstr "撤销对 {server} 上 {tool} 的允许"
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:51
+#: src/features/chat/guest-links/guest-link-panel.tsx:74
 msgid "Revoke the earlier guest link first, then make a new one."
 msgstr "请先撤销之前的访客链接，再创建新的链接。"
 
-#: src/features/chat/guest-links/use-guest-link-revoke.tsx:61
+#: src/features/chat/guest-links/use-guest-link-revoke.tsx:103
 msgid "Revoke the guest link?"
 msgstr "撤销访客链接？"
 
@@ -27641,7 +27645,7 @@ msgstr "撤销访客链接？"
 msgid "Revoked {0} sessions"
 msgstr "已撤销 {0} 个会话"
 
-#: src/features/chat/guest-links/use-guest-link-revoke.tsx:48
+#: src/features/chat/guest-links/use-guest-link-revoke.tsx:90
 msgid "Revoking the link deletes {waitingCount, plural, one {the # guest message still waiting. It cannot be sent afterwards.} other {the # guest messages still waiting. They cannot be sent afterwards.}}"
 msgstr "撤销链接会删除仍在等待的 {waitingCount, plural, other {# 条访客消息}}。删除后将无法发送。"
 
@@ -29036,7 +29040,7 @@ msgstr "用你的账号将此内容发送给机器人："
 msgid "Send to agent"
 msgstr "发送给智能体"
 
-#: src/features/chat/guest-links/guest-page.tsx:275
+#: src/features/chat/guest-links/guest-page.tsx:274
 msgid "Send to the owner"
 msgstr "发送给所有者"
 
@@ -29052,12 +29056,12 @@ msgstr "发送验证码"
 msgid "Sending your message and waiting for the reply"
 msgstr "正在发送你的消息并等待回复"
 
-#: src/features/chat/guest-links/guest-page.tsx:275
+#: src/features/chat/guest-links/guest-page.tsx:274
 #: src/features/chat/thread/streaming-placeholder.tsx:617
 msgid "Sending…"
 msgstr "正在发送…"
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:175
+#: src/features/chat/guest-links/guest-link-panel.tsx:200
 #: src/features/devices/components/devices-settings.tsx:387
 msgid "Sent"
 msgstr "已发送"
@@ -29078,7 +29082,7 @@ msgstr "由无人值守的运行发送"
 msgid "Sent by the lead agent"
 msgstr "由主导智能体发送"
 
-#: src/features/chat/guest-links/guest-page.tsx:292
+#: src/features/chat/guest-links/guest-page.tsx:291
 msgid "Sent by the owner"
 msgstr "所有者已发送"
 
@@ -29289,8 +29293,8 @@ msgstr "支出占比"
 msgid "Share page"
 msgstr "分享页面"
 
-#: src/features/chat/sharing/thread-share-button.tsx:202
-#: src/features/chat/sharing/thread-share-button.tsx:251
+#: src/features/chat/sharing/thread-share-button.tsx:203
+#: src/features/chat/sharing/thread-share-button.tsx:252
 msgid "Share Thread"
 msgstr "分享对话"
 
@@ -29767,7 +29771,7 @@ msgstr "相比 Gemini 2.5 Pro 能力显著提升"
 msgid "Significant improvements over Gemini 3 Pro"
 msgstr "相比 Gemini 3 Pro 显著提升"
 
-#: src/lib/native/native-bridge.tsx:132
+#: src/lib/native/native-bridge.tsx:133
 msgid "Signing in through your browser did not work. Try again."
 msgstr "通过浏览器登录失败，请重试。"
 
@@ -29894,7 +29898,7 @@ msgstr "无法加载技能。你仍可以不使用技能进行转发。"
 msgid "Skills views"
 msgstr "技能视图"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:405
+#: src/features/onboarding/components/onboarding-dialog.tsx:404
 #: src/features/onboarding/components/setup-checklist.tsx:202
 msgid "Skip"
 msgstr "跳过"
@@ -29911,7 +29915,7 @@ msgstr "跳过问题"
 msgid "Skip to content"
 msgstr "跳到内容"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:400
+#: src/features/onboarding/components/onboarding-dialog.tsx:399
 msgid "Skip tour"
 msgstr "跳过导览"
 
@@ -30159,7 +30163,7 @@ msgstr "此次运行中的部分图像无法保存。"
 msgid "Some steps had no pricing data; the total is a minimum."
 msgstr "部分步骤缺少价格数据；总额为最低值。"
 
-#: src/components/error-boundary.tsx:51
+#: src/components/error-boundary.tsx:200
 #: src/components/settings/settings-modal.tsx:127
 #: src/features/pages/components/page-share-dialog.tsx:50
 msgid "Something went wrong"
@@ -30723,7 +30727,7 @@ msgstr "开始试运行"
 msgid "Start writing..."
 msgstr "开始写作..."
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:45
+#: src/features/onboarding/components/onboarding-dialog.tsx:44
 msgid "Start Your First Chat"
 msgstr "开始你的第一次聊天"
 
@@ -30867,7 +30871,7 @@ msgid "Steering:"
 msgstr "引导："
 
 #. placeholder {0}: currentIndex + 1
-#: src/features/onboarding/components/onboarding-dialog.tsx:355
+#: src/features/onboarding/components/onboarding-dialog.tsx:354
 msgid "Step {0} of {totalSteps}: {title}"
 msgstr "第 {0}/{totalSteps} 步：{title}"
 
@@ -32376,7 +32380,7 @@ msgstr "那台电脑不在线。"
 msgid "That did not go through. Try again."
 msgstr ""
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:77
+#: src/features/chat/guest-links/guest-link-panel.tsx:100
 msgid "That did not work. Please try again."
 msgstr "操作未成功。请重试。"
 
@@ -32725,9 +32729,13 @@ msgstr "发送给模型的完整系统提示词..."
 msgid "The goal is removed; its tasks stay, without a goal."
 msgstr "目标将被删除；其任务会保留，但不再属于任何目标。"
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:130
+#: src/features/chat/guest-links/guest-link-panel.tsx:155
 msgid "The guest link could not be loaded."
 msgstr "无法加载访客链接。"
+
+#: src/features/chat/guest-links/guest-link-panel.tsx:68
+msgid "The guest link was replaced or has ended."
+msgstr "访客链接已被替换或已失效。"
 
 #: src/features/develop/components/guide-tab.tsx:118
 #: src/features/develop/components/guide-tab.tsx:121
@@ -32834,7 +32842,7 @@ msgstr "登录"
 msgid "The last turn stopped before it finished."
 msgstr "上一轮在完成前就停止了。"
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:121
+#: src/features/chat/guest-links/guest-link-panel.tsx:142
 msgid "The link could not be copied. Select it and copy it yourself."
 msgstr "无法复制链接。请选中后自行复制。"
 
@@ -32890,7 +32898,7 @@ msgstr "无法访问 MCP 注册表，因此可能缺少服务器建议。"
 msgid "The MCP Registry is unavailable right now. Showing popular servers instead."
 msgstr "MCP 注册表当前不可用，改为显示热门服务器。"
 
-#: src/features/chat/guest-links/guest-page.tsx:99
+#: src/features/chat/guest-links/guest-page.tsx:98
 msgid "The message could not be sent. Check your connection and try again."
 msgstr "消息无法发送。请检查网络连接后重试。"
 
@@ -33365,7 +33373,7 @@ msgstr "此聊天属于某个工作进程。请在它自己的消息框中向它
 msgid "This chat cannot be compacted."
 msgstr "此聊天无法压缩。"
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:56
+#: src/features/chat/guest-links/guest-link-panel.tsx:79
 msgid "This chat cannot have a guest link."
 msgstr "此聊天不能有访客链接。"
 
@@ -33611,11 +33619,11 @@ msgstr "太短了：至少 {minLength} 个字符。"
 msgid "This is your organization's URL namespace"
 msgstr "这是你的组织的 URL 命名空间"
 
-#: src/features/chat/guest-links/guest-page.tsx:254
+#: src/features/chat/guest-links/guest-page.tsx:253
 msgid "This link has ended."
 msgstr "此链接已失效。"
 
-#: src/features/chat/guest-links/guest-page.tsx:90
+#: src/features/chat/guest-links/guest-page.tsx:89
 msgid "This link is already in use in another browser."
 msgstr "此链接已在另一个浏览器中使用。"
 
@@ -33623,11 +33631,11 @@ msgstr "此链接已在另一个浏览器中使用。"
 msgid "This link is incomplete."
 msgstr "此链接不完整。"
 
-#: src/features/chat/guest-links/guest-page.tsx:279
+#: src/features/chat/guest-links/guest-page.tsx:278
 msgid "This link is not complete. Ask for the full link."
 msgstr "此链接不完整。请索取完整链接。"
 
-#: src/features/chat/guest-links/guest-page.tsx:93
+#: src/features/chat/guest-links/guest-page.tsx:92
 msgid "This link is not taking messages right now. Try again later."
 msgstr "此链接目前不接收消息。请稍后再试。"
 
@@ -33641,7 +33649,7 @@ msgstr "此记忆已被删除。"
 msgid "This merges the commit {0} into the base branch with “{1}” on {hostLabel}. If the branch has changed since you opened this page, {hostLabel} refuses."
 msgstr "这会在 {hostLabel} 上以“{1}”方式将提交 {0} 合并到基础分支。如果自你打开此页面后分支已更改，{hostLabel} 将拒绝。"
 
-#: src/features/chat/guest-links/guest-page.tsx:87
+#: src/features/chat/guest-links/guest-page.tsx:86
 msgid "This message cannot be left. Keep it short, don't start it with / or mention anyone, or try again later."
 msgstr "无法留下此消息。请保持简短，不要以 / 开头或提及任何人，或稍后再试。"
 
@@ -33974,11 +33982,11 @@ msgstr "对话已设为永久"
 msgid "Thread list"
 msgstr "对话列表"
 
-#: src/features/chat/sharing/thread-share-button.tsx:170
+#: src/features/chat/sharing/thread-share-button.tsx:171
 msgid "Thread made private"
 msgstr "对话已设为私密"
 
-#: src/features/chat/sharing/thread-share-button.tsx:170
+#: src/features/chat/sharing/thread-share-button.tsx:171
 msgid "Thread made public"
 msgstr "对话已设为公开"
 
@@ -34302,7 +34310,7 @@ msgstr ""
 msgid "too many files"
 msgstr "文件过多"
 
-#: src/features/chat/guest-links/guest-page.tsx:96
+#: src/features/chat/guest-links/guest-page.tsx:95
 msgid "Too many messages. Please try again later."
 msgstr "消息太多。请稍后再试。"
 
@@ -34315,7 +34323,7 @@ msgstr "短时间内开始的新上下文过多，请一分钟后重试。"
 msgid "Too many requests right now. Try again in a moment."
 msgstr "当前请求过多。请稍后重试。"
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:72
+#: src/features/chat/guest-links/guest-link-panel.tsx:95
 msgid "Too many requests. Please try again in a moment."
 msgstr "请求过多。请稍后再试。"
 
@@ -34690,7 +34698,7 @@ msgstr "尝试调整搜索词。"
 #: src/components/error-component.tsx:40
 #: src/features/auth/components/device-approval.tsx:95
 #: src/features/auth/components/device-approval.tsx:338
-#: src/features/chat/guest-links/guest-page.tsx:270
+#: src/features/chat/guest-links/guest-page.tsx:269
 #: src/features/connection/components/offline-screen.tsx:64
 #: src/features/develop/components/files-tab.tsx:275
 #: src/features/develop/components/thread-pull-requests.tsx:169
@@ -34702,7 +34710,7 @@ msgstr "尝试调整搜索词。"
 msgid "Try again"
 msgstr "重试"
 
-#: src/components/error-boundaries/global-error-boundary-provider.tsx:241
+#: src/components/error-boundaries/global-error-boundary-provider.tsx:211
 #: src/components/error-boundaries/route-error-boundary.tsx:80
 #: src/components/settings/settings-modal.tsx:132
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:442
@@ -35777,7 +35785,7 @@ msgstr "使用了 {0}"
 msgid "Used for buttons, highlights and focus rings. Every option keeps text readable in light and dark mode."
 msgstr "用于按钮、高亮和焦点环。每个选项在浅色和深色模式下都能保持文字清晰可读。"
 
-#: src/features/chat/sharing/thread-share-button.tsx:287
+#: src/features/chat/sharing/thread-share-button.tsx:288
 msgid "user"
 msgstr "用户"
 
@@ -35795,7 +35803,7 @@ msgstr "用户"
 msgid "User"
 msgstr "用户"
 
-#: src/features/chat/sharing/thread-share-button.tsx:153
+#: src/features/chat/sharing/thread-share-button.tsx:154
 msgid "User access removed"
 msgstr "已移除用户访问权限"
 
@@ -36653,7 +36661,7 @@ msgstr "请等待智能体准备就绪后再试。"
 msgid "Wait for the reply to finish, then try again."
 msgstr "请等待回复完成后再重试。"
 
-#: src/features/chat/guest-links/guest-link-panel.tsx:175
+#: src/features/chat/guest-links/guest-link-panel.tsx:200
 msgid "Waiting"
 msgstr "等待中"
 
@@ -36682,7 +36690,7 @@ msgstr "正在等待输出…"
 msgid "Waiting for the agent…"
 msgstr "正在等待智能体…"
 
-#: src/features/chat/guest-links/guest-page.tsx:292
+#: src/features/chat/guest-links/guest-page.tsx:291
 #: src/features/chat/thread/request-secret-prompt.tsx:343
 msgid "Waiting for the owner"
 msgstr "正在等待所有者"
@@ -36906,8 +36914,8 @@ msgstr "粗细"
 msgid "Welcome back"
 msgstr "欢迎回来"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:46
-#: src/features/onboarding/components/onboarding-dialog.tsx:312
+#: src/features/onboarding/components/onboarding-dialog.tsx:45
+#: src/features/onboarding/components/onboarding-dialog.tsx:311
 msgid "Welcome to Neore"
 msgstr "欢迎使用 Neore"
 
@@ -37314,7 +37322,7 @@ msgstr "重新撰写"
 msgid "Write long-form content alongside chat"
 msgstr "在聊天旁撰写长篇内容"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:37
+#: src/features/onboarding/components/onboarding-dialog.tsx:36
 msgid "Write long-form content in a side-by-side canvas editor. Go from chat to finished document without switching tools."
 msgstr "在并排的画布编辑器中撰写长篇内容。从聊天到成稿，无需切换工具。"
 
@@ -37322,7 +37330,7 @@ msgstr "在并排的画布编辑器中撰写长篇内容。从聊天到成稿，
 msgid "Write some code for me..."
 msgstr "帮我写点代码..."
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:64
+#: src/features/onboarding/components/onboarding-dialog.tsx:63
 msgid "Write something"
 msgstr "写点东西"
 
@@ -37655,7 +37663,7 @@ msgstr "你需要一个身份验证器应用（如 Google Authenticator 或 Auth
 msgid "You're all caught up."
 msgstr "你已处理完所有通知。"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:270
+#: src/features/onboarding/components/onboarding-dialog.tsx:269
 msgid "You're all set!"
 msgstr "一切就绪！"
 
@@ -37861,7 +37869,7 @@ msgstr "你的本地服务器有响应，但拒绝了此网站（CORS）。请�
 msgid "Your location (e.g., \"New York, USA\", \"Berlin, Germany\")."
 msgstr "你的位置（例如“New York, USA”“Berlin, Germany”）。"
 
-#: src/features/chat/guest-links/guest-page.tsx:241
+#: src/features/chat/guest-links/guest-page.tsx:240
 msgid "Your message"
 msgstr "你的消息"
 
@@ -37869,7 +37877,7 @@ msgstr "你的消息"
 msgid "Your message contains inappropriate content that cannot be sent."
 msgstr "你的消息包含不当内容，无法发送。"
 
-#: src/features/chat/guest-links/guest-page.tsx:236
+#: src/features/chat/guest-links/guest-page.tsx:235
 msgid "Your message waits for the owner of this conversation. Nothing happens until they send it."
 msgstr "你的消息正在等待此对话的所有者。在对方发送之前不会有任何操作。"
 
@@ -37877,7 +37885,7 @@ msgstr "你的消息正在等待此对话的所有者。在对方发送之前不
 msgid "Your message:"
 msgstr "你的消息："
 
-#: src/features/chat/guest-links/guest-page.tsx:285
+#: src/features/chat/guest-links/guest-page.tsx:284
 msgid "Your messages"
 msgstr "你的消息"
 
@@ -37893,7 +37901,7 @@ msgstr "你的下一条消息是一个目标。智能体会持续工作，直到
 msgid "Your next message will start a self-destructing chat."
 msgstr "你的下一条消息将开始一个阅后即焚的聊天。"
 
-#: src/features/chat/guest-links/guest-page.tsx:262
+#: src/features/chat/guest-links/guest-page.tsx:261
 msgid "Your notes could not be loaded. They are still there; try again in a moment."
 msgstr "无法加载你的消息。它们仍然存在；请稍后再试。"
 

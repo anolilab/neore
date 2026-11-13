@@ -1,12 +1,11 @@
 import { api } from "@neore/backend/api";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import type { ComponentProps } from "react";
-import { useState } from "react";
 import { expect, fn, screen, userEvent, waitFor, within } from "storybook/test";
 
 import { GUEST_NOTES, guestLinksFixtures } from "@/storybook/fixtures/guest-links";
 import { userFixtures } from "@/storybook/fixtures/user";
-import { lunora, lunoraAnswered, lunoraError, lunoraHandlers, lunoraIdle } from "@/storybook/lunora";
+import { lunora, lunoraAnswered, lunoraError, lunoraHandlers, lunoraIdle, lunoraPending } from "@/storybook/lunora";
 
 import GuestLinkPanel from "./guest-link-panel";
 import useGuestLinkRevoke from "./use-guest-link-revoke";
@@ -26,6 +25,8 @@ const WithRevoke = ({ threadId, ...props }: Omit<ComponentProps<typeof GuestLink
 const HELD = GUEST_NOTES[0]?.text ?? "";
 /** `RevokeDeclined`'s revoke: a Cancel must never reach it. */
 const revokeCalled = fn(() => null);
+/** The meta's backend, shared with `RevokeDeclined`: it starts over before each story, so a revoke in one never shows in the next. */
+const FIXTURES = guestLinksFixtures();
 
 const meta = {
     args: { threadId: "thread-1" },
@@ -37,7 +38,7 @@ const meta = {
             </div>
         ),
     ],
-    parameters: { msw: { handlers: { lunora: lunoraHandlers(...userFixtures(), ...guestLinksFixtures()) } } },
+    parameters: { msw: { handlers: { lunora: lunoraHandlers(...userFixtures(), ...FIXTURES) } } },
     title: "Chat/Guest link",
 } satisfies Meta<typeof WithRevoke>;
 
@@ -67,6 +68,19 @@ export const NoLink: Story = {
 
         // The token rides in the fragment, never the path or the query.
         await expect(new URL(field.value).hash).toMatch(/^#[0-9a-f]{64}$/u);
+        // The read now holds the new link: it is live, not offered again.
+        await waitFor(async () => {
+            await expect(canvas.queryByRole("button", { name: "Create guest link" })).toBeNull();
+        });
+    },
+};
+
+/** The first read is still out: Create waits, and says why. */
+export const Loading: Story = {
+    parameters: { msw: { handlers: { lunora: lunoraHandlers(...userFixtures(), lunoraPending(api.chat.guest_links.getGuestLink)) } } },
+    play: async ({ canvas }) => {
+        await expect(await canvas.findByRole("status")).toHaveTextContent("Loading the guest link…");
+        await expect(canvas.getByRole("button", { name: "Create guest link" })).toBeDisabled();
     },
 };
 
@@ -101,8 +115,6 @@ export const LockedChat: Story = {
 
 /** Revoking deletes the notes still waiting: the owner confirms first, then focus goes to "Create guest link". */
 export const RevokeWithWaitingNotes: Story = {
-    // Its own fixtures: the revoke ends their link, which the other stories' must keep.
-    parameters: { msw: { handlers: { lunora: lunoraHandlers(...userFixtures(), ...guestLinksFixtures()) } } },
     play: async ({ canvas }) => {
         await userEvent.click(await canvas.findByRole("button", { name: "Revoke link" }));
         await expect(await screen.findByRole("alertdialog")).toHaveTextContent("deletes the 1 guest message still waiting");
@@ -117,7 +129,7 @@ export const RevokeWithWaitingNotes: Story = {
 /** Cancelling the confirm revokes nothing. */
 export const RevokeDeclined: Story = {
     parameters: {
-        msw: { handlers: { lunora: lunoraHandlers(...userFixtures(), ...guestLinksFixtures(), lunora(api.chat.guest_links.revokeGuestLink, revokeCalled)) } },
+        msw: { handlers: { lunora: lunoraHandlers(...userFixtures(), ...FIXTURES, lunora(api.chat.guest_links.revokeGuestLink, revokeCalled)) } },
     },
     play: async ({ canvas }) => {
         revokeCalled.mockClear();
@@ -129,6 +141,25 @@ export const RevokeDeclined: Story = {
         await lunoraIdle();
         await expect(revokeCalled).not.toHaveBeenCalled();
         await expect(canvas.getByRole("button", { name: "Revoke link" })).toBeEnabled();
+    },
+};
+
+/** The link was replaced from another tab since the owner looked: the revoke is refused, nothing is deleted, and they are told. */
+export const RevokeReplacedElsewhere: Story = {
+    parameters: {
+        msw: {
+            handlers: {
+                lunora: lunoraHandlers(
+                    ...userFixtures(),
+                    ...guestLinksFixtures({ messages: [] }),
+                    lunoraError(api.chat.guest_links.revokeGuestLink, "NOT_FOUND", "That guest link has ended.", 404, { code: "GUEST_LINK_ENDED" }),
+                ),
+            },
+        },
+    },
+    play: async ({ canvas }) => {
+        await userEvent.click(await canvas.findByRole("button", { name: "Revoke link" }));
+        await expect(await screen.findByText("The guest link was replaced or has ended.")).toBeInTheDocument();
     },
 };
 
@@ -151,33 +182,4 @@ export const RefusalInAppWords: Story = {
         await expect(await screen.findByText("Guest messages from an earlier link are still waiting.")).toBeInTheDocument();
         await expect(screen.queryByText("server words")).toBeNull();
     },
-};
-
-/** Stands in for the owner moving to another chat while a new link is being made. */
-const ChatChangesDuringCreate = ({ threadId: firstThreadId, ...props }: ComponentProps<typeof WithRevoke>) => {
-    const [threadId, setThreadId] = useState(firstThreadId);
-
-    return (
-        <>
-            <button onClick={() => setThreadId("thread-2")} type="button">
-                Open another chat
-            </button>
-            <WithRevoke {...props} threadId={threadId} />
-        </>
-    );
-};
-
-/** A link made for one chat never shows in another, even when it comes back after the owner moved on. */
-export const LinkStaysWithItsChat: Story = {
-    parameters: {
-        msw: { handlers: { lunora: lunoraHandlers(...userFixtures(), ...guestLinksFixtures({ createDelayMs: 500, link: false })) } },
-    },
-    play: async ({ canvas }) => {
-        await lunoraAnswered(api.chat.guest_links.getGuestLink);
-        await userEvent.click(await canvas.findByRole("button", { name: "Create guest link" }));
-        await userEvent.click(canvas.getByRole("button", { name: "Open another chat" }));
-        await lunoraAnswered(api.chat.guest_links.createGuestLink);
-        await expect(canvas.queryByRole("textbox", { name: "Guest link" })).toBeNull();
-    },
-    render: (args) => <ChatChangesDuringCreate {...args} />,
 };

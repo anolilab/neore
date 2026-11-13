@@ -7,7 +7,7 @@ import { Input } from "@neore/ui/components/input";
 import { formatDateTime } from "@neore/ui/utils/locale-format";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import type { FC } from "react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { useCRPC } from "@/lib/lunora/crpc";
@@ -22,10 +22,10 @@ interface GuestLinkPanelProps {
     locked?: boolean;
 
     /**
-     * Revokes the link, asking first when `waitingCount` notes would be deleted (`useGuestLinkRevoke`, held outside the share
-     * menu); `false` when the owner declined.
+     * Revokes the link shown (`linkId`), asking first when the waiting notes shown (their ids) would be deleted
+     * (`useGuestLinkRevoke`, held outside the share menu); `false` when the owner declined.
      */
-    revokeLink: (waitingCount: number) => Promise<boolean>;
+    revokeLink: (linkId: string, waitingNotes: string[]) => Promise<boolean>;
     threadId: string;
 }
 
@@ -33,8 +33,8 @@ interface GuestLinkPanelProps {
 const GuestLinkPanel: FC<GuestLinkPanelProps> = ({ locked = false, revokeLink, threadId }) => {
     const { i18n, t } = useLingui();
     const crpc = useCRPC();
-    // Only its hash is stored: the link can be shown once, right after it is made, and only in the chat it was made for.
-    const [madeLink, setMadeLink] = useState<{ threadId: string; url: string }>();
+    // Only its hash is stored: the link can be shown once, right after it is made.
+    const [madeLink, setMadeLink] = useState<{ id: string; url: string }>();
     // A locked chat answers only with its live passcode proof, as the rest of the thread does.
     const unlockProof = useUnlockProof(threadId);
     const linkQuery = useQuery(crpc.chat.guest_links.getGuestLink.queryOptions({ threadId: threadId as Id<"threads">, unlockProof }));
@@ -44,11 +44,34 @@ const GuestLinkPanel: FC<GuestLinkPanelProps> = ({ locked = false, revokeLink, t
     // After a revoke, focus goes to "Create guest link" once it shows, not to the page: the Revoke button is gone.
     const focusCreateRef = useRef(false);
     const [revoking, setRevoking] = useState(false);
+    // A link past its end is not live, even before the next read says so (a read reruns on writes, not on time): the panel
+    // re-renders when it ends.
+    const [now, setNow] = useState(() => Date.now());
+    const linkEnd = data?.link?.expiresAt;
+    const live = linkEnd !== undefined && linkEnd > now;
+
+    useEffect(() => {
+        if (linkEnd === undefined || linkEnd <= Date.now()) {
+            return undefined;
+        }
+
+        // One timeout to the end: a link lives a day (`GUEST_LINK_TTL_MS`), well within a browser timeout.
+        const timer = setTimeout(() => setNow(Date.now()), linkEnd - Date.now());
+
+        return () => clearTimeout(timer);
+    }, [linkEnd]);
 
     const reportError = (error: unknown) => {
         switch (errorCode(error)) {
             case "CONFLICT": {
                 toast.error(t`Revoke the earlier guest link first, then make a new one.`);
+
+                return;
+            }
+            case "GUEST_LINK_ENDED": {
+                // Revoked or replaced elsewhere since the owner looked: show them the link as it is now.
+                toast.error(t`The guest link was replaced or has ended.`);
+                void linkQuery.refetch();
 
                 return;
             }
@@ -80,28 +103,24 @@ const GuestLinkPanel: FC<GuestLinkPanelProps> = ({ locked = false, revokeLink, t
     };
 
     const handleCreate = () => {
-        const forThread = threadId;
-
         create.mutate(
-            { threadId: forThread as Id<"threads"> },
-            {
-                onError: reportError,
-                // Kept with its chat: a link made for a chat the panel no longer shows is not shown in another.
-                onSuccess: ({ linkToken }) => setMadeLink({ threadId: forThread, url: guestLinkUrl(linkToken) }),
-            },
+            { threadId: threadId as Id<"threads"> },
+            { onError: reportError, onSuccess: ({ id, linkToken }) => setMadeLink({ id, url: guestLinkUrl(linkToken) }) },
         );
     };
 
-    const waitingCount = data?.messages.filter((note) => note.status === "held").length ?? 0;
+    // The waiting notes the owner sees: a revoke deletes these and no other (`revokeGuestLink`'s `confirmedNotes`).
+    const waitingNotes = data?.messages.filter((note) => note.status === "held").map((note) => note.id) ?? [];
+
+    const shownLinkId = data?.link?.id;
 
     const handleRevoke = async () => {
-        const forThread = threadId;
-
         setRevoking(true);
 
         try {
-            if (await revokeLink(waitingCount)) {
-                setMadeLink((made) => (made?.threadId === forThread ? undefined : made));
+            // The link the owner sees: one replaced since (another tab) is refused, not revoked in its place.
+            if (shownLinkId !== undefined && (await revokeLink(shownLinkId, waitingNotes))) {
+                setMadeLink(undefined);
                 focusCreateRef.current = true;
             }
         } catch (error) {
@@ -111,7 +130,9 @@ const GuestLinkPanel: FC<GuestLinkPanelProps> = ({ locked = false, revokeLink, t
         setRevoking(false);
     };
 
-    const linkUrl = madeLink?.threadId === threadId ? madeLink.url : undefined;
+    // Shown only while the live read still holds that very link, by id: not once it is revoked, replaced or past its end, and
+    // never in another chat, whose link has another id.
+    const linkUrl = live && madeLink !== undefined && madeLink.id === data?.link?.id ? madeLink.url : undefined;
 
     const handleCopy = () => {
         if (linkUrl) {
@@ -122,11 +143,15 @@ const GuestLinkPanel: FC<GuestLinkPanelProps> = ({ locked = false, revokeLink, t
         }
     };
 
-    const expiresAt = data?.link ? formatDateTime(data.link.expiresAt, i18n.locale) : undefined;
+    const expiresAt = live ? formatDateTime(linkEnd, i18n.locale) : undefined;
 
     return (
         <div className="flex flex-col gap-3">
             <p className="text-muted-foreground text-sm">{t`Anyone with a guest link can leave you a message here. Nothing they write runs on its own.`}</p>
+            {/* Mounted from the start, so the text that appears in it is announced. */}
+            <p className="text-muted-foreground text-sm empty:hidden" role="status">
+                {linkQuery.isPending ? t`Loading the guest link…` : null}
+            </p>
             {linkQuery.isError && <p role="alert">{t`The guest link could not be loaded.`}</p>}
             {locked && <p className="text-muted-foreground text-sm">{t`A locked chat cannot have a guest link.`}</p>}
             {linkUrl && (
