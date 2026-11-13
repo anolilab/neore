@@ -91,7 +91,7 @@ const keyedRunsOf = async (userId: string): Promise<{ key?: string; live: boolea
 
 /** Erases the user the way the workflow drains the erasure: each batch's run cursor is where the next batch's scan starts. */
 const eraseAll = async (userId: string): Promise<void> => {
-    let runCursor: string | null = null;
+    let runCursor: string | null | undefined;
     let more = true;
 
     while (more) {
@@ -211,6 +211,24 @@ describe("the purge's object steps", () => {
 });
 
 describe("erasure of the run scan", () => {
+    it("does not rescan the run rows once the scan has finished within one erasure, but a fresh erasure scans again", async () => {
+        const finished = await harness.run(async (ctx: any) => await eraseUsageForUser(ctx, A));
+
+        expect(finished.runCursor).toBeNull();
+
+        await harness.run(async (ctx: any) => {
+            await ctx.db.insert("usageExportRuns", { createdAt: 1, deleteAt: 0, requestId: "late:1", userId: A });
+        });
+
+        // Later batches of the same erasure pass `null` and do not look at the run rows again.
+        await harness.run(async (ctx: any) => await eraseUsageForUser(ctx, A, null));
+        expect(await countOf("usageExportRuns", A)).toBe(1);
+
+        // A fresh erasure starts the scan again and removes it.
+        await harness.run(async (ctx: any) => await eraseUsageForUser(ctx, A));
+        expect(await countOf("usageExportRuns", A)).toBe(0);
+    });
+
     it("reaches an unkeyed run behind more than 500 keyed runs, scanning in batches", async () => {
         await harness.run(async (ctx: any) => {
             for (let index = 0; index < 510; index += 1) {

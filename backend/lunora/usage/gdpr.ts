@@ -118,12 +118,11 @@ export const releaseUsageKey = internalMutation
  * (`usageReplies`), the backfill's position (`usageBackfill`), the export's pieces, project index and run rows. `hasMore` while any
  * batch came back full. A failed delete throws: the erasure step fails, and its retry finds what is left, so it never reports done
  * early. A run row with an object is kept: its purge removes the object and then the row.
+ *
+ * `runCursor` is the run scan's position: `undefined` starts the scan, a string continues it, and `null` means it has finished, so the
+ * later batches of the same erasure do not rescan the run rows.
  */
-export const eraseUsageForUser = async (
-    ctx: MutationCtx,
-    userId: string,
-    runCursor: string | null = null,
-): Promise<BatchResult & { runCursor: string | null }> => {
+export const eraseUsageForUser = async (ctx: MutationCtx, userId: string, runCursor?: string | null): Promise<BatchResult & { runCursor: string | null }> => {
     const [days, keys, backfills, pieces, projects] = await Promise.all([
         ctx.db
             .query("usageDaily")
@@ -153,10 +152,10 @@ export const eraseUsageForUser = async (
     // done while an object remains. A run without one is removed wherever it sits. The scan carries its position from one call to the
     // next, so keyed runs, however many, cannot hide an unkeyed run behind them.
     const runsAt = (cursor: string | null) => ctx.db.usageExportRuns.findMany({ consistency: "primary", cursor, limit: EXPORT_PIECE_BATCH, where: { userId } });
-    let cursor = runCursor;
+    let cursor: string | null | undefined = runCursor;
 
-    for (let pages = 0; pages < RUN_PAGES_PER_ERASURE; pages += 1) {
-        const runs = await runsAt(cursor);
+    for (let pages = 0; cursor !== null && pages < RUN_PAGES_PER_ERASURE; pages += 1) {
+        const runs = await runsAt(cursor ?? null);
 
         for (const run of runs.page) {
             if (run.usageKey !== undefined) {
@@ -172,15 +171,11 @@ export const eraseUsageForUser = async (
         }
 
         cursor = runs.isDone ? null : runs.continueCursor;
-
-        if (cursor === null) {
-            break;
-        }
     }
 
     return {
         hasMore: full(days) || full(keys) || full(backfills) || fullPieces(pieces.page) || fullPieces(projects.page) || cursor !== null,
-        runCursor: cursor,
+        runCursor: cursor ?? null,
     };
 };
 

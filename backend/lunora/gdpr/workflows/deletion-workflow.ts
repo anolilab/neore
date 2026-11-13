@@ -584,8 +584,9 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
         });
 
         // The usage rows and export tables are erased in batches. The run scan carries its position from one batch to the next.
+        // Each erasure starts its run scan afresh (`undefined`); a null cursor between its batches means the scan has finished.
         const eraseUsage = async (name: string): Promise<void> => {
-            let runCursor: string | null = null;
+            let runCursor: string | null | undefined;
 
             await drain(name, async (round) => {
                 const result = (await context.run(

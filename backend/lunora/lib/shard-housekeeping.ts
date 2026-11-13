@@ -255,7 +255,7 @@ export const runShardTick = internalMutation
         // a reap that failed is.
         const exportRunRead = await (async () => {
             try {
-                const { page } = await ctx.db.usageExportRuns.findMany({ limit: 1, orderBy: [{ deleteAt: "asc" }] });
+                const { page } = await ctx.db.usageExportRuns.findMany({ consistency: "primary", limit: 1, orderBy: [{ deleteAt: "asc" }] });
 
                 return { deleteAt: page[0]?.deleteAt };
             } catch (error) {

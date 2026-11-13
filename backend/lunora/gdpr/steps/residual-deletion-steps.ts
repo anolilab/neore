@@ -223,7 +223,7 @@ const PURGE_PAGES_PER_CALL = 50;
 export const deleteUserUsageDaily = internalMutation
     .input({ runCursor: v.optional(v.union(v.string(), v.null())), userId: v.string() })
     .output(vUsageErasure)
-    .mutation(async ({ args: { runCursor, userId }, ctx: context }) => await eraseUsageForUser(context, userId, runCursor ?? null));
+    .mutation(async ({ args: { runCursor, userId }, ctx: context }) => await eraseUsageForUser(context, userId, runCursor));
 
 /**
  * Deletes the stored usage JSON of the user's export runs, and releases the record of each run whose export has ended, a bounded part
