@@ -181,9 +181,10 @@ enum PushContent {
             return .placeholder
         }
 
-        // The phone signed out or switched accounts while the text was on its way: it is not this person's to see.
+        // The phone signed out or switched accounts while the text was on its way: it is not this person's to see, and a tap
+        // must not open its chat (as for a 404).
         guard session()?.userId == fetchedFor.userId else {
-            return .placeholder
+            return .notThisAccount
         }
 
         return .text(Text(title: title, body: body))
