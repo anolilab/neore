@@ -16,6 +16,7 @@ import { describe, expect, it } from "vitest";
 const appRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 const SOURCE_FILE = /\.tsx?$/u;
 const NOT_COMPILED = /\.(?:test|d)\.tsx?$/u;
+const COMPONENT_NAME = /^[A-Z]/u;
 
 /**
  * Hooks the compiler still skips, as `file#name`, by the top-level declaration that holds them: an edit that moves them
@@ -24,6 +25,9 @@ const NOT_COMPILED = /\.(?:test|d)\.tsx?$/u;
  * initializer).
  */
 const KNOWN_BAILOUTS = ["src/voice/use-dictation.ts#useDictation", "src/voice/use-dictation.ts#useOnDeviceVoiceInput", "src/voice/use-voice-input.ts#useVoiceInput"];
+
+/** Run under every screen, so a skip here costs every screen; checked for a compiled result like the screens. */
+const MUST_COMPILE = ["src/auth/auth-context.tsx#AuthProvider", "src/offline/offline-provider.tsx#OfflineProvider", "src/offline/use-host-statuses.ts#useHostStatuses"];
 
 const sourceFiles = (directory: string): string[] =>
     readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
@@ -46,7 +50,10 @@ interface CompileEvent {
 interface CompileResult {
     /** `file#name` of each top-level declaration whose function the compiler skipped, with its reason. */
     bailouts: Map<string, string>;
+    /** `file#name` of each top-level declaration the compiler compiled a function of. */
     compiled: string[];
+    /** `file#name` of each top-level component: a function whose name starts with a capital. */
+    components: string[];
 }
 
 const reasonOf = (event: CompileEvent): string => {
@@ -76,6 +83,24 @@ const declaredName = (statement: types.Statement): string | undefined => {
     return statement.type === "ExportDefaultDeclaration" ? "default" : undefined;
 };
 
+/** Whether a top-level statement declares a component: a function, or a `const` holding one, named with a capital. */
+const isComponent = (statement: types.Statement): boolean => {
+    const declaration = statement.type === "ExportNamedDeclaration" || statement.type === "ExportDefaultDeclaration" ? statement.declaration : statement;
+    const name = declaredName(statement);
+
+    if (name === undefined || !COMPONENT_NAME.test(name)) {
+        return false;
+    }
+
+    if (declaration?.type === "FunctionDeclaration") {
+        return true;
+    }
+
+    const init = declaration?.type === "VariableDeclaration" ? declaration.declarations[0]?.init : undefined;
+
+    return init?.type === "ArrowFunctionExpression" || init?.type === "FunctionExpression";
+};
+
 /** The top-level declaration that holds `line`: the component or hook a reported location belongs to. */
 const enclosingName = (statements: ReadonlyArray<types.Statement>, line: number | undefined): string => {
     const holder = statements.find((statement) => line !== undefined && statement.loc !== null && statement.loc !== undefined && statement.loc.start.line <= line && line <= statement.loc.end.line);
@@ -84,7 +109,7 @@ const enclosingName = (statements: ReadonlyArray<types.Statement>, line: number 
 };
 
 const compile = (file: string): CompileResult => {
-    const result: CompileResult = { bailouts: new Map(), compiled: [] };
+    const result: CompileResult = { bailouts: new Map(), compiled: [], components: [] };
     const source = readFileSync(file, "utf8");
     const options = {
         babelrc: false,
@@ -93,10 +118,12 @@ const compile = (file: string): CompileResult => {
         parserOpts: { plugins: file.endsWith(".tsx") ? ["typescript", "jsx"] : ["typescript"] } satisfies ParserOptions,
     };
     const statements = parseSync(source, options)?.program.body ?? [];
+
+    result.components = statements.filter((statement) => isComponent(statement)).map((statement) => `${relative(appRoot, file)}#${declaredName(statement) ?? ""}`);
     const logger = {
         logEvent: (_filename: string | null, event: CompileEvent) => {
             if (event.kind === "CompileSuccess") {
-                result.compiled.push(event.fnName ?? "<anonymous>");
+                result.compiled.push(`${relative(appRoot, file)}#${enclosingName(statements, event.fnLoc?.start.line)}`);
             } else if (event.kind === "CompileError" || event.kind === "PipelineError") {
                 result.bailouts.set(`${relative(appRoot, file)}#${enclosingName(statements, event.fnLoc?.start.line)}`, reasonOf(event));
             }
@@ -110,12 +137,21 @@ const compile = (file: string): CompileResult => {
 
 const results = [...sourceFiles(join(appRoot, "app")), ...sourceFiles(join(appRoot, "src"))].map((file) => compile(file));
 const bailouts = new Map(results.flatMap((result) => [...result.bailouts]));
+const compiled = new Set(results.flatMap((result) => result.compiled));
 
 describe("react compiler over apps/mobile", () => {
-    it("compiles every screen", () => {
-        const screens = [...bailouts].filter(([location]) => location.startsWith("app/"));
+    // A function can be left out without an error: `"use no memo"` opts it out, and nothing is logged as a failure. So
+    // each one is checked for a compiled result, not only for the absence of a bail-out.
+    it("compiles every screen component", () => {
+        const screens = results.flatMap((result) => result.components).filter((name) => name.startsWith("app/"));
 
-        expect(screens).toStrictEqual([]);
+        expect(screens.length).toBeGreaterThan(5);
+        expect(screens.filter((name) => !compiled.has(name))).toStrictEqual([]);
+        expect(bailouts.keys().filter((name) => name.startsWith("app/")).toArray()).toStrictEqual([]);
+    });
+
+    it("compiles the providers and hooks every screen runs", () => {
+        expect(MUST_COMPILE.filter((name) => !compiled.has(name))).toStrictEqual([]);
     });
 
     it("skips only the known hooks", () => {
