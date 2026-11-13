@@ -235,3 +235,31 @@ describe("gfm review cases, third round", () => {
         );
     });
 });
+
+describe("gfm review cases, fourth round", () => {
+    it("keeps a column covered by a rowspan when a later colspan runs across it", () => {
+        expect(
+            convert(
+                "<table><tr><th>H1</th><th>H2</th><th>H3</th></tr><tr><td>a</td><td rowspan=3>b</td><td>c</td></tr><tr><td colspan=3>x</td></tr><tr><td>1</td><td>2</td></tr></table>",
+            ),
+        ).toBe("| H1 | H2 | H3 |\n| --- | --- | --- |\n| a | b | c |\n| x |  |  |\n| 1 |  | 2 |");
+    });
+
+    it("asks a remove filter once per element, so a gfm rule and the rule search agree", () => {
+        const service = new TurndownService().use(gfm);
+        const asked = new Set<Node>();
+
+        // Removes an element the first time it is asked about it, and keeps it after that.
+        service.remove((node) => {
+            if (node.getAttribute("class") !== "flip" || asked.has(node)) {
+                return false;
+            }
+
+            asked.add(node);
+
+            return true;
+        });
+
+        expect(service.turndown(`<p>a<s class="flip">secret</s>b</p>`)).toBe("ab");
+    });
+});

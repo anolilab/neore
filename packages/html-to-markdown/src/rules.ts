@@ -155,8 +155,8 @@ export default class Rules implements RuleLookup {
     /** Rules whose replacement ignores the children, so converting them is wasted work. */
     private readonly skipChildrenRules = new WeakSet<Rule>();
 
-    /** Each element's answer from the remove filters. Dropped when a remove filter is added. */
-    private removedAnswers = new WeakMap<Node, boolean>();
+    /** The remove filters and each element's answer from them (see Removal). */
+    private readonly removal: Removal = { answers: new WeakMap(), list: this.removeList };
 
     private readonly options: Options;
 
@@ -207,7 +207,7 @@ export default class Rules implements RuleLookup {
         this.skipChildrenRules.add(rule);
         this.removeList.unshift(rule);
         this.answers.undecided = new WeakSet();
-        this.removedAnswers = new WeakMap();
+        this.removal.answers = new WeakMap();
     }
 
     /**
@@ -225,7 +225,9 @@ export default class Rules implements RuleLookup {
             return this.blankRule;
         }
 
-        return decideRule(this.answers, this.searchOrder, node, this.options, this) ?? this.defaultRule;
+        const search: ListSearch = (list, candidate, nodeName) => searchList(this.removal, list, candidate, nodeName, this.options, this);
+
+        return decideRule(this.answers, this.searchOrder, node, search) ?? this.defaultRule;
     }
 
     /**
@@ -254,31 +256,13 @@ export default class Rules implements RuleLookup {
             return undefined;
         }
 
-        return decideRule(this.answers, this.searchOrder, annotateNode(node, this.options), this.options, this);
+        const search: ListSearch = (list, candidate, nodeName) => searchList(this.removal, list, candidate, nodeName, this.options, this);
+
+        return decideRule(this.answers, this.searchOrder, annotateNode(node, this.options), search);
     }
 
     isRemoved(node: Node): boolean {
-        if (node.nodeType !== 1 || this.removeList.length === 0) {
-            return false;
-        }
-
-        const known = this.removedAnswers.get(node);
-
-        if (known !== undefined) {
-            return known;
-        }
-
-        // A filter may add a remove filter while it runs, which replaces the answers. This answer belongs to the old
-        // filters then, so it is not recorded.
-        const answersBefore = this.removedAnswers;
-        // Annotated once per element, as ruleFor does: annotating reads the element's whole text.
-        const isMatch = findRule(this.removeList, annotateNode(node, this.options), node.nodeName.toLowerCase(), this.options, this) !== undefined;
-
-        if (this.removedAnswers === answersBefore) {
-            this.removedAnswers.set(node, isMatch);
-        }
-
-        return isMatch;
+        return removalRule(this.removal, node, this.options, this) !== undefined;
     }
 
     forEach(visit: (rule: Rule, index: number) => void): void {
@@ -288,18 +272,62 @@ export default class Rules implements RuleLookup {
     }
 }
 
+/** How the rule search looks in one list. */
+type ListSearch = (list: ReadonlyArray<Rule>, node: AnnotatedNode, nodeName: string) => Rule | undefined;
+
+/**
+ * The remove filters and each element's answer from them: the filter that matches, or null. The rule search reads the
+ * same answers, so each remove filter is asked once per element and a gfm rule that lets a removed element go agrees
+ * with the search. The answers are dropped when a remove filter is added.
+ */
+interface Removal {
+    answers: WeakMap<Node, Rule | null>;
+    readonly list: ReadonlyArray<Rule>;
+}
+
+/** The first rule in the list that matches. The remove filters are answered once per element, through removalRule. */
+function searchList(
+    removal: Removal,
+    list: ReadonlyArray<Rule>,
+    node: AnnotatedNode,
+    nodeName: string,
+    options: Options,
+    lookup: RuleLookup,
+): Rule | undefined {
+    return list === removal.list ? removalRule(removal, node, options, lookup, node) : findRule(list, node, nodeName, options, lookup);
+}
+
+/** The remove filter that matches the element, asked once per element. `annotated` is the node, when annotated already. */
+function removalRule(removal: Removal, node: Node, options: Options, lookup: RuleLookup, annotated?: AnnotatedNode): Rule | undefined {
+    if (node.nodeType !== 1 || removal.list.length === 0) {
+        return undefined;
+    }
+
+    const known = removal.answers.get(node);
+
+    if (known !== undefined) {
+        return known ?? undefined;
+    }
+
+    // A filter may add a remove filter while it runs, which replaces the answers. This answer belongs to the old
+    // filters then, so it is not recorded.
+    const answersBefore = removal.answers;
+    // Annotated once per element, as ruleFor does: annotating reads the element's whole text.
+    const rule = findRule(removal.list, annotated ?? annotateNode(node, options), node.nodeName.toLowerCase(), options, lookup);
+
+    if (removal.answers === answersBefore) {
+        removal.answers.set(node, rule ?? null);
+    }
+
+    return rule;
+}
+
 /**
  * The first rule of any kind that matches the node, asked once per node. A filter can
  * be asked twice for one node (code-block detection, then traversal), and a second
  * answer that differs from the first would split the two. The first answer is kept.
  */
-function decideRule(
-    answers: Answers,
-    searchOrder: ReadonlyArray<ReadonlyArray<Rule>>,
-    node: AnnotatedNode,
-    options: Options,
-    lookup: RuleLookup,
-): Rule | undefined {
+function decideRule(answers: Answers, searchOrder: ReadonlyArray<ReadonlyArray<Rule>>, node: AnnotatedNode, find: ListSearch): Rule | undefined {
     const known = answers.decided.get(node);
 
     if (known) {
@@ -317,7 +345,7 @@ function decideRule(
     const undecidedBefore = answers.undecided;
 
     for (const list of searchOrder) {
-        const rule = findRule(list, node, nodeName, options, lookup);
+        const rule = find(list, node, nodeName);
 
         if (rule) {
             answers.decided.set(node, rule);

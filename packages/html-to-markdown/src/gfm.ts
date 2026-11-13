@@ -186,28 +186,25 @@ function span(cell: Element, name: "colspan" | "rowspan"): number {
 
 /** The rows of a table laid out on a grid, or null when the grid would hold more than MAX_TABLE_CELLS cells. */
 function grid(rows: ReadonlyArray<Row>, lookup: RuleLookup): { lines: string[][]; width: number } | null {
-    // For each column, how many more rows a cell above still covers.
-    const covered: number[] = [];
+    // For each column, the row index from which no cell above covers it. A cell that overlaps one above, which HTML
+    // calls a table model error, keeps the longer cover, so the rows below still skip the column.
+    const coveredUntil: number[] = [];
     const lines: string[][] = [];
     let width = 0;
 
     for (const [rowIndex, { element: row, groupEnd }] of rows.entries()) {
         const line: string[] = [];
         let column = 0;
-        const skipCovered = (): void => {
-            while ((covered[column] ?? 0) > 0) {
-                covered[column] = (covered[column] ?? 1) - 1;
-                line[column] = "";
-                column += 1;
-            }
-        };
 
         for (const cell of ownCells(row, lookup)) {
-            skipCovered();
+            while ((coveredUntil[column] ?? 0) > rowIndex) {
+                column += 1;
+            }
 
             const columns = span(cell, "colspan");
             const rowSpan = span(cell, "rowspan");
-            const below = groupEnd - rowIndex - 1;
+            // A cell spans down to the end of its row group at most, and `rowspan="0"` to that end.
+            const until = rowSpan === 0 ? groupEnd : Math.min(rowIndex + rowSpan, groupEnd);
 
             width = Math.max(width, column + columns);
 
@@ -218,16 +215,10 @@ function grid(rows: ReadonlyArray<Row>, lookup: RuleLookup): { lines: string[][]
             line[column] = cellTexts.get(cell) ?? "";
 
             for (let offset = 0; offset < columns; offset += 1) {
-                line[column + offset] ??= "";
-                covered[column + offset] = rowSpan === 0 ? below : Math.min(rowSpan - 1, below);
+                coveredUntil[column + offset] = Math.max(coveredUntil[column + offset] ?? 0, until);
             }
 
             column += columns;
-        }
-
-        while (column < covered.length) {
-            skipCovered();
-            column += 1;
         }
 
         lines.push(line);
