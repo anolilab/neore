@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { HomeIcon, InboxIcon, SettingsIcon } from "lucide-react";
+import { flushSync } from "react-dom";
 import { expect, screen, userEvent } from "storybook/test";
 
 import MOBILE_BREAKPOINT_QUERY from "../utils/breakpoints";
@@ -85,6 +86,8 @@ const Layout = ({ collapsible, defaultOpen = "all", side, variant, withLauncher 
                 <SidebarTrigger name="main" />
                 <span className="text-sm">Page content</span>
             </header>
+            {/* Positioned and stacked, as a chat's scroll area is: the rail beside it must still be above it. */}
+            <div className="relative z-0 h-svh" data-testid="page-body" />
         </SidebarInset>
     </SidebarProvider>
 );
@@ -142,6 +145,18 @@ const transitionsOf = (element: HTMLElement) =>
 
 const settled = async (element: HTMLElement) => {
     await Promise.all(element.getAnimations().map((animation) => animation.finished));
+};
+
+/**
+ * Clicks `target`, commits the update at once, and reads `read` in the same task: what the click started is read where it starts,
+ * before any frame passes, however slow the runner.
+ */
+const clickAndRead = <T,>(target: HTMLElement, read: () => T): T => {
+    flushSync(() => {
+        target.click();
+    });
+
+    return read();
 };
 
 /** The rail, once it has settled, lies inside the viewport and is the element a click there reaches. */
@@ -215,18 +230,18 @@ const slidePlay =
 
         // Reduced motion: nothing slides; the box and the page's edge reach their places at once, together.
         if (globalThis.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-            await userEvent.click(trigger);
-            await expect(movingOrWaiting(container)).toStrictEqual([]);
-            await expect(movingOrWaiting(gap)).toStrictEqual([]);
+            const closing = clickAndRead(trigger, () => [...movingOrWaiting(container), ...movingOrWaiting(gap)]);
+
+            await expect(closing).toStrictEqual([]);
             await settled(container);
             await settled(gap);
             await expect(gap.getBoundingClientRect().width).toBe(0);
             await expect(isOffScreen()).toBe(true);
             await expectRailReachable(canvasElement);
 
-            await userEvent.click(trigger);
-            await expect(movingOrWaiting(container)).toStrictEqual([]);
-            await expect(movingOrWaiting(gap)).toStrictEqual([]);
+            const opening = clickAndRead(trigger, () => [...movingOrWaiting(container), ...movingOrWaiting(gap)]);
+
+            await expect(opening).toStrictEqual([]);
             // The global reduced-motion rule leaves a 0.01 ms transition: settled within a frame.
             await settled(container);
             await settled(gap);
@@ -236,13 +251,24 @@ const slidePlay =
             return;
         }
 
-        await userEvent.click(trigger);
+        // Open, the rail sits on the sidebar's edge above the page, and a click there reaches it.
+        await expectRailReachable(canvasElement);
 
-        // Closing: the box slides, its resting place and the gap wait for the slide to end, and nothing animates the width.
-        await expect(transitionsOf(container)).toContainEqual(expect.objectContaining({ duration: 200, property: "translate" }));
-        await expect(moving(container)).toStrictEqual(["translate"]);
-        await expect(transitionsOf(gap)).toStrictEqual([{ delay: 200, duration: 0, property: "width" }]);
-        await expect(gap.getBoundingClientRect().width).toBe(width);
+        const closing = clickAndRead(trigger, () => {
+            return {
+                box: transitionsOf(container),
+                boxMoving: moving(container),
+                gap: transitionsOf(gap),
+                gapWidth: gap.getBoundingClientRect().width,
+            };
+        });
+
+        // Closing, read where it starts: the box slides, its resting place and the gap wait for the slide to end, and nothing animates
+        // the width.
+        await expect(closing.box).toContainEqual(expect.objectContaining({ duration: 200, property: "translate" }));
+        await expect(closing.boxMoving).toStrictEqual(["translate"]);
+        await expect(closing.gap).toStrictEqual([{ delay: 200, duration: 0, property: "width" }]);
+        await expect(closing.gapWidth).toBe(width);
 
         await settled(container);
         await settled(gap);
@@ -252,12 +278,15 @@ const slidePlay =
 
         // The rail stays at the viewport's edge, and a click on it opens the sidebar again.
         await expectRailReachable(canvasElement);
-        await userEvent.click(canvasElement.querySelector<HTMLElement>('[data-slot="sidebar-rail"]') ?? trigger);
-        await expect(sidebar?.dataset.state).toBe("expanded");
 
-        // Opening: the gap takes its width at once, and the box slides in over it.
-        await expect(gap.getBoundingClientRect().width).toBe(width);
-        await expect(moving(container)).toStrictEqual(["translate"]);
+        const opening = clickAndRead(canvasElement.querySelector<HTMLElement>('[data-slot="sidebar-rail"]') ?? trigger, () => {
+            return { boxMoving: moving(container), gapWidth: gap.getBoundingClientRect().width, state: sidebar?.dataset.state };
+        });
+
+        // Opening, read where it starts: the rail's click opened it, the gap takes its width at once, and the box slides in over it.
+        await expect(opening.state).toBe("expanded");
+        await expect(opening.gapWidth).toBe(width);
+        await expect(opening.boxMoving).toStrictEqual(["translate"]);
 
         await settled(container);
 

@@ -404,7 +404,8 @@ const SidebarRail = <T extends string>({
                     <button
                         aria-label={t`Toggle Sidebar`}
                         className={cn(
-                            "fixed top-1/2 h-20 w-8 -translate-y-1/2 cursor-pointer transition-[left,right,translate] duration-300 ease-in-out in-data-[side=left]:left-(--sidebar-width) in-data-[side=left]:group-data-[collapsible=icon]:left-(--sidebar-width-icon) in-data-[side=left]:group-data-[collapsible=offcanvas]:left-16 in-data-[side=right]:right-(--sidebar-width) in-data-[side=right]:group-data-[collapsible=icon]:right-(--sidebar-width-icon) in-data-[side=right]:group-data-[collapsible=offcanvas]:right-0 max-md:hidden",
+                            // Above the page: outside the sliding box it has no stacking context of its own, and the page beside it is positioned.
+                            "fixed top-1/2 z-20 h-20 w-8 -translate-y-1/2 cursor-pointer transition-[left,right,translate] duration-300 ease-in-out in-data-[side=left]:left-(--sidebar-width) in-data-[side=left]:group-data-[collapsible=icon]:left-(--sidebar-width-icon) in-data-[side=left]:group-data-[collapsible=offcanvas]:left-16 in-data-[side=right]:right-(--sidebar-width) in-data-[side=right]:group-data-[collapsible=icon]:right-(--sidebar-width-icon) in-data-[side=right]:group-data-[collapsible=offcanvas]:right-0 max-md:hidden",
                             {
                                 "in-data-[side=left]:-translate-x-2 hover:in-data-[side=left]:translate-x-1 in-data-[side=right]:translate-x-1 hover:in-data-[side=right]:-translate-x-2":
                                     isOpen,
