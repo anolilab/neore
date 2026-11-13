@@ -1277,7 +1277,7 @@ overrides:
   '@eslint/plugin-kit@<0.3.3': '>=0.5.0'
   '@grpc/grpc-js@<1.14.5': '>=1.14.5'
   '@hono/node-server@<1.19.10': '>=1.19.10'
-  '@hono/node-server@<2.0.10': '>=2.0.10'
+  '@hono/node-server@<2.1.6': '>=2.1.6'
   '@humanfs/node@<0.16.8': '>=0.16.8'
   '@langchain/core@<0.3.80': '>=0.3.80'
   '@modelcontextprotocol/sdk@<1.25.2': '>=1.25.2'
@@ -6511,8 +6511,8 @@ packages:
       y-protocols: ^1.0.6
       yjs: ^13.6.8
 
-  '@hono/node-server@2.1.4':
-    resolution: {integrity: sha512-2g1qeHl4BduwDn6L8nkAvDrPUWPMlkQ//a5NhP/zIyaXKMjZNRV+cG9Csu+BiJFf6+68pqzjf4Hi5sJGKHuS1g==}
+  '@hono/node-server@2.1.7':
+    resolution: {integrity: sha512-Wr0E6S+v2Bw9FkpGNP5BQ5QbJvclUa06UVehd65WFZe6XeJwbrKQQ5wPDevc0IC+QyzbO7v3Llh5uo45IZcSnA==}
     engines: {node: '>=20'}
     peerDependencies:
       hono: 4.13.16
@@ -29393,7 +29393,7 @@ snapshots:
       - bufferutil
       - utf-8-validate
 
-  '@hono/node-server@2.1.4(hono@4.13.16)':
+  '@hono/node-server@2.1.7(hono@4.13.16)':
     dependencies:
       hono: 4.13.16
 
@@ -32317,7 +32317,7 @@ snapshots:
 
   '@modelcontextprotocol/sdk@1.32.1(@cfworker/json-schema@4.1.1)(supports-color@10.2.2)(zod@4.6.7)':
     dependencies:
-      '@hono/node-server': 2.1.4(hono@4.13.16)
+      '@hono/node-server': 2.1.7(hono@4.13.16)
       ajv: 8.20.0
       ajv-formats: 3.0.1
       content-type: 1.0.5
@@ -32342,7 +32342,7 @@ snapshots:
 
   '@modelcontextprotocol/sdk@1.32.2(@cfworker/json-schema@4.1.1)(supports-color@10.2.2)(zod@4.6.7)':
     dependencies:
-      '@hono/node-server': 2.1.4(hono@4.13.16)
+      '@hono/node-server': 2.1.7(hono@4.13.16)
       ajv: 8.20.0
       ajv-formats: 3.0.1
       content-type: 1.0.5
@@ -33790,7 +33790,7 @@ snapshots:
       '@electric-sql/pglite': 0.3.15
       '@electric-sql/pglite-socket': 0.0.20(@electric-sql/pglite@0.3.15)
       '@electric-sql/pglite-tools': 0.2.20(@electric-sql/pglite@0.3.15)
-      '@hono/node-server': 2.1.4(hono@4.13.16)
+      '@hono/node-server': 2.1.7(hono@4.13.16)
       '@mrleebo/prisma-ast': 0.13.1
       '@prisma/get-platform': 7.2.0
       '@prisma/query-plan-executor': 7.2.0
