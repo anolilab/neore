@@ -115,6 +115,14 @@ const siteWindow = (app: ElectronApplication): Promise<Page> => findPage(app, (u
 const composerCreated = (app: ElectronApplication): Promise<boolean | undefined> =>
     app.evaluate(() => (globalThis as { neoreShell?: { quickComposer: boolean } }).neoreShell?.quickComposer);
 
+/** Whether the Quick Composer's window is shown, as the main process sees it; undefined while it does not exist. */
+const composerVisible = (app: ElectronApplication): Promise<boolean | undefined> =>
+    app.evaluate(({ BrowserWindow }) =>
+        BrowserWindow.getAllWindows()
+            .find((win) => win.webContents.getURL().endsWith("/quick-composer/index.html"))
+            ?.isVisible(),
+    );
+
 /** Opens the Quick Composer as its shortcut would (it is created on first use), and returns its own page. */
 const composerPage = async (app: ElectronApplication): Promise<Page> => {
     await app.evaluate(() => (globalThis as { neoreShell?: { toggleQuickComposer: () => void } }).neoreShell?.toggleQuickComposer());
@@ -219,6 +227,9 @@ test("creates the tray, and the Quick Composer window on its own local page at i
         const composer = await composerPage(app);
 
         expect(composer.url()).toMatch(COMPOSER_FILE);
+        // The first press shows it once it has painted, with the cursor in the prompt.
+        await expect.poll(() => composerVisible(app)).toBe(true);
+        await expect(composer.locator("#prompt")).toBeFocused();
         // The composer exposes its two commands and nothing of the site bridge.
         expect(await composer.evaluate(() => typeof (globalThis as PageGlobal).neoreNative)).toBe("undefined");
     } finally {

@@ -986,10 +986,43 @@ const createQuickComposer = (): BrowserWindow => {
         win.hide();
     });
     win.on("closed", () => {
+        if (state.composer !== win) {
+            return;
+        }
+
         state.composer = undefined;
+        state.composerOpening = undefined;
     });
 
-    win.loadURL(composerPage.href);
+    // A page that failed to load, or whose renderer died, never paints again: it is thrown away, and the next press
+    // makes a new one instead of toggling a dead window.
+    const discard = (): void => {
+        if (state.composer === win) {
+            state.composer = undefined;
+            state.composerOpening = undefined;
+        }
+
+        if (!win.isDestroyed()) {
+            win.destroy();
+        }
+    };
+
+    contents.on("did-fail-load", (_event, _errorCode: number, _description: string, _validatedUrl: string, isMainFrame: boolean) => {
+        if (isMainFrame) {
+            discard();
+        }
+    });
+    contents.on("render-process-gone", () => discard());
+
+    const load = async (): Promise<void> => {
+        try {
+            await win.loadURL(composerPage.href);
+        } catch {
+            discard();
+        }
+    };
+
+    load();
     state.composer = win;
     shellProbe.quickComposer = true;
 
@@ -1016,6 +1049,11 @@ const toggleQuickComposer = (): void => {
 
         state.composerOpening = opening;
         created.once("ready-to-show", () => {
+            // A composer discarded after a failed load may still report its paint: the window is gone for good.
+            if (state.composer !== created) {
+                return;
+            }
+
             if (state.composerOpening === opening) {
                 state.composerOpening = undefined;
             }

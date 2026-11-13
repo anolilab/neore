@@ -112,6 +112,11 @@ vi.mock("electron", () => {
         const window = {
             calls: [] as string[],
             center: () => {},
+            // Like Electron's: the window goes at once, with `closed` and without `close`.
+            destroy: () => {
+                window.destroyed = true;
+                handlers.get("closed")?.({ preventDefault: () => {} }, "");
+            },
             destroyed: false,
             focus: () => {},
             focused: true,
@@ -537,6 +542,48 @@ describe("tray and Quick Composer", () => {
         composerReady(created);
         expect(created.calls).toStrictEqual(["show"]);
         expect(composerWindows()).toStrictEqual([created]);
+    });
+
+    describe("a composer whose first load fails", () => {
+        const failures: [string, (window: FakeWindow) => void][] = [
+            [
+                "its page fails to load",
+                (window) => (window.webContents.handlers.get("did-fail-load") as unknown as (...args: unknown[]) => void)({}, -6, "ERR_FILE_NOT_FOUND", window.loaded[0], true),
+            ],
+            ["its renderer dies", (window) => (window.webContents.handlers.get("render-process-gone") as unknown as (...args: unknown[]) => void)({}, { reason: "crashed" })],
+        ];
+
+        it.each(failures)("is thrown away when %s, and the next press makes a new one that opens at its paint", (_name, fail) => {
+            const failed = newComposer({ ready: false });
+
+            fail(failed);
+            expect(failed.destroyed).toBe(true);
+            expect(composerWindows()).toStrictEqual([]);
+
+            pressComposerShortcut();
+
+            const fresh = composer();
+
+            expect(fresh).not.toBe(failed);
+            expect(fresh.loaded).toStrictEqual([expect.stringMatching(SITE_HTML_PATTERN)]);
+
+            // A late paint from the thrown-away window shows nothing and leaves the new one loading.
+            composerReady(failed);
+            expect(failed.calls).toStrictEqual([]);
+            expect(fresh.calls).toStrictEqual([]);
+
+            composerReady(fresh);
+            expect(fresh.calls).toStrictEqual(["show"]);
+        });
+
+        it("ignores a failed subframe load", () => {
+            const created = newComposer({ ready: false });
+
+            (created.webContents.handlers.get("did-fail-load") as unknown as (...args: unknown[]) => void)({}, -6, "ERR_FILE_NOT_FOUND", "file:///x", false);
+            expect(created.destroyed).toBe(false);
+            composerReady(created);
+            expect(created.calls).toStrictEqual(["show"]);
+        });
     });
 
     it("hands a composed text to the main window once, and hides the composer", () => {
