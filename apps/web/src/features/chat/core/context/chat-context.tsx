@@ -45,7 +45,7 @@ import { createReadinessGate } from "../utils/readiness-gate";
 import { runEditMessage, runReloadMessage } from "./branch-actions";
 import type { ChangedSettings, StreamingMessage } from "./chat-action-shared";
 import { stopTarget, toAppError } from "./chat-action-shared";
-import { ChatActionsContext, ChatMessagesContext, ChatStreamingContext, ChatThreadContext } from "./chat-context-hooks";
+import ChatContextProviders from "./chat-context-providers";
 import type {
     ChatActionsContextValue,
     ChatMessagesContextValue,
@@ -65,9 +65,11 @@ import { registerThreadErrorSink, takeUndeliveredThreadError } from "./thread-er
 export {
     ChatActionsContext,
     ChatContext,
+    ChatIsEmptyContext,
     ChatMessagesContext,
     ChatStreamingContext,
     ChatThreadContext,
+    ChatThreadIdentityContext,
     useChat,
     useChatActions,
     useChatError,
@@ -77,6 +79,7 @@ export {
     useChatLunora,
     useChatMessages,
     useChatThread,
+    useChatThreadIdentity,
 } from "./chat-context-hooks";
 export type {
     ChatActionsContextValue,
@@ -84,6 +87,7 @@ export type {
     ChatMessagesContextValue,
     ChatStreamingContextValue,
     ChatThreadContextValue,
+    ChatThreadIdentity,
 } from "./chat-context-types";
 
 interface ChatProviderProps {
@@ -973,12 +977,8 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
     }, [sendMessage, cancelStream, reloadMessage, editMessage, copyMessage, clearError, regenerate, error, lunora, jwtToken]);
 
     return (
-        <ChatThreadContext value={threadContextValue}>
-            <ChatMessagesContext value={messagesContextValue}>
-                <ChatStreamingContext value={streamingContextValue}>
-                    <ChatActionsContext value={actionsContextValue}>{children}</ChatActionsContext>
-                </ChatStreamingContext>
-            </ChatMessagesContext>
-        </ChatThreadContext>
+        <ChatContextProviders actions={actionsContextValue} messages={messagesContextValue} streaming={streamingContextValue} thread={threadContextValue}>
+            {children}
+        </ChatContextProviders>
     );
 };

@@ -27,7 +27,7 @@ import type { FC } from "react";
 import { use, useMemo } from "react";
 
 import { useUserSettings } from "@/features/auth/hooks/use-user-settings";
-import { ChatThreadContext } from "@/features/chat/core/context/chat-context-hooks";
+import { ChatThreadContext, ChatThreadIdentityContext } from "@/features/chat/core/context/chat-context-hooks";
 import type { ThreadData } from "@/features/chat/core/context/chat-context-types";
 import useFeatureFlaggedModels from "@/hooks/use-feature-flagged-models";
 import type { UIMessage } from "@/lib/agent";
@@ -170,7 +170,9 @@ const ModelColumn: FC<{
                         {assistant && (
                             <div className="prose prose-sm dark:prose-invert max-w-none px-6 py-4">
                                 <ChatThreadContext value={columnThreadContext}>
-                                    <MessageContent message={assistant} />
+                                    <ChatThreadIdentityContext value={columnThreadContext}>
+                                        <MessageContent message={assistant} />
+                                    </ChatThreadIdentityContext>
                                 </ChatThreadContext>
                             </div>
                         )}
