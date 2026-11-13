@@ -729,8 +729,8 @@ catalogs:
       specifier: 1.0.0-alpha.113
       version: 1.0.0-alpha.113
     '@lunora/payment':
-      specifier: 1.0.0-alpha.271
-      version: 1.0.0-alpha.271
+      specifier: 1.0.0-alpha.272
+      version: 1.0.0-alpha.272
     '@lunora/queue':
       specifier: 1.0.0-alpha.143
       version: 1.0.0-alpha.143
@@ -2601,7 +2601,7 @@ importers:
         version: 1.0.0-alpha.113(@opentelemetry/api@1.9.1)(@visulima/email@4.2.0(@opentelemetry/api@1.9.1)(@react-email/render@2.1.0(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(@types/node@26.6.6)(asn1js@3.0.10)(dayjs@1.11.23)(handlebars@4.7.10)(luxon@3.7.2)(moment@2.31.0)(pkijs@3.4.3))(handlebars@4.7.10)
       '@lunora/payment':
         specifier: catalog:lunora
-        version: 1.0.0-alpha.271(@cloudflare/workers-types@5.20261106.1)(@effect/sql-d1@4.0.3(effect@4.0.5))(@effect/sql-sqlite-do@4.0.3(effect@4.0.5))(@libsql/client@0.17.4)(@opentelemetry/api@1.9.1)(creem@1.13.0(@cfworker/json-schema@4.1.1)(supports-color@10.2.2))(effect@4.0.5)(expo-sqlite@58.0.14(expo@58.0.23)(react-native@0.88.1(@babel/core@7.29.7(supports-color@10.2.2))(@react-native/metro-config@0.88.1(@babel/core@7.29.7(supports-color@10.2.2))(supports-color@10.2.2))(@types/react@19.3.0)(react@19.3.1)(supports-color@10.2.2))(react@19.3.1))(valibot@1.4.2(typescript@6.0.3))(zod@4.6.7)
+        version: 1.0.0-alpha.272(@cloudflare/workers-types@5.20261106.1)(@effect/sql-d1@4.0.3(effect@4.0.5))(@effect/sql-sqlite-do@4.0.3(effect@4.0.5))(@libsql/client@0.17.4)(@opentelemetry/api@1.9.1)(creem@1.13.0(@cfworker/json-schema@4.1.1)(supports-color@10.2.2))(effect@4.0.5)(expo-sqlite@58.0.14(expo@58.0.23)(react-native@0.88.1(@babel/core@7.29.7(supports-color@10.2.2))(@react-native/metro-config@0.88.1(@babel/core@7.29.7(supports-color@10.2.2))(supports-color@10.2.2))(@types/react@19.3.0)(react@19.3.1)(supports-color@10.2.2))(react@19.3.1))(valibot@1.4.2(typescript@6.0.3))(zod@4.6.7)
       '@lunora/queue':
         specifier: catalog:lunora
         version: 1.0.0-alpha.143
@@ -7514,8 +7514,8 @@ packages:
     resolution: {integrity: sha512-cyogfgh/LRoZtHh8YsfEmdHIfr4HtAwRhDUXYXOXj7m433qbkalZIiLhBY4u/YVedqB9E79D9YvPo2Vz2J5KHg==}
     engines: {node: ^22.15.0 || >=24.11.0}
 
-  '@lunora/payment@1.0.0-alpha.271':
-    resolution: {integrity: sha512-rLIq2gzcMq0E6cv7dGFP2bftXOTrYsOGMnUR58sHCgHvdQTLC/qw58qBVSoo6RYzZOVuDksJqdzRd0VCPRt/sw==}
+  '@lunora/payment@1.0.0-alpha.272':
+    resolution: {integrity: sha512-qz2QeSj6SJ1xPjH2+Lp8zEgf6e9EvYPw0gMhHKSUoy8W7WjzODwXw/cjhQKemKCaYmNUmwW/F/fM3CrZpYiH2A==}
     engines: {node: ^22.15.0 || >=24.11.0}
     peerDependencies:
       '@polar-sh/sdk': ^0.48.0
@@ -31572,7 +31572,7 @@ snapshots:
       - valibot
       - zod
 
-  '@lunora/payment@1.0.0-alpha.271(@cloudflare/workers-types@5.20261106.1)(@effect/sql-d1@4.0.3(effect@4.0.5))(@effect/sql-sqlite-do@4.0.3(effect@4.0.5))(@libsql/client@0.17.4)(@opentelemetry/api@1.9.1)(creem@1.13.0(@cfworker/json-schema@4.1.1)(supports-color@10.2.2))(effect@4.0.5)(expo-sqlite@58.0.14(expo@58.0.23)(react-native@0.88.1(@babel/core@7.29.7(supports-color@10.2.2))(@react-native/metro-config@0.88.1(@babel/core@7.29.7(supports-color@10.2.2))(supports-color@10.2.2))(@types/react@19.3.0)(react@19.3.1)(supports-color@10.2.2))(react@19.3.1))(valibot@1.4.2(typescript@6.0.3))(zod@4.6.7)':
+  '@lunora/payment@1.0.0-alpha.272(@cloudflare/workers-types@5.20261106.1)(@effect/sql-d1@4.0.3(effect@4.0.5))(@effect/sql-sqlite-do@4.0.3(effect@4.0.5))(@libsql/client@0.17.4)(@opentelemetry/api@1.9.1)(creem@1.13.0(@cfworker/json-schema@4.1.1)(supports-color@10.2.2))(effect@4.0.5)(expo-sqlite@58.0.14(expo@58.0.23)(react-native@0.88.1(@babel/core@7.29.7(supports-color@10.2.2))(@react-native/metro-config@0.88.1(@babel/core@7.29.7(supports-color@10.2.2))(supports-color@10.2.2))(@types/react@19.3.0)(react@19.3.1)(supports-color@10.2.2))(react@19.3.1))(valibot@1.4.2(typescript@6.0.3))(zod@4.6.7)':
     dependencies:
       '@lunora/errors': 1.0.0-alpha.89
       '@lunora/server': 1.0.0-alpha.274(@cloudflare/workers-types@5.20261106.1)(@effect/sql-d1@4.0.3(effect@4.0.5))(@effect/sql-sqlite-do@4.0.3(effect@4.0.5))(@electric-sql/pglite@0.3.15)(@libsql/client@0.17.4)(@opentelemetry/api@1.9.1)(effect@4.0.5)(expo-sqlite@58.0.14(expo@58.0.23)(react-native@0.88.1(@babel/core@7.29.7(supports-color@10.2.2))(@react-native/metro-config@0.88.1(@babel/core@7.29.7(supports-color@10.2.2))(supports-color@10.2.2))(@types/react@19.3.0)(react@19.3.1)(supports-color@10.2.2))(react@19.3.1))(valibot@1.4.2(typescript@6.0.3))(zod@4.6.7)

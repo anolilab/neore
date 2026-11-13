@@ -3,7 +3,7 @@ import { LegendList } from "@legendapp/list/react-native";
 import { api } from "@neore/backend/api";
 import type { Id } from "@neore/backend/dataModel";
 import { randomUUID } from "expo-crypto";
-import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
+import { useFocusEffect, useIsFocused, useLocalSearchParams, useRouter } from "expo-router";
 import type { ComponentRef } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AccessibilityInfo, Keyboard, KeyboardAvoidingView, Pressable, Share, Text, View } from "react-native";
@@ -30,6 +30,7 @@ import type { StreamDelta } from "@/chat/stream";
 import { relayReply } from "@/chat/stream";
 import type { SendStage } from "@/chat/unsent-send";
 import { failedSendMessage, failedSendOutcome, giveBackDraft, shouldKeepClientMessageId, withoutUnsentRows } from "@/chat/unsent-send";
+import { useIsAppActive } from "@/chat/use-app-active";
 import { useReplyConfirmation } from "@/chat/use-reply-confirmation";
 import { loadConfig } from "@/lib/config";
 import { DEFAULT_CHAT_MODEL } from "@/lib/defaults";
@@ -419,8 +420,12 @@ const Chat = () => {
     const onConfirmationEnded = useCallback(() => {
         setError(withoutAwaitReply);
     }, []);
+    const isFocused = useIsFocused();
+    const isAppActive = useIsAppActive();
     const { addConfirmation, confirmTick, isAwaitingReply } = useReplyConfirmation({
         fetchPage: fetchMessagePage,
+        // Nobody sees a check's result behind another screen or with the app in the background.
+        isPaused: !isFocused || !isAppActive,
         onEnded: onConfirmationEnded,
         onRefused: onConfirmationRefused,
         threadId,

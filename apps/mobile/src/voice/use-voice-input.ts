@@ -1,11 +1,13 @@
 import type { RecordingOptions } from "expo-audio";
-import { AudioQuality, getRecordingPermissionsAsync, IOSOutputFormat, requestRecordingPermissionsAsync, setAudioModeAsync, useAudioRecorder } from "expo-audio";
+import { AudioModule, AudioQuality, getRecordingPermissionsAsync, IOSOutputFormat, requestRecordingPermissionsAsync, setAudioModeAsync } from "expo-audio";
+// The platform mapping `useAudioRecorder` applies to the options; the recorder here is made outside that hook.
+import { createRecordingOptions } from "expo-audio/build/utils/options";
 import { File } from "expo-file-system";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { getClient } from "@/lib/lunora";
-import { settleQuietly } from "@/offline/quietly";
-
+import { getClient } from "../lib/lunora";
+import { settleQuietly } from "../offline/quietly";
+import { createLazyResource } from "./lazy-resource";
 import type { VoicePhase } from "./voice-input";
 import {
     MAX_CLIP_MS,
@@ -123,7 +125,27 @@ const isDiscarded = (uri: string | undefined): boolean => {
  * press never clears a send failure.
  */
 export const useVoiceInput = ({ onText }: { onText: (text: string) => void }) => {
-    const recorder = useAudioRecorder(RECORDING_OPTIONS);
+    // Made on the first press, not each time a chat opens: most visits never record. Released when the screen goes.
+    const [recorders] = useState(() =>
+        createLazyResource(
+            () => new AudioModule.AudioRecorder(createRecordingOptions(RECORDING_OPTIONS)),
+            (made) => {
+                made.release();
+            },
+        ),
+    );
+
+    // Whether a press is preparing the recorder: a native object is not released mid-prepare; that press releases it.
+    const isPreparing = useRef(false);
+
+    useEffect(
+        () => () => {
+            if (!isPreparing.current) {
+                recorders.release();
+            }
+        },
+        [recorders],
+    );
     const [phase, setPhase] = useState<VoicePhase>("idle");
     const [error, setError] = useState<string | undefined>(undefined);
     // Whether the finger is still on the button: a release during the permission prompt or the recorder's start records nothing.
@@ -151,8 +173,9 @@ export const useVoiceInput = ({ onText }: { onText: (text: string) => void }) =>
     const stopRecording = useCallback(async (): Promise<string | undefined> => {
         isRecording.current = false;
 
+        const recorder = recorders.peek();
         const stopping = (async () => {
-            await recorder.stop();
+            await recorder?.stop();
         })();
         const leaving = leaveRecordingMode(pressToken.current, stopping);
 
@@ -163,8 +186,8 @@ export const useVoiceInput = ({ onText }: { onText: (text: string) => void }) =>
             await leaving;
         }
 
-        return clipUri.current ?? recorder.uri ?? undefined;
-    }, [recorder]);
+        return clipUri.current ?? recorder?.uri ?? undefined;
+    }, [recorders]);
 
     const finish = useCallback(async () => {
         isHeld.current = false;
@@ -183,7 +206,7 @@ export const useVoiceInput = ({ onText }: { onText: (text: string) => void }) =>
             let durationMillis = 0;
 
             try {
-                ({ durationMillis } = recorder.getStatus());
+                durationMillis = recorders.peek()?.getStatus().durationMillis ?? 0;
             } catch (statusError) {
                 console.warn("Could not read the voice recording's length.", statusError);
             }
@@ -234,7 +257,7 @@ export const useVoiceInput = ({ onText }: { onText: (text: string) => void }) =>
                 setPhase("idle");
             }
         }
-    }, [recorder, report, stopRecording]);
+    }, [recorders, report, stopRecording]);
 
     const start = useCallback(async () => {
         if (isBusy.current) {
@@ -265,6 +288,13 @@ export const useVoiceInput = ({ onText }: { onText: (text: string) => void }) =>
 
             await session.last;
 
+            // The screen went while the permission was asked or an earlier press let go of the mic: nothing was taken yet.
+            if (!isMounted.current) {
+                isBusy.current = false;
+
+                return;
+            }
+
             // Another screen's press is still recording (a chat opened over it during the hold): this press is dropped.
             if (session.owner !== undefined) {
                 report(MIC_BUSY_MESSAGE);
@@ -275,8 +305,33 @@ export const useVoiceInput = ({ onText }: { onText: (text: string) => void }) =>
 
             session.owner = token;
             await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
-            await recorder.prepareToRecordAsync();
-            clipUri.current = recorder.uri ?? undefined;
+
+            // The screen went while the session switched to recording: it already released its recorder, so none is made
+            // now (nobody would release it), and the session goes back.
+            if (!isMounted.current) {
+                await leaveRecordingMode(token);
+                isBusy.current = false;
+
+                return;
+            }
+
+            const recorder = recorders.get();
+
+            isPreparing.current = true;
+
+            try {
+                await recorder.prepareToRecordAsync();
+                // Read before any release below: a released recorder may no longer say where its file is, and the file
+                // must be deleted either way.
+                clipUri.current = recorder.uri ?? undefined;
+            } finally {
+                isPreparing.current = false;
+
+                // The screen went while the recorder was preparing: it is released now that the prepare has settled.
+                if (!isMounted.current) {
+                    recorders.release();
+                }
+            }
 
             // Released while the recorder was starting (or while the first permission prompt was up): nothing to record.
             if (!isHeld.current || !isMounted.current) {
@@ -306,7 +361,7 @@ export const useVoiceInput = ({ onText }: { onText: (text: string) => void }) =>
             clipUri.current = undefined;
             isBusy.current = false;
         }
-    }, [finish, recorder, report]);
+    }, [finish, recorders, report]);
 
     // Leaving the screen mid-recording: stop, and delete what was recorded even when the released recorder cannot stop.
     useEffect(() => {

@@ -12782,6 +12782,35 @@
       "shardMode": "root",
       "refinementsRecorded": true
     },
+    "payment_referenceRevisions": {
+      "commitOrdered": false,
+      "fields": {
+        "referenceId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "revision": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        }
+      },
+      "indexes": {
+        "by_reference": {
+          "fields": [
+            "referenceId"
+          ],
+          "unique": true
+        }
+      },
+      "memory": false,
+      "relations": {},
+      "shardMode": "root",
+      "refinementsRecorded": true
+    },
     "payment_sessions": {
       "commitOrdered": false,
       "fields": {

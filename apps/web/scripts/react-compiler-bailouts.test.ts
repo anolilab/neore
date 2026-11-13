@@ -15,6 +15,7 @@ import reactCompilerOptions from "../react-compiler-options";
  * one of these components.
  */
 const MUST_COMPILE: Record<string, string[]> = {
+    "src/components/model-picker/model-picker.tsx": ["ModelPicker", "ModelRow", "ModelGroupRenderer"],
     "src/features/auth/components/organization/organization-switcher.tsx": ["OrganizationSwitcher"],
     "src/features/auth/components/team/team-switcher.tsx": ["TeamSwitcher"],
     "src/features/chat/core/context/chat-context.tsx": ["ChatProvider"],
