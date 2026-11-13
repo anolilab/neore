@@ -705,6 +705,8 @@ overrides:
   # a second rule for the 0.9 line never got a look in. An upper bound at the
   # patched version is what actually forces the re-resolve.
   "@xmldom/xmldom@<0.9.12": ">=0.9.12"
+  # GHSA on glob 10.5.0 (AbortSignal cancellation bypass). Pulled in by @bacons/apple-targets, which runs at prebuild only.
+  "glob@10.5.0": 11.1.0
   # plist 3.1.0 still needs @xmldom/xmldom 0.8 and calls its parser without a mime type,
   # so the 0.9.12 pin above broke electron-builder's Info.plist read on macOS. 3.1.1 moved
   # to the 0.9 line; this override sends the old range there, with the security pin intact.

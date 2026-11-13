@@ -217,6 +217,21 @@ describe("unclosed raw-text elements in string input", () => {
 });
 
 describe("CDATA sections in DOM input", () => {
+    // A CDATA section prints its text, so an emphasis run must not join across it as if it printed nothing.
+    it("keeps a CDATA section between emphasis outside the emphasis", () => {
+        const htmlDocument = createDocument("<p><em>a</em></p>");
+        const paragraph = htmlDocument.querySelector("p") as Element;
+        const second = htmlDocument.createElement("em");
+
+        second.textContent = "b";
+        appendCdataSection(paragraph, "x");
+        // Domino has no ParentNode.append().
+        // eslint-disable-next-line unicorn/prefer-dom-node-append
+        paragraph.appendChild(second);
+
+        expect(new TurndownService().turndown(paragraph)).toBe("*a*x*b*");
+    });
+
     it("converts the text of a CDATA section in a paragraph", () => {
         const htmlDocument = createDocument("<p>before </p>");
         const paragraph = htmlDocument.querySelector("p") as Element;

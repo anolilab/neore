@@ -68,6 +68,8 @@ export interface ChatThreadContextValue {
     threadId: string | undefined;
 }
 
+export type ChatThreadIdentity = Pick<ChatThreadContextValue, "isNewThread" | "model" | "threadId">;
+
 export interface ChatMessagesContextValue {
     isEmpty: boolean;
     loadMore: (numberItems: number) => void;
