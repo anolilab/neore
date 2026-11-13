@@ -645,8 +645,9 @@ function scanRun(
         if (canMerge && isRunMember(sibling, names, options, lookup)) {
             const member = annotationOf(sibling, options);
 
-            // Two emphasis elements join across at most one break; two breaks would be a blank line.
-            if (gap + separation(member, opposite(side)) > 1) {
+            // Two emphasis elements join across at most one break; two breaks would be a blank line. When a single
+            // break is itself written as a blank line (a `br` with a newline), they cannot join across any break.
+            if (gap + separation(member, opposite(side)) > maxJoinBreaks(options)) {
                 break;
             }
 
@@ -665,6 +666,11 @@ function scanRun(
     }
 
     return { run: { count: 0, wordEdge: false } };
+}
+
+/** How many hard breaks two emphasis elements may share delimiters across: none when a break writes a blank line. */
+function maxJoinBreaks(options: Options): number {
+    return lineBreakMarker(options.br).includes("\n\n") ? 0 : 1;
 }
 
 /**
