@@ -10,6 +10,7 @@ import { Building, Check, ChevronsUpDown, Users } from "lucide-react";
 import type { ComponentProps } from "react";
 import { useCallback, useState } from "react";
 
+import { useAuthActiveOrganization } from "@/features/auth/hooks/use-auth-session";
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 import { useCRPC } from "@/lib/lunora/crpc";
 
@@ -32,12 +33,12 @@ export interface TeamSwitcherProps extends Omit<ComponentProps<typeof Button>, "
 }
 
 const TeamSwitcher = ({ className, showAllOrganization = true, ...props }: TeamSwitcherProps) => {
-    const { hooks, toast } = useAuth();
+    const { toast } = useAuth();
     const { t } = useLingui();
     const crpc = useCRPC();
     const queryClient = useQueryClient();
 
-    const { data: activeOrganization, isPending: isOrgPending } = hooks.useActiveOrganization();
+    const { data: activeOrganization, isPending: isOrgPending } = useAuthActiveOrganization();
 
     // Only fetch teams when in an organization
     const { data: myTeams, isPending: isTeamsPending } = useQuery(crpc.auth.team.getMyTeams.queryOptions(activeOrganization ? {} : undefined));

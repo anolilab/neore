@@ -14,7 +14,9 @@ const idOf = (message: unknown): string | undefined => {
  * multi-step replies on top of that, so without this every message object is new
  * on every push and every memoized row re-renders for a change to one of them.
  * Matching by id rather than position keeps identity when `loadMore` prepends
- * older messages. Returns `previous` itself when nothing changed.
+ * older messages. Returns `previous` itself when nothing changed. A message that is
+ * the same object as before (the query cache shared it, `combineUnchangedTurns`
+ * reused it) is taken as is, so a push pays the deep compare only for what it changed.
  */
 export const shareUnchangedMessages = <M extends object>(previous: ReadonlyArray<M>, next: M[]): M[] => {
     if (previous.length === 0 || next.length === 0) {
@@ -36,8 +38,8 @@ export const shareUnchangedMessages = <M extends object>(previous: ReadonlyArray
     const shared = next.map((message, index) => {
         const id = idOf(message);
         const before = id === undefined ? undefined : previousById.get(id);
-        // Deep-compares, and on a difference still reuses the unchanged parts inside.
-        const result = before === undefined ? message : (replaceEqualDeep(before, message) as M);
+        // The same object needs no walk; otherwise deep-compare, and on a difference still reuse the unchanged parts inside.
+        const result = before === undefined || before === message ? message : (replaceEqualDeep(before, message) as M);
 
         if (result !== previous[index]) {
             isIdentical = false;

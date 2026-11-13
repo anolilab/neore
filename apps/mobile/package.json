@@ -52,6 +52,7 @@
     },
     "devDependencies": {
         "@anolilab/eslint-config": "catalog:lint",
+        "@bacons/apple-targets": "5.0.0",
         "@react-native/metro-config": "0.88.1",
         "@types/node": "catalog:types",
         "@types/react": "catalog:types",

@@ -7,7 +7,6 @@ import ThreadNode from "./thread-node";
 import type { BranchNode } from "./types";
 
 interface SortableThreadItemProperties {
-    currentThreadId: string | undefined;
     expandedThreads: Set<string>;
     handleCreateBranch: (threadId: string) => void;
     handleDeleteThread: (threadId: string) => void;
@@ -17,25 +16,16 @@ interface SortableThreadItemProperties {
     handleThreadToggle: (threadId: string, index: number, isShiftClick: boolean) => void;
     handleUnpinThread: (threadId: string) => void;
     index?: number;
-    // Passed down by the list for its keyboard navigation; the sortable row does not read them.
-    // eslint-disable-next-line react/no-unused-prop-types
-    isKeyboardNavigating: boolean;
-    isKeyboardSelected: boolean;
     isSelected: boolean;
     isSelectionMode: boolean;
-    /** The keyboard-selected thread, so a child row can tell it is the one selected (the flat index means nothing inside a group). */
-    keyboardThreadId?: string;
     loadingStates: import("./types").LoadingStates;
     node: BranchNode;
     selectedThreadIds: Set<string>;
-    // eslint-disable-next-line react/no-unused-prop-types
-    selectedThreadIndex: number;
     toggleExpanded: (threadId: string) => void;
     updateThread: (threadId: string, model: string, status: "archived" | "active") => void;
 }
 
 const SortableThreadItem: FC<SortableThreadItemProperties> = ({
-    currentThreadId,
     expandedThreads,
     handleCreateBranch,
     handleDeleteThread,
@@ -45,8 +35,6 @@ const SortableThreadItem: FC<SortableThreadItemProperties> = ({
     handleThreadToggle,
     handleUnpinThread,
     index,
-    isKeyboardSelected,
-    keyboardThreadId,
     isSelected,
     isSelectionMode,
     loadingStates,
@@ -66,7 +54,6 @@ const SortableThreadItem: FC<SortableThreadItemProperties> = ({
     return (
         <div onMouseEnter={handleMouseEnter} ref={setNodeRef} style={style}>
             <ThreadNode
-                currentThreadId={currentThreadId}
                 // The drag handle is the only focusable part of the sortable item: the row holds buttons and a link.
                 dragAttributes={attributes}
                 dragListeners={listeners}
@@ -78,10 +65,8 @@ const SortableThreadItem: FC<SortableThreadItemProperties> = ({
                 handleThreadToggle={handleThreadToggle}
                 handleUnpinThread={handleUnpinThread}
                 index={index}
-                isKeyboardSelected={isKeyboardSelected}
                 isSelected={isSelected}
                 isSelectionMode={isSelectionMode}
-                keyboardThreadId={keyboardThreadId}
                 loadingStates={loadingStates}
                 node={node}
                 selectedThreadIds={selectedThreadIds}

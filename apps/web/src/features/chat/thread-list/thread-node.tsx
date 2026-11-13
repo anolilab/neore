@@ -63,6 +63,7 @@ import { createLunoraQueryOptions, useCRPC, useLunora } from "@/lib/lunora/crpc"
 import { openThreadWindow, supportsThreadWindows } from "@/lib/native/bridge";
 import { showError, showWarning } from "@/lib/toast";
 
+import { useIsKeyboardSelected } from "./contexts/keyboard-selection-context";
 import useCanHover from "./hooks/use-can-hover";
 import { useThreadStateActions } from "./hooks/use-thread-state-actions";
 import { releaseBlinkWindow } from "./lib/needs-you-blink";
@@ -100,6 +101,9 @@ const renderMessengerBadgeIcon = (source: string) => {
 
 const CHAT_THREAD_PATH_RE = new RegExp(`^/chat/(${LUNORA_ID_SOURCE})$`);
 
+/** Child rows take no part in the list's keyboard reset; one function for all of them keeps their props unchanged. */
+const ignoreMouseEnter = (): void => {};
+
 /** Escaped Tailwind `group/action-item` class selector, hoisted so the render body stays compilable. */
 const ACTION_ITEM_SELECTOR = String.raw`.group\/action-item`;
 
@@ -121,7 +125,6 @@ const getArchiveTooltip = (isArchiving: boolean, status: string | undefined): Me
 };
 
 const ThreadNodeChildren: FC<{
-    currentThreadId: string | undefined;
     expandedThreads: Set<string>;
     handleCreateBranch: (threadId: string) => void;
     handleDeleteThread: (threadId: string) => void;
@@ -130,17 +133,13 @@ const ThreadNodeChildren: FC<{
     handlePinThread: (threadId: string) => void;
     handleThreadToggle: (threadId: string, index: number, isShiftClick: boolean) => void;
     handleUnpinThread: (threadId: string) => void;
-    isKeyboardNavigating: boolean;
     isSelectionMode: boolean;
-    keyboardThreadId?: string;
     loadingStates: LoadingStates;
     nodes: BranchNode[];
     selectedThreadIds: Set<string>;
-    selectedThreadIndex: number;
     toggleExpanded: (threadId: string) => void;
     updateThread: (threadId: string, model: string, status: "archived" | "active") => void;
 }> = ({
-    currentThreadId,
     expandedThreads,
     handleCreateBranch,
     handleDeleteThread,
@@ -149,20 +148,16 @@ const ThreadNodeChildren: FC<{
     handlePinThread,
     handleThreadToggle,
     handleUnpinThread,
-    isKeyboardNavigating,
     isSelectionMode,
-    keyboardThreadId,
     loadingStates,
     nodes: children,
     selectedThreadIds,
-    selectedThreadIndex,
     toggleExpanded,
     updateThread,
 }) => (
     <div className="relative">
         {children.map((child, childIndex) => (
             <SortableThreadItem
-                currentThreadId={currentThreadId}
                 expandedThreads={expandedThreads}
                 handleCreateBranch={handleCreateBranch}
                 handleDeleteThread={handleDeleteThread}
@@ -172,16 +167,12 @@ const ThreadNodeChildren: FC<{
                 handleThreadToggle={handleThreadToggle}
                 handleUnpinThread={handleUnpinThread}
                 index={childIndex}
-                isKeyboardNavigating={isKeyboardNavigating}
-                isKeyboardSelected={child.threadId === keyboardThreadId}
                 isSelected={selectedThreadIds.has(child.threadId)}
                 isSelectionMode={isSelectionMode}
                 key={child.threadId}
-                keyboardThreadId={keyboardThreadId}
                 loadingStates={loadingStates}
                 node={child}
                 selectedThreadIds={selectedThreadIds}
-                selectedThreadIndex={selectedThreadIndex}
                 toggleExpanded={toggleExpanded}
                 updateThread={updateThread}
             />
@@ -190,7 +181,6 @@ const ThreadNodeChildren: FC<{
 );
 
 interface ThreadNodeProperties {
-    currentThreadId: string | undefined;
     dragAttributes?: ReturnType<typeof useSortable>["attributes"];
     dragListeners?: ReturnType<typeof useSortable>["listeners"];
     expandedThreads: Set<string>;
@@ -201,10 +191,8 @@ interface ThreadNodeProperties {
     handleThreadToggle: (threadId: string, index: number, isShiftClick: boolean) => void;
     handleUnpinThread: (threadId: string) => void;
     index?: number;
-    isKeyboardSelected?: boolean;
     isSelected: boolean;
     isSelectionMode: boolean;
-    keyboardThreadId?: string;
     loadingStates: LoadingStates;
     node: BranchNode;
     selectedThreadIds: Set<string>;
@@ -213,7 +201,6 @@ interface ThreadNodeProperties {
 }
 
 const ThreadNode: FC<ThreadNodeProperties> = ({
-    currentThreadId,
     dragAttributes,
     dragListeners,
     expandedThreads,
@@ -224,10 +211,8 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
     handleThreadToggle,
     handleUnpinThread,
     index,
-    isKeyboardSelected,
     isSelected,
     isSelectionMode,
-    keyboardThreadId,
     loadingStates,
     node,
     selectedThreadIds,
@@ -244,7 +229,9 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
 
     useLoadMarkWhenVisible(LOAD_MARKS.sidebarListVisible, rowRef);
     const router = useRouter();
-    const location = useLocation();
+    // Boolean selectors: a thread switch re-renders the row it leaves and the row it opens, not every row.
+    const isActive = useLocation({ select: (location) => location.pathname.match(CHAT_THREAD_PATH_RE)?.[1] === node.threadId });
+    const isKeyboardSelected = useIsKeyboardSelected(node.threadId);
     const queryClient = useQueryClient();
     const { mutateAsync: convertToPermanent } = useMutation(crpc.chat.functions.convertTemporaryToPermanent.mutationOptions());
     const { isPending: isStopping, mutate: stopThreadStream } = useMutation(crpc.chat.functions.abortThreadStream.mutationOptions());
@@ -286,7 +273,6 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
     const canHover = useCanHover();
     const isTransitioningRef = useRef(false);
 
-    const urlThreadId = location.pathname.match(CHAT_THREAD_PATH_RE)?.[1];
     const splitViewEnabled = useUIStateStore((state) => state.preferences.splitViewEnabled === true);
     // A boolean selector, so a row re-renders only when its own chat enters or leaves the panes.
     const isOpenInSplit = useSplitLayoutStore((state) => splitViewEnabled && state.layout.panes.includes(node.threadId));
@@ -303,18 +289,14 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                 return;
             }
 
-            if (urlThreadId === undefined) {
+            // Read at the click, not subscribed to: only this handler needs to know whether a chat is open.
+            if (!CHAT_THREAD_PATH_RE.test(router.state.location.pathname)) {
                 await router.navigate({ params: { threadId: node.threadId }, search: {}, to: "/chat/$threadId" });
             }
         };
 
         void open();
-    }, [node.threadId, router, t, urlThreadId]);
-    const isOnDefaultRoute = location.pathname === "/chat" || location.pathname === "/chat/";
-
-    const isActive = isOnDefaultRoute
-        ? false // Never active on default route
-        : urlThreadId === node.threadId || (urlThreadId === undefined && currentThreadId === node.threadId && currentThreadId !== "default");
+    }, [node.threadId, router, t]);
     const hasChildren = node?.children?.length > 0;
     const isComparisonParent = hasChildren && node.children?.some((child: any) => child.branchType === "comparison");
     const isExpanded = expandedThreads.has(node.threadId);
@@ -499,10 +481,6 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                 }
 
                 if (isActive) {
-                    return;
-                }
-
-                if (urlThreadId === node.threadId || currentThreadId === node.threadId) {
                     return;
                 }
 
@@ -1212,10 +1190,6 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                                 return;
                             }
 
-                            if (urlThreadId === node.threadId || currentThreadId === node.threadId) {
-                                return;
-                            }
-
                             if (isTransitioningRef.current) {
                                 return;
                             }
@@ -1258,22 +1232,18 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
 
             {hasChildren && isExpanded && (
                 <ThreadNodeChildren
-                    currentThreadId={currentThreadId}
                     expandedThreads={expandedThreads}
                     handleCreateBranch={handleCreateBranch}
                     handleDeleteThread={handleDeleteThread}
                     handleDownloadThread={handleDownloadThread}
-                    handleMouseEnter={() => {}}
+                    handleMouseEnter={ignoreMouseEnter}
                     handlePinThread={handlePinThread}
                     handleThreadToggle={handleThreadToggle}
                     handleUnpinThread={handleUnpinThread}
-                    isKeyboardNavigating={false}
                     isSelectionMode={isSelectionMode}
-                    keyboardThreadId={keyboardThreadId}
                     loadingStates={loadingStates}
                     nodes={node.children}
                     selectedThreadIds={selectedThreadIds}
-                    selectedThreadIndex={-1}
                     toggleExpanded={toggleExpanded}
                     updateThread={updateThread}
                 />

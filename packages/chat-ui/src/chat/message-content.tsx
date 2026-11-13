@@ -14,12 +14,14 @@ import { useLingui } from "@lingui/react/macro";
 import { Reasoning, ReasoningContent, ReasoningTrigger } from "@neore/ui/components/ai-elements/reasoning";
 import { Source, Sources, SourcesContent, SourcesTrigger } from "@neore/ui/components/ai-elements/sources";
 import AnimatedTiles from "@neore/ui/components/animated-tiles";
+import CachedMarkdownBlock from "@neore/ui/components/cached-markdown-block";
 import { chatMarkdownComponents, hostMarkdownComponents } from "@neore/ui/components/chat-markdown-components";
 import type { FileRendererType } from "@neore/ui/components/file-renderers/file-type-utilities";
 import { getFileRendererType } from "@neore/ui/components/file-renderers/file-type-utilities";
 import { useFocusableCodeBlocks } from "@neore/ui/hooks/use-focusable-code-blocks";
 import useStreamdownAppearance from "@neore/ui/hooks/use-streamdown-appearance";
-import useStreamdownPlugins from "@neore/ui/hooks/use-streamdown-plugins";
+import useStreamdownPlugins, { streamdownRehypePlugins } from "@neore/ui/hooks/use-streamdown-plugins";
+import { MarkdownBlockCacheContext } from "@neore/ui/utils/markdown-block-cache";
 import { AlertCircle, ChevronDown, ChevronRight, FileIcon, Globe, Loader2, Play, Presentation, Terminal } from "lucide-react";
 import type { ComponentType, FC, ReactNode } from "react";
 import { lazy, memo, Suspense, useEffect, useMemo, useRef, useState } from "react";
@@ -130,20 +132,25 @@ const DefaultText: FC<{ isAnimating: boolean; literalImages?: boolean; text: str
 
     // `codeBlockMaxHeight="none"`: the 24-line cap is per block (`chatMarkdownComponents`), not Streamdown's global 400px.
     // `contents` keeps the wrapper out of the layout.
+    // A finished reply's parsed blocks are cached across mounts (`CachedMarkdownBlock`); a streaming one is not.
     return (
         <div className="contents" ref={rootRef}>
-            <Streamdown
-                className="streamdown-animate"
-                codeBlockMaxHeight="none"
-                components={literalImages ? hostMarkdownComponents : chatMarkdownComponents}
-                isAnimating={isAnimating}
-                lineNumbers={codeLineNumbers}
-                mermaid={mermaid}
-                plugins={plugins}
-                shikiTheme={shikiTheme}
-            >
-                {text}
-            </Streamdown>
+            <MarkdownBlockCacheContext value={!isAnimating}>
+                <Streamdown
+                    BlockComponent={CachedMarkdownBlock}
+                    className="streamdown-animate"
+                    codeBlockMaxHeight="none"
+                    components={literalImages ? hostMarkdownComponents : chatMarkdownComponents}
+                    isAnimating={isAnimating}
+                    lineNumbers={codeLineNumbers}
+                    mermaid={mermaid}
+                    plugins={plugins}
+                    rehypePlugins={streamdownRehypePlugins(text)}
+                    shikiTheme={shikiTheme}
+                >
+                    {text}
+                </Streamdown>
+            </MarkdownBlockCacheContext>
         </div>
     );
 });

@@ -10,7 +10,7 @@ import { FileDown, FileUp, Package, Plus, Search, Wand2 } from "lucide-react";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
-import { useAuth } from "@/features/auth/lib/auth-ui-provider";
+import { useAuthActiveOrganization, useAuthSession } from "@/features/auth/hooks/use-auth-session";
 import useCheckout from "@/features/billing/hooks/use-checkout";
 import { useCRPCClient, useLunoraActionOptions } from "@/lib/lunora/crpc";
 import { createJsZip } from "@/lib/zip";
@@ -63,9 +63,8 @@ const SkillList = ({ reloadKey = 0 }: SkillListProps) => {
     const { mutateAsync: exportSkill } = useMutation(useLunoraActionOptions(api.skills.io.exportSkill));
 
     // Auth
-    const { hooks } = useAuth();
-    const { data: sessionData } = hooks.useSession();
-    const { data: activeOrganization } = hooks.useActiveOrganization();
+    const { data: sessionData } = useAuthSession();
+    const { data: activeOrganization } = useAuthActiveOrganization();
     const isLoggedIn = !!sessionData?.user;
     const currentUserId = sessionData?.user?.id;
 
