@@ -71,11 +71,13 @@ pnpm lint:types           # TypeScript check (NOT pnpm typecheck); inside apps/w
   Under a per-app firewall allow Playwright's Chromium, or use `E2E_BROWSER_CHANNEL=chrome`.
 - Before interacting with an SSR'd form in e2e, call `awaitFormHydrated()` (`e2e/helpers.ts`); `toBeEnabled()` is
   not enough. A dead backend shows the same symptom, so check both.
-- Do not "fix" `react-doctor` bail-outs on Lingui `` t`…` `` templates, split the babel passes in `vite.config.ts`, or
-  rewrite `t` templates by hand (breaks message IDs).
+- Do not "fix" `react-doctor` bail-outs on Lingui `` t`…` `` templates or rewrite `t` templates by hand (breaks message
+  IDs). The build lowers the Lingui macro with Babel, then runs the React Compiler's native port inside `react()`: keep
+  `babel()` above `react()` in `vite.config.ts`, and its `validateExhaustiveMemoizationDependencies: false`.
 - On a `todo` (compiler bail-out) finding, keep the manual `useMemo`/`useCallback`; fix the bail-out first or leave both.
-- Keep the `"@babel/traverse@7>@babel/types"` override in `pnpm-workspace.yaml`. In components avoid `throw`, `finally`,
-  `?:`/`&&`/`??`/`?.` inside `try`/`catch` (use a module-level helper) and ref reads during render.
+- Keep the `"@babel/traverse@7>@babel/types"` override in `pnpm-workspace.yaml` (Storybook still runs the Babel
+  compiler). In components avoid `throw`, `finally`, `?:`/`&&`/`??`/`?.` inside `try`/`catch` (use a module-level helper;
+  the Babel compiler bails on them) and ref reads during render.
 - **Chat rows are memoized on message IDENTITY**: keep `useUIMessages`' structural sharing
   (`lib/agent/share-unchanged-messages.ts`); chat action callbacks read `messagesRef`, never close over `messages`;
   stream chunks are batched per frame (`createFrameBatcher`).

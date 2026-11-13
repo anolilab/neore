@@ -10,7 +10,7 @@ import tailwindcss from "@tailwindcss/vite";
 import { tanstackStart } from "@tanstack/react-start/plugin/vite";
 import { devToolbar } from "@visulima/dev-toolbar/vite";
 import viteErrorOverlay from "@visulima/vite-overlay";
-import react, { reactCompilerPreset } from "@vitejs/plugin-react";
+import react from "@vitejs/plugin-react";
 import mdxPlugin from "fumadocs-mdx/vite";
 import Unfonts from "unplugin-fonts/vite";
 import { purgePolyfills } from "unplugin-purge-polyfills";
@@ -40,6 +40,10 @@ import wasm from "vite-plugin-wasm";
 const REACT_CHUNK_RE = /\/node_modules\/(react|react-dom|react-compiler-runtime|scheduler|use-sync-external-store)\//;
 const TANSTACK_CHUNK_RE = /\/node_modules\/@tanstack\/(react-query|react-router)\//;
 const LUNORA_CHUNK_RE = /\/node_modules\/@lunora\//;
+
+/** A module the Lingui macro has to lower before the React Compiler reads it. */
+const LINGUI_MACRO_RE = /@lingui\/(?:core|react)\/macro/;
+
 // Kept although it ships every Base UI component to every page: ungrouped, the
 // chat route (which uses nearly all of them) paid more for ~50 extra chunks
 // (1,477 vs 1,441KB gzip) than the entry saved (93KB).
@@ -231,9 +235,17 @@ export default defineConfig(async ({ mode }) => {
                     workspaceRoot: "../..",
                 }),
             lingui(),
+            // Babel only lowers the Lingui macros, and only in files that import one. It runs before `react()` below
+            // (both are `pre` plugins, so their order here is their order), so the React Compiler sees plain calls.
             babel({
-                plugins: ["@lingui/babel-plugin-lingui-macro"],
-                presets: [reactCompilerPreset({ target: "19" })],
+                presets: [
+                    {
+                        preset: () => {
+                            return { plugins: ["@lingui/babel-plugin-lingui-macro"] };
+                        },
+                        rolldown: { filter: { code: LINGUI_MACRO_RE } },
+                    },
+                ],
             }),
             Unfonts({
                 custom: {
@@ -278,7 +290,10 @@ export default defineConfig(async ({ mode }) => {
             tailwindcss(),
             svgr(),
             tanstackStart(),
-            react(),
+            // The React Compiler's native port, in place of the Babel plugin: ~15x less compile time. The exhaustive
+            // memo-dependency check is off, as in the Babel version this replaced, which does not run it: with it on,
+            // hand-memoized hooks such as `useThreadGroups` and `DataGridRow` would be skipped.
+            react({ compiler: { environment: { validateExhaustiveMemoizationDependencies: false }, target: "19" } }),
         ],
         resolve: {
             alias: {
