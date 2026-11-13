@@ -2,8 +2,8 @@
 
 /**
  * Renders the production chat screen (`app/chat/[threadId].tsx`) with its native modules and services stubbed at the
- * module boundary, and streams a reply through its real `send`: what is measured is the screen's own wiring of the
- * batcher, the row writes and the memoised rows, not a copy of it.
+ * module boundary, and types, sends and streams a reply through its real composer and `send`: what is measured is the
+ * screen's own wiring of the draft store, the batcher, the row writes and the memoised rows, not a copy of it.
  */
 import type { ReactNode } from "react";
 import { act, createElement, Fragment } from "react";
@@ -19,10 +19,14 @@ const harness = vi.hoisted(() => {
         finishReply: undefined as ((outcome: string) => void) | undefined,
         /** Frames requested by the screen, run by the test. */
         frames: [] as (() => void)[],
+        /** Whether the start waits for the test (`settleStart`) instead of answering with a reply stream. */
+        holdStart: false,
         /** One entry per render of the message list: it renders exactly when the screen does. */
         listRenders: [] as number[],
         /** The delta handler the screen gave the stream. */
         onDelta: undefined as ((delta: { reasoning: string; text: string }) => void) | undefined,
+        /** Settles a held start, as the gateway would. */
+        settleStart: undefined as ((outcome: Error) => void) | undefined,
         /** What each `Text` rendered: a row skipped by its memo adds nothing. */
         textRenders: [] as string[],
     };
@@ -139,13 +143,24 @@ vi.mock(import("@/auth/secure-store"), () => ({ secureGrantStore: {} } as never)
 // eslint-disable-next-line no-restricted-syntax -- secure storage is a native module
 vi.mock(import("@/chat/last-thread-store"), () => ({ forgetLastThread: async () => {}, rememberLastThread: async () => {} } as never));
 
-// The start answers with a reply stream; everything else of the chat API is the real module.
+// The start answers with a reply stream, or waits until the test settles it; everything else of the chat API is real.
 // eslint-disable-next-line no-restricted-syntax -- the start is a network call
 vi.mock(import("@/chat/chat-api"), async (importOriginal) => {
     const original = await importOriginal<typeof import("@/chat/chat-api")>();
     const started = { contentType: "text/event-stream", messageId: "m2", streamId: "s1", streaming: true, streamToken: "token", threadId: "t1" };
 
-    return { ...original, startChat: async () => started } as never;
+    return {
+        ...original,
+        startChat: async () => {
+            if (!harness.holdStart) {
+                return started;
+            }
+
+            return await new Promise((_resolve, reject) => {
+                harness.settleStart = reject;
+            });
+        },
+    } as never;
 });
 
 // The stream hands its delta handler to the test, which plays the reply, and ends when the test says so.
@@ -195,6 +210,7 @@ describe("the chat screen streaming a reply", () => {
     const mounted: { container?: HTMLElement; root?: Root } = {};
 
     beforeEach(() => {
+        harness.holdStart = false;
         harness.frames = [];
         harness.listRenders = [];
         harness.textRenders = [];
@@ -277,5 +293,96 @@ describe("the chat screen streaming a reply", () => {
             harness.finishReply?.("finished");
             await Promise.resolve();
         });
+    });
+});
+
+describe("the chat screen's composer", () => {
+    const mounted: { container?: HTMLElement; root?: Root } = {};
+
+    const messageBox = (): HTMLTextAreaElement => {
+        const box = mounted.container?.querySelector<HTMLTextAreaElement>("textarea[aria-label='Message']");
+
+        if (!box) {
+            throw new Error("The message box is not on screen.");
+        }
+
+        return box;
+    };
+
+    const typeInto = (value: string) => {
+        act(() => {
+            const box = messageBox();
+
+            Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")?.set?.call(box, value);
+            box.dispatchEvent(new Event("input", { bubbles: true }));
+        });
+    };
+
+    const openChat = async () => {
+        act(() => {
+            mounted.root?.render(createElement(ChatScreen));
+        });
+        await vi.waitFor(() => {
+            expect(mounted.container?.textContent).toContain("An earlier answer");
+        });
+    };
+
+    beforeEach(() => {
+        harness.listRenders = [];
+        harness.textRenders = [];
+        harness.settleStart = undefined;
+        harness.holdStart = true;
+        // React reads this to allow `act` outside a testing library.
+        Reflect.set(globalThis, "IS_REACT_ACT_ENVIRONMENT", true);
+        mounted.container = document.createElement("div");
+        mounted.root = createRoot(mounted.container);
+    });
+
+    afterEach(() => {
+        act(() => {
+            mounted.root?.unmount();
+        });
+    });
+
+    it("types into the real composer without rendering the screen or its message list again", async () => {
+        await openChat();
+
+        const listBefore = harness.listRenders.length;
+
+        for (const text of ["H", "He", "Hel", "Hell", "Hello"]) {
+            typeInto(text);
+        }
+
+        expect(messageBox().value).toBe("Hello");
+        expect(harness.listRenders).toHaveLength(listBefore);
+    });
+
+    it("sends the typed prompt, empties the box, and gives the prompt back when the start is refused", async () => {
+        const { ChatError } = await import("@/chat/chat-api");
+
+        await openChat();
+        typeInto("Go on");
+
+        const send = [...mounted.container?.querySelectorAll("button") ?? []].find((button) => button.textContent === "Send");
+
+        await act(async () => {
+            send?.click();
+            await vi.waitFor(() => {
+                expect(harness.settleStart).toBeDefined();
+            });
+        });
+
+        // The prompt left the box with the send, and shows as the user's row.
+        expect(messageBox().value).toBe("");
+        expect(mounted.container?.textContent).toContain("Go on");
+
+        await act(async () => {
+            harness.settleStart?.(new ChatError("The message was refused.", { isRefusal: true }));
+            await vi.waitFor(() => {
+                expect(messageBox().value).toBe("Go on");
+            });
+        });
+
+        expect(mounted.container?.textContent).toContain("The message was refused.");
     });
 });
