@@ -155,23 +155,50 @@ export const parseMessageHash = (hash: string): string | undefined => {
     }
 };
 
-/** On unless the browser opted out with `"0"`; storage that cannot be read keeps the default. */
-
 /**
  * Keys that open, or step through, the BROWSER's find: Cmd/Ctrl+F, F3 and Cmd/Ctrl+G, with or without Shift.
  * Find opened from a menu (Edit › Find, Firefox's quick find, mobile Safari) sends no key at all; the list's
  * "Show all earlier messages" control is the way to reach unmounted messages from there.
  */
 export const isBrowserFindKey = (event: Pick<KeyboardEvent, "ctrlKey" | "key" | "metaKey">): boolean => {
-    if (event.key === "F3") {
+    // Autofill and some IMEs send a keydown with no `key`.
+    const key = typeof event.key === "string" ? event.key : "";
+
+    if (key === "F3") {
         return true;
     }
 
-    const key = event.key.toLowerCase();
+    if (!event.metaKey && !event.ctrlKey) {
+        return false;
+    }
 
-    return (event.metaKey || event.ctrlKey) && (key === "f" || key === "g");
+    const lower = key.toLowerCase();
+
+    return lower === "f" || lower === "g";
 };
 
+/** Message indexes `[first, last]` a text selection spans; those rows stay mounted while it lasts. */
+export interface PinnedRange {
+    first: number;
+    last: number;
+}
+
+/** The virtualizer's indexes plus the pinned ones below `count`, ascending and without repeats. */
+export const withPinnedRange = (indexes: ReadonlyArray<number>, pinned: PinnedRange | null, count: number): number[] => {
+    if (!pinned) {
+        return [...indexes];
+    }
+
+    const all = new Set(indexes);
+
+    for (let index = Math.max(0, pinned.first); index <= Math.min(pinned.last, count - 1); index += 1) {
+        all.add(index);
+    }
+
+    return [...all].toSorted((a, b) => a - b);
+};
+
+/** On unless the browser opted out with `"0"`; storage that cannot be read keeps the default. */
 export const readVirtualizeFlag = (): boolean => {
     try {
         return globalThis.localStorage?.getItem(VIRTUALIZE_FLAG_KEY) !== "0";

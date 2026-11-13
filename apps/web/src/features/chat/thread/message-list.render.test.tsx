@@ -8,7 +8,8 @@
 
 import { formatGoalReviewNote } from "@neore/backend/chat/goals";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, render, screen, within } from "@testing-library/react";
+import type { UserEvent } from "@testing-library/user-event";
 import userEvent from "@testing-library/user-event";
 import type { Context, ReactNode } from "react";
 import { createElement, useLayoutEffect, useState } from "react";
@@ -532,6 +533,8 @@ const nextFrames = async (count: number): Promise<void> => {
 
 const SHOW_ALL_NAME = /earlier messages/;
 
+const viewport = (): HTMLElement => document.querySelector<HTMLElement>('[data-slot="scroll-area-viewport"]')!;
+
 const focusedMessageId = (): string | undefined => (document.activeElement as HTMLElement | null)?.dataset.listMessageId;
 
 // Several cases mount the whole thread from cold; see RENDER_TEST_TIMEOUT_MS.
@@ -731,6 +734,45 @@ describe("a long thread", { timeout: RENDER_TEST_TIMEOUT_MS }, () => {
         expect(screen.queryByRole("button", { name: SHOW_ALL_NAME })).toBeNull();
     });
 
+    it("keeps the rows a text selection spans mounted while it lasts, then windows them again", async () => {
+        mountInto();
+
+        act(() => scrollToMessage("m100"));
+        await vi.waitFor(() => expect(mountedIds()).toEqual(expect.arrayContaining(["m100", "m101"])), { timeout: 5000 });
+
+        const rowOf = (id: string): HTMLElement => document.querySelector<HTMLElement>(`[data-list-message-id="${CSS.escape(id)}"]`)!;
+        const first = rowOf("m100");
+        const last = rowOf("m101");
+        const selection = document.getSelection()!;
+
+        // Select from inside one older reply into the next, as a drag would.
+        act(() => {
+            const range = document.createRange();
+
+            range.setStart(within(first).getByText("message 100").firstChild!, 2);
+            range.setEnd(within(last).getByText("message 101").firstChild!, 5);
+            selection.removeAllRanges();
+            selection.addRange(range);
+            document.dispatchEvent(new Event("selectionchange"));
+        });
+
+        // Back to the newest messages: without the selection both rows would leave the window.
+        act(() => viewport().scrollTo({ top: THREAD_LENGTH * 100 }));
+        await vi.waitFor(() => expect(mountedIds()).not.toContain("m99"), { timeout: 5000 });
+
+        expect(rowOf("m100")).toBe(first);
+        expect(rowOf("m101")).toBe(last);
+        expect(selection.toString()).not.toBe("");
+
+        act(() => {
+            selection.removeAllRanges();
+            document.dispatchEvent(new Event("selectionchange"));
+        });
+
+        await vi.waitFor(() => expect(mountedIds()).not.toContain("m100"), { timeout: 5000 });
+        expect(mountedIds()).not.toContain("m101");
+    });
+
     it("has no show-all control while every message is mounted", () => {
         localStorage.setItem(VIRTUALIZE_FLAG_KEY, "0");
 
@@ -778,19 +820,25 @@ describe("a long thread", { timeout: RENDER_TEST_TIMEOUT_MS }, () => {
     describe("read aloud", () => {
         const speechSynthesisStub = { cancel: vi.fn(), speak: vi.fn() };
 
-        const viewport = (): HTMLElement => document.querySelector<HTMLElement>('[data-slot="scroll-area-viewport"]')!;
         const row = (id: string): HTMLElement | null => document.querySelector<HTMLElement>(`[data-list-message-id="${CSS.escape(id)}"]`);
 
         /** Jumps to an older reply in the virtualized head and starts reading it aloud. */
+        let user: UserEvent;
+
         const readOlderReply = async (id: string): Promise<void> => {
             act(() => scrollToMessage(id));
             await vi.waitFor(() => expect(row(id)).not.toBeNull(), { timeout: 5000 });
-            fireEvent.click(within(row(id)!).getByRole("button", { name: "Read aloud" }));
+
+            const button = within(row(id)!).getByRole("button", { name: "Read aloud" });
+
+            await user.click(button);
 
             expect(getReadAloudId()).toBe(id);
+            expect(document.activeElement).toBe(button);
         };
 
         beforeEach(() => {
+            user = userEvent.setup();
             harness.withReadAloud = true;
             speechSynthesisStub.cancel.mockClear();
             speechSynthesisStub.speak.mockClear();
@@ -818,7 +866,11 @@ describe("a long thread", { timeout: RENDER_TEST_TIMEOUT_MS }, () => {
             // Scrolled back into view, the remounted row knows it is reading and stops it.
             act(() => scrollToMessage("m101"));
             await vi.waitFor(() => expect(row("m101")).not.toBeNull(), { timeout: 5000 });
-            fireEvent.click(within(row("m101")!).getByRole("button", { name: "Stop reading" }));
+            const stop = within(row("m101")!).getByRole("button", { name: "Stop reading" });
+
+            await user.click(stop);
+
+            expect(document.activeElement).toBe(stop);
 
             expect(getReadAloudId()).toBeNull();
             expect(speechSynthesisStub.cancel).toHaveBeenCalledTimes(cancelsWhileStarting + 1);

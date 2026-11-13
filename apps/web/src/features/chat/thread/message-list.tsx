@@ -32,9 +32,9 @@ import { useLingui } from "@lingui/react/macro";
 import { Button } from "@neore/ui/components/button";
 import cn from "@neore/ui/utils/cn";
 import type { Virtualizer } from "@tanstack/react-virtual";
-import { useVirtualizer } from "@tanstack/react-virtual";
+import { defaultRangeExtractor, useVirtualizer } from "@tanstack/react-virtual";
 import { AnimatePresence } from "motion/react";
-import type { FC, ReactNode } from "react";
+import type { FC, ReactNode, RefObject } from "react";
 import { Fragment, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 
 import { useChatIsStreaming, useChatMessages, useChatThread } from "@/features/chat/core/context/chat-context";
@@ -49,7 +49,7 @@ import { showInfo } from "@/lib/toast";
 
 import LoadMoreTrigger from "./load-more-trigger";
 import MessageItem from "./message-item";
-import type { MessagePosition, WindowPlan } from "./message-windowing";
+import type { MessagePosition, PinnedRange, WindowPlan } from "./message-windowing";
 import {
     getWindowPlan,
     isBrowserFindKey,
@@ -59,6 +59,7 @@ import {
     resolveJumpTarget,
     shouldAnimateEntrance,
     shouldLoadOlderForJump,
+    withPinnedRange,
 } from "./message-windowing";
 import { RateLimitPauseNotice } from "./rate-limit-pause-notice";
 import { useEndReadAloudWithMessages } from "./read-aloud-speech";
@@ -140,6 +141,99 @@ const useShowAllMessages = (): { isAllShown: boolean; showAll: () => void } => {
     return { isAllShown, showAll };
 };
 
+/** The first and last row a text selection in the list touches, by message id. */
+interface SelectedRows {
+    firstId: string;
+    lastId: string;
+}
+
+const ROW_SELECTOR = "[data-list-message-id]";
+
+/** Where a selection end sits: its row's id, or which side of the list it lies on when it is outside the list. */
+const rowEdge = (list: HTMLElement, node: Node | null): string | "after" | "before" | undefined => {
+    if (!node) {
+        return undefined;
+    }
+
+    if (!list.contains(node)) {
+        const around = document.createRange();
+
+        around.selectNode(list);
+
+        return around.comparePoint(node, 0) < 0 ? "before" : "after";
+    }
+
+    const element = node instanceof Element ? node : node.parentElement;
+
+    return element?.closest<HTMLElement>(ROW_SELECTOR)?.dataset.listMessageId;
+};
+
+const readSelectedRows = (list: HTMLElement): SelectedRows | null => {
+    const selection = document.getSelection();
+
+    if (!selection || selection.isCollapsed || selection.rangeCount === 0 || !selection.getRangeAt(0).intersectsNode(list)) {
+        return null;
+    }
+
+    const rows = list.querySelectorAll<HTMLElement>(ROW_SELECTOR);
+    const resolve = (edge: string | undefined): string | undefined => {
+        if (edge === "before") {
+            return rows[0]?.dataset.listMessageId;
+        }
+
+        if (edge === "after") {
+            return rows[rows.length - 1]?.dataset.listMessageId;
+        }
+
+        return edge;
+    };
+    // The range runs in document order, whichever way the selection was made.
+    const range = selection.getRangeAt(0);
+    const firstId = resolve(rowEdge(list, range.startContainer));
+    const lastId = resolve(rowEdge(list, range.endContainer));
+
+    return firstId === undefined || lastId === undefined ? null : { firstId, lastId };
+};
+
+/**
+ * The rows a text selection in the list spans. The virtualizer keeps them mounted while it lasts, so
+ * scrolling a selected older reply out of view does not cut the selection; windowing resumes once it clears.
+ */
+const useSelectedRows = (listRef: RefObject<HTMLElement | null>): SelectedRows | null => {
+    const [selected, setSelected] = useState<SelectedRows | null>(null);
+
+    useEffect(() => {
+        const handleSelectionChange = () => {
+            const list = listRef.current;
+            const next = list ? readSelectedRows(list) : null;
+
+            setSelected((previous) => (previous?.firstId === next?.firstId && previous?.lastId === next?.lastId ? previous : next));
+        };
+
+        document.addEventListener("selectionchange", handleSelectionChange);
+
+        return () => document.removeEventListener("selectionchange", handleSelectionChange);
+    }, [listRef]);
+
+    return selected;
+};
+
+/** The selected rows as indexes into `messages`; null when there is no selection or a row is gone. */
+const pinnedRange = (messages: ReadonlyArray<UIMessage>, selected: SelectedRows | null): PinnedRange | null => {
+    if (!selected) {
+        return null;
+    }
+
+    const first = messages.findIndex((message) => message.id === selected.firstId);
+    const last = messages.findIndex((message) => message.id === selected.lastId);
+
+    if (first === -1 || last === -1) {
+        return null;
+    }
+
+    return { first: Math.min(first, last), last: Math.max(first, last) };
+};
+
 type RenderRow = (message: UIMessage, index: number) => ReactNode;
 
 interface VirtualizedHeadProps {
@@ -147,6 +241,8 @@ interface VirtualizedHeadProps {
     layoutKey: string;
     messages: UIMessage[];
     onVirtualizer: (virtualizer: Virtualizer<HTMLElement, Element> | null) => void;
+    /** Rows a text selection spans: mounted wherever the scroll is, so the selection holds. */
+    pinned: PinnedRange | null;
     renderRow: RenderRow;
 }
 
@@ -155,7 +251,7 @@ interface VirtualizedHeadProps {
  * spacer sized to the virtualizer's total, measured as they mount (heights vary
  * a lot). Scrolls with ThreadViewport's element, offset by `scrollMargin`.
  */
-const VirtualizedHead: FC<VirtualizedHeadProps> = ({ layoutKey, messages, onVirtualizer, renderRow }) => {
+const VirtualizedHead: FC<VirtualizedHeadProps> = ({ layoutKey, messages, onVirtualizer, pinned, renderRow }) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const [scrollElement, setScrollElement] = useState<HTMLElement | null>(null);
     const [scrollMargin, setScrollMargin] = useState(0);
@@ -182,12 +278,18 @@ const VirtualizedHead: FC<VirtualizedHeadProps> = ({ layoutKey, messages, onVirt
     const estimateSize = useCallback(() => ESTIMATED_ROW_HEIGHT, []);
     const getItemKey = useCallback((index: number) => messages[index]?.id ?? index, [messages]);
 
+    const rangeExtractor = useCallback(
+        (range: Parameters<typeof defaultRangeExtractor>[0]) => withPinnedRange(defaultRangeExtractor(range), pinned, messages.length),
+        [messages.length, pinned],
+    );
+
     const virtualizer = useVirtualizer<HTMLElement, Element>({
         count: messages.length,
         estimateSize,
         getItemKey,
         getScrollElement,
         overscan: 4,
+        rangeExtractor,
         scrollMargin,
     });
 
@@ -257,6 +359,8 @@ const MessageList: FC<MessageListProps> = memo(({ className, editComposerCompone
     const isVirtualizeFlagOn = useSyncExternalStore(subscribeToNothing, readVirtualizeFlag, () => true);
 
     const { isAllShown, showAll } = useShowAllMessages();
+    const listRef = useRef<HTMLDivElement>(null);
+    const selectedRows = useSelectedRows(listRef);
     const plan: WindowPlan = getWindowPlan(messages.length, { enabled: isVirtualizeFlagOn && !isAllShown });
 
     // After "Show all earlier messages", focus goes to the oldest loaded message, where the shown history starts.
@@ -544,6 +648,7 @@ const MessageList: FC<MessageListProps> = memo(({ className, editComposerCompone
     };
 
     const tailStart = plan.virtualized ? plan.headCount : 0;
+    const pinned = pinnedRange(messages, selectedRows);
     const earlierCount = plan.headCount;
 
     return (
@@ -558,12 +663,18 @@ const MessageList: FC<MessageListProps> = memo(({ className, editComposerCompone
                 </Button>
             )}
 
-            <div className={cn("message-list flex flex-col", className)} role="list" style={{ "--thread-max-width": maxWidth } as React.CSSProperties}>
+            <div
+                className={cn("message-list flex flex-col", className)}
+                ref={listRef}
+                role="list"
+                style={{ "--thread-max-width": maxWidth } as React.CSSProperties}
+            >
                 {plan.virtualized && (
                     <VirtualizedHead
                         layoutKey={messagesStatus}
                         messages={messages.slice(0, plan.headCount)}
                         onVirtualizer={handleVirtualizer}
+                        pinned={pinned}
                         renderRow={renderRow}
                     />
                 )}

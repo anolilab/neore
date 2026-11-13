@@ -14,6 +14,7 @@ import {
     shouldLoadOlderForJump,
     VIRTUALIZE_FLAG_KEY,
     VIRTUALIZE_THRESHOLD,
+    withPinnedRange,
 } from "./message-windowing";
 
 describe(getWindowPlan, () => {
@@ -200,5 +201,25 @@ describe(isBrowserFindKey, () => {
         expect(isBrowserFindKey(key({ key: "g" }))).toBe(false);
         expect(isBrowserFindKey(key({ ctrlKey: true, key: "h" }))).toBe(false);
         expect(isBrowserFindKey(key({ key: "F4" }))).toBe(false);
+    });
+
+    it("takes a keydown with no key (autofill) without throwing", () => {
+        const autofill = { ctrlKey: false, key: undefined, metaKey: false } as unknown as KeyboardEvent;
+        const withModifier = { ctrlKey: true, key: undefined, metaKey: false } as unknown as KeyboardEvent;
+
+        expect(() => isBrowserFindKey(autofill)).not.toThrow();
+        expect(isBrowserFindKey(autofill)).toBe(false);
+        expect(isBrowserFindKey(withModifier)).toBe(false);
+    });
+});
+
+describe(withPinnedRange, () => {
+    it("adds the pinned rows to the visible ones, in order", () => {
+        expect(withPinnedRange([10, 11, 12], { first: 3, last: 5 }, 40)).toStrictEqual([3, 4, 5, 10, 11, 12]);
+    });
+
+    it("keeps the visible rows as they are without a pin, and clamps a pin to the rows that exist", () => {
+        expect(withPinnedRange([1, 2], null, 40)).toStrictEqual([1, 2]);
+        expect(withPinnedRange([1, 2], { first: 38, last: 45 }, 40)).toStrictEqual([1, 2, 38, 39]);
     });
 });
