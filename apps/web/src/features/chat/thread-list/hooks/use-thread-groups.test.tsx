@@ -418,4 +418,19 @@ describe("node identity across rebuilds", () => {
             expect(node).toBe(before.get(threadId));
         }
     });
+
+    it("compares a changed push once, not again in React's retry after it keeps the result", () => {
+        const collapsedGroups = new Set<GroupType>();
+        const collapsedProjects = new Set<string>();
+        const { rerender, result } = renderHook(() => useThreadGroups(collapsedGroups, collapsedProjects, "", "threads", undefined, [], undefined, undefined));
+
+        composite.threads.page = (structuredClone(composite.threads.page) as { _id: string; status: string }[]).map((thread) =>
+            thread._id === "c" ? { ...thread, status: "running" } : thread,
+        ) as never;
+        shareCalls.count = 0;
+        rerender();
+
+        expect(shareCalls.count).toBe(1);
+        expect(nodesOf(result.current.threadGroups).get("c")?.status).toBe("running");
+    });
 });

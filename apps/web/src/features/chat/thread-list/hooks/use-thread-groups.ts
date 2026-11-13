@@ -48,8 +48,9 @@ const sortThreadsInGroup = (threads: BranchNode[]): BranchNode[] => {
     });
 };
 
-/** The nodes of one build, shared with the build before it. */
+/** The nodes of one build, shared with the build before it, and the build they came from. */
 interface SharedNodes {
+    built: BranchNode[][];
     byId: NodesById;
     lists: BranchNode[][];
 }
@@ -299,13 +300,25 @@ const useThreadGroups = (
     // --- Sharing: an unchanged thread gets the node it had, so only the rows whose thread changed re-render ---
     // Kept in state and adjusted during render, not in a ref: an update made during a render is thrown away with that render, so the
     // nodes compared against are always those of the last render React kept, and the hook stays compiled. The deep compare runs once
-    // per build (memoized on the build and the nodes it is compared with), so a render that brings no new build compares nothing.
-    const sharedBase = sharedNodes?.byId ?? NO_NODES;
-    const sharedBuild = useMemo(() => (builtNodes === null ? null : shareUnchangedNodes(sharedBase, builtNodes)), [builtNodes, sharedBase]);
+    // per build: renders that bring no new build reuse it, and so does React's immediate retry after the update below, which finds
+    // the state already holding this build's nodes.
+    const sharedBuild = useMemo(() => {
+        if (builtNodes === null) {
+            return null;
+        }
+
+        if (sharedNodes?.built === builtNodes) {
+            return sharedNodes;
+        }
+
+        const shared = shareUnchangedNodes(sharedNodes?.byId ?? NO_NODES, builtNodes);
+
+        return { built: builtNodes, byId: shared.byId, lists: shared.lists };
+    }, [builtNodes, sharedNodes]);
     let currentShared = sharedNodes;
 
     // A build that changed no node keeps the state it has: no update, so a rebuild can never loop through this.
-    if (sharedBuild !== null && (!currentShared || !sameNodeLists(currentShared.lists, sharedBuild.lists))) {
+    if (sharedBuild !== null && sharedBuild !== currentShared && (!currentShared || !sameNodeLists(currentShared.lists, sharedBuild.lists))) {
         currentShared = sharedBuild;
         setSharedNodes(sharedBuild);
     }
