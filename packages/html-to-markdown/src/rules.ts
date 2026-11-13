@@ -87,12 +87,17 @@ export default class Rules implements RuleLookup {
      * decide whether to treat a node as transparent asks this first.
      */
     hasRuleFor(node: Node): boolean {
+        return this.ruleFor(node) !== undefined;
+    }
+
+    ruleFor(node: Node): Rule | undefined {
         // Only an element has a rule. A filter written for elements must not be handed a text node.
         if (node.nodeType !== 1) {
-            return false;
+            return undefined;
         }
 
-        return decideRule(this.answers, this.searchOrder, annotateNode(node, this.options), this.options, this) !== undefined;
+        // decideRule reads and fills the per-node answers, so each node is asked once.
+        return decideRule(this.answers, this.searchOrder, annotateNode(node, this.options), this.options, this);
     }
 
     forEach(visit: (rule: Rule, index: number) => void): void {

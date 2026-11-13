@@ -155,8 +155,8 @@ const rules: Record<string, Rule> = {
     emphasis: {
         filter: ["em", "i"],
 
-        replacement(content, node, options) {
-            return wrapRun(content, node, options, { intraword: "*", names: EMPHASIS_NAMES, plain: options.emDelimiter });
+        replacement(content, node, options, lookup) {
+            return wrapRun(content, node, options, { intraword: "*", names: EMPHASIS_NAMES, plain: options.emDelimiter }, lookup);
         },
     },
 
@@ -330,8 +330,8 @@ const rules: Record<string, Rule> = {
     strong: {
         filter: ["strong", "b"],
 
-        replacement(content, node, options) {
-            return wrapRun(content, node, options, { intraword: "**", names: STRONG_NAMES, plain: options.strongDelimiter });
+        replacement(content, node, options, lookup) {
+            return wrapRun(content, node, options, { intraword: "**", names: STRONG_NAMES, plain: options.strongDelimiter }, lookup);
         },
     },
 };
@@ -509,17 +509,16 @@ interface EmphasisRun {
  * gives `_12_`. A run that touches a word character uses `*` (or `**`), because `_`
  * cannot open or close inside a word.
  */
-function wrapRun(content: string, node: AnnotatedNode, options: Options, style: RunStyle): string {
-    // A same-kind parent writes the delimiters for the whole run, so a nested element writes none.
+function wrapRun(content: string, node: AnnotatedNode, options: Options, style: RunStyle, lookup: RuleLookup): string {
+    // A same-kind parent writes the delimiters for the whole run, so a nested element writes none. That holds only
+    // when the built-in rule renders the parent: a custom rule writes its own output and no delimiters.
     // A parent with a block (even a blank one, which prints a break) never shares its delimiters, so the nested element keeps its own.
-    const parent = node.parentNode;
-
-    if (parent && style.names.has(parent.nodeName.toLowerCase()) && !hasPrintingBlockDescendant(parent, options)) {
+    if (hasSharingParent(node.parentNode, style, options, lookup)) {
         return wrapInline(content, options, "", "");
     }
 
-    const before = emphasisRun(node, "left", style.names, options);
-    const after = emphasisRun(node, "right", style.names, options);
+    const before = emphasisRun(node, "left", style.names, options, lookup);
+    const after = emphasisRun(node, "right", style.names, options, lookup);
     const delimiter = before.wordEdge || after.wordEdge ? style.intraword : style.plain;
 
     return wrapInline(content, options, before.count === 0 ? delimiter : "", after.count === 0 ? delimiter : "");
@@ -571,14 +570,14 @@ const rightRuns = new WeakMap<Node, EmphasisRun>();
  * are output directly beside it. The walk stops at whitespace, at a line break,
  * and at the first node that outputs something else.
  */
-function emphasisRun(node: AnnotatedNode, side: Side, names: ReadonlySet<string>, options: Options): EmphasisRun {
+function emphasisRun(node: AnnotatedNode, side: Side, names: ReadonlySet<string>, options: Options, lookup: RuleLookup): EmphasisRun {
     const known = side === "left" ? leftRuns : rightRuns;
     const chain: AnnotatedNode[] = [];
     let current = node;
     let run = known.get(current);
 
     while (!run) {
-        const step = scanRun(current, side, names, options);
+        const step = scanRun(current, side, names, options, lookup);
 
         if ("run" in step) {
             run = step.run;
@@ -604,7 +603,13 @@ function emphasisRun(node: AnnotatedNode, side: Side, names: ReadonlySet<string>
  * or the end of the run. A member's answer depends only on that member, so `emphasisRun`
  * can store it.
  */
-function scanRun(node: AnnotatedNode, side: Side, names: ReadonlySet<string>, options: Options): { member: AnnotatedNode } | { run: EmphasisRun } {
+function scanRun(
+    node: AnnotatedNode,
+    side: Side,
+    names: ReadonlySet<string>,
+    options: Options,
+    lookup: RuleLookup,
+): { member: AnnotatedNode } | { run: EmphasisRun } {
     const gap = separation(node, side);
     let sibling = neighbour(node, side);
     // An element with a block inside it never merges, because the block would end the delimiter.
@@ -613,7 +618,7 @@ function scanRun(node: AnnotatedNode, side: Side, names: ReadonlySet<string>, op
     while (sibling && gap !== Infinity) {
         emphasisSteps.count += 1;
 
-        if (canMerge && isRunMember(sibling, names, options)) {
+        if (canMerge && isRunMember(sibling, names, options, lookup)) {
             const member = annotationOf(sibling, options);
 
             // Two emphasis elements join across at most one break; two breaks would be a blank line.
@@ -649,13 +654,40 @@ function separation(node: AnnotatedNode, side: Side): number {
     return flankOf(node, side) === "" ? edgeBreaks(node, side) : Infinity;
 }
 
-/** True for an element of the same kind that outputs delimiters, so it can share a run with this one. */
-function isRunMember(node: Node, names: ReadonlySet<string>, options: Options): boolean {
+/** The built-in rule that renders a run's elements. Only its output writes the run's delimiters. */
+function builtinRunRule(names: ReadonlySet<string>): Rule | undefined {
+    return names === EMPHASIS_NAMES ? rules.emphasis : rules.strong;
+}
+
+/**
+ * True for an element of the same kind that can share a run with this one. It must be rendered by the
+ * built-in rule, so the run's delimiters are its own, and it must print something: an element with
+ * nothing to print (an image with no source, a word-break hint) would write no delimiter while its
+ * neighbour left its own out.
+ */
+function isRunMember(node: Node, names: ReadonlySet<string>, options: Options, lookup: RuleLookup): boolean {
     if (node.nodeType !== 1 || !names.has(node.nodeName.toLowerCase())) {
         return false;
     }
 
-    return !annotationOf(node, options).isBlank && !hasOnlyBreaks(node) && !hasBlockDescendant(node);
+    if (lookup.ruleFor(node) !== builtinRunRule(names) || annotationOf(node, options).isBlank) {
+        return false;
+    }
+
+    return !hasOnlyBreaks(node) && !hasBlockDescendant(node) && childEdge(node as Element, "left", options) !== null;
+}
+
+/**
+ * True when a same-kind parent that the built-in rule renders writes the delimiters for the whole run, so
+ * a nested element writes none. A parent with a block (even a blank one, which prints a break) never shares
+ * its delimiters, and a parent that a custom rule renders writes no delimiters of its own.
+ */
+function hasSharingParent(parent: Node | null, style: RunStyle, options: Options, lookup: RuleLookup): boolean {
+    if (!parent || !style.names.has(parent.nodeName.toLowerCase())) {
+        return false;
+    }
+
+    return lookup.ruleFor(parent) === builtinRunRule(style.names) && !hasPrintingBlockDescendant(parent, options);
 }
 
 const annotations = new WeakMap<Node, AnnotatedNode>();
