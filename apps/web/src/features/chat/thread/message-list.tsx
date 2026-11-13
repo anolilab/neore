@@ -14,12 +14,11 @@
  * Performance optimizations:
  * - Throttled updates during streaming (60fps max)
  * - Memoized message items
- * - Long threads (> VIRTUALIZE_THRESHOLD) virtualize their OLDER messages behind
- *   the `neore:virtualize-messages` localStorage flag. The newest
- *   ALWAYS_MOUNTED_TAIL messages and the streaming placeholder are always real
- *   DOM, so stick-to-bottom (ThreadViewport) and the live region never see the
- *   virtualizer. Cmd/Ctrl+F turns virtualization off for the rest of the visit
- *   so find-in-page can reach every loaded message.
+ * - Every loaded message stays mounted, so whatever a row holds (a draft, a
+ *   dialog, focus, a selection, playing media, read aloud) survives scrolling, and
+ *   find-in-page and screen readers reach all of it. Rows off screen are cheap
+ *   instead: `content-visibility: auto` (styles.css) skips their layout and paint,
+ *   and `contain-intrinsic-size: auto` keeps each one's last real height.
  *
  * Jump to a message: `#message-<id>` in the URL, or `scrollToMessage(id, { threadId })`.
  * Pins and message-search results use the latter.
@@ -27,11 +26,9 @@
 
 import { useLingui } from "@lingui/react/macro";
 import cn from "@neore/ui/utils/cn";
-import type { Virtualizer } from "@tanstack/react-virtual";
-import { useVirtualizer } from "@tanstack/react-virtual";
 import { AnimatePresence } from "motion/react";
 import type { FC, ReactNode } from "react";
-import { Fragment, memo, useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
+import { Fragment, memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { useChatIsStreaming, useChatMessages, useChatThread } from "@/features/chat/core/context/chat-context";
 import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
@@ -45,22 +42,17 @@ import { showInfo } from "@/lib/toast";
 
 import LoadMoreTrigger from "./load-more-trigger";
 import MessageItem from "./message-item";
-import type { MessagePosition, WindowPlan } from "./message-windowing";
-import {
-    getWindowPlan,
-    parseMessageHash,
-    readVirtualizeFlag,
-    resolveJumpMessageId,
-    resolveJumpTarget,
-    shouldAnimateEntrance,
-    shouldLoadOlderForJump,
-} from "./message-windowing";
+import type { MessagePosition } from "./message-windowing";
+import { parseMessageHash, resolveJumpMessageId, shouldAnimateEntrance, shouldLoadOlderForJump } from "./message-windowing";
 import { RateLimitPauseNotice } from "./rate-limit-pause-notice";
 import { selectStreamIdToShow, selectStreamTokenFor } from "./stream-to-show";
 import { StreamingPlaceholder, ThinkingPlaceholder } from "./streaming-placeholder";
 
-// Rough height of an unmeasured row; the virtualizer corrects it on first measure.
-const ESTIMATED_ROW_HEIGHT = 160;
+/**
+ * Frames a jump keeps re-centring its row. Rows above it that were never rendered are counted at their estimated
+ * height (`contain-intrinsic-size`); as they near the viewport they take their real one and push the row.
+ */
+const JUMP_SETTLE_FRAMES = 10;
 
 /** How big each older page a jump pulls in looking for its target is. */
 const JUMP_PAGE_SIZE = 50;
@@ -76,9 +68,6 @@ interface PendingJump {
 
 // Kept here as well: the callers that render inside the list import it from the list.
 export { scrollToMessage } from "@/features/chat/core/utils/scroll-to-message";
-
-// The flag is read once per mount; flipping it takes a reload.
-const subscribeToNothing = (): (() => void) => () => {};
 
 /**
  * Ids present once the thread's first page landed. Messages outside this set
@@ -98,110 +87,18 @@ const useInitialMessageIds = (messages: UIMessage[], messagesReady: boolean): Re
     return initialIds;
 };
 
-/** Cmd/Ctrl+F: the browser can only find text that is in the DOM, so mount everything. */
-const useFindInPageOverride = (): boolean => {
-    const [isFindRequested, setIsFindRequested] = useState(false);
+/** Where a jump to a loaded message lands: its row, or the streaming item for the reply still streaming (it has no row). */
+const findJumpTarget = (list: HTMLElement | null, messages: ReadonlyArray<{ id: string }>, messageId: string): HTMLElement | null => {
+    const row = document.querySelector<HTMLElement>(`[data-list-message-id="${CSS.escape(messageId)}"]`);
 
-    useEffect(() => {
-        if (isFindRequested) {
-            return undefined;
-        }
+    if (row || messages.at(-1)?.id !== messageId) {
+        return row;
+    }
 
-        const handleKeyDown = (event: KeyboardEvent) => {
-            if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "f") {
-                setIsFindRequested(true);
-            }
-        };
-
-        globalThis.addEventListener("keydown", handleKeyDown);
-
-        return () => globalThis.removeEventListener("keydown", handleKeyDown);
-    }, [isFindRequested]);
-
-    return isFindRequested;
+    return list?.querySelector<HTMLElement>("[data-list-streaming]") ?? null;
 };
 
 type RenderRow = (message: UIMessage, index: number) => ReactNode;
-
-interface VirtualizedHeadProps {
-    /** Changes whenever content above the list may have moved (e.g. the load-more spinner). */
-    layoutKey: string;
-    messages: UIMessage[];
-    onVirtualizer: (virtualizer: Virtualizer<HTMLElement, Element> | null) => void;
-    renderRow: RenderRow;
-}
-
-/**
- * The older part of a long thread. Rows are absolutely positioned inside a
- * spacer sized to the virtualizer's total, measured as they mount (heights vary
- * a lot). Scrolls with ThreadViewport's element, offset by `scrollMargin`.
- */
-const VirtualizedHead: FC<VirtualizedHeadProps> = ({ layoutKey, messages, onVirtualizer, renderRow }) => {
-    const containerRef = useRef<HTMLDivElement>(null);
-    const [scrollElement, setScrollElement] = useState<HTMLElement | null>(null);
-    const [scrollMargin, setScrollMargin] = useState(0);
-
-    // The scroll element belongs to ThreadViewport; find it rather than threading a ref through Thread.
-    useLayoutEffect(() => {
-        setScrollElement(containerRef.current?.closest<HTMLElement>('[data-slot="scroll-area-viewport"]') ?? null);
-    }, []);
-
-    // Content above the list (padding, the load-more spinner) shifts where row 0 starts.
-    useLayoutEffect(() => {
-        const container = containerRef.current;
-
-        if (!container || !scrollElement) {
-            return;
-        }
-
-        const margin = container.getBoundingClientRect().top - scrollElement.getBoundingClientRect().top + scrollElement.scrollTop;
-
-        setScrollMargin((previous) => (Math.abs(margin - previous) > 1 ? margin : previous));
-    }, [layoutKey, messages.length, scrollElement]);
-
-    const getScrollElement = useCallback(() => scrollElement, [scrollElement]);
-    const estimateSize = useCallback(() => ESTIMATED_ROW_HEIGHT, []);
-    const getItemKey = useCallback((index: number) => messages[index]?.id ?? index, [messages]);
-
-    const virtualizer = useVirtualizer<HTMLElement, Element>({
-        count: messages.length,
-        estimateSize,
-        getItemKey,
-        getScrollElement,
-        overscan: 4,
-        scrollMargin,
-    });
-
-    useEffect(() => {
-        onVirtualizer(virtualizer);
-
-        return () => onVirtualizer(null);
-    }, [onVirtualizer, virtualizer]);
-
-    return (
-        <div className="relative w-full" ref={containerRef} style={{ height: virtualizer.getTotalSize() }}>
-            {virtualizer.getVirtualItems().map((item) => {
-                const message = messages[item.index];
-
-                if (!message) {
-                    return null;
-                }
-
-                return (
-                    <div
-                        className="absolute top-0 left-0 w-full"
-                        data-index={item.index}
-                        key={item.key}
-                        ref={virtualizer.measureElement}
-                        style={{ transform: `translateY(${item.start - scrollMargin}px)` }}
-                    >
-                        {renderRow(message, item.index)}
-                    </div>
-                );
-            })}
-        </div>
-    );
-};
 
 interface MessageListProps {
     className?: string;
@@ -229,73 +126,91 @@ const MessageList: FC<MessageListProps> = memo(({ className, editComposerCompone
 
     const initialIds = useInitialMessageIds(messages, messagesReady);
 
-    // The server snapshot is `false`: localStorage does not exist during SSR.
-    const isVirtualizeFlagOn = useSyncExternalStore(subscribeToNothing, readVirtualizeFlag, () => false);
-
-    const isFindRequested = useFindInPageOverride();
-    const plan: WindowPlan = getWindowPlan(messages.length, { enabled: isVirtualizeFlagOn && !isFindRequested });
-
-    // Jump-to-message. Refs hold the latest plan/messages so the listener is attached once.
-    const virtualizerRef = useRef<Virtualizer<HTMLElement, Element> | null>(null);
-    const jumpStateRef = useRef({ messages, plan, threadId });
+    // Jump-to-message. A ref holds the latest messages so the listener is attached once.
+    const jumpStateRef = useRef({ messages, threadId });
 
     useLayoutEffect(() => {
-        jumpStateRef.current = { messages, plan, threadId };
+        jumpStateRef.current = { messages, threadId };
     });
 
-    const handleVirtualizer = useCallback((virtualizer: Virtualizer<HTMLElement, Element> | null) => {
-        virtualizerRef.current = virtualizer;
-    }, []);
+    const listRef = useRef<HTMLDivElement>(null);
+
+    // Each jump's generation: a newer request, or unmounting, stops an older jump still re-centring its row.
+    const jumpGenerationRef = useRef(0);
+
+    useEffect(
+        () => () => {
+            jumpGenerationRef.current += 1;
+        },
+        [],
+    );
 
     const jumpTo = useCallback((requestedId: string, position?: MessagePosition, focus = true): boolean => {
-        const { messages: currentMessages, plan: currentPlan } = jumpStateRef.current;
-        const messageId = resolveJumpMessageId(currentMessages, requestedId, position);
+        const messageId = resolveJumpMessageId(jumpStateRef.current.messages, requestedId, position);
+        const element = messageId ? findJumpTarget(listRef.current, jumpStateRef.current.messages, messageId) : null;
 
-        if (!messageId) {
+        if (!element) {
             return false;
         }
 
-        const target = resolveJumpTarget(
-            currentMessages.map((message) => message.id),
-            messageId,
-            currentPlan,
-        );
+        jumpGenerationRef.current += 1;
 
-        if (target.kind === "missing") {
-            return false;
+        const generation = jumpGenerationRef.current;
+
+        element.scrollIntoView({ block: "center" });
+
+        // Move focus too, so keyboard and screen-reader users land where sighted users do.
+        if (focus) {
+            // Marks the row a jump landed on, so it alone shows a focus ring; a row focused by a click in its text does not.
+            element.dataset.jumped = "";
+            element.addEventListener(
+                "blur",
+                () => {
+                    delete element.dataset.jumped;
+                },
+                { once: true },
+            );
+            element.focus({ preventScroll: true });
         }
 
-        const reveal = () => {
-            const element = document.querySelector<HTMLElement>(`[data-list-message-id="${CSS.escape(messageId)}"]`);
+        // Re-centre whenever the row's centre moved, for every frame of the budget: rows above it render at their real height as
+        // they come into view, and one can still change after a still frame (a late image, a skip that ends later).
+        // The reader scrolling on their own (wheel, drag, touch, a key) ends the re-centring: it would fight their input.
+        let framesLeft = JUMP_SETTLE_FRAMES;
+        let previousCentre = NaN;
+        const readerInput = new AbortController();
+        const stopOnInput = () => readerInput.abort();
 
-            if (!element) {
+        for (const type of ["wheel", "touchmove", "keydown", "pointerdown"] as const) {
+            element.ownerDocument.addEventListener(type, stopOnInput, { capture: true, passive: true, signal: readerInput.signal });
+        }
+
+        const settle = () => {
+            if (jumpGenerationRef.current !== generation || !element.isConnected || readerInput.signal.aborted) {
+                readerInput.abort();
+
                 return;
             }
 
-            element.scrollIntoView({ block: "center" });
+            // The centre, not the top: the row itself can grow in place (an image in it loading without a size).
+            const { height, top } = element.getBoundingClientRect();
+            const centre = top + height / 2;
 
-            // Move focus too, so keyboard and screen-reader users land where sighted users do.
-            if (focus) {
-                // Marks the row a jump landed on, so it alone shows a focus ring; a row focused by a click in its text does not.
-                element.dataset.jumped = "";
-                element.addEventListener(
-                    "blur",
-                    () => {
-                        delete element.dataset.jumped;
-                    },
-                    { once: true },
-                );
-                element.focus({ preventScroll: true });
+            if (Number.isNaN(previousCentre) || Math.abs(centre - previousCentre) >= 1) {
+                element.scrollIntoView({ block: "center" });
+            }
+
+            previousCentre = centre;
+            framesLeft -= 1;
+
+            if (framesLeft > 0) {
+                requestAnimationFrame(settle);
+            } else {
+                readerInput.abort();
             }
         };
 
-        if (target.kind === "head" && virtualizerRef.current) {
-            // Mount the row first, then let it measure before the precise scroll.
-            virtualizerRef.current.scrollToIndex(target.index, { align: "center" });
-            requestAnimationFrame(() => requestAnimationFrame(reveal));
-        } else {
-            reveal();
-        }
+        requestAnimationFrame(settle);
 
         return true;
     }, []);
@@ -313,6 +228,8 @@ const MessageList: FC<MessageListProps> = memo(({ className, editComposerCompone
     });
 
     const requestJump = useCallback(({ focus, messageId, position, threadId: targetThreadId }: ScrollToMessageDetail) => {
+        // A request stops the re-centring an earlier jump still has pending, even before its own target loads.
+        jumpGenerationRef.current += 1;
         pendingJumpRef.current = { focus, messageId, pagesLoaded: 0, position, threadId: targetThreadId };
         setJumpRequest((value) => value + 1);
     }, []);
@@ -366,7 +283,10 @@ const MessageList: FC<MessageListProps> = memo(({ className, editComposerCompone
             }
 
             if (jumpTo(pending.messageId, pending.position, pending.focus)) {
-                pendingJumpRef.current = undefined;
+                // A request made while this one landed is left for the next run.
+                if (pendingJumpRef.current === pending) {
+                    pendingJumpRef.current = undefined;
+                }
 
                 return;
             }
@@ -410,7 +330,7 @@ const MessageList: FC<MessageListProps> = memo(({ className, editComposerCompone
         return emptyComponent ? <>{emptyComponent}</> : null;
     }
 
-    // aria-setsize: screen readers report the full thread length even when rows are virtualized.
+    // aria-setsize: screen readers report the full thread length, placeholder included.
     const setSize = messages.length + (showPlaceholder ? 1 : 0);
 
     const renderMessage = (message: UIMessage, index: number): ReactNode => {
@@ -470,32 +390,31 @@ const MessageList: FC<MessageListProps> = memo(({ className, editComposerCompone
         );
     };
 
-    const tailStart = plan.virtualized ? plan.headCount : 0;
-
     return (
         <>
             {/* Loading indicator — trigger lives in ThreadViewport's scroll handler */}
             <LoadMoreTrigger status={messagesStatus} />
 
-            <div className={cn("message-list flex flex-col", className)} role="list" style={{ "--thread-max-width": maxWidth } as React.CSSProperties}>
-                {plan.virtualized && (
-                    <VirtualizedHead
-                        layoutKey={messagesStatus}
-                        messages={messages.slice(0, plan.headCount)}
-                        onVirtualizer={handleVirtualizer}
-                        renderRow={renderRow}
-                    />
-                )}
+            <div
+                className={cn("message-list flex flex-col", className)}
+                ref={listRef}
+                role="list"
+                style={{ "--thread-max-width": maxWidth } as React.CSSProperties}
+            >
+                {messages.map((message, index) => (
+                    <Fragment key={message.id}>{renderRow(message, index)}</Fragment>
+                ))}
 
-                {messages.slice(tailStart).map((message, offset) => {
-                    const index = tailStart + offset;
-
-                    return <Fragment key={message.id}>{renderRow(message, index)}</Fragment>;
-                })}
-
-                {/* Placeholders stay in the always-mounted tail so their live region is never virtualized away. */}
+                {/* The placeholder is not a message row: its live region is never skipped (`content-visibility` is on rows only). */}
                 {showPlaceholder && (
-                    <div aria-posinset={setSize} aria-setsize={setSize} role="listitem">
+                    <div
+                        aria-posinset={setSize}
+                        aria-setsize={setSize}
+                        className="data-jumped:focus-visible:ring-ring rounded-lg outline-none data-jumped:focus-visible:ring-2 data-jumped:focus-visible:ring-inset"
+                        data-list-streaming=""
+                        role="listitem"
+                        tabIndex={-1}
+                    >
                         {/* Gateway streaming placeholder - uses MessageContent for identical rendering */}
                         {/* Without a gateway token (a host-run turn, or a stream another client started) it reads the persisted body. */}
                         {streamIdToShow && (

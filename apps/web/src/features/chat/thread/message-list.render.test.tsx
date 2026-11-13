@@ -18,8 +18,10 @@ const harness = vi.hoisted(() => {
     return {
         actions: {} as Record<string, unknown>,
         ActionsContext: undefined as Context<Record<string, unknown>> | undefined,
+        activeStreamId: null as string | null,
         contentRenders: new Map<string, number>(),
         goal: null as unknown,
+        infos: [] as string[],
         messages: [] as unknown[],
         MessagesContext: undefined as Context<unknown[]> | undefined,
         publish: undefined as (() => void) | undefined,
@@ -46,7 +48,7 @@ vi.mock("@/features/chat/core/context/chat-context", async () => {
     return {
         useChatActions: () => use(harness.ActionsContext!),
         useChatIsStreaming: () => {
-            return { activeStreamId: null, gatewayUrl: null, isStreaming: false, streamToken: null };
+            return { activeStreamId: harness.activeStreamId, gatewayUrl: null, isStreaming: harness.activeStreamId !== null, streamToken: null };
         },
         useChatMessages: () => {
             return { isStreaming: false, loadMore: () => {}, messages: use(harness.MessagesContext!), messagesReady: true, messagesStatus: "Exhausted" };
@@ -76,7 +78,10 @@ vi.mock("./message-content", () => {
 });
 
 vi.mock("./streaming-placeholder", () => {
-    return { StreamingPlaceholder: () => null, ThinkingPlaceholder: () => null };
+    return {
+        StreamingPlaceholder: ({ streamId }: { streamId: string }) => createElement("div", { "data-testid": "streaming-placeholder" }, streamId),
+        ThinkingPlaceholder: () => null,
+    };
 });
 
 vi.mock("@/features/chat/core/hooks/use-thread-manager", () => {
@@ -151,6 +156,44 @@ vi.mock("@/features/chat/translation/translate-action", () => {
 vi.mock("./fork-branch-dialog", () => {
     return { default: () => null };
 });
+
+vi.mock("@/lib/toast", async (importOriginal) => {
+    return {
+        ...(await importOriginal<object>()),
+        showInfo: (message: string) => {
+            harness.infos.push(message);
+        },
+    };
+});
+
+/** Animation frames the jump tests run by hand, so none waits on the runner delivering real ones. */
+const frames = new Map<number, FrameRequestCallback>();
+const frameIds = { last: 0 };
+
+const stubAnimationFrames = (): void => {
+    frames.clear();
+    vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
+        frameIds.last += 1;
+        frames.set(frameIds.last, callback);
+
+        return frameIds.last;
+    });
+    vi.stubGlobal("cancelAnimationFrame", (id: number) => frames.delete(id));
+};
+
+/** Runs `count` frames, each in its own `act` so the effects a frame causes are committed before the next one. */
+const runFrames = (count: number): void => {
+    for (let frame = 0; frame < count; frame += 1) {
+        const due = [...frames.values()];
+
+        frames.clear();
+        act(() => {
+            for (const callback of due) {
+                callback(performance.now());
+            }
+        });
+    }
+};
 
 // Imported after the mocks.
 const { default: MessageList, scrollToMessage } = await import("./message-list");
@@ -410,5 +453,199 @@ describe("message list goal", () => {
         expect(harness.contentRenders.has("m2")).toBe(false);
         expect(harness.contentRenders.has("m1")).toBe(true);
         expect(harness.contentRenders.has("m3")).toBe(true);
+    });
+});
+
+describe("a long thread", () => {
+    afterEach(() => {
+        harness.activeStreamId = null;
+        vi.restoreAllMocks();
+    });
+
+    beforeEach(() => {
+        harness.messages = Array.from({ length: THREAD_LENGTH }, (_, index) => makeMessage(index));
+        harness.actions = { copyMessage: () => {}, reloadMessage: () => {} };
+    });
+
+    it("keeps every message mounted, each a row directly in the list, where off-screen rows skip layout and paint", () => {
+        mountInto();
+
+        const rows = [...document.querySelectorAll<HTMLElement>("[data-list-message-id]")];
+
+        expect(rows).toHaveLength(THREAD_LENGTH);
+        // `.message-list > [data-list-message-id]` in styles.css: content-visibility applies to exactly these.
+        expect(rows.every((row) => row.parentElement?.classList.contains("message-list"))).toBe(true);
+    });
+
+    it("renders the streaming reply as the list's last item, outside the rows the stylesheet can skip", () => {
+        harness.activeStreamId = "stream-1";
+
+        mountInto();
+
+        const placeholder = screen.getByTestId("streaming-placeholder");
+
+        expect(placeholder.closest("[data-list-message-id]")).toBeNull();
+        expect(screen.getAllByRole("listitem").at(-1)?.contains(placeholder)).toBe(true);
+    });
+
+    describe("a jump", () => {
+        /** Calls of `scrollIntoView` per row, and the tops a row reports, frame after frame. */
+        const scrolls = new Map<string, number>();
+        const tops = new Map<string, number[]>();
+        /** The heights a row reports, frame after frame (100 when unset). */
+        const heights = new Map<string, number[]>();
+        /** Runs after a row's `scrollIntoView`. */
+        let onScroll: (id: string) => void = () => {};
+
+        beforeEach(() => {
+            scrolls.clear();
+            tops.clear();
+            heights.clear();
+            onScroll = () => {};
+            harness.infos.length = 0;
+            stubAnimationFrames();
+        });
+
+        afterEach(() => {
+            vi.unstubAllGlobals();
+        });
+
+        const rowOf = (id: string): HTMLElement => document.querySelector<HTMLElement>(`[data-list-message-id="${CSS.escape(id)}"]`)!;
+
+        /** Gives every mounted row a scroll that is counted and a top that follows `tops`, frame after frame. */
+        const stubRows = (): void => {
+            for (const row of document.querySelectorAll<HTMLElement>("[data-list-message-id]")) {
+                const id = row.dataset.listMessageId ?? "";
+
+                Object.defineProperties(row, {
+                    getBoundingClientRect: {
+                        configurable: true,
+                        value: () => {
+                            const queue = tops.get(id) ?? [];
+                            const top = queue.length > 1 ? queue.shift()! : (queue[0] ?? 0);
+                            const heightQueue = heights.get(id) ?? [];
+                            const height = heightQueue.length > 1 ? heightQueue.shift()! : (heightQueue[0] ?? 100);
+
+                            return { bottom: top + height, height, left: 0, right: 0, top, width: 0, x: 0, y: top } as DOMRect;
+                        },
+                    },
+                    scrollIntoView: {
+                        configurable: true,
+                        value: () => {
+                            scrolls.set(id, (scrolls.get(id) ?? 0) + 1);
+                            onScroll(id);
+                        },
+                    },
+                });
+            }
+        };
+
+        it("re-centres its row until rows above it stop pushing it", () => {
+            // Rows above render at their real height as they come into view: the row moves twice, then stays.
+            tops.set("m100", [500, 300, 300]);
+            mountInto();
+            stubRows();
+
+            act(() => scrollToMessage("m100"));
+            // The jump's own frame, then one per re-centring.
+            runFrames(4);
+
+            expect(scrolls.get("m100")).toBe(3);
+            expect(document.activeElement).toBe(rowOf("m100"));
+
+            runFrames(3);
+
+            expect(scrolls.get("m100")).toBe(3);
+            // Re-centring moves the view, never focus: keyboard and screen-reader users stay on the message.
+            expect(document.activeElement).toBe(rowOf("m100"));
+        });
+
+        it("re-centres its row again when a row above changes after it stood still", () => {
+            // Still for two frames, then a late image above it pushes it once more.
+            tops.set("m100", [500, 300, 300, 300, 250, 250]);
+            mountInto();
+            stubRows();
+
+            act(() => scrollToMessage("m100"));
+            runFrames(8);
+
+            // The jump's own scroll, the two moves while rows settled, and the late one.
+            expect(scrolls.get("m100")).toBe(4);
+            expect(document.activeElement).toBe(rowOf("m100"));
+        });
+
+        it("re-centres its row when it grows in place, its top unmoved", () => {
+            // An image in the row loads without a reserved size: the row grows by 400px, its top stays.
+            tops.set("m100", [300]);
+            heights.set("m100", [100, 100, 500, 500]);
+            mountInto();
+            stubRows();
+
+            act(() => scrollToMessage("m100"));
+            runFrames(6);
+
+            // The jump's own scroll, the first settling frame, and the growth.
+            expect(scrolls.get("m100")).toBe(3);
+        });
+
+        it("stops re-centring once the reader scrolls on their own", () => {
+            // A row that never settles would be re-centred for every frame of the budget.
+            tops.set("m100", [100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 1100]);
+            mountInto();
+            stubRows();
+
+            act(() => scrollToMessage("m100"));
+            runFrames(2);
+
+            const before = scrolls.get("m100");
+
+            // The reader turns the wheel right after the jump.
+            act(() => {
+                document.body.dispatchEvent(new WheelEvent("wheel", { bubbles: true, deltaY: -100 }));
+            });
+            runFrames(8);
+
+            expect(scrolls.get("m100")).toBe(before);
+        });
+
+        it("stops re-centring an older jump once a newer one is asked for", () => {
+            // A row that never settles would be re-centred for every frame of the budget.
+            tops.set("m100", [100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 1100]);
+            mountInto();
+            stubRows();
+
+            // The newer jump is asked for right after the older one first scrolls its row.
+            onScroll = (id) => {
+                if (id === "m100" && scrolls.get("m100") === 1) {
+                    scrollToMessage("m150");
+                }
+            };
+            act(() => scrollToMessage("m100"));
+            runFrames(14);
+
+            expect(scrolls.get("m150")).toBeGreaterThanOrEqual(1);
+            // Its first scroll only: none of the re-centring frames ran.
+            expect(scrolls.get("m100")).toBe(1);
+            // Focus went to the newer target and stayed there.
+            expect(document.activeElement).toBe(rowOf("m150"));
+        });
+
+        it("lands on the streaming item for the reply still streaming, without paging or a not-found notice", () => {
+            const last = THREAD_LENGTH - 1;
+
+            harness.activeStreamId = "stream-1";
+            harness.messages = [...(harness.messages as UIMessage[]).slice(0, last), { ...makeMessage(last), status: "pending" } as UIMessage];
+            mountInto();
+
+            const streaming = screen.getAllByRole("listitem").at(-1)!;
+
+            streaming.scrollIntoView = vi.fn();
+            act(() => scrollToMessage(`m${String(last)}`));
+            runFrames(4);
+
+            expect(streaming.scrollIntoView).toHaveBeenCalled();
+            expect(document.activeElement).toBe(streaming);
+            expect(harness.infos).toStrictEqual([]);
+        });
     });
 });
