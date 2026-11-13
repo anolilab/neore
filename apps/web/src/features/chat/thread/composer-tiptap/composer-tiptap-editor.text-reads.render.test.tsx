@@ -1,8 +1,9 @@
 /**
- * One keystroke in the REAL composer editor reads its text from the change handler and from the ghost completion's
+ * One keystroke, typed through the keyboard events ProseMirror handles, in the REAL composer editor reads its text from the change handler and from the ghost completion's
  * update and selection-change listeners. The text of one document is serialised once, however many of them ask.
  */
-import { act, render, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { Editor } from "@tiptap/core";
 import { createRef } from "react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
@@ -105,19 +106,18 @@ describe("ComposerTiptapEditor text reads", () => {
             expect(ref.current?.getEditor()).toBeTruthy();
         });
 
-        const editor = ref.current!.getEditor()!;
+        const user = userEvent.setup();
 
+        // Focused directly: a click asks for layout (`elementFromPoint`) that jsdom does not have.
         act(() => {
-            editor.commands.focus();
+            screen.getByRole("textbox").focus();
         });
 
         const editorGetText = vi.spyOn(Editor.prototype, "getText");
 
         serialised.count = 0;
 
-        act(() => {
-            editor.commands.insertContent("a");
-        });
+        await user.keyboard("a");
 
         expect(onChange).toHaveBeenLastCalledWith("a");
         expect(serialised.count + editorGetText.mock.calls.length).toBe(1);
