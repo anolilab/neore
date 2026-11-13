@@ -70,6 +70,11 @@ export default class Rules implements RuleLookup {
      * decide whether to treat a node as transparent asks this first.
      */
     hasRuleFor(node: Node): boolean {
+        // Only an element has a rule. A filter written for elements must not be handed a text node.
+        if (node.nodeType !== 1) {
+            return false;
+        }
+
         return decideRule(this.decided, this.searchOrder, annotateNode(node, this.options), this.options, this) !== undefined;
     }
 
