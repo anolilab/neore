@@ -1346,13 +1346,32 @@ function linkText(content: string, hardBreak: string): string {
             // A newline in the marker itself would split the link, so it becomes a space too.
             const inline = written.replaceAll(MARKER_NEWLINES, " ").trimEnd();
 
-            if (inline && !HARD_BREAK.test(whole.slice(0, offset + written.length))) {
+            if (inline && !hasHardBreakEnding(whole, offset + written.length)) {
                 return `${inline} `;
             }
 
             return whole.charAt(offset - 1) === " " ? "" : " ";
         })
         .slice(0, -1);
+}
+
+/**
+ * True when the text up to `end` ends as CommonMark's hard break does: in two spaces, or in an
+ * unescaped backslash (an odd run of them). It reads back from `end` only, so it costs the length of
+ * that run, not of the text before it.
+ */
+function hasHardBreakEnding(text: string, end: number): boolean {
+    if (text.startsWith("  ", end - 2)) {
+        return true;
+    }
+
+    let start = end;
+
+    while (start > 0 && text.charAt(start - 1) === "\\") {
+        start -= 1;
+    }
+
+    return (end - start) % 2 === 1;
 }
 
 /**

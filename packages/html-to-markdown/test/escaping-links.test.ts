@@ -452,3 +452,21 @@ describe("reference labels with a non-breaking space", () => {
         );
     });
 });
+
+/*
+ * Deciding whether a dropped marker ends in a hard break reads back from the marker only. Reading the whole link text
+ * before each break made a link with many breaks quadratic. The bound is far above the linear time and far below the
+ * quadratic one (about 7 s for this input).
+ */
+
+describe("a link with many breaks that are not kept", () => {
+    it("converts in time linear in the number of breaks", () => {
+        const breaks = 24_000;
+        const html = `<a href=/x>${"a<br><h1>b</h1>".repeat(breaks)}</a>`;
+        const start = performance.now();
+        const markdown = new TurndownService({ br: "<br>" }).turndown(html);
+
+        expect(markdown.startsWith("[")).toBe(true);
+        expect(performance.now() - start).toBeLessThan(3000);
+    });
+});
