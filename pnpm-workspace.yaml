@@ -314,7 +314,7 @@ catalogs:
     "@lunora/d1": 1.0.0-alpha.236
     "@lunora/mail": 1.0.0-alpha.139
     "@lunora/notify": 1.0.0-alpha.113
-    "@lunora/payment": 1.0.0-alpha.271
+    "@lunora/payment": 1.0.0-alpha.272
     "@lunora/queue": 1.0.0-alpha.143
     "@lunora/ratelimit": 1.0.0-alpha.196
     "@lunora/react": 1.0.0-alpha.299
