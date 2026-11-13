@@ -25,7 +25,7 @@ export interface HistoryRow {
 }
 
 export interface HistoryGap {
-    /** The oldest row of the run that joins the newest row. */
+    /** The oldest row of the run that joins the newest row; {@link EMPTY_RUN} while no row of that run is shown yet. */
     anchorId: string;
     /** Where the history below `anchorId` is read from. */
     cursor: string;
@@ -56,6 +56,16 @@ export interface HistoryPage<R> {
     rows: R[];
 }
 
+/**
+ * The anchor of a hole above which no row is shown yet: a newest page with nothing to show (its messages had no
+ * content) that is not the chat's end, over saved rows whose place is not known. Every row on screen is kept below it.
+ */
+const EMPTY_RUN = "";
+
+/** Where the run that joins the newest row starts in `rows`, for a hole anchored at `anchorId`. */
+const anchorAt = (rows: ReadonlyArray<HistoryRow>, anchorId: string): number =>
+    anchorId === EMPTY_RUN ? rows.length : Math.max(0, rows.findIndex((row) => row.id === anchorId));
+
 /** A row the server holds: rows made on this screen (sending, or sent and not read back yet) are not. */
 const isServerRow = (row: HistoryRow): boolean => row.status !== "local" && row.finished !== true;
 
@@ -74,7 +84,7 @@ export const hasOlder = (history: ChatHistory<HistoryRow>): boolean => nextOlder
 
 /** The rows of the run that joins the newest row: what may be saved as the chat's newest messages. */
 export const newestRun = <R extends HistoryRow>(history: ChatHistory<R>): R[] => {
-    const start = history.gap === undefined ? 0 : Math.max(0, history.rows.findIndex((row) => row.id === history.gap?.anchorId));
+    const start = history.gap === undefined ? 0 : anchorAt(history.rows, history.gap.anchorId);
 
     return history.rows.slice(start).filter((row) => isServerRow(row));
 };
@@ -94,7 +104,7 @@ interface Split<R> {
 const splitOf = <R extends HistoryRow>(history: ChatHistory<R>): Split<R> => {
     if (history.gap !== undefined) {
         const { anchorId, keptCursor, keptGap } = history.gap;
-        const at = Math.max(0, history.rows.findIndex((row) => row.id === anchorId));
+        const at = anchorAt(history.rows, anchorId);
 
         return { kept: history.rows.slice(0, at), keptCursor, keptGap, run: history.rows.slice(at) };
     }
@@ -142,8 +152,16 @@ const merged = <R extends HistoryRow>({ kept, keptCursor, keptGap, run }: Split<
     const [pageOldest] = pageRows;
     const body = [...pageRows, ...run];
 
-    if (pageOldest === undefined || page.olderCursor === null) {
+    if (page.olderCursor === null) {
         return { olderCursor: page.olderCursor, rows: body };
+    }
+
+    if (pageOldest === undefined) {
+        // A page with nothing new to show that is not the chat's end: the rows kept below stay, and so does what is
+        // known below them; the hole reads on from the page's cursor.
+        return kept.length === 0
+            ? { olderCursor: page.olderCursor, rows: body }
+            : { gap: gapOf(run[0]?.id ?? EMPTY_RUN, page.olderCursor, { cursor: keptCursor, gap: keptGap }), olderCursor: undefined, rows: [...kept, ...run] };
     }
 
     const pageIds = new Set(pageRows.map((row) => row.id));
@@ -200,8 +218,8 @@ const newestPageOf = <R extends HistoryRow>(history: ChatHistory<R>, page: Histo
 
     if (oldest === undefined) {
         // A page with nothing to show (its messages had no content) that is not the chat's end tells nothing about the
-        // rows on screen: they stay, and an empty screen can still read on from the page's cursor.
-        return history.rows.length === 0 ? { olderCursor: page.olderCursor, rows: [] } : history;
+        // rows on screen: they stay, below a hole read from the page's cursor ({@link merged}).
+        return merged({ kept: history.rows, keptCursor: history.olderCursor, keptGap: history.gap, run: [] }, page);
     }
 
     const split = splitOf(history);

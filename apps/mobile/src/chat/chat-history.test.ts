@@ -666,12 +666,25 @@ describe("any split of a chat into pages", () => {
 });
 
 describe("an empty newest page that is not the chat's end", () => {
-    it("keeps the rows on screen, their hole and their cursor", () => {
+    it("keeps the rows on screen and reads on from the page's cursor", () => {
         const shown = withNewestPage({ olderCursor: null, rows: run(1, 20) }, { olderCursor: "61", rows: run(61, 80) });
         const next = withNewestPage(shown, { olderCursor: "next", rows: [] });
 
-        expect(next).toStrictEqual(shown);
-        expect(hasOlder(next)).toBe(true);
+        expect(ids(next.rows)).toStrictEqual(ids(shown.rows));
+        expect(nextOlderCursor(next)).toBe("next");
+    });
+
+    it("lets saved rows whose place is not known yet read on from the page's cursor, and joins them when a page reaches them", () => {
+        const next = withNewestPage({ olderCursor: undefined, rows: run(41, 60) }, { olderCursor: "61", rows: [] });
+
+        expect(ids(next.rows)).toStrictEqual(ids(run(41, 60)));
+        expect(nextOlderCursor(next)).toBe("61");
+
+        // The page below the empty one reaches the saved rows: they are on the chat, and the hole moves to its oldest row.
+        const joined = withOlderPage(next, { olderCursor: "41", rows: run(41, 60) }, "61");
+
+        expect(ids(joined.rows)).toStrictEqual(ids(run(41, 60)));
+        expect(nextOlderCursor(joined)).toBe("41");
     });
 
     it("lets an empty screen read on from the page's cursor", () => {
@@ -682,5 +695,16 @@ describe("an empty newest page that is not the chat's end", () => {
 
     it("still ends the chat when the empty page is its end", () => {
         expect(withNewestPage({ olderCursor: "41", rows: run(41, 60) }, { olderCursor: null, rows: [] })).toStrictEqual({ olderCursor: null, rows: [] });
+    });
+});
+
+describe("an empty older page under a hole that is not the chat's end", () => {
+    it("keeps the rows kept below the hole and reads on from the page's cursor", () => {
+        const shown = withNewestPage({ olderCursor: "1", rows: run(1, 20) }, { olderCursor: "61", rows: run(61, 80) });
+        const next = withOlderPage(shown, { olderCursor: "50", rows: [] }, "61");
+
+        expect(ids(next.rows)).toStrictEqual(ids([...run(1, 20), ...run(61, 80)]));
+        expect(nextOlderCursor(next)).toBe("50");
+        expect(next.gap?.anchorId).toBe("m61");
     });
 });

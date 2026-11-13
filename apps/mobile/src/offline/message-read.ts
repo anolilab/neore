@@ -72,12 +72,20 @@ export type MessageReadResult
         | { kind: "superseded" }
         | { kind: "unreachable" };
 
-const failureOf = async (error: unknown, cache: ScopedCache | undefined, threadId: string): Promise<{ kind: "failed"; message: string } | { kind: "refused" } | { kind: "unreachable" }> => {
+const failureOf = async (
+    error: unknown,
+    cache: ScopedCache | undefined,
+    threadId: string,
+    gate: MessageReadGate,
+): Promise<{ kind: "failed"; message: string } | { kind: "refused" } | { kind: "unreachable" }> => {
     if (isNetworkFailure(error)) {
         return { kind: "unreachable" };
     }
 
     if (isThreadRefusal(error)) {
+        // Every read in flight is stale from here: one landing while the saved copy is dropped must neither show nor save
+        // its rows, or the save could put them back after the deletion.
+        gate.invalidate();
         // A chat that is locked shows no cached content, and nothing of it stays on the device.
         try {
             await cache?.forgetThreads([threadId]);
@@ -124,7 +132,7 @@ export const readThreadMessages = async ({ cache, fetchRows, gate, now = Date.no
             return { kind: "superseded" };
         }
 
-        return failureOf(error, cache, threadId);
+        return failureOf(error, cache, threadId, gate);
     }
 };
 
@@ -158,6 +166,6 @@ export const readOlderMessages = async ({ cache, fetchPage, gate, isCurrent = ga
 
         return isCurrent() ? { kind: "page", olderCursor, rows } : { kind: "superseded" };
     } catch (error: unknown) {
-        return isCurrent() ? failureOf(error, cache, threadId) : { kind: "superseded" };
+        return isCurrent() ? failureOf(error, cache, threadId, gate) : { kind: "superseded" };
     }
 };

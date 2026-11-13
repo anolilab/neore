@@ -242,6 +242,63 @@ describe("an older page", () => {
         expect(await scoped.loadThreads()).toEqual([]);
     });
 
+    it("makes a newest-page read that lands while the saved copy is dropped stale, on screen and in the cache", async () => {
+        const scoped = await setup();
+        const gate = createMessageReadGate();
+        let answerNewest: (() => void) | undefined;
+        let finishForget: (() => void) | undefined;
+
+        await scoped.saveMessages("t1", [{ createdAt: 1, id: "m1", role: "user", shareText: "secret", status: "success", text: "secret", threadId: "t1" }]);
+
+        // The deletion waits for the test, so the newest-page read can land while it is pending.
+        const slowForget = {
+            ...scoped,
+            forgetThreads: async (threadIds: ReadonlyArray<string>) => {
+                // eslint-disable-next-line unicorn/prefer-promise-with-resolvers -- `Promise.withResolvers` needs Node 22.11; the package allows 22.0
+                await new Promise<void>((resolve) => {
+                    finishForget = resolve;
+                });
+                await scoped.forgetThreads(threadIds);
+            },
+        };
+
+        const newest = readThreadMessages({
+            cache: scoped,
+            fetchRows: async () => {
+                // eslint-disable-next-line unicorn/prefer-promise-with-resolvers -- `Promise.withResolvers` needs Node 22.11; the package allows 22.0
+                await new Promise<void>((resolve) => {
+                    answerNewest = resolve;
+                });
+
+                return { olderCursor: null, rows: [row("m2", 2, 9)] };
+            },
+            gate,
+            threadId: "t1",
+        });
+        const older = readOlderMessages({
+            cache: slowForget,
+            fetchPage: async () => {
+                throw forbidden();
+            },
+            gate,
+            isCurrent: () => true,
+            threadId: "t1",
+        });
+
+        await settle();
+        answerNewest?.();
+
+        expect((await newest).kind).toBe("superseded");
+
+        finishForget?.();
+
+        expect((await older).kind).toBe("refused");
+
+        await settle();
+
+        expect(await scoped.loadMessages("t1")).toEqual([]);
+    });
+
     it("keeps the saved copy when the server never answered, and reports a plain failure", async () => {
         const scoped = await setup();
 
