@@ -74,6 +74,7 @@ let mutationCalls: { args: unknown; ref: string }[] = [];
 let failAfterMessage = false;
 /** What the send's claim answers (`claimChatStart`), for a send with a `clientMessageId`. */
 let claimOutcome: unknown = null;
+let failStream = false;
 
 const run = async <T>(body: (ctx: any) => Promise<T>): Promise<T> => await harness.run(body);
 
@@ -114,6 +115,10 @@ const fakeContext = (): any => {
 
             if (reference.__lunoraRef === "chat_goals_internal:startGoal") {
                 return { error: "A goal is already running here.", ok: false };
+            }
+
+            if (reference.__lunoraRef === "chat_streaming:createStreamWithMessage" && failStream) {
+                throw new Error("stream write failed");
             }
 
             if (reference.__lunoraRef === "chat_streaming:createStreamWithMessage") {
@@ -179,6 +184,7 @@ beforeEach(async () => {
     mutationCalls = [];
     failAfterMessage = false;
     claimOutcome = null;
+    failStream = false;
     harness = lunoraTest(schema as never);
     threadId = await run(async (ctx) => await ctx.db.insert("threads", { model: A, status: "active", title: "T", userId: OWNER }));
     await insertRow("u1", 0, 0, "user", "hello");
@@ -451,6 +457,13 @@ describe("/chat/start and a sub-agent's wait", () => {
         const response = await start({ goal: { text: "Ship the release" }, model: A });
 
         expect(response.status).toBe(400);
+        expect(afterMessageCalls()).toStrictEqual([{ threadId }]);
+    });
+
+    it("tells it once about a saved prompt whose stream then fails", async () => {
+        failStream = true;
+
+        await expect(start({ model: A })).rejects.toThrow("stream write failed");
         expect(afterMessageCalls()).toStrictEqual([{ threadId }]);
     });
 

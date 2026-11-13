@@ -1663,6 +1663,7 @@ export const threads = sqliteTable("threads", {
     customSystemPrompt: text("customSystemPrompt"),
     deleted: integer("deleted", { mode: "boolean" }),
     deletedAt: real("deletedAt"),
+    deletingAt: real("deletingAt"),
     dictationLanguage: text("dictationLanguage"),
     enabledFeatures: text("enabledFeatures", { mode: "json" }).$type<Array<string>>(),
     externalThreadId: text("externalThreadId"),

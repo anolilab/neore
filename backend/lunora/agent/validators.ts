@@ -695,6 +695,8 @@ export const vThreadDocFields = {
     botId: v.optional(v.string()),
     contextResetMessageId: v.optional(v.string()),
     createdAt: v.optional(v.number()),
+    // Written only by a hard delete's first page (`agent/threads.ts`): the thread is going, so not a create or patch field.
+    deletingAt: v.optional(v.number()),
     // Written only by `chat/group/functions.ts`, which checks every participant
     // is a skill the owner may use — so it is deliberately not a create field.
     groupChat: v.optional(vGroupChat),

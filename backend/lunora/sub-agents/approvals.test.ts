@@ -20,6 +20,7 @@ import {
     cancelSubAgentRunsForStop,
     completeResumedRun,
     markDeletedThreadResults,
+    cancelDeletedThreadQueue,
     afterOwnerMessage,
     finishRun,
     listSubAgentApprovals,
@@ -1130,6 +1131,74 @@ describe("deleting a thread", () => {
         expect(await parentReplies()).toHaveLength(0);
     });
 
+    it("ends the worker messages the user typed, which a Stop leaves alone", async () => {
+        const typed = await run(async (context) => {
+            const now = Date.now();
+            const worker = await context.db.insert("threads", { status: "active", title: "Worker", userId: OWNER });
+
+            return await context.db.insert("subAgentRuns", {
+                childThreadId: worker,
+                clientId: "client-typed",
+                createdAt: now,
+                depth: 1,
+                mode: "worker",
+                parentThreadId: parentId,
+                startedAt: now,
+                status: "running",
+                task: "Typed by the user",
+                toolCallId: "call-typed",
+                updatedAt: now,
+                userId: OWNER,
+            });
+        });
+
+        await deleteThread(parentId);
+
+        const ended = await run(async (context) => await context.db.get("subAgentRuns", typed));
+
+        expect(ended.status).toBe("cancelled");
+    });
+
+    it("takes no result posted after its first page, however many it has yet to mark", async () => {
+        // More messages than one page, so the thread is still there after the delete's first page.
+        await run(async (context) => {
+            for (const order of [0, 1]) {
+                await context.db.insert("messages", {
+                    message: { content: `Message ${String(order)}`, role: "user" },
+                    order,
+                    status: "success",
+                    stepOrder: 0,
+                    threadId: parentId,
+                    tool: false,
+                    userId: OWNER,
+                });
+            }
+        });
+        await internalCall(_deletePageForThreadId, { limit: 1, threadId: parentId });
+        expect(await run(async (context) => await context.db.get("threads", parentId as Id<"threads">))).not.toBeNull();
+
+        // A run the paged marking has not reached yet: the thread is going, so its post is refused all the same.
+        const late = await run(async (context) => {
+            const now = Date.now();
+
+            return await context.db.insert("subAgentRuns", {
+                childThreadId: childId,
+                createdAt: now,
+                depth: 1,
+                parentThreadId: parentId,
+                result: "Late",
+                status: "succeeded",
+                task: "Late",
+                toolCallId: "call-late",
+                updatedAt: now,
+                userId: OWNER,
+            });
+        });
+
+        expect(await run(async (context) => await postRunResult(context, late, 0))).toBe(false);
+        expect(await parentReplies()).toHaveLength(0);
+    });
+
     it("schedules nothing for a thread with no runs", async () => {
         const lone = await run(async (context) => await context.db.insert("threads", { status: "active", title: "Lone", userId: OWNER }));
         const before = harness.scheduler.list().length;
@@ -1142,6 +1211,50 @@ describe("deleting a thread", () => {
                 .slice(before)
                 .filter((job) => JSON.stringify(job.args).includes(lone)),
         ).toStrictEqual([]);
+    });
+
+    it("cancels a deleted worker's queue past one call's 200, in a continuation", async () => {
+        const worker = await run(async (context) => {
+            const now = Date.now();
+            const thread = await context.db.insert("threads", { status: "active", title: "Worker", userId: OWNER });
+
+            for (let index = 0; index < 205; index += 1) {
+                await context.db.insert("subAgentRuns", {
+                    childThreadId: thread,
+                    createdAt: now + index,
+                    depth: 1,
+                    mode: "worker",
+                    parentThreadId: parentId,
+                    status: "queued",
+                    task: `Message ${String(index)}`,
+                    toolCallId: `call-many-queued-${String(index)}`,
+                    updatedAt: now,
+                    userId: OWNER,
+                });
+            }
+
+            return thread;
+        });
+        const queuedLeft = async (): Promise<number> => {
+            const rows = await run(
+                async (context) =>
+                    await context.db
+                        .query("subAgentRuns")
+                        .withIndex("by_childThreadId_and_status", (q: any) => q.eq("childThreadId", worker).eq("status", "queued"))
+                        .collect(),
+            );
+
+            return rows.length;
+        };
+
+        await deleteThread(worker);
+        expect(await queuedLeft()).toBe(5);
+
+        const jobs = harness.scheduler.list().filter((job) => JSON.stringify(job.args) === JSON.stringify({ threadId: worker }));
+
+        expect(jobs).toHaveLength(1);
+        await internalCall(cancelDeletedThreadQueue, { threadId: worker });
+        expect(await queuedLeft()).toBe(0);
     });
 
     it("cancels every queued message of a deleted worker, past the first page", async () => {

@@ -27173,6 +27173,12 @@
           "optional": true,
           "unique": false
         },
+        "deletingAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "dictationLanguage": {
           "kind": "string",
           "nullable": false,

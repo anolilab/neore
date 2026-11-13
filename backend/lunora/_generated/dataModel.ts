@@ -1935,6 +1935,7 @@ export interface Doc_threads {
     customSystemPrompt?: string;
     deleted?: boolean;
     deletedAt?: number;
+    deletingAt?: number;
     dictationLanguage?: string;
     enabledFeatures?: Array<string>;
     externalThreadId?: string;
@@ -5148,6 +5149,7 @@ export interface Insert_threads {
     customSystemPrompt?: string;
     deleted?: boolean;
     deletedAt?: number;
+    deletingAt?: number;
     dictationLanguage?: string;
     enabledFeatures?: Array<string>;
     externalThreadId?: string;

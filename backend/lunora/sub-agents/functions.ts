@@ -1201,7 +1201,8 @@ export const attachChildThread = internalMutation
 const GONE_PARENT_REASON = "The conversation that started this run is gone.";
 
 /** A deleted parent, or one no longer the run owner's, can never take the post. */
-const isGoneParent = (thread: Doc<"threads"> | null, run: RunDoc): boolean => !thread || thread.deleted === true || thread.userId !== run.userId;
+const isGoneParent = (thread: Doc<"threads"> | null, run: RunDoc): boolean =>
+    !thread || thread.deleted === true || thread.deletingAt !== undefined || thread.userId !== run.userId;
 
 const postToParent = async (ctx: MutationCtx, run: RunDoc, text: string): Promise<{ reason: string; retry: boolean } | undefined> => {
     const thread = await ctx.db.get("threads", run.parentThreadId as Id<"threads">);
@@ -2123,9 +2124,10 @@ const activeRunsOf = async (ctx: MutationCtx, parentThreadId: string): Promise<R
  * into a thread nobody waits on. Not what a person typed into a worker's own thread (those carry a
  * client id): only a Stop there ends them.
  */
-const delegatedTree = async (ctx: MutationCtx, threadId: string): Promise<RunDoc[]> => {
+const delegatedTree = async (ctx: MutationCtx, threadId: string, options: { withTyped?: boolean } = {}): Promise<RunDoc[]> => {
     const targets: RunDoc[] = [];
-    const notTyped = (run: RunDoc) => run.mode !== "worker" || run.clientId === undefined;
+    // A Stop leaves the messages the user typed into a worker alone; a delete (`withTyped`) takes them too.
+    const notTyped = (run: RunDoc) => options.withTyped === true || run.mode !== "worker" || run.clientId === undefined;
     const topLevel = await activeRunsOf(ctx, threadId);
     let level = topLevel.filter((run) => notTyped(run));
 
@@ -2263,9 +2265,10 @@ export const endSubAgentRunsOfDeletedThread = async (ctx: MutationCtx, threadId:
         }
     }
 
-    // Only an owned thread delegates (`delegateToSubAgent` admits runs for the parent's owner alone).
+    // Only an owned thread delegates (`delegateToSubAgent` admits runs for the parent's owner alone). Unlike a Stop, the
+    // runs the user typed into a worker go too: their lead and the thread their results go to are gone, and they spend.
     if (userId !== undefined) {
-        await cancelSubAgentRunsForStop(ctx, threadId, userId);
+        await cancelRuns(ctx, await delegatedTree(ctx, threadId, { withTyped: true }), userId);
     }
 };
 

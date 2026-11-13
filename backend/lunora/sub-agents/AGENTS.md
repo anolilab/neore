@@ -65,8 +65,9 @@
 - **Lifecycle:** the send (`chat/http.ts`, any content type, a resend too, not a new thread) calls `afterOwnerMessage`
   after the save and its claim, in its own transaction, never failing the send: a run waiting on that child ends unless
   one of its requests is still open on the latest turn (read from the waiting runs and the turn, no row history), and the
-  results held here are released. A hard delete marks every result bound for the thread `postFailed` and cancels its
-  queue, both paged with a continuation past a per-call bound, then ends the runs it is the child of and those it
-  delegated (`endSubAgentRunsOfDeletedThread`). A result for any parent with a request its owner can still answer
+  results held here are released. A hard delete sets the thread's `deletingAt` on its first page (a going thread takes
+  no post, `isGoneParent`), marks every result bound for it `postFailed` and cancels its queue (both paged with a
+  continuation), then ends the runs it is the child of and those it delegated, typed worker messages too
+  (`endSubAgentRunsOfDeletedThread`; a Stop leaves those). A result for any parent with a request its owner can still answer
   (pending, unexpired, open on its latest turn) is held; an answer or a send releases it (`releaseHeldResults`), the
   backed-off recheck covers an expiry. Every end goes through `finishRun`.
