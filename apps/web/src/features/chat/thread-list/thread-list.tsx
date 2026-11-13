@@ -5,7 +5,7 @@ import type { FC } from "react";
 import { lazy, Suspense, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 
-import { useAuth } from "@/features/auth/lib/auth-ui-provider";
+import { useAuthActiveOrganization } from "@/features/auth/hooks/use-auth-session";
 import { THREAD_LIST_PAGINATION_OPTS } from "@/features/chat/core/constants/query-options";
 import ManageThreadTagsDialog from "@/features/chat/tags/manage-thread-tags-dialog";
 import { useHasOpened } from "@/hooks/use-has-opened";
@@ -26,8 +26,7 @@ const CHAT_THREAD_PATH_RE = new RegExp(`^/chat/(${LUNORA_ID_SOURCE})$`);
 const ThreadList: FC = () => {
     const crpc = useCRPC();
     const { isAuthenticated, isLoading: isAuthLoading } = useLunoraAuth();
-    const { hooks } = useAuth();
-    const { data: activeOrganization } = hooks.useActiveOrganization();
+    const { data: activeOrganization } = useAuthActiveOrganization();
     const organizationId = activeOrganization?.id ?? null;
     const isAuthReady = isAuthenticated && !isAuthLoading;
     const [expandedThreads, setExpandedThreads] = useState<Set<string>>(() => new Set());

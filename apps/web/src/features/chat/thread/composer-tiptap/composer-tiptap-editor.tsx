@@ -35,6 +35,7 @@ import { LOAD_MARKS, useLoadMark } from "@/lib/analytics/load-marks";
 
 import type { ChatReference } from "../chat-reference";
 import { cleanEditorText } from "./clean-editor-text";
+import { readComposerText } from "./composer-text";
 import { composerEditorAttributes } from "./editor-attributes";
 import type { BannedWordMatch } from "./extensions/banned-word-decoration";
 import BannedWordDecoration from "./extensions/banned-word-decoration";
@@ -159,7 +160,7 @@ const editorGhostState = (editor: Editor, focused: boolean): Pick<GhostEligibili
     return {
         caretAtEnd: selection.empty && selection.head === Selection.atEnd(doc).from,
         focused,
-        text: editor.getText({ blockSeparator: "\n" }),
+        text: readComposerText(editor),
     };
 };
 
@@ -368,7 +369,7 @@ const ComposerTiptapEditor = ({
         onUpdate: ({ editor: ed }) => {
             isInternalUpdate.current = true;
             // Reads the raw text (the store counts what it removes), then cleans the document itself.
-            const text = ed.getText({ blockSeparator: "\n" });
+            const text = readComposerText(ed);
 
             cleanEditorText(ed);
             onChange(text);
@@ -442,7 +443,7 @@ const ComposerTiptapEditor = ({
             return;
         }
 
-        const currentText = editor.getText({ blockSeparator: "\n" });
+        const currentText = readComposerText(editor);
 
         if (currentText !== value) {
             // Convert plain text to paragraphs
@@ -523,7 +524,7 @@ const ComposerTiptapEditor = ({
         let clearAnnouncement: ReturnType<typeof setTimeout> | undefined;
 
         const controller = createGhostController({
-            getText: () => editor.getText({ blockSeparator: "\n" }),
+            getText: () => readComposerText(editor),
             onSuggestion: (suggestion) => {
                 if (editor.isDestroyed) {
                     return;

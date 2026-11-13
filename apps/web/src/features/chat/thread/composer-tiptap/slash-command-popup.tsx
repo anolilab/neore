@@ -19,7 +19,7 @@ import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } fro
 import { createPortal } from "react-dom";
 
 import { useModelPickerPopupActions } from "@/components/model-picker/model-picker-popup-store";
-import { useAuth } from "@/features/auth/lib/auth-ui-provider";
+import { useAuthSession } from "@/features/auth/hooks/use-auth-session";
 import useCompactThread from "@/features/chat/compaction/use-compact-thread";
 import useClearContext from "@/features/chat/context-reset/use-clear-context";
 import { useModelStore } from "@/features/chat/core/stores/model-store";
@@ -155,8 +155,7 @@ const SlashCommandPopup: FC<SlashCommandPopupProps> = ({
     const { compact } = useCompactThread(currentThreadId);
     const { clear } = useClearContext(currentThreadId);
 
-    const { hooks } = useAuth();
-    const { data: sessionData } = hooks.useSession();
+    const { data: sessionData } = useAuthSession();
     const user = sessionData?.user;
     const isProUser = (user as { plan?: string; role?: string } | undefined)?.plan === "premium" || user?.role === "admin";
 

@@ -8,6 +8,7 @@ import type {
     ChatMessagesContextValue,
     ChatStreamingContextValue,
     ChatThreadContextValue,
+    ChatThreadIdentity,
 } from "./chat-context-types";
 
 // --- Split Contexts ---
@@ -15,6 +16,10 @@ export const ChatThreadContext = createContext<ChatThreadContextValue | null>(nu
 export const ChatMessagesContext = createContext<ChatMessagesContextValue | null>(null);
 export const ChatStreamingContext = createContext<ChatStreamingContextValue | null>(null);
 export const ChatActionsContext = createContext<ChatActionsContextValue | null>(null);
+/** Changes only on empty↔non-empty, not on every streamed batch like the messages context. */
+export const ChatIsEmptyContext = createContext<boolean | null>(null);
+/** Changes only when the thread id, model or new-thread flag does, not on every write to the thread record. */
+export const ChatThreadIdentityContext = createContext<ChatThreadIdentity | null>(null);
 
 /** @deprecated Use specific context hooks instead */
 export const ChatContext = createContext<ChatContextValue | null>(null);
@@ -91,6 +96,20 @@ export const useChatMessages = (): Pick<ChatMessagesContextValue, "messages" | "
 export const useChatThread = (): ChatThreadContextValue => useChatThreadContext();
 
 /**
+ * The thread's id, model and new-thread flag, without the live thread record: a write to the record (title, status,
+ * settings) does not re-render the caller.
+ */
+export const useChatThreadIdentity = (): ChatThreadIdentity => {
+    const context = use(ChatThreadIdentityContext);
+
+    if (!context) {
+        throw new Error("useChatThreadIdentity must be used within a ChatProvider");
+    }
+
+    return context;
+};
+
+/**
  * Hook to access chat actions (subscribes only to actions context).
  */
 export const useChatActions = (): Pick<
@@ -103,11 +122,15 @@ export const useChatActions = (): Pick<
 };
 
 /**
- * Hook to check if thread is empty (no messages)
- * Uses derived boolean from messages context — only re-renders on empty↔non-empty transitions.
+ * Hook to check if thread is empty (no messages). Reads its own context, so a streamed batch, which changes the
+ * messages context, does not re-render the caller; only an empty↔non-empty change does.
  */
 export const useChatIsEmpty = (): boolean => {
-    const { isEmpty } = useChatMessagesContext();
+    const isEmpty = use(ChatIsEmptyContext);
+
+    if (isEmpty === null) {
+        throw new Error("useChatIsEmpty must be used within a ChatProvider");
+    }
 
     return isEmpty;
 };

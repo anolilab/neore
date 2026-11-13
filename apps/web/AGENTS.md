@@ -76,6 +76,9 @@ pnpm lint:types           # TypeScript check (NOT pnpm typecheck); inside apps/w
 - On a `todo` (compiler bail-out) finding, keep the manual `useMemo`/`useCallback`; fix the bail-out first or leave both.
 - Keep the `"@babel/traverse@7>@babel/types"` override in `pnpm-workspace.yaml`. In components avoid `throw`, `finally`,
   `?:`/`&&`/`??`/`?.` inside `try`/`catch` (use a module-level helper) and ref reads during render.
+- Read the session/organizations with `useAuthSession`/`useAuthActiveOrganization`/`useAuthOrganizationList`
+  (`features/auth/hooks/use-auth-session.ts`), never `useAuth().hooks.useX()`.
+  `scripts/react-compiler-bailouts.test.ts` lists components that must compile.
 - **Chat rows are memoized on message IDENTITY**: keep `useUIMessages`' structural sharing
   (`lib/agent/share-unchanged-messages.ts`); chat action callbacks read `messagesRef`, never close over `messages`;
   stream chunks are batched per frame (`createFrameBatcher`).

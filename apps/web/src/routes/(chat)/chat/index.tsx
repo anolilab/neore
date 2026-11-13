@@ -7,8 +7,8 @@ import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import RouteErrorBoundary from "@/components/error-boundaries/route-error-boundary";
+import { useAuthActiveOrganization, useAuthSession } from "@/features/auth/hooks/use-auth-session";
 import { useUserSettings } from "@/features/auth/hooks/use-user-settings";
-import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 import Assistant from "@/features/chat/assistant";
 import { useLinkSearchAsWritten, usePromptLinkDraft } from "@/features/chat/core/hooks/use-prompt-link-draft";
 import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
@@ -60,9 +60,8 @@ const ChatPage = () => {
     const navigate = useNavigate();
     const crpc = useCRPC();
     const { data: userSettings } = useUserSettings();
-    const { hooks } = useAuth();
-    const { data: activeOrganization, isPending: isOrgPending } = hooks.useActiveOrganization();
-    const { data: sessionData, isPending: isSessionPending } = hooks.useSession();
+    const { data: activeOrganization, isPending: isOrgPending } = useAuthActiveOrganization();
+    const { data: sessionData, isPending: isSessionPending } = useAuthSession();
     const activeTeamId = (sessionData?.session as { activeTeamId?: string | null } | undefined)?.activeTeamId ?? undefined;
     const resumeScopeReady = !isOrgPending && !isSessionPending;
     const resumeLastChat =

@@ -37,6 +37,8 @@ import { createDebouncer, DEFAULT_SIZE, readWindowState, restorableState, SAVE_D
 
 interface ShellState {
     composer?: BrowserWindow;
+    /** Set while a new composer loads: presses then only flip whether it opens at its first paint. */
+    composerOpening?: { wanted: boolean };
     /** Set once `registerDeviceIpc` has run: the core loaded. */
     deviceReady: boolean;
     /** Set in `start`: the tray's "Dictation settings…" opens its local window. */
@@ -112,14 +114,18 @@ const shellProbe: {
     device: boolean;
     dictation?: DictationProbe;
     openTerminal: (folder: string) => Promise<void>;
+    /** Whether the Quick Composer window exists: it is created on its first use. */
     quickComposer: boolean;
     terminalPids: () => number[];
+    /** What the shortcut and the tray item do; the e2e suite cannot press a global shortcut. */
+    toggleQuickComposer: () => void;
     tray: boolean;
 } = {
     device: false,
     openTerminal: async (_folder: string): Promise<void> => {},
     quickComposer: false,
     terminalPids: (): number[] => [],
+    toggleQuickComposer: (): void => {},
     tray: false,
 };
 
@@ -980,20 +986,100 @@ const createQuickComposer = (): BrowserWindow => {
         win.hide();
     });
     win.on("closed", () => {
+        if (state.composer !== win) {
+            return;
+        }
+
         state.composer = undefined;
+        state.composerOpening = undefined;
+        shellProbe.quickComposer = false;
     });
 
-    win.loadURL(composerPage.href);
+    // A page that failed to load, or whose renderer died, never paints again: it is thrown away, and the next press
+    // makes a new one instead of toggling a dead window. A failed load both fires `did-fail-load` and rejects
+    // `loadURL`, so only the first report is logged.
+    let discarded = false;
+    const discard = (reason: string): void => {
+        if (discarded) {
+            return;
+        }
+
+        discarded = true;
+        log(`Quick Composer discarded, a press opens a new one: ${reason}`);
+
+        if (state.composer === win) {
+            state.composer = undefined;
+            state.composerOpening = undefined;
+            shellProbe.quickComposer = false;
+        }
+
+        if (!win.isDestroyed()) {
+            win.destroy();
+        }
+    };
+
+    contents.on("did-fail-load", (_event, errorCode: number, description: string, _validatedUrl: string, isMainFrame: boolean) => {
+        if (isMainFrame) {
+            discard(`load failed (${errorCode} ${description})`);
+        }
+    });
+    contents.on("render-process-gone", (_event, details: { reason: string }) => discard(`renderer gone (${details.reason})`));
+
+    const load = async (): Promise<void> => {
+        try {
+            await win.loadURL(composerPage.href);
+        } catch (error) {
+            discard(`load failed (${String(error)})`);
+        }
+    };
+
+    load();
     state.composer = win;
     shellProbe.quickComposer = true;
 
     return win;
 };
 
+const revealQuickComposer = (composer: BrowserWindow): void => {
+    composer.center();
+    composer.show();
+    composer.focus();
+};
+
+/**
+ * The composer is created on its first use, not at start-up, so a launch spends no renderer on it while the site
+ * loads. Until its `ready-to-show` it is never shown: its page focuses the prompt on the window's `focus`, which a
+ * window shown before its script ran would miss. A press while it loads opens or closes it once it is ready.
+ */
 const toggleQuickComposer = (): void => {
     const { composer } = state;
 
     if (composer === undefined) {
+        const created = createQuickComposer();
+        const opening = { wanted: true };
+
+        state.composerOpening = opening;
+        created.once("ready-to-show", () => {
+            // A composer discarded after a failed load may still report its paint: the window is gone for good.
+            if (state.composer !== created) {
+                return;
+            }
+
+            if (state.composerOpening === opening) {
+                state.composerOpening = undefined;
+            }
+
+            if (opening.wanted) {
+                revealQuickComposer(created);
+            }
+        });
+
+        return;
+    }
+
+    if (state.composerOpening !== undefined) {
+        state.composerOpening.wanted = !state.composerOpening.wanted;
+
         return;
     }
 
@@ -1003,9 +1089,7 @@ const toggleQuickComposer = (): void => {
         return;
     }
 
-    composer.center();
-    composer.show();
-    composer.focus();
+    revealQuickComposer(composer);
 };
 
 /** A global shortcut can be taken by another app, and Wayland has none at all, so a failure is logged, never fatal. */
@@ -1376,8 +1460,8 @@ const start = (): void => {
     }
 
     createMainWindow();
-    createQuickComposer();
     createTray();
+    shellProbe.toggleQuickComposer = toggleQuickComposer;
     registerQuickComposerShortcut();
     dictation.register();
     checkForUpdates();

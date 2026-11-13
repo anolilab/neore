@@ -18,7 +18,7 @@ import type {
     ChatStreamingContextValue,
     ChatThreadContextValue,
 } from "@/features/chat/core/context/chat-context";
-import { ChatActionsContext, ChatMessagesContext, ChatStreamingContext, ChatThreadContext } from "@/features/chat/core/context/chat-context";
+import ChatContextProviders from "@/features/chat/core/context/chat-context-providers";
 import type { ModelId } from "@/features/chat/core/stores/model-store";
 import { useModelStore } from "@/features/chat/core/stores/model-store";
 import { useLunora } from "@/lib/lunora/crpc";
@@ -100,13 +100,9 @@ const LandingChatProvider = ({ children }: LandingChatProviderProps) => {
     }, [lunora]);
 
     return (
-        <ChatThreadContext value={threadValue}>
-            <ChatMessagesContext value={MESSAGES_VALUE}>
-                <ChatStreamingContext value={STREAMING_VALUE}>
-                    <ChatActionsContext value={actionsValue}>{children}</ChatActionsContext>
-                </ChatStreamingContext>
-            </ChatMessagesContext>
-        </ChatThreadContext>
+        <ChatContextProviders actions={actionsValue} messages={MESSAGES_VALUE} streaming={STREAMING_VALUE} thread={threadValue}>
+            {children}
+        </ChatContextProviders>
     );
 };
 
