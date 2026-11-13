@@ -15,6 +15,7 @@ import { lazy, Suspense, useCallback, useEffect, useEffectEvent, useMemo, useRef
 
 import { ErrorBoundary } from "@/components/error-boundary";
 import { SettingsSearchField, SettingsSearchResults, useSettingsSearch } from "@/components/settings/settings-search";
+import { useAuthActiveOrganization, useAuthSession } from "@/features/auth/hooks/use-auth-session";
 import useInviteOnly from "@/features/auth/hooks/use-invite-only";
 import { hasNoAccount } from "@/features/auth/lib/account-state";
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
@@ -173,11 +174,11 @@ export const SettingsModal: FC = () => {
     const search = useSearch({ strict: false }) as { settings?: boolean; settingsTab?: SettingsTab };
     const queryClient = useQueryClient();
     const crpc = useCRPC();
-    const { apiKey, hooks, organization } = useAuth();
-    const { data: activeOrganization } = hooks.useActiveOrganization();
+    const { apiKey, organization } = useAuth();
+    const { data: activeOrganization } = useAuthActiveOrganization();
     // A guest, or signed out (the chat is reachable signed out under invite-only), locks the account tabs. A session
     // read still pending or failed is unknown, not signed out, so it locks nothing.
-    const isAnonymous = hasNoAccount(hooks.useSession());
+    const isAnonymous = hasNoAccount(useAuthSession());
 
     const { close, isOpen, open } = useModalState("settings");
     // Once opened, stay mounted so the Dialog's Activity component can

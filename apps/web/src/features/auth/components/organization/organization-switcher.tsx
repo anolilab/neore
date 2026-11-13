@@ -7,6 +7,7 @@ import { useNavigate } from "@tanstack/react-router";
 import type { FC } from "react";
 import { useCallback, useEffect, useState } from "react";
 
+import { useAuthActiveOrganization, useAuthOrganizationList, useAuthSession } from "@/features/auth/hooks/use-auth-session";
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 import authViewPaths from "@/features/auth/lib/auth-view-paths";
 import { getLocalizedError } from "@/features/auth/lib/utilities";
@@ -32,11 +33,11 @@ const OrganizationSwitcher: FC<OrganizationSwitcherProps> = ({ className, hidePe
     const [isPending, setIsPending] = useState(false);
     const [isCreateOrgDialogOpen, setIsCreateOrgDialogOpen] = useState(false);
 
-    const { data: sessionData } = authContext.hooks.useSession();
+    const { data: sessionData } = useAuthSession();
     const user = sessionData?.user;
 
-    const { data: organizations } = authContext.hooks.useListOrganizations();
-    const { data: activeOrganization, refetch: refetchActiveOrganization } = authContext.hooks.useActiveOrganization();
+    const { data: organizations } = useAuthOrganizationList();
+    const { data: activeOrganization, refetch: refetchActiveOrganization } = useAuthActiveOrganization();
 
     const switchOrganization = useCallback(
         async (organizationId: string | null) => {
