@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 
 import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { createRequire } from "node:module";
+import { dirname, join } from "node:path";
 
 import type { ReactNode } from "react";
 import { act } from "react";
@@ -29,15 +30,60 @@ const renderShimmer = (node = <Shimmer>Thinking...</Shimmer>) => {
     };
 };
 
-// The animation is declared in the utility, i.e. on the shimmering element, where its inline `--shimmer-duration` is
-// set. A `@theme` variable would be resolved on :root instead, and every shimmer would run at the 2s fallback.
-const SHIMMER_UTILITY = /@utility animate-text-shimmer \{\s*animation: text-shimmer var\(--shimmer-duration, 2s\) steps\(30\) infinite;/u;
-const THEME_SHIMMER_VARIABLE = /--animate-text-shimmer:/u;
-const PAUSED_RULE = /&\[data-paused\] \{\s*animation-play-state: paused;/u;
-const SHIMMER_KEYFRAMES = /@keyframes text-shimmer\s*\{\s*from\s*\{\s*background-position: 100% center;\s*\}\s*to\s*\{\s*background-position: 0% center;/u;
+const requireFromUi = createRequire(join(import.meta.dirname, "../../../package.json"));
+const tailwindDirectory = dirname(requireFromUi.resolve("tailwindcss/package.json"));
+const { compile } = requireFromUi("tailwindcss") as {
+    compile: (
+        css: string,
+        options: {
+            base: string;
+            loadModule: (id: string, base: string) => Promise<{ base: string; module: () => void; path: string }>;
+            loadStylesheet: (id: string, base: string) => Promise<{ base: string; content: string; path: string }>;
+        },
+    ) => Promise<{ build: (candidates: string[]) => string }>;
+};
 
-// The stylesheet as written: the unit-test transform turns CSS imports into empty modules.
-const globalCss = readFileSync(join(import.meta.dirname, "../../global.css"), "utf8");
+/**
+ * What Tailwind generates from `global.css` for `candidates`: the real stylesheet and Tailwind's own core, with the
+ * imports that add nothing here (tw-animate-css, shadcn, the typography plugin) left empty.
+ */
+const generatedCss = async (candidates: string[]): Promise<string> => {
+    const compiler = await compile(readFileSync(join(import.meta.dirname, "../../global.css"), "utf8"), {
+        base: join(import.meta.dirname, "../.."),
+        loadModule: async (id: string, base: string) => {
+            return { base, module: () => {}, path: id };
+        },
+        loadStylesheet: async (id: string, base: string) => {
+            if (id === "tailwindcss") {
+                const path = join(tailwindDirectory, "index.css");
+
+                return { base: tailwindDirectory, content: readFileSync(path, "utf8"), path };
+            }
+
+            return { base, content: "", path: id };
+        },
+    });
+
+    return compiler.build(candidates);
+};
+
+/** The classes a rendered shimmer carries: what Tailwind finds in the source when it builds the app. */
+const shimmerClasses = (): string[] => {
+    const { element, unmount } = renderShimmer();
+    const classes = [...element.classList];
+
+    unmount();
+
+    return classes;
+};
+
+const SHIMMER_RULE =
+    /\.animate-text-shimmer \{\s*animation: text-shimmer var\(--shimmer-duration, 2s\) steps\(30\) infinite;\s*&\[data-paused\] \{\s*animation-play-state: paused;/u;
+const SHIMMER_KEYFRAMES = /@keyframes text-shimmer \{\s*from \{\s*background-position: 100% center;\s*\}\s*to \{\s*background-position: 0% center;/u;
+const REDUCED_MOTION_OVERRIDE = /^\.motion-reduce\\:animate-none \{\s*animation: none;/u;
+const THEME_SHIMMER_VARIABLE = /--animate-text-shimmer:/u;
+const REDUCED_MOTION_RULE_START = /\.motion-reduce\\:animate-none \{/u;
+const REDUCED_MOTION_QUERY = /^@media \(prefers-reduced-motion: reduce\) \{\s*$/u;
 
 describe("Shimmer", () => {
     it("animates with the CSS keyframe, timed by its duration", () => {
@@ -68,10 +114,22 @@ describe("Shimmer", () => {
         unmount();
     });
 
-    it("steps the sweep instead of repainting on every frame, timed on the element itself", () => {
-        expect(globalCss).toMatch(SHIMMER_UTILITY);
-        expect(globalCss).not.toMatch(THEME_SHIMMER_VARIABLE);
-        expect(globalCss).toMatch(SHIMMER_KEYFRAMES);
+    it("gets a generated rule that steps the sweep, timed on the element itself, and stops under reduced motion", async () => {
+        const css = await generatedCss(shimmerClasses());
+        const rule = css.indexOf(".animate-text-shimmer {");
+        const override = css.search(REDUCED_MOTION_RULE_START);
+
+        // The animation is on the element, where its inline `--shimmer-duration` is set: a `@theme` variable would be
+        // resolved on :root instead, and every shimmer would run at the 2s fallback.
+        expect(css).toMatch(SHIMMER_RULE);
+        expect(css).not.toMatch(THEME_SHIMMER_VARIABLE);
+        expect(css).toMatch(SHIMMER_KEYFRAMES);
+        expect(css.slice(override)).toMatch(REDUCED_MOTION_OVERRIDE);
+        // …inside the reduced-motion query.
+        expect(css.slice(css.lastIndexOf("@media", override), override)).toMatch(REDUCED_MOTION_QUERY);
+        // Later in the stylesheet, so it wins over the utility.
+        expect(rule).toBeGreaterThan(-1);
+        expect(override).toBeGreaterThan(rule);
     });
 });
 
@@ -124,7 +182,6 @@ describe("Shimmer off-screen", () => {
         report(false);
 
         expect("paused" in element.dataset).toBe(true);
-        expect(globalCss).toMatch(PAUSED_RULE);
 
         report(true);
 
