@@ -96,7 +96,18 @@ export default class Rules implements RuleLookup {
             return undefined;
         }
 
-        // decideRule reads and fills the per-node answers, so each node is asked once.
+        // A node already answered is not annotated again: annotating reads the node's whole text, and a parent is
+        // asked about once per child, so annotating each time made a parent with many children quadratic.
+        const known = this.answers.decided.get(node);
+
+        if (known) {
+            return known;
+        }
+
+        if (this.answers.undecided.has(node)) {
+            return undefined;
+        }
+
         return decideRule(this.answers, this.searchOrder, annotateNode(node, this.options), this.options, this);
     }
 
