@@ -29424,6 +29424,10 @@ msgstr "さらに {remainingCount} 件表示"
 msgid "Show all"
 msgstr "すべて表示"
 
+#: src/features/chat/thread/message-list.tsx:557
+msgid "Show all {earlierCount} earlier messages"
+msgstr "以前のメッセージ{earlierCount}件をすべて表示"
+
 #: ../../packages/ui/src/components/chat-markdown.tsx:83
 msgid "Show all {lines} lines"
 msgstr "{lines} 行すべてを表示"

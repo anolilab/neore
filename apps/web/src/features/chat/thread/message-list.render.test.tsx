@@ -9,6 +9,7 @@
 import { formatGoalReviewNote } from "@neore/backend/chat/goals";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import type { Context, ReactNode } from "react";
 import { createElement, useLayoutEffect, useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -510,13 +511,16 @@ class SilentUtterance {
 /* eslint-enable class-methods-use-this */
 
 /** A Cmd/Ctrl+F keydown, as it reaches the document. */
-const pressFind = (): void => {
+/** A keydown from the focused element, as a real keypress reaches the document and the window. */
+const pressKey = (init: KeyboardEventInit): void => {
     const target = document.activeElement ?? document.body;
 
     act(() => {
-        target.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, cancelable: true, code: "KeyF", ctrlKey: true, key: "f" }));
+        target.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, cancelable: true, ...init }));
     });
 };
+
+const pressFind = (): void => pressKey({ code: "KeyF", ctrlKey: true, key: "f" });
 
 const nextFrames = async (count: number): Promise<void> => {
     for (let frame = 0; frame < count; frame += 1) {
@@ -525,6 +529,8 @@ const nextFrames = async (count: number): Promise<void> => {
         });
     }
 };
+
+const SHOW_ALL_NAME = /earlier messages/;
 
 const focusedMessageId = (): string | undefined => (document.activeElement as HTMLElement | null)?.dataset.listMessageId;
 
@@ -689,6 +695,48 @@ describe("a long thread", { timeout: RENDER_TEST_TIMEOUT_MS }, () => {
         pressFind();
 
         expect(mountedIds()).toHaveLength(THREAD_LENGTH);
+    });
+
+    it.each([
+        ["F3", { code: "F3", key: "F3" }],
+        ["Shift+F3", { code: "F3", key: "F3", shiftKey: true }],
+        ["Ctrl+G", { code: "KeyG", ctrlKey: true, key: "g" }],
+        ["Cmd+Shift+G", { code: "KeyG", key: "G", metaKey: true, shiftKey: true }],
+    ])("mounts every message once %s reaches the browser's find", (_name, init: KeyboardEventInit) => {
+        mountInto();
+
+        pressKey(init);
+
+        expect(mountedIds()).toHaveLength(THREAD_LENGTH);
+    });
+
+    it("offers keyboard users a control that shows every earlier message and moves focus to the oldest", async () => {
+        const user = userEvent.setup();
+
+        mountInto();
+
+        expect(mountedIds()).not.toContain("m100");
+
+        // The control is the first stop in the thread for Tab, and its name says what it does.
+        await user.tab();
+
+        const showAll = screen.getByRole("button", { name: `Show all ${THREAD_LENGTH - ALWAYS_MOUNTED_TAIL} earlier messages` });
+
+        expect(document.activeElement).toBe(showAll);
+
+        await user.keyboard("{Enter}");
+
+        expect(mountedIds()).toHaveLength(THREAD_LENGTH);
+        expect(focusedMessageId()).toBe("m0");
+        expect(screen.queryByRole("button", { name: SHOW_ALL_NAME })).toBeNull();
+    });
+
+    it("has no show-all control while every message is mounted", () => {
+        localStorage.setItem(VIRTUALIZE_FLAG_KEY, "0");
+
+        mountInto();
+
+        expect(screen.queryByRole("button", { name: SHOW_ALL_NAME })).toBeNull();
     });
 
     it("keeps the streaming reply and the newest messages mounted while a run streams", () => {

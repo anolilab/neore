@@ -19,14 +19,17 @@
  *   ALWAYS_MOUNTED_TAIL messages and the streaming placeholder are always real
  *   DOM, so stick-to-bottom (ThreadViewport) and the live region never see the
  *   virtualizer. The thread's own find bar searches the data and jumps, so it
- *   reaches unmounted rows; only Cmd/Ctrl+F that falls through to the BROWSER's
- *   find turns virtualization off for the rest of the visit.
+ *   reaches unmounted rows. A find key the BROWSER gets (Cmd/Ctrl+F, F3,
+ *   Cmd/Ctrl+G) or the "Show all earlier messages" control (keyboard,
+ *   screen readers, find opened from a menu) mounts every loaded message
+ *   for the rest of the visit.
  *
  * Jump to a message: `#message-<id>` in the URL, or `scrollToMessage(id, { threadId })`.
  * Pins and message-search results use the latter.
  */
 
 import { useLingui } from "@lingui/react/macro";
+import { Button } from "@neore/ui/components/button";
 import cn from "@neore/ui/utils/cn";
 import type { Virtualizer } from "@tanstack/react-virtual";
 import { useVirtualizer } from "@tanstack/react-virtual";
@@ -49,6 +52,7 @@ import MessageItem from "./message-item";
 import type { MessagePosition, WindowPlan } from "./message-windowing";
 import {
     getWindowPlan,
+    isBrowserFindKey,
     parseMessageHash,
     readVirtualizeFlag,
     resolveJumpMessageId,
@@ -104,30 +108,36 @@ const useInitialMessageIds = (messages: UIMessage[], messagesReady: boolean): Re
 };
 
 /**
- * Cmd/Ctrl+F that reaches the browser's find: it can only find text that is in the DOM, so mount everything.
- * On a thread page the find-in-thread shortcut takes the chord on `document` and prevents the default; this
- * listener is on the window, so it runs after that one and sees whether the browser still gets the chord.
+ * Whether every loaded message is mounted for the rest of this visit: the browser's find can only find
+ * text that is in the DOM, and keyboard and screen-reader users move through the DOM.
+ *
+ * Set by a find key the browser gets (`isBrowserFindKey`). On a thread page the find-in-thread shortcut
+ * takes Cmd/Ctrl+F on `document` and prevents the default; this listener is on the window, so it runs
+ * after that one and sees whether the browser still gets the key. Find opened from a menu sends no key:
+ * the "Show all earlier messages" control at the top of the list (`showAll`) covers that, and keyboard use.
  */
-const useFindInPageOverride = (): boolean => {
-    const [isFindRequested, setIsFindRequested] = useState(false);
+const useShowAllMessages = (): { isAllShown: boolean; showAll: () => void } => {
+    const [isAllShown, setIsAllShown] = useState(false);
 
     useEffect(() => {
-        if (isFindRequested) {
+        if (isAllShown) {
             return undefined;
         }
 
         const handleKeyDown = (event: KeyboardEvent) => {
-            if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "f" && !event.defaultPrevented) {
-                setIsFindRequested(true);
+            if (isBrowserFindKey(event) && !event.defaultPrevented) {
+                setIsAllShown(true);
             }
         };
 
         globalThis.addEventListener("keydown", handleKeyDown);
 
         return () => globalThis.removeEventListener("keydown", handleKeyDown);
-    }, [isFindRequested]);
+    }, [isAllShown]);
 
-    return isFindRequested;
+    const showAll = useCallback(() => setIsAllShown(true), []);
+
+    return { isAllShown, showAll };
 };
 
 type RenderRow = (message: UIMessage, index: number) => ReactNode;
@@ -246,8 +256,25 @@ const MessageList: FC<MessageListProps> = memo(({ className, editComposerCompone
     // The server snapshot is the default (on): localStorage does not exist during SSR.
     const isVirtualizeFlagOn = useSyncExternalStore(subscribeToNothing, readVirtualizeFlag, () => true);
 
-    const isFindRequested = useFindInPageOverride();
-    const plan: WindowPlan = getWindowPlan(messages.length, { enabled: isVirtualizeFlagOn && !isFindRequested });
+    const { isAllShown, showAll } = useShowAllMessages();
+    const plan: WindowPlan = getWindowPlan(messages.length, { enabled: isVirtualizeFlagOn && !isAllShown });
+
+    // After "Show all earlier messages", focus goes to the oldest loaded message, where the shown history starts.
+    const focusOldestRef = useRef(false);
+
+    useEffect(() => {
+        if (!focusOldestRef.current || plan.virtualized) {
+            return;
+        }
+
+        focusOldestRef.current = false;
+        document.querySelector<HTMLElement>(`[data-list-message-id="${CSS.escape(messages[0]?.id ?? "")}"]`)?.focus();
+    });
+
+    const handleShowAll = useCallback(() => {
+        focusOldestRef.current = true;
+        showAll();
+    }, [showAll]);
 
     // Jump-to-message. Refs hold the latest plan/messages so the listener is attached once.
     const virtualizerRef = useRef<Virtualizer<HTMLElement, Element> | null>(null);
@@ -517,11 +544,19 @@ const MessageList: FC<MessageListProps> = memo(({ className, editComposerCompone
     };
 
     const tailStart = plan.virtualized ? plan.headCount : 0;
+    const earlierCount = plan.headCount;
 
     return (
         <>
             {/* Loading indicator — trigger lives in ThreadViewport's scroll handler */}
             <LoadMoreTrigger status={messagesStatus} />
+
+            {/* Rows outside the window are not in the DOM, so Tab, a screen reader and menu-opened find would skip them. Shown on focus. */}
+            {plan.virtualized && (
+                <Button className="sr-only mx-auto my-2 focus-visible:not-sr-only" onClick={handleShowAll} size="sm" type="button" variant="outline">
+                    {t`Show all ${earlierCount} earlier messages`}
+                </Button>
+            )}
 
             <div className={cn("message-list flex flex-col", className)} role="list" style={{ "--thread-max-width": maxWidth } as React.CSSProperties}>
                 {plan.virtualized && (

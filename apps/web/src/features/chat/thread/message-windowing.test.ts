@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
     ALWAYS_MOUNTED_TAIL,
     getWindowPlan,
+    isBrowserFindKey,
     JUMP_MAX_PAGES,
     JUMP_MAX_PAGES_WITH_POSITION,
     parseMessageHash,
@@ -178,5 +179,26 @@ describe(shouldLoadOlderForJump, () => {
 
     it("is bounded even with a position", () => {
         expect(shouldLoadOlderForJump(JUMP_MAX_PAGES_WITH_POSITION, loadedTurns(0), { order: 1 })).toBe(false);
+    });
+});
+
+describe(isBrowserFindKey, () => {
+    const key = (init: Partial<Pick<KeyboardEvent, "ctrlKey" | "key" | "metaKey">>) => {
+        return { ctrlKey: false, key: "", metaKey: false, ...init };
+    };
+
+    it("takes the keys that open or step through the browser's find", () => {
+        expect(isBrowserFindKey(key({ ctrlKey: true, key: "f" }))).toBe(true);
+        expect(isBrowserFindKey(key({ key: "F", metaKey: true }))).toBe(true);
+        expect(isBrowserFindKey(key({ key: "F3" }))).toBe(true);
+        expect(isBrowserFindKey(key({ ctrlKey: true, key: "g" }))).toBe(true);
+        expect(isBrowserFindKey(key({ key: "G", metaKey: true }))).toBe(true);
+    });
+
+    it("leaves other keys alone", () => {
+        expect(isBrowserFindKey(key({ key: "f" }))).toBe(false);
+        expect(isBrowserFindKey(key({ key: "g" }))).toBe(false);
+        expect(isBrowserFindKey(key({ ctrlKey: true, key: "h" }))).toBe(false);
+        expect(isBrowserFindKey(key({ key: "F4" }))).toBe(false);
     });
 });

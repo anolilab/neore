@@ -156,6 +156,22 @@ export const parseMessageHash = (hash: string): string | undefined => {
 };
 
 /** On unless the browser opted out with `"0"`; storage that cannot be read keeps the default. */
+
+/**
+ * Keys that open, or step through, the BROWSER's find: Cmd/Ctrl+F, F3 and Cmd/Ctrl+G, with or without Shift.
+ * Find opened from a menu (Edit › Find, Firefox's quick find, mobile Safari) sends no key at all; the list's
+ * "Show all earlier messages" control is the way to reach unmounted messages from there.
+ */
+export const isBrowserFindKey = (event: Pick<KeyboardEvent, "ctrlKey" | "key" | "metaKey">): boolean => {
+    if (event.key === "F3") {
+        return true;
+    }
+
+    const key = event.key.toLowerCase();
+
+    return (event.metaKey || event.ctrlKey) && (key === "f" || key === "g");
+};
+
 export const readVirtualizeFlag = (): boolean => {
     try {
         return globalThis.localStorage?.getItem(VIRTUALIZE_FLAG_KEY) !== "0";

@@ -29424,6 +29424,10 @@ msgstr "再显示 {remainingCount} 个"
 msgid "Show all"
 msgstr "显示全部"
 
+#: src/features/chat/thread/message-list.tsx:557
+msgid "Show all {earlierCount} earlier messages"
+msgstr "显示全部 {earlierCount} 条更早的消息"
+
 #: ../../packages/ui/src/components/chat-markdown.tsx:83
 msgid "Show all {lines} lines"
 msgstr "显示全部 {lines} 行"
