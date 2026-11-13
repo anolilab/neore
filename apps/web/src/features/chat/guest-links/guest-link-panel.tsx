@@ -51,15 +51,28 @@ const GuestLinkPanel: FC<GuestLinkPanelProps> = ({ locked = false, revokeLink, t
     const live = linkEnd !== undefined && linkEnd > now;
 
     useEffect(() => {
-        if (linkEnd === undefined || linkEnd <= Date.now()) {
+        if (linkEnd === undefined) {
             return undefined;
         }
 
-        // One timeout to the end: a link lives a day (`GUEST_LINK_TTL_MS`), well within a browser timeout.
-        const timer = setTimeout(() => setNow(Date.now()), linkEnd - Date.now());
+        const current = Date.now();
+
+        // Ended already, while the panel still counts it live (it ended before the read answered, or the timer fired late):
+        // catch up once. Once `now` has passed the end there is nothing left to do.
+        if (linkEnd <= current) {
+            if (now < linkEnd) {
+                setNow(current);
+            }
+
+            return undefined;
+        }
+
+        // A timeout to the end (a link lives a day, `GUEST_LINK_TTL_MS`, well within a browser timeout), armed again each time
+        // `now` moves while the link is still ahead: a timer can fire early, or the clock move back.
+        const timer = setTimeout(() => setNow(Date.now()), linkEnd - current);
 
         return () => clearTimeout(timer);
-    }, [linkEnd]);
+    }, [linkEnd, now]);
 
     const reportError = (error: unknown) => {
         switch (errorCode(error)) {

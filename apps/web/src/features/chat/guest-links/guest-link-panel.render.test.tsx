@@ -139,6 +139,31 @@ describe("GuestLinkPanel", () => {
         expect(screen.queryByText(ACTIVE_UNTIL)).toBeNull();
         expect(screen.getByRole("button", { name: "Create guest link" })).toBeTruthy();
     });
+    it("does not show a link as live that ended before the read answered", async () => {
+        vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+        const mountedAt = Date.now();
+        const readNow = showPanel({ link: null, messages: [] });
+
+        // The read answers two seconds after the panel mounted, with a link that ended one second after it.
+        vi.setSystemTime(mountedAt + 2000);
+        await readNow({ link: { bound: false, expiresAt: mountedAt + 1000, id: "link-1" }, messages: [] });
+
+        expect(screen.queryByText(ACTIVE_UNTIL)).toBeNull();
+        expect(screen.getByRole("button", { name: "Create guest link" })).toBeTruthy();
+    });
+
+    it("waits again when its timer fires before the link has ended, as when the clock moved back", () => {
+        vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+        showPanel({ link: { bound: false, expiresAt: Date.now() + 1000, id: "link-1" }, messages: [] });
+
+        // The clock moves back two seconds: the timer still fires after one, with the link a further two from its end.
+        vi.setSystemTime(Date.now() - 2000);
+        act(() => vi.advanceTimersByTime(1000));
+        expect(screen.getByText(ACTIVE_UNTIL)).toBeTruthy();
+
+        act(() => vi.advanceTimersByTime(2000));
+        expect(screen.getByRole("button", { name: "Create guest link" })).toBeTruthy();
+    });
 });
 
 describe(useGuestLinkRevoke, () => {

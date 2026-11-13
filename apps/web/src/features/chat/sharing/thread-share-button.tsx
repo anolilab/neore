@@ -21,6 +21,7 @@ import { toast } from "sonner";
 import DeleteConfirmationDialog from "@/components/delete-confirmation-dialog";
 import { useChatThread } from "@/features/chat/core/context/chat-context-hooks";
 import { getValidThreadId } from "@/features/chat/core/hooks/use-validated-thread";
+import { canHaveGuestLink } from "@/features/chat/guest-links/can-have-guest-link";
 import GuestLinkPanel from "@/features/chat/guest-links/guest-link-panel";
 import useGuestLinkRevoke from "@/features/chat/guest-links/use-guest-link-revoke";
 import useWorker from "@/features/sub-agents/hooks/use-worker";
@@ -68,15 +69,10 @@ const ThreadShareButton: React.FC<ThreadShareButtonProperties> = ({ classes, thr
 
     const { thread } = useChatThread();
     const { knownNotWorker } = useWorker(actualThreadId);
-    // As the backend refuses one (`chat/guest-links.ts#createGuestLink`): no tab for a temporary, archived or host-run chat, nor
-    // for a worker's once the thread has said so, and none while that read is out. A locked chat's read says nothing of its
+    // No tab until the thread and its relationship are known (`canHaveGuestLink`). A locked chat's read says nothing of its
     // relationship (`null`), so a locked worker's thread shows the tab; there Create is off and the backend refuses a link.
-    const canHaveGuestLink =
-        knownNotWorker &&
-        thread?.runner !== "host" &&
-        thread?.status !== "archived" &&
-        (thread as { isTemporary?: boolean } | null | undefined)?.isTemporary !== true;
-    const showGuests = threadAccess?.isOwner === true && canHaveGuestLink && Boolean(actualThreadId);
+    const showGuests =
+        threadAccess?.isOwner === true && canHaveGuestLink(thread as Parameters<typeof canHaveGuestLink>[0], knownNotWorker) && Boolean(actualThreadId);
     // The Guests tab can go while it is open (the chat is archived, or turns out to be a worker's): fall back to the first tab.
     const shownTab = tab === "guests" && !showGuests ? "access" : tab;
 
