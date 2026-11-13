@@ -173,7 +173,7 @@ export const dismissAccountNotifications = async (): Promise<void> => {
 };
 
 /** Records the account signed in on this phone; `onSwitch` removes the previous person's alerts first when it differs. */
-export const noteSignedInAccount = async (userId: string, onSwitch: () => Promise<void>): Promise<void> =>
+export const noteSignedInAccount = async (userId: string, onSwitch: () => Promise<void>, isCurrent: () => boolean): Promise<void> =>
     await noteAccountOnPhone(
         userId,
         {
@@ -182,4 +182,5 @@ export const noteSignedInAccount = async (userId: string, onSwitch: () => Promis
             write: setItemAsync,
         },
         onSwitch,
+        isCurrent,
     );

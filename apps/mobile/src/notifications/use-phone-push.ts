@@ -135,13 +135,15 @@ const accountChecks = createAccountChecks(ACCOUNT_CHECK_TIMEOUT_MS, console.warn
  * alerts cannot be removed after they arrive.
  */
 const checkAccount = (userId: string, isCurrent: () => boolean): void => {
-    accountChecks.run(async () => {
-        if (!isCurrent()) {
+    accountChecks.run(async (isLive) => {
+        const isOwner = () => isCurrent() && isLive();
+
+        if (!isOwner()) {
             return;
         }
 
         try {
-            await noteSignedInAccount(userId, dismissAccountNotifications);
+            await noteSignedInAccount(userId, dismissAccountNotifications, isOwner);
         } catch (error) {
             // eslint-disable-next-line no-console -- no logger in the app; alerts that could not be removed must not be silent
             console.warn("Could not remove the previous account's notifications.", error);

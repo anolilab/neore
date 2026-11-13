@@ -425,6 +425,16 @@ describe("noteAccountOnPhone", () => {
         expect(removeAlerts).toHaveBeenCalledOnce();
         expect(first.items[LAST_ACCOUNT_KEY]).toBe("sha256:u1");
     });
+    it("removes nothing and writes nothing for a check that is no longer current", async () => {
+        const { items, store } = device("sha256:u1");
+        const removeAlerts = vi.fn(async () => undefined);
+
+        await noteAccountOnPhone("u2", store, removeAlerts, () => false);
+
+        expect(removeAlerts).not.toHaveBeenCalled();
+        expect(store.write).not.toHaveBeenCalled();
+        expect(items[LAST_ACCOUNT_KEY]).toBe("sha256:u1");
+    });
 });
 
 describe("createAccountChecks", () => {
@@ -432,9 +442,14 @@ describe("createAccountChecks", () => {
         const queue = createAccountChecks(1000, () => undefined);
         const order: string[] = [];
         let release: () => void = () => undefined;
+        let markStarted: () => void = () => undefined;
+        const started = new Promise<void>((resolve) => {
+            markStarted = () => resolve();
+        });
 
         queue.run(async () => {
             order.push("first:start");
+            markStarted();
             await new Promise<void>((resolve) => {
                 release = () => resolve();
             });
@@ -444,9 +459,8 @@ describe("createAccountChecks", () => {
             order.push("second");
         });
 
-        await vi.waitFor(() => {
-            expect(order).toEqual(["first:start"]);
-        });
+        await started;
+        expect(order).toEqual(["first:start"]);
         release();
         await queue.settled();
 
@@ -471,6 +485,27 @@ describe("createAccountChecks", () => {
 
             expect(next).toHaveBeenCalledOnce();
             expect(warn).toHaveBeenCalledOnce();
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it("tells a check that timed out that it is no longer live", async () => {
+        vi.useFakeTimers();
+
+        try {
+            const queue = createAccountChecks(1000, () => undefined);
+            let isLive: () => boolean = () => true;
+
+            queue.run(async (live) => {
+                isLive = live;
+                await new Promise<void>(() => {});
+            });
+
+            await vi.advanceTimersByTimeAsync(1000);
+            await queue.settled();
+
+            expect(isLive()).toBe(false);
         } finally {
             vi.useRealTimers();
         }

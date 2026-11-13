@@ -307,11 +307,10 @@ export const LAST_ACCOUNT_KEY = "neore.mobile.last-push-account";
 export const PENDING_REMOVAL = "pending-removal";
 
 /**
- * Records the account signed in on this phone. When another person replaces the account on record, the alerts still on
- * the phone are the previous person's, and `removeSwitchedAlerts` removes them first. The record moves only after that
- * succeeds, so a failed removal is seen again at the next sign-in. Kept on the device, not in memory, so it holds across a
- * relaunch. Only a digest of the id is kept. The record outlives sign-out on purpose: alerts of that account that are still
- * in flight are told apart from the next person's alerts at the next sign-in.
+ * Records the account signed in on this phone. Unless the record already names this account, the alerts still on the phone
+ * may be someone else's, and `removeSwitchedAlerts` removes them first. The record moves to this account only after that
+ * succeeds; a failed removal marks it pending, so the next sign-in removes them again. Kept on the device, not in memory,
+ * so it holds across a relaunch. Only a digest of the id is kept, and sign-out does not clear it.
  */
 export const noteAccountOnPhone = async (
     userId: string,
@@ -321,23 +320,27 @@ export const noteAccountOnPhone = async (
         write: (key: string, value: string) => Promise<void>;
     },
     removeSwitchedAlerts: () => Promise<void>,
+    isCurrent: () => boolean = () => true,
 ): Promise<void> => {
     const current = await store.digest(userId);
     const previous = await store.read(LAST_ACCOUNT_KEY) ?? undefined;
 
-    if (previous === current) {
+    if (previous === current || !isCurrent()) {
         return;
     }
 
     try {
         await removeSwitchedAlerts();
     } catch (error) {
+        // Pending even when this check is no longer current: the next sign-in must remove the alerts whoever it is.
         await store.write(LAST_ACCOUNT_KEY, PENDING_REMOVAL);
 
         throw error;
     }
 
-    await store.write(LAST_ACCOUNT_KEY, current);
+    if (isCurrent()) {
+        await store.write(LAST_ACCOUNT_KEY, current);
+    }
 };
 
 /**
@@ -345,16 +348,25 @@ export const noteAccountOnPhone = async (
  * finished after `timeoutMs` stops holding up the ones queued after it, so one hung check cannot keep every later
  * account's alerts and registration waiting. A check that fails or times out is reported through `warn`; the queue moves on either way.
  */
-const runAfter = async (previous: Promise<void>, check: () => Promise<void>, timeoutMs: number, warn: (message: string, error: unknown) => void): Promise<void> => {
+const runAfter = async (
+    previous: Promise<void>,
+    check: (isLive: () => boolean) => Promise<void>,
+    timeoutMs: number,
+    warn: (message: string, error: unknown) => void,
+): Promise<void> => {
     await previous;
 
+    let isLive = true;
     let timer: ReturnType<typeof setTimeout> | undefined;
 
     try {
         await Promise.race([
-            check(),
+            check(() => isLive),
             new Promise<never>((_resolve, reject) => {
-                timer = setTimeout(() => reject(new Error("Timed out")), timeoutMs);
+                timer = setTimeout(() => {
+                    isLive = false;
+                    reject(new Error("Timed out"));
+                }, timeoutMs);
             }),
         ]);
     } catch (error) {
@@ -368,7 +380,7 @@ export const createAccountChecks = (timeoutMs: number, warn: (message: string, e
     let last: Promise<void> = Promise.resolve();
 
     return {
-        run: (check: () => Promise<void>): void => {
+        run: (check: (isLive: () => boolean) => Promise<void>): void => {
             last = runAfter(last, check, timeoutMs, warn);
         },
         /** Resolves once every check queued so far has finished or timed out. */
