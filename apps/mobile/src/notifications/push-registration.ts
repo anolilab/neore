@@ -340,9 +340,9 @@ export const noteAccountOnPhone = async (
 /**
  * Runs account checks one after another: a check starts only when the one before it has finished. A check that has not
  * finished after `timeoutMs` stops holding up the ones queued after it, so one hung check cannot keep every later
- * account's alerts and registration waiting. The check reports its own failure; the queue moves on either way.
+ * account's alerts and registration waiting. A check that fails or times out is reported through `warn`; the queue moves on either way.
  */
-const runAfter = async (previous: Promise<void>, check: () => Promise<void>, timeoutMs: number): Promise<void> => {
+const runAfter = async (previous: Promise<void>, check: () => Promise<void>, timeoutMs: number, warn: (message: string, error: unknown) => void): Promise<void> => {
     await previous;
 
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -354,19 +354,19 @@ const runAfter = async (previous: Promise<void>, check: () => Promise<void>, tim
                 timer = setTimeout(() => reject(new Error("Timed out")), timeoutMs);
             }),
         ]);
-    } catch {
-        // The check has reported its own failure.
+    } catch (error) {
+        warn("A check of this phone's notifications did not finish, so it was skipped.", error);
     } finally {
         clearTimeout(timer);
     }
 };
 
-export const createAccountChecks = (timeoutMs: number) => {
+export const createAccountChecks = (timeoutMs: number, warn: (message: string, error: unknown) => void) => {
     let last: Promise<void> = Promise.resolve();
 
     return {
         run: (check: () => Promise<void>): void => {
-            last = runAfter(last, check, timeoutMs);
+            last = runAfter(last, check, timeoutMs, warn);
         },
         /** Resolves once every check queued so far has finished or timed out. */
         settled: (): Promise<void> => last,

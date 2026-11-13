@@ -3,6 +3,9 @@ import { StoredGrantNotClearedError } from "./stored-grant-error";
 /** How long sign-out waits for the server to drop this phone's push token before it carries on without it. */
 export const RELEASE_PUSH_TIMEOUT_MS = 5000;
 
+/** How long sign-out waits for the phone's alerts to be removed before it carries on without them. */
+export const ALERT_REMOVAL_TIMEOUT_MS = 5000;
+
 interface SignOutSteps {
     /** Empties the offline cache. */
     clearCache: () => Promise<void>;
@@ -21,10 +24,19 @@ interface SignOutSteps {
 
 /** Removes the alerts of the account that leaves. A failure only warns: sign-out goes on, and the next sign-in sees the switch. */
 const removeAlerts = async (dismiss: (() => Promise<void>) | undefined, warn: (message: string, error: unknown) => void): Promise<void> => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+
     try {
-        await dismiss?.();
+        await Promise.race([
+            dismiss?.(),
+            new Promise<never>((_resolve, reject) => {
+                timer = setTimeout(() => reject(new Error("Timed out")), ALERT_REMOVAL_TIMEOUT_MS);
+            }),
+        ]);
     } catch (error) {
         warn("Could not remove this account's notifications.", error);
+    } finally {
+        clearTimeout(timer);
     }
 };
 

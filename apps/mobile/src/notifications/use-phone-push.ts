@@ -125,7 +125,8 @@ const setUpNotifications = async (): Promise<boolean> => {
 /** How long an account check may hold up the checks and registrations queued after it. */
 const ACCOUNT_CHECK_TIMEOUT_MS = 5000;
 
-const accountChecks = createAccountChecks(ACCOUNT_CHECK_TIMEOUT_MS);
+// eslint-disable-next-line no-console -- no logger in the app; a check that did not finish must not be silent
+const accountChecks = createAccountChecks(ACCOUNT_CHECK_TIMEOUT_MS, console.warn);
 
 /**
  * Another person signed in on this phone, now or before a relaunch: the alerts still on it are the previous account's,

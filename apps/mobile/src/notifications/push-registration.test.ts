@@ -425,7 +425,7 @@ describe("noteAccountOnPhone", () => {
 
 describe("createAccountChecks", () => {
     it("runs the checks one after another, so a check starts only once the one before it has finished", async () => {
-        const queue = createAccountChecks(1000);
+        const queue = createAccountChecks(1000, () => undefined);
         const order: string[] = [];
         let release: () => void = () => undefined;
 
@@ -453,7 +453,8 @@ describe("createAccountChecks", () => {
         vi.useFakeTimers();
 
         try {
-            const queue = createAccountChecks(1000);
+            const warn = vi.fn();
+            const queue = createAccountChecks(1000, warn);
             const next = vi.fn(async () => undefined);
 
             queue.run(async () => {
@@ -465,6 +466,7 @@ describe("createAccountChecks", () => {
             await queue.settled();
 
             expect(next).toHaveBeenCalledOnce();
+            expect(warn).toHaveBeenCalledOnce();
         } finally {
             vi.useRealTimers();
         }
