@@ -1138,6 +1138,39 @@ describe("useFeatureFlagsKnown on the client this module loads", () => {
 });
 
 describe("useFeatureFlagEnabled", () => {
+    it("reads a flag the loaded response left out as off, not as the server-rendered value once the wait is over", async () => {
+        vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+
+        try {
+            const client = await loadClientModule();
+
+            client.setBootstrapFlags({ "code-mode": true });
+
+            const loaded = await client.loadPostHog();
+
+            // Flags arrived (the mock answers at once), but this one is not in them.
+            Object.assign(loaded, { isFeatureEnabled: vi.fn((): boolean | undefined => undefined) });
+
+            const wrapper = ({ children }: { children: ReactNode }) => createElement(client.PostHogClientContext, { value: loaded }, children);
+            const { result } = renderHook(() => client.useFeatureFlagEnabled("code-mode"), { wrapper });
+
+            act(() => {
+                client.setAnalyticsIdentity({ user: { id: "user-1" } });
+                client.startPostHog(loaded, () => {});
+            });
+
+            expect(result.current).toBe(false);
+
+            act(() => {
+                vi.advanceTimersByTime(client.FLAGS_WAIT_MS);
+            });
+
+            expect(result.current).toBe(false);
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
     it("answers off once started when the flags never arrive within the wait, and follows them if they come later", async () => {
         vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
 
