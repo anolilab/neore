@@ -62,3 +62,10 @@
   while its parent's one-shot run goes (running or awaiting), so it never lands after a request; that run's end, waited
   or not, posts it (`releaseHeldResults`). A pause, first or continued, never overwrites a `"question"` the child thread
   waits on.
+- **Lifecycle:** a new message saved in a child (`createStreamWithMessage`) schedules `endApprovalWaitForMessage` when
+  a run waits on that child (one indexed read; never fails the send); it ends only a run none of whose requests is still
+  open on the latest turn. A hard delete marks results bound for the thread `postFailed`, then ends the runs it is the
+  child of and those it delegated (`endSubAgentRunsOfDeletedThread`). A result for any parent with a request its owner
+  can still answer (pending, unexpired, open on its latest turn) is held; an answer (`resumeClaimedRun`) or the owner's
+  send past it releases it (`releaseHeldResults`), the backed-off recheck covers an expiry. Every end goes through
+  `finishRun`.

@@ -68,7 +68,7 @@ import { LEFT_ORGANIZATION_MESSAGE } from "../auth/lib/organization-policy";
 import { readOrganizationPermissionCap } from "../auth/lib/permission-cap-read";
 import type { PendingToolRequest } from "../chat/lib/tool-approval-claim";
 import { findPendingRequestOnLatestTurn, latestTurnRows, openRequestsOfLatestTurn, SUB_AGENT_RUN_ENDED_BY } from "../chat/lib/tool-approval-claim";
-import { denyToolApprovalRun, PENDING_APPROVAL_TTL_MS } from "../chat/lib/tool-approval-cleanup";
+import { denyToolApprovalRun, isToolApprovalRunExpired, PENDING_APPROVAL_TTL_MS, pendingApprovalCutoff } from "../chat/lib/tool-approval-cleanup";
 import { MAX_LENGTH } from "../lib/validators";
 import { RUN_STALE_MS, RUN_WATCH_RETRY } from "../chat/lib/interrupted-run";
 import { HOST_SESSION_BUSY_RETRY_MS, HOST_START_MAX_ATTEMPTS, hostRunActivity, hostStartRetryDelayMs, sendHostRunTurn } from "./host-runs";
@@ -1291,11 +1291,46 @@ const oneShotRunGoesOn = async (ctx: Pick<QueryCtx, "db">, threadId: string): Pr
     return false;
 };
 
+/**
+ * Whether `thread` waits on a request its owner can still answer: open on its latest turn, pending and not expired. A post
+ * would move the thread past it, and then it could not be answered. One indexed read gates the turn's: a thread with no
+ * unexpired pending request costs that read alone. Not `awaitingInput`, which a chat run sets only after it recorded its
+ * requests and closed its stream: a post in that gap would land past them.
+ */
+const waitsOnOpenRequest = async (ctx: Pick<QueryCtx, "db">, thread: Doc<"threads">, now: number): Promise<boolean> => {
+    const anyPending = await ctx.db
+        .query("toolApprovalRuns")
+        .withIndex("by_threadId_status_createdAt", (q) => q.eq("threadId", thread._id).eq("status", "pending").gte("createdAt", pendingApprovalCutoff(now)))
+        .first();
+
+    if (anyPending === null) {
+        return false;
+    }
+
+    const open = openRequestsOfLatestTurn(await latestTurnRows(ctx, thread._id, thread.activeLeafMessageId));
+
+    for (const approvalId of open.keys()) {
+        const row = await ctx.db
+            .query("toolApprovalRuns")
+            .withIndex("by_approvalId", (q) => q.eq("approvalId", approvalId))
+            .first();
+
+        if (row?.threadId === thread._id && row.status === "pending" && !isToolApprovalRunExpired(row, now)) {
+            return true;
+        }
+    }
+
+    return false;
+};
+
 /** Nested runs of one thread read per status when its run ends; the held posts' own checks cover any beyond them. */
 const HELD_RESULTS_RELEASED = 20;
 
-/** A one-shot run ended: the nested results its thread held back are posted now ({@link postRunResult} checks again). */
-const releaseHeldResults = async (ctx: MutationCtx, childThreadId: string): Promise<void> => {
+/**
+ * The results `childThreadId` held back are posted now ({@link postRunResult} checks again): its one-shot run ended, or a
+ * request it waited on was answered (`resumeClaimedRun`).
+ */
+export const releaseHeldResults = async (ctx: MutationCtx, childThreadId: string): Promise<void> => {
     for (const status of ["succeeded", "failed", "cancelled"] as const) {
         const nested = await ctx.db
             .query("subAgentRuns")
@@ -1331,8 +1366,10 @@ export const postRunResult = async (ctx: MutationCtx, runId: Id<"subAgentRuns">,
         return false;
     }
 
+    const parent = await ctx.db.get("threads", run.parentThreadId as Id<"threads">);
+
     // A parent that is gone cannot take the post, whatever stream it left behind.
-    if (isGoneParent(await ctx.db.get("threads", run.parentThreadId as Id<"threads">), run)) {
+    if (isGoneParent(parent, run)) {
         await patchById(ctx.db, "subAgentRuns", run._id, { postFailed: GONE_PARENT_REASON });
 
         return false;
@@ -1340,8 +1377,9 @@ export const postRunResult = async (ctx: MutationCtx, runId: Id<"subAgentRuns">,
 
     // A parent that is itself a one-shot sub-agent still going takes no nested result: landing between its steps, or after
     // a request it waits on, the post would move its thread past that request, which then could not be answered. Its run's
-    // end posts it (`finishRun`); this check, backing off, covers an end that did not.
-    if (await oneShotRunGoesOn(ctx, run.parentThreadId)) {
+    // end posts it (`finishRun`). Nor does any parent that waits on a request its owner can still answer: the answer posts
+    // it (`resumeClaimedRun`). This check, backing off, covers an end or an expiry that did not.
+    if ((await oneShotRunGoesOn(ctx, run.parentThreadId)) || (parent !== null && (await waitsOnOpenRequest(ctx, parent, Date.now())))) {
         await ctx.scheduler.runAfter(heldPostDelayMs(waits), internal.sub_agents.functions.postResult, { attempt, failures, runId, waits: waits + 1 });
 
         return false;
@@ -1607,6 +1645,66 @@ const scheduleReaperAt = async (ctx: Pick<MutationCtx, "scheduler">, runId: Id<"
     // A deadline already past (an older request expired during a resumed turn) reaps at once: the scheduler takes no negative delay.
     await ctx.scheduler.runAfter(Math.max(0, reapAt - now + SUB_AGENT_REAP_SLACK_MS), internal.sub_agents.functions.reapRun, { runId });
 };
+
+/**
+ * Whether `threadId` is the child of a run that waits: only then does a new message there have a wait to end
+ * ({@link endApprovalWaits}). One indexed read, empty for every thread that is no sub-agent's child.
+ */
+export const hasWaitingSubAgentRun = async (ctx: Pick<QueryCtx, "db">, threadId: string): Promise<boolean> => {
+    const waiting = await ctx.db
+        .query("subAgentRuns")
+        .withIndex("by_childThreadId_and_status", (q) => q.eq("childThreadId", threadId).eq("status", "awaiting"))
+        .first();
+
+    return waiting !== null;
+};
+
+/**
+ * Ends the one-shot runs of `childThreadId` whose wait a new message in the child moved past: none of the run's requests
+ * is open on the latest turn any more, so nothing will answer them (the test `markRunAwaiting` uses). Each ends as
+ * cancelled through `finishRun`, so its requests are denied, its slot is freed and its parent is told. A run that waits
+ * again on a request still open (its continuation paused anew) is left waiting; a running one is past its request.
+ * Workers never pause. Returns how many ended.
+ */
+export const endApprovalWaits = async (ctx: MutationCtx, childThreadId: string): Promise<number> => {
+    const { rows } = await pendingApprovalRows(ctx, childThreadId);
+    // The open requests of each run, by run.
+    const requestsOf = new Map<Id<"subAgentRuns">, Doc<"toolApprovalRuns">[]>();
+
+    for (const row of rows) {
+        const runId = row.config.subAgentRunId;
+
+        if (runId !== undefined) {
+            requestsOf.set(runId, [...(requestsOf.get(runId) ?? []), row]);
+        }
+    }
+
+    let ended = 0;
+
+    for (const [runId, requests] of requestsOf) {
+        const run = await ctx.db.get("subAgentRuns", runId);
+
+        if (run?.mode === "worker" || run?.childThreadId !== childThreadId || run.status !== "awaiting") {
+            continue;
+        }
+
+        const stillOpen = await Promise.all(
+            requests.map(async (row) => await findPendingRequestOnLatestTurn(ctx, childThreadId as Id<"threads">, row.approvalId)),
+        );
+
+        if (stillOpen.every((request) => request === undefined) && (await finishRun(ctx, run._id, { kind: "cancelled" }))) {
+            ended += 1;
+        }
+    }
+
+    return ended;
+};
+
+/** A new message was saved in a child thread: its waiting runs end ({@link endApprovalWaits}). Returns how many ended. */
+export const endApprovalWaitForMessage = internalMutation
+    .input({ threadId: v.string().max(MAX_LENGTH.id) })
+    .output(v.number())
+    .mutation(async ({ args, ctx }) => await endApprovalWaits(ctx, args.threadId));
 
 /**
  * `running` → `awaiting`: the child stopped on an approval request recorded on its thread. The run keeps its fan-out
@@ -2032,6 +2130,48 @@ const cancelRuns = async (ctx: MutationCtx, targets: ReadonlyArray<RunDoc>, user
     }
 
     return cancelled;
+};
+
+/**
+ * A thread is being hard-deleted: the runs it is the child of end as cancelled, and so do the runs it delegated, as a
+ * Stop would end them. A waiting run's request goes with the thread, so nothing would answer it: left alone, the run
+ * would hold its fan-out slot until its reaper. The thread's own queued worker runs go first, so ending the one going
+ * does not start the next on a thread that is going away. Every end goes through `finishRun`, which also stops a
+ * resumed run's live continuation.
+ */
+export const endSubAgentRunsOfDeletedThread = async (ctx: MutationCtx, threadId: string, userId: string | undefined): Promise<void> => {
+    // A result bound for this thread has nowhere to go: one posted behind the delete's cursor would outlive it. Marked
+    // first, so neither the ends below (and the results they release) nor a retry already scheduled posts here.
+    for (const status of ["queued", "running", "awaiting", "succeeded", "failed", "cancelled"] as const) {
+        const runs = await ctx.db
+            .query("subAgentRuns")
+            .withIndex("by_parentThreadId_and_status", (q) => q.eq("parentThreadId", threadId).eq("status", status))
+            .take(CANCEL_THREAD_MAX);
+
+        for (const run of runs) {
+            if (run.resultPostedAt === undefined && run.postFailed === undefined) {
+                await patchById(ctx.db, "subAgentRuns", run._id, { postFailed: GONE_PARENT_REASON });
+            }
+        }
+    }
+
+    await cancelQueuedWorkerRuns(ctx, threadId);
+
+    for (const status of ["awaiting", "running"] as const) {
+        const runs = await ctx.db
+            .query("subAgentRuns")
+            .withIndex("by_childThreadId_and_status", (q) => q.eq("childThreadId", threadId).eq("status", status))
+            .take(CANCEL_THREAD_MAX);
+
+        for (const run of runs) {
+            await finishRun(ctx, run._id, { kind: "cancelled" });
+        }
+    }
+
+    // Only an owned thread delegates (`delegateToSubAgent` admits runs for the parent's owner alone).
+    if (userId !== undefined) {
+        await cancelSubAgentRunsForStop(ctx, threadId, userId);
+    }
 };
 
 /**

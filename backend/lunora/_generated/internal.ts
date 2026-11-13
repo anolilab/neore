@@ -1224,6 +1224,7 @@ export interface InternalApiTypes {
             completeRun: FunctionReference<"mutation", { outcome: { error: string; kind: "failed" } | { kind: "succeeded"; result: string }; runId: Id<"subAgentRuns"> }, boolean>;
             continuingRun: FunctionReference<"query", { runId: Id<"subAgentRuns"> }, null | number>;
             createRun: FunctionReference<"mutation", { dispatchedBy: "lead" | "user" | "trigger" | "messenger" | "outside_agent"; headless?: boolean; host?: { agentKey: string; deviceId: string; folderId: string }; leadTools?: Array<string>; model?: string; name?: string; organizationId?: string; parentModel?: string; parentThreadId: string; persistent?: boolean; skillSlug?: string; task: string; toolAllowlist?: Array<string>; toolCallId?: string; userId: string }, { runId: Id<"subAgentRuns">; workerId?: string } | { error: string }>;
+            endApprovalWaitForMessage: FunctionReference<"mutation", { threadId: string }, number>;
             isHostWorker: FunctionReference<"query", { userId: string; workerId: string }, boolean>;
             messageWorker: FunctionReference<"mutation", { dispatchedBy: "lead" | "user" | "trigger" | "messenger" | "outside_agent"; headless?: boolean; message: string; organizationId?: string; parentThreadId: string; toolCallId: string; userId: string; workerId: string }, { runId: Id<"subAgentRuns">; state: "queued" | "running" | "awaiting" | "succeeded" | "failed" | "cancelled"; workerId: string } | { error: string }>;
             postResult: FunctionReference<"mutation", { attempt: number; failures?: number; runId: Id<"subAgentRuns">; waits?: number }, null>;
@@ -2568,6 +2569,7 @@ export const internal: InternalApiTypes = {
             completeRun: { __lunoraRef: "sub_agents_functions:completeRun" },
             continuingRun: { __lunoraRef: "sub_agents_functions:continuingRun" },
             createRun: { __lunoraRef: "sub_agents_functions:createRun" },
+            endApprovalWaitForMessage: { __lunoraRef: "sub_agents_functions:endApprovalWaitForMessage" },
             isHostWorker: { __lunoraRef: "sub_agents_functions:isHostWorker" },
             messageWorker: { __lunoraRef: "sub_agents_functions:messageWorker" },
             postResult: { __lunoraRef: "sub_agents_functions:postResult" },

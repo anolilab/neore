@@ -10,6 +10,9 @@ import { registeredApi, registerModule } from "../../test/registered-api";
 import { jobsQueueMessages } from "../../test/stubs/cloudflare-workers";
 import { respondToToolApproval } from "../chat/tool-permissions";
 import { stopActiveForThread } from "../chat/streaming/persistent/library";
+import { _deletePageForThreadId } from "../agent/threads";
+import { createStreamWithMessage } from "../chat/streaming/index";
+import { clearAwaitingInput } from "../agent/table-writes";
 import { PENDING_APPROVAL_TTL_MS } from "../chat/lib/tool-approval-cleanup";
 import { THREAD_LOCKED_CODE } from "../lib/thread-lock";
 import type { Id } from "../_generated/dataModel";
@@ -17,6 +20,8 @@ import schema from "../schema";
 import {
     cancelSubAgentRunsForStop,
     completeResumedRun,
+    endApprovalWaitForMessage,
+    finishRun,
     listSubAgentApprovals,
     markRunAwaiting,
     postRunResult,
@@ -36,6 +41,7 @@ const STILL_WORKING = /still working/iu;
 const NOT_FOUND = /not found/iu;
 const ONCE_OR_ALWAYS = /once or always/iu;
 const ALREADY_ENDED = /already ended/iu;
+const GONE = /gone/u;
 
 const registry = vi.hoisted(() => new Map<string, unknown>());
 
@@ -934,5 +940,254 @@ describe("a resumed run ended from outside", () => {
     it("stops nothing once the continuation is no longer live, not the owner's reply beside it", async () => {
         expect(await internalCall(stopActiveForThread, { messageId: "approval-gone", onlyNamed: true, threadId: childId })).toBe(false);
         expect(await statuses()).toStrictEqual({ "approval-owner": "pending", [APPROVAL_ID]: "streaming" });
+    });
+});
+
+describe("a result for a parent that waits on its own request", () => {
+    const PARENT_REQUEST = "approval-parent";
+    const heldPosts = () => harness.scheduler.list().filter((job) => (job.args as { runId?: string } | undefined)?.runId === runId);
+
+    beforeEach(async () => {
+        // The parent's own reply paused on a request its owner can still answer.
+        await run(async (context) => {
+            await context.db.insert("messages", {
+                message: {
+                    content: [
+                        { input: { path: "/tmp/parent.txt" }, toolCallId: "call-parent-tool", toolName: TOOL, type: "tool-call" },
+                        { approvalId: PARENT_REQUEST, toolCallId: "call-parent-tool", type: "tool-approval-request" },
+                    ],
+                    role: "assistant",
+                },
+                order: 1,
+                status: "success",
+                stepOrder: 0,
+                threadId: parentId,
+                tool: true,
+                userId: OWNER,
+            });
+            await context.db.insert("toolApprovalRuns", {
+                approvalId: PARENT_REQUEST,
+                config: { ...CONFIG(), subAgentRunId: undefined },
+                createdAt: Date.now(),
+                status: "pending",
+                threadId: parentId,
+                userId: OWNER,
+            });
+            await context.db.patch("threads", parentId as Id<"threads">, { awaitingInput: "approval" });
+        });
+        await run(async (context) => await finishRun(context, runId, { error: "boom", kind: "failed" }));
+    });
+
+    it("is held while the request is open, and posted once it can no longer be answered", async () => {
+        expect(await parentReplies()).toHaveLength(0);
+        expect(heldPosts().map((job) => job.args)).toContainEqual({ attempt: 0, failures: 0, runId, waits: 1 });
+
+        await run(async (context) => {
+            const [row] = await context.db
+                .query("toolApprovalRuns")
+                .withIndex("by_approvalId", (q: any) => q.eq("approvalId", PARENT_REQUEST))
+                .collect();
+
+            await context.db.patch("toolApprovalRuns", row._id, { createdAt: Date.now() - PENDING_APPROVAL_TTL_MS - 1 });
+        });
+
+        expect(await run(async (context) => await postRunResult(context, runId, 0))).toBe(true);
+        expect(await parentReplies()).toHaveLength(1);
+    });
+
+    it("is posted once the request is closed, though no answer is on the turn yet", async () => {
+        await run(async (context) => {
+            const [row] = await context.db
+                .query("toolApprovalRuns")
+                .withIndex("by_approvalId", (q: any) => q.eq("approvalId", PARENT_REQUEST))
+                .collect();
+
+            await context.db.patch("toolApprovalRuns", row._id, { resolvedAt: Date.now(), status: "denied" });
+        });
+
+        expect(await run(async (context) => await postRunResult(context, runId, 0))).toBe(true);
+    });
+
+    it("is held though the thread does not show it waits yet: a run records its requests before it says so", async () => {
+        await run(async (context) => await clearAwaitingInput(context.db, parentId as Id<"threads">));
+
+        expect(await run(async (context) => await postRunResult(context, runId, 0))).toBe(false);
+        expect(await parentReplies()).toHaveLength(0);
+    });
+
+    it("is released when the owner sends a new message past the request", async () => {
+        const before = heldPosts().length;
+
+        await internalCall(createStreamWithMessage, {
+            messageId: "message-past",
+            streamingConfig: { contentType: "text", model: "m" },
+            threadId: parentId,
+            userId: OWNER,
+        });
+
+        expect(
+            heldPosts()
+                .slice(before)
+                .map((job) => job.args),
+        ).toStrictEqual([{ attempt: 0, runId }]);
+    });
+
+    it("is released when the owner answers the request, to post after the reply the answer starts", async () => {
+        const before = heldPosts().length;
+
+        await as(OWNER).mutation(respondToToolApproval as never, { approvalId: PARENT_REQUEST, decision: "approve", threadId: parentId } as never);
+
+        expect(
+            heldPosts()
+                .slice(before)
+                .map((job) => job.args),
+        ).toStrictEqual([{ attempt: 0, runId }]);
+    });
+});
+
+describe("deleting a thread", () => {
+    const deleteThread = async (threadId: string): Promise<unknown> => await internalCall(_deletePageForThreadId, { threadId });
+
+    /** A run the child delegated itself, still working. */
+    const nestedRun = async (): Promise<Id<"subAgentRuns">> =>
+        await run(async (context) => {
+            const now = Date.now();
+            const nestedChild = await context.db.insert("threads", { status: "active", title: "Sub-agent: nested", userId: OWNER });
+
+            return await context.db.insert("subAgentRuns", {
+                childThreadId: nestedChild,
+                createdAt: now,
+                depth: 2,
+                parentThreadId: childId,
+                startedAt: now,
+                status: "running",
+                task: "Nested work",
+                toolCallId: "call-nested",
+                updatedAt: now,
+                userId: OWNER,
+            });
+        });
+    const statusOf = async (id: Id<"subAgentRuns">): Promise<string> => {
+        const row = await run(async (context) => await context.db.get("subAgentRuns", id));
+
+        return row.status;
+    };
+
+    it.each([
+        ["waiting", false],
+        ["resumed", true],
+    ] as const)("ends the %s run it is the child of, and the run that child delegated", async (_case, resumed) => {
+        const nested = await nestedRun();
+
+        await run(async (context) => await markRunAwaiting(context, runId));
+
+        if (resumed) {
+            await answer(APPROVAL_ID, "approve");
+        }
+
+        await deleteThread(childId);
+
+        expect(await runStatus()).toBe("cancelled");
+        expect(await statusOf(nested)).toBe("cancelled");
+    });
+
+    it("ends the waiting run it delegated, whose result has nowhere to go", async () => {
+        await run(async (context) => await markRunAwaiting(context, runId));
+        await deleteThread(parentId);
+
+        expect(await runRow()).toMatchObject({ postFailed: expect.stringMatching(GONE), status: "cancelled" });
+        expect(await parentReplies()).toHaveLength(0);
+    });
+
+    it("stops a resumed run's live continuation on the deleted child", async () => {
+        await run(async (context) => await markRunAwaiting(context, runId));
+        await answer(APPROVAL_ID, "approve");
+        await deleteThread(childId);
+
+        expect(await runStatus()).toBe("cancelled");
+        expect(harness.scheduler.list().map((job) => job.args)).toContainEqual({ messageId: APPROVAL_ID, onlyNamed: true, threadId: childId });
+    });
+});
+
+describe("a new message in a waiting child", () => {
+    const send = async (threadId: string): Promise<unknown> =>
+        await internalCall(createStreamWithMessage, {
+            messageId: "message-new",
+            streamingConfig: { contentType: "text", model: "m" },
+            threadId,
+            userId: OWNER,
+        });
+    const waitEnds = (threadId: string) => harness.scheduler.list().filter((job) => JSON.stringify(job.args) === JSON.stringify({ threadId }));
+    /** A row on the child's thread at `order`: the owner's new message, or an assistant turn with a request of the run. */
+    const childRow = async (order: number, approvalId?: string): Promise<void> =>
+        await run(async (context) => {
+            await context.db.insert("messages", {
+                message:
+                    approvalId === undefined
+                        ? { content: "Do it differently.", role: "user" }
+                        : {
+                              content: [
+                                  { input: {}, toolCallId: `call-${approvalId}`, toolName: TOOL, type: "tool-call" },
+                                  { approvalId, toolCallId: `call-${approvalId}`, type: "tool-approval-request" },
+                              ],
+                              role: "assistant",
+                          },
+                order,
+                status: "success",
+                stepOrder: 0,
+                threadId: childId,
+                tool: approvalId !== undefined,
+                userId: OWNER,
+            });
+
+            if (approvalId !== undefined) {
+                await context.db.insert("toolApprovalRuns", {
+                    approvalId,
+                    config: CONFIG(),
+                    createdAt: Date.now(),
+                    status: "pending",
+                    threadId: childId,
+                    userId: OWNER,
+                });
+            }
+        });
+
+    it("ends the run's wait, which frees its slot and closes its requests", async () => {
+        await run(async (context) => await markRunAwaiting(context, runId));
+        await childRow(2);
+        await send(childId);
+
+        expect(waitEnds(childId)).toHaveLength(1);
+        expect(await internalCall(endApprovalWaitForMessage, { threadId: childId })).toBe(1);
+        expect(await runStatus()).toBe("cancelled");
+        expect(await pendingRequests()).toHaveLength(0);
+    });
+
+    it("schedules nothing for a child whose run does not wait, whatever requests are open there", async () => {
+        // The run is still running, its requests recorded: a pending sub-agent request alone is no wait to end.
+        await send(childId);
+        // Nor does a thread that is no sub-agent's child.
+        await send(parentId);
+
+        expect(waitEnds(childId)).toHaveLength(0);
+        expect(waitEnds(parentId)).toHaveLength(0);
+    });
+
+    it("leaves a wait the continuation started again on a request still open", async () => {
+        await run(async (context) => await markRunAwaiting(context, runId));
+        await childRow(2);
+        // The owner answered meanwhile, and the continuation paused on a new request: the run waits on that one.
+        await childRow(3, "approval-3");
+
+        expect(await internalCall(endApprovalWaitForMessage, { threadId: childId })).toBe(0);
+        expect(await runStatus()).toBe("awaiting");
+    });
+
+    it("leaves a resumed run going: it is past its request", async () => {
+        await run(async (context) => await markRunAwaiting(context, runId));
+        await answer(APPROVAL_ID, "approve");
+
+        expect(await internalCall(endApprovalWaitForMessage, { threadId: childId })).toBe(0);
+        expect(await runStatus()).toBe("running");
     });
 });
