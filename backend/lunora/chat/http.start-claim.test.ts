@@ -14,6 +14,9 @@ import { createThreadWithInitialMessage, gateThreadActionHandler } from "./funct
 import { startGoal } from "./goals/internal";
 import { runChatStart } from "./http";
 import { enqueueJob } from "../lib/job-queue";
+import { createRatelimit } from "../lib/rate-limiter";
+import { applyRateLimit } from "../lib/rate-limiter-mutations";
+import { chargeDailyLimitOnce } from "./daily-charge";
 import {
     CHAT_START_CLAIM_TTL_MS,
     CHAT_START_LEASE_MS,
@@ -39,6 +42,8 @@ const state = vi.hoisted(() => {
         goalFails: false,
         /** The ids of every prompt the no-id path saved from the HTTP action. */
         legacySaves: 0,
+        /** The next save of a prompt (into a thread, or with a new chat) fails, once: after the charge, before anything is saved. */
+        saveFails: false,
         /** The references the HTTP scheduler was handed. */
         scheduled: [] as string[],
         /** What each scheduled job was handed, in the same order. */
@@ -88,12 +93,19 @@ vi.mock("../lib/job-queue", () => {
         }),
     };
 });
-vi.mock("./lib/daily-limit", () => {
-    return {
-        chargeDailyLimit: async () => {
-            state.charges += 1;
+// The real charge, against the real limiter: `state.charges` counts the units it actually took.
+vi.mock("./lib/daily-limit", async (importOriginal) => {
+    const original = await importOriginal<typeof import("./lib/daily-limit")>();
 
-            return { ok: true };
+    return {
+        ...original,
+        chargeDailyLimit: async (...args: Parameters<typeof original.chargeDailyLimit>) => {
+            const before = await textUnitsLeft();
+            const result = await original.chargeDailyLimit(...args);
+
+            state.charges += before - (await textUnitsLeft());
+
+            return result;
         },
     };
 });
@@ -165,11 +177,34 @@ const withoutNestedMutations = (ctx: any): any =>
         },
     });
 
+const failSaveOnce = (): void => {
+    if (!state.saveFails) {
+        return;
+    }
+
+    state.saveFails = false;
+
+    throw new Error("the prompt could not be saved");
+};
+
+/** What is left of the caller's daily text quota (free tier). */
+const textUnitsLeft = async (): Promise<number> => {
+    const { remaining } = (await run(async (ctx) => await createRatelimit("chat/dailyText:free", ctx.db as never).getRemaining(state.userId))) as {
+        remaining: number;
+    };
+
+    return remaining;
+};
+
 const HANDLERS: Record<string, (args: any) => Promise<unknown>> = {
     "agent_agent_switch:getRunAgentModel": async () => state.agentModel,
     "agent_threads:getThreadInternal": async (args) => await run(async (ctx) => await ctx.db.get("threads", args.threadId)),
-    "chat_functions:createThreadWithInitialMessage": async (args) =>
-        await run(async (ctx) => await (createThreadWithInitialMessage as any).handler(withoutNestedMutations(ctx), args)),
+    "chat_daily_charge:chargeDailyLimitOnce": async (args) => await run(async (ctx) => await ctx.runMutation(chargeDailyLimitOnce, args)),
+    "chat_functions:createThreadWithInitialMessage": async (args) => {
+        failSaveOnce();
+
+        return await run(async (ctx) => await (createThreadWithInitialMessage as any).handler(withoutNestedMutations(ctx), args));
+    },
     "chat_functions:gateThreadAction": async (args) => await run(async (ctx) => await gateThreadActionHandler(ctx, args)),
     "chat_goals_internal:startGoal": async (args) => {
         if (state.goalFails) {
@@ -183,7 +218,11 @@ const HANDLERS: Record<string, (args: any) => Promise<unknown>> = {
     "chat_start_claim:claimChatStart": async (args) => await run(async (ctx) => await ctx.runMutation(claimChatStart, args)),
     "chat_start_claim:recordStartTitlesScheduled": async (args) => await run(async (ctx) => await ctx.runMutation(recordStartTitlesScheduled, args)),
     "chat_start_claim:releaseChatStart": async (args) => await run(async (ctx) => await ctx.runMutation(releaseChatStart, args)),
-    "chat_start_claim:saveStartPrompt": async (args) => await run(async (ctx) => await (saveStartPrompt as any).handler(withoutNestedMutations(ctx), args)),
+    "chat_start_claim:saveStartPrompt": async (args) => {
+        failSaveOnce();
+
+        return await run(async (ctx) => await (saveStartPrompt as any).handler(withoutNestedMutations(ctx), args));
+    },
     "chat_streaming:createStreamWithMessage": async (args) => {
         vi.setSystemTime(Date.now() + state.streamDelayMs);
 
@@ -195,6 +234,7 @@ const HANDLERS: Record<string, (args: any) => Promise<unknown>> = {
 
         return await run(async (ctx) => await (createStreamWithMessage as any).handler(withoutNestedMutations(ctx), args));
     },
+    "lib_rate_limiter_mutations:applyRateLimit": async (args) => await run(async (ctx) => await ctx.runMutation(applyRateLimit, args)),
 };
 
 const fakeContext = (): any => {
@@ -235,6 +275,7 @@ beforeEach(async () => {
     state.scheduled.length = 0;
     state.scheduledArgs.length = 0;
     state.scheduleFails = undefined;
+    state.saveFails = false;
     state.streamDelayMs = 0;
     state.streamFails = false;
     vi.mocked(enqueueJob).mockClear();
@@ -498,6 +539,33 @@ describe("/chat/start with clientMessageId", () => {
         expect(await countRows("threadGoals")).toBe(0);
         expect(await countRows("messages")).toBe(1);
         expect(state.charges).toBe(1);
+    });
+
+    it("charges one quota unit for a send whose save failed after its charge, however often it is retried", async () => {
+        for (const [clientMessageId, target] of [
+            ["save-fails-in-thread", { threadId }],
+            ["save-fails-new-chat", {}],
+        ] as const) {
+            const { charges } = state;
+
+            state.saveFails = true;
+            await expect(send({ clientMessageId, ...target })).rejects.toThrow("the prompt could not be saved");
+
+            const retried = await send({ clientMessageId, ...target });
+            const again = await send({ clientMessageId, ...target });
+
+            expect(retried.status).toBe(200);
+            expect(again.json).toMatchObject({ duplicate: true, messageId: retried.json.messageId });
+            expect(state.charges - charges).toBe(1);
+        }
+
+        expect(await countRows("messages")).toBe(2);
+
+        // The same id on another prompt is refused by the send's claim, before any charge.
+        const { charges } = state;
+
+        expect((await send({ clientMessageId: "save-fails-in-thread", prompt: "something else", threadId })).status).toBe(422);
+        expect(state.charges).toBe(charges);
     });
 
     it("refuses the same id on a different send, and never answers it with the first send's thread", async () => {

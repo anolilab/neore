@@ -165,6 +165,14 @@ const vClaimOutcome = v.union(
 
 const startKey = (userId: string, clientMessageId: string): string => `${userId}:${clientMessageId}`;
 
+/**
+ * The daily charge's key for a keyed send (`chargeDailyLimit`'s `chargeKey`): the user, the id and the request's fingerprint.
+ * It outlives the send's claim being given back after a failed save, so a retry of the same send is not charged again; the
+ * same id on another request is another send. No day in it: a retry just after midnight is the send the first day paid for.
+ */
+export const startChargeKey = (userId: string, clientMessageId: string, fingerprint: string): string =>
+    `chat-start:${userId}:${clientMessageId}:${fingerprint}`;
+
 const recordOf = (result: string | undefined): StartRecord | undefined => (result === undefined ? undefined : (JSON.parse(result) as StartRecord));
 
 const isSaved = (record: StartRecord | undefined): record is SavedRecord => record?.messageId !== undefined && record.threadId !== undefined;

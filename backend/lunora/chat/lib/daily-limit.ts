@@ -56,12 +56,16 @@ export const dailyLimitKeyOf = (kind: DailyLimitKind, tier: DailyLimitTier): Rat
 
 export type DailyLimitResult = { ok: true } | { ok: false; retryAfter?: number };
 
-/** Charge `count` units of `kind` to `user`'s daily quota. */
+/**
+ * Charge `count` units of `kind` to `user`'s daily quota. With a `chargeKey` (a keyed send's, `startChargeKey`) the units
+ * are taken once per key (`chat/daily-charge.ts#chargeDailyLimitOnce`): a retry of a send already charged is not charged again.
+ */
 export const chargeDailyLimit = async (
     context: Pick<HttpActionCtx, "runMutation">,
     user: LimitedUser & Pick<BetterAuthUser, "_id">,
     kind: DailyLimitKind,
     count = 1,
+    { chargeKey }: { chargeKey?: string } = {},
 ): Promise<DailyLimitResult> => {
     if (isPlatformAdmin(user)) {
         return { ok: true };
@@ -73,7 +77,10 @@ export const chargeDailyLimit = async (
         return { ok: false };
     }
 
-    const result = await context.runMutation(internal.lib.rate_limiter_mutations.applyRateLimit, { count, identifier: user._id, key });
+    const result =
+        chargeKey === undefined
+            ? await context.runMutation(internal.lib.rate_limiter_mutations.applyRateLimit, { count, identifier: user._id, key })
+            : await context.runMutation(internal.chat.daily_charge.chargeDailyLimitOnce, { chargeKey, count, identifier: user._id, key });
 
     return result.ok ? { ok: true } : { ok: false, retryAfter: result.retryAfter };
 };

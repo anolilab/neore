@@ -60,6 +60,7 @@ registerModule(registry, "agent_messages", await import("../agent/messages"));
 registerModule(registry, "agent_sharing", await import("../agent/sharing"));
 registerModule(registry, "agent_threads", await import("../agent/threads"));
 registerModule(registry, "auth_functions", await import("../auth/functions"));
+registerModule(registry, "chat_daily_charge", await import("../chat/daily-charge"));
 registerModule(registry, "chat_functions", await import("../chat/functions"));
 registerModule(registry, "chat_start_claim", await import("../chat/start-claim"));
 registerModule(registry, "chat_streaming", await import("../chat/streaming"));
@@ -184,8 +185,8 @@ describe("POST /chat with a clientMessageId", () => {
         return { json: (await response.json()) as any, status: response.status };
     };
 
-    it("saves a retried send once and answers it with the first send's ids, uncharged", async () => {
-        const before = await dailyRemaining();
+    // What a retry saves and charges is `chat/http.start-claim.test.ts`'s; this checks the public answer to it.
+    it("answers a retried send 200 with duplicate: true and the first send's ids, and the id on another prompt with client_message_id_reused", async () => {
         const first = await postChat({ clientMessageId: "public-send-1", prompt: "hello" });
 
         expect(first.status).toBe(202);
@@ -201,15 +202,11 @@ describe("POST /chat with a clientMessageId", () => {
             streamToken: expect.any(String),
             threadId: first.json.threadId,
         });
-        expect(await countMessages()).toBe(1);
-        expect(await dailyRemaining()).toBe(before - 1);
 
-        // The same id on another prompt is refused, and saves nothing.
         const reused = await postChat({ clientMessageId: "public-send-1", prompt: "something else" });
 
         expect(reused.status).toBe(422);
         expect(reused.json.error).toMatchObject({ code: "client_message_id_reused" });
-        expect(await countMessages()).toBe(1);
     });
 
     it("refuses a malformed clientMessageId before anything is saved", async () => {

@@ -35,7 +35,7 @@ import { documentTextPart, guestNoteIdOfMessage, guestTextPart } from "./lib/att
 import { unsendableGuestText } from "./lib/guest-link-store";
 import { formatPageContextPart, parsePageContext } from "./lib/page-context";
 import type { ChatStartRequest, StartClaim } from "./start-claim";
-import { chatStartFingerprint, isValidClientMessageId } from "./start-claim";
+import { chatStartFingerprint, isValidClientMessageId, startChargeKey } from "./start-claim";
 import { createStreamToken } from "./streaming/persistent/stream-token";
 
 const SAFE_TOKEN_RE = /^[\w-]+$/;
@@ -903,21 +903,25 @@ const runChatStartOnShard = async (
     // A send with a client id is taken before the charge too: a resend is answered with the first send's ids, uncharged.
     // Its fingerprint binds the id to this thread and prompt, so a duplicate's thread is the one gated above (or the
     // caller's own new chat), and the same id on another send is refused.
-    const startOutcome =
+    const startFingerprint =
         body.clientMessageId === undefined
+            ? undefined
+            : await chatStartFingerprint({
+                  contentType,
+                  ...(body.fileIds !== undefined && { fileIds: body.fileIds }),
+                  ...(body.goal !== undefined && { goal: goalText }),
+                  ...(body.guestMessageId !== undefined && { guestMessageId: body.guestMessageId }),
+                  ...(body.parentId !== undefined && { parentId: body.parentId }),
+                  ...(body.prompt !== undefined && { prompt: body.prompt }),
+                  settings: startSettingsOf(body, pageContext),
+                  ...(validThreadId !== undefined && { threadId: validThreadId }),
+              });
+    const startOutcome =
+        body.clientMessageId === undefined || startFingerprint === undefined
             ? undefined
             : await context.runMutation(internal.chat.start_claim.claimChatStart, {
                   clientMessageId: body.clientMessageId,
-                  fingerprint: await chatStartFingerprint({
-                      contentType,
-                      ...(body.fileIds !== undefined && { fileIds: body.fileIds }),
-                      ...(body.goal !== undefined && { goal: goalText }),
-                      ...(body.guestMessageId !== undefined && { guestMessageId: body.guestMessageId }),
-                      ...(body.parentId !== undefined && { parentId: body.parentId }),
-                      ...(body.prompt !== undefined && { prompt: body.prompt }),
-                      settings: startSettingsOf(body, pageContext),
-                      ...(validThreadId !== undefined && { threadId: validThreadId }),
-                  }),
+                  fingerprint: startFingerprint,
                   streams: contentType === "text",
                   userId,
               });
@@ -1142,7 +1146,10 @@ const runChatStartOnShard = async (
 
     // A resumed send was charged by its first try.
     if (contentType === "text" && !resumed) {
-        const dailyLimit = await chargeDailyLimit(context, user, "Text").catch(async (error: unknown) => {
+        // A keyed send is charged once per send: a retry after a failed save, which gave its claim back, is not charged again.
+        const chargeKey =
+            body.clientMessageId === undefined || startFingerprint === undefined ? undefined : startChargeKey(userId, body.clientMessageId, startFingerprint);
+        const dailyLimit = await chargeDailyLimit(context, user, "Text", 1, { ...(chargeKey !== undefined && { chargeKey }) }).catch(async (error: unknown) => {
             await releaseGuestSend();
 
             throw error;

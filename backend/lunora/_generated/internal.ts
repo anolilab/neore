@@ -373,6 +373,7 @@ export interface InternalApiTypes {
             isCustomProviderRunnable: FunctionReference<"query", { providerId: string; userId: string }, boolean>;
         };
         daily_charge: {
+            chargeDailyLimitOnce: FunctionReference<"mutation", { chargeKey: string; count?: number; identifier: string; key: string }, { ok: boolean; retryAfter?: number }>;
             chargeDailyUnit: FunctionReference<"mutation", { count?: number; kind: "Audio" | "Image" | "Text" | "Video"; organizationId?: string; requestId?: string; userId: string }, boolean>;
         };
         edit_abandon: {
@@ -1702,6 +1703,7 @@ export const internal: InternalApiTypes = {
             isCustomProviderRunnable: { __lunoraRef: "chat_custom_providers:isCustomProviderRunnable" },
         },
         daily_charge: {
+            chargeDailyLimitOnce: { __lunoraRef: "chat_daily_charge:chargeDailyLimitOnce" },
             chargeDailyUnit: { __lunoraRef: "chat_daily_charge:chargeDailyUnit" },
         },
         edit_abandon: {
