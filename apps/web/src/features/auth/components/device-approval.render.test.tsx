@@ -140,9 +140,11 @@ describe("DeviceApproval", () => {
         expect(alert.textContent).toBe(
             "This account already has the maximum number of paired devices. Remove one in Settings, then run `neore-host pair` again.",
         );
-        // Focus moves in an effect, which can land a tick after the content appears.
+        const heading = await screen.findByRole("heading", { level: 1 });
+
+        // The review moves focus in a passive effect, which can land a tick after the alert appears.
         await vi.waitFor(() => {
-            expect(screen.getByRole("heading", { level: 1 }).matches(":focus")).toBe(true);
+            expect(heading.matches(":focus")).toBe(true);
         });
     });
 
@@ -242,9 +244,11 @@ describe("DeviceApproval", () => {
         const alert = await screen.findByRole("alert");
 
         expect(alert.textContent).toContain("different account");
-        // Focus moves in an effect, which can land a tick after the content appears.
+        const heading = await screen.findByRole("heading", { level: 1 });
+
+        // The review moves focus in a passive effect, which can land a tick after the alert appears.
         await vi.waitFor(() => {
-            expect(screen.getByRole("heading", { level: 1 }).matches(":focus")).toBe(true);
+            expect(heading.matches(":focus")).toBe(true);
         });
     });
 
@@ -301,10 +305,8 @@ describe("DeviceApproval", () => {
 
         await screen.findByRole("button", { name: "Try again" });
 
-        // Focus moves in an effect, which can land a tick after the content appears.
-        await vi.waitFor(() => {
-            expect(screen.getByRole("heading", { level: 1 }).matches(":focus")).toBe(true);
-        });
+        // The problem message focuses its heading from a ref callback, during the commit that shows it.
+        expect(screen.getByRole("heading", { level: 1 }).matches(":focus")).toBe(true);
     });
 
     it("does not announce 'already answered' for a code opened by another account", async () => {
