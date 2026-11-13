@@ -1279,6 +1279,64 @@ describe("deleting a thread", () => {
         expect(queued).toHaveLength(205);
     });
 
+    it("does not walk the queue of a worker whose row is already gone", async () => {
+        const { gone, running } = await run(async (context) => {
+            const now = Date.now();
+            const thread = await context.db.insert("threads", { status: "active", title: "Worker", userId: OWNER });
+            const base = {
+                childThreadId: thread,
+                depth: 1,
+                mode: "worker" as const,
+                parentThreadId: parentId,
+                runner: { deviceId: "device-1", kind: "host" as const },
+                updatedAt: now,
+                userId: OWNER,
+            };
+            const current = await context.db.insert("subAgentRuns", {
+                ...base,
+                createdAt: now - 1,
+                startedAt: now,
+                status: "running",
+                task: "Current",
+                toolCallId: "call-gone-current",
+            });
+
+            for (let index = 0; index < 205; index += 1) {
+                await context.db.insert("subAgentRuns", {
+                    ...base,
+                    createdAt: now + index,
+                    status: "queued",
+                    task: `Queued ${String(index)}`,
+                    toolCallId: `call-gone-${String(index)}`,
+                });
+            }
+
+            // The delete's last page took the row.
+            await context.db.delete("threads", thread);
+
+            return { gone: thread, running: current };
+        });
+
+        await run(async (context) => await finishRun(context, running, { kind: "cancelled" }));
+
+        const queued = await run(
+            async (context) =>
+                await context.db
+                    .query("subAgentRuns")
+                    .withIndex("by_childThreadId_and_status", (q: any) => q.eq("childThreadId", gone).eq("status", "queued"))
+                    .collect(),
+        );
+
+        expect(queued).toHaveLength(205);
+    });
+
+    it("lets a result post again to a chat whose delete was abandoned an hour ago or more", async () => {
+        await run(async (context) => await context.db.patch("threads", parentId as Id<"threads">, { deletingAt: Date.now() - 2 * 60 * 60_000 }));
+        await run(async (context) => await finishRun(context, runId, { error: "boom", kind: "failed" }));
+
+        expect(await parentReplies()).toHaveLength(1);
+    });
+
     it("cancels a deleted worker's queue past one call's 200, in a continuation", async () => {
         const worker = await run(async (context) => {
             const now = Date.now();

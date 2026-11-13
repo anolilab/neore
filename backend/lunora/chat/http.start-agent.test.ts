@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { runAgentModelOf } from "../agent/agent-switch";
 import { enqueueJob } from "../lib/job-queue";
+import { chatLogger } from "../lib/logger";
 import schema from "../schema";
 import { gateThreadActionHandler } from "./functions";
 import { switchThreadAgentHandler } from "./agent-switch";
@@ -487,7 +488,12 @@ describe("/chat/start and a sub-agent's wait", () => {
     it("does not fail the send when that call fails", async () => {
         failAfterMessage = true;
 
+        const warn = vi.spyOn(chatLogger, "warn").mockImplementation(() => undefined);
         const response = await start({ model: A });
+
+        // The failure itself is left on the record, then retried.
+        expect(warn).toHaveBeenCalledWith(expect.stringContaining("retrying shortly"), expect.objectContaining({ message: "afterOwnerMessage failed" }));
+        warn.mockRestore();
 
         expect(response.status).toBe(200);
         expect(afterMessageCalls()).toHaveLength(1);

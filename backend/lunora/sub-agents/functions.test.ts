@@ -129,11 +129,17 @@ describe("admitSubAgentRun", () => {
         expect(await runs()).toHaveLength(0);
     });
 
-    it("refuses a conversation being hard-deleted, whose runs are ending", async () => {
+    it("refuses a conversation being hard-deleted, whose runs are ending, and says so", async () => {
         await harness.run(async (ctx: any) => await ctx.db.patch("threads", threadId, { deletingAt: Date.now() }));
 
-        expect(await admit()).toStrictEqual({ error: expect.stringMatching(ONLY_OWNER) });
+        expect(await admit()).toStrictEqual({ error: "This chat is being deleted." });
         expect(await runs()).toHaveLength(0);
+    });
+
+    it("admits again in a conversation whose delete was abandoned an hour ago or more", async () => {
+        await harness.run(async (ctx: any) => await ctx.db.patch("threads", threadId, { deletingAt: Date.now() - 2 * 60 * 60_000 }));
+
+        expect(await admit()).toHaveProperty("runId");
     });
 
     it(`caps concurrent children at ${String(SUB_AGENT_MAX_CONCURRENT)} and frees a slot when one ends`, async () => {

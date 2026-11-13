@@ -16,7 +16,10 @@ detail. Paths are relative to `backend/lunora/`.
     because the send itself may have just closed one (`discardPausedThreadSecrets`).
 - **A hard delete ends the thread's runs** (`endSubAgentRunsOfDeletedThread`, on `agent/threads.ts`'s first page):
   - It sets the thread's `deletingAt` first. From then on a going thread takes no post (`isGoneParent`), admits no new
-    run (`admitCommon`), and its worker queue starts nothing (`claimQueuedRun`).
+    run (`admitCommon`, "This chat is being deleted."), and its worker queue starts nothing (`startNextWorkerRun`, with
+    `claimQueuedRun` as a backstop; a worker whose row is already gone starts nothing either).
+  - The mark holds for an hour (`isGoingThread`, `DELETING_HOLDS_MS`). A chain that fails or is abandoned has no hook to
+    clear it, so past that the thread is live again.
   - It marks every unposted result bound for the thread `postFailed`, and cancels its worker queue newest first. Both
     are paged, with a continuation past a per-call bound (`markDeletedThreadResults`, `cancelDeletedThreadQueue`).
   - It ends the runs the thread is the child of first, so the Stop path then reaches what that child delegated. Then it

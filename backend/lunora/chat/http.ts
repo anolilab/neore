@@ -1071,12 +1071,13 @@ const runChatStartOnShard = async (
 
         afterSaveDone = true;
 
-        // A failed call is tried once more shortly (it is idempotent); only a failed retry schedule is logged.
-        await context.runMutation(internal.sub_agents.functions.afterOwnerMessage, { threadId: savedThreadId }).catch(async () => {
+        // A failed call is logged and tried once more shortly (it is idempotent); a failed retry schedule is logged too.
+        await context.runMutation(internal.sub_agents.functions.afterOwnerMessage, { threadId: savedThreadId }).catch(async (error: unknown) => {
+            chatLogger.warn("[chat] Could not end a sub-agent's wait or release its held results; retrying shortly", error);
             await httpScheduler(context)
                 .runAfter(AFTER_SAVE_RETRY_MS, internal.sub_agents.functions.afterOwnerMessage, { threadId: savedThreadId })
-                .catch((error: unknown) => {
-                    chatLogger.error("[chat] Could not end a sub-agent's wait or release its held results, nor schedule a retry", error);
+                .catch((error_: unknown) => {
+                    chatLogger.error("[chat] Could not end a sub-agent's wait or release its held results, nor schedule a retry", error_);
                 });
         });
     };

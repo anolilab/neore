@@ -218,9 +218,13 @@ const admitCommon = async (
     // only the parent thread's owner may delegate from it — not a collaborator.
     const parent = await ctx.db.get("threads", args.parentThreadId as Id<"threads">);
 
-    // A conversation being hard-deleted (`deletingAt`) starts nothing more: its runs are ending, and a new one would spend.
-    if (!parent || parent.deleted || parent.deletingAt !== undefined || parent.userId !== args.userId) {
+    if (!parent || parent.deleted || parent.userId !== args.userId) {
         return { error: "Only the owner of this conversation can delegate to sub-agents." };
+    }
+
+    // A conversation being hard-deleted starts nothing more: its runs are ending, and a new one would spend.
+    if (isGoingThread(parent, ctx.now)) {
+        return { error: "This chat is being deleted." };
     }
 
     return { account, allowlist: allowlist.tools, parent, skillSlug, task };
@@ -1043,7 +1047,7 @@ export const claimQueuedRun = async (ctx: MutationCtx, runId: Id<"subAgentRuns">
         // Archived, deleted or locked after this run was queued: it ends cancelled and uncharged, the
         // thread stays as it is, and the rest of the queue drains the same way.
         // A worker being hard-deleted (`deletingAt`) starts nothing more, past what its delete has cancelled so far.
-        if (!worker || worker.deleted || worker.deletingAt !== undefined || worker.status === "archived" || isThreadLocked(worker)) {
+        if (!worker || worker.deleted || isGoingThread(worker, ctx.now) || worker.status === "archived" || isThreadLocked(worker)) {
             await finishRun(ctx, run._id, { kind: "cancelled" });
 
             return null;
@@ -1202,14 +1206,24 @@ export const attachChildThread = internalMutation
  */
 const GONE_PARENT_REASON = "The conversation that started this run is gone.";
 
-/** A deleted parent, or one no longer the run owner's, can never take the post. */
-const isGoneParent = (thread: Doc<"threads"> | null, run: RunDoc): boolean =>
-    !thread || thread.deleted === true || thread.deletingAt !== undefined || thread.userId !== run.userId;
+/**
+ * How long a hard delete's `deletingAt` holds. A delete chain that failed or was abandoned has no hook to clear it, so past
+ * this the thread counts as live again (it can delegate, and results post to it). Far past any delete chain's length.
+ */
+const DELETING_HOLDS_MS = 60 * 60_000;
+
+/** Whether `thread` is being hard-deleted: marked on the delete's first page (`agent/threads.ts`), and not stale. */
+const isGoingThread = (thread: Pick<Doc<"threads">, "deletingAt">, now: number): boolean =>
+    thread.deletingAt !== undefined && now - thread.deletingAt < DELETING_HOLDS_MS;
+
+/** A deleted parent, one being deleted, or one no longer the run owner's, can never take the post. */
+const isGoneParent = (thread: Doc<"threads"> | null, run: RunDoc, now: number): boolean =>
+    !thread || thread.deleted === true || isGoingThread(thread, now) || thread.userId !== run.userId;
 
 const postToParent = async (ctx: MutationCtx, run: RunDoc, text: string): Promise<{ reason: string; retry: boolean } | undefined> => {
     const thread = await ctx.db.get("threads", run.parentThreadId as Id<"threads">);
 
-    if (!thread || isGoneParent(thread, run)) {
+    if (!thread || isGoneParent(thread, run, Date.now())) {
         return { reason: GONE_PARENT_REASON, retry: false };
     }
 
@@ -1243,7 +1257,8 @@ const startNextWorkerRun = async (ctx: MutationCtx, childThreadId: string): Prom
     // (`cancelDeletedThreadQueue`); `claimQueuedRun` refuses a going worker's run as a backstop.
     const worker = await ctx.db.get("threads", childThreadId as Id<"threads">);
 
-    if (worker?.deletingAt !== undefined) {
+    // A thread already gone (its delete's last page) is the same: nothing of it starts.
+    if (!worker || isGoingThread(worker, ctx.now)) {
         return;
     }
 
@@ -1407,7 +1422,7 @@ export const postRunResult = async (ctx: MutationCtx, runId: Id<"subAgentRuns">,
     const parent = await ctx.db.get("threads", run.parentThreadId as Id<"threads">);
 
     // A parent that is gone cannot take the post, whatever stream it left behind.
-    if (isGoneParent(parent, run)) {
+    if (isGoneParent(parent, run, ctx.now)) {
         await patchById(ctx.db, "subAgentRuns", run._id, { postFailed: GONE_PARENT_REASON });
 
         return false;
