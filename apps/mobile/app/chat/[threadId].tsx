@@ -29,6 +29,7 @@ import { useIsAppActive } from "@/chat/use-app-active";
 import { useReplyConfirmation } from "@/chat/use-reply-confirmation";
 import { loadConfig } from "@/lib/config";
 import { DEFAULT_CHAT_MODEL } from "@/lib/defaults";
+import { withCatch, withFinally } from "@/lib/guarded";
 import { getClient } from "@/lib/lunora";
 import { streamingFetch } from "@/lib/streaming-fetch";
 import { offerPhonePush } from "@/notifications/use-phone-push";
@@ -130,6 +131,12 @@ const appendToRow = (rows: Row[], id: string, text: string): Row[] =>
 
         return { ...row, shareText: row.shareText + text, text: row.text + text };
     });
+
+/** A steer starts a new row. The row before it stays unless it has no text yet: then it is not part of the reply. */
+const withSteeredRow = (rows: Row[], previousId: string, steered: Row): Row[] => [
+    ...rows.filter((row) => row.id !== previousId || row.text !== ""),
+    steered,
+];
 
 const fetchMessagePage = (threadId: string, cursor: string | null) =>
     getClient().query(api.chat.functions.getThreadUIMessages, {
@@ -307,22 +314,7 @@ const Chat = () => {
 
         setIsLoadingOlder(true);
 
-        try {
-            const result = await readOlderMessages({
-                cache,
-                fetchPage: async () => {
-                    const page = await fetchMessagePage(threadId, olderCursor);
-                    const syncedAt = Date.now();
-
-                    return {
-                        olderCursor: page.isDone ? null : page.continueCursor,
-                        rows: page.page.map((message) => toRow(message, threadId, syncedAt)),
-                    };
-                },
-                gate: readGate.current,
-                threadId,
-            });
-
+        const showOlder = (result: Awaited<ReturnType<typeof readOlderMessages>>) => {
             switch (result.kind) {
                 case "failed": {
                     setError(result.message);
@@ -351,9 +343,27 @@ const Chat = () => {
                     break;
                 }
             }
-        } finally {
-            setIsLoadingOlder(false);
-        }
+        };
+
+        const fetchPage = async () => {
+            const page = await fetchMessagePage(threadId, olderCursor);
+            const syncedAt = Date.now();
+
+            return {
+                olderCursor: page.isDone ? null : page.continueCursor,
+                rows: page.page.map((message) => toRow(message, threadId, syncedAt)),
+            };
+        };
+
+        // `withFinally`, not `try … finally`: the React Compiler skips a component that holds a `finally`.
+        await withFinally(
+            async () => {
+                showOlder(await readOlderMessages({ cache, fetchPage, gate: readGate.current, threadId }));
+            },
+            () => {
+                setIsLoadingOlder(false);
+            },
+        );
     };
 
     // The saved messages paint first; live rows replace them, and a cached row never replaces a newer live one.
@@ -365,14 +375,11 @@ const Chat = () => {
         let isCancelled = false;
 
         const showCached = async () => {
-            try {
-                const cached = await cache.loadMessages(threadId);
+            // An unreadable cache is an empty one.
+            const cached = await withCatch(async () => await cache.loadMessages(threadId), (): Row[] => []);
 
-                if (!isCancelled && !hasLiveRows.current && !isRefused.current && cached.length > 0) {
-                    writeRows((current) => byCreation(mergeRows(current, cached)));
-                }
-            } catch {
-                // An unreadable cache is an empty one.
+            if (!isCancelled && !hasLiveRows.current && !isRefused.current && cached.length > 0) {
+                writeRows((current) => byCreation(mergeRows(current, cached)));
             }
         };
 
@@ -548,9 +555,11 @@ const Chat = () => {
         ]);
 
         // How far the send got decides whether a failure gives the prompt back (`settleFailedSend`).
-        let stage: SendStage = "before-request";
+        const progress: { stage: SendStage } = { stage: "before-request" };
 
-        try {
+        // The send as a closure run by `withCatch` and `withFinally` below, not a `try` around it: the React Compiler skips
+        // a component that holds a `finally`, or a `throw` inside a `try`.
+        const deliver = async () => {
             const config = loadConfig();
             const jwt = await fetchAccessToken({ fetch, lunoraUrl: config.lunoraUrl, store: secureGrantStore });
 
@@ -564,7 +573,7 @@ const Chat = () => {
             // is tried again while its first try is still being saved, or when a try gets no answer (`startWithRetries`). A
             // resend the server already took answers with that send's ids (`duplicate`), and opens that chat like any start.
             const started = await requireOnline({ isOffline: sendControl.disabled }, () => {
-                stage = "requested";
+                progress.stage = "requested";
 
                 return startWithRetries({
                     attempt: async () =>
@@ -586,7 +595,7 @@ const Chat = () => {
                 return;
             }
 
-            stage = "accepted";
+            progress.stage = "accepted";
             acceptStart({ controller, sender, started, userId });
 
             const replyStream = replyStreamOf(started);
@@ -621,12 +630,9 @@ const Chat = () => {
 
                         steerCount += 1;
                         activeId = `${assistantId}-${steerCount}`;
-                        writeRows((current) => {
-                            // A row that has no text yet is not part of the reply; the steered text takes its place.
-                            const kept = current.filter((row) => row.id !== previousId || row.text !== "");
+                        const steered = localRow(activeId, "assistant", threadId ?? NEW_THREAD, text);
 
-                            return [...kept, localRow(activeId, "assistant", threadId ?? NEW_THREAD, text)];
-                        });
+                        writeRows((current) => withSteeredRow(current, previousId, steered));
 
                         return;
                     }
@@ -655,7 +661,8 @@ const Chat = () => {
             addConfirmation({ holdsSend: outcome === "unconfirmed", messageId: started.messageId, steers: steerCount, threadId: started.threadId });
 
             AccessibilityInfo.announceForAccessibility("Reply finished");
-        } catch (error_) {
+        };
+        const recover = (error_: unknown) => {
             // A send sign-out stopped belongs to the account that left: its prompt and held id are dropped, never kept for
             // the next one to sign in.
             if (sendSession.isSignedOut()) {
@@ -665,16 +672,23 @@ const Chat = () => {
                 return;
             }
 
-            const { isMerged } = settleFailedSend({ clientMessageId, error: error_, ids: { assistant: assistantId, user: userId }, prompt, stage });
+            const { isMerged } = settleFailedSend({ clientMessageId, error: error_, ids: { assistant: assistantId, user: userId }, prompt, stage: progress.stage });
 
             // The abort error of a send stopped on purpose is not shown: its notice is.
             if (!controller.signal.aborted) {
-                setError(failedSendMessage(error_, stage, { isMerged }));
+                setError(failedSendMessage(error_, progress.stage, { isMerged }));
             }
-        } finally {
-            sendSession.end();
-            setSending(false);
-        }
+        };
+
+        await withFinally(
+            async () => {
+                await withCatch(deliver, recover);
+            },
+            () => {
+                sendSession.end();
+                setSending(false);
+            },
+        );
     };
 
     // The last known geometry of the list. The end is recomputed whenever any of it changes, not only on a scroll.

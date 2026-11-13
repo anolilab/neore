@@ -5,6 +5,7 @@ import { AccessibilityInfo, Platform } from "react-native";
 
 import { useAuth } from "../auth/auth-state";
 import { bindLastThreadOwner } from "../chat/last-thread-store";
+import { withCatch } from "../lib/guarded";
 import { getClient } from "../lib/lunora";
 import type { ScopedCache } from "./cache";
 import { canWrite, INITIAL_CONNECTIVITY, isOffline as isOfflineState, isReachable, reduceConnectivity } from "./connectivity";
@@ -109,23 +110,25 @@ export const OfflineProvider = ({ children }: { children: ReactNode }) => {
         const offlineCache = getOfflineCache();
         let isCancelled = false;
 
-        const run = async () => {
-            try {
-                if (status === "signed-out") {
-                    await offlineCache.clear();
-                } else if (status === "signed-in" && userId !== undefined) {
-                    // Like the cache, the saved chat to reopen accepts saves from this account only.
-                    bindLastThreadOwner(userId);
-                    await offlineCache.bindOwner(userId);
+        const update = async () => {
+            if (status === "signed-out") {
+                await offlineCache.clear();
+            } else if (status === "signed-in" && userId !== undefined) {
+                // Like the cache, the saved chat to reopen accepts saves from this account only.
+                bindLastThreadOwner(userId);
+                await offlineCache.bindOwner(userId);
 
-                    if (!isCancelled) {
-                        setBound({ cache: offlineCache.forOwner(userId), userId });
-                    }
+                if (!isCancelled) {
+                    setBound({ cache: offlineCache.forOwner(userId), userId });
                 }
-            } catch (error) {
+            }
+        };
+        // `withCatch`, not a `try` around `update`: the React Compiler skips a component whose `try` holds a condition.
+        const run = async () => {
+            await withCatch(update, (error: unknown) => {
                 // eslint-disable-next-line no-console -- no logger in the app; the app carries on without a cache, but not silently
                 console.warn("Could not update the offline cache.", error);
-            }
+            });
         };
 
         run();
