@@ -126,6 +126,9 @@ function decideRule(
 
     // Lowercased once for the node, not once per rule.
     const nodeName = node.nodeName.toLowerCase();
+    // A filter may add a rule during this search, which replaces the no-match set. A no-match answer then
+    // belongs to the old rules, so it is not recorded in the new set.
+    const undecidedBefore = answers.undecided;
 
     for (const list of searchOrder) {
         const rule = findRule(list, node, nodeName, options, lookup);
@@ -137,7 +140,9 @@ function decideRule(
         }
     }
 
-    answers.undecided.add(node);
+    if (answers.undecided === undecidedBefore) {
+        answers.undecided.add(node);
+    }
 
     return undefined;
 }

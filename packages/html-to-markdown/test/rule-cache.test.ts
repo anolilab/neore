@@ -47,4 +47,40 @@ describe("the rule lookup cache", () => {
 
         expect(service.turndown("<p><span>x</span></p>")).toBe("[1]");
     });
+
+    // A filter that adds a rule matching a node while that node is being searched must not leave a stale no-match
+    // answer behind: the later lookup has to see the new rule.
+    it("finds a rule that a filter adds during the search for the same node", () => {
+        const service = new TurndownService();
+        let wasAdded = false;
+
+        // The span's first search is the one that adds the rule for spans, so that search cannot see it.
+        service.addRule("adds-matching-rule", {
+            filter(node: Node) {
+                if (!wasAdded && node.nodeName === "SPAN") {
+                    wasAdded = true;
+                    service.addRule("span", { filter: "span", replacement: () => "[S]" });
+                }
+
+                return false;
+            },
+            replacement: (content: string) => content,
+        });
+
+        // The div asks about its span twice: the first lookup adds the rule, so the second must find it.
+        service.addRule("ask-twice", {
+            filter(node: Node, _options, lookup) {
+                if (node.nodeName !== "DIV") {
+                    return false;
+                }
+
+                lookup.hasRuleFor(node.firstChild as Node);
+
+                return lookup.hasRuleFor(node.firstChild as Node);
+            },
+            replacement: (content: string) => content,
+        });
+
+        expect(service.turndown("<div><span>x</span></div>")).toBe("[S]");
+    });
 });
