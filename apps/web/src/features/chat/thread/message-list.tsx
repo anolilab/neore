@@ -152,20 +152,8 @@ interface SelectedRows {
 
 const ROW_SELECTOR = "[data-list-message-id]";
 
-/** Where a selection end sits: its row's id, or which side of the list it lies on when it is outside the list. */
-const rowEdge = (list: HTMLElement, node: Node | null): string | "after" | "before" | undefined => {
-    if (!node) {
-        return undefined;
-    }
-
-    if (!list.contains(node)) {
-        const around = document.createRange();
-
-        around.selectNode(list);
-
-        return around.comparePoint(node, 0) < 0 ? "before" : "after";
-    }
-
+/** The message of the row a selection boundary sits in; undefined outside a row. */
+const rowIdOfNode = (node: Node): string | undefined => {
     const element = node instanceof Element ? node : node.parentElement;
 
     return element?.closest<HTMLElement>(ROW_SELECTOR)?.dataset.listMessageId;
@@ -178,22 +166,13 @@ const readSelectedRows = (list: HTMLElement): SelectedRows | null => {
         return null;
     }
 
-    const rows = list.querySelectorAll<HTMLElement>(ROW_SELECTOR);
-    const resolve = (edge: string | undefined): string | undefined => {
-        if (edge === "before") {
-            return rows[0]?.dataset.listMessageId;
-        }
-
-        if (edge === "after") {
-            return rows[rows.length - 1]?.dataset.listMessageId;
-        }
-
-        return edge;
-    };
-    // The range runs in document order, whichever way the selection was made.
+    // The range runs in document order and crosses the list, so a boundary that is not in a row lies before the rows
+    // (the start) or after them (the end), whatever node and offset name it: Cmd/Ctrl+A ends at the body, after its last child.
     const range = selection.getRangeAt(0);
-    const firstId = resolve(rowEdge(list, range.startContainer));
-    const lastId = resolve(rowEdge(list, range.endContainer));
+    const rows = list.querySelectorAll<HTMLElement>(ROW_SELECTOR);
+    const rowOf = (node: Node): string | undefined => (list.contains(node) ? rowIdOfNode(node) : undefined);
+    const firstId = rowOf(range.startContainer) ?? rows[0]?.dataset.listMessageId;
+    const lastId = rowOf(range.endContainer) ?? rows[rows.length - 1]?.dataset.listMessageId;
 
     return firstId === undefined || lastId === undefined ? null : { firstId, lastId };
 };

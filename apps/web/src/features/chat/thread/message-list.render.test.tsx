@@ -29,6 +29,8 @@ const harness = vi.hoisted(() => {
         contentRenders: new Map<string, number>(),
         /** Renders the list inside the real shortcut manager and the thread's find bar. */
         withFind: false,
+        /** What every cRPC mutation does; a test makes one hang or fail. */
+        mutate: (async () => undefined) as (variables: unknown) => Promise<unknown>,
         /** The edit composer the list renders for the message being edited. */
         editComposer: undefined as ((props: { message: UIMessage }) => ReactNode) | undefined,
         /** Extra content a test renders inside a message's row (a prompt card), by message id. */
@@ -171,7 +173,7 @@ vi.mock("@/features/auth/hooks/use-user-settings", () => {
 vi.mock("@/lib/lunora/crpc", () => {
     const leaf = {
         mutationOptions: () => {
-            return { mutationFn: async () => undefined };
+            return { mutationFn: async (variables: unknown) => harness.mutate(variables) };
         },
         queryOptions: () => {
             return { queryFn: async () => null, queryKey: ["crpc-mock"] };
@@ -680,6 +682,7 @@ describe("a long thread", { timeout: RENDER_TEST_TIMEOUT_MS }, () => {
         harness.editComposer = undefined;
         harness.rowExtras.clear();
         harness.thread = undefined;
+        harness.mutate = async () => undefined;
         useChatUIStore.getState().stopEditing();
         harness.threadId = "thread-1";
         scrollReportDelayFrames = 0;
@@ -815,6 +818,31 @@ describe("a long thread", { timeout: RENDER_TEST_TIMEOUT_MS }, () => {
         expect(mountedIds()).toHaveLength(THREAD_LENGTH);
         expect(focusedMessageId()).toBe("m0");
         expect(screen.queryByRole("button", { name: SHOW_ALL_NAME })).toBeNull();
+    });
+
+    it("pins every row from the first to the last when everything is selected (Cmd/Ctrl+A)", async () => {
+        mountInto();
+
+        const selection = document.getSelection()!;
+
+        // Select All ends at the body, after its last child: not inside any row.
+        act(() => {
+            selection.selectAllChildren(document.body);
+            document.dispatchEvent(new Event("selectionchange"));
+        });
+
+        act(() => viewport().scrollTo({ top: THREAD_LENGTH * 100 }));
+        await act(async () => {
+            await nextFrames(2);
+        });
+
+        expect(mountedIds()).toHaveLength(THREAD_LENGTH);
+
+        act(() => {
+            selection.removeAllRanges();
+            document.dispatchEvent(new Event("selectionchange"));
+        });
+        await vi.waitFor(() => expect(mountedIds().length).toBeLessThan(THREAD_LENGTH / 2), { timeout: 5000 });
     });
 
     it("keeps the rows a text selection spans mounted while it lasts, then windows them again", async () => {
@@ -1031,6 +1059,51 @@ describe("a long thread", { timeout: RENDER_TEST_TIMEOUT_MS }, () => {
             expect((within(questionCard).getByRole("textbox") as HTMLTextAreaElement).value).toBe("src/a.ts");
             expect(within(rowOf("m103")!).getByPlaceholderText(SECRET_PLACEHOLDER)).toBe(secretField);
             expect(secretField.value).toBe("sk-test-123");
+        });
+
+        it("keeps a sent answer's row until the send settles, so a failed send brings the form back with what was typed", async () => {
+            const user = userEvent.setup();
+            // The send hangs until the test fails it.
+            const network = new EventTarget();
+
+            harness.thread = { userId: "owner" };
+            harness.mutate = async () =>
+                new Promise((_resolve, reject) => {
+                    network.addEventListener("fail", () => reject(new Error("offline")), { once: true });
+                });
+            harness.rowExtras.set("m101", () => createElement(AskUserPrompt, { part: waitingPart("tool-askUser", { question: "Which file?" }) }));
+            mountInto();
+
+            act(() => scrollToMessage("m101"));
+            await vi.waitFor(() => expect(focusedMessageId()).toBe("m101"), { timeout: 5000 });
+            await user.type(within(rowOf("m101")!).getByRole("textbox"), "src/a.ts");
+            await user.click(within(rowOf("m101")!).getByRole("button", { name: "Send answer" }));
+            // Focus moves on while the send is in flight.
+            act(() => (document.activeElement as HTMLElement).blur());
+            await scrollToNewest();
+
+            expect(rowOf("m101")).not.toBeNull();
+
+            await act(async () => {
+                network.dispatchEvent(new Event("fail"));
+            });
+
+            expect((within(rowOf("m101")!).getByRole("textbox") as HTMLTextAreaElement).value).toBe("src/a.ts");
+        });
+
+        it("holds no row for a card its viewer cannot answer, or one nobody has typed in", async () => {
+            harness.thread = { userId: "someone-else" };
+            harness.rowExtras.set("m101", () => createElement(AskUserPrompt, { part: waitingPart("tool-askUser", { question: "Which file?" }) }));
+            harness.rowExtras.set("m103", () => createElement(RequestSecretPrompt, { part: waitingPart("tool-requestSecret", { label: "Files token" }) }));
+            mountInto();
+
+            act(() => scrollToMessage("m101"));
+            await vi.waitFor(() => expect(rowOf("m103")).not.toBeNull(), { timeout: 5000 });
+            act(() => (document.activeElement as HTMLElement).blur());
+            await scrollToNewest();
+
+            expect(rowOf("m101")).toBeNull();
+            expect(rowOf("m103")).toBeNull();
         });
 
         it("keeps an older message being edited, its text and focus, when scrolled away", async () => {

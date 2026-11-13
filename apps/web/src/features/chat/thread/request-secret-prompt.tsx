@@ -136,8 +136,9 @@ const RequestSecretPrompt: FC<{ part: ToolPart }> = ({ part }) => {
     const isOwner = !!thread?.userId && thread.userId === sessionData?.user?.id;
     const isWaiting = part.state === "approval-requested" && submitted === null && !closed;
 
-    // What is typed here lives only in this card: the list must not virtualize the row away while it waits for an answer.
-    useHoldRow(isWaiting);
+    // What is typed here lives only in this card. Held for the person who can answer it, while it holds their input and
+    // while a send is in flight, so a failed save shows its error in the card; a stale or read-only card holds nothing.
+    useHoldRow(isOwner && ((isWaiting && drafts.some((value) => value.trim() !== "")) || isPending));
     const usesServer = fields.some((field) => field.use?.kind === "mcp_header");
     // Only the owner's servers are the destination, and only the owner's card needs them: for anyone else (a
     // collaborator, a public view) the query never runs. For the owner it is the one the composer and Settings read.
