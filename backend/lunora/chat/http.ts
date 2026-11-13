@@ -460,6 +460,9 @@ const emptyAfterStripping = (prompt: unknown): boolean => {
 const hostRunThreadResponse = (): Response =>
     Response.json({ error: "HOST_RUN_THREAD", message: "This thread runs on a paired computer. Send the message from the desktop app." }, { status: 409 });
 
+/** How long a send waits before it tries its failed `afterOwnerMessage` call once more. */
+const AFTER_SAVE_RETRY_MS = 5000;
+
 export const runChatStart = async (
     context: HttpActionCtx,
     rawBody: ChatStartBody,
@@ -1068,8 +1071,13 @@ const runChatStartOnShard = async (
 
         afterSaveDone = true;
 
-        await context.runMutation(internal.sub_agents.functions.afterOwnerMessage, { threadId: savedThreadId }).catch((error: unknown) => {
-            chatLogger.error("[chat] Could not end a sub-agent's wait or release its held results", error);
+        // A failed call is tried once more shortly (it is idempotent); only a failed retry schedule is logged.
+        await context.runMutation(internal.sub_agents.functions.afterOwnerMessage, { threadId: savedThreadId }).catch(async () => {
+            await httpScheduler(context)
+                .runAfter(AFTER_SAVE_RETRY_MS, internal.sub_agents.functions.afterOwnerMessage, { threadId: savedThreadId })
+                .catch((error: unknown) => {
+                    chatLogger.error("[chat] Could not end a sub-agent's wait or release its held results, nor schedule a retry", error);
+                });
         });
     };
 
@@ -1084,6 +1092,10 @@ const runChatStartOnShard = async (
                 await enqueueRun({ messageId, streamId: duplicateStreamId, threadId });
             }
         } finally {
+            // The first try may have died before its own call: a resend makes it, whether or not its run's submission
+            // succeeds (it is idempotent and catches its own errors).
+            await afterSave(threadId);
+
             // Title jobs no try recorded scheduled: they follow the run, so a failed submission skipped them, or one was refused.
             // Each is recorded once scheduled; one this resend fails to schedule, or dies before, is left to the next.
             // A guest note's text never reaches the title model.
@@ -1094,9 +1106,6 @@ const runChatStartOnShard = async (
                 await recordTitlesScheduled(pending.claim, messageId, await runTitleJobs());
             }
         }
-
-        // The first try may have died before its own call: a resend makes it (it is idempotent).
-        await afterSave(threadId);
 
         return Response.json(
             {

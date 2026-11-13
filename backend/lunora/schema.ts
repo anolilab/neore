@@ -2702,10 +2702,10 @@ export const schema = defineSchema({
         // The delegating run's model, inherited when still allowed.
         parentModel: v.optional(v.string()),
         parentThreadId: v.string(),
-        // Why the result never reached the parent thread, once the retries ran out. Terminal: set
-        // instead of `resultPostedAt`, never with it.
         // The run's one pending post check (`postResult`), so a release replaces it instead of adding a second loop.
         postCheckId: v.optional(v.string()),
+        // Why the result never reached the parent thread, once the retries ran out. Terminal: set
+        // instead of `resultPostedAt`, never with it.
         postFailed: v.optional(v.string()),
         // A one-shot run's reaper deadline once it waited on an approval (`awaiting`): the approval's expiry while it
         // waits, a fresh run window once it resumes. Unset = the window from `createdAt`.

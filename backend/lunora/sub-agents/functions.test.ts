@@ -129,6 +129,13 @@ describe("admitSubAgentRun", () => {
         expect(await runs()).toHaveLength(0);
     });
 
+    it("refuses a conversation being hard-deleted, whose runs are ending", async () => {
+        await harness.run(async (ctx: any) => await ctx.db.patch("threads", threadId, { deletingAt: Date.now() }));
+
+        expect(await admit()).toStrictEqual({ error: expect.stringMatching(ONLY_OWNER) });
+        expect(await runs()).toHaveLength(0);
+    });
+
     it(`caps concurrent children at ${String(SUB_AGENT_MAX_CONCURRENT)} and frees a slot when one ends`, async () => {
         for (let index = 0; index < SUB_AGENT_MAX_CONCURRENT; index += 1) {
             expect(await admit()).toHaveProperty("runId");

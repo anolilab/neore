@@ -62,13 +62,5 @@
   while its parent's one-shot run goes (running or awaiting), so it never lands after a request; that run's end, waited
   or not, posts it (`releaseHeldResults`). A pause, first or continued, never overwrites a `"question"` the child thread
   waits on.
-- **Lifecycle:** the send (`chat/http.ts`, any content type, a resend too, not a new thread) calls `afterOwnerMessage`
-  after the save and its claim, in its own transaction, never failing the send: a run waiting on that child ends unless
-  one of its requests is still open on the latest turn (read from the waiting runs and the turn, no row history), and the
-  results held here are released. A hard delete sets the thread's `deletingAt` on its first page (a going thread takes
-  no post, `isGoneParent`), marks every result bound for it `postFailed` and cancels its queue (both paged with a
-  continuation), then ends the runs it is the child of and those it delegated, typed worker messages too
-  (`endSubAgentRunsOfDeletedThread`; a Stop leaves those). A result for any parent with a request its owner can still answer
-  (pending, unexpired, open on its latest turn) is held; an answer or a send releases it (`releaseHeldResults`, which
-  replaces the run's one pending check, `postCheckId`), the backed-off recheck covers an expiry. A going worker
-  (`deletingAt`) starts no queued run (`claimQueuedRun`). Every end goes through `finishRun`.
+- **Lifecycle** ([reference](../../../docs/agents/sub-agents.md)): a send in a child ends its moved-past waits
+  (`afterOwnerMessage`); a hard delete sets `deletingAt` and ends the thread's runs (`endSubAgentRunsOfDeletedThread`).

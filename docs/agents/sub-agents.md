@@ -1,0 +1,30 @@
+# SUB AGENTS — AGENT NOTES — REFERENCE
+
+The rules are summarized in `backend/lunora/sub-agents/AGENTS.md`, which agents load automatically; this file holds the
+detail. Paths are relative to `backend/lunora/`.
+
+## LIFECYCLE
+
+- **A new message in a child ends its wait.** The send (`chat/http.ts`, `afterSave`) calls `afterOwnerMessage` after the
+  save and its claim, for every content type and for a resend. A send that starts a new thread skips it.
+  - The call runs in its own transaction, once per send, also when the stream or run fails after the save. A failed
+    call is retried once (`AFTER_SAVE_RETRY_MS`), so it never fails the send.
+  - `endApprovalWaits` reads the child's waiting runs and the latest turn's open requests, with no pending-row
+    history. A run ends only when none of its requests is still open on that turn, so a wait its continuation started
+    again stays.
+  - The same call releases the results held for the thread (`releaseHeldResults`). It isn't gated on a pending request,
+    because the send itself may have just closed one (`discardPausedThreadSecrets`).
+- **A hard delete ends the thread's runs** (`endSubAgentRunsOfDeletedThread`, on `agent/threads.ts`'s first page):
+  - It sets the thread's `deletingAt` first. From then on a going thread takes no post (`isGoneParent`), admits no new
+    run (`admitCommon`), and its worker queue starts nothing (`claimQueuedRun`).
+  - It marks every unposted result bound for the thread `postFailed`, and cancels its worker queue newest first. Both
+    are paged, with a continuation past a per-call bound (`markDeletedThreadResults`, `cancelDeletedThreadQueue`).
+  - It ends the runs the thread is the child of first, so the Stop path then reaches what that child delegated. Then it
+    ends what the thread delegated, including worker messages the user typed, which a Stop leaves alone
+    (`delegatedTree`'s `withTyped`).
+- **A result waits while its parent has a request its owner can still answer** (pending, unexpired, and open on the
+  parent's latest turn; `waitsOnOpenRequest`), as well as while the parent's one-shot run goes.
+  - An answer (`resumeClaimedRun`) or a send releases it.
+  - The run keeps one pending post check (`postCheckId`). A release replaces it instead of adding a loop, and the
+    backed-off recheck covers an expiry.
+- Every end goes through `finishRun`, so a resumed run's live continuation stops too (`liveContinuationOf`).

@@ -7,6 +7,7 @@ import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { runAgentModelOf } from "../agent/agent-switch";
+import { enqueueJob } from "../lib/job-queue";
 import schema from "../schema";
 import { gateThreadActionHandler } from "./functions";
 import { switchThreadAgentHandler } from "./agent-switch";
@@ -51,10 +52,17 @@ vi.mock("./lib/get-agent", () => {
         },
     };
 });
+/** What the send scheduled through `httpScheduler`: the title jobs, and a retry of a failed `afterOwnerMessage`. */
+const scheduled = vi.hoisted(() => [] as { args: unknown; delayMs: number }[]);
+
 vi.mock("../lib/http-scheduler", () => {
     return {
         httpScheduler: () => {
-            return { runAfter: async () => {} };
+            return {
+                runAfter: async (delayMs: number, _reference: unknown, args: unknown) => {
+                    scheduled.push({ args, delayMs });
+                },
+            };
         },
     };
 });
@@ -185,6 +193,7 @@ beforeEach(async () => {
     failAfterMessage = false;
     claimOutcome = null;
     failStream = false;
+    scheduled.length = 0;
     harness = lunoraTest(schema as never);
     threadId = await run(async (ctx) => await ctx.db.insert("threads", { model: A, status: "active", title: "T", userId: OWNER }));
     await insertRow("u1", 0, 0, "user", "hello");
@@ -440,6 +449,14 @@ describe("/chat/start and a sub-agent's wait", () => {
         expect(afterMessageCalls()).toStrictEqual([{ threadId }]);
     });
 
+    it("tells it on a resend whose run's submission fails again", async () => {
+        claimOutcome = { messageId: "m-first", outcome: "duplicate", streamId: "stream-first", streamUnclaimed: true, threadId };
+        vi.mocked(enqueueJob).mockRejectedValueOnce(new Error("queue down"));
+
+        await expect(start({ clientMessageId: "client-3", model: A })).rejects.toThrow("queue down");
+        expect(afterMessageCalls()).toStrictEqual([{ threadId }]);
+    });
+
     it("tells it nothing for a send the claim refuses, which saved nothing, nor for a send that starts a thread", async () => {
         claimOutcome = { outcome: "in_progress" };
 
@@ -474,5 +491,7 @@ describe("/chat/start and a sub-agent's wait", () => {
 
         expect(response.status).toBe(200);
         expect(afterMessageCalls()).toHaveLength(1);
+        // Tried once more shortly, with the same args.
+        expect(scheduled.filter((job) => job.delayMs > 0).map((job) => job.args)).toStrictEqual([{ threadId }]);
     });
 });

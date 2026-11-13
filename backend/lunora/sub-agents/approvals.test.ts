@@ -1231,6 +1231,54 @@ describe("deleting a thread", () => {
         expect(row.status).toBe("cancelled");
     });
 
+    it("does not walk a going worker's queue from one run's end, which its delete cancels in batches", async () => {
+        const { going, running } = await run(async (context) => {
+            const now = Date.now();
+            const thread = await context.db.insert("threads", { deletingAt: now, status: "active", title: "Worker", userId: OWNER });
+            const base = {
+                childThreadId: thread,
+                depth: 1,
+                mode: "worker" as const,
+                parentThreadId: parentId,
+                runner: { deviceId: "device-1", kind: "host" as const },
+                updatedAt: now,
+                userId: OWNER,
+            };
+            const current = await context.db.insert("subAgentRuns", {
+                ...base,
+                createdAt: now - 1,
+                startedAt: now,
+                status: "running",
+                task: "Current",
+                toolCallId: "call-current",
+            });
+
+            for (let index = 0; index < 205; index += 1) {
+                await context.db.insert("subAgentRuns", {
+                    ...base,
+                    createdAt: now + index,
+                    status: "queued",
+                    task: `Queued ${String(index)}`,
+                    toolCallId: `call-host-${String(index)}`,
+                });
+            }
+
+            return { going: thread, running: current };
+        });
+
+        await run(async (context) => await finishRun(context, running, { kind: "cancelled" }));
+
+        const queued = await run(
+            async (context) =>
+                await context.db
+                    .query("subAgentRuns")
+                    .withIndex("by_childThreadId_and_status", (q: any) => q.eq("childThreadId", going).eq("status", "queued"))
+                    .collect(),
+        );
+
+        expect(queued).toHaveLength(205);
+    });
+
     it("cancels a deleted worker's queue past one call's 200, in a continuation", async () => {
         const worker = await run(async (context) => {
             const now = Date.now();

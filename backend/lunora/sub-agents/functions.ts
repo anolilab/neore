@@ -218,7 +218,8 @@ const admitCommon = async (
     // only the parent thread's owner may delegate from it — not a collaborator.
     const parent = await ctx.db.get("threads", args.parentThreadId as Id<"threads">);
 
-    if (!parent || parent.deleted || parent.userId !== args.userId) {
+    // A conversation being hard-deleted (`deletingAt`) starts nothing more: its runs are ending, and a new one would spend.
+    if (!parent || parent.deleted || parent.deletingAt !== undefined || parent.userId !== args.userId) {
         return { error: "Only the owner of this conversation can delegate to sub-agents." };
     }
 
@@ -1237,6 +1238,15 @@ const postToParent = async (ctx: MutationCtx, run: RunDoc, text: string): Promis
 
 /** Starts the worker's next queued run, if none is going: the head of the line has no job until now. */
 const startNextWorkerRun = async (ctx: MutationCtx, childThreadId: string): Promise<void> => {
+    // A worker being hard-deleted moves its line no further: each start would cancel the head through `finishRun`, which
+    // starts the next, so one mutation would walk the whole queue. Its delete cancels the queue in bounded batches
+    // (`cancelDeletedThreadQueue`); `claimQueuedRun` refuses a going worker's run as a backstop.
+    const worker = await ctx.db.get("threads", childThreadId as Id<"threads">);
+
+    if (worker?.deletingAt !== undefined) {
+        return;
+    }
+
     const next = nextQueuedWorkerRun(await latestWorkerRuns(ctx, childThreadId));
 
     if (next) {
