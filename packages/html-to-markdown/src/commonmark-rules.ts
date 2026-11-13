@@ -26,7 +26,13 @@ class ReferenceLinkRule implements Rule {
     filter = isReferencedLink;
 
     replacement(content: string, node: AnnotatedNode, options: Options): string {
-        const href = escapeLinkDestination(node.getAttribute("href") ?? "");
+        const rawHref = node.getAttribute("href") ?? "";
+
+        if (options.safeLinks && isUnsafeDestination(rawHref)) {
+            return content;
+        }
+
+        const href = escapeLinkDestination(rawHref, options.safeLinks);
         let title = cleanAttribute(node.getAttribute("title"));
 
         if (title) {
@@ -207,8 +213,14 @@ const rules: Record<string, Rule> = {
             return options.linkStyle === "inlined" && node.nodeName === "A" && Boolean(node.getAttribute("href"));
         },
 
-        replacement(content, node) {
-            const href = escapeLinkDestination(node.getAttribute("href") ?? "");
+        replacement(content, node, options) {
+            const rawHref = node.getAttribute("href") ?? "";
+
+            if (options.safeLinks && isUnsafeDestination(rawHref)) {
+                return content;
+            }
+
+            const href = escapeLinkDestination(rawHref, options.safeLinks);
             const title = escapeLinkTitle(cleanAttribute(node.getAttribute("title")));
             const titlePart = title ? ` "${title}"` : "";
 
@@ -321,14 +333,76 @@ function isSpacePadded(text: string): boolean {
     return terminators === 0 ? hasNonSpace : terminators === 1;
 }
 
+const SCHEME = /^([a-z][\d+.a-z-]*):/i;
+const TAB_OR_NEWLINE = /[\t\n\r]/g;
+const BACKSLASH_ESCAPE = /\\([!"#$%&'()*+,./:;<=>?@[\\\]^_`{|}~-])/g;
+const NUMERIC_REFERENCE = /&#(?:(\d+)|x([\da-f]+));?/gi;
+const HEAD_END = /[/?#]/;
+const SAFE_SCHEMES = new Set(["http", "https", "mailto", "tel"]);
+
+/**
+ * True when a link destination has a scheme outside `SAFE_SCHEMES` (`javascript:`, `data:`, `vbscript:`, `file:`...).
+ * A destination with no scheme is relative and kept.
+ *
+ * The check runs on a decoded copy of the destination. Backslash escapes of ASCII punctuation and numeric character
+ * references (decimal or hex, `;` optional) are decoded first. Then leading and trailing C0 controls and spaces are
+ * dropped and tabs and line breaks removed, the way a browser reads an `href`. A named reference such as `&colon;` is
+ * not decoded, so a `&` that remains before the first `/`, `?` or `#` makes the destination unsafe: it could spell a
+ * scheme. Numeric references are decoded before that test, so `&#0;javascript:alert(1)` becomes U+FFFD followed by
+ * `javascript:alert(1)`, which has no scheme, and is kept. A plain scheme regular expression is used instead of
+ * `new URL`, which throws on a relative URL and on some schemes with a bad host; those must not pass as relative.
+ */
+function isUnsafeDestination(href: string): boolean {
+    const decoded = stripUrlNoise(decodeDestination(href));
+    const head = decoded.split(HEAD_END, 1)[0] ?? "";
+
+    if (head.includes("&")) {
+        return true;
+    }
+
+    const scheme = SCHEME.exec(decoded)?.[1];
+
+    return scheme !== undefined && !SAFE_SCHEMES.has(scheme.toLowerCase());
+}
+
+function decodeDestination(href: string): string {
+    return href.replaceAll(BACKSLASH_ESCAPE, "$1").replaceAll(NUMERIC_REFERENCE, (_match, decimal?: string, hex?: string) => {
+        const codePoint = decimal === undefined ? Number.parseInt(hex ?? "", 16) : Number(decimal);
+
+        return codePoint > 0 && codePoint <= 1_114_111 ? String.fromCodePoint(codePoint) : "�";
+    });
+}
+
+function stripUrlNoise(href: string): string {
+    let start = 0;
+    let end = href.length;
+
+    while (start < end && (href.codePointAt(start) ?? 0) <= 0x20) {
+        start += 1;
+    }
+
+    while (end > start && (href.codePointAt(end - 1) ?? 0) <= 0x20) {
+        end -= 1;
+    }
+
+    return href.slice(start, end).replaceAll(TAB_OR_NEWLINE, "");
+}
+
 function cleanAttribute(attribute: string | null): string {
     // `\n\s*` collapses each run of line breaks (and the blanks after them) to one
     // line break. It matches upstream's `(\n+\s*)+` without nested quantifiers.
     return attribute ? attribute.replaceAll(LINE_BREAK_RUN, "\n") : "";
 }
 
-function escapeLinkDestination(destination: string): string {
-    const escaped = destination
+/**
+ * With `safeLinks`, `\` and `&` are escaped too. CommonMark undoes those added escapes, so the rendered destination is
+ * the raw attribute, not the decoded copy. The check already covers the raw attribute: `isUnsafeDestination` runs on a
+ * decoded copy of that same text. Line breaks are dropped first, as a browser drops them from an `href`, so the
+ * destination stays on one line and cannot start a reference definition.
+ */
+function escapeLinkDestination(destination: string, isSafeLinks = false): string {
+    const oneLine = destination.replaceAll(LINE_BREAKS, "");
+    const escaped = (isSafeLinks ? oneLine.replaceAll("\\", "\\\\").replaceAll("&", "&amp;") : oneLine)
         .replaceAll("<", String.raw`\<`)
         .replaceAll(">", String.raw`\>`)
         .replaceAll("(", String.raw`\(`)

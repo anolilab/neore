@@ -36,7 +36,9 @@ differential test covers each of them.
   `@mixmark-io/domino` to `setHTMLParser`. Domino is dropped when the converter moves onto an internal tree.
 - Node's DOM is still mutated during conversion (upstream's design).
 - Reference-style links keep their state on a shared rule object, as upstream does.
-- Unsafe `javascript:` hrefs are not filtered, and `<style>`, `<script>` and `display:none` content is not removed.
+- `<style>`, `<script>`, `<noscript>`, `<template>` and `<title>` emit nothing (a divergence from upstream). Unsafe link
+  destinations are kept unless the `safeLinks` option is on (off by default, as upstream). `display:none` content is not
+  removed.
 
 ## Roadmap
 

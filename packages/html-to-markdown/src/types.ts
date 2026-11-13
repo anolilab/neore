@@ -27,6 +27,19 @@ export interface Options {
     linkStyle: string;
     preformattedCode: boolean;
     rules?: Record<string, Rule>;
+
+    /**
+     * When true, a link whose destination has a scheme other than http, https, mailto or tel renders as its text only.
+     * Relative destinations are kept, unless the decoded destination has a `&` before its first `/`, `?` or `#`.
+     * Decoding undoes backslash escapes of ASCII punctuation and numeric references, decimal or hex, with or without `;`.
+     * Named references such as `&colon;` are not decoded, so their `&` stays in the checked text.
+     * `\` and `&` are escaped in the output, so the rendered destination is the raw attribute, which the check covers
+     * through a decoded copy. Off by default, as upstream.
+     *
+     * Images are out of scope: an `<img src>` is rendered unchanged, even a `javascript:` one, because an image does not
+     * run script.
+     */
+    safeLinks: boolean;
     strongDelimiter: string;
 }
 

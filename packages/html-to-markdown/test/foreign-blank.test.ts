@@ -40,7 +40,8 @@ function documentWithPrefixedElement(prefixedName: string): Node {
     return document.body;
 }
 
-const PREFIXED_NAMES = ["x:a", "x:img", "x:script", "x:br", "x:td"];
+// x:script is not here: it is non-content, removed before blank detection, so paste-safety.test.ts pins its output.
+const PREFIXED_NAMES = ["x:a", "x:img", "x:br", "x:td"];
 
 describe("blank detection with foreign elements", () => {
     const upstream = new TurndownUpstream();

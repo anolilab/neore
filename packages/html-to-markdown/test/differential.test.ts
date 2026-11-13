@@ -98,10 +98,11 @@ const ELEMENTS = [
     "td",
     "th",
     "figure",
-    "script",
     "iframe",
 ];
 
+// `script` is not generated: the port drops its text where upstream keeps it, a deliberate divergence covered by
+// test/paste-safety.test.ts. The `javascript:` href is kept by default (`safeLinks` is off), as upstream keeps it.
 const HREFS = ["https://x.y/z", "a b", "(x)", "<y>", "", "javascript:alert(1)"];
 const TITLES = ["", `a "quoted" title`, "line\nbreak\n\n  title"];
 const VOID_ELEMENTS = ["<br>", "<hr>", `<img alt="a_b" src="i.png">`, `<img src="">`];
