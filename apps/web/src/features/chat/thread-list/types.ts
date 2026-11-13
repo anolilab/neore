@@ -80,6 +80,8 @@ export interface HierarchicalThreadListProperties {
     collapsedGroups: Set<GroupType>;
     collapsedProjects: Set<string>;
     expandedThreads: Set<string>;
+    /** The asked search failed: the list says so instead of showing every thread. */
+    isSearchError?: boolean;
     isSearchLoading: boolean;
     isSelectionMode: boolean;
     lastSelectedIndex: number;

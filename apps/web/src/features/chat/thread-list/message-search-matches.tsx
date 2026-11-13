@@ -5,6 +5,7 @@ import type { FC } from "react";
 
 import { scrollToMessage } from "@/features/chat/thread/message-list";
 
+import { useShownSearchQuery } from "./contexts/search-query-context";
 import { buildMatchSnippet } from "./utilities";
 
 /** Enough to tell the hits apart without turning one result into a wall of text. */
@@ -19,7 +20,6 @@ interface RelevantMessage {
 
 interface MessageSearchMatchesProps {
     matches: RelevantMessage[];
-    searchQuery: string;
     threadId: string;
 }
 
@@ -28,8 +28,9 @@ interface MessageSearchMatchesProps {
  * jumps to (and focuses) that message, loading older pages if it is not loaded.
  * Rendered outside the row's own `role="button"` so the buttons do not nest.
  */
-const MessageSearchMatches: FC<MessageSearchMatchesProps> = ({ matches, searchQuery, threadId }) => {
+const MessageSearchMatches: FC<MessageSearchMatchesProps> = ({ matches, threadId }) => {
     const { t } = useLingui();
+    const searchQuery = useShownSearchQuery();
     const router = useRouter();
     const visible = matches.filter((match) => match.text?.trim()).slice(0, MAX_VISIBLE_MATCHES);
 
