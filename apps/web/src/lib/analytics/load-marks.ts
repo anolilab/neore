@@ -81,9 +81,15 @@ export const useLoadMarkWhenVisible = (name: LoadMark, ref: RefObject<Element | 
             return undefined;
         }
 
-        const observer = watcherFor(name);
+        // Best-effort, as every analytics call: a watcher that cannot be made or observe never breaks the row it marks.
+        let observer: IntersectionObserver;
 
-        observer.observe(element);
+        try {
+            observer = watcherFor(name);
+            observer.observe(element);
+        } catch {
+            return undefined;
+        }
 
         return () => {
             observer.unobserve(element);
