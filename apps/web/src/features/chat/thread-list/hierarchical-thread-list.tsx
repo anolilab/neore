@@ -27,8 +27,10 @@ import { useCRPC } from "@/lib/lunora/crpc";
 import { showError, showInfo } from "@/lib/toast";
 
 import ThreadGroupRenderer from "./components/thread-group-renderer";
+import { KeyboardSelectionProvider } from "./contexts/keyboard-selection-context";
 import GroupHeader from "./group-header";
 import useKeyboardNavigation from "./hooks/use-keyboard-navigation";
+import useStableCallback from "./hooks/use-stable-callback";
 import useThreadGroups from "./hooks/use-thread-groups";
 import useThreadHandlers from "./hooks/use-thread-handlers";
 import useThreadListKeyboard from "./hooks/use-thread-list-keyboard";
@@ -214,8 +216,10 @@ const ProjectGroupContainer: FC<{ children: ReactNode; isProjectGroup: boolean; 
     );
 };
 
+/** One object for the list's life: new sensor options make new activators, and the drag context then re-renders every sortable row. */
+const KEYBOARD_SENSOR_OPTIONS = { coordinateGetter: sortableKeyboardCoordinates };
+
 const VirtualizedThreadList: FC<{
-    currentThreadId: string | undefined;
     expandedThreads: Set<string>;
     flattenedThreads: BranchNode[];
     getGroupThreadIds: (group: ThreadGroup) => string[];
@@ -230,13 +234,11 @@ const VirtualizedThreadList: FC<{
     handlePinThread: (threadId: string) => void;
     handleThreadToggle: (threadId: string, index: number, isShiftClick: boolean) => void;
     handleUnpinThread: (threadId: string) => void;
-    isKeyboardNavigating: boolean;
     isSelectionMode: boolean;
     loadingStates: any;
     projectsMap: Map<string, any>;
     searchQuery: string;
     selectedThreadIds: Set<string>;
-    selectedThreadIndex: number;
     toggleExpanded: (threadId: string) => void;
     toggleGroupCollapsed: (groupType: GroupType, projectId?: string) => void;
     updateThread: (threadId: string, model: string, status: "archived" | "active") => void;
@@ -244,9 +246,6 @@ const VirtualizedThreadList: FC<{
 }> = memo(({ virtualItems, ...props }) => {
     const parentReference = useRef<HTMLDivElement>(null);
     const { t } = useLingui();
-    // Keyboard selection is an index into the flattened list, which the rows' own indexes (restarting in each group) do not match:
-    // the highlighted row is the one whose thread the selection names, so F2 and the menu key act on what is shown.
-    const keyboardThreadId = props.isKeyboardNavigating ? props.flattenedThreads[props.selectedThreadIndex]?.threadId : undefined;
 
     // Memoize estimateSize callback
     const estimateSize = useCallback(
@@ -343,7 +342,6 @@ const VirtualizedThreadList: FC<{
                                 })()
                             ) : (
                                 <SortableThreadItem
-                                    currentThreadId={props.currentThreadId}
                                     expandedThreads={props.expandedThreads}
                                     handleCreateBranch={props.handleCreateBranch}
                                     handleDeleteThread={props.handleDeleteThread}
@@ -353,17 +351,13 @@ const VirtualizedThreadList: FC<{
                                     handleThreadToggle={props.handleThreadToggle}
                                     handleUnpinThread={props.handleUnpinThread}
                                     index={item.index}
-                                    isKeyboardNavigating={props.isKeyboardNavigating}
-                                    isKeyboardSelected={props.isKeyboardNavigating && item.thread.threadId === keyboardThreadId}
                                     isSelected={props.selectedThreadIds.has(item.thread.threadId)}
                                     isSelectionMode={props.isSelectionMode}
                                     key={item.thread.threadId}
-                                    keyboardThreadId={keyboardThreadId}
                                     loadingStates={props.loadingStates}
                                     node={item.thread}
                                     searchQuery={props.searchQuery}
                                     selectedThreadIds={props.selectedThreadIds}
-                                    selectedThreadIndex={props.selectedThreadIndex}
                                     toggleExpanded={props.toggleExpanded}
                                     updateThread={props.updateThread}
                                 />
@@ -431,8 +425,15 @@ const HierarchicalThreadList: FC<
     const { mutateAsync: moveThreadToProject } = useMoveThreadToProject();
     const { mutateAsync: updateProjectOrderMutation } = useUpdateProjectOrder();
 
-    const { handleBulkDeleteThreads, handleCreateBranch, handleDeleteThread, handleDownloadThread, handlePinThread, handleUnpinThread, updateThread } =
-        useThreadHandlers(setLoadingStates, currentThreadId);
+    const threadHandlers = useThreadHandlers(setLoadingStates, currentThreadId);
+    const { handleBulkDeleteThreads } = threadHandlers;
+    // Every row gets these: kept stable, so their closures changing (with the open thread, or the thread data) re-renders no row.
+    const handleCreateBranch = useStableCallback(threadHandlers.handleCreateBranch);
+    const handleDeleteThread = useStableCallback(threadHandlers.handleDeleteThread);
+    const handleDownloadThread = useStableCallback(threadHandlers.handleDownloadThread);
+    const handlePinThread = useStableCallback(threadHandlers.handlePinThread);
+    const handleUnpinThread = useStableCallback(threadHandlers.handleUnpinThread);
+    const updateThread = useStableCallback(threadHandlers.updateThread);
 
     const { isPlaceholderData, threadGroups, threadsData } = useThreadGroups(
         collapsedGroups,
@@ -750,12 +751,7 @@ const HierarchicalThreadList: FC<
     );
 
     // Drag and drop sensors
-    const sensors = useSensors(
-        useSensor(PointerSensor),
-        useSensor(KeyboardSensor, {
-            coordinateGetter: sortableKeyboardCoordinates,
-        }),
-    );
+    const sensors = useSensors(useSensor(PointerSensor), useSensor(KeyboardSensor, KEYBOARD_SENSOR_OPTIONS));
 
     // Handle drag end - implement thread reordering and moving to projects
     const handleDragEnd = useCallback(
@@ -1031,12 +1027,11 @@ const HierarchicalThreadList: FC<
         setShowKeyboardHelp,
     });
 
-    // Reset keyboard navigation on mouse interaction
-    const handleMouseEnter = useCallback(() => {
-        if (isKeyboardNavigating) {
-            resetNavigation();
-        }
-    }, [isKeyboardNavigating, resetNavigation]);
+    // Reset keyboard navigation on mouse interaction. Every row gets this, so it does not change when navigation starts or stops:
+    // resetting when nothing is selected sets the state it already has, which renders nothing.
+    const handleMouseEnter = resetNavigation;
+    // The arrow keys' row, by id: the flat index matches no row's own index (those restart in each group), and child rows need it too.
+    const keyboardThreadId = isKeyboardNavigating ? flattenedThreads[selectedThreadIndex]?.threadId : undefined;
 
     // Flatten all visible items for virtualization (groups + threads)
     const virtualItems = useMemo(() => {
@@ -1171,7 +1166,6 @@ const HierarchicalThreadList: FC<
                 return (
                     <ProjectGroupContainer isProjectGroup={isProjectGroup} key={group.title} projectId={group.projectId}>
                         <ThreadGroupRenderer
-                            currentThreadId={currentThreadId}
                             expandedThreads={expandedThreads}
                             flattenedThreads={flattenedThreads}
                             getGroupThreadIds={getGroupThreadIds}
@@ -1187,13 +1181,11 @@ const HierarchicalThreadList: FC<
                             handlePinThread={handlePinThread}
                             handleThreadToggle={handleThreadToggle}
                             handleUnpinThread={handleUnpinThread}
-                            isKeyboardNavigating={isKeyboardNavigating}
                             isSelectionMode={isSelectionMode}
                             loadingStates={loadingStates}
                             projectPinnedAt={project?.pinnedAt}
                             searchQuery={searchQuery}
                             selectedThreadIds={selectedThreadIds}
-                            selectedThreadIndex={selectedThreadIndex}
                             toggleExpanded={toggleExpanded}
                             toggleGroupCollapsed={toggleGroupCollapsed}
                             updateThread={updateThread}
@@ -1217,7 +1209,6 @@ const HierarchicalThreadList: FC<
                                         {(dragListeners) => (
                                             <ProjectGroupContainer isProjectGroup={isProjectGroup} projectId={group.projectId}>
                                                 <ThreadGroupRenderer
-                                                    currentThreadId={currentThreadId}
                                                     dragListeners={dragListeners}
                                                     expandedThreads={expandedThreads}
                                                     flattenedThreads={flattenedThreads}
@@ -1234,14 +1225,12 @@ const HierarchicalThreadList: FC<
                                                     handlePinThread={handlePinThread}
                                                     handleThreadToggle={handleThreadToggle}
                                                     handleUnpinThread={handleUnpinThread}
-                                                    isKeyboardNavigating={isKeyboardNavigating}
                                                     isReordering={loadingStates.reordering}
                                                     isSelectionMode={isSelectionMode}
                                                     loadingStates={loadingStates}
                                                     projectPinnedAt={project?.pinnedAt}
                                                     searchQuery={searchQuery}
                                                     selectedThreadIds={selectedThreadIds}
-                                                    selectedThreadIndex={selectedThreadIndex}
                                                     toggleExpanded={toggleExpanded}
                                                     toggleGroupCollapsed={toggleGroupCollapsed}
                                                     updateThread={updateThread}
@@ -1263,7 +1252,6 @@ const HierarchicalThreadList: FC<
         // Extract to separate component to isolate useVirtualizer from React Compiler
         return (
             <VirtualizedThreadList
-                currentThreadId={currentThreadId}
                 expandedThreads={expandedThreads}
                 flattenedThreads={flattenedThreads}
                 getGroupThreadIds={getGroupThreadIds}
@@ -1278,13 +1266,11 @@ const HierarchicalThreadList: FC<
                 handlePinThread={handlePinThread}
                 handleThreadToggle={handleThreadToggle}
                 handleUnpinThread={handleUnpinThread}
-                isKeyboardNavigating={isKeyboardNavigating}
                 isSelectionMode={isSelectionMode}
                 loadingStates={loadingStates}
                 projectsMap={projectsMap}
                 searchQuery={searchQuery}
                 selectedThreadIds={selectedThreadIds}
-                selectedThreadIndex={selectedThreadIndex}
                 toggleExpanded={toggleExpanded}
                 toggleGroupCollapsed={toggleGroupCollapsed}
                 updateThread={updateThread}
@@ -1298,71 +1284,73 @@ const HierarchicalThreadList: FC<
         // The list root stays mounted while the list is, so it is the fallback focus target when a row unmounts during a rename.
         // Focused as the fallback when a rename's row has unmounted: its ring is the only focus cue there, so it stays visible.
         <PullRequestCountsProvider threadIds={visibleThreadIds}>
-            <div
-                className="focus-visible:ring-ring/50 relative flex flex-col gap-2 rounded-md outline-none focus-visible:ring-2"
-                ref={listRootReference}
-                tabIndex={-1}
-            >
-                {isSelectionMode && (
-                    <SelectionToolbar
-                        isAllSelected={isAllSelected}
-                        onClearSelection={handleClearSelection}
-                        onDeleteSelected={handleBulkDelete}
-                        onDone={onExitSelectionMode}
-                        onSelectAll={handleSelectAll}
-                        onSelectByDate={handleSelectByDate}
-                        selectedCount={selectedThreadIds.size}
-                    />
-                )}
-                <DndContext collisionDetection={closestCorners} onDragEnd={handleDragEnd} sensors={sensors}>
-                    {renderThreadGroups()}
-                </DndContext>
-                {hasOpenedProjectForm && (
-                    <Suspense fallback={null}>
-                        <ProjectFormDialog editingProject={editingProject} onClose={() => setShowProjectFormDialog(false)} open={showProjectFormDialog} />
-                    </Suspense>
-                )}
-                <DeleteConfirmationDialog
-                    description={t`This will permanently delete the project and all associated threads. This action cannot be undone.`}
-                    isDeleting={isDeletingProject}
-                    itemName={projectToDelete?.name}
-                    onConfirm={handleConfirmDeleteProject}
-                    onOpenChange={(open) => {
-                        if (!open) {
-                            setProjectToDelete(null);
-                        }
-                    }}
-                    open={!!projectToDelete}
-                    title={t`Delete Project`}
-                />
-                {snoozeThread && (
-                    <SnoozeUntilDialog
-                        key={snoozeThread.threadId}
+            <KeyboardSelectionProvider threadId={keyboardThreadId}>
+                <div
+                    className="focus-visible:ring-ring/50 relative flex flex-col gap-2 rounded-md outline-none focus-visible:ring-2"
+                    ref={listRootReference}
+                    tabIndex={-1}
+                >
+                    {isSelectionMode && (
+                        <SelectionToolbar
+                            isAllSelected={isAllSelected}
+                            onClearSelection={handleClearSelection}
+                            onDeleteSelected={handleBulkDelete}
+                            onDone={onExitSelectionMode}
+                            onSelectAll={handleSelectAll}
+                            onSelectByDate={handleSelectByDate}
+                            selectedCount={selectedThreadIds.size}
+                        />
+                    )}
+                    <DndContext collisionDetection={closestCorners} onDragEnd={handleDragEnd} sensors={sensors}>
+                        {renderThreadGroups()}
+                    </DndContext>
+                    {hasOpenedProjectForm && (
+                        <Suspense fallback={null}>
+                            <ProjectFormDialog editingProject={editingProject} onClose={() => setShowProjectFormDialog(false)} open={showProjectFormDialog} />
+                        </Suspense>
+                    )}
+                    <DeleteConfirmationDialog
+                        description={t`This will permanently delete the project and all associated threads. This action cannot be undone.`}
+                        isDeleting={isDeletingProject}
+                        itemName={projectToDelete?.name}
+                        onConfirm={handleConfirmDeleteProject}
                         onOpenChange={(open) => {
                             if (!open) {
-                                setSnoozeThreadId(null);
+                                setProjectToDelete(null);
                             }
                         }}
-                        open
-                        previousUntil={snoozeThread.snoozedUntil}
-                        restoreFocus={() => renameFocusTarget(listRootReference.current, snoozeThread.threadId)}
-                        threadId={snoozeThread.threadId}
+                        open={!!projectToDelete}
+                        title={t`Delete Project`}
                     />
-                )}
-                {renameThread && !isThreadLocked(renameThread.lockedAt) && (
-                    <RenameThreadDialog
-                        onOpenChange={(open) => {
-                            if (!open) {
-                                setRenameThreadId(null);
-                            }
-                        }}
-                        open
-                        restoreFocus={() => renameFocusTarget(listRootReference.current, renameThread.threadId)}
-                        storedTitle={renameThread.storedTitle ?? renameThread.title}
-                        threadId={renameThread.threadId}
-                    />
-                )}
-            </div>
+                    {snoozeThread && (
+                        <SnoozeUntilDialog
+                            key={snoozeThread.threadId}
+                            onOpenChange={(open) => {
+                                if (!open) {
+                                    setSnoozeThreadId(null);
+                                }
+                            }}
+                            open
+                            previousUntil={snoozeThread.snoozedUntil}
+                            restoreFocus={() => renameFocusTarget(listRootReference.current, snoozeThread.threadId)}
+                            threadId={snoozeThread.threadId}
+                        />
+                    )}
+                    {renameThread && !isThreadLocked(renameThread.lockedAt) && (
+                        <RenameThreadDialog
+                            onOpenChange={(open) => {
+                                if (!open) {
+                                    setRenameThreadId(null);
+                                }
+                            }}
+                            open
+                            restoreFocus={() => renameFocusTarget(listRootReference.current, renameThread.threadId)}
+                            storedTitle={renameThread.storedTitle ?? renameThread.title}
+                            threadId={renameThread.threadId}
+                        />
+                    )}
+                </div>
+            </KeyboardSelectionProvider>
         </PullRequestCountsProvider>
     );
 };
