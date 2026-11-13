@@ -1,6 +1,7 @@
 /**
  * Typing in the model picker's search re-filters the list on every keystroke. A row that is still listed, in the same
- * state, is not rendered again: only rows whose match changed are.
+ * state, is not rendered again: only rows whose match changed are. Covers the web app's picker and the shared one the
+ * browser extension mounts.
  */
 import type { GatewayModel } from "@neore/ai/models";
 import { fireEvent, render, screen } from "@testing-library/react";
@@ -44,7 +45,54 @@ vi.mock("@neore/ui/components/command", async (importOriginal) => {
     return { ...original, CommandItem: CountedCommandItem };
 });
 
-const { ModelPicker } = await import("@neore/chat-ui/model-picker/model-picker");
+vi.mock("@/hooks/use-feature-flagged-models", () => {
+    return { default: () => [] };
+});
+
+vi.mock("@/hooks/use-model-filter-rules", () => {
+    return {
+        useBlockedCreators: () => {
+            return { blockedCreators: [], isLoaded: true, setBlockedCreators: vi.fn() };
+        },
+        withCreatorHidden: (blocked: string[]) => blocked,
+        withoutCreator: (blocked: string[]) => blocked,
+    };
+});
+
+vi.mock("@/features/auth/hooks/use-auth-session", () => {
+    return {
+        useAuthSession: () => {
+            return { data: null };
+        },
+    };
+});
+
+vi.mock("@/features/auth/hooks/use-invite-only", () => {
+    return {
+        default: () => {
+            return { canSignUp: true, inviteOnly: false, mustSignIn: false, signUpHref: "/auth/sign-up" };
+        },
+    };
+});
+
+vi.mock("@/features/chat/core/hooks/use-model-nicknames", () => {
+    return {
+        default: () => {
+            return { nicknames: {} };
+        },
+    };
+});
+
+vi.mock("@/lib/analytics", () => {
+    return { trackEvent: vi.fn() };
+});
+
+vi.mock("@tanstack/react-router", () => {
+    return { Link: ({ children }: { children: ReactNode }) => children };
+});
+
+const { ModelPicker: SharedModelPicker } = await import("@neore/chat-ui/model-picker/model-picker");
+const { default: WebModelPicker } = await import("./model-picker");
 
 const model = (id: string, name: string, displayProvider: string) => ({ displayProvider, id, mode: "text", name, provider: "gateway" }) as GatewayModel;
 
@@ -54,6 +102,9 @@ const MODELS = [
     model("anthropic/claude-sonnet", "Claude Sonnet", "Anthropic"),
     model("mistral/large", "Large", "Mistral"),
 ];
+
+// The model rows only: the web picker's sort control has options of its own.
+const listedRows = () => screen.getAllByRole("option").filter((option: HTMLElement) => option.dataset.modelId !== undefined);
 
 const search = (query: string) => {
     rowRenders.clear();
@@ -74,21 +125,24 @@ beforeEach(() => {
     );
 });
 
-describe("ModelPicker search", () => {
+describe.each([
+    ["web", WebModelPicker],
+    ["shared (browser extension)", SharedModelPicker],
+])("%s ModelPicker search", (_name: string, ModelPicker: typeof WebModelPicker | typeof SharedModelPicker) => {
     it("re-renders only the rows whose match changed", () => {
         render(<ModelPicker defaultModeFilter="text" defaultTab="all" footer={null} models={MODELS} />);
 
         // Both GPT rows were listed before and still are; the other creators' rows leave.
         search("gpt");
 
-        expect(screen.getAllByRole("option")).toHaveLength(2);
+        expect(listedRows()).toHaveLength(2);
         expect(rowRenders.get("openai/gpt-5") ?? 0).toBe(0);
         expect(rowRenders.get("openai/gpt-4o") ?? 0).toBe(0);
 
         // GPT-5 leaves; GPT-4o stays as it was, though its group changed.
         search("gpt-4");
 
-        expect(screen.getAllByRole("option")).toHaveLength(1);
+        expect(listedRows()).toHaveLength(1);
         expect(rowRenders.get("openai/gpt-4o") ?? 0).toBe(0);
     });
 });

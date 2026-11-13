@@ -118,10 +118,8 @@ export interface ModelPickerProps {
 }
 
 interface ModelItem {
-    icon?: ReactNode;
     label: string;
     model: GatewayModel;
-    onSelect: () => void;
     value: string;
 }
 
@@ -130,6 +128,53 @@ interface ModelGroup {
     items: ModelItem[];
     value: string;
 }
+
+// ─── Stable rows ──────────────────────────────────────────────────────────────
+// A search keystroke rebuilds the filtered list. The row and group objects are reused for a model (and a group with
+// the same rows) that is still there, so the memoized groups and rows below re-render only where a match changed.
+
+const itemsByModel = new WeakMap<GatewayModel, ModelItem>();
+
+/** The row for a model, reused while its label (which a nickname can change) is the same. */
+const stableModelItem = (model: GatewayModel, label: string): ModelItem => {
+    const previous = itemsByModel.get(model);
+
+    if (previous?.label === label) {
+        return previous;
+    }
+
+    const item: ModelItem = { label, model, value: model.id };
+
+    itemsByModel.set(model, item);
+
+    return item;
+};
+
+/** The last group built with each first row; a group is reused while its label, kind and rows are the same. */
+const groupsByFirstItem = new WeakMap<ModelItem, ModelGroup>();
+
+const stableModelGroup = (value: string, items: ModelItem[], isFavorite: boolean): ModelGroup => {
+    const [first] = items;
+    const previous = first ? groupsByFirstItem.get(first) : undefined;
+
+    if (
+        previous &&
+        previous.value === value &&
+        Boolean(previous.isFavorite) === isFavorite &&
+        previous.items.length === items.length &&
+        previous.items.every((item: ModelItem, index: number) => item === items[index])
+    ) {
+        return previous;
+    }
+
+    const group: ModelGroup = isFavorite ? { isFavorite: true, items, value } : { items, value };
+
+    if (first) {
+        groupsByFirstItem.set(first, group);
+    }
+
+    return group;
+};
 
 // ─── Detail Panel ─────────────────────────────────────────────────────────────
 
@@ -352,7 +397,7 @@ const ModelItemActions = memo<{
     modelId: string;
     onInfo: (modelId: string) => void;
     onInfoLeave: () => void;
-    onMove?: (delta: -1 | 1) => void;
+    onMove?: (modelId: string, delta: -1 | 1) => void;
     onToggleFavorite: (modelId: string, setFavorite: boolean) => void;
 }>(({ canMoveDown, canMoveUp, isFavorite, isInfoActive, label, modelId, onInfo, onInfoLeave, onMove, onToggleFavorite }) => {
     const { t } = useLingui();
@@ -379,7 +424,7 @@ const ModelItemActions = memo<{
                         data-move-delta={-1}
                         data-move-id={modelId}
                         disabled={!canMoveUp}
-                        onClick={() => onMove(-1)}
+                        onClick={() => onMove(modelId, -1)}
                         tabIndex={-1}
                         type="button"
                     >
@@ -391,7 +436,7 @@ const ModelItemActions = memo<{
                         data-move-delta={1}
                         data-move-id={modelId}
                         disabled={!canMoveDown}
-                        onClick={() => onMove(1)}
+                        onClick={() => onMove(modelId, 1)}
                         tabIndex={-1}
                         type="button"
                     >
@@ -417,6 +462,143 @@ const ModelItemActions = memo<{
     );
 });
 
+// ─── Model Row ────────────────────────────────────────────────────────────────
+// Memoized on the (stable) row object and its own flags: a search keystroke re-renders only rows whose state changed.
+
+const ModelRow = memo<{
+    anchorMode: string | null;
+    canMoveDown: boolean;
+    canMoveUp: boolean;
+    canSignUp: boolean;
+    isFavorite: boolean;
+    isInfoActive: boolean;
+    isLockedForAnonymous: boolean;
+    isParallelSelected: boolean;
+    isSelected: boolean;
+    item: ModelItem;
+    onInfo: (modelId: string) => void;
+    onInfoLeave: () => void;
+    /** Only set while this row's place in the starred order can be changed. */
+    onMove?: (modelId: string, delta: -1 | 1) => void;
+    onSelectModel: (modelId: string) => void;
+    parallelMaxReached: boolean;
+    selectionMode: ModelPickerSelectionMode;
+    showProviderIcon: boolean;
+    toggleFavorite: (id: string, isFavorite: boolean) => void;
+}>(
+    ({
+        anchorMode,
+        canMoveDown,
+        canMoveUp,
+        canSignUp,
+        isFavorite,
+        isInfoActive,
+        isLockedForAnonymous,
+        isParallelSelected,
+        isSelected,
+        item,
+        onInfo,
+        onInfoLeave,
+        onMove,
+        onSelectModel,
+        parallelMaxReached,
+        selectionMode,
+        showProviderIcon,
+        toggleFavorite,
+    }) => {
+        const { t } = useLingui();
+        // A model is type-locked when a different mode is already anchored via the first selection
+        const isTypeMismatch = selectionMode === "parallel" && anchorMode !== null && getModelMode(item.model) !== anchorMode && !isParallelSelected;
+        const isDisabled = isLockedForAnonymous || (selectionMode === "parallel" && ((parallelMaxReached && !isParallelSelected) || isTypeMismatch));
+
+        let stateClassName = "";
+        let lockedTitle: string | undefined;
+
+        if (isLockedForAnonymous) {
+            stateClassName = "cursor-not-allowed opacity-40";
+            lockedTitle = canSignUp ? t`Sign up to unlock all models` : t`Sign in to unlock all models`;
+        } else if (isTypeMismatch) {
+            stateClassName = "cursor-not-allowed opacity-25";
+            lockedTitle = t`Only ${getModelModeName(anchorMode!)} models can be compared. Clear selection to switch types.`;
+        } else if (isDisabled) {
+            stateClassName = "cursor-not-allowed opacity-40";
+        }
+
+        let parallelIndicator: ReactNode;
+
+        if (isTypeMismatch) {
+            parallelIndicator = <Lock className="text-muted-foreground size-4" />;
+        } else if (isParallelSelected) {
+            parallelIndicator = <CheckSquare2 className="text-primary-text size-4" />;
+        } else {
+            parallelIndicator = <Square className={cn("size-4", isDisabled ? "text-muted-foreground/20" : "text-muted-foreground")} />;
+        }
+
+        return (
+            <div className={cn("group/row relative mx-1.5", stateClassName)}>
+                <CommandItem
+                    aria-disabled={isDisabled || undefined}
+                    className={cn(
+                        "flex-row !items-center rounded-md py-2 pl-2 transition-colors duration-100",
+                        onMove ? "pr-26" : "pr-14",
+                        isSelected && selectionMode === "single" ? "bg-accent/60" : "",
+                        isParallelSelected && selectionMode === "parallel" ? "bg-accent/40" : "",
+                    )}
+                    data-model-id={item.model.id}
+                    onClick={(e: React.MouseEvent & { preventBaseUIHandler?: () => void }) => {
+                        e.preventBaseUIHandler?.();
+
+                        if (isLockedForAnonymous) {
+                            trackEvent("signup_wall_shown", { trigger: "model_picker" });
+                        }
+
+                        if (!isDisabled) {
+                            onSelectModel(item.model.id);
+                        }
+                    }}
+                    title={lockedTitle}
+                    value={item.value}
+                >
+                    {/* Anonymous lock icon */}
+                    {isLockedForAnonymous ? (
+                        <span className="mr-2 flex shrink-0 items-center justify-center">
+                            <Lock className="text-muted-foreground size-4" />
+                        </span>
+                    ) : null}
+
+                    {/* Parallel checkbox / lock */}
+                    {!isLockedForAnonymous && selectionMode === "parallel" ? (
+                        <span className="mr-2 flex shrink-0 items-center justify-center">{parallelIndicator}</span>
+                    ) : null}
+
+                    {/* Provider icon — only shown on starred tab */}
+                    {showProviderIcon ? (
+                        <ProviderIcon
+                            className="mr-2 size-5 shrink-0"
+                            provider={item.model.provider || item.model.displayProvider || ""}
+                            providerIcon={item.model.id.split("/", 1)[0] || item.model.displayProvider || ""}
+                        />
+                    ) : null}
+
+                    <ModelItemContent isSelected={isSelected} label={item.label} model={item.model} selectionMode={selectionMode} />
+                </CommandItem>
+                <ModelItemActions
+                    canMoveDown={canMoveDown}
+                    canMoveUp={canMoveUp}
+                    isFavorite={isFavorite}
+                    isInfoActive={isInfoActive}
+                    label={item.label}
+                    modelId={item.model.id}
+                    onInfo={onInfo}
+                    onInfoLeave={onInfoLeave}
+                    onMove={onMove}
+                    onToggleFavorite={toggleFavorite}
+                />
+            </div>
+        );
+    },
+);
+
 // ─── Model Group ──────────────────────────────────────────────────────────────
 
 const ModelGroupRenderer = memo<{
@@ -429,6 +611,7 @@ const ModelGroupRenderer = memo<{
     isFavorite: (id: string) => boolean;
     onInfo: (modelId: string) => void;
     onInfoLeave: () => void;
+    onSelectModel: (modelId: string) => void;
     parallelMaxReached: boolean;
     parallelSelectedIds: Set<string>;
     /** The starred list in screen order, and how to move one favorite. Unset when the order is not editable. */
@@ -448,6 +631,7 @@ const ModelGroupRenderer = memo<{
         isFavorite,
         onInfo,
         onInfoLeave,
+        onSelectModel,
         parallelMaxReached,
         parallelSelectedIds,
         reorder,
@@ -456,118 +640,45 @@ const ModelGroupRenderer = memo<{
         showGroupLabel = true,
         showProviderIcon = false,
         toggleFavorite,
-    }) => {
-        const { t } = useLingui();
+    }) => (
+        <CommandGroup items={group.items}>
+            {showGroupLabel ? (
+                <CommandGroupLabel className="text-muted-foreground px-3 pt-3 pb-0.5 text-[10px] font-semibold tracking-widest uppercase">
+                    {group.value}
+                </CommandGroupLabel>
+            ) : null}
+            <CommandCollection>
+                {(item: ModelItem) => {
+                    const isParallelSelected = parallelSelectedIds.has(item.model.id);
+                    const position = reorder ? reorder.ids.indexOf(item.model.id) : -1;
 
-        return (
-            <CommandGroup items={group.items}>
-                {showGroupLabel ? (
-                    <CommandGroupLabel className="text-muted-foreground px-3 pt-3 pb-0.5 text-[10px] font-semibold tracking-widest uppercase">
-                        {group.value}
-                    </CommandGroupLabel>
-                ) : null}
-                <CommandCollection>
-                    {(item: ModelItem) => {
-                        const isParallelSelected = parallelSelectedIds.has(item.model.id);
-                        const isSelected = selectionMode === "parallel" ? isParallelSelected : selectedModelId === item.value;
-                        const position = reorder ? reorder.ids.indexOf(item.model.id) : -1;
-                        // A model is type-locked when a different mode is already anchored via the first selection
-                        const isTypeMismatch =
-                            selectionMode === "parallel" && anchorMode !== null && getModelMode(item.model) !== anchorMode && !isParallelSelected;
-                        const isLockedForAnonymous = isAnonymous && item.model.id !== selectedModelId;
-                        const isDisabled =
-                            isLockedForAnonymous || (selectionMode === "parallel" && ((parallelMaxReached && !isParallelSelected) || isTypeMismatch));
-
-                        let stateClassName = "";
-                        let lockedTitle: string | undefined;
-
-                        if (isLockedForAnonymous) {
-                            stateClassName = "cursor-not-allowed opacity-40";
-                            lockedTitle = canSignUp ? t`Sign up to unlock all models` : t`Sign in to unlock all models`;
-                        } else if (isTypeMismatch) {
-                            stateClassName = "cursor-not-allowed opacity-25";
-                            lockedTitle = t`Only ${getModelModeName(anchorMode!)} models can be compared. Clear selection to switch types.`;
-                        } else if (isDisabled) {
-                            stateClassName = "cursor-not-allowed opacity-40";
-                        }
-
-                        let parallelIndicator: ReactNode;
-
-                        if (isTypeMismatch) {
-                            parallelIndicator = <Lock className="text-muted-foreground size-4" />;
-                        } else if (isParallelSelected) {
-                            parallelIndicator = <CheckSquare2 className="text-primary-text size-4" />;
-                        } else {
-                            parallelIndicator = <Square className={cn("size-4", isDisabled ? "text-muted-foreground/20" : "text-muted-foreground")} />;
-                        }
-
-                        return (
-                            <div className={cn("group/row relative mx-1.5", stateClassName)} key={item.value}>
-                                <CommandItem
-                                    aria-disabled={isDisabled || undefined}
-                                    className={cn(
-                                        "flex-row !items-center rounded-md py-2 pl-2 transition-colors duration-100",
-                                        reorder && position !== -1 ? "pr-26" : "pr-14",
-                                        isSelected && selectionMode === "single" ? "bg-accent/60" : "",
-                                        isParallelSelected && selectionMode === "parallel" ? "bg-accent/40" : "",
-                                    )}
-                                    data-model-id={item.model.id}
-                                    onClick={(e: React.MouseEvent & { preventBaseUIHandler?: () => void }) => {
-                                        e.preventBaseUIHandler?.();
-
-                                        if (isLockedForAnonymous) {
-                                            trackEvent("signup_wall_shown", { trigger: "model_picker" });
-                                        }
-
-                                        if (!isDisabled) {
-                                            item.onSelect();
-                                        }
-                                    }}
-                                    title={lockedTitle}
-                                    value={item.value}
-                                >
-                                    {/* Anonymous lock icon */}
-                                    {isLockedForAnonymous ? (
-                                        <span className="mr-2 flex shrink-0 items-center justify-center">
-                                            <Lock className="text-muted-foreground size-4" />
-                                        </span>
-                                    ) : null}
-
-                                    {/* Parallel checkbox / lock */}
-                                    {!isLockedForAnonymous && selectionMode === "parallel" ? (
-                                        <span className="mr-2 flex shrink-0 items-center justify-center">{parallelIndicator}</span>
-                                    ) : null}
-
-                                    {/* Provider icon — only shown on starred tab */}
-                                    {showProviderIcon ? (
-                                        <ProviderIcon
-                                            className="mr-2 size-5 shrink-0"
-                                            provider={item.model.provider || item.model.displayProvider || ""}
-                                            providerIcon={item.model.id.split("/", 1)[0] || item.model.displayProvider || ""}
-                                        />
-                                    ) : null}
-
-                                    <ModelItemContent isSelected={isSelected} label={item.label} model={item.model} selectionMode={selectionMode} />
-                                </CommandItem>
-                                <ModelItemActions
-                                    canMoveDown={position !== -1 && position < (reorder?.ids.length ?? 0) - 1}
-                                    canMoveUp={position > 0}
-                                    isFavorite={isFavorite(item.model.id)}
-                                    isInfoActive={infoModelId === item.model.id}
-                                    label={item.label}
-                                    modelId={item.model.id}
-                                    onInfo={onInfo}
-                                    onInfoLeave={onInfoLeave}
-                                    onMove={reorder && position !== -1 ? (delta) => reorder.move(item.model.id, delta) : undefined}
-                                    onToggleFavorite={toggleFavorite}
-                                />
-                            </div>
-                        );
-                    }}
-                </CommandCollection>
-            </CommandGroup>
-        );
-    },
+                    return (
+                        <ModelRow
+                            anchorMode={anchorMode}
+                            canMoveDown={position !== -1 && position < (reorder?.ids.length ?? 0) - 1}
+                            canMoveUp={position > 0}
+                            canSignUp={canSignUp}
+                            isFavorite={isFavorite(item.model.id)}
+                            isInfoActive={infoModelId === item.model.id}
+                            isLockedForAnonymous={isAnonymous && item.model.id !== selectedModelId}
+                            isParallelSelected={isParallelSelected}
+                            isSelected={selectionMode === "parallel" ? isParallelSelected : selectedModelId === item.value}
+                            item={item}
+                            key={item.value}
+                            onInfo={onInfo}
+                            onInfoLeave={onInfoLeave}
+                            onMove={reorder && position !== -1 ? reorder.move : undefined}
+                            onSelectModel={onSelectModel}
+                            parallelMaxReached={parallelMaxReached}
+                            selectionMode={selectionMode}
+                            showProviderIcon={showProviderIcon}
+                            toggleFavorite={toggleFavorite}
+                        />
+                    );
+                }}
+            </CommandCollection>
+        </CommandGroup>
+    ),
 );
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
@@ -800,30 +911,18 @@ const ModelPicker: FC<ModelPickerProps> = ({
         };
     }, [favoriteModelIds, selectedProvider, searchQuery, activeTab, sourceModels, modeFilter]);
 
-    const createModelItems = useCallback(
-        (models: GatewayModel[]): ModelItem[] =>
-            models.map((model) => {
-                return {
-                    icon: undefined,
-                    label: getModelLabel(model, nicknames),
-                    model,
-                    onSelect: () => handleModelSelect(model.id),
-                    value: model.id,
-                };
-            }),
-        [handleModelSelect, nicknames],
-    );
-
     const groupedItems = useMemo(() => {
+        const itemsFor = (models: GatewayModel[]): ModelItem[] => models.map((model: GatewayModel) => stableModelItem(model, getModelLabel(model, nicknames)));
+
         if (sort !== "default") {
             const listed = activeTab === "starred" ? favoriteModels : [...favoriteModels, ...regularModels];
 
-            return [{ items: createModelItems(sortModels(listed, sort, nicknames)), value: sort }];
+            return [stableModelGroup(sort, itemsFor(sortModels(listed, sort, nicknames)), false)];
         }
 
         if (activeTab === "starred") {
             // One group in the user's own order; grouping by creator would split it.
-            return [{ isFavorite: true, items: createModelItems(favoriteModels), value: "starred" }];
+            return [stableModelGroup("starred", itemsFor(favoriteModels), true)];
         }
 
         const groups: ModelGroup[] = [];
@@ -831,11 +930,11 @@ const ModelPicker: FC<ModelPickerProps> = ({
         const grouped = groupModelsByCreator(allModels);
 
         for (const [creator, creatorModels] of grouped.entries()) {
-            groups.push({ items: createModelItems(creatorModels), value: creator });
+            groups.push(stableModelGroup(creator, itemsFor(creatorModels), false));
         }
 
         return groups;
-    }, [favoriteModels, regularModels, activeTab, createModelItems, sort, nicknames]);
+    }, [favoriteModels, regularModels, activeTab, sort, nicknames]);
 
     // One search text per model per locale (`i18n` is a new object on every
     // locale change), so a keystroke only runs `includes` over prebuilt strings.
@@ -865,7 +964,7 @@ const ModelPicker: FC<ModelPickerProps> = ({
             const filteredItems = filterModelsByQuery(group.items, searchQuery, searchTexts);
 
             if (filteredItems.length > 0) {
-                filtered.push({ ...group, items: filteredItems });
+                filtered.push(stableModelGroup(group.value, filteredItems, Boolean(group.isFavorite)));
             }
         }
 
@@ -1250,6 +1349,7 @@ const ModelPicker: FC<ModelPickerProps> = ({
                                         key={`${activeTab}-${group.value}`}
                                         onInfo={handleInfo}
                                         onInfoLeave={scheduleInfoClose}
+                                        onSelectModel={handleModelSelect}
                                         parallelMaxReached={isParallelMaxReached}
                                         parallelSelectedIds={parallelSelectedIds}
                                         reorder={reorder}
