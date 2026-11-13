@@ -1,7 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { HomeIcon, InboxIcon, SettingsIcon } from "lucide-react";
-import { expect, userEvent } from "storybook/test";
+import { expect, screen, userEvent } from "storybook/test";
 
+import MOBILE_BREAKPOINT_QUERY from "../utils/breakpoints";
 import {
     Sidebar,
     SidebarContent,
@@ -138,7 +139,19 @@ const slidePlay =
     async ({ canvas, canvasElement }: { canvas: { getByRole: (role: string, options: { name: string }) => HTMLElement }; canvasElement: HTMLElement }) => {
         const { container, gap } = sidebarParts(canvasElement);
 
-        // On a phone the sidebar is a sheet: there is no gap or sliding box.
+        // On a phone the sidebar is a sheet, opened by the trigger: it slides in as a dialog, with no gap or sliding box.
+        if (globalThis.matchMedia(MOBILE_BREAKPOINT_QUERY).matches) {
+            await expect(container).toBeNull();
+            await userEvent.click(canvas.getByRole("button", { name: "Toggle Sidebar" }));
+            await expect(await screen.findByRole("dialog", { name: "Sidebar" })).toBeVisible();
+
+            return;
+        }
+
+        // On a wider screen both boxes must be there: a missing one is a broken layout, not a phone.
+        await expect(container).not.toBeNull();
+        await expect(gap).not.toBeNull();
+
         if (!container || !gap) {
             return;
         }
