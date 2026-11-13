@@ -34,7 +34,7 @@ const AppSidebar: FC<
         <>
             <SidebarShortcut />
             <Sidebar
-                className={cn("left-16 [&>div]:flex-row", className)}
+                className={cn("left-16 [--sidebar-offset:4rem] [&>div]:flex-row", className)}
                 collapsible="offcanvas"
                 data-focus-area="sidebar"
                 name="left"

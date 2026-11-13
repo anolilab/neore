@@ -27,14 +27,18 @@ type LayoutProps = {
     defaultOpen?: "all" | (typeof NAMES)[number][];
     side?: "left" | "right";
     variant?: "sidebar" | "floating" | "inset";
+    /** Puts a 4rem launcher column at the viewport's edge, with the sidebar starting beside it (the app's layout). */
+    withLauncher?: boolean;
     /** Adds the rail that reopens a collapsed sidebar from the viewport's edge. */
     withRail?: boolean;
 };
 
-const Layout = ({ collapsible, defaultOpen = "all", side, variant, withRail = false }: LayoutProps) => (
+const Layout = ({ collapsible, defaultOpen = "all", side, variant, withLauncher = false, withRail = false }: LayoutProps) => (
     <SidebarProvider className="min-h-80" defaultOpen={defaultOpen} sidebarNames={NAMES}>
+        {withLauncher && <div className="bg-sidebar relative z-20 hidden h-svh w-16 shrink-0 md:block" data-testid="launcher" />}
         <Sidebar
             aria-label="Workspace"
+            className={withLauncher ? "left-16 [--sidebar-offset:4rem]" : undefined}
             collapsible={collapsible}
             name="main"
             rail={withRail ? <SidebarRail name="main" side={side ?? "left"} /> : undefined}
@@ -264,3 +268,54 @@ const slidePlay =
 export const SlidesClosedAndOpen: Story = { args: { withRail: true }, play: slidePlay("left"), tags: ["reduced-motion"] };
 
 export const SlidesClosedAndOpenOnTheRight: Story = { args: { side: "right", withRail: true }, play: slidePlay("right"), tags: ["reduced-motion"] };
+
+/**
+ * A sidebar that starts beside a launcher slides far enough to clear it: by its width plus the launcher's, so its last frames before
+ * it settles off screen do not sit over the launcher.
+ */
+export const SlidesClearOfTheLauncher: Story = {
+    args: { withLauncher: true },
+    play: async ({ canvasElement }) => {
+        if (globalThis.matchMedia(MOBILE_BREAKPOINT_QUERY).matches) {
+            return;
+        }
+
+        const { container } = sidebarParts(canvasElement);
+        const launcher = canvasElement.querySelector<HTMLElement>('[data-testid="launcher"]');
+        const trigger = canvasElement.querySelector<HTMLElement>('[data-slot="sidebar-trigger"]');
+
+        await expect(container).not.toBeNull();
+        await expect(launcher).not.toBeNull();
+        await expect(trigger).not.toBeNull();
+
+        if (!container || !launcher || !trigger) {
+            return;
+        }
+
+        const { width } = container.getBoundingClientRect();
+        const launcherBox = launcher.getBoundingClientRect();
+
+        await userEvent.click(trigger);
+
+        // Held a frame before the slide ends, with the box's resting place still to come: the box's last frame of the slide.
+        const transitions = container.getAnimations().filter((animation): animation is CSSTransition => animation instanceof CSSTransition);
+        const slide = transitions.find((transition) => transition.transitionProperty === "translate");
+
+        await expect(slide).toBeDefined();
+
+        for (const transition of transitions) {
+            transition.pause();
+            transition.currentTime = transition === slide ? 199 : 0;
+        }
+
+        // Within a few pixels of the end: the box's right edge has cleared the launcher, not stopped on its right edge.
+        await expect(container.getBoundingClientRect().right).toBeLessThanOrEqual(launcherBox.left + 4);
+
+        for (const transition of transitions) {
+            transition.finish();
+        }
+
+        await expect(container.getBoundingClientRect().right).toBeLessThanOrEqual(launcherBox.left);
+        await expect(width).toBeGreaterThan(0);
+    },
+};

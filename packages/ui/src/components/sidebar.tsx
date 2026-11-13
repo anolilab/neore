@@ -325,8 +325,10 @@ const Sidebar = <T extends string>({
                           "[transition:translate_200ms_linear,left_0s_linear,right_0s_linear] group-data-[collapsible=offcanvas]:[transition-delay:0s,200ms,200ms] motion-reduce:[transition-duration:0s] motion-reduce:group-data-[collapsible=offcanvas]:[transition-delay:0s]"
                         : "transition-[left,right,width] duration-200 ease-linear",
                     side === "left"
-                        ? "left-0 group-data-[collapsible=offcanvas]:left-[calc(var(--sidebar-width)*-1)] group-data-[collapsible=offcanvas]:-translate-x-full"
-                        : "right-0 group-data-[collapsible=offcanvas]:right-[calc(var(--sidebar-width)*-1)] group-data-[collapsible=offcanvas]:translate-x-full",
+                        ? // The slide clears the box's own width plus `--sidebar-offset`, the room it starts from (a launcher beside it), so
+                          // its last frames do not sit over what is there.
+                          "left-0 group-data-[collapsible=offcanvas]:left-[calc(var(--sidebar-width)*-1)] group-data-[collapsible=offcanvas]:translate-x-[calc(-100%_-_var(--sidebar-offset,0px))]"
+                        : "right-0 group-data-[collapsible=offcanvas]:right-[calc(var(--sidebar-width)*-1)] group-data-[collapsible=offcanvas]:translate-x-[calc(100%_+_var(--sidebar-offset,0px))]",
                     // Adjust the padding for floating and inset variants.
                     variant === "floating" || variant === "inset"
                         ? "group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)+(--spacing(4))+2px)]"
